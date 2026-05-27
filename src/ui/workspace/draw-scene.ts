@@ -267,8 +267,7 @@ function drawOutOfBoundsOutlines(
   const bedH = project.device.bedHeight;
   for (const obj of project.scene.objects) {
     const bbox = transformedBBox(obj);
-    const outOfBounds =
-      bbox.minX < 0 || bbox.minY < 0 || bbox.maxX > bedW || bbox.maxY > bedH;
+    const outOfBounds = bbox.minX < 0 || bbox.minY < 0 || bbox.maxX > bedW || bbox.maxY > bedH;
     if (!outOfBounds) continue;
     ctx.save();
     ctx.strokeStyle = '#c62828';

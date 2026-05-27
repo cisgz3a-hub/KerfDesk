@@ -1,44 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
+import type { ImportedSvg } from '../../core/scene';
 import { useStore } from './store';
+import { resetStore as reset, svgObj as svgObjFromHelpers } from './test-helpers';
 
-function reset(): void {
-  useStore.setState({
-    project: createProject(),
-    selectedObjectId: null,
-    additionalSelectedIds: new Set(),
-    previewMode: false,
-    undoStack: [],
-    redoStack: [],
-    pendingUndo: null,
-    cursorMm: null,
-    dirty: false,
-    savedName: null,
-    lastSaveTarget: null,
-  });
-}
-
-function svgObj(id: string, colors: ReadonlyArray<string>): ImportedSvg {
-  return {
-    kind: 'imported-svg',
-    id,
-    source: `${id}.svg`,
-    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
-    transform: IDENTITY_TRANSFORM,
-    paths: colors.map((color) => ({
-      color,
-      polylines: [
-        {
-          points: [
-            { x: 0, y: 0 },
-            { x: 5, y: 5 },
-          ],
-          closed: false,
-        },
-      ],
-    })),
-  };
-}
+// Re-export under the original local names so the (large) body of this
+// file doesn't have to change. Pure rename, no behaviour change.
+const svgObj: (id: string, colors: ReadonlyArray<string>) => ImportedSvg = svgObjFromHelpers;
 
 describe('useStore', () => {
   beforeEach(() => {
@@ -75,7 +42,8 @@ describe('useStore', () => {
     useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']), 1);
     useStore.getState().importSvgObject(svgObj('O3', ['#00ff00']), 2);
     const [a, b, c] = useStore.getState().project.scene.objects;
-    if (a === undefined || b === undefined || c === undefined) throw new Error('expected 3 objects');
+    if (a === undefined || b === undefined || c === undefined)
+      throw new Error('expected 3 objects');
     expect(b.transform.x - a.transform.x).toBeCloseTo(10);
     expect(b.transform.y - a.transform.y).toBeCloseTo(10);
     expect(c.transform.x - a.transform.x).toBeCloseTo(20);
@@ -124,46 +92,7 @@ describe('useStore', () => {
     expect(layerColors).toEqual(['#00ff00', '#ff0000']);
   });
 
-  it('duplicateSelection clones the selected object with a 10 mm offset', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().selectObject('O1');
-    const before = useStore.getState().project.scene.objects[0];
-    useStore.getState().duplicateSelection();
-    const after = useStore.getState().project.scene.objects;
-    expect(after).toHaveLength(2);
-    const clone = after[1];
-    expect(clone).toBeDefined();
-    if (clone === undefined || before === undefined) return;
-    expect(clone.id).not.toBe(before.id);
-    expect(clone.transform.x).toBeCloseTo(before.transform.x + 10, 5);
-    expect(clone.transform.y).toBeCloseTo(before.transform.y + 10, 5);
-    // New clone becomes the selection.
-    expect(useStore.getState().selectedObjectId).toBe(clone.id);
-  });
-
-  it('duplicateSelection on multi-select clones every selected object', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
-    useStore.getState().selectObject('O1');
-    useStore.getState().toggleSelectObject('O2');
-    useStore.getState().duplicateSelection();
-    const objs = useStore.getState().project.scene.objects;
-    expect(objs).toHaveLength(4);
-    // Original primary is still in selection-extras? No — selection
-    // resets to the new clones. Just confirm the new primary is one
-    // of the clones (not O1 / O2).
-    const sel = useStore.getState().selectedObjectId;
-    expect(sel === 'O1' || sel === 'O2').toBe(false);
-    expect(useStore.getState().additionalSelectedIds.size).toBe(1);
-  });
-
-  it('duplicateSelection is a no-op with no selection', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().selectObject(null);
-    const before = useStore.getState().project.scene.objects.length;
-    useStore.getState().duplicateSelection();
-    expect(useStore.getState().project.scene.objects).toHaveLength(before);
-  });
+  // duplicateSelection tests live in duplicate.test.ts.
 
   it('setLayerParam patches the matching layer', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
@@ -214,9 +143,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
     // Simulate the user dragging the object to (123, 45):
     const orig = useStore.getState().project.scene.objects[0];
     if (orig === undefined) throw new Error('expected object');
-    useStore
-      .getState()
-      .setObjectTransform(orig.id, { ...orig.transform, x: 123, y: 45 });
+    useStore.getState().setObjectTransform(orig.id, { ...orig.transform, x: 123, y: 45 });
     const replacement: ImportedSvg = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
     useStore.getState().importSvgObject(replacement);
     const after = useStore.getState().project.scene.objects[0];
@@ -251,9 +178,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
 
   it('different sources still add as new (no false re-import)', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const outcome = useStore
-      .getState()
-      .importSvgObject(svgObj('O2', ['#0000ff'])); // different source ('O2.svg')
+    const outcome = useStore.getState().importSvgObject(svgObj('O2', ['#0000ff'])); // different source ('O2.svg')
     expect(outcome.kind).toBe('added');
     expect(useStore.getState().project.scene.objects).toHaveLength(2);
   });
@@ -285,9 +210,12 @@ describe('useStore — dirty / save tracking (F-A11)', () => {
 
   it('markSaved clears dirty and remembers the SaveTarget', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const target = { displayName: 'my-job.lf2', write: async () => {
+    const target = {
+      displayName: 'my-job.lf2',
+      write: async () => {
         /* test stub — no-op */
-      } };
+      },
+    };
     useStore.getState().markSaved(target);
     const s = useStore.getState();
     expect(s.dirty).toBe(false);
@@ -304,11 +232,12 @@ describe('useStore — dirty / save tracking (F-A11)', () => {
   });
 
   it('newProject clears save tracking', () => {
-    useStore
-      .getState()
-      .markSaved({ displayName: 'old.lf2', write: async () => {
+    useStore.getState().markSaved({
+      displayName: 'old.lf2',
+      write: async () => {
         /* test stub — no-op */
-      } });
+      },
+    });
     useStore.getState().newProject();
     const s = useStore.getState();
     expect(s.savedName).toBeNull();

@@ -50,7 +50,9 @@ export function FontPicker(props: Props): JSX.Element {
       >
         <span style={triggerNameStyle}>{selected.displayName}</span>
         <span style={triggerClassStyle}>({selected.styleClass})</span>
-        <span aria-hidden style={caretStyle}>▾</span>
+        <span aria-hidden style={caretStyle}>
+          ▾
+        </span>
       </button>
       {open && (
         <ul role="listbox" style={menuStyle}>

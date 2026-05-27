@@ -48,8 +48,8 @@ export function PlannerAdvanced(props: {
         </Row>
         <p style={advancedHintStyle}>
           Tune these to match your machine&apos;s <code style={inlineCodeStyle}>$$</code> output
-          when burn times consistently differ from the estimate. Defaults match the GRBL
-          shipping standard.
+          when burn times consistently differ from the estimate. Defaults match the GRBL shipping
+          standard.
         </p>
       </div>
     </details>

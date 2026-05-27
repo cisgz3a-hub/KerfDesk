@@ -36,7 +36,12 @@ export type FontEntry = {
 
 export const FONT_REGISTRY: ReadonlyArray<FontEntry> = [
   { key: 'roboto-regular', displayName: 'Roboto', license: 'Apache-2.0', styleClass: 'sans' },
-  { key: 'inconsolata-regular', displayName: 'Inconsolata', license: 'OFL-1.1', styleClass: 'mono' },
+  {
+    key: 'inconsolata-regular',
+    displayName: 'Inconsolata',
+    license: 'OFL-1.1',
+    styleClass: 'mono',
+  },
   { key: 'pacifico-regular', displayName: 'Pacifico', license: 'OFL-1.1', styleClass: 'script' },
   {
     key: 'dancing-script-regular',

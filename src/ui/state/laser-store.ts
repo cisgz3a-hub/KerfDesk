@@ -36,10 +36,7 @@ import {
 import type { DeviceProfile } from '../../core/devices';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
-import {
-  applyDetectedSettingsPatch,
-  consumeSettingsResponse,
-} from './detected-settings-action';
+import { applyDetectedSettingsPatch, consumeSettingsResponse } from './detected-settings-action';
 
 export type { AutofocusResult } from './autofocus-action';
 export { describeAutofocusResult } from './autofocus-action';

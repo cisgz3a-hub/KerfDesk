@@ -142,9 +142,10 @@ function checkPreflight(args: RunAutofocusArgs): AutofocusResult | null {
 // Map an AutofocusResult to a user-friendly toast message + variant.
 // Lives next to the protocol so callers don't have to keep the wording
 // in sync — every consumer pushes the same strings.
-export function describeAutofocusResult(
-  result: AutofocusResult,
-): { readonly message: string; readonly variant: 'success' | 'warning' | 'error' } {
+export function describeAutofocusResult(result: AutofocusResult): {
+  readonly message: string;
+  readonly variant: 'success' | 'warning' | 'error';
+} {
   switch (result.kind) {
     case 'ok':
       return { message: 'Auto-focus complete', variant: 'success' };

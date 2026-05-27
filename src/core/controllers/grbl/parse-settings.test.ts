@@ -99,7 +99,8 @@ describe('SettingsCollector state machine', () => {
   });
 
   it('collecting accumulates settings and transitions to done on the trailing ok', () => {
-    let state: ReturnType<typeof startCollecting> | ReturnType<typeof onResponse> = startCollecting();
+    let state: ReturnType<typeof startCollecting> | ReturnType<typeof onResponse> =
+      startCollecting();
     for (const line of FALCON_DUMP) {
       state = onResponse(state, classifyResponse(line));
     }

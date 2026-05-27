@@ -1,0 +1,45 @@
+// Shared test helpers for the useStore test suite. Co-located here rather
+// than under src/__fixtures__/ because they reference the AppState shape
+// directly — if AppState grows a field, both files would otherwise have
+// to update in lockstep. One place is one place.
+
+import { createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
+import { useStore } from './store';
+
+export function resetStore(): void {
+  useStore.setState({
+    project: createProject(),
+    selectedObjectId: null,
+    additionalSelectedIds: new Set(),
+    previewMode: false,
+    undoStack: [],
+    redoStack: [],
+    pendingUndo: null,
+    cursorMm: null,
+    dirty: false,
+    savedName: null,
+    lastSaveTarget: null,
+  });
+}
+
+export function svgObj(id: string, colors: ReadonlyArray<string>): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    paths: colors.map((color) => ({
+      color,
+      polylines: [
+        {
+          points: [
+            { x: 0, y: 0 },
+            { x: 5, y: 5 },
+          ],
+          closed: false,
+        },
+      ],
+    })),
+  };
+}

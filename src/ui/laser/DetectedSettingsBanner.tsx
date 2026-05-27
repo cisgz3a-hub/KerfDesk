@@ -25,8 +25,8 @@ export function DetectedSettingsBanner(): JSX.Element | null {
     <div style={panelStyle} role="region" aria-label="Detected machine settings">
       <strong style={titleStyle}>Detected machine settings</strong>
       <p style={hintStyle}>
-        Your laser reported these values via <code>$$</code>. Apply them to keep time
-        estimates and bed bounds in sync with the firmware.
+        Your laser reported these values via <code>$$</code>. Apply them to keep time estimates and
+        bed bounds in sync with the firmware.
       </p>
       <ul style={listStyle}>
         {rows.map((r) => (
@@ -36,7 +36,9 @@ export function DetectedSettingsBanner(): JSX.Element | null {
               {r.changed ? (
                 <>
                   <span style={oldStyle}>{r.oldText}</span>
-                  <span aria-hidden style={arrowStyle}>→</span>
+                  <span aria-hidden style={arrowStyle}>
+                    →
+                  </span>
                   <span style={newStyle}>{r.newText}</span>
                 </>
               ) : (
@@ -68,10 +70,7 @@ type Row = {
   readonly changed: boolean;
 };
 
-function describePatch(
-  patch: Partial<DeviceProfile>,
-  current: DeviceProfile,
-): ReadonlyArray<Row> {
+function describePatch(patch: Partial<DeviceProfile>, current: DeviceProfile): ReadonlyArray<Row> {
   const rows: Row[] = [];
   pushNumericRow(rows, 'Bed width', patch.bedWidth, current.bedWidth, formatMm);
   pushNumericRow(rows, 'Bed height', patch.bedHeight, current.bedHeight, formatMm);
@@ -146,7 +145,11 @@ const rowStyle: React.CSSProperties = {
   padding: '2px 0',
 };
 const rowLabelStyle: React.CSSProperties = { width: 130, color: '#555' };
-const rowValueStyle: React.CSSProperties = { display: 'inline-flex', gap: 4, alignItems: 'baseline' };
+const rowValueStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  gap: 4,
+  alignItems: 'baseline',
+};
 const oldStyle: React.CSSProperties = { color: '#888', textDecoration: 'line-through' };
 const arrowStyle: React.CSSProperties = { color: '#888' };
 const newStyle: React.CSSProperties = { color: '#1a3552', fontWeight: 600 };

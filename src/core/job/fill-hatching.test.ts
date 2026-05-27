@@ -125,9 +125,9 @@ describe('fillHatching', () => {
         { x: 10, y: 10 },
       ],
     };
-    expect(
-      fillHatching({ polylines: [openLine], hatchAngleDeg: 0, hatchSpacingMm: 0.5 }),
-    ).toEqual([]);
+    expect(fillHatching({ polylines: [openLine], hatchAngleDeg: 0, hatchSpacingMm: 0.5 })).toEqual(
+      [],
+    );
   });
 
   it('returns empty for degenerate input (fewer than 3 points)', () => {
@@ -138,9 +138,9 @@ describe('fillHatching', () => {
         { x: 5, y: 0 },
       ],
     };
-    expect(
-      fillHatching({ polylines: [twoPoint], hatchAngleDeg: 0, hatchSpacingMm: 0.5 }),
-    ).toEqual([]);
+    expect(fillHatching({ polylines: [twoPoint], hatchAngleDeg: 0, hatchSpacingMm: 0.5 })).toEqual(
+      [],
+    );
   });
 
   it('clamps a too-small spacing rather than running forever', () => {

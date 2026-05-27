@@ -12,7 +12,12 @@
 // lookup; we just split on '\n' for line breaks.
 
 import { useState } from 'react';
-import { DEFAULT_FONT_KEY, FONT_REGISTRY, type KnownFontKey, textToPolylines } from '../../core/text';
+import {
+  DEFAULT_FONT_KEY,
+  FONT_REGISTRY,
+  type KnownFontKey,
+  textToPolylines,
+} from '../../core/text';
 import {
   DEFAULT_TEXT_ALIGNMENT,
   DEFAULT_TEXT_COLOR,
@@ -38,7 +43,9 @@ export function AddTextDialog(): JSX.Element | null {
   return <DialogForm key={key} state={state} />;
 }
 
-function DialogForm(props: { readonly state: NonNullable<ReturnType<typeof useUiStore.getState>['textDialog']> }): JSX.Element {
+function DialogForm(props: {
+  readonly state: NonNullable<ReturnType<typeof useUiStore.getState>['textDialog']>;
+}): JSX.Element {
   const { state } = props;
   const close = useUiStore((s) => s.closeTextDialog);
   const upsert = useStore((s) => s.upsertTextObject);
@@ -91,9 +98,7 @@ function useTextDialogFields(
   const [fontKey, setFontKey] = useState<string>(
     state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY,
   );
-  const [sizeMm, setSizeMm] = useState(
-    state.mode === 'edit' ? state.sizeMm : DEFAULT_TEXT_SIZE_MM,
-  );
+  const [sizeMm, setSizeMm] = useState(state.mode === 'edit' ? state.sizeMm : DEFAULT_TEXT_SIZE_MM);
   const [alignment, setAlignment] = useState<TextAlignment>(
     state.mode === 'edit' ? state.alignment : DEFAULT_TEXT_ALIGNMENT,
   );
@@ -312,7 +317,12 @@ const panelStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
 };
 const headingStyle: React.CSSProperties = { margin: 0, fontSize: 16 };
-const fieldStyle: React.CSSProperties = { display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13 };
+const fieldStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  fontSize: 13,
+};
 const fieldLabelStyle: React.CSSProperties = { width: 90, paddingTop: 4, color: '#444' };
 const fieldControlStyle: React.CSSProperties = {
   flex: 1,

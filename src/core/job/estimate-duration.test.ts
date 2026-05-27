@@ -124,7 +124,10 @@ describe('estimateJobDuration', () => {
             speed: fc.integer({ min: 100, max: 6000 }),
             passes: fc.integer({ min: 1, max: 5 }),
             pts: fc.array(
-              fc.tuple(fc.double({ min: 0, max: 400, noNaN: true }), fc.double({ min: 0, max: 400, noNaN: true })),
+              fc.tuple(
+                fc.double({ min: 0, max: 400, noNaN: true }),
+                fc.double({ min: 0, max: 400, noNaN: true }),
+              ),
               { minLength: 2, maxLength: 10 },
             ),
           }),
@@ -142,10 +145,7 @@ describe('estimateJobDuration', () => {
             })),
           };
           const r = estimateJobDuration(job, device);
-          expect(r.totalSeconds).toBeCloseTo(
-            r.breakdown.cutSeconds + r.breakdown.travelSeconds,
-            6,
-          );
+          expect(r.totalSeconds).toBeCloseTo(r.breakdown.cutSeconds + r.breakdown.travelSeconds, 6);
           expect(r.breakdown.cutSeconds).toBeGreaterThanOrEqual(0);
           expect(r.breakdown.travelSeconds).toBeGreaterThanOrEqual(0);
           expect(Number.isFinite(r.totalSeconds)).toBe(true);
@@ -165,7 +165,10 @@ describe('estimateJobDuration', () => {
       fc.property(
         fc.double({ min: 1.0, max: 10, noNaN: true }),
         fc.array(
-          fc.tuple(fc.double({ min: 0, max: 100, noNaN: true }), fc.double({ min: 0, max: 100, noNaN: true })),
+          fc.tuple(
+            fc.double({ min: 0, max: 100, noNaN: true }),
+            fc.double({ min: 0, max: 100, noNaN: true }),
+          ),
           { minLength: 2, maxLength: 8 },
         ),
         (k, pts) => {

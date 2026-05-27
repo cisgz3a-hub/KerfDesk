@@ -67,10 +67,10 @@ function DialogBody(): JSX.Element {
         <TracePreview state={preview} />
         <p style={hintStyle}>
           <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings.
-          Forces pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with
-          curves. <strong>Sharp</strong> — pixel-perfect detail, no blur.{' '}
-          <strong>Detailed</strong> — line drawings with shading (~4 layers).{' '}
-          <strong>Photo</strong> — actual photographs (~8 posterized layers).
+          Forces pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with curves.{' '}
+          <strong>Sharp</strong> — pixel-perfect detail, no blur. <strong>Detailed</strong> — line
+          drawings with shading (~4 layers). <strong>Photo</strong> — actual photographs (~8
+          posterized layers).
         </p>
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
       </form>
@@ -84,7 +84,11 @@ function PresetPicker(props: {
 }): JSX.Element {
   return (
     <Field label="Preset">
-      <select value={props.value} onChange={(e) => props.onChange(e.target.value)} style={selectStyle}>
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        style={selectStyle}
+      >
         {Object.keys(TRACE_PRESETS).map((key) => (
           <option key={key} value={key}>
             {key}
@@ -111,7 +115,10 @@ async function commit(
     const id = crypto.randomUUID();
     const result = parseSvg({ svgText: svg, id, source: args.file.name });
     if (result.object === null) {
-      ctx.pushToast(`Tracing ${args.file.name} produced no paths — try a higher contrast image.`, 'warning');
+      ctx.pushToast(
+        `Tracing ${args.file.name} produced no paths — try a higher contrast image.`,
+        'warning',
+      );
       return;
     }
     // Re-tag the parsed object as a TracedImage variant so the rest

@@ -76,7 +76,11 @@ function FileButtons(): JSX.Element {
       >
         Open…
       </button>
-      <button type="button" title="Save project (Ctrl+S)" onClick={() => void handleSaveProject(saveCtx)}>
+      <button
+        type="button"
+        title="Save project (Ctrl+S)"
+        onClick={() => void handleSaveProject(saveCtx)}
+      >
         Save
       </button>
       <button

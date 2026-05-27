@@ -242,4 +242,3 @@ const inlineLabelStyle: React.CSSProperties = {
   fontSize: 12,
   cursor: 'pointer',
 };
-

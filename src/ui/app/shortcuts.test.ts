@@ -3,7 +3,9 @@ import { handleEditShortcut, handleViewShortcut } from './shortcuts';
 
 // Minimal stub for the EditCtx so each test only spies on the action it
 // cares about. Anything that fires unexpectedly trips its assertion.
-function editCtx(overrides: Partial<Parameters<typeof handleEditShortcut>[1]> = {}): Parameters<typeof handleEditShortcut>[1] {
+function editCtx(
+  overrides: Partial<Parameters<typeof handleEditShortcut>[1]> = {},
+): Parameters<typeof handleEditShortcut>[1] {
   return {
     undo: vi.fn(),
     redo: vi.fn(),
@@ -93,10 +95,7 @@ describe('handleEditShortcut — Cmd+D duplicate', () => {
     const div = document.createElement('div');
     document.body.appendChild(div);
     const ctx = editCtx();
-    const handled = handleEditShortcut(
-      fakeKeydown({ key: 'd', metaKey: true, target: div }),
-      ctx,
-    );
+    const handled = handleEditShortcut(fakeKeydown({ key: 'd', metaKey: true, target: div }), ctx);
     expect(handled).toBe(true);
     expect(ctx.duplicateSelection).toHaveBeenCalled();
     div.remove();

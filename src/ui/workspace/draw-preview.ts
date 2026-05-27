@@ -3,7 +3,13 @@
 // rendered as cut polylines + travel dashed lines, optionally truncated
 // at a 0..1 scrubber fraction with a red head marker at the cut point.
 
-import { applyTransform, type Layer, type Project, type SceneObject, type Vec2 } from '../../core/scene';
+import {
+  applyTransform,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Vec2,
+} from '../../core/scene';
 import { buildToolpath, compileJob, sliceToolpath, type ToolpathStep } from '../../core/job';
 import type { ViewTransform } from './view-transform';
 
@@ -65,11 +71,7 @@ export function drawPreview(
   if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
 }
 
-function drawStep(
-  ctx: CanvasRenderingContext2D,
-  step: ToolpathStep,
-  view: ViewTransform,
-): void {
+function drawStep(ctx: CanvasRenderingContext2D, step: ToolpathStep, view: ViewTransform): void {
   if (step.kind === 'travel') drawTravel(ctx, step.from, step.to, view);
   else drawCut(ctx, step.polyline, step.color, view);
 }

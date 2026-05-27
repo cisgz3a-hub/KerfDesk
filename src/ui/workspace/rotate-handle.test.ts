@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
-import { hitRotateHandle, ROTATE_HANDLE_OFFSET_MM, rotateObjectByDrag, rotateHandlePosition } from './rotate-handle';
+import {
+  hitRotateHandle,
+  ROTATE_HANDLE_OFFSET_MM,
+  rotateObjectByDrag,
+  rotateHandlePosition,
+} from './rotate-handle';
 
 function obj(): SceneObject {
   return {

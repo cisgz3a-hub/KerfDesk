@@ -15,7 +15,11 @@ import { useStore } from '../state';
 import type { ImportOutcome } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { describeImportError, describeImportResult, describeReimportOutcome } from './import-toasts';
+import {
+  describeImportError,
+  describeImportResult,
+  describeReimportOutcome,
+} from './import-toasts';
 
 export function useImportDragDrop(): void {
   const importSvgObject = useStore((s) => s.importSvgObject);

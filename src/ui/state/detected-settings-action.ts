@@ -52,9 +52,7 @@ export function consumeSettingsResponse(
 // Returns true if a patch was applied, false when called with no
 // pending detection (defensive — UI buttons should be disabled but
 // nothing breaks if a stale click slips through).
-export function applyDetectedSettingsPatch(
-  patch: Partial<DeviceProfile> | null,
-): boolean {
+export function applyDetectedSettingsPatch(patch: Partial<DeviceProfile> | null): boolean {
   if (patch === null) return false;
   // useStore (project store) is independent of useLaserStore; both
   // are top-level Zustand stores. getState() avoids a parameter pipe
