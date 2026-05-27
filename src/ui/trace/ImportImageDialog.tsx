@@ -42,7 +42,7 @@ function DialogBody(): JSX.Element {
   const importSvgObject = useStore((s) => s.importSvgObject);
   const pushToast = useToastStore((s) => s.pushToast);
   const [file, setFile] = useState<File | null>(null);
-  const [preset, setPreset] = useState<string>('Smooth');
+  const [preset, setPreset] = useState<string>('Line Art');
   const [busy, setBusy] = useState(false);
   const options: TraceOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
 
@@ -62,10 +62,11 @@ function DialogBody(): JSX.Element {
         <FilePicker file={file} onPick={setFile} />
         <PresetPicker value={preset} onChange={setPreset} />
         <p style={hintStyle}>
-          <strong>Smooth</strong> — flowing lines, best for logos and clean engraving.{' '}
-          <strong>Sharp</strong> — keeps fine pixel detail at the cost of jaggedness.{' '}
-          <strong>Detailed</strong> — small features, ~4 color layers.{' '}
-          <strong>Photo</strong> — many colors + heavy blur, for photographic input.
+          <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings.
+          Forces pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with
+          curves. <strong>Sharp</strong> — pixel-perfect detail, no blur.{' '}
+          <strong>Detailed</strong> — line drawings with shading (~4 layers).{' '}
+          <strong>Photo</strong> — actual photographs (~8 posterized layers).
         </p>
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
       </form>
