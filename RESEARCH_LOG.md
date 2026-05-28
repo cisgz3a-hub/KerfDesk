@@ -172,6 +172,7 @@ These are not in `package.json`; they are sources of record we rely on for proto
 - **Version / date:** v1.1f (latest stable as of evaluation)
 - **License:** GPL-3 (the firmware itself; **we do not depend on or distribute it** — we implement against its protocol, which is documentation, not licensed code)
 - **Source:** https://github.com/gnea/grbl/wiki
+- **Upstream status:** gnea/grbl is archived since Aug 30 2019 (last commit, last accepted PR). 1.1h is the de-facto wire protocol; actively maintained protocol-compatible forks are **grblHAL**, **FluidNC**, and **µCNC**.
 - **Decision affected:** ADR-006 (GRBL-only in MVP)
 - **Evaluated:** 2026-05-26
 - **Confidence:** high (protocol is mature and stable)
@@ -284,7 +285,7 @@ Libraries that were evaluated and explicitly rejected. Keeping this list prevent
 
 - **Subject:** GRBL motion planner — junction-deviation cornering + two-pass lookahead
 - **Sources consulted:**
-  - **grbl** itself (github.com/gnea/grbl) — `planner.c`, `stepper.c`. License: **GPL-3.0**. Read-only reference per ADR-017 (same status this log gives CNCjs for protocol work). No code copied.
+  - **grbl** itself (github.com/gnea/grbl) — `planner.c`, `stepper.c`. License: **GPL-3.0**. Read-only reference per ADR-017 (same status this log gives CNCjs for protocol work). No code copied. Upstream archived Aug 2019; live forks are grblHAL / FluidNC / µCNC.
   - **grbl-sim** (github.com/grbl/grbl-sim) — earlier-thought-to-be-MIT; actually GPL-3. Same read-only reference.
   - **Sonny Jeon's "Improving Grbl: cornering algorithm"** (2014 design paper, publicly published). Algorithm and math are public — algorithms are not copyrightable.
   - **MeerK40t** (github.com/meerk40t/meerk40t) — MIT-licensed laser app. Skimmed for sanity-check; their planner is heavier than what we needed for an estimator and we did not adopt code.
