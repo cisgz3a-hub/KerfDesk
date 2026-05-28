@@ -10,6 +10,12 @@
 //   * external xlink:href stripped by custom hook
 //   * non-image data: URIs stripped by custom hook
 //
+// SAFE_FOR_XML defaults to `true` in DOMPurify (escapes characters that
+// break XML parsers downstream). We deliberately rely on that default
+// instead of setting it explicitly — passing it through the call site
+// would invite a future "let me try false to fix X" without realising
+// the trade-off. MIT-T4 audit note.
+//
 // Test corpus of crafted-malicious SVGs lives at
 // src/__fixtures__/svg/malicious/.
 

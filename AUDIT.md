@@ -575,7 +575,9 @@ under fake-time testing.
 **Evidence:** `src/ui/trace/image-loader.ts:23-39`. The `finally`-revoke
 is fine. Document this so a future refactor doesn't drop it.
 
-**Status:** **NOTE.**
+**Status:** **RESOLVED** — `image-loader.ts` now carries a doc comment
+on the createObjectURL / revokeObjectURL pairing explicitly flagging
+this as load-bearing for refactors.
 
 ### Comparison: where the first-pass audit was over- or under-rated
 
@@ -759,12 +761,13 @@ three fixes shipped this same commit, four items TRACKED.
   twice as aggressive as imagetracerjs's default (8). For very small
   logos (sub-50 px) this could eat dots / periods / small features.
   Add a sub-50px fixture test confirming small-feature retention.
-- **MIT-T4 — DOMPurify `SAFE_FOR_XML` reliance.** We rely on the
-  upstream default (`true`). Add a one-line comment so a future reader
-  knows we deliberately don't override it.
-- **MIT-T5 — opentype.js RTL.** Hebrew / Arabic text comes out
-  LTR-mirrored. Known limitation; add a doc note. Real fix needs
-  Unicode-aware bidi which is outside scope.
+- **MIT-T4 — DOMPurify `SAFE_FOR_XML` reliance.** ✅ RESOLVED. The
+  sanitize.ts header now documents the deliberate reliance on the
+  upstream `true` default so a future reader knows not to flip it.
+- **MIT-T5 — opentype.js RTL.** ✅ RESOLVED. `text-to-polylines.ts`
+  carries a known-limitation note covering Hebrew/Arabic ordering
+  + Arabic shaping; full fix would need the Unicode Bidirectional
+  Algorithm and is parked.
 
 ### Process note
 
