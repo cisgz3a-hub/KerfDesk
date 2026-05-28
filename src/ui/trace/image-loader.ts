@@ -20,6 +20,12 @@ export async function loadImageAsRawData(
   file: File,
   maxEdge: number = MAX_EDGE_PX,
 ): Promise<RawImageData> {
+  // The try/finally pairing around createObjectURL + revokeObjectURL is
+  // load-bearing: each createObjectURL allocation pins the underlying
+  // Blob in memory until revokeObjectURL is called or the document is
+  // torn down. A future refactor that swaps the try/finally for a bare
+  // try/catch (or moves the decode out of the same function) would leak
+  // the Blob on every import. Keep them in lockstep. R-L3 audit note.
   const url = URL.createObjectURL(file);
   try {
     const img = await decodeImage(url);

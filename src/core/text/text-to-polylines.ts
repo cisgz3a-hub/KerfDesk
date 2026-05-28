@@ -19,6 +19,13 @@
 // scene, matching SVG-like convention; the origin transform applies
 // later as for any other SceneObject).
 //
+// Known limitation — RTL scripts (Hebrew, Arabic, N'Ko, etc.) render
+// left-to-right rather than right-to-left because opentype.js doesn't
+// run the Unicode Bidirectional Algorithm. Glyph shapes are correct,
+// only ordering is wrong. Full fix needs a UBA pass (e.g. via the
+// `bidi-js` package, MIT) and would also need Arabic shaping for joining
+// forms. Out of Phase D scope; tracked as MIT-T5 in AUDIT.md.
+//
 // Pure-core compliant: no clock, no random, no I/O.
 
 import * as opentype from 'opentype.js';
