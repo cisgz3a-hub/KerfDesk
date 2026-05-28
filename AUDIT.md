@@ -88,7 +88,11 @@ store. The user has to clear them manually via browser settings.
 `port.forget()` after `port.close()`. Don't call on cable-yank
 (`disconnect` event) — the user probably wants to plug it back in.
 
-**Status:** **TRACKED** — adds 5 LOC in `web-serial.ts` and `laser-store.ts`.
+**Status:** **RESOLVED** — `web-serial.ts` close() now calls
+`port.forget?.()` after `port.close()`. Optional chain because
+forget() is Chromium 103+; older runtimes silently no-op rather
+than throw. Cable-yank path is unchanged (goes through the
+`disconnect` event, never reaches close()).
 
 ---
 

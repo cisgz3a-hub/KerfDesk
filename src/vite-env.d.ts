@@ -70,6 +70,10 @@ interface SerialPort extends EventTarget {
   readonly writable: WritableStream<Uint8Array> | null;
   open(options: SerialOptions): Promise<void>;
   close(): Promise<void>;
+  // Chromium 103+; revokes the in-page permission for this port. Optional
+  // in the type because older Chromium / Electron <22 may not have it
+  // and we fall through gracefully (A2 audit fix).
+  forget?(): Promise<void>;
   getInfo(): SerialPortInfo;
   addEventListener(type: 'disconnect', listener: (this: SerialPort, ev: Event) => unknown): void;
   removeEventListener(type: 'disconnect', listener: (this: SerialPort, ev: Event) => unknown): void;
