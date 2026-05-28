@@ -111,7 +111,7 @@ async function commit(
   ctx.setBusy(true);
   try {
     const image = await loadImageAsRawData(args.file);
-    const svg = traceImageToSvgString(image, args.options);
+    const svg = await traceImageToSvgString(image, args.options);
     const id = crypto.randomUUID();
     const result = parseSvg({ svgText: svg, id, source: args.file.name });
     if (result.object === null) {

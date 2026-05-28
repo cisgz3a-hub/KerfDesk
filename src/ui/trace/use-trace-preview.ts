@@ -108,13 +108,13 @@ function runTrace(
   options: TraceOptions,
   setState: (next: TracePreviewState) => void,
 ): void {
-  // Trace is sync but can run for 50-200ms on a 400px image. Defer
-  // to a microtask so React can paint the "tracing" state first; the
-  // setTimeout in the options-effect already amortizes the rapid-
-  // change case, this is just the first-paint courtesy.
-  queueMicrotask(() => {
+  // Trace is async (lazy-loads imagetracerjs on first call — A6
+  // bundle-split) and the synchronous work itself can run 50-200ms
+  // on a 400px image. Both happen off the React-render-path so the
+  // "tracing" state can paint first.
+  void (async () => {
     try {
-      const raw = traceImageToSvgString(img, options);
+      const raw = await traceImageToSvgString(img, options);
       const { clean } = sanitizeSvg(raw);
       const responsive = makeSvgResponsive(clean, img.width, img.height);
       setState({ kind: 'ready', svg: responsive, width: img.width, height: img.height });
@@ -124,7 +124,7 @@ function runTrace(
         message: err instanceof Error ? err.message : String(err),
       });
     }
-  });
+  })();
 }
 
 // imagetracerjs emits <svg width="W" height="H">…</svg> with no
