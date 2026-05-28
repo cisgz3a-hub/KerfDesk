@@ -242,7 +242,7 @@ Specific font set TBD at Phase D kickoff. Likely candidates from OFL/MIT collect
 
 ### Decision
 - Phase E feature, not MVP.
-- `imagetracer.js` (MIT). `potrace-wasm` rejected (GPL-2).
+- `imagetracerjs` (Unlicense — MIT-compatible). `potrace-wasm` rejected (GPL-2).
 - `TracedImage` Scene object flows through Line pipeline.
 
 ---
@@ -371,7 +371,7 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 ### Phase D / E candidates already pinned in ADR-012 / ADR-013
 
 - `opentype.js` (MIT) — Phase D text-to-path.
-- `imagetracer.js` (MIT) — Phase E raster trace.
+- `imagetracerjs` (Unlicense — MIT-compatible) — Phase E raster trace.
 
 ### What this policy explicitly rejects
 

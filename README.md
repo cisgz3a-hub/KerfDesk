@@ -2,7 +2,7 @@
 
 > A focused CAM application for **GRBL** laser cutters and engravers. Web app and Windows desktop from one codebase. Proprietary source (ADR-018).
 
-**Status:** Pre-development planning. No code yet. Five spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) define what gets built, in what order, by what rules; this README is the entry index.
+**Status:** Phases A–E shipped (the MVP and the two post-MVP rounds: text + raster trace). Phase F.1 (Fill hatching) shipped 2026-05-28; Phase F.2 (raster image engrave) is the next scoped piece. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://laserforge.pages.dev>. Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
 
 ---
 
@@ -35,28 +35,32 @@ Read in this order:
 
 | Document | What's in it |
 |---|---|
-| **[`PROJECT.md`](./PROJECT.md)** | Product scope, non-negotiables, phase plan A → E. The "what." |
-| **[`WORKFLOW.md`](./WORKFLOW.md)** | Every user flow in Phase A, with success / error / empty / edge states. The "what should happen." |
-| **[`DECISIONS.md`](./DECISIONS.md)** | All architectural decisions with rationale, alternatives, and consequences. 17 ADRs. The "why." |
+| **[`PROJECT.md`](./PROJECT.md)** | Product scope, non-negotiables, phase plan A → F. The "what." |
+| **[`WORKFLOW.md`](./WORKFLOW.md)** | Every user flow with success / error / empty / edge states. The "what should happen." |
+| **[`DECISIONS.md`](./DECISIONS.md)** | All architectural decisions with rationale, alternatives, and consequences. 19 ADRs (ADR-001..019). The "why." |
 | **[`CLAUDE.md`](./CLAUDE.md)** | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. The "how." |
 | **[`RESEARCH_LOG.md`](./RESEARCH_LOG.md)** | Every dependency and external claim with license, version, source, evaluator. The "where it came from." |
+| **[`AUDIT.md`](./AUDIT.md)** | Rolling professional audit. Re-run after each phase; archived snapshots in `AUDIT-YYYY-MM-DD-phase-*.md`. |
 
 ## Build status
 
-Pre-development. Phase A acceptance criteria are written ([`PROJECT.md`](./PROJECT.md) "Vertical slice — Phase A acceptance"); the first PR will set up the repo skeleton and the test/lint scaffolding.
-
-Once code starts landing:
+Phases A–E shipped + Phase F.1 (Fill hatching) shipped. 429+ tests pass; `pnpm audit` is 0/0/0/0. See `AUDIT.md` for current findings.
 
 ```bash
 pnpm install
-pnpm test           # Vitest unit + property + snapshot
-pnpm lint           # ESLint with boundary + file-size rules
-pnpm typecheck      # tsc --noEmit
-pnpm dev:web        # Vite dev server, browser build
-pnpm dev:desktop    # Vite + Electron, desktop build
-pnpm build:web      # Static bundle to dist/web
-pnpm build:desktop  # Signed .exe to dist/desktop
-pnpm deploy:web     # Manual deploy of dist/web to Cloudflare Pages
+pnpm test               # Vitest unit + property + snapshot
+pnpm lint               # ESLint with boundary, react-hooks, file-size rules
+pnpm lint:fix           # autofix lint
+pnpm typecheck          # tsc --noEmit
+pnpm format             # prettier --write .
+pnpm format:check       # prettier --check . (CI gate)
+pnpm license-check      # license allow-list audit (CI gate)
+pnpm dev:web            # Vite dev server, browser build
+pnpm dev:desktop        # Vite + Electron, desktop build
+pnpm build:web          # Static bundle to dist/web (no sourcemaps in prod)
+pnpm build:desktop      # Signed .exe to dist/desktop
+pnpm deploy:web         # Manual deploy of dist/web to Cloudflare Pages (production)
+pnpm deploy:web:preview # Same, but to a per-deploy preview URL
 ```
 
 ### Cloudflare Pages — auto-deploy on push
@@ -84,12 +88,13 @@ Runtime dependencies remain governed by their own open-source licenses (MIT, BSD
 
 ## Contributing
 
-Pre-development; contribution guidelines arrive with the first code PR.
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
-Architectural changes are gated by the ADR process — see [`DECISIONS.md`](./DECISIONS.md) for the format. Scope changes require a [`PROJECT.md`](./PROJECT.md) revision.
+Architectural changes are gated by the ADR process — see [`DECISIONS.md`](./DECISIONS.md) for the format. Scope changes require a [`PROJECT.md`](./PROJECT.md) revision. The four operating-manual principles from [`CLAUDE.md`](./CLAUDE.md) (think before coding, simplicity first, surgical changes, goal-driven) gate every PR.
 
 ## Acknowledgements
 
 - **LightBurn** — for setting the UX convention this project follows. We are not affiliated with LightBurn; we use it as a reference, not a code source.
 - **CNCjs** — for being the canonical open-source GRBL implementation. Used as a Phase B protocol reference, not as a dependency.
-- **DOMPurify, opentype.js, imagetracer.js** — for the MIT-compatible libraries that let LaserForge 2.0 stand on proven security and parsing work rather than reinventing it.
+- **GRBL active forks** — grblHAL, FluidNC, µCNC keep the 1.1h wire protocol alive after `gnea/grbl` was archived (Aug 2019).
+- **DOMPurify** (MPL-2.0 / Apache-2.0), **opentype.js** (MIT), **imagetracerjs** (Unlicense) — the MIT-compatible libraries that let LaserForge 2.0 stand on proven security and parsing work rather than reinventing it.

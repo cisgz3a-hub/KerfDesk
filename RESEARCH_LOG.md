@@ -89,28 +89,36 @@ not separately evaluated against ADR-017's per-library criteria — the stack
 choice itself was the ADR. Listed here for completeness so the bundle / CVE
 audit can find them.
 
+Versions below reflect the current `package.json` (last refreshed 2026-05-28
+after the F-2 security bump). When you bump anything in this table, also
+append a row to the "Re-verification log" further down so the diff stays
+auditable.
+
 | Package | Version (pinned ^) | License | Role |
 |---|---|---|---|
 | `typescript` | ^5.5.0 | Apache-2.0 | Type-checker |
-| `vite` | ^5.4.0 | MIT | Web build + dev server |
+| `vite` | ^6.4.2 | MIT | Web build + dev server |
 | `@vitejs/plugin-react` | ^4.3.0 | MIT | JSX transform for Vite |
-| `vitest` | ^2.0.0 | MIT | Test runner |
-| `@vitest/coverage-v8` | ^2.0.0 | MIT | Coverage |
+| `vitest` | ^3.2.4 | MIT | Test runner |
+| `@vitest/coverage-v8` | ^3.2.4 | MIT | Coverage |
 | `jsdom` | ^25.0.0 | MIT | DOM env for Vitest |
 | `fast-check` | ^3.22.0 | BSD-2-Clause | Property tests |
 | `eslint` | ^9.10.0 | MIT | Linter |
 | `@eslint/js` | ^9.10.0 | MIT | Core rules |
 | `typescript-eslint` | ^8.6.0 | MIT (BSD-2 components) | TS lint rules |
-| `eslint-plugin-boundaries` | ^5.0.0 | MIT | Module isolation (ADR-010) |
+| `eslint-plugin-boundaries` | ^6.0.2 | MIT | Module isolation (ADR-010) |
 | `eslint-plugin-import` | ^2.31.0 | MIT | Import-cycle detection |
 | `eslint-plugin-react` | ^7.36.0 | MIT | React rules |
-| `eslint-plugin-react-hooks` | ^5.0.0 | MIT | Hook-deps rule |
+| `eslint-plugin-react-hooks` | ^5.0.0 | MIT | Hook-deps rule (wired post-R-H4) |
 | `eslint-config-prettier` | ^9.1.0 | MIT | Disables style rules covered by Prettier |
 | `eslint-import-resolver-typescript` | ^3.6.3 | ISC | TS path resolution for boundaries |
 | `prettier` | ^3.3.0 | MIT | Formatter |
 | `globals` | ^15.9.0 | MIT | Predefined env globals |
 | `license-checker` | ^25.0.1 | BSD-3-Clause | CI license audit |
-| `@types/node`, `@types/react`, `@types/react-dom` | various | MIT (DefinitelyTyped) | Type declarations |
+| `@types/node`, `@types/react`, `@types/react-dom`, `@types/opentype.js` | various | MIT (DefinitelyTyped) | Type declarations |
+| `electron` | ^42.3.0 | MIT | Windows desktop shell (bumped F-2; CVE-2026-34769/34780 patched) |
+| `electron-builder` | ^26.11.1 | MIT | Desktop installer pipeline |
+| `wrangler` | ^4.95.0 | MIT / Apache-2.0 | Cloudflare Pages deploy CLI |
 
 All licenses verified MIT-compatible by `pnpm license-check` (production-only)
 + manual review of dev-dep tree. The CI workflow re-runs the check on every
@@ -236,7 +244,10 @@ Append re-verification entries here when an existing row is re-checked. Format:
 - YYYY-MM-DD — {Subject} — {what changed or "unchanged"} — {evaluator}
 ```
 
-*No entries yet.*
+- 2026-05-27 — DOMPurify — bumped from ^3.3.2 to current `^3.3.2` (still patched against CVE-2026-0540; no version drift required at this time) — Claude
+- 2026-05-27 — F-2 dev-dep security bump — electron 32 → ^42.3.0, electron-builder 25 → ^26.11.1, vite 5 → ^6.4.2, vitest 2 → ^3.2.4, @vitest/coverage-v8 2 → ^3.2.4, eslint-plugin-boundaries 5 → ^6.0.2, tmp transitive override `<0.2.6 → ^0.2.6`. `pnpm audit` 34 → 0/0/0/0. CVE-2026-34769 (Electron command-line switch injection) and CVE-2026-34780 (WebCodecs preload bypass) patched. — Claude
+- 2026-05-27 — wrangler — added as a new dev dep `^4.95.0` (MIT) for Cloudflare Pages deploy. Approved post-hoc per ADR-017 (build-tool category, see ADR-009 umbrella). — Claude
+- 2026-05-28 — gnea/grbl — re-verified upstream status. Repo archived since Aug 2019; 1.1h remains de-facto wire protocol; active forks are grblHAL, FluidNC, µCNC. Our streaming code is protocol-compatible with all three (only depends on 1.1h surface). — Claude
 
 ---
 

@@ -613,3 +613,97 @@ Findings I could NOT verify against primary sources and therefore did
 not include: a "renderer kill switch" in Electron 42 (no current docs
 support), a 2025/2026 OWASP Desktop Top 10 (doesn't exist), a
 maintained MIT-licensed JS GRBL streamer outside CNCjs.
+
+---
+
+## Documentation re-audit (2026-05-28, third pass)
+
+Triggered by user request to verify the spec files still match the
+code. Run by an independent agent; verified by reading the cited
+file:line evidence. **No code findings** beyond what the re-audit
+already covered — the doc layer had slipped during the fast Phase F.1
+iteration. Every finding below is FIXED in this same commit unless
+marked TRACKED.
+
+### D-Critical
+
+- **D-H2 `package.json` license field** — said `"license": "MIT"`
+  even though ADR-018 made the project proprietary. License appears
+  in every SBOM and npm-related tool; the contradiction with the
+  LICENSE file was a real legal-metadata bug. **FIXED:** changed to
+  `"SEE LICENSE IN LICENSE"`, description rewritten.
+
+### D-High
+
+- **D-H1 README.md "Pre-development. No code yet."** — totally
+  stale; project is post-Phase-F.1 with 12,539 source LOC and a live
+  deploy. **FIXED:** Status section rewritten.
+- **D-H3 ADR count** — README said 17 ADRs; actual is 19
+  (001..019, with ADR-018 superseding ADR-008). **FIXED.**
+- **D-H4 README "Five spec files"** — omitted AUDIT.md from the
+  project-document table. **FIXED:** AUDIT.md added as a sixth row.
+
+### D-Medium
+
+- **D-M1 CONTRIBUTING.md preamble** said "in pre-development …
+  placeholder." **FIXED** — rewrote intro paragraph to reflect that
+  CI gates and deploy workflow are live.
+- **D-M2 WORKFLOW.md header** said "Phase A complete. Phase B/C/D/E
+  sections are stubs." Phase B is now fully fleshed out and Phase
+  F.1 has F-F1. **FIXED** — header re-stated.
+- **D-M3 RESEARCH_LOG umbrella stack** versions were stale (vite 5,
+  vitest 2, no electron/wrangler rows). **FIXED** — table refreshed
+  to match package.json + added 4 entries to the Re-verification log.
+- **D-M4 PROJECT.md security posture** said
+  `setPermissionRequestHandler returns false except for 'serial'`.
+  Actual code (`electron/main.ts`) also accepts `fileSystem*` after
+  commit `2965bd0`. **FIXED.**
+- **D-M5 imagetracer.js typo** — appeared in PROJECT.md (×2),
+  DECISIONS.md (×2), README ack section. The actual npm package is
+  `imagetracerjs` and its license is Unlicense, not MIT. **FIXED**
+  everywhere.
+- **D-M6 gnea/grbl status** — A3 finding from the prior audit was
+  still open. **FIXED:** PROJECT.md + RESEARCH_LOG Re-verification
+  log both now mention the archive status + the active forks
+  (grblHAL, FluidNC, µCNC).
+- **D-M7 WORKFLOW.md Cmd+D tag** said "(Phase C)" — feature shipped
+  as commit `32f30ca`. **FIXED:** retagged as shipped, with the
+  related Cut/Copy/Paste lines clarified as not-implemented.
+- **D-M8 DECISIONS.md "Phase A fixture corpus" open item** — Phase
+  A shipped; item should be marked done. **TRACKED** — left for the
+  next ADR pass; minor.
+
+### D-Low / Note
+
+- D-L1 PROJECT.md Brave issue stamp — TRACKED, low.
+- D-L2 README pnpm script list incomplete — **FIXED:** added
+  `lint:fix`, `format`, `format:check`, `license-check`,
+  `deploy:web:preview`.
+- D-L3 RESEARCH_LOG Re-verification log empty — **FIXED** (added
+  four entries this pass).
+- D-L5 Anchor links — verified, OK.
+- D-L6 AUDIT.md size — borderline, intentional.
+
+### Code spot-check (B-N findings from the agent's Part B)
+
+- **B-N1 laser-store.ts at 399/400** — one line shy of the hard cap.
+  TRACKED — will split when the next edit lands (per CLAUDE.md
+  "stop and split before continuing"). No actionable code change
+  this session.
+- **B-N2 no new test gaps** — every post-AUDIT commit added or
+  updated tests.
+- **B-N3 no new `any` / `!` / `@ts-ignore`** in modified files.
+- **B-N4 vacuous assertions scan** — none. Three `toBeDefined()`
+  calls are all followed by stronger assertions + nullable handling.
+- **B-N5 R-H1 fix dep omission has prose comment, not directive** —
+  Low; left as-is.
+
+### Verdict after this pass
+
+**Ship-ready.** Critical license-metadata inconsistency closed.
+13 doc items refreshed; one TRACKED. Code itself was clean coming in
+and stays clean — 429/429 tests, 0/0/0/0 vulns, 1 file at exactly the
+soft cap, 1 file (laser-store) at 399 lines (one shy of hard cap,
+flagged for pre-emptive split next edit). Karpathy principles
+preserved: every change carried evidence, single-responsibility, and
+verifiable verdicts.

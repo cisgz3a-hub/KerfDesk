@@ -1,6 +1,6 @@
 # Contributing to LaserForge 2.0
 
-LaserForge 2.0 is in pre-development. Full contribution guidelines, PR templates, and CI rules arrive with the first code PR — this file is a placeholder so collaborators know the shape of the process.
+LaserForge 2.0 is shipped through Phase F.1 and under active development. CI gates (`.github/workflows/ci.yml`) are live: typecheck, lint, prettier, license-check, vitest, build, file-size discipline. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
 
 ## Before you open a PR
 

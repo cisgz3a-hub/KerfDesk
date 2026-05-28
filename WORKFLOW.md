@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document is **Phase A complete**. Phase B, C, D, E sections are stubs and will be filled at their kickoff per ADR-016.
+> This document is **Phase A + Phase B + Phase F.1 fleshed out**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code for all phases through F.1 is shipped — the gap is documentation density, not implementation.
 
 ---
 
@@ -463,10 +463,10 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 #### Edit
 - `Cmd/Ctrl+Z` — Undo
 - `Cmd/Ctrl+Shift+Z` — Redo
-- `Cmd/Ctrl+X` — Cut (Phase C)
-- `Cmd/Ctrl+C` — Copy (Phase C)
-- `Cmd/Ctrl+V` — Paste (Phase C)
-- `Cmd/Ctrl+D` — Duplicate (Phase C)
+- `Cmd/Ctrl+X` — Cut (not implemented)
+- `Cmd/Ctrl+C` — Copy (browser default in inputs; no scene-object clipboard yet)
+- `Cmd/Ctrl+V` — Paste (browser default in inputs)
+- `Cmd/Ctrl+D` — Duplicate selection with 10mm offset (shipped)
 - `Cmd/Ctrl+A` — Select all
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
@@ -479,10 +479,12 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 
 #### View
 - `P` — Toggle preview
-- `F` — Frame all (zoom to fit)
+- `F` — Fit to bed
+- `Shift+F` — Fit to selection (falls back to all-objects, then bed)
 - `+` / `=` — Zoom in
 - `-` — Zoom out
-- `0` — Reset zoom to 100%
+- `0` — Reset zoom (same as F)
+- `Ctrl+Wheel` — Zoom at cursor
 - `Space + drag` — Pan
 
 #### Phase B+ shortcuts
