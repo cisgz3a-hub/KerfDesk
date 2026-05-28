@@ -104,6 +104,10 @@ type LiveRefs = {
   // line would otherwise re-render Laser components for no reason —
   // only the final `done` patch matters to the UI.
   settingsCollector: SettingsCollectorState;
+  // R-L2: one-shot fired by handleLine the first time runHandshake's
+  // race wants to observe a line. Held here so the shared `refs`
+  // object handler functions receive carries it across calls.
+  onLineArrived: (() => void) | null;
 };
 
 const refs: LiveRefs = {
@@ -112,6 +116,7 @@ const refs: LiveRefs = {
   unsubscribeClose: null,
   pollHandle: null,
   settingsCollector: idleCollector(),
+  onLineArrived: null,
 };
 
 const LOG_MAX = 200;
@@ -129,6 +134,7 @@ function teardown(): void {
   refs.unsubscribeClose = null;
   refs.pollHandle = null;
   refs.settingsCollector = idleCollector();
+  refs.onLineArrived = null;
 }
 
 async function safeWrite(line: string): Promise<void> {

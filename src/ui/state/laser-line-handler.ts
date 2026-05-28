@@ -29,6 +29,13 @@ import type { LaserState } from './laser-store';
 
 export type HandlerRefs = {
   settingsCollector: SettingsCollectorState;
+  // One-shot callback fired by handleLine the next time any line arrives.
+  // runHandshake sets it before awaiting; handleLine clears it after
+  // calling. Lets the handshake be event-driven instead of busy-polling
+  // get().log.length on a 50 ms loop (R-L2 audit finding — the old loop
+  // was brittle under vi.useFakeTimers and burnt CPU during the
+  // 2-second connect window).
+  onLineArrived: (() => void) | null;
 };
 
 export type SetFn = (
@@ -53,14 +60,22 @@ export async function runHandshake(
   safeWrite: (line: string) => Promise<void>,
 ): Promise<void> {
   const HANDSHAKE_TIMEOUT_MS = 2000;
-  const POLL_MS = 50;
-  const start = Date.now();
-  const startLen = get().log.length;
-  while (Date.now() - start < HANDSHAKE_TIMEOUT_MS) {
-    if (get().log.length > startLen) break;
-    await new Promise((r) => setTimeout(r, POLL_MS));
-  }
-  if (get().log.length === startLen) {
+  // Race a single deadline timer against a one-shot resolved by
+  // handleLine. No busy-polling get().log.length and no reliance on
+  // Date.now() advancement — both clean under fake-time testing.
+  const gotLine = await new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      refs.onLineArrived = null;
+      resolve(false);
+    }, HANDSHAKE_TIMEOUT_MS);
+    refs.onLineArrived = (): void => {
+      clearTimeout(timer);
+      refs.onLineArrived = null;
+      resolve(true);
+    };
+  });
+
+  if (!gotLine) {
     set({
       log: appendLog(
         get(),
@@ -91,6 +106,13 @@ export function handleLine(
   const cls = classifyResponse(line);
   // Always log the raw line for the user-visible console.
   set({ log: appendLog(get(), line) });
+  // R-L2: fire + clear the one-shot the moment any line lands so
+  // runHandshake's Promise.race resolves event-driven instead of polling.
+  if (refs.onLineArrived !== null) {
+    const cb = refs.onLineArrived;
+    refs.onLineArrived = null;
+    cb();
+  }
   // F-7: feed every classified response to the settings collector.
   // Returns a patch only when the `$$` response window just closed.
   const patch = consumeSettingsResponse(refs, cls);
