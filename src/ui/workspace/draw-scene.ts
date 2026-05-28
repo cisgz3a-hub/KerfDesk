@@ -4,9 +4,11 @@
 // per-feature renderers live in sibling files so no single file grows
 // beyond the 250-line soft cap (CLAUDE.md).
 
+import { fillHatching } from '../../core/job/fill-hatching';
 import {
   applyTransform,
   type Layer,
+  type Polyline,
   type Project,
   type SceneObject,
   transformedBBox,
@@ -146,32 +148,94 @@ function drawObjectPolylines(
   for (const path of obj.paths) {
     const layer = layerByColor.get(path.color);
     if (layer === undefined || !layer.visible) continue;
-    ctx.strokeStyle = path.color;
-    ctx.lineWidth = layer.output ? 1.5 : 0.75;
-    // Single beginPath/stroke per color, regardless of how many
-    // polylines that color has. The per-polyline stroke() loop this
-    // replaces was the cause of the post-import freeze: each stroke
-    // is a GPU sync, so a 5000-polyline traced image emitted 5000
-    // syncs per redraw at 60 Hz → 300k syncs/sec → canvas chokes.
-    // Batching to one stroke per color drops that to O(colors) ≈ 1-8.
-    // Standard Canvas2D performance pattern (MDN "Canvas optimisation").
-    ctx.beginPath();
-    for (const polyline of path.polylines) {
-      for (let i = 0; i < polyline.points.length; i += 1) {
-        const raw = polyline.points[i];
-        if (raw === undefined) continue;
-        const p = applyTransform(raw, obj.transform);
-        const cx = view.offsetX + p.x * view.scale;
-        const cy = view.offsetY + p.y * view.scale;
-        // moveTo starts a new subpath without stroking, so successive
-        // polylines accumulate into the same Path2D and one final
-        // stroke() draws them all.
-        if (i === 0) ctx.moveTo(cx, cy);
-        else ctx.lineTo(cx, cy);
-      }
+    if (layer.mode === 'fill') {
+      // Fill-mode preview: show the actual hatch pattern that will burn
+      // (LightBurn-style WYSIWYG). Outline drops to a faint guide stroke
+      // so the user still sees the shape boundary. fillHatching is the
+      // exact function compileJob runs at emit time, so what you see is
+      // what gets G-code'd. Sub-ms per typical object — no cache needed
+      // until profiling says otherwise.
+      drawOutlineFaint(ctx, obj, path.polylines, view, path.color);
+      drawFillHatches(ctx, obj, path.polylines, layer, view, path.color);
+    } else {
+      ctx.strokeStyle = path.color;
+      ctx.lineWidth = layer.output ? 1.5 : 0.75;
+      // Single beginPath/stroke per color, regardless of how many
+      // polylines that color has. Per-polyline stroke() was the cause
+      // of the post-import freeze: each stroke is a GPU sync, so a
+      // 5000-polyline traced image emitted 5000 syncs per redraw at
+      // 60 Hz → canvas chokes. Batching to one stroke per color drops
+      // that to O(colors) ≈ 1-8. Standard Canvas2D pattern (MDN).
+      strokePolylinesBatched(ctx, obj, path.polylines, view);
     }
-    ctx.stroke();
   }
+}
+
+// Faint outline drawn as a guide under the hatch lines in Fill mode.
+// Same batched stroke as the line path, just with a thinner dashed
+// stroke at the layer color (alpha-dimmed via ctx.globalAlpha) so the
+// hatches read as the actual burn pattern, not a competing fill.
+function drawOutlineFaint(
+  ctx: CanvasRenderingContext2D,
+  obj: SceneObject,
+  polylines: ReadonlyArray<Polyline>,
+  view: ViewTransform,
+  color: string,
+): void {
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 0.75;
+  ctx.setLineDash([3, 3]);
+  strokePolylinesBatched(ctx, obj, polylines, view);
+  ctx.restore();
+}
+
+// Run fillHatching on the source polylines and draw the resulting
+// hatch lines at the layer's actual color + line weight. Mirrors what
+// compileJob → grbl-strategy will emit, so the canvas matches the
+// G-code 1:1.
+function drawFillHatches(
+  ctx: CanvasRenderingContext2D,
+  obj: SceneObject,
+  polylines: ReadonlyArray<Polyline>,
+  layer: Layer,
+  view: ViewTransform,
+  color: string,
+): void {
+  const hatches = fillHatching({
+    polylines,
+    hatchAngleDeg: layer.hatchAngleDeg,
+    hatchSpacingMm: layer.hatchSpacingMm,
+  });
+  if (hatches.length === 0) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = layer.output ? 1.5 : 0.75;
+  strokePolylinesBatched(ctx, obj, hatches, view);
+}
+
+// Extracted batched-stroke helper used by both line mode and the
+// outline-guide / hatch-line paths in fill mode. One beginPath/stroke
+// per call — see the comment block on drawObjectPaths for why.
+function strokePolylinesBatched(
+  ctx: CanvasRenderingContext2D,
+  obj: SceneObject,
+  polylines: ReadonlyArray<Polyline>,
+  view: ViewTransform,
+): void {
+  ctx.beginPath();
+  for (const polyline of polylines) {
+    for (let i = 0; i < polyline.points.length; i += 1) {
+      const raw = polyline.points[i];
+      if (raw === undefined) continue;
+      const p = applyTransform(raw, obj.transform);
+      const cx = view.offsetX + p.x * view.scale;
+      const cy = view.offsetY + p.y * view.scale;
+      if (i === 0) ctx.moveTo(cx, cy);
+      else ctx.lineTo(cx, cy);
+    }
+  }
+  ctx.stroke();
 }
 
 function drawSelectionBox(

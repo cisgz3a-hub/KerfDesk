@@ -13,7 +13,12 @@
 // References: gnea/grbl wiki "Interface" + CNCjs streaming.js (read for
 // pattern only — not vendored per ADR-017 / RESEARCH_LOG.md CNCjs entry).
 
-export const DEFAULT_RX_BUFFER_BYTES = 127;
+// GRBL's RX buffer is 128 bytes. CNCjs uses 120 (8-byte safety margin) —
+// the headroom protects against senders that occasionally add CR/LF and
+// against transient queueing edge cases. We previously used 127 (1-byte
+// margin) and were off-by-one in the conservative direction. MIT-compare
+// audit recommended matching CNCjs. No observed bug at 127 — preventive.
+export const DEFAULT_RX_BUFFER_BYTES = 120;
 
 export type StreamerStatus = 'idle' | 'streaming' | 'paused' | 'done' | 'cancelled';
 

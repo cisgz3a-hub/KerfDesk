@@ -151,8 +151,17 @@ function pushLinePolylines(
   // fontSize added after each glyph's natural advance — opentype's
   // implementation just does `x += options.letterSpacing * fontSize`
   // per char (verified in node_modules/opentype.js source).
+  //
+  // Features: opentype v2 defaults kerning ON but ships ligatures OFF.
+  // We turn liga + rlig on explicitly so "fi" / "fl" and language-
+  // required ligatures render as expected — without this, glyphs that
+  // a font designs as one shape come out as two separate letters and
+  // the user sees a visible regression vs Inkscape / CorelDRAW
+  // (MIT-compare audit recommendation).
   const path = font.getPath(line, xOffset, yBaseline, sizeMm, {
+    kerning: true,
     letterSpacing,
+    features: { liga: true, rlig: true },
   });
   flattenPath(path.commands, out);
 }
