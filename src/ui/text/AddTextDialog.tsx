@@ -11,7 +11,7 @@
 // scripts opentype's getPath handles word-spacing and Unicode glyph
 // lookup; we just split on '\n' for line breaks.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   DEFAULT_FONT_KEY,
   FONT_REGISTRY,
@@ -26,6 +26,7 @@ import {
   DEFAULT_TEXT_SIZE_MM,
 } from '../../core/text';
 import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
+import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -52,12 +53,24 @@ function DialogForm(props: {
   const pushToast = useToastStore((s) => s.pushToast);
   const fields = useTextDialogFields(state);
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // R-M1 a11y: Escape closes, Tab cycles within, focus returns to the
+  // toolbar button on close. Hook installs keydown listener and
+  // initial-focus + cleanup-focus behaviour.
+  useDialogA11y(dialogRef, close);
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     void commitText(state, fields.values, { upsert, close, pushToast, setSubmitting });
   };
   return (
-    <div style={backdropStyle} role="dialog" aria-label="Add or edit text">
+    <div
+      ref={dialogRef}
+      style={backdropStyle}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Add or edit text"
+      tabIndex={-1}
+    >
       <form onSubmit={onSubmit} style={panelStyle}>
         <h2 style={headingStyle}>{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
         <FormFields fields={fields} />

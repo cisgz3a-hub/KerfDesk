@@ -17,7 +17,7 @@
 // 'traced-image' so the source filename + future "re-trace from
 // the original raster" workflow can find it.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { IDENTITY_TRANSFORM, type TracedImage } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
@@ -26,6 +26,7 @@ import {
   traceImageToSvgString,
 } from '../../core/trace';
 import { parseSvg } from '../../io/svg';
+import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -48,6 +49,10 @@ function DialogBody(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const options: TraceOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
   const preview = useTracePreview(file, options);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  // R-M1 a11y: Escape closes, Tab cycles within, focus returns to the
+  // toolbar button on close.
+  useDialogA11y(dialogRef, close);
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -59,7 +64,14 @@ function DialogBody(): JSX.Element {
   };
 
   return (
-    <div style={backdropStyle} role="dialog" aria-label="Import raster image">
+    <div
+      ref={dialogRef}
+      style={backdropStyle}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Import raster image"
+      tabIndex={-1}
+    >
       <form onSubmit={onSubmit} style={panelStyle}>
         <h2 style={headingStyle}>Trace Image</h2>
         <FilePicker file={file} onPick={setFile} />
