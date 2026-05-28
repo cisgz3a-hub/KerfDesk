@@ -93,7 +93,7 @@ Import a raster (JPG/PNG), trace to vectors via `imagetracerjs` (Unlicense — M
 Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005. See ADR-019 (Fill) + ADR-020 (Image).
 
 - **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
-- **F.2 — Image** [Kickoff done — ADR-020]. True raster engrave: a new `RasterImage` SceneObject variant carries PNG bytes as a data URL; a new `emit-raster.ts` strategy emits per-pixel S-modulation G1 moves with overscan. M-mode hardcoded to M4 (dynamic) for image groups per ADR-020 Q1. Dithering modes: threshold, Floyd-Steinberg, direct grayscale; rolled-in-house (~30 LOC per algorithm) — no new dependency. Streaming-emit kicks in past 100 KB G-code to keep memory bounded on large images.
+- **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs threshold/Floyd-Steinberg/grayscale; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet burned on Falcon.
 
 ### Anything past Phase F
 

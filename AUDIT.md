@@ -261,6 +261,7 @@ better risk/effort allocation at this stage. **Accepted gap, documented.**
 | Feature | Status | Evidence |
 |---|---|---|
 | Phase F.1 Fill mode | **CLAIMED** | 10 unit + property tests for fillHatching, compile-job dispatch tests; no real Falcon burn yet |
+| Phase F.2 Image mode (a-e shipped) | **CLAIMED** | 12 dither tests + 16 emit-raster tests + scene-mutations + back-fill; **F.2.f hardware burn pending** — see WORKFLOW.md F-F2 acceptance checklist |
 | Frame feed decoupling | VERIFIED | User confirmed Frame works at speed after the change |
 | Build badge | VERIFIED | Visible in DOM; defines confirmed inline in dist/web/assets/index-*.js |
 | Canvas auto-zoom on import | CLAIMED | Logic tested via the new combinedBBox + zoomToBounds math; not verified on a real import workflow |
