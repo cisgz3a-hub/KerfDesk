@@ -139,7 +139,13 @@ risk is small. Worth flagging.
 **Fix path:** Register `app://` via `protocol.handle()` in `app.whenReady`;
 change `loadFile` to `loadURL('app://./index.html')`. ~20 LOC.
 
-**Status:** **TRACKED** — defer until next Electron-security pass.
+**Status:** **RESOLVED** — `electron/main.ts` now registers `app` as a
+privileged standard+secure scheme via `protocol.registerSchemesAsPrivileged`,
+installs a `protocol.handle('app', ...)` mapping `app://app/<path>` onto
+`dist/web/<path>` via `net.fetch(file://...)` for correct MIME inheritance,
+and calls `loadURL('app://app/index.html')` instead of `loadFile`. Path-
+traversal guard re-resolves every request and 404s anything escaping the
+bundle root.
 
 ---
 

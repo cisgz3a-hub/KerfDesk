@@ -9,21 +9,64 @@
 //   * CSP set via session.webRequest.onHeadersReceived (not meta tag —
 //     per Electron docs, meta CSP is unreliable on file:// origin and
 //     can't gate things like form-action / frame-ancestors)
+//   * Renderer runs on the custom `app://` scheme via protocol.handle()
+//     instead of file:// (A4 audit fix). Gives the renderer a predictable
+//     origin so CSP behaves consistently and the cross-origin-isolation
+//     defaults match a normal HTTPS site rather than file://'s special
+//     case. Path traversal is blocked by re-resolving every request and
+//     refusing anything outside the dist/web bundle root.
 //
 // Renderer source:
 //   * If env LASERFORGE_DEV_URL is set (e.g. http://localhost:5173), load that
 //     URL — Vite dev server with HMR. CSP is loosened in that mode for HMR.
-//   * Otherwise load dist/web/index.html via file://. This is what
-//     `pnpm dev:desktop` and the packaged build both do.
+//   * Otherwise load app://app/index.html which the protocol handler maps
+//     to dist/web/index.html. This is what `pnpm dev:desktop` and the
+//     packaged build both do.
 
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, net, protocol, session } from 'electron';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DEV_URL = process.env['LASERFORGE_DEV_URL'];
+
+// Custom-scheme registration MUST happen before app.whenReady(). Per the
+// Electron security checklist, declaring `standard: true` + `secure: true`
+// makes the renderer behave like an HTTPS origin (fetch / SubtleCrypto /
+// SharedArrayBuffer all work the same as on real HTTPS). `supportFetchAPI`
+// lets renderer code `fetch('app://...')` for additional assets if needed.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+    },
+  },
+]);
+
+// Maps an `app://app/<path>` URL onto a file under dist/web. Refuses any
+// resolved path that escapes the bundle root (e.g. ../../etc/passwd).
+function makeAppProtocolHandler(distRoot: string) {
+  return async (request: Request): Promise<Response> => {
+    const url = new URL(request.url);
+    // Strip leading slash; treat empty path as index.html.
+    const requested = url.pathname.replace(/^\/+/, '') || 'index.html';
+    const filePath = path.normalize(path.join(distRoot, requested));
+    // Path-traversal guard: after normalize, the path must still live
+    // inside distRoot. path.relative returns '' or a non-'..' string
+    // when within; '..'-prefixed otherwise.
+    const rel = path.relative(distRoot, filePath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      return new Response('Not Found', { status: 404 });
+    }
+    return net.fetch(pathToFileURL(filePath).toString());
+  };
+}
 
 async function createWindow(): Promise<void> {
   const window = new BrowserWindow({
@@ -178,8 +221,11 @@ async function createWindow(): Promise<void> {
   if (DEV_URL !== undefined && DEV_URL.length > 0) {
     await window.loadURL(DEV_URL);
   } else {
-    const indexPath = path.join(__dirname, '..', 'dist', 'web', 'index.html');
-    await window.loadFile(indexPath);
+    // A4 fix: load through the custom app:// scheme registered in
+    // whenReady() below rather than file://. Both work; app:// gives
+    // the renderer a predictable HTTPS-like origin that CSP and the
+    // standard browser origin policies behave consistently against.
+    await window.loadURL('app://app/index.html');
   }
 
   // Surface renderer console output to the main process stdout so dev runs
@@ -197,7 +243,14 @@ async function createWindow(): Promise<void> {
 
 void app
   .whenReady()
-  .then(createWindow)
+  .then(() => {
+    // Wire the app:// scheme to the dist/web bundle before opening any
+    // window. createWindow() will call loadURL('app://app/index.html'),
+    // which fails fast if this handler isn't installed yet.
+    const distRoot = path.join(__dirname, '..', 'dist', 'web');
+    protocol.handle('app', makeAppProtocolHandler(distRoot));
+    return createWindow();
+  })
   .catch((err: unknown) => {
     console.error('Failed to create window:', err);
     app.exit(1);
