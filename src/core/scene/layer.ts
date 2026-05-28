@@ -37,6 +37,19 @@ export const LAYER_DEFAULTS = {
   hatchSpacingMm: 0.2,
 } as const satisfies Omit<Layer, 'id' | 'color'>;
 
-export function createLayer(args: { id: string; color: string }): Layer {
-  return { id: args.id, color: args.color, ...LAYER_DEFAULTS };
+export function createLayer(args: {
+  id: string;
+  color: string;
+  mode?: LayerMode;
+}): Layer {
+  // mode override (F.2.c): raster-image imports want mode='image'
+  // from the moment their layer is auto-created so the user doesn't
+  // have to toggle. Other callers (SVG / text imports) omit it and
+  // inherit LAYER_DEFAULTS.mode ('line').
+  return {
+    id: args.id,
+    color: args.color,
+    ...LAYER_DEFAULTS,
+    ...(args.mode !== undefined ? { mode: args.mode } : {}),
+  };
 }

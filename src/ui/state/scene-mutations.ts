@@ -82,6 +82,18 @@ export function ensureLayersForColors(
   return out;
 }
 
+// F.2.c: dedicated layer-ensurer for raster images. Same shape as
+// ensureLayersForColors but the new layer comes up in mode='image'
+// instead of the default 'line'. If a layer with that color already
+// exists, it's untouched — we don't auto-flip an existing layer's
+// mode (would surprise the user; they may have other line/fill work
+// on that color).
+export function ensureRasterImageLayer(scene: Scene, color: string): Scene {
+  const exists = scene.layers.some((l) => l.color === color);
+  if (exists) return scene;
+  return addLayer(scene, createLayer({ id: color, color, mode: 'image' }));
+}
+
 // Clone every selected SceneObject with a fresh id and a 10 mm offset.
 // Returns the new selection (first clone as primary, rest as extras)
 // plus the new scene + undo push. Matches the F-A3 multi-import
@@ -133,14 +145,17 @@ export function applyDuplicate(
 
 // Drop layers whose color isn't referenced by any remaining object.
 // Called after removeSceneObject so the Cuts/Layers panel doesn't
-// stay polluted with stale per-color settings. Only object kinds
-// that own `paths` count as consumers (imported-svg, text,
-// traced-image). Match the same kinds compileJob walks.
+// stay polluted with stale per-color settings. Two consumer shapes:
+// objects with `paths` (imported-svg, text, traced-image) contribute
+// one used-color per path; raster-image contributes its single
+// `color` field (F.2.c). Match the same kinds compileJob walks.
 export function pruneOrphanLayers(scene: Scene): Scene {
   const usedColors = new Set<string>();
   for (const obj of scene.objects) {
     if (obj.kind === 'imported-svg' || obj.kind === 'text' || obj.kind === 'traced-image') {
       for (const p of obj.paths) usedColors.add(p.color);
+    } else if (obj.kind === 'raster-image') {
+      usedColors.add(obj.color);
     }
   }
   const kept = scene.layers.filter((l) => usedColors.has(l.color));
@@ -176,6 +191,13 @@ export function applyFreshImport(
     positioned.kind === 'traced-image'
   ) {
     scene = ensureLayersForColors(scene, positioned.paths);
+  } else if (positioned.kind === 'raster-image') {
+    // F.2.c: ensure an image-mode layer exists for the raster's
+    // color. Raster images bring their own color (typically the
+    // canonical DEFAULT_RASTER_LAYER_COLOR) and need mode='image'
+    // on the created layer so the eventual F.2.d compile arm
+    // dispatches to emit-raster.
+    scene = ensureRasterImageLayer(scene, positioned.color);
   }
   return {
     project: { ...s.project, scene },

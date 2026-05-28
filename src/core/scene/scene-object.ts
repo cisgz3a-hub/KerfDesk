@@ -103,9 +103,55 @@ export type TracedImage = {
   readonly paths: ReadonlyArray<ColoredPath>;
 };
 
-// Full union expanded through Phase E (ADR-014). Future variants
-// require an ADR + a PROJECT.md scope revision.
-export type SceneObject = ImportedSvg | TextObject | TracedImage;
+// Raster image for image-mode engraving, Phase F.2 (ADR-020).
+// Unlike TracedImage (which is vectorized at import time and burns
+// as outlines), RasterImage retains its pixel data so the compile
+// path can dither + emit per-pixel S-modulation G-code.
+//
+// dataUrl carries PNG bytes embedded in the .lf2 file as a data URL
+// (per ADR-020 — self-contained projects). pixelWidth/pixelHeight
+// are the source bitmap dimensions; bounds is its placement in mm
+// on the workspace.
+//
+// `dither` and `linesPerMm` are layer-mode-specific knobs typically
+// surfaced via the Image-mode layer fields, but stored on the
+// object so each image carries its own preferred quality settings
+// across save/load.
+export type DitherAlgorithm = 'threshold' | 'floyd-steinberg' | 'grayscale';
+
+export type RasterImage = {
+  readonly kind: 'raster-image';
+  readonly id: string;
+  readonly source: string;
+  readonly dataUrl: string; // 'data:image/png;base64,...'
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  readonly bounds: Bounds;
+  readonly transform: Transform;
+  // The Layer this image binds to, by color key. Lets a single
+  // RasterImage reuse the same color/mode/power/speed plumbing as
+  // every other SceneObject. Fresh imports land on a canonical
+  // image-mode layer (created if missing) so the operator gets a
+  // working Image layer auto-configured. The user can re-assign
+  // by changing this color (or via a future "Move to layer..." UI).
+  readonly color: string;
+  readonly dither: DitherAlgorithm;
+  // Engraving resolution. 5-25 typical for diode lasers; above 20
+  // strains USB bandwidth and pushes G-code past ~1 MB on a
+  // 100×100 mm image.
+  readonly linesPerMm: number;
+};
+
+// Canonical Layer color for fresh RasterImage imports. Mid-grey is
+// the conventional "image" indicator in CAM tools (LightBurn uses
+// black, but black collides with line-art SVG imports). 808080 is
+// distinct from primary colors and likely-unused so it won't
+// accidentally collide with a real layer the user created.
+export const DEFAULT_RASTER_LAYER_COLOR = '#808080';
+
+// Full union expanded through Phase F.2 (ADR-014, ADR-020). Future
+// variants require an ADR + a PROJECT.md scope revision.
+export type SceneObject = ImportedSvg | TextObject | TracedImage | RasterImage;
 
 // Exhaustiveness helper. Place in the default arm of every `switch` over a
 // discriminated union so adding a variant produces exactly one TS error (the

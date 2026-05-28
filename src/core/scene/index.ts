@@ -8,9 +8,11 @@ export { LAYER_DEFAULTS, createLayer } from './layer';
 export type {
   Bounds,
   ColoredPath,
+  DitherAlgorithm,
   FontKey,
   ImportedSvg,
   Polyline,
+  RasterImage,
   SceneObject,
   TextAlignment,
   TextObject,
@@ -18,7 +20,7 @@ export type {
   Transform,
   Vec2,
 } from './scene-object';
-export { IDENTITY_TRANSFORM, assertNever } from './scene-object';
+export { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, assertNever } from './scene-object';
 
 export { applyTransform } from './transform';
 export type { AABB } from './hit-test';

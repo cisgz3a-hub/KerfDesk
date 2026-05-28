@@ -77,6 +77,14 @@ function appendSegmentsFromObject(
     case 'traced-image':
       appendPathSegments(obj.paths, obj.transform, layer, device, out);
       return;
+    case 'raster-image':
+      // F.2.c: SceneObject union now includes raster-image. The
+      // dedicated raster emit path (compileRasterGroup → emitRaster)
+      // lands in F.2.d; for this commit, raster images don't
+      // contribute polyline segments and the compile path skips
+      // them. Behaviour parity with the F.2.b standalone emit-raster
+      // tests preserved.
+      return;
     default:
       assertNever(obj, 'SceneObject');
   }
