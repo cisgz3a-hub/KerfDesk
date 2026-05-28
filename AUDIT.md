@@ -115,7 +115,10 @@ The wire protocol is still correct; the wording is just stale.
 **Fix:** One-line addendum to each: "1.1h is the de-facto wire protocol;
 actively maintained forks: grblHAL, FluidNC, µCNC."
 
-**Status:** **TRACKED** — 3-line doc edit.
+**Status:** **RESOLVED** — RESEARCH_LOG.md GRBL protocol entry now
+carries an explicit "Upstream status" line; the planner-references
+section also flags grbl as archived. PROJECT.md:342 already had the
+addendum; verified in this pass.
 
 ---
 
@@ -676,12 +679,14 @@ marked TRACKED.
   as commit `32f30ca`. **FIXED:** retagged as shipped, with the
   related Cut/Copy/Paste lines clarified as not-implemented.
 - **D-M8 DECISIONS.md "Phase A fixture corpus" open item** — Phase
-  A shipped; item should be marked done. **TRACKED** — left for the
-  next ADR pass; minor.
+  A shipped; item should be marked done. ✅ **RESOLVED** — both
+  open items in DECISIONS.md "Open items" now struck through with
+  the corresponding evidence (fixture files + bundled font list).
 
 ### D-Low / Note
 
-- D-L1 PROJECT.md Brave issue stamp — TRACKED, low.
+- D-L1 PROJECT.md Brave issue stamp — ✅ RESOLVED. Re-verification
+  date appended ("status last re-verified 2026-05-28 — still open").
 - D-L2 README pnpm script list incomplete — **FIXED:** added
   `lint:fix`, `format`, `format:check`, `license-check`,
   `deploy:web:preview`.

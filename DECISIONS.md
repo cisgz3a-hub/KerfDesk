@@ -399,8 +399,12 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 ## Open items
 
-1. **Phase A fixture corpus.** Five SVG fixtures for snapshot tests.
-2. **Bundled MIT fonts list** for Phase D (resolved at Phase D kickoff).
+1. ~~**Phase A fixture corpus.** Five SVG fixtures for snapshot tests.~~ ✅
+   Shipped — see `src/__fixtures__/svg/` (rectangle-single-color,
+   two-color-paths, multi-shape, closed-polygon, zigzag).
+2. ~~**Bundled MIT fonts list** for Phase D~~ ✅ Resolved at Phase D
+   kickoff — bundled fonts are Inter, Roboto, Source Code Pro, Pacifico
+   (all OFL/MIT, see `src/fonts/`).
 
 ## ADR-018 — Proprietary license, private repo (supersedes ADR-008)
 
