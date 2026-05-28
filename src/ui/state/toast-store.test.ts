@@ -46,4 +46,19 @@ describe('useToastStore', () => {
     vi.advanceTimersByTime(2001); // first hits 3001, second hits 2001
     expect(useToastStore.getState().toasts.map((t) => t.message)).toEqual(['second']);
   });
+
+  it('manual dismiss cancels the auto-dismiss timer (R-L1 regression)', () => {
+    // The clearTimeout call inside dismissToast is the fix. We assert by
+    // observing the timer count Vitest fake-timers tracks — clearTimeout
+    // decrements it, while leaving the stale callback would not.
+    useToastStore.getState().pushToast('cancel-me');
+    expect(vi.getTimerCount()).toBe(1);
+    const [t] = useToastStore.getState().toasts;
+    if (t === undefined) throw new Error('expected toast');
+    useToastStore.getState().dismissToast(t.id);
+    expect(vi.getTimerCount()).toBe(0);
+    // And advancing past the auto-dismiss window must not throw or change state.
+    vi.advanceTimersByTime(5000);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
 });

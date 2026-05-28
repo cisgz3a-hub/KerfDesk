@@ -25,6 +25,15 @@ type ToastState = {
   readonly dismissToast: (id: string) => void;
 };
 
+// Active auto-dismiss timers, keyed by toast id. Held outside the store
+// (R-L1 audit finding): when the user manually dismisses a toast, we must
+// clear the matching setTimeout to stop a stale callback from firing later.
+// Without this, a rapid burst of pushes followed by manual dismissals leaves
+// orphaned timers resident in the event loop until they fire as no-op
+// filters. Not a leak per se, but accumulates work and prevents tests/JSDOM
+// from quiescing.
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   pushToast: (message, variant = 'info') => {
@@ -36,7 +45,18 @@ export const useToastStore = create<ToastState>((set, get) => ({
     // Schedule auto-dismiss out of band — toast lifetime is decoupled from
     // React commit cycles so a fast burst of toasts doesn't extend each
     // other's lifetimes.
-    setTimeout(() => get().dismissToast(id), AUTO_DISMISS_MS);
+    const handle = setTimeout(() => {
+      timers.delete(id);
+      get().dismissToast(id);
+    }, AUTO_DISMISS_MS);
+    timers.set(id, handle);
   },
-  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  dismissToast: (id) => {
+    const handle = timers.get(id);
+    if (handle !== undefined) {
+      clearTimeout(handle);
+      timers.delete(id);
+    }
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+  },
 }));
