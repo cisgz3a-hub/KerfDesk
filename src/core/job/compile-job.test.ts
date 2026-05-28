@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { createLayer, EMPTY_SCENE, IDENTITY_TRANSFORM, type SceneObject } from '../scene';
 import { compileJob } from './compile-job';
+import type { CutGroup, Job } from './job';
+
+// Narrow helper — every test in this file expects compileJob to
+// emit CutGroups (no image-mode layers in fixtures), so the cast
+// captures that invariant without sprinkling `as` everywhere.
+function firstCutGroup(job: Job): CutGroup | undefined {
+  const g = job.groups[0];
+  if (g === undefined || g.kind !== 'cut') return undefined;
+  return g;
+}
 
 function svgObj(args: {
   id: string;
@@ -95,8 +105,8 @@ describe('compileJob', () => {
       ],
     });
     const job = compileJob({ objects: [obj], layers: [layer] }, dev);
-    expect(job.groups[0]?.power).toBe(100);
-    expect(job.groups[0]?.passes).toBe(1);
+    expect(firstCutGroup(job)?.power).toBe(100);
+    expect(firstCutGroup(job)?.passes).toBe(1);
   });
 
   it('omits a layer whose color has no matching geometry', () => {
@@ -129,7 +139,7 @@ describe('compileJob', () => {
     // Object transform: (1,1) → (101,101), (2,2) → (102,102).
     // Default device is front-left origin (bedH = 400); Y is flipped to
     // bedH - y → (101, 299), (102, 298).
-    expect(job.groups[0]?.segments[0]?.polyline).toEqual([
+    expect(firstCutGroup(job)?.segments[0]?.polyline).toEqual([
       { x: 101, y: 299 },
       { x: 102, y: 298 },
     ]);
@@ -174,7 +184,7 @@ describe('compileJob', () => {
       ],
     };
     const job = compileJob({ objects: [sq], layers: [layer] }, dev);
-    const segs = job.groups[0]?.segments ?? [];
+    const segs = firstCutGroup(job)?.segments ?? [];
     expect(segs.length).toBeGreaterThan(1);
     for (const seg of segs) {
       expect(seg.polyline).toHaveLength(2);
@@ -216,7 +226,7 @@ describe('compileJob', () => {
     const job = compileJob({ objects: [obj], layers: [layer] }, { ...dev, origin: 'front-right' });
     // Front-right origin → X mirrored within bed (400), Y flipped (SVG top
     // y=0 → machine back y=bedHeight).
-    expect(job.groups[0]?.segments[0]?.polyline).toEqual([
+    expect(firstCutGroup(job)?.segments[0]?.polyline).toEqual([
       { x: 400, y: 400 },
       { x: 390, y: 400 },
     ]);

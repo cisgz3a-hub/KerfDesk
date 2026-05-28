@@ -6,6 +6,7 @@ function aJob(): Job {
   return {
     groups: [
       {
+        kind: 'cut',
         layerId: 'L1',
         color: '#000',
         power: 30,

@@ -85,6 +85,11 @@ function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] 
   const out: Block[] = [];
   let cursor: Vec2 = ORIGIN;
   for (const group of job.groups) {
+    // F.2.d: planner-aware estimator works on vector blocks (one
+    // per polyline edge). Raster groups produce a different motion
+    // model (constant-feed sweeps) — skipped here and accounted
+    // for separately in estimate-duration's raster path.
+    if (group.kind !== 'cut') continue;
     const cutV = Math.max(1, Math.min(group.speed, device.maxFeed)) / SECONDS_PER_MINUTE;
     for (let pass = 0; pass < group.passes; pass += 1) {
       for (const seg of group.segments) {

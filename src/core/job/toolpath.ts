@@ -27,6 +27,11 @@ export function buildToolpath(job: Job): Toolpath {
   const steps: ToolpathStep[] = [];
   let prevEnd: Vec2 | null = null;
   for (const group of job.groups) {
+    // F.2.d: the preview scrubber walks vector cuts/travels. Raster
+    // groups don't have a meaningful "edge" model for the scrubber
+    // (they're a continuous sweep); skip them for now. Future
+    // enhancement: synthesize one "raster" step per row.
+    if (group.kind !== 'cut') continue;
     for (const seg of group.segments) {
       const first = seg.polyline[0];
       if (first === undefined) continue;

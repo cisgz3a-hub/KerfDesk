@@ -40,12 +40,19 @@
 // Pure-core compliant: no clock, no random, no I/O.
 
 import type { Vec2 } from '../scene';
-import type { CutGroup, CutSegment, Job } from './job';
+import type { CutGroup, CutSegment, Group, Job } from './job';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 
 export function optimizePaths(job: Job): Job {
-  return { groups: job.groups.map(optimizeGroup) };
+  return { groups: job.groups.map(optimizeGroupAny) };
+}
+
+// F.2.d: raster groups don't have polylines to reorder; pass through
+// untouched. Only cut groups go through the nearest-neighbour pass.
+function optimizeGroupAny(group: Group): Group {
+  if (group.kind !== 'cut') return group;
+  return optimizeGroup(group);
 }
 
 function optimizeGroup(group: CutGroup): CutGroup {
