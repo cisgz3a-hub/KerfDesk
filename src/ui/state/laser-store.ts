@@ -11,7 +11,6 @@
 import { create } from 'zustand';
 import {
   CMD_HOME,
-  CMD_SETTINGS,
   CMD_UNLOCK,
   RT_HOLD,
   RT_JOG_CANCEL,
@@ -20,15 +19,13 @@ import {
   RT_STATUS,
   buildJogCommand,
   cancel as cancelStreamer,
-  classifyResponse,
   createStreamer,
+  disconnect as disconnectStreamer,
   idleCollector,
   type JogParams,
-  onAck,
   pause as pauseStreamer,
   resume as resumeStreamer,
   type SettingsCollectorState,
-  startCollecting,
   step,
   type StatusReport,
   type StreamerState,
@@ -36,7 +33,8 @@ import {
 import type { DeviceProfile } from '../../core/devices';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
-import { applyDetectedSettingsPatch, consumeSettingsResponse } from './detected-settings-action';
+import { applyDetectedSettingsPatch } from './detected-settings-action';
+import { handleLine, runHandshake } from './laser-line-handler';
 
 export type { AutofocusResult } from './autofocus-action';
 export { describeAutofocusResult } from './autofocus-action';
@@ -175,16 +173,30 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
       try {
         const conn = await portRef.open({ baudRate: DEFAULT_BAUD });
         refs.connection = conn;
-        refs.unsubscribeLine = conn.onLine((line) => handleLine(set, get, line));
+        refs.unsubscribeLine = conn.onLine((line) => handleLine(set, get, refs, safeWrite, line));
         refs.unsubscribeClose = conn.onClose(() => {
           teardown();
-          set({ connection: { kind: 'disconnected' }, statusReport: null });
+          // If a job was streaming or paused when the port dropped, mark
+          // the streamer 'disconnected' so the UI shows "connection lost
+          // mid-job" instead of leaving a stale 'streaming' state behind.
+          // MIT-T1 audit finding (CNCjs parity). Functional set form so
+          // we don't clobber any concurrent ack-driven update — same
+          // pattern as R-H2's resume/stop fix.
+          set((s) => ({
+            connection: { kind: 'disconnected' },
+            statusReport: null,
+            streamer:
+              s.streamer !== null &&
+              (s.streamer.status === 'streaming' || s.streamer.status === 'paused')
+                ? disconnectStreamer(s.streamer)
+                : s.streamer,
+          }));
         });
         refs.pollHandle = setInterval(() => {
           void safeWrite(RT_STATUS);
         }, STATUS_POLL_MS);
         set({ connection: { kind: 'connected' }, alarmCode: null });
-        void runHandshake(set, get);
+        void runHandshake(set, get, refs, safeWrite);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         set({ connection: { kind: 'failed', error: message } });
@@ -315,85 +327,3 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...jobActions(set, get),
   ...detectedSettingsActions(set, get),
 }));
-
-// Validates the connection by waiting up to HANDSHAKE_TIMEOUT_MS for *any*
-// response from GRBL (welcome banner or first status poll reply). If something
-// comes back, we follow up with `$$` so the operator can see the live
-// settings in the log. If nothing comes back, we surface a clear "no
-// response" message so a wrong-baud or non-GRBL device doesn't silently
-// look "Connected" (audit finding I-3).
-async function runHandshake(set: SetFn, get: GetFn): Promise<void> {
-  const HANDSHAKE_TIMEOUT_MS = 2000;
-  const POLL_MS = 50;
-  const start = Date.now();
-  const startLen = get().log.length;
-  while (Date.now() - start < HANDSHAKE_TIMEOUT_MS) {
-    if (get().log.length > startLen) break;
-    await new Promise((r) => setTimeout(r, POLL_MS));
-  }
-  if (get().log.length === startLen) {
-    set({
-      log: pushLog(
-        get(),
-        '[lf2] No GRBL response within 2 s. Check baud rate (115200) and that the device is GRBL.',
-      ),
-    });
-    return;
-  }
-  // Got a reply — query settings so the operator can see $30, $32, etc.
-  // Reset detectedSettings + arm the collector first so handleLine can
-  // build up the patch as setting lines stream in. The collector closes
-  // on the trailing `ok` that GRBL emits at the end of $$.
-  set({
-    log: pushLog(get(), '[lf2] Connected. Querying settings ($$)…'),
-    detectedSettings: null,
-  });
-  refs.settingsCollector = startCollecting();
-  await safeWrite(`${CMD_SETTINGS}\n`);
-}
-
-function handleLine(
-  set: (partial: Partial<LaserState>) => void,
-  get: () => LaserState,
-  line: string,
-): void {
-  const cls = classifyResponse(line);
-  // Always log the raw line for the user-visible console. Truncated above.
-  set({ log: pushLog(get(), line) });
-  // F-7: feed every classified response to the settings collector.
-  // Returns a patch only when the `$$` response window just closed.
-  const patch = consumeSettingsResponse(refs, cls);
-  if (patch !== null) set({ detectedSettings: patch });
-  if (cls.kind === 'status') {
-    set({ statusReport: cls.report });
-    return;
-  }
-  if (cls.kind === 'alarm') {
-    set({ alarmCode: cls.code });
-    advanceStream(set, get, 'alarm');
-    return;
-  }
-  if (cls.kind === 'error') {
-    set({ lastError: cls.code });
-    advanceStream(set, get, 'error');
-    return;
-  }
-  if (cls.kind === 'ok') {
-    advanceStream(set, get, 'ok');
-    return;
-  }
-  // welcome / message / setting / unknown — already logged.
-}
-
-function advanceStream(
-  set: (partial: Partial<LaserState>) => void,
-  get: () => LaserState,
-  ack: 'ok' | 'error' | 'alarm',
-): void {
-  const s = get().streamer;
-  if (s === null) return;
-  const acked = onAck(s, ack);
-  const stepped = step(acked.state);
-  set({ streamer: stepped.state });
-  if (stepped.toSend.length > 0) void safeWrite(stepped.toSend);
-}

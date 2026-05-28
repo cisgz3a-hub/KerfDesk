@@ -23,6 +23,7 @@ export {
   DEFAULT_RX_BUFFER_BYTES,
   cancel,
   createStreamer,
+  disconnect,
   onAck,
   pause,
   progress,

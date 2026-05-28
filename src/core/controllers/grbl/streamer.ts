@@ -20,7 +20,18 @@
 // audit recommended matching CNCjs. No observed bug at 127 — preventive.
 export const DEFAULT_RX_BUFFER_BYTES = 120;
 
-export type StreamerStatus = 'idle' | 'streaming' | 'paused' | 'done' | 'cancelled';
+// 'disconnected' is distinct from 'cancelled' so the UI can show
+// "job aborted — connection lost" vs the user-initiated stop. The
+// streamer treats both as terminal (no more bytes go out), but the
+// reducer entry-point differs (cancel = user, disconnect = cable yank).
+// CNCjs parity per MIT-T1 audit finding.
+export type StreamerStatus =
+  | 'idle'
+  | 'streaming'
+  | 'paused'
+  | 'done'
+  | 'cancelled'
+  | 'disconnected';
 
 export type StreamerState = {
   readonly status: StreamerStatus;
@@ -80,7 +91,12 @@ function splitLines(gcode: string): ReadonlyArray<string> {
 // Try to send as many queued lines as fit in the remaining buffer. Always
 // safe to call repeatedly; returns toSend = '' when nothing changed.
 export function step(state: StreamerState): StepResult {
-  if (state.status === 'paused' || state.status === 'done' || state.status === 'cancelled') {
+  if (
+    state.status === 'paused' ||
+    state.status === 'done' ||
+    state.status === 'cancelled' ||
+    state.status === 'disconnected'
+  ) {
     return { state, toSend: '' };
   }
   let queued = state.queued;
@@ -150,6 +166,15 @@ export function resume(state: StreamerState): StreamerState {
 
 export function cancel(state: StreamerState): StreamerState {
   return { ...state, status: 'cancelled', queued: [] };
+}
+
+// Mark the streamer disconnected — used when the serial port drops
+// mid-stream (cable yank, OS sleep). Same shape as cancel() at the
+// data layer (queued lines cleared), but the status distinguishes
+// involuntary loss from user-initiated stop so the UI can word the
+// notification correctly. MIT-T1 audit finding (CNCjs parity).
+export function disconnect(state: StreamerState): StreamerState {
+  return { ...state, status: 'disconnected', queued: [] };
 }
 
 // Progress as a fraction [0, 1].
