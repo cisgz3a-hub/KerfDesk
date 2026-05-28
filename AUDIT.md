@@ -178,7 +178,20 @@ documented case but the rule would catch one if it appeared.
 ```
 Then run lint, audit each finding, fix or `eslint-disable` with comment.
 
-**Status:** **TRACKED** — separate PR worth doing.
+**Status:** **RESOLVED (targeted variant).** A full `strictTypeChecked`
+flip fights project conventions — that preset wants `!` non-null
+assertions (which CLAUDE.md bans) and dot-notation that loses
+`noUncheckedIndexedAccess`'s benefit. Instead, `eslint.config.mjs`
+turns on the four high-value rules the audit specifically called out:
+- `@typescript-eslint/no-floating-promises` (the big one — would have
+  caught a missed `await safeWrite()` in laser-store)
+- `@typescript-eslint/no-misused-promises` (async functions in sync
+  signatures), with `checksVoidReturn: false` so React event handlers
+  stay idiomatic
+- `@typescript-eslint/use-unknown-in-catch-callback-variable`
+- `@typescript-eslint/prefer-promise-reject-errors`
+Lint now passes type-aware. Whole-preset upgrade tracked here as
+future work if a class of bug surfaces those rules want.
 
 ---
 
