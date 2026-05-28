@@ -86,7 +86,7 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 
 ### Phase E — v0.5 "Image vectorize" [Planned, post-MVP]
 
-Import a raster (JPG/PNG), trace to vectors via `imagetracer.js` (MIT — `potrace-wasm` rejected on GPL grounds). Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013.
+Import a raster (JPG/PNG), trace to vectors via `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds). Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013.
 
 ### Phase F — v0.6 "Raster engrave" [In progress]
 
@@ -188,7 +188,7 @@ phase; tracked here so they don't get lost.
 - **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
 - **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
 - **Text (Phase D):** `opentype.js` (MIT). Bundled MIT fonts.
-- **Vectorize (Phase E):** `imagetracer.js` (MIT).
+- **Vectorize (Phase E):** `imagetracerjs` (Unlicense — MIT-compatible).
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), Playwright (E2E smoke per platform).
 - **Build:** Vite → web bundle; Vite + electron-builder → signed Windows `.exe`.
 - **Lint/format:**
@@ -285,7 +285,7 @@ Each subfolder has its own `index.ts` defining the module's public API. ESLint f
 - **Imported SVG is untrusted.** Parsed via native `DOMParser`, sanitized via **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters: true }` and a custom hook removing external `xlink:href` and non-image data URIs.
 - **Imported raster images (Phase E)** decoded inside a sandbox. Memory-bounded.
 - **Bundled fonts (Phase D)** parsed with `opentype.js` only. Never passed to native font APIs.
-- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. Narrow typed IPC. `setPermissionRequestHandler` returns `false` except for `serial`.
+- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial` and any `fileSystem*` permission (needed for the File System Access API in Electron 33+ — see commit `2965bd0`). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M5` start; `M5`, park at end.
 - **No auto-update from arbitrary URLs.**
@@ -339,7 +339,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 | `LICENSE` | Proprietary — All Rights Reserved (ADR-018). |
 
 External authorities:
-- **GRBL v1.1 official docs** (gnea/grbl wiki) — protocol authority.
+- **GRBL v1.1h wire protocol** — defined in the `gnea/grbl` wiki, which has been archived since Aug 2019. The 1.1h streaming protocol (simple send-response, character-counted buffer) remains the de-facto wire authority; actively maintained protocol-compatible forks are **grblHAL**, **FluidNC**, and **µCNC**.
 - **W3C SVG 1.1 / 2** — geometry parsing authority.
 - **LightBurn** — UX and workflow reference *only*. We copy its model, not its code.
 - **CNCjs source** (MIT, github.com/cncjs/cncjs) — Phase B protocol reference *only*. Not a dependency.
