@@ -49,10 +49,7 @@ describe('dither — threshold', () => {
 
   it('matches default 128 threshold when none provided', () => {
     const buf = new Uint8Array([127, 128, 129]);
-    const out = dither(
-      { luma: buf, width: 3, height: 1 },
-      { algorithm: 'threshold', sMax: SMAX },
-    );
+    const out = dither({ luma: buf, width: 3, height: 1 }, { algorithm: 'threshold', sMax: SMAX });
     // 127 < 128 → burn; 128 ≥ 128 → off; 129 ≥ 128 → off.
     expect(Array.from(out)).toEqual([SMAX, 0, 0]);
   });
@@ -78,18 +75,12 @@ describe('dither — grayscale', () => {
 
 describe('dither — floyd-steinberg', () => {
   it('all-black input stays full-burn (no error to diffuse)', () => {
-    const out = dither(
-      uniform(8, 4, 0),
-      { algorithm: 'floyd-steinberg', sMax: SMAX },
-    );
+    const out = dither(uniform(8, 4, 0), { algorithm: 'floyd-steinberg', sMax: SMAX });
     expect(Array.from(out).every((v) => v === SMAX)).toBe(true);
   });
 
   it('all-white input stays off (no error to diffuse)', () => {
-    const out = dither(
-      uniform(8, 4, 255),
-      { algorithm: 'floyd-steinberg', sMax: SMAX },
-    );
+    const out = dither(uniform(8, 4, 255), { algorithm: 'floyd-steinberg', sMax: SMAX });
     expect(Array.from(out).every((v) => v === 0)).toBe(true);
   });
 

@@ -78,9 +78,10 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
   // back to all-zero if missing (pre-F.2.e .lf2 files, or import
   // paths that haven't populated it yet). Decoding is pure: atob is
   // a JS standard global available in Node 16+ and every browser.
-  const luma = obj.lumaBase64 !== undefined
-    ? decodeBase64Luma(obj.lumaBase64, obj.pixelWidth * obj.pixelHeight)
-    : new Uint8Array(obj.pixelWidth * obj.pixelHeight);
+  const luma =
+    obj.lumaBase64 !== undefined
+      ? decodeBase64Luma(obj.lumaBase64, obj.pixelWidth * obj.pixelHeight)
+      : new Uint8Array(obj.pixelWidth * obj.pixelHeight);
   const sMax = Math.round((clamp(layer.power, 0, 100) / 100) * device.maxPowerS);
   // Layer settings win over per-image settings so the operator can
   // re-tune one layer without editing every image on it.

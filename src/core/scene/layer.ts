@@ -49,11 +49,7 @@ export const LAYER_DEFAULTS = {
   linesPerMm: 10,
 } as const satisfies Omit<Layer, 'id' | 'color'>;
 
-export function createLayer(args: {
-  id: string;
-  color: string;
-  mode?: LayerMode;
-}): Layer {
+export function createLayer(args: { id: string; color: string; mode?: LayerMode }): Layer {
   // mode override (F.2.c): raster-image imports want mode='image'
   // from the moment their layer is auto-created so the user doesn't
   // have to toggle. Other callers (SVG / text imports) omit it and
