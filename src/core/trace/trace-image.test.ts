@@ -70,21 +70,21 @@ function buildLogoLikeFixture(): Fixture {
 }
 
 describe('traceImageToSvgString', () => {
-  it('returns a string starting with <svg', () => {
-    const svg = traceImageToSvgString(blackSquareOnWhite());
+  it('returns a string starting with <svg', async () => {
+    const svg = await traceImageToSvgString(blackSquareOnWhite());
     expect(typeof svg).toBe('string');
     expect(svg.startsWith('<svg')).toBe(true);
   });
 
-  it('produces a non-trivially-sized SVG (more than just the root tag)', () => {
-    const svg = traceImageToSvgString(blackSquareOnWhite());
+  it('produces a non-trivially-sized SVG (more than just the root tag)', async () => {
+    const svg = await traceImageToSvgString(blackSquareOnWhite());
     // A black-on-white traced output should contain at least one
     // <path>, <polygon>, or <rect> element with coordinates.
     expect(svg.length).toBeGreaterThan(50);
     expect(svg).toMatch(/<(path|polygon|polyline|rect)/);
   });
 
-  it('fixed-palette mode produces a 2-color output regardless of input richness', () => {
+  it('fixed-palette mode produces a 2-color output regardless of input richness', async () => {
     // The "Line Art" preset uses a fixed [white, black] palette.
     // Even on a noisy 4-color fixture it must yield exactly two
     // color layers in the SVG (clean ink + background).
@@ -100,7 +100,7 @@ describe('traceImageToSvgString', () => {
       data[i * 4 + 2] = v;
       data[i * 4 + 3] = 255;
     }
-    const svg = traceImageToSvgString(
+    const svg = await traceImageToSvgString(
       { width: W, height: H, data },
       {
         ...DEFAULT_TRACE_OPTIONS,
@@ -115,12 +115,12 @@ describe('traceImageToSvgString', () => {
     expect(uniqueFills.size).toBeLessThanOrEqual(2);
   });
 
-  it('respects numberOfColors — 2 colors produces fewer/different layers than 8', () => {
-    const two = traceImageToSvgString(blackSquareOnWhite(), {
+  it('respects numberOfColors — 2 colors produces fewer/different layers than 8', async () => {
+    const two = await traceImageToSvgString(blackSquareOnWhite(), {
       ...DEFAULT_TRACE_OPTIONS,
       numberOfColors: 2,
     });
-    const eight = traceImageToSvgString(blackSquareOnWhite(), {
+    const eight = await traceImageToSvgString(blackSquareOnWhite(), {
       ...DEFAULT_TRACE_OPTIONS,
       numberOfColors: 8,
     });
@@ -136,7 +136,7 @@ describe('traceImageToSvgString', () => {
     // with `paths: ColoredPath[]`. If anything in that chain
     // regresses, this test catches it.
     const { parseSvg } = await import('../../io/svg/parse-svg');
-    const svg = traceImageToSvgString(blackSquareOnWhite());
+    const svg = await traceImageToSvgString(blackSquareOnWhite());
     const result = parseSvg({ svgText: svg, id: 'test', source: 'fixture.png' });
     expect(result.object).not.toBeNull();
     if (result.object !== null) {
@@ -185,7 +185,7 @@ describe('traceImageToSvgString', () => {
     expect(Array.from(data)).toEqual(Array.from(original));
   });
 
-  it('Line Art preset: traces an AA-heavy fixture without spurious dots', () => {
+  it('Line Art preset: traces an AA-heavy fixture without spurious dots', async () => {
     // Build a 32×32 fixture: a 12×12 black square at (10,10) with
     // gradient-shaded AA borders 1 pixel wide. Without pre-threshold
     // these borders produce edge speckle in the trace; with the
@@ -212,7 +212,7 @@ describe('traceImageToSvgString', () => {
         data[i + 3] = 255;
       }
     }
-    const svg = traceImageToSvgString(
+    const svg = await traceImageToSvgString(
       { width: W, height: H, data },
       {
         ...DEFAULT_TRACE_OPTIONS,
@@ -244,7 +244,7 @@ describe('traceImageToSvgString', () => {
     // is small. If either lever flips, the bug is back.
     const image = buildLogoLikeFixture();
     const { parseSvg } = await import('../../io/svg/parse-svg');
-    const svg = traceImageToSvgString(image, {
+    const svg = await traceImageToSvgString(image, {
       ...DEFAULT_TRACE_OPTIONS,
       fixedPalette: ['#ffffff', '#000000'],
       thresholdLuma: 128,
@@ -260,7 +260,7 @@ describe('traceImageToSvgString', () => {
     expect(longest).toBeGreaterThanOrEqual(20);
   });
 
-  it('handles a fully-uniform image without throwing', () => {
+  it('handles a fully-uniform image without throwing', async () => {
     // All-white 8×8 — nothing to trace. Should still produce a valid
     // SVG string (probably empty or just the root tag).
     const W = 8;
@@ -272,6 +272,6 @@ describe('traceImageToSvgString', () => {
       data[i + 2] = 255;
       data[i + 3] = 255;
     }
-    expect(() => traceImageToSvgString({ width: W, height: H, data })).not.toThrow();
+    await expect(traceImageToSvgString({ width: W, height: H, data })).resolves.not.toThrow();
   });
 });

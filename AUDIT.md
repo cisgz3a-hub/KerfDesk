@@ -199,8 +199,15 @@ Zustand + our own code.
 - Dynamic-import imagetracerjs — only loaded when Trace Image dialog opens.
 - Manual chunk splitting via `build.rollupOptions.output.manualChunks`.
 
-**Status:** **TRACKED** — would shave ~40% off initial load.
-First-launch UX is still <2s per PROJECT.md success metric, so deferred.
+**Status:** **RESOLVED** — `text-to-polylines.ts` and `trace-image.ts`
+now lazy-load their heavy libs via `await import(...)` with a cached
+promise. After the change, `pnpm build:web` emits:
+- `assets/index-*.js` — **312.67 KB** (down from 573 KB; -46%)
+- `assets/opentype-*.js` — 243.41 KB (only fetched when Add Text opens)
+- `assets/imagetracer_*.js` — 20.07 KB (only fetched when Trace Image opens)
+Initial first-paint bundle is now well under Vite's 500 KB warn. UI
+call sites (`AddTextDialog`, `ImportImageDialog`, `useTracePreview`)
+await the now-async functions; test suite (432 tests) green.
 
 ---
 

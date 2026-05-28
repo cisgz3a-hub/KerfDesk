@@ -14,12 +14,32 @@
 // type assertion at the boundary so the rest of the codebase only
 // sees clean function signatures.
 //
+// Lazy-loaded via dynamic import (A6 audit fix) so the ~80 KB
+// minified weight doesn't land in the initial bundle — users who
+// never open Trace Image never download it. The cached promise
+// means subsequent traces hit memory, not the network.
+//
 // Pure-core compliant: no clock, no random, no I/O. Takes data
-// in, gives string out.
+// in, gives string out (asynchronously now, to allow the lazy
+// load; the trace work itself is still synchronous CPU).
 
-// @ts-expect-error — imagetracerjs ships no type declarations; we
-// take it as `unknown`-shaped and assert the minimal API we use.
-import ImageTracer from 'imagetracerjs';
+// Internal type for the imagetracer module surface we use. Keeps
+// the `as` cast contained to one place.
+type ImageTracerModule = {
+  readonly imagedataToSVG: (imgd: RawImageData, options?: Record<string, unknown>) => string;
+};
+
+let tracerPromise: Promise<ImageTracerModule> | null = null;
+async function loadTracer(): Promise<ImageTracerModule> {
+  if (tracerPromise === null) {
+    // @ts-expect-error — imagetracerjs ships no type declarations
+    tracerPromise = import('imagetracerjs').then((mod) => {
+      const resolved = (mod.default ?? mod) as unknown as ImageTracerModule;
+      return resolved;
+    });
+  }
+  return tracerPromise;
+}
 
 // Minimal shape matching the ImageData browser type. Lets tests
 // construct fixtures without a real browser canvas.
@@ -157,17 +177,11 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   },
 };
 
-// Internal type for the imagetracer module surface we use. Keeps
-// the `as` cast contained to one place.
-type ImageTracerModule = {
-  readonly imagedataToSVG: (imgd: RawImageData, options?: Record<string, unknown>) => string;
-};
-
-export function traceImageToSvgString(
+export async function traceImageToSvgString(
   image: RawImageData,
   options: TraceOptions = DEFAULT_TRACE_OPTIONS,
-): string {
-  const tracer = ImageTracer as unknown as ImageTracerModule;
+): Promise<string> {
+  const tracer = await loadTracer();
   // Pre-threshold to 1-bit if requested. Done before handing the
   // pixels to imagetracer so anti-aliased edges get binarized
   // away — without this step, even with a fixed palette, AA

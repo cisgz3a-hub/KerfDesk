@@ -136,7 +136,7 @@ async function commitText(
   ctx.setSubmitting(true);
   try {
     const buffer = await loadFont(asKnownFontKey(v.fontKey));
-    const rendered = textToPolylines({
+    const rendered = await textToPolylines({
       fontBuffer: buffer,
       content: v.content,
       sizeMm: v.sizeMm,

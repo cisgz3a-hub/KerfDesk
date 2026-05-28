@@ -27,9 +27,33 @@
 // forms. Out of Phase D scope; tracked as MIT-T5 in AUDIT.md.
 //
 // Pure-core compliant: no clock, no random, no I/O.
+//
+// opentype.js is lazy-loaded via dynamic import (A6 audit fix) — the
+// ~110 KB minified weight stays out of the initial bundle. Users who
+// never open Add Text never download it. We import only types
+// statically; the runtime arrives via `await loadOpentype()`.
 
-import * as opentype from 'opentype.js';
+import type * as opentype from 'opentype.js';
 import type { Bounds, ColoredPath, Polyline, Vec2 } from '../scene';
+
+// Module surface we actually use. Lets the loader narrow the dynamic-
+// import result to something callable without a sprawling cast.
+type OpentypeModule = {
+  readonly parse: (buffer: ArrayBuffer) => opentype.Font;
+};
+
+let opentypePromise: Promise<OpentypeModule> | null = null;
+async function loadOpentype(): Promise<OpentypeModule> {
+  if (opentypePromise === null) {
+    opentypePromise = import('opentype.js').then((mod) => {
+      // opentype.js publishes both a namespace and a default export
+      // depending on bundler; prefer namespace, fall back to default.
+      const ns = mod as unknown as OpentypeModule & { default?: OpentypeModule };
+      return ns.parse !== undefined ? ns : (ns.default as OpentypeModule);
+    });
+  }
+  return opentypePromise;
+}
 
 // Sampling resolution for curves. 12 segments per cubic / quad keeps
 // glyphs smooth at typical sizes (10-40 mm). Same default as the SVG
@@ -54,8 +78,9 @@ export type TextRenderResult = {
   readonly bounds: Bounds;
 };
 
-export function textToPolylines(input: TextRenderInput): TextRenderResult {
-  const font = opentype.parse(input.fontBuffer);
+export async function textToPolylines(input: TextRenderInput): Promise<TextRenderResult> {
+  const ot = await loadOpentype();
+  const font = ot.parse(input.fontBuffer);
   const lines = input.content.split('\n');
   const lineSpacingMm = input.sizeMm * input.lineHeight;
   const letterSpacing = input.letterSpacing ?? 0;
