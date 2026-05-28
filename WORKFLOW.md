@@ -755,13 +755,41 @@ correct M4-mode raster G-code from Compile.
 - **Stream gigabytes**: protected by the streaming-emit path (per
   ADR-020 Q3), so the renderer doesn't OOM.
 
-**Acceptance for F.2.f hardware verification:**
+**Acceptance for F.2.f hardware verification (concrete checklist):**
 
-- 50×50 mm photo at 5 lines/mm, threshold mode — burns visible image
-  without overheating diode.
-- 50×50 mm photo at 10 lines/mm, floyd-steinberg — burns visible
-  image with photographic tonality.
-- Same input + same params → byte-identical G-code on the canonical
-  fixture (snapshot test in CI mirrors this).
-- M4 emits at preamble for the image group; M3 emits for any cut
-  layer in the same job. No cross-contamination.
+Pre-flight (no laser):
+1. Build a fresh project. Verify `Engrave Image…` button exists in
+   the toolbar between `Trace Image…` and `Save G-code…`.
+2. Click `Engrave Image…`, pick a 50×50 mm test PNG (e.g. a
+   400×400 px black-and-white logo).
+3. The image lands centered on the bed, fills its natural 96-DPI
+   mm-bounds, and appears as a bitmap (not vectorized).
+4. A new layer auto-creates at color `#808080` with `mode = image`,
+   `dither = floyd-steinberg`, `lines/mm = 10`.
+5. Click Save G-code. The output should contain:
+   - `M5` then `M4 S0` before any image-group G1
+   - `; image layer ... color #808080 power ...%` comment
+   - `; 400 × 400 px, 50.000 × 50.000 mm`
+   - Many `G1 Xn.nnn Sn` lines with `S` values changing per dither output
+   - Trailing `M5` before the post-amble's `G0 X0 Y0 S0`
+
+Hardware burn on the Falcon (must be confirmed by user):
+1. **50×50 mm test patch, threshold mode at 5 lines/mm**, 30% power,
+   3000 mm/min feed. Outcome: visible burned shape, even tone, no
+   over-burn at corners (M4 dynamic mode confirmed working).
+2. **50×50 mm grayscale photo, floyd-steinberg at 10 lines/mm**, 60%
+   power, 4500 mm/min. Outcome: photographic tonality, dithered
+   pixel pattern visible at close range.
+3. **5×5 cut + 30×30 image in the same job**: layer order matters
+   — confirm that mode flips between M3 (cut) and M4 (image) at the
+   right group boundaries (`M5` between groups; no laser-on travel
+   between groups).
+4. **Frame works on an image layer**: clicking Frame on a scene
+   with only a RasterImage traces the 4 corners of the image's
+   mm-bounds (not the overscan-extended rectangle).
+5. **No "burn-line on travel" artefacts**: between rows, the head
+   moves at S=0 — verify by looking at the row-end overscan zone
+   for any unintended burn marks.
+
+When this checklist passes, mark F.2.f complete in AUDIT.md A8
+inventory and tag the build as the first Phase F.2 release.
