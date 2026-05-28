@@ -148,19 +148,29 @@ function drawObjectPolylines(
     if (layer === undefined || !layer.visible) continue;
     ctx.strokeStyle = path.color;
     ctx.lineWidth = layer.output ? 1.5 : 0.75;
+    // Single beginPath/stroke per color, regardless of how many
+    // polylines that color has. The per-polyline stroke() loop this
+    // replaces was the cause of the post-import freeze: each stroke
+    // is a GPU sync, so a 5000-polyline traced image emitted 5000
+    // syncs per redraw at 60 Hz → 300k syncs/sec → canvas chokes.
+    // Batching to one stroke per color drops that to O(colors) ≈ 1-8.
+    // Standard Canvas2D performance pattern (MDN "Canvas optimisation").
+    ctx.beginPath();
     for (const polyline of path.polylines) {
-      ctx.beginPath();
       for (let i = 0; i < polyline.points.length; i += 1) {
         const raw = polyline.points[i];
         if (raw === undefined) continue;
         const p = applyTransform(raw, obj.transform);
         const cx = view.offsetX + p.x * view.scale;
         const cy = view.offsetY + p.y * view.scale;
+        // moveTo starts a new subpath without stroking, so successive
+        // polylines accumulate into the same Path2D and one final
+        // stroke() draws them all.
         if (i === 0) ctx.moveTo(cx, cy);
         else ctx.lineTo(cx, cy);
       }
-      ctx.stroke();
     }
+    ctx.stroke();
   }
 }
 
