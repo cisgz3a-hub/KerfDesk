@@ -32,7 +32,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Node 22 LTS — required by pnpm 11.3.0 (which uses node:sqlite,
+          # added in Node 22.5). Bumped from 20 after pnpm/action-setup@v4
+          # surfaced the version conflict. Node 20 goes EOL Apr 2026; 22
+          # is the current LTS through Apr 2027.
+          node-version: 22
           cache: pnpm
 
       - name: Install dependencies
