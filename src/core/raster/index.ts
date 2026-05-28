@@ -7,3 +7,6 @@
 
 export type { DitherAlgorithm, DitherInput, DitherOptions } from './dither';
 export { dither } from './dither';
+
+export type { EmitRasterInput } from './emit-raster';
+export { emitRasterGroup } from './emit-raster';
