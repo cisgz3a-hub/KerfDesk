@@ -568,10 +568,153 @@ and `hatchSpacingMm: number` (default 0.2 mm ≈ 5 lines/mm). Pre-F.1
 
 ---
 
+## ADR-020 — Phase F.2 raster image engrave (kickoff)
+
+### Status | Date
+Accepted (kickoff — no code yet) | 2026-05-28
+
+### Context
+
+ADR-019 sketched F.2 as deferred. PROJECT.md Phase F.2 description
+captures the surface — `RasterImage` SceneObject variant, M4 dynamic
+mode, per-pixel S-modulation, dithering, overscan, streaming. The
+research plan parked five open questions for this kickoff:
+
+1. M3 vs M4 wiring — Layer field, DeviceProfile field, or hardcoded
+   per layer.mode?
+2. Dithering library vs roll-our-own — re-evaluate `floyd-steinberg`
+   npm package vs ~30 LOC self-implementation?
+3. Streaming vs materialize — at what byte-threshold do we switch
+   from string concatenation to a generator-emit?
+4. Preview rendering — Canvas2D drawing a million tiny lines is slow.
+   Need a downsampled / image-blit preview.
+5. Hardware test — real engrave of a 50×50 mm photo on the Falcon.
+
+This ADR commits answers to 1-4 so F.2 implementation has a clear
+target. Question 5 is hardware verification, not an architecture
+decision; it lives in the F.2.f acceptance checklist.
+
+### Decision
+
+**Q1 — M-mode wiring: hardcoded per `layer.mode`.** Image groups emit
+M4 (dynamic — power scales with feed); line/fill groups emit M3
+(constant). No Layer field, no DeviceProfile flag. Rationale: the
+M3/M4 choice is dictated by what the laser is doing (cut/engrave vs
+raster), not the operator's preference. Exposing it as a knob invites
+misconfiguration. If a controller variant later needs M3 for raster,
+add a `forceMMode` field on DeviceProfile then.
+
+**Q2 — Dithering: roll our own.** Three reasons:
+- The `floyd-steinberg` npm package was last published 2017; would
+  fail ADR-017 maintenance check.
+- The algorithm is ~30 LOC of well-known math (error-diffusion table
+  + serpentine scan) — every CAM tool implements it inline.
+- Three modes ship: `threshold` (single-cutoff), `floyd-steinberg`
+  (greyscale error-diffusion), `grayscale` (direct luma → S, no
+  dithering — for lasers that support 256-level S). Pure functions in
+  `src/core/raster/dither.ts`.
+
+**Q3 — Streaming: write the full string up to 100 KB; generator past
+that.** A 50×50 mm photo at 5 lines/mm is ~250 lines × ~30 chars =
+7.5 KB — fits in memory. A 200×200 mm photo at 10 lines/mm balloons
+to ~6 MB — must stream. The 100 KB threshold matches the heuristic
+the AUDIT.md A6 mitigation already uses for bundle splits (the order
+where allocation becomes user-visible). Implementation: emit-raster
+returns either a `string` or an `AsyncIterable<string>`; the file/
+serial writer adapts.
+
+**Q4 — Preview: Canvas2D `drawImage` of the source raster, scaled to
+the object's mm-bounds.** No per-pixel paths in the draw loop. The
+RasterImage carries an `<img>`-loadable data URL — drawing it through
+Canvas2D's `drawImage` with a matrix transform is hardware-accelerated
+and avoids the million-line problem. Engraving G-code visualisation
+(the "what will burn") is a separate render layer we'll add later if
+needed; for the MVP, "here is the image at the right place and size"
+is the preview.
+
+**New SceneObject variant `RasterImage`:**
+```ts
+{ readonly kind: 'raster-image';
+  readonly id: string;
+  readonly source: string;        // filename
+  readonly dataUrl: string;       // PNG data URL, embedded in .lf2
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  readonly bounds: Bounds;        // mm bounds (mm-per-pixel from DPI)
+  readonly transform: Transform;
+  readonly dither: 'threshold' | 'floyd-steinberg' | 'grayscale';
+  readonly linesPerMm: number;    // 5..25 typical; user-settable
+}
+```
+
+**New Layer mode arm** — when `layer.mode === 'image'` and the layer's
+group source is a RasterImage, `compileJob` emits a `RasterGroup`
+discriminant that `emit-gcode.ts` dispatches to `emitRaster` instead
+of the existing `emitGroup`. Non-RasterImage objects on an image-mode
+layer warn and skip (similar to the Fill+open-polyline pattern).
+
+### Alternatives considered
+
+1. **Inline-base64 elsewhere or external file references.** Keeping
+   the image data IN the `.lf2` was confirmed by the user this session
+   for self-containment — losing the source raster would lose
+   re-trace / re-dither ability.
+2. **One generator-only emit path.** Always-stream is simpler but
+   pessimises the common case (small image). The 100 KB threshold
+   adds ~10 LOC and avoids the heap pressure on big jobs.
+3. **`canvg` for image-on-canvas preview.** Heavier than necessary —
+   we already have a decoded `HTMLImageElement` from `image-loader.ts`,
+   so `drawImage` is the surgical-changes answer.
+
+### Consequences
+
+- New module `src/core/raster/` (dither, emit-raster, preview-data).
+  Stays pure-core; no I/O.
+- `scene-object.ts` gains the `RasterImage` variant; `compileJob`,
+  `draw-scene`, and `serializeProject` get one new switch arm each.
+  ESLint's exhaustiveness rule (ADR-019) makes the missing arms
+  surface as TypeScript errors — the same enforced TODO list.
+- `Layer` mode UI: enable the third dropdown option ('Image'), gate
+  the dither + lines-per-mm inputs on it.
+- `.lf2` schema gains the `raster-image` SceneObject. Back-fill is
+  one-way (old files have no RasterImage). Bump schemaVersion only
+  if old code needs to refuse new files; for now, additive-only.
+- Bundle impact: zero. We don't adopt a new lib. The base64 image
+  bytes live in user data, not in the build.
+- Hardware verification (F.2.f) goes on the Falcon checklist before
+  ship: 50×50 mm photo at 5 lines/mm, threshold + floyd-steinberg
+  modes both burn without overheating.
+
+### Verification
+
+To be written WITH the implementation, not before:
+
+- Unit tests for `dither.ts`: each algorithm round-trips a known
+  luma-to-S mapping; property-test bounds + power-scale invariants.
+- Unit tests for `emit-raster.ts`: a 4×4 fixture → known byte stream;
+  overscan adds N mm of S0 travel at each row end.
+- Snapshot test: a 16×16 fixture image at 5 lines/mm produces
+  byte-identical G-code to a recorded snapshot.
+- Determinism property: same RasterImage + same options → identical
+  G-code over 100 fuzz seeds (the dither itself is deterministic
+  given seed; we use 0 as the default seed).
+- Hardware: 50×50 mm photo on the Falcon at 5 lines/mm and 10 lines/mm
+  with each of the three dither modes.
+
+### Out of scope for F.2
+
+- Multi-pass raster (deep engrave). Single pass only.
+- Per-row feed/power schedules (uniform across the image).
+- Photo presets ("portrait", "landscape", "logo"). User picks
+  dither + lines-per-mm; everything else uses Layer defaults.
+- Multi-image compositing on the same layer. One RasterImage per
+  layer for v1.
+- Rotary-axis raster. PROJECT.md "Out of scope" still applies.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
-- ADR-020 — Phase F.2 raster image engrave: emit path, M3/M4 selection,
-  dithering, overscan, streaming threshold.
 - ADR-021 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
   config grows).
@@ -579,4 +722,4 @@ and `hatchSpacingMm: number` (default 0.2 mm ≈ 5 lines/mm). Pre-F.1
   release).
 - (Earlier reservations for ADR-019..023 were stale — Phase B / E
   shipped without formal ADRs at those slots. ADR-019 above is the
-  first slot used since then.)
+  first slot used since then; ADR-020 is now used by Phase F.2.)
