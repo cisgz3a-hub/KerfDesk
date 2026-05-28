@@ -40,7 +40,13 @@ export type { AutofocusResult } from './autofocus-action';
 export { describeAutofocusResult } from './autofocus-action';
 
 const DEFAULT_BAUD = 115200;
+// Status poll tick. We tick at 250 ms always, but when no job is active
+// we only emit a `?` every 4th tick (effective 1000 ms). MIT-T2 audit
+// finding: CNCjs / LightBurn both ramp polling down when idle to cut
+// serial chatter and CPU. While streaming/paused we keep the fast cadence
+// so the live progress UI stays smooth.
 const STATUS_POLL_MS = 250;
+const IDLE_POLL_DIVISOR = 4;
 
 export type ConnectionState =
   | { readonly kind: 'disconnected' }
@@ -192,7 +198,14 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
                 : s.streamer,
           }));
         });
+        let pollTick = 0;
         refs.pollHandle = setInterval(() => {
+          pollTick++;
+          const s = get();
+          const isActive =
+            s.streamer !== null &&
+            (s.streamer.status === 'streaming' || s.streamer.status === 'paused');
+          if (!isActive && pollTick % IDLE_POLL_DIVISOR !== 0) return;
           void safeWrite(RT_STATUS);
         }, STATUS_POLL_MS);
         set({ connection: { kind: 'connected' }, alarmCode: null });
