@@ -1,0 +1,131 @@
+// Line-receive pipeline extracted from laser-store so that file stays
+// under the 400-line hard cap (CLAUDE.md ADR-015). Three responsibilities
+// — they're cohesive because each fires per inbound serial line:
+//
+//   runHandshake  — waits up to 2 s after connect for any GRBL reply;
+//                   if anything arrives, sends `$$` to harvest settings.
+//   handleLine    — classifies an inbound line, feeds the settings
+//                   collector, fans the result into LaserState (status,
+//                   alarm, error), and drives the streamer's ack loop.
+//   advanceStream — pops the head-of-flight line from the streamer and
+//                   pushes the next eligible bytes if buffer allows.
+//
+// All three take the shared mutable `refs` object by reference (same
+// instance laser-store creates) so the settings-collector state is
+// observable across calls. Pure ports of the previous in-file logic;
+// no behavior change.
+
+import {
+  classifyResponse,
+  CMD_SETTINGS,
+  onAck,
+  type SettingsCollectorState,
+  startCollecting,
+  step,
+  type StreamerState,
+} from '../../core/controllers/grbl';
+import { consumeSettingsResponse } from './detected-settings-action';
+import type { LaserState } from './laser-store';
+
+export type HandlerRefs = {
+  settingsCollector: SettingsCollectorState;
+};
+
+export type SetFn = (
+  partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
+) => void;
+export type GetFn = () => LaserState;
+
+// Append a log line with a fixed history cap. Same constant as
+// laser-store's own pushLog — duplicated rather than re-exported
+// because importing it would create a circular store ↔ handler
+// dependency. 200 lines is plenty for diagnostics without holding
+// onto a session's worth of GRBL chatter.
+const LOG_MAX = 200;
+function appendLog(state: LaserState, line: string): ReadonlyArray<string> {
+  return [...state.log, line].slice(-LOG_MAX);
+}
+
+export async function runHandshake(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: (line: string) => Promise<void>,
+): Promise<void> {
+  const HANDSHAKE_TIMEOUT_MS = 2000;
+  const POLL_MS = 50;
+  const start = Date.now();
+  const startLen = get().log.length;
+  while (Date.now() - start < HANDSHAKE_TIMEOUT_MS) {
+    if (get().log.length > startLen) break;
+    await new Promise((r) => setTimeout(r, POLL_MS));
+  }
+  if (get().log.length === startLen) {
+    set({
+      log: appendLog(
+        get(),
+        '[lf2] No GRBL response within 2 s. Check baud rate (115200) and that the device is GRBL.',
+      ),
+    });
+    return;
+  }
+  // Got a reply — query settings so the operator can see $30, $32, etc.
+  // Reset detectedSettings + arm the collector first so handleLine can
+  // build up the patch as setting lines stream in. The collector closes
+  // on the trailing `ok` that GRBL emits at the end of $$.
+  set({
+    log: appendLog(get(), '[lf2] Connected. Querying settings ($$)…'),
+    detectedSettings: null,
+  });
+  refs.settingsCollector = startCollecting();
+  await safeWrite(`${CMD_SETTINGS}\n`);
+}
+
+export function handleLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: (line: string) => Promise<void>,
+  line: string,
+): void {
+  const cls = classifyResponse(line);
+  // Always log the raw line for the user-visible console.
+  set({ log: appendLog(get(), line) });
+  // F-7: feed every classified response to the settings collector.
+  // Returns a patch only when the `$$` response window just closed.
+  const patch = consumeSettingsResponse(refs, cls);
+  if (patch !== null) set({ detectedSettings: patch });
+  if (cls.kind === 'status') {
+    set({ statusReport: cls.report });
+    return;
+  }
+  if (cls.kind === 'alarm') {
+    set({ alarmCode: cls.code });
+    advanceStream(set, get, safeWrite, 'alarm');
+    return;
+  }
+  if (cls.kind === 'error') {
+    set({ lastError: cls.code });
+    advanceStream(set, get, safeWrite, 'error');
+    return;
+  }
+  if (cls.kind === 'ok') {
+    advanceStream(set, get, safeWrite, 'ok');
+    return;
+  }
+  // welcome / message / setting / unknown — already logged.
+}
+
+function advanceStream(
+  set: SetFn,
+  get: GetFn,
+  safeWrite: (line: string) => Promise<void>,
+  ack: 'ok' | 'error' | 'alarm',
+): void {
+  const s: StreamerState | null = get().streamer;
+  if (s === null) return;
+  const acked = onAck(s, ack);
+  const stepped = step(acked.state);
+  set({ streamer: stepped.state });
+  if (stepped.toSend.length > 0) void safeWrite(stepped.toSend);
+}

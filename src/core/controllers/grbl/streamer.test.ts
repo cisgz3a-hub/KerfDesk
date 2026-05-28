@@ -3,6 +3,7 @@ import {
   cancel,
   createStreamer,
   DEFAULT_RX_BUFFER_BYTES,
+  disconnect,
   onAck,
   pause,
   progress,
@@ -126,5 +127,27 @@ describe('progress', () => {
 
   it('reports 1 for an empty job', () => {
     expect(progress(createStreamer(''))).toBe(1);
+  });
+});
+
+describe('disconnect', () => {
+  it('marks the streamer disconnected and clears the queue (terminal state)', () => {
+    let s = createStreamer('G21\nG90\nM5\n');
+    s = step(s).state; // status -> streaming, all lines now in flight
+    expect(s.status).toBe('streaming');
+    const d = disconnect(s);
+    expect(d.status).toBe('disconnected');
+    // Queue cleared so a subsequent step() can't push any more bytes
+    // even if something tried to re-engage the streamer.
+    expect(d.queued).toEqual([]);
+    // step() is a no-op once disconnected — matches done/cancelled paths.
+    expect(step(d).toSend).toBe('');
+  });
+
+  it('is distinct from cancel — status differs even though queue handling is the same', () => {
+    let s = createStreamer('G21\n');
+    s = step(s).state;
+    expect(disconnect(s).status).toBe('disconnected');
+    expect(cancel(s).status).toBe('cancelled');
   });
 });
