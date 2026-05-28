@@ -569,7 +569,12 @@ close() for Escape, and trap focus to the dialog while open. ~30 LOC.
 Separate session — needs a small focus-trap utility (~50 LOC) which is
 worth its own module + tests.
 
-**Status:** **TRACKED.**
+**Status:** **RESOLVED** — `src/ui/common/use-dialog-a11y.ts` ships a
+reusable hook handling all four behaviours (Escape → onClose, Tab /
+Shift+Tab focus cycle, initial focus on mount, return focus on
+unmount). Both dialogs now pin `aria-modal="true"`, `tabIndex={-1}`
+on the dialog root, and `useDialogA11y(ref, close)`. WCAG 2.1 dialog
+pattern compliance.
 
 ### R-L1 — Toast `setTimeout` not tracked across manual dismiss (LOW)
 
