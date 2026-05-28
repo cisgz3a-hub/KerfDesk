@@ -26,6 +26,7 @@ function group(opts: {
   segments?: ReadonlyArray<CutSegment>;
 }): CutGroup {
   return {
+    kind: 'cut',
     layerId: 'L1',
     color: '#000',
     power: 50,
@@ -136,6 +137,7 @@ describe('estimateJobDuration', () => {
         (groups) => {
           const job: Job = {
             groups: groups.map((g) => ({
+              kind: 'cut',
               layerId: 'L',
               color: '#000',
               power: 50,

@@ -1,4 +1,4 @@
-export type { CutGroup, CutSegment, Job } from './job';
+export type { CutGroup, CutSegment, Group, Job, RasterGroup } from './job';
 export { EMPTY_JOB } from './job';
 export { compileJob } from './compile-job';
 export type { JobBounds } from './job-bounds';

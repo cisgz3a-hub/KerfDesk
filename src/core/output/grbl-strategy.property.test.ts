@@ -47,6 +47,7 @@ const arbSegment: fc.Arbitrary<CutSegment> = fc.record({
 });
 
 const arbGroup = fc.record({
+  kind: fc.constant('cut' as const),
   layerId: fc.string({ minLength: 1, maxLength: 4 }),
   color: fc.constantFrom('#ff0000', '#00ff00', '#0000ff', '#000000'),
   power: fc.double({ min: 0, max: 100, noNaN: true, noDefaultInfinity: true }),
@@ -108,6 +109,7 @@ describe('grblStrategy property tests', () => {
     const job: Job = {
       groups: [
         {
+          kind: 'cut',
           layerId: 'L1',
           color: '#000000',
           power: 50,

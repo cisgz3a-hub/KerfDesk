@@ -7,6 +7,7 @@ const empty: Job = { groups: [] };
 const job: Job = {
   groups: [
     {
+      kind: 'cut',
       layerId: 'L1',
       color: '#ff0000',
       power: 30,

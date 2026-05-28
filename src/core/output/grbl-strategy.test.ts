@@ -20,6 +20,7 @@ describe('grblStrategy single-segment job', () => {
   const job: Job = {
     groups: [
       {
+        kind: 'cut',
         layerId: 'L1',
         color: '#ff0000',
         power: 50,
@@ -70,6 +71,7 @@ describe('grblStrategy is deterministic (non-negotiable #5)', () => {
     const job: Job = {
       groups: [
         {
+          kind: 'cut',
           layerId: 'A',
           color: '#000000',
           power: 33.333,
@@ -98,6 +100,7 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     const job: Job = {
       groups: [
         {
+          kind: 'cut',
           layerId: 'L1',
           color: '#ff0000',
           power: 100,

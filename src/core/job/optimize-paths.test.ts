@@ -5,6 +5,14 @@ import { estimateJobDuration } from './estimate-duration';
 import type { CutGroup, CutSegment, Job } from './job';
 import { optimizePaths } from './optimize-paths';
 
+// All fixtures in this file produce CutGroups; narrow on the union
+// for ergonomic field access in the assertions below.
+function asCut(j: Job, i = 0): CutGroup | undefined {
+  const g = j.groups[i];
+  if (g === undefined || g.kind !== 'cut') return undefined;
+  return g;
+}
+
 function seg(...pts: Array<[number, number]>): CutSegment {
   return { polyline: pts.map(([x, y]) => ({ x, y })), closed: false };
 }
@@ -18,6 +26,7 @@ function closedSeg(...pts: Array<[number, number]>): CutSegment {
 
 function group(segments: ReadonlyArray<CutSegment>): CutGroup {
   return {
+    kind: 'cut',
     layerId: 'L1',
     color: '#000',
     power: 50,
@@ -49,7 +58,7 @@ describe('optimizePaths', () => {
       ],
     };
     const result = optimizePaths(j);
-    const firstSeg = result.groups[0]?.segments[0];
+    const firstSeg = asCut(result)?.segments[0];
     expect(firstSeg?.polyline[0]).toEqual({ x: 0, y: 0 });
   });
 
@@ -61,7 +70,7 @@ describe('optimizePaths', () => {
       groups: [group([seg([50, 0], [10, 0])])],
     };
     const result = optimizePaths(j);
-    const firstPoint = result.groups[0]?.segments[0]?.polyline[0];
+    const firstPoint = asCut(result)?.segments[0]?.polyline[0];
     expect(firstPoint).toEqual({ x: 10, y: 0 });
   });
 
@@ -72,7 +81,7 @@ describe('optimizePaths', () => {
       groups: [group([closedSeg([0, 0], [10, 0], [10, 10], [0, 10])])],
     };
     const result = optimizePaths(j);
-    const firstSeg = result.groups[0]?.segments[0];
+    const firstSeg = asCut(result)?.segments[0];
     expect(firstSeg?.polyline[0]).toEqual({ x: 0, y: 0 });
     expect(firstSeg?.closed).toBe(true);
     // Polyline orientation preserved (not reversed)
@@ -238,7 +247,7 @@ describe('optimizePaths', () => {
     const original = group([seg([10, 10], [20, 20]), seg([0, 0], [5, 5])]);
     const j: Job = { groups: [{ ...original, passes: 3, power: 75, speed: 1500 }] };
     const result = optimizePaths(j);
-    const g = result.groups[0];
+    const g = asCut(result);
     expect(g?.layerId).toBe('L1');
     expect(g?.color).toBe('#000');
     expect(g?.power).toBe(75);
@@ -252,6 +261,6 @@ describe('optimizePaths', () => {
       groups: [group([seg([10, 10], [20, 20]), seg([30, 30], [40, 40]), seg([5, 5], [15, 15])])],
     };
     const result = optimizePaths(j);
-    expect(result.groups[0]?.segments.length).toBe(3);
+    expect(asCut(result)?.segments.length).toBe(3);
   });
 });

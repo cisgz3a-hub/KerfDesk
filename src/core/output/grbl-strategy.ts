@@ -10,7 +10,9 @@
 // Postamble: M5, then `G0 X0 Y0 S0` to park at origin.
 
 import type { DeviceProfile } from '../devices';
-import type { CutGroup, CutSegment, Job } from '../job';
+import type { CutGroup, CutSegment, Group, Job, RasterGroup } from '../job';
+import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
+import { assertNever } from '../scene';
 import type { OutputStrategy } from './output-strategy';
 
 const DECIMAL_PLACES = 3;
@@ -77,11 +79,40 @@ function emitGroup(group: CutGroup, device: DeviceProfile): string {
   return chunks.join(LINE_END) + LINE_END;
 }
 
+// F.2.d: raster groups emit through the dedicated raster path
+// (emit-raster.ts), which handles the M4 flip + per-pixel S
+// modulation. The strategy stays one-arm-per-kind so adding new
+// group types lights up the exhaustiveness check.
+function emitRasterGroupHere(group: RasterGroup): string {
+  return emitRasterGroupGcode({
+    sValues: group.sValues,
+    width: group.pixelWidth,
+    height: group.pixelHeight,
+    bounds: group.bounds,
+    feedMmPerMin: group.speed,
+    overscanMm: group.overscanMm,
+    layerId: group.layerId,
+    color: group.color,
+    powerPercent: group.power,
+  });
+}
+
+function emitAnyGroup(group: Group, device: DeviceProfile): string {
+  switch (group.kind) {
+    case 'cut':
+      return emitGroup(group, device);
+    case 'raster':
+      return emitRasterGroupHere(group);
+    default:
+      return assertNever(group, 'Group');
+  }
+}
+
 function emitJob(job: Job, device: DeviceProfile): string {
   const parts: string[] = [];
   parts.push(preamble());
   for (const group of job.groups) {
-    parts.push(emitGroup(group, device));
+    parts.push(emitAnyGroup(group, device));
   }
   parts.push(postamble());
   return parts.join('');

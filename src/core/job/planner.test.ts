@@ -16,6 +16,7 @@ function seg(...pts: Array<[number, number]>): CutSegment {
 
 function group(opts: Partial<CutGroup> & { segments: ReadonlyArray<CutSegment> }): CutGroup {
   return {
+    kind: 'cut',
     layerId: 'L1',
     color: '#000',
     power: 50,
