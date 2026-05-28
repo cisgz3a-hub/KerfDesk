@@ -796,10 +796,11 @@ three fixes shipped this same commit, four items TRACKED.
   250 ms regardless of streamer state. CNCjs uses a longer cadence
   when idle. Bump to ~1000 ms when no streamer is active; keep 250 ms
   while streaming. Low priority — current load on GRBL is fine.
-- **MIT-T3 — `pathOmit: 16` fixture test.** Our "Line Art" preset is
-  twice as aggressive as imagetracerjs's default (8). For very small
-  logos (sub-50 px) this could eat dots / periods / small features.
-  Add a sub-50px fixture test confirming small-feature retention.
+- **MIT-T3 — `pathOmit: 16` fixture test.** ✅ RESOLVED.
+  `trace-image.test.ts` now ships a 40×40 fixture with a 24×24 body
+  + a 4×4 corner dot; asserts a polyline whose centroid lies in the
+  dot region exists in the trace output. Guards against a future
+  preset tweak dropping small features.
 - **MIT-T4 — DOMPurify `SAFE_FOR_XML` reliance.** ✅ RESOLVED. The
   sanitize.ts header now documents the deliberate reliance on the
   upstream `true` default so a future reader knows not to flip it.

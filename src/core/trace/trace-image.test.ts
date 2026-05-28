@@ -260,6 +260,62 @@ describe('traceImageToSvgString', () => {
     expect(longest).toBeGreaterThanOrEqual(20);
   });
 
+  it('sub-50px logo retains small features under Line Art preset (MIT-T3)', async () => {
+    // Audit finding MIT-T3: our Line Art preset uses pathOmit=16, twice
+    // imagetracerjs's default 8. For a tiny logo (< 50 px on the long
+    // edge — typical favicon / small badge case) the aggressive omit
+    // could eat dots, periods, or thin strokes. This fixture is a
+    // 40×40 image carrying:
+    //   - A solid 24×24 square (the "body" — a large feature)
+    //   - A 4×4 black dot in the corner (the "small feature" to preserve)
+    // Both are well above the 16-point omit threshold (a 4×4 square's
+    // perimeter has 16 contour points, and the threshold actually counts
+    // sample points after curve-fitting which is usually more), so the
+    // dot must survive. If a future preset tweak drops it, this test
+    // catches the regression.
+    const W = 40;
+    const H = 40;
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y += 1) {
+      for (let x = 0; x < W; x += 1) {
+        const inBigSquare = x >= 4 && x < 28 && y >= 4 && y < 28;
+        const inDot = x >= 32 && x < 36 && y >= 32 && y < 36;
+        const v = inBigSquare || inDot ? 0 : 255;
+        const i = (y * W + x) * 4;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
+        data[i + 3] = 255;
+      }
+    }
+    const { parseSvg } = await import('../../io/svg/parse-svg');
+    const svg = await traceImageToSvgString(
+      { width: W, height: H, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        fixedPalette: ['#ffffff', '#000000'],
+        thresholdLuma: 128,
+        pathOmit: 16,
+        lineFilter: true,
+      },
+    );
+    const result = parseSvg({ svgText: svg, id: 't3', source: 'tiny.png' });
+    expect(result.object).not.toBeNull();
+    if (result.object === null) return;
+    // Look for ANY polyline whose bounding-box centre lies inside the
+    // expected dot region (32..36 in both axes). The dot is small —
+    // we don't care about its exact point count, just that some
+    // polyline exists there.
+    const allPolylines = result.object.paths.flatMap((p) => p.polylines);
+    const dotPresent = allPolylines.some((pl) => {
+      if (pl.points.length === 0) return false;
+      const cx = pl.points.reduce((s, p) => s + p.x, 0) / pl.points.length;
+      const cy = pl.points.reduce((s, p) => s + p.y, 0) / pl.points.length;
+      return cx >= 30 && cx <= 38 && cy >= 30 && cy <= 38;
+    });
+    expect(dotPresent).toBe(true);
+  });
+
   it('handles a fully-uniform image without throwing', async () => {
     // All-white 8×8 — nothing to trace. Should still produce a valid
     // SVG string (probably empty or just the root tag).
