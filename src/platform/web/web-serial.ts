@@ -130,6 +130,19 @@ function makeConnection(port: SerialPort): SerialConnection {
       } catch (err) {
         console.warn('port.close() rejected:', err);
       }
+      // A2 audit finding: revoke the in-page permission for this port on
+      // explicit user-disconnect so a long-running tab doesn't accumulate
+      // per-port permissions across many laser sessions. Only do this
+      // here — the cable-yank path (disconnect event → fireClose) goes
+      // through a different code path and intentionally leaves the
+      // pairing so the user can plug back in without re-picking.
+      // Chromium 103+ ships forget(); on older runtimes the optional
+      // chain is a no-op rather than a TypeError.
+      try {
+        await port.forget?.();
+      } catch (err) {
+        console.warn('port.forget() rejected:', err);
+      }
       for (const h of closeSubs) h();
     },
   };
