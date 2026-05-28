@@ -698,6 +698,80 @@ marked TRACKED.
 - **B-N5 R-H1 fix dep omission has prose comment, not directive** —
   Low; left as-is.
 
+---
+
+## MIT-comparison audit (2026-05-28, fourth pass)
+
+User asked whether our wrapper / use of each MIT-compatible library is
+as good as or better than upstream. Independent agent compared each
+wrapper against the upstream source via WebFetch. Five sections;
+three fixes shipped this same commit, four items TRACKED.
+
+### Library-by-library verdict
+
+| Library | Where we use it | Verdict |
+|---|---|---|
+| DOMPurify | `src/io/svg/sanitize.ts` | **Parity, slight edge** (removeAllHooks bracketing isn't documented upstream and is the safer pattern) |
+| opentype.js | `src/core/text/text-to-polylines.ts` | **Behind on ligatures (FIXED); ahead on closure detection** (our `CLOSURE_EPS_MM` is something upstream itself should ship) |
+| imagetracerjs | `src/core/trace/trace-image.ts` | **Ahead** — `thresholdToMonochrome` is a real novel addition; our presets are tuned per-domain |
+| CNCjs streamer | `src/core/controllers/grbl/streamer.ts` | **Parity on math, off-by-7 on buffer-margin (FIXED)** |
+| Sonny Jeon planner | `src/core/job/planner.ts` | **Parity** — formula, lookahead order, edge cases all match the canonical derivation |
+
+### Fixed this commit
+
+- **MIT-1 — opentype.js ligatures (`text-to-polylines.ts:154`).** Was
+  missing `features: { liga: true, rlig: true }` on the `getPath` call.
+  v2 defaults kerning on but ligatures off. Real visual regression vs
+  Inkscape / CorelDRAW: "fi" / "fl" came out as two separate glyphs
+  instead of the designer's ligature. Added explicit features + kerning
+  flag. ~3 LOC.
+- **MIT-2 — GRBL streamer buffer 127 → 120 (`streamer.ts:16`).** CNCjs
+  uses 120 bytes (8-byte safety margin on GRBL's 128-byte RX buffer);
+  we used 127 (1-byte margin), which is conservative enough most of
+  the time but lacks headroom for senders that occasionally add CR/LF.
+  Matches CNCjs's documented practice. No observed bug — preventive.
+- **MIT-3 — Fill preview overlay (`draw-scene.ts`).** Not from the
+  library audit per se, but the same session's user ask. When a layer
+  is in Fill mode, draw the actual hatch lines (via the same
+  `fillHatching` compileJob uses) over a faint dashed outline guide.
+  LightBurn pattern. WYSIWYG; what the user sees is what the G-code
+  emits.
+
+### TRACKED for follow-up
+
+- **MIT-T1 — Streamer disconnect state.** `StreamerStatus` is
+  `idle | streaming | paused | done | cancelled`. CNCjs treats
+  disconnect as a controller event that destroys the streamer; we
+  have no `'disconnected'` status, so a mid-stream port drop leaves
+  the consumer without a clean way to mark in-flight lines as lost.
+  Add `'disconnected'` and an `onDisconnect()` reducer in the next
+  laser-store edit (laser-store.ts is currently at 399/400 LOC — the
+  next edit should split it anyway).
+- **MIT-T2 — Status-poll cadence backoff.** Today we poll status at
+  250 ms regardless of streamer state. CNCjs uses a longer cadence
+  when idle. Bump to ~1000 ms when no streamer is active; keep 250 ms
+  while streaming. Low priority — current load on GRBL is fine.
+- **MIT-T3 — `pathOmit: 16` fixture test.** Our "Line Art" preset is
+  twice as aggressive as imagetracerjs's default (8). For very small
+  logos (sub-50 px) this could eat dots / periods / small features.
+  Add a sub-50px fixture test confirming small-feature retention.
+- **MIT-T4 — DOMPurify `SAFE_FOR_XML` reliance.** We rely on the
+  upstream default (`true`). Add a one-line comment so a future reader
+  knows we deliberately don't override it.
+- **MIT-T5 — opentype.js RTL.** Hebrew / Arabic text comes out
+  LTR-mirrored. Known limitation; add a doc note. Real fix needs
+  Unicode-aware bidi which is outside scope.
+
+### Process note
+
+This is the second time an independent agent has caught fixable bugs
+the same-author audit missed (first time: R-H2 race condition; this
+time: opentype.js ligatures + streamer buffer margin). The
+independent-second-pass pattern is paying off. Keeping it as standard
+practice for future audits.
+
+---
+
 ### Verdict after this pass
 
 **Ship-ready.** Critical license-metadata inconsistency closed.
