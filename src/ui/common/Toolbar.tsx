@@ -121,6 +121,7 @@ function FileButtons(): JSX.Element {
       </button>
       <TextButton />
       <ImageButton />
+      <EngraveImageButton />
       <button
         type="button"
         title="Export G-code for the current scene (Ctrl+E)"
@@ -160,6 +161,99 @@ function ImageButton(): JSX.Element {
       Trace Image…
     </button>
   );
+}
+
+// Phase F.2 — Engrave Image (raster mode). Different from Trace
+// Image: the raster keeps its pixels and burns directly via
+// per-pixel S modulation rather than being vectorized.
+function EngraveImageButton(): JSX.Element {
+  const importRasterImage = useStore((s) => s.importRasterImage);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const onPick = (file: File): void => {
+    void (async () => {
+      try {
+        const { loadImageAsRawData, extractLumaBase64 } = await import('../trace/image-loader');
+        const image = await loadImageAsRawData(file);
+        const { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM } = await import(
+          '../../core/scene'
+        );
+        // Use a sensible mm-bounds default: assume 96 DPI from the
+        // image so the imported size is ergonomic for the operator
+        // to scale rather than tiny pixel-multiples.
+        const MM_PER_INCH = 25.4;
+        const ASSUMED_DPI = 96;
+        const widthMm = (image.width / ASSUMED_DPI) * MM_PER_INCH;
+        const heightMm = (image.height / ASSUMED_DPI) * MM_PER_INCH;
+        const dataUrl = await readAsDataUrl(file);
+        const lumaBase64 = extractLumaBase64(image);
+        importRasterImage({
+          kind: 'raster-image',
+          id: crypto.randomUUID(),
+          source: file.name,
+          dataUrl,
+          pixelWidth: image.width,
+          pixelHeight: image.height,
+          bounds: { minX: 0, minY: 0, maxX: widthMm, maxY: heightMm },
+          transform: IDENTITY_TRANSFORM,
+          color: DEFAULT_RASTER_LAYER_COLOR,
+          dither: 'floyd-steinberg',
+          linesPerMm: 10,
+          lumaBase64,
+        });
+        pushToast(`Added image: ${file.name} (${image.width}×${image.height} px)`, 'success');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        pushToast(`Could not load image: ${message}`, 'error');
+      }
+    })();
+  };
+  return <FileButton title="Engrave a raster image directly (PNG/JPG)" onPick={onPick} label="Engrave Image…" accept="image/png,image/jpeg" />;
+}
+
+// Generic hidden-input file picker. Used by EngraveImageButton to
+// avoid touching the platform.pickFilesForOpen pipeline (which
+// returns text-only FileHandles; binary images need the raw File).
+function FileButton(props: {
+  readonly title: string;
+  readonly accept: string;
+  readonly label: string;
+  readonly onPick: (file: File) => void;
+}): JSX.Element {
+  const inputId = `lf2-file-${props.label.replace(/\s+/g, '-')}`;
+  return (
+    <>
+      <input
+        id={inputId}
+        type="file"
+        accept={props.accept}
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file !== undefined) props.onPick(file);
+          // Reset so picking the same file twice still fires onChange.
+          e.target.value = '';
+        }}
+      />
+      <button
+        type="button"
+        title={props.title}
+        onClick={() => document.getElementById(inputId)?.click()}
+      >
+        {props.label}
+      </button>
+    </>
+  );
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (): void => {
+      resolve(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = (): void => reject(new Error('FileReader failed to read the image.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 // One-place shortcut reference — surfaces on hover of the small "⌨ shortcuts"

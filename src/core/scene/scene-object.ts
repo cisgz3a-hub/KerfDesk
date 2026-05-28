@@ -140,6 +140,14 @@ export type RasterImage = {
   // strains USB bandwidth and pushes G-code past ~1 MB on a
   // 100×100 mm image.
   readonly linesPerMm: number;
+  // Pre-extracted greyscale luma buffer (one byte per pixel, ITU-R
+  // BT.601: 0.299·R + 0.587·G + 0.114·B), base64-encoded so it can
+  // round-trip through .lf2's JSON. Length after decode equals
+  // pixelWidth * pixelHeight. Optional because pre-F.2.e .lf2 files
+  // didn't have it; compileJob renders an all-zero (blank) raster
+  // when absent. UI's image import path is responsible for
+  // populating it from the decoded ImageData.
+  readonly lumaBase64?: string;
 };
 
 // Canonical Layer color for fresh RasterImage imports. Mid-grey is

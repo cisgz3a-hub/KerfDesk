@@ -131,6 +131,20 @@ function normalizeLayer(layer: unknown): unknown {
   if (typeof out['hatchSpacingMm'] !== 'number') {
     out['hatchSpacingMm'] = LAYER_DEFAULTS.hatchSpacingMm;
   }
+  // F.2.e: back-fill image-mode Layer fields. Same additive-with-
+  // default pattern as the hatch fields above — pre-F.2 .lf2 files
+  // don't have them; treating missing as the default keeps the
+  // schema additive (no schemaVersion bump).
+  if (
+    out['ditherAlgorithm'] !== 'threshold' &&
+    out['ditherAlgorithm'] !== 'floyd-steinberg' &&
+    out['ditherAlgorithm'] !== 'grayscale'
+  ) {
+    out['ditherAlgorithm'] = LAYER_DEFAULTS.ditherAlgorithm;
+  }
+  if (typeof out['linesPerMm'] !== 'number' || out['linesPerMm'] <= 0) {
+    out['linesPerMm'] = LAYER_DEFAULTS.linesPerMm;
+  }
   return out;
 }
 
