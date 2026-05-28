@@ -571,7 +571,10 @@ On manual dismiss the timer still runs and no-ops at fire time.
 loop instead of `Promise.race([... timeout])`. Fine in prod, brittle
 under fake-time testing.
 
-**Status:** **TRACKED.**
+**Status:** **RESOLVED** — `laser-line-handler.ts` now races a single
+deadline `setTimeout` against a one-shot `onLineArrived` callback that
+`handleLine` fires the moment any line lands. No `Date.now()` reads,
+no 50 ms poll loop. Event-driven; clean under `vi.useFakeTimers`.
 
 ### R-L3 — `URL.createObjectURL` cleanup correct but brittle (NOTE)
 
