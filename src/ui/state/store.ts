@@ -72,25 +72,19 @@ export type AppState = {
   // for a re-import (existing object with matching source filename
   // found) it's `{ kind: 'replaced', kept, added, removed }`.
   readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
-  // F.2.e: add a raster image SceneObject (no re-import diff logic — each
-  // import creates a new object on a fresh id). Auto-fits and centres
-  // on the bed, ensures an image-mode layer for the raster's color,
-  // and pushes to the undo stack like every other fresh import.
+  // F.2.e raster import — no re-import diff, just a fresh add with
+  // auto-fit + image-mode layer ensure (see scene-mutations).
   readonly importRasterImage: (object: SceneObject) => void;
-  // Phase D — insert or update a TextObject by id. The dialog's
-  // Submit always calls this; on add it's a new id, on edit it
-  // matches an existing id and replaces in place (preserves the
-  // user's position/transform).
+  // Phase D insert / update text by id; on add it's a new id, on
+  // edit it replaces in place (preserves position/transform).
   readonly upsertTextObject: (text: TextObject) => void;
   readonly removeSceneObject: (id: string) => void;
   // Clone every currently-selected SceneObject with a fresh id and a
   // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
   // new selection. No-op when nothing is selected.
   readonly duplicateSelection: () => void;
-  // Zoom the viewport to the bounds of the current selection (primary
-  // + extras). Falls back to fitting all objects when nothing's
-  // selected, and to bed fit when the scene is empty. Driven by the
-  // Shift+F shortcut and the "fit to selection" zoom button.
+  // Zoom to current selection's bounds; falls back to fit-all then
+  // bed-fit. Driven by Shift+F and the fit-to-selection zoom button.
   readonly fitToSelection: () => void;
   readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
@@ -98,14 +92,11 @@ export type AppState = {
   readonly undo: () => void;
   readonly redo: () => void;
 
-  // Single-select: replaces both primary + additional with `id` (or clears
-  // all when `id` is null). Used by plain clicks.
+  // Single-select on plain click; clears all when id is null.
   readonly selectObject: (id: string | null) => void;
-  // Multi-select toggle: shift+click. Adds/removes `id` from the selection
-  // set; never clears the primary.
+  // Shift+click toggle; never clears the primary.
   readonly toggleSelectObject: (id: string) => void;
-  // Select-all: F-A5 / F-A15 Ctrl+A. Primary becomes the first object;
-  // additional gets the rest.
+  // Ctrl+A: primary = first, additional = rest.
   readonly selectAllObjects: () => void;
   readonly togglePreview: () => void;
   readonly setCursorMm: (cursor: Vec2 | null) => void;
