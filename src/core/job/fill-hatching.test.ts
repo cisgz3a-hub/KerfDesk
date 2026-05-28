@@ -116,6 +116,30 @@ describe('fillHatching', () => {
     }
   });
 
+  it('fills a polyline that returns to its start but lacks closed: true (autosave / opentype regression)', () => {
+    // Autosave-restored TextObjects from before the text-to-polylines fix
+    // carry polylines marked closed: false even though the contour returns
+    // to its start point (opentype.js v2 emits a closing L instead of a
+    // Z command). fillHatching now detects geometric closure as a
+    // fallback, so old saved projects work without re-rendering the text.
+    const lShapedClose: Polyline = {
+      closed: false, // ← intentionally wrong; geometry says closed
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+        { x: 0, y: 0 }, // back to start = closed geometrically
+      ],
+    };
+    const result = fillHatching({
+      polylines: [lShapedClose],
+      hatchAngleDeg: 0,
+      hatchSpacingMm: 1.0,
+    });
+    expect(result.length).toBeGreaterThan(0);
+  });
+
   it('returns empty for open polylines (no enclosed area)', () => {
     const openLine: Polyline = {
       closed: false,

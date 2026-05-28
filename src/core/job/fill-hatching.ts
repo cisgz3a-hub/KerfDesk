@@ -51,7 +51,14 @@ export type HatchInput = {
 
 export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   const spacing = Math.max(MIN_HATCH_SPACING_MM, input.hatchSpacingMm);
-  const closed = input.polylines.filter((p) => p.closed && p.points.length >= 3);
+  // Accept polylines whose `closed` flag is set, OR whose first and
+  // last points coincide within float epsilon. Defense-in-depth for
+  // upstream sources that don't set the flag — notably opentype.js v2
+  // glyphs whose stored TextObject polylines were created before the
+  // text-to-polylines fix landed (autosave-restored "O" reproduced
+  // the original Frame=empty bug even after deploy). Caller doesn't
+  // have to re-render the text — we just notice the geometry.
+  const closed = input.polylines.filter(isClosedEnough);
   if (closed.length === 0) return [];
 
   const angle = normalizeAngle(input.hatchAngleDeg);
@@ -97,6 +104,21 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   }
 
   return hatchesRotated.map((pl) => rotatePolyline(pl, angle));
+}
+
+// "Closed enough" check: either the closed flag is set, or the polyline
+// returns to within FLAG_EPS_MM of its starting point. The geometric
+// half catches glyph contours whose source omitted Z (opentype.js v2)
+// and any data-at-rest polylines whose closed flag was set incorrectly
+// upstream. Same epsilon as text-to-polylines.flattenPath uses.
+const CLOSURE_EPS_MM = 1e-4;
+function isClosedEnough(pl: Polyline): boolean {
+  if (pl.points.length < 3) return false;
+  if (pl.closed) return true;
+  const first = pl.points[0];
+  const last = pl.points[pl.points.length - 1];
+  if (first === undefined || last === undefined) return false;
+  return Math.abs(first.x - last.x) < CLOSURE_EPS_MM && Math.abs(first.y - last.y) < CLOSURE_EPS_MM;
 }
 
 // Wrap hatch angle into [0, 180). Hatching at 200° looks identical to 20°
