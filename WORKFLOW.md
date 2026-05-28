@@ -703,9 +703,65 @@ or traced image) with at least one closed polyline.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 
-### F-F2. Image-engrave a raster (Phase F.2 — not yet shipped)
+### F-F2. Image-engrave a raster (Phase F.2 — kickoff decided, not yet shipped)
 
-Stub. Will document on F.2 kickoff after the RasterImage SceneObject
-variant + emit-raster.ts strategy land. Per ADR-019, the F.2 emit path
-will run separately from the existing grbl-strategy and will switch
-to M4 dynamic spindle mode for image groups.
+ADR-020 kicked off; implementation pending. This section documents the
+intended flow so the implementation hits a clear target.
+
+**Goal:** the operator drops a PNG / JPG on the canvas, sees it
+positioned at its intrinsic size, sets a Layer to mode = Image with a
+dither + lines-per-mm choice, previews where it will burn, and gets
+correct M4-mode raster G-code from Compile.
+
+**Success path (the only path that ends in working G-code):**
+
+1. Operator drags a `.png` (or `.jpg`) onto the canvas, OR clicks
+   "Add Image" in the Toolbar.
+2. App decodes the image, computes intrinsic mm-bounds from the
+   image's DPI metadata (defaulting to 96 DPI when none), inserts a
+   `RasterImage` SceneObject at the canvas centre.
+3. The image renders on the workspace via Canvas2D `drawImage` —
+   real bitmap, scaled into mm-bounds. (Distinct from the Phase E
+   "trace this image" flow, which converts to vectors immediately.)
+4. The image's color is unimportant for layer assignment; raster
+   images bypass color-based layer creation and land on a default
+   "Image" layer that the auto-create pass tags `mode = 'image'`.
+5. Operator selects the Image layer, sees the new fields appear:
+   - **Dither**: dropdown of `threshold` / `floyd-steinberg` /
+     `grayscale`. Default `floyd-steinberg`.
+   - **Lines/mm**: number input, 5..25, default 10.
+6. Workspace shows the image where it will burn; no separate "preview
+   the dither" overlay in v1 — the image itself is the preview.
+7. **Compile** → emit-gcode walks the scene. The Image layer's group
+   dispatches to `emitRaster` (M4 mode, per-pixel X sweep with S
+   modulating per dither output, overscan extends X travel ~5 mm
+   each side with S0).
+8. G-code file lands in the chosen output target (download, Save As,
+   or the connected serial).
+
+**Error / edge states:**
+
+- **No image data**: user typed Compile with an empty Image layer →
+  G-code emits nothing for that layer, toast warns: "Image layer has
+  no raster object; nothing to engrave."
+- **Multiple images on one layer**: warn at compile time. v1 supports
+  exactly one RasterImage per image-mode layer. Extras skip.
+- **Non-RasterImage on an Image layer**: e.g. user dropped a vector,
+  then flipped its layer to Image mode. Compile skips with toast,
+  same shape as F-F1 Fill open-polyline warning.
+- **Lines/mm > 20**: warn but allow — at ≥ 25 the bandwidth to the
+  Falcon over USB starts to bottleneck; >20 lines/mm produces ~6 MB
+  G-code for a 100×100 mm image which is on the edge.
+- **Stream gigabytes**: protected by the streaming-emit path (per
+  ADR-020 Q3), so the renderer doesn't OOM.
+
+**Acceptance for F.2.f hardware verification:**
+
+- 50×50 mm photo at 5 lines/mm, threshold mode — burns visible image
+  without overheating diode.
+- 50×50 mm photo at 10 lines/mm, floyd-steinberg — burns visible
+  image with photographic tonality.
+- Same input + same params → byte-identical G-code on the canonical
+  fixture (snapshot test in CI mirrors this).
+- M4 emits at preamble for the image group; M3 emits for any cut
+  layer in the same job. No cross-contamination.

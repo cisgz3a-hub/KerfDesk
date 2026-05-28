@@ -90,10 +90,10 @@ Import a raster (JPG/PNG), trace to vectors via `imagetracerjs` (Unlicense — M
 
 ### Phase F — v0.6 "Raster engrave" [In progress]
 
-Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005. See ADR-019.
+Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005. See ADR-019 (Fill) + ADR-020 (Image).
 
-- **F.1 — Fill** [In progress]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
-- **F.2 — Image** [Planned, future kickoff]. True raster engrave: a new `RasterImage` SceneObject variant carries PNG bytes as a data URL; a new `emit-raster.ts` strategy emits per-pixel S-modulation G1 moves with overscan. M-mode flips to M4 (dynamic) for image groups per GRBL community convention. Dithering modes: threshold, Floyd-Steinberg, direct grayscale. Decisions deferred to F.2 kickoff (no committed code yet).
+- **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
+- **F.2 — Image** [Kickoff done — ADR-020]. True raster engrave: a new `RasterImage` SceneObject variant carries PNG bytes as a data URL; a new `emit-raster.ts` strategy emits per-pixel S-modulation G1 moves with overscan. M-mode hardcoded to M4 (dynamic) for image groups per ADR-020 Q1. Dithering modes: threshold, Floyd-Steinberg, direct grayscale; rolled-in-house (~30 LOC per algorithm) — no new dependency. Streaming-emit kicks in past 100 KB G-code to keep memory bounded on large images.
 
 ### Anything past Phase F
 
