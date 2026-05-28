@@ -63,6 +63,7 @@ export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
         </td>
       </tr>
       {layer.mode === 'fill' && <FillSubRow layer={layer} />}
+      {layer.mode === 'image' && <ImageSubRow layer={layer} />}
     </>
   );
 }
@@ -81,21 +82,20 @@ function ColorSwatch(props: { readonly color: string; readonly visible: boolean 
 }
 
 function ModeSelect({ layer }: { readonly layer: Layer }): JSX.Element {
-  // F.1 enables 'fill'. 'image' stays disabled until F.2 lands (the
-  // RasterImage SceneObject + raster emit path don't exist yet).
+  // F.1 enables 'fill'; F.2 enables 'image' (raster engrave via
+  // dither + per-pixel S modulation; needs a RasterImage on the
+  // layer to actually emit G-code).
   const setLayerParam = useStore((s) => s.setLayerParam);
   return (
     <select
       value={layer.mode}
       onChange={(e) => setLayerParam(layer.id, { mode: e.target.value as LayerMode })}
-      title="Line cuts along the outline. Fill hatches the interior of closed shapes."
+      title="Line: cut along the outline. Fill: hatch a closed shape. Image: raster-engrave a bitmap."
       aria-label={`Mode for ${layer.color}`}
     >
       <option value="line">Line</option>
       <option value="fill">Fill</option>
-      <option value="image" disabled>
-        Image (F.2)
-      </option>
+      <option value="image">Image</option>
     </select>
   );
 }
@@ -162,6 +162,66 @@ function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
         aria-label={`Hatch spacing for ${layer.color}`}
       />
       <span style={unitStyle}>mm spacing</span>
+    </>
+  );
+}
+
+// F.2.e: image-mode sub-row. Mirrors FillSubRow's layout — full
+// width below the main row, two inputs (dither + lines/mm).
+function ImageSubRow({ layer }: { readonly layer: Layer }): JSX.Element {
+  return (
+    <tr style={layer.output ? subRowStyle : { ...subRowStyle, ...rowDimmedStyle }}>
+      <td style={tdStyle} aria-hidden />
+      <td style={subRowLabelStyle} colSpan={6}>
+        <span style={subRowLabelTextStyle}>Image</span>
+        <DitherSelect layer={layer} />
+        <LinesPerMmInput layer={layer} />
+      </td>
+    </tr>
+  );
+}
+
+function DitherSelect({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <select
+      value={layer.ditherAlgorithm}
+      onChange={(e) =>
+        setLayerParam(layer.id, {
+          ditherAlgorithm: e.target.value as Layer['ditherAlgorithm'],
+        })
+      }
+      title="Threshold: harsh binary. Floyd-Steinberg: photo-style error diffusion. Grayscale: direct luma → S."
+      aria-label={`Dither for ${layer.color}`}
+    >
+      <option value="threshold">Threshold</option>
+      <option value="floyd-steinberg">Floyd-Steinberg</option>
+      <option value="grayscale">Grayscale</option>
+    </select>
+  );
+}
+
+function LinesPerMmInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const debounced = useDebouncedCommit<number>({
+    value: layer.linesPerMm,
+    commit: (linesPerMm) => setLayerParam(layer.id, { linesPerMm }),
+    parse: (s) => clamp(numericValue(s), 1, 50),
+  });
+  return (
+    <>
+      <input
+        type="number"
+        min={1}
+        max={50}
+        step={1}
+        value={debounced.displayValue}
+        onChange={debounced.onChange}
+        onBlur={debounced.onBlur}
+        style={inputStyle}
+        aria-label={`Lines per mm for ${layer.color}`}
+      />
+      <span style={unitStyle}>lines/mm</span>
     </>
   );
 }

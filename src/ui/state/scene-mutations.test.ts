@@ -49,6 +49,8 @@ describe('ensureRasterImageLayer', () => {
           output: true,
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
+          ditherAlgorithm: 'floyd-steinberg',
+          linesPerMm: 10,
         },
       ],
     };
@@ -75,6 +77,8 @@ describe('pruneOrphanLayers — raster image branch', () => {
           output: true,
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
+          ditherAlgorithm: 'floyd-steinberg',
+          linesPerMm: 10,
         },
         {
           id: '#ff0000',
@@ -87,6 +91,8 @@ describe('pruneOrphanLayers — raster image branch', () => {
           output: true,
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
+          ditherAlgorithm: 'floyd-steinberg',
+          linesPerMm: 10,
         },
       ],
     };

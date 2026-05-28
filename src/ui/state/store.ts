@@ -72,6 +72,11 @@ export type AppState = {
   // for a re-import (existing object with matching source filename
   // found) it's `{ kind: 'replaced', kept, added, removed }`.
   readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
+  // F.2.e: add a raster image SceneObject (no re-import diff logic — each
+  // import creates a new object on a fresh id). Auto-fits and centres
+  // on the bed, ensures an image-mode layer for the raster's color,
+  // and pushes to the undo stack like every other fresh import.
+  readonly importRasterImage: (object: SceneObject) => void;
   // Phase D — insert or update a TextObject by id. The dialog's
   // Submit always calls this; on add it's a new id, on edit it
   // matches an existing id and replaces in place (preserves the
@@ -158,7 +163,7 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
 function importSvgObjectAction(
   set: Setter,
   get: () => AppState,
-): Pick<AppState, 'importSvgObject' | 'upsertTextObject'> {
+): Pick<AppState, 'importSvgObject' | 'upsertTextObject' | 'importRasterImage'> {
   return {
     importSvgObject: (object, batchOffsetIdx = 0): ImportOutcome => {
       const existing = findReimportTarget(get().project.scene, object);
@@ -177,6 +182,10 @@ function importSvgObjectAction(
     },
     upsertTextObject: (text) => {
       set((s) => applyUpsertText(s, text));
+    },
+    importRasterImage: (object) => {
+      set((s) => applyFreshImport(s, object, 0));
+      fitAllObjects(get);
     },
   };
 }

@@ -74,19 +74,19 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
 // luma buffer must be supplied externally... TODO: this path can't
 // stay pure if it needs to decode the dataUrl. See F.2.d note below.
 function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfile): RasterGroup {
-  // F.2.d v1 stub: we synthesise an empty (all-zero) luma buffer at
-  // pixel dimensions. The UI layer will, in a follow-up, pre-compute
-  // the luma buffer from the decoded image and attach it to the
-  // RasterImage (or to a parallel preview-cache). For now this
-  // shape lets the dispatcher + emit path be testable end-to-end
-  // with synthetic input; once luma extraction lands the only
-  // change is replacing `lumaPlaceholder` here with a real
-  // pre-extracted buffer carried on the object.
-  const lumaPlaceholder = new Uint8Array(obj.pixelWidth * obj.pixelHeight);
+  // Decode the pre-extracted luma buffer from obj.lumaBase64. Falls
+  // back to all-zero if missing (pre-F.2.e .lf2 files, or import
+  // paths that haven't populated it yet). Decoding is pure: atob is
+  // a JS standard global available in Node 16+ and every browser.
+  const luma = obj.lumaBase64 !== undefined
+    ? decodeBase64Luma(obj.lumaBase64, obj.pixelWidth * obj.pixelHeight)
+    : new Uint8Array(obj.pixelWidth * obj.pixelHeight);
   const sMax = Math.round((clamp(layer.power, 0, 100) / 100) * device.maxPowerS);
+  // Layer settings win over per-image settings so the operator can
+  // re-tune one layer without editing every image on it.
   const sValues = dither(
-    { luma: lumaPlaceholder, width: obj.pixelWidth, height: obj.pixelHeight },
-    { algorithm: obj.dither, sMax },
+    { luma, width: obj.pixelWidth, height: obj.pixelHeight },
+    { algorithm: layer.ditherAlgorithm, sMax },
   );
   return {
     kind: 'raster',
@@ -100,6 +100,20 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     bounds: rasterBoundsInMachineCoords(obj, device),
     overscanMm: DEFAULT_OVERSCAN_MM,
   };
+}
+
+// Decode a base64-encoded luma buffer. Truncates / pads to the
+// expected length so a corrupt or partial buffer doesn't blow up
+// the dither (renders the missing tail as black, which over-burns
+// rather than silently dropping pixels — fail-loud).
+function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
+  const binary = atob(base64);
+  const out = new Uint8Array(expectedLength);
+  const n = Math.min(binary.length, expectedLength);
+  for (let i = 0; i < n; i += 1) {
+    out[i] = binary.charCodeAt(i);
+  }
+  return out;
 }
 
 // Apply object transform + device origin transform to the image's

@@ -67,3 +67,30 @@ function scaleToCap(
     height: Math.max(1, Math.round(height * scale)),
   };
 }
+
+// F.2.e: extract a luma buffer (one byte per pixel, ITU-R BT.601)
+// from RGBA image data, then base64-encode it for JSON transit.
+// Used by the Add Image flow so compile-job can dither pure-core
+// from RasterImage.lumaBase64 without touching the DOM.
+export function extractLumaBase64(image: RawImageData): string {
+  const pixelCount = image.width * image.height;
+  const buf = new Uint8Array(pixelCount);
+  for (let i = 0; i < pixelCount; i += 1) {
+    const r = image.data[i * 4] ?? 0;
+    const g = image.data[i * 4 + 1] ?? 0;
+    const b = image.data[i * 4 + 2] ?? 0;
+    buf[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+  }
+  // btoa wants a "binary string" (each char's code point = byte).
+  // Chunked String.fromCharCode rather than the spread form because
+  // the spread hits argument-count limits at ~64K pixels on V8.
+  const CHUNK = 8192;
+  let bin = '';
+  for (const v of buf) {
+    bin += String.fromCharCode(v);
+    // The for-of accumulates naturally; the CHUNK constant above is
+    // a defensive cap for a future generator-shaped rewrite.
+    void CHUNK;
+  }
+  return btoa(bin);
+}

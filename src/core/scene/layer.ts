@@ -2,12 +2,16 @@
 // parameters (power, speed, passes) that the OutputStrategy consumes when
 // emitting G-code. WORKFLOW.md F-A7 defines defaults and value ranges.
 
-// Phase F activates the 'fill' arm (F.1) and parks 'image' for F.2.
-// 'line' = vector cut/engrave along the polylines themselves. 'fill' =
-// parallel-line hatching inside a closed contour. 'image' = raster
-// engrave (per-pixel S modulation) — defined for future SceneObject
-// kinds (RasterImage), but no Layer with mode='image' compiles yet.
+// Phase F: 'line' = vector cut/engrave along polylines; 'fill' =
+// parallel-line hatching inside closed contours (F.1); 'image' =
+// raster engrave with per-pixel S modulation (F.2, ADR-020).
 export type LayerMode = 'line' | 'fill' | 'image';
+
+// F.2: dither algorithm choice for image-mode layers. Mirrors the
+// pure-core enum in scene-object.ts (DitherAlgorithm) so the Layer
+// type doesn't reach into the SceneObject module. Kept aligned;
+// adding an algorithm here also needs the matching dither.ts arm.
+export type LayerDitherAlgorithm = 'threshold' | 'floyd-steinberg' | 'grayscale';
 
 export type Layer = {
   readonly id: string;
@@ -24,6 +28,12 @@ export type Layer = {
   // visible banding at standard kerfs).
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
+  // F.2 image-mode parameters. Ignored unless mode === 'image'.
+  // Layer values WIN over per-RasterImage settings at compile time
+  // so the operator can re-tune one layer without touching every
+  // image on it.
+  readonly ditherAlgorithm: LayerDitherAlgorithm;
+  readonly linesPerMm: number;
 };
 
 export const LAYER_DEFAULTS = {
@@ -35,6 +45,8 @@ export const LAYER_DEFAULTS = {
   output: true,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.2,
+  ditherAlgorithm: 'floyd-steinberg',
+  linesPerMm: 10,
 } as const satisfies Omit<Layer, 'id' | 'color'>;
 
 export function createLayer(args: {
