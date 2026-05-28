@@ -174,9 +174,7 @@ function EngraveImageButton(): JSX.Element {
       try {
         const { loadImageAsRawData, extractLumaBase64 } = await import('../trace/image-loader');
         const image = await loadImageAsRawData(file);
-        const { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM } = await import(
-          '../../core/scene'
-        );
+        const { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM } = await import('../../core/scene');
         // Use a sensible mm-bounds default: assume 96 DPI from the
         // image so the imported size is ergonomic for the operator
         // to scale rather than tiny pixel-multiples.
@@ -207,7 +205,14 @@ function EngraveImageButton(): JSX.Element {
       }
     })();
   };
-  return <FileButton title="Engrave a raster image directly (PNG/JPG)" onPick={onPick} label="Engrave Image…" accept="image/png,image/jpeg" />;
+  return (
+    <FileButton
+      title="Engrave a raster image directly (PNG/JPG)"
+      onPick={onPick}
+      label="Engrave Image…"
+      accept="image/png,image/jpeg"
+    />
+  );
 }
 
 // Generic hidden-input file picker. Used by EngraveImageButton to
