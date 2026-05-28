@@ -48,9 +48,9 @@ jobs:
           fetch-depth: 1
 
       - name: Set up pnpm
+        # See ci.yml for why no `with.version` — package.json's
+        # packageManager field is the single source of truth.
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
