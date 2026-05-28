@@ -140,6 +140,21 @@ describe('textToPolylines', () => {
     expect(wide.bounds.maxX).toBeCloseTo(tight.bounds.maxX, 5);
   });
 
+  it('marks glyph contours as closed even when opentype.js omits Z (Fill-mode regression)', () => {
+    // opentype.js v2 emits the closing edge as a regular L back to the
+    // contour start instead of a Z command. Without geometric closure
+    // detection, every text polyline came out closed=false, which made
+    // fillHatching reject them all and Frame in Fill mode said
+    // "Nothing to frame." User-reported bug.
+    const r = render('O');
+    const pls = r.paths[0]?.polylines ?? [];
+    // The letter O has 2 contours (outer + inner). Both must be closed.
+    expect(pls.length).toBeGreaterThanOrEqual(2);
+    for (const pl of pls) {
+      expect(pl.closed).toBe(true);
+    }
+  });
+
   it('parses Dancing Script (variable font) and produces drawable polylines', () => {
     // Regression for the github-error-html-as-ttf bug: an invalid
     // font binary throws "unsupported OpenType signature" inside
