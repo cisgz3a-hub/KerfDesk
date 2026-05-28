@@ -145,6 +145,33 @@ export default tseslint.config(
       // domain-walker — the missing arm IS the to-do list.
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
 
+      // A5 audit fix: enable the high-value type-aware rules the audit
+      // specifically called out, without flipping the whole strictTypeChecked
+      // preset (which contradicts project rules — e.g. it wants `!`
+      // assertions CLAUDE.md bans, and demands dot-notation that fights
+      // tsconfig's noUncheckedIndexedAccess strictness).
+      //
+      // no-floating-promises is the most important: a missed `await` on
+      // safeWrite() in the serial I/O path would let the streamer advance
+      // before bytes hit the wire. Real laser-safety win.
+      '@typescript-eslint/no-floating-promises': 'error',
+      // Catches passing async functions where sync are expected (e.g. as
+      // an event handler signature) — silent promise rejection in those
+      // spots is a common foot-gun.
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        // Setting checksVoidReturn=false because React event handlers are
+        // typed as void-returning; passing an async function there is the
+        // standard idiom and we handle errors inside.
+        { checksVoidReturn: false },
+      ],
+      // Type-aware error checking — catches errors typed `unknown` being
+      // treated as `Error` without a narrowing check.
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+      // Promise-returning .then chains in tests are fine; the rest of the
+      // codebase prefers async/await. This catches forgotten .catch.
+      '@typescript-eslint/prefer-promise-reject-errors': 'error',
+
       // Style preferences that don't match the codebase's chosen patterns.
       // We use `type` aliases uniformly (so discriminated unions and object
       // shapes look the same at the type level) and `ReadonlyArray<T>` for
