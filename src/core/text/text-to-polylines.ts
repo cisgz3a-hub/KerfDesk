@@ -162,11 +162,32 @@ function pushLinePolylines(
 // or per disjoint segment. De Casteljau sampling for curves — same
 // approach as src/io/svg/flatten-curves.ts (kept self-contained here
 // rather than reaching across module boundaries).
+//
+// **opentype.js v2 quirk:** the v2 PathCommand stream omits explicit `Z`
+// commands for closed glyph contours — closure is encoded as a final
+// `L` back to the contour's start point instead. Without compensating,
+// every text polyline came out closed=false, which made fillHatching
+// reject them all (it needs closed contours for the even-odd rule).
+// User-visible symptom: typing a letter "O", switching the layer to
+// Fill mode, and clicking Frame produced "Nothing to frame — enable
+// Output on at least one layer." We now detect closure geometrically
+// — if the last point of a subpath equals its start within float
+// epsilon, treat it as closed even when no Z arrived.
+const CLOSURE_EPS_MM = 1e-4;
 function flattenPath(commands: ReadonlyArray<opentype.PathCommand>, out: Polyline[]): void {
   let current: Vec2[] = [];
   let startPoint: Vec2 | null = null;
-  const finish = (close: boolean): void => {
-    if (current.length >= 2) out.push({ points: current, closed: close });
+  const finish = (closedByZ: boolean): void => {
+    if (current.length >= 2) {
+      const first = current[0];
+      const last = current[current.length - 1];
+      const isGeomClosed =
+        first !== undefined &&
+        last !== undefined &&
+        Math.abs(first.x - last.x) < CLOSURE_EPS_MM &&
+        Math.abs(first.y - last.y) < CLOSURE_EPS_MM;
+      out.push({ points: current, closed: closedByZ || isGeomClosed });
+    }
     current = [];
   };
   for (const cmd of commands) {
