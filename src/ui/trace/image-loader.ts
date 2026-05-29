@@ -108,11 +108,11 @@ export function extractLumaBase64(image: RawImageData): string {
 
 // Read a File's bytes as a base64 data URL ('data:image/png;base64,…').
 // Distinct from loadImageAsRawData: this preserves the ORIGINAL bytes —
-// no decode, no downscale — so the stored bitmap is full quality. Used
-// by the raster-import paths to embed the source image in the .lf2
-// project (ADR-020) and, per ADR-026, to keep a traced image's source
-// raster on the canvas. Shared by the Engrave Image flow (Toolbar) and
-// the Trace Image dialog so the FileReader plumbing lives in one place.
+// no decode, no downscale — so the stored bitmap is full quality. Used by
+// the Import Image flow (Toolbar) to embed the source image in the .lf2
+// project (ADR-020); that same stored dataUrl is what the Trace tool later
+// reconstructs (dataUrlToFile, below) to overlay a vector trace on the
+// already-imported bitmap (ADR-026, unified image flow).
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -122,4 +122,17 @@ export function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = (): void => reject(new Error('FileReader failed to read the image.'));
     reader.readAsDataURL(file);
   });
+}
+
+// Reconstruct a File from a stored data URL. The unified image flow
+// (LightBurn model) imports a bitmap first, then runs Trace as a tool on
+// that already-imported RasterImage — but the trace preview + commit
+// pipeline (useTracePreview, loadImageAsRawData) is keyed on a File. Round-
+// tripping the RasterImage's embedded dataUrl back into a File lets the
+// trace tool reuse that pipeline unchanged instead of forking it to accept
+// raw pixels. `fetch` on a data URL is synchronous-decode in the browser.
+export async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type });
 }

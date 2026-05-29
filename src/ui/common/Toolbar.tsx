@@ -120,8 +120,8 @@ function FileButtons(): JSX.Element {
         Import SVG…
       </button>
       <TextButton />
-      <ImageButton />
-      <EngraveImageButton />
+      <ImportImageButton />
+      <TraceImageButton />
       <button
         type="button"
         title="Export G-code for the current scene (Ctrl+E)"
@@ -149,24 +149,42 @@ function TextButton(): JSX.Element {
   );
 }
 
-// Phase E — Trace Image opens the ImportImageDialog (PNG/JPG → vector).
-function ImageButton(): JSX.Element {
+// ADR-027 — Trace is a TOOL run on a SELECTED bitmap: it opens the
+// ImportImageDialog seeded with that image and overlays the resulting
+// vectors on it (the bitmap stays as the deletable source). Disabled
+// until a raster-image is selected, mirroring LightBurn's greyed-out
+// Trace with no image selected.
+function TraceImageButton(): JSX.Element {
   const openImageDialog = useUiStore((s) => s.openImageDialog);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const objects = useStore((s) => s.project.scene.objects);
+  const selected =
+    selectedObjectId === null ? undefined : objects.find((o) => o.id === selectedObjectId);
+  const raster = selected !== undefined && selected.kind === 'raster-image' ? selected : null;
   return (
     <button
       type="button"
-      title="Trace a raster image (PNG/JPG) into vectors"
-      onClick={openImageDialog}
+      title={
+        raster === null
+          ? 'Select an image first, then trace it into vectors'
+          : 'Trace the selected image into vectors'
+      }
+      disabled={raster === null}
+      onClick={(): void => {
+        if (raster !== null) openImageDialog(raster);
+      }}
     >
       Trace Image…
     </button>
   );
 }
 
-// Phase F.2 — Engrave Image (raster mode). Different from Trace
-// Image: the raster keeps its pixels and burns directly via
-// per-pixel S modulation rather than being vectorized.
-function EngraveImageButton(): JSX.Element {
+// ADR-027 — the single Import Image action. An image always enters the
+// scene as a bitmap (RasterImage) on an image-mode layer, matching
+// LightBurn; vectorizing it is a separate tool (TraceImageButton) run on
+// the selection afterward. 96-DPI mm sizing keeps the import an ergonomic
+// size to scale rather than tiny pixel-multiples.
+function ImportImageButton(): JSX.Element {
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
   const onPick = (file: File): void => {
@@ -208,15 +226,15 @@ function EngraveImageButton(): JSX.Element {
   };
   return (
     <FileButton
-      title="Engrave a raster image directly (PNG/JPG)"
+      title="Import an image (PNG/JPG) as a bitmap"
       onPick={onPick}
-      label="Engrave Image…"
+      label="Import Image…"
       accept="image/png,image/jpeg"
     />
   );
 }
 
-// Generic hidden-input file picker. Used by EngraveImageButton to
+// Generic hidden-input file picker. Used by ImportImageButton to
 // avoid touching the platform.pickFilesForOpen pipeline (which
 // returns text-only FileHandles; binary images need the raw File).
 function FileButton(props: {

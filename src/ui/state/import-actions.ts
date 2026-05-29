@@ -1,17 +1,17 @@
-// Image-import store actions: the raster-image "Engrave Image" add
-// (importRasterImage) and the ADR-026 "trace keeps its source" paired
-// insert (importTracedWithSource). Split out of store.ts so that file
-// stays under the 400-line hard cap.
+// Image/raster store actions — thin dispatchers wiring the pure scene
+// mutations into Zustand `set` calls: bitmap import (importRasterImage)
+// and the ADR-026 trace-on-selection tool (traceExistingImage). Split
+// out of store.ts so that file stays under the 400-line hard cap.
 //
 // Mirrors the viewport-actions.ts no-cycle pattern: restates the
 // minimal `set` / `get` shapes (ImportSet / ProjectSlice) it needs
 // rather than importing AppState from store.ts, which would form the
 // store.ts -> import-actions.ts -> store.ts cycle ESLint forbids.
 
-import type { RasterImage, SceneObject, TracedImage } from '../../core/scene';
+import type { SceneObject, TracedImage } from '../../core/scene';
 import {
   applyFreshImport,
-  applyTracedWithSource,
+  applyTraceToExisting,
   type MutationResult,
   type StateSlice,
 } from './scene-mutations';
@@ -29,7 +29,7 @@ export function imageImportActions(
   get: () => ProjectSlice,
 ): {
   readonly importRasterImage: (object: SceneObject) => void;
-  readonly importTracedWithSource: (traced: TracedImage, source: RasterImage) => void;
+  readonly traceExistingImage: (sourceId: string, traced: TracedImage) => void;
 } {
   return {
     importRasterImage: (object) => {
@@ -37,8 +37,8 @@ export function imageImportActions(
       // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
       fitAllObjects(get);
     },
-    importTracedWithSource: (traced, source) => {
-      set((s) => applyTracedWithSource(s, traced, source));
+    traceExistingImage: (sourceId, traced) => {
+      set((s) => applyTraceToExisting(s, sourceId, traced));
       fitAllObjects(get);
     },
   };

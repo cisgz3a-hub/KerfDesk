@@ -1,39 +1,38 @@
-// ImportImageDialog — Phase E modal for picking a raster image,
-// adjusting trace parameters, and committing the traced object to
-// the scene.
+// ImportImageDialog — the Trace tool's modal. Trace runs on a bitmap
+// the operator ALREADY imported and selected (LightBurn's model,
+// ADR-027); the dialog is seeded with that RasterImage, never a blank
+// file picker.
 //
 // Flow:
-//   1. User picks a PNG/JPG via <input type="file">
-//   2. Image is decoded into RawImageData (image-loader.ts)
+//   1. Toolbar's "Trace…" (enabled only with a raster-image selected)
+//      seeds ui-store.imageDialog with the chosen RasterImage.
+//   2. Its embedded dataUrl is round-tripped back into a File
+//      (dataUrlToFile) so the existing File-keyed preview + trace
+//      pipeline (useTracePreview, loadImageAsRawData) runs unchanged.
 //   3. User picks a preset + tweaks brightness/contrast/gamma/invert
 //      + dither (AdjustmentControls) — live preview via
 //      useTracePreview while they tune.
 //   4. Submit → traceImage (Web Worker if available, inline fallback)
 //      → ColoredPath[] directly from imagetracerjs tracedata
-//      (bypassing parseSvg's curve-flattening) → insert the vector
-//      trace AND its source bitmap as one undoable pair via
-//      importTracedWithSource (ADR-026): both share one fit-to-bed
-//      transform so they overlay, the trace draws on top and is the
-//      selection, the source lands on its image-mode layer ready to
-//      burn or delete.
+//      (bypassing parseSvg's curve-flattening) → overlay the vector
+//      trace onto the existing bitmap via traceExistingImage
+//      (ADR-026): the trace takes the source's transform so they
+//      register pixel-for-pixel, draws on top, becomes the selection,
+//      and the source is re-tagged 'trace-source' as the deletable
+//      backing.
 //
 // Result is tagged with `kind: 'traced-image'` so the source
 // filename + future "re-trace from original raster" workflow can
 // find it.
 //
-// Presentational pieces (FilePicker, PresetPicker, DialogActions,
+// Presentational pieces (SourceLabel, PresetPicker, DialogActions,
 // styles) live in dialog-parts.tsx; the pure-data option transforms
 // (mergeAdjustments, hasAggressivePreprocessing,
 // relaxAggressivePreprocessing) live in trace-options.ts. This file
 // only owns state + the commit flow + the dialog shell.
 
-import { useMemo, useRef, useState } from 'react';
-import {
-  DEFAULT_RASTER_LAYER_COLOR,
-  IDENTITY_TRANSFORM,
-  type RasterImage,
-  type TracedImage,
-} from '../../core/scene';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
 import { DEFAULT_TRACE_OPTIONS, TRACE_PRESETS, type TraceOptions } from '../../core/trace';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
@@ -46,33 +45,50 @@ import {
 } from './AdjustmentControls';
 import {
   DialogActions,
-  FilePicker,
   PresetHint,
   PresetPicker,
+  SourceLabel,
   backdropStyle,
   headingStyle,
   panelStyle,
 } from './dialog-parts';
-import { extractLumaBase64, loadImageAsRawData, readFileAsDataUrl } from './image-loader';
+import { dataUrlToFile, loadImageAsRawData } from './image-loader';
 import { mergeAdjustments } from './trace-options';
 import { traceImageWithFallback } from './use-trace-worker-client';
 import { TracePreview } from './TracePreview';
 import { useTracePreview } from './use-trace-preview';
 
 export function ImportImageDialog(): JSX.Element | null {
-  const open = useUiStore((s) => s.imageDialogOpen);
-  if (!open) return null;
-  return <DialogBody />;
+  const seed = useUiStore((s) => s.imageDialog);
+  if (seed === null) return null;
+  return <DialogBody seed={seed} />;
 }
 
-function DialogBody(): JSX.Element {
+function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   const close = useUiStore((s) => s.closeImageDialog);
-  const importTracedWithSource = useStore((s) => s.importTracedWithSource);
+  const traceExistingImage = useStore((s) => s.traceExistingImage);
   const pushToast = useToastStore((s) => s.pushToast);
   const [file, setFile] = useState<File | null>(null);
   const [preset, setPreset] = useState<string>('Line Art');
   const [adjustments, setAdjustments] = useState<AdjustmentValues>(DEFAULT_ADJUSTMENTS);
   const [busy, setBusy] = useState(false);
+  // Reconstruct a File from the seed bitmap's embedded dataUrl so the
+  // File-keyed preview + trace pipeline runs unchanged (image-loader.
+  // dataUrlToFile). The `cancelled` guard drops a stale decode if the
+  // seed swaps or the dialog unmounts before fetch resolves.
+  useEffect(() => {
+    let cancelled = false;
+    dataUrlToFile(seed.dataUrl, seed.source)
+      .then((f) => {
+        if (!cancelled) setFile(f);
+      })
+      .catch(() => {
+        if (!cancelled) pushToast(`Could not read ${seed.source} for tracing.`, 'error');
+      });
+    return (): void => {
+      cancelled = true;
+    };
+  }, [seed.dataUrl, seed.source, pushToast]);
   // Layer the user adjustments on top of the preset. The preset
   // already pins the trace-side knobs (numberOfColors, lineFilter,
   // etc.); we just merge the LF1 image-level levers in.
@@ -98,10 +114,13 @@ function DialogBody(): JSX.Element {
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     if (file === null) {
-      pushToast('Pick an image file first.', 'warning');
+      pushToast('Image still loading — try again in a moment.', 'warning');
       return;
     }
-    void commit({ file, options }, { importTracedWithSource, pushToast, close, setBusy });
+    void commit(
+      { file, options, sourceId: seed.id, source: seed.source },
+      { traceExistingImage, pushToast, close, setBusy },
+    );
   };
 
   return (
@@ -110,12 +129,12 @@ function DialogBody(): JSX.Element {
       style={backdropStyle}
       role="dialog"
       aria-modal="true"
-      aria-label="Import raster image"
+      aria-label="Trace image"
       tabIndex={-1}
     >
       <form onSubmit={onSubmit} style={panelStyle}>
         <h2 style={headingStyle}>Trace Image</h2>
-        <FilePicker file={file} onPick={setFile} />
+        <SourceLabel name={seed.source} />
         <PresetPicker value={preset} onChange={setPreset} />
         <AdjustmentControls values={adjustments} onChange={setAdjustments} />
         <TracePreview state={preview} />
@@ -127,9 +146,14 @@ function DialogBody(): JSX.Element {
 }
 
 async function commit(
-  args: { readonly file: File; readonly options: TraceOptions },
+  args: {
+    readonly file: File;
+    readonly options: TraceOptions;
+    readonly sourceId: string;
+    readonly source: string;
+  },
   ctx: {
-    readonly importTracedWithSource: ReturnType<typeof useStore.getState>['importTracedWithSource'];
+    readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
     readonly close: () => void;
     readonly setBusy: (v: boolean) => void;
@@ -150,50 +174,32 @@ async function commit(
     const { paths, bounds } = await traceImageWithFallback(image, args.options);
     if (paths.length === 0) {
       ctx.pushToast(
-        `Tracing ${args.file.name} produced no paths — try a higher contrast image.`,
+        `Tracing ${args.source} produced no paths — try a higher contrast image.`,
         'warning',
       );
       return;
     }
+    // transform is a placeholder: applyTraceToExisting overwrites it
+    // with the source bitmap's own transform so the vectors register
+    // pixel-for-pixel over the features they came from (ADR-026).
     const traced: TracedImage = {
       kind: 'traced-image',
       id: crypto.randomUUID(),
-      source: args.file.name,
+      source: args.source,
       bounds,
       transform: IDENTITY_TRANSFORM,
       paths,
     };
-    // ADR-026: keep the source bitmap on the canvas with the trace. Its
-    // bounds are the FULL image frame in the same pixel space the trace
-    // bounds live in, so the single shared fit-to-bed transform that
-    // importTracedWithSource applies overlays the two pixel-for-pixel.
-    // dataUrl holds the original full-res bytes; pixelWidth/Height + luma
-    // come from the decoded image so the burnable dither path stays
-    // self-consistent (mirrors Toolbar's Engrave Image flow).
-    const source: RasterImage = {
-      kind: 'raster-image',
-      id: crypto.randomUUID(),
-      source: args.file.name,
-      dataUrl: await readFileAsDataUrl(args.file),
-      pixelWidth: image.width,
-      pixelHeight: image.height,
-      bounds: { minX: 0, minY: 0, maxX: image.width, maxY: image.height },
-      transform: IDENTITY_TRANSFORM,
-      color: DEFAULT_RASTER_LAYER_COLOR,
-      dither: 'floyd-steinberg',
-      linesPerMm: 10,
-      lumaBase64: extractLumaBase64(image),
-    };
-    ctx.importTracedWithSource(traced, source);
+    ctx.traceExistingImage(args.sourceId, traced);
     const colorCount = traced.paths.length;
     ctx.pushToast(
-      `Traced ${args.file.name} — ${colorCount} color${colorCount === 1 ? '' : 's'}, source kept`,
+      `Traced ${args.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, source kept`,
       'success',
     );
     ctx.close();
   } catch (err) {
     ctx.pushToast(
-      `Could not trace ${args.file.name}: ${err instanceof Error ? err.message : String(err)}`,
+      `Could not trace ${args.source}: ${err instanceof Error ? err.message : String(err)}`,
       'error',
     );
   } finally {

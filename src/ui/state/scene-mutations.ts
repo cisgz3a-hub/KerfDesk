@@ -19,6 +19,7 @@ import {
   type SceneObject,
   type TextObject,
   type TracedImage,
+  type Transform,
 } from '../../core/scene';
 
 const HISTORY_DEPTH = 50;
@@ -210,29 +211,63 @@ export function applyFreshImport(
   };
 }
 
-// ADR-026: trace keeps its source. Insert BOTH the vector trace and the
-// source bitmap, sharing ONE transform so they overlay pixel-for-pixel.
-// The transform is the bed-fit of the source's full-image frame; the
-// trace's bounds are a sub-rect of that frame, so under the shared
-// transform the vector lands exactly over the features it traced. The
-// raster goes in first (drawn beneath), the trace second (drawn on top),
-// and the trace is the selection — so "delete the source to keep the
-// trace" is the obvious next gesture. A single pushUndo covers the pair.
-export function applyTracedWithSource(
+// Build the transform that lands a trace pixel-for-pixel over the bitmap
+// it was traced from. imagetracerjs emits polylines in the source's PIXEL
+// space (1 unit = 1 px), but the bitmap was imported in millimetres — its
+// object-local `bounds` span the mm size (96-DPI sizing at import, ADR-027)
+// while `pixelWidth/Height` record the original px grid. Both objects are
+// drawn through the SAME applyTransform (scale→mirror→rotate→translate),
+// so reusing the bitmap's raw transform would leave pixel-unit vectors
+// (extent = pixelWidth) over an mm-unit bitmap (extent = widthMm): a fixed
+// widthMm/pixelWidth = 25.4/96 ratio, i.e. the trace renders ~3.78x too
+// large. Folding the bitmap's mm-per-pixel into the trace's scale converts
+// the pixel points into the same mm frame. Rotation, mirror, and the
+// translate are inherited unchanged; this is exact because imported rasters
+// always have bounds anchored at (0,0) (so there is no bounds offset for
+// the scale to interact with). Degenerate 0-px sources fall back to the
+// raw transform — a 0-px image traces to nothing anyway.
+function overlayTransformForRaster(source: RasterImage): Transform {
+  if (source.pixelWidth === 0 || source.pixelHeight === 0) return source.transform;
+  const mmPerPxX = (source.bounds.maxX - source.bounds.minX) / source.pixelWidth;
+  const mmPerPxY = (source.bounds.maxY - source.bounds.minY) / source.pixelHeight;
+  return {
+    ...source.transform,
+    scaleX: source.transform.scaleX * mmPerPxX,
+    scaleY: source.transform.scaleY * mmPerPxY,
+  };
+}
+
+// ADR-026 (unified image flow): a trace overlays the bitmap it was
+// traced FROM — which the operator imported first as a standalone raster
+// (LightBurn's model: Trace is a tool run on a SELECTED image, not a
+// second import). We find that existing bitmap by id and give the trace a
+// transform that maps its pixel-space points onto the bitmap's mm extent
+// (overlayTransformForRaster) so the vectors land pixel-for-pixel over the
+// features they came from, then tag the bitmap 'trace-source' so the
+// canvas tints it as the deletable backing. The trace is appended last
+// (drawn on top) and becomes the selection, so "delete the source to
+// keep the trace" stays the obvious next gesture; a single pushUndo
+// covers the change.
+//
+// Total + defensive: if `sourceId` no longer resolves to a raster
+// (shouldn't happen — the dialog seeds from a live selection behind a
+// modal), the trace is still added at its own transform rather than
+// silently lost.
+export function applyTraceToExisting(
   s: StateSlice,
+  sourceId: string,
   traced: TracedImage,
-  source: RasterImage,
 ): MutationResult {
-  const { bedWidth, bedHeight } = s.project.device;
-  // Tag the source as the trace backing so the canvas tints it: the user
-  // sees two stacked layers and knows the tinted one is the deletable
-  // original (ADR-026). Render-only — no effect on compile/G-code.
-  const taggedSource: RasterImage = { ...source, role: 'trace-source' };
-  const fittedSource = fitObjectToBed(taggedSource, bedWidth, bedHeight);
-  const positionedTrace: TracedImage = { ...traced, transform: fittedSource.transform };
-  let scene = addObject(s.project.scene, fittedSource);
+  const existing = s.project.scene.objects.find((o) => o.id === sourceId);
+  let scene = s.project.scene;
+  let transform = traced.transform;
+  if (existing !== undefined && existing.kind === 'raster-image') {
+    transform = overlayTransformForRaster(existing);
+    const taggedSource: RasterImage = { ...existing, role: 'trace-source' };
+    scene = replaceObject(scene, existing.id, taggedSource);
+  }
+  const positionedTrace: TracedImage = { ...traced, transform };
   scene = addObject(scene, positionedTrace);
-  scene = ensureRasterImageLayer(scene, source.color);
   scene = ensureLayersForColors(scene, positionedTrace.paths);
   return {
     project: { ...s.project, scene },
