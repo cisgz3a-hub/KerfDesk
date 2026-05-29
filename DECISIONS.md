@@ -1049,6 +1049,47 @@ overlap.
 
 ---
 
+## ADR-027 — LightBurn is the source of truth; divergences are defects to redesign
+
+**Status:** Accepted | **Date:** 2026-05-29
+
+### Context
+
+ADR-001 adopted "LightBurn's user-facing workflow and naming" as the product model, and `CLAUDE.md` collaboration rule #3 states "LightBurn is the reference for every behavior." In practice these have been read as *aspirational guidance*, and LaserForge has accumulated divergences from LightBurn — several flagged in the code itself:
+
+- 3 layer modes (Line / Fill / Image) vs LightBurn's 4 — no Offset Fill (`src/core/scene/layer.ts`).
+- A single `power` per layer vs LightBurn's Min Power + Max Power (`src/core/scene/layer.ts`, `src/core/output/grbl-strategy.ts`).
+- An inline per-layer card editor vs LightBurn's separate Cut Settings Editor with Common / Advanced tabs (`src/ui/layers/LayerRow.tsx`).
+- 3 dither algorithms vs LightBurn's ten (`src/core/scene/layer.ts`; LIGHTBURN-STUDY §1.4, §4.8).
+- Two import buttons ("Trace Image" + "Engrave Image") producing two SceneObject variants vs LightBurn's single image object (`src/ui/common/Toolbar.tsx`, `src/core/scene/scene-object.ts`).
+- A grey default raster-layer color whose own code comment reads "LightBurn uses black, but black collides with line-art SVG imports" (`src/core/scene/scene-object.ts:167`).
+
+The maintainer's directive (2026-05-29) makes the posture binding: **LightBurn is the *source of truth*, not merely a reference.** Where LaserForge's workflow, tab/window architecture, or pipeline diverges from LightBurn, the divergence is a **defect to be redesigned toward LightBurn**, unless a specific ADR records it as a deliberate, justified exception.
+
+This work proceeds under the maintainer's operating discipline — Andrej Karpathy's guidance on LLM-assisted coding (paraphrased, not a verbatim quote): keep the AI on a *tight leash* with small, individually-verified increments; keep a human in the loop reviewing every diff; dial autonomy to the risk of the change (an architectural redesign is the lowest-autonomy, highest-scrutiny case); and *verify, don't trust* — a green test suite is not evidence a feature is correct. See `CLAUDE.md` collaboration rules #1–#3.
+
+### Decision
+
+1. **LightBurn is canonical** for workflow, tab/window architecture, layer & cut semantics, the four layer modes (Line / Fill / Offset Fill / Image), defaults, optimization behavior, and G-code semantics. The authoritative behavior reference is `LIGHTBURN-STUDY.md` §§1–7.
+
+2. **A divergence is a defect by default.** Where LaserForge's behavior differs from LightBurn's, we treat it as a bug and redesign LaserForge to match — we do not defend it as a design choice. The running ledger is `LIGHTBURN-STUDY.md` §8 (gap / divergence + the redesign action per area).
+
+3. **Scope ≠ behavior.** This ADR governs *how a feature behaves once we build it* (match LightBurn), **not** *whether* we build it. Which features exist at all, and in what order, remains governed by `PROJECT.md` phases and the scope ADRs (e.g. ADR-006 GRBL-only, ADR-007 Windows-only desktop). "We haven't built LightBurn feature X yet" is a scope **gap**; "we built X but it behaves differently from LightBurn" is a **divergence**.
+
+4. **Deliberate divergences require an ADR exception.** A divergence may stand only if an ADR records it with an explicit **"Divergence from LightBurn"** note and rationale (e.g. the narrower GRBL-only scope is justified by ADR-006). Any divergence not so recorded is a defect on the §8 backlog. (The grey raster-layer color is the current example: it must now be either ADR-justified or fixed to match LightBurn.)
+
+5. **Documentation first, then tight-leash redesign.** This decision and the §8 ledger are recorded *before* any code redesign. Each redesign item lands as its own small, individually-verified PR per rule #1 — never a batched rewrite. Perceptual verification (rule #2) gates anything touching trace / fill / engrave / raster output.
+
+### Consequences
+
+- Existing divergences become an explicit, prioritizable backlog in `LIGHTBURN-STUDY.md` §8 rather than implicit drift.
+- Some shipped code is now formally flagged divergent (grey image-layer color, 3 dither modes, single power, inline layer editor, dual import buttons). Each needs either an ADR exception or a fix — but **not in this diff**; this pass is documentation only.
+- New work inherits a clear tie-breaker: when a design question arises, the answer is "what does LightBurn do?" unless an ADR says otherwise.
+- This ADR **strengthens ADR-001** (which adopted the workflow) and operationalizes `CLAUDE.md` rule #3 (which named LightBurn the reference) into a binding source-of-truth-with-exceptions rule.
+- It does **not** authorize implementing the whole LightBurn feature surface — that would violate scope discipline (point 3). The backlog is worked in `PROJECT.md` phase order.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-022 — Origin-aware preflight + Frame (lift the deferral in
