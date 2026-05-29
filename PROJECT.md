@@ -76,7 +76,7 @@ Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `fla
 
 **MVP is complete at end of Phase C.**
 
-### Phase D — v0.4 "Text + fonts" [Planned, post-MVP]
+### Phase D — v0.4 "Text + fonts" [Shipped]
 
 Type text on canvas in selectable bundled fonts; result flows through the existing Line pipeline. See ADR-012.
 
@@ -84,9 +84,11 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 - Text-to-path via `opentype.js` (MIT).
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height, weld toggle.
 
-### Phase E — v0.5 "Image vectorize" [Planned, post-MVP]
+### Phase E — v0.5 "Image vectorize" [Shipped]
 
 Import a raster (JPG/PNG), trace to vectors via `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds). Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013.
+
+**Trace pipeline hardening (2026-05-29).** Fixed transparent-PNG decode (composite onto white — it was producing all-black traces); added a perceptual-fidelity test harness that renders trace output and diffs it against analytic ground-truth masks via IoU (ADR-025, `src/__fixtures__/perceptual/`); and made a committed trace keep its source bitmap as a coexisting `RasterImage` for LightBurn-style overlay (ADR-026, new `src/ui/state/import-actions.ts`). **Known open gap — the next frontier:** imagetracerjs is outline-only, so a single pen stroke becomes two parallel contours; closing this outline-vs-centerline gap (a centerline/skeleton trace mode + metric) is the core remaining "faulty vs LightBurn" issue and is *not* caught by the IoU harness. Also open: `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (the `Line Art` preset sidesteps it), and the ADR-026 follow-ups (re-trace-from-source, source dimming/opacity, grouping the trace+source pair). See ADR-025 'Scope'/'Consequences' and ADR-026 'Consequences'.
 
 ### Phase F — v0.6 "Raster engrave" [In progress]
 

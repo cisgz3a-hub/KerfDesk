@@ -2,7 +2,7 @@
 
 > A focused CAM application for **GRBL** laser cutters and engravers. Web app and Windows desktop from one codebase. Proprietary source (ADR-018).
 
-**Status:** Phases A–E shipped (the MVP and the two post-MVP rounds: text + raster trace). Phase F.1 (Fill hatching) shipped 2026-05-28; Phase F.2 (raster image engrave) is the next scoped piece. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://laserforge.pages.dev>. Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
+**Status:** Phases A–E shipped (the MVP plus the two post-MVP rounds: text + raster trace), plus Phase F.1 (Fill hatching, shipped 2026-05-28), Phase F.2 (raster image engrave — code shipped through F.2.e, hardware burn F.2.f pending), and Phase F.3 (set work origin — code shipped, hardware verification pending). **Trace pipeline hardened 2026-05-29:** transparent-PNG decode fix, a perceptual-fidelity test harness (ADR-025), and LightBurn-style trace-keeps-source overlay (ADR-026). **Known open gap (next frontier):** imagetracerjs is outline-only, so the outline-vs-centerline limitation — the core "faulty vs LightBurn" issue — remains; see ADR-025 'Scope'. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://laserforge.pages.dev> (published manually via `pnpm deploy:web`; CI auto-deploy is dormant until the Cloudflare secrets are set — see below). Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
 
 ---
 
@@ -37,14 +37,14 @@ Read in this order:
 |---|---|
 | **[`PROJECT.md`](./PROJECT.md)** | Product scope, non-negotiables, phase plan A → F. The "what." |
 | **[`WORKFLOW.md`](./WORKFLOW.md)** | Every user flow with success / error / empty / edge states. The "what should happen." |
-| **[`DECISIONS.md`](./DECISIONS.md)** | All architectural decisions with rationale, alternatives, and consequences. 19 ADRs (ADR-001..019). The "why." |
+| **[`DECISIONS.md`](./DECISIONS.md)** | All architectural decisions with rationale, alternatives, and consequences. 26 ADRs (ADR-001..026; ADR-022–024 are reserved placeholders, not yet written). The "why." |
 | **[`CLAUDE.md`](./CLAUDE.md)** | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. The "how." |
 | **[`RESEARCH_LOG.md`](./RESEARCH_LOG.md)** | Every dependency and external claim with license, version, source, evaluator. The "where it came from." |
 | **[`AUDIT.md`](./AUDIT.md)** | Rolling professional audit. Re-run after each phase; archived snapshots in `AUDIT-YYYY-MM-DD-phase-*.md`. |
 
 ## Build status
 
-Phases A–E shipped + Phase F.1 (Fill hatching) shipped. 429+ tests pass; `pnpm audit` is 0/0/0/0. See `AUDIT.md` for current findings.
+Phases A–E shipped, plus Phase F.1 / F.2 / F.3 (see **Status** above). 644 tests across 68 files pass; `pnpm audit` is 0/0/0/0. See `AUDIT.md` for current findings.
 
 ```bash
 pnpm install
@@ -79,6 +79,12 @@ repository secrets to authenticate:
 Add both at **Settings → Secrets and variables → Actions → New
 repository secret**. Until both are set the workflow will fail at the
 "Publish to Cloudflare Pages" step (CI itself stays green).
+
+**Current status (2026-05-29): the two secrets are not set**, so the
+auto-deploy workflow is dormant. The live site is published manually with
+`pnpm deploy:web` (a local `wrangler login` provides the auth). The latest
+manual deploy serves the current `main`. Add the two secrets above to
+enable push-to-deploy.
 
 ## License
 
