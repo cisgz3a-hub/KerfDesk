@@ -9,6 +9,7 @@ import {
   createProject,
   type Layer,
   type Project,
+  type RasterImage,
   removeObject,
   type SceneObject,
   type TextObject,
@@ -78,6 +79,9 @@ export type AppState = {
   readonly importRasterImage: (object: SceneObject) => void;
   // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
   readonly traceExistingImage: (sourceId: string, traced: TracedImage) => void;
+  // ADR-029 Convert to Bitmap: replace a selected vector with the raster
+  // engrave-source rasterized from it (LightBurn discards the original).
+  readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
   // Phase D insert / update text by id; on add it's a new id, on
   // edit it replaces in place (preserves position/transform).
   readonly upsertTextObject: (text: TextObject) => void;
