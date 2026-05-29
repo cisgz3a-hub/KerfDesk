@@ -61,6 +61,12 @@ export function pickHandleDrag(args: {
   return null;
 }
 
+// Mouse button codes per the DOM event spec / React's MouseEvent. We
+// trigger pan on middle OR right — CAD convention, so users don't have
+// to learn the Space modifier to pan with a regular mouse.
+const MIDDLE_BUTTON = 1;
+const RIGHT_BUTTON = 2;
+
 // Resolve a mouse-down event to the drag it should initiate. Pure of
 // React — takes side-effect callbacks (selection updates) so the hook in
 // Workspace stays under the function-line cap.
@@ -74,7 +80,12 @@ export function computeMouseDownDrag(args: {
   readonly onPlainClick: (id: string | null) => void;
 }): DragState | null {
   const { e, ref, project, selectedObjectId, viewState, onShiftClick, onPlainClick } = args;
-  if (useUiStore.getState().spaceDown) {
+  // Three pan triggers: Space-held + left button (existing), middle
+  // button (CAD convention), right button (alternative for users
+  // without middle button). All three create the same pan DragState
+  // and use the same downstream offset math.
+  const isPanButton = e.button === MIDDLE_BUTTON || e.button === RIGHT_BUTTON;
+  if (useUiStore.getState().spaceDown || isPanButton) {
     return {
       kind: 'pan',
       startClientX: e.clientX,

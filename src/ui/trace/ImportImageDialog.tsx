@@ -5,32 +5,57 @@
 // Flow:
 //   1. User picks a PNG/JPG via <input type="file">
 //   2. Image is decoded into RawImageData (image-loader.ts)
-//   3. User adjusts color count + smoothing (or accepts defaults)
-//   4. Submit → traceImageToSvgString → parseSvg → upsert via
-//      the existing importSvgObject pipeline (it auto-fits, adds
-//      layers per color, and pushes to the undo stack).
+//   3. User picks a preset + tweaks brightness/contrast/gamma/invert
+//      + dither (AdjustmentControls) — live preview via
+//      useTracePreview while they tune.
+//   4. Submit → traceImage (Web Worker if available, inline fallback)
+//      → ColoredPath[] directly from imagetracerjs tracedata
+//      (bypassing parseSvg's curve-flattening) → insert the vector
+//      trace AND its source bitmap as one undoable pair via
+//      importTracedWithSource (ADR-026): both share one fit-to-bed
+//      transform so they overlay, the trace draws on top and is the
+//      selection, the source lands on its image-mode layer ready to
+//      burn or delete.
 //
-// Reuses parseSvg for two reasons: (a) the polyline conversion +
-// color extraction are already battle-tested, and (b) the
-// resulting object IS effectively an SVG import as far as the
-// store is concerned. We then patch the result to mark it as a
-// 'traced-image' so the source filename + future "re-trace from
-// the original raster" workflow can find it.
+// Result is tagged with `kind: 'traced-image'` so the source
+// filename + future "re-trace from original raster" workflow can
+// find it.
+//
+// Presentational pieces (FilePicker, PresetPicker, DialogActions,
+// styles) live in dialog-parts.tsx; the pure-data option transforms
+// (mergeAdjustments, hasAggressivePreprocessing,
+// relaxAggressivePreprocessing) live in trace-options.ts. This file
+// only owns state + the commit flow + the dialog shell.
 
-import { useRef, useState } from 'react';
-import { IDENTITY_TRANSFORM, type TracedImage } from '../../core/scene';
+import { useMemo, useRef, useState } from 'react';
 import {
-  DEFAULT_TRACE_OPTIONS,
-  TRACE_PRESETS,
-  type TraceOptions,
-  traceImageToSvgString,
-} from '../../core/trace';
-import { parseSvg } from '../../io/svg';
+  DEFAULT_RASTER_LAYER_COLOR,
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+  type TracedImage,
+} from '../../core/scene';
+import { DEFAULT_TRACE_OPTIONS, TRACE_PRESETS, type TraceOptions } from '../../core/trace';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { loadImageAsRawData } from './image-loader';
+import {
+  AdjustmentControls,
+  DEFAULT_ADJUSTMENTS,
+  type AdjustmentValues,
+} from './AdjustmentControls';
+import {
+  DialogActions,
+  FilePicker,
+  PresetHint,
+  PresetPicker,
+  backdropStyle,
+  headingStyle,
+  panelStyle,
+} from './dialog-parts';
+import { extractLumaBase64, loadImageAsRawData, readFileAsDataUrl } from './image-loader';
+import { mergeAdjustments } from './trace-options';
+import { traceImageWithFallback } from './use-trace-worker-client';
 import { TracePreview } from './TracePreview';
 import { useTracePreview } from './use-trace-preview';
 
@@ -42,12 +67,28 @@ export function ImportImageDialog(): JSX.Element | null {
 
 function DialogBody(): JSX.Element {
   const close = useUiStore((s) => s.closeImageDialog);
-  const importSvgObject = useStore((s) => s.importSvgObject);
+  const importTracedWithSource = useStore((s) => s.importTracedWithSource);
   const pushToast = useToastStore((s) => s.pushToast);
   const [file, setFile] = useState<File | null>(null);
   const [preset, setPreset] = useState<string>('Line Art');
+  const [adjustments, setAdjustments] = useState<AdjustmentValues>(DEFAULT_ADJUSTMENTS);
   const [busy, setBusy] = useState(false);
-  const options: TraceOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
+  // Layer the user adjustments on top of the preset. The preset
+  // already pins the trace-side knobs (numberOfColors, lineFilter,
+  // etc.); we just merge the LF1 image-level levers in.
+  //
+  // useMemo is load-bearing — useTracePreview depends on `options` as
+  // a useEffect dep, so a fresh object reference every render would
+  // re-fire the effect on every render, repeatedly cancelling the
+  // 300ms debounce timer and leaving the preview stuck in 'tracing'.
+  // (Audit finding H1, 2026-05-28.) Memoise on the SCALAR contents,
+  // not on `presetOptions` itself, because `presetOptions` is
+  // re-derived from `TRACE_PRESETS[preset]` each render and would
+  // otherwise be ref-unstable too.
+  const options: TraceOptions = useMemo(
+    () => mergeAdjustments(TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS, adjustments),
+    [preset, adjustments],
+  );
   const preview = useTracePreview(file, options);
   const dialogRef = useRef<HTMLDivElement>(null);
   // R-M1 a11y: Escape closes, Tab cycles within, focus returns to the
@@ -60,7 +101,7 @@ function DialogBody(): JSX.Element {
       pushToast('Pick an image file first.', 'warning');
       return;
     }
-    void commit({ file, options }, { importSvgObject, pushToast, close, setBusy });
+    void commit({ file, options }, { importTracedWithSource, pushToast, close, setBusy });
   };
 
   return (
@@ -76,45 +117,19 @@ function DialogBody(): JSX.Element {
         <h2 style={headingStyle}>Trace Image</h2>
         <FilePicker file={file} onPick={setFile} />
         <PresetPicker value={preset} onChange={setPreset} />
+        <AdjustmentControls values={adjustments} onChange={setAdjustments} />
         <TracePreview state={preview} />
-        <p style={hintStyle}>
-          <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings.
-          Forces pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with curves.{' '}
-          <strong>Sharp</strong> — pixel-perfect detail, no blur. <strong>Detailed</strong> — line
-          drawings with shading (~4 layers). <strong>Photo</strong> — actual photographs (~8
-          posterized layers).
-        </p>
+        <PresetHint />
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
       </form>
     </div>
   );
 }
 
-function PresetPicker(props: {
-  readonly value: string;
-  readonly onChange: (next: string) => void;
-}): JSX.Element {
-  return (
-    <Field label="Preset">
-      <select
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        style={selectStyle}
-      >
-        {Object.keys(TRACE_PRESETS).map((key) => (
-          <option key={key} value={key}>
-            {key}
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
-}
-
 async function commit(
   args: { readonly file: File; readonly options: TraceOptions },
   ctx: {
-    readonly importSvgObject: ReturnType<typeof useStore.getState>['importSvgObject'];
+    readonly importTracedWithSource: ReturnType<typeof useStore.getState>['importTracedWithSource'];
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
     readonly close: () => void;
     readonly setBusy: (v: boolean) => void;
@@ -123,35 +138,58 @@ async function commit(
   ctx.setBusy(true);
   try {
     const image = await loadImageAsRawData(args.file);
-    const svg = await traceImageToSvgString(image, args.options);
-    const id = crypto.randomUUID();
-    const result = parseSvg({ svgText: svg, id, source: args.file.name });
-    if (result.object === null) {
+    // LF1-port path: tracedata → ColoredPath[] directly, skipping the
+    // SVG-string + parseSvg detour that flattened Béziers at coarse
+    // tolerance. Curves stay at imagetracerjs's analytic fidelity
+    // through to compile. Runs in a Web Worker when one is available,
+    // falling back to inline tracing otherwise (see
+    // use-trace-worker-client.ts). traceImageWithFallback wraps the
+    // raw call with the H3 retry semantics — on zero paths with an
+    // aggressive preset, it retries with the levers relaxed — so the
+    // preview and commit paths produce the same result.
+    const { paths, bounds } = await traceImageWithFallback(image, args.options);
+    if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.file.name} produced no paths — try a higher contrast image.`,
         'warning',
       );
       return;
     }
-    // Re-tag the parsed object as a TracedImage variant so the rest
-    // of the pipeline knows its origin. Same `paths` shape, just a
-    // different `kind` discriminator.
     const traced: TracedImage = {
       kind: 'traced-image',
-      id,
+      id: crypto.randomUUID(),
       source: args.file.name,
-      bounds: result.object.bounds,
+      bounds,
       transform: IDENTITY_TRANSFORM,
-      paths: result.object.paths,
+      paths,
     };
-    const outcome = ctx.importSvgObject(traced);
-    if (outcome.kind === 'added') {
-      const colorCount = traced.paths.length;
-      ctx.pushToast(
-        `Traced ${args.file.name} — ${colorCount} color${colorCount === 1 ? '' : 's'}`,
-        'success',
-      );
-    }
+    // ADR-026: keep the source bitmap on the canvas with the trace. Its
+    // bounds are the FULL image frame in the same pixel space the trace
+    // bounds live in, so the single shared fit-to-bed transform that
+    // importTracedWithSource applies overlays the two pixel-for-pixel.
+    // dataUrl holds the original full-res bytes; pixelWidth/Height + luma
+    // come from the decoded image so the burnable dither path stays
+    // self-consistent (mirrors Toolbar's Engrave Image flow).
+    const source: RasterImage = {
+      kind: 'raster-image',
+      id: crypto.randomUUID(),
+      source: args.file.name,
+      dataUrl: await readFileAsDataUrl(args.file),
+      pixelWidth: image.width,
+      pixelHeight: image.height,
+      bounds: { minX: 0, minY: 0, maxX: image.width, maxY: image.height },
+      transform: IDENTITY_TRANSFORM,
+      color: DEFAULT_RASTER_LAYER_COLOR,
+      dither: 'floyd-steinberg',
+      linesPerMm: 10,
+      lumaBase64: extractLumaBase64(image),
+    };
+    ctx.importTracedWithSource(traced, source);
+    const colorCount = traced.paths.length;
+    ctx.pushToast(
+      `Traced ${args.file.name} — ${colorCount} color${colorCount === 1 ? '' : 's'}, source kept`,
+      'success',
+    );
     ctx.close();
   } catch (err) {
     ctx.pushToast(
@@ -162,108 +200,3 @@ async function commit(
     ctx.setBusy(false);
   }
 }
-
-function FilePicker(props: {
-  readonly file: File | null;
-  readonly onPick: (f: File | null) => void;
-}): JSX.Element {
-  return (
-    <Field label="Image">
-      <input
-        type="file"
-        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-        onChange={(e) => props.onPick(e.target.files?.[0] ?? null)}
-        style={fileInputStyle}
-      />
-      {props.file !== null && (
-        <span style={fileNameStyle} title={props.file.name}>
-          {props.file.name}
-        </span>
-      )}
-    </Field>
-  );
-}
-
-function DialogActions(props: {
-  readonly canSubmit: boolean;
-  readonly busy: boolean;
-  readonly onCancel: () => void;
-}): JSX.Element {
-  return (
-    <div style={actionsStyle}>
-      <button type="button" onClick={props.onCancel} disabled={props.busy}>
-        Cancel
-      </button>
-      <button type="submit" disabled={!props.canSubmit}>
-        {props.busy ? 'Tracing…' : 'Trace'}
-      </button>
-    </div>
-  );
-}
-
-function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
-  return (
-    <label style={fieldStyle}>
-      <span style={fieldLabelStyle}>{props.label}</span>
-      <span style={fieldControlStyle}>{props.children}</span>
-    </label>
-  );
-}
-
-const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-};
-const panelStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 6,
-  padding: 16,
-  minWidth: 380,
-  maxWidth: 520,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  fontFamily: 'system-ui, sans-serif',
-};
-const headingStyle: React.CSSProperties = { margin: 0, fontSize: 16 };
-const fieldStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  fontSize: 13,
-};
-const fieldLabelStyle: React.CSSProperties = { width: 90, color: '#444' };
-const fieldControlStyle: React.CSSProperties = {
-  flex: 1,
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  flexWrap: 'wrap',
-};
-const fileInputStyle: React.CSSProperties = { flex: 1, fontSize: 12 };
-const fileNameStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: '#555',
-  maxWidth: 240,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
-const selectStyle: React.CSSProperties = { flex: 1, fontSize: 13 };
-const hintStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: '#666',
-  margin: '4px 0 0 0',
-  fontStyle: 'italic',
-};
-const actionsStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 8,
-  marginTop: 8,
-};

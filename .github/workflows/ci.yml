@@ -60,9 +60,15 @@ jobs:
       - name: Build web bundle
         run: pnpm build:web
 
-      - name: Verify file-size discipline (no file > 400 lines)
+      - name: Verify file-size discipline (coarse raw-line backstop)
+        # ESLint's max-lines rule (eslint.config.mjs) is the real gate and runs
+        # in the "ESLint" step above: 400 lines EXCLUDING blank and comment
+        # lines (skipBlankLines + skipComments), per ADR-015. This step is only
+        # a coarse backstop against catastrophic raw-line bloat. It counts EVERY
+        # line, including the explanatory comments CLAUDE.md mandates, so its
+        # threshold is deliberately looser than the 400 code-line rule.
         run: |
-          MAX=400
+          MAX=600
           BAD=$(find src -name '*.ts' -o -name '*.tsx' | xargs wc -l | awk -v max=$MAX '$1 > max && $2 != "total" { print $2 " (" $1 " lines)" }')
           if [ -n "$BAD" ]; then
             echo "Files exceeding $MAX lines:"

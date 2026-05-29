@@ -1,19 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Polyline } from '../scene';
+import { square } from '../../__fixtures__/square';
 import { fillHatching } from './fill-hatching';
-
-function square(side: number, originX = 0, originY = 0): Polyline {
-  return {
-    closed: true,
-    points: [
-      { x: originX, y: originY },
-      { x: originX + side, y: originY },
-      { x: originX + side, y: originY + side },
-      { x: originX, y: originY + side },
-    ],
-  };
-}
 
 describe('fillHatching', () => {
   it('hatches a unit square at angle=0 spacing=0.1 to ~10 horizontal lines', () => {
@@ -240,5 +229,203 @@ describe('fillHatching', () => {
       hatchSpacingMm: 0.3,
     });
     expect(a).toEqual(b);
+  });
+
+  // Byte-level output lock. The active-edge optimization (perf fix for the
+  // big-image freeze) must produce IDENTICAL hatch lines — this snapshot of
+  // a donut (outer + inner-hole, exercising even-odd pairing + snake) is the
+  // tripwire. If it moves, the optimization changed behaviour and that's a bug.
+  it('matches the exact donut hatch output (regression lock for the perf rewrite)', () => {
+    const result = fillHatching({
+      polylines: [square(10), square(4, 3, 3)],
+      hatchAngleDeg: 0,
+      hatchSpacingMm: 1.0,
+    });
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 0,
+              "y": 0,
+            },
+            {
+              "x": 10,
+              "y": 0,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 10,
+              "y": 1,
+            },
+            {
+              "x": 0,
+              "y": 1,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 0,
+              "y": 2,
+            },
+            {
+              "x": 10,
+              "y": 2,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 3,
+              "y": 3,
+            },
+            {
+              "x": 0,
+              "y": 3,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 10,
+              "y": 3,
+            },
+            {
+              "x": 7,
+              "y": 3,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 0,
+              "y": 4,
+            },
+            {
+              "x": 3,
+              "y": 4,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 7,
+              "y": 4,
+            },
+            {
+              "x": 10,
+              "y": 4,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 3,
+              "y": 5,
+            },
+            {
+              "x": 0,
+              "y": 5,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 10,
+              "y": 5,
+            },
+            {
+              "x": 7,
+              "y": 5,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 0,
+              "y": 6,
+            },
+            {
+              "x": 3,
+              "y": 6,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 7,
+              "y": 6,
+            },
+            {
+              "x": 10,
+              "y": 6,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 10,
+              "y": 7,
+            },
+            {
+              "x": 0,
+              "y": 7,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 0,
+              "y": 8,
+            },
+            {
+              "x": 10,
+              "y": 8,
+            },
+          ],
+        },
+        {
+          "closed": false,
+          "points": [
+            {
+              "x": 10,
+              "y": 9,
+            },
+            {
+              "x": 0,
+              "y": 9,
+            },
+          ],
+        },
+      ]
+    `);
   });
 });

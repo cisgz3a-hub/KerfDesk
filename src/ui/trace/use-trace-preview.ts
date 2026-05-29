@@ -3,18 +3,25 @@
 // ImportImageDialog so the user can flip between presets and see the
 // result instead of guessing-then-committing.
 //
+// Preview and commit now share the SAME trace function
+// (traceImageWithFallback from use-trace-worker-client), so what the
+// user sees in the preview is what they get on Trace — including the
+// H3 retry-with-relaxed-preset semantics. The only difference is
+// rendering: preview stringifies the ColoredPath[] to SVG for the
+// browser to display; commit feeds the same paths to importSvgObject.
+//
 // Phases (all guarded by the latest-call-wins token so a slow trace
 // followed by a fast trace can't show stale output):
 //   1. file changes → decode at the preview-size cap once
-//   2. options change → re-run traceImageToSvgString on the decoded
+//   2. options change → re-run traceImageWithFallback on the decoded
 //      pixels, debounced 300ms so dragging a slider doesn't thrash
-//   3. SVG goes through sanitizeSvg before reaching the renderer —
-//      defense-in-depth even though imagetracerjs's output is trusted
+//   3. ColoredPath[] → SVG string via coloredPathsToSvg before the
+//      renderer sees it
 
 import { useEffect, useRef, useState } from 'react';
-import { type RawImageData, type TraceOptions, traceImageToSvgString } from '../../core/trace';
-import { sanitizeSvg } from '../../io/svg/sanitize';
-import { loadImageAsRawData, PREVIEW_MAX_EDGE_PX } from './image-loader';
+import { type RawImageData, type TraceOptions, coloredPathsToSvg } from '../../core/trace';
+import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
+import { traceImageWithFallback } from './use-trace-worker-client';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
@@ -108,16 +115,16 @@ function runTrace(
   options: TraceOptions,
   setState: (next: TracePreviewState) => void,
 ): void {
-  // Trace is async (lazy-loads imagetracerjs on first call — A6
-  // bundle-split) and the synchronous work itself can run 50-200ms
-  // on a 400px image. Both happen off the React-render-path so the
-  // "tracing" state can paint first.
+  // Trace is async — runs in the Worker if available, otherwise
+  // inline. Either way the work happens off the React-render-path so
+  // the "tracing" state can paint first. Output is the same shape the
+  // commit flow consumes, then stringified to SVG locally for the
+  // browser to render.
   void (async () => {
     try {
-      const raw = await traceImageToSvgString(img, options);
-      const { clean } = sanitizeSvg(raw);
-      const responsive = makeSvgResponsive(clean, img.width, img.height);
-      setState({ kind: 'ready', svg: responsive, width: img.width, height: img.height });
+      const { paths } = await traceImageWithFallback(img, options);
+      const svg = coloredPathsToSvg(paths, img.width, img.height);
+      setState({ kind: 'ready', svg, width: img.width, height: img.height });
     } catch (err) {
       setState({
         kind: 'error',
@@ -125,16 +132,4 @@ function runTrace(
       });
     }
   })();
-}
-
-// imagetracerjs emits <svg width="W" height="H">…</svg> with no
-// viewBox (we set viewbox:false in trace-image so coordinates stay
-// in pixel space). For the preview we want the SVG to scale to its
-// container instead. Replace the opening tag's attrs with a viewBox
-// + 100% sizing so it letterboxes into the preview frame.
-function makeSvgResponsive(svg: string, width: number, height: number): string {
-  const opener = svg.match(/^<svg\b[^>]*>/i);
-  if (opener === null) return svg;
-  const replacement = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">`;
-  return svg.replace(opener[0], replacement);
 }

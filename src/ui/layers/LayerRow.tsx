@@ -1,70 +1,123 @@
-// LayerRow — single row of the Cuts/Layers panel. Each input field is a thin
-// sub-component so this component itself stays under the 80-line function
-// limit and the JSX stays readable.
+// LayerRow — single card in the Cuts/Layers panel.
 //
-// Number inputs (power / speed / passes) use a 300ms debounced commit so
-// typing "1500" doesn't push four undo frames (F-A7 — "the LF1 audit found
-// this missing; do not repeat"). Visible / Output checkboxes commit
-// immediately since each click is a single discrete change.
+// Layout per layer is a vertical CARD, not a horizontal table row.
+// Each setting gets its own field row (label on the left, input + unit
+// on the right) so:
+//   - Field labels read in full ("Power", "Speed", "Hatch spacing",
+//     "Dither", "Resolution") instead of being abbreviated to fit
+//     squeezed table columns.
+//   - The Image / Fill mode-specific settings just appear as more
+//     field rows when the mode demands them — no awkward sub-row
+//     spanning a colSpan'd <td>.
+//   - The panel uses its vertical space, of which there's plenty.
+//
+// Number inputs (power / speed / passes / hatch / lines-per-mm) use a
+// 300ms debounced commit so typing "1500" doesn't push four undo
+// frames (F-A7 — "the LF1 audit found this missing; do not repeat").
+// Visible / Output checkboxes commit immediately since each click is
+// a single discrete change.
 
 import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
-const rowStyle: React.CSSProperties = {};
-const rowDimmedStyle: React.CSSProperties = { opacity: 0.5 };
-const tdStyle: React.CSSProperties = { padding: '4px 4px', verticalAlign: 'middle' };
-const swatchStyle: React.CSSProperties = { display: 'inline-block', width: 12, height: 12 };
-const inputStyle: React.CSSProperties = { width: 64 };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666', marginLeft: 2 };
-// F.1 fill sub-row: visually grouped under the parent layer row.
-const subRowStyle: React.CSSProperties = { background: '#fafafa' };
-const subRowLabelStyle: React.CSSProperties = {
-  padding: '2px 4px 6px 4px',
+const cardStyle: React.CSSProperties = {
+  background: '#ffffff',
+  border: '1px solid #e0e0e0',
+  borderRadius: 6,
+  padding: '10px 12px',
+  marginBottom: 10,
   display: 'flex',
-  alignItems: 'baseline',
+  flexDirection: 'column',
   gap: 8,
 };
-const subRowLabelTextStyle: React.CSSProperties = {
+const cardDimmedStyle: React.CSSProperties = { opacity: 0.55 };
+const cardHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  paddingBottom: 6,
+  borderBottom: '1px solid #f0f0f0',
+};
+const swatchStyle: React.CSSProperties = {
+  display: 'inline-block',
+  width: 16,
+  height: 16,
+  flexShrink: 0,
+  borderRadius: 3,
+};
+const headerFillerStyle: React.CSSProperties = { flex: 1 };
+const headerToggleStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
   fontSize: 11,
   color: '#666',
-  width: 40,
 };
+// A field row inside the card: label on the left at fixed width so
+// the inputs align vertically across rows.
+const fieldRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  minHeight: 28,
+};
+const fieldLabelStyle: React.CSSProperties = {
+  width: 96,
+  fontSize: 12,
+  color: '#333',
+};
+const fieldValueStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  flex: 1,
+};
+const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
+const wideInputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
+const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
+const ditherSelectStyle: React.CSSProperties = { flex: 1, maxWidth: 180 };
+const modeSelectStyle: React.CSSProperties = { fontSize: 13, padding: '2px 4px' };
 
 export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
-  // When the layer is in Fill mode we render an extra sub-row underneath
-  // with the hatch angle + spacing inputs. Keeps the main row at its
-  // existing 7-column shape so non-fill layers (the common case) don't
-  // grow the panel width — and matches the LightBurn pattern of
-  // mode-conditional sub-controls.
   return (
-    <>
-      <tr style={layer.output ? rowStyle : rowDimmedStyle}>
-        <td style={tdStyle}>
-          <ColorSwatch color={layer.color} visible={layer.visible} />
-        </td>
-        <td style={tdStyle}>
-          <ModeSelect layer={layer} />
-        </td>
-        <td style={tdStyle}>
-          <PowerInput layer={layer} />
-        </td>
-        <td style={tdStyle}>
-          <SpeedInput layer={layer} />
-        </td>
-        <td style={tdStyle}>
-          <PassesInput layer={layer} />
-        </td>
-        <td style={tdStyle}>
-          <VisibleToggle layer={layer} />
-        </td>
-        <td style={tdStyle}>
-          <OutputToggle layer={layer} />
-        </td>
-      </tr>
-      {layer.mode === 'fill' && <FillSubRow layer={layer} />}
-      {layer.mode === 'image' && <ImageSubRow layer={layer} />}
-    </>
+    <section
+      style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
+      aria-label={`Layer ${layer.color}`}
+    >
+      <header style={cardHeaderStyle}>
+        <ColorSwatch color={layer.color} visible={layer.visible} />
+        <ModeSelect layer={layer} />
+        <span style={headerFillerStyle} />
+        <HeaderToggle label="Show" layer={layer} field="visible" />
+        <HeaderToggle label="Output" layer={layer} field="output" />
+      </header>
+      <FieldRow label="Power">
+        <PowerInput layer={layer} />
+        <span style={unitStyle}>%</span>
+      </FieldRow>
+      <FieldRow label="Speed">
+        <SpeedInput layer={layer} />
+        <span style={unitStyle}>mm/min</span>
+      </FieldRow>
+      <FieldRow label="Passes">
+        <PassesInput layer={layer} />
+      </FieldRow>
+      {layer.mode === 'fill' && <FillFields layer={layer} />}
+      {layer.mode === 'image' && <ImageFields layer={layer} />}
+    </section>
+  );
+}
+
+function FieldRow(props: {
+  readonly label: string;
+  readonly children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <div style={fieldRowStyle}>
+      <span style={fieldLabelStyle}>{props.label}</span>
+      <div style={fieldValueStyle}>{props.children}</div>
+    </div>
   );
 }
 
@@ -82,9 +135,6 @@ function ColorSwatch(props: { readonly color: string; readonly visible: boolean 
 }
 
 function ModeSelect({ layer }: { readonly layer: Layer }): JSX.Element {
-  // F.1 enables 'fill'; F.2 enables 'image' (raster engrave via
-  // dither + per-pixel S modulation; needs a RasterImage on the
-  // layer to actually emit G-code).
   const setLayerParam = useStore((s) => s.setLayerParam);
   return (
     <select
@@ -92,6 +142,7 @@ function ModeSelect({ layer }: { readonly layer: Layer }): JSX.Element {
       onChange={(e) => setLayerParam(layer.id, { mode: e.target.value as LayerMode })}
       title="Line: cut along the outline. Fill: hatch a closed shape. Image: raster-engrave a bitmap."
       aria-label={`Mode for ${layer.color}`}
+      style={modeSelectStyle}
     >
       <option value="line">Line</option>
       <option value="fill">Fill</option>
@@ -100,19 +151,37 @@ function ModeSelect({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function FillSubRow({ layer }: { readonly layer: Layer }): JSX.Element {
-  // Sub-row spans the full table width (7 cols) and shows only when the
-  // layer is in Fill mode. Inputs commit on the same 300ms debounce as
-  // the main-row power/speed/passes (consistent UX per F-A7).
+function HeaderToggle(props: {
+  readonly label: string;
+  readonly layer: Layer;
+  readonly field: 'visible' | 'output';
+}): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
   return (
-    <tr style={layer.output ? subRowStyle : { ...subRowStyle, ...rowDimmedStyle }}>
-      <td style={tdStyle} aria-hidden />
-      <td style={subRowLabelStyle} colSpan={6}>
-        <span style={subRowLabelTextStyle}>Hatch</span>
+    <label style={headerToggleStyle}>
+      <input
+        type="checkbox"
+        checked={props.layer[props.field]}
+        onChange={(e) => setLayerParam(props.layer.id, { [props.field]: e.target.checked })}
+        aria-label={`${props.label} for ${props.layer.color}`}
+      />
+      {props.label}
+    </label>
+  );
+}
+
+function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
+  return (
+    <>
+      <FieldRow label="Hatch angle">
         <HatchAngleInput layer={layer} />
+        <span style={unitStyle}>°</span>
+      </FieldRow>
+      <FieldRow label="Hatch spacing">
         <HatchSpacingInput layer={layer} />
-      </td>
-    </tr>
+        <span style={unitStyle}>mm</span>
+      </FieldRow>
+    </>
   );
 }
 
@@ -124,20 +193,17 @@ function HatchAngleInput({ layer }: { readonly layer: Layer }): JSX.Element {
     parse: (s) => clamp(numericValue(s), 0, 180),
   });
   return (
-    <>
-      <input
-        type="number"
-        min={0}
-        max={180}
-        step={5}
-        value={debounced.displayValue}
-        onChange={debounced.onChange}
-        onBlur={debounced.onBlur}
-        style={inputStyle}
-        aria-label={`Hatch angle for ${layer.color}`}
-      />
-      <span style={unitStyle}>° angle</span>
-    </>
+    <input
+      type="number"
+      min={0}
+      max={180}
+      step={5}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Hatch angle for ${layer.color}`}
+    />
   );
 }
 
@@ -149,35 +215,31 @@ function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
     parse: (s) => clamp(numericValue(s), 0.05, 10),
   });
   return (
-    <>
-      <input
-        type="number"
-        min={0.05}
-        max={10}
-        step={0.05}
-        value={debounced.displayValue}
-        onChange={debounced.onChange}
-        onBlur={debounced.onBlur}
-        style={inputStyle}
-        aria-label={`Hatch spacing for ${layer.color}`}
-      />
-      <span style={unitStyle}>mm spacing</span>
-    </>
+    <input
+      type="number"
+      min={0.05}
+      max={10}
+      step={0.05}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Hatch spacing for ${layer.color}`}
+    />
   );
 }
 
-// F.2.e: image-mode sub-row. Mirrors FillSubRow's layout — full
-// width below the main row, two inputs (dither + lines/mm).
-function ImageSubRow({ layer }: { readonly layer: Layer }): JSX.Element {
+function ImageFields({ layer }: { readonly layer: Layer }): JSX.Element {
   return (
-    <tr style={layer.output ? subRowStyle : { ...subRowStyle, ...rowDimmedStyle }}>
-      <td style={tdStyle} aria-hidden />
-      <td style={subRowLabelStyle} colSpan={6}>
-        <span style={subRowLabelTextStyle}>Image</span>
+    <>
+      <FieldRow label="Dither">
         <DitherSelect layer={layer} />
+      </FieldRow>
+      <FieldRow label="Resolution">
         <LinesPerMmInput layer={layer} />
-      </td>
-    </tr>
+        <span style={unitStyle}>lines / mm</span>
+      </FieldRow>
+    </>
   );
 }
 
@@ -193,6 +255,7 @@ function DitherSelect({ layer }: { readonly layer: Layer }): JSX.Element {
       }
       title="Threshold: harsh binary. Floyd-Steinberg: photo-style error diffusion. Grayscale: direct luma → S."
       aria-label={`Dither for ${layer.color}`}
+      style={ditherSelectStyle}
     >
       <option value="threshold">Threshold</option>
       <option value="floyd-steinberg">Floyd-Steinberg</option>
@@ -209,20 +272,17 @@ function LinesPerMmInput({ layer }: { readonly layer: Layer }): JSX.Element {
     parse: (s) => clamp(numericValue(s), 1, 50),
   });
   return (
-    <>
-      <input
-        type="number"
-        min={1}
-        max={50}
-        step={1}
-        value={debounced.displayValue}
-        onChange={debounced.onChange}
-        onBlur={debounced.onBlur}
-        style={inputStyle}
-        aria-label={`Lines per mm for ${layer.color}`}
-      />
-      <span style={unitStyle}>lines/mm</span>
-    </>
+    <input
+      type="number"
+      min={1}
+      max={50}
+      step={1}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Lines per mm for ${layer.color}`}
+    />
   );
 }
 
@@ -234,19 +294,16 @@ function PowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
     parse: (s) => clamp(numericValue(s), 0, 100),
   });
   return (
-    <>
-      <input
-        type="number"
-        min={0}
-        max={100}
-        value={debounced.displayValue}
-        onChange={debounced.onChange}
-        onBlur={debounced.onBlur}
-        style={inputStyle}
-        aria-label={`Power for ${layer.color}`}
-      />
-      <span style={unitStyle}>%</span>
-    </>
+    <input
+      type="number"
+      min={0}
+      max={100}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Power for ${layer.color}`}
+    />
   );
 }
 
@@ -259,19 +316,16 @@ function SpeedInput({ layer }: { readonly layer: Layer }): JSX.Element {
     parse: (s) => clamp(numericValue(s), 1, maxFeed),
   });
   return (
-    <>
-      <input
-        type="number"
-        min={1}
-        max={maxFeed}
-        value={debounced.displayValue}
-        onChange={debounced.onChange}
-        onBlur={debounced.onBlur}
-        style={inputStyle}
-        aria-label={`Speed for ${layer.color}`}
-      />
-      <span style={unitStyle}>mm/min</span>
-    </>
+    <input
+      type="number"
+      min={1}
+      max={maxFeed}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={wideInputStyle}
+      aria-label={`Speed for ${layer.color}`}
+    />
   );
 }
 
@@ -292,30 +346,6 @@ function PassesInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Passes for ${layer.color}`}
-    />
-  );
-}
-
-function VisibleToggle({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
-  return (
-    <input
-      type="checkbox"
-      checked={layer.visible}
-      onChange={(e) => setLayerParam(layer.id, { visible: e.target.checked })}
-      aria-label={`Visibility for ${layer.color}`}
-    />
-  );
-}
-
-function OutputToggle({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
-  return (
-    <input
-      type="checkbox"
-      checked={layer.output}
-      onChange={(e) => setLayerParam(layer.id, { output: e.target.checked })}
-      aria-label={`Output for ${layer.color}`}
     />
   );
 }

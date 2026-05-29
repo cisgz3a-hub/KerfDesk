@@ -38,13 +38,48 @@ describe('emitRasterGroup — preamble + postamble', () => {
 });
 
 describe('emitRasterGroup — row layout', () => {
-  it('emits one G0 rapid + one or more G1 per row', () => {
-    // 2×2 image, all pixels S=0 (white) — each row should produce
-    // one G0 (rapid to start), one G1 ending at maxX with S0, and
-    // one G1 ending at endX (overscan exit) with S0.
-    const out = emitRasterGroup(makeInput({ sValues: new Uint16Array([0, 0, 0, 0]) }));
+  it('emits one G0 rapid + one or more G1 per row with content', () => {
+    // 2×2 image, every pixel burning — each row produces one G0
+    // (rapid to active-span start) and at least one G1 (run end +
+    // overscan exit).
+    const out = emitRasterGroup(makeInput({ sValues: new Uint16Array([100, 100, 100, 100]) }));
     const g0s = out.match(/^G0 /gm) ?? [];
     expect(g0s.length).toBe(2); // one per row
+  });
+
+  it('skips rows that are entirely S=0 (no G0/G1 for blank rows)', () => {
+    // All-white 2×2 should produce zero row data — just preamble +
+    // postamble + the header comments. Saves time on blank bands
+    // above/below the actual burn content of a banner image.
+    const out = emitRasterGroup(makeInput({ sValues: new Uint16Array([0, 0, 0, 0]) }));
+    expect((out.match(/^G0 /gm) ?? []).length).toBe(0);
+  });
+
+  it('only emits rows where at least one pixel burns', () => {
+    // 4×3 image: middle row is the only one with content. Expect
+    // exactly one G0 (for that row) — top and bottom rows skip.
+    const out = emitRasterGroup(
+      makeInput({
+        width: 4,
+        height: 3,
+        bounds: { minX: 0, minY: 0, maxX: 4, maxY: 3 },
+        sValues: new Uint16Array([
+          0,
+          0,
+          0,
+          0, //
+          0,
+          500,
+          500,
+          0, //
+          0,
+          0,
+          0,
+          0, //
+        ]),
+      }),
+    );
+    expect((out.match(/^G0 /gm) ?? []).length).toBe(1);
   });
 
   it('row Y coordinates straddle pixel centres (half-pixel offset)', () => {
@@ -61,20 +96,41 @@ describe('emitRasterGroup — row layout', () => {
     expect(out).toMatch(/G0 X0\.000 Y1\.000 S0/);
   });
 
-  it('overscan adds margin to both ends of the sweep', () => {
+  it('overscan adds margin to both ends of the ACTIVE span', () => {
+    // Full-width burn so the active span equals the full row;
+    // overscan extends 5 mm beyond bounds.minX / maxX as before.
     const out = emitRasterGroup(
       makeInput({
         bounds: { minX: 10, minY: 0, maxX: 20, maxY: 2 },
         overscanMm: 5,
-        sValues: new Uint16Array([0, 0, 0, 0]),
+        sValues: new Uint16Array([100, 100, 100, 100]),
         width: 2,
         height: 2,
       }),
     );
-    // First G0 should rapid to X = 10 - 5 = 5.
+    // First G0 should rapid to active-start (10) - overscan (5) = 5.
     expect(out).toMatch(/G0 X5\.000 Y0\.500 S0/);
-    // Last G1 of row ends at 20 + 5 = 25.
+    // Last G1 of row ends at active-end (20) + overscan (5) = 25.
     expect(out).toMatch(/G1 X25\.000 S0/);
+  });
+
+  it('clips sweep to active span when row has leading/trailing zeros', () => {
+    // 6×1 row: [0, 0, 500, 500, 0, 0]. Active span columns 2..3.
+    // bounds 0..6 → active-start = 2.0, active-end = 4.0.
+    // overscan 1.0 → G0 to 1.0, G1 ends at 5.0.
+    const out = emitRasterGroup(
+      makeInput({
+        width: 6,
+        height: 1,
+        bounds: { minX: 0, minY: 0, maxX: 6, maxY: 1 },
+        overscanMm: 1,
+        sValues: new Uint16Array([0, 0, 500, 500, 0, 0]),
+      }),
+    );
+    expect(out).toMatch(/G0 X1\.000 /);
+    expect(out).toMatch(/G1 X5\.000 S0/);
+    // Should NOT travel to X=7 (full-bounds + overscan) any more.
+    expect(out).not.toMatch(/G1 X7\.000/);
   });
 });
 
@@ -98,6 +154,31 @@ describe('emitRasterGroup — S modulation', () => {
   });
 
   it('S is only emitted when it changes (modal G-code)', () => {
+    // Use a row with internal S-changes inside the active span so we
+    // verify run-length compression without confusion from leading
+    // zero clipping. Pattern [500, 500, 1000, 1000]: 1 run change.
+    const out = emitRasterGroup(
+      makeInput({
+        width: 4,
+        height: 1,
+        sValues: new Uint16Array([500, 500, 1000, 1000]),
+        bounds: { minX: 0, minY: 0, maxX: 4, maxY: 1 },
+        overscanMm: 0,
+      }),
+    );
+    const lines = out.split('\n');
+    const g1lines = lines.filter((l) => l.startsWith('G1 '));
+    // First G1: F + S500 to X=2. Second G1: S1000 to X=4. Third G1:
+    // S0 exit overscan at X=4. That's 3 G1s, 3 S-emissions.
+    expect(g1lines).toHaveLength(3);
+    const sCount = g1lines.filter((l) => /S\d/.test(l)).length;
+    expect(sCount).toBe(3);
+  });
+
+  it('clipping skips the leading S=0 run — first G1 carries the burn S', () => {
+    // [0, 0, 500, 500] used to emit a leading G1 at S=0 across the
+    // first half of the row. After clipping, the sweep starts at the
+    // first burn pixel so the first G1 already carries S500.
     const out = emitRasterGroup(
       makeInput({
         width: 4,
@@ -107,14 +188,9 @@ describe('emitRasterGroup — S modulation', () => {
         overscanMm: 0,
       }),
     );
-    // First G1 carries S0 (or F=feed + S0); second G1 carries S500
-    // (changed); third G1 (overscan exit) carries S0 (changed back).
     const lines = out.split('\n');
-    const g1lines = lines.filter((l) => l.startsWith('G1 '));
-    expect(g1lines).toHaveLength(3);
-    // Confirm only two S-changes happen (S0 → S500 → S0)
-    const sCount = g1lines.filter((l) => /S\d/.test(l)).length;
-    expect(sCount).toBeGreaterThanOrEqual(2);
+    const firstG1 = lines.find((l) => l.startsWith('G1 ')) ?? '';
+    expect(firstG1).toContain('S500');
   });
 
   it('first G1 of the whole raster carries the feed F', () => {

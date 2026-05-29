@@ -118,11 +118,21 @@ export function handleLine(
   const patch = consumeSettingsResponse(refs, cls);
   if (patch !== null) set({ detectedSettings: patch });
   if (cls.kind === 'status') {
-    set({ statusReport: cls.report });
+    // Cache WCO across frames — GRBL only reports it intermittently
+    // (every Nth status per `$10`'s WCO bit). UI reads `wcoCache`,
+    // never `statusReport.wco`. F.3 / ADR-021.
+    if (cls.report.wco !== null) {
+      set({ statusReport: cls.report, wcoCache: cls.report.wco });
+    } else {
+      set({ statusReport: cls.report });
+    }
     return;
   }
   if (cls.kind === 'alarm') {
-    set({ alarmCode: cls.code });
+    // GRBL clears G92 on alarm (1 — hard limit; soft-resets internally).
+    // Mirror that in our cache so the readout stops claiming a custom
+    // origin is active. F.3 / ADR-021.
+    set({ alarmCode: cls.code, wcoCache: null });
     advanceStream(set, get, safeWrite, 'alarm');
     return;
   }

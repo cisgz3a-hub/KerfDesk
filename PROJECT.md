@@ -94,6 +94,7 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 
 - **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
 - **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs threshold/Floyd-Steinberg/grayscale; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet burned on Falcon.
+- **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
 
 ### Anything past Phase F
 
@@ -109,28 +110,9 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
 These are user-requested or product-research items. Not yet scoped into a
 phase; tracked here so they don't get lost.
 
-- **Work-origin from current head position.** User-facing flow: operator
-  manually jogs (or hand-drags, motors-off) the head to a corner of the
-  workpiece, presses a "Set origin here" button in the Laser panel, then
-  the next compiled job emits coordinates relative to that physical point
-  rather than the machine 0,0. Standard CAM convention; LightBurn calls
-  it "Set Job Origin to Current Position."
-  - GRBL mechanics: `G92 X0 Y0` (transient — cleared by alarm / reset
-    / G92.1) is the LightBurn / LaserGRBL convention; `G10 L20 P1 X0 Y0`
-    sets the same on the G54 coordinate system persistently. Probably
-    expose both as a toggle ("session-only" vs "persistent").
-  - Surface: a new section in the Laser panel sitting next to Home /
-    Frame, plus a status-bar readout for "Origin: machine 0,0" vs
-    "Origin: WPos X.X Y.Y (custom)." Reset button to clear (G92.1 +
-    G10 L20 P1 reset to machine zero).
-  - Head-position source: existing `?` status poll already fetches
-    `WPos` / `MPos` from GRBL — `laser-store.statusReport` has it.
-  - MIT references (study-only, no code copy): CNCjs (MIT) implements
-    the same flow. LaserGRBL (GPLv3) and gSender (GPLv3) cannot be
-    referenced for code per ADR-017, but their UX choices are public.
-  - Pre-research: GRBL wiki "Work coordinate system" + Sonny Jeon's
-    `$10` reporting flags note.
-  - Needs its own ADR + WORKFLOW.md F-X entry at kickoff.
+- *(none currently parked — the Phase F.3 set-work-origin note that
+  used to live here was promoted to a Phase F line above on 2026-05-28
+  with ADR-021 and WORKFLOW.md F-F3.)*
 
 ---
 

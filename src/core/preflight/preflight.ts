@@ -13,8 +13,7 @@
 // Phase A scope: bounds check supports front-left/right and rear-left/right
 // origins (positive coord range). Center origin is documented as Phase B.
 
-import type { Layer } from '../scene';
-import type { Project } from '../scene';
+import { assertNever, type Layer, type Project, type Scene, type SceneObject } from '../scene';
 import { findOutOfBoundsCoords } from '../invariants';
 
 export type PreflightCode =
@@ -23,6 +22,7 @@ export type PreflightCode =
   | 'power-out-of-range'
   | 'speed-out-of-range'
   | 'passes-below-one'
+  | 'layer-mode-mismatch'
   | 'empty-output';
 
 export type PreflightIssue = {
@@ -51,6 +51,8 @@ export function runPreflight(project: Project, gcode: string): PreflightResult {
   for (const layer of outputLayers) {
     appendLayerIssues(layer, project.device.maxFeed, issues);
   }
+
+  appendModeMismatchIssues(project.scene, outputLayers, issues);
 
   appendBoundsIssues(project, gcode, issues);
 
@@ -83,6 +85,47 @@ function appendLayerIssues(layer: Layer, maxFeed: number, issues: PreflightIssue
       message: `Layer ${layer.id} passes ${layer.passes} must be an integer ≥ 1.`,
     });
   }
+}
+
+// F4: catch objects that compileJob silently drops because their layer's
+// mode won't process them. compile-job.ts only feeds raster images to
+// image-mode layers and only feeds vector paths to line/fill-mode layers;
+// anything assigned (by color) to the wrong mode emits no G-code and no
+// error today. Flag one issue per offending OUTPUT layer so the operator
+// sees "this layer won't engrave what's on it" before writing the file.
+function appendModeMismatchIssues(
+  scene: Scene,
+  outputLayers: ReadonlyArray<Layer>,
+  issues: PreflightIssue[],
+): void {
+  for (const layer of outputLayers) {
+    if (scene.objects.some((obj) => isStrandedOnLayer(obj, layer))) {
+      issues.push({ code: 'layer-mode-mismatch', message: mismatchMessage(layer) });
+    }
+  }
+}
+
+// True when `obj` is assigned to `layer` (by color) but `layer.mode` is the
+// kind compileJob won't emit for that object — so it's silently dropped.
+function isStrandedOnLayer(obj: SceneObject, layer: Layer): boolean {
+  switch (obj.kind) {
+    case 'imported-svg':
+    case 'text':
+    case 'traced-image':
+      // Vectors emit only on line/fill layers; an image layer ignores them.
+      return layer.mode === 'image' && obj.paths.some((p) => p.color === layer.color);
+    case 'raster-image':
+      // Rasters emit only on image layers; a line/fill layer ignores them.
+      return layer.mode !== 'image' && obj.color === layer.color;
+    default:
+      return assertNever(obj, 'SceneObject');
+  }
+}
+
+function mismatchMessage(layer: Layer): string {
+  return layer.mode === 'image'
+    ? `Layer ${layer.id} is in Image mode but has vector objects assigned; they will not be engraved. Set the layer to Line or Fill, or move the objects to another layer.`
+    : `Layer ${layer.id} is in ${layer.mode === 'fill' ? 'Fill' : 'Line'} mode but has an image assigned; it will not be engraved. Set the layer to Image mode.`;
 }
 
 function appendBoundsIssues(project: Project, gcode: string, issues: PreflightIssue[]): void {

@@ -35,9 +35,16 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { handleLine, runHandshake } from './laser-line-handler';
+import {
+  resetOrigin as resetOriginAction,
+  setOriginHere as setOriginHereAction,
+  type WorkCoordinateOffset,
+} from './origin-actions';
 
 export type { AutofocusResult } from './autofocus-action';
 export { describeAutofocusResult } from './autofocus-action';
+export { hasCustomOrigin } from './origin-actions';
+export type { WorkCoordinateOffset } from './origin-actions';
 
 const DEFAULT_BAUD = 115200;
 // Status poll tick. We tick at 250 ms always, but when no job is active
@@ -66,6 +73,16 @@ export type LaserState = {
   // null after either Apply (which dispatched updateDeviceProfile) or
   // Dismiss (which left the profile alone).
   readonly detectedSettings: Partial<DeviceProfile> | null;
+  /**
+   * F.3 — last-seen Work Coordinate Offset from the GRBL controller.
+   * GRBL only reports WCO on a cadence (~every Nth status frame), so
+   * the UI needs the *last non-null* value cached here, not the raw
+   * StatusReport.wco which is null on most frames. Updated by the
+   * line-handler when a WCO-bearing status arrives; cleared on
+   * disconnect, alarm, and soft reset (all of which clear G92 in
+   * GRBL itself). UI reads `wcoCache`, NEVER `statusReport.wco`.
+   */
+  readonly wcoCache: WorkCoordinateOffset | null;
 
   readonly connect: (adapter: PlatformAdapter) => Promise<void>;
   readonly disconnect: () => Promise<void>;
@@ -89,6 +106,12 @@ export type LaserState = {
   readonly stopJob: () => Promise<void>;
   readonly applyDetectedSettings: () => void;
   readonly dismissDetectedSettings: () => void;
+  // F.3 origin actions. setOriginHere sends G92 X0 Y0 (transient,
+  // session-scoped); resetOrigin sends G92.1 to clear it. Cache
+  // updates flow back through line-handler when GRBL's next
+  // WCO-bearing status arrives.
+  readonly setOriginHere: () => Promise<void>;
+  readonly resetOrigin: () => Promise<void>;
 };
 
 // Live state held outside Zustand. The connection / pollHandle references are
@@ -161,6 +184,7 @@ function initialLaserState(): Pick<
   | 'streamer'
   | 'log'
   | 'detectedSettings'
+  | 'wcoCache'
 > {
   return {
     connection: { kind: 'disconnected' },
@@ -170,6 +194,7 @@ function initialLaserState(): Pick<
     streamer: null,
     log: [],
     detectedSettings: null,
+    wcoCache: null,
   };
 }
 
@@ -197,6 +222,10 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
           set((s) => ({
             connection: { kind: 'disconnected' },
             statusReport: null,
+            // GRBL clears G92 on the reset that fires when the port
+            // closes; our cache must match or the next connect will
+            // show "custom origin" against an actually-zeroed machine.
+            wcoCache: null,
             streamer:
               s.streamer !== null &&
               (s.streamer.status === 'streaming' || s.streamer.status === 'paused')
@@ -225,7 +254,12 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
       const conn = refs.connection;
       teardown();
       if (conn !== null) await conn.close().catch(() => undefined);
-      set({ connection: { kind: 'disconnected' }, statusReport: null, streamer: null });
+      set({
+        connection: { kind: 'disconnected' },
+        statusReport: null,
+        streamer: null,
+        wcoCache: null,
+      });
     },
   };
 }
@@ -315,10 +349,25 @@ function jobActions(
     },
     stopJob: async () => {
       await safeWrite(RT_SOFT_RESET);
-      // Same race window as resumeJob — use functional set so the
-      // cancel applies to the current state, not a pre-await snapshot.
-      set((s) => (s.streamer !== null ? { streamer: cancelStreamer(s.streamer) } : s));
+      // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
+      // cached WCO so the readout doesn't lie about "custom origin"
+      // until the next WCO frame arrives. Same race window as
+      // resumeJob — use functional set.
+      set((s) => ({
+        wcoCache: null,
+        streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
+      }));
     },
+  };
+}
+
+function originActions(): Pick<LaserState, 'setOriginHere' | 'resetOrigin'> {
+  // No `set` / `get` access needed — the cache is written by the
+  // line-handler reactively when GRBL emits the WCO frame in response
+  // to our G92 / G92.1. We only need to push the bytes.
+  return {
+    setOriginHere: () => setOriginHereAction(safeWrite),
+    resetOrigin: () => resetOriginAction(safeWrite),
   };
 }
 
@@ -344,5 +393,6 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...connectionActions(set, get),
   ...jogActions(set, get),
   ...jobActions(set, get),
+  ...originActions(),
   ...detectedSettingsActions(set, get),
 }));

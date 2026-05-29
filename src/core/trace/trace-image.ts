@@ -23,6 +23,12 @@
 // in, gives string out (asynchronously now, to allow the lazy
 // load; the trace work itself is still synchronous CPU).
 
+import { type DitherMode, ditherForTrace } from './dither-trace';
+import { despeckle, medianFilter, otsuThreshold } from './preprocess';
+import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
+
+export type { DitherMode } from './dither-trace';
+
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
 type ImageTracerModule = {
@@ -86,6 +92,56 @@ export type TraceOptions = {
   // speckle in the trace output. 0..255 range; undefined = skip
   // pre-threshold and feed raw pixels.
   readonly thresholdLuma?: number;
+  // Phase E.2 quality polish — three pure-core preprocessing
+  // stages (see preprocess.ts). Compose in this order:
+  //   medianFilter → (otsuThreshold OR thresholdLuma) → despeckle → tracer
+  // Each is opt-in via its flag so callers see only the quality
+  // they ask for. Defaults in TRACE_PRESETS pick sensible bundles
+  // per input class (logo vs photo vs sketch).
+  //
+  // useOtsuThreshold: when true, the cutoff is picked from the
+  // image's luma histogram (Otsu 1979) instead of a fixed value.
+  // Overrides thresholdLuma when both are set.
+  readonly useOtsuThreshold?: boolean;
+  // medianFilter: 3×3 median filter (RGBA → greyscale) applied
+  // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
+  // artefacts without rounding off real edges the way a Gaussian
+  // blur would.
+  readonly medianFilter?: boolean;
+  // despeckleMinPixels: connected-component despeckle applied AFTER
+  // thresholding. Any ink region (4-connected, luma<128) with fewer
+  // than N pixels gets flipped to white. 0 or undefined disables.
+  // Topology-preserving: holes inside letters (O, B, etc.) survive.
+  readonly despeckleMinPixels?: number;
+  // Phase E.3 — image-level adjustments ported from LF1's
+  // ImageProcessing.ts (see raster-prep.ts). All four run BEFORE the
+  // existing median → threshold → despeckle chain, so the cleanup
+  // stages operate on pixels the user has already brightened /
+  // contrast-pushed / gamma-corrected / inverted to taste.
+  //
+  // brightness: −100..+100, 0 = no-op. Linear add of brightness*2.55
+  // to each channel; +100 saturates black to white.
+  readonly brightness?: number;
+  // contrast: −100..+100, 0 = no-op. Pivot around 128 with factor
+  // 1 + contrast/100. +100 doubles contrast; −100 collapses to grey.
+  readonly contrast?: number;
+  // gamma: 0.1..5, 1 = no-op. Power curve in normalised space.
+  // gamma > 1 brightens midtones; gamma < 1 darkens them.
+  readonly gamma?: number;
+  // invert: swap each channel to 255 − v. Useful when the source is
+  // light-on-dark (white logo on black) and the user wants the laser
+  // to engrave the dark areas — flipping the image makes that the
+  // standard dark-on-light input every tracer assumes.
+  readonly invert?: boolean;
+  // ditherMode: pre-trace halftone. Continuous-tone inputs (photos,
+  // shaded sketches) collapse into solid silhouettes under a simple
+  // threshold; dithering turns the tones into a spatially-distributed
+  // binary pattern that the tracer renders as halftoned ink. When set
+  // (and not 'none'), the dither replaces the threshold step — its
+  // output is already binary, and the despeckle stage is skipped to
+  // avoid erasing the dot pattern. Defaults to undefined ('none').
+  // See dither-trace.ts for the 13 supported modes.
+  readonly ditherMode?: DitherMode;
 };
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
@@ -109,15 +165,19 @@ export const DEFAULT_TRACE_OPTIONS: TraceOptions = {
 // (vector-like logos, line drawings, monochrome signs).
 export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   'Line Art': {
-    // For clean black-on-white logos / line drawings. Two key
-    // knobs (and the lesson from Phase E.1 → E.2):
-    //   * thresholdLuma 128 — pre-converts the input to pure 1-bit
-    //     so anti-aliased edges become hard pixels. Without this,
-    //     borderline-gray AA pixels become speckle in the trace.
+    // For clean black-on-white logos / line drawings. Phase E.2
+    // upgrade stack:
+    //   * useOtsuThreshold — picks the cutoff from the image's
+    //     histogram instead of assuming 128. Logos shot under
+    //     uneven light or with a tinted background now binarise
+    //     cleanly without manual tuning.
     //   * fixedPalette [white, black] — guarantees a 2-layer output
     //     even if the input has stray non-monochrome pixels.
-    //   * pathOmit 16 — drops any sub-16-point speckle that slipped
-    //     through the threshold (single-pixel JPEG artifacts etc.).
+    //   * despeckleMinPixels 12 — removes connected ink blobs under
+    //     12 pixels. Kills JPEG dot artefacts that survived the
+    //     threshold.
+    //   * pathOmit 16 — second-line defence: drops short paths the
+    //     tracer might still emit at edges.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 1,
@@ -126,23 +186,30 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurDelta: 0,
     lineFilter: true,
     fixedPalette: ['#ffffff', '#000000'],
-    thresholdLuma: 128,
+    useOtsuThreshold: true,
+    despeckleMinPixels: 12,
   },
   Smooth: {
-    // For slightly noisy / hand-drawn line art. Adds blur to
-    // suppress noise at the cost of a little detail loss.
+    // For slightly noisy / hand-drawn line art. Median filter kills
+    // salt-and-pepper noise before threshold; despeckle catches what
+    // survives. Blur slider remains for compatibility but the median
+    // does most of the work.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 2,
     quadraticTolerance: 2,
-    blurRadius: 5,
-    blurDelta: 40,
+    blurRadius: 1,
+    blurDelta: 20,
     lineFilter: true,
+    fixedPalette: ['#ffffff', '#000000'],
+    medianFilter: true,
+    useOtsuThreshold: true,
+    despeckleMinPixels: 24,
   },
   Sharp: {
     // For pixel-art / blueprint inputs where every notch matters.
-    // Same threshold + palette as Line Art (kills AA speckle) but
-    // skips lineFilter so corners stay crisp.
+    // Otsu picks a clean cutoff but no median (would round notches).
+    // Smaller despeckle so single-pixel features still survive.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 0.5,
@@ -151,11 +218,13 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurDelta: 0,
     lineFilter: false,
     fixedPalette: ['#ffffff', '#000000'],
-    thresholdLuma: 128,
+    useOtsuThreshold: true,
+    despeckleMinPixels: 4,
   },
   Detailed: {
-    // For line drawings with some shading — 4 colors keeps
-    // mid-tones as distinct cut layers.
+    // For line drawings with some shading — 4 colors keeps mid-tones
+    // as distinct cut layers. Median smooths the shading bands but
+    // we don't threshold (multi-colour output).
     numberOfColors: 4,
     pathOmit: 8,
     lineTolerance: 1,
@@ -163,10 +232,12 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurRadius: 1,
     blurDelta: 10,
     lineFilter: true,
+    medianFilter: true,
   },
   Photo: {
     // For actual photographs — heavy blur + many colors. Produces
-    // many layers; intended for posterized-style engraving.
+    // many layers; intended for posterized-style engraving. Median
+    // pre-pass cleans JPEG blocks without rounding edges away.
     numberOfColors: 8,
     pathOmit: 8,
     lineTolerance: 1.5,
@@ -174,6 +245,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurRadius: 3,
     blurDelta: 30,
     lineFilter: true,
+    medianFilter: true,
   },
 };
 
@@ -182,35 +254,133 @@ export async function traceImageToSvgString(
   options: TraceOptions = DEFAULT_TRACE_OPTIONS,
 ): Promise<string> {
   const tracer = await loadTracer();
-  // Pre-threshold to 1-bit if requested. Done before handing the
-  // pixels to imagetracer so anti-aliased edges get binarized
-  // away — without this step, even with a fixed palette, AA
-  // pixels survive as borderline-classified speckle.
-  const prepared =
-    options.thresholdLuma !== undefined
-      ? thresholdToMonochrome(image, options.thresholdLuma)
-      : image;
-  const baseOpts: Record<string, unknown> = {
+  const prepared = preprocessForTrace(image, options);
+  return tracer.imagedataToSVG(prepared, buildImageTracerOptions(options));
+}
+
+// Preprocessing chain — each stage is opt-in via TraceOptions flags
+// and runs in order: brightness → contrast → gamma → invert → median
+// → (dither OR threshold) → despeckle → tracer. See raster-prep.ts,
+// dither-trace.ts and preprocess.ts for rationale and algorithm
+// references. The composition matters: image-level adjustments run
+// BEFORE noise filtering so the median sees the user's intended tonal
+// range; dither/threshold then reads that range; despeckle operates
+// on the binarised result.
+//
+// Dither and threshold are mutually exclusive — both binarize the
+// image, so chaining would discard the dither pattern. When a dither
+// mode is active, the despeckle stage is also skipped because its
+// "remove small ink regions" semantics would erase the intentional
+// halftone dots.
+//
+// Extracted from traceImageToSvgString so complexity stays under
+// the project cap (12). Pure function — same inputs, same output.
+export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
+  let prepared = applyImageAdjustments(image, options);
+  if (options.medianFilter === true) {
+    prepared = medianFilter(prepared);
+  }
+  if (isDitherActive(options)) {
+    return ditherForTrace(prepared, options.ditherMode ?? 'none');
+  }
+  prepared = applyThreshold(prepared, options);
+  if (shouldDespeckle(options)) {
+    prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
+  }
+  return prepared;
+}
+
+function isDitherActive(options: TraceOptions): boolean {
+  return options.ditherMode !== undefined && options.ditherMode !== 'none';
+}
+
+// Brightness → contrast → gamma → invert. Each is a no-op at its
+// neutral value (0 / 0 / 1 / false) and returns the input ref-equal,
+// so chaining is cheap when the user hasn't touched a slider.
+function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
+  let out = image;
+  if (options.brightness !== undefined && options.brightness !== 0) {
+    out = adjustBrightness(out, options.brightness);
+  }
+  if (options.contrast !== undefined && options.contrast !== 0) {
+    out = adjustContrast(out, options.contrast);
+  }
+  if (options.gamma !== undefined && options.gamma !== 1) {
+    out = adjustGamma(out, options.gamma);
+  }
+  if (options.invert === true) {
+    out = invertImage(out);
+  }
+  return out;
+}
+
+// Otsu wins when both are set — it derives the cutoff from the
+// histogram, so a hand-set thresholdLuma would be ignored anyway.
+function applyThreshold(image: RawImageData, options: TraceOptions): RawImageData {
+  if (options.useOtsuThreshold === true) {
+    return thresholdToMonochrome(image, otsuThreshold(image));
+  }
+  if (options.thresholdLuma !== undefined) {
+    return thresholdToMonochrome(image, options.thresholdLuma);
+  }
+  return image;
+}
+
+// Despeckle only makes sense on binary data — otherwise the luma<128
+// classification inside despeckle splits a non-binary image in two
+// arbitrarily, eroding mid-tones the user wanted to keep.
+function shouldDespeckle(options: TraceOptions): boolean {
+  const min = options.despeckleMinPixels;
+  if (min === undefined || min <= 1) return false;
+  return options.useOtsuThreshold === true || options.thresholdLuma !== undefined;
+}
+
+// Phase E.2 — port LaserForge 1's imagetracerjs settings after audit
+// found ours were leaving the worst defaults on. The most impactful
+// single change is `rightangleenhance: false`. When true
+// (imagetracerjs's default!) it forces traced edges toward axis-
+// aligned right angles — devastating on organic curves and photos,
+// which is exactly what was making images look blocky. LF1 turned
+// it off; we now do too.
+//
+// The rest of the additions match LF1's explicit defaults so
+// imagetracerjs has no autonomous behaviour we don't control:
+//   - colorquantcycles 1: single quantization pass when used.
+//   - layering 0: sequential layer order (vs parallel default 1).
+//   - roundcoords 1: 1-decimal coordinate rounding.
+//   - strokewidth 0: no stroke widths in output.
+//   - scale 1: explicit 1:1 input-to-output scale.
+//
+// Exported for direct testing — the regression-test catch was an
+// off-the-mark fixed-palette / colour-sampling interaction; we now
+// pin the wired-through options directly.
+export function buildImageTracerOptions(options: TraceOptions): Record<string, unknown> {
+  const opts: Record<string, unknown> = {
     numberofcolors: options.numberOfColors,
     pathomit: options.pathOmit,
     ltres: options.lineTolerance,
     qtres: options.quadraticTolerance,
-    // Pre-blur + line-filter — quality knobs Phase E v1 missed.
     blurradius: options.blurRadius,
     blurdelta: options.blurDelta,
     linefilter: options.lineFilter,
-    // Disable scale + viewbox attributes so the raw mm-scale
-    // coordinates match the input image dimensions.
     viewbox: false,
     desc: false,
+    rightangleenhance: false,
+    colorquantcycles: 1,
+    layering: 0,
+    roundcoords: 1,
+    strokewidth: 0,
+    scale: 1,
   };
-  // Fixed palette overrides color quantization entirely — the
-  // tracer's `pal` accepts {r, g, b, a} entries. Used by the
-  // "Line Art" preset to force a clean 2-color output.
+  // colorsampling 0 + fixed palette ONLY when caller forced a
+  // palette (Line Art / Smooth / Sharp). Multi-colour presets
+  // (Detailed / Photo) need imagetracerjs's adaptive quantization
+  // to produce >2 layers; colorsampling=0 there would collapse them.
   if (options.fixedPalette !== undefined && options.fixedPalette.length > 0) {
-    baseOpts['pal'] = options.fixedPalette.map(hexToRgba);
+    opts['colorsampling'] = 0;
+    opts['pal'] = options.fixedPalette.map(hexToRgba);
   }
-  return tracer.imagedataToSVG(prepared, baseOpts);
+  return opts;
 }
 
 // Convert an RGBA buffer to pure 1-bit black/white. Each output

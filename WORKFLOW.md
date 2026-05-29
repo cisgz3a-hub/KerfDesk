@@ -793,3 +793,86 @@ Hardware burn on the Falcon (must be confirmed by user):
 
 When this checklist passes, mark F.2.f complete in AUDIT.md A8
 inventory and tag the build as the first Phase F.2 release.
+
+### F-F3. Set work origin to the current head position (Phase F.3)
+
+**ADR:** [ADR-021](DECISIONS.md#adr-021--phase-f3-set-work-origin-via-g92-kickoff).
+
+**Operator intent.** Place the workpiece anywhere on the bed, jog the
+head to one of its corners, and run the next job relative to that
+physical point — without moving the workpiece to the machine origin.
+Matches LightBurn's "Set Job Origin to Current Position" UX.
+
+**Where in the UI.** New `OriginRow` in the Laser panel, between the
+existing SetupRow (Home / Auto-focus / Frame / Start) and the
+streaming controls. Two buttons:
+
+- **Set origin here** — sends `G92 X0 Y0`. Declares the current head
+  position as work-coord (0, 0). Toast confirms the write; the status
+  bar's `Origin:` row flips from "machine 0,0" (muted) to
+  "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
+  next WCO-bearing status frame arrives.
+- **Reset origin** — sends `G92.1`. Clears the offset, status returns
+  to "machine 0,0". Disabled when no custom origin is active.
+
+**Status readout.** `StatusDisplay` shows MPos + `Origin:` row. The
+`Origin:` row reads from `wcoCache` (cached last-seen WCO across
+status frames). It must never read the raw `statusReport.wco` — GRBL
+only emits WCO every Nth frame, so the raw field is null on ~29
+frames out of 30 and would flicker the readout.
+
+**The four states.**
+
+1. **Success.** Connected, idle, head jogged to a workpiece corner.
+   Click Set origin here → toast "Origin set to current head position
+   (G92)." → status row updates to "Origin: X… Y… (custom)". Click
+   Frame → head traces the workpiece-relative bounding box. Click
+   Start → job runs at the workpiece corner.
+2. **No connection.** Both buttons disabled (`busy = props.disabled
+   || streaming`; `disabled` set by `LaserWindow` when connection
+   isn't `connected`). User must connect first.
+3. **Alarm clears origin mid-session.** Operator sets origin, then a
+   limit switch triggers (or `\x18` is sent). GRBL clears G92
+   internally; the alarm branch in `laser-line-handler.ts` clears
+   `wcoCache`; the status row reverts to "Origin: machine 0,0". User
+   re-jogs and re-sets if they want the offset back.
+4. **Off-bed risk.** Operator sets origin near the bed edge, then
+   runs a job whose scene-mm bounds *fit the bed* but extend off the
+   *machine* once the offset is applied. **The current preflight does
+   not catch this** (gap documented in ADR-021, future ADR-022).
+   Mitigation: always click Frame after Set origin here — the
+   existing Frame button traces the post-WCS-offset path and will
+   reveal the risk before the laser fires. The Falcon's `$20=0`
+   default means an off-machine move skips steps mechanically rather
+   than crashing.
+
+**Hardware verification checklist (Falcon A1 Pro — user-driven).**
+
+1. Connect → `StatusDisplay` shows `Origin: machine 0,0` (muted).
+2. Jog (or motors-off hand-drag) the head to a workpiece corner.
+   MPos updates accordingly.
+3. Click **Set origin here**. Within ~5 s the readout flips to
+   `Origin: X… Y… (custom)` (red/bold), values matching the previous
+   MPos. Toast confirms.
+4. Click **Frame**. Head sweeps the bounding box *around the
+   workpiece corner*, not around machine origin.
+5. Run a 5 mm × 5 mm test square (S=0 or low power on scrap). It
+   should burn at the workpiece corner.
+6. Click **Reset origin**. Toast confirms; readout returns to
+   `Origin: machine 0,0`.
+7. **Alarm-clear path.** Set origin again, then deliberately trigger
+   an alarm (e.g. hit a soft limit). The readout returns to
+   `Origin: machine 0,0` on alarm receipt. Click Unlock; the readout
+   stays at machine zero (GRBL keeps G92 cleared after `$X`).
+8. **Stop-clear path.** Set origin, start a job, press **Stop**
+   (sends `\x18`). The readout returns to machine zero.
+9. **Reconnect-clear path.** Set origin, disconnect, reconnect. The
+   readout shows `Origin: machine 0,0` (cache cleared on
+   `teardown`).
+10. **$10 unusual config.** Set `$10=1` (WPos-only) and repeat steps
+    2–3. The cache should still update — WCO is reported on a
+    separate bit from MPos/WPos.
+
+When this checklist passes on the Falcon, promote Phase F.3's
+"Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
+Shipped" and update AUDIT.md's A8 hardware inventory.

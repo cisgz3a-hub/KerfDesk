@@ -160,6 +160,14 @@ These have been chosen in advance but are not yet in `package.json`. Re-verify a
 - **Bundle impact:** ~50 KB minified. Negligible vs the existing bundle.
 - **Integration shape:** UI layer decodes file → canvas → ImageData, then `core/trace/trace-image.ts` runs `imagedataToSVG`. The resulting SVG string flows through the existing `parseSvg()` pipeline (reuses DOMPurify sanitization + bezier flattening + color-keyed layer assignment). Output becomes a `TracedImage` SceneObject — same `paths: ColoredPath[]` shape as ImportedSvg and TextObject, so compileJob / draw-scene need only one new switch arm each.
 - **Trace quality:** Acceptable on the fixture corpus (synthetic black-on-white square + standard test). Real-world quality depends heavily on input contrast and the `numberofcolors` parameter; the dialog exposes 2-16 colors with 2 as the default for clean engraving cuts.
+- **2026-05-28 — preprocessing upgrade (Phase E.2).** Real-world trace quality on user-supplied images (banner logos, photos) was visibly poor on the bare imagetracerjs path. Rather than swap libraries, added three pure-core preprocessing stages composed before the tracer:
+  - **Otsu's adaptive threshold** — picks the binary cutoff from the image's luma histogram by maximising between-class variance. Reference: N. Otsu, "A Threshold Selection Method from Gray-Level Histograms", IEEE Trans. Sys. Man. Cyber. 9 (1979). Public-domain math; implemented from the paper, no library used.
+  - **3×3 median filter** — kills salt-and-pepper noise (JPEG artefacts, scan dust) before threshold. Classic image-processing primitive, public domain.
+  - **Connected-component despeckle** — removes ink regions below N pixels via 4-connected BFS. Topology preserving (letter holes survive). Textbook flood-fill, public domain.
+  - **TRACE_PRESETS reworked** to use these stages. "Line Art" now: Otsu + despeckle 12; "Smooth" adds median + despeckle 24; "Sharp" Otsu + despeckle 4; "Detailed" / "Photo" use median.
+- **Alternatives that would replace imagetracerjs entirely (parked, not adopted):**
+  - **vtracer** (MIT, Rust-based, has WASM build) — visioncortex group; known higher quality than imagetracerjs. Strong candidate for a future evaluation. Would need a bundle-impact + integration-shape review before adoption per ADR-017.
+  - **potrace** (GPL-2) — gold standard but license-incompatible per ADR-017. Algorithm (Selinger 2003 paper) could be re-implemented from scratch if the preprocessing-upgrade path stops being enough.
 
 ---
 

@@ -13,10 +13,12 @@ import {
   fitObjectToBed,
   type ImportedSvg,
   type Project,
+  type RasterImage,
   replaceObject,
   type Scene,
   type SceneObject,
   type TextObject,
+  type TracedImage,
 } from '../../core/scene';
 
 const HISTORY_DEPTH = 50;
@@ -35,7 +37,7 @@ export type ImportOutcome =
 // Minimal slice of AppState these helpers need. Avoids a circular
 // store.ts <-> scene-mutations.ts import (store imports AppState
 // from itself, so we'd loop). Restating just the fields used.
-type StateSlice = {
+export type StateSlice = {
   readonly project: Project;
   readonly undoStack: ReadonlyArray<Project>;
 };
@@ -202,6 +204,39 @@ export function applyFreshImport(
   return {
     project: { ...s.project, scene },
     selectedObjectId: positioned.id,
+    undoStack: pushUndo(s.project, s.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+// ADR-026: trace keeps its source. Insert BOTH the vector trace and the
+// source bitmap, sharing ONE transform so they overlay pixel-for-pixel.
+// The transform is the bed-fit of the source's full-image frame; the
+// trace's bounds are a sub-rect of that frame, so under the shared
+// transform the vector lands exactly over the features it traced. The
+// raster goes in first (drawn beneath), the trace second (drawn on top),
+// and the trace is the selection — so "delete the source to keep the
+// trace" is the obvious next gesture. A single pushUndo covers the pair.
+export function applyTracedWithSource(
+  s: StateSlice,
+  traced: TracedImage,
+  source: RasterImage,
+): MutationResult {
+  const { bedWidth, bedHeight } = s.project.device;
+  // Tag the source as the trace backing so the canvas tints it: the user
+  // sees two stacked layers and knows the tinted one is the deletable
+  // original (ADR-026). Render-only — no effect on compile/G-code.
+  const taggedSource: RasterImage = { ...source, role: 'trace-source' };
+  const fittedSource = fitObjectToBed(taggedSource, bedWidth, bedHeight);
+  const positionedTrace: TracedImage = { ...traced, transform: fittedSource.transform };
+  let scene = addObject(s.project.scene, fittedSource);
+  scene = addObject(scene, positionedTrace);
+  scene = ensureRasterImageLayer(scene, source.color);
+  scene = ensureLayersForColors(scene, positionedTrace.paths);
+  return {
+    project: { ...s.project, scene },
+    selectedObjectId: positionedTrace.id,
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,

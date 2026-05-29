@@ -12,8 +12,9 @@ import { useUiStore } from './ui-store';
 
 // Minimal slice of AppState this action reads. Restated locally to
 // avoid the store.ts ↔ this-file circular import that
-// `import type { AppState }` would otherwise create.
-type ProjectSlice = {
+// `import type { AppState }` would otherwise create. Exported so the
+// sibling import-actions.ts can type its `get` the same way.
+export type ProjectSlice = {
   readonly project: {
     readonly device: { readonly bedWidth: number; readonly bedHeight: number };
     readonly scene: { readonly objects: ReadonlyArray<SceneObject> };

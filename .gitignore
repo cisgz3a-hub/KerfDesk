@@ -12,6 +12,9 @@ out/
 .vite/
 coverage/
 
+# Perceptual test harness — opt-in render dumps (PERCEPTUAL_ARTIFACTS=1)
+perceptual-artifacts/
+
 # Electron / electron-builder
 release/
 dist-electron/

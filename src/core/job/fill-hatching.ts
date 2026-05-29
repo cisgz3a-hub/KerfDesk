@@ -66,41 +66,43 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   const yBounds = polylineYBounds(rotated);
   if (yBounds === null) return [];
 
+  // Build the edge table ONCE, then sweep scanlines with an active set —
+  // rather than re-walking every edge of every contour at every scanline.
+  // The old O(scanlines × edges) walk froze the whole app when a traced
+  // "big image" (thousands of contours) was switched to Fill: the canvas
+  // redraw AND the live ETA both run this synchronously. Edges sorted by
+  // their low Y let a single advancing cursor admit them; the half-open
+  // `y < yHi` test retires them. Each edge is touched only on the scanlines
+  // it actually spans, so the cost tracks the geometry, not bed height.
+  const edges = buildSortedEdges(rotated);
   const hatchesRotated: Polyline[] = [];
   // Snap the first scanline to a multiple of `spacing` so two adjacent
   // shapes hatched separately use the same Y grid — avoids visible
   // seams where two regions abut.
   const yStart = Math.ceil(yBounds.minY / spacing) * spacing;
   // Iterate by integer index rather than `y += spacing` so floating-point
-  // drift doesn't decide whether the last scanline sits exactly on the
-  // top boundary (which the half-open rule would then reject anyway).
-  // Counting via `Math.round((maxY - yStart) / spacing) + 1` gives the
-  // same scanline count for two polygons that span the same height,
-  // independent of rotation angle.
+  // drift doesn't decide whether the last scanline sits exactly on the top
+  // boundary (which the half-open rule would then reject anyway). The
+  // integer count is also rotation-invariant for equal-height polygons.
   const scanCount = Math.max(0, Math.floor((yBounds.maxY - yStart) / spacing + SCANLINE_EPS) + 1);
+  let nextEdge = 0;
+  let active: ScanEdge[] = [];
   for (let scanIndex = 0; scanIndex < scanCount; scanIndex += 1) {
     const y = yStart + scanIndex * spacing;
-    const intersections = collectIntersectionsAtY(rotated, y);
-    if (intersections.length < 2) continue;
-    intersections.sort((a, b) => a - b);
-    // Snake fill: every other scanline reverses direction to skip the
-    // long return travel. Cheaper than a post-hoc 2-opt and the saving
-    // is the same.
-    const forward = scanIndex % 2 === 0;
-    for (let i = 0; i + 1 < intersections.length; i += 2) {
-      const xa = intersections[i];
-      const xb = intersections[i + 1];
-      if (xa === undefined || xb === undefined) continue;
-      if (xb - xa < SCANLINE_EPS) continue; // degenerate slice
-      const [x0, x1] = forward ? [xa, xb] : [xb, xa];
-      hatchesRotated.push({
-        points: [
-          { x: x0, y },
-          { x: x1, y },
-        ],
-        closed: false,
-      });
+    // Admit every edge whose span has begun (sorted by yLo, so stop at the
+    // first one still ahead of this scanline).
+    while (nextEdge < edges.length) {
+      const e = edges[nextEdge];
+      if (e === undefined || e.yLo > y) break;
+      active.push(e);
+      nextEdge += 1;
     }
+    // Retire edges whose span has ended: an edge covers the half-open
+    // interval [yLo, yHi), so y >= yHi means it no longer crosses. Since y
+    // only increases, a retired edge never returns.
+    active = active.filter((e) => y < e.yHi);
+    const intersections = active.map((e) => intersectX(e, y));
+    pushScanlineHatches(intersections, y, scanIndex, hatchesRotated);
   }
 
   return hatchesRotated.map((pl) => rotatePolyline(pl, angle));
@@ -171,37 +173,76 @@ function polylineYBounds(
   return { minY, maxY };
 }
 
-// For one Y, collect every edge intersection across every closed
-// polyline. Rule: an edge (p,q) contributes one intersection if Y is
-// in the half-open interval [min(p.y, q.y), max(p.y, q.y)). Horizontal
-// edges (p.y === q.y) contribute nothing — the scanline would either
-// miss or overlap entirely, which the half-open rule handles by giving
-// zero intersections in both cases.
-function collectIntersectionsAtY(polylines: ReadonlyArray<Polyline>, y: number): number[] {
-  const out: number[] = [];
+// One non-horizontal polygon edge, precomputed for the scanline sweep.
+// yLo/yHi are the half-open Y span [yLo, yHi) the edge crosses; ax..by
+// are the endpoints in the (already rotated) horizontal-scanline frame.
+type ScanEdge = {
+  readonly ax: number;
+  readonly ay: number;
+  readonly bx: number;
+  readonly by: number;
+  readonly yLo: number;
+  readonly yHi: number;
+};
+
+// Flatten every closed polyline into a flat edge list, dropping horizontal
+// edges (they never cross a scanline — the half-open rule gives them zero
+// intersections), and sort by yLo so the sweep can admit edges with a single
+// advancing cursor instead of re-scanning the whole list each scanline.
+function buildSortedEdges(polylines: ReadonlyArray<Polyline>): ScanEdge[] {
+  const edges: ScanEdge[] = [];
   for (const pl of polylines) {
-    pushIntersectionsForPolyline(pl, y, out);
+    const n = pl.points.length;
+    if (n < 2) continue;
+    // Every edge of the closed polygon, including the implicit closing
+    // edge points[n-1] → points[0].
+    for (let i = 0; i < n; i += 1) {
+      const a = pl.points[i];
+      const b = pl.points[(i + 1) % n];
+      if (a === undefined || b === undefined) continue;
+      if (Math.abs(b.y - a.y) < SCANLINE_EPS) continue;
+      edges.push({
+        ax: a.x,
+        ay: a.y,
+        bx: b.x,
+        by: b.y,
+        yLo: Math.min(a.y, b.y),
+        yHi: Math.max(a.y, b.y),
+      });
+    }
   }
-  return out;
+  edges.sort((e1, e2) => e1.yLo - e2.yLo);
+  return edges;
 }
 
-function pushIntersectionsForPolyline(pl: Polyline, y: number, out: number[]): void {
-  const n = pl.points.length;
-  if (n < 2) return;
-  // Iterate every edge of the closed polygon, including the implicit
-  // closing edge from points[n-1] → points[0].
-  for (let i = 0; i < n; i += 1) {
-    const a = pl.points[i];
-    const b = pl.points[(i + 1) % n];
-    if (a === undefined || b === undefined) continue;
-    const yLo = Math.min(a.y, b.y);
-    const yHi = Math.max(a.y, b.y);
-    if (y < yLo || y >= yHi) continue;
-    // Horizontal edge — yLo === yHi means the `y < yLo` check above
-    // already rejected it (since y === yHi too via the >= side).
-    const dy = b.y - a.y;
-    if (Math.abs(dy) < SCANLINE_EPS) continue;
-    const t = (y - a.y) / dy;
-    out.push(a.x + t * (b.x - a.x));
+// X coordinate where edge `e` crosses horizontal line `y`. Caller guarantees
+// y is inside [yLo, yHi), so dy is non-zero (horizontal edges were dropped).
+function intersectX(e: ScanEdge, y: number): number {
+  const dy = e.by - e.ay;
+  const t = (y - e.ay) / dy;
+  return e.ax + t * (e.bx - e.ax);
+}
+
+// Pair sorted X intersections into interior runs (even-odd rule) and emit one
+// hatch line per run. Direction alternates with scanIndex (snake fill) so the
+// laser doesn't return-to-start between rows. scanIndex (not a boolean) keeps
+// the snake decision here and avoids a boolean parameter at the call site.
+function pushScanlineHatches(xs: number[], y: number, scanIndex: number, out: Polyline[]): void {
+  if (xs.length < 2) return;
+  xs.sort((a, b) => a - b);
+  const forward = scanIndex % 2 === 0;
+  for (let i = 0; i + 1 < xs.length; i += 2) {
+    const xa = xs[i];
+    const xb = xs[i + 1];
+    if (xa === undefined || xb === undefined) continue;
+    if (xb - xa < SCANLINE_EPS) continue;
+    const [x0, x1] = forward ? [xa, xb] : [xb, xa];
+    out.push({
+      points: [
+        { x: x0, y },
+        { x: x1, y },
+      ],
+      closed: false,
+    });
   }
 }

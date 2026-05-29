@@ -7,9 +7,13 @@
 //   <Alarm|MPos:0.000,0.000,0.000|FS:0,0|Pn:XY>
 //   <Door:1|WPos:...|FS:...|Ov:100,100,100>
 //
-// We extract: state (with optional substate), MPos or WPos, feed+spindle.
-// Other fields (Bf, Ln, Pn, Ov, WCO) are not parsed yet — Phase C will add
-// them as features land.
+// We extract: state (with optional substate), MPos or WPos, feed+spindle,
+// and WCO (Work Coordinate Offset). WCO is reported intermittently by
+// GRBL (every Nth status frame per `$10`'s WCO bit), so consumers that
+// need the *current* offset must cache the last non-null value across
+// frames — see laser-store's `wcoCache`. UI code MUST NOT read
+// `StatusReport.wco` directly (it would flicker on most frames).
+// Other fields (Bf, Ln, Pn, Ov) are still not parsed.
 
 export type GrblState =
   | 'Idle'
@@ -29,6 +33,14 @@ export type StatusReport = {
   readonly wPos: { x: number; y: number; z: number } | null;
   readonly feed: number | null;
   readonly spindle: number | null;
+  /**
+   * Work Coordinate Offset — the machine-to-work translation that
+   * GRBL is currently applying. WPos = MPos - WCO. Reported on a
+   * cadence (every Nth status), so it's null on most frames. **UI
+   * code must read `wcoCache` from the laser-store, NEVER this
+   * field**, or the readout will flicker.
+   */
+  readonly wco: { x: number; y: number; z: number } | null;
 };
 
 const STATE_VALUES: ReadonlyArray<GrblState> = [
@@ -61,6 +73,7 @@ export function parseStatusReport(line: string): StatusReport | null {
     wPos: pickAxisField(fields, 'WPos'),
     feed: pickFsValue(fields, 0),
     spindle: pickFsValue(fields, 1),
+    wco: pickAxisField(fields, 'WCO'),
   };
 }
 
@@ -75,7 +88,7 @@ function parseState(token: string): { state: GrblState; subState: number | null 
 
 function pickAxisField(
   fields: ReadonlyArray<string>,
-  label: 'MPos' | 'WPos',
+  label: 'MPos' | 'WPos' | 'WCO',
 ): { x: number; y: number; z: number } | null {
   for (const f of fields) {
     if (!f.startsWith(`${label}:`)) continue;
