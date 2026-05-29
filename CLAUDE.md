@@ -16,6 +16,22 @@ If any of these contradict each other, **stop and ask.** Do not proceed.
 
 ---
 
+## Working with the maintainer — collaboration rules
+
+These are behavioral norms for *how* to work in this repo. Unlike the coding rules below, they are **not CI-enforced** — they are enforced by the maintainer's review. They exist because LaserForge's hard problem is **output fidelity vs LightBurn**, which the automated suite does not measure.
+
+1. **Tight leash — small, individually-verified diffs.** Make the smallest reviewable change that advances the goal, verify it, and let the maintainer review each diff before continuing. No large unreviewed rewrites, no multi-concern diffs, no batching unrelated fixes. When **auditing, report findings and let the maintainer choose what to fix — do not auto-fix.**
+
+2. **Verify perceptually — green tests are NOT proof a feature works.** The suite asserts *structure and determinism* (SVG prefixes, path counts, byte-identical G-code over fuzz seeds), never *fidelity* (does the trace / fill / engrave look like the input?). Output can be geometrically wrong and still pass everything. Never call a trace/fill/engrave/raster feature "working" because `pnpm test` is green. Render it and compare to the source — the perceptual harness (`src/__fixtures__/perceptual/`, ADR-025), a rendered preview, or a golden-image diff — and **state plainly what was NOT verified.** When unsure, say "I have not verified the output looks correct," not "it works."
+
+3. **LightBurn is the reference for every behavior.** For any behavior, UX, default, layer/cut semantics, mode (Line/Fill/Image), or G-code decision, match LightBurn unless the maintainer says otherwise. State the LightBurn behavior and check ours against it; call divergences bugs, not choices. Baseline semantics: Line = vector outline cut; Fill/Scan = hatch-fill interior; Image = dithered/grayscale raster engrave of a bitmap (not vectors). Layers are keyed by color; a layer's mode applies to every object on it; hiding a layer hides its objects on the canvas.
+
+4. **Live-app verification must be side-effect-free.** The dev-server preview shares the maintainer's *real* working scene — treat its canvas as live work, not a sandbox. Validate a changed function in isolation (real browser APIs on throwaway DOM nodes / a throwaway canvas), not by driving the real file `<input>` or clicking commit buttons. Synthetic DOM events (`change`, `keydown` on `window`) DO fire real handlers — they have committed objects into the maintainer's scene before. If a full UI render is truly needed, ask the maintainer to do the import, or confirm first.
+
+5. **No invention.** Don't state an API, file, config value, or behavior you haven't verified in the current tree — read the code or run the command first. "I don't know" is fine; inventing is not. (Restated from "When you don't know — say so" because it is the rule most often violated here.)
+
+---
+
 ## Size limits — hard
 
 These are enforced by ESLint and `tsc`, not by judgment.
