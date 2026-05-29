@@ -9,15 +9,18 @@ import {
   createProject,
   type Layer,
   type Project,
+  type RasterImage,
   removeObject,
   type SceneObject,
   type TextObject,
+  type TracedImage,
   type Transform,
   updateLayer,
   type Vec2,
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import { fitAllObjects, fitToSelection } from './viewport-actions';
+import { imageImportActions } from './import-actions';
 import {
   applyDuplicate,
   applyFreshImport,
@@ -72,9 +75,9 @@ export type AppState = {
   // for a re-import (existing object with matching source filename
   // found) it's `{ kind: 'replaced', kept, added, removed }`.
   readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
-  // F.2.e raster import — no re-import diff, just a fresh add with
-  // auto-fit + image-mode layer ensure (see scene-mutations).
+  // F.2.e raster + ADR-026 trace-keeps-source — both implemented in import-actions.ts.
   readonly importRasterImage: (object: SceneObject) => void;
+  readonly importTracedWithSource: (traced: TracedImage, source: RasterImage) => void;
   // Phase D insert / update text by id; on add it's a new id, on
   // edit it replaces in place (preserves position/transform).
   readonly upsertTextObject: (text: TextObject) => void;
@@ -154,7 +157,7 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
 function importSvgObjectAction(
   set: Setter,
   get: () => AppState,
-): Pick<AppState, 'importSvgObject' | 'upsertTextObject' | 'importRasterImage'> {
+): Pick<AppState, 'importSvgObject' | 'upsertTextObject'> {
   return {
     importSvgObject: (object, batchOffsetIdx = 0): ImportOutcome => {
       const existing = findReimportTarget(get().project.scene, object);
@@ -173,10 +176,6 @@ function importSvgObjectAction(
     },
     upsertTextObject: (text) => {
       set((s) => applyUpsertText(s, text));
-    },
-    importRasterImage: (object) => {
-      set((s) => applyFreshImport(s, object, 0));
-      fitAllObjects(get);
     },
   };
 }
@@ -390,6 +389,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...initialState(),
   ...projectActions(set),
   ...importSvgObjectAction(set, get),
+  ...imageImportActions(set, get),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

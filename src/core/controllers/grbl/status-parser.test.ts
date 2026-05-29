@@ -40,6 +40,31 @@ describe('parseStatusReport — happy paths', () => {
   it('accepts trailing whitespace and surrounding noise lines', () => {
     expect(parseStatusReport('  <Idle|MPos:0.000,0.000,0.000|FS:0,0>  \r\n')?.state).toBe('Idle');
   });
+
+  // GRBL 1.1 reports WCO (Work Coordinate Offset) on a cadence — every Nth
+  // status frame, configurable via the WCO bit of `$10`. These three cases
+  // cover the modes the parser needs to handle for Phase F.3 set-work-origin:
+  // present + well-formed, absent (most frames), and malformed (don't crash
+  // siblings).
+  it('parses WCO when present in the status frame', () => {
+    const r = parseStatusReport('<Idle|MPos:50.000,60.000,0.000|FS:0,0|WCO:10.000,20.000,0.000>');
+    expect(r?.wco).toEqual({ x: 10, y: 20, z: 0 });
+  });
+
+  it('returns wco=null on status frames that omit the WCO field (typical case)', () => {
+    const r = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(r?.wco).toBeNull();
+    // Siblings still parsed.
+    expect(r?.state).toBe('Idle');
+    expect(r?.mPos).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('tolerates a malformed WCO field without losing other fields', () => {
+    const r = parseStatusReport('<Idle|MPos:1.000,2.000,0.000|FS:0,0|WCO:not,a,number>');
+    expect(r?.wco).toBeNull();
+    expect(r?.mPos).toEqual({ x: 1, y: 2, z: 0 });
+    expect(r?.feed).toBe(0);
+  });
 });
 
 describe('parseStatusReport — degenerate inputs', () => {

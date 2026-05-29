@@ -278,7 +278,7 @@ Hard limits enforced by ESLint:
 Plus: co-located tests required, single responsibility (no "and" in description), new-file-first default. See `CLAUDE.md` for operational rules.
 
 ### Verification
-ESLint fails CI on violation. Periodic audit: `find src -name '*.ts*' -exec wc -l {} +` produces no file > 400.
+ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
 
 ---
 
@@ -711,15 +711,354 @@ To be written WITH the implementation, not before:
   layer for v1.
 - Rotary-axis raster. PROJECT.md "Out of scope" still applies.
 
+### Post-kickoff additions (decided during F.2 implementation)
+
+These tweaks landed AFTER the kickoff Decision section was written,
+in response to observed UX and hardware behaviour. Recording them
+here so the ADR reflects what actually shipped.
+
+1. **Skip blank rows during emit.** When a raster row contains no
+   non-zero S-values, `emitRasterGroup` emits zero G-code for it
+   (no G0, no G1). The controller plans an oblique rapid from the
+   end of one active row to the start of the next. Saves time on
+   banner-shaped images with empty bands above / below content.
+   Rationale: matches what LightBurn / LaserGRBL do in practice
+   for image-mode emit; ADR-020 originally specified "every row
+   sweeps" which over-emits for sparse content.
+
+2. **Clip rows to their active span.** For non-blank rows, the
+   sweep starts at the first non-zero pixel (minus overscan) and
+   ends at the last non-zero pixel (plus overscan). Was: full
+   `bounds.minX - overscan` → `bounds.maxX + overscan` regardless
+   of where pixels actually fell. Combined with #1, removes all
+   wasted travel-at-feed across white space.
+
+3. **draw-raster.ts transform composition.** `drawRasterImage`
+   originally composed its Canvas2D `translate / rotate / scale`
+   around the bounding-box centre and drew at `(-w/2, -h/2)`. That
+   diverged from `applyTransform`'s scale-then-translate-around-
+   origin math by `w * (1 - scaleX) / 2` for any `scaleX != 1`,
+   so the rendered image drifted away from the selection box when
+   `fitObjectToBed` auto-scaled a large import. Replaced with
+   `translate(t.x, t.y) → rotate → scale → drawImage(bounds.minX,
+   bounds.minY, w, h)` which mirrors `applyTransform` exactly.
+   Regression test in `src/ui/workspace/draw-raster.test.ts` pins
+   the convention against future refactors.
+
+### Verification (now landed, not deferred)
+
+Tests covering the items above:
+
+- `src/core/raster/dither.test.ts` — 12 unit tests for the three
+  algorithms (threshold / FS / grayscale).
+- `src/core/raster/emit-raster.test.ts` — 20 unit tests: preamble
+  / postamble, row layout, S-modulation, invariants, validation,
+  skip-blank-rows, clip-active-span.
+- `src/core/raster/emit-raster.property.test.ts` — 5 fast-check
+  property tests, 100 fuzz seeds each: laser-off-on-travel
+  (#3 non-negotiable), determinism (#5), X and Y coords inside
+  bounds ± overscan, G0-per-row count never exceeds non-zero-rows
+  count.
+- `src/ui/workspace/draw-raster.test.ts` — 9 regression tests
+  covering the transform-composition fix: identity, translated,
+  scaled-down, scaled+translated, rotated 30°/90°, mirrored X/Y,
+  full combo. Each asserts the draw-raster math matches
+  `applyTransform` for all four image corners.
+
+Hardware (F.2.f) is still user-driven per the WORKFLOW.md F-F2
+checklist; not gated by these tests.
+
+---
+
+## ADR-021 — Phase F.3 set-work-origin via G92 (kickoff)
+
+**Date:** 2026-05-28
+**Status:** Accepted, code shipped, hardware verification pending.
+
+**Context.** PROJECT.md's "Future feature notes" listed an operator
+flow where the user jogs the laser head to a corner of the workpiece
+and presses a button to declare "this is (0, 0) for the next job."
+Standard CAM convention; LightBurn ships it as "Set Job Origin to
+Current Position." Closes a gap experienced operators expect.
+
+GRBL supports two mechanisms for this:
+
+- `G92 X0 Y0` — transient; modifies the active WCS's machine-to-work
+  offset. Cleared by GRBL on alarm, soft reset (`\x18`), power-cycle,
+  or `$RST=#`. Matches LightBurn / LaserGRBL UX (each session starts
+  with a clean origin).
+- `G10 L20 P1 X0 Y0` — persistent; sets the G54 origin itself.
+  Survives reset / reconnect. Reset is more involved (`G10 L2 P1
+  X0 Y0` with head at machine zero, or `$RST=#`).
+
+**Decision.**
+
+1. **Ship G92 only.** Defer G10 L20 P1 (persistent mode) until a user
+   requests it. Karpathy smallest-first; two modes is two UX surfaces
+   to design and document, and we lack signal that anyone wants the
+   persistent variant.
+2. **Don't change the compile pipeline.** GRBL applies the WCS offset
+   to absolute-G90 G-code at run time, so emitted coordinates already
+   honour the offset. No new SceneObject fields, no `.lf2` schema
+   change.
+3. **Cache WCO in laser-store across status frames.** GRBL reports
+   the WCO field intermittently (every Nth status per the WCO bit of
+   `$10`), so the most recent frame's WCO is null ~29 times out of 30.
+   UI consumers read `wcoCache` (last-seen value), never the raw
+   `statusReport.wco`. The two-sources-of-truth boundary is documented
+   in the parser's JSDoc; a future lint rule could enforce it.
+4. **Defer preflight + Frame updates.** Bed-bounds preflight currently
+   assumes origin = machine zero. A job that "fits the bed" in
+   scene-mm may still run off-machine if the operator set origin near
+   the workpiece edge. Mitigation: existing Frame button traces the
+   actual machine path (post-WCS-offset), so framing AFTER set-origin
+   reveals off-bed risk before the laser fires. Documented gap;
+   surface origin-aware preflight in a follow-up if users hit it.
+5. **Don't auto-write `$10`.** Adding a runtime check on connect is
+   cheap, but toasting "your config is unusual" for a non-default
+   `$10` is operator-hostile. WCO is reported on a separate bit from
+   MPos/WPos so origin math works regardless.
+
+**Cache invalidation.** `wcoCache` is cleared in three places, matching
+the three ways GRBL clears G92 itself:
+
+- `disconnect()` and the `onClose` callback (port drop / reconnect).
+- `stopJob` (sends `\x18` soft reset).
+- `'alarm'` branch in laser-line-handler (GRBL clears G92 on alarm 1).
+
+Together these match GRBL's actual behaviour — operators never see a
+"stale cache shows custom origin while GRBL says machine zero" state.
+
+**MIT references consulted** (per ADR-017; algorithms / protocol
+docs only, no code copied):
+
+- CNCjs (`cncjs/cncjs`, MIT) — `src/server/controllers/Grbl/GrblController.js`
+  caches WCO across status frames and surfaces "WCS offset active"
+  in its UI. We re-implement the pattern, not the code.
+- gnea/grbl wiki (public-domain) — `Interface.md` documents the WCO
+  emission cadence and `$10` mask bits;
+  `Grbl-v1.1-Configuration.md` documents G92 / G92.1 semantics under
+  alarm and reset.
+- grblHAL `core/grbl.md` (public-domain) — confirms vanilla GRBL 1.1
+  behaviour.
+- NOT consulted: LaserGRBL, gSender (both GPLv3). UX choices
+  observable but no code reading per ADR-017.
+
+**Consequences.**
+
+- Operators get LightBurn-parity workpiece-relative jobs.
+- Two new buttons (`Set origin here` / `Reset origin`) in
+  `JobControls.tsx`, status-bar readout in `StatusDisplay.tsx`.
+- `laser-store.ts` gains `wcoCache` field + two thin action wrappers.
+- `StatusReport.wco` is parsed but UI must not read it directly
+  (flicker). Comment in `status-parser.ts` flags this; convention
+  enforced socially.
+- Bed-bounds preflight gap remains; operators framing first remains
+  the recommended safety check.
+- 1 toast per Set/Reset action provides immediate feedback during
+  the WCO-frame latency window (~0.25-7.5s).
+
+---
+
+## ADR-025 — Perceptual fidelity harness for the trace pipeline
+
+**Date:** 2026-05-29
+**Status:** Accepted, harness shipped, scope limits documented below.
+
+**Context.** Every trace test we had asserted *structure* — path
+counts, polyline lengths, SVG prefixes, contour topology. None rendered
+the output and asked the only question an operator actually cares about:
+"does the trace cover the source image's ink?" A test suite can be fully
+green while the trace is visibly wrong, because nothing measured the
+rendered result against the input. This is exactly the gap behind the
+recurring "you keep telling me it works, but vs LightBurn it's faulty"
+complaint: green `pnpm test` was never evidence of perceptual quality.
+The standing rule (see CLAUDE.md "When you don't know — say so", and the
+session feedback constraint) is to never call trace / fill / engrave
+"working" on the basis of a green structural suite alone.
+
+We needed a measuring instrument: render trace output back to pixels and
+diff it against a known-correct mask.
+
+**Decision.**
+
+1. **Build a render-and-diff harness under `src/__fixtures__/perceptual/`,
+   zero new dependencies, pure TypeScript.** It lives in `__fixtures__`
+   (boundary- and coverage-exempt per `eslint.config.mjs`), so it may use
+   `node:fs` / `node:zlib` / `process` for the opt-in artifact dump
+   without violating the pure-core globals rule. No runtime dependency is
+   added, so no RESEARCH_LOG / ADR-017 evaluation is required.
+
+2. **Ground truth is analytic, not a stored golden file.** Each synthetic
+   fixture (`shapes.ts`) is a black-on-white bitmap whose inked region is
+   a closed-form predicate sampled at pixel centres. The *same* predicate
+   fills both the source image the tracer sees and the truth mask. So the
+   truth is, by construction, exactly the set of black pixels in the
+   source — it cannot drift out of sync with the fixture, and there are no
+   golden PNGs to re-bless on every discretization tweak.
+
+3. **Rasterize trace output with an even-odd scanline fill**
+   (`rasterize.ts`), modelled on the existing `fill-hatching.ts` parity
+   rule (half-open `[yLo, yHi)`, pixel inked iff its centre is inside an
+   odd number of closed contours). Even-odd is load-bearing: it keeps hole
+   topology correct, so a letter "O" / ring / square-glyph stays hollow
+   instead of flooding.
+
+4. **Compare via IoU + precision / recall / f1 / agreement**
+   (`compare.ts`). IoU (Jaccard) is the headline number; precision and
+   recall separate over-inking from missed ink when it regresses.
+
+5. **Test the measuring instruments themselves first.** `rasterize.test.ts`
+   and `compare.test.ts` pin the rasterizer and comparator against
+   hand-computed pixel counts and overlaps *before* either is trusted to
+   judge the tracer. If the instrument is wrong, the harness lies — so the
+   instrument gets the first, strictest tests.
+
+6. **Opt-in visual proof, off by default.** `png.ts` writes a
+   `[ground truth | predicted | diff]` PNG per fixture to
+   `perceptual-artifacts/` only when `PERCEPTUAL_ARTIFACTS=1` (self-
+   contained 8-bit-RGB encoder via `node:zlib`; diff legend green=TP,
+   red=FP, blue=FN). Normal `pnpm test` writes nothing; the directory is
+   gitignored. A green "IoU=0.97" is still invisible — this makes the
+   result eyeballable on demand.
+
+**Measured baselines** (2026-05-29, Line Art preset — the import dialog's
+default — imagetracerjs current pin):
+
+| Fixture | IoU | Residual cause |
+|---|---|---|
+| solid-square | 1.000 | — |
+| plus-stroke | 1.000 | — |
+| square-glyph | 1.000 | hole preserved |
+| filled-disc | 0.986 | circle → polygon discretization |
+| ring-annulus | 0.978 | curved boundary, both edges |
+
+Per-fixture floors in `trace-perceptual.test.ts` sit just under these
+(square/plus/glyph 0.97, disc/ring 0.95): a real fidelity regression
+trips the test while normal discretization noise does not.
+
+**Finding — `DEFAULT_TRACE_OPTIONS` degenerates on binary input.** While
+baselining, the harness *measured* (did not assume) that the bare
+`DEFAULT_TRACE_OPTIONS` collapses to IoU ≈ 0.25 on a solid square: the
+imagetracerjs adaptive 2-colour quantizer degenerates to a single palette
+colour on an already-binary image and traces the whole image frame
+instead of the shape. The `Line Art` preset pins a fixed `[white, black]`
+palette (`colorsampling:0` + `pal`) and sidesteps it. This is captured as
+a characterization test (`lineArtIoU - defaultIoU > 0.5`). Real-world
+impact is limited because `ImportImageDialog` already defaults to
+`Line Art`; but `DEFAULT_TRACE_OPTIONS` remains a latent footgun for
+`traceImageToSvgString` and the zero-paths relax-retry fallback. Left
+as-is here — changing trace defaults is its own decision, not a rider on
+a test-harness ADR.
+
+**Scope — what IoU here does and does NOT measure.** IoU measures
+*geometric area coverage of the outline trace*. A high score means "the
+filled contours cover the right pixels," NOT "as good as LightBurn." It
+deliberately does **not** measure:
+
+- The **outline-vs-centerline gap** — imagetracerjs is outline-only, so a
+  single pen stroke still becomes two parallel contours. This is the core
+  "faulty vs LightBurn" issue and a coverage metric cannot see it (the
+  doubled outline still covers the right pixels). Measuring it needs a
+  different instrument (skeleton / centerline distance).
+- **Curve smoothness** or node economy.
+- **Raster-engrave quality** (dithering, power mapping).
+- **Photographic / noisy input** — fixtures are synthetic clean line art.
+
+So a green perceptual suite is necessary, not sufficient: it rules out
+gross coverage regressions, not perceptual parity with LightBurn. When
+reporting trace work, that distinction must be stated plainly rather than
+implied away.
+
+**Consequences.**
+
+- New `src/__fixtures__/perceptual/` module: `shapes.ts`, `rasterize.ts`,
+  `compare.ts`, `png.ts` (+ co-located tests), and the payload test
+  `src/core/trace/trace-perceptual.test.ts`.
+- `perceptual-artifacts/` added to `.gitignore`.
+- No runtime dependency, no API change, no compile-pipeline change.
+- Future work, if signal warrants: a centerline-distance metric to put a
+  number on the outline-vs-centerline gap; the `DEFAULT_TRACE_OPTIONS`
+  degeneracy fix; non-synthetic fixtures.
+
+---
+
+## ADR-026 — Trace keeps its source image (LightBurn-style overlay)
+
+Date 2026-05-29. Status Accepted.
+
+**Context.** Committing a trace (`ImportImageDialog`) used to create only a
+`TracedImage` (vector) and discard the source bitmap. Users coming from
+LightBurn expect the source image to remain as a first-class object together
+with the trace, so they can eyeball the vector against the original and then
+delete the source to keep the trace. With no source retained — and the
+transparent-PNG decode bug (ADR-fix in `image-loader.ts`) producing an
+all-black trace — the reported experience was "I traced an image and got a
+blank canvas with nothing to compare against."
+
+The scene model already supports the two-object world: `RasterImage` (pixels)
+and `TracedImage` (vector) both carry `bounds` + `transform` and can coexist;
+`drawRasterImage` stretches the bitmap into its `bounds` rect. So no new
+`SceneObject` variant is needed.
+
+The audit surfaced the real blocker: the two import paths use **different
+coordinate spaces**. Trace bounds come from `boundsFromColoredPaths` — pixel
+space. The raster path (Engrave Image) builds **mm** bounds via a 96-DPI
+assumption. `fitObjectToBed` fits each object independently from its own
+bounds, so naively inserting both yields two different sizes that do not
+overlap.
+
+**Decision.**
+
+1. After a trace, insert **both** objects from one decode — the vector
+   `TracedImage` and the source as a real `RasterImage` (burnable, on the
+   `DEFAULT_RASTER_LAYER_COLOR` image layer, exactly like Engrave Image).
+2. **Alignment by shared transform.** Compute one fit transform from the full
+   decoded image frame `(0,0,W,H)` and apply that *same* transform to both
+   objects. The raster's bounds are the full frame; the trace's bounds are its
+   content bbox within that frame. Sharing the transform makes them overlay
+   pixel-for-pixel. New mutation `applyTracedWithSource` does this; it
+   deliberately bypasses `applyFreshImport`'s per-object `fitObjectToBed`.
+3. **Z-order + selection.** Insert the raster first (bottom), the trace second
+   (top), so the vector renders over the source; select the trace.
+   "Delete source to keep the trace" is just deleting the raster
+   (`removeSceneObject` + `pruneOrphanLayers`, already exist).
+4. **One undo entry** covers the pair (single `pushUndo`).
+5. The retained source is **output-eligible** (appears in G-code) until the
+   user deletes it or toggles its image layer's output off — matching
+   LightBurn, where the retained image is a real object on its own layer.
+
+**Consequences.**
+
+- **Trace sizing changes:** a trace is now fit to the *source frame*, not to
+  its own content bbox. If artwork doesn't fill the frame, the trace lands
+  smaller on the bed than it did before — but correctly sized and positioned
+  relative to the source (the faithful LightBurn behavior).
+- **Double-burn risk:** because the source is burnable and coincident with the
+  trace, compiling without deleting the source engraves the raster *and* cuts
+  the vector. Mitigated by the source living on its own image-mode layer
+  (output toggle) and the trace being the default selection. Chosen over a new
+  non-output "reference object" concept to avoid expanding the union; revisit
+  if users double-burn in practice.
+- **New store surface:** `importTracedWithSource`. To stay under the 400-line
+  file cap (CI `wc -l` gate), the raster/traced image import actions move from
+  `store.ts` into `src/ui/state/import-actions.ts`.
+- **Not addressed here:** re-trace-from-source, dimming/opacity of the retained
+  source, and grouping the pair so they move as one (each is independently
+  selectable for now).
+
 ---
 
 ## Future ADRs (anticipated, not yet written)
 
-- ADR-021 — Web-app deployment target (covered ad-hoc in the current
+- ADR-022 — Origin-aware preflight + Frame (lift the deferral in
+  ADR-021). Requires WCO threading into `framePreflight` and the
+  Frame trace.
+- ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
-  config grows).
-- ADR-022 — Update mechanism for Windows desktop (before first signed
+  config grows further).
+- ADR-024 — Update mechanism for Windows desktop (before first signed
   release).
 - (Earlier reservations for ADR-019..023 were stale — Phase B / E
-  shipped without formal ADRs at those slots. ADR-019 above is the
-  first slot used since then; ADR-020 is now used by Phase F.2.)
+  shipped without formal ADRs at those slots. ADR-019 / ADR-020 /
+  ADR-021 are the first three slots since reused.)

@@ -172,7 +172,8 @@ function EngraveImageButton(): JSX.Element {
   const onPick = (file: File): void => {
     void (async () => {
       try {
-        const { loadImageAsRawData, extractLumaBase64 } = await import('../trace/image-loader');
+        const { loadImageAsRawData, extractLumaBase64, readFileAsDataUrl } =
+          await import('../trace/image-loader');
         const image = await loadImageAsRawData(file);
         const { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM } = await import('../../core/scene');
         // Use a sensible mm-bounds default: assume 96 DPI from the
@@ -182,7 +183,7 @@ function EngraveImageButton(): JSX.Element {
         const ASSUMED_DPI = 96;
         const widthMm = (image.width / ASSUMED_DPI) * MM_PER_INCH;
         const heightMm = (image.height / ASSUMED_DPI) * MM_PER_INCH;
-        const dataUrl = await readAsDataUrl(file);
+        const dataUrl = await readFileAsDataUrl(file);
         const lumaBase64 = extractLumaBase64(image);
         importRasterImage({
           kind: 'raster-image',
@@ -248,17 +249,6 @@ function FileButton(props: {
       </button>
     </>
   );
-}
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (): void => {
-      resolve(typeof reader.result === 'string' ? reader.result : '');
-    };
-    reader.onerror = (): void => reject(new Error('FileReader failed to read the image.'));
-    reader.readAsDataURL(file);
-  });
 }
 
 // One-place shortcut reference — surfaces on hover of the small "⌨ shortcuts"

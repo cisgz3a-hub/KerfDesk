@@ -77,22 +77,59 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   chunks.push('M5');
   chunks.push('M4 S0');
   const feed = Math.round(input.feedMmPerMin);
-  // Body — one row at a time, left-to-right.
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
   let isFirstSweep = true;
+  // Body — one row at a time. Two optimizations on top of the naive
+  // "sweep every row across the full width" version:
+  //   1. Skip rows whose pixels are all S=0. They contribute zero
+  //      burn and would otherwise force the head to sweep at feed
+  //      across width mm of nothing. For a 200×100 mm banner with
+  //      80% of its rows blank, this drops engrave time ~5×.
+  //   2. For non-empty rows, clip the sweep to the active span
+  //      (first non-zero pixel to last non-zero pixel) plus overscan
+  //      on each side. Skipping leading/trailing all-zero pixels
+  //      means the head only burns travel where pixels actually exist.
+  // The G0 rapid between rows handles arbitrarily-large Y jumps when
+  // we skip a band of empty rows — the controller plans an oblique
+  // travel from the end of one active row to the start of the next.
   for (let y = 0; y < input.height; y += 1) {
-    // Pixel-row centres are offset by half-pixel from the bounds top
-    // so the burn lines straddle each pixel rather than sitting on
-    // the seam between pixels (matches LightBurn convention).
+    const span = activeSpan(input, y);
+    if (span === null) continue; // all-zero row → skip entirely
     const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
-    chunks.push(emitRow(input, y, worldY, pixelWidthMm, feed, isFirstSweep));
+    chunks.push(emitRow(input, y, worldY, pixelWidthMm, feed, isFirstSweep, span));
     isFirstSweep = false;
   }
   // Trailing M5 so any subsequent cut group starts from a known
   // mode-off state. The cut group will re-issue its own M3.
   chunks.push('M5');
   return chunks.join(LINE_END) + LINE_END;
+}
+
+// Returns the [firstX, lastX] inclusive column range with any S>0
+// pixel, or null if the entire row is S=0. Scanning twice (forward
+// then backward) is O(width) — same as one linear scan plus negligible
+// constant, and reads cleaner than threading both extents through one
+// pass.
+type ActiveSpan = { readonly firstX: number; readonly lastX: number };
+function activeSpan(input: EmitRasterInput, y: number): ActiveSpan | null {
+  const rowStart = y * input.width;
+  let firstX = -1;
+  for (let i = 0; i < input.width; i += 1) {
+    if ((input.sValues[rowStart + i] ?? 0) !== 0) {
+      firstX = i;
+      break;
+    }
+  }
+  if (firstX === -1) return null;
+  let lastX = input.width - 1;
+  for (let i = input.width - 1; i >= firstX; i -= 1) {
+    if ((input.sValues[rowStart + i] ?? 0) !== 0) {
+      lastX = i;
+      break;
+    }
+  }
+  return { firstX, lastX };
 }
 
 function emitRow(
@@ -102,34 +139,41 @@ function emitRow(
   pixelWidthMm: number,
   feed: number,
   isFirstSweep: boolean,
+  span: ActiveSpan,
 ): string {
   const lines: string[] = [];
-  // Rapid into the overscan zone, then a G1 onto the first pixel
-  // edge at S0 — the controller is in M4, so the diode is dark
-  // during this sub-row positioning move.
-  const startX = input.bounds.minX - input.overscanMm;
-  const endX = input.bounds.maxX + input.overscanMm;
+  // Sweep extents are the ACTIVE span's pixel edges plus overscan,
+  // not the full image bounds. For a row with content only in cols
+  // 40..60 of a 200-col image, the head only visits world X from
+  // (minX + 40*pw - overscan) to (minX + 61*pw + overscan).
+  const activeStartX = input.bounds.minX + span.firstX * pixelWidthMm;
+  const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
+  const startX = activeStartX - input.overscanMm;
+  const endX = activeEndX + input.overscanMm;
+  // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
   lines.push(`G0 X${fmt(startX)} Y${fmt(worldY)} S0`);
-  // First G1 of the entire raster carries the feed; subsequent rows
-  // inherit it (G-code is modal). For safety on long jobs we always
-  // emit feed on the first G1 of each row — cheap insurance.
   let prevS = -1;
-  // Sweep into the body and emit runs.
-  let runStartIdx = 0;
-  let runS = input.sValues[y * input.width] ?? 0;
-  for (let i = 1; i < input.width; i += 1) {
+  // Sweep runs within the active span. Start the run accounting at
+  // firstX so we don't waste G1s on the leading zeros we just
+  // overscan-rapid'd past.
+  let runStartIdx = span.firstX;
+  let runS = input.sValues[y * input.width + span.firstX] ?? 0;
+  for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
     const cellS = input.sValues[y * input.width + i] ?? 0;
     if (cellS !== runS) {
       const runEndX = input.bounds.minX + i * pixelWidthMm;
-      lines.push(formatRunG1(runEndX, runS, prevS, feed, isFirstSweep && runStartIdx === 0));
+      lines.push(
+        formatRunG1(runEndX, runS, prevS, feed, isFirstSweep && runStartIdx === span.firstX),
+      );
       prevS = runS;
       runStartIdx = i;
       runS = cellS;
     }
   }
-  // Final run ends at maxX.
-  const finalEndX = input.bounds.maxX;
-  lines.push(formatRunG1(finalEndX, runS, prevS, feed, isFirstSweep && runStartIdx === 0));
+  // Final run ends at the active-span end edge.
+  lines.push(
+    formatRunG1(activeEndX, runS, prevS, feed, isFirstSweep && runStartIdx === span.firstX),
+  );
   // Exit overscan with S0 so the diode is dark during deceleration.
   lines.push(`G1 X${fmt(endX)} S0`);
   return lines.join(LINE_END);

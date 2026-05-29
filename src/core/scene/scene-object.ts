@@ -148,6 +148,15 @@ export type RasterImage = {
   // when absent. UI's image import path is responsible for
   // populating it from the decoded ImageData.
   readonly lumaBase64?: string;
+  // ADR-026 render-only marker. When this raster is the source bitmap
+  // kept *behind* a trace (the backing you delete once the vector looks
+  // right), it's tagged 'trace-source' so the canvas renders it with a
+  // tint — the visual cue that there are two stacked layers and which
+  // one to remove. Standalone Engrave-Image rasters leave it unset and
+  // render normally. Optional + additive: pre-ADR-026 .lf2 files simply
+  // lack it (no schemaVersion bump, no migration — same pattern as
+  // letterSpacing). Affects display only; never the compiled G-code.
+  readonly role?: 'trace-source';
 };
 
 // Canonical Layer color for fresh RasterImage imports. Mid-grey is

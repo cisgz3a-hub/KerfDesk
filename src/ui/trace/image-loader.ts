@@ -16,6 +16,15 @@ const MAX_EDGE_PX = 1024;
 // preset switch stays sub-200ms even on photo-class input.
 export const PREVIEW_MAX_EDGE_PX = 400;
 
+// A fresh canvas is transparent black (RGBA 0,0,0,0). Drawing a PNG
+// that has an alpha channel (e.g. artwork exported "with no
+// background") leaves its transparent regions at (0,0,0,*) — which
+// every downstream luma/threshold stage reads as solid BLACK ink, so
+// the whole image traces black. Compositing onto opaque white first
+// makes transparency the laser's unburned "paper", matching the
+// dark-on-light input every tracer assumes.
+const PAPER_WHITE = '#ffffff';
+
 export async function loadImageAsRawData(
   file: File,
   maxEdge: number = MAX_EDGE_PX,
@@ -37,6 +46,8 @@ export async function loadImageAsRawData(
     if (ctx === null) {
       throw new Error('Could not create 2D canvas context for image decoding.');
     }
+    ctx.fillStyle = PAPER_WHITE;
+    ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
     const imgd = ctx.getImageData(0, 0, width, height);
     return { width: imgd.width, height: imgd.height, data: imgd.data };
@@ -93,4 +104,22 @@ export function extractLumaBase64(image: RawImageData): string {
     void CHUNK;
   }
   return btoa(bin);
+}
+
+// Read a File's bytes as a base64 data URL ('data:image/png;base64,…').
+// Distinct from loadImageAsRawData: this preserves the ORIGINAL bytes —
+// no decode, no downscale — so the stored bitmap is full quality. Used
+// by the raster-import paths to embed the source image in the .lf2
+// project (ADR-020) and, per ADR-026, to keep a traced image's source
+// raster on the canvas. Shared by the Engrave Image flow (Toolbar) and
+// the Trace Image dialog so the FileReader plumbing lives in one place.
+export function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (): void => {
+      resolve(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = (): void => reject(new Error('FileReader failed to read the image.'));
+    reader.readAsDataURL(file);
+  });
 }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TRACE_OPTIONS, thresholdToMonochrome, traceImageToSvgString } from './trace-image';
+import {
+  buildImageTracerOptions,
+  DEFAULT_TRACE_OPTIONS,
+  thresholdToMonochrome,
+  traceImageToSvgString,
+  TRACE_PRESETS,
+} from './trace-image';
 
 type Fixture = {
   readonly width: number;
@@ -314,6 +320,37 @@ describe('traceImageToSvgString', () => {
       return cx >= 30 && cx <= 38 && cy >= 30 && cy <= 38;
     });
     expect(dotPresent).toBe(true);
+  });
+
+  it('rightangleenhance is always false (regression — LF1 audit)', () => {
+    // imagetracerjs's `rightangleenhance` defaults to TRUE, which forces
+    // traced edges toward 90° angles and ruins organic curves. LF1's
+    // settings audit caught this; we now always set it false. A future
+    // refactor that drops the explicit setting falls back to imagetracerjs's
+    // default and silently regresses image quality. This test pins the
+    // override.
+    for (const presetName of Object.keys(TRACE_PRESETS)) {
+      const preset = TRACE_PRESETS[presetName];
+      if (preset === undefined) continue;
+      const opts = buildImageTracerOptions(preset);
+      expect(opts['rightangleenhance']).toBe(false);
+    }
+  });
+
+  it('colorsampling is 0 ONLY when a fixed palette is set', () => {
+    // colorsampling=0 disables imagetracerjs's color quantization
+    // entirely. Correct for 2-colour engraving (Line Art / Smooth /
+    // Sharp where we force the palette ourselves) — wrong for
+    // multi-colour (Detailed / Photo, which need adaptive quant to
+    // produce >2 layers). Pin both directions of this conditional.
+    const withPalette = buildImageTracerOptions({
+      ...DEFAULT_TRACE_OPTIONS,
+      fixedPalette: ['#ffffff', '#000000'],
+    });
+    expect(withPalette['colorsampling']).toBe(0);
+
+    const noPalette = buildImageTracerOptions(DEFAULT_TRACE_OPTIONS);
+    expect(noPalette['colorsampling']).toBeUndefined();
   });
 
   it('handles a fully-uniform image without throwing', async () => {

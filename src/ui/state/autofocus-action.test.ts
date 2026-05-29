@@ -43,6 +43,7 @@ function idleStatus(): StatusReport {
     wPos: null,
     feed: 0,
     spindle: 0,
+    wco: null,
   };
 }
 

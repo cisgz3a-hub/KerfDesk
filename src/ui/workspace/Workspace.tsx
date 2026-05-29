@@ -22,7 +22,7 @@ import {
   panOffsetForDrag,
 } from './drag-state';
 import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
-import { canvasMouseToScene } from './view-transform';
+import { canvasMouseToScene, clientToCanvasPx, zoomAtCursorPx } from './view-transform';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -78,13 +78,11 @@ export function Workspace(): JSX.Element {
         onMouseUp={handlers.onMouseUp}
         onMouseLeave={handlers.onMouseUp}
         onDoubleClick={openTextEditForSelectedText}
-        onWheel={(e) => {
-          // Pinch-to-zoom on trackpads + Ctrl+Wheel on mice. Both arrive
-          // here as wheel events with ctrlKey true (browser convention).
-          if (!e.ctrlKey && !e.metaKey) return;
+        onWheel={(e) => handleCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY })}
+        onContextMenu={(e) => {
+          // Right-click is rebound to pan; suppress the OS context
+          // menu so a right-drag doesn't pop up the menu on release.
           e.preventDefault();
-          const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-          useUiStore.getState().zoomBy(factor);
         }}
         style={canvasStyle}
         aria-label="LaserForge workspace"
@@ -106,6 +104,36 @@ export function Workspace(): JSX.Element {
       {!previewMode && <ZoomControls />}
     </>
   );
+}
+
+// Wheel-to-zoom anchored at the cursor. Three wheel sources fire
+// here: plain mouse-wheel, Ctrl+wheel (mouse), and trackpad pinch
+// (browsers convert pinch into a wheel event with ctrlKey true). All
+// three zoom at the cursor — the bed-center-anchored zoomBy felt
+// unmoored when the user's attention was in a corner.
+//
+// Module-level so the Workspace function stays under the line cap and
+// the prop reference is stable across renders.
+function handleCanvasWheel(
+  e: React.WheelEvent<HTMLCanvasElement>,
+  canvas: HTMLCanvasElement | null,
+  project: Project,
+  view: { readonly zoomFactor: number; readonly panX: number; readonly panY: number },
+): void {
+  e.preventDefault();
+  if (canvas === null) return;
+  const cursorPx = clientToCanvasPx(e, canvas);
+  if (cursorPx === null) return;
+  const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+  const next = zoomAtCursorPx({
+    cursorPx,
+    factor,
+    canvas: { width: canvas.width, height: canvas.height },
+    bed: { width: project.device.bedWidth, height: project.device.bedHeight },
+    view,
+  });
+  useUiStore.getState().setZoom(next.zoomFactor);
+  useUiStore.getState().setPan(next.panX, next.panY);
 }
 
 // Phase D — double-click on a selected text opens the edit dialog
@@ -209,4 +237,8 @@ const canvasStyle: React.CSSProperties = {
   background: '#fafafa',
   width: '100%',
   height: '100%',
+  // Block browser-default touch handling so trackpad gestures and
+  // mobile pinch-zoom reach our wheel handler instead of zooming the
+  // whole page or scrolling under our feet.
+  touchAction: 'none',
 };

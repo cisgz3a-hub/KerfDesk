@@ -81,3 +81,56 @@ export function canvasMouseToScene(
   );
   return { x: (px - v.offsetX) / v.scale, y: (py - v.offsetY) / v.scale };
 }
+
+// Cursor-anchored zoom — the user's natural expectation when scrolling
+// the wheel over the canvas is that the point under the cursor stays
+// under the cursor as the view scales. Plain `zoomBy` instead keeps
+// the bed center anchored, so wheel-zooming in a corner of the bed
+// pulls content away from where the user is looking.
+//
+// Math: solve for (panX', panY') such that the scene-mm point under
+// `cursorCanvasPx` is unchanged after the zoom. Pure — returns the
+// next ViewState; the caller writes it to the store. Doesn't clamp
+// zoomFactor itself; the store clamps in setZoom.
+export function zoomAtCursorPx(args: {
+  readonly cursorPx: { readonly x: number; readonly y: number };
+  readonly factor: number;
+  readonly canvas: { readonly width: number; readonly height: number };
+  readonly bed: { readonly width: number; readonly height: number };
+  readonly view: ViewState;
+}): ViewState {
+  const { cursorPx, factor, canvas, bed, view } = args;
+  const v0 = computeView(canvas.width, canvas.height, bed.width, bed.height, view);
+  if (v0.scale === 0) return view;
+  const sceneBeforeX = (cursorPx.x - v0.offsetX) / v0.scale;
+  const sceneBeforeY = (cursorPx.y - v0.offsetY) / v0.scale;
+  const nextView: ViewState = { ...view, zoomFactor: view.zoomFactor * factor };
+  const v1 = computeView(canvas.width, canvas.height, bed.width, bed.height, nextView);
+  const sceneAfterX = (cursorPx.x - v1.offsetX) / v1.scale;
+  const sceneAfterY = (cursorPx.y - v1.offsetY) / v1.scale;
+  // Positive panX shifts content right => scene under cursor decreases.
+  // To pull sceneAfter back to sceneBefore, add (after - before) to pan.
+  return {
+    zoomFactor: nextView.zoomFactor,
+    panX: view.panX + (sceneAfterX - sceneBeforeX),
+    panY: view.panY + (sceneAfterY - sceneBeforeY),
+  };
+}
+
+// Convert a viewport-space client (clientX/clientY) into canvas-px
+// coordinates. Shared between the wheel handler (which needs the
+// cursor px to anchor the zoom) and any future helper that wants to
+// translate a raw mouse/wheel event without going through React's
+// MouseEvent type — WheelEvent doesn't satisfy that constraint, but
+// shares clientX/clientY.
+export function clientToCanvasPx(
+  client: { readonly clientX: number; readonly clientY: number },
+  canvas: HTMLCanvasElement | null,
+): { readonly x: number; readonly y: number } | null {
+  if (canvas === null) return null;
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((client.clientX - rect.left) / rect.width) * canvas.width,
+    y: ((client.clientY - rect.top) / rect.height) * canvas.height,
+  };
+}

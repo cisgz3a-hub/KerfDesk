@@ -261,7 +261,10 @@ better risk/effort allocation at this stage. **Accepted gap, documented.**
 | Feature | Status | Evidence |
 |---|---|---|
 | Phase F.1 Fill mode | **CLAIMED** | 10 unit + property tests for fillHatching, compile-job dispatch tests; no real Falcon burn yet |
-| Phase F.2 Image mode (a-e shipped) | **CLAIMED** | 12 dither tests + 16 emit-raster tests + scene-mutations + back-fill; **F.2.f hardware burn pending** — see WORKFLOW.md F-F2 acceptance checklist |
+| Phase F.2 Image mode (a-e shipped) | **CLAIMED** | 12 dither tests + 20 emit-raster unit tests + 5 fast-check property tests + 9 draw-raster regression tests + scene-mutations + back-fill; **F.2.f hardware burn pending** — see WORKFLOW.md F-F2 acceptance checklist |
+| F.2 raster perf (skip blank rows + clip active span) | **CLAIMED** | Added post-kickoff per user UX feedback; covered by `emit-raster.test.ts` unit + `emit-raster.property.test.ts` fuzz (100 seeds × 5 invariants). Banner-shaped images should now skip large white bands; needs the same Falcon burn before VERIFIED. |
+| F.2 drawRasterImage transform fix | **CLAIMED** | Selection box and rendered image were drifting at scale != 1; fix in 3b9c4139 rewires the Canvas2D transform chain to mirror `applyTransform` exactly. Regression suite in `src/ui/workspace/draw-raster.test.ts` (9 cases) pins the convention. User-confirmed visually pre-deploy; not yet burned. |
+| F.2.e UI card layout | **CLAIMED** | Cuts/Layers redesigned from horizontal 7-col table → vertical card-per-layer (93277657). Visually confirmed on the live site; no automated component-level tests (A7 accepted gap). |
 | Frame feed decoupling | VERIFIED | User confirmed Frame works at speed after the change |
 | Build badge | VERIFIED | Visible in DOM; defines confirmed inline in dist/web/assets/index-*.js |
 | Canvas auto-zoom on import | CLAIMED | Logic tested via the new combinedBBox + zoomToBounds math; not verified on a real import workflow |
@@ -758,6 +761,7 @@ three fixes shipped this same commit, four items TRACKED.
 | Library | Where we use it | Verdict |
 |---|---|---|
 | DOMPurify | `src/io/svg/sanitize.ts` | **Parity, slight edge** (removeAllHooks bracketing isn't documented upstream and is the safer pattern) |
+| Raster emit (vs LightBurn / LaserGRBL behaviour) | `src/core/raster/emit-raster.ts` | **Parity** — we skip blank rows + clip active spans (LightBurn calls this "image bounds optimization", LaserGRBL does similar pre-scan trimming). Reference: behaviour-only, no code copied (LaserGRBL is GPL-3 per ADR-017; LightBurn is closed-source so we only match the visible G-code shape). Our property tests fuzz the laser-off-on-travel and bounds invariants 100×; both LightBurn and LaserGRBL handle these but their test discipline isn't observable. Counts as parity with a slight edge on test rigour. |
 | opentype.js | `src/core/text/text-to-polylines.ts` | **Behind on ligatures (FIXED); ahead on closure detection** (our `CLOSURE_EPS_MM` is something upstream itself should ship) |
 | imagetracerjs | `src/core/trace/trace-image.ts` | **Ahead** — `thresholdToMonochrome` is a real novel addition; our presets are tuned per-domain |
 | CNCjs streamer | `src/core/controllers/grbl/streamer.ts` | **Parity on math, off-by-7 on buffer-margin (FIXED)** |
