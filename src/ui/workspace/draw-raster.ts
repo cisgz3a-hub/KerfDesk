@@ -65,33 +65,42 @@ export function drawRasterImage(
   }
   if (!img.complete || img.naturalWidth === 0) return; // still decoding
 
-  // Mirror core/scene/transform.ts's applyTransform exactly:
-  //   p' = translate(rotate(mirror(scale(p)))) = scale → rotate-about-0,0 → translate
-  // In Canvas2D, equivalent compose order is: translate, rotate, scale
-  // (each new transform multiplies on the right, so the FIRST op in
-  // pixel space is the LAST one we applied — i.e. scale acts first
-  // on object-local points, exactly what applyTransform does).
-  //
-  // The previous version translated to (centre + t.x, centre + t.y)
-  // and drew at (-w/2, -h/2). That worked for scaleX/Y == 1 but
-  // drifted whenever fitObjectToBed scaled the import down: the
-  // unscaled centre offset and the scaled bounds disagree, putting
-  // the visible image off-axis from its selection-box AABB. The fix
-  // is to translate to (t.x, t.y) — the object-local origin — and
-  // draw at (bounds.minX, bounds.minY), so scale applies to both the
-  // image dimensions and its placement, matching applyTransform.
-  const t = obj.transform;
-  const w = obj.bounds.maxX - obj.bounds.minX;
-  const h = obj.bounds.maxY - obj.bounds.minY;
+  // Trace-source backings draw tinted so the operator can tell the
+  // deletable original apart from the trace stacked on top (ADR-026).
+  const paint = obj.role === 'trace-source' ? (tintedTraceSource(obj.dataUrl, img) ?? img) : img;
+  drawBitmapAtTransform(ctx, paint, obj.bounds, obj.transform, view);
+}
+
+// Blit a decoded bitmap (an HTMLImageElement, or an offscreen canvas
+// such as the tinted trace-source backing or the F.2.c dither-preview
+// buffer) at an object's mm placement, mirroring core/scene/
+// transform.ts's applyTransform exactly:
+//   p' = translate(rotate(mirror(scale(p)))) = scale → rotate-about-0,0 → translate
+// In Canvas2D the equivalent compose order is translate, rotate, scale
+// (each new transform multiplies on the right, so scale acts first on
+// object-local points, exactly what applyTransform does).
+//
+// Translating to (t.x, t.y) — the object-local origin — and drawing at
+// (bounds.minX, bounds.minY) keeps the image and its selection-box AABB
+// in register even when fitObjectToBed scales the import down (an
+// earlier version translated to the centre and drew at -w/2,-h/2, which
+// drifted under non-unit scale).
+export function drawBitmapAtTransform(
+  ctx: CanvasRenderingContext2D,
+  bitmap: CanvasImageSource,
+  bounds: AABB,
+  transform: ObjTransform,
+  view: ViewTransform,
+): void {
+  const t = transform;
+  const w = bounds.maxX - bounds.minX;
+  const h = bounds.maxY - bounds.minY;
   ctx.save();
   ctx.translate(view.offsetX + t.x * view.scale, view.offsetY + t.y * view.scale);
   ctx.rotate(t.rotationDeg * DEG_TO_RAD);
   const sx = (t.mirrorX ? -1 : 1) * t.scaleX * view.scale;
   const sy = (t.mirrorY ? -1 : 1) * t.scaleY * view.scale;
   ctx.scale(sx, sy);
-  // Trace-source backings draw tinted so the operator can tell the
-  // deletable original apart from the trace stacked on top (ADR-026).
-  const paint = obj.role === 'trace-source' ? (tintedTraceSource(obj.dataUrl, img) ?? img) : img;
-  ctx.drawImage(paint, obj.bounds.minX, obj.bounds.minY, w, h);
+  ctx.drawImage(bitmap, bounds.minX, bounds.minY, w, h);
   ctx.restore();
 }
