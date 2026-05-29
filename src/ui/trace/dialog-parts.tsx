@@ -1,4 +1,4 @@
-// Presentational pieces of ImportImageDialog — the file picker, preset
+// Presentational pieces of ImportImageDialog — the source label, preset
 // dropdown, action row, label/field shell, and every shared style
 // constant. Split out so the dialog file holds only orchestration
 // (state, the commit flow, render) and stays under the 250-line soft
@@ -31,23 +31,15 @@ export function PresetPicker(props: {
   );
 }
 
-export function FilePicker(props: {
-  readonly file: File | null;
-  readonly onPick: (f: File | null) => void;
-}): JSX.Element {
+// Trace runs on an already-imported bitmap (LightBurn's model, ADR-027),
+// so the dialog shows which image it's tracing rather than offering a
+// file pick. Long filenames truncate with an ellipsis.
+export function SourceLabel(props: { readonly name: string }): JSX.Element {
   return (
     <Field label="Image">
-      <input
-        type="file"
-        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-        onChange={(e) => props.onPick(e.target.files?.[0] ?? null)}
-        style={fileInputStyle}
-      />
-      {props.file !== null && (
-        <span style={fileNameStyle} title={props.file.name}>
-          {props.file.name}
-        </span>
-      )}
+      <span style={fileNameStyle} title={props.name}>
+        {props.name}
+      </span>
     </Field>
   );
 }
@@ -128,7 +120,6 @@ const fieldControlStyle: React.CSSProperties = {
   gap: 6,
   flexWrap: 'wrap',
 };
-const fileInputStyle: React.CSSProperties = { flex: 1, fontSize: 12 };
 const fileNameStyle: React.CSSProperties = {
   fontSize: 11,
   color: '#555',

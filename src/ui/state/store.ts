@@ -9,7 +9,6 @@ import {
   createProject,
   type Layer,
   type Project,
-  type RasterImage,
   removeObject,
   type SceneObject,
   type TextObject,
@@ -75,9 +74,10 @@ export type AppState = {
   // for a re-import (existing object with matching source filename
   // found) it's `{ kind: 'replaced', kept, added, removed }`.
   readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
-  // F.2.e raster + ADR-026 trace-keeps-source — both implemented in import-actions.ts.
+  // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
   readonly importRasterImage: (object: SceneObject) => void;
-  readonly importTracedWithSource: (traced: TracedImage, source: RasterImage) => void;
+  // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
+  readonly traceExistingImage: (sourceId: string, traced: TracedImage) => void;
   // Phase D insert / update text by id; on add it's a new id, on
   // edit it replaces in place (preserves position/transform).
   readonly upsertTextObject: (text: TextObject) => void;

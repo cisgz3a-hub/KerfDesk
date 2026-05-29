@@ -5,7 +5,7 @@
 // an editable action.
 
 import { create } from 'zustand';
-import type { Bounds } from '../../core/scene';
+import type { Bounds, RasterImage } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
 
 export const MIN_ZOOM = 0.1;
@@ -63,10 +63,13 @@ type UiState = {
   readonly textDialog: TextDialogState | null;
   readonly openTextDialog: (next: TextDialogState) => void;
   readonly closeTextDialog: () => void;
-  // Phase E import-image dialog. Single-flag state (no add-vs-edit
-  // mode yet — "re-trace existing image" is a Phase E.1 follow-on).
-  readonly imageDialogOpen: boolean;
-  readonly openImageDialog: () => void;
+  // Trace-Image dialog. Holds the bitmap to trace, or null when closed.
+  // LightBurn's model: Trace is a tool run on a SELECTED, already-imported
+  // image — so the dialog is always seeded with the RasterImage the
+  // operator picked (via the toolbar Trace button), never a blank file
+  // picker. Importing an image as a bitmap is a separate, dialog-less path.
+  readonly imageDialog: RasterImage | null;
+  readonly openImageDialog: (source: RasterImage) => void;
   readonly closeImageDialog: () => void;
 };
 
@@ -93,9 +96,9 @@ export const useUiStore = create<UiState>((set) => ({
   textDialog: null,
   openTextDialog: (next) => set({ textDialog: next }),
   closeTextDialog: () => set({ textDialog: null }),
-  imageDialogOpen: false,
-  openImageDialog: () => set({ imageDialogOpen: true }),
-  closeImageDialog: () => set({ imageDialogOpen: false }),
+  imageDialog: null,
+  openImageDialog: (source) => set({ imageDialog: source }),
+  closeImageDialog: () => set({ imageDialog: null }),
 }));
 
 function clamp01(n: number): number {
