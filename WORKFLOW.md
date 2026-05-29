@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document is **Phase A + Phase B + Phase F.1 fleshed out**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code for all phases through F.1 is shipped — the gap is documentation density, not implementation.
+> This document has **Phase A, Phase B, and Phase F (F.1 Fill, F.2 Image engrave, F.3 Set work origin) flows fleshed out**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code for all phases through F.3 is shipped — the gap is documentation density, not implementation.
 
 ---
 
@@ -703,10 +703,11 @@ or traced image) with at least one closed polyline.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
 
-### F-F2. Image-engrave a raster (Phase F.2 — kickoff decided, not yet shipped)
+### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
-ADR-020 kicked off; implementation pending. This section documents the
-intended flow so the implementation hits a clear target.
+ADR-020 shipped through F.2.e (dither + per-pixel S-modulation raster
+emit); only the F.2.f on-hardware burn verification is pending. This
+section documents the flow.
 
 **Goal:** the operator drops a PNG / JPG on the canvas, sees it
 positioned at its intrinsic size, sets a Layer to mode = Image with a
