@@ -1,14 +1,16 @@
 // Image/raster store actions — thin dispatchers wiring the pure scene
-// mutations into Zustand `set` calls: bitmap import (importRasterImage)
-// and the ADR-026 trace-on-selection tool (traceExistingImage). Split
-// out of store.ts so that file stays under the 400-line hard cap.
+// mutations into Zustand `set` calls: bitmap import (importRasterImage),
+// the ADR-026 trace-on-selection tool (traceExistingImage), and ADR-029
+// Convert to Bitmap (convertToBitmap). Split out of store.ts so that file
+// stays under the 400-line hard cap.
 //
 // Mirrors the viewport-actions.ts no-cycle pattern: restates the
 // minimal `set` / `get` shapes (ImportSet / ProjectSlice) it needs
 // rather than importing AppState from store.ts, which would form the
 // store.ts -> import-actions.ts -> store.ts cycle ESLint forbids.
 
-import type { SceneObject, TracedImage } from '../../core/scene';
+import type { RasterImage, SceneObject, TracedImage } from '../../core/scene';
+import { applyConvertToBitmap } from './convert-to-bitmap';
 import {
   applyFreshImport,
   applyTraceToExisting,
@@ -30,6 +32,7 @@ export function imageImportActions(
 ): {
   readonly importRasterImage: (object: SceneObject) => void;
   readonly traceExistingImage: (sourceId: string, traced: TracedImage) => void;
+  readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
 } {
   return {
     importRasterImage: (object) => {
@@ -40,6 +43,12 @@ export function imageImportActions(
     traceExistingImage: (sourceId, traced) => {
       set((s) => applyTraceToExisting(s, sourceId, traced));
       fitAllObjects(get);
+    },
+    // No fitAllObjects: Convert replaces the vector in place (same bounds +
+    // transform), so re-fitting would only jerk the camera. Consistent with the
+    // store convention that the import/add paths re-fit, not in-place edits.
+    convertToBitmap: (sourceId, raster) => {
+      set((s) => applyConvertToBitmap(s, sourceId, raster));
     },
   };
 }

@@ -9,6 +9,7 @@ import {
   handleSaveProject,
 } from '../app/file-actions';
 import { usePlatform } from '../app/platform-context';
+import { buildBitmapFromVector, isConvertibleVector } from '../raster/vector-to-bitmap';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -122,6 +123,7 @@ function FileButtons(): JSX.Element {
       <TextButton />
       <ImportImageButton />
       <TraceImageButton />
+      <ConvertToBitmapButton />
       <button
         type="button"
         title="Export G-code for the current scene (Ctrl+E)"
@@ -175,6 +177,48 @@ function TraceImageButton(): JSX.Element {
       }}
     >
       Trace Image…
+    </button>
+  );
+}
+
+// ADR-029 — Convert to Bitmap is a TOOL run on a SELECTED vector (SVG, text, or
+// traced image): it rasterizes the vector into a RasterImage engrave-source and
+// replaces the original in place. LightBurn discards the source vector on
+// convert (documented behavior), so this is one-way — hence no '…' (it is
+// immediate; no dialog in A2). Disabled until a convertible vector is selected,
+// mirroring LightBurn's greyed-out menu item. The try/catch guards the one
+// browser-only step (canvas toDataURL inside buildBitmapFromVector), surfacing
+// failure as a toast like ImportImageButton does.
+function ConvertToBitmapButton(): JSX.Element {
+  const convertToBitmap = useStore((s) => s.convertToBitmap);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const objects = useStore((s) => s.project.scene.objects);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const selected =
+    selectedObjectId === null ? undefined : objects.find((o) => o.id === selectedObjectId);
+  const convertible = selected !== undefined && isConvertibleVector(selected) ? selected : null;
+  return (
+    <button
+      type="button"
+      title={
+        convertible === null
+          ? 'Select a vector (SVG, text, or trace) to convert into a bitmap'
+          : 'Convert the selected vector into a bitmap — replaces it'
+      }
+      disabled={convertible === null}
+      onClick={(): void => {
+        if (convertible === null) return;
+        try {
+          const raster = buildBitmapFromVector(convertible);
+          convertToBitmap(convertible.id, raster);
+          pushToast(`Converted to bitmap: ${raster.source}`, 'success');
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          pushToast(`Could not convert to bitmap: ${message}`, 'error');
+        }
+      }}
+    >
+      Convert to Bitmap
     </button>
   );
 }
