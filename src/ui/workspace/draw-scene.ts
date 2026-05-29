@@ -15,6 +15,7 @@ import {
 } from '../../core/scene';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawRasterImage } from './draw-raster';
+import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor } from './handles';
 import { rotateHandlePosition } from './rotate-handle';
@@ -55,6 +56,9 @@ export function drawScene(
   drawOriginMarker(ctx, view);
   if (opts.preview) {
     drawObjectsFaint(ctx, project, view);
+    // Raster sim under the vector toolpath: image engrave is the burned
+    // "background", cuts/scans layer on top (matches LightBurn preview).
+    drawRasterPreview(ctx, project, view);
     drawPreview(ctx, project, view, opts.scrubberT ?? 1);
   } else {
     drawObjects(ctx, project, view, opts.selectedId, opts.additionalSelectedIds);
