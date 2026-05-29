@@ -97,6 +97,7 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 - **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
 - **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs threshold/Floyd-Steinberg/grayscale; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet burned on Falcon.
 - **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
+- **F.4 — Convert to Bitmap** [A1–A2 shipped (Fill All); A3 Outlines / A4 Use Cut Settings / A5 polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
 
 ### Anything past Phase F
 
@@ -112,9 +113,14 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
 These are user-requested or product-research items. Not yet scoped into a
 phase; tracked here so they don't get lost.
 
-- *(none currently parked — the Phase F.3 set-work-origin note that
-  used to live here was promoted to a Phase F line above on 2026-05-28
-  with ADR-021 and WORKFLOW.md F-F3.)*
+- *(Convert to Bitmap promoted to Phase F.4 above on 2026-05-29 with ADR-029;
+  build started at increment A1.)*
+- **Trace control realignment to LightBurn** (Cutoff/Threshold band, Ignore Less
+  Than, Smoothness, Optimize, Sketch Trace, Trace Transparency) — designed in
+  **ADR-030**; replaces our preset/`numberOfColors` model. Redesign of the
+  shipped Phase E Trace (higher scrutiny). Separable from §8.6 #1 (eliminate
+  `TracedImage`). Staged B1→B4. *Phase assignment + build order pending
+  maintainer decision (2026-05-29).*
 
 ---
 

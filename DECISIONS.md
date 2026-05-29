@@ -987,6 +987,19 @@ implied away.
 
 Date 2026-05-29. Status Accepted.
 
+> **Amendment (2026-05-29, same day).** The *mechanism* below was revised by
+> the image-flow unification (ADR-027, LightBurn model): an image is no longer
+> traced-and-deposited in one step. It is imported first as a standalone
+> `RasterImage` (Toolbar "Import Image"), and **Trace** runs as a tool on the
+> *already-selected* bitmap, overlaying the vector on it. The mutation is
+> `applyTraceToExisting` and the store action `traceExistingImage` (replacing
+> the `applyTracedWithSource` / `importTracedWithSource` named below); the trace
+> adopts the bitmap's transform with the bitmap's mm-per-pixel folded into its
+> scale so the pixel-space vectors register on the mm-space bitmap. ADR-026's
+> *goal* is unchanged — retain the source, overlay pixel-for-pixel, delete the
+> source to keep the trace. The original mechanism is preserved below as the
+> decision record.
+
 **Context.** Committing a trace (`ImportImageDialog`) used to create only a
 `TracedImage` (vector) and discard the source bitmap. Users coming from
 LightBurn expect the source image to remain as a first-class object together
@@ -1087,6 +1100,142 @@ This work proceeds under the maintainer's operating discipline — Andrej Karpat
 - New work inherits a clear tie-breaker: when a design question arises, the answer is "what does LightBurn do?" unless an ADR says otherwise.
 - This ADR **strengthens ADR-001** (which adopted the workflow) and operationalizes `CLAUDE.md` rule #3 (which named LightBurn the reference) into a binding source-of-truth-with-exceptions rule.
 - It does **not** authorize implementing the whole LightBurn feature surface — that would violate scope discipline (point 3). The backlog is worked in `PROJECT.md` phase order.
+
+---
+
+## ADR-028 — Raster engrave preview renders in scene space via the compile path's dither
+
+**Status:** Accepted | **Date:** 2026-05-29
+
+### Context
+
+Preview mode (F-A8) rendered nothing for raster (image-mode) layers: an image-only scene previewed as a blank bed. Three causes, all in the preview path:
+
+1. `draw-scene.ts` ran `drawObjectsFaint` + `drawPreview` in the preview branch and skipped `drawObjects` — the only path that draws rasters.
+2. `drawObjectsFaint` (`draw-preview.ts`) draws only `imported-svg` ghosts.
+3. `buildToolpath` (`toolpath.ts`) skips non-`cut` groups, so a raster-only job has `totalLength === 0` and `drawPreview` returns early.
+
+LightBurn's Preview "shades according to power" — darker pixel = more laser power = deeper burn (LIGHTBURN-STUDY.md §1.4). Under ADR-027 a blank raster preview is a **divergence/defect**, not a missing feature: the engrave object exists and compiles to G-code, but the operator can't see what it will burn.
+
+`RasterGroup.sValues` (dithered **and** power-scaled) is exactly that signal, but `RasterGroup.bounds` is a machine-coord AABB with the front-left origin's Y-flip already applied and **no rotation** (`compile-job.ts` `rasterBoundsInMachineCoords`). Rendering the preview from those bounds would mis-register and drop object rotation/mirror.
+
+### Decision
+
+1. **Reuse the compile path for WYSIWYG.** Preview calls core `dither()` then a new pure `rasterPreviewRgba()` (the reserved `core/raster` F.2.c "preview-data" slot) — the same `dither()` call `compileRasterGroup` makes, with the same `sMax = round(clamp(power,0,100)/100 × maxPowerS)` and the same `layer.ditherAlgorithm` (layer wins over per-image settings). The preview is therefore byte-for-byte the schedule that gets emitted. This mirrors `drawFillHatches`, which already calls core `fillHatching` directly for the fill preview.
+
+2. **Render in scene space, not machine space.** `drawRasterPreview` (`src/ui/workspace/draw-raster-preview.ts`) blits the grayscale-sim bitmap through `drawBitmapAtTransform` (extracted from `drawRasterImage`), so it registers pixel-for-pixel with the on-canvas bitmap and honours rotation/mirror. The machine-coord Y-flip stays confined to the G-code path. `imageSmoothingEnabled = false` keeps threshold/Floyd dots crisp under upscale.
+
+3. **Same gate as compile.** Only output-enabled, image-mode layers render, matched to rasters by `obj.color === layer.color` — exactly `compileJob`'s filter. `layer.visible` is intentionally ignored: preview shows *what burns*, not what's shown on the design canvas.
+
+4. **Pure/DOM split.** `rasterPreviewRgba` is pure (`S → grayscale RGBA`, property-tested in core); the DOM concerns (luma `atob` decode, offscreen canvas, `putImageData`) live in the UI file and are cached per `dataUrl|algorithm|sMax` since the sim is static until one of those changes.
+
+5. **Design view is unchanged.** Design mode still shows the bitmap itself (no dither overlay — WORKFLOW F-F2 step 6). Preview shows **only** the sim, not a faint original underneath (unlike the SVG ghost), matching LightBurn — its preview shows the simulated burn, not the source photo.
+
+6. **Increment 1 scope.** The scrubber animates vectors only; the raster sim renders complete regardless of `scrubberT`. Feeding raster rows into the scrubber (a `'raster'` `ToolpathStep` variant) is **deferred to a separate PR** (Increment 2) — it requires a core toolpath-union change, which this diff deliberately avoids.
+
+### Consequences
+
+- Raster-only and mixed scenes now preview a faithful burn simulation; the blank-canvas defect is fixed without touching the `SceneObject` union, the toolpath union, or the `.lf2` schema.
+- All three dither modes render from one `S → grayscale` mapping: threshold/Floyd-Steinberg produce crisp black/white dots, grayscale a smooth ramp.
+- **Verification (per CLAUDE.md #2):** core math is property-tested (`preview-data.test.ts`) and the dither↔preview agreement is content-checked against the compile call. On-canvas registration (the sim overlaying the bitmap pixel-for-pixel, including rotation) is **maintainer-eyeball only** — not asserted by the suite, and not driven from the live file `<input>` per CLAUDE.md #4.
+- Gated by ADR-027 (divergence fix) and ADR-025 (perceptual harness is the fidelity gate for raster output).
+
+---
+
+## ADR-029 — Convert to Bitmap (vector → raster engrave source)
+
+**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` shipped — Fill All only; A3 Outlines / A4 Use Cut Settings / A5 placement-brightness polish pending) | **Date:** 2026-05-29
+
+### Context
+
+LightBurn has a **Convert to Bitmap** tool (Edit menu, `Ctrl/Cmd+Shift+B`, or right-click) that rasterizes selected vector graphics into a bitmap on an Image-mode layer — the inverse of Trace. LaserForge has **no vector→raster tool at all** (LIGHTBURN-STUDY §7.4; §8.5 GAP). Under ADR-027 this is a scope **gap** (a feature we haven't built), not a divergence — so *whether* we build it is governed by `PROJECT.md`, and *how it behaves once built* must match LightBurn.
+
+Official behavior, re-confirmed against the docs on 2026-05-29 (`docs.lightburnsoftware.com/latest/Reference/ConvertToBitmap/`) and the maintainer's screenshots:
+
+- **Render Type** — three options: **Outlines** (contours only), **Fill All** (solid fill of areas between outlines), **Use Cut Settings** (outline vs solid fill *per object*, depending on whether its layer is Line mode).
+- **DPI** — numeric field + slider (screenshots show a 10–2000 range; 254 for Outlines/Fill All, 84 for Use Cut Settings). The docs state **no default**; the per-render-type values seen are live UI state, not documented defaults.
+- Every rendered pixel's brightness is **automatically set to 50% gray**.
+- **The source vector is deleted.** Docs warn: duplicate first to keep it.
+- Result lands on **the last selected layer** (Image mode).
+- Solid fill requires a **closed shape**.
+
+We already have an even-odd scanline polygon rasterizer — but it is **test-only** (`src/__fixtures__/perceptual/rasterize.ts`, boundary/coverage-exempt), pixel-space, scale = 1, **binary** (ink/bg), with no DPI/mm mapping. It is a proven geometric reference, not a reusable production module. The output target `RasterImage` (PNG `dataUrl` + base64 luma + `bounds` + `transform`) already exists (`scene-object.ts`).
+
+### Decision (proposed)
+
+1. **New pure-core module** `src/core/raster/rasterize-vector.ts` — `rasterizeVectorToLuma(...) → { luma: Uint8Array; width; height }`, deterministic and pure (no DOM/canvas), generalizing the test fixture's even-odd fill + DDA stroke to **grayscale** output on a **mm-bounds × DPI** pixel grid. Property-tested (even-odd holes, determinism). `width = round(widthMm / MM_PER_INCH × dpi)` with `MM_PER_INCH = 25.4` a named constant.
+
+2. **Luma convention:** ink pixel = **50% gray (`128`)** to match LightBurn; background = white (`255` = unburned). This is the same luma `dither()` consumes downstream (high luma = light = less burn), so a converted bitmap flows through the existing F.2 engrave path unchanged.
+
+3. **Render Type → our model.** `Outlines` → stroke each contour. `Fill All` → even-odd fill of closed shapes (open paths cannot fill — match LightBurn's closed-shape rule; the open-path behavior, skip vs outline-fallback, is pinned in the UI increment). `Use Cut Settings` → per source object: outline if its layer mode is `line`, else fill (we have no Offset Fill; `fill` mode → fill), which requires reading each object's layer mode.
+
+4. **PNG encode + `RasterImage` build is UI/io, not core** (ADR-010). Core returns the luma grid; the UI wraps it in an offscreen canvas → `toDataURL('image/png')` for `dataUrl` and base64-encodes the luma for `lumaBase64`, then constructs the `RasterImage` exactly as the existing image-import path does.
+
+5. **The source vector is DELETED** (maintainer decision 2026-05-29 — match LightBurn). The selected vector object(s) are removed and replaced by the new `RasterImage` in **one undo entry**. Undo replaces LightBurn's manual "duplicate first" guidance — same net behavior, better ergonomics.
+   - **Asymmetry is intentional, not a contradiction with ADR-026:** Trace *keeps* its source (ADR-026); Convert to Bitmap *deletes* its source (this ADR). Both are faithful — LightBurn keeps the image on Trace by default but deletes the vector on Convert.
+
+6. **Placement** on an Image-mode layer. LightBurn uses "the last selected layer"; our layers are color-keyed, so the UI increment maps this to the `DEFAULT_RASTER_LAYER_COLOR` image layer (or the object's own layer if already image-mode), consistent with how image import picks its layer.
+
+7. **DPI default is ours, not LightBurn's** (docs state none). The UI increment picks a sane named-constant default and labels it as a LaserForge choice — no invention of a LightBurn default.
+
+8. **Scope:** outside explicit Phase F → gated by the accompanying `PROJECT.md` entry. Staged tight-leash: **A1** core Fill-All → **A2** UI + PNG + `RasterImage` → **A3** Outlines → **A4** Use Cut Settings → **A5** placement/brightness polish. Each is its own individually-verified diff.
+
+### Consequences
+
+- New production surface in `core/raster` (the real, non-test rasterizer), reusing geometry proven in the test fixture but with its own co-located tests.
+- Source deletion is undo-recoverable; no duplicate-first dance required.
+- **Perceptual gate (CLAUDE.md #2 / ADR-025):** the rasterized bitmap must be eyeballed (or IoU-diffed) against the source vector at the chosen DPI — green property tests are *not* fidelity proof.
+- Does **not** touch the `SceneObject` union (`RasterImage` already exists), the toolpath union, or the `.lf2` schema.
+- Composes cleanly with the `TracedImage`-elimination backlog (#1): "Use Cut Settings" reads layer mode, so it is agnostic to which vector kinds exist.
+
+---
+
+## ADR-030 — Trace control model realigned to LightBurn (Cutoff/Threshold band)
+
+**Status:** Proposed (documentation gate; pending maintainer scope/order ratification) | **Date:** 2026-05-29
+
+### Context
+
+LaserForge's Trace dialog (`src/ui/trace/ImportImageDialog.tsx`) already runs as a tool on a *selected* bitmap (ADR-027 ✓) and keeps its source (ADR-026 ✓ — which matches LightBurn's default). But its **control model diverges** from LightBurn (ADR-027 → a defect to redesign), distinct from the already-tracked output-kind divergence (`TracedImage`, §8.6 #1):
+
+- **Ours:** `PresetPicker` (imagetracerjs `numberOfColors` + Otsu/median/despeckle presets) + `AdjustmentControls` (brightness / contrast / gamma / invert) folded into the Trace dialog.
+- **LightBurn** (re-confirmed 2026-05-29, `docs.lightburnsoftware.com/latest/Reference/TraceImage/`, plus the maintainer's screenshot defaults):
+
+| LightBurn control | Default | LaserForge today |
+|---|---|---|
+| **Cutoff** + **Threshold** (brightness *band*: trace iff `Cutoff ≤ brightness ≤ Threshold`) | 0 / 128 | no explicit band (a threshold is baked into presets) — **missing** |
+| **Ignore Less Than** (min traced area) | 2 | ≈ despeckle (rough) |
+| **Smoothness** (0 lines → 1.33 curves) | 1.000 | ≈ curve fitting (rough) |
+| **Optimize** (node reduction) | 0.2 | ≈ node reduction (rough) |
+| **Trace Transparency** (trace alpha) | off | **missing** |
+| **Sketch Trace** (local-contrast adaptive threshold) | off | **missing** |
+| Fade Image / Show Points / Boundary–Clear Boundary | — | preview exists; these actions **mostly missing** |
+| **Delete Image After Trace** (opt-in) | off | we always keep (ADR-026); the *opt-in* toggle is **missing** |
+
+LaserForge additionally has **extra** controls LightBurn's Trace dialog lacks: `numberOfColors`/multi-color presets (LightBurn's trace is a single brightness band) and brightness/contrast/gamma/invert (LightBurn does image adjustment in a *separate* Adjust Image dialog, §2.2 / §7.6 — not the Trace dialog).
+
+Separately and *not solved here*: imagetracerjs is outline-only (a pen stroke → two parallel contours — the centerline gap, PROJECT.md Phase E "known open gap"), and `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input.
+
+### Decision (proposed)
+
+1. **Adopt LightBurn's control vocabulary** as the Trace dialog's primary model — Cutoff + Threshold, Ignore Less Than, Smoothness, Optimize, Trace Transparency, Sketch Trace — replacing `numberOfColors` + presets. Defaults match LightBurn (0 / 128 / 2 / 1.000 / 0.2 / off / off).
+
+2. **The brightness band is the core semantic:** a pixel is "ink" iff `Cutoff ≤ brightness ≤ Threshold` — a pure-core predicate producing a binary mask the tracer then vectorizes. (imagetracerjs is multi-color by design; realigning to a single band means either configuring it to a 2-color/threshold mode or pre-binarizing to a mask and tracing that — pinned in the implementation increment.)
+
+3. **Image adjustment is separate from Trace** (LightBurn-faithful): move brightness/contrast/gamma/invert out of the Trace dialog toward a dedicated Adjust-Image surface (its own small diff), rather than leaving them mixed into Trace.
+
+4. **Add the missing actions** incrementally — Show Points, Fade Image (extend the existing preview), Boundary/Clear Boundary, and an **opt-in** Delete Image After Trace (default keep, per ADR-026). Sketch Trace and Trace Transparency are the two genuinely new algorithms.
+
+5. **Separable from backlog #1.** This ADR governs the *input controls*; §8.6 #1 governs the *output kind* (`TracedImage` → plain vectors). Both are needed for fully faithful Trace, but neither forces the other's order — the maintainer sequences them.
+
+6. **Scope:** this is a **redesign of a shipped feature** (Phase E) → higher risk than ADR-029's additive work, so lower autonomy / higher scrutiny (ADR-027). Staged: **B1** brightness-band core + Cutoff/Threshold dialog → **B2** Ignore Less Than / Smoothness / Optimize mapped to real tracer params → **B3** Sketch Trace + Trace Transparency → **B4** Show Points / Boundary / Fade / Delete-after. Each its own verified diff with a perceptual before/after.
+
+### Consequences
+
+- A working feature's UX changes → must not regress trace quality without the maintainer seeing before/after renders (CLAUDE.md #2).
+- Dropping `numberOfColors`/multi-color presets narrows us toward LightBurn's single-band trace; if multi-color trace is valued it needs its own ADR exception (ADR-027 §4).
+- The centerline/outline gap (Phase E known issue) is **not** addressed here — control vocabulary ≠ centerline algorithm; kept separate.
+- Touches `ImportImageDialog.tsx` + trace option types + tracer config; the control swap itself needs no scene-union or schema change (that is backlog #1).
 
 ---
 

@@ -280,6 +280,7 @@ Identical to F-A3 except:
 2. Viewport switches modes:
    - Original geometry rendered at 30% opacity in muted color.
    - Cut paths rendered in their Layer color at full opacity.
+   - Image-mode layers render their raster engrave simulation (dithered/grayscale; darker pixel = more power = deeper burn), beneath the vector cut paths.
    - Travel moves rendered as light-gray dashed lines.
    - Origin marker remains visible.
 3. Play scrubber appears at bottom of viewport: a slider 0 to total path length.
@@ -305,6 +306,13 @@ Identical to F-A3 except:
 #### Edge — preview of very large scene
 - > 10,000 path segments: warning shown above viewport: `Large scene · preview simplified for performance` and only every Nth point rendered.
 - Generated G-code is unaffected — preview simplification is visual only.
+
+#### Raster engrave preview (image-mode layers) — ADR-028
+- **Success:** each `raster-image` on an output-enabled image-mode layer renders a burn simulation at the image's placement, registered with the bitmap including rotation/mirror. Threshold/Floyd-Steinberg render as crisp black/white dots; grayscale as a smooth ramp. The simulation uses the exact dither + power scaling the G-code will emit (WYSIWYG, like the Fill hatch preview).
+- **Live updates:** changing the layer's power or dither algorithm re-renders the simulation within the same 100 ms budget.
+- **Empty:** an image-mode layer with Output off shows no simulation — same rule as any non-output layer (preview shows what *burns*, not what's merely visible on the design canvas).
+- **Edge — missing luma:** a legacy `.lf2` raster with no embedded luma buffer renders dark (full-burn), not blank — the same fallback `compileJob` uses.
+- **Edge — scrubber:** the scrubber animates vector toolpaths only; the raster simulation always renders complete regardless of scrubber position. Row-by-row raster scrubbing is deferred to a later increment.
 
 ---
 
@@ -759,9 +767,9 @@ correct M4-mode raster G-code from Compile.
 **Acceptance for F.2.f hardware verification (concrete checklist):**
 
 Pre-flight (no laser):
-1. Build a fresh project. Verify `Engrave Image…` button exists in
-   the toolbar between `Trace Image…` and `Save G-code…`.
-2. Click `Engrave Image…`, pick a 50×50 mm test PNG (e.g. a
+1. Build a fresh project. Verify `Import Image…` button exists in
+   the toolbar between `Text…` and `Trace Image…`.
+2. Click `Import Image…`, pick a 50×50 mm test PNG (e.g. a
    400×400 px black-and-white logo).
 3. The image lands centered on the bed, fills its natural 96-DPI
    mm-bounds, and appears as a bitmap (not vectorized).
@@ -877,3 +885,63 @@ frames out of 30 and would flicker the readout.
 When this checklist passes on the Falcon, promote Phase F.3's
 "Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
 Shipped" and update AUDIT.md's A8 hardware inventory.
+
+---
+
+### F-F4. Convert a selected vector to a bitmap (Phase F.4)
+
+**ADR:** [ADR-029](DECISIONS.md#adr-029--convert-to-bitmap-vector--raster-engrave-source).
+
+**Operator intent.** Turn a vector object (imported SVG, text, or a
+traced image) into a raster engrave source — the inverse of Trace —
+so it burns as a dithered/grayscale image rather than outlines or
+hatch fill. Matches LightBurn's **Convert to Bitmap** (Edit menu /
+`Ctrl+Shift+B` / right-click).
+
+**Where in the UI.** Toolbar **Convert to Bitmap** button, next to
+Trace Image. Enabled only when a single convertible vector is
+selected; disabled (greyed, with a "select a vector first" tooltip)
+otherwise — mirroring LightBurn's greyed menu item. No dialog: A2
+ships **Fill All** only, so the conversion is immediate (hence no
+"…" on the label). The Render Type picker (Outlines / Use Cut
+Settings) and a DPI control arrive with A3/A4.
+
+**What it does.** Rasterizes the selected vector's closed contours
+into a `RasterImage` at the LaserForge default 254 DPI (= 10
+lines/mm; a LaserForge choice — LightBurn documents no default),
+every inked pixel at 50% gray on white, carrying the source's own
+bounds + transform so the bitmap lands exactly where the vector was.
+**The source vector is deleted** (LightBurn discards the original);
+the swap is one undo entry, so Ctrl+Z restores the vector — replacing
+LightBurn's manual "duplicate first" guidance.
+
+**The four states.**
+
+1. **Success.** A closed-shape SVG / text / trace is selected. Click
+   Convert to Bitmap → the vector is replaced in place by a grayscale
+   bitmap on the image-mode layer (`DEFAULT_RASTER_LAYER_COLOR`), the
+   new bitmap becomes the selection, and a toast confirms "Converted
+   to bitmap: `<name>` (bitmap)". It then engraves through the
+   existing F.2 image path.
+2. **Empty / nothing convertible.** No selection, or the selection is
+   already a `RasterImage` (a bitmap can't be re-converted). Button
+   disabled; tooltip prompts selecting a vector.
+3. **Open / unfillable geometry.** A vector with only open contours
+   (no closed shape) rasterizes to an all-white bitmap — Fill All
+   fills closed shapes only, LightBurn's same closed-shape rule. The
+   convert still succeeds; the operator sees a blank engrave source
+   and can undo. (Outlines mode in A3 will render open paths.)
+4. **Encode failure (edge).** If the browser cannot create a 2D
+   canvas context (`toDataURL` unavailable), the build throws and is
+   caught → error toast "Could not convert to bitmap: `<message>`";
+   the scene is left unchanged (the swap never dispatched).
+
+**Verification status.** Fill + PNG-encode + luma fidelity verified
+in a real browser, side-effect-free (CLAUDE.md #4): the pure builder
+rasterizes a square-with-hole to a real PNG that round-trips to
+200×200 px at 254 DPI, ink at 50% gray, the even-odd hole preserved
+white, and the base64 luma byte-matches the PNG. **Not yet verified:**
+the live in-app render/placement of the swapped bitmap on the
+workspace canvas, and a side-by-side pixel comparison against
+LightBurn's own Convert output — both deferred (need a live import or
+a LightBurn session).
