@@ -1191,9 +1191,9 @@ Border (1.5+). Source: [7-9]
 
 ### 8.1 Application shell — menus & toolbars (vs §3)
 
-- **HAVE** ✓ A single flat top toolbar: File actions + Text / Trace Image / Engrave Image / Save G-code, a build badge, and a shortcut-hint chip (`src/ui/common/Toolbar.tsx`). Keyboard shortcuts exist (`src/ui/app/shortcuts.ts`, mirrored in `Toolbar.tsx` `SHORTCUT_HINT`). ◦ cursor-anchored zoom + middle/right-drag pan (commit `46580392`).
+- **HAVE** ✓ A single flat top toolbar: File actions + Text / Import Image / Trace Image / Save G-code, a build badge, and a shortcut-hint chip (`src/ui/common/Toolbar.tsx`). Keyboard shortcuts exist (`src/ui/app/shortcuts.ts`, mirrored in `Toolbar.tsx` `SHORTCUT_HINT`). ◦ cursor-anchored zoom + middle/right-drag pan (commit `46580392`).
 - **GAP** No menu bar — none of LightBurn's File / Edit / Tools / Arrange / Laser Tools / Window / Help menus (§3.1). No Main / Arrange / Creation toolbars (§3.9–3.11). No right-click context menu. No creation/tool palette. No dockable windows.
-- **DIVERGE** ✓ Top-level actions are a flat row of toolbar buttons rather than LightBurn's menu-bar + grouped-toolbar structure (`Toolbar.tsx`). → **redesign:** introduce a LightBurn-style menu bar (File/Edit/Tools/Arrange/Laser Tools/Window/Help) and grouped toolbars; relocate Trace/Engrave under Tools / Laser Tools to match §3.1–3.11.
+- **DIVERGE** ✓ Top-level actions are a flat row of toolbar buttons rather than LightBurn's menu-bar + grouped-toolbar structure (`Toolbar.tsx`). → **redesign:** introduce a LightBurn-style menu bar (File/Edit/Tools/Arrange/Laser Tools/Window/Help) and grouped toolbars; relocate Import Image / Trace under Tools / Laser Tools to match §3.1–3.11.
 
 ### 8.2 Cuts / Layers window & Cut Settings Editor (vs §4)
 
@@ -1223,14 +1223,15 @@ Border (1.5+). Source: [7-9]
 ### 8.5 Image sub-tools, trace & Material Library (vs §7)
 
 - **HAVE** ◦ imagetracerjs trace with pre-trace dither + Adjust Image (brightness / contrast / gamma / invert) and presets (`src/core/trace/`, `src/ui/trace/`). ✓ raster engrave with dither + lines-per-mm via per-pixel S modulation (`emit-raster.ts`, reached through `grbl-strategy.ts`). ✓ trace-keeps-source overlay (ADR-026).
-- **GAP** No Interval Test (§7.1) or **Material Test** generator (§7.8). No **Dot Width Correction** (§7.2). No **Convert to Bitmap** (§7.4). No **Apply Mask to Image** (§7.5). No **Material Library** / `.clb` (§7.7). No per-object Shape-Properties image controls (§7.6).
+- **GAP** No Interval Test (§7.1) or **Material Test** generator (§7.8). No **Dot Width Correction** (§7.2). No **Convert to Bitmap** (§7.4 — designed in ADR-029; parked in PROJECT.md Future feature notes). No **Apply Mask to Image** (§7.5). No **Material Library** / `.clb` (§7.7). No per-object Shape-Properties image controls (§7.6).
 - **DIVERGE** (the headline structural one)
-  - ✓ **Two image entry points → two object kinds.** `Toolbar.tsx` has separate **Trace Image** (`ImageButton` → `TracedImage`, vector) and **Engrave Image** (`EngraveImageButton` → `RasterImage`, pixels) buttons; the union carries both variants (`scene-object.ts` `SceneObject`). LightBurn imports **one** image object; trace-to-vector vs raster-engrave is an *operation / layer mode* on that one object, not two separate imports (§7.3 Images vs Vectors). → **redesign:** unify to a single image import; "Trace" becomes a tool/operation on the imported image, raster engrave is the Image layer-mode. (Already flagged as a smell in §1.5.)
+  - ✓ **Two image *object kinds* (the import split is now resolved).** `Toolbar.tsx` has a single **Import Image** (`ImportImageButton` → `RasterImage`) action; **Trace** (`TraceImageButton`) runs as a tool on the *already-selected* bitmap and overlays a `TracedImage` on it — the LightBurn model (one import; trace is a downstream operation), per ADR-027's image-flow unification. **Still divergent:** the scene union carries **two** image variants, `RasterImage` *and* `TracedImage` (`scene-object.ts` `SceneObject`), where LightBurn has one image object (trace output is plain vectors). → **redesign (remaining):** eliminate the `TracedImage` kind so trace output is an ordinary vector object, with a `.lf2` 1→2 schema migration (bump `PROJECT_SCHEMA_VERSION`). (§7.3; smell first flagged §1.5.)
   - ✓ **Grey default raster-layer color** `DEFAULT_RASTER_LAYER_COLOR = '#808080'` (`scene-object.ts:167`); the code comment itself notes "LightBurn uses black, but black collides with line-art SVG imports." → **redesign or ADR-justify:** match LightBurn (black) or record the deliberate divergence per ADR-027 §4. Currently undocumented → defect.
+  - **Trace control vocabulary.** Our dialog uses imagetracerjs `numberOfColors` + Otsu/median/despeckle presets and in-dialog brightness/contrast/gamma/invert, vs LightBurn's Cutoff/Threshold brightness band + Ignore Less Than / Smoothness / Optimize / Sketch Trace / Trace Transparency (image adjustment is a *separate* Adjust Image dialog). → **redesign:** adopt LightBurn's control model — designed in **ADR-030**; separable from #1 (the output-kind merge). (§1.3 mapping note.)
 
 ### 8.6 Divergence backlog (redesign-to-match; sequence in PROJECT.md phase order)
 
-1. Unify the two image import paths into one image object (§8.5) — biggest structural divergence.
+1. Eliminate the second image object kind — trace output becomes a plain vector object, not a `TracedImage` (§8.5); needs a `.lf2` 1→2 schema migration. (The two *import paths* are already unified into one Import Image action; this kind merge is the remaining structural half.)
 2. Cut Settings Editor modal with Common / Advanced tabs, replacing the inline card (§8.2).
 3. Min Power + Max Power on layers (§8.2) — needed for honest M4 dynamic-power parity.
 4. Fourth layer mode: Offset Fill (§8.2).
@@ -1240,6 +1241,7 @@ Border (1.5+). Source: [7-9]
 8. Menu bar + grouped toolbars (§8.1).
 9. Window-vs-crossing selection (§8.4).
 10. Resolve the grey raster-layer-color divergence (§8.5) — fix or ADR-justify.
+11. Trace control realignment to LightBurn's Cutoff/Threshold band + Ignore Less Than / Smoothness / Optimize / Sketch Trace / Trace Transparency, replacing presets/`numberOfColors` (§8.5; ADR-030). Distinct from #1 (output kind).
 
 *(Order is rough structural impact, not a schedule. Actual sequencing is governed by `PROJECT.md` phases; behavior parity with LightBurn is governed by ADR-027.)*
 
