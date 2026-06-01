@@ -50,6 +50,7 @@ const DEV_URL = process.env['LASERFORGE_DEV_URL'];
 const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
+  "worker-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
@@ -245,6 +246,10 @@ async function createWindow(): Promise<void> {
   // Policy rationale (each directive):
   //   default-src 'self'           - same-origin baseline; reject everything else.
   //   script-src 'self'            - bundled Vite scripts only; no inline JS, no eval.
+  //   worker-src 'self' data: blob:
+  //                                - Vite emits the trace worker as a module worker
+  //                                  URL; allow that off-thread trace path while
+  //                                  keeping all other worker origins blocked.
   //   style-src 'self' 'unsafe-inline'
   //                                - React's `style={{ ... }}` prop emits inline styles
   //                                  on every element. 'unsafe-inline' is required.
