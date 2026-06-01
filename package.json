@@ -91,7 +91,7 @@
     "@types/dompurify": "^3.0.5",
     "@types/jsdom": "^28.0.1",
     "@types/opentype.js": "^1.3.9",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^8.2.2",
@@ -119,7 +119,7 @@
     "opentype.js": "^1.3.4",
     "polygon-clipping": "^0.15.7",
     "polygon-offset": "^0.3.2",
-    "react": "^19.2.4",
+    "react": "^19.2.6",
     "react-dom": "^19.2.4",
     "zustand": "^5.0.13"
   }
