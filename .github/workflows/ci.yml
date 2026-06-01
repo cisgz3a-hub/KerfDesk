@@ -48,6 +48,9 @@ jobs:
       - name: ESLint
         run: pnpm lint
 
+      - name: ESLint Electron main
+        run: pnpm lint:electron
+
       - name: Prettier
         run: pnpm format:check
 
@@ -59,6 +62,9 @@ jobs:
 
       - name: Build web bundle
         run: pnpm build:web
+
+      - name: Build Electron main process
+        run: pnpm build:electron-main
 
       - name: Verify file-size discipline (coarse raw-line backstop)
         # ESLint's max-lines rule (eslint.config.mjs) is the real gate and runs

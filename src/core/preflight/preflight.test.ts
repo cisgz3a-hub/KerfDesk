@@ -140,6 +140,43 @@ describe('runPreflight — F-A10 check 2: bounds', () => {
     const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
     expect(codes).toContain('out-of-bed');
   });
+
+  it('flags fill overscan lead-in moves that leave the bed', () => {
+    const layer = {
+      ...createLayer({ id: 'L-fill', color: '#ff0000', mode: 'fill' }),
+      fillOverscanMm: 5,
+      hatchSpacingMm: 2,
+    };
+    const nearLeftEdge: SceneObject = {
+      kind: 'imported-svg',
+      id: 'O-fill',
+      source: 'fill.svg',
+      bounds: { minX: 1, minY: 1, maxX: 9, maxY: 9 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 1, y: 1 },
+                { x: 9, y: 1 },
+                { x: 9, y: 9 },
+                { x: 1, y: 9 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { ...EMPTY_SCENE, objects: [nearLeftEdge], layers: [layer] },
+    };
+    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).toContain('out-of-bed');
+  });
 });
 
 describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () => {
@@ -221,6 +258,60 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
       },
     };
     const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).not.toContain('layer-mode-mismatch');
+  });
+
+  it('flags a rotated raster image because raster emit is axis-aligned', () => {
+    const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });
+    const rotatedRaster: SceneObject = {
+      ...grayRaster,
+      transform: { ...IDENTITY_TRANSFORM, rotationDeg: 45 },
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { ...EMPTY_SCENE, objects: [rotatedRaster], layers: [imageLayer] },
+    };
+    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).toContain('unsupported-raster-transform');
+  });
+
+  it('does not block on rotated trace-source backing images', () => {
+    const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });
+    const traceSource: SceneObject = {
+      ...grayRaster,
+      role: 'trace-source',
+      transform: { ...IDENTITY_TRANSFORM, rotationDeg: 45 },
+    };
+    const traceLayer = createLayer({ id: 'L-black', color: '#000000', mode: 'fill' });
+    const traced: SceneObject = {
+      kind: 'traced-image',
+      id: 'T1',
+      source: 'x.png',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 1, y: 1 },
+                { x: 9, y: 1 },
+                { x: 9, y: 9 },
+                { x: 1, y: 9 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { ...EMPTY_SCENE, objects: [traceSource, traced], layers: [imageLayer, traceLayer] },
+    };
+    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).not.toContain('unsupported-raster-transform');
     expect(codes).not.toContain('layer-mode-mismatch');
   });
 });

@@ -231,6 +231,59 @@ These are not in `package.json`; they are sources of record we rely on for proto
   - We replicate the user-visible workflow (color-as-layer, Cuts/Layers window, Laser window, naming conventions) because it is the recognized convention in the field, not because of LightBurn IP.
   - Where our product deviates from LightBurn (GRBL-only per ADR-006, web-app delivery per ADR-003, etc.), the deviation is documented in its own ADR.
 
+### Fill hatch overscan and GRBL endpoint burn behavior
+
+- **Version / date:** LightBurn docs crawled 2026-06-01; GRBL v1.1 documentation
+- **License:** n/a
+- **Source URLs:**
+  - https://docs.lightburnsoftware.com/UI/CutSettings/CutSettings-Fill.html
+  - https://docs.lightburnsoftware.com/Troubleshooting/JobQuality/BurnedEdges.html
+  - https://docs.lightburnsoftware.com/2.1/Explainers/Overscanning/
+  - https://docs.lightburnsoftware.com/2.1/Reference/CutSettingsEditor/SharedSettings/
+  - https://github.com/gnea/grbl
+  - https://github.com/gnea/grbl/blob/master/doc/markdown/settings.md
+- **Decision affected:** ADR-031 (proposed); `src/core/job/job.ts`,
+  `src/core/job/compile-job.ts`, `src/core/output/grbl-strategy.ts`
+- **Evaluated:** 2026-06-01 by Codex
+- **Confidence:** high for overscan root cause; medium for exact default
+  distance because acceleration and material vary per machine.
+- **Re-verify by:** 2026-12-01
+- **Notes:**
+  - LightBurn documents Fill as scan-line engraving of closed shapes and
+    says Overscanning adds extra moves before/after each line so the
+    head reaches speed before firing and slows after the laser is off.
+  - LightBurn's dark-edge troubleshooting specifically attributes
+    darker Fill/Image edges to missing or incorrect overscanning.
+  - LightBurn defaults GRBL devices to Variable Power (`M4`) and treats
+    Constant Power (`M3`) as a compatibility option; GRBL documents
+    `M4` dynamic laser power as speed-scaled. LaserForge keeps `M3` for
+    the first Fill overscan increment to minimize blast radius; `M4`
+    Fill is a separate hardware experiment if overscan alone is not
+    enough.
+  - Local evidence: Image mode already emits S0 overscan in
+    `emit-raster.ts`; Fill mode currently flows through `CutGroup` and
+    starts positive-S motion at the hatch boundary.
+
+### Bidirectional raster engraving after overscan runtime regression
+
+- **Version / date:** LightBurn latest docs crawled 2026-06-01; GRBL v1.1 laser-mode docs; Rayforge docs crawled 2026-06-01
+- **License:** n/a for docs; Rayforge is implementation reference only, no code copied.
+- **Source URLs:**
+  - https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/
+  - https://docs.lightburnsoftware.com/legacy/ScanningOffsetAdjustment
+  - https://github-wiki-see.page/m/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode
+  - https://rayforge.org/docs/latest/features/overscan.html
+- **Decision affected:** ADR-032; `src/core/raster/emit-raster.ts`
+- **Evaluated:** 2026-06-01 by Codex
+- **Confidence:** high that unidirectional overscanned raster rows are the avoidable runtime cost; medium on hardware backlash risk until user burns a bidirectional test.
+- **Re-verify by:** 2026-12-01
+- **Notes:**
+  - LightBurn documents Bi-directional Fill as engraving while sweeping in both directions; disabling it burns in one direction and returns without engraving, which can add significant runtime on long jobs.
+  - LightBurn's overscanning guidance still applies in both directions: the laser-off runway is needed before the burn span and after it so the marked area sees steadier speed.
+  - Rayforge documents the same raster tradeoff: bidirectional raster alternates row direction and is faster, while unidirectional is slower but can be more consistent on machines with backlash.
+  - LightBurn's scanning-offset page documents the risk side: high-speed bidirectional scanning can show ghosted/shifted edges if the machine has response delay or belt stretch, and compensation is a separate calibration problem.
+  - Local evidence: `emit-raster.ts` explicitly listed serpentine alternation as deferred and emitted every active row left-to-right. Fill hatches already alternate direction in `fill-hatching.ts`, so the runtime regression target is raster/Image mode, not Fill mode.
+
 ### Open-source competitor landscape (research)
 
 - **Date:** 2026-05-26
@@ -356,6 +409,54 @@ Neither is adopted in F.1 (F.1 doesn't do raster anything).
   self-implement the ~80 LOC raster emit and reuse our existing
   streamer.
 - **Decision deferred:** to F.2 kickoff ADR-020.
+
+---
+
+## Workspace image-scan responsiveness (2026-06-01)
+
+**Trigger:** user reported that the app still froze after applying an
+image trace/scan. The trace geometry was now visually acceptable, but
+post-trace interaction became unusably slow.
+
+**Sources consulted:**
+- MDN Web Workers / transferable objects:
+  `https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers`
+  and `https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects`.
+  Transferable `ArrayBuffer`s avoid copy cost when moving large image
+  buffers across worker boundaries, but transferred buffers detach from
+  the sender, so this is a measured follow-up rather than a casual swap.
+- MDN OffscreenCanvas:
+  `https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas`.
+  OffscreenCanvas can move rendering into a worker, but it is a larger
+  architecture change than the current bug needs.
+- web.dev main-thread responsiveness:
+  `https://web.dev/articles/optimize-long-tasks` and
+  `https://web.dev/articles/off-main-thread`. Long work should be
+  split, yielded, or moved off the main thread; UI redraw paths should
+  not perform unbounded geometry walks.
+- React memoization docs:
+  `https://react.dev/reference/react/useMemo` and
+  `https://react.dev/reference/react/memo`. Memoization is useful for
+  expensive calculations in granular editors only when dependencies are
+  stable; always-new objects defeat it.
+
+**Local evidence and outcome:**
+- `draw-vector-strokes.ts` already reduced Canvas2D `lineTo` calls, but
+  the sampled path still read every source point. Added
+  `display-polylines.ts` and a stronger point-read regression so the
+  display sample is bounded and cached by immutable polyline array.
+- `draw-preview.ts` compiled the job and rebuilt the toolpath from
+  inside the draw function. `Workspace.tsx` now memoizes the preview
+  toolpath by `project` while preview mode is active, so pan/zoom/scrub
+  redraws do not recompile the job.
+- Worker fallback is now bounded: tiny images can still trace inline in
+  test/non-worker contexts, but large images fail with an actionable
+  error instead of silently tracing on the main thread.
+
+**Decision:** keep full geometry for saved projects, G-code, and Start.
+Only display/preview rendering is simplified. OffscreenCanvas and
+transferable return formats remain future work if profiling still shows
+long tasks after this bounded-rendering fix.
 
 ---
 

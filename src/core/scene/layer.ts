@@ -28,6 +28,7 @@ export type Layer = {
   // visible banding at standard kerfs).
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
+  readonly fillOverscanMm: number;
   // F.2 image-mode parameters. Ignored unless mode === 'image'.
   // Layer values WIN over per-RasterImage settings at compile time
   // so the operator can re-tune one layer without touching every
@@ -45,6 +46,7 @@ export const LAYER_DEFAULTS = {
   output: true,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.2,
+  fillOverscanMm: 5,
   ditherAlgorithm: 'floyd-steinberg',
   linesPerMm: 10,
 } as const satisfies Omit<Layer, 'id' | 'color'>;

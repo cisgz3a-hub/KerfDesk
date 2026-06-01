@@ -10,7 +10,8 @@
 // Postamble: M5, then `G0 X0 Y0 S0` to park at origin.
 
 import type { DeviceProfile } from '../devices';
-import type { CutGroup, CutSegment, Group, Job, RasterGroup } from '../job';
+import { expandFillHatchWithOverscan } from '../job/fill-overscan';
+import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
 import type { OutputStrategy } from './output-strategy';
@@ -79,6 +80,27 @@ function emitGroup(group: CutGroup, device: DeviceProfile): string {
   return chunks.join(LINE_END) + LINE_END;
 }
 
+function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
+  const s = scaleS(group.power, device.maxPowerS);
+  const feed = Math.round(group.speed);
+  const chunks: string[] = [];
+  chunks.push(
+    `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} overscan ${fmt(group.overscanMm)} mm`,
+  );
+  for (let p = 0; p < group.passes; p += 1) {
+    chunks.push(`; pass ${p + 1} of ${group.passes}`);
+    for (const seg of group.segments) {
+      const run = expandFillHatchWithOverscan(seg.polyline, group.overscanMm);
+      if (run === null) continue;
+      chunks.push(`G0 X${fmt(run.leadStart.x)} Y${fmt(run.leadStart.y)} S0`);
+      chunks.push(`G1 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} F${feed} S0`);
+      chunks.push(`G1 X${fmt(run.burnEnd.x)} Y${fmt(run.burnEnd.y)} S${s}`);
+      chunks.push(`G1 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
+    }
+  }
+  return chunks.join(LINE_END) + LINE_END;
+}
+
 // F.2.d: raster groups emit through the dedicated raster path
 // (emit-raster.ts), which handles the M4 flip + per-pixel S
 // modulation. The strategy stays one-arm-per-kind so adding new
@@ -90,6 +112,7 @@ function emitRasterGroupHere(group: RasterGroup): string {
     height: group.pixelHeight,
     bounds: group.bounds,
     feedMmPerMin: group.speed,
+    passes: group.passes,
     overscanMm: group.overscanMm,
     layerId: group.layerId,
     color: group.color,
@@ -101,6 +124,8 @@ function emitAnyGroup(group: Group, device: DeviceProfile): string {
   switch (group.kind) {
     case 'cut':
       return emitGroup(group, device);
+    case 'fill':
+      return emitFillGroup(group, device);
     case 'raster':
       return emitRasterGroupHere(group);
     default:
@@ -111,8 +136,13 @@ function emitAnyGroup(group: Group, device: DeviceProfile): string {
 function emitJob(job: Job, device: DeviceProfile): string {
   const parts: string[] = [];
   parts.push(preamble());
+  let previousKind: Group['kind'] | null = null;
   for (const group of job.groups) {
+    if ((group.kind === 'cut' || group.kind === 'fill') && previousKind === 'raster') {
+      parts.push('M3 S0' + LINE_END);
+    }
     parts.push(emitAnyGroup(group, device));
+    previousKind = group.kind;
   }
   parts.push(postamble());
   return parts.join('');

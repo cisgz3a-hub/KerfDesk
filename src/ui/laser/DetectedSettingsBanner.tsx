@@ -26,7 +26,7 @@ export function DetectedSettingsBanner(): JSX.Element | null {
       <strong style={titleStyle}>Detected machine settings</strong>
       <p style={hintStyle}>
         Your laser reported these values via <code>$$</code>. Apply them to keep time estimates and
-        bed bounds in sync with the firmware.
+        controller power settings in sync with the firmware.
       </p>
       <ul style={listStyle}>
         {rows.map((r) => (
@@ -70,12 +70,23 @@ type Row = {
   readonly changed: boolean;
 };
 
-function describePatch(patch: Partial<DeviceProfile>, current: DeviceProfile): ReadonlyArray<Row> {
+export function describePatch(
+  patch: Partial<DeviceProfile>,
+  current: DeviceProfile,
+): ReadonlyArray<Row> {
   const rows: Row[] = [];
   pushNumericRow(rows, 'Bed width', patch.bedWidth, current.bedWidth, formatMm);
   pushNumericRow(rows, 'Bed height', patch.bedHeight, current.bedHeight, formatMm);
   pushNumericRow(rows, 'Max feed', patch.maxFeed, current.maxFeed, formatFeed);
   pushNumericRow(rows, 'Max power (S)', patch.maxPowerS, current.maxPowerS, formatInt);
+  pushNumericRow(rows, 'Min power (S)', patch.minPowerS, current.minPowerS, formatInt);
+  pushBooleanRow(
+    rows,
+    'Laser mode ($32)',
+    patch.laserModeEnabled,
+    current.laserModeEnabled,
+    formatLaserMode,
+  );
   pushNumericRow(rows, 'Acceleration', patch.accelMmPerSec2, current.accelMmPerSec2, formatAccel);
   pushNumericRow(
     rows,
@@ -85,6 +96,22 @@ function describePatch(patch: Partial<DeviceProfile>, current: DeviceProfile): R
     formatMm,
   );
   return rows;
+}
+
+function pushBooleanRow(
+  rows: Row[],
+  label: string,
+  next: boolean | undefined,
+  prev: boolean,
+  format: (value: boolean) => string,
+): void {
+  if (next === undefined) return;
+  rows.push({
+    label,
+    oldText: format(prev),
+    newText: format(next),
+    changed: next !== prev,
+  });
 }
 
 function pushNumericRow(
@@ -124,6 +151,9 @@ function formatInt(n: number): string {
 }
 function formatAccel(n: number): string {
   return `${Math.round(n)} mm/s²`;
+}
+function formatLaserMode(enabled: boolean): string {
+  return enabled ? 'Enabled' : 'Disabled';
 }
 
 const panelStyle: React.CSSProperties = {

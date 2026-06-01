@@ -8,6 +8,7 @@
 
 import type { Vec2 } from '../scene';
 import type { Job } from './job';
+import { expandFillHatchWithOverscan } from './fill-overscan';
 
 export type ToolpathStep =
   | { readonly kind: 'travel'; readonly from: Vec2; readonly to: Vec2; readonly length: number }
@@ -31,18 +32,28 @@ export function buildToolpath(job: Job): Toolpath {
     // groups don't have a meaningful "edge" model for the scrubber
     // (they're a continuous sweep); skip them for now. Future
     // enhancement: synthesize one "raster" step per row.
-    if (group.kind !== 'cut') continue;
+    if (group.kind === 'raster') continue;
+    if (group.kind === 'fill') {
+      for (const seg of group.segments) {
+        const run = expandFillHatchWithOverscan(seg.polyline, group.overscanMm);
+        if (run === null) continue;
+        appendTravelStep(steps, prevEnd, run.leadStart);
+        appendTravelStep(steps, run.leadStart, run.burnStart);
+        steps.push({
+          kind: 'cut',
+          color: group.color,
+          polyline: [run.burnStart, run.burnEnd],
+          length: dist(run.burnStart, run.burnEnd),
+        });
+        appendTravelStep(steps, run.burnEnd, run.leadEnd);
+        prevEnd = run.leadEnd;
+      }
+      continue;
+    }
     for (const seg of group.segments) {
       const first = seg.polyline[0];
       if (first === undefined) continue;
-      if (prevEnd !== null && (prevEnd.x !== first.x || prevEnd.y !== first.y)) {
-        steps.push({
-          kind: 'travel',
-          from: prevEnd,
-          to: first,
-          length: dist(prevEnd, first),
-        });
-      }
+      appendTravelStep(steps, prevEnd, first);
       steps.push({
         kind: 'cut',
         color: group.color,
@@ -55,6 +66,16 @@ export function buildToolpath(job: Job): Toolpath {
   }
   const totalLength = steps.reduce((sum, s) => sum + s.length, 0);
   return { steps, totalLength };
+}
+
+function appendTravelStep(steps: ToolpathStep[], from: Vec2 | null, to: Vec2): void {
+  if (from === null || (from.x === to.x && from.y === to.y)) return;
+  steps.push({
+    kind: 'travel',
+    from,
+    to,
+    length: dist(from, to),
+  });
 }
 
 // Slice the toolpath at arc-length `cut`. Returns the steps to render whole,

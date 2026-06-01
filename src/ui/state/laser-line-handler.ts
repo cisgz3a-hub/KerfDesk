@@ -26,6 +26,7 @@ import {
 } from '../../core/controllers/grbl';
 import { consumeSettingsResponse } from './detected-settings-action';
 import type { LaserState } from './laser-store';
+import { hasCustomOrigin } from './origin-actions';
 
 export type HandlerRefs = {
   settingsCollector: SettingsCollectorState;
@@ -91,6 +92,7 @@ export async function runHandshake(
   set({
     log: appendLog(get(), '[lf2] Connected. Querying settings ($$)…'),
     detectedSettings: null,
+    controllerSettings: null,
   });
   refs.settingsCollector = startCollecting();
   await safeWrite(`${CMD_SETTINGS}\n`);
@@ -116,13 +118,17 @@ export function handleLine(
   // F-7: feed every classified response to the settings collector.
   // Returns a patch only when the `$$` response window just closed.
   const patch = consumeSettingsResponse(refs, cls);
-  if (patch !== null) set({ detectedSettings: patch });
+  if (patch !== null) set({ detectedSettings: patch, controllerSettings: patch });
   if (cls.kind === 'status') {
     // Cache WCO across frames — GRBL only reports it intermittently
     // (every Nth status per `$10`'s WCO bit). UI reads `wcoCache`,
     // never `statusReport.wco`. F.3 / ADR-021.
     if (cls.report.wco !== null) {
-      set({ statusReport: cls.report, wcoCache: cls.report.wco });
+      set({
+        statusReport: cls.report,
+        wcoCache: cls.report.wco,
+        workOriginActive: hasCustomOrigin(cls.report.wco),
+      });
     } else {
       set({ statusReport: cls.report });
     }
@@ -132,7 +138,7 @@ export function handleLine(
     // GRBL clears G92 on alarm (1 — hard limit; soft-resets internally).
     // Mirror that in our cache so the readout stops claiming a custom
     // origin is active. F.3 / ADR-021.
-    set({ alarmCode: cls.code, wcoCache: null });
+    set({ alarmCode: cls.code, wcoCache: null, workOriginActive: false });
     advanceStream(set, get, safeWrite, 'alarm');
     return;
   }
@@ -159,5 +165,5 @@ function advanceStream(
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
   set({ streamer: stepped.state });
-  if (stepped.toSend.length > 0) void safeWrite(stepped.toSend);
+  if (stepped.toSend.length > 0) void safeWrite(stepped.toSend).catch(() => undefined);
 }

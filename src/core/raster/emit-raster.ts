@@ -9,12 +9,12 @@
 //     controller flips into dynamic-power mode before the first burn.
 //     Cut groups in the same job re-issue their own M3 at start; the
 //     dispatcher (compile-job in F.2.d) is responsible for ordering.
-//   - Each pixel row sweeps left-to-right (serpentine deferred — see
-//     "Future improvements" below). Run-length compression: a G1
+//   - Pixel rows sweep bidirectionally: active rows alternate
+//     left-to-right, then right-to-left. Run-length compression: a G1
 //     emits only when the dithered S changes from the previous pixel,
 //     so a row of identical S values becomes one G1, and a checker
-//     pattern becomes N G1s. The X coordinate on each G1 is the
-//     RIGHT edge of the run — that's where the new S kicks in.
+//     pattern becomes N G1s. The X coordinate on each G1 is the far
+//     edge of the run in the current sweep direction.
 //   - Overscan: each row's rapid arrives `overscanMm` to the left of
 //     bounds.minX, then sweeps past bounds.maxX by `overscanMm` with
 //     S0 on the exit. Gives the head room to accelerate / decelerate
@@ -27,8 +27,6 @@
 // same options → byte-identical G-code (determinism invariant #5).
 //
 // Future improvements (out of F.2.b v1):
-//   - Serpentine alternation (every other row reversed). Cuts
-//     bidirectional-travel time in half on tall images.
 //   - Async-iterable emit for >100 KB jobs (ADR-020 Q3 threshold).
 //   - Per-pixel feed modulation for grayscale-on-non-M4 controllers.
 
@@ -58,6 +56,7 @@ export type EmitRasterInput = {
   // Feed rate for raster G1s, in mm/min. Constant across the image —
   // M4 controllers modulate power, not speed.
   readonly feedMmPerMin: number;
+  readonly passes?: number;
   // Distance to overshoot at each row end, in mm. 5 mm is a typical
   // default for diode lasers; higher feeds want more. 0 disables.
   readonly overscanMm: number;
@@ -79,8 +78,8 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   const feed = Math.round(input.feedMmPerMin);
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
-  let isFirstSweep = true;
-  // Body — one row at a time. Two optimizations on top of the naive
+  const passes = normalizedPasses(input.passes);
+  // Body — one row at a time. Three optimizations on top of the naive
   // "sweep every row across the full width" version:
   //   1. Skip rows whose pixels are all S=0. They contribute zero
   //      burn and would otherwise force the head to sweep at feed
@@ -90,15 +89,32 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   //      (first non-zero pixel to last non-zero pixel) plus overscan
   //      on each side. Skipping leading/trailing all-zero pixels
   //      means the head only burns travel where pixels actually exist.
+  //   3. Alternate emitted active rows left-to-right / right-to-left so
+  //      overscan does not force a full-width return move between rows.
   // The G0 rapid between rows handles arbitrarily-large Y jumps when
   // we skip a band of empty rows — the controller plans an oblique
   // travel from the end of one active row to the start of the next.
-  for (let y = 0; y < input.height; y += 1) {
-    const span = activeSpan(input, y);
-    if (span === null) continue; // all-zero row → skip entirely
-    const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
-    chunks.push(emitRow(input, y, worldY, pixelWidthMm, feed, isFirstSweep, span));
-    isFirstSweep = false;
+  for (let pass = 0; pass < passes; pass += 1) {
+    if (passes > 1) chunks.push(`; raster pass ${pass + 1} of ${passes}`);
+    let emittedSweepCount = 0;
+    for (let y = 0; y < input.height; y += 1) {
+      const span = activeSpan(input, y);
+      if (span === null) continue;
+      const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
+      chunks.push(
+        emitRow(
+          input,
+          y,
+          worldY,
+          pixelWidthMm,
+          feed,
+          emittedSweepCount === 0,
+          emittedSweepCount % 2 === 1,
+          span,
+        ),
+      );
+      emittedSweepCount += 1;
+    }
   }
   // Trailing M5 so any subsequent cut group starts from a known
   // mode-off state. The cut group will re-issue its own M3.
@@ -139,6 +155,7 @@ function emitRow(
   pixelWidthMm: number,
   feed: number,
   isFirstSweep: boolean,
+  reverse: boolean,
   span: ActiveSpan,
 ): string {
   const lines: string[] = [];
@@ -148,32 +165,41 @@ function emitRow(
   // (minX + 40*pw - overscan) to (minX + 61*pw + overscan).
   const activeStartX = input.bounds.minX + span.firstX * pixelWidthMm;
   const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
-  const startX = activeStartX - input.overscanMm;
-  const endX = activeEndX + input.overscanMm;
+  const startX = reverse ? activeEndX + input.overscanMm : activeStartX - input.overscanMm;
+  const endX = reverse ? activeStartX - input.overscanMm : activeEndX + input.overscanMm;
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
   lines.push(`G0 X${fmt(startX)} Y${fmt(worldY)} S0`);
   let prevS = -1;
-  // Sweep runs within the active span. Start the run accounting at
-  // firstX so we don't waste G1s on the leading zeros we just
-  // overscan-rapid'd past.
-  let runStartIdx = span.firstX;
-  let runS = input.sValues[y * input.width + span.firstX] ?? 0;
-  for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
-    const cellS = input.sValues[y * input.width + i] ?? 0;
-    if (cellS !== runS) {
-      const runEndX = input.bounds.minX + i * pixelWidthMm;
-      lines.push(
-        formatRunG1(runEndX, runS, prevS, feed, isFirstSweep && runStartIdx === span.firstX),
-      );
-      prevS = runS;
-      runStartIdx = i;
-      runS = cellS;
-    }
+  let shouldEmitFeed = isFirstSweep;
+  const pushRun = (x: number, s: number): void => {
+    lines.push(formatRunG1(x, s, prevS, feed, shouldEmitFeed));
+    shouldEmitFeed = false;
+    prevS = s;
+  };
+  if (input.overscanMm > 0) {
+    pushRun(reverse ? activeEndX : activeStartX, 0);
   }
-  // Final run ends at the active-span end edge.
-  lines.push(
-    formatRunG1(activeEndX, runS, prevS, feed, isFirstSweep && runStartIdx === span.firstX),
-  );
+  if (reverse) {
+    let runS = input.sValues[y * input.width + span.lastX] ?? 0;
+    for (let i = span.lastX - 1; i >= span.firstX; i -= 1) {
+      const cellS = input.sValues[y * input.width + i] ?? 0;
+      if (cellS !== runS) {
+        pushRun(input.bounds.minX + (i + 1) * pixelWidthMm, runS);
+        runS = cellS;
+      }
+    }
+    pushRun(activeStartX, runS);
+  } else {
+    let runS = input.sValues[y * input.width + span.firstX] ?? 0;
+    for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
+      const cellS = input.sValues[y * input.width + i] ?? 0;
+      if (cellS !== runS) {
+        pushRun(input.bounds.minX + i * pixelWidthMm, runS);
+        runS = cellS;
+      }
+    }
+    pushRun(activeEndX, runS);
+  }
   // Exit overscan with S0 so the diode is dark during deceleration.
   lines.push(`G1 X${fmt(endX)} S0`);
   return lines.join(LINE_END);
@@ -224,4 +250,8 @@ function validate(input: EmitRasterInput): void {
   if (input.overscanMm < 0) {
     throw new Error('emitRasterGroup: overscanMm must be >= 0');
   }
+}
+
+function normalizedPasses(passes: number | undefined): number {
+  return Math.max(1, Math.floor(passes ?? 1));
 }

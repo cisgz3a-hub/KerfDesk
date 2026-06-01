@@ -9,6 +9,8 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
       bedHeight: 400,
       maxFeed: 6000,
       maxPowerS: 1000,
+      minPowerS: 0,
+      laserModeEnabled: true,
       origin: 'front-left',
       homing: { enabled: false, direction: 'front-left' },
     });
@@ -28,6 +30,8 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(DEFAULT_DEVICE_PROFILE.bedHeight).toBeGreaterThan(0);
     expect(Number.isFinite(DEFAULT_DEVICE_PROFILE.maxFeed)).toBe(true);
     expect(Number.isInteger(DEFAULT_DEVICE_PROFILE.maxPowerS)).toBe(true);
+    expect(Number.isInteger(DEFAULT_DEVICE_PROFILE.minPowerS)).toBe(true);
+    expect(DEFAULT_DEVICE_PROFILE.laserModeEnabled).toBe(true);
   });
 
   it('bed dimensions sit in the millimetre range, not centimetre or inch', () => {

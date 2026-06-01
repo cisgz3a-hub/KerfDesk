@@ -44,6 +44,55 @@ describe('buildToolpath', () => {
   it('returns empty toolpath for an empty job', () => {
     expect(buildToolpath({ groups: [] })).toEqual({ steps: [], totalLength: 0 });
   });
+
+  it('renders fill overscan as laser-off runway around the burn span', () => {
+    const tp = buildToolpath({
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000',
+          power: 30,
+          speed: 1000,
+          passes: 1,
+          overscanMm: 2,
+          segments: [
+            {
+              polyline: [
+                { x: 10, y: 5 },
+                { x: 20, y: 5 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(tp.steps.map((s) => s.kind)).toEqual(['travel', 'cut', 'travel']);
+    expect(tp.totalLength).toBe(14);
+    expect(tp.steps[0]).toMatchObject({
+      kind: 'travel',
+      from: { x: 8, y: 5 },
+      to: { x: 10, y: 5 },
+      length: 2,
+    });
+    expect(tp.steps[1]).toMatchObject({
+      kind: 'cut',
+      color: '#000',
+      polyline: [
+        { x: 10, y: 5 },
+        { x: 20, y: 5 },
+      ],
+      length: 10,
+    });
+    expect(tp.steps[2]).toMatchObject({
+      kind: 'travel',
+      from: { x: 20, y: 5 },
+      to: { x: 22, y: 5 },
+      length: 2,
+    });
+  });
 });
 
 describe('sliceToolpath', () => {

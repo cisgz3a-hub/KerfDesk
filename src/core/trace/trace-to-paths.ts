@@ -32,6 +32,8 @@ import {
   buildImageTracerOptions,
   preprocessForTrace,
 } from './trace-image';
+import { traceImageToCenterlinePaths } from './centerline-trace';
+import { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -40,6 +42,17 @@ import {
 // produce smoother but larger output; lower values reveal facets on
 // close inspection.
 const SAMPLES_PER_QUADRATIC = 16;
+
+// Post-trace cleanup thresholds, in source-image pixels. ImageTracer can
+// preserve anti-aliased pixel teeth as real contour vertices; those turn into
+// pointy engrave geometry. Keep this cleanup sub-pixel/small-pixel only so
+// real logo corners and intentional details survive.
+const GEOMETRY_EPS = 1e-6;
+const SPIKE_EDGE_MAX_PX = 1.25;
+const SPIKE_BASE_MAX_PX = 2;
+const SPIKE_HEIGHT_MAX_PX = 0.9;
+const STRAIGHT_JITTER_TOLERANCE_PX = 0.12;
+const CLEANUP_MAX_PASSES = 6;
 
 // Background palette entry — paths in this colour layer are dropped
 // (we never engrave the white background). 6-digit lowercase hex to
@@ -96,6 +109,11 @@ type ImageTracerModule = {
   ) => TraceData;
 };
 
+type TracedPoint = {
+  readonly point: Vec2;
+  readonly curveSample: boolean;
+};
+
 let tracerPromise: Promise<ImageTracerModule> | null = null;
 async function loadTracer(): Promise<ImageTracerModule> {
   if (tracerPromise === null) {
@@ -117,6 +135,8 @@ export async function traceImageToColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
+  if (options.traceMode === 'centerline') return traceImageToCenterlinePaths(image, options);
+  if (shouldUsePotraceTraceBackend(options)) return traceImageToPotraceColoredPaths(image, options);
   const tracer = await loadTracer();
   const prepared = preprocessForTrace(image, options);
   const td = tracer.imagedataToTracedata(prepared, buildImageTracerOptions(options));
@@ -157,22 +177,22 @@ function segmentsToPolyline(segments: ReadonlyArray<TraceSegment>): Polyline {
   if (segments.length === 0) {
     return { points: [], closed: true };
   }
-  const points: Vec2[] = [];
+  const points: TracedPoint[] = [];
   const first = segments[0];
-  if (first === undefined) return { points, closed: true };
-  points.push({ x: first.x1, y: first.y1 });
+  if (first === undefined) return { points: [], closed: true };
+  points.push({ point: { x: first.x1, y: first.y1 }, curveSample: false });
   for (const seg of segments) {
     appendSegmentSamples(points, seg);
   }
-  return { points, closed: true };
+  return { points: cleanTracedPoints(points), closed: true };
 }
 
 // Push the samples of one segment onto the running point list. Skips
 // t=0 (already there as the previous segment's end / the initial
 // start point) and includes t=1 (the segment's endpoint).
-function appendSegmentSamples(points: Vec2[], seg: TraceSegment): void {
+function appendSegmentSamples(points: TracedPoint[], seg: TraceSegment): void {
   if (seg.type === 'L') {
-    points.push({ x: seg.x2, y: seg.y2 });
+    points.push({ point: { x: seg.x2, y: seg.y2 }, curveSample: false });
     return;
   }
   // Q — quadratic Bezier with start (x1,y1), control (x2,y2), end
@@ -185,10 +205,111 @@ function appendSegmentSamples(points: Vec2[], seg: TraceSegment): void {
     const t2 = t * t;
     const twoOmtT = 2 * omt * t;
     points.push({
-      x: omt2 * seg.x1 + twoOmtT * seg.x2 + t2 * seg.x3,
-      y: omt2 * seg.y1 + twoOmtT * seg.y2 + t2 * seg.y3,
+      point: {
+        x: omt2 * seg.x1 + twoOmtT * seg.x2 + t2 * seg.x3,
+        y: omt2 * seg.y1 + twoOmtT * seg.y2 + t2 * seg.y3,
+      },
+      curveSample: true,
     });
   }
+}
+
+function cleanTracedPoints(points: ReadonlyArray<TracedPoint>): Vec2[] {
+  if (points.length < 4) return toVec2(points);
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first === undefined || last === undefined || !samePoint(first.point, last.point)) {
+    return toVec2(points);
+  }
+
+  const rawRing = points.slice(0, -1);
+  if (rawRing.length < 3) return toVec2(points);
+
+  let ring = removeDuplicateRingPoints(rawRing);
+  if (ring.length < 3) return toVec2(points);
+
+  for (let pass = 0; pass < CLEANUP_MAX_PASSES; pass += 1) {
+    const next = cleanupRingPass(ring);
+    if (next.length === ring.length) break;
+    ring = next;
+    if (ring.length < 3) return toVec2(points);
+  }
+
+  const closed = toVec2(ring);
+  const start = closed[0];
+  return start === undefined ? toVec2(points) : [...closed, start];
+}
+
+function cleanupRingPass(points: ReadonlyArray<TracedPoint>): TracedPoint[] {
+  const kept: TracedPoint[] = [];
+  const count = points.length;
+  for (let i = 0; i < count; i += 1) {
+    const prev = points[(i + count - 1) % count];
+    const curr = points[i];
+    const next = points[(i + 1) % count];
+    if (prev === undefined || curr === undefined || next === undefined) continue;
+    const canClean = !curr.curveSample;
+    if (
+      canClean &&
+      (isTinySpike(prev.point, curr.point, next.point) ||
+        isNearlyCollinearJitter(prev.point, curr.point, next.point))
+    ) {
+      continue;
+    }
+    kept.push(curr);
+  }
+  return kept.length >= 3 ? kept : [...points];
+}
+
+function removeDuplicateRingPoints(points: ReadonlyArray<TracedPoint>): TracedPoint[] {
+  const out: TracedPoint[] = [];
+  for (const point of points) {
+    const prev = out[out.length - 1];
+    if (prev !== undefined && samePoint(prev.point, point.point)) continue;
+    out.push(point);
+  }
+  return out;
+}
+
+function isTinySpike(a: Vec2, b: Vec2, c: Vec2): boolean {
+  const ab = distance(a, b);
+  const bc = distance(b, c);
+  const ac = distance(a, c);
+  if (ab <= GEOMETRY_EPS || bc <= GEOMETRY_EPS) return true;
+  if (Math.max(ab, bc) > SPIKE_EDGE_MAX_PX) return false;
+  if (ac > SPIKE_BASE_MAX_PX) return false;
+  return distancePointToLine(b, a, c) <= SPIKE_HEIGHT_MAX_PX;
+}
+
+function isNearlyCollinearJitter(a: Vec2, b: Vec2, c: Vec2): boolean {
+  const ab = distance(a, b);
+  const bc = distance(b, c);
+  const ac = distance(a, c);
+  if (ab <= GEOMETRY_EPS || bc <= GEOMETRY_EPS) return true;
+  if (ac <= GEOMETRY_EPS) return false;
+  const dot = (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y);
+  if (dot <= 0) return false;
+  return distancePointToLine(b, a, c) <= STRAIGHT_JITTER_TOLERANCE_PX;
+}
+
+function distancePointToLine(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  if (len <= GEOMETRY_EPS) return distance(p, a);
+  return Math.abs(dy * p.x - dx * p.y + b.x * a.y - b.y * a.x) / len;
+}
+
+function distance(a: Vec2, b: Vec2): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function samePoint(a: Vec2, b: Vec2): boolean {
+  return distance(a, b) <= GEOMETRY_EPS;
+}
+
+function toVec2(points: ReadonlyArray<TracedPoint>): Vec2[] {
+  return points.map((p) => p.point);
 }
 
 // Palette entry → 6-digit lowercase hex. Matches the colour-key

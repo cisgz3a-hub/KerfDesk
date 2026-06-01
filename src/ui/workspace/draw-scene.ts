@@ -4,22 +4,31 @@
 // per-feature renderers live in sibling files so no single file grows
 // beyond the 250-line soft cap (CLAUDE.md).
 
-import { fillHatching } from '../../core/job/fill-hatching';
+import type { Toolpath } from '../../core/job';
 import {
-  applyTransform,
   type Layer,
   type Polyline,
   type Project,
   type SceneObject,
   transformedBBox,
 } from '../../core/scene';
-import { drawObjectsFaint, drawPreview } from './draw-preview';
+import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
+import {
+  buildDisplayPolylines,
+  type DisplayPolylineCache,
+  type DisplayPolylines,
+} from './display-polylines';
 import { drawRasterImage } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor } from './handles';
 import { rotateHandlePosition } from './rotate-handle';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
+import {
+  drawLargeSceneNotice,
+  fillClosedPolylinesBatched,
+  strokePolylinesBatched,
+} from './draw-vector-strokes';
 
 export type DrawOpts = {
   readonly selectedId: string | null;
@@ -32,6 +41,9 @@ export type DrawOpts = {
   // 1.0 = full toolpath, < 1.0 = render up to that arc-length and draw a
   // head marker at the cursor position.
   readonly scrubberT?: number;
+  readonly onRasterBitmapReady?: () => void;
+  readonly displayPolylineCache?: DisplayPolylineCache;
+  readonly previewToolpath?: Toolpath;
   // User zoom + pan (F-A15). Defaults to fit-to-bed when omitted.
   readonly view?: ViewState;
 };
@@ -59,9 +71,23 @@ export function drawScene(
     // Raster sim under the vector toolpath: image engrave is the burned
     // "background", cuts/scans layer on top (matches LightBurn preview).
     drawRasterPreview(ctx, project, view);
-    drawPreview(ctx, project, view, opts.scrubberT ?? 1);
+    drawPreview(
+      ctx,
+      opts.previewToolpath ?? buildPreviewToolpath(project),
+      view,
+      opts.scrubberT ?? 1,
+    );
   } else {
-    drawObjects(ctx, project, view, opts.selectedId, opts.additionalSelectedIds);
+    const simplified = drawObjects(
+      ctx,
+      project,
+      view,
+      opts.selectedId,
+      opts.additionalSelectedIds,
+      opts.onRasterBitmapReady,
+      opts.displayPolylineCache,
+    );
+    if (simplified) drawLargeSceneNotice(ctx);
   }
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
@@ -125,18 +151,28 @@ function drawObjects(
   view: ViewTransform,
   selectedId: string | null,
   additionalSelectedIds: ReadonlySet<string> = EMPTY_SELECTION,
-): void {
+  onRasterBitmapReady?: () => void,
+  displayPolylineCache?: DisplayPolylineCache,
+): boolean {
   const layerByColor = new Map(project.scene.layers.map((l) => [l.color, l]));
+  let simplified = false;
   for (const obj of project.scene.objects) {
     // ImportedSvg and TextObject share the same polyline shape after
     // text renders to paths in the UI layer — single drawing path.
-    drawObjectPolylines(ctx, obj, layerByColor, view);
+    if (drawObjectPolylines(ctx, obj, layerByColor, view, displayPolylineCache)) {
+      simplified = true;
+    }
     // F.2.c: raster images render via Canvas2D drawImage rather than
     // polyline strokes. The bitmap displays at its mm-bounds; the
     // dither preview overlay is a separate render layer we can add
     // later if needed.
     if (obj.kind === 'raster-image') {
-      drawRasterImage(ctx, obj, view);
+      drawRasterImage(
+        ctx,
+        obj,
+        view,
+        onRasterBitmapReady === undefined ? undefined : { onBitmapReady: onRasterBitmapReady },
+      );
     }
     if (obj.id === selectedId) {
       drawSelectionBox(ctx, obj, view);
@@ -144,6 +180,7 @@ function drawObjects(
       drawSecondarySelectionBox(ctx, obj, view);
     }
   }
+  return simplified;
 }
 
 function drawObjectPolylines(
@@ -151,63 +188,46 @@ function drawObjectPolylines(
   obj: SceneObject,
   layerByColor: Map<string, Layer>,
   view: ViewTransform,
-): void {
+  displayPolylineCache: DisplayPolylineCache | undefined,
+): boolean {
   // imported-svg, text, AND traced-image all carry the same
   // ColoredPath[] shape — single drawing path. Each variant
   // populates `paths` upstream (parseSvg for SVG, textToPolylines
   // for text, traceImageToSvgString→parseSvg for traced image).
-  if (obj.kind !== 'imported-svg' && obj.kind !== 'text' && obj.kind !== 'traced-image') return;
+  if (obj.kind !== 'imported-svg' && obj.kind !== 'text' && obj.kind !== 'traced-image') {
+    return false;
+  }
+  let simplified = false;
   for (const path of obj.paths) {
     const layer = layerByColor.get(path.color);
     if (layer === undefined || !layer.visible) continue;
     if (layer.mode === 'fill') {
-      // Fill-mode preview: show the actual hatch pattern that will burn
-      // (LightBurn-style WYSIWYG). Outline drops to a faint guide stroke
-      // so the user still sees the shape boundary. fillHatching is the
-      // exact function compileJob runs at emit time, so what you see is
-      // what gets G-code'd. Sub-ms per typical object — no cache needed
-      // until profiling says otherwise.
-      drawOutlineFaint(ctx, obj, path.polylines, view, path.color);
-      drawFillHatches(ctx, obj, path.polylines, layer, view, path.color);
-    } else {
-      ctx.strokeStyle = path.color;
-      ctx.lineWidth = layer.output ? 1.5 : 0.75;
-      // Single beginPath/stroke per color, regardless of how many
-      // polylines that color has. Per-polyline stroke() was the cause
-      // of the post-import freeze: each stroke is a GPU sync, so a
-      // 5000-polyline traced image emitted 5000 syncs per redraw at
-      // 60 Hz → canvas chokes. Batching to one stroke per color drops
-      // that to O(colors) ≈ 1-8. Standard Canvas2D pattern (MDN).
-      strokePolylinesBatched(ctx, obj, path.polylines, view);
+      drawFilledDesignGeometry(ctx, obj, path.polylines, layer, view, path.color);
+      continue;
     }
+    ctx.strokeStyle = path.color;
+    ctx.lineWidth = layer.output ? 1.5 : 0.75;
+    // Single beginPath/stroke per color, regardless of how many
+    // polylines that color has. Per-polyline stroke() was the cause
+    // of the post-import freeze: each stroke is a GPU sync, so a
+    // 5000-polyline traced image emitted 5000 syncs per redraw at
+    // 60 Hz → canvas chokes. Batching to one stroke per color drops
+    // that to O(colors) ≈ 1-8. Standard Canvas2D pattern (MDN).
+    const display = displayPolylinesFor(path.polylines, displayPolylineCache);
+    if (display.isSimplified) simplified = true;
+    strokePolylinesBatched(ctx, obj, display.polylines, view);
   }
+  return simplified;
 }
 
-// Faint outline drawn as a guide under the hatch lines in Fill mode.
-// Same batched stroke as the line path, just with a thinner dashed
-// stroke at the layer color (alpha-dimmed via ctx.globalAlpha) so the
-// hatches read as the actual burn pattern, not a competing fill.
-function drawOutlineFaint(
-  ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
+function displayPolylinesFor(
   polylines: ReadonlyArray<Polyline>,
-  view: ViewTransform,
-  color: string,
-): void {
-  ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 0.75;
-  ctx.setLineDash([3, 3]);
-  strokePolylinesBatched(ctx, obj, polylines, view);
-  ctx.restore();
+  cache: DisplayPolylineCache | undefined,
+): DisplayPolylines {
+  return cache?.get(polylines) ?? buildDisplayPolylines(polylines);
 }
 
-// Run fillHatching on the source polylines and draw the resulting
-// hatch lines at the layer's actual color + line weight. Mirrors what
-// compileJob → grbl-strategy will emit, so the canvas matches the
-// G-code 1:1.
-function drawFillHatches(
+function drawFilledDesignGeometry(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
   polylines: ReadonlyArray<Polyline>,
@@ -215,39 +235,18 @@ function drawFillHatches(
   view: ViewTransform,
   color: string,
 ): void {
-  const hatches = fillHatching({
-    polylines,
-    hatchAngleDeg: layer.hatchAngleDeg,
-    hatchSpacingMm: layer.hatchSpacingMm,
-  });
-  if (hatches.length === 0) return;
+  const closed = polylines.filter((polyline) => polyline.closed);
+  const open = polylines.filter((polyline) => !polyline.closed);
+
+  if (closed.length > 0) {
+    ctx.fillStyle = color;
+    fillClosedPolylinesBatched(ctx, obj, closed, view);
+  }
+  if (open.length === 0) return;
+
   ctx.strokeStyle = color;
   ctx.lineWidth = layer.output ? 1.5 : 0.75;
-  strokePolylinesBatched(ctx, obj, hatches, view);
-}
-
-// Extracted batched-stroke helper used by both line mode and the
-// outline-guide / hatch-line paths in fill mode. One beginPath/stroke
-// per call — see the comment block on drawObjectPaths for why.
-function strokePolylinesBatched(
-  ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
-  polylines: ReadonlyArray<Polyline>,
-  view: ViewTransform,
-): void {
-  ctx.beginPath();
-  for (const polyline of polylines) {
-    for (let i = 0; i < polyline.points.length; i += 1) {
-      const raw = polyline.points[i];
-      if (raw === undefined) continue;
-      const p = applyTransform(raw, obj.transform);
-      const cx = view.offsetX + p.x * view.scale;
-      const cy = view.offsetY + p.y * view.scale;
-      if (i === 0) ctx.moveTo(cx, cy);
-      else ctx.lineTo(cx, cy);
-    }
-  }
-  ctx.stroke();
+  strokePolylinesBatched(ctx, obj, open, view);
 }
 
 function drawSelectionBox(

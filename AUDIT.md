@@ -20,20 +20,20 @@
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Total source LOC | 12 539 | ✅ small for scope |
-| Total test LOC | 5 572 (~44% of source) | ✅ unusually high — most projects ≤ 30% |
-| Tests passing | **427 / 427** | ✅ |
-| Test files | 49 | ✅ |
+| Total source LOC | 20 721 | ✅ still compact for scope |
+| Total test LOC | 11 030 (~53% of source) | ✅ unusually high — most projects ≤ 30% |
+| Tests passing | **796 / 796** | ✅ |
+| Test files | 101 | ✅ |
 | Production deps | 6 (dompurify, imagetracerjs, opentype.js, react, react-dom, zustand) | ✅ tight |
 | **Production vulns** | **0** (`pnpm audit --prod`) | ✅ |
 | **Dev vulns** | **0** (`pnpm audit`) | ✅ down from 34 pre-F-2 |
 | Files over hard cap (400 LOC) | **0** | ✅ (store.ts at exactly 400) |
-| Files over soft cap (250 LOC) | 11 source + 4 test | ⚠️ documented, monitor |
+| Files over soft cap (250 LOC) | 21 source + 9 test | ⚠️ documented, monitor |
 | ESLint errors | 0 | ✅ |
 | ESLint warnings | 1 (boundaries plugin v6 legacy-selector — non-fatal) | ⚠️ |
 | TypeScript strict | clean (no `any`, no `!`, no `eval`, no `innerHTML=`) | ✅ |
 | `@ts-expect-error` in src | 1 (`trace-image.ts`, imagetracerjs untyped lib) | ✅ justified |
-| Bundle (JS, raw / gzip) | 573 KB / 173 KB | ⚠️ over 500 KB warning; under 1 MB project target |
+| Bundle (JS, raw / gzip) | 659 KB / 205 KB | ⚠️ over 500 KB warning; under 1 MB project target |
 | Bundle (fonts, lazy) | 1.08 MB across 4 .ttf files | ✅ loaded on demand |
 | Web prod deploy | `https://laserforge.pages.dev`, CSP+HSTS+SRI headers ✓ | ✅ |
 | CI status | every `ci.yml` step green; deploy.yml awaits secrets | ✅ |
@@ -264,6 +264,7 @@ better risk/effort allocation at this stage. **Accepted gap, documented.**
 | Phase F.2 Image mode (a-e shipped) | **CLAIMED** | 12 dither tests + 20 emit-raster unit tests + 5 fast-check property tests + 9 draw-raster regression tests + scene-mutations + back-fill; **F.2.f hardware burn pending** — see WORKFLOW.md F-F2 acceptance checklist |
 | F.2 raster perf (skip blank rows + clip active span) | **CLAIMED** | Added post-kickoff per user UX feedback; covered by `emit-raster.test.ts` unit + `emit-raster.property.test.ts` fuzz (100 seeds × 5 invariants). Banner-shaped images should now skip large white bands; needs the same Falcon burn before VERIFIED. |
 | F.2 drawRasterImage transform fix | **CLAIMED** | Selection box and rendered image were drifting at scale != 1; fix in 3b9c4139 rewires the Canvas2D transform chain to mirror `applyTransform` exactly. Regression suite in `src/ui/workspace/draw-raster.test.ts` (9 cases) pins the convention. User-confirmed visually pre-deploy; not yet burned. |
+| Post-trace large-scene responsiveness | **CLAIMED** | Audit in `audit/reports/image-scan-freeze-audit-2026-06-01.md`; bounded display-polyline cache + preview toolpath memoization covered by workspace/trace focused tests. No geometry/G-code simplification. |
 | F.2.e UI card layout | **CLAIMED** | Cuts/Layers redesigned from horizontal 7-col table → vertical card-per-layer (93277657). Visually confirmed on the live site; no automated component-level tests (A7 accepted gap). |
 | Frame feed decoupling | VERIFIED | User confirmed Frame works at speed after the change |
 | Build badge | VERIFIED | Visible in DOM; defines confirmed inline in dist/web/assets/index-*.js |

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "LF2-SO-H1",
+    "title": "Set Origin does not anchor imported or traced job bounds to the user-set origin",
+    "severity": "high",
+    "confidence": "high",
+    "status": "fixed",
+    "files": [
+      "src/core/controllers/grbl/commands.ts",
+      "src/ui/state/origin-actions.ts",
+      "src/ui/common/image-import.ts",
+      "src/ui/state/scene-mutations.ts",
+      "src/core/scene/fit-to-bed.ts",
+      "src/core/job/compile-job.ts",
+      "src/core/output/grbl-strategy.ts",
+      "src/ui/laser/JobControls.tsx",
+      "src/ui/state/laser-store.ts"
+    ],
+    "component": "Origin controls, import placement, job compilation, frame/start output",
+    "trigger_path": "Import an image or trace an imported image, leave it at its auto-centered bed placement, jog the head to a workpiece corner, press Set origin here, then press Frame or Start.",
+    "failure_mode": "LaserForge sends G92 X0 Y0, but still compiles and frames the job at the object's absolute canvas/bed coordinates. For a centered 50 mm by 30 mm import on a 400 mm by 400 mm bed, the emitted work-coordinate bounds are around X175..225 and Y185..215 instead of X0..50 and Y0..30 relative to the user-set origin.",
+    "consequence": "The frame/burn is offset from the physical point the operator selected. The job can miss the material, appear to use the canvas origin rather than the imported image origin, and can move unexpectedly far from the current head position.",
+    "concrete_fix": "Implemented a first-stage fix: active custom-origin sessions now translate compiled job geometry so the front-left job bounds anchor is at work-coordinate 0,0, and Start/Frame consume that adjusted geometry. Full explicit LightBurn Start From and 9-dot Job Origin UI remains future work."
+  },
+  {
+    "id": "LF2-SO-M1",
+    "title": "Frame and preflight are not origin-aware when a G92 work offset is active",
+    "severity": "medium",
+    "confidence": "high",
+    "status": "partially-fixed",
+    "files": [
+      "src/ui/laser/JobControls.tsx",
+      "src/core/job/frame-preflight.ts",
+      "src/ui/state/laser-store.ts",
+      "DECISIONS.md",
+      "WORKFLOW.md"
+    ],
+    "component": "Frame preflight and framing jog output",
+    "trigger_path": "Set a custom origin near a machine edge, then frame or start a job whose compiled scene bounds fit within the nominal bed.",
+    "failure_mode": "framePreflight checks only compiled job bounds against device bed size. It does not include the active WCO/G92 offset, while frame jogs are sent in work coordinates with $J=G90.",
+    "consequence": "A job can pass the app's bounds check while the physical machine path is shifted by the active work offset. The documented mitigation that Frame reveals post-WCS risk is incomplete unless the frame/preflight path is computed from the same physical path the controller will execute.",
+    "concrete_fix": "Implemented known-WCO physical checks for Start/Frame by testing adjusted job bounds plus WCO. Remaining gap: if no current controller position/WCO is known, LaserForge can origin-adjust output but cannot prove physical machine extents."
+  }
+]

@@ -6,7 +6,7 @@
 //   * sandbox: true
 //   * webSecurity: true
 //   * setPermissionRequestHandler returns false except for `serial` (Phase B)
-//   * CSP set via session.webRequest.onHeadersReceived (not meta tag —
+//   * CSP set via session.webRequest.onHeadersReceived (not meta tag -
 //     per Electron docs, meta CSP is unreliable on file:// origin and
 //     can't gate things like form-action / frame-ancestors)
 //   * Renderer runs on the custom `app://` scheme via protocol.handle()
@@ -18,19 +18,55 @@
 //
 // Renderer source:
 //   * If env LASERFORGE_DEV_URL is set (e.g. http://localhost:5173), load that
-//     URL — Vite dev server with HMR. CSP is loosened in that mode for HMR.
+//     URL - Vite dev server with HMR. CSP is loosened in that mode for HMR.
 //   * Otherwise load app://app/index.html which the protocol handler maps
 //     to dist/web/index.html. This is what `pnpm dev:desktop` and the
 //     packaged build both do.
 
-import { app, BrowserWindow, net, protocol, session } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  net,
+  protocol,
+  session,
+  type Event as ElectronEvent,
+  type Session,
+  type WebContents,
+} from 'electron';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  serialPortDialogButtons,
+  serialPortIdForDialogResponse,
+  serialPortLabel,
+  type ElectronSerialPortSummary,
+} from './serial-port-choice.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DEV_URL = process.env['LASERFORGE_DEV_URL'];
+const CSP_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+type ElectronSerialPort = ElectronSerialPortSummary & {
+  readonly vendorId?: string;
+  readonly productId?: string;
+  readonly serialNumber?: string;
+  readonly usbDriverName?: string;
+  readonly deviceInstanceId?: string;
+};
 
 // Custom-scheme registration MUST happen before app.whenReady(). Per the
 // Electron security checklist, declaring `standard: true` + `secure: true`
@@ -68,8 +104,8 @@ function makeAppProtocolHandler(distRoot: string) {
   };
 }
 
-async function createWindow(): Promise<void> {
-  const window = new BrowserWindow({
+function createMainWindow(): BrowserWindow {
+  return new BrowserWindow({
     width: 1280,
     height: 800,
     show: false,
@@ -83,42 +119,10 @@ async function createWindow(): Promise<void> {
       webSecurity: true,
     },
   });
+}
 
-  // F-9 audit fix: set Content-Security-Policy via webRequest headers
-  // rather than a <meta> tag. Per Electron docs, meta CSP is unreliable
-  // on file:// origin and can't gate form-action / frame-ancestors.
-  //
-  // Policy rationale (each directive):
-  //   default-src 'self'           — same-origin baseline; reject everything else.
-  //   script-src 'self'            — bundled Vite scripts only; no inline JS, no eval.
-  //   style-src 'self' 'unsafe-inline'
-  //                                — React's `style={{ ... }}` prop emits inline styles
-  //                                  on every element. 'unsafe-inline' is required.
-  //                                  No third-party stylesheets are allowed.
-  //   img-src 'self' data: blob:   — Vite-bundled images + blob URLs for
-  //                                  image-loader.ts (raster image picker
-  //                                  creates blobs from File objects).
-  //   font-src 'self' data:        — Vite-bundled .ttf files via ?url import.
-  //   connect-src 'self'           — same-origin fetch only (font assets); no
-  //                                  outbound HTTP. Reinforces PROJECT.md
-  //                                  "External services: None."
-  //   object-src 'none'            — block <embed>/<object>/<applet> entirely.
-  //   base-uri 'self'              — pin <base> tag to same-origin.
-  //   form-action 'none'           — no form submissions anywhere.
-  //   frame-ancestors 'none'       — refuse to be embedded.
-  const CSP_POLICY = [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self' data:",
-    "connect-src 'self'",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'none'",
-    "frame-ancestors 'none'",
-  ].join('; ');
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+function installContentSecurityPolicy(ses: Session): void {
+  ses.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
@@ -126,39 +130,72 @@ async function createWindow(): Promise<void> {
       },
     });
   });
+}
 
-  // Permission gate: deny everything by default, allow only what the app
-  // actually uses.
-  //
-  // WebSerial (Phase B) needs four cooperating hooks; missing any of them
-  // and the renderer's `navigator.serial.requestPort()` either errors
-  // silently or never shows a picker:
-  //   1) setPermissionCheckHandler   — accept 'serial' so the API isn't
-  //      gated out before requestPort even fires.
-  //   2) setDevicePermissionHandler  — approve serial-device grants per-device.
-  //   3) select-serial-port event    — pick which port to return.
-  //   4) setPermissionRequestHandler — accept 'serial' explicitly.
-  //
-  // File System Access (Phase A: SVG import, .lf2 save/open) is gated
-  // on Electron 33+ via these same handlers. Chromium uses several
-  // permission names for the API's sub-operations:
-  //   'fileSystem'              — read via showOpenFilePicker → getFile
-  //   'fileSystem-write'        — write via handle.createWritable
-  //   'fileSystem-read-write'   — combined read/write request
-  //   (future variants)         — Chrome ships new names occasionally
-  // Allowing anything starting with 'fileSystem' covers all of them
-  // and stays safe: all File System Access entry points require a
-  // user gesture, so drive-by content can't trigger pickers.
-  //
-  // Electron 32 didn't route FileSystemFileHandle.getFile() through
-  // these hooks at all; Electron 33+ does. F-2's bump to 42 surfaced
-  // the gap.
-  const isAllowedPermission = (permission: string): boolean =>
-    permission === 'serial' || permission.startsWith('fileSystem');
-  const ses = session.defaultSession;
-  // setPermissionCheckHandler's permission type isn't exposed in Electron's
-  // public type union (it's a wider string set than RequestHandler). The
-  // (permission: string) cast below is verified against Electron docs.
+function isAllowedPermission(permission: string): boolean {
+  return permission === 'serial' || permission.startsWith('fileSystem');
+}
+
+async function chooseSerialPortId(
+  webContents: WebContents,
+  portList: ReadonlyArray<ElectronSerialPort>,
+): Promise<string> {
+  if (portList.length === 0) {
+    console.log('[serial] No ports - is the laser plugged in and powered on?');
+    return '';
+  }
+  const buttons = serialPortDialogButtons(portList);
+  const owner = BrowserWindow.fromWebContents(webContents) ?? undefined;
+  const options = {
+    type: 'question' as const,
+    buttons: [...buttons],
+    cancelId: buttons.length - 1,
+    defaultId: 0,
+    noLink: true,
+    message: 'Select laser serial port',
+    detail: portList.map((port, i) => `${i + 1}. ${serialPortLabel(port)}`).join('\n'),
+  };
+  const result =
+    owner === undefined
+      ? await dialog.showMessageBox(options)
+      : await dialog.showMessageBox(owner, options);
+  return serialPortIdForDialogResponse(portList, result.response);
+}
+
+function logSerialPorts(portList: ReadonlyArray<ElectronSerialPort>): void {
+  console.log(
+    `[serial] select-serial-port fired; ${portList.length} port(s) visible to OS:`,
+    portList.map((p) => ({
+      portId: p.portId,
+      portName: p.portName,
+      vendorId: p.vendorId,
+      productId: p.productId,
+    })),
+  );
+}
+
+function handleSelectSerialPort(
+  event: ElectronEvent,
+  portList: ReadonlyArray<ElectronSerialPort>,
+  webContents: WebContents,
+  callback: (portId: string) => void,
+): void {
+  event.preventDefault();
+  logSerialPorts(portList);
+  void chooseSerialPortId(webContents, portList)
+    .then((chosen) => {
+      console.log(
+        chosen === '' ? '[serial] Port selection cancelled.' : `[serial] Selected port: ${chosen}`,
+      );
+      callback(chosen);
+    })
+    .catch((err: unknown) => {
+      console.error('Serial port picker failed:', err);
+      callback('');
+    });
+}
+
+function installPermissionHandlers(ses: Session): void {
   ses.setPermissionCheckHandler((_wc, permission) => {
     return isAllowedPermission(permission as string);
   });
@@ -168,75 +205,96 @@ async function createWindow(): Promise<void> {
   ses.setPermissionRequestHandler((_wc, permission, cb) => {
     cb(isAllowedPermission(permission as string));
   });
-  // The `select-serial-port` event fires when the renderer calls
-  // navigator.serial.requestPort(). The callback closes the loop with the
-  // chosen port id (or '' to cancel). PortList contains every USB-serial
-  // device currently visible to the OS.
-  // The `select-serial-port` event signature isn't in @types/electron's
-  // narrow event union, so we describe it locally and use `as never` at the
-  // attach site to widen `ses.on`'s type to our shape.
-  type ElectronSerialPort = {
-    readonly portId: string;
-    readonly portName: string;
-    readonly displayName?: string;
-    readonly vendorId?: string;
-    readonly productId?: string;
-    readonly serialNumber?: string;
-    readonly usbDriverName?: string;
-    readonly deviceInstanceId?: string;
-  };
   const onSelectSerialPort = (
-    event: Electron.Event,
+    event: ElectronEvent,
     portList: ReadonlyArray<ElectronSerialPort>,
-    _webContents: Electron.WebContents,
+    webContents: WebContents,
     callback: (portId: string) => void,
   ): void => {
-    event.preventDefault();
-    console.log(
-      `[serial] select-serial-port fired; ${portList.length} port(s) visible to OS:`,
-      portList.map((p) => ({
-        portId: p.portId,
-        portName: p.portName,
-        vendorId: p.vendorId,
-        productId: p.productId,
-      })),
-    );
-    if (portList.length === 0) {
-      console.log('[serial] No ports — is the laser plugged in and powered on?');
-      callback('');
-      return;
-    }
-    // Phase B initial: auto-pick the first port. Phase B polish replaces
-    // this with a custom IPC-driven picker that surfaces portList to the
-    // renderer's Laser panel and lets the user choose.
-    const chosen = portList[0]?.portId ?? '';
-    console.log(`[serial] Auto-picking port: ${chosen}`);
-    callback(chosen);
+    handleSelectSerialPort(event, portList, webContents, callback);
   };
   (ses.on as unknown as (e: 'select-serial-port', l: typeof onSelectSerialPort) => void)(
     'select-serial-port',
     onSelectSerialPort,
   );
+}
 
+async function loadRenderer(window: BrowserWindow): Promise<void> {
   if (DEV_URL !== undefined && DEV_URL.length > 0) {
     await window.loadURL(DEV_URL);
   } else {
-    // A4 fix: load through the custom app:// scheme registered in
-    // whenReady() below rather than file://. Both work; app:// gives
-    // the renderer a predictable HTTPS-like origin that CSP and the
-    // standard browser origin policies behave consistently against.
     await window.loadURL('app://app/index.html');
   }
+}
+
+function installDevTools(window: BrowserWindow): void {
+  if (app.isPackaged) return;
+  window.webContents.on('console-message', (_event, level, message, line, source) => {
+    console.log(`[renderer ${level}] ${source}:${line}  ${message}`);
+  });
+  window.webContents.openDevTools({ mode: 'detach' });
+}
+
+async function createWindow(): Promise<void> {
+  const window = createMainWindow();
+
+  // F-9 audit fix: set Content-Security-Policy via webRequest headers
+  // rather than a <meta> tag. Per Electron docs, meta CSP is unreliable
+  // on file:// origin and can't gate form-action / frame-ancestors.
+  //
+  // Policy rationale (each directive):
+  //   default-src 'self'           - same-origin baseline; reject everything else.
+  //   script-src 'self'            - bundled Vite scripts only; no inline JS, no eval.
+  //   style-src 'self' 'unsafe-inline'
+  //                                - React's `style={{ ... }}` prop emits inline styles
+  //                                  on every element. 'unsafe-inline' is required.
+  //                                  No third-party stylesheets are allowed.
+  //   img-src 'self' data: blob:   - Vite-bundled images + blob URLs for
+  //                                  image-loader.ts (raster image picker
+  //                                  creates blobs from File objects).
+  //   font-src 'self' data:        - Vite-bundled .ttf files via ?url import.
+  //   connect-src 'self'           - same-origin fetch only (font assets); no
+  //                                  outbound HTTP. Reinforces PROJECT.md
+  //                                  "External services: None."
+  //   object-src 'none'            - block <embed>/<object>/<applet> entirely.
+  //   base-uri 'self'              - pin <base> tag to same-origin.
+  //   form-action 'none'           - no form submissions anywhere.
+  //   frame-ancestors 'none'       - refuse to be embedded.
+  installContentSecurityPolicy(session.defaultSession);
+
+  // Permission gate: deny everything by default, allow only what the app
+  // actually uses.
+  //
+  // WebSerial (Phase B) needs four cooperating hooks; missing any of them
+  // and the renderer's `navigator.serial.requestPort()` either errors
+  // silently or never shows a picker:
+  //   1) setPermissionCheckHandler   - accept 'serial' so the API isn't
+  //      gated out before requestPort even fires.
+  //   2) setDevicePermissionHandler  - approve serial-device grants per-device.
+  //   3) select-serial-port event    - pick which port to return.
+  //   4) setPermissionRequestHandler - accept 'serial' explicitly.
+  //
+  // File System Access (Phase A: SVG import, .lf2 save/open) is gated
+  // on Electron 33+ via these same handlers. Chromium uses several
+  // permission names for the API's sub-operations:
+  //   'fileSystem'              - read via showOpenFilePicker -> getFile
+  //   'fileSystem-write'        - write via handle.createWritable
+  //   'fileSystem-read-write'   - combined read/write request
+  //   (future variants)         - Chrome ships new names occasionally
+  // Allowing anything starting with 'fileSystem' covers all of them
+  // and stays safe: all File System Access entry points require a
+  // user gesture, so drive-by content can't trigger pickers.
+  //
+  // Electron 32 didn't route FileSystemFileHandle.getFile() through
+  // these hooks at all; Electron 33+ does. F-2's bump to 42 surfaced
+  // the gap.
+  installPermissionHandlers(session.defaultSession);
+  await loadRenderer(window);
 
   // Surface renderer console output to the main process stdout so dev runs
   // can see errors without having to open DevTools manually. Removed in the
   // packaged build via the app.isPackaged guard.
-  if (!app.isPackaged) {
-    window.webContents.on('console-message', (_event, level, message, line, source) => {
-      console.log(`[renderer ${level}] ${source}:${line}  ${message}`);
-    });
-    window.webContents.openDevTools({ mode: 'detach' });
-  }
+  installDevTools(window);
 
   window.once('ready-to-show', () => window.show());
 }

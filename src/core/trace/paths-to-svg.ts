@@ -45,13 +45,36 @@ function svgOpen(width: number, height: number): string {
 }
 
 function coloredPathToSvgPath(path: ColoredPath): string {
-  const d = path.polylines.map(polylineToSubPath).join(' ');
+  const closed = path.polylines.filter((pl) => pl.closed);
+  const open = path.polylines.filter((pl) => !pl.closed);
+  const filled = closedPolylinesToSvgPath(path.color, closed);
+  const stroked = openPolylinesToSvgPath(path.color, open);
+  return `${filled}${stroked}`;
+}
+
+function closedPolylinesToSvgPath(
+  color: string,
+  polylines: ReadonlyArray<ColoredPath['polylines'][number]>,
+): string {
+  const d = polylines.map(polylineToSubPath).join(' ');
   if (d === '') return '';
   // Fill the path with the layer colour, no stroke — matches the
   // engrave intent (we're filling the silhouette, not outlining it).
   // fill-rule="evenodd" honours hole topology when an outer contour
   // and its hole live in the same ColoredPath.
-  return `<path d="${d}" fill="${path.color}" fill-rule="evenodd" stroke="none"/>`;
+  return `<path d="${d}" fill="${color}" fill-rule="evenodd" stroke="none"/>`;
+}
+
+function openPolylinesToSvgPath(
+  color: string,
+  polylines: ReadonlyArray<ColoredPath['polylines'][number]>,
+): string {
+  const d = polylines.map(polylineToSubPath).join(' ');
+  if (d === '') return '';
+  return (
+    `<path d="${d}" fill="none" stroke="${color}" stroke-width="1"` +
+    ' stroke-linecap="round" stroke-linejoin="round"/>'
+  );
 }
 
 function polylineToSubPath(polyline: ColoredPath['polylines'][number]): string {

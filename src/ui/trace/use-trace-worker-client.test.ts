@@ -12,7 +12,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RawImageData } from '../../core/trace';
-import { traceImage } from './use-trace-worker-client';
+import { canTraceInline, traceImage } from './use-trace-worker-client';
 
 // Build a tiny synthetic image — single black pixel surrounded by
 // white. Just enough that imagetracerjs has *something* to trace,
@@ -37,6 +37,11 @@ function tinyImage(): RawImageData {
 }
 
 describe('traceImage (worker client with inline fallback)', () => {
+  it('allows inline fallback only for bounded images', () => {
+    expect(canTraceInline({ width: 400, height: 400 })).toBe(true);
+    expect(canTraceInline({ width: 401, height: 400 })).toBe(false);
+  });
+
   it('returns paths + bounds when Worker is unavailable', async () => {
     const result = await traceImage(tinyImage(), {
       numberOfColors: 2,

@@ -13,6 +13,7 @@ import {
 const FALCON_DUMP = [
   '$11=0.010',
   '$30=1000',
+  '$31=0',
   '$32=1',
   '$110=10000.000',
   '$111=10000.000',
@@ -27,6 +28,8 @@ describe('settingsMapToProfilePatch', () => {
     const map = new Map<number, string>([
       [11, '0.010'],
       [30, '1000'],
+      [31, '0'],
+      [32, '1'],
       [110, '10000.000'],
       [111, '10000.000'],
       [120, '2500.000'],
@@ -37,6 +40,7 @@ describe('settingsMapToProfilePatch', () => {
     const patch = settingsMapToProfilePatch(map);
     expect(patch.junctionDeviationMm).toBe(0.01);
     expect(patch.maxPowerS).toBe(1000);
+    expect(patch).toMatchObject({ minPowerS: 0, laserModeEnabled: true });
     expect(patch.maxFeed).toBe(10000);
     expect(patch.accelMmPerSec2).toBe(2500);
     expect(patch.bedWidth).toBe(400);
@@ -73,10 +77,16 @@ describe('settingsMapToProfilePatch', () => {
       settingsMapToProfilePatch(
         new Map([
           [22, '1'],
-          [32, '1'],
+          [33, '1'],
         ]),
       ),
     ).toEqual({});
+  });
+
+  it('maps disabled laser mode so Start can block unsafe M4 assumptions', () => {
+    expect(settingsMapToProfilePatch(new Map([[32, '0']]))).toEqual({
+      laserModeEnabled: false,
+    });
   });
 
   it('rejects non-numeric or non-positive values rather than poisoning the profile', () => {

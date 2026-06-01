@@ -22,6 +22,8 @@ export type DeviceProfile = {
   readonly bedHeight: number; // mm
   readonly maxFeed: number; // mm/min
   readonly maxPowerS: number; // GRBL $30 value (e.g. 1000)
+  readonly minPowerS: number; // GRBL $31 value; normally 0 for diode lasers
+  readonly laserModeEnabled: boolean; // GRBL $32; true means laser mode is enabled
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. Capped at maxFeed at
@@ -75,6 +77,8 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   bedHeight: 400,
   maxFeed: 6000,
   maxPowerS: 1000,
+  minPowerS: 0,
+  laserModeEnabled: true,
   origin: 'front-left',
   homing: { enabled: false, direction: 'front-left' },
   autofocusCommand: DEFAULT_AUTOFOCUS_COMMAND,

@@ -56,17 +56,13 @@ describe('rasterPreviewRgba', () => {
 
   it('is monotonic: higher S never renders lighter than lower S', () => {
     fc.assert(
-      fc.property(
-        fc.integer({ min: 0, max: SMAX }),
-        fc.integer({ min: 0, max: SMAX }),
-        (a, b) => {
-          const lo = Math.min(a, b);
-          const hi = Math.max(a, b);
-          const out = rasterPreviewRgba(new Uint16Array([lo, hi]), SMAX, 2, 1);
-          // More power (hi) ⇒ darker ⇒ gray no greater than the lo pixel.
-          return grayAt(out, 1) <= grayAt(out, 0);
-        },
-      ),
+      fc.property(fc.integer({ min: 0, max: SMAX }), fc.integer({ min: 0, max: SMAX }), (a, b) => {
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        const out = rasterPreviewRgba(new Uint16Array([lo, hi]), SMAX, 2, 1);
+        // More power (hi) ⇒ darker ⇒ gray no greater than the lo pixel.
+        return grayAt(out, 1) <= grayAt(out, 0);
+      }),
       { numRuns: FUZZ_RUNS },
     );
   });

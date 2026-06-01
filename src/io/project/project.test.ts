@@ -151,6 +151,7 @@ describe('deserializeProject', () => {
       const layer = r.project.scene.layers[0];
       expect(layer?.hatchAngleDeg).toBe(0);
       expect(layer?.hatchSpacingMm).toBe(0.2);
+      expect(layer?.fillOverscanMm).toBe(5);
     }
   });
 

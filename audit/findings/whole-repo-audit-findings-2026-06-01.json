@@ -1,0 +1,105 @@
+[
+  {
+    "id": "LF-AUDIT-001",
+    "severity": "high",
+    "category": "laser-safety-state",
+    "files": [
+      "src/ui/state/laser-store.ts:165",
+      "src/ui/state/laser-store.ts:325",
+      "src/ui/state/laser-store.ts:331",
+      "src/ui/state/laser-store.ts:356",
+      "src/ui/state/laser-line-handler.ts:163"
+    ],
+    "component": "Laser serial write path and job controls",
+    "trigger_path": "Connected controller -> serial write rejects or port becomes unwritable -> Start/Pause/Resume/Stop/stream advance/Set Origin uses safeWrite",
+    "failure_mode": "safeWrite catches write errors, logs to console, and resolves. Callers advance UI/job state as if the command was delivered.",
+    "consequence": "Operator can see Pause/Stop/Start/Origin success while the controller did not receive the safety or job command. This is especially risky for Pause/Stop because the UI can move away from the actual machine state.",
+    "confidence": "high",
+    "concrete_fix": "Change safeWrite to return a Result or throw. For safety commands, surface delivery failure in the UI and keep state in an explicit failed-command state. Do not mark a job streaming until the first chunk write succeeds. Add tests with a SerialConnection.write mock that rejects for start, pause, resume, stop, and origin actions."
+  },
+  {
+    "id": "LF-AUDIT-002",
+    "severity": "high",
+    "category": "start-gate",
+    "files": [
+      "src/ui/laser/LaserWindow.tsx:27",
+      "src/ui/laser/LaserWindow.tsx:30",
+      "src/ui/laser/LaserWindow.tsx:63",
+      "src/ui/laser/JobControls.tsx:141",
+      "src/ui/laser/JobControls.tsx:142",
+      "src/ui/laser/start-job-readiness.ts:18"
+    ],
+    "component": "Start job readiness",
+    "trigger_path": "Controller connected but statusReport is null, Run, Hold, Jog, Home, or Alarm -> user presses Start job",
+    "failure_mode": "Start is enabled for any connected controller and prepareStartJob checks project preflight/controller settings, but not live machine state.",
+    "consequence": "Commands may be sent to a non-idle or locked controller. GRBL may reject them, while the app can still enter a streaming state through the write path. The operator receives a weak recovery surface.",
+    "confidence": "high",
+    "concrete_fix": "Add machine-readiness gating that blocks Start unless the latest status report is Idle, no alarm is active, no jog/home/focus/hold/run state is active, and no streamer is already active. Thread the blocker messages through prepareStartJob and cover Alarm, Run, Hold, Jog/Home, and unknown-status tests."
+  },
+  {
+    "id": "LF-AUDIT-003",
+    "severity": "high",
+    "category": "desktop-serial-permission",
+    "files": [
+      "electron/main.ts:165",
+      "electron/main.ts:196",
+      "electron/main.ts:212",
+      "electron/main.ts:213"
+    ],
+    "component": "Electron select-serial-port handler",
+    "trigger_path": "Desktop build -> multiple serial devices attached -> user connects",
+    "failure_mode": "Electron grants serial device permission and auto-picks portList[0] instead of forcing explicit user selection.",
+    "consequence": "The app can connect to the wrong serial device. In a laser/CNC environment, sending jog, homing, frame, or job commands to the wrong controller is a safety and trust failure.",
+    "confidence": "high",
+    "concrete_fix": "Replace auto-pick with a renderer-visible port chooser. If multiple ports exist and no explicit selection has been made, cancel the request and show a blocking message. Persist only user-confirmed choices."
+  },
+  {
+    "id": "LF-AUDIT-004",
+    "severity": "medium",
+    "category": "ci-coverage",
+    "files": [
+      "eslint.config.mjs:75",
+      ".github/workflows/ci.yml:48",
+      ".github/workflows/ci.yml:61",
+      "package.json:28",
+      "package.json:30"
+    ],
+    "component": "Desktop/Electron CI coverage",
+    "trigger_path": "Change electron/main.ts or Electron config -> open PR",
+    "failure_mode": "Root ESLint ignores electron/**, CI runs lint/typecheck/build for the web app, and CI does not run build:electron-main or build:desktop.",
+    "consequence": "Main-process regressions can merge while web CI stays green. This undermines the project's stated web plus Windows desktop target.",
+    "confidence": "high",
+    "concrete_fix": "Add an Electron lint config using electron/tsconfig.json, run it in CI, and add `pnpm build:electron-main` to the main CI lane. Consider running full `build:desktop` in release or nightly CI if packaging time is too high for every PR."
+  },
+  {
+    "id": "LF-AUDIT-005",
+    "severity": "medium",
+    "category": "ci-hygiene",
+    "files": [
+      "src/core/controllers/grbl/parse-settings.ts:77",
+      "src/core/trace/centerline-distance.ts:36",
+      "src/core/trace/potrace-bitmap.ts:51",
+      "src/core/trace/potrace-curve.ts:216",
+      "src/core/trace/potrace-polygon.ts:140",
+      "src/ui/laser/DeviceSettings.tsx:129"
+    ],
+    "component": "Lint and formatting gates",
+    "trigger_path": "Run CI-equivalent lint/format checks on the current worktree",
+    "failure_mode": "`npm.cmd run lint` fails with 27 errors and `npm.cmd run format:check` reports 207 files needing formatting.",
+    "consequence": "The branch cannot pass the documented CI gates. More importantly, the failing complexity/max-lines/non-null rules are exactly the repo's guardrails against fragile generated algorithms.",
+    "confidence": "high",
+    "concrete_fix": "Do not blanket-disable rules. Split the Potrace/centerline helpers into smaller pure functions, remove non-null assertions with explicit guards, split DeviceSettings.BasicRows, then run Prettier once as a separate mechanical commit."
+  },
+  {
+    "id": "LF-AUDIT-006",
+    "severity": "low",
+    "category": "documentation-drift",
+    "files": ["README.md:47", "AUDIT.md:25", "AUDIT.md:26", "AUDIT.md:39"],
+    "component": "Audit/readme status claims",
+    "trigger_path": "Maintainer reads repo status after current trace/power work",
+    "failure_mode": "README and AUDIT.md still report older test counts and CI-green status while current verification shows 99 files/784 tests, lint red, and format red.",
+    "consequence": "The repo's public status documents are no longer reliable enough to guide release decisions.",
+    "confidence": "high",
+    "concrete_fix": "After fixes are chosen, refresh README/AUDIT metrics from actual command output and explicitly distinguish clean-main status from current dirty-worktree audit status."
+  }
+]

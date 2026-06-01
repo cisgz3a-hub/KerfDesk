@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import type { Vec2 } from '../scene';
 import { estimateJobDuration, formatDuration } from './estimate-duration';
-import type { CutGroup, CutSegment, Job } from './job';
+import type { CutGroup, CutSegment, FillGroup, Job } from './job';
 
 // Pin accel + junctionDeviation explicitly. The shipping defaults are
 // 500 / 0.01; this suite was written against accel=1000 so we'd get
@@ -33,6 +33,19 @@ function group(opts: {
     speed: opts.speed ?? 1000, // mm/min
     passes: opts.passes ?? 1,
     segments: opts.segments ?? [],
+  };
+}
+
+function fillGroup(overscanMm: number): FillGroup {
+  return {
+    kind: 'fill',
+    layerId: 'fill',
+    color: '#000',
+    power: 50,
+    speed: 1000,
+    passes: 1,
+    overscanMm,
+    segments: [seg([10, 0], [20, 0])],
   };
 }
 
@@ -106,6 +119,14 @@ describe('estimateJobDuration', () => {
     };
     const r = estimateJobDuration(j, fastDevice);
     expect(r.breakdown.cutSeconds).toBeCloseTo(1.1, 2);
+  });
+
+  it('includes fill overscan runway time in the travel estimate', () => {
+    const zero = estimateJobDuration({ groups: [fillGroup(0)] }, device);
+    const overscan = estimateJobDuration({ groups: [fillGroup(5)] }, device);
+    expect(overscan.breakdown.cutSeconds).toBeCloseTo(zero.breakdown.cutSeconds, 6);
+    expect(overscan.breakdown.travelSeconds).toBeGreaterThan(zero.breakdown.travelSeconds);
+    expect(overscan.totalSeconds).toBeGreaterThan(zero.totalSeconds);
   });
 
   it('handles a layer whose speed is 0 or negative by treating it as 1 mm/min (minimum) — never NaN/Inf', () => {

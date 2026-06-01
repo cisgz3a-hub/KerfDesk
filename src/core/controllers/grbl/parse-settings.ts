@@ -7,6 +7,8 @@
 // The map of GRBL setting numbers we look at:
 //   $11   Junction deviation (mm)              → junctionDeviationMm
 //   $30   Max spindle/laser RPM (S-value top)  → maxPowerS
+//   $31   Min spindle/laser RPM (S-value floor)→ minPowerS
+//   $32   Laser mode enabled (0/1)             → laserModeEnabled
 //   $110  Max rate X (mm/min)                  ┐
 //   $111  Max rate Y (mm/min)                  ├ taken as max of XY → maxFeed
 //   $120  Acceleration X (mm/sec²)             ┐
@@ -81,11 +83,10 @@ export function settingsMapToProfilePatch(
   // is a compile error — so we accumulate field objects and merge.
   const fields: Array<Partial<DeviceProfile>> = [];
 
-  const jd = parseFiniteNumber(map.get(11));
-  if (jd !== null && jd > 0) fields.push({ junctionDeviationMm: jd });
-
-  const maxS = parseFiniteNumber(map.get(30));
-  if (maxS !== null && maxS > 0) fields.push({ maxPowerS: maxS });
+  pushPositiveSetting(fields, map, 11, (value) => ({ junctionDeviationMm: value }));
+  pushPositiveSetting(fields, map, 30, (value) => ({ maxPowerS: value }));
+  pushNonNegativeSetting(fields, map, 31, (value) => ({ minPowerS: value }));
+  pushLaserModeSetting(fields, map);
 
   const rateX = parseFiniteNumber(map.get(110));
   const rateY = parseFiniteNumber(map.get(111));
@@ -97,12 +98,40 @@ export function settingsMapToProfilePatch(
   const minAccel = pickLesserPositive(accelX, accelY);
   if (minAccel !== null) fields.push({ accelMmPerSec2: minAccel });
 
-  const travelX = parseFiniteNumber(map.get(130));
-  if (travelX !== null && travelX > 0) fields.push({ bedWidth: travelX });
-  const travelY = parseFiniteNumber(map.get(131));
-  if (travelY !== null && travelY > 0) fields.push({ bedHeight: travelY });
+  pushPositiveSetting(fields, map, 130, (value) => ({ bedWidth: value }));
+  pushPositiveSetting(fields, map, 131, (value) => ({ bedHeight: value }));
 
   return Object.assign({}, ...fields) as Partial<DeviceProfile>;
+}
+
+function pushPositiveSetting(
+  fields: Array<Partial<DeviceProfile>>,
+  map: ReadonlyMap<number, string>,
+  id: number,
+  build: (value: number) => Partial<DeviceProfile>,
+): void {
+  const value = parseFiniteNumber(map.get(id));
+  if (value !== null && value > 0) fields.push(build(value));
+}
+
+function pushNonNegativeSetting(
+  fields: Array<Partial<DeviceProfile>>,
+  map: ReadonlyMap<number, string>,
+  id: number,
+  build: (value: number) => Partial<DeviceProfile>,
+): void {
+  const value = parseFiniteNumber(map.get(id));
+  if (value !== null && value >= 0) fields.push(build(value));
+}
+
+function pushLaserModeSetting(
+  fields: Array<Partial<DeviceProfile>>,
+  map: ReadonlyMap<number, string>,
+): void {
+  const laserMode = parseFiniteNumber(map.get(32));
+  if (laserMode === 0 || laserMode === 1) {
+    fields.push({ laserModeEnabled: laserMode === 1 });
+  }
 }
 
 // `$N=value` values arrive as strings like "1000", "0.010", "2500.000".

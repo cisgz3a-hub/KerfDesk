@@ -20,6 +20,7 @@ import {
   type TextObject,
   type TracedImage,
   type Transform,
+  updateLayer,
 } from '../../core/scene';
 
 const HISTORY_DEPTH = 50;
@@ -80,6 +81,37 @@ export function ensureLayersForColors(
     const exists = out.layers.some((l) => l.color === path.color);
     if (!exists) {
       out = addLayer(out, createLayer({ id: path.color, color: path.color }));
+    }
+  }
+  return out;
+}
+
+function ensureFillLayersForColors(
+  scene: Scene,
+  paths: ReadonlyArray<{ readonly color: string }>,
+): Scene {
+  return ensureLayersForMode(scene, paths, 'fill');
+}
+
+function ensureLineLayersForColors(
+  scene: Scene,
+  paths: ReadonlyArray<{ readonly color: string }>,
+): Scene {
+  return ensureLayersForMode(scene, paths, 'line');
+}
+
+function ensureLayersForMode(
+  scene: Scene,
+  paths: ReadonlyArray<{ readonly color: string }>,
+  mode: 'fill' | 'line',
+): Scene {
+  let out = scene;
+  for (const path of paths) {
+    const existing = out.layers.find((l) => l.color === path.color);
+    if (existing === undefined) {
+      out = addLayer(out, createLayer({ id: path.color, color: path.color, mode }));
+    } else if (existing.mode !== mode) {
+      out = updateLayer(out, existing.id, { mode });
     }
   }
   return out;
@@ -268,7 +300,10 @@ export function applyTraceToExisting(
   }
   const positionedTrace: TracedImage = { ...traced, transform };
   scene = addObject(scene, positionedTrace);
-  scene = ensureLayersForColors(scene, positionedTrace.paths);
+  scene =
+    positionedTrace.traceMode === 'centerline'
+      ? ensureLineLayersForColors(scene, positionedTrace.paths)
+      : ensureFillLayersForColors(scene, positionedTrace.paths);
   return {
     project: { ...s.project, scene },
     selectedObjectId: positionedTrace.id,

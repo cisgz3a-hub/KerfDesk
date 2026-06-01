@@ -46,4 +46,36 @@ describe('computeJobBounds', () => {
       maxY: 80,
     });
   });
+
+  it('uses fill burn bounds without including overscan runway', () => {
+    expect(
+      computeJobBounds({
+        groups: [
+          {
+            kind: 'fill',
+            layerId: 'fill',
+            color: '#000000',
+            power: 30,
+            speed: 1500,
+            passes: 1,
+            overscanMm: 5,
+            segments: [
+              {
+                polyline: [
+                  { x: 10, y: 20 },
+                  { x: 100, y: 20 },
+                ],
+                closed: false,
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual({
+      minX: 10,
+      minY: 20,
+      maxX: 100,
+      maxY: 20,
+    });
+  });
 });

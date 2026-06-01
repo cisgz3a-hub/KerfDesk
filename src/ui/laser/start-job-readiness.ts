@@ -1,0 +1,105 @@
+import type { StatusReport } from '../../core/controllers/grbl';
+import {
+  applyJobOrigin,
+  compileJob,
+  computeJobBounds,
+  describeFramePreflightFailure,
+  framePreflight,
+  offsetJobBounds,
+  USER_ORIGIN_JOB_PLACEMENT,
+} from '../../core/job';
+import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import { runControllerReadiness } from '../../core/preflight';
+import type { Project } from '../../core/scene';
+import { emitGcode } from '../../io/gcode';
+import { hasCustomOrigin, type WorkCoordinateOffset } from '../state/origin-actions';
+import { detectJobIntentWarnings } from './job-intent-warnings';
+
+export type StartJobPreparation =
+  | {
+      readonly ok: true;
+      readonly gcode: string;
+      readonly warnings: ReadonlyArray<string>;
+    }
+  | {
+      readonly ok: false;
+      readonly messages: ReadonlyArray<string>;
+    };
+
+export type MachineStartSnapshot = {
+  readonly statusReport: StatusReport | null;
+  readonly alarmCode: number | null;
+  readonly hasActiveStreamer: boolean;
+  readonly workOriginActive?: boolean;
+  readonly wcoCache?: WorkCoordinateOffset | null;
+};
+
+export function prepareStartJob(
+  project: Project,
+  controllerSettings: ControllerSettingsSnapshot | null,
+  machine: MachineStartSnapshot,
+): StartJobPreparation {
+  const machineIssues = findMachineStartIssues(machine);
+  if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
+
+  const useUserOrigin = usesUserOrigin(machine);
+  const { gcode, preflight } = useUserOrigin
+    ? emitGcode(project, { jobOrigin: USER_ORIGIN_JOB_PLACEMENT })
+    : emitGcode(project);
+  if (!preflight.ok) {
+    return { ok: false, messages: preflight.issues.map((i) => i.message) };
+  }
+
+  const originBoundsIssue = findOriginBoundsIssue(project, machine, useUserOrigin);
+  if (originBoundsIssue !== null) {
+    return { ok: false, messages: [originBoundsIssue] };
+  }
+
+  const controller = runControllerReadiness(project, controllerSettings);
+  if (!controller.ok) {
+    return { ok: false, messages: controller.errors.map((i) => i.message) };
+  }
+
+  return {
+    ok: true,
+    gcode,
+    warnings: [...controller.warnings.map((i) => i.message), ...detectJobIntentWarnings(project)],
+  };
+}
+
+function usesUserOrigin(machine: MachineStartSnapshot): boolean {
+  return machine.workOriginActive === true || hasCustomOrigin(machine.wcoCache ?? null);
+}
+
+function findOriginBoundsIssue(
+  project: Project,
+  machine: MachineStartSnapshot,
+  useUserOrigin: boolean,
+): string | null {
+  if (!useUserOrigin || machine.wcoCache === null || machine.wcoCache === undefined) return null;
+  const job = applyJobOrigin(compileJob(project.scene, project.device), USER_ORIGIN_JOB_PLACEMENT);
+  const bounds = computeJobBounds(job);
+  if (bounds === null) return null;
+  const physicalBounds = offsetJobBounds(bounds, machine.wcoCache);
+  const preflight = framePreflight(physicalBounds, project.device);
+  if (preflight.kind === 'ok') return null;
+  return `Custom origin would place this job outside the machine bed. ${describeFramePreflightFailure(preflight)}`;
+}
+
+function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<string> {
+  const issues: string[] = [];
+  if (machine.hasActiveStreamer) {
+    issues.push('A job is already active. Stop or finish it before starting another.');
+  }
+  if (machine.alarmCode !== null) {
+    issues.push('Controller is in alarm state. Clear the alarm before starting.');
+  }
+  if (machine.statusReport === null) {
+    issues.push(
+      'Controller status is not known yet. Wait for an Idle status report before starting.',
+    );
+  } else if (machine.statusReport.state !== 'Idle') {
+    issues.push(`Machine must be Idle before starting (currently ${machine.statusReport.state}).`);
+  }
+  return issues;
+}
