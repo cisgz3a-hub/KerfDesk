@@ -25,6 +25,7 @@ import { TRACE_PRESETS } from '../../core/trace';
 import { traceImageWithFallback } from './use-trace-worker-client';
 
 const LINE_ART = TRACE_PRESETS['Line Art']!;
+const CENTERLINE = TRACE_PRESETS['Centerline']!;
 const DETAILED = TRACE_PRESETS['Detailed']!;
 
 // Build a W×H white image with a filled black square inscribed at the
@@ -57,6 +58,27 @@ function whiteWithBlackSquare(
     }
   }
   return { width, height, data };
+}
+
+function whiteWithBlackRect(
+  width: number,
+  height: number,
+  rectX: number,
+  rectY: number,
+  rectWidth: number,
+  rectHeight: number,
+): RawImageData {
+  const image = whiteWithBlackSquare(width, height, -1, -1, 0);
+  for (let y = rectY; y < rectY + rectHeight; y += 1) {
+    for (let x = rectX; x < rectX + rectWidth; x += 1) {
+      const offset = (y * width + x) * 4;
+      image.data[offset] = 0;
+      image.data[offset + 1] = 0;
+      image.data[offset + 2] = 0;
+      image.data[offset + 3] = 255;
+    }
+  }
+  return image;
 }
 
 function pureWhiteImage(width: number, height: number): RawImageData {
@@ -101,6 +123,18 @@ describe('traceImageWithFallback — end-to-end pipeline', () => {
     // Detailed does adaptive quantisation; at minimum the dark layer
     // should survive (background is dropped by the white-skip rule).
     expect(paths.length).toBeGreaterThan(0);
+  });
+
+  it('traces thick line art as open centerline paths under Centerline preset', async () => {
+    const image = whiteWithBlackRect(24, 12, 4, 4, 16, 3);
+    const { paths, bounds } = await traceImageWithFallback(image, CENTERLINE);
+    const polylines = paths[0]?.polylines ?? [];
+
+    expect(paths).toHaveLength(1);
+    expect(paths[0]?.color).toBe('#000000');
+    expect(polylines.length).toBeGreaterThan(0);
+    expect(polylines.every((pl) => !pl.closed)).toBe(true);
+    expect(bounds.maxY - bounds.minY).toBeLessThanOrEqual(0.5);
   });
 
   it('survives a pure-white image without crashing (returns 0 paths)', async () => {

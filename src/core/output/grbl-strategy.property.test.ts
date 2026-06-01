@@ -136,4 +136,33 @@ describe('grblStrategy property tests', () => {
       for (const s of sValues) expect(s).toBe(expectedS(50, maxPowerS));
     }
   });
+
+  it('keeps fill overscan runway laser-off', async () => {
+    const { grblStrategy } = await import('./grbl-strategy');
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000000',
+          power: 50,
+          speed: 1500,
+          passes: 1,
+          overscanMm: 5,
+          segments: [
+            {
+              polyline: [
+                { x: 10, y: 10 },
+                { x: 20, y: 10 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+    expect(findLaserOnTravelIssues(out)).toEqual([]);
+    expect(out).not.toMatch(/^M[34] S[1-9]/m);
+  });
 });

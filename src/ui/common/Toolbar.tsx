@@ -13,6 +13,7 @@ import { buildBitmapFromVector, isConvertibleVector } from '../raster/vector-to-
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { rasterImportGeometry } from './image-import';
 
 // F-A13 dirty-check. Returns true if it's safe to proceed (project is clean,
 // or the user confirmed discard). Phase A uses the native confirm() —
@@ -234,17 +235,17 @@ function ImportImageButton(): JSX.Element {
   const onPick = (file: File): void => {
     void (async () => {
       try {
-        const { loadImageAsRawData, extractLumaBase64, readFileAsDataUrl } =
+        const { loadImageAsRawData, extractLumaBase64, readFileAsDataUrl, readImageNaturalSize } =
           await import('../trace/image-loader');
+        const natural = await readImageNaturalSize(file);
         const image = await loadImageAsRawData(file);
         const { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM } = await import('../../core/scene');
-        // Use a sensible mm-bounds default: assume 96 DPI from the
-        // image so the imported size is ergonomic for the operator
-        // to scale rather than tiny pixel-multiples.
-        const MM_PER_INCH = 25.4;
-        const ASSUMED_DPI = 96;
-        const widthMm = (image.width / ASSUMED_DPI) * MM_PER_INCH;
-        const heightMm = (image.height / ASSUMED_DPI) * MM_PER_INCH;
+        const geometry = rasterImportGeometry({
+          naturalWidth: natural.width,
+          naturalHeight: natural.height,
+          sampledWidth: image.width,
+          sampledHeight: image.height,
+        });
         const dataUrl = await readFileAsDataUrl(file);
         const lumaBase64 = extractLumaBase64(image);
         importRasterImage({
@@ -252,9 +253,9 @@ function ImportImageButton(): JSX.Element {
           id: crypto.randomUUID(),
           source: file.name,
           dataUrl,
-          pixelWidth: image.width,
-          pixelHeight: image.height,
-          bounds: { minX: 0, minY: 0, maxX: widthMm, maxY: heightMm },
+          pixelWidth: geometry.pixelWidth,
+          pixelHeight: geometry.pixelHeight,
+          bounds: geometry.bounds,
           transform: IDENTITY_TRANSFORM,
           color: DEFAULT_RASTER_LAYER_COLOR,
           dither: 'floyd-steinberg',

@@ -11,12 +11,25 @@
 // adjustments → median → dither/threshold → despeckle).
 
 export type { DitherMode, RawImageData, TraceOptions } from './trace-image';
-export { DEFAULT_TRACE_OPTIONS, TRACE_PRESETS, traceImageToSvgString } from './trace-image';
+export {
+  DEFAULT_TRACE_OPTIONS,
+  TRACE_PRESETS,
+  thresholdBandToMonochrome,
+  traceImageToSvgString,
+} from './trace-image';
+export {
+  DEFAULT_LIGHTBURN_TRACE_SETTINGS,
+  lightBurnTraceSettingsToPotraceParams,
+  type LightBurnTraceSettings,
+  type PotraceParams,
+} from './potrace-params';
 export {
   boundsFromColoredPaths,
   traceImageToColoredPaths,
   tracedataToColoredPaths,
 } from './trace-to-paths';
+export { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
+export { traceImageToCenterlinePaths } from './centerline-trace';
 export { coloredPathsToSvg } from './paths-to-svg';
 // Phase E.2 preprocessing primitives. Exposed so tests + future UI
 // (e.g. an "Advanced" trace dialog showing the auto-computed Otsu

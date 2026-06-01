@@ -28,6 +28,11 @@ export type CutGroup = {
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
+export type FillGroup = Omit<CutGroup, 'kind'> & {
+  readonly kind: 'fill';
+  readonly overscanMm: number;
+};
+
 // F.2 raster group. Carries the pre-dithered S-value buffer plus
 // the placement and feed needed by emit-raster.ts to render G-code.
 // `sValues.length` MUST equal `pixelWidth * pixelHeight`.
@@ -37,6 +42,7 @@ export type RasterGroup = {
   readonly color: string;
   readonly power: number; // 0..100 (percent)
   readonly speed: number; // mm/min; already capped to device.maxFeed
+  readonly passes: number; // integer â‰¥ 1
   // S-values per pixel, already scaled by power %. Row-major.
   readonly sValues: Uint16Array;
   readonly pixelWidth: number;
@@ -52,7 +58,7 @@ export type RasterGroup = {
   readonly overscanMm: number;
 };
 
-export type Group = CutGroup | RasterGroup;
+export type Group = CutGroup | FillGroup | RasterGroup;
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;

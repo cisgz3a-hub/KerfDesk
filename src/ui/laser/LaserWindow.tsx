@@ -1,7 +1,6 @@
 // LaserWindow — Phase B controller panel. Connection, status, jog, job
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
-import { emitGcode } from '../../io/gcode';
 import { describeAlarm } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
@@ -13,10 +12,10 @@ import { LaserLog } from './LaserLog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
+import { prepareStartJob } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
   const platform = usePlatform();
-  const project = useStore((s) => s.project);
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
   const connect = useLaserStore((s) => s.connect);
@@ -26,13 +25,32 @@ export function LaserWindow(): JSX.Element {
 
   const supportsSerial = platform.serial.isSupported();
   const onStartJob = async (): Promise<void> => {
-    const { gcode, preflight } = emitGcode(project);
-    if (!preflight.ok) {
-      const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
+    const project = useStore.getState().project;
+    const laser = useLaserStore.getState();
+    const prepared = prepareStartJob(project, laser.controllerSettings, {
+      statusReport: laser.statusReport,
+      alarmCode: laser.alarmCode,
+      hasActiveStreamer:
+        laser.streamer !== null &&
+        (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
+      workOriginActive: laser.workOriginActive,
+      wcoCache: laser.wcoCache,
+    });
+    if (!prepared.ok) {
+      const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
       window.alert(`Cannot start job:\n\n${lines}`);
       return;
     }
-    await startJob(gcode);
+    if (prepared.warnings.length > 0) {
+      const lines = prepared.warnings.map((message) => `• ${message}`).join('\n');
+      if (!window.confirm(`Controller warning:\n\n${lines}\n\nStart anyway?`)) return;
+    }
+    try {
+      await startJob(prepared.gcode);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.alert(`Could not start job:\n\n${message}`);
+    }
   };
 
   return (

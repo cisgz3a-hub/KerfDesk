@@ -56,6 +56,10 @@ export type RawImageData = {
 };
 
 export type TraceOptions = {
+  // Filled contours preserve source silhouettes for fill engraving.
+  // Centerline traces skeletonize dark strokes into open line paths
+  // for single-pass vector engraving.
+  readonly traceMode?: 'filled-contours' | 'centerline';
   // Number of color quantization buckets. 2 = black-and-white,
   // suitable for most laser engraving. Higher values produce more
   // layers and (usually) more visual fidelity. Range 2-16.
@@ -91,6 +95,9 @@ export type TraceOptions = {
   // anti-aliased edges that otherwise become borderline-classified
   // speckle in the trace output. 0..255 range; undefined = skip
   // pre-threshold and feed raw pixels.
+  // If set, thresholdLuma becomes the upper bound of LightBurn's
+  // inclusive brightness band: cutoffLuma <= luma <= thresholdLuma.
+  readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
   // Phase E.2 quality polish — three pure-core preprocessing
   // stages (see preprocess.ts). Compose in this order:
@@ -113,6 +120,9 @@ export type TraceOptions = {
   // than N pixels gets flipped to white. 0 or undefined disables.
   // Topology-preserving: holes inside letters (O, B, etc.) survive.
   readonly despeckleMinPixels?: number;
+  readonly ignoreLessThanPixels?: number;
+  readonly smoothness?: number;
+  readonly optimize?: number;
   // Phase E.3 — image-level adjustments ported from LF1's
   // ImageProcessing.ts (see raster-prep.ts). All four run BEFORE the
   // existing median → threshold → despeckle chain, so the cleanup
@@ -167,10 +177,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   'Line Art': {
     // For clean black-on-white logos / line drawings. Phase E.2
     // upgrade stack:
-    //   * useOtsuThreshold — picks the cutoff from the image's
-    //     histogram instead of assuming 128. Logos shot under
-    //     uneven light or with a tinted background now binarise
-    //     cleanly without manual tuning.
+    //   * cutoffLuma / thresholdLuma — LightBurn's default trace
+    //     brightness band, inclusive 0..128.
     //   * fixedPalette [white, black] — guarantees a 2-layer output
     //     even if the input has stray non-monochrome pixels.
     //   * despeckleMinPixels 12 — removes connected ink blobs under
@@ -180,6 +188,26 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     //     tracer might still emit at edges.
     numberOfColors: 2,
     pathOmit: 16,
+    lineTolerance: 1,
+    quadraticTolerance: 1,
+    blurRadius: 0,
+    blurDelta: 0,
+    lineFilter: true,
+    fixedPalette: ['#ffffff', '#000000'],
+    cutoffLuma: 0,
+    thresholdLuma: 128,
+    ignoreLessThanPixels: 2,
+    smoothness: 1,
+    optimize: 0.2,
+    despeckleMinPixels: 12,
+  },
+  Centerline: {
+    // For black strokes that should engrave as one path down the
+    // middle instead of filled outline contours. Uses the same
+    // binarisation as Line Art, then skeletonizes the ink mask.
+    traceMode: 'centerline',
+    numberOfColors: 2,
+    pathOmit: 0,
     lineTolerance: 1,
     quadraticTolerance: 1,
     blurRadius: 0,
@@ -320,6 +348,9 @@ function applyThreshold(image: RawImageData, options: TraceOptions): RawImageDat
   if (options.useOtsuThreshold === true) {
     return thresholdToMonochrome(image, otsuThreshold(image));
   }
+  if (options.cutoffLuma !== undefined) {
+    return thresholdBandToMonochrome(image, options.cutoffLuma, options.thresholdLuma ?? 128);
+  }
   if (options.thresholdLuma !== undefined) {
     return thresholdToMonochrome(image, options.thresholdLuma);
   }
@@ -332,7 +363,11 @@ function applyThreshold(image: RawImageData, options: TraceOptions): RawImageDat
 function shouldDespeckle(options: TraceOptions): boolean {
   const min = options.despeckleMinPixels;
   if (min === undefined || min <= 1) return false;
-  return options.useOtsuThreshold === true || options.thresholdLuma !== undefined;
+  return (
+    options.useOtsuThreshold === true ||
+    options.cutoffLuma !== undefined ||
+    options.thresholdLuma !== undefined
+  );
 }
 
 // Phase E.2 — port LaserForge 1's imagetracerjs settings after audit
@@ -397,7 +432,7 @@ export function thresholdToMonochrome(image: RawImageData, threshold: number): R
     const r = image.data[i] ?? 0;
     const g = image.data[i + 1] ?? 0;
     const b = image.data[i + 2] ?? 0;
-    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    const luma = lumaByte(r, g, b);
     const v = luma >= cutoff ? 255 : 0;
     data[i] = v;
     data[i + 1] = v;
@@ -405,6 +440,32 @@ export function thresholdToMonochrome(image: RawImageData, threshold: number): R
     data[i + 3] = 255;
   }
   return { width: image.width, height: image.height, data };
+}
+
+export function thresholdBandToMonochrome(
+  image: RawImageData,
+  cutoff: number,
+  threshold: number,
+): RawImageData {
+  const data = new Uint8ClampedArray(image.data.length);
+  const lo = Math.max(0, Math.min(255, Math.min(cutoff, threshold)));
+  const hi = Math.max(0, Math.min(255, Math.max(cutoff, threshold)));
+  for (let i = 0; i < image.data.length; i += 4) {
+    const r = image.data[i] ?? 0;
+    const g = image.data[i + 1] ?? 0;
+    const b = image.data[i + 2] ?? 0;
+    const luma = lumaByte(r, g, b);
+    const v = luma >= lo && luma <= hi ? 0 : 255;
+    data[i] = v;
+    data[i + 1] = v;
+    data[i + 2] = v;
+    data[i + 3] = 255;
+  }
+  return { width: image.width, height: image.height, data };
+}
+
+function lumaByte(r: number, g: number, b: number): number {
+  return Math.round(0.299 * r + 0.587 * g + 0.114 * b);
 }
 
 // Convert '#rrggbb' (or '#rgb') to {r, g, b, a} as imagetracerjs

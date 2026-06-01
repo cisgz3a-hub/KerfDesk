@@ -186,6 +186,7 @@ async function commit(
       kind: 'traced-image',
       id: crypto.randomUUID(),
       source: args.source,
+      traceMode: args.options.traceMode === 'centerline' ? 'centerline' : 'filled-contours',
       bounds,
       transform: IDENTITY_TRANSFORM,
       paths,

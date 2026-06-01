@@ -16,6 +16,7 @@ import {
   type PaletteEntry,
   type TraceData,
   type TracePath,
+  type TraceSegmentL,
   tracedataToColoredPaths,
 } from './trace-to-paths';
 
@@ -27,6 +28,17 @@ function makeTracedata(
   palette: ReadonlyArray<PaletteEntry>,
 ): TraceData {
   return { layers, palette };
+}
+
+function linePath(points: ReadonlyArray<readonly [number, number]>): TracePath {
+  const segments: TraceSegmentL[] = [];
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const a = points[i];
+    const b = points[i + 1];
+    if (a === undefined || b === undefined) continue;
+    segments.push({ type: 'L', x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
+  }
+  return { segments };
 }
 
 describe('tracedataToColoredPaths', () => {
@@ -190,5 +202,88 @@ describe('tracedataToColoredPaths', () => {
     );
     const result = tracedataToColoredPaths(td);
     expect(result[0]?.color).toBe('#050a0f');
+  });
+
+  it('removes sub-pixel spike vertices from closed contours', () => {
+    const td = makeTracedata(
+      [
+        [
+          linePath([
+            [0, 0],
+            [5, 0],
+            [5.2, -0.3],
+            [5.4, 0],
+            [10, 0],
+            [10, 10],
+            [0, 10],
+            [0, 0],
+          ]),
+        ],
+      ],
+      [{ r: 0, g: 0, b: 0 }],
+    );
+
+    const result = tracedataToColoredPaths(td);
+    const points = result[0]?.polylines[0]?.points ?? [];
+    expect(points).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+    ]);
+  });
+
+  it('simplifies nearly collinear jitter on straight contour edges', () => {
+    const td = makeTracedata(
+      [
+        [
+          linePath([
+            [0, 0],
+            [2, 0.05],
+            [4, -0.04],
+            [6, 0.03],
+            [10, 0],
+            [10, 10],
+            [0, 10],
+            [0, 0],
+          ]),
+        ],
+      ],
+      [{ r: 0, g: 0, b: 0 }],
+    );
+
+    const result = tracedataToColoredPaths(td);
+    const points = result[0]?.polylines[0]?.points ?? [];
+    expect(points).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+    ]);
+  });
+
+  it('keeps sampled quadratic curve points on closed contours', () => {
+    const td = makeTracedata(
+      [
+        [
+          {
+            segments: [
+              { type: 'Q', x1: 0, y1: 0, x2: 5, y2: 10, x3: 10, y3: 0 },
+              { type: 'Q', x1: 10, y1: 0, x2: 5, y2: -10, x3: 0, y3: 0 },
+            ],
+          },
+        ],
+      ],
+      [{ r: 0, g: 0, b: 0 }],
+    );
+
+    const result = tracedataToColoredPaths(td);
+    const points = result[0]?.polylines[0]?.points ?? [];
+    expect(points).toHaveLength(33);
+    expect(points[8]?.x).toBeCloseTo(5, 6);
+    expect(points[8]?.y).toBeCloseTo(5, 6);
+    expect(points[32]).toEqual({ x: 0, y: 0 });
   });
 });

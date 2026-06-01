@@ -10,7 +10,14 @@ import {
   type SceneObject,
   type Vec2,
 } from '../../core/scene';
-import { buildToolpath, compileJob, sliceToolpath, type ToolpathStep } from '../../core/job';
+import {
+  buildToolpath,
+  compileJob,
+  sliceToolpath,
+  type Toolpath,
+  type ToolpathStep,
+} from '../../core/job';
+import { strideForSegmentBudget } from './draw-complexity';
 import type { ViewTransform } from './view-transform';
 
 export function drawObjectsFaint(
@@ -58,17 +65,19 @@ function drawObjectPolylinesFaint(
 
 export function drawPreview(
   ctx: CanvasRenderingContext2D,
-  project: Project,
+  toolpath: Toolpath,
   view: ViewTransform,
   scrubberT: number,
 ): void {
-  const job = compileJob(project.scene, project.device);
-  const toolpath = buildToolpath(job);
   if (toolpath.totalLength === 0) return;
   const sliced = sliceToolpath(toolpath, scrubberT * toolpath.totalLength);
   for (const step of sliced.whole) drawStep(ctx, step, view);
   if (sliced.partial !== null) drawStep(ctx, sliced.partial, view);
   if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
+}
+
+export function buildPreviewToolpath(project: Project): Toolpath {
+  return buildToolpath(compileJob(project.scene, project.device));
 }
 
 function drawStep(ctx: CanvasRenderingContext2D, step: ToolpathStep, view: ViewTransform): void {
@@ -115,13 +124,24 @@ function drawCut(
   ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  for (let i = 0; i < polyline.length; i += 1) {
-    const p = polyline[i];
-    if (p === undefined) continue;
-    const cx = view.offsetX + p.x * view.scale;
-    const cy = view.offsetY + p.y * view.scale;
-    if (i === 0) ctx.moveTo(cx, cy);
-    else ctx.lineTo(cx, cy);
+  const stride = strideForSegmentBudget(Math.max(0, polyline.length - 1));
+  if (stride > 1) {
+    for (let i = 1; i < polyline.length; i += stride) {
+      const from = polyline[i - 1];
+      const to = polyline[i];
+      if (from === undefined || to === undefined) continue;
+      ctx.moveTo(view.offsetX + from.x * view.scale, view.offsetY + from.y * view.scale);
+      ctx.lineTo(view.offsetX + to.x * view.scale, view.offsetY + to.y * view.scale);
+    }
+  } else {
+    for (let i = 0; i < polyline.length; i += 1) {
+      const p = polyline[i];
+      if (p === undefined) continue;
+      const cx = view.offsetX + p.x * view.scale;
+      const cy = view.offsetY + p.y * view.scale;
+      if (i === 0) ctx.moveTo(cx, cy);
+      else ctx.lineTo(cx, cy);
+    }
   }
   ctx.stroke();
 }

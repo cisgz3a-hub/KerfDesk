@@ -62,6 +62,11 @@ const ORIGIN_OPTIONS: ReadonlyArray<{ readonly value: Origin; readonly label: st
   { value: 'center', label: 'Center' },
 ];
 
+type DeviceRowsProps = {
+  readonly device: ReturnType<typeof useStore.getState>['project']['device'];
+  readonly update: ReturnType<typeof useStore.getState>['updateDeviceProfile'];
+};
+
 function OriginSelect(props: {
   readonly value: Origin;
   readonly onChange: (next: Origin) => void;
@@ -126,10 +131,7 @@ function HomingEditor(props: {
 // The five always-visible numeric fields: Name, Bed (W×H), Origin,
 // Max feed, $30 max power. Sub-component so DeviceSettings itself
 // stays under the 80-line function cap and reads as a list.
-function BasicRows(props: {
-  readonly device: ReturnType<typeof useStore.getState>['project']['device'];
-  readonly update: ReturnType<typeof useStore.getState>['updateDeviceProfile'];
-}): JSX.Element {
+function BasicRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
     <>
@@ -168,6 +170,15 @@ function BasicRows(props: {
         <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
       </Row>
       <FeedRows device={device} update={update} />
+      <PowerRows device={device} update={update} />
+    </>
+  );
+}
+
+function PowerRows(props: DeviceRowsProps): JSX.Element {
+  const { device, update } = props;
+  return (
+    <>
       <Row label="$30 (max S)">
         <input
           type="number"
@@ -181,6 +192,34 @@ function BasicRows(props: {
           aria-label="GRBL $30 max power S"
         />
       </Row>
+      <Row label="$31 (min S)">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={device.minPowerS}
+          onChange={(e) =>
+            update({ minPowerS: Math.max(0, Math.floor(Number(e.target.value) || 0)) })
+          }
+          style={numInputStyle}
+          aria-label="GRBL $31 min power S"
+          title="Minimum nonzero spindle/laser S value. Diode lasers usually use 0."
+        />
+      </Row>
+      <Row label="$32 laser mode">
+        <label
+          style={inlineLabelStyle}
+          title="GRBL laser mode. Keep this enabled for M4 dynamic-power image engraving."
+        >
+          <input
+            type="checkbox"
+            checked={device.laserModeEnabled}
+            onChange={(e) => update({ laserModeEnabled: e.target.checked })}
+            aria-label="GRBL $32 laser mode enabled"
+          />
+          <span>Enabled</span>
+        </label>
+      </Row>
     </>
   );
 }
@@ -189,10 +228,7 @@ function BasicRows(props: {
 // speed. Sit next to each other so the relationship (one caps the
 // other) is immediately legible. Extracted from BasicRows so each
 // component stays under the 80-line per-function lint cap.
-function FeedRows(props: {
-  readonly device: ReturnType<typeof useStore.getState>['project']['device'];
-  readonly update: ReturnType<typeof useStore.getState>['updateDeviceProfile'];
-}): JSX.Element {
+function FeedRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
     <>

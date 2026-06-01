@@ -33,26 +33,46 @@ function lumaAt(r: { luma: Uint8Array; width: number }, x: number, y: number): n
 describe('rasterizeVectorToLuma (Fill All)', () => {
   it('derives pixel dimensions from mm bounds × dpi', () => {
     // 10 mm at 1 px/mm → 10 px.
-    const r = rasterizeVectorToLuma({ polylines: [], bounds: bounds(0, 0, 10, 10), dpi: DPI_1PX_PER_MM });
+    const r = rasterizeVectorToLuma({
+      polylines: [],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+    });
     expect(r.width).toBe(10);
     expect(r.height).toBe(10);
     expect(r.luma.length).toBe(100);
   });
 
   it('doubling dpi doubles each pixel dimension', () => {
-    const lo = rasterizeVectorToLuma({ polylines: [], bounds: bounds(0, 0, 10, 5), dpi: DPI_1PX_PER_MM });
-    const hi = rasterizeVectorToLuma({ polylines: [], bounds: bounds(0, 0, 10, 5), dpi: DPI_1PX_PER_MM * 2 });
+    const lo = rasterizeVectorToLuma({
+      polylines: [],
+      bounds: bounds(0, 0, 10, 5),
+      dpi: DPI_1PX_PER_MM,
+    });
+    const hi = rasterizeVectorToLuma({
+      polylines: [],
+      bounds: bounds(0, 0, 10, 5),
+      dpi: DPI_1PX_PER_MM * 2,
+    });
     expect([hi.width, hi.height]).toEqual([lo.width * 2, lo.height * 2]);
   });
 
   it('no contours → entirely background (white)', () => {
-    const r = rasterizeVectorToLuma({ polylines: [], bounds: bounds(0, 0, 10, 10), dpi: DPI_1PX_PER_MM });
+    const r = rasterizeVectorToLuma({
+      polylines: [],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+    });
     expect([...r.luma].every((v) => v === BG)).toBe(true);
   });
 
   it('a closed square fills its interior with ink, leaves outside white', () => {
     const sq = closedSquare(2, 2, 8, 8);
-    const r = rasterizeVectorToLuma({ polylines: [sq], bounds: bounds(0, 0, 10, 10), dpi: DPI_1PX_PER_MM });
+    const r = rasterizeVectorToLuma({
+      polylines: [sq],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+    });
     expect(lumaAt(r, 5, 5)).toBe(INK); // interior
     expect(lumaAt(r, 0, 0)).toBe(BG); // outside the square
   });
@@ -70,8 +90,19 @@ describe('rasterizeVectorToLuma (Fill All)', () => {
   });
 
   it('open polylines do not fill (Fill All needs closed shapes)', () => {
-    const open: Polyline = { closed: false, points: [{ x: 1, y: 1 }, { x: 9, y: 1 }, { x: 9, y: 9 }] };
-    const r = rasterizeVectorToLuma({ polylines: [open], bounds: bounds(0, 0, 10, 10), dpi: DPI_1PX_PER_MM });
+    const open: Polyline = {
+      closed: false,
+      points: [
+        { x: 1, y: 1 },
+        { x: 9, y: 1 },
+        { x: 9, y: 9 },
+      ],
+    };
+    const r = rasterizeVectorToLuma({
+      polylines: [open],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+    });
     expect([...r.luma].every((v) => v === BG)).toBe(true);
   });
 

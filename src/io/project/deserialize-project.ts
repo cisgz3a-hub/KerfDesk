@@ -97,6 +97,14 @@ function normalizeProject(raw: Record<string, unknown>): Project {
         typeof dev['framingFeedMmPerMin'] === 'number' && dev['framingFeedMmPerMin'] > 0
           ? dev['framingFeedMmPerMin']
           : DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
+      minPowerS:
+        typeof dev['minPowerS'] === 'number' && dev['minPowerS'] >= 0
+          ? dev['minPowerS']
+          : DEFAULT_DEVICE_PROFILE.minPowerS,
+      laserModeEnabled:
+        typeof dev['laserModeEnabled'] === 'boolean'
+          ? dev['laserModeEnabled']
+          : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
     scene: {
       ...scene,
@@ -130,6 +138,9 @@ function normalizeLayer(layer: unknown): unknown {
   }
   if (typeof out['hatchSpacingMm'] !== 'number') {
     out['hatchSpacingMm'] = LAYER_DEFAULTS.hatchSpacingMm;
+  }
+  if (typeof out['fillOverscanMm'] !== 'number' || out['fillOverscanMm'] < 0) {
+    out['fillOverscanMm'] = LAYER_DEFAULTS.fillOverscanMm;
   }
   // F.2.e: back-fill image-mode Layer fields. Same additive-with-
   // default pattern as the hatch fields above — pre-F.2 .lf2 files

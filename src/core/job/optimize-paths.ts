@@ -43,6 +43,7 @@ import type { Vec2 } from '../scene';
 import type { CutGroup, CutSegment, Group, Job } from './job';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
+export const MAX_NEAREST_NEIGHBOR_SEGMENTS = 2_000;
 
 export function optimizePaths(job: Job): Job {
   return { groups: job.groups.map(optimizeGroupAny) };
@@ -57,6 +58,11 @@ function optimizeGroupAny(group: Group): Group {
 
 function optimizeGroup(group: CutGroup): CutGroup {
   if (group.segments.length === 0) return group;
+  // Nearest-neighbor is O(n^2). Large traces can produce tens of
+  // thousands of cut/hatch segments, and optimizing them synchronously
+  // pins the UI. Keep deterministic source order once the optimizer
+  // would do more harm than good.
+  if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
   // N=1 still benefits — open polylines can be entered from either
   // endpoint; reversal isn't a no-op when start ≠ origin.
   const ordered = nearestNeighborOrder(group.segments);

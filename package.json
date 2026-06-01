@@ -13,6 +13,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "lint": "eslint .",
+    "lint:electron": "eslint --config eslint.electron.config.mjs electron/**/*.ts",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",

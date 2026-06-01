@@ -126,3 +126,144 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     expect(out.match(/G1 X5\.000 Y0\.000 F1000 S1000/g)).toHaveLength(3);
   });
 });
+
+describe('grblStrategy fill hatch overscan', () => {
+  it('emits laser-off lead-in and lead-out around the burn span', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          overscanMm: 2,
+          segments: [
+            {
+              polyline: [
+                { x: 10, y: 5 },
+                { x: 20, y: 5 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    const out = emit(job);
+
+    expect(out).toContain(
+      [
+        'G0 X8.000 Y5.000 S0',
+        'G1 X10.000 Y5.000 F1500 S0',
+        'G1 X20.000 Y5.000 S300',
+        'G1 X22.000 Y5.000 S0',
+      ].join('\n'),
+    );
+    expect(out).not.toMatch(/^M[34] S[1-9]/m);
+  });
+});
+
+describe('grblStrategy mixed raster/vector mode transitions', () => {
+  it('re-arms M3 before a cut group that follows a raster group', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'raster',
+          layerId: 'image',
+          color: '#808080',
+          power: 50,
+          speed: 1000,
+          passes: 1,
+          sValues: new Uint16Array([500]),
+          pixelWidth: 1,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+          overscanMm: 0,
+        },
+        {
+          kind: 'cut',
+          layerId: 'cut',
+          color: '#ff0000',
+          power: 50,
+          speed: 1500,
+          passes: 1,
+          segments: [
+            {
+              polyline: [
+                { x: 1, y: 1 },
+                { x: 2, y: 2 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    expect(emit(job)).toContain('M5\nM3 S0\n; layer cut color #ff0000');
+  });
+
+  it('re-arms M3 before a fill group that follows a raster group', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'raster',
+          layerId: 'image',
+          color: '#808080',
+          power: 50,
+          speed: 1000,
+          passes: 1,
+          sValues: new Uint16Array([500]),
+          pixelWidth: 1,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+          overscanMm: 0,
+        },
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#ff0000',
+          power: 50,
+          speed: 1500,
+          passes: 1,
+          overscanMm: 1,
+          segments: [
+            {
+              polyline: [
+                { x: 1, y: 1 },
+                { x: 2, y: 1 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    expect(emit(job)).toContain('M5\nM3 S0\n; fill layer fill color #ff0000');
+  });
+
+  it('repeats raster row data for each raster pass', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'raster',
+          layerId: 'image',
+          color: '#808080',
+          power: 50,
+          speed: 1000,
+          passes: 2,
+          sValues: new Uint16Array([500]),
+          pixelWidth: 1,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+          overscanMm: 0,
+        },
+      ],
+    };
+    const out = emit(job);
+    expect(out.match(/^; raster pass /gm)).toHaveLength(2);
+    expect(out.match(/^G0 X0\.000 Y0\.500 S0/gm)).toHaveLength(2);
+  });
+});

@@ -35,7 +35,8 @@
 
 import type { DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
-import type { CutGroup, Job } from './job';
+import { expandFillHatchWithOverscan } from './fill-overscan';
+import type { CutGroup, FillGroup, Job } from './job';
 
 const SECONDS_PER_MINUTE = 60;
 const ORIGIN: Vec2 = { x: 0, y: 0 };
@@ -89,8 +90,22 @@ function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] 
     // per polyline edge). Raster groups produce a different motion
     // model (constant-feed sweeps) — skipped here and accounted
     // for separately in estimate-duration's raster path.
-    if (group.kind !== 'cut') continue;
+    if (group.kind === 'raster') continue;
     const cutV = Math.max(1, Math.min(group.speed, device.maxFeed)) / SECONDS_PER_MINUTE;
+    if (group.kind === 'fill') {
+      for (let pass = 0; pass < group.passes; pass += 1) {
+        for (const seg of group.segments) {
+          const run = expandFillHatchWithOverscan(seg.polyline, group.overscanMm);
+          if (run === null) continue;
+          appendTravel(out, cursor, run.leadStart, travelV);
+          appendTravel(out, run.leadStart, run.burnStart, cutV);
+          appendCut(out, run.burnStart, run.burnEnd, cutV);
+          appendTravel(out, run.burnEnd, run.leadEnd, cutV);
+          cursor = run.leadEnd;
+        }
+      }
+      continue;
+    }
     for (let pass = 0; pass < group.passes; pass += 1) {
       for (const seg of group.segments) {
         const first = seg.polyline[0];
@@ -253,4 +268,4 @@ function unitVector(from: Vec2, to: Vec2, length: number): Vec2 {
 // Compatibility note: a future per-group export could expose Block[]
 // for visualization (preview G-code velocity profile). Out of scope
 // for the estimator itself.
-export type { Block, CutGroup };
+export type { Block, CutGroup, FillGroup };

@@ -181,6 +181,10 @@ function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
         <HatchSpacingInput layer={layer} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
+      <FieldRow label="Overscan">
+        <FillOverscanInput layer={layer} />
+        <span style={unitStyle}>mm</span>
+      </FieldRow>
     </>
   );
 }
@@ -225,6 +229,28 @@ function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Hatch spacing for ${layer.color}`}
+    />
+  );
+}
+
+function FillOverscanInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const debounced = useDebouncedCommit<number>({
+    value: layer.fillOverscanMm,
+    commit: (fillOverscanMm) => setLayerParam(layer.id, { fillOverscanMm }),
+    parse: (s) => clamp(numericValue(s), 0, 25),
+  });
+  return (
+    <input
+      type="number"
+      min={0}
+      max={25}
+      step={0.5}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Fill overscan for ${layer.color}`}
     />
   );
 }

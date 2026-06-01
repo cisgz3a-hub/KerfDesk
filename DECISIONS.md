@@ -1239,11 +1239,238 @@ Separately and *not solved here*: imagetracerjs is outline-only (a pen stroke �
 
 ---
 
+## ADR-031 - Fill hatch overscan lead-in/out
+
+**Status:** Accepted | **Date:** 2026-06-01
+
+### Context
+
+The first real logo burn after the trace/fill fixes produced correct
+geometry and smooth motion, but showed visible darker marks at the sides
+of filled regions. The burn photo (`<redacted-path>\Downloads\191275.jpg`)
+matches the standard Fill/Image endpoint-overburn failure: hatch lines
+start and stop at the object boundary while the gantry is accelerating or
+decelerating.
+
+Research on 2026-06-01 re-confirmed the LightBurn model:
+
+- Fill mode is scan-line engraving inside closed shapes.
+- GCode Fill/Image overscanning adds extra laser-off moves at the start
+  and end of scan lines.
+- Missing or insufficient overscanning causes darker burned edges.
+- LightBurn defaults GRBL devices to Variable Power (`M4`), while
+  Constant Power (`M3`) is a compatibility option.
+
+LaserForge Image mode already has the right primitive in
+`src/core/raster/emit-raster.ts`: rapid to the overscan zone, feed to the
+active span with `S0`, burn the active span, then exit overscan with
+`S0`. Fill mode does not. ADR-019 intentionally let Fill hatches flow
+through `CutGroup` unchanged, which was the right smallest-first ship
+decision, but it now prevents output from distinguishing a Fill scan line
+from a Line/outline cut.
+
+### Decision
+
+1. **Add a distinct `FillGroup` to `Job`.** Keep Fill hatch generation in
+   `compile-job.ts`, but compile Fill layers to `kind: 'fill'` instead
+   of `kind: 'cut'`. Line output remains `CutGroup`.
+
+2. **Add `fillOverscanMm` to `Layer`.** Default to `5` mm, matching the
+   current Image overscan baseline. Back-fill missing values from
+   `LAYER_DEFAULTS`; no schema bump.
+
+3. **Emit Fill with S0 lead-in/out.** Each two-point hatch expands to:
+   lead start, burn start, burn end, lead end. G-code shape:
+
+   ```gcode
+   G0 XleadStart YleadStart S0
+   G1 XburnStart YburnStart Ffeed S0
+   G1 XburnEnd YburnEnd Spositive
+   G1 XleadEnd YleadEnd S0
+   ```
+
+   Positive power stays on a moving `G1`, never on a stationary modal
+   command.
+
+4. **Keep `M3` in the first increment.** LightBurn's GRBL default is
+   `M4`, and GRBL documents speed-scaled dynamic power. However, changing
+   Fill from `M3` to `M4` also changes cut-depth behavior on short
+   hatches and increases the diff's blast radius. The next surgical step
+   is overscan under the existing M-mode; `M4` Fill becomes a separate
+   hardware experiment if edge marks remain.
+
+5. **Keep Frame/job bounds on burn geometry.** Overscan is runway, not
+   engraved artwork. Frame should still trace the active burn area, while
+   preflight checks emitted G-code so out-of-bed overscan is caught before
+   writing or streaming.
+
+### Consequences
+
+- `Group` becomes `CutGroup | FillGroup | RasterGroup`. Exhaustive switch
+  failures are expected and useful in output, bounds, toolpath, and
+  planner modules.
+- Fill preview/toolpath must keep showing burn hatches and may represent
+  overscan as traversal moves. Raster remains skipped by the preview
+  scrubber until its own row model is added.
+- Jobs near a bed edge can fail preflight after overscan is enabled.
+  This is correct; the operator can move the artwork inward or lower Fill
+  Overscan.
+- More overscan increases runtime. This is the same speed/quality tradeoff
+  LightBurn documents.
+
+### Verification
+
+- Unit tests for the shared fill-overscan geometry helper.
+- Compile tests for `line -> CutGroup`, `fill -> FillGroup`.
+- G-code tests that pin S0 lead-in/out and active positive-S hatch spans.
+- Property/invariant tests for no positive-S travel and no stationary
+  positive-S modal commands.
+- Bounds/preflight tests proving emitted overscan outside the bed is
+  reported.
+- Toolpath/planner tests so preview and duration do not silently drop Fill
+  after the new discriminant lands.
+- Hardware test: same logo or a 20 mm cropped sample at 0, 2, and 5 mm
+  Fill Overscan, same material/power/speed/focus.
+
+---
+
+## ADR-032 - Bidirectional raster rows after overscan runtime regression
+
+**Status:** Accepted | **Date:** 2026-06-01
+
+### Context
+
+After ADR-031-style overscan fixed the visible side burn marks, the next
+hardware observation was that a print took roughly three times longer.
+The runtime cost is expected if overscanned engraving remains
+unidirectional: every row burns left-to-right, exits the right overscan
+zone, then wastes a return move to the left overscan zone before the
+next row.
+
+Research on 2026-06-01 checked the LightBurn model and one open-source
+reference:
+
+- LightBurn documents Bi-directional Fill as side-to-side engraving with
+  the laser on in both directions; disabling it engraves one way and
+  returns without engraving.
+- LightBurn documents overscanning as laser-off runway before/after each
+  row so the marked span happens at steadier speed.
+- Rayforge documents the same tradeoff for raster: bidirectional is
+  faster, while unidirectional can be more consistent if the machine has
+  backlash.
+- LightBurn's Scanning Offset Adjustment page documents the calibration
+  caveat: at high speeds, bidirectional rows can show ghosted or shifted
+  edges if machine response delay or belt stretch is not compensated.
+
+Local code evidence matched the slow path: `fill-hatching.ts` already
+snakes Fill hatches, but `emit-raster.ts` explicitly deferred
+serpentine alternation and emitted every active raster row left-to-right.
+
+### Decision
+
+1. Keep overscan enabled. It fixed the endpoint-overburn failure and is
+   still required for even engraving.
+2. Change only raster/Image row emission to serpentine movement:
+   emitted active row 0 sweeps left-to-right, emitted active row 1
+   sweeps right-to-left, and so on.
+3. Alternate by emitted active-row count, not raw pixel row index, so
+   skipped blank rows do not force a long return sweep.
+4. Preserve active-span clipping. A row still runs only from first
+   nonzero pixel to last nonzero pixel, plus overscan on the entry and
+   exit sides.
+5. Preserve M4 dynamic-power raster mode and S0 runway at both ends.
+6. Do not add a UI toggle in this patch. If hardware shows
+   bidirectional ghosting, add a later Image-layer option for
+   unidirectional mode and/or scanning offset calibration.
+
+### Consequences
+
+- Raster jobs should recover most of the avoidable row-return time added
+  by overscan, especially tall images with many active rows.
+- G-code remains deterministic and modal: feed is emitted on the first
+  raster G1, S changes are still run-length compressed, and G0 travels
+  remain S0.
+- Hardware may reveal backlash/offset artifacts at high speed. That is a
+  calibration follow-up, not a reason to keep the default slow path.
+
+### Verification
+
+- `emit-raster.test.ts` pins that active rows alternate direction even
+  when blank rows are skipped.
+- `emit-raster.test.ts` pins right-to-left S-run order on reverse rows.
+- Existing raster invariants still cover S0 G0 travel, deterministic
+  output, bounds plus overscan, validation, and RLE behavior.
+
+---
+
+## ADR-022 - Origin-aware job placement and physical Frame/Start preflight
+
+**Date:** 2026-06-01
+**Status:** Accepted, code shipped, hardware verification pending.
+
+**Context.** ADR-021 shipped the controller half of Set origin here:
+`G92 X0 Y0` makes the current head position work-coordinate (0,0).
+The missing half was job placement. Fresh imports are auto-centered on
+the bed, so absolute `G90` output still asked GRBL to move to the
+artwork's canvas coordinates after G92. The user-visible failure was a
+centered imported/traced image framing and burning offset from the
+physical point the operator had just set as origin.
+
+LightBurn separates these concerns: Start From chooses the placement
+reference, while Job Origin chooses which point of the job bounds is
+anchored there. LaserForge does not yet have that full UI surface, but
+the existing Set origin here workflow must still do the safe expected
+thing.
+
+**Decision.**
+
+1. Keep `G92 X0 Y0` as the controller command. The bug was not the GRBL
+   command.
+2. Add a pure job-placement helper that can translate compiled job
+   geometry by a chosen bounds anchor.
+3. For active custom-origin sessions, use a front-left job anchor and
+   translate the compiled job so that anchor is work-coordinate (0,0).
+   Absolute mode remains the default when no custom origin is active.
+4. Share the adjusted geometry between Start and Frame. Start emits
+   adjusted G-code; Frame traces adjusted bounds.
+5. Track `workOriginActive` immediately after a successful Set origin
+   write so Frame/Start do not wait for GRBL's next intermittent WCO
+   status frame. If the current machine position is known, seed
+   `wcoCache` immediately from it.
+6. When WCO is known, run physical Frame/Start bounds checks on
+   `adjustedJobBounds + WCO`. This catches the near-edge custom-origin
+   case that ADR-021 deferred.
+7. Do not add a `.lf2` schema field in this patch. The full LightBurn
+   Start From dropdown plus 9-dot Job Origin selector remains a future
+   UI expansion.
+
+**Consequences.**
+
+- A centered imported/traced image now starts relative to the Set origin
+  point instead of its canvas-center placement.
+- `emitGcode(project)` still preserves absolute coordinates for export
+  and no-origin flows. `emitGcode(project, { jobOrigin })` is the
+  origin-aware path used by Start.
+- Physical off-bed detection is only as fresh as `wcoCache`. The common
+  path is covered because Set origin infers WCO from the latest MPos; if
+  the controller has not provided any position yet, LaserForge can still
+  origin-adjust output but cannot prove physical machine extents.
+
+**Verification.**
+
+- `src/core/job/job-origin.test.ts` pins lower-left anchor translation
+  and WCO bounds offset.
+- `src/ui/laser/start-job-readiness.test.ts` pins the regression: a
+  centered traced image under custom origin no longer emits centered
+  X/Y coordinates, and a near-edge custom origin blocks Start.
+- Focused pass: job-origin, start-job-readiness, laser-store,
+  laser-line-handler, and frame-preflight tests.
+- `pnpm run typecheck`.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
-- ADR-022 — Origin-aware preflight + Frame (lift the deferral in
-  ADR-021). Requires WCO threading into `framePreflight` and the
-  Frame trace.
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
   config grows further).

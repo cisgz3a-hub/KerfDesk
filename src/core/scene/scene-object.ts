@@ -98,6 +98,8 @@ export type TracedImage = {
   readonly kind: 'traced-image';
   readonly id: string;
   readonly source: string;
+  // Missing means legacy filled-contour trace.
+  readonly traceMode?: 'filled-contours' | 'centerline';
   readonly bounds: Bounds;
   readonly transform: Transform;
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -144,8 +146,8 @@ export type RasterImage = {
   // BT.601: 0.299·R + 0.587·G + 0.114·B), base64-encoded so it can
   // round-trip through .lf2's JSON. Length after decode equals
   // pixelWidth * pixelHeight. Optional because pre-F.2.e .lf2 files
-  // didn't have it; compileJob renders an all-zero (blank) raster
-  // when absent. UI's image import path is responsible for
+  // didn't have it; compileJob treats missing data as all-white
+  // (laser off). UI's image import path is responsible for
   // populating it from the decoded ImageData.
   readonly lumaBase64?: string;
   // ADR-026 render-only marker. When this raster is the source bitmap

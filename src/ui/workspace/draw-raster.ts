@@ -5,13 +5,19 @@
 //
 // drawImage path: HTMLImageElement is loaded lazily (async PNG
 // decode) and cached per dataUrl so repeated frames hit memory.
-// First paint shows nothing until the image loads — same shape as
-// the SVG import flow's one-frame delay.
+// First paint may land before decode finishes, so callers can
+// subscribe to the load event and schedule one redraw.
 
 import type { AABB, Transform as ObjTransform } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
 
-const rasterImageCache = new Map<string, HTMLImageElement>();
+type RasterImageCacheEntry = {
+  readonly img: HTMLImageElement;
+  readonly onReady: Set<() => void>;
+  failed: boolean;
+};
+
+const rasterImageCache = new Map<string, RasterImageCacheEntry>();
 // Tinted copies of trace-source bitmaps, keyed by dataUrl. The tint is
 // static per image, so we composite it once and reuse the canvas every
 // frame rather than re-tinting on each redraw.
@@ -23,6 +29,30 @@ const DEG_TO_RAD = Math.PI / 180;
 // tell which one (the tinted backing) to delete. Display only.
 const TRACE_SOURCE_TINT_COLOR = '#3b82c4';
 const TRACE_SOURCE_TINT_ALPHA = 0.4;
+
+function rasterImageEntry(dataUrl: string): RasterImageCacheEntry {
+  const cached = rasterImageCache.get(dataUrl);
+  if (cached !== undefined) return cached;
+
+  const img = new Image();
+  const entry: RasterImageCacheEntry = { img, onReady: new Set(), failed: false };
+  img.onload = () => {
+    const callbacks = [...entry.onReady];
+    entry.onReady.clear();
+    for (const callback of callbacks) callback();
+  };
+  img.onerror = () => {
+    entry.failed = true;
+    entry.onReady.clear();
+  };
+  img.src = dataUrl;
+  rasterImageCache.set(dataUrl, entry);
+  return entry;
+}
+
+export type DrawRasterImageOptions = {
+  readonly onBitmapReady?: () => void;
+};
 
 // Return a copy of `img` whose opaque pixels are washed with the tint
 // color; transparent regions stay clear (the 'source-atop' composite
@@ -56,14 +86,16 @@ export function drawRasterImage(
     readonly role?: 'trace-source';
   },
   view: ViewTransform,
+  options: DrawRasterImageOptions = {},
 ): void {
-  let img = rasterImageCache.get(obj.dataUrl);
-  if (img === undefined) {
-    img = new Image();
-    img.src = obj.dataUrl;
-    rasterImageCache.set(obj.dataUrl, img);
+  const entry = rasterImageEntry(obj.dataUrl);
+  const { img } = entry;
+  if (!img.complete || img.naturalWidth === 0) {
+    if (!entry.failed && options.onBitmapReady !== undefined) {
+      entry.onReady.add(options.onBitmapReady);
+    }
+    return; // still decoding
   }
-  if (!img.complete || img.naturalWidth === 0) return; // still decoding
 
   // Trace-source backings draw tinted so the operator can tell the
   // deletable original apart from the trace stacked on top (ADR-026).

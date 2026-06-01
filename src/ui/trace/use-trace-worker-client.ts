@@ -7,8 +7,9 @@
 // `new Worker(new URL('./trace-worker.ts', import.meta.url),
 // { type: 'module' })` pattern. Vite detects and code-splits the
 // worker file as its own ES-module chunk. Outside a bundler (vitest,
-// SSR, environments without Worker support) the construction throws
-// and the caller falls back to the inline path via traceImage().
+// SSR, environments without Worker support) the construction throws.
+// Small test-sized images can fall back inline; large images report a
+// recoverable error instead of pinning the main thread.
 //
 // One worker per app lifetime — cheaper than spawning per-trace
 // because imagetracerjs's lazy load only pays its cost once. The
@@ -39,6 +40,7 @@ let workerInstance: Worker | null = null;
 let workerFailed = false;
 let nextRequestId = 0;
 const pendingByRequestId = new Map<number, Pending>();
+const MAX_INLINE_TRACE_PIXELS = 160_000;
 
 // Lazy-construct the worker. Returns null if the runtime doesn't have
 // a Worker constructor (vitest without jsdom workers, SSR) or if a
@@ -109,24 +111,41 @@ function retireWorker(): void {
   }
 }
 
-// Trace via the worker if available, otherwise inline. Callers don't
-// need to branch — the same Promise shape comes back either way.
+// Trace via the worker if available, otherwise through the bounded
+// inline fallback. Callers don't need to branch — the same Promise
+// shape comes back either way for images small enough to run inline.
 // The try/catch around traceInWorker is the second half of H6's fix:
 // if the worker rejects (either because handleWorkerMessage marked
 // it dead, or because the worker died mid-flight), fall back to
-// inline tracing for THIS call. Without it, every commit through the
-// dialog would error-toast after the first worker failure even though
-// the inline path would have succeeded.
+// inline tracing for THIS call when it is small enough. Without it,
+// every commit through the dialog would error-toast after the first
+// worker failure even though a bounded inline path would have succeeded.
 export async function traceImage(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
   const worker = ensureWorker();
   if (worker === null) {
-    return traceInline(image, options);
+    return traceInlineIfSafe(image, options);
   }
   try {
     return await traceInWorker(worker, image, options);
   } catch {
-    return traceInline(image, options);
+    return traceInlineIfSafe(image, options);
   }
+}
+
+export function canTraceInline(image: {
+  readonly width: number;
+  readonly height: number;
+}): boolean {
+  return image.width * image.height <= MAX_INLINE_TRACE_PIXELS;
+}
+
+async function traceInlineIfSafe(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
+  if (!canTraceInline(image)) {
+    throw new Error(
+      'Trace worker is unavailable for this large image. Reload the app and try again.',
+    );
+  }
+  return traceInline(image, options);
 }
 
 async function traceInline(image: RawImageData, options: TraceOptions): Promise<TraceResult> {

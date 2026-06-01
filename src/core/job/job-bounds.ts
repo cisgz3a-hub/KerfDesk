@@ -3,7 +3,8 @@
 // cut, and (future) by preflight to short-circuit the per-point bounds
 // check on jobs whose AABB already fails.
 
-import type { CutGroup, Group, Job, RasterGroup } from './job';
+import { assertNever } from '../scene';
+import type { CutGroup, FillGroup, Group, Job, RasterGroup } from './job';
 
 export type JobBounds = {
   readonly minX: number;
@@ -30,10 +31,18 @@ export function computeJobBounds(job: Job): JobBounds | null {
 
 // Returns true if the group contributed any point to the AABB.
 function extendBoundsForGroup(b: MutableBounds, group: Group): boolean {
-  return group.kind === 'cut' ? extendBoundsForCut(b, group) : extendBoundsForRaster(b, group);
+  switch (group.kind) {
+    case 'cut':
+    case 'fill':
+      return extendBoundsForCut(b, group);
+    case 'raster':
+      return extendBoundsForRaster(b, group);
+    default:
+      return assertNever(group, 'Group');
+  }
 }
 
-function extendBoundsForCut(b: MutableBounds, group: CutGroup): boolean {
+function extendBoundsForCut(b: MutableBounds, group: CutGroup | FillGroup): boolean {
   let any = false;
   for (const seg of group.segments) {
     for (const p of seg.polyline) {

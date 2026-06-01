@@ -15,6 +15,7 @@ describe('createLayer', () => {
       output: true,
       hatchAngleDeg: 0,
       hatchSpacingMm: 0.2,
+      fillOverscanMm: 5,
       ditherAlgorithm: 'floyd-steinberg',
       linesPerMm: 10,
     });

@@ -30,7 +30,14 @@ function importedSvgSource(color: string = SOURCE_COLOR): ImportedSvg {
       {
         color,
         polylines: [
-          { closed: true, points: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 0, y: 20 }] },
+          {
+            closed: true,
+            points: [
+              { x: 0, y: 0 },
+              { x: 20, y: 0 },
+              { x: 0, y: 20 },
+            ],
+          },
         ],
       },
     ],
@@ -80,7 +87,11 @@ describe('applyConvertToBitmap (ADR-029)', () => {
   it('adds the bitmap unchanged so it overlays the source bounds + transform', () => {
     const src = importedSvgSource();
     const raster = bitmapFor(src);
-    const result = applyConvertToBitmap({ project: projectWithVector(), undoStack: [] }, 'src-vec', raster);
+    const result = applyConvertToBitmap(
+      { project: projectWithVector(), undoStack: [] },
+      'src-vec',
+      raster,
+    );
     const added = result.project.scene.objects.find((o) => o.kind === 'raster-image');
     expect(added).toEqual(raster); // mutation must not mangle the built bitmap
     expect(added?.bounds).toEqual(src.bounds);
@@ -123,13 +134,21 @@ describe('applyConvertToBitmap (ADR-029)', () => {
       ...base,
       scene: { ...base.scene, objects: [...base.scene.objects, sibling] },
     };
-    const result = applyConvertToBitmap({ project, undoStack: [] }, 'src-vec', bitmapFor(importedSvgSource()));
+    const result = applyConvertToBitmap(
+      { project, undoStack: [] },
+      'src-vec',
+      bitmapFor(importedSvgSource()),
+    );
     expect(result.project.scene.layers.map((l) => l.color)).toContain(SOURCE_COLOR);
   });
 
   it('records exactly one undo entry == the project before, redo cleared, dirty set', () => {
     const project = projectWithVector();
-    const result = applyConvertToBitmap({ project, undoStack: [] }, 'src-vec', bitmapFor(importedSvgSource()));
+    const result = applyConvertToBitmap(
+      { project, undoStack: [] },
+      'src-vec',
+      bitmapFor(importedSvgSource()),
+    );
     expect(result.undoStack).toHaveLength(1);
     expect(result.undoStack[0]).toBe(project);
     expect(result.redoStack).toEqual([]);
@@ -139,7 +158,11 @@ describe('applyConvertToBitmap (ADR-029)', () => {
   it('degrades gracefully: missing source → raster still added, nothing removed', () => {
     const project = projectWithVector();
     const before = project.scene.objects.length;
-    const result = applyConvertToBitmap({ project, undoStack: [] }, 'no-such-id', bitmapFor(importedSvgSource()));
+    const result = applyConvertToBitmap(
+      { project, undoStack: [] },
+      'no-such-id',
+      bitmapFor(importedSvgSource()),
+    );
     const objects = result.project.scene.objects;
     expect(objects).toHaveLength(before + 1);
     expect(objects.find((o) => o.id === 'src-vec')).toBeDefined();

@@ -12,9 +12,9 @@ import type { RawImageData } from '../../core/trace';
 // and starts to feel slow above ~1 megapixel on modest hardware.
 // Larger inputs are downsampled proportionally before tracing.
 const MAX_EDGE_PX = 1024;
-// Smaller cap used by the live preview path so re-tracing on every
-// preset switch stays sub-200ms even on photo-class input.
-export const PREVIEW_MAX_EDGE_PX = 400;
+// Preview and commit use the same cap so the dialog does not preview one
+// pixel grid and then commit a different trace.
+export const PREVIEW_MAX_EDGE_PX = MAX_EDGE_PX;
 
 // A fresh canvas is transparent black (RGBA 0,0,0,0). Drawing a PNG
 // that has an alpha channel (e.g. artwork exported "with no
@@ -51,6 +51,18 @@ export async function loadImageAsRawData(
     ctx.drawImage(img, 0, 0, width, height);
     const imgd = ctx.getImageData(0, 0, width, height);
     return { width: imgd.width, height: imgd.height, data: imgd.data };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export async function readImageNaturalSize(
+  file: File,
+): Promise<{ readonly width: number; readonly height: number }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await decodeImage(url);
+    return { width: img.width, height: img.height };
   } finally {
     URL.revokeObjectURL(url);
   }

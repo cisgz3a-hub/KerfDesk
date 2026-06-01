@@ -19,8 +19,9 @@
 // If a future refactor moves drawRasterImage's math back to a
 // centre-based composition, these tests fail loudly.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyTransform, IDENTITY_TRANSFORM, type Transform, type Vec2 } from '../../core/scene';
+import { drawRasterImage } from './draw-raster';
 
 // Replicates the math the ctx calls in drawRasterImage compose at
 // unit view scale. Canvas2D applies transforms in the right-to-left
@@ -91,4 +92,63 @@ describe('drawRasterImage render position matches applyTransform', () => {
       }
     });
   }
+});
+
+type FakeImageInstance = {
+  complete: boolean;
+  naturalWidth: number;
+  naturalHeight: number;
+  src: string;
+  onload: ((event: Event) => void) | null;
+};
+
+function installPendingImage(): FakeImageInstance[] {
+  const instances: FakeImageInstance[] = [];
+  class PendingImage {
+    complete = false;
+    naturalWidth = 0;
+    naturalHeight = 0;
+    src = '';
+    onload: ((event: Event) => void) | null = null;
+
+    constructor() {
+      instances.push(this);
+    }
+  }
+  vi.stubGlobal('Image', PendingImage);
+  return instances;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('drawRasterImage bitmap decode redraw', () => {
+  it('requests one redraw when an imported bitmap finishes decoding', () => {
+    const images = installPendingImage();
+    const onBitmapReady = vi.fn();
+
+    drawRasterImage(
+      {} as CanvasRenderingContext2D,
+      {
+        dataUrl: 'data:image/png;base64,pending-redraw',
+        bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+        transform: IDENTITY_TRANSFORM,
+      },
+      { scale: 1, offsetX: 0, offsetY: 0 },
+      { onBitmapReady },
+    );
+
+    expect(images).toHaveLength(1);
+    expect(onBitmapReady).not.toHaveBeenCalled();
+    const image = images[0];
+    if (image === undefined) throw new Error('expected image to be constructed');
+
+    image.complete = true;
+    image.naturalWidth = 1;
+    image.naturalHeight = 1;
+    image.onload?.(new Event('load'));
+
+    expect(onBitmapReady).toHaveBeenCalledTimes(1);
+  });
 });

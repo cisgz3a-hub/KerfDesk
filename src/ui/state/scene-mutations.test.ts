@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyTransform,
+  createLayer,
   createProject,
   IDENTITY_TRANSFORM,
   type Project,
@@ -12,11 +13,7 @@ import {
   type Scene,
   type TracedImage,
 } from '../../core/scene';
-import {
-  applyTraceToExisting,
-  ensureRasterImageLayer,
-  pruneOrphanLayers,
-} from './scene-mutations';
+import { applyTraceToExisting, ensureRasterImageLayer, pruneOrphanLayers } from './scene-mutations';
 
 function blankScene(): Scene {
   return { objects: [], layers: [] };
@@ -61,6 +58,7 @@ describe('ensureRasterImageLayer', () => {
           output: true,
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
+          fillOverscanMm: 5,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
         },
@@ -89,6 +87,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           output: true,
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
+          fillOverscanMm: 5,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
         },
@@ -103,6 +102,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           output: true,
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
+          fillOverscanMm: 5,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
         },
@@ -163,6 +163,27 @@ function tracedVector(): TracedImage {
     // applyTraceToExisting overwrites it with the source's transform.
     transform: IDENTITY_TRANSFORM,
     paths: [{ color: '#000000', polylines: [] }],
+  };
+}
+
+function centerlineVector(): TracedImage {
+  return {
+    ...tracedVector(),
+    traceMode: 'centerline',
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 0, y: 0 },
+              { x: 10, y: 0 },
+            ],
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -230,9 +251,32 @@ describe('applyTraceToExisting (ADR-026)', () => {
     expect(result.selectedObjectId).toBe('trace1');
   });
 
-  it('ensures a line layer for the trace color', () => {
+  it('ensures a fill layer for the trace color', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', tracedVector());
+    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('fill');
+  });
+
+  it('ensures a line layer for centerline traces', () => {
+    const project = projectWithSource();
+    const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', centerlineVector());
+    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
+  });
+
+  it('flips an existing fill layer back to line for centerline traces', () => {
+    const project = projectWithSource();
+    const withFillLayer: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [createLayer({ id: '#000000', color: '#000000', mode: 'fill' })],
+      },
+    };
+    const result = applyTraceToExisting(
+      { project: withFillLayer, undoStack: [] },
+      'src1',
+      centerlineVector(),
+    );
     expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
   });
 

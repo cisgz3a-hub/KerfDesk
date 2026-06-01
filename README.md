@@ -44,7 +44,7 @@ Read in this order:
 
 ## Build status
 
-Phases A–E shipped, plus Phase F.1 / F.2 / F.3 (see **Status** above). 644 tests across 68 files pass; `pnpm audit` is 0/0/0/0. See `AUDIT.md` for current findings.
+Phases A–E shipped, plus Phase F.1 / F.2 / F.3 (see **Status** above). 796 tests across 101 files pass; `pnpm audit` is 0/0/0/0. See `AUDIT.md` for current findings.
 
 ```bash
 pnpm install

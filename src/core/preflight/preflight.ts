@@ -23,6 +23,7 @@ export type PreflightCode =
   | 'speed-out-of-range'
   | 'passes-below-one'
   | 'layer-mode-mismatch'
+  | 'unsupported-raster-transform'
   | 'empty-output';
 
 export type PreflightIssue = {
@@ -53,6 +54,8 @@ export function runPreflight(project: Project, gcode: string): PreflightResult {
   }
 
   appendModeMismatchIssues(project.scene, outputLayers, issues);
+
+  appendUnsupportedRasterTransformIssues(project.scene, outputLayers, issues);
 
   appendBoundsIssues(project, gcode, issues);
 
@@ -115,6 +118,7 @@ function isStrandedOnLayer(obj: SceneObject, layer: Layer): boolean {
       // Vectors emit only on line/fill layers; an image layer ignores them.
       return layer.mode === 'image' && obj.paths.some((p) => p.color === layer.color);
     case 'raster-image':
+      if (obj.role === 'trace-source') return false;
       // Rasters emit only on image layers; a line/fill layer ignores them.
       return layer.mode !== 'image' && obj.color === layer.color;
     default:
@@ -126,6 +130,28 @@ function mismatchMessage(layer: Layer): string {
   return layer.mode === 'image'
     ? `Layer ${layer.id} is in Image mode but has vector objects assigned; they will not be engraved. Set the layer to Line or Fill, or move the objects to another layer.`
     : `Layer ${layer.id} is in ${layer.mode === 'fill' ? 'Fill' : 'Line'} mode but has an image assigned; it will not be engraved. Set the layer to Image mode.`;
+}
+
+function appendUnsupportedRasterTransformIssues(
+  scene: Scene,
+  outputLayers: ReadonlyArray<Layer>,
+  issues: PreflightIssue[],
+): void {
+  const outputImageColors = new Set(
+    outputLayers.filter((l) => l.mode === 'image').map((l) => l.color),
+  );
+  for (const obj of scene.objects) {
+    if (obj.kind !== 'raster-image') continue;
+    if (obj.role === 'trace-source') continue;
+    if (!outputImageColors.has(obj.color)) continue;
+    if (obj.transform.rotationDeg !== 0 || obj.transform.mirrorX || obj.transform.mirrorY) {
+      issues.push({
+        code: 'unsupported-raster-transform',
+        message:
+          'Image raster output currently supports scale and position only. Clear rotation/mirror before engraving, or convert after placing the artwork.',
+      });
+    }
+  }
 }
 
 function appendBoundsIssues(project: Project, gcode: string, issues: PreflightIssue[]): void {

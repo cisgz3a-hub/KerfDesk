@@ -10,11 +10,13 @@
 // `view-transform.ts`; the drag state machine in `drag-state.ts`; the
 // HTML overlays (drop hint, preview scrubber, etc.) in `overlays.tsx`.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { buildPreviewToolpath } from './draw-preview';
 import { drawScene } from './draw-scene';
+import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
 import {
   computeMouseDownDrag,
   type DragState,
@@ -37,34 +39,18 @@ export function Workspace(): JSX.Element {
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const panX = useUiStore((s) => s.panX);
   const panY = useUiStore((s) => s.panY);
-  useEffect(() => {
-    const canvas = ref.current;
-    if (canvas === null) return;
-    const ctx = canvas.getContext('2d');
-    if (ctx === null) return;
-    drawScene(ctx, canvas.width, canvas.height, project, {
-      selectedId: selectedObjectId,
-      additionalSelectedIds,
-      preview: previewMode,
-      scrubberT,
-      view: { zoomFactor, panX, panY },
-    });
-  }, [
+  const viewState = useMemo(() => ({ zoomFactor, panX, panY }), [zoomFactor, panX, panY]);
+  useWorkspaceDraw({
+    ref,
     project,
     selectedObjectId,
     additionalSelectedIds,
     previewMode,
     scrubberT,
-    zoomFactor,
-    panX,
-    panY,
-  ]);
-
-  const { handlers, dragKind } = useDragMove(ref, project, previewMode, {
-    zoomFactor,
-    panX,
-    panY,
+    viewState,
   });
+
+  const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
   const isEmpty = project.scene.objects.length === 0;
   const dragOverlay = useUiStore((s) => s.dragOverlay);
   return (
@@ -95,7 +81,7 @@ export function Workspace(): JSX.Element {
           project={project}
           selectedId={selectedObjectId}
           kind={dragKind}
-          viewState={{ zoomFactor, panX, panY }}
+          viewState={viewState}
         />
       )}
       {previewMode && <PreviewScrubber />}
@@ -104,6 +90,67 @@ export function Workspace(): JSX.Element {
       {!previewMode && <ZoomControls />}
     </>
   );
+}
+
+function useWorkspaceDraw(args: {
+  readonly ref: React.RefObject<HTMLCanvasElement | null>;
+  readonly project: Project;
+  readonly selectedObjectId: string | null;
+  readonly additionalSelectedIds: ReadonlySet<string>;
+  readonly previewMode: boolean;
+  readonly scrubberT: number;
+  readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
+}): void {
+  const {
+    ref,
+    project,
+    selectedObjectId,
+    additionalSelectedIds,
+    previewMode,
+    scrubberT,
+    viewState,
+  } = args;
+  const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
+  const displayPolylineCacheRef = useRef<DisplayPolylineCache | null>(null);
+  if (displayPolylineCacheRef.current === null) {
+    displayPolylineCacheRef.current = createDisplayPolylineCache();
+  }
+  const displayPolylineCache = displayPolylineCacheRef.current;
+  const previewToolpath = useMemo(
+    () => (previewMode ? buildPreviewToolpath(project) : null),
+    [previewMode, project],
+  );
+  const requestRasterRedraw = useCallback(() => {
+    setRasterRedrawTick((tick) => tick + 1);
+  }, []);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (canvas === null) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx === null) return;
+    drawScene(ctx, canvas.width, canvas.height, project, {
+      selectedId: selectedObjectId,
+      additionalSelectedIds,
+      preview: previewMode,
+      scrubberT,
+      view: viewState,
+      onRasterBitmapReady: requestRasterRedraw,
+      displayPolylineCache,
+      ...(previewToolpath === null ? {} : { previewToolpath }),
+    });
+  }, [
+    ref,
+    project,
+    selectedObjectId,
+    additionalSelectedIds,
+    previewMode,
+    scrubberT,
+    viewState,
+    rasterRedrawTick,
+    displayPolylineCache,
+    previewToolpath,
+    requestRasterRedraw,
+  ]);
 }
 
 // Wheel-to-zoom anchored at the cursor. Three wheel sources fire

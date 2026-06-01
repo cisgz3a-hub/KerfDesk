@@ -304,14 +304,14 @@ Identical to F-A3 except:
 - Preflight summary at top of viewport: `Preview: 1 layer extends 12 mm beyond bed`.
 
 #### Edge — preview of very large scene
-- > 10,000 path segments: warning shown above viewport: `Large scene · preview simplified for performance` and only every Nth point rendered.
-- Generated G-code is unaffected — preview simplification is visual only.
+- > 10,000 path segments: warning shown above viewport: `Large scene - display simplified for performance`; the canvas renders a bounded display sample instead of walking every source point on each redraw.
+- Generated G-code and saved project geometry are unaffected — simplification is visual only.
 
 #### Raster engrave preview (image-mode layers) — ADR-028
 - **Success:** each `raster-image` on an output-enabled image-mode layer renders a burn simulation at the image's placement, registered with the bitmap including rotation/mirror. Threshold/Floyd-Steinberg render as crisp black/white dots; grayscale as a smooth ramp. The simulation uses the exact dither + power scaling the G-code will emit (WYSIWYG, like the Fill hatch preview).
 - **Live updates:** changing the layer's power or dither algorithm re-renders the simulation within the same 100 ms budget.
 - **Empty:** an image-mode layer with Output off shows no simulation — same rule as any non-output layer (preview shows what *burns*, not what's merely visible on the design canvas).
-- **Edge — missing luma:** a legacy `.lf2` raster with no embedded luma buffer renders dark (full-burn), not blank — the same fallback `compileJob` uses.
+- **Edge — missing luma:** a legacy `.lf2` raster with no embedded luma buffer renders white / laser-off, not full-burn. If that leaves the job with no G1 burn moves, preflight reports empty output.
 - **Edge — scrubber:** the scrubber animates vector toolpaths only; the raster simulation always renders complete regardless of scrubber position. Row-by-row raster scrubbing is deferred to a later increment.
 
 ---
@@ -676,13 +676,13 @@ or traced image) with at least one closed polyline.
 1. In the Cuts/Layers panel, find the row for the color you want to
    engrave as fill.
 2. Click the **Mode** dropdown → choose **Fill**.
-3. The row expands: a sub-row appears underneath showing two new
-   inputs — **° angle** and **mm spacing**. Defaults are 0° (horizontal
-   hatching) and 0.2 mm (≈ 5 lines/mm).
-4. (Optional) Adjust the inputs. Both commit on the 300 ms F-A7 debounce.
+3. The row expands: a sub-row appears underneath showing Fill-specific
+   inputs: **° angle**, **mm spacing**, and **Overscan**. Defaults are
+   0° (horizontal hatching), 0.2 mm (≈ 5 lines/mm), and 5 mm overscan.
+4. (Optional) Adjust the inputs. All three commit on the 300 ms F-A7 debounce.
 5. Compile + emit G-code as usual (Save G-code, or Start job in the
-   Laser panel). The CutGroup for that color now contains hatch lines
-   instead of the outline.
+   Laser panel). The FillGroup for that color now contains hatch lines
+   with laser-off overscan runway instead of the outline.
 
 **Error**:
 - *No closed polylines on this color* — the layer's mode is Fill, but
@@ -710,6 +710,10 @@ or traced image) with at least one closed polyline.
   guard. The user can lower `hatchSpacingMm` or switch to Line mode.
 - *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
   boundary so an accidental 0 doesn't generate millions of lines.
+- *Overscan near a bed edge*: Fill Overscan adds laser-off runway before
+  and after each hatch line. The framed burn area does not grow, but
+  preflight checks the emitted G-code and can reject a job whose runway
+  would move outside the bed. Move the artwork inward or lower Overscan.
 
 ### F-F2. Image-engrave a raster (Phase F.2 — code shipped through F.2.e; hardware burn pending)
 
@@ -743,8 +747,9 @@ correct M4-mode raster G-code from Compile.
    the dither" overlay in v1 — the image itself is the preview.
 7. **Compile** → emit-gcode walks the scene. The Image layer's group
    dispatches to `emitRaster` (M4 mode, per-pixel X sweep with S
-   modulating per dither output, overscan extends X travel ~5 mm
-   each side with S0).
+   modulating per dither output). Active rows alternate
+   left-to-right / right-to-left, and overscan extends the entry and
+   exit side of each row by ~5 mm with S0.
 8. G-code file lands in the chosen output target (download, Save As,
    or the connected serial).
 
@@ -799,6 +804,11 @@ Hardware burn on the Falcon (must be confirmed by user):
 5. **No "burn-line on travel" artefacts**: between rows, the head
    moves at S=0 — verify by looking at the row-end overscan zone
    for any unintended burn marks.
+6. **Bidirectional row speed**: on a two-row black/white test patch,
+   the second active row should return right-to-left instead of
+   rapiding back to the left edge first. If the burn shows ghosted or
+   staggered vertical edges, lower speed for the job and treat scanning
+   offset calibration as the next hardware task.
 
 When this checklist passes, mark F.2.f complete in AUDIT.md A8
 inventory and tag the build as the first Phase F.2 release.
@@ -820,7 +830,9 @@ streaming controls. Two buttons:
   position as work-coord (0, 0). Toast confirms the write; the status
   bar's `Origin:` row flips from "machine 0,0" (muted) to
   "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
-  next WCO-bearing status frame arrives.
+  next WCO-bearing status frame arrives. Frame and Start switch to
+  user-origin placement immediately after the write succeeds; they do
+  not wait for that later status frame.
 - **Reset origin** — sends `G92.1`. Clears the offset, status returns
   to "machine 0,0". Disabled when no custom origin is active.
 
@@ -835,8 +847,9 @@ frames out of 30 and would flicker the readout.
 1. **Success.** Connected, idle, head jogged to a workpiece corner.
    Click Set origin here → toast "Origin set to current head position
    (G92)." → status row updates to "Origin: X… Y… (custom)". Click
-   Frame → head traces the workpiece-relative bounding box. Click
-   Start → job runs at the workpiece corner.
+   Frame → head traces the job's front-left anchored bounding box
+   around the workpiece corner. Click Start → job runs at the
+   workpiece corner.
 2. **No connection.** Both buttons disabled (`busy = props.disabled
    || streaming`; `disabled` set by `LaserWindow` when connection
    isn't `connected`). User must connect first.
@@ -847,13 +860,13 @@ frames out of 30 and would flicker the readout.
    re-jogs and re-sets if they want the offset back.
 4. **Off-bed risk.** Operator sets origin near the bed edge, then
    runs a job whose scene-mm bounds *fit the bed* but extend off the
-   *machine* once the offset is applied. **The current preflight does
-   not catch this** (gap documented in ADR-021, future ADR-022).
-   Mitigation: always click Frame after Set origin here — the
-   existing Frame button traces the post-WCS-offset path and will
-   reveal the risk before the laser fires. The Falcon's `$20=0`
-   default means an off-machine move skips steps mechanically rather
-   than crashing.
+   *machine* once the offset is applied. When WCO is known, Frame and
+   Start preflight check the physical bounds (`job bounds + WCO`) and
+   block with an out-of-bed message before motion. If no controller
+   position/WCO has been observed yet, Frame/Start can still place the
+   job relative to the custom origin but cannot prove the physical
+   extents; wait for an Idle status/WCO readout before relying on the
+   safety check.
 
 **Hardware verification checklist (Falcon A1 Pro — user-driven).**
 
@@ -863,8 +876,9 @@ frames out of 30 and would flicker the readout.
 3. Click **Set origin here**. Within ~5 s the readout flips to
    `Origin: X… Y… (custom)` (red/bold), values matching the previous
    MPos. Toast confirms.
-4. Click **Frame**. Head sweeps the bounding box *around the
-   workpiece corner*, not around machine origin.
+4. Click **Frame**. Head sweeps the job's front-left anchored bounding
+   box *around the workpiece corner*, not around machine origin or the
+   image's auto-centered canvas placement.
 5. Run a 5 mm × 5 mm test square (S=0 or low power on scrap). It
    should burn at the workpiece corner.
 6. Click **Reset origin**. Toast confirms; readout returns to

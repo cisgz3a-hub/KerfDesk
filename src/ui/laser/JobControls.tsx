@@ -4,17 +4,18 @@
 import { useMemo } from 'react';
 import { progress } from '../../core/controllers/grbl';
 import {
+  applyJobOrigin,
   compileJob,
   computeJobBounds,
   describeFramePreflightFailure,
-  estimateJobDuration,
-  formatDuration,
   framePreflight,
-  optimizePaths,
+  offsetJobBounds,
+  USER_ORIGIN_JOB_PLACEMENT,
 } from '../../core/job';
 import { useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
 
 type Props = {
   readonly disabled: boolean;
@@ -51,9 +52,10 @@ function OriginRow(props: {
   const setOrigin = useLaserStore((s) => s.setOriginHere);
   const resetOrigin = useLaserStore((s) => s.resetOrigin);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const pushToast = useToastStore((s) => s.pushToast);
   const busy = props.disabled || props.streaming;
-  const hasCustom = hasCustomOrigin(wcoCache);
+  const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
   // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
   // intermittently (every Nth status per `$10`), so the StatusDisplay
   // readout may take 1-30 frames (~0.25-7.5s) to update after a G92.
@@ -102,7 +104,7 @@ function SetupRow(props: {
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const home = useLaserStore((s) => s.home);
-  const estimateLabel = useJobEstimateLabel();
+  const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
   // Disabled when the command is empty — there's no portable autofocus
   // G-code (see DeviceProfile.autofocusCommand docs); shipping a default
@@ -142,33 +144,43 @@ function SetupRow(props: {
         type="button"
         onClick={props.onStartJob}
         disabled={busy}
-        title={
-          estimateLabel === null
-            ? 'Enable Output on at least one layer to start a job'
-            : `Estimated burn time: ${estimateLabel} (excludes acceleration overhead)`
-        }
+        title={startJobTitle(estimate)}
       >
         Start job
       </button>
-      {estimateLabel !== null && <span style={estimateStyle}>≈ {estimateLabel}</span>}
+      <EstimateBadge estimate={estimate} />
     </div>
   );
 }
 
-// Live ETA for the current scene + device settings. Returns null when
-// there's nothing to burn (no output-enabled layer / empty scene) so the
-// caller can hide the readout instead of showing "0s". useMemo keeps the
-// estimate stable across re-renders that don't touch scene or device.
-function useJobEstimateLabel(): string | null {
+// Live ETA for the current scene + device settings. Huge vector traces
+// intentionally report "too-large" so React render never runs the full
+// compile/optimize/estimate pipeline on a main-thread hot path.
+function useJobEstimate(): LiveJobEstimate {
   const project = useStore((s) => s.project);
-  return useMemo(() => {
-    // Optimize before estimating so the ETA reflects the actual burn
-    // order (emitGcode runs the same compile→optimize chain).
-    const job = optimizePaths(compileJob(project.scene, project.device));
-    if (job.groups.length === 0) return null;
-    const r = estimateJobDuration(job, project.device);
-    return r.totalSeconds > 0 ? formatDuration(r.totalSeconds) : null;
-  }, [project.scene, project.device]);
+  return useMemo(() => estimateLiveJob(project), [project]);
+}
+
+function startJobTitle(estimate: LiveJobEstimate): string {
+  if (estimate.kind === 'estimated') {
+    return `Estimated burn time: ${estimate.label} (excludes acceleration overhead)`;
+  }
+  if (estimate.kind === 'too-large') {
+    return 'Large trace: live estimate paused for performance. Start still generates full G-code.';
+  }
+  return 'Enable Output on at least one layer to start a job';
+}
+
+function EstimateBadge({ estimate }: { readonly estimate: LiveJobEstimate }): JSX.Element | null {
+  if (estimate.kind === 'estimated') return <span style={estimateStyle}>≈ {estimate.label}</span>;
+  if (estimate.kind === 'too-large') {
+    return (
+      <span style={estimateStyle} title="Live estimate paused so large traces stay responsive.">
+        large job
+      </span>
+    );
+  }
+  return null;
 }
 
 function RunningControls(props: {
@@ -181,7 +193,7 @@ function RunningControls(props: {
   return (
     <div style={rowStyle}>
       {props.isStreaming && (
-        <button type="button" onClick={pauseJob}>
+        <button type="button" onClick={() => void pauseJob()}>
           Pause
         </button>
       )}
@@ -215,9 +227,14 @@ function ProgressBar({
 function useFrameAction(): () => void {
   const project = useStore((s) => s.project);
   const frame = useLaserStore((s) => s.frame);
+  const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const wcoCache = useLaserStore((s) => s.wcoCache);
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
-    const job = compileJob(project.scene, project.device);
+    const compiled = compileJob(project.scene, project.device);
+    const job = workOriginActive
+      ? applyJobOrigin(compiled, USER_ORIGIN_JOB_PLACEMENT)
+      : compiled;
     const bounds = computeJobBounds(job);
     if (bounds === null) {
       pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
@@ -228,7 +245,9 @@ function useFrameAction(): () => void {
     // steps mechanically — the operator hears grinding and the trace
     // collapses to a sideways line because the axis that hit the stop
     // can't keep up. Better to refuse here with a clear instruction.
-    const pre = framePreflight(bounds, project.device);
+    const preflightBounds =
+      workOriginActive && wcoCache !== null ? offsetJobBounds(bounds, wcoCache) : bounds;
+    const pre = framePreflight(preflightBounds, project.device);
     if (pre.kind === 'out-of-bounds') {
       pushToast(describeFramePreflightFailure(pre), 'error');
       return;

@@ -10,7 +10,7 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       globals: false,
-      include: ['src/**/*.test.{ts,tsx}'],
+      include: ['src/**/*.test.{ts,tsx}', 'electron/**/*.test.ts'],
       exclude: ['node_modules/**', 'dist/**', 'release/**'],
       coverage: {
         provider: 'v8',

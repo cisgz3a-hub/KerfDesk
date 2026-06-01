@@ -66,6 +66,7 @@ export default tseslint.config(
       'node_modules/**',
       '.claude/**',
       'eslint.config.mjs',
+      'eslint.electron.config.mjs',
       'vite.config.*',
       'vitest.config.*',
       '*.config.js',

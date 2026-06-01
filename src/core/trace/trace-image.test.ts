@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildImageTracerOptions,
   DEFAULT_TRACE_OPTIONS,
+  preprocessForTrace,
+  thresholdBandToMonochrome,
   thresholdToMonochrome,
   traceImageToSvgString,
   TRACE_PRESETS,
 } from './trace-image';
+import { lightBurnTraceSettingsToPotraceParams } from './potrace-params';
 
 type Fixture = {
   readonly width: number;
@@ -189,6 +192,59 @@ describe('traceImageToSvgString', () => {
     const original = new Uint8ClampedArray(data);
     thresholdToMonochrome({ width: 1, height: 1, data }, 128);
     expect(Array.from(data)).toEqual(Array.from(original));
+  });
+
+  it('thresholdBandToMonochrome matches LightBurn Cutoff/Threshold inclusivity', () => {
+    // LightBurn traces brightness values in the inclusive range
+    // Cutoff..Threshold. With Cutoff=10 and Threshold=128, black (0)
+    // is excluded, 10/64/128 are ink, and 129/255 are excluded.
+    const data = new Uint8ClampedArray([
+      0, 0, 0, 255, 10, 10, 10, 255, 64, 64, 64, 255, 128, 128, 128, 255, 129, 129, 129, 255, 255,
+      255, 255, 255,
+    ]);
+
+    const result = thresholdBandToMonochrome({ width: 6, height: 1, data }, 10, 128);
+
+    expect(Array.from(result.data)).toEqual([
+      255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255,
+      255, 255,
+    ]);
+  });
+
+  it('preprocessForTrace applies the LightBurn brightness band when cutoffLuma is set', () => {
+    const data = new Uint8ClampedArray([
+      0, 0, 0, 255, 32, 32, 32, 255, 128, 128, 128, 255, 180, 180, 180, 255,
+    ]);
+
+    const result = preprocessForTrace(
+      { width: 4, height: 1, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        cutoffLuma: 32,
+        thresholdLuma: 128,
+      },
+    );
+
+    expect(Array.from(result.data)).toEqual([
+      255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+    ]);
+  });
+
+  it('Line Art preset uses LightBurn default Cutoff/Threshold range', () => {
+    const lineArt = TRACE_PRESETS['Line Art'];
+
+    expect(lineArt?.cutoffLuma).toBe(0);
+    expect(lineArt?.thresholdLuma).toBe(128);
+    expect(lineArt?.ignoreLessThanPixels).toBe(2);
+    expect(lineArt?.smoothness).toBe(1);
+    expect(lineArt?.optimize).toBe(0.2);
+    expect(lightBurnTraceSettingsToPotraceParams(lineArt)).toMatchObject({
+      turdSize: 2,
+      alphaMax: 1,
+      optCurve: true,
+      optTolerance: 0.2,
+    });
+    expect(lineArt?.useOtsuThreshold).toBeUndefined();
   });
 
   it('Line Art preset: traces an AA-heavy fixture without spurious dots', async () => {

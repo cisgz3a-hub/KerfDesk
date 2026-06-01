@@ -89,6 +89,26 @@ describe('coloredPathsToSvg', () => {
     expect(svg).not.toContain('Z"');
   });
 
+  it('renders open polylines as stroked centerlines, not filled polygons', () => {
+    const open: ColoredPath = {
+      color: '#ff0000',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 0, y: 0 },
+            { x: 5, y: 5 },
+            { x: 10, y: 0 },
+          ],
+        },
+      ],
+    };
+    const svg = coloredPathsToSvg([open], 10, 10);
+    expect(svg).toContain('fill="none"');
+    expect(svg).toContain('stroke="#ff0000"');
+    expect(svg).toContain('stroke-linecap="round"');
+  });
+
   it('concatenates multiple polylines in the same <path> d', () => {
     const svg = coloredPathsToSvg([DONUT], 10, 10);
     // Two subpaths joined with a space + M command.

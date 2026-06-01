@@ -17,11 +17,17 @@
 //
 // Only output-enabled image-mode layers render — the exact gate compileJob
 // uses (layer.visible is ignored; preview shows what burns, not what's
-// shown). Dither output is cached per dataUrl|algorithm|sMax since it's
-// static until one of those changes.
+// shown). Dither output is cached per source image + luma + layer settings
+// since it's static until one of those changes.
 
 import type { DeviceProfile } from '../../core/devices';
-import { dither, rasterPreviewRgba } from '../../core/raster';
+import {
+  dither,
+  pixelExtentForMm,
+  rasterPreviewRgba,
+  resampleLumaNearest,
+  whiteLuma,
+} from '../../core/raster';
 import type { Layer, Project, RasterImage } from '../../core/scene';
 import { drawBitmapAtTransform } from './draw-raster';
 import type { ViewTransform } from './view-transform';
@@ -38,6 +44,7 @@ export function drawRasterPreview(
     if (!layer.output || layer.mode !== 'image') continue;
     for (const obj of project.scene.objects) {
       if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
+      if (obj.role === 'trace-source') continue;
       drawOnePreview(ctx, obj, layer, project.device, view);
     }
   }
@@ -71,21 +78,34 @@ function previewCanvasFor(
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
   const sMax = powerToSMax(layer.power, device.maxPowerS);
-  const key = `${obj.dataUrl}|${layer.ditherAlgorithm}|${sMax}`;
+  const targetWidth = pixelExtentForMm(
+    (obj.bounds.maxX - obj.bounds.minX) * Math.abs(obj.transform.scaleX),
+    layer.linesPerMm,
+  );
+  const targetHeight = pixelExtentForMm(
+    (obj.bounds.maxY - obj.bounds.minY) * Math.abs(obj.transform.scaleY),
+    layer.linesPerMm,
+  );
+  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${layer.ditherAlgorithm}|${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
   const cached = previewCanvasCache.get(key);
   if (cached !== undefined) return cached;
-  const luma = decodeLuma(obj.lumaBase64, pixelWidth * pixelHeight);
+  const sourceLuma = decodeLuma(obj.lumaBase64, pixelWidth * pixelHeight);
+  const luma = resampleLumaNearest(
+    { luma: sourceLuma, width: pixelWidth, height: pixelHeight },
+    targetWidth,
+    targetHeight,
+  );
   const sValues = dither(
-    { luma, width: pixelWidth, height: pixelHeight },
+    { luma, width: targetWidth, height: targetHeight },
     { algorithm: layer.ditherAlgorithm, sMax },
   );
-  const rgba = rasterPreviewRgba(sValues, sMax, pixelWidth, pixelHeight);
+  const rgba = rasterPreviewRgba(sValues, sMax, targetWidth, targetHeight);
   const canvas = document.createElement('canvas');
-  canvas.width = pixelWidth;
-  canvas.height = pixelHeight;
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
   const octx = canvas.getContext('2d');
   if (octx === null) return null;
-  octx.putImageData(new ImageData(rgba, pixelWidth, pixelHeight), 0, 0);
+  octx.putImageData(new ImageData(rgba, targetWidth, targetHeight), 0, 0);
   previewCanvasCache.set(key, canvas);
   return canvas;
 }
@@ -98,13 +118,17 @@ function powerToSMax(powerPercent: number, maxPowerS: number): number {
   return Math.round((clamped / PERCENT_MAX) * maxPowerS);
 }
 
-// Mirror compileJob's decodeBase64Luma: atob → charCodeAt, truncate/pad
-// to the expected pixel count. Missing buffer (pre-F.2.e .lf2) degrades
-// to all-zero = full-burn black, the same fallback compile uses.
+// Mirror compileJob's decodeBase64Luma: missing/corrupt bytes are white
+// so preview and G-code both fail safe to laser-off.
 function decodeLuma(base64: string | undefined, expectedLength: number): Uint8Array {
-  const out = new Uint8Array(expectedLength);
+  const out = whiteLuma(expectedLength);
   if (base64 === undefined) return out;
-  const binary = atob(base64);
+  let binary = '';
+  try {
+    binary = atob(base64);
+  } catch {
+    return out;
+  }
   const n = Math.min(binary.length, expectedLength);
   for (let i = 0; i < n; i += 1) out[i] = binary.charCodeAt(i);
   return out;

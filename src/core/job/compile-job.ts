@@ -10,7 +10,7 @@
 // arrays, indexed loops) → repeatable across runs.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
-import { dither } from '../raster';
+import { dither, pixelExtentForMm, resampleLumaNearest, whiteLuma } from '../raster';
 import {
   applyTransform,
   assertNever,
@@ -22,7 +22,7 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
-import { fillHatching } from './fill-hatching';
+import { memoizedFillHatching } from './fill-hatching-cache';
 import type { CutSegment, Group, Job, RasterGroup } from './job';
 
 // Default overscan kept here (not on Layer) so it can ride device
@@ -43,21 +43,26 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
       // by layer if they want different power/dither per image).
       for (const obj of scene.objects) {
         if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
+        if (obj.role === 'trace-source') continue;
         groups.push(compileRasterGroup(obj, layer, device));
       }
       continue;
     }
     const segments = collectSegmentsForLayer(scene.objects, layer, device);
     if (segments.length === 0) continue;
-    groups.push({
-      kind: 'cut',
+    const common = {
       layerId: layer.id,
       color: layer.color,
       power: clamp(layer.power, 0, 100),
       speed: Math.min(layer.speed, device.maxFeed),
       passes: Math.max(1, Math.floor(layer.passes)),
       segments,
-    });
+    };
+    groups.push(
+      layer.mode === 'fill'
+        ? { ...common, kind: 'fill', overscanMm: Math.max(0, layer.fillOverscanMm) }
+        : { ...common, kind: 'cut' },
+    );
   }
   return { groups };
 }
@@ -74,19 +79,24 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
 // luma buffer must be supplied externally... TODO: this path can't
 // stay pure if it needs to decode the dataUrl. See F.2.d note below.
 function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfile): RasterGroup {
-  // Decode the pre-extracted luma buffer from obj.lumaBase64. Falls
-  // back to all-zero if missing (pre-F.2.e .lf2 files, or import
-  // paths that haven't populated it yet). Decoding is pure: atob is
-  // a JS standard global available in Node 16+ and every browser.
-  const luma =
+  // Missing/corrupt luma fails safe to white (S0), not black/full-burn.
+  const sourceLuma =
     obj.lumaBase64 !== undefined
       ? decodeBase64Luma(obj.lumaBase64, obj.pixelWidth * obj.pixelHeight)
-      : new Uint8Array(obj.pixelWidth * obj.pixelHeight);
+      : whiteLuma(obj.pixelWidth * obj.pixelHeight);
   const sMax = Math.round((clamp(layer.power, 0, 100) / 100) * device.maxPowerS);
+  const bounds = rasterBoundsInMachineCoords(obj, device);
+  const pixelWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
+  const pixelHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
+  const luma = resampleLumaNearest(
+    { luma: sourceLuma, width: obj.pixelWidth, height: obj.pixelHeight },
+    pixelWidth,
+    pixelHeight,
+  );
   // Layer settings win over per-image settings so the operator can
   // re-tune one layer without editing every image on it.
   const sValues = dither(
-    { luma, width: obj.pixelWidth, height: obj.pixelHeight },
+    { luma, width: pixelWidth, height: pixelHeight },
     { algorithm: layer.ditherAlgorithm, sMax },
   );
   return {
@@ -95,21 +105,26 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     color: layer.color,
     power: clamp(layer.power, 0, 100),
     speed: Math.min(layer.speed, device.maxFeed),
+    passes: Math.max(1, Math.floor(layer.passes)),
     sValues,
-    pixelWidth: obj.pixelWidth,
-    pixelHeight: obj.pixelHeight,
-    bounds: rasterBoundsInMachineCoords(obj, device),
+    pixelWidth,
+    pixelHeight,
+    bounds,
     overscanMm: DEFAULT_OVERSCAN_MM,
   };
 }
 
-// Decode a base64-encoded luma buffer. Truncates / pads to the
-// expected length so a corrupt or partial buffer doesn't blow up
-// the dither (renders the missing tail as black, which over-burns
-// rather than silently dropping pixels — fail-loud).
+// Decode a base64-encoded luma buffer. Truncates / pads to the expected
+// length so a corrupt or partial buffer does not blow up the dither.
+// Missing/corrupt bytes are white so the laser stays off.
 function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
-  const binary = atob(base64);
-  const out = new Uint8Array(expectedLength);
+  let binary = '';
+  try {
+    binary = atob(base64);
+  } catch {
+    return whiteLuma(expectedLength);
+  }
+  const out = whiteLuma(expectedLength);
   const n = Math.min(binary.length, expectedLength);
   for (let i = 0; i < n; i += 1) {
     out[i] = binary.charCodeAt(i);
@@ -124,19 +139,19 @@ function rasterBoundsInMachineCoords(
   obj: RasterImage,
   device: DeviceProfile,
 ): { readonly minX: number; readonly minY: number; readonly maxX: number; readonly maxY: number } {
-  const tl = toMachineCoords(
-    applyTransform({ x: obj.bounds.minX, y: obj.bounds.minY }, obj.transform),
-    device,
-  );
-  const br = toMachineCoords(
-    applyTransform({ x: obj.bounds.maxX, y: obj.bounds.maxY }, obj.transform),
-    device,
-  );
+  const corners = [
+    { x: obj.bounds.minX, y: obj.bounds.minY },
+    { x: obj.bounds.maxX, y: obj.bounds.minY },
+    { x: obj.bounds.maxX, y: obj.bounds.maxY },
+    { x: obj.bounds.minX, y: obj.bounds.maxY },
+  ].map((p) => toMachineCoords(applyTransform(p, obj.transform), device));
+  const xs = corners.map((p) => p.x);
+  const ys = corners.map((p) => p.y);
   return {
-    minX: Math.min(tl.x, br.x),
-    maxX: Math.max(tl.x, br.x),
-    minY: Math.min(tl.y, br.y),
-    maxY: Math.max(tl.y, br.y),
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
   };
 }
 
@@ -211,13 +226,7 @@ function appendPathSegments(
   for (const path of paths) {
     if (path.color !== layer.color) continue;
     const polylines =
-      layer.mode === 'fill'
-        ? fillHatching({
-            polylines: path.polylines,
-            hatchAngleDeg: layer.hatchAngleDeg,
-            hatchSpacingMm: layer.hatchSpacingMm,
-          })
-        : path.polylines;
+      layer.mode === 'fill' ? memoizedFillHatching(path.polylines, layer) : path.polylines;
     for (const polyline of polylines) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, transform), device),
