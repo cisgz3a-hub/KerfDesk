@@ -29,10 +29,10 @@ export type LaserOffMethod = 'gcode-m5' | 'native' | 'pwm-zero' | 'unsupported';
 export type PauseLatencyClass = 'realtime' | 'queued' | 'unknown';
 
 /**
- * How the controller receives the job. Determines whether `disconnect`
- * is enough to stop a job (host-streamed) or whether a separate
- * cancel command is needed (uploaded-file controllers like some
- * Wi-Fi LightBurn dialects).
+ * How the controller receives the job. This is related to, but not
+ * identical to, physical stop-on-disconnect: host-streamed controllers
+ * stop receiving new input when the link drops, but firmware may still
+ * execute already-buffered motion.
  */
 export type ExecutionModel = 'lineStream' | 'uploadedFile' | 'realtimeApi' | 'unknown';
 
@@ -74,7 +74,10 @@ export interface ControllerSafetyCapabilities {
   testFireMaxDurationMs: number;
 
   // ─── Side-effects of stop / disconnect ────────────────────────
-  /** Critical for Wi-Fi/file-upload controllers — disconnect alone may NOT stop the job. */
+  /**
+   * True only when losing the host transport physically halts an active
+   * job. "Host stops sending new lines" is not enough.
+   */
   disconnectStopsJob: SafetyTristate;
   /** True when stop leaves the position counter untrusted (soft-reset, alarm). */
   stopInvalidatesPosition: SafetyTristate;
@@ -99,8 +102,9 @@ export interface ControllerSafetyCapabilities {
  * - `laserOffCanBeVerified: false` — we send M5 but cannot read back
  *   the laser-off state; the safety service must rely on the per-
  *   character ack as a best effort.
- * - `disconnectStopsJob: true` — GRBL is host-streamed; closing the
- *   serial port stops the line stream, which stops the job.
+ * - `disconnectStopsJob: false` — GRBL is host-streamed, so closing
+ *   the serial port stops new host input, but firmware may continue
+ *   executing already-buffered RX/planner commands.
  * - `stopInvalidatesPosition: true` and `stopRequiresRehome: true` —
  *   our stop is a soft-reset; GRBL position counter is reset.
  */
@@ -123,7 +127,7 @@ export const grblSafetyCapabilities: ControllerSafetyCapabilities = {
   testFireRequiresMotion: false,
   testFireMaxDurationMs: 5000,
 
-  disconnectStopsJob: true,
+  disconnectStopsJob: false,
   stopInvalidatesPosition: true,
   stopRequiresRehome: true,
 

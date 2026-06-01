@@ -279,6 +279,27 @@ void (async () => {
     'alarm without active job does not trip recovery (idle alarm path is preflight territory)');
 }
 
+// -------- 6b. Live disconnect during active job triggers recovery immediately --------
+{
+  const { ctrl, fireStateChange } = makeController();
+  const ref = { current: ctrl } as MutableRefObject<LaserController>;
+  const portRef = { current: null } as MutableRefObject<SerialPortLike | null>;
+  const svc = new MachineService(ref, portRef);
+
+  (svc as unknown as { activeTicket: ValidatedJobTicket | null }).activeTicket =
+    { ticketId: 'disconnect-ticket' } as unknown as ValidatedJobTicket;
+
+  svc.attachAutoFinalize(ctrl);
+  fireStateChange({ ...idle, status: 'disconnected' });
+
+  const r = svc.getRecoveryState();
+  assert(r.status === 'disconnectDuringJob',
+    `live disconnect during active job auto-triggers disconnect recovery (got '${r.status}')`);
+  if (r.status === 'disconnectDuringJob') {
+    assert(r.requiresRehome === true, 'disconnect recovery requires rehome by default');
+  }
+}
+
 // -------- 7. notifyLaserSafetyOutcome('failed') auto-triggers triggerEmergencyStop --------
 {
   const { ctrl } = makeController();

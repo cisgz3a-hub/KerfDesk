@@ -13,6 +13,7 @@ const actionLabel: Record<string, string> = {
   frame: 'Frame',
   stop: 'Stop',
   compile: 'Compile',
+  'manual-position-confirmed': 'I verified zero',
 };
 
 export interface RecoveryCardProps {

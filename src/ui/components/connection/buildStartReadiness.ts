@@ -21,6 +21,7 @@
  * same gates without inheriting from ConnectionPanelMain.
  */
 import type { ActiveOperationState, LaserOutputState } from '../../../app/MachineService';
+import { firstStartBlocker, type StartBlocker } from '../../../app/StartBlocker';
 import type { MachineState, MachineStatus } from '../../../controllers/ControllerInterface';
 import type { WcsUncertainReason } from '../../../controllers/grbl/GrblWcsConsentClassifier';
 import type { GcodeStartMode } from '../../../core/output/GcodeOrigin';
@@ -47,6 +48,7 @@ export interface BuildStartReadinessInput {
   readonly gcodeStale: boolean;
   readonly isSimulator: boolean;
   readonly machineBlocksJobStart: boolean;
+  readonly startBlockers?: readonly StartBlocker[];
   readonly canFrame: boolean;
   readonly requireFrame: boolean;
   readonly hasFramed: boolean;
@@ -206,6 +208,7 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
       severity: i.severity as 'blocker' | 'warning',
       text: i.title,
     }));
+  const startBlocker = firstStartBlocker(input.startBlockers ?? []);
 
   const gates: StartReadinessGate[] = [
     {
@@ -258,6 +261,13 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
         ? `Machine is "${input.machineStatus}"`
         : 'Machine not in idle state',
       failAction: 'Wait for idle, or stop/reset on the controller if it is stuck',
+    },
+    {
+      id: 'startBlocker',
+      label: 'Start safety policy',
+      status: startBlocker == null ? 'ok' : 'fail',
+      failHeadline: startBlocker?.title ?? 'Start is blocked by safety policy',
+      failAction: startBlocker?.action ?? 'Clear the blocking condition before starting',
     },
     {
       id: 'frameControls',

@@ -31,7 +31,7 @@ console.log('\n=== T2-6 Phase 3ad app start-mode selection helpers ===\n');
   const result = buildStartModeSelectionCommit(scene, 'current', { x: 10.5, y: 20.5 });
   assert(result.scene.startPosition.x === 11, 'current mode rounds .5 X up');
   assert(result.scene.startPosition.y === 21, 'current mode rounds .5 Y up');
-  assert(result.shouldResetWcs === true, 'current mode resets WCS');
+  assert(result.shouldResetWcs === false, 'current/head mode does not reset WCS');
 }
 
 {

@@ -60,18 +60,18 @@ type DisconnectSafetyAwareController = LaserController & {
 };
 
 /**
- * Resolve whether a controller halts its active job on USB
+ * Resolve whether a controller physically halts its active job on USB
  * disconnect. Honors a declared `capabilities.safety.disconnectStopsJob`
- * field; otherwise falls back to a per-family default — GRBL and
- * gcode-line-stream controllers default to `true` (the firmware
- * stops streaming and motion when the port closes), other families
- * fall back to `'unknown'` so the service can route through a
- * `disconnectDuringJob` recovery state.
+ * field; otherwise falls back conservatively. GRBL stops receiving new
+ * host input when the port closes, but already-buffered firmware motion
+ * may continue, so GRBL is not a true stop-on-disconnect controller.
  */
 export function controllerDisconnectStopsJob(ctrl: LaserController): DisconnectStopsJobValue {
   const declared = (ctrl as DisconnectSafetyAwareController).capabilities?.safety?.disconnectStopsJob;
   if (declared === true || declared === false || declared === 'unknown') return declared;
-  return ctrl.family === 'grbl' || ctrl.family === 'gcode-line-stream' ? true : 'unknown';
+  if (ctrl.family === 'grbl') return false;
+  if (ctrl.family === 'gcode-line-stream') return 'unknown';
+  return 'unknown';
 }
 
 /**

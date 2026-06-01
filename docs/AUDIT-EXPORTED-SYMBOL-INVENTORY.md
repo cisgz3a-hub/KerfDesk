@@ -8,8 +8,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2884
-- Files with exports: 521
+- Export rows: 2921
+- Files with exports: 527
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
@@ -19,8 +19,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | entitlement-security | 110 |
 | file-ipc-boundary | 197 |
 | machine-control | 244 |
-| supporting-runtime | 900 |
-| ui-operator-surface | 636 |
+| supporting-runtime | 936 |
+| ui-operator-surface | 637 |
 
 ## Checklist
 
@@ -762,21 +762,21 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 149 | `BurnState from ./BurnState` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 149 | `BurnStateListener from ./BurnState` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 157 | `LaserOutputState` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 158 | `LaserOutputStateListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 159 | `SafetyStateListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 160 | `RecoveryStateListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 169 | `WiFiOverride` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 174 | `WiFiOverrideListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 185 | `ActiveOperationKind` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 217 | `ActiveOperationState` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 240 | `OperationLease` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 247 | `MachineServiceState` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 253 | `JobRecordingSink` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 394 | `MachineServiceOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 398 | `MachineService` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 154 | `BurnState from ./BurnState` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 154 | `BurnStateListener from ./BurnState` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 162 | `LaserOutputState` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 163 | `LaserOutputStateListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 164 | `SafetyStateListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 165 | `RecoveryStateListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 174 | `WiFiOverride` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 179 | `WiFiOverrideListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 190 | `ActiveOperationKind` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 222 | `ActiveOperationState` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 245 | `OperationLease` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 252 | `MachineServiceState` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 258 | `JobRecordingSink` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 399 | `MachineServiceOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 403 | `MachineService` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -980,6 +980,25 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
 | 13 | `sendSetOriginWcsCommand` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/app/StartBlocker.ts`
+
+**Exports inventoried:** 10
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 5 | `StartBlockerSeverity` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 7 | `StartBlocker` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 24 | `StartBlockerInput` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 38 | `StartBlockedError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 95 | `evaluateStartBlockers` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 191 | `firstStartBlocker` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 195 | `formatStartBlockerForError` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 199 | `makeStartBlockedError` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 203 | `isStartBlockedError` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 207 | `isPreStartStartBlocker` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -4463,18 +4482,73 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
+### File: `src/import/trace/PotraceCurveMath.ts`
+
+**Exports inventoried:** 8
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 8 | `PotraceCurveTag` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 10 | `PotraceCurveSegment` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 19 | `PotraceCurve` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 133 | `potraceAlphaForVertex` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 144 | `smoothClosedPolygonToPotraceCurve` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 190 | `potraceCurveToPathSegments` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 327 | `optimizePotraceCurve` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 428 | `smoothClosedPolygonWithPotraceAlpha` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/import/trace/PotracePathScanner.ts`
+
+**Exports inventoried:** 4
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 4 | `PotraceTurnPolicy` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 6 | `PotracePathScanOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 11 | `PotraceScannedPath` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 179 | `traceBitmapToPotracePaths` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/import/trace/PotracePolygonMath.ts`
+
+**Exports inventoried:** 5
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | `PotracePoint` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 107 | `potraceSegmentPenalty` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 119 | `calculatePotraceLongestStraightSegments` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 228 | `calculateBestPotracePolygon` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 377 | `adjustPotraceVertices` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/import/trace/PotraceTraceBackend.ts`
+
+**Exports inventoried:** 2
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 18 | `PotraceTraceBackendOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 26 | `traceBitmapToSubPaths` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
 ### File: `src/import/trace/PotraceTracer.ts`
 
 **Exports inventoried:** 6
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 16 | `TraceOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 24 | `DEFAULT_TRACE_OPTIONS` | const | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 32 | `PotraceItem` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 48 | `contourToSubPath` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 89 | `traceToSceneObject` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 168 | `traceToSceneObjectAsync` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 17 | `TraceOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 26 | `DEFAULT_TRACE_OPTIONS` | const | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 35 | `PotraceItem` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 51 | `contourToSubPath` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 92 | `traceToSceneObject` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 150 | `traceToSceneObjectAsync` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -4484,8 +4558,24 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 9 | `TraceWorkerOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 17 | `TraceWorkerMessageIn` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 12 | `TraceWorkerOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 21 | `TraceWorkerMessageIn` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/import/trace/TraceBitmap.ts`
+
+**Exports inventoried:** 7
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | `TraceBitmap` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 8 | `TraceImageData` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 14 | `TraceBitmapOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 31 | `grayscaleToTraceBitmap` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 51 | `removeSmallInkRegions` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 101 | `traceBitmapToImageData` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 113 | `grayscaleToTraceImageData` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -5669,8 +5759,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 37 | `BuildStartReadinessInput` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 198 | `buildStartReadiness` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 38 | `BuildStartReadinessInput` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 200 | `buildStartReadiness` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -5832,8 +5922,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 |---:|---|---|---|---|---|---|---|---|---|---|---|
 | 14 | `GateStatus` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 | 16 | `StartReadinessGate` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 53 | `StartReadiness` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 89 | `StartReadinessPanel` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 54 | `StartReadiness` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 90 | `StartReadinessPanel` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -5919,8 +6009,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 152 | `ConnectionPanelMainProps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 237 | `ConnectionPanelMain` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 157 | `ConnectionPanelMainProps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 242 | `ConnectionPanelMain` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -7210,29 +7300,30 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 18 | `RecoveryCardProps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 28 | `RecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 19 | `RecoveryCardProps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 29 | `RecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
 ### File: `src/ui/recovery/RecoveryCardContent.ts`
 
-**Exports inventoried:** 12
+**Exports inventoried:** 13
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
 | 20 | `RecoveryVariant` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 27 | `RecoveryAction` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 38 | `RecoveryStep` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 44 | `RecoveryCardContent` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 55 | `alarmRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 78 | `disconnectRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 96 | `frameFailedRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 112 | `emergencyStopRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 129 | `jobFailedRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 146 | `alarmCodeReason` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 151 | `buildRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 167 | `shouldShowRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 28 | `RecoveryAction` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 40 | `RecoveryStep` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 46 | `RecoveryCardContent` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 57 | `alarmRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 80 | `disconnectRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 98 | `frameFailedRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 114 | `emergencyStopRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 131 | `positionUnknownRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 147 | `jobFailedRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 164 | `alarmCodeReason` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 169 | `buildRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 186 | `shouldShowRecoveryCard` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

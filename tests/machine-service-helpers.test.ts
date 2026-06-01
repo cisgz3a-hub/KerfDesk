@@ -166,15 +166,17 @@ console.log('\n=== T1-145 MachineService helpers ===\n');
   assert(controllerDisconnectStopsJob(grblUnknown) === 'unknown',
     'declared unknown → unknown');
 
-  // No declaration + grbl family → true (default)
+  // No declaration + grbl family → false. Host streaming stops on
+  // disconnect, but GRBL may continue buffered RX/planner motion.
   const grblBare = { family: 'grbl' } as unknown as LaserController;
-  assert(controllerDisconnectStopsJob(grblBare) === true,
-    'grbl family + no declaration → true (family default)');
+  assert(controllerDisconnectStopsJob(grblBare) === false,
+    'grbl family + no declaration → false (buffered firmware motion may continue)');
 
-  // No declaration + gcode-line-stream family → true
+  // No declaration + gcode-line-stream family → 'unknown' unless a
+  // controller explicitly proves physical halt-on-disconnect semantics.
   const gls = { family: 'gcode-line-stream' } as unknown as LaserController;
-  assert(controllerDisconnectStopsJob(gls) === true,
-    'gcode-line-stream family + no declaration → true');
+  assert(controllerDisconnectStopsJob(gls) === 'unknown',
+    'gcode-line-stream family + no declaration → unknown');
 
   // No declaration + unknown family → 'unknown'
   const marlin = { family: 'marlin' } as unknown as LaserController;

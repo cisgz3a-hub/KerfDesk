@@ -510,9 +510,21 @@ export function App(): React.ReactElement {
   const handleSaveOrigin = useCallback(async () => {
     // T1-104: exact-idle gate. T1-105: state and storage update only
     // after the G10 command is accepted by the transport.
-    if (grbl.machineState?.status !== 'idle') return;
+    if (grbl.machineState?.status !== 'idle') {
+      void showAlert(
+        'Set Origin unavailable',
+        `Set Origin requires the controller to report Idle. Current status: ${grbl.machineState?.status ?? 'unknown'}.`,
+      );
+      return { ok: false, reason: 'machine-not-idle' };
+    }
     const pos = grbl.machineState?.position;
-    if (!pos) return;
+    if (!pos) {
+      void showAlert(
+        'Set Origin unavailable',
+        'The controller has not reported a usable head position yet. Reconnect to refresh MPos/WPos, then try again.',
+      );
+      return { ok: false, reason: 'position-unavailable' };
+    }
     const origin = { x: pos.x, y: pos.y };
     const result = await machineUi.executionCoordinator.setOriginAtCurrentPosition();
     if (!result.ok) {
@@ -520,7 +532,7 @@ export function App(): React.ReactElement {
         'Set Origin failed',
         `The Set Origin command was not accepted by the controller (${result.reason ?? 'unknown reason'}). The saved origin was not updated; verify connection and try again.`,
       );
-      return;
+      return { ok: false, reason: result.reason ?? 'controller-rejected' };
     }
     setSavedOrigin(origin);
     // T1-41: snapshot G54 *after* the Set Origin G10 command was
@@ -539,6 +551,7 @@ export function App(): React.ReactElement {
         'Set Origin succeeded, but the controller did not respond to the work-offset query. Saved-origin jobs will be blocked until you Set Origin again with a responsive controller. (T1-41)',
       );
     }
+    return { ok: true };
   }, [grbl.machineState, machineUi.executionCoordinator, machineUi.service, setSavedOrigin, showAlert]);
   const lastManualSaveHashRef = useRef<string>(hashSceneForPersistence(scene));
   const lastAutosaveHashRef = useRef<string>(lastManualSaveHashRef.current);

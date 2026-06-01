@@ -38,6 +38,7 @@ import {
 } from '../src/app/MachineEventLedger';
 import { MachineService } from '../src/app/MachineService';
 import { setUnsafePriorState } from '../src/app/unsafePriorState';
+import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 
@@ -121,6 +122,23 @@ function buildService(ctrl: LaserController): MachineService {
   return new MachineService({ current: ctrl }, portRef);
 }
 
+function makeStatefulController(): { ctrl: LaserController; fireStateChange: (s: MachineState) => void } {
+  const listeners: Array<(s: MachineState) => void> = [];
+  const ctrl = makeController({ isJobRunning: false }) as LaserController & { state: MachineState };
+  ctrl.onStateChange = (cb: (s: MachineState) => void) => {
+    listeners.push(cb);
+    return () => {
+      const i = listeners.indexOf(cb);
+      if (i >= 0) listeners.splice(i, 1);
+    };
+  };
+  const fireStateChange = (s: MachineState): void => {
+    ctrl.state = s;
+    for (const cb of listeners) cb(s);
+  };
+  return { ctrl, fireStateChange };
+}
+
 console.log('\n=== T1-195 MachineEventLedger production wiring ===\n');
 
 installMockLocalStorage();
@@ -144,6 +162,26 @@ void (async () => {
     assert(events.length === 1, 'disconnect-while-running: 1 event appended');
     if (events.length === 1 && events[0].kind === 'disconnect-while-running') {
       assert(typeof events[0].t === 'number' && events[0].t > 0, 'event has timestamp');
+    }
+  }
+
+  // -------- 1b. live disconnected state during active ticket appends event --------
+  {
+    const ledger = new InMemoryMachineEventLedger();
+    _setMachineEventLedgerForTest(ledger);
+    resetMemoryStore();
+    const { ctrl, fireStateChange } = makeStatefulController();
+    const svc = buildService(ctrl);
+    (svc as unknown as { activeTicket: ValidatedJobTicket | null }).activeTicket =
+      { ticketId: 'live-disconnect-ticket' } as unknown as ValidatedJobTicket;
+
+    svc.attachAutoFinalize(ctrl);
+    fireStateChange({ ...idle, status: 'disconnected' });
+
+    const events = ledger.query({ kinds: new Set(['disconnect-while-running']) });
+    assert(events.length === 1, 'live disconnected active ticket appends disconnect-while-running');
+    if (events.length === 1 && events[0].kind === 'disconnect-while-running') {
+      assert(events[0].ticketId === 'live-disconnect-ticket', 'live disconnect event carries active ticket id');
     }
   }
 

@@ -104,7 +104,7 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   const r = buildStartReadiness(happy());
   assert(r.ready === true, 'happy path: ready=true');
   assert(r.blockingGate === null, 'happy path: no blocking gate');
-  assert(r.gates.length === 13, `13 gates rendered (got ${r.gates.length})`);
+  assert(r.gates.length === 14, `14 gates rendered (got ${r.gates.length})`);
   assert(r.gates.every((g) => g.status === 'ok'),
     'happy path: every gate status ok');
 }
@@ -117,6 +117,7 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     'gcodeFresh',
     'preflight',
     'machineState',
+    'startBlocker',
     'frameControls',
     'framing',
     'currentModeAnchor',

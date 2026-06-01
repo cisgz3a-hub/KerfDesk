@@ -237,6 +237,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         geom.grayscaleWidth,
         geom.grayscaleHeight,
         {
+          cutoff: DEFAULT_TRACE_OPTIONS.cutoff,
           threshold: traceThreshold,
           turdsize: traceTurdsize,
           alphamax: traceAlphamax,

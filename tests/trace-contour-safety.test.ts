@@ -53,17 +53,36 @@ console.log('\n=== trace contour safety ===\n');
   );
 }
 
-assert(DEFAULT_TRACE_OPTIONS.turdsize === 8, 'default trace speckle filter is conservative');
+assert(DEFAULT_TRACE_OPTIONS.cutoff === 0, 'default trace cutoff matches LightBurn lower brightness bound');
+assert(DEFAULT_TRACE_OPTIONS.threshold === 128, 'default trace threshold matches LightBurn upper brightness bound');
+assert(DEFAULT_TRACE_OPTIONS.turdsize === 2, 'default trace speckle filter matches Potrace turdsize');
+assert(DEFAULT_TRACE_OPTIONS.alphamax === 1.0, 'default trace smoothness maps to Potrace alphamax');
+assert(DEFAULT_TRACE_OPTIONS.opttolerance === 0.2, 'default trace optimize maps to Potrace opttolerance');
 
 const adapterSource = readFileSync(resolve('src/import/trace/ImageTracerAdapter.ts'), 'utf8');
 const workerSource = readFileSync(resolve('src/import/trace/trace.worker.ts'), 'utf8');
-for (const [label, source] of [
-  ['adapter', adapterSource],
-  ['worker', workerSource],
-] as const) {
-  assert(/linefilter:\s*true/.test(source), `${label}: linefilter is enabled`);
-  assert(/rightangleenhance:\s*false/.test(source), `${label}: right-angle enhancement is disabled for general tracing`);
-}
+const tracerSource = readFileSync(resolve('src/import/trace/PotraceTracer.ts'), 'utf8');
+assert(
+  /grayscaleToTraceBitmap/.test(tracerSource),
+  'main-thread trace builds the shared LightBurn/Potrace bitmap stage',
+);
+assert(
+  /grayscaleToTraceBitmap/.test(workerSource),
+  'worker trace builds the shared LightBurn/Potrace bitmap stage',
+);
+assert(
+  /traceBitmapToSubPaths/.test(tracerSource),
+  'main-thread image trace uses the Potrace polygon/vertex backend',
+);
+assert(
+  /traceBitmapToSubPaths/.test(workerSource),
+  'worker image trace uses the Potrace polygon/vertex backend',
+);
+assert(/linefilter:\s*true/.test(adapterSource), 'adapter: linefilter is enabled for non-image trace users');
+assert(/rightangleenhance:\s*false/.test(adapterSource), 'adapter: right-angle enhancement is disabled for non-image trace users');
+assert(/pathomit:\s*turd/.test(adapterSource), 'adapter keeps caller-provided pathomit for non-image trace users');
+assert(!/traceCanvas/.test(tracerSource), 'main-thread image trace no longer routes through ImageTracer fitting');
+assert(!/imagetracerjs/.test(workerSource), 'worker image trace no longer routes through ImageTracer fitting');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

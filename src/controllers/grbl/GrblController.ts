@@ -1028,21 +1028,34 @@ export class GrblController implements GrblControllerApi {
   }
 
   async disconnect(): Promise<void> {
+    const wasJobRunning = this._isJobRunning;
     this._stopStatusPolling();
+    if (this._port?.isOpen && wasJobRunning) {
+      // Closing USB stops new host input, not necessarily the firmware's
+      // buffered planner. Send GRBL soft reset first while the link still
+      // exists so queued motion/laser output is purged before close.
+      try {
+        this._sendRealtime(REALTIME_RESET);
+      } catch {
+        // Best effort — the cable may already be gone.
+      }
+    }
     this._abortJob();
     if (this._port?.isOpen) {
-      // Safety: pause motion and turn laser off before closing port.
-      // Uses feed hold (not soft reset) to preserve machine position.
-      // Without this, closing port while in M3 mode leaves the laser on.
-      try {
-        this._sendRealtime(REALTIME_FEED_HOLD);
-        await new Promise(r => setTimeout(r, 50));
-        this._port.write('M5 S0\n');
-        this._emitRawLine('M5 S0', 'tx', 'user');
-      } catch {
-        // Best effort — port may already be closing or in error state
+      if (!wasJobRunning) {
+        // Safety: pause motion and turn laser off before closing port.
+        // Uses feed hold (not soft reset) to preserve machine position.
+        // Without this, closing port while in M3 mode leaves the laser on.
+        try {
+          this._sendRealtime(REALTIME_FEED_HOLD);
+          await new Promise(r => setTimeout(r, 50));
+          this._port.write('M5 S0\n');
+          this._emitRawLine('M5 S0', 'tx', 'user');
+        } catch {
+          // Best effort — port may already be closing or in error state
+        }
       }
-      await new Promise(r => setTimeout(r, 80));
+      await new Promise(r => setTimeout(r, wasJobRunning ? 40 : 80));
       this._activeConnectionToken = null;
       try {
         // T2-31: close() is now async. Await so disconnect resolves only

@@ -19,6 +19,7 @@ export interface StartReadinessGate {
     | 'gcodeFresh'
     | 'preflight'
     | 'machineState'
+    | 'startBlocker'
     | 'frameControls'
     | 'framing'
     | 'currentModeAnchor'

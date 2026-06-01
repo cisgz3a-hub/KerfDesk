@@ -72,8 +72,10 @@ const grbl = getGrblFirmwareAdapter();
   );
   // Shared: both support arcs.
   assert(m.supportsArcs === true && g.supportsArcs === true, 'both support G2/G3 arcs');
-  // Shared: both halt on disconnect (host-streamed).
-  assert(m.disconnectStopsJob === true && g.disconnectStopsJob === true, 'both halt on disconnect');
+  // Both host-streamed adapters stop new host input on disconnect, but
+  // GRBL must not claim already-buffered firmware motion is halted.
+  assert(m.disconnectStopsJob === true && g.disconnectStopsJob === false,
+    'GRBL does not claim physical halt-on-disconnect');
 }
 
 // -------- 2. emit() throws MarlinNotYetSupportedError --------

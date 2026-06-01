@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 513 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 828 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 519 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 835 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -23,7 +23,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | Boundary | Files | Direct child directories |
 |---|---:|---|
 | `src/` | 2 | - |
-| `src/app` | 49 | - |
+| `src/app` | 50 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 30 | grbl |
 | `src/core` | 116 | box, devices, geometry, grbl, image, job, logging, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
@@ -32,7 +32,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/entitlements` | 12 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 10 | - |
-| `src/import` | 19 | dxf, image, svg, trace |
+| `src/import` | 24 | dxf, image, svg, trace |
 | `src/integrity` | 1 | - |
 | `src/io` | 14 | migrations, validation |
 | `src/machine-control-v2` | 12 | grbl |
@@ -50,7 +50,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 751 | - |
+| `tests/` | 758 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -110,6 +110,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/app/RecoveryBypassToken.ts`
 - `src/app/SafetyActionResult.ts`
 - `src/app/SafetyStateMachine.ts`
+- `src/app/StartBlocker.ts`
 - `src/app/StructuredMessageLog.ts`
 - `src/app/StructuredRxTxEntry.ts`
 - `src/app/UserModeGates.ts`
@@ -366,7 +367,12 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/import/svg/index.ts`
 - `src/import/svg/svgParserHelpers.ts`
 - `src/import/trace/ImageTracerAdapter.ts`
+- `src/import/trace/PotraceCurveMath.ts`
+- `src/import/trace/PotracePathScanner.ts`
+- `src/import/trace/PotracePolygonMath.ts`
+- `src/import/trace/PotraceTraceBackend.ts`
 - `src/import/trace/PotraceTracer.ts`
+- `src/import/trace/TraceBitmap.ts`
 - `src/import/trace/index.ts`
 - `src/import/trace/trace.worker.ts`
 
@@ -1284,6 +1290,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/spool-semantic-gcode-validation.test.ts`
 - `tests/stale-followup-doc-sweep.test.ts`
 - `tests/stale-gcode-blocks-start.test.ts`
+- `tests/start-blocker-policy.test.ts`
 - `tests/start-mode-labels.test.ts`
 - `tests/start-mode-wcs-reset.test.ts`
 - `tests/start-readiness-auto-expand.test.tsx`
@@ -1344,6 +1351,12 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/ticket-validation-message-translation.test.ts`
 - `tests/time-estimator-stream.test.ts`
 - `tests/trace-contour-safety.test.ts`
+- `tests/trace-lightburn-bitmap.test.ts`
+- `tests/trace-potrace-backend.test.ts`
+- `tests/trace-potrace-optcurve.test.ts`
+- `tests/trace-potrace-pathscan.test.ts`
+- `tests/trace-potrace-polygon.test.ts`
+- `tests/trace-potrace-smoothing.test.ts`
 - `tests/trace-scene-transforms.test.ts`
 - `tests/trace-selection-atomic-commit.test.ts`
 - `tests/trace-storm-probe.test.ts`

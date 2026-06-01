@@ -605,8 +605,9 @@ export class ExecutionCoordinator {
    * Stop (if requested), laser off, then {@link MachineService.disconnect} (wake-lock release +
    * controller disconnect + port clear). No-op if already disconnected.
    *
-   * @param options.skipStop — omit controller {@link LaserController.stop} (e.g. toolbar
-   *   disconnect while idle). GRBL `stop()` is a soft reset; skipping avoids alarm/rehome.
+   * @param options.skipStop — omit controller {@link LaserController.stop} only while idle
+   *   (e.g. toolbar disconnect from a finished machine). Running jobs always attempt stop
+   *   before closing the port because disconnect cannot cancel already-buffered GRBL motion.
    */
   async safeDisconnect(options?: { skipStop?: boolean }): Promise<void> {
     const ctrl = this.deps.controllerRef.current;
@@ -624,7 +625,7 @@ export class ExecutionCoordinator {
     }
 
     const jobWasRunningAtSequenceStart = ctrl.isJobRunning === true;
-    if (!options?.skipStop) {
+    if (jobWasRunningAtSequenceStart || !options?.skipStop) {
       try {
         ctrl.stop();
       } catch {

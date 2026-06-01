@@ -8,7 +8,7 @@ interface JobPositionProps {
   machinePositionKnown: boolean;
   hasSetOrigin: boolean;
   isConnected: boolean;
-  onSaveOrigin: () => void;
+  onSaveOrigin: () => void | Promise<void>;
 }
 
 interface WorkflowStepsProps {

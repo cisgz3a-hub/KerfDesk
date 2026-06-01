@@ -7,7 +7,7 @@
  *   - `capabilities()`: static GRBL advert (matches what
  *     GrblControllerApi declares today: gcode-line-stream, M4
  *     dynamic laser, G2/G3 arcs, `?` status, `$#` work-offset,
- *     host-streamed → disconnect halts).
+ *     host-streamed transport with buffered firmware execution).
  *   - `compileConstraints()`: GRBL planner constraints (no arc
  *     flattening, runtime accel/feed limits from live identity).
  *   - `emit(plan, job)`: thin wrapper over `GrblOutputStrategy.
@@ -66,7 +66,7 @@ const GRBL_CAPABILITIES: FirmwareCapabilities = Object.freeze({
   supportsArcs: true,
   supportsRealtimeStatusQuery: true,
   supportsWorkOffsetQuery: true,
-  disconnectStopsJob: true,
+  disconnectStopsJob: false,
   // Real value comes from `$30` at connect time. Null here means
   // "must be filled in from the live identity"; `validate()` checks
   // for the live value.

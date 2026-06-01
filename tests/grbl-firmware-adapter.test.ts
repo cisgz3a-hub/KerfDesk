@@ -50,7 +50,8 @@ const adapter = getGrblFirmwareAdapter();
   assert(caps.supportsArcs === true, 'G2/G3 arcs supported');
   assert(caps.supportsRealtimeStatusQuery === true, '? realtime status supported');
   assert(caps.supportsWorkOffsetQuery === true, '$# work-offset query supported');
-  assert(caps.disconnectStopsJob === true, 'disconnect halts (host-streamed)');
+  assert(caps.disconnectStopsJob === false,
+    'disconnect stops host streaming only; buffered GRBL motion may continue');
   assert(caps.maxSpindleStatic === null, 'maxSpindleStatic is null (read from live identity)');
 }
 

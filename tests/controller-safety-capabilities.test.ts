@@ -56,8 +56,8 @@ void (async () => {
   assert(c.supportsTestFire === true, 'GRBL: supportsTestFire=true');
   assert(c.testFireRequiresMotion === false, 'GRBL: testFireRequiresMotion=false');
   assert(c.testFireMaxDurationMs === 5000, `GRBL: testFireMaxDurationMs=5000 (got ${c.testFireMaxDurationMs})`);
-  assert(c.disconnectStopsJob === true,
-    'GRBL: disconnectStopsJob=true (host-streamed)');
+  assert(c.disconnectStopsJob === false,
+    'GRBL: disconnectStopsJob=false (host stream stops, buffered firmware motion may continue)');
   assert(c.stopInvalidatesPosition === true,
     'GRBL: stopInvalidatesPosition=true (soft-reset)');
   assert(c.stopRequiresRehome === true,

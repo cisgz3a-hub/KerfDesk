@@ -10,6 +10,8 @@ import { sendSetOriginWcsCommand } from '../src/app/sendSetOriginWcsCommand';
 import { type SafetyAction, type SafetyActionResult } from '../src/app/SafetyActionResult';
 import type { ControllerOutput, ControllerJobTicket, LaserController, MachineState } from '../src/controllers/ControllerInterface';
 import type { SerialPortLike } from '../src/communication/SerialPort';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 let passed = 0;
 let failed = 0;
@@ -217,6 +219,29 @@ void (async () => {
     const result = await makeCoordinator(ctrl, sim).setOriginAtCurrentPosition();
     assertContract(result.ok === false && sim.length === 0,
       'ExecutionCoordinator.setOriginAtCurrentPosition failure does not record an un-emitted simulator command');
+  }
+
+  {
+    const panelSource = readFileSync(resolve(process.cwd(), 'src/ui/components/ConnectionPanelMain.tsx'), 'utf8');
+    const appSource = readFileSync(resolve(process.cwd(), 'src/ui/components/App.tsx'), 'utf8');
+    assertContract(
+      /onSaveOrigin:\s*\(\)\s*=>\s*Promise<\{\s*ok:\s*boolean/.test(panelSource),
+      'ConnectionPanelMain requires onSaveOrigin to return an async success/failure result',
+    );
+    assertContract(
+      /const saveOriginFromPanel = async/.test(panelSource)
+      && /await onSaveOrigin\(\)/.test(panelSource)
+      && /if \(result\.ok\)/.test(panelSource),
+      'ConnectionPanelMain advances hasSetOrigin only after Set Origin succeeds',
+    );
+    assertContract(
+      /return \{\s*ok:\s*false,\s*reason:\s*'machine-not-idle'/.test(appSource),
+      'App returns explicit machine-not-idle Set Origin failure instead of silent no-op',
+    );
+    assertContract(
+      /return \{\s*ok:\s*false,\s*reason:\s*'position-unavailable'/.test(appSource),
+      'App returns explicit missing-position Set Origin failure instead of silent no-op',
+    );
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

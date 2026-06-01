@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { RecoveryCard } from '../src/ui/recovery/RecoveryCard';
-import { emergencyStopRecoveryCard } from '../src/ui/recovery/RecoveryCardContent';
+import { disconnectRecoveryCard, emergencyStopRecoveryCard } from '../src/ui/recovery/RecoveryCardContent';
 
 let passed = 0;
 let failed = 0;
@@ -41,6 +41,17 @@ console.log('\n=== recovery card UI wiring ===\n');
 }
 
 {
+  const html = renderToStaticMarkup(React.createElement(RecoveryCard, {
+    content: disconnectRecoveryCard(),
+  }));
+
+  assert(/USB connection/.test(html), 'Disconnect card names USB connection loss');
+  assert(/buffered commands/.test(html), 'Disconnect card warns about buffered firmware commands');
+  assert(/physical E-stop|power cutoff/i.test(html), 'Disconnect card tells operator to use physical stop/power');
+  assert(/data-recovery-card="disconnect"/.test(html), 'Disconnect card carries a variant marker');
+}
+
+{
   const source = readFileSync(
     resolve(process.cwd(), 'src/ui/components/ConnectionPanelMain.tsx'),
     'utf-8',
@@ -60,6 +71,9 @@ console.log('\n=== recovery card UI wiring ===\n');
   assert(/setJobFailedRecoveryMessage/.test(source), 'ConnectionPanelMain marks failed jobs for recovery');
   assert(/buildRecoveryCard\(\{\s*variant:\s*'job-failed'/.test(source), 'ConnectionPanelMain builds job-failed recovery content');
   assert(/buildRecoveryCard\(\{\s*variant:\s*'emergency-stop'/.test(source), 'ConnectionPanelMain builds emergency-stop recovery content');
+  assert(/buildRecoveryCard\(\{\s*variant:\s*'position-unknown'/.test(source), 'ConnectionPanelMain builds position-unknown recovery content');
+  assert(/confirmManualPositionRecovery/.test(source), 'ConnectionPanelMain wires manual-position recovery action');
+  assert(/isPreStartStartBlocker/.test(source), 'ConnectionPanelMain classifies pre-start Start blockers separately from job failures');
   assert(/React\.createElement\(RecoveryCard/.test(source), 'ConnectionPanelMain renders RecoveryCard');
   assert(/handleRecoveryAction/.test(source), 'ConnectionPanelMain wires recovery-card actions');
   assert(!/Machine halted \(alarm state\)/.test(source), 'ConnectionPanelMain no longer renders the legacy alarm banner copy');

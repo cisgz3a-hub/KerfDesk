@@ -122,6 +122,17 @@ void (async () => {
     stopped.kind !== 'stoppedPositionUnknown' || /rehome|required|position/i.test(stopped.reason),
     'soft-reset stop records rehome/position reason',
   );
+
+  const recovery = svc as unknown as {
+    confirmManualPositionRecovery?: (args: { reason: string }) => boolean;
+  };
+  assert(
+    typeof recovery.confirmManualPositionRecovery === 'function',
+    'MachineService exposes manual-position recovery for no-home machines',
+  );
+  const cleared = recovery.confirmManualPositionRecovery?.({ reason: 'operator manually zeroed and framed' });
+  assert(cleared === true, 'manual-position recovery acknowledges stoppedPositionUnknown');
+  assert(kind(svc.getSafetyState()) === 'safeIdle', 'manual-position recovery clears stoppedPositionUnknown to safeIdle');
 }
 
 {

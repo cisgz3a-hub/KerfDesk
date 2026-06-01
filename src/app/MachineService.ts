@@ -47,11 +47,16 @@ import {
 } from './SafetyActionResult';
 import {
   safetyStateInitial,
-  safetyStateAllowsStartJob,
+  clearToSafeIdle,
   transitionFromSafetyResult,
   type SafetyResultLike,
   type SafetyState,
 } from './SafetyStateMachine';
+import {
+  evaluateStartBlockers,
+  firstStartBlocker,
+  makeStartBlockedError,
+} from './StartBlocker';
 import {
   ackInspection,
   ackUnlock,
@@ -61,6 +66,7 @@ import {
   ackRecompile,
   recoveryStateInitial,
   triggerAlarm,
+  triggerDisconnectDuringJob,
   triggerEmergencyStop,
   type RecoveryState,
 } from '../runtime/RecoveryState';
@@ -803,6 +809,28 @@ export class MachineService {
           }),
         );
       }
+      if (state.status === 'disconnected' && this.activeTicket != null) {
+        const previousRecovery = this._recoveryState;
+        const nextRecovery = triggerDisconnectDuringJob({
+          current: previousRecovery,
+          occurredAt: Date.now(),
+          lastJobLine: lastProgress?.linesAcknowledged ?? 0,
+          requiresRehome: true,
+        });
+        if (nextRecovery !== previousRecovery) {
+          this._setRecoveryState(nextRecovery);
+        }
+        if (
+          previousRecovery.status !== 'disconnectDuringJob'
+          && nextRecovery.status === 'disconnectDuringJob'
+        ) {
+          getMachineEventLedger().append({
+            kind: 'disconnect-while-running',
+            t: Date.now(),
+            ticketId: this.activeTicket.ticketId ?? null,
+          });
+        }
+      }
       void this.tryFinalizeJobLog(state, lastProgress, ctrl.isJobRunning, sink);
     });
     const unsubProgress = ctrl.onProgress((progress) => {
@@ -1092,11 +1120,20 @@ export class MachineService {
       );
     }
 
-    if (!safetyStateAllowsStartJob(this._safetyState)) {
-      throw new Error(
-        `Machine is not in a safe idle state (safety state: ${this._safetyState.kind}). `
-        + 'Complete or acknowledge the pending safety action before starting a job.',
-      );
+    const startBlocker = firstStartBlocker(evaluateStartBlockers({
+      isConnected: true,
+      machineStatus: machineState?.status ?? controller.state?.status,
+      machineErrorCode: machineState?.errorCode ?? controller.state?.errorCode,
+      laserOutputState: this._laserOutputState,
+      activeOperation: this._activeOperation,
+      safetyState: this._safetyState,
+      placementUncertain: controller.getPlacementUncertain?.() === true,
+      placementUncertainReason: controller.getPlacementUncertainReason?.() ?? null,
+      allowUnverifiedWcsStart,
+      startMode: currentStartMode,
+    }));
+    if (startBlocker != null) {
+      throw makeStartBlockedError(startBlocker);
     }
 
     // T1-123: refuse to start a job over an untrusted (Falcon WiFi)
@@ -1125,18 +1162,6 @@ export class MachineService {
     // optional reason is only diagnostic text. Compatibility profiles for
     // manual-zero machines can opt into unverified-WCS start, but the default
     // stays fail-closed.
-    if (
-      this.controllerRef.current?.getPlacementUncertain?.() === true
-      && !allowUnverifiedWcsStart
-    ) {
-      const placementReason =
-        this.controllerRef.current.getPlacementUncertainReason?.() ?? 'unknown';
-      throw new Error(
-        `Work-coordinate state could not be confirmed (reason: ${placementReason}). `
-        + 'Reconnect or address the underlying WCS issue before starting a job.',
-      );
-    }
-
     // BUG-007: saved-origin jobs depend on the G54 offset captured when
     // the operator clicked Set Origin. The UI verifies this before Start,
     // but the service is the final boundary before bytes stream to the
@@ -1502,6 +1527,12 @@ export class MachineService {
    */
   getSafetyState(): SafetyState {
     return this._safetyState;
+  }
+
+  confirmManualPositionRecovery(_args?: { reason?: string }): boolean {
+    if (this._safetyState.kind !== 'stoppedPositionUnknown') return false;
+    this._setSafetyState(clearToSafeIdle());
+    return true;
   }
 
   /**
@@ -2593,20 +2624,39 @@ export class MachineService {
   }
 
   private async _guardDisconnectStopsJob(ctrl: LaserController): Promise<SafetyActionResult | null> {
-    // T3-60: GRBL is host-streamed, so disconnecting the port stops the line
-    // stream. Uploaded-file/native controllers may continue running after the
-    // host disappears, so a running job must be aborted before closing.
+    // T3-60: disconnect only stops new host input. Already-buffered
+    // firmware motion may continue, so a running job must be stopped or
+    // natively aborted before closing the transport.
     if (!ctrl.isJobRunning) return null;
     const disconnectStopsJob = controllerDisconnectStopsJob(ctrl);
     if (disconnectStopsJob === true) return null;
 
     const abortJob = (ctrl as DisconnectSafetyAwareController).safetyOps?.abortJob;
+    if (!abortJob && ctrl.family === 'grbl') {
+      try {
+        const stopResult = await ctrl.operations.stopJob(undefined, 'disconnect-before-close');
+        if (stopResult.ok) return null;
+        return this._recordSafetyResult(makeDisconnectResult({
+          accepted: false,
+          message:
+            `Cannot safely disconnect: ${stopResult.message ?? stopResult.reason}. ` +
+            'Use Stop or the physical E-stop/power cutoff if unsafe.',
+        }));
+      } catch (err: unknown) {
+        return this._recordSafetyResult(makeDisconnectResult({
+          accepted: false,
+          message:
+            `Cannot safely disconnect: ${err instanceof Error ? err.message : String(err)}. ` +
+            'Use Stop or the physical E-stop/power cutoff if unsafe.',
+        }));
+      }
+    }
     if (!abortJob) {
       return this._recordSafetyResult(makeDisconnectResult({
         accepted: false,
         message:
           'Cannot safely disconnect: controller may continue running after disconnect ' +
-          'and no native abort is available. Inspect machine before retry.',
+          'and no native abort is available. Use Stop or the physical E-stop/power cutoff if unsafe.',
       }));
     }
 

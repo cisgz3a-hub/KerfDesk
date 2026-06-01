@@ -170,7 +170,7 @@ function PanelHarness(props: {
     originCorner: activeProfile?.originCorner ?? 'front-left',
     machinePosition: null,
     onSelectMode: () => {},
-    onSaveOrigin: () => {},
+    onSaveOrigin: async () => ({ ok: true }),
     gcodeStale: false,
     machineService,
     outcomeReplaySection: null,

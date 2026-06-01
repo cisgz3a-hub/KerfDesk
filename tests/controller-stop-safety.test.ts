@@ -120,6 +120,31 @@ async function main(): Promise<void> {
   }
 
   {
+    // Disconnect during a live job must first send GRBL soft reset so RX /
+    // planner buffers are purged before the host closes the only command path.
+    const port = new MockSerialPort((line: string) => {
+      if (line.startsWith(';')) return [];
+      if (/\bG0\b|\bG00\b/.test(line)) return [];
+      return ['ok'];
+    });
+    const ctrl = new GrblController();
+    port.open();
+    await ctrl.connect(port);
+    await flush();
+    await ctrl.sendJob(['G21', 'G90', 'G0 X1 Y1', 'M2']);
+    await flush();
+    assert(ctrl.isJobRunning, 'sanity: job is running before disconnect()');
+    port.received.length = 0;
+    port.realtimeBytes.length = 0;
+    await ctrl.disconnect();
+    await flush();
+    assert(port.realtimeBytes.includes(0x18), 'disconnect() during job sends soft reset (0x18)');
+    assert(!port.realtimeBytes.includes(0x21), 'disconnect() during job does not rely on feed hold');
+    assert(!hasM5S0InReceived(port.received), 'disconnect() during job does not rely on queued M5');
+    assert(!port.isOpen, 'disconnect() during job closes port after reset');
+  }
+
+  {
     const ctrl = new GrblController();
     const port = new MockSerialPort();
     port.open();

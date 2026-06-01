@@ -75,11 +75,13 @@ export interface FirmwareCapabilities {
   /** Whether the firmware supports the GRBL `$#` work-offset query. */
   readonly supportsWorkOffsetQuery: boolean;
   /**
-   * Whether the firmware halts when the host transport disconnects.
-   * GRBL: true (host-streamed). Ruida-like / file-upload: false.
-   * Used by `MachineService._guardDisconnectStopsJob` to refuse a
-   * disconnect during a running job when the firmware would keep
-   * running autonomously.
+   * Whether the firmware physically halts an active job when the host
+   * transport disconnects. This is stricter than "the host stops
+   * streaming": GRBL stops receiving new lines, but can continue
+   * executing already-buffered RX/planner commands, so it must not
+   * advertise this as true. Used by
+   * `MachineService._guardDisconnectStopsJob` to refuse or pre-stop a
+   * disconnect during a running job.
    */
   readonly disconnectStopsJob: boolean;
   /**

@@ -74,6 +74,10 @@ function makeController(args: {
       },
     },
     operations: {
+      stopJob: async () => {
+        calls.push('stopJob');
+        return okOperation();
+      },
       laserOff: async () => {
         calls.push('laserOff');
         return okOperation();
@@ -104,9 +108,9 @@ void (async () => {
       exposeAbort: false,
     });
     const { result, portRef } = await disconnectWith(controller);
-    assert(result.accepted, 'GRBL running disconnect remains accepted');
-    assert(!calls.includes('abortJob'), 'GRBL does not require extra native abort');
-    assert(calls.join('>') === 'laserOff>disconnect', `GRBL order unchanged (${calls.join('>')})`);
+    assert(result.accepted, 'GRBL running disconnect accepted after controller stop');
+    assert(!calls.includes('abortJob'), 'GRBL uses controller stop, not native abort');
+    assert(calls.join('>') === 'stopJob>laserOff>disconnect', `GRBL stops before close (${calls.join('>')})`);
     assert(portRef.current === null, 'GRBL disconnect still clears port ref');
   }
 

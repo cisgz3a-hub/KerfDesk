@@ -244,9 +244,14 @@ function input(overrides: Partial<CommandGatesInput> = {}): CommandGatesInput {
     'canFrame reads from gates.canFrameSafe');
   assert(/canFire: gates\?\.canTestFire \?\? false/.test(panelSrc),
     'canFire prop reads from gates.canTestFire');
-  // canStartJob extends with baseSafe conjunct.
-  assert(/&&\s*\(gates\?\.baseSafe \?\? false\)/.test(panelSrc),
-    'canStartJob includes (gates?.baseSafe ?? false) conjunct');
+  // PRT4040 simplification: job start no longer uses baseSafe directly
+  // because baseSafe still includes stale recoveryPending bookkeeping.
+  // Start uses the dedicated StartBlocker policy instead.
+  assert(/evaluateStartBlockers/.test(panelSrc), 'canStartJob uses the StartBlocker policy');
+  assert(/blockingStartBlocker == null/.test(panelSrc),
+    'canStartJob checks that no StartBlocker is active');
+  assert(!/&&\s*\(gates\?\.baseSafe \?\? false\)/.test(panelSrc),
+    'canStartJob no longer hard-blocks on gates.baseSafe');
   // The OLD ad-hoc shape `isConnected && !isRunning && machineState?.status === 'idle'`
   // for canFrame / canAutoFocus / canFire is gone.
   assert(

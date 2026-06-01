@@ -115,6 +115,11 @@ import { UnsafeAtConnectBanner } from './connection/UnsafeAtConnectBanner';
 import { type UnsafeAtConnectActionKind } from './connection/unsafeAtConnectMessages';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
+import {
+  evaluateStartBlockers,
+  firstStartBlocker,
+  isPreStartStartBlocker,
+} from '../../app/StartBlocker';
 import { analyzeOperationOrder } from '../../app/OperationOrder';
 import { computeUserModeGatePolicy, type UserMode } from '../../app/UserModeGates';
 import {
@@ -202,7 +207,7 @@ export interface ConnectionPanelMainProps {
   originCorner: MachineOriginCorner;
   machinePosition: { x: number; y: number } | null;
   onSelectMode: (mode: StartMode) => void;
-  onSaveOrigin: () => void;
+  onSaveOrigin: () => Promise<{ ok: boolean; reason?: string }>;
   gcodeStale?: boolean;
   isCompiling?: boolean;
   compileProgress?: CompileProgress | null;
@@ -1293,7 +1298,9 @@ export function ConnectionPanelMain({
       setElapsedSeconds(0);
       elapsedSecondsRef.current = 0;
       const msg = e instanceof Error ? e.message : String(e);
-      setJobFailedRecoveryMessage(`Job failed to start: ${msg}`);
+      if (!isPreStartStartBlocker(e)) {
+        setJobFailedRecoveryMessage(`Job failed to start: ${msg}`);
+      }
       setMessages(prev => [...prev, `Failed to start: ${msg}`]);
       await showAlert('Cannot start job', msg);
     }
@@ -1747,11 +1754,28 @@ export function ConnectionPanelMain({
               'This profile has homing disabled. Confirm you have manually re-established a safe zero point or verified the machine position before continuing.',
             );
             if (ok) {
+              invalidatePositionProof();
+              machineService.confirmManualPositionRecovery({ reason: 'manual position verified from recovery card' });
               machineService.applyRecoveryAck('rehome');
               appendMessage('Recovery step acknowledged: position verified manually.');
             }
           }
           break;
+        case 'manual-position-confirmed': {
+          const ok = await showConfirm(
+            'Manual position recovery',
+            'Confirm you inspected the machine and manually placed or verified the head at the intended zero point. You must Frame again before Start.',
+          );
+          if (ok) {
+            invalidatePositionProof();
+            if (machineService.confirmManualPositionRecovery({ reason: 'manual position verified from recovery card' })) {
+              appendMessage('Position recovery acknowledged: frame again before Start.');
+            } else {
+              appendMessage('Manual position verified. Frame again before Start.');
+            }
+          }
+          break;
+        }
         case 'frame':
         case 'reframe':
           if (await handleFrameSafe()) {
@@ -1796,6 +1820,7 @@ export function ConnectionPanelMain({
     handleHome,
     handleStop,
     handleUnlock,
+    invalidatePositionProof,
     machineService,
     onRecompile,
     showConfirm,
@@ -1986,7 +2011,6 @@ void executionCoordinator.beginTestFire({ maxSpindle })
       | WcsUncertainReason
       | null;
   const allowUnverifiedWcsStart = activeProfile?.allowUnverifiedWcsStart === true;
-  const wcsBlocksJobStart = placementUncertain && !allowUnverifiedWcsStart;
   // T1-122/T-GRBL4040: live RecoveryState remains the recovery-card
   // model, but it is advisory for Start. Real Start gating lives in
   // controller/preflight proof: controller-safe, laser off, WCS
@@ -2038,6 +2062,20 @@ void executionCoordinator.beginTestFire({ maxSpindle })
       frameAnchor: currentFrameAnchorRef.current,
       machinePosition,
     });
+  const startBlockers = evaluateStartBlockers({
+    isConnected,
+    machineStatus,
+    machineErrorCode: machineState?.errorCode,
+    laserOutputState,
+    activeOperation,
+    safetyState,
+    placementUncertain,
+    placementUncertainReason,
+    allowUnverifiedWcsStart,
+    startMode,
+    currentPositionConfirmed: startMode !== 'current' || machinePosition != null,
+  });
+  const blockingStartBlocker = firstStartBlocker(startBlockers);
   // T1-30: canStartJob keeps its existing product-level conjuncts
   // (gcode exists / fresh / framed / preflight passed / not running /
   // machine bounds OK / laser output confirmed off / WCS confirmed or
@@ -2054,18 +2092,15 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     !isRunning &&
     !!preflight?.canStart &&
     !gcodeStale &&
-    !machineBlocksJobStart &&
     (!requireFrame || hasFramed.current) &&
     currentModeFrameAnchorValid &&
-    laserOutputState !== 'unknown' &&
-    !wcsBlocksJobStart &&
+    blockingStartBlocker == null &&
     // T1-123: connection-trust gate. Trusted (USB) connections pass
     // automatically; Falcon WiFi connections need an explicit override
     // grant. Audit Phase 2 #7: previously trust was never consulted
     // by the start gate, so a job could go out over an unauthenticated
     // WiFi connection without the user's awareness.
-    wifiStartAllowed &&
-    (gates?.baseSafe ?? false);
+    wifiStartAllowed;
   const canResetWcsToBaseline = Boolean(
     isConnected &&
     !isRunning &&
@@ -2119,6 +2154,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     gcodeStale,
     isSimulator,
     machineBlocksJobStart,
+    startBlockers,
     canFrame,
     requireFrame,
     hasFramed: hasFramed.current,
@@ -2139,6 +2175,11 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     canStartJob,
   });
   void workflowVersion;
+  useEffect(() => {
+    if (jobFailedRecoveryMessage != null && !isRunning && startReadiness.ready) {
+      setJobFailedRecoveryMessage(null);
+    }
+  }, [isRunning, jobFailedRecoveryMessage, startReadiness.ready]);
 
   const machineControlV2State: MachineControlState = (() => {
     if (machineState == null || machineState.status === 'disconnected') return 'disconnected';
@@ -2375,10 +2416,14 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     startBlockedReason: startReadiness.blockingGate?.failHeadline ?? null,
   };
 
-  const saveOriginFromPanel = () => {
-    hasSetOrigin.current = true;
-    setWorkflowVersion(v => v + 1);
-    onSaveOrigin();
+  const saveOriginFromPanel = async () => {
+    const result = await onSaveOrigin();
+    if (result.ok) {
+      hasSetOrigin.current = true;
+      setWorkflowVersion(v => v + 1);
+    } else {
+      appendMessage(`Set Origin was not saved: ${result.reason ?? 'unknown reason'}.`);
+    }
   };
 
   const jobPositionSection = isConnected && React.createElement(JobPosition, {
@@ -2663,6 +2708,8 @@ void executionCoordinator.beginTestFire({ maxSpindle })
 
   const safetyRecoveryContent = safetyState.kind === 'requiresInspection'
     ? buildRecoveryCard({ variant: 'emergency-stop' })
+    : safetyState.kind === 'stoppedPositionUnknown'
+      ? buildRecoveryCard({ variant: 'position-unknown' })
     : null;
   const safetyRecoveryCard = safetyRecoveryContent &&
     React.createElement(RecoveryCard, {

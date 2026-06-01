@@ -22,7 +22,8 @@ export type RecoveryVariant =
   | 'disconnect'
   | 'frame-failed'
   | 'emergency-stop'
-  | 'job-failed';
+  | 'job-failed'
+  | 'position-unknown';
 
 export type RecoveryAction =
   | 'inspect'
@@ -33,7 +34,8 @@ export type RecoveryAction =
   | 'reframe'
   | 'frame'
   | 'stop'
-  | 'compile';
+  | 'compile'
+  | 'manual-position-confirmed';
 
 export interface RecoveryStep {
   readonly text: string;
@@ -81,8 +83,9 @@ export function disconnectRecoveryCard(): RecoveryCardContent {
     title: 'Connection Lost',
     whatHappened: 'USB connection to the machine was interrupted.',
     whatItMeans:
-      'Job state is unknown. The laser may still be on. The machine may still be moving.',
+      'Job state is unknown. GRBL may still be executing buffered commands, so the laser may still be on and the machine may still be moving.',
     steps: [
+      { text: 'If anything is still moving or firing, use the physical E-stop or power cutoff now.' },
       { text: 'Check that the laser is OFF (look at the machine).' },
       { text: 'Inspect material for damage.' },
       { text: 'Reconnect.', action: 'reconnect' },
@@ -126,6 +129,22 @@ export function emergencyStopRecoveryCard(): RecoveryCardContent {
   };
 }
 
+export function positionUnknownRecoveryCard(): RecoveryCardContent {
+  return {
+    variant: 'position-unknown',
+    title: 'Position Needs Confirmation',
+    whatHappened: 'The machine stopped or reset, and LaserForge no longer trusts the previous head position.',
+    whatItMeans:
+      'The controller can be idle while the app still needs you to confirm where the head is before a new job.',
+    steps: [
+      { text: 'Inspect the machine and material.' },
+      { text: 'Manually place the head at the intended zero point, or use Set Origin if available.', action: 'manual-position-confirmed' },
+      { text: 'Frame the job again before pressing Start.', action: 'frame' },
+    ],
+    doNot: 'Start from the old frame without confirming position.',
+  };
+}
+
 export function jobFailedRecoveryCard(errorMessage: string): RecoveryCardContent {
   return {
     variant: 'job-failed',
@@ -160,6 +179,7 @@ export function buildRecoveryCard(opts: {
     case 'frame-failed':    return frameFailedRecoveryCard(opts.frameTimeoutSec ?? 15);
     case 'emergency-stop':  return emergencyStopRecoveryCard();
     case 'job-failed':      return jobFailedRecoveryCard(opts.errorMessage ?? 'Job failed.');
+    case 'position-unknown': return positionUnknownRecoveryCard();
   }
 }
 

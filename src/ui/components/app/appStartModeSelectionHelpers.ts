@@ -30,7 +30,7 @@ export function buildStartModeSelectionCommit(
       startPosition: { x: Math.round(origin.x), y: Math.round(origin.y) },
     },
     action: 'start-position',
-    shouldResetWcs: mode !== 'savedOrigin',
+    shouldResetWcs: mode === 'absolute',
   };
 }
 

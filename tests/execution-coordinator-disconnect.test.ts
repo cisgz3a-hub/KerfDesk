@@ -383,6 +383,52 @@ void (async () => {
     let disconnectCalls = 0;
     const mock = {
       protocolName: 'mock',
+      state: { ...baseState, status: 'run' as const },
+      isJobRunning: true,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {
+        stopCalls++;
+      },
+      emergencyStop: () => {},
+      sendCommand: () => {},
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+      safetyOff: async () => ({ stage: 'm5' as const }),
+      operations: operations(async () => ({ ok: true as const })),
+    } as unknown as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: (options?: { jobWasRunningAtSequenceStart?: boolean }) => Promise<SafetyActionResult> }).disconnect = async (options) => {
+      disconnectCalls++;
+      assert(options?.jobWasRunningAtSequenceStart === true,
+        'running toolbar disconnect preserves running-job proof');
+      return inner(options);
+    };
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: () => {} },
+    });
+    await coord.safeDisconnect({ skipStop: true });
+    assert(stopCalls === 1, 'running safeDisconnect ignores skipStop and sends stop');
+    assert(disconnectCalls === 1, 'running safeDisconnect still closes through MachineService');
+  }
+
+  {
+    let stopCalls = 0;
+    let disconnectCalls = 0;
+    const mock = {
+      protocolName: 'mock',
       state: { ...baseState, status: 'idle' as const },
       isJobRunning: false,
       maxSpindle: null,
