@@ -142,9 +142,46 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 // pipeline (useTracePreview, loadImageAsRawData) is keyed on a File. Round-
 // tripping the RasterImage's embedded dataUrl back into a File lets the
 // trace tool reuse that pipeline unchanged instead of forking it to accept
-// raw pixels. `fetch` on a data URL is synchronous-decode in the browser.
+// raw pixels. Do not use fetch(dataUrl) here: production CSP's connect-src
+// intentionally blocks data: fetches, while Vite dev has no matching
+// Cloudflare header.
 export async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
-  const res = await fetch(dataUrl);
-  const blob = await res.blob();
-  return new File([blob], filename, { type: blob.type });
+  const { mimeType, bytes } = decodeDataUrl(dataUrl);
+  return new File([toArrayBuffer(bytes)], filename, { type: mimeType });
+}
+
+function decodeDataUrl(dataUrl: string): {
+  readonly mimeType: string;
+  readonly bytes: Uint8Array;
+} {
+  if (!dataUrl.startsWith('data:')) {
+    throw new Error('Stored image is not a data URL.');
+  }
+  const comma = dataUrl.indexOf(',');
+  if (comma < 0) {
+    throw new Error('Stored image data URL is malformed.');
+  }
+
+  const header = dataUrl.slice('data:'.length, comma);
+  const payload = dataUrl.slice(comma + 1);
+  const parts = header.split(';').filter(Boolean);
+  const mimeType = parts.find((part) => part.toLowerCase() !== 'base64') ?? '';
+  const isBase64 = parts.some((part) => part.toLowerCase() === 'base64');
+
+  if (!isBase64) {
+    return { mimeType, bytes: new TextEncoder().encode(decodeURIComponent(payload)) };
+  }
+
+  const bin = atob(decodeURIComponent(payload.replace(/\s/g, '')));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return { mimeType, bytes };
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
