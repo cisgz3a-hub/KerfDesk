@@ -55,6 +55,11 @@ export default defineConfig({
     // compressed. Warn if a chunk pushes past 500 KB compressed.
     chunkSizeWarningLimit: 500,
   },
+  worker: {
+    // Trace worker imports the lazy trace pipeline, so production workers must
+    // emit as ES modules. Vite's default iife worker format cannot code-split.
+    format: 'es',
+  },
   server: {
     port: 5173,
     strictPort: true,

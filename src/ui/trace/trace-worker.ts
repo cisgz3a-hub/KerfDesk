@@ -11,9 +11,10 @@
 // worker instance (the live preview reuses the same worker across
 // preset changes).
 //
-// Vite loads this via the `?worker` import suffix at the call site —
-// see use-trace-worker-client.ts. The worker is bundled separately
-// and not part of the main entry chunk.
+// Vite loads this from the direct
+// `new Worker(new URL('./trace-worker.ts', import.meta.url), { type: 'module' })`
+// expression in use-trace-worker-client.ts. That call-site shape is
+// what makes Vite bundle the worker instead of shipping raw TS.
 
 /// <reference lib="webworker" />
 

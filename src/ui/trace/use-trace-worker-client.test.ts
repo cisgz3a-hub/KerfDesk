@@ -1,7 +1,6 @@
-// Smoke test for the inline-fallback path. The actual worker
-// behaviour can't be exercised here — vitest's environment doesn't
-// host the `new URL('./trace-worker.ts', import.meta.url)` worker
-// resolution Vite injects at build time. The fallback path IS
+// Smoke test for the inline-fallback path. Vitest's environment doesn't
+// host the production worker bundle resolution Vite injects at build
+// time, so the fallback path IS
 // exercised: ensureWorker() throws on the URL construction and
 // returns null, traceImage() then runs traceImageToColoredPaths
 // inline. This test verifies that fallback path returns the expected
@@ -9,6 +8,8 @@
 //
 // The worker path is covered at runtime in dev / Cloudflare builds.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import type { RawImageData } from '../../core/trace';
@@ -37,6 +38,21 @@ function tinyImage(): RawImageData {
 }
 
 describe('traceImage (worker client with inline fallback)', () => {
+  it('uses Vite-recognized inline worker construction for production large traces', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'src/ui/trace/use-trace-worker-client.ts'),
+      'utf8',
+    );
+    const compact = source.replace(/\s+/g, ' ');
+
+    expect(compact).toMatch(
+      /new Worker\(new URL\('\.\/trace-worker\.ts', import\.meta\.url\), \{ type: 'module',? \}\)/,
+    );
+    expect(compact).not.toContain(
+      "const workerUrl = new URL('./trace-worker.ts', import.meta.url); workerInstance = new Worker(workerUrl",
+    );
+  });
+
   it('allows inline fallback only for bounded images', () => {
     expect(canTraceInline({ width: 400, height: 400 })).toBe(true);
     expect(canTraceInline({ width: 401, height: 400 })).toBe(false);
