@@ -232,9 +232,7 @@ function useFrameAction(): () => void {
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
     const compiled = compileJob(project.scene, project.device);
-    const job = workOriginActive
-      ? applyJobOrigin(compiled, USER_ORIGIN_JOB_PLACEMENT)
-      : compiled;
+    const job = workOriginActive ? applyJobOrigin(compiled, USER_ORIGIN_JOB_PLACEMENT) : compiled;
     const bounds = computeJobBounds(job);
     if (bounds === null) {
       pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');

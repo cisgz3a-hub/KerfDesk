@@ -61,8 +61,9 @@ function ensureWorker(): Worker | null {
     return null;
   }
   try {
-    const workerUrl = new URL('./trace-worker.ts', import.meta.url);
-    workerInstance = new Worker(workerUrl, { type: 'module' });
+    workerInstance = new Worker(new URL('./trace-worker.ts', import.meta.url), {
+      type: 'module',
+    });
     workerInstance.onmessage = handleWorkerMessage;
     workerInstance.onerror = (): void => {
       // Worker crashed (e.g. module-resolution failure, syntax error
