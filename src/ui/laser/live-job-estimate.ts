@@ -15,6 +15,7 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
+import { runPreEmitPreflight } from '../../core/preflight';
 
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = 10_000;
 export const LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET = 20_000;
@@ -26,6 +27,11 @@ export type LiveJobEstimate =
   | { readonly kind: 'too-large' };
 
 export function estimateLiveJob(project: Project): LiveJobEstimate {
+  // A raster whose target grid blows the budget must short-circuit BEFORE the
+  // compileJob below — the live estimate runs on every render, so otherwise it
+  // allocates the giant resampled-luma + dither buffers and freezes the tab
+  // (roadmap P1-A).
+  if (!runPreEmitPreflight(project).ok) return { kind: 'too-large' };
   if (countOutputVectorSegments(project.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }

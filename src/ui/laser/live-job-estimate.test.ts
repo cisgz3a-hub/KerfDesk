@@ -108,6 +108,22 @@ function denseFillProject(): Project {
   };
 }
 
+function hugeRasterProject(): Project {
+  const base = imageOnlyProject();
+  return {
+    ...base,
+    scene: {
+      ...base.scene,
+      objects: base.scene.objects.map((o) =>
+        o.kind === 'raster-image'
+          ? { ...o, bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 } }
+          : o,
+      ),
+      layers: base.scene.layers.map((l) => ({ ...l, linesPerMm: 25 })),
+    },
+  };
+}
+
 describe('live job estimate', () => {
   it('estimates small vector jobs', () => {
     expect(estimateLiveJob(tracedLineProject(2)).kind).toBe('estimated');
@@ -124,6 +140,11 @@ describe('live job estimate', () => {
 
   it('estimates image-only jobs instead of showing them as empty', () => {
     expect(estimateLiveJob(imageOnlyProject()).kind).toBe('estimated');
+  });
+
+  it('skips an over-budget raster before compiling it (P1-A freeze guard)', () => {
+    // 300x300mm @ 25 lines/mm = 7500x7500 = 56M px - would freeze if compiled.
+    expect(estimateLiveJob(hugeRasterProject())).toEqual({ kind: 'too-large' });
   });
 
   it('skips dense fill jobs even when their raw vector count is small', () => {
