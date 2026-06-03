@@ -3,7 +3,12 @@
 // I/O. The UI / platform adapter decides whether to actually write the file
 // based on `preflight.ok`.
 
-import { runPreflight, type PreflightOptions, type PreflightResult } from '../../core/preflight';
+import {
+  runPreEmitPreflight,
+  runPreflight,
+  type PreflightOptions,
+  type PreflightResult,
+} from '../../core/preflight';
 import { applyJobOrigin, compileJob, optimizePaths, type JobOriginPlacement } from '../../core/job';
 import { grblStrategy } from '../../core/output';
 import type { Project } from '../../core/scene';
@@ -25,6 +30,13 @@ export type EmitGcodeOptions = {
 };
 
 export function emitGcode(project: Project, options: EmitGcodeOptions = {}): EmitGcodeResult {
+  // Pre-emit budget guard FIRST: a raster that would engrave to an enormous
+  // pixel grid is refused here, before compileJob allocates the resampled luma,
+  // the dither buffers, and the G-code string (roadmap P1-A). Empty g-code +
+  // the failing preflight means the UI shows the reason instead of freezing.
+  const preEmit = runPreEmitPreflight(project);
+  if (!preEmit.ok) return { gcode: '', preflight: preEmit };
+
   // compile → optimize → emit. The optimize step is pure path-order
   // reduction (nearest-neighbor heuristic) — same cuts, same speeds,
   // same passes, just shorter travel between them. Determinism

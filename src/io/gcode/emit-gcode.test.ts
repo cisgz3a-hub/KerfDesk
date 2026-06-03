@@ -76,6 +76,36 @@ describe('emitGcode', () => {
     expect(withMeta.preflight.ok).toBe(withoutMeta.preflight.ok);
   });
 
+  it('refuses an oversized raster before compile, returning empty g-code (P1-A)', () => {
+    const base = createProject();
+    const color = '#808080';
+    const raster: SceneObject = {
+      kind: 'raster-image',
+      id: 'R1',
+      color,
+      source: 'x.png',
+      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      pixelWidth: 4,
+      pixelHeight: 4,
+      dither: 'floyd-steinberg',
+      linesPerMm: 25,
+      bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      transform: IDENTITY_TRANSFORM,
+    };
+    const project = {
+      ...base,
+      scene: addLayer(addObject(base.scene, raster), {
+        ...createLayer({ id: color, color, mode: 'image' }),
+        linesPerMm: 25,
+      }),
+    };
+    const { gcode, preflight } = emitGcode(project);
+    expect(preflight.ok).toBe(false);
+    expect(preflight.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
+    // No compile ran, so nothing was allocated and no g-code was produced.
+    expect(gcode).toBe('');
+  });
+
   it('returns a failing preflight when the project has no output layers', () => {
     const project = createProject();
     const { preflight } = emitGcode(project);

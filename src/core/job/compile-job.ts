@@ -24,6 +24,7 @@ import {
   type Vec2,
 } from '../scene';
 import { memoizedFillHatching } from './fill-hatching-cache';
+import { rasterBoundsInMachineCoords } from './raster-bounds';
 import type { CutSegment, Group, Job, RasterGroup } from './job';
 
 // Default overscan kept here (not on Layer) so it can ride device
@@ -148,29 +149,6 @@ function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
 
 function isBase64Whitespace(char: string): boolean {
   return char === ' ' || char === '\n' || char === '\r' || char === '\t';
-}
-
-// Apply object transform + device origin transform to the image's
-// natural bounds and return the AABB in machine coords. Same
-// convention as CutGroup polylines after toMachineCoords.
-function rasterBoundsInMachineCoords(
-  obj: RasterImage,
-  device: DeviceProfile,
-): { readonly minX: number; readonly minY: number; readonly maxX: number; readonly maxY: number } {
-  const corners = [
-    { x: obj.bounds.minX, y: obj.bounds.minY },
-    { x: obj.bounds.maxX, y: obj.bounds.minY },
-    { x: obj.bounds.maxX, y: obj.bounds.maxY },
-    { x: obj.bounds.minX, y: obj.bounds.maxY },
-  ].map((p) => toMachineCoords(applyTransform(p, obj.transform), device));
-  const xs = corners.map((p) => p.x);
-  const ys = corners.map((p) => p.y);
-  return {
-    minX: Math.min(...xs),
-    maxX: Math.max(...xs),
-    minY: Math.min(...ys),
-    maxY: Math.max(...ys),
-  };
 }
 
 function clamp(n: number, lo: number, hi: number): number {

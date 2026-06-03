@@ -29,6 +29,7 @@ export type PreflightCode =
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
+  | 'raster-too-large'
   | 'empty-output';
 
 export type PreflightIssue = {
