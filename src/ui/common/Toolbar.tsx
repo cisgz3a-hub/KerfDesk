@@ -14,6 +14,7 @@ import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { rasterImportGeometry } from './image-import';
+import { readImageDensity } from './image-density';
 
 // F-A13 dirty-check. Returns true if it's safe to proceed (project is clean,
 // or the user confirmed discard). Phase A uses the native confirm() —
@@ -239,12 +240,16 @@ function ImportImageButton(): JSX.Element {
           await import('../trace/image-loader');
         const natural = await readImageNaturalSize(file);
         const image = await loadImageAsRawData(file);
+        // Honour embedded PNG/JPEG density so the import lands at its real-world
+        // size; fall back to 96 DPI when there is none (P2-A).
+        const density = await readImageDensity(file);
         const { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM } = await import('../../core/scene');
         const geometry = rasterImportGeometry({
           naturalWidth: natural.width,
           naturalHeight: natural.height,
           sampledWidth: image.width,
           sampledHeight: image.height,
+          ...(density !== null ? { dpi: density } : {}),
         });
         const dataUrl = await readFileAsDataUrl(file);
         const lumaBase64 = extractLumaBase64(image);
