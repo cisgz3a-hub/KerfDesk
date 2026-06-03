@@ -1,7 +1,7 @@
 // Web Worker that runs the trace pipeline off the main thread.
 // Receives a RawImageData + TraceOptions, returns ColoredPath[].
-// Step 5 of the LF1 image-trace port — preserves UI responsiveness
-// during the 50-500ms preprocess+trace window on larger inputs.
+// Preserves UI responsiveness during the 50-500ms preprocess+trace
+// window on larger inputs.
 //
 // The work itself is identical to traceImageToColoredPaths in
 // trace-to-paths.ts (we share the pure-core preprocessing helpers and

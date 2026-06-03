@@ -1,4 +1,4 @@
-export type { Issue } from './predicates';
+export type { Issue, MotionBoundsOffset, OutOfBoundsCoordOptions } from './predicates';
 export {
   collectG1SValues,
   expectedS,

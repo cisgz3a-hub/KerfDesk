@@ -1469,6 +1469,75 @@ thing.
 
 ---
 
+## ADR-033 - Skip fill overscan on short hatch runs; emit runway as rapid
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+A traced-image Fill burn took ~2 h on hardware versus ~5 min for the same
+artwork, size, and settings in LightBurn (~24x). A multi-agent audit
+(`audit/FILL-SPEED-DIAGNOSIS-2026-06-03.md`) traced the dominant cost to the
+ADR-031 overscan runway, not streaming (the streamer is character-counting):
+
+- The lead-in/lead-out (default 5 mm/side = 10 mm runway) were emitted as
+  `G1 ... S0` at the *cutting* feed (default 1500 mm/min), so ~0.4-0.5 s of
+  laser-off travel was spent per hatch run, independent of burn length.
+- A traced image fragments each 0.2 mm scanline into thousands of short runs.
+  On a short run the fixed 10 mm runway dwarfs the actual burn, and the per-run
+  runway is paid N times with no merging (Fill is also excluded from
+  `optimize-paths`). LightBurn burns the same art as a continuous raster:
+  overscan once per row, not per run.
+
+### Decision
+
+This is the first of two fixes (the second — merging collinear runs into
+continuous laser-on sweeps — is tracked separately).
+
+1. **Emit the overscan runway as a `G0` rapid, not a `G1` at cutting feed.** The
+   runway is laser-off (`S0`); GRBL still decelerates to the burn feed by
+   `burnStart` across the collinear junction, so the burn span stays at constant
+   velocity and ADR-031's edge-evening purpose is preserved. The burn `G1` now
+   carries `F` explicitly because the lead-in is no longer a `G1` that sets the
+   modal feed. The planner prices the runway at travel velocity to keep the ETA
+   honest.
+2. **Skip the runway entirely on short runs.** When the burn is shorter than
+   `OVERSCAN_MIN_BURN_RATIO` (= 2) x the per-side overscan — i.e. the runway
+   would be longer than the burn — `effectiveOverscanMm` returns 0 and the run
+   emits just a seek `G0` to `burnStart` and the burn `G1`. The threshold lives
+   in one helper so the emitter, the planner ETA, and the preview scrubber agree.
+
+This refines ADR-031: overscan still protects long fill spans, but short runs
+trade edge-evening for the large speed win. M3/M4 is unchanged (ADR-020); Fill
+stays on M3.
+
+### Consequences
+
+- Long fill runs are unchanged in coverage; their runway is faster (rapid).
+- Short fill runs lose accel/decel edge-evening. On those the burn is brief and
+  the head is in its accel ramp regardless, so the quality cost is expected to be
+  small — but it is a real tradeoff and needs hardware confirmation.
+- Burn geometry (the positive-S `G1` spans) is byte-identical to before; only
+  laser-off travel changed.
+- `OVERSCAN_MIN_BURN_RATIO` is a tunable constant if hardware shows short-run
+  edge marks.
+
+### Verification
+
+- `fill-overscan.test.ts`: `effectiveOverscanMm` applies at >= 2x, skips below,
+  and returns 0 for disabled/degenerate input.
+- `grbl-strategy.test.ts`: long run keeps the rapid runway; short run emits only
+  seek + burn; no `G1` laser-off move; the burn carries `F`.
+- Empirical (Karpathy's law): the real emitted G-code for a mixed long/short
+  fill was inspected — long run has the rapid runway, short run skips it, and the
+  burn endpoints match the input hatch exactly.
+- Full suite + `tsc --noEmit` + lint on touched files green.
+- **Hardware verification needed:** re-burn the original traced logo on the
+  Falcon A1 Pro and confirm (a) the wall-clock drop and (b) no new edge marks on
+  small filled features.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

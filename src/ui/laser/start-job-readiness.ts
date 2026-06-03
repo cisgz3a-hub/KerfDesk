@@ -15,6 +15,9 @@ import { emitGcode } from '../../io/gcode';
 import { hasCustomOrigin, type WorkCoordinateOffset } from '../state/origin-actions';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 
+export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
+  'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
+
 export type StartJobPreparation =
   | {
       readonly ok: true;
@@ -30,6 +33,7 @@ export type MachineStartSnapshot = {
   readonly statusReport: StatusReport | null;
   readonly alarmCode: number | null;
   readonly hasActiveStreamer: boolean;
+  readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
 };
@@ -43,16 +47,23 @@ export function prepareStartJob(
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
 
   const useUserOrigin = usesUserOrigin(machine);
-  const { gcode, preflight } = useUserOrigin
-    ? emitGcode(project, { jobOrigin: USER_ORIGIN_JOB_PLACEMENT })
-    : emitGcode(project);
-  if (!preflight.ok) {
-    return { ok: false, messages: preflight.issues.map((i) => i.message) };
+  const originOffset = resolveUserOriginOffset(machine, useUserOrigin);
+  if (originOffset === 'unknown') {
+    return { ok: false, messages: [CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE] };
   }
-
   const originBoundsIssue = findOriginBoundsIssue(project, machine, useUserOrigin);
   if (originBoundsIssue !== null) {
     return { ok: false, messages: [originBoundsIssue] };
+  }
+
+  const { gcode, preflight } = useUserOrigin
+    ? emitGcode(project, {
+        jobOrigin: USER_ORIGIN_JOB_PLACEMENT,
+        preflightMotionOffset: originOffset ?? undefined,
+      })
+    : emitGcode(project);
+  if (!preflight.ok) {
+    return { ok: false, messages: preflight.issues.map((i) => i.message) };
   }
 
   const controller = runControllerReadiness(project, controllerSettings);
@@ -69,6 +80,15 @@ export function prepareStartJob(
 
 function usesUserOrigin(machine: MachineStartSnapshot): boolean {
   return machine.workOriginActive === true || hasCustomOrigin(machine.wcoCache ?? null);
+}
+
+function resolveUserOriginOffset(
+  machine: MachineStartSnapshot,
+  useUserOrigin: boolean,
+): WorkCoordinateOffset | 'unknown' | null {
+  if (!useUserOrigin) return null;
+  if (machine.wcoCache === null || machine.wcoCache === undefined) return 'unknown';
+  return machine.wcoCache;
 }
 
 function findOriginBoundsIssue(
@@ -90,6 +110,9 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
   const issues: string[] = [];
   if (machine.hasActiveStreamer) {
     issues.push('A job is already active. Stop or finish it before starting another.');
+  }
+  if (machine.autofocusBusy === true) {
+    issues.push('Auto-focus is running. Wait for it to finish before starting a job.');
   }
   if (machine.alarmCode !== null) {
     issues.push('Controller is in alarm state. Clear the alarm before starting.');

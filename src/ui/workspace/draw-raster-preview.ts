@@ -33,13 +33,19 @@ import { drawBitmapAtTransform } from './draw-raster';
 import type { ViewTransform } from './view-transform';
 
 const PERCENT_MAX = 100;
-const previewCanvasCache = new Map<string, HTMLCanvasElement>();
+type PreviewCanvasCacheEntry = {
+  readonly dataUrl: string;
+  readonly canvas: HTMLCanvasElement;
+};
+
+const previewCanvasCache = new Map<string, PreviewCanvasCacheEntry>();
 
 export function drawRasterPreview(
   ctx: CanvasRenderingContext2D,
   project: Project,
   view: ViewTransform,
 ): void {
+  pruneRasterPreviewCache(liveRasterPreviewDataUrls(project));
   for (const layer of project.scene.layers) {
     if (!layer.output || layer.mode !== 'image') continue;
     for (const obj of project.scene.objects) {
@@ -47,6 +53,12 @@ export function drawRasterPreview(
       if (obj.role === 'trace-source') continue;
       drawOnePreview(ctx, obj, layer, project.device, view);
     }
+  }
+}
+
+export function pruneRasterPreviewCache(liveDataUrls: ReadonlySet<string>): void {
+  for (const [key, entry] of previewCanvasCache) {
+    if (!liveDataUrls.has(entry.dataUrl)) previewCanvasCache.delete(key);
   }
 }
 
@@ -88,7 +100,7 @@ function previewCanvasFor(
   );
   const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${layer.ditherAlgorithm}|${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
   const cached = previewCanvasCache.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return cached.canvas;
   const sourceLuma = decodeLuma(obj.lumaBase64, pixelWidth * pixelHeight);
   const luma = resampleLumaNearest(
     { luma: sourceLuma, width: pixelWidth, height: pixelHeight },
@@ -106,8 +118,23 @@ function previewCanvasFor(
   const octx = canvas.getContext('2d');
   if (octx === null) return null;
   octx.putImageData(new ImageData(rgba, targetWidth, targetHeight), 0, 0);
-  previewCanvasCache.set(key, canvas);
+  previewCanvasCache.set(key, { dataUrl: obj.dataUrl, canvas });
   return canvas;
+}
+
+function liveRasterPreviewDataUrls(project: Project): Set<string> {
+  const imageLayerColors = new Set(
+    project.scene.layers
+      .filter((layer) => layer.output && layer.mode === 'image')
+      .map((layer) => layer.color),
+  );
+  const live = new Set<string>();
+  for (const obj of project.scene.objects) {
+    if (obj.kind !== 'raster-image') continue;
+    if (obj.role === 'trace-source') continue;
+    if (imageLayerColors.has(obj.color)) live.add(obj.dataUrl);
+  }
+  return live;
 }
 
 // Mirror compileRasterGroup's S-scale exactly: round(clamp(power)/100 ×

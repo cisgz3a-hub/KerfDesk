@@ -1,4 +1,4 @@
-// Unit tests for the 13-mode dither port. Covers each mode's
+// Unit tests for the 13-mode dither parity suite. Covers each mode's
 // determinism, output-domain (binary), and dark-as-ink convention,
 // plus a property check that error-diffusion modes preserve local
 // average brightness (the whole reason halftoning works).

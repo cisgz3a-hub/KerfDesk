@@ -39,10 +39,15 @@ let tracerPromise: Promise<ImageTracerModule> | null = null;
 async function loadTracer(): Promise<ImageTracerModule> {
   if (tracerPromise === null) {
     // @ts-expect-error — imagetracerjs ships no type declarations
-    tracerPromise = import('imagetracerjs').then((mod) => {
-      const resolved = (mod.default ?? mod) as unknown as ImageTracerModule;
-      return resolved;
-    });
+    tracerPromise = import('imagetracerjs')
+      .then((mod) => {
+        const resolved = (mod.default ?? mod) as unknown as ImageTracerModule;
+        return resolved;
+      })
+      .catch((error: unknown) => {
+        tracerPromise = null;
+        throw error;
+      });
   }
   return tracerPromise;
 }
@@ -123,8 +128,8 @@ export type TraceOptions = {
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
-  // Phase E.3 — image-level adjustments ported from LF1's
-  // ImageProcessing.ts (see raster-prep.ts). All four run BEFORE the
+  // Phase E.3 — image-level adjustments matching LF1's
+  // ImageProcessing.ts math (see raster-prep.ts). All four run BEFORE the
   // existing median → threshold → despeckle chain, so the cleanup
   // stages operate on pixels the user has already brightened /
   // contrast-pushed / gamma-corrected / inverted to taste.
@@ -370,8 +375,8 @@ function shouldDespeckle(options: TraceOptions): boolean {
   );
 }
 
-// Phase E.2 — port LaserForge 1's imagetracerjs settings after audit
-// found ours were leaving the worst defaults on. The most impactful
+// Phase E.2 — match LaserForge 1's proven imagetracerjs settings after
+// audit found ours were leaving the worst defaults on. The most impactful
 // single change is `rightangleenhance: false`. When true
 // (imagetracerjs's default!) it forces traced edges toward axis-
 // aligned right angles — devastating on organic curves and photos,

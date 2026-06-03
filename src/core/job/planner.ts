@@ -35,7 +35,7 @@
 
 import type { DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
-import { expandFillHatchWithOverscan } from './fill-overscan';
+import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import type { CutGroup, FillGroup, Job } from './job';
 
 const SECONDS_PER_MINUTE = 60;
@@ -91,38 +91,76 @@ function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] 
     // model (constant-feed sweeps) — skipped here and accounted
     // for separately in estimate-duration's raster path.
     if (group.kind === 'raster') continue;
-    const cutV = Math.max(1, Math.min(group.speed, device.maxFeed)) / SECONDS_PER_MINUTE;
-    if (group.kind === 'fill') {
-      for (let pass = 0; pass < group.passes; pass += 1) {
-        for (const seg of group.segments) {
-          const run = expandFillHatchWithOverscan(seg.polyline, group.overscanMm);
-          if (run === null) continue;
-          appendTravel(out, cursor, run.leadStart, travelV);
-          appendTravel(out, run.leadStart, run.burnStart, cutV);
-          appendCut(out, run.burnStart, run.burnEnd, cutV);
-          appendTravel(out, run.burnEnd, run.leadEnd, cutV);
-          cursor = run.leadEnd;
-        }
-      }
-      continue;
-    }
-    for (let pass = 0; pass < group.passes; pass += 1) {
-      for (const seg of group.segments) {
-        const first = seg.polyline[0];
-        if (first === undefined) continue;
-        appendTravel(out, cursor, first, travelV);
-        for (let i = 1; i < seg.polyline.length; i += 1) {
-          const a = seg.polyline[i - 1];
-          const b = seg.polyline[i];
-          if (a !== undefined && b !== undefined) appendCut(out, a, b, cutV);
-        }
-        const last = seg.polyline[seg.polyline.length - 1];
-        if (last !== undefined) cursor = last;
-      }
-    }
+    const cutV = groupCutVelocity(group, device);
+    cursor =
+      group.kind === 'fill'
+        ? appendFillGroupBlocks(out, cursor, group, cutV, travelV)
+        : appendCutGroupBlocks(out, cursor, group, cutV, travelV);
   }
   appendTravel(out, cursor, ORIGIN, travelV);
   return out;
+}
+
+function groupCutVelocity(group: CutGroup | FillGroup, device: DeviceProfile): number {
+  return Math.max(1, Math.min(group.speed, device.maxFeed)) / SECONDS_PER_MINUTE;
+}
+
+function appendFillGroupBlocks(
+  out: Block[],
+  initialCursor: Vec2,
+  group: FillGroup,
+  cutV: number,
+  travelV: number,
+): Vec2 {
+  let cursor = initialCursor;
+  for (let pass = 0; pass < group.passes; pass += 1) {
+    for (const seg of group.segments) {
+      // Overscan lead-in/lead-out are laser-off runway emitted as G0 rapids
+      // (grbl-strategy.emitFillGroup), so price them at travel velocity, not
+      // cut velocity — otherwise the ETA over-counts the runway as slow cutting
+      // moves. The burn itself stays at cutV. Short runs skip the runway
+      // (effectiveOverscanMm → 0): the lead points collapse onto the burn ends,
+      // so the two runway appendTravel calls become zero-length and drop out.
+      const overscan = effectiveOverscanMm(seg.polyline, group.overscanMm);
+      const run = expandFillHatchWithOverscan(seg.polyline, overscan);
+      if (run === null) continue;
+      appendTravel(out, cursor, run.leadStart, travelV);
+      appendTravel(out, run.leadStart, run.burnStart, travelV);
+      appendCut(out, run.burnStart, run.burnEnd, cutV);
+      appendTravel(out, run.burnEnd, run.leadEnd, travelV);
+      cursor = run.leadEnd;
+    }
+  }
+  return cursor;
+}
+
+function appendCutGroupBlocks(
+  out: Block[],
+  initialCursor: Vec2,
+  group: CutGroup,
+  cutV: number,
+  travelV: number,
+): Vec2 {
+  let cursor = initialCursor;
+  for (let pass = 0; pass < group.passes; pass += 1) {
+    for (const seg of group.segments) {
+      const first = seg.polyline[0];
+      if (first === undefined) continue;
+      appendTravel(out, cursor, first, travelV);
+      appendCutPolylineBlocks(out, seg.polyline, cutV);
+      const last = seg.polyline[seg.polyline.length - 1];
+      if (last !== undefined) cursor = last;
+    }
+  }
+  return cursor;
+}
+
+function appendCutPolylineBlocks(out: Block[], polyline: ReadonlyArray<Vec2>, cutV: number): void {
+  for (let i = 1; i < polyline.length; i += 1) {
+    const a = polyline[i - 1];
+    const b = polyline[i];
+    if (a !== undefined && b !== undefined) appendCut(out, a, b, cutV);
+  }
 }
 
 function appendTravel(out: Block[], from: Vec2, to: Vec2, v: number): void {

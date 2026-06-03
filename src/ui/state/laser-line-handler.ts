@@ -18,6 +18,7 @@
 import {
   classifyResponse,
   CMD_SETTINGS,
+  disconnect as disconnectStreamer,
   onAck,
   type SettingsCollectorState,
   startCollecting,
@@ -165,5 +166,9 @@ function advanceStream(
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
   set({ streamer: stepped.state });
-  if (stepped.toSend.length > 0) void safeWrite(stepped.toSend).catch(() => undefined);
+  if (stepped.toSend.length > 0) {
+    void safeWrite(stepped.toSend).catch(() => {
+      set({ streamer: disconnectStreamer(acked.state) });
+    });
+  }
 }

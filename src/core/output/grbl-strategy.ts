@@ -10,7 +10,7 @@
 // Postamble: M5, then `G0 X0 Y0 S0` to park at origin.
 
 import type { DeviceProfile } from '../devices';
-import { expandFillHatchWithOverscan } from '../job/fill-overscan';
+import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
@@ -90,12 +90,28 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
-      const run = expandFillHatchWithOverscan(seg.polyline, group.overscanMm);
+      // The overscan lead-in/lead-out are laser-off runway — emit them as G0
+      // rapids, not G1 at the cutting feed (audit 2026-06-03). GRBL still
+      // decelerates to the burn feed by burnStart (collinear junction), so the
+      // burn span stays at constant speed — overscan's edge-quality purpose is
+      // intact. The burn G1 carries F explicitly: the lead-in is a G0, so it no
+      // longer establishes the modal feed. Every G0 keeps S0 (PROJECT.md #3).
+      //
+      // Short runs skip the runway entirely (effectiveOverscanMm → 0): on those
+      // the 2×overscan runway would exceed the burn, and a traced fill is mostly
+      // such runs. With overscan 0 the lead points collapse onto the burn ends,
+      // so only the seek-to-burnStart G0 and the burn G1 are emitted.
+      const overscan = effectiveOverscanMm(seg.polyline, group.overscanMm);
+      const run = expandFillHatchWithOverscan(seg.polyline, overscan);
       if (run === null) continue;
       chunks.push(`G0 X${fmt(run.leadStart.x)} Y${fmt(run.leadStart.y)} S0`);
-      chunks.push(`G1 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} F${feed} S0`);
-      chunks.push(`G1 X${fmt(run.burnEnd.x)} Y${fmt(run.burnEnd.y)} S${s}`);
-      chunks.push(`G1 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
+      if (overscan > 0) {
+        chunks.push(`G0 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} S0`);
+      }
+      chunks.push(`G1 X${fmt(run.burnEnd.x)} Y${fmt(run.burnEnd.y)} F${feed} S${s}`);
+      if (overscan > 0) {
+        chunks.push(`G0 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
+      }
     }
   }
   return chunks.join(LINE_END) + LINE_END;

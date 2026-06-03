@@ -128,7 +128,7 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
 });
 
 describe('grblStrategy fill hatch overscan', () => {
-  it('emits laser-off lead-in and lead-out around the burn span', () => {
+  it('emits the overscan lead-in/out as laser-off G0 rapids (not cutting-feed moves)', () => {
     const job: Job = {
       groups: [
         {
@@ -154,15 +154,62 @@ describe('grblStrategy fill hatch overscan', () => {
 
     const out = emit(job);
 
+    // The overscan runway is laser-off travel, so it rides a G0 rapid, not a
+    // G1 at the cutting feed. Traversing the 2×overscan runway at the slow
+    // cut feed on every one of thousands of fragmented hatch runs was the
+    // dominant term in the 2h-vs-LightBurn-5min fill burn (audit 2026-06-03).
+    // Because the lead-in is no longer a G1, it no longer sets the modal feed,
+    // so the burn G1 must now carry F explicitly.
     expect(out).toContain(
       [
         'G0 X8.000 Y5.000 S0',
-        'G1 X10.000 Y5.000 F1500 S0',
-        'G1 X20.000 Y5.000 S300',
-        'G1 X22.000 Y5.000 S0',
+        'G0 X10.000 Y5.000 S0',
+        'G1 X20.000 Y5.000 F1500 S300',
+        'G0 X22.000 Y5.000 S0',
       ].join('\n'),
     );
+    // No laser-off move is emitted at cutting feed: every runway hop is a G0,
+    // so no G1 line ends in S0.
+    expect(out).not.toMatch(/^G1[^\n]* S0$/m);
     expect(out).not.toMatch(/^M[34] S[1-9]/m);
+  });
+
+  it('skips the overscan runway on short runs but keeps it on long runs', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          overscanMm: 5,
+          segments: [
+            { polyline: [{ x: 10, y: 0 }, { x: 30, y: 0 }], closed: false }, // 20mm -> overscan
+            { polyline: [{ x: 10, y: 5 }, { x: 13, y: 5 }], closed: false }, // 3mm  -> skip
+          ],
+        },
+      ],
+    };
+
+    const out = emit(job);
+
+    // Long run (20mm >= 2x5): full rapid runway around the burn.
+    expect(out).toContain(
+      [
+        'G0 X5.000 Y0.000 S0',
+        'G0 X10.000 Y0.000 S0',
+        'G1 X30.000 Y0.000 F1500 S300',
+        'G0 X35.000 Y0.000 S0',
+      ].join('\n'),
+    );
+    // Short run (3mm < 2x5): no runway — straight seek to burnStart, then burn,
+    // then the postamble. Coverage (burn endpoints) is unchanged; only the
+    // laser-off runway is dropped.
+    expect(out).toContain(
+      ['G0 X10.000 Y5.000 S0', 'G1 X13.000 Y5.000 F1500 S300', 'M5'].join('\n'),
+    );
   });
 });
 

@@ -34,9 +34,9 @@ jobs:
     name: Build + deploy web bundle
     runs-on: ubuntu-latest
     # workflow_run fires for EVERY CI completion (success + failure).
-    # The condition below gates on the success path; manual dispatches
-    # also pass (they have no workflow_run to inspect).
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Manual dispatches are production deploys, so the selected ref must
+    # be main and the job still re-runs the repo and CI proof steps below.
+    if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,8 +62,35 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Repository identity guard
+        run: pnpm guard:repo
+
+      - name: TypeScript typecheck
+        run: pnpm typecheck
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: ESLint Electron main
+        run: pnpm lint:electron
+
+      - name: Prettier
+        run: pnpm format:check
+
+      - name: License audit
+        run: pnpm license-check
+
+      - name: Vitest
+        run: pnpm test
+
       - name: Build web bundle
         run: pnpm build:web
+
+      - name: Build Electron main process
+        run: pnpm build:electron-main
+
+      - name: Verify file-size discipline
+        run: pnpm check:file-size
 
       - name: Publish to Cloudflare Pages
         # cloudflare/wrangler-action is the official Cloudflare action.

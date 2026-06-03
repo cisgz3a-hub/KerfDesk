@@ -30,6 +30,17 @@ const DEG_TO_RAD = Math.PI / 180;
 const TRACE_SOURCE_TINT_COLOR = '#3b82c4';
 const TRACE_SOURCE_TINT_ALPHA = 0.4;
 
+export function pruneRasterImageCaches(liveDataUrls: ReadonlySet<string>): void {
+  for (const [dataUrl, entry] of rasterImageCache) {
+    if (liveDataUrls.has(dataUrl)) continue;
+    entry.onReady.clear();
+    rasterImageCache.delete(dataUrl);
+  }
+  for (const dataUrl of tintedTraceSourceCache.keys()) {
+    if (!liveDataUrls.has(dataUrl)) tintedTraceSourceCache.delete(dataUrl);
+  }
+}
+
 function rasterImageEntry(dataUrl: string): RasterImageCacheEntry {
   const cached = rasterImageCache.get(dataUrl);
   if (cached !== undefined) return cached;

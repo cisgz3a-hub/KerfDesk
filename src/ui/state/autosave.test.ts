@@ -9,6 +9,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   localStorage.clear();
 });
 
@@ -46,6 +47,22 @@ describe('writeAutosave / readAutosave round-trip', () => {
     );
     expect(readAutosave()).toBeNull();
   });
+
+  it('reports quota failure instead of silently claiming autosave worked', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('storage full', 'QuotaExceededError');
+    });
+
+    const result = writeAutosave(createProject());
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        kind: 'failed',
+        reason: 'quota',
+      }),
+    );
+    expect(readAutosave()).toBeNull();
+  });
 });
 
 describe('clearAutosave', () => {
@@ -71,6 +88,26 @@ describe('startAutosaveLoop', () => {
     expect(readAutosave()).toBeNull(); // no tick yet
     vi.advanceTimersByTime(100);
     expect(readAutosave()).not.toBeNull();
+    stop();
+  });
+
+  it('reports write failures so the UI can warn that recovery is unavailable', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('storage full', 'QuotaExceededError');
+    });
+    const project = createProject();
+    const onWriteFailure = vi.fn();
+    const stop = startAutosaveLoop(
+      () => ({ project, dirty: true, isStreaming: false }),
+      100,
+      onWriteFailure,
+    );
+
+    vi.advanceTimersByTime(100);
+
+    expect(onWriteFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'failed', reason: 'quota' }),
+    );
     stop();
   });
 

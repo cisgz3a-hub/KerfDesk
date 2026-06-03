@@ -10,11 +10,13 @@
 //   5. Passes ≥ 1 (integer) for every output layer.
 //   6. Generated G-code is non-empty (at least one G1 line).
 //
-// Phase A scope: bounds check supports front-left/right and rear-left/right
-// origins (positive coord range). Center origin is documented as Phase B.
-
 import { assertNever, type Layer, type Project, type Scene, type SceneObject } from '../scene';
-import { findOutOfBoundsCoords } from '../invariants';
+import {
+  findLaserOnTravelIssues,
+  findOutOfBoundsCoords,
+  type MotionBoundsOffset,
+} from '../invariants';
+import { machineBoundsForDevice } from '../devices';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -24,6 +26,7 @@ export type PreflightCode =
   | 'passes-below-one'
   | 'layer-mode-mismatch'
   | 'unsupported-raster-transform'
+  | 'laser-on-travel'
   | 'empty-output';
 
 export type PreflightIssue = {
@@ -36,9 +39,17 @@ export type PreflightResult = {
   readonly issues: ReadonlyArray<PreflightIssue>;
 };
 
+export type PreflightOptions = {
+  readonly motionOffset?: MotionBoundsOffset | undefined;
+};
+
 const MAX_BOUNDS_ISSUES = 5;
 
-export function runPreflight(project: Project, gcode: string): PreflightResult {
+export function runPreflight(
+  project: Project,
+  gcode: string,
+  options: PreflightOptions = {},
+): PreflightResult {
   const issues: PreflightIssue[] = [];
   const outputLayers = project.scene.layers.filter((l) => l.output);
 
@@ -57,7 +68,9 @@ export function runPreflight(project: Project, gcode: string): PreflightResult {
 
   appendUnsupportedRasterTransformIssues(project.scene, outputLayers, issues);
 
-  appendBoundsIssues(project, gcode, issues);
+  appendBoundsIssues(project, gcode, issues, options.motionOffset);
+
+  appendLaserOnTravelIssues(gcode, issues);
 
   if (!/\bG1\b/.test(gcode)) {
     issues.push({
@@ -154,18 +167,28 @@ function appendUnsupportedRasterTransformIssues(
   }
 }
 
-function appendBoundsIssues(project: Project, gcode: string, issues: PreflightIssue[]): void {
-  if (project.device.origin === 'center') {
-    // Phase B will support bounds checking with negative-coord rectangles.
-    return;
-  }
-  const oob = findOutOfBoundsCoords(gcode, {
-    width: project.device.bedWidth,
-    height: project.device.bedHeight,
+function appendBoundsIssues(
+  project: Project,
+  gcode: string,
+  issues: PreflightIssue[],
+  motionOffset: MotionBoundsOffset | undefined,
+): void {
+  const oob = findOutOfBoundsCoords(gcode, machineBoundsForDevice(project.device), {
+    motionOffset,
   });
   for (const issue of oob.slice(0, MAX_BOUNDS_ISSUES)) {
     issues.push({
       code: 'out-of-bed',
+      message: `Line ${issue.lineNumber}: ${issue.reason}`,
+    });
+  }
+}
+
+function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): void {
+  const travelIssues = findLaserOnTravelIssues(gcode);
+  for (const issue of travelIssues.slice(0, MAX_BOUNDS_ISSUES)) {
+    issues.push({
+      code: 'laser-on-travel',
       message: `Line ${issue.lineNumber}: ${issue.reason}`,
     });
   }

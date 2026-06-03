@@ -23,7 +23,7 @@
 // Pure-core compliant: no clock reads, no Math.random, no I/O.
 
 import type { DeviceProfile } from '../devices';
-import type { Job } from './job';
+import type { CutSegment, FillGroup, Job, RasterGroup } from './job';
 import { estimateWithPlanner } from './planner';
 
 export type JobDurationEstimate = {
@@ -34,8 +34,88 @@ export type JobDurationEstimate = {
   };
 };
 
+const PIXEL_CENTER_OFFSET = 0.5;
+const SWEEP_DIRECTION_PERIOD = 2;
+
 export function estimateJobDuration(job: Job, device: DeviceProfile): JobDurationEstimate {
-  return estimateWithPlanner(job, device);
+  return estimateWithPlanner(jobWithRasterSweeps(job), device);
+}
+
+function jobWithRasterSweeps(job: Job): Job {
+  let changed = false;
+  const groups = job.groups.map((group) => {
+    if (group.kind !== 'raster') return group;
+    changed = true;
+    return rasterAsFillSweepGroup(group);
+  });
+  return changed ? { groups } : job;
+}
+
+function rasterAsFillSweepGroup(group: RasterGroup): FillGroup {
+  return {
+    kind: 'fill',
+    layerId: group.layerId,
+    color: group.color,
+    power: group.power,
+    speed: group.speed,
+    passes: group.passes,
+    overscanMm: group.overscanMm,
+    segments: rasterActiveSweepSegments(group),
+  };
+}
+
+function rasterActiveSweepSegments(group: RasterGroup): FillGroup['segments'] {
+  if (group.pixelWidth <= 0 || group.pixelHeight <= 0) return [];
+  const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
+  const pixelHeightMm = (group.bounds.maxY - group.bounds.minY) / group.pixelHeight;
+  if (pixelWidthMm <= 0 || pixelHeightMm <= 0) return [];
+
+  const segments: CutSegment[] = [];
+  let sweepIndex = 0;
+  for (let y = 0; y < group.pixelHeight; y += 1) {
+    const span = rasterActiveSpan(group, y);
+    if (span === null) continue;
+    const worldY = group.bounds.minY + (y + PIXEL_CENTER_OFFSET) * pixelHeightMm;
+    const startX = group.bounds.minX + span.firstX * pixelWidthMm;
+    const endX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
+    const isReverseSweep = sweepIndex % SWEEP_DIRECTION_PERIOD === 1;
+    segments.push({
+      polyline: isReverseSweep
+        ? [
+            { x: endX, y: worldY },
+            { x: startX, y: worldY },
+          ]
+        : [
+            { x: startX, y: worldY },
+            { x: endX, y: worldY },
+          ],
+      closed: false,
+    });
+    sweepIndex += 1;
+  }
+  return segments;
+}
+
+type RasterSpan = { readonly firstX: number; readonly lastX: number };
+
+function rasterActiveSpan(group: RasterGroup, y: number): RasterSpan | null {
+  const rowStart = y * group.pixelWidth;
+  let firstX = -1;
+  for (let x = 0; x < group.pixelWidth; x += 1) {
+    if ((group.sValues[rowStart + x] ?? 0) !== 0) {
+      firstX = x;
+      break;
+    }
+  }
+  if (firstX === -1) return null;
+  let lastX = group.pixelWidth - 1;
+  for (let x = group.pixelWidth - 1; x >= firstX; x -= 1) {
+    if ((group.sValues[rowStart + x] ?? 0) !== 0) {
+      lastX = x;
+      break;
+    }
+  }
+  return { firstX, lastX };
 }
 
 // Human-readable formatter — "4m 23s" / "47s" / "1h 12m". Co-located with

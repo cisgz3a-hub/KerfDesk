@@ -16,6 +16,10 @@ import { useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
+import { CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE } from './start-job-readiness';
+
+const PAUSE_HOLD_SAFETY_MESSAGE =
+  'Pause is feed hold only. Use Stop or physical E-stop if unsafe.';
 
 type Props = {
   readonly disabled: boolean;
@@ -193,7 +197,7 @@ function RunningControls(props: {
   return (
     <div style={rowStyle}>
       {props.isStreaming && (
-        <button type="button" onClick={() => void pauseJob()}>
+        <button type="button" onClick={() => void pauseJob()} title={PAUSE_HOLD_SAFETY_MESSAGE}>
           Pause
         </button>
       )}
@@ -205,6 +209,7 @@ function RunningControls(props: {
       <button type="button" onClick={() => void stopJob()} style={stopBtnStyle}>
         Stop
       </button>
+      <span style={runningSafetyStyle}>{PAUSE_HOLD_SAFETY_MESSAGE}</span>
     </div>
   );
 }
@@ -232,10 +237,15 @@ function useFrameAction(): () => void {
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
     const compiled = compileJob(project.scene, project.device);
-    const job = workOriginActive ? applyJobOrigin(compiled, USER_ORIGIN_JOB_PLACEMENT) : compiled;
+    const useUserOrigin = workOriginActive || hasCustomOrigin(wcoCache);
+    const job = useUserOrigin ? applyJobOrigin(compiled, USER_ORIGIN_JOB_PLACEMENT) : compiled;
     const bounds = computeJobBounds(job);
     if (bounds === null) {
       pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
+      return;
+    }
+    if (useUserOrigin && wcoCache === null) {
+      pushToast(CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE, 'error');
       return;
     }
     // Refuse to drive the head off-bed. The Falcon (and most diode
@@ -244,7 +254,7 @@ function useFrameAction(): () => void {
     // collapses to a sideways line because the axis that hit the stop
     // can't keep up. Better to refuse here with a clear instruction.
     const preflightBounds =
-      workOriginActive && wcoCache !== null ? offsetJobBounds(bounds, wcoCache) : bounds;
+      useUserOrigin && wcoCache !== null ? offsetJobBounds(bounds, wcoCache) : bounds;
     const pre = framePreflight(preflightBounds, project.device);
     if (pre.kind === 'out-of-bounds') {
       pushToast(describeFramePreflightFailure(pre), 'error');
@@ -306,4 +316,9 @@ const estimateStyle: React.CSSProperties = {
   color: '#666',
   alignSelf: 'center',
   fontVariantNumeric: 'tabular-nums',
+};
+const runningSafetyStyle: React.CSSProperties = {
+  color: '#fbbf24',
+  fontSize: 12,
+  lineHeight: 1.3,
 };

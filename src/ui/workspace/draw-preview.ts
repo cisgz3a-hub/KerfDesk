@@ -3,13 +3,7 @@
 // rendered as cut polylines + travel dashed lines, optionally truncated
 // at a 0..1 scrubber fraction with a red head marker at the cut point.
 
-import {
-  applyTransform,
-  type Layer,
-  type Project,
-  type SceneObject,
-  type Vec2,
-} from '../../core/scene';
+import { type Layer, type Project, type SceneObject, type Vec2 } from '../../core/scene';
 import {
   buildToolpath,
   compileJob,
@@ -17,7 +11,9 @@ import {
   type Toolpath,
   type ToolpathStep,
 } from '../../core/job';
+import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
+import { strokePolylinesBatched } from './draw-vector-strokes';
 import type { ViewTransform } from './view-transform';
 
 export function drawObjectsFaint(
@@ -47,19 +43,8 @@ function drawObjectPolylinesFaint(
     if (layer === undefined || !layer.visible) continue;
     ctx.strokeStyle = path.color;
     ctx.lineWidth = layer.output ? 1.5 : 0.75;
-    for (const polyline of path.polylines) {
-      ctx.beginPath();
-      for (let i = 0; i < polyline.points.length; i += 1) {
-        const raw = polyline.points[i];
-        if (raw === undefined) continue;
-        const p = applyTransform(raw, obj.transform);
-        const cx = view.offsetX + p.x * view.scale;
-        const cy = view.offsetY + p.y * view.scale;
-        if (i === 0) ctx.moveTo(cx, cy);
-        else ctx.lineTo(cx, cy);
-      }
-      ctx.stroke();
-    }
+    const display = buildDisplayPolylines(path.polylines);
+    strokePolylinesBatched(ctx, obj, display.polylines, view);
   }
 }
 
@@ -71,7 +56,7 @@ export function drawPreview(
 ): void {
   if (toolpath.totalLength === 0) return;
   const sliced = sliceToolpath(toolpath, scrubberT * toolpath.totalLength);
-  for (const step of sliced.whole) drawStep(ctx, step, view);
+  drawWholeSteps(ctx, sliced.whole, view);
   if (sliced.partial !== null) drawStep(ctx, sliced.partial, view);
   if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
 }
@@ -83,6 +68,32 @@ export function buildPreviewToolpath(project: Project): Toolpath {
 function drawStep(ctx: CanvasRenderingContext2D, step: ToolpathStep, view: ViewTransform): void {
   if (step.kind === 'travel') drawTravel(ctx, step.from, step.to, view);
   else drawCut(ctx, step.polyline, step.color, view);
+}
+
+function drawWholeSteps(
+  ctx: CanvasRenderingContext2D,
+  steps: ReadonlyArray<ToolpathStep>,
+  view: ViewTransform,
+): void {
+  const stride = strideForSegmentBudget(steps.length);
+  if (stride <= 1) {
+    for (const step of steps) drawStep(ctx, step, view);
+    return;
+  }
+
+  let lastDrawnIndex = -1;
+  for (let i = 0; i < steps.length; i += stride) {
+    const step = steps[i];
+    if (step === undefined) continue;
+    drawStep(ctx, step, view);
+    lastDrawnIndex = i;
+  }
+
+  const finalIndex = steps.length - 1;
+  if (finalIndex > lastDrawnIndex) {
+    const finalStep = steps[finalIndex];
+    if (finalStep !== undefined) drawStep(ctx, finalStep, view);
+  }
 }
 
 function drawHead(ctx: CanvasRenderingContext2D, head: Vec2, view: ViewTransform): void {

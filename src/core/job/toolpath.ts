@@ -8,7 +8,7 @@
 
 import type { Vec2 } from '../scene';
 import type { Job } from './job';
-import { expandFillHatchWithOverscan } from './fill-overscan';
+import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 
 export type ToolpathStep =
   | { readonly kind: 'travel'; readonly from: Vec2; readonly to: Vec2; readonly length: number }
@@ -35,7 +35,11 @@ export function buildToolpath(job: Job): Toolpath {
     if (group.kind === 'raster') continue;
     if (group.kind === 'fill') {
       for (const seg of group.segments) {
-        const run = expandFillHatchWithOverscan(seg.polyline, group.overscanMm);
+        // Match the emitter: short runs skip overscan (effectiveOverscanMm → 0),
+        // so the runway steps collapse to zero length and appendTravelStep drops
+        // them. Keeps the preview scrubber honest with the streamed g-code.
+        const overscan = effectiveOverscanMm(seg.polyline, group.overscanMm);
+        const run = expandFillHatchWithOverscan(seg.polyline, overscan);
         if (run === null) continue;
         appendTravelStep(steps, prevEnd, run.leadStart);
         appendTravelStep(steps, run.leadStart, run.burnStart);

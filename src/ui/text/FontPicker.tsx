@@ -28,8 +28,8 @@ export function FontPicker(props: Props): JSX.Element {
   const rootRef = useRef<HTMLDivElement>(null);
   useFontCssRegistration();
   useOutsideClickToClose(rootRef, open, () => setOpen(false));
-  const selected = FONT_REGISTRY.find((f) => f.key === props.value) ?? FONT_REGISTRY[0];
-  if (selected === undefined) {
+  const selected = FONT_REGISTRY.find((f) => f.key === props.value);
+  if (selected === undefined && props.value === '' && FONT_REGISTRY.length === 0) {
     // FONT_REGISTRY is a static non-empty array — this branch keeps
     // TS happy under noUncheckedIndexedAccess but is unreachable in
     // practice.
@@ -46,10 +46,19 @@ export function FontPicker(props: Props): JSX.Element {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        style={triggerStyleFor(selected.key)}
+        style={selected === undefined ? triggerBaseStyle : triggerStyleFor(selected.key)}
       >
-        <span style={triggerNameStyle}>{selected.displayName}</span>
-        <span style={triggerClassStyle}>({selected.styleClass})</span>
+        {selected === undefined ? (
+          <>
+            <span style={triggerNameStyle}>Missing font: {props.value}</span>
+            <span style={triggerClassStyle}>(choose replacement)</span>
+          </>
+        ) : (
+          <>
+            <span style={triggerNameStyle}>{selected.displayName}</span>
+            <span style={triggerClassStyle}>({selected.styleClass})</span>
+          </>
+        )}
         <span aria-hidden style={caretStyle}>
           ▾
         </span>

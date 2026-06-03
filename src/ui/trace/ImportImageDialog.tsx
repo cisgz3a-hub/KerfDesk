@@ -91,7 +91,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   }, [seed.dataUrl, seed.source, pushToast]);
   // Layer the user adjustments on top of the preset. The preset
   // already pins the trace-side knobs (numberOfColors, lineFilter,
-  // etc.); we just merge the LF1 image-level levers in.
+  // etc.); we just merge the LF1-compatible image-level levers in.
   //
   // useMemo is load-bearing — useTracePreview depends on `options` as
   // a useEffect dep, so a fresh object reference every render would
@@ -162,7 +162,7 @@ async function commit(
   ctx.setBusy(true);
   try {
     const image = await loadImageAsRawData(args.file);
-    // LF1-port path: tracedata → ColoredPath[] directly, skipping the
+    // Direct tracedata path: ColoredPath[] directly, skipping the
     // SVG-string + parseSvg detour that flattened Béziers at coarse
     // tolerance. Curves stay at imagetracerjs's analytic fidelity
     // through to compile. Runs in a Web Worker when one is available,
