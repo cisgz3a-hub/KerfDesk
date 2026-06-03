@@ -144,7 +144,15 @@ export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (): void => {
-      resolve(typeof reader.result === 'string' ? reader.result : '');
+      // Fail at the read boundary instead of resolving '' — an empty data URL
+      // would be stored as the project's image and silently engrave nothing
+      // (P2-A). A non-string result here means the read did not produce a data
+      // URL, which is an error, not an empty image.
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('FileReader returned a non-string result for the image.'));
+      }
     };
     reader.onerror = (): void => reject(new Error('FileReader failed to read the image.'));
     reader.readAsDataURL(file);
