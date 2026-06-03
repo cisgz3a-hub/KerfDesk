@@ -8,3 +8,4 @@ export type {
 export { runControllerReadiness } from './controller-readiness';
 export type { PreflightCode, PreflightIssue, PreflightOptions, PreflightResult } from './preflight';
 export { runPreflight } from './preflight';
+export { runPreEmitPreflight } from './pre-emit';
