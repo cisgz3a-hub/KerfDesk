@@ -23,7 +23,13 @@ export async function handleImportSvg(
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<void> {
-  const files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
+  let files: ReadonlyArray<{ readonly name: string; readonly text: () => Promise<string> }>;
+  try {
+    files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
+  } catch (err) {
+    pushToast(`Could not import SVG: ${errMsg(err)}`, 'error');
+    return;
+  }
   let successIdx = 0;
   for (const file of files) {
     try {
@@ -67,10 +73,16 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     window.alert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
-  const target = await ctx.platform.pickFileForSave({
-    suggestedName: suggestedGcodeName(ctx.savedName),
-    extensions: ['.gcode', '.nc'],
-  });
+  let target: SaveTarget | null;
+  try {
+    target = await ctx.platform.pickFileForSave({
+      suggestedName: suggestedGcodeName(ctx.savedName),
+      extensions: ['.gcode', '.nc'],
+    });
+  } catch (err) {
+    ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
+    return;
+  }
   if (target === null) return;
   try {
     await target.write(gcode);
@@ -95,12 +107,18 @@ export type SaveProjectCtx = {
 // lastSaveTarget so the next save will prompt regardless.
 export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false): Promise<void> {
   const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
-  const target = reuseTarget
-    ? ctx.lastSaveTarget
-    : await ctx.platform.pickFileForSave({
-        suggestedName: ctx.savedName ?? 'untitled.lf2',
-        extensions: ['.lf2'],
-      });
+  let target: SaveTarget | null;
+  try {
+    target = reuseTarget
+      ? ctx.lastSaveTarget
+      : await ctx.platform.pickFileForSave({
+          suggestedName: ctx.savedName ?? 'untitled.lf2',
+          extensions: ['.lf2'],
+        });
+  } catch (err) {
+    ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
+    return;
+  }
   if (target === null) return;
   try {
     await target.write(serializeProject(ctx.project));
@@ -122,10 +140,22 @@ export type OpenProjectCtx = {
 };
 
 export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
-  const files = await ctx.platform.pickFilesForOpen({ accept: ['.lf2'], multiple: false });
+  let files: ReadonlyArray<{ readonly name: string; readonly text: () => Promise<string> }>;
+  try {
+    files = await ctx.platform.pickFilesForOpen({ accept: ['.lf2'], multiple: false });
+  } catch (err) {
+    ctx.pushToast(`Could not open project: ${errMsg(err)}`, 'error');
+    return;
+  }
   const file = files[0];
   if (file === undefined) return;
-  const text = await file.text();
+  let text: string;
+  try {
+    text = await file.text();
+  } catch (err) {
+    ctx.pushToast(`Could not open ${file.name}: ${errMsg(err)}`, 'error');
+    return;
+  }
   const result = deserializeProject(text);
   if (result.kind === 'ok') {
     ctx.setProject(result.project);

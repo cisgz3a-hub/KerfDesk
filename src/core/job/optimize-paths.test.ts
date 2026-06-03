@@ -103,6 +103,19 @@ describe('optimizePaths', () => {
     expect(firstSeg?.polyline[1]).toEqual({ x: 10, y: 0 });
   });
 
+  it('cuts contained closed contours before their containing outer contour', () => {
+    const outer = closedSeg([0, 0], [100, 0], [100, 100], [0, 100]);
+    const inner = closedSeg([40, 40], [60, 40], [60, 60], [40, 60]);
+    const j: Job = {
+      groups: [group([outer, inner])],
+    };
+
+    const result = optimizePaths(j);
+
+    expect(asCut(result)?.segments[0]).toEqual(inner);
+    expect(asCut(result)?.segments[1]).toEqual(outer);
+  });
+
   it('property: cut time is preserved exactly (same cuts, same speed)', () => {
     // Reordering segments doesn't add or remove any cut — the total
     // cut distance and per-layer feed are identical, so cut time

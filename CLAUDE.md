@@ -34,11 +34,11 @@ These are behavioral norms for *how* to work in this repo. Unlike the coding rul
 
 ## Size limits — hard
 
-These are enforced by ESLint and `tsc`, not by judgment.
+These are enforced by ESLint, `tsc`, and CI scripts, not by judgment. ESLint's file line limit counts code lines excluding blank and comment lines; CI also runs a 600 raw physical lines backstop to catch files that grow too large physically.
 
 | Unit | Soft limit | Hard limit | Rule |
 |---|---|---|---|
-| File | 250 lines | 400 lines | Lint warning at soft, error at hard. No exceptions. |
+| File | 250 counted code lines | 400 counted code lines | Lint warning at soft, error at hard, excluding blank and comment lines. No exceptions to this counted-code limit; CI also enforces 600 raw physical lines. |
 | React component | 150 lines | 250 lines | If approaching, split into sub-components in a folder. |
 | Function | 40 lines | 80 lines | If approaching, extract helpers. |
 | Cyclomatic complexity per function | 8 | 12 | Lint error at hard. |
@@ -165,8 +165,8 @@ Enforced by ESLint `no-restricted-globals` and `no-restricted-imports`.
 
 ## Tests — co-located, written first for bug fixes
 
-- Source file `Foo.ts` → test file `Foo.test.ts` in the same folder.
-- A file with no test is rejected by CI lint (`require-test-coverage` custom rule).
+- Source file `Foo.ts` → test file `Foo.test.ts` in the same folder when the source has direct testable behavior.
+- CI does not enforce a direct sibling-test rule. PR review rejects source changes without modified or added tests unless the change is a pure refactor or an explicitly documented policy/docs/build-only change.
 - Property tests for all invariants (`PROJECT.md` non-negotiables 1–7).
 - Snapshot tests for G-code output on the fixture corpus.
 - **Bug fix workflow**: write a failing test that demonstrates the bug, then fix it, then verify the test passes. PR must include both the test (new) and the fix.

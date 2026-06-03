@@ -5,7 +5,10 @@
 //   * nodeIntegration: false
 //   * sandbox: true
 //   * webSecurity: true
-//   * setPermissionRequestHandler returns false except for `serial` (Phase B)
+//   * permission handlers allow only serial / File System Access from the
+//     trusted renderer origin
+//   * navigation and renderer-created windows are locked to the trusted
+//     renderer origin
 //   * CSP set via session.webRequest.onHeadersReceived (not meta tag -
 //     per Electron docs, meta CSP is unreliable on file:// origin and
 //     can't gate things like form-action / frame-ancestors)
@@ -42,11 +45,20 @@ import {
   serialPortLabel,
   type ElectronSerialPortSummary,
 } from './serial-port-choice.js';
+import {
+  makeTrustedRendererOrigins,
+  shouldAllowNavigation,
+  shouldAllowWindowOpen,
+  shouldGrantDevicePermission,
+  shouldGrantPermissionCheck,
+  shouldGrantPermissionRequest,
+} from './trusted-renderer-policy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DEV_URL = process.env['LASERFORGE_DEV_URL'];
+const TRUSTED_RENDERER_ORIGINS = makeTrustedRendererOrigins(DEV_URL);
 const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
@@ -133,10 +145,6 @@ function installContentSecurityPolicy(ses: Session): void {
   });
 }
 
-function isAllowedPermission(permission: string): boolean {
-  return permission === 'serial' || permission.startsWith('fileSystem');
-}
-
 async function chooseSerialPortId(
   webContents: WebContents,
   portList: ReadonlyArray<ElectronSerialPort>,
@@ -197,14 +205,37 @@ function handleSelectSerialPort(
 }
 
 function installPermissionHandlers(ses: Session): void {
-  ses.setPermissionCheckHandler((_wc, permission) => {
-    return isAllowedPermission(permission as string);
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    const baseInput = {
+      permission: String(permission),
+      requestingOrigin,
+      currentUrl: wc?.getURL() ?? '',
+    };
+    return shouldGrantPermissionCheck(
+      details.embeddingOrigin === undefined
+        ? baseInput
+        : { ...baseInput, embeddingOrigin: details.embeddingOrigin },
+      TRUSTED_RENDERER_ORIGINS,
+    );
   });
   ses.setDevicePermissionHandler((details) => {
-    return details.deviceType === 'serial';
+    return shouldGrantDevicePermission(
+      { deviceType: details.deviceType, origin: details.origin },
+      TRUSTED_RENDERER_ORIGINS,
+    );
   });
-  ses.setPermissionRequestHandler((_wc, permission, cb) => {
-    cb(isAllowedPermission(permission as string));
+  ses.setPermissionRequestHandler((wc, permission, cb, details) => {
+    cb(
+      shouldGrantPermissionRequest(
+        {
+          permission: String(permission),
+          isMainFrame: details.isMainFrame,
+          requestingUrl: details.requestingUrl,
+          currentUrl: wc.getURL(),
+        },
+        TRUSTED_RENDERER_ORIGINS,
+      ),
+    );
   });
   const onSelectSerialPort = (
     event: ElectronEvent,
@@ -218,6 +249,21 @@ function installPermissionHandlers(ses: Session): void {
     'select-serial-port',
     onSelectSerialPort,
   );
+}
+
+function installNavigationPolicy(window: BrowserWindow): void {
+  const webContents = window.webContents;
+  webContents.on('will-navigate', (event, url) => {
+    const targetUrl = event.url.length > 0 ? event.url : url;
+    if (!shouldAllowNavigation(targetUrl, TRUSTED_RENDERER_ORIGINS)) {
+      event.preventDefault();
+    }
+  });
+  webContents.setWindowOpenHandler((details) => {
+    return {
+      action: shouldAllowWindowOpen(details.url, TRUSTED_RENDERER_ORIGINS) ? 'allow' : 'deny',
+    };
+  });
 }
 
 async function loadRenderer(window: BrowserWindow): Promise<void> {
@@ -238,6 +284,7 @@ function installDevTools(window: BrowserWindow): void {
 
 async function createWindow(): Promise<void> {
   const window = createMainWindow();
+  installNavigationPolicy(window);
 
   // F-9 audit fix: set Content-Security-Policy via webRequest headers
   // rather than a <meta> tag. Per Electron docs, meta CSP is unreliable

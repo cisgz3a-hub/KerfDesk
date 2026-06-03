@@ -3,7 +3,7 @@
 // I/O. The UI / platform adapter decides whether to actually write the file
 // based on `preflight.ok`.
 
-import { runPreflight, type PreflightResult } from '../../core/preflight';
+import { runPreflight, type PreflightOptions, type PreflightResult } from '../../core/preflight';
 import { applyJobOrigin, compileJob, optimizePaths, type JobOriginPlacement } from '../../core/job';
 import { grblStrategy } from '../../core/output';
 import type { Project } from '../../core/scene';
@@ -15,6 +15,7 @@ export type EmitGcodeResult = {
 
 export type EmitGcodeOptions = {
   readonly jobOrigin?: JobOriginPlacement;
+  readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
 };
 
 export function emitGcode(project: Project, options: EmitGcodeOptions = {}): EmitGcodeResult {
@@ -26,6 +27,8 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   const placed = options.jobOrigin ? applyJobOrigin(compiled, options.jobOrigin) : compiled;
   const job = optimizePaths(placed);
   const gcode = grblStrategy.emit(job, project.device);
-  const preflight = runPreflight(project, gcode);
+  const preflight = runPreflight(project, gcode, {
+    motionOffset: options.preflightMotionOffset,
+  });
   return { gcode, preflight };
 }

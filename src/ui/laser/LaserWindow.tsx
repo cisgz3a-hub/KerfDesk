@@ -22,6 +22,7 @@ export function LaserWindow(): JSX.Element {
   const disconnect = useLaserStore((s) => s.disconnect);
   const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
   const startJob = useLaserStore((s) => s.startJob);
+  const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
 
   const supportsSerial = platform.serial.isSupported();
   const onStartJob = async (): Promise<void> => {
@@ -33,6 +34,7 @@ export function LaserWindow(): JSX.Element {
       hasActiveStreamer:
         laser.streamer !== null &&
         (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
+      autofocusBusy: laser.autofocusBusy,
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,
     });
@@ -67,14 +69,14 @@ export function LaserWindow(): JSX.Element {
         connection={connection}
         onConnect={() => void connect(platform)}
         onDisconnect={() => void disconnect()}
-        disabled={!supportsSerial}
+        disabled={!supportsSerial || autofocusBusy}
       />
       {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
       <DetectedSettingsBanner />
       <StatusDisplay />
-      <JogPad disabled={connection.kind !== 'connected'} />
+      <JogPad disabled={connection.kind !== 'connected' || autofocusBusy} />
       <JobControls
-        disabled={connection.kind !== 'connected'}
+        disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void onStartJob()}
       />
       <LaserLog />

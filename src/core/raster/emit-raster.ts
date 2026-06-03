@@ -179,30 +179,63 @@ function emitRow(
   if (input.overscanMm > 0) {
     pushRun(reverse ? activeEndX : activeStartX, 0);
   }
-  if (reverse) {
-    let runS = input.sValues[y * input.width + span.lastX] ?? 0;
-    for (let i = span.lastX - 1; i >= span.firstX; i -= 1) {
-      const cellS = input.sValues[y * input.width + i] ?? 0;
-      if (cellS !== runS) {
-        pushRun(input.bounds.minX + (i + 1) * pixelWidthMm, runS);
-        runS = cellS;
-      }
-    }
-    pushRun(activeStartX, runS);
-  } else {
-    let runS = input.sValues[y * input.width + span.firstX] ?? 0;
-    for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
-      const cellS = input.sValues[y * input.width + i] ?? 0;
-      if (cellS !== runS) {
-        pushRun(input.bounds.minX + i * pixelWidthMm, runS);
-        runS = cellS;
-      }
-    }
-    pushRun(activeEndX, runS);
-  }
+  emitRowRuns(input, y, pixelWidthMm, span, reverse, pushRun);
   // Exit overscan with S0 so the diode is dark during deceleration.
   lines.push(`G1 X${fmt(endX)} S0`);
   return lines.join(LINE_END);
+}
+
+type PushRasterRun = (x: number, s: number) => void;
+
+function emitRowRuns(
+  input: EmitRasterInput,
+  y: number,
+  pixelWidthMm: number,
+  span: ActiveSpan,
+  reverse: boolean,
+  pushRun: PushRasterRun,
+): void {
+  if (reverse) {
+    emitReverseRowRuns(input, y, pixelWidthMm, span, pushRun);
+    return;
+  }
+  emitForwardRowRuns(input, y, pixelWidthMm, span, pushRun);
+}
+
+function emitReverseRowRuns(
+  input: EmitRasterInput,
+  y: number,
+  pixelWidthMm: number,
+  span: ActiveSpan,
+  pushRun: PushRasterRun,
+): void {
+  let runS = input.sValues[y * input.width + span.lastX] ?? 0;
+  for (let i = span.lastX - 1; i >= span.firstX; i -= 1) {
+    const cellS = input.sValues[y * input.width + i] ?? 0;
+    if (cellS !== runS) {
+      pushRun(input.bounds.minX + (i + 1) * pixelWidthMm, runS);
+      runS = cellS;
+    }
+  }
+  pushRun(input.bounds.minX + span.firstX * pixelWidthMm, runS);
+}
+
+function emitForwardRowRuns(
+  input: EmitRasterInput,
+  y: number,
+  pixelWidthMm: number,
+  span: ActiveSpan,
+  pushRun: PushRasterRun,
+): void {
+  let runS = input.sValues[y * input.width + span.firstX] ?? 0;
+  for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
+    const cellS = input.sValues[y * input.width + i] ?? 0;
+    if (cellS !== runS) {
+      pushRun(input.bounds.minX + i * pixelWidthMm, runS);
+      runS = cellS;
+    }
+  }
+  pushRun(input.bounds.minX + (span.lastX + 1) * pixelWidthMm, runS);
 }
 
 // One G1 closing a run. Emits S only when it changed from the

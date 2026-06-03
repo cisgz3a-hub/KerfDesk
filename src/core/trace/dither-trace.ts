@@ -1,7 +1,7 @@
-// 13-mode dither pass for the trace pipeline. Ported from LaserForge 1's
-// src/import/Dithering.ts (algorithms only — coefficients are public
-// domain image-processing math; the implementation was rewritten for our
-// RawImageData shape and pure-core rules).
+// 13-mode dither pass for the trace pipeline. Implemented for parity with
+// LaserForge 1's src/import/Dithering.ts catalogue and coefficients. The
+// image-processing math is public-domain/common-practice, and this
+// implementation was rewritten for RawImageData and pure-core rules.
 //
 // Why a dither stage for trace input? Photographic / shaded sources have
 // continuous tones that thresholdToMonochrome collapses into solid

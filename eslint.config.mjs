@@ -80,6 +80,7 @@ export default tseslint.config(
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,
   {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
     plugins: {
       boundaries: boundariesPlugin,
       import: importPlugin,
@@ -193,6 +194,8 @@ export default tseslint.config(
         { name: 'localStorage', message: 'core/ must not do I/O.' },
         { name: 'sessionStorage', message: 'core/ must not do I/O.' },
         { name: 'fetch', message: 'core/ must not do network I/O.' },
+        { name: 'atob', message: 'core/ must not depend on browser base64 globals.' },
+        { name: 'btoa', message: 'core/ must not depend on browser base64 globals.' },
       ],
       'no-restricted-syntax': [
         'error',
@@ -219,6 +222,14 @@ export default tseslint.config(
       'max-lines-per-function': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       'boundaries/dependencies': 'off',
+    },
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: globals.node,
     },
   },
   // Place prettier LAST so it disables conflicting style rules.

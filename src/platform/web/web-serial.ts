@@ -94,8 +94,15 @@ function makeConnection(port: SerialPort): SerialConnection {
   const closeSubs: Subscribers<void> = new Set();
   const ctx = {
     closed: false,
+    streamsClosed: false,
     reader: port.readable?.getReader(),
     writer: port.writable?.getWriter(),
+  };
+
+  const closeStreamsOnce = async (): Promise<void> => {
+    if (ctx.streamsClosed) return;
+    ctx.streamsClosed = true;
+    await closeStreams(ctx.reader, ctx.writer);
   };
 
   const fireClose = (): void => {
@@ -103,9 +110,15 @@ function makeConnection(port: SerialPort): SerialConnection {
     ctx.closed = true;
     for (const h of closeSubs) h();
   };
-  port.addEventListener('disconnect', fireClose);
 
-  void runReadLoop(ctx.reader, lineSubs, fireClose);
+  const handleDroppedConnection = (): void => {
+    port.removeEventListener('disconnect', handleDroppedConnection);
+    void closeStreamsOnce();
+    fireClose();
+  };
+  port.addEventListener('disconnect', handleDroppedConnection);
+
+  void runReadLoop(ctx.reader, lineSubs, handleDroppedConnection);
 
   return {
     write: async (data: string) => {
@@ -123,8 +136,8 @@ function makeConnection(port: SerialPort): SerialConnection {
     close: async () => {
       if (ctx.closed) return;
       ctx.closed = true;
-      port.removeEventListener('disconnect', fireClose);
-      await closeStreams(ctx.reader, ctx.writer);
+      port.removeEventListener('disconnect', handleDroppedConnection);
+      await closeStreamsOnce();
       try {
         await port.close();
       } catch (err) {

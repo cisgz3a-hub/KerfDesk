@@ -120,6 +120,7 @@ function installPendingImage(): FakeImageInstance[] {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 

@@ -189,6 +189,8 @@ describe('describeAutofocusResult', () => {
   it('maps timeout to a warning', () => {
     const t = describeAutofocusResult({ kind: 'timeout' });
     expect(t.variant).toBe('warning');
+    expect(t.message).toMatch(/may still be moving/i);
+    expect(t.message).toMatch(/physical/i);
   });
 
   it('maps ok to a success toast', () => {

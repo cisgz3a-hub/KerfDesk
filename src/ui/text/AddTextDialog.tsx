@@ -148,7 +148,9 @@ async function commitText(
   }
   ctx.setSubmitting(true);
   try {
-    const buffer = await loadFont(asKnownFontKey(v.fontKey));
+    const knownFontKey = asKnownFontKey(v.fontKey);
+    const substitutedFont = knownFontKey !== v.fontKey;
+    const buffer = await loadFont(knownFontKey);
     const rendered = await textToPolylines({
       fontBuffer: buffer,
       content: v.content,
@@ -162,7 +164,7 @@ async function commitText(
       kind: 'text',
       id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
       content: v.content,
-      fontKey: v.fontKey,
+      fontKey: knownFontKey,
       sizeMm: v.sizeMm,
       alignment: v.alignment,
       lineHeight: v.lineHeight,
@@ -173,6 +175,12 @@ async function commitText(
       paths: rendered.paths,
     };
     ctx.upsert(obj);
+    if (substitutedFont) {
+      ctx.pushToast(
+        `Missing font "${v.fontKey}" was substituted with ${fontDisplayName(knownFontKey)}.`,
+        'warning',
+      );
+    }
     ctx.close();
   } catch (err) {
     ctx.pushToast(
@@ -276,6 +284,10 @@ function DialogActions(props: {
 function asKnownFontKey(key: string): KnownFontKey {
   if (FONT_REGISTRY.some((f) => f.key === key)) return key as KnownFontKey;
   return DEFAULT_FONT_KEY;
+}
+
+function fontDisplayName(key: KnownFontKey): string {
+  return FONT_REGISTRY.find((f) => f.key === key)?.displayName ?? key;
 }
 
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {

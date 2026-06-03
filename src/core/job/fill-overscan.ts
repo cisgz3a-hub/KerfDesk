@@ -30,3 +30,26 @@ export function expandFillHatchWithOverscan(
     leadEnd: { x: burnEnd.x + ux * runway, y: burnEnd.y + uy * runway },
   };
 }
+
+// Below this multiple of the per-side overscan, the laser-off runway (2×
+// overscan total) would be longer than the burn itself, so it dominates the
+// motion. A traced-image fill fragments each scanline into thousands of such
+// short runs; carrying the full runway on every one was the bulk of the
+// ~2h-vs-LightBurn-~5min burn (audit 2026-06-03). Short runs skip overscan and
+// lose its accel/decel edge-evening on those runs only — a deliberate
+// speed/quality tradeoff (DECISIONS.md ADR-033).
+const OVERSCAN_MIN_BURN_RATIO = 2;
+
+// The overscan to actually apply to a hatch run: the configured value when the
+// burn is long enough to be worth a runway, otherwise 0 (skip). Single source
+// of truth so the emitter, the planner ETA, and the preview scrubber agree on
+// which runs get a runway.
+export function effectiveOverscanMm(polyline: ReadonlyArray<Vec2>, overscanMm: number): number {
+  if (overscanMm <= 0) return 0;
+  const a = polyline[0];
+  const b = polyline[1];
+  if (a === undefined || b === undefined || polyline.length !== 2) return 0;
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  if (length <= 0) return 0;
+  return length < OVERSCAN_MIN_BURN_RATIO * overscanMm ? 0 : overscanMm;
+}

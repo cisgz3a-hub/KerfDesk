@@ -16,6 +16,7 @@ import {
   assertNever,
   type ColoredPath,
   type Layer,
+  type Polyline,
   type RasterImage,
   type Scene,
   type SceneObject,
@@ -29,6 +30,13 @@ import type { CutSegment, Group, Job, RasterGroup } from './job';
 // profiles in the future without a .lf2 schema bump. 5 mm matches
 // the ADR-020 baseline for diode lasers.
 const DEFAULT_OVERSCAN_MM = 5;
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
+
+const layerFillCache = new WeakMap<
+  ReadonlyArray<SceneObject>,
+  Map<string, ReadonlyArray<Polyline>>
+>();
 
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
@@ -76,8 +84,7 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
 // PNG decoding has already happened upstream when the RasterImage
 // was created (UI layer; image-loader.ts). We work from `dataUrl`
 // metadata only via pixelWidth/pixelHeight; the actual greyscale
-// luma buffer must be supplied externally... TODO: this path can't
-// stay pure if it needs to decode the dataUrl. See F.2.d note below.
+// luma buffer is stored separately as base64 and decoded locally.
 function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfile): RasterGroup {
   // Missing/corrupt luma fails safe to white (S0), not black/full-burn.
   const sourceLuma =
@@ -118,18 +125,29 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
 // length so a corrupt or partial buffer does not blow up the dither.
 // Missing/corrupt bytes are white so the laser stays off.
 function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
-  let binary = '';
-  try {
-    binary = atob(base64);
-  } catch {
-    return whiteLuma(expectedLength);
-  }
   const out = whiteLuma(expectedLength);
-  const n = Math.min(binary.length, expectedLength);
-  for (let i = 0; i < n; i += 1) {
-    out[i] = binary.charCodeAt(i);
+  let outIndex = 0;
+  let buffer = 0;
+  let bitCount = 0;
+  for (const char of base64) {
+    if (outIndex >= expectedLength || char === '=') break;
+    if (isBase64Whitespace(char)) continue;
+    const value = BASE64_ALPHABET.indexOf(char);
+    if (value === -1) return whiteLuma(expectedLength);
+    buffer = (buffer << 6) | value;
+    bitCount += 6;
+    if (bitCount >= 8) {
+      bitCount -= 8;
+      out[outIndex] = (buffer >> bitCount) & 0xff;
+      outIndex += 1;
+      buffer &= (1 << bitCount) - 1;
+    }
   }
   return out;
+}
+
+function isBase64Whitespace(char: string): boolean {
+  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
 }
 
 // Apply object transform + device origin transform to the image's
@@ -164,9 +182,76 @@ function collectSegmentsForLayer(
   layer: Layer,
   device: DeviceProfile,
 ): CutSegment[] {
+  if (layer.mode === 'fill') return collectFillSegmentsForLayer(objects, layer, device);
+  return collectLineSegmentsForLayer(objects, layer, device);
+}
+
+function collectLineSegmentsForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+): CutSegment[] {
   const out: CutSegment[] = [];
   for (const obj of objects) {
     appendSegmentsFromObject(obj, layer, device, out);
+  }
+  return out;
+}
+
+function collectFillSegmentsForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+): CutSegment[] {
+  return memoizedLayerFillHatching(objects, layer, device).map((polyline) => ({
+    polyline: polyline.points,
+    closed: polyline.closed,
+  }));
+}
+
+function memoizedLayerFillHatching(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+): ReadonlyArray<Polyline> {
+  const cacheKey = layerFillCacheKey(layer, device);
+  let bySettings = layerFillCache.get(objects);
+  if (bySettings === undefined) {
+    bySettings = new Map<string, ReadonlyArray<Polyline>>();
+    layerFillCache.set(objects, bySettings);
+  }
+  const cached = bySettings.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const contours = collectFillContoursForLayer(objects, layer, device);
+  const hatches = memoizedFillHatching(contours, layer);
+  if (bySettings.size >= MAX_LAYER_FILL_CACHE_ENTRIES) {
+    const oldestKey = bySettings.keys().next().value;
+    if (oldestKey !== undefined) bySettings.delete(oldestKey);
+  }
+  bySettings.set(cacheKey, hatches);
+  return hatches;
+}
+
+function layerFillCacheKey(layer: Layer, device: DeviceProfile): string {
+  return [
+    layer.color,
+    layer.hatchAngleDeg,
+    layer.hatchSpacingMm,
+    device.origin,
+    device.bedWidth,
+    device.bedHeight,
+  ].join(':');
+}
+
+function collectFillContoursForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+): Polyline[] {
+  const out: Polyline[] = [];
+  for (const obj of objects) {
+    appendFillContoursFromObject(obj, layer, device, out);
   }
   return out;
 }
@@ -204,18 +289,56 @@ function appendSegmentsFromObject(
   }
 }
 
+function appendFillContoursFromObject(
+  obj: SceneObject,
+  layer: Layer,
+  device: DeviceProfile,
+  out: Polyline[],
+): void {
+  switch (obj.kind) {
+    case 'imported-svg':
+      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      return;
+    case 'text':
+      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      return;
+    case 'traced-image':
+      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      return;
+    case 'raster-image':
+      return;
+    default:
+      assertNever(obj, 'SceneObject');
+  }
+}
+
+function appendFillPathContours(
+  paths: ReadonlyArray<ColoredPath>,
+  transform: Transform,
+  layer: Layer,
+  device: DeviceProfile,
+  out: Polyline[],
+): void {
+  for (const path of paths) {
+    if (path.color !== layer.color) continue;
+    for (const polyline of path.polylines) {
+      out.push({
+        points: polyline.points.map((p) => toMachineCoords(applyTransform(p, transform), device)),
+        closed: polyline.closed,
+      });
+    }
+  }
+}
+
 // Shared materializer for any SceneObject whose paths are already
 // available as ColoredPath polylines (ImportedSvg, TextObject,
 // TracedImage). The switch above stays one-arm-per-kind for
 // exhaustiveness, but each arm just delegates here — no duplicated
 // coordinate-transform math.
 //
-// F.1 — when the layer's mode is 'fill', replace the per-color polylines
-// with the output of fillHatching() BEFORE applying the object's
-// transform. Doing the scanline math in object-local coordinates lets
-// fillHatching work in a clean frame; the transform then moves the
-// hatch lines to scene coordinates exactly the same way it would move
-// the outline polylines.
+// Line mode transforms source contours directly. Fill mode uses the
+// layer-wide machine-space path above so hatch spacing is physical and
+// same-layer contours interact before hatching.
 function appendPathSegments(
   paths: ReadonlyArray<ColoredPath>,
   transform: Transform,
@@ -225,9 +348,7 @@ function appendPathSegments(
 ): void {
   for (const path of paths) {
     if (path.color !== layer.color) continue;
-    const polylines =
-      layer.mode === 'fill' ? memoizedFillHatching(path.polylines, layer) : path.polylines;
-    for (const polyline of polylines) {
+    for (const polyline of path.polylines) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, transform), device),
       );

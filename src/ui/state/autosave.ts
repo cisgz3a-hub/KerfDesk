@@ -1,19 +1,19 @@
-// Autosave — PROJECT.md Phase C item: "autosave + recovery."
+// Autosave - PROJECT.md Phase C item: "autosave + recovery."
 //
 // Writes the current Project to localStorage every 30 s when dirty.
 // On boot, the recovery hook checks the slot and prompts the user
-// to restore if it looks recent. Single-slot, last-write-wins —
-// not a generational backup system (per CLAUDE.md "simplicity first").
+// to restore if it looks recent. Single-slot, last-write-wins: not a
+// generational backup system.
 //
 // Boundaries:
-//   * localStorage only — works web + Electron renderer; ~5 MB cap.
+//   * localStorage only - works web + Electron renderer; roughly 5 MB cap.
 //   * Pauses during live streaming so the render loop owns the CPU.
 //   * Cleared by handleSaveProject after a successful manual save.
-//   * Best-effort: quota-exceeded / private-browsing failures are
-//     swallowed silently. Autosave is a safety net, not a guarantee.
+//   * Storage failures are reported to the UI so the operator can
+//     manually save instead of trusting a missing recovery slot.
 //
 // Schema: { schemaVersion, savedAt, projectJson }. Bumping schemaVersion
-// invalidates older slots (readAutosave returns null) — matches the
+// invalidates older slots (readAutosave returns null), matching the
 // project-file schema-migration policy.
 
 import { deserializeProject } from '../../io/project/deserialize-project';
@@ -35,8 +35,21 @@ export type AutosaveSnapshot = {
   readonly savedAt: number;
 };
 
-export function writeAutosave(project: Project, now: number = Date.now()): void {
-  if (typeof localStorage === 'undefined') return;
+export type AutosaveWriteResult =
+  | { readonly kind: 'ok'; readonly savedAt: number }
+  | { readonly kind: 'unavailable'; readonly reason: 'storage-unavailable' }
+  | {
+      readonly kind: 'failed';
+      readonly reason: 'quota' | 'storage-error';
+      readonly error: unknown;
+    };
+
+export type AutosaveWriteFailure = Exclude<AutosaveWriteResult, { readonly kind: 'ok' }>;
+
+export function writeAutosave(project: Project, now: number = Date.now()): AutosaveWriteResult {
+  if (typeof localStorage === 'undefined') {
+    return { kind: 'unavailable', reason: 'storage-unavailable' };
+  }
   try {
     const record: AutosaveRecord = {
       schemaVersion: AUTOSAVE_SCHEMA_VERSION,
@@ -44,8 +57,13 @@ export function writeAutosave(project: Project, now: number = Date.now()): void 
       projectJson: serializeProject(project),
     };
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(record));
-  } catch {
-    // Quota exceeded or storage disabled — autosave is best-effort.
+    return { kind: 'ok', savedAt: now };
+  } catch (error) {
+    return {
+      kind: 'failed',
+      reason: isQuotaExceededError(error) ? 'quota' : 'storage-error',
+      error,
+    };
   }
 }
 
@@ -88,16 +106,18 @@ export type AutosaveSnapshotFn = () => {
 
 // Starts a setInterval-driven autosave loop. Returns the stop function;
 // callers (the React hook) clear on unmount. The interval is configurable
-// for tests — production wiring passes AUTOSAVE_INTERVAL_MS.
+// for tests; production wiring passes AUTOSAVE_INTERVAL_MS.
 export function startAutosaveLoop(
   getSnapshot: AutosaveSnapshotFn,
   intervalMs: number = AUTOSAVE_INTERVAL_MS,
+  onWriteFailure?: (failure: AutosaveWriteFailure) => void,
 ): () => void {
   const handle = setInterval(() => {
     const snap = getSnapshot();
     if (!snap.dirty) return;
     if (snap.isStreaming) return;
-    writeAutosave(snap.project);
+    const result = writeAutosave(snap.project);
+    if (result.kind !== 'ok') onWriteFailure?.(result);
   }, intervalMs);
   return () => clearInterval(handle);
 }
@@ -110,4 +130,18 @@ function isAutosaveRecord(v: unknown): v is AutosaveRecord {
     typeof r['savedAt'] === 'number' &&
     typeof r['projectJson'] === 'string'
   );
+}
+
+function isQuotaExceededError(error: unknown): boolean {
+  if (error instanceof DOMException) {
+    return (
+      error.name === 'QuotaExceededError' ||
+      error.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      error.code === 22
+    );
+  }
+  if (error instanceof Error) {
+    return error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED';
+  }
+  return false;
 }

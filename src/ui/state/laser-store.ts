@@ -68,6 +68,7 @@ export type LaserState = {
   readonly alarmCode: number | null;
   readonly lastError: number | null;
   readonly lastWriteError: string | null;
+  readonly autofocusBusy: boolean;
   readonly streamer: StreamerState | null;
   readonly log: ReadonlyArray<string>;
   // F-7: settings auto-detected from the `$$` dump on connect. Non-null
@@ -147,6 +148,8 @@ const refs: LiveRefs = {
 };
 
 const LOG_MAX = 200;
+const AUTOFOCUS_BUSY_MESSAGE =
+  'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 
 function pushLog(state: LaserState, line: string): ReadonlyArray<string> {
   return [...state.log, line].slice(-LOG_MAX);
@@ -209,6 +212,7 @@ function initialLaserState(): Pick<
   | 'alarmCode'
   | 'lastError'
   | 'lastWriteError'
+  | 'autofocusBusy'
   | 'streamer'
   | 'log'
   | 'detectedSettings'
@@ -222,6 +226,7 @@ function initialLaserState(): Pick<
     alarmCode: null,
     lastError: null,
     lastWriteError: null,
+    autofocusBusy: false,
     streamer: null,
     log: [],
     detectedSettings: null,
@@ -242,6 +247,14 @@ function inferCurrentMachinePosition(state: LaserState): WorkCoordinateOffset | 
     };
   }
   return null;
+}
+
+function isActiveJob(streamer: StreamerState | null): boolean {
+  return streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
+}
+
+function assertAutofocusIdle(get: GetFn): void {
+  if (get().autofocusBusy) throw new Error(AUTOFOCUS_BUSY_MESSAGE);
 }
 
 function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' | 'disconnect'> {
@@ -287,9 +300,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         refs.pollHandle = setInterval(() => {
           pollTick++;
           const s = get();
-          const isActive =
-            s.streamer !== null &&
-            (s.streamer.status === 'streaming' || s.streamer.status === 'paused');
+          const isActive = isActiveJob(s.streamer);
           if (!isActive && pollTick % IDLE_POLL_DIVISOR !== 0) return;
           void safeWrite(set, get, RT_STATUS).catch(() => undefined);
         }, STATUS_POLL_MS);
@@ -301,7 +312,9 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
       }
     },
     disconnect: async () => {
+      assertAutofocusIdle(get);
       const conn = refs.connection;
+      if (isActiveJob(get().streamer)) await safeWrite(set, get, RT_SOFT_RESET);
       teardown();
       if (conn !== null) await conn.close().catch(() => undefined);
       set({
@@ -323,31 +336,42 @@ function jogActions(
 ): Pick<LaserState, 'home' | 'autofocus' | 'unlockAlarm' | 'jog' | 'cancelJog' | 'frame'> {
   return {
     home: async () => {
+      assertAutofocusIdle(get);
       await safeWrite(set, get, `${CMD_HOME}\n`);
     },
     autofocus: async (command) => {
+      if (get().autofocusBusy) {
+        return { kind: 'preflight-failed', reason: 'Auto-focus is already running.' };
+      }
+      set({ autofocusBusy: true });
       // Delegates to the protocol-aware runner (autofocus-action.ts).
       // The runner subscribes to incoming lines, waits for ok / error /
       // status transitions, and times out at 15s — fire-and-forget
       // (the old behavior) was the entire reason previous attempts
       // looked "hung" or fired the wrong command silently.
-      return runAutofocus({
-        connection: refs.connection,
-        statusReport: get().statusReport,
-        command,
-      });
+      try {
+        return await runAutofocus({
+          connection: refs.connection,
+          statusReport: get().statusReport,
+          command,
+        });
+      } finally {
+        set({ autofocusBusy: false });
+      }
     },
     unlockAlarm: async () => {
       await safeWrite(set, get, `${CMD_UNLOCK}\n`);
       set({ alarmCode: null });
     },
     jog: async (params) => {
+      assertAutofocusIdle(get);
       await safeWrite(set, get, `${buildJogCommand(params)}\n`);
     },
     cancelJog: async () => {
       await safeWrite(set, get, RT_JOG_CANCEL);
     },
     frame: async (bounds, feed) => {
+      assertAutofocusIdle(get);
       const f = Math.max(1, Math.round(feed));
       const fmt = (n: number): string => n.toFixed(3);
       const corners = [
@@ -370,10 +394,17 @@ function jobActions(
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
   return {
     startJob: async (gcode) => {
+      assertAutofocusIdle(get);
       const initial = createStreamer(gcode);
       const stepped = step(initial);
-      if (stepped.toSend.length > 0) await safeWrite(set, get, stepped.toSend);
       set({ streamer: stepped.state });
+      if (stepped.toSend.length === 0) return;
+      try {
+        await safeWrite(set, get, stepped.toSend);
+      } catch (err) {
+        set({ streamer: null });
+        throw err;
+      }
     },
     pauseJob: async () => {
       await safeWrite(set, get, RT_HOLD);
@@ -421,6 +452,7 @@ function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere'
   // need to switch placement as soon as the write succeeds.
   return {
     setOriginHere: async () => {
+      assertAutofocusIdle(get);
       await setOriginHereAction((out) => safeWrite(set, get, out));
       const inferredWco = inferCurrentMachinePosition(get());
       set({
@@ -429,6 +461,7 @@ function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere'
       });
     },
     resetOrigin: async () => {
+      assertAutofocusIdle(get);
       await resetOriginAction((out) => safeWrite(set, get, out));
       set({ workOriginActive: false, wcoCache: null });
     },

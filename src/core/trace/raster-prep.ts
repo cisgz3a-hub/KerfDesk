@@ -1,5 +1,6 @@
-// Image-level preprocessing operator levers ported from LaserForge 1's
-// src/core/image/ImageProcessing.ts. Four pure functions over RawImageData:
+// Image-level preprocessing operator levers implemented for parity with
+// LaserForge 1's src/core/image/ImageProcessing.ts math. Four pure
+// functions over RawImageData:
 //
 //   - adjustBrightness  (delta −100..+100, 0 = no-op)
 //   - adjustContrast    (delta −100..+100, 0 = no-op)
@@ -12,8 +13,8 @@
 //   → despeckle → tracer.
 //
 // All math is public-domain image processing. Algorithm references and
-// constants match LF1 exactly so a user importing the same image with
-// the same settings gets byte-identical results.
+// constants match LF1 exactly so matching per-channel input values
+// produce the same adjusted bytes.
 //
 // Pure-core compliant: no clock, no random, no I/O.
 

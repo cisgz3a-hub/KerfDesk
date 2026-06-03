@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import type { Vec2 } from '../scene';
 import { estimateJobDuration, formatDuration } from './estimate-duration';
-import type { CutGroup, CutSegment, FillGroup, Job } from './job';
+import type { CutGroup, CutSegment, FillGroup, Job, RasterGroup } from './job';
 
 // Pin accel + junctionDeviation explicitly. The shipping defaults are
 // 500 / 0.01; this suite was written against accel=1000 so we'd get
@@ -46,6 +46,29 @@ function fillGroup(overscanMm: number): FillGroup {
     passes: 1,
     overscanMm,
     segments: [seg([10, 0], [20, 0])],
+  };
+}
+
+function rasterGroup(opts: {
+  sValues?: Uint16Array;
+  pixelWidth?: number;
+  pixelHeight?: number;
+  passes?: number;
+}): RasterGroup {
+  const pixelWidth = opts.pixelWidth ?? 4;
+  const pixelHeight = opts.pixelHeight ?? 2;
+  return {
+    kind: 'raster',
+    layerId: 'image',
+    color: '#808080',
+    power: 30,
+    speed: 1200,
+    passes: opts.passes ?? 1,
+    sValues: opts.sValues ?? new Uint16Array(pixelWidth * pixelHeight).fill(500),
+    pixelWidth,
+    pixelHeight,
+    bounds: { minX: 10, minY: 20, maxX: 50, maxY: 30 },
+    overscanMm: 5,
   };
 }
 
@@ -129,6 +152,27 @@ describe('estimateJobDuration', () => {
     expect(overscan.totalSeconds).toBeGreaterThan(zero.totalSeconds);
   });
 
+  it('estimates raster-only jobs instead of reporting zero duration', () => {
+    const r = estimateJobDuration({ groups: [rasterGroup({})] }, device);
+
+    expect(r.totalSeconds).toBeGreaterThan(0);
+    expect(r.breakdown.cutSeconds).toBeGreaterThan(0);
+  });
+
+  it('includes raster sweeps in mixed vector and raster jobs', () => {
+    const cutOnly = estimateJobDuration(
+      { groups: [group({ segments: [seg([0, 0], [100, 0])] })] },
+      device,
+    );
+    const mixed = estimateJobDuration(
+      { groups: [group({ segments: [seg([0, 0], [100, 0])] }), rasterGroup({})] },
+      device,
+    );
+
+    expect(mixed.totalSeconds).toBeGreaterThan(cutOnly.totalSeconds);
+    expect(mixed.breakdown.cutSeconds).toBeGreaterThan(cutOnly.breakdown.cutSeconds);
+  });
+
   it('handles a layer whose speed is 0 or negative by treating it as 1 mm/min (minimum) — never NaN/Inf', () => {
     const j: Job = {
       groups: [group({ speed: 0, segments: [seg([0, 0], [1, 0])] })],
@@ -186,7 +230,11 @@ describe('estimateJobDuration', () => {
     // longer (or the same time, at the limit where cruise dominates).
     fc.assert(
       fc.property(
-        fc.double({ min: 1.0, max: 10, noNaN: true }),
+        // Keep this meaningfully above 1.0. Values like
+        // 1.0000000000000002 exercise IEEE rounding noise more than
+        // geometry scaling and can move the planner result by a few
+        // milliseconds in either direction.
+        fc.double({ min: 1.001, max: 10, noNaN: true }),
         fc.array(
           fc.tuple(
             fc.double({ min: 0, max: 100, noNaN: true }),

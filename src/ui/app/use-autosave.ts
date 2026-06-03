@@ -18,8 +18,29 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
-import { clearAutosave, readAutosave, startAutosaveLoop, writeAutosave } from '../state/autosave';
+import {
+  AUTOSAVE_INTERVAL_MS,
+  clearAutosave,
+  readAutosave,
+  startAutosaveLoop,
+  writeAutosave,
+} from '../state/autosave';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
+
+export const AUTOSAVE_FAILURE_MESSAGE =
+  'Autosave could not write this project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
+
+type PushToast = ReturnType<typeof useToastStore.getState>['pushToast'];
+
+export function createAutosaveFailureReporter(pushToast: PushToast): () => void {
+  let hasWarned = false;
+  return () => {
+    if (hasWarned) return;
+    hasWarned = true;
+    pushToast(AUTOSAVE_FAILURE_MESSAGE, 'warning');
+  };
+}
 
 function snapshotForAutosave(): {
   readonly project: ReturnType<typeof useStore.getState>['project'];
@@ -35,8 +56,14 @@ function snapshotForAutosave(): {
 }
 
 export function useAutosave(): void {
+  const pushToast = useToastStore((s) => s.pushToast);
   useEffect(() => {
-    const stopInterval = startAutosaveLoop(snapshotForAutosave);
+    const reportAutosaveFailure = createAutosaveFailureReporter(pushToast);
+    const stopInterval = startAutosaveLoop(
+      snapshotForAutosave,
+      AUTOSAVE_INTERVAL_MS,
+      reportAutosaveFailure,
+    );
     const onBeforeUnload = (): void => {
       const snap = snapshotForAutosave();
       // Even mid-stream: if the user closed the window, persisting
@@ -44,14 +71,17 @@ export function useAutosave(): void {
       // during streaming." The streaming guard exists so the 30s
       // interval doesn't perturb the render loop — that no longer
       // applies once the page is unloading.
-      if (snap.dirty) writeAutosave(snap.project);
+      if (snap.dirty) {
+        const result = writeAutosave(snap.project);
+        if (result.kind !== 'ok') reportAutosaveFailure();
+      }
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
       stopInterval();
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
-  }, []);
+  }, [pushToast]);
 }
 
 export function useAutosaveRecovery(): void {

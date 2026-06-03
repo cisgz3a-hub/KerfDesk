@@ -298,6 +298,30 @@ describe('compileJob raster image groups', () => {
     expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual(new Array(50).fill(0));
   });
 
+  it('decodes saved luma without relying on a host atob global', () => {
+    const originalAtob = globalThis.atob;
+    Object.defineProperty(globalThis, 'atob', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    try {
+      const layer = {
+        ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
+        ditherAlgorithm: 'threshold' as const,
+        linesPerMm: 1,
+      };
+      const job = compileJob({ objects: [rasterObject('AP//AA==')], layers: [layer] }, dev);
+      expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toContain(300);
+    } finally {
+      Object.defineProperty(globalThis, 'atob', {
+        value: originalAtob,
+        configurable: true,
+        writable: true,
+      });
+    }
+  });
+
   it('measures transformed raster bounds from all four corners', () => {
     const layer = {
       ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),

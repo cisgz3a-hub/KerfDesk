@@ -1,0 +1,240 @@
+[
+  {
+    "id": "LF-CV-001",
+    "status": "confirmed",
+    "severity": "P0 safety",
+    "confidence": "high",
+    "module": "Runtime job control",
+    "files": [
+      "src/ui/state/laser-store.ts",
+      "src/core/controllers/grbl/commands.ts"
+    ],
+    "functionComponent": "pauseJob / RT_HOLD",
+    "triggerPath": "Operator presses Pause during an active burn move.",
+    "failureMode": "The app sends GRBL feed hold only and marks the streamer paused without sending laser-off/reset or verifying laser state.",
+    "consequence": "Beam behavior during hold is not proven safe; GRBL feed hold is not a guaranteed spindle/laser-off command.",
+    "evidence": [
+      "RT_HOLD is defined as '!'.",
+      "pauseJob sends only RT_HOLD.",
+      "GRBL docs say feed hold does not disable spindle/coolant.",
+      "LightBurn docs distinguish Pause/Stop and require physical emergency stop readiness."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/GetStarted/JobControl/",
+    "concreteFix": "Write failing pause safety tests, then either label Pause as non-safety hold with UI warning or change Pause to a safety-first stop/reset policy with hardware verification.",
+    "notes": "This should move ahead of static parity fixes because it affects live laser behavior."
+  },
+  {
+    "id": "LF-CV-002",
+    "status": "confirmed",
+    "severity": "P0/P1 output correctness",
+    "confidence": "high",
+    "module": "Path optimization",
+    "files": [
+      "src/core/job/optimize-paths.ts"
+    ],
+    "functionComponent": "optimizePaths / optimizeGroup",
+    "triggerPath": "Cutting nested closed shapes.",
+    "failureMode": "Nearest-neighbor ordering can cut outer contours before inner contours.",
+    "consequence": "Parts can shift or drop before internal details are cut.",
+    "evidence": [
+      "optimizePaths implements greedy nearest-neighbor ordering.",
+      "No polygon containment or depth ordering was found.",
+      "LightBurn documents Cut Inner Shapes First as an optimization setting."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/OptimizationSettings/",
+    "concreteFix": "Add containment depth ordering for closed cut paths before nearest-neighbor optimization, with tests for nested squares, holes, open paths, and mixed groups.",
+    "notes": "This is the cleanest pure-core parity fix after pause safety."
+  },
+  {
+    "id": "LF-CV-003",
+    "status": "confirmed",
+    "severity": "P1 safety defense-in-depth",
+    "confidence": "high",
+    "module": "Preflight invariants",
+    "files": [
+      "src/core/invariants/predicates.ts",
+      "src/core/preflight/preflight.ts",
+      "src/io/gcode/emit-gcode.ts"
+    ],
+    "functionComponent": "findLaserOnTravelIssues / runPreflight",
+    "triggerPath": "Future output strategy or regression emits travel move with nonzero S value.",
+    "failureMode": "Laser-off travel predicate exists but is not wired into preflight/output gating.",
+    "consequence": "A future G-code regression could pass app preflight without catching laser-on travel.",
+    "evidence": [
+      "findLaserOnTravelIssues is defined.",
+      "runPreflight imports bounds checking but not the laser-on-travel predicate.",
+      "Current GRBL strategy emits S0 on G0, so this is defense-in-depth rather than proof current output is unsafe."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/GetStarted/JobControl/",
+    "concreteFix": "Wire the predicate into preflight or emitGcode and add a failing test with intentionally unsafe G-code.",
+    "notes": "Pair with existing emitter behavior instead of replacing it."
+  },
+  {
+    "id": "LF-CV-004",
+    "status": "confirmed",
+    "severity": "P1 workflow correctness",
+    "confidence": "high",
+    "module": "Job placement",
+    "files": [
+      "src/core/job/job-origin.ts",
+      "src/ui/laser/start-job-readiness.ts"
+    ],
+    "functionComponent": "applyJobOrigin / USER_ORIGIN_JOB_PLACEMENT",
+    "triggerPath": "User frames or starts a job expecting center/corner/current-position origin behavior.",
+    "failureMode": "Core has 9-anchor types, but UI/start readiness uses hardcoded front-left placement.",
+    "consequence": "Job may start from an unexpected physical location.",
+    "evidence": [
+      "JobOriginAnchor includes 9 positions.",
+      "Default placement constants use front-left.",
+      "LightBurn exposes Start From modes and a 9-dot Job Origin selector."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/CoordinatesOrigin/",
+    "concreteFix": "Expose absolute/user-origin mode plus 9-dot anchor UI first; handle Current Position and Stored Position in a separate state-safety ADR.",
+    "notes": "Use existing core math rather than inventing new placement math."
+  },
+  {
+    "id": "LF-CV-005",
+    "status": "confirmed",
+    "severity": "P1 output fidelity",
+    "confidence": "high",
+    "module": "Raster engraving settings",
+    "files": [
+      "src/core/raster/dither.ts",
+      "src/core/scene/layer.ts",
+      "src/ui/layers/LayerRow.tsx",
+      "src/core/trace/dither-trace.ts"
+    ],
+    "functionComponent": "DitherAlgorithm / LayerDitherAlgorithm",
+    "triggerPath": "Image import/engrave with logo, photo, or small text.",
+    "failureMode": "Raster engrave path exposes only threshold, Floyd-Steinberg, and grayscale, while trace has more kernels and LightBurn exposes broader image controls.",
+    "consequence": "Engraving output can be coarse or mismatched against LightBurn expectations.",
+    "evidence": [
+      "Raster dither type has three modes.",
+      "Trace dither path has a broader kernel set.",
+      "LightBurn Image Mode docs list multiple modes and image controls."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/",
+    "concreteFix": "Promote deterministic trace kernels into raster S-value output where appropriate, then add schema/UI/golden tests and one hardware burn comparison.",
+    "notes": "Do not blindly expose every trace mode until raster output semantics are proven."
+  },
+  {
+    "id": "LF-CV-006",
+    "status": "confirmed",
+    "severity": "P1 workflow/output ordering",
+    "confidence": "high",
+    "module": "Layer ordering",
+    "files": [
+      "src/ui/state/store.ts",
+      "src/ui/layers/CutsLayersPanel.tsx",
+      "src/core/job/compile-job.ts"
+    ],
+    "functionComponent": "layers / setLayerParam / compile order",
+    "triggerPath": "User wants one cut or engrave layer to run before another.",
+    "failureMode": "Layer parameters can be edited, but layer order/priority cannot be changed from the UI.",
+    "consequence": "Output order is import/internal order rather than operator-selected order.",
+    "evidence": [
+      "setLayerParam updates layer settings, not order.",
+      "CutsLayersPanel maps layers without reorder controls.",
+      "LightBurn supports Order By Layer and Order By Priority."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/OptimizationSettings/",
+    "concreteFix": "Add moveLayer state action, UI up/down controls, and compile-order tests; add priority only if needed after layer order.",
+    "notes": "Layer order is smaller and more testable than full LightBurn priority behavior."
+  },
+  {
+    "id": "LF-CV-007",
+    "status": "confirmed",
+    "severity": "P1 output and firmware compatibility",
+    "confidence": "medium-high",
+    "module": "Cut settings / GRBL output",
+    "files": [
+      "src/core/scene/layer.ts",
+      "src/core/output/grbl-strategy.ts",
+      "src/core/raster/emit-raster.ts"
+    ],
+    "functionComponent": "layer power / GRBL modal strategy",
+    "triggerPath": "User expects LightBurn-like Min Power or M3/M4 control.",
+    "failureMode": "Single-power layer model and fixed modal output do not represent LightBurn's Max Power/Min Power/firmware support distinction.",
+    "consequence": "A naive Min Power field could mislead users and produce unexpected output on GRBL firmware.",
+    "evidence": [
+      "Layer model has one main power value.",
+      "LightBurn Shared Settings document Max Power and Min Power.",
+      "Firmware behavior depends on GRBL laser mode and modal command policy."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/SharedSettings/",
+    "concreteFix": "Write an ADR for Min Power, M3/M4, and GRBL $31 assumptions before adding schema/UI/output behavior.",
+    "notes": "This is a design decision, not a quick UI field."
+  },
+  {
+    "id": "LF-CV-008",
+    "status": "partially-stale-confirmed-residual",
+    "severity": "P2 import fidelity",
+    "confidence": "high",
+    "module": "SVG import",
+    "files": [
+      "src/io/svg/parse-svg.ts",
+      "src/io/svg/shape-to-polylines.ts"
+    ],
+    "functionComponent": "parseSvg / parseTransform / parseViewBox",
+    "triggerPath": "Import SVG using physical units, defs, symbols, or use references.",
+    "failureMode": "Current parser handles recursive transforms, but remaining gaps include unit-aware scaling and use/symbol expansion.",
+    "consequence": "Some SVGs import at wrong scale or omit reused symbol content.",
+    "evidence": [
+      "parseTransform and presentationStateFor exist.",
+      "Width/height use Number.parseFloat, dropping units.",
+      "No confirmed use/href/symbol expansion was found."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/CoordinatesOrigin/",
+    "concreteFix": "Add failing tests for mm/cm/in/px/viewBox and defs/symbol/use, then implement only those cases.",
+    "notes": "Reject the stale no-transform claim; keep the residual import-fidelity finding."
+  },
+  {
+    "id": "LF-CV-009",
+    "status": "stale-resolved-monitor",
+    "severity": "resolved/monitor",
+    "confidence": "high",
+    "module": "Duration estimation",
+    "files": [
+      "src/core/job/planner.ts",
+      "src/core/job/estimate-duration.ts"
+    ],
+    "functionComponent": "estimateJobDuration / jobWithRasterSweeps",
+    "triggerPath": "Estimate duration for raster jobs.",
+    "failureMode": "Original audit claimed raster ETA undercount because planner skips raster groups.",
+    "consequence": "Do not spend implementation time on this as a current defect unless fresh tests fail.",
+    "evidence": [
+      "planner.ts skips raw raster groups.",
+      "estimateJobDuration wraps jobs with jobWithRasterSweeps before estimating.",
+      "Raster duration tests exist."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/",
+    "concreteFix": "Keep tests and add later hardware calibration; no Tier 0 code change from the stale claim.",
+    "notes": "This is a correction to the generated audit, not a confirmed open defect."
+  },
+  {
+    "id": "LF-CV-010",
+    "status": "confirmed-with-scope-limits",
+    "severity": "P1 foundation / P3 advanced parity",
+    "confidence": "high",
+    "module": "Scene object model / toolbar",
+    "files": [
+      "src/core/scene/scene-object.ts",
+      "src/ui/common/Toolbar.tsx",
+      "PROJECT.md",
+      "DECISIONS.md"
+    ],
+    "functionComponent": "SceneObject / Toolbar",
+    "triggerPath": "User expects basic drawing or advanced LightBurn editing operations.",
+    "failureMode": "Primitive shape creation is absent; advanced operations are outside current project scope.",
+    "consequence": "Users must use external tools for layout/editing, but implementing all LightBurn editing would explode scope.",
+    "evidence": [
+      "Scene object union has imported SVG, text, traced image, and raster image rather than primitives.",
+      "Toolbar lacks primitive drawing tools.",
+      "Project docs mark boolean ops, node editing, kerf/offset, tabs/bridges, camera, rotary, DXF/PDF, and variable text out of scope."
+    ],
+    "lightburnReference": "https://docs.lightburnsoftware.com/latest/Reference/OptimizationSettings/",
+    "concreteFix": "If approved, add primitive parametric shapes and grouping first. Keep advanced operations behind explicit PROJECT/ADR scope changes.",
+    "notes": "This is a real parity gap but not an authorization to build all LightBurn features."
+  }
+]
+

@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  createStreamer,
   idleCollector,
   startCollecting,
+  step,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
 import { handleLine, type GetFn, type SetFn } from './laser-line-handler';
@@ -14,6 +16,7 @@ function makeLaserState(): LaserState {
     alarmCode: null,
     lastError: null,
     lastWriteError: null,
+    autofocusBusy: false,
     streamer: null,
     log: [],
     detectedSettings: null,
@@ -75,5 +78,29 @@ describe('handleLine detected controller settings', () => {
       minPowerS: 0,
       laserModeEnabled: true,
     });
+  });
+});
+
+describe('handleLine streamer writes', () => {
+  it('marks the streamer disconnected if an ack-triggered follow-up write fails', async () => {
+    const { refs, set, get } = makeHarness();
+    const firstStep = step(
+      createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', {
+        rxBufferBytes: 30,
+      }),
+    );
+    set({ streamer: firstStep.state });
+    const safeWrite = vi.fn(async () => {
+      throw new Error('port lost');
+    });
+
+    handleLine(set, get, refs, safeWrite, 'ok');
+    await Promise.resolve();
+
+    expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n');
+    expect(get().streamer?.status).toBe('disconnected');
+    expect(get().streamer?.completed).toBe(1);
+    expect(get().streamer?.inFlight.map((item) => item.line)).toEqual(['G1 X1234567891\n']);
+    expect(get().streamer?.queued).toEqual([]);
   });
 });

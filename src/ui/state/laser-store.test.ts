@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { RT_SOFT_RESET } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 
@@ -7,7 +8,10 @@ type FakeConnection = SerialConnection & {
   readonly emitClose: () => void;
 };
 
-function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
+function makeConnection(
+  write: (data: string) => Promise<void>,
+  close: () => Promise<void> = async () => undefined,
+): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
   return {
@@ -20,7 +24,7 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
       closeHandlers.add(handler);
       return () => closeHandlers.delete(handler);
     },
-    close: async () => undefined,
+    close,
     emitLine: (line) => {
       for (const handler of lineHandlers) handler(line);
     },
@@ -55,6 +59,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  useLaserStore.setState({ autofocusBusy: false });
   await useLaserStore.getState().disconnect();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
@@ -62,6 +67,7 @@ afterEach(async () => {
     alarmCode: null,
     lastError: null,
     lastWriteError: null,
+    autofocusBusy: false,
     streamer: null,
     log: [],
     detectedSettings: null,
@@ -88,6 +94,23 @@ describe('laser-store serial write failures', () => {
     expect(useLaserStore.getState().log.join('\n')).toContain('Serial write failed: port lost');
   });
 
+  it('keeps an initial job ack that arrives before the first write resolves', async () => {
+    const live = { connection: null as FakeConnection | null };
+    const write = vi.fn(async (data: string) => {
+      if (data.includes('G21')) live.connection?.emitLine('ok');
+    });
+    const connection = makeConnection(write);
+    live.connection = connection;
+    await connectWith(connection);
+
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+
+    expect(useLaserStore.getState().streamer?.completed).toBe(1);
+    expect(useLaserStore.getState().streamer?.inFlight.map((item) => item.line)).not.toContain(
+      'G21\n',
+    );
+  });
+
   it('keeps a streaming job streaming when feed-hold fails to send', async () => {
     let shouldFail = false;
     const write = vi.fn(async () => {
@@ -105,6 +128,7 @@ describe('laser-store serial write failures', () => {
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: write rejected',
     );
+    shouldFail = false;
   });
 
   it('keeps a streaming job active when soft-reset fails to send', async () => {
@@ -124,6 +148,24 @@ describe('laser-store serial write failures', () => {
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: reset rejected',
     );
+    shouldFail = false;
+  });
+
+  it('sends soft reset before disconnecting an active job', async () => {
+    const close = vi.fn(async () => undefined);
+    const write = vi.fn(async () => undefined);
+    const connection = makeConnection(write, close);
+    await connectWith(connection);
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+
+    write.mockClear();
+    await useLaserStore.getState().disconnect();
+
+    expect(write).toHaveBeenCalledWith(RT_SOFT_RESET);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(useLaserStore.getState().streamer).toBeNull();
   });
 
   it('rejects Set Origin when the G92 write fails', async () => {
@@ -163,5 +205,58 @@ describe('laser-store serial write failures', () => {
     expect(write).toHaveBeenCalledWith('G92.1\n');
     expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().wcoCache).toBeNull();
+  });
+});
+
+describe('laser-store autofocus lifecycle', () => {
+  it('refuses a second autofocus while one is already pending', async () => {
+    const write = vi.fn(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+
+    const first = useLaserStore.getState().autofocus('$HZ1');
+    await Promise.resolve();
+    const second = useLaserStore.getState().autofocus('$HZ1');
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+
+    await expect(second).resolves.toMatchObject({
+      kind: 'preflight-failed',
+      reason: expect.stringMatching(/auto-focus is already running/i),
+    });
+    await expect(first).resolves.toMatchObject({ kind: 'ok' });
+  });
+
+  it('refuses jog commands while autofocus is pending', async () => {
+    const write = vi.fn(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+
+    const autofocus = useLaserStore.getState().autofocus('$HZ1');
+    await Promise.resolve();
+
+    await expect(useLaserStore.getState().jog({ dx: 1, feed: 1000 })).rejects.toThrow(
+      /auto-focus is running/i,
+    );
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await expect(autofocus).resolves.toMatchObject({ kind: 'ok' });
+  });
+
+  it('refuses other motion and origin actions while autofocus is busy', async () => {
+    useLaserStore.setState({ autofocusBusy: true });
+
+    await expect(useLaserStore.getState().home()).rejects.toThrow(/auto-focus is running/i);
+    await expect(
+      useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000),
+    ).rejects.toThrow(/auto-focus is running/i);
+    await expect(useLaserStore.getState().startJob('G21\nG90\nM5\n')).rejects.toThrow(
+      /auto-focus is running/i,
+    );
+    await expect(useLaserStore.getState().setOriginHere()).rejects.toThrow(
+      /auto-focus is running/i,
+    );
+    await expect(useLaserStore.getState().resetOrigin()).rejects.toThrow(/auto-focus is running/i);
+    await expect(useLaserStore.getState().disconnect()).rejects.toThrow(/auto-focus is running/i);
   });
 });

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { textToPolylines } from './text-to-polylines';
 
 // Load Roboto once for the whole suite. Same font the app ships;
@@ -170,6 +170,43 @@ describe('textToPolylines', () => {
     });
     expect(r.paths[0]?.polylines.length).toBeGreaterThan(0);
     expect(r.bounds.maxX - r.bounds.minX).toBeGreaterThan(0);
+  });
+
+  it('retries the opentype dynamic import after a transient chunk failure', async () => {
+    vi.resetModules();
+    (globalThis as { __lfOpentypeAttempts?: number }).__lfOpentypeAttempts = 0;
+    vi.doMock('opentype.js', () => {
+      const state = globalThis as { __lfOpentypeAttempts?: number };
+      const attempts = (state.__lfOpentypeAttempts ?? 0) + 1;
+      state.__lfOpentypeAttempts = attempts;
+      if (attempts === 1) throw new Error('chunk failed');
+      return {
+        parse: () => ({
+          getAdvanceWidth: () => 0,
+          getPath: () => ({ commands: [] }),
+        }),
+      };
+    });
+    try {
+      const fresh = await import('./text-to-polylines');
+      const input = {
+        fontBuffer: new ArrayBuffer(0),
+        content: '',
+        sizeMm: 10,
+        alignment: 'left' as const,
+        lineHeight: 1.4,
+        color: '#000000',
+      };
+
+      await expect(fresh.textToPolylines(input)).rejects.toThrow(/chunk failed|mocking a module/);
+      await expect(fresh.textToPolylines(input)).resolves.toMatchObject({
+        bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      });
+    } finally {
+      vi.doUnmock('opentype.js');
+      vi.resetModules();
+      delete (globalThis as { __lfOpentypeAttempts?: number }).__lfOpentypeAttempts;
+    }
   });
 });
 
