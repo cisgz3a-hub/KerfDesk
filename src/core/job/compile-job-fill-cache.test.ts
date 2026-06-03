@@ -64,4 +64,22 @@ describe('compileJob fill hatch cache', () => {
 
     expect(fillHatching).toHaveBeenCalledTimes(1);
   });
+
+  it('passes fillBidirectional to the hatcher and re-hatches when it flips (ADR-038)', () => {
+    const base = tracedFillScene();
+    const uni: Scene = {
+      ...base,
+      layers: base.layers.map((l) => ({ ...l, fillBidirectional: false })),
+    };
+
+    compileJob(base, DEFAULT_DEVICE_PROFILE); // bidirectional: true (default)
+    compileJob(uni, DEFAULT_DEVICE_PROFILE); // bidirectional: false
+
+    // The compile path threads the layer flag into fillHatching...
+    expect(fillHatching).toHaveBeenCalledWith(expect.objectContaining({ bidirectional: false }));
+    // ...and flipping it is not a cache hit — both directions are computed
+    // (the flag is part of both fill cache keys, so a stale snake path can't
+    // be reused for a unidirectional layer).
+    expect(fillHatching).toHaveBeenCalledTimes(2);
+  });
 });

@@ -30,6 +30,14 @@ export type Layer = {
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
+  // Bidirectional (snake) hatch fill: alternate each scanline's direction so
+  // the head never returns to start between rows (faster). Set false for
+  // UNIDIRECTIONAL fill — every row burns the same direction — which removes
+  // the alternating laser-firing-lag offset ("zipper") that can serrate small
+  // text on a bidirectional fill (ADR-038; burn-perfection Cause C). Default
+  // true (speed): the zipper is sub-0.1 mm at typical diode feeds, so most
+  // fills want the faster snake.
+  readonly fillBidirectional: boolean;
   // F.2 image-mode parameters. Ignored unless mode === 'image'.
   // Layer values WIN over per-RasterImage settings at compile time
   // so the operator can re-tune one layer without touching every
@@ -48,6 +56,7 @@ export const LAYER_DEFAULTS = {
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
+  fillBidirectional: true,
   ditherAlgorithm: 'floyd-steinberg',
   linesPerMm: 10,
 } as const satisfies Omit<Layer, 'id' | 'color'>;

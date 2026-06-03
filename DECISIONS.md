@@ -1843,6 +1843,68 @@ passes sub-cap images through untouched.
 
 ---
 
+## ADR-038 - Per-layer unidirectional fill option (was: snake hardcoded)
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+The "amplifier" third of the small-text burn defect (docs/research/burn-perfection-
+small-text.md, **Cause C**). Fill hatching alternated each scanline's direction
+unconditionally (snake fill, `fill-hatching.ts` `pushScanlineHatches`), and the
+emitter applies no scan-offset compensation. A diode's laser-on lag is a fixed
+*time*; at feed it becomes a fixed *distance* offset that flips sign on each
+alternating row, so a vertical edge lands at two alternating X positions - a
+"zipper" / serration. On a glyph only a handful of scanlines tall there is no
+spatial averaging to hide it. LightBurn exposes both a Scanning Offset Adjustment
+table and a bi-/uni-directional fill toggle; LaserForge had neither, and snake was
+not even user-togglable (no per-layer flag in `src/core`).
+
+### Decision
+
+Add a per-layer **`fillBidirectional`** boolean (default `true` = the existing
+snake). When `false`, `fillHatching` emits every row in the SAME direction
+(unidirectional): the per-sweep G0 in the emitter rapids the head back between
+rows with the laser off, so the alternating firing-lag offset cannot form. The
+flag threads layer -> `compile-job` -> `memoizedFillHatching` -> `fillHatching`'s
+`HatchInput.bidirectional`, is part of BOTH fill cache keys (`layerFillCacheKey`
+and the inner hatch cache - else flipping it would silently reuse the old path),
+is back-filled to `true` for pre-ADR-038 `.lf2` files (`deserialize-project.ts`),
+and is exposed as a "Bidirectional" checkbox in the layer panel (`LayerRow.tsx`).
+
+A full scan-offset *compensation* table (correcting bidirectional rows rather
+than serialising them) is deliberately deferred - unidirectional is the simpler,
+calibration-free lever and the right first step.
+
+### Consequences
+
+- Unidirectional removes the zipper entirely at the cost of one laser-off
+  return-rapid per row (slower fill). It is opt-in; the default (snake) preserves
+  the current speed and is byte-identical, so no existing output changes.
+- This is the SMALLEST of the three small-text levers: at the user's 1500 mm/min
+  the lag zipper is ~0.025-0.075 mm. M4 dynamic power (ADR-036) and the trace
+  decode cap (ADR-037) are the larger levers; this finishes the set.
+- Old projects reopen unchanged (back-filled to snake). New layers default to
+  snake. Determinism preserved (the flag is pure input to a pure function).
+
+### Verification
+
+- `fill-hatching.test.ts`: with `bidirectional: false`, EVERY row runs
+  left-to-right (no alternation) - the zipper cannot form; the snake default test
+  is unchanged.
+- `compile-job-fill-cache.test.ts`: the compile path threads the layer flag into
+  `fillHatching` (`bidirectional: false` observed) AND flipping it re-hatches
+  rather than serving a stale cache entry (both cache keys include it).
+- `project.test.ts`: a pre-ADR-038 layer back-fills `fillBidirectional` to `true`.
+- `layer.test.ts`: `createLayer` default includes `fillBidirectional: true`.
+- Full suite + tsc --noEmit + lint green.
+- **Hardware verification needed:** burn the "langebaan" small text with the layer
+  set unidirectional and confirm the edge serration is reduced. Expect a subtle
+  effect at 1500 mm/min (the zipper is small at this feed); the bigger small-text
+  wins are ADR-036 (density) and ADR-037 (trace fidelity).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

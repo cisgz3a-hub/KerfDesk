@@ -238,6 +238,7 @@ function layerFillCacheKey(layer: Layer, device: DeviceProfile): string {
     layer.color,
     layer.hatchAngleDeg,
     layer.hatchSpacingMm,
+    layer.fillBidirectional,
     device.origin,
     device.bedWidth,
     device.bedHeight,

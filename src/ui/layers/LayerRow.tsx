@@ -185,7 +185,26 @@ function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
         <FillOverscanInput layer={layer} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
+      <FieldRow label="Bidirectional">
+        <BidirectionalInput layer={layer} />
+      </FieldRow>
     </>
+  );
+}
+
+// Snake (bidirectional) vs unidirectional fill. On = faster (no return travel);
+// off = every row burns the same direction, removing the firing-lag zipper that
+// can serrate small text (ADR-038). A discrete click, so it commits immediately
+// like Visible / Output (no debounce).
+function BidirectionalInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <input
+      type="checkbox"
+      checked={layer.fillBidirectional}
+      onChange={(e) => setLayerParam(layer.id, { fillBidirectional: e.target.checked })}
+      aria-label={`Bidirectional fill for ${layer.color}`}
+    />
   );
 }
 

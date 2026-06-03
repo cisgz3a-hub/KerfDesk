@@ -142,6 +142,11 @@ function normalizeLayer(layer: unknown): unknown {
   if (typeof out['fillOverscanMm'] !== 'number' || out['fillOverscanMm'] < 0) {
     out['fillOverscanMm'] = LAYER_DEFAULTS.fillOverscanMm;
   }
+  // ADR-038: pre-unidirectional .lf2 files have no fillBidirectional — default
+  // to the snake fill they were authored against so reopening is unchanged.
+  if (typeof out['fillBidirectional'] !== 'boolean') {
+    out['fillBidirectional'] = LAYER_DEFAULTS.fillBidirectional;
+  }
   // F.2.e: back-fill image-mode Layer fields. Same additive-with-
   // default pattern as the hatch fields above — pre-F.2 .lf2 files
   // don't have them; treating missing as the default keeps the
