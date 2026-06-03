@@ -67,6 +67,7 @@ afterEach(async () => {
     alarmCode: null,
     lastError: null,
     lastWriteError: null,
+    safetyNotice: null,
     autofocusBusy: false,
     streamer: null,
     log: [],
@@ -76,6 +77,42 @@ afterEach(async () => {
     workOriginActive: false,
   });
   vi.restoreAllMocks();
+});
+
+describe('laser-store safety notices (P0-B)', () => {
+  it('raises a disconnect-during-job notice when the USB drops mid-job', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+
+    connection.emitClose();
+
+    expect(useLaserStore.getState().streamer?.status).toBe('disconnected');
+    expect(useLaserStore.getState().safetyNotice?.kind).toBe('disconnect-during-job');
+  });
+
+  it('does not raise a notice when the port drops with no active job', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    expect(useLaserStore.getState().streamer).toBeNull();
+
+    connection.emitClose();
+
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+  });
+
+  it('clearSafetyNotice acknowledges and removes the notice', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    connection.emitClose();
+    expect(useLaserStore.getState().safetyNotice).not.toBeNull();
+
+    useLaserStore.getState().clearSafetyNotice();
+
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+  });
 });
 
 describe('laser-store serial write failures', () => {
@@ -128,6 +165,10 @@ describe('laser-store serial write failures', () => {
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: write rejected',
     );
+    expect(useLaserStore.getState().safetyNotice).toMatchObject({
+      kind: 'write-failed',
+      action: 'pause',
+    });
     shouldFail = false;
   });
 
@@ -148,6 +189,10 @@ describe('laser-store serial write failures', () => {
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: reset rejected',
     );
+    expect(useLaserStore.getState().safetyNotice).toMatchObject({
+      kind: 'write-failed',
+      action: 'stop',
+    });
     shouldFail = false;
   });
 
