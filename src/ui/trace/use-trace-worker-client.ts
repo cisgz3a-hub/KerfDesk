@@ -40,6 +40,10 @@ let workerInstance: Worker | null = null;
 let nextRequestId = 0;
 const pendingByRequestId = new Map<number, Pending>();
 const MAX_INLINE_TRACE_PIXELS = 160_000;
+// Bound a worker request: a hung-but-alive worker (a pathological tracer loop)
+// would otherwise leave the preview/commit UI pending forever. 30s is far past
+// any legitimate trace of a budget-capped image (P2-A).
+const TRACE_WORKER_TIMEOUT_MS = 30_000;
 
 // Lazy-construct the worker. Returns null if the runtime doesn't have
 // a Worker constructor (vitest without jsdom workers, SSR) or if a
@@ -157,7 +161,24 @@ function traceInWorker(
   return new Promise<TraceResult>((resolve, reject) => {
     nextRequestId += 1;
     const id = nextRequestId;
-    pendingByRequestId.set(id, { resolve, reject });
+    // On timeout: drop the pending, terminate the worker (so the next trace
+    // builds a fresh one), and reject so the caller falls back / surfaces it.
+    const timer = setTimeout(() => {
+      if (pendingByRequestId.delete(id)) {
+        retireWorker();
+        reject(new Error('Trace worker timed out'));
+      }
+    }, TRACE_WORKER_TIMEOUT_MS);
+    pendingByRequestId.set(id, {
+      resolve: (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      },
+      reject: (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    });
     const request: TraceWorkerRequest = { id, image, options };
     worker.postMessage(request);
   });

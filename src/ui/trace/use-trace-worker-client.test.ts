@@ -186,3 +186,45 @@ describe('traceImage (worker client with inline fallback)', () => {
     expect(workers[1]?.terminated).toBe(false);
   });
 });
+
+describe('traceImage worker timeout (P2-A)', () => {
+  it('rejects and terminates a worker that never responds', async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    let terminated = 0;
+    let constructed = 0;
+    class HungWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor() {
+        constructed += 1;
+      }
+      postMessage(): void {
+        /* hung — intentionally never responds */
+      }
+      terminate(): void {
+        terminated += 1;
+      }
+    }
+    vi.stubGlobal('Worker', HungWorker);
+    try {
+      const client = await import('./use-trace-worker-client');
+      // Large image (> 160k px) so a failure cannot fall back inline — the
+      // timeout must surface as a rejection.
+      const rejection = expect(client.traceImage(largeImage(), traceOptions)).rejects.toThrow(
+        'timed out',
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      await rejection;
+      expect(terminated).toBe(1);
+
+      // The retired worker is replaced on the next trace.
+      const next = client.traceImage(largeImage(), traceOptions).catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await next;
+      expect(constructed).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
