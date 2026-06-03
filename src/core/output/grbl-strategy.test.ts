@@ -321,7 +321,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
     expect(emit(job)).toContain('M5\nM3 S0\n; layer cut color #ff0000');
   });
 
-  it('re-arms M3 before a fill group that follows a raster group', () => {
+  it('arms M4 (dynamic power) before a fill group that follows a raster group', () => {
     const job: Job = {
       groups: [
         {
@@ -357,7 +357,9 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
         },
       ],
     };
-    expect(emit(job)).toContain('M5\nM3 S0\n; fill layer fill color #ff0000');
+    // Fill now arms DYNAMIC power (M4). Raster ended in M5, so M4 S0 alone
+    // flips the mode — no redundant second M5 (ADR-036).
+    expect(emit(job)).toContain('M5\nM4 S0\n; fill layer fill color #ff0000');
   });
 
   it('repeats raster row data for each raster pass', () => {
