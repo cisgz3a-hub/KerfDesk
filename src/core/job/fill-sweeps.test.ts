@@ -25,14 +25,26 @@ describe('groupFillSweeps', () => {
     ]);
   });
 
-  it('orders a reverse-snake scanline right-to-left (matches fillHatching encoding)', () => {
-    // fillHatching reverse scanline: left pair first, each run reversed.
-    const sweeps = groupFillSweeps([seg(13, 5, 3, 5), seg(30, 5, 20, 5)]);
+  it('orders a reverse-snake scanline right-to-left in one sweep (small gap)', () => {
+    // fillHatching reverse scanline: left pair first, each run reversed. The 2mm
+    // gap stays under the rapid threshold, so it is one continuous sweep with the
+    // rightmost region burned first.
+    const sweeps = groupFillSweeps([seg(9, 5, 3, 5), seg(17, 5, 11, 5)]);
     expect(sweeps).toHaveLength(1);
     expect(sweeps[0]?.spans).toEqual([
-      { start: { x: 30, y: 5 }, end: { x: 20, y: 5 } },
-      { start: { x: 13, y: 5 }, end: { x: 3, y: 5 } },
+      { start: { x: 17, y: 5 }, end: { x: 11, y: 5 } },
+      { start: { x: 9, y: 5 }, end: { x: 3, y: 5 } },
     ]);
+  });
+
+  it('splits a scanline at a large gap so the emitter rapids across it (ADR-035)', () => {
+    // Two regions 15mm apart on one scanline — above the 5mm threshold — become
+    // SEPARATE sweeps. The emitter then crosses the gap with a G0 rapid (hard
+    // laser-off) instead of a slow G1 S0 feed move (the stray-line audit fix).
+    const sweeps = groupFillSweeps([seg(0, 0, 5, 0), seg(20, 0, 25, 0)]);
+    expect(sweeps).toHaveLength(2);
+    expect(sweeps[0]?.spans).toEqual([{ start: { x: 0, y: 0 }, end: { x: 5, y: 0 } }]);
+    expect(sweeps[1]?.spans).toEqual([{ start: { x: 20, y: 0 }, end: { x: 25, y: 0 } }]);
   });
 
   it('starts a new sweep when the line changes (next scanline)', () => {

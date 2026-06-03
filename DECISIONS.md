@@ -1617,6 +1617,77 @@ behavior is preserved; only multi-span scanlines (holes) change.
 
 ---
 
+## ADR-035 - Split a fill scanline at large gaps so the emitter rapids across them
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+ADR-034 made each scanline ONE continuous laser-on sweep, crossing every interior
+gap with the laser blanked at feed (G1 ... S0). That is the right move for a true
+interior hole — a few tenths of a mm wide — where lifting to a rapid and stopping
+would cost more than it saves. But the very first hardware burn after ADR-034 (the
+user's traced "arch house" logo) printed cleanly EXCEPT for one stray line where
+"the laser should've been switched off to move to a second part."
+
+Karpathy's-law audit of the actual burned G-code (`Gcode arch house.gcode`,
+reproduced byte-for-byte from `untitled archii.lf2` by the live pipeline) found the
+cause: a single scanline can have ink in two regions of the image that are far
+apart — here up to **20.94 mm** of empty space between regions, with **164** such
+inter-region gaps wider than 5 mm. ADR-034 grouped ALL of one scanline's collinear
+runs into one sweep, so those wide gaps were crossed as slow `G1 ... S0`
+cutting-feed moves. A diode laser has a small turn-off lag; held at S0 but moving
+slowly across 20 mm, the residual/again-on transient marks a faint line — exactly
+the stray "move to a second part" line. LightBurn crosses such inter-region gaps
+with a G0 rapid (laser forced off in GRBL laser mode), not a feed move.
+`findLaserOnTravelIssues` stayed 0 throughout — the G-code was never *invalid*
+(every S0 gap is a legal blanked move); it was a feed-vs-rapid quality choice.
+
+### Decision
+
+Amend ADR-034's grouping: a scanline still groups collinear runs, but
+`buildSweeps()` (was `buildSweep()`) now SPLITS the ordered spans into multiple
+sweeps wherever the gap between consecutive spans exceeds
+`GAP_RAPID_THRESHOLD_MM` (5 mm). Small gaps (true interior holes) stay in one
+continuous sweep exactly as ADR-034 intended; wide inter-region gaps become a
+sweep boundary, and the emitter's existing per-sweep G0 seek crosses them as a
+rapid (hard laser-off, faster than feed). No change was needed in the emitter,
+planner, or preview — they already iterate sweeps and treat the space between
+sweeps as a G0 rapid. 5 mm sits above the rapid-vs-feed time break-even (~3.3 mm
+at the default feed) and cleanly separates an inter-region gap from a hole.
+
+### Consequences
+
+- The stray-line failure mode is structurally removed: no fill gap wider than
+  5 mm is ever crossed at cutting feed. The laser is hard-off (G0, forced off in
+  laser mode) across every inter-region move.
+- Marginally faster: wide gaps now move at rapid rate, not cut feed.
+- SAFETY: still PROJECT.md #3-clean — every G0 carries S0, positive S only on a
+  moving G1. Splitting a sweep only ever turns a blanked feed move into a blanked
+  rapid; it never extends a laser-on span.
+- A 5 mm-to-feed-break-even mismatch means gaps between 3.3 and 5 mm still feed
+  (a deliberate hysteresis so small detail does not stop-start); this is the
+  smoothness/speed trade ADR-034 chose, now bounded so it cannot mark.
+
+### Verification
+
+- `fill-sweeps.test.ts`: large-gap split (15 mm gap -> 2 sweeps), small-gap
+  continuity preserved (2-3 mm gaps stay one sweep), reverse-snake small-gap
+  ordering, plus all ADR-034 cases unchanged.
+- `grbl-strategy.test.ts`: a 15 mm inter-region gap emits `G0 ... S0` across it
+  and asserts NO `G1 ... S0` crosses it; the multi-hole (3 mm gaps) continuous
+  chain from ADR-034 is unchanged.
+- Empirical (Karpathy's law) on the user's real file: re-emitting
+  `untitled archii.lf2` through the live pipeline dropped the longest laser-off
+  FEED move from **20.94 mm -> 4.87 mm** and inter-region G1-S0 gaps > 5 mm from
+  **164 -> 0**; `findLaserOnTravelIssues` 0 before and after. The 16.6 mm gap that
+  produced the stray line is now crossed by G0 rapids.
+- Full suite + tsc --noEmit + lint on touched files green.
+- **Hardware verification needed:** re-burn the "arch house" logo on the Falcon
+  A1 Pro and confirm the stray cross-region line is gone.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

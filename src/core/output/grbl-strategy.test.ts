@@ -258,6 +258,28 @@ describe('grblStrategy fill hatch overscan', () => {
     const sSequence = (burnBody.slice(0, burnBody.indexOf('G0 X25')).match(/S\d+/g) ?? []).join(',');
     expect(sSequence).toBe('S300,S0,S300,S0,S300');
   });
+
+  it('rapids (G0) across a large inter-region gap instead of a slow G1 S0 (ADR-035)', () => {
+    // Two regions 15mm apart on one scanline (> 5mm threshold). The burned-logo
+    // audit (2026-06-03) found such gaps crossed at cutting feed (slow G1 S0
+    // over empty space) — the "move to a second part" that left a stray line.
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill', layerId: 'fill', color: '#000000', power: 30,
+          speed: 1500, passes: 1, overscanMm: 0,
+          segments: [
+            { polyline: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false },
+            { polyline: [{ x: 20, y: 0 }, { x: 25, y: 0 }], closed: false },
+          ],
+        },
+      ],
+    };
+    const out = emit(job);
+    // The 15mm gap is crossed by a G0 rapid (laser hard-off), NOT a G1 ... S0.
+    expect(out).toMatch(/^G0 X20\.000 Y0\.000 S0$/m);
+    expect(out).not.toMatch(/^G1 X20\.000 Y0\.000 S0$/m);
+  });
 });
 
 describe('grblStrategy mixed raster/vector mode transitions', () => {
