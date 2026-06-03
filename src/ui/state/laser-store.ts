@@ -20,7 +20,6 @@ import {
   buildJogCommand,
   cancel as cancelStreamer,
   createStreamer,
-  disconnect as disconnectStreamer,
   idleCollector,
   type JogParams,
   pause as pauseStreamer,
@@ -41,6 +40,12 @@ import {
   setOriginHere as setOriginHereAction,
   type WorkCoordinateOffset,
 } from './origin-actions';
+import { type LaserSafetyNotice, writeFailedNotice } from './laser-safety-notice';
+import {
+  buildPortClosePatch,
+  initialLaserState,
+  serialWriteErrorMessage,
+} from './laser-store-helpers';
 
 export type { AutofocusResult } from './autofocus-action';
 export { describeAutofocusResult } from './autofocus-action';
@@ -68,6 +73,11 @@ export type LaserState = {
   readonly alarmCode: number | null;
   readonly lastError: number | null;
   readonly lastWriteError: string | null;
+  // P0-B: operator-facing safety alert raised when the store cannot guarantee
+  // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
+  // drop mid-job. null = nothing to warn about. Cleared on the next successful
+  // connect or via clearSafetyNotice.
+  readonly safetyNotice: LaserSafetyNotice | null;
   readonly autofocusBusy: boolean;
   readonly streamer: StreamerState | null;
   readonly log: ReadonlyArray<string>;
@@ -109,6 +119,7 @@ export type LaserState = {
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
+  readonly clearSafetyNotice: () => void;
   readonly applyDetectedSettings: () => void;
   readonly dismissDetectedSettings: () => void;
   // F.3 origin actions. setOriginHere sends G92 X0 Y0 (transient,
@@ -167,10 +178,6 @@ function teardown(): void {
   refs.onLineArrived = null;
 }
 
-function serialWriteErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 async function safeWrite(set: SetFn, get: GetFn, line: string): Promise<void> {
   const conn = refs.connection;
   if (conn === null) {
@@ -204,37 +211,6 @@ type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 type GetFn = () => LaserState;
-
-function initialLaserState(): Pick<
-  LaserState,
-  | 'connection'
-  | 'statusReport'
-  | 'alarmCode'
-  | 'lastError'
-  | 'lastWriteError'
-  | 'autofocusBusy'
-  | 'streamer'
-  | 'log'
-  | 'detectedSettings'
-  | 'controllerSettings'
-  | 'wcoCache'
-  | 'workOriginActive'
-> {
-  return {
-    connection: { kind: 'disconnected' },
-    statusReport: null,
-    alarmCode: null,
-    lastError: null,
-    lastWriteError: null,
-    autofocusBusy: false,
-    streamer: null,
-    log: [],
-    detectedSettings: null,
-    controllerSettings: null,
-    wcoCache: null,
-    workOriginActive: false,
-  };
-}
 
 function inferCurrentMachinePosition(state: LaserState): WorkCoordinateOffset | null {
   const report = state.statusReport;
@@ -274,27 +250,12 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         );
         refs.unsubscribeClose = conn.onClose(() => {
           teardown();
-          // If a job was streaming or paused when the port dropped, mark
-          // the streamer 'disconnected' so the UI shows "connection lost
-          // mid-job" instead of leaving a stale 'streaming' state behind.
-          // MIT-T1 audit finding (CNCjs parity). Functional set form so
-          // we don't clobber any concurrent ack-driven update — same
-          // pattern as R-H2's resume/stop fix.
-          set((s) => ({
-            connection: { kind: 'disconnected' },
-            statusReport: null,
-            controllerSettings: null,
-            // GRBL clears G92 on the reset that fires when the port
-            // closes; our cache must match or the next connect will
-            // show "custom origin" against an actually-zeroed machine.
-            wcoCache: null,
-            workOriginActive: false,
-            streamer:
-              s.streamer !== null &&
-              (s.streamer.status === 'streaming' || s.streamer.status === 'paused')
-                ? disconnectStreamer(s.streamer)
-                : s.streamer,
-          }));
+          // If a job was streaming/paused when the port dropped, mark the
+          // streamer 'disconnected' AND raise the disconnect-during-job safety
+          // notice (GRBL may still be running buffered commands). Functional set
+          // so we don't clobber a concurrent ack-driven update. See
+          // buildPortClosePatch (laser-store-helpers) for the patch + rationale.
+          set(buildPortClosePatch);
         });
         let pollTick = 0;
         refs.pollHandle = setInterval(() => {
@@ -304,7 +265,12 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
           if (!isActive && pollTick % IDLE_POLL_DIVISOR !== 0) return;
           void safeWrite(set, get, RT_STATUS).catch(() => undefined);
         }, STATUS_POLL_MS);
-        set({ connection: { kind: 'connected' }, alarmCode: null, lastWriteError: null });
+        set({
+          connection: { kind: 'connected' },
+          alarmCode: null,
+          lastWriteError: null,
+          safetyNotice: null,
+        });
         void runHandshake(set, get, refs, (out) => safeWrite(set, get, out)).catch(() => undefined);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -314,7 +280,16 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
     disconnect: async () => {
       assertAutofocusIdle(get);
       const conn = refs.connection;
-      if (isActiveJob(get().streamer)) await safeWrite(set, get, RT_SOFT_RESET);
+      if (isActiveJob(get().streamer)) {
+        try {
+          await safeWrite(set, get, RT_SOFT_RESET);
+        } catch {
+          // The stop-before-disconnect write failed (USB likely already gone),
+          // so the machine may still run buffered commands. Warn — but STILL
+          // tear down the link the operator asked to drop (don't rethrow).
+          set({ safetyNotice: writeFailedNotice('disconnect') });
+        }
+      }
       teardown();
       if (conn !== null) await conn.close().catch(() => undefined);
       set({
@@ -407,12 +382,22 @@ function jobActions(
       }
     },
     pauseJob: async () => {
-      await safeWrite(set, get, RT_HOLD);
+      try {
+        await safeWrite(set, get, RT_HOLD);
+      } catch (err) {
+        set({ safetyNotice: writeFailedNotice('pause') });
+        throw err;
+      }
       const s = get().streamer;
       if (s !== null) set({ streamer: pauseStreamer(s) });
     },
     resumeJob: async () => {
-      await safeWrite(set, get, RT_RESUME);
+      try {
+        await safeWrite(set, get, RT_RESUME);
+      } catch (err) {
+        set({ safetyNotice: writeFailedNotice('resume') });
+        throw err;
+      }
       // Functional set so the snapshot is taken AT WRITE TIME — during
       // the await above, ack-driven handleLine paths can have advanced
       // the streamer via advanceStream. A `const s = get().streamer`
@@ -432,7 +417,12 @@ function jobActions(
       if (toSend.length > 0) await safeWrite(set, get, toSend);
     },
     stopJob: async () => {
-      await safeWrite(set, get, RT_SOFT_RESET);
+      try {
+        await safeWrite(set, get, RT_SOFT_RESET);
+      } catch (err) {
+        set({ safetyNotice: writeFailedNotice('stop') });
+        throw err;
+      }
       // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
       // cached WCO so the readout doesn't lie about "custom origin"
       // until the next WCO frame arrives. Same race window as
@@ -492,4 +482,5 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...jobActions(set, get),
   ...originActions(set, get),
   ...detectedSettingsActions(set, get),
+  clearSafetyNotice: () => set({ safetyNotice: null }),
 }));
