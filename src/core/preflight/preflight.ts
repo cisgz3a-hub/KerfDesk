@@ -13,6 +13,7 @@
 import { assertNever, type Layer, type Project, type Scene, type SceneObject } from '../scene';
 import {
   findLaserOnTravelIssues,
+  findLongBlankFeedMoves,
   findOutOfBoundsCoords,
   type MotionBoundsOffset,
 } from '../invariants';
@@ -27,6 +28,7 @@ export type PreflightCode =
   | 'layer-mode-mismatch'
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
+  | 'long-blank-feed'
   | 'empty-output';
 
 export type PreflightIssue = {
@@ -44,6 +46,13 @@ export type PreflightOptions = {
 };
 
 const MAX_BOUNDS_ISSUES = 5;
+
+// Blocking threshold for long laser-off FEED moves (G1 with effective S0), in
+// mm. Matches ADR-035's fill gap-rapid split (gaps > 5 mm become G0 rapids), so
+// fresh output never trips this; a hit means a regression or a stale export
+// from before the fix. Do NOT lower in code until the A/B burn threshold
+// experiment is done (roadmap P2-B).
+const LONG_BLANK_FEED_THRESHOLD_MM = 5;
 
 export function runPreflight(
   project: Project,
@@ -71,6 +80,8 @@ export function runPreflight(
   appendBoundsIssues(project, gcode, issues, options.motionOffset);
 
   appendLaserOnTravelIssues(gcode, issues);
+
+  appendLongBlankFeedIssues(gcode, issues);
 
   if (!/\bG1\b/.test(gcode)) {
     issues.push({
@@ -190,6 +201,20 @@ function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): voi
     issues.push({
       code: 'laser-on-travel',
       message: `Line ${issue.lineNumber}: ${issue.reason}`,
+    });
+  }
+}
+
+// Block g-code that crawls across a long gap at cutting feed with the laser off
+// (G1 ... S0). Distinct from laser-on-travel: this is the marking / stale-export
+// invariant (the "moved to the second part and left a stray line" class). Fresh
+// post-ADR-035 output is clean; a hit means a regression or an old export.
+function appendLongBlankFeedIssues(gcode: string, issues: PreflightIssue[]): void {
+  const blankFeed = findLongBlankFeedMoves(gcode, { thresholdMm: LONG_BLANK_FEED_THRESHOLD_MM });
+  for (const issue of blankFeed.slice(0, MAX_BOUNDS_ISSUES)) {
+    issues.push({
+      code: 'long-blank-feed',
+      message: `Line ${issue.lineNumber}: blank G1 feed move ${issue.distanceMm.toFixed(3)} mm exceeds ${LONG_BLANK_FEED_THRESHOLD_MM.toFixed(3)} mm. Regenerate output or lower the fill blank-feed threshold after hardware verification.`,
     });
   }
 }
