@@ -1688,6 +1688,92 @@ at the default feed) and cleanly separates an inter-region gap from a hole.
 
 ---
 
+## ADR-036 - Fill engraving emits M4 dynamic power (was M3 constant); supersedes ADR-020 #4
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+After ADR-034/035 fixed fill *speed* and the stray line, the user reported small
+traced text ("langebaan", a few mm tall) burning with **uneven density** -
+blobby, "not smooth" - while large shapes were clean. The
+`burn-perfection-research` workflow (docs/research/burn-perfection-small-text.md)
+root-caused the density half to **Cause A: M3 constant power**.
+
+With `M3`, GRBL holds the programmed laser power regardless of head speed
+(`laser_mode.md`: *"keeps the laser power as programmed, regardless if the
+machine is moving, accelerating, or stopped"*). A short engrave stroke spends a
+large fraction of its length below the commanded feed: at 1500 mm/min (25 mm/s)
+and the default accel 500 mm/s^2, the ramp-to-speed distance is
+`v^2/(2a) = 0.625 mm` at *each* end - ~30% of a 4 mm glyph stem. Constant power
+over those slow zones deposits more energy/mm -> the dark, irregular density. The
+canonical GRBL remedy is **M4 dynamic power**, which scales S by
+`actual_feed / programmed_feed` so energy/mm stays constant through accel/decel,
+with **no** offset calibration. LightBurn's GRBL default is M4 for fill/scan.
+
+The raster path already emitted M4 (`emit-raster.ts:76-77`); fill did not. The
+M3-for-fill choice was an explicit deferral in **ADR-020 decision #4**, which
+warned the change "also changes cut-depth behavior on short hatches" and parked
+it as "a separate hardware experiment if edge marks remain." Those edge marks
+are exactly this symptom. This ADR supersedes ADR-020 #4.
+
+### Decision
+
+Fill groups emit **M4 dynamic power**; cut groups keep **M3 constant power** (a
+slow corner must still cut fully through). Laser power mode is modal across
+groups, so `emitJob` now tracks the current mode (`'M3' | 'M4' | 'off'`,
+initialised to M3 by the preamble) and emits a flip ONLY when the required mode
+changes:
+
+- **cut** when not already M3 -> `M3 S0`.
+- **fill** when not already M4 -> from M3, `M5` then `M4 S0` (the M5 clears
+  constant mode, mirroring emit-raster's documented reason); from `off` (after a
+  raster group, which already issued its trailing M5), `M4 S0` alone.
+- **raster** manages its own M4 internally and ends in M5; we mark mode `off`.
+
+This generalises the old single rule (`raster -> cut/fill emits M3`) into a
+proper state machine. The fill *body* (sweeps, S-sequence, overscan, the
+PROJECT.md #3 guards) is unchanged - only the mode word that precedes it.
+
+### Consequences
+
+- Small/short engrave strokes hold constant energy/mm; the density unevenness
+  flattens with no per-machine calibration.
+- **Safer on travel/pause:** under M4 the diode is dark whenever the head is
+  stopped (dynamic power -> 0 at 0 feed). M3 keeps firing a stopped head. So fill
+  is now strictly safer for the "laser firing during pause" failure mode, on top
+  of the unchanged PROJECT.md #3 invariant (every G0 carries S0; positive S only
+  on a moving G1).
+- **Cut-only jobs are byte-identical** (the flip never fires); vector cutting
+  behaviour is untouched. Raster is untouched.
+- A fill-only job starts `M3 S0` / `M5` / `M4 S0` - a one-time, laser-off
+  redundancy from keeping the documented M3-priming preamble intact rather than
+  rippling a preamble change through every determinism baseline.
+- This is a g-code-emission (safety-path) change: the M3->M4 contract was
+  reviewed against all callers; only `emitJob`'s mode management changed.
+
+### Verification
+
+- `grbl-strategy.fill-power-mode.test.ts`: fill-only job arms M4 after the M3
+  preamble and burns under it; fill->cut restores M3; consecutive fills emit a
+  single M4 flip; cut-only never emits M4.
+- `grbl-strategy.test.ts`: the raster->fill transition now asserts `M5\nM4 S0`
+  (was M3); raster->cut still asserts `M5\nM3 S0`.
+- `grbl-strategy.property.test.ts`: determinism + laser-off-travel fuzz (incl.
+  fill groups) still green - the M4 S0 line sets sticky S=0, never false-flags.
+- `pipeline.snapshot.test.ts`: byte-identical (the SVG fixtures compile to vector
+  cuts, not fills) - confirms the change is fill-scoped.
+- Empirical (Karpathy's law) on the user's real `untitled archii.lf2`: the fill
+  group's emitted mode went **M3 -> M4** (M4 count 0 -> 1), the burn G1s follow
+  the M4 flip, `findLaserOnTravelIssues` 0 before and after.
+- Full suite + tsc --noEmit + lint on touched files green.
+- **Hardware verification needed:** re-burn the "langebaan" small text on the
+  Falcon A1 Pro and confirm the density is even (no blobby slow-zone over-burn).
+  Note: M4 fixes the *density* half; the *wavy-edge* half is trace faceting
+  (Cause B / Fix 2), a separate change.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
