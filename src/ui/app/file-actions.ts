@@ -6,6 +6,7 @@
 
 import type { Project, SceneObject } from '../../core/scene';
 import { emitGcode } from '../../io/gcode';
+import { buildGcodeMetadata } from './build-info';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
@@ -67,7 +68,10 @@ export type SaveGcodeCtx = {
 };
 
 export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
-  const { gcode, preflight } = emitGcode(ctx.project);
+  // Saved exports carry a provenance header (build / commit / emitter) so a
+  // stale file is obvious later. The streamed Start path intentionally omits it
+  // for now (roadmap P0-A open Q2 — streamer comment handling unverified).
+  const { gcode, preflight } = emitGcode(ctx.project, { metadata: buildGcodeMetadata() });
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
     window.alert(`Cannot save G-code:\n\n${lines}`);

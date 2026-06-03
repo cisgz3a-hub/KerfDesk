@@ -47,6 +47,35 @@ describe('emitGcode', () => {
     expect(gcode).toContain('G1');
   });
 
+  it('prepends a provenance header only when metadata is passed (P0-A)', () => {
+    const base = createProject();
+    const project = {
+      ...base,
+      scene: addLayer(
+        addObject(base.scene, sampleObject),
+        createLayer({ id: 'L1', color: '#ff0000' }),
+      ),
+    };
+    const withMeta = emitGcode(project, {
+      metadata: {
+        appName: 'LaserForge 2.0',
+        appVersion: '9.9.9',
+        gitSha: 'deadbee',
+        buildTimeUtc: '2026-06-03T00:00:00.000Z',
+        emitterRevision: 'test-rev',
+      },
+    });
+    const withoutMeta = emitGcode(project);
+    // Header present and first; the motion body is unchanged after it.
+    expect(withMeta.gcode.startsWith('; LaserForge 2.0')).toBe(true);
+    expect(withMeta.gcode).toContain('; commit: deadbee');
+    expect(withMeta.gcode.endsWith(withoutMeta.gcode)).toBe(true);
+    // No metadata => no header => deterministic body only.
+    expect(withoutMeta.gcode.startsWith('G21')).toBe(true);
+    // The header never changes the preflight verdict (comments are inert).
+    expect(withMeta.preflight.ok).toBe(withoutMeta.preflight.ok);
+  });
+
   it('returns a failing preflight when the project has no output layers', () => {
     const project = createProject();
     const { preflight } = emitGcode(project);
