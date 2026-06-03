@@ -77,6 +77,48 @@ describe('runPreflight laser-off travel invariant', () => {
   });
 });
 
+describe('runPreflight long blank-feed invariant', () => {
+  it('flags a long G1 S0 blank-feed move (stale or regressed output)', () => {
+    const project = projectWith(createLayer({ id: 'L1', color: '#ff0000' }));
+    // A 20 mm laser-off cutting-feed move — the stray-line / stale-export class
+    // ADR-035 eliminated from fresh output.
+    const staleGcode = [
+      'G21',
+      'G90',
+      'M3 S0',
+      'G1 X1.000 Y1.000 F1500 S300',
+      'G1 X21.000 Y1.000 S0',
+      'M5',
+    ].join('\n');
+
+    const result = runPreflight(project, staleGcode);
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: 'long-blank-feed',
+      message:
+        'Line 5: blank G1 feed move 20.000 mm exceeds 5.000 mm. Regenerate output or lower the fill blank-feed threshold after hardware verification.',
+    });
+  });
+
+  it('does not flag fresh output whose blank gaps are at or below 5 mm (ADR-035)', () => {
+    const project = projectWith(createLayer({ id: 'L1', color: '#ff0000' }));
+    const freshGcode = [
+      'G21',
+      'G90',
+      'M3 S0',
+      'G1 X1.000 Y1.000 F1500 S300',
+      'G1 X5.000 Y1.000 S0', // 4 mm blank gap — under the 5 mm threshold
+      'G1 X10.000 Y1.000 S300',
+      'M5',
+    ].join('\n');
+
+    const result = runPreflight(project, freshGcode);
+
+    expect(result.issues.every((i) => i.code !== 'long-blank-feed')).toBe(true);
+  });
+});
+
 describe('runPreflight — F-A10 check 1: no output layer', () => {
   it('flags no-output-layer when zero layers have output=true', () => {
     const layer = { ...createLayer({ id: 'L1', color: '#ff0000' }), output: false };

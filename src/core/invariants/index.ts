@@ -5,3 +5,5 @@ export {
   findLaserOnTravelIssues,
   findOutOfBoundsCoords,
 } from './predicates';
+export type { BlankFeedIssue, BlankFeedOptions } from './blank-feed';
+export { findLongBlankFeedMoves } from './blank-feed';
