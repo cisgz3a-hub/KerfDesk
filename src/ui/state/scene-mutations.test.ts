@@ -13,7 +13,12 @@ import {
   type Scene,
   type TracedImage,
 } from '../../core/scene';
-import { applyTraceToExisting, ensureRasterImageLayer, pruneOrphanLayers } from './scene-mutations';
+import {
+  applyTraceToExisting,
+  ensureRasterImageLayer,
+  pruneOrphanLayers,
+  resolveRasterLayerColor,
+} from './scene-mutations';
 
 function blankScene(): Scene {
   return { objects: [], layers: [] };
@@ -34,6 +39,30 @@ function rasterImage(color: string): RasterImage {
     linesPerMm: 10,
   };
 }
+
+describe('resolveRasterLayerColor (P2-A)', () => {
+  it('reuses a free color', () => {
+    expect(resolveRasterLayerColor(blankScene(), '#808080')).toBe('#808080');
+  });
+
+  it('reuses the color when it is already an image layer', () => {
+    const scene: Scene = {
+      objects: [],
+      layers: [createLayer({ id: '#808080', color: '#808080', mode: 'image' })],
+    };
+    expect(resolveRasterLayerColor(scene, '#808080')).toBe('#808080');
+  });
+
+  it('picks a unique color when the preferred collides with a non-image layer', () => {
+    const scene: Scene = {
+      objects: [],
+      layers: [createLayer({ id: '#808080', color: '#808080', mode: 'line' })],
+    };
+    const color = resolveRasterLayerColor(scene, '#808080');
+    expect(color).not.toBe('#808080');
+    expect(scene.layers.some((l) => l.color === color)).toBe(false);
+  });
+});
 
 describe('ensureRasterImageLayer', () => {
   it('creates an image-mode layer when the color is new', () => {
