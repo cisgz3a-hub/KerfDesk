@@ -65,6 +65,40 @@ const arbJob: fc.Arbitrary<Job> = fc.record({
   groups: fc.array(arbGroup, { minLength: 0, maxLength: 3 }),
 });
 
+// Fill arbitraries (audit 2026-06-03): the continuous-sweep emit path
+// (groupFillSweeps + buildSweep's float projection/sort + the S0-gap emitter)
+// must be exercised by the determinism + laser-off fuzz, which previously only
+// fed cut groups. Spans are placed on a small set of shared Y values so runs
+// collide into multi-span sweeps with interior gaps — the path that matters.
+const arbFillSpan = fc
+  .record({
+    y: fc.constantFrom(10, 20, 30),
+    x0: fc.double({ min: 0, max: BED_WIDTH, noNaN: true, noDefaultInfinity: true }),
+    x1: fc.double({ min: 0, max: BED_WIDTH, noNaN: true, noDefaultInfinity: true }),
+  })
+  .map(({ y, x0, x1 }) => ({
+    polyline: [
+      { x: x0, y },
+      { x: x1, y },
+    ],
+    closed: false,
+  }));
+
+const arbFillGroup = fc.record({
+  kind: fc.constant('fill' as const),
+  layerId: fc.string({ minLength: 1, maxLength: 4 }),
+  color: fc.constantFrom('#ff0000', '#00ff00', '#000000'),
+  power: fc.double({ min: 0, max: 100, noNaN: true, noDefaultInfinity: true }),
+  speed: fc.double({ min: 1, max: DEFAULT_DEVICE_PROFILE.maxFeed, noNaN: true, noDefaultInfinity: true }),
+  passes: fc.integer({ min: 1, max: 3 }),
+  overscanMm: fc.double({ min: 0, max: 5, noNaN: true, noDefaultInfinity: true }),
+  segments: fc.array(arbFillSpan, { minLength: 0, maxLength: 8 }),
+});
+
+const arbMixedJob: fc.Arbitrary<Job> = fc.record({
+  groups: fc.array(fc.oneof(arbGroup, arbFillGroup), { minLength: 0, maxLength: 3 }),
+});
+
 describe('grblStrategy property tests', () => {
   it('is deterministic across 100 fuzz seeds', async () => {
     const { grblStrategy } = await import('./grbl-strategy');
@@ -164,5 +198,28 @@ describe('grblStrategy property tests', () => {
     const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
     expect(findLaserOnTravelIssues(out)).toEqual([]);
     expect(out).not.toMatch(/^M[34] S[1-9]/m);
+  });
+
+  it('is deterministic across 100 fuzz seeds INCLUDING fill groups (continuous-sweep path)', async () => {
+    const { grblStrategy } = await import('./grbl-strategy');
+    fc.assert(
+      fc.property(arbMixedJob, (job) => {
+        const a = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+        const b = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+        return a === b;
+      }),
+      { numRuns: FUZZ_RUNS },
+    );
+  });
+
+  it('emits zero laser-on-travel issues across 100 random jobs WITH fill groups', async () => {
+    const { grblStrategy } = await import('./grbl-strategy');
+    fc.assert(
+      fc.property(arbMixedJob, (job) => {
+        const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+        return findLaserOnTravelIssues(out).length === 0;
+      }),
+      { numRuns: FUZZ_RUNS },
+    );
   });
 });
