@@ -150,7 +150,10 @@ describe('deserializeProject', () => {
     if (r.kind === 'ok') {
       const layer = r.project.scene.layers[0];
       expect(layer?.hatchAngleDeg).toBe(0);
-      expect(layer?.hatchSpacingMm).toBe(0.2);
+      // Backfill follows the current LAYER_DEFAULTS (lowered 0.2 -> 0.1 in the
+      // 2026-06-03 fill quality audit). Pre-F.1 files predate Fill, so adopting
+      // the current default is correct.
+      expect(layer?.hatchSpacingMm).toBe(0.1);
       expect(layer?.fillOverscanMm).toBe(5);
     }
   });

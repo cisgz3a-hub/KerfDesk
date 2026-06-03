@@ -23,9 +23,10 @@ export type Layer = {
   readonly visible: boolean;
   readonly output: boolean;
   // F.1 fill parameters. Ignored unless mode === 'fill'. Defaults
-  // chosen for a typical 5W diode laser: 0° = horizontal hatching,
-  // 0.2 mm spacing ≈ 5 lines/mm (good for engraved fills without
-  // visible banding at standard kerfs).
+  // chosen for a typical diode laser: 0° = horizontal hatching,
+  // 0.1 mm spacing ≈ 10 lines/mm (LightBurn's diode norm). The prior
+  // 0.2 mm ≈ 5 lines/mm showed visible banding on hardware — see the
+  // fill quality audit 2026-06-03.
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
@@ -45,7 +46,7 @@ export const LAYER_DEFAULTS = {
   visible: true,
   output: true,
   hatchAngleDeg: 0,
-  hatchSpacingMm: 0.2,
+  hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
   ditherAlgorithm: 'floyd-steinberg',
   linesPerMm: 10,
