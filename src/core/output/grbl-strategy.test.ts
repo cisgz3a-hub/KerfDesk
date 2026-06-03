@@ -211,6 +211,53 @@ describe('grblStrategy fill hatch overscan', () => {
       ['G0 X10.000 Y5.000 S0', 'G1 X13.000 Y5.000 F1500 S300', 'M5'].join('\n'),
     );
   });
+
+  it('emits one continuous sweep for a multi-hole scanline, blanking gaps with S0', () => {
+    // One scanline (y=0) with three ink spans / two interior holes. ADR-034:
+    // the whole row must ride a single laser-on G1 chain, crossing the holes at
+    // S0 (no lift, no stop) — not three separate G0-seek + burn runs.
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          overscanMm: 5,
+          segments: [
+            { polyline: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false },
+            { polyline: [{ x: 8, y: 0 }, { x: 12, y: 0 }], closed: false },
+            { polyline: [{ x: 15, y: 0 }, { x: 20, y: 0 }], closed: false },
+          ],
+        },
+      ],
+    };
+
+    const out = emit(job);
+
+    // Exhaustive per-segment S sequence for the whole sweep: rapid into the
+    // runway (S0 x2), then ONE G1 chain — ink S300, gap S0, ink S300, gap S0,
+    // ink S300 — then the rapid lead-out (S0). No G0 between the ink spans.
+    expect(out).toContain(
+      [
+        'G0 X-5.000 Y0.000 S0',
+        'G0 X0.000 Y0.000 S0',
+        'G1 X5.000 Y0.000 F1500 S300',
+        'G1 X8.000 Y0.000 S0',
+        'G1 X12.000 Y0.000 S300',
+        'G1 X15.000 Y0.000 S0',
+        'G1 X20.000 Y0.000 S300',
+        'G0 X25.000 Y0.000 S0',
+      ].join('\n'),
+    );
+    // Safety: every interior gap re-blanks to S0 and every ink span re-asserts
+    // S300 (S is modal — a missed reset would fire the beam across a hole).
+    const burnBody = out.slice(out.indexOf('F1500 S300'));
+    const sSequence = (burnBody.slice(0, burnBody.indexOf('G0 X25')).match(/S\d+/g) ?? []).join(',');
+    expect(sSequence).toBe('S300,S0,S300,S0,S300');
+  });
 });
 
 describe('grblStrategy mixed raster/vector mode transitions', () => {

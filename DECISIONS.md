@@ -1538,6 +1538,74 @@ stays on M3.
 
 ---
 
+## ADR-034 - Continuous-sweep fill: one G1 per scanline, S0-blanked gaps
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+ADR-033 made the per-run overscan cheap, but the dominant structural cost of the
+~2h-vs-LightBurn-~5min traced-image Fill remained: every interior hatch run was
+emitted as its own G0-seek + burn, and the planner forced a full
+decel-to-zero / accel-from-zero at every cut<->travel boundary. A traced image
+fragments each 0.2 mm scanline into many short runs, so the head stopped
+thousands of times. LightBurn (and our own raster path, emit-raster.ts) instead
+burn a row as one continuous sweep, crossing interior gaps with the laser blanked.
+
+### Decision
+
+Emit each scanline as ONE continuous laser-on sweep.
+
+1. **New pure module `fill-sweeps.ts`.** `groupFillSweeps()` regroups
+   fillHatching's flat per-run output into one FillSweep per scanline: runs on
+   the same infinite line (collinear within 1e-6 mm) are one sweep; a change of
+   line (the next, parallel scanline) starts a new one. The sweep direction is
+   taken from the group's first run, preserving fillHatching's snake.
+   fillHatching, compile-job, the caches, and the FillGroup type are unchanged —
+   the regrouping happens at consumption.
+2. **Emitter (grbl-strategy.ts).** Per sweep: G0 into the optional overscan
+   runway (laser off; 1a rapid + 1b short-run skip preserved), then a single G1
+   chain — each ink span at S{s}, each interior gap at S0 (diode dark, head
+   still at feed so it never stops over a hole), then the G0 lead-out. S is
+   modal, so every ink span re-asserts S{s} and every gap asserts S0.
+3. **Planner (planner.ts).** A sweep is one cut block from the first span's
+   start to the last span's end at cut velocity — no per-run full stop. Gaps run
+   at feed too, so one block is accurate for total time.
+4. **Preview (toolpath.ts).** Each ink span is a cut step; each interior gap is
+   a laser-off travel step, matching the emitted path.
+
+Single-run scanlines (convex fills) emit byte-identically to before, so 1a/1b
+behavior is preserved; only multi-span scanlines (holes) change.
+
+### Consequences
+
+- A traced-image fill collapses from thousands of short stop-start runs to a few
+  hundred continuous sweeps — the structural fix for the 24x gap.
+- SAFETY: a missed S-reset would fire the beam across an interior hole at full
+  power. The per-segment S sequence is asserted exhaustively, including a
+  multi-hole (>=3 spans) fixture. Every G0 still carries S0; positive S only
+  rides a moving G1 (PROJECT.md #3, unchanged).
+- The ETA breakdown counts gap time as cut time (gaps move at feed, laser off);
+  total time is accurate, the cut/travel split is slightly biased toward cut.
+- Grouping is collinearity-based, so it is correct for angled hatches and never
+  merges two parallel scanlines (they are >= MIN_HATCH_SPACING_MM apart).
+
+### Verification
+
+- `fill-sweeps.test.ts`: forward, reverse-snake, multi-hole, scanline-boundary,
+  angled-collinear, parallel-offset (no merge), and degenerate inputs.
+- `grbl-strategy.test.ts`: a multi-hole scanline emits one continuous G1 chain
+  with the exact S sequence S{s},S0,...,S{s}; single-run output unchanged.
+- Empirical (Karpathy's law): the real emitted G-code for a 3-span / 2-hole
+  scanline was inspected — one G1 chain, holes blanked at feed, no G0 between ink
+  spans.
+- Full suite + tsc --noEmit + lint on touched files green.
+- **Hardware verification needed:** re-burn the original traced logo on the
+  Falcon A1 Pro and confirm (a) the wall-clock drops toward the LightBurn
+  reference and (b) holes are clean (no beam bleed across gaps, no scorch).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
