@@ -33,6 +33,14 @@
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
 
+// A white gap WIDER than this between two ink islands on one raster row is
+// crossed with a G0 rapid (laser hard-off) instead of a slow G1 S0 feed move:
+// the raster analogue of ADR-035's fill gap-rapid split (ADR-039). 5 mm matches
+// the fill threshold and the long-blank-feed preflight (P0-A) so fresh raster
+// output passes that invariant. Smaller interior gaps stay within one sweep,
+// blanked at feed as before.
+const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
+
 function fmt(n: number): string {
   return n.toFixed(DECIMAL_PLACES);
 }
@@ -96,24 +104,27 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   // travel from the end of one active row to the start of the next.
   for (let pass = 0; pass < passes; pass += 1) {
     if (passes > 1) chunks.push(`; raster pass ${pass + 1} of ${passes}`);
-    let emittedSweepCount = 0;
+    let emittedRowCount = 0;
+    let feedEmitted = false;
     for (let y = 0; y < input.height; y += 1) {
-      const span = activeSpan(input, y);
-      if (span === null) continue;
+      const spans = activeSpans(input, y, pixelWidthMm);
+      if (spans.length === 0) continue;
       const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
-      chunks.push(
-        emitRow(
-          input,
-          y,
-          worldY,
-          pixelWidthMm,
-          feed,
-          emittedSweepCount === 0,
-          emittedSweepCount % 2 === 1,
-          span,
-        ),
-      );
-      emittedSweepCount += 1;
+      // Snake direction alternates per emitted ROW; within a reverse row the
+      // ink islands sweep right-to-left too.
+      const reverse = emittedRowCount % 2 === 1;
+      const ordered = reverse ? [...spans].reverse() : spans;
+      for (const span of ordered) {
+        // Each island is its own sweep, so the G0 lead-in to the NEXT island
+        // crosses the wide white gap between them as a rapid (laser off) rather
+        // than a slow G1 S0 feed move — the raster analogue of ADR-035 (ADR-039).
+        // F rides only the very first G1 of the whole group.
+        chunks.push(
+          emitSpanSweep(input, y, worldY, pixelWidthMm, feed, !feedEmitted, reverse, span),
+        );
+        feedEmitted = true;
+      }
+      emittedRowCount += 1;
     }
   }
   // Trailing M5 so any subsequent cut group starts from a known
@@ -122,39 +133,43 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   return chunks.join(LINE_END) + LINE_END;
 }
 
-// Returns the [firstX, lastX] inclusive column range with any S>0
-// pixel, or null if the entire row is S=0. Scanning twice (forward
-// then backward) is O(width) — same as one linear scan plus negligible
-// constant, and reads cleaner than threading both extents through one
-// pass.
 type ActiveSpan = { readonly firstX: number; readonly lastX: number };
-function activeSpan(input: EmitRasterInput, y: number): ActiveSpan | null {
+
+// The ink islands of one row, each an inclusive [firstX, lastX] column range.
+// Consecutive ink separated by a white gap WIDER than
+// RASTER_GAP_RAPID_THRESHOLD_MM is split into separate spans, so the emitter
+// crosses that gap with a G0 rapid (ADR-039); smaller interior gaps stay within
+// one span (blanked at feed, as before). Returns [] for an all-white row.
+function activeSpans(input: EmitRasterInput, y: number, pixelWidthMm: number): ActiveSpan[] {
   const rowStart = y * input.width;
+  const spans: ActiveSpan[] = [];
   let firstX = -1;
+  let lastInk = -1;
   for (let i = 0; i < input.width; i += 1) {
-    if ((input.sValues[rowStart + i] ?? 0) !== 0) {
+    if ((input.sValues[rowStart + i] ?? 0) === 0) continue;
+    if (firstX === -1) {
       firstX = i;
-      break;
+      lastInk = i;
+      continue;
     }
-  }
-  if (firstX === -1) return null;
-  let lastX = input.width - 1;
-  for (let i = input.width - 1; i >= firstX; i -= 1) {
-    if ((input.sValues[rowStart + i] ?? 0) !== 0) {
-      lastX = i;
-      break;
+    const gapMm = (i - lastInk - 1) * pixelWidthMm;
+    if (gapMm > RASTER_GAP_RAPID_THRESHOLD_MM) {
+      spans.push({ firstX, lastX: lastInk });
+      firstX = i;
     }
+    lastInk = i;
   }
-  return { firstX, lastX };
+  if (firstX !== -1) spans.push({ firstX, lastX: lastInk });
+  return spans;
 }
 
-function emitRow(
+function emitSpanSweep(
   input: EmitRasterInput,
   y: number,
   worldY: number,
   pixelWidthMm: number,
   feed: number,
-  isFirstSweep: boolean,
+  emitFeed: boolean,
   reverse: boolean,
   span: ActiveSpan,
 ): string {
@@ -170,7 +185,7 @@ function emitRow(
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
   lines.push(`G0 X${fmt(startX)} Y${fmt(worldY)} S0`);
   let prevS = -1;
-  let shouldEmitFeed = isFirstSweep;
+  let shouldEmitFeed = emitFeed;
   const pushRun = (x: number, s: number): void => {
     lines.push(formatRunG1(x, s, prevS, feed, shouldEmitFeed));
     shouldEmitFeed = false;
