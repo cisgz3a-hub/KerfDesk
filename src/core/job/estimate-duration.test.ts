@@ -152,6 +152,42 @@ describe('estimateJobDuration', () => {
     expect(overscan.totalSeconds).toBeGreaterThan(zero.totalSeconds);
   });
 
+  it('prices a multi-span sweep as one continuous cut block over the envelope (ADR-034)', () => {
+    // Three ink spans on one scanline (two holes). The continuous sweep moves at
+    // feed across the whole row (ink + S0-blanked gaps), so its cut time equals a
+    // single span over the full envelope, not three separate stop-start runs.
+    const multiSpan: FillGroup = {
+      kind: 'fill',
+      layerId: 'fill',
+      color: '#000',
+      power: 50,
+      speed: 1000,
+      passes: 1,
+      overscanMm: 0,
+      segments: [seg([0, 0], [5, 0]), seg([8, 0], [12, 0]), seg([15, 0], [20, 0])],
+    };
+    const oneSpan: FillGroup = { ...multiSpan, segments: [seg([0, 0], [20, 0])] };
+    const multi = estimateJobDuration({ groups: [multiSpan] }, device);
+    const single = estimateJobDuration({ groups: [oneSpan] }, device);
+    expect(multi.breakdown.cutSeconds).toBeCloseTo(single.breakdown.cutSeconds, 6);
+    expect(multi.totalSeconds).toBeCloseTo(single.totalSeconds, 6);
+  });
+
+  it('repeats a fill sweep per pass in the estimate', () => {
+    const base = {
+      kind: 'fill' as const,
+      layerId: 'fill',
+      color: '#000',
+      power: 50,
+      speed: 1000,
+      overscanMm: 0,
+      segments: [seg([0, 0], [5, 0]), seg([8, 0], [12, 0])],
+    };
+    const onePass = estimateJobDuration({ groups: [{ ...base, passes: 1 }] }, device);
+    const twoPass = estimateJobDuration({ groups: [{ ...base, passes: 2 }] }, device);
+    expect(twoPass.breakdown.cutSeconds).toBeCloseTo(onePass.breakdown.cutSeconds * 2, 4);
+  });
+
   it('estimates raster-only jobs instead of reporting zero duration', () => {
     const r = estimateJobDuration({ groups: [rasterGroup({})] }, device);
 

@@ -1595,7 +1595,18 @@ behavior is preserved; only multi-span scanlines (holes) change.
 - `fill-sweeps.test.ts`: forward, reverse-snake, multi-hole, scanline-boundary,
   angled-collinear, parallel-offset (no merge), and degenerate inputs.
 - `grbl-strategy.test.ts`: a multi-hole scanline emits one continuous G1 chain
-  with the exact S sequence S{s},S0,...,S{s}; single-run output unchanged.
+  with the exact S sequence S{s},S0,...,S{s}; single-run output unchanged relative
+  to the post-ADR-033 emitter (the ADR-033 runway G1->G0 swap shipped in the same
+  commit). Zero-length / coincident-span guard covered (touching spans; degenerate
+  interior span) — added after the 2026-06-03 change audit.
+- `grbl-strategy.property.test.ts`: the 100-seed determinism and
+  laser-off-on-travel fuzz now include fill groups (PROJECT.md Phase-A gate that
+  previously only fed cut groups).
+- `estimate-duration.test.ts`: a multi-span sweep is priced as one continuous cut
+  block over the envelope (the planner appendFillGroupBlocks path), plus per-pass
+  repetition.
+- `toolpath.test.ts`: a multi-hole sweep renders cut / gap-travel / cut steps so
+  the preview scrubber matches the emitted path.
 - Empirical (Karpathy's law): the real emitted G-code for a 3-span / 2-hole
   scanline was inspected — one G1 chain, holes blanked at feed, no G0 between ink
   spans.
