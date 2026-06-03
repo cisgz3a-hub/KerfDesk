@@ -6,11 +6,12 @@
 import { type Layer, type Project, type SceneObject, type Vec2 } from '../../core/scene';
 import {
   buildToolpath,
-  compileJob,
+  EMPTY_JOB,
   sliceToolpath,
   type Toolpath,
   type ToolpathStep,
 } from '../../core/job';
+import { prepareOutput } from '../../io/gcode';
 import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
@@ -62,7 +63,12 @@ export function drawPreview(
 }
 
 export function buildPreviewToolpath(project: Project): Toolpath {
-  return buildToolpath(compileJob(project.scene, project.device));
+  // Use the SAME prepared job (compile + optimize) as Save/Start so the preview
+  // shows the exact path ORDER the machine runs (roadmap P1-C). An over-budget
+  // raster prepares to nothing -> empty preview (matching the too-large
+  // estimate), never a freeze.
+  const prepared = prepareOutput(project);
+  return buildToolpath(prepared.ok ? prepared.job : EMPTY_JOB);
 }
 
 function drawStep(ctx: CanvasRenderingContext2D, step: ToolpathStep, view: ViewTransform): void {

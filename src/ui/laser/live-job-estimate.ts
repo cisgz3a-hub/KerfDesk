@@ -1,10 +1,4 @@
-import {
-  compileJob,
-  estimateJobDuration,
-  formatDuration,
-  optimizePaths,
-  type Job,
-} from '../../core/job';
+import { estimateJobDuration, formatDuration, type Job } from '../../core/job';
 import {
   applyTransform,
   type ColoredPath,
@@ -15,7 +9,7 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
-import { runPreEmitPreflight } from '../../core/preflight';
+import { prepareOutput } from '../../io/gcode';
 
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = 10_000;
 export const LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET = 20_000;
@@ -27,11 +21,7 @@ export type LiveJobEstimate =
   | { readonly kind: 'too-large' };
 
 export function estimateLiveJob(project: Project): LiveJobEstimate {
-  // A raster whose target grid blows the budget must short-circuit BEFORE the
-  // compileJob below — the live estimate runs on every render, so otherwise it
-  // allocates the giant resampled-luma + dither buffers and freezes the tab
-  // (roadmap P1-A).
-  if (!runPreEmitPreflight(project).ok) return { kind: 'too-large' };
+  // Cheap vector pre-counts gate the compile so a huge trace never reaches it.
   if (countOutputVectorSegments(project.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
@@ -39,13 +29,17 @@ export function estimateLiveJob(project: Project): LiveJobEstimate {
     return { kind: 'too-large' };
   }
 
-  const job = compileJob(project.scene, project.device);
-  if (job.groups.length === 0) return { kind: 'empty' };
-  if (countCompiledCutSegments(job) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
+  // Same prepared job (budget guard + compile + optimize) as Save / Start /
+  // Preview, so the ETA times the exact path the machine runs (roadmap P1-C). A
+  // raster over the pixel budget prepares to nothing -> too-large (roadmap P1-A).
+  const prepared = prepareOutput(project);
+  if (!prepared.ok) return { kind: 'too-large' };
+  if (prepared.job.groups.length === 0) return { kind: 'empty' };
+  if (countCompiledCutSegments(prepared.job) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
 
-  const result = estimateJobDuration(optimizePaths(job), project.device);
+  const result = estimateJobDuration(prepared.job, project.device);
   return result.totalSeconds > 0
     ? { kind: 'estimated', label: formatDuration(result.totalSeconds) }
     : { kind: 'empty' };

@@ -1959,6 +1959,65 @@ only the very first G1 of the group.
 
 ---
 
+## ADR-040 - Shared prepared-output pipeline (preview = save = start = estimate)
+
+**Status:** Accepted, code shipped. | **Date:** 2026-06-03
+
+### Context
+
+The canvas Preview built its toolpath from RAW `compileJob` - no `optimizePaths`,
+no job-origin - while Save/Start emitted from the OPTIMIZED job (`emitGcode` ran
+compile -> applyJobOrigin -> optimizePaths). The live Estimate had yet a third
+copy of the compile+optimize sequence. So the operator could approve one path
+order in the preview and burn a different (re-ordered) one, and the three
+copies could drift independently (P1-C; the audit's "approve one, burn another"
+risk). The pre-emit raster budget guard (P1-A) was also wired into emit and
+estimate separately.
+
+### Decision
+
+Introduce `prepareOutput(project, options): PreparedOutput` (src/io/gcode) as the
+ONE place that turns a Project into the machine Job:
+`runPreEmitPreflight -> compileJob -> optional applyJobOrigin -> optimizePaths`.
+It returns `{ ok: true, job }` or `{ ok: false, preflight }` (over-budget raster).
+Every output-facing consumer now derives from it:
+
+- `emitGcode` emits `prepared.job`, then runs the full gcode preflight on the
+  body (unchanged external behaviour).
+- `buildPreviewToolpath` builds from `prepared.job`, so the preview shows the
+  exact optimized order the machine runs (an over-budget raster -> empty preview
+  via EMPTY_JOB, never a freeze).
+- `estimateLiveJob` times `prepared.job` (its cheap vector pre-counts still gate
+  the compile first; the standalone preEmit call from P1-A.2 folded into
+  prepareOutput).
+
+Frame is intentionally NOT routed through prepareOutput: it computes a bounding
+box for the framing pass (not a toolpath order) and keeps its own physical-bounds
+/ WCO checks.
+
+### Consequences
+
+- Preview, Save, Start, and Estimate cannot diverge in path order or budget
+  verdict - they are the same function. The optimize step moved INTO the shared
+  path, so the preview's travel lines now match the burn (cut geometry was always
+  identical; only ordering changed).
+- emitGcode is behaviour-identical (the inline compile/place/optimize moved into
+  prepareOutput verbatim). The pre-emit budget guard is now applied once, in
+  prepareOutput, for all consumers.
+
+### Verification
+
+- `prepare-output.test.ts`: ok + non-empty job for a vector project; ok:false +
+  raster-too-large for an over-budget raster; deterministic (same project ->
+  deep-equal job).
+- `draw-preview.parity.test.ts`: `buildPreviewToolpath(project)` deep-equals
+  `buildToolpath(prepareOutput(project).job)` on a project the optimizer reorders
+  - a regression lock that fails the moment the preview reverts to raw compileJob.
+- emit-gcode + live-job-estimate tests unchanged and green (behaviour preserved).
+- Full suite + tsc --noEmit + lint green.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
