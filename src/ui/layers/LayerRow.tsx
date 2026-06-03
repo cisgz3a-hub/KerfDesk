@@ -18,6 +18,7 @@
 // a single discrete change.
 
 import type { Layer, LayerMode } from '../../core/scene';
+import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -314,13 +315,16 @@ function LinesPerMmInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: layer.linesPerMm,
     commit: (linesPerMm) => setLayerParam(layer.id, { linesPerMm }),
-    parse: (s) => clamp(numericValue(s), 1, 50),
+    // 5..25 lines/mm (WORKFLOW.md). The 25 cap matches raster-budget's
+    // MAX_RASTER_LINES_PER_MM so the slider can't author an obviously
+    // over-budget raster; the pre-emit pixel budget still catches large bounds.
+    parse: (s) => clamp(numericValue(s), 5, MAX_RASTER_LINES_PER_MM),
   });
   return (
     <input
       type="number"
-      min={1}
-      max={50}
+      min={5}
+      max={MAX_RASTER_LINES_PER_MM}
       step={1}
       value={debounced.displayValue}
       onChange={debounced.onChange}
