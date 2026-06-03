@@ -7,9 +7,11 @@ const hatchCache = new WeakMap<ReadonlyArray<Polyline>, Map<string, ReadonlyArra
 
 export function memoizedFillHatching(
   polylines: ReadonlyArray<Polyline>,
-  layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm'>,
+  layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional'>,
 ): ReadonlyArray<Polyline> {
-  const cacheKey = `${layer.hatchAngleDeg}:${layer.hatchSpacingMm}`;
+  // fillBidirectional is part of the key: toggling snake/unidirectional changes
+  // the hatch geometry, so a stale cache entry would silently keep the old path.
+  const cacheKey = `${layer.hatchAngleDeg}:${layer.hatchSpacingMm}:${layer.fillBidirectional}`;
   let bySettings = hatchCache.get(polylines);
   if (bySettings === undefined) {
     bySettings = new Map<string, ReadonlyArray<Polyline>>();
@@ -23,6 +25,7 @@ export function memoizedFillHatching(
     polylines,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
+    bidirectional: layer.fillBidirectional,
   });
   if (bySettings.size >= MAX_SETTINGS_PER_POLYLINE_SET) {
     const oldestKey = bySettings.keys().next().value;

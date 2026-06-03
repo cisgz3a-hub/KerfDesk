@@ -17,7 +17,8 @@
 //      holes (e.g. letter "O") because the inner contour contributes a
 //      second pair of intersections that skips its enclosed area.
 //   4. Alternate direction each scanline (snake fill) so the laser doesn't
-//      do a long return-to-start travel between rows.
+//      do a long return-to-start travel between rows — unless `bidirectional`
+//      is false, when every row goes the same way (unidirectional, ADR-038).
 //   5. Rotate every hatch line by +hatchAngle to bring it back into the
 //      original frame.
 //
@@ -47,6 +48,11 @@ export type HatchInput = {
   readonly polylines: ReadonlyArray<Polyline>;
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
+  // Snake fill (alternate each row's direction) when true/undefined; emit every
+  // row in the SAME direction when false (unidirectional). Unidirectional trades
+  // a return-rapid per row for removing the bidirectional firing-lag zipper that
+  // can serrate small text (ADR-038). Defaults to true.
+  readonly bidirectional?: boolean;
 };
 
 export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
@@ -75,6 +81,7 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   // `y < yHi` test retires them. Each edge is touched only on the scanlines
   // it actually spans, so the cost tracks the geometry, not bed height.
   const edges = buildSortedEdges(rotated);
+  const bidirectional = input.bidirectional ?? true;
   const hatchesRotated: Polyline[] = [];
   // Snap the first scanline to a multiple of `spacing` so two adjacent
   // shapes hatched separately use the same Y grid — avoids visible
@@ -102,7 +109,7 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
     // only increases, a retired edge never returns.
     active = active.filter((e) => y < e.yHi);
     const intersections = active.map((e) => intersectX(e, y));
-    pushScanlineHatches(intersections, y, scanIndex, hatchesRotated);
+    pushScanlineHatches(intersections, y, scanIndex, bidirectional, hatchesRotated);
   }
 
   return hatchesRotated.map((pl) => rotatePolyline(pl, angle));
@@ -224,13 +231,20 @@ function intersectX(e: ScanEdge, y: number): number {
 }
 
 // Pair sorted X intersections into interior runs (even-odd rule) and emit one
-// hatch line per run. Direction alternates with scanIndex (snake fill) so the
-// laser doesn't return-to-start between rows. scanIndex (not a boolean) keeps
-// the snake decision here and avoids a boolean parameter at the call site.
-function pushScanlineHatches(xs: number[], y: number, scanIndex: number, out: Polyline[]): void {
+// hatch line per run. When bidirectional, direction alternates with scanIndex
+// (snake fill) so the laser doesn't return-to-start between rows; when not,
+// every row goes forward (unidirectional — the emitter rapids back between
+// rows, but no alternating firing-lag zipper, ADR-038).
+function pushScanlineHatches(
+  xs: number[],
+  y: number,
+  scanIndex: number,
+  bidirectional: boolean,
+  out: Polyline[],
+): void {
   if (xs.length < 2) return;
   xs.sort((a, b) => a - b);
-  const forward = scanIndex % 2 === 0;
+  const forward = bidirectional ? scanIndex % 2 === 0 : true;
   for (let i = 0; i + 1 < xs.length; i += 2) {
     const xa = xs[i];
     const xb = xs[i + 1];

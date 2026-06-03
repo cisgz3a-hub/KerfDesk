@@ -155,6 +155,9 @@ describe('deserializeProject', () => {
       // the current default is correct.
       expect(layer?.hatchSpacingMm).toBe(0.1);
       expect(layer?.fillOverscanMm).toBe(5);
+      // ADR-038: pre-unidirectional files back-fill to snake (true), matching
+      // the fill they were authored against.
+      expect(layer?.fillBidirectional).toBe(true);
     }
   });
 
