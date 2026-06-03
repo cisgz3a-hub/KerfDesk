@@ -36,6 +36,7 @@
 import type { DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import { groupFillSweeps } from './fill-sweeps';
 import type { CutGroup, FillGroup, Job } from './job';
 
 const SECONDS_PER_MINUTE = 60;
@@ -113,16 +114,20 @@ function appendFillGroupBlocks(
   travelV: number,
 ): Vec2 {
   let cursor = initialCursor;
+  const sweeps = groupFillSweeps(group.segments);
   for (let pass = 0; pass < group.passes; pass += 1) {
-    for (const seg of group.segments) {
-      // Overscan lead-in/lead-out are laser-off runway emitted as G0 rapids
-      // (grbl-strategy.emitFillGroup), so price them at travel velocity, not
-      // cut velocity — otherwise the ETA over-counts the runway as slow cutting
-      // moves. The burn itself stays at cutV. Short runs skip the runway
-      // (effectiveOverscanMm → 0): the lead points collapse onto the burn ends,
-      // so the two runway appendTravel calls become zero-length and drop out.
-      const overscan = effectiveOverscanMm(seg.polyline, group.overscanMm);
-      const run = expandFillHatchWithOverscan(seg.polyline, overscan);
+    for (const sweep of sweeps) {
+      const first = sweep.spans[0];
+      const last = sweep.spans[sweep.spans.length - 1];
+      if (first === undefined || last === undefined) continue;
+      // A scanline is one continuous G1 sweep at feed (ink + S0-blanked gaps),
+      // so the burn is a SINGLE cut block from the first span's start to the
+      // last span's end — no per-run full stop (ADR-034). The gaps move at feed
+      // too, so pricing the whole span as one cut block is accurate for total
+      // time. The overscan runway is laser-off rapid travel; short sweeps skip
+      // it (effectiveOverscanMm → 0, zero-length travels drop out).
+      const overscan = effectiveOverscanMm([first.start, last.end], group.overscanMm);
+      const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
       if (run === null) continue;
       appendTravel(out, cursor, run.leadStart, travelV);
       appendTravel(out, run.leadStart, run.burnStart, travelV);

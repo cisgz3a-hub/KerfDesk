@@ -9,6 +9,7 @@
 import type { Vec2 } from '../scene';
 import type { Job } from './job';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import { groupFillSweeps, type FillSweep } from './fill-sweeps';
 
 export type ToolpathStep =
   | { readonly kind: 'travel'; readonly from: Vec2; readonly to: Vec2; readonly length: number }
@@ -34,23 +35,9 @@ export function buildToolpath(job: Job): Toolpath {
     // enhancement: synthesize one "raster" step per row.
     if (group.kind === 'raster') continue;
     if (group.kind === 'fill') {
-      for (const seg of group.segments) {
-        // Match the emitter: short runs skip overscan (effectiveOverscanMm → 0),
-        // so the runway steps collapse to zero length and appendTravelStep drops
-        // them. Keeps the preview scrubber honest with the streamed g-code.
-        const overscan = effectiveOverscanMm(seg.polyline, group.overscanMm);
-        const run = expandFillHatchWithOverscan(seg.polyline, overscan);
-        if (run === null) continue;
-        appendTravelStep(steps, prevEnd, run.leadStart);
-        appendTravelStep(steps, run.leadStart, run.burnStart);
-        steps.push({
-          kind: 'cut',
-          color: group.color,
-          polyline: [run.burnStart, run.burnEnd],
-          length: dist(run.burnStart, run.burnEnd),
-        });
-        appendTravelStep(steps, run.burnEnd, run.leadEnd);
-        prevEnd = run.leadEnd;
+      for (const sweep of groupFillSweeps(group.segments)) {
+        const end = appendFillSweepSteps(steps, prevEnd, sweep, group.color, group.overscanMm);
+        if (end !== null) prevEnd = end;
       }
       continue;
     }
@@ -70,6 +57,36 @@ export function buildToolpath(job: Job): Toolpath {
   }
   const totalLength = steps.reduce((sum, s) => sum + s.length, 0);
   return { steps, totalLength };
+}
+
+// One fill scanline as preview steps matching the emitted continuous sweep
+// (ADR-034): travel into the optional overscan runway, then each ink span is a
+// cut and each interior gap is a laser-off travel. Returns the new head
+// position, or null if the sweep was degenerate.
+function appendFillSweepSteps(
+  steps: ToolpathStep[],
+  prevEnd: Vec2 | null,
+  sweep: FillSweep,
+  color: string,
+  overscanMm: number,
+): Vec2 | null {
+  const first = sweep.spans[0];
+  const last = sweep.spans[sweep.spans.length - 1];
+  if (first === undefined || last === undefined) return null;
+  const overscan = effectiveOverscanMm([first.start, last.end], overscanMm);
+  const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+  if (run === null) return null;
+  appendTravelStep(steps, prevEnd, run.leadStart);
+  appendTravelStep(steps, run.leadStart, run.burnStart);
+  for (let i = 0; i < sweep.spans.length; i += 1) {
+    const span = sweep.spans[i];
+    if (span === undefined) continue;
+    steps.push({ kind: 'cut', color, polyline: [span.start, span.end], length: dist(span.start, span.end) });
+    const next = sweep.spans[i + 1];
+    if (next !== undefined) appendTravelStep(steps, span.end, next.start);
+  }
+  appendTravelStep(steps, run.burnEnd, run.leadEnd);
+  return run.leadEnd;
 }
 
 function appendTravelStep(steps: ToolpathStep[], from: Vec2 | null, to: Vec2): void {

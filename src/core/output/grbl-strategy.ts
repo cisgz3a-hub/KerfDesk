@@ -11,6 +11,7 @@
 
 import type { DeviceProfile } from '../devices';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
+import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
@@ -87,34 +88,66 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
   chunks.push(
     `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} overscan ${fmt(group.overscanMm)} mm`,
   );
+  // Each scanline's runs become ONE continuous laser-on sweep: a single G1
+  // pass across the row that blanks the interior gaps (holes) with S0 instead
+  // of lifting to a rapid and stopping at every run. This is the structural
+  // fill-speed fix (ADR-034) — it matches how emit-raster.ts sweeps a row and
+  // how LightBurn fills, collapsing thousands of short stop-start runs into a
+  // few hundred continuous sweeps. Single-run scanlines emit exactly as before
+  // (1a rapid runway + 1b short-run skip preserved).
+  const sweeps = groupFillSweeps(group.segments);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
-    for (const seg of group.segments) {
-      // The overscan lead-in/lead-out are laser-off runway — emit them as G0
-      // rapids, not G1 at the cutting feed (audit 2026-06-03). GRBL still
-      // decelerates to the burn feed by burnStart (collinear junction), so the
-      // burn span stays at constant speed — overscan's edge-quality purpose is
-      // intact. The burn G1 carries F explicitly: the lead-in is a G0, so it no
-      // longer establishes the modal feed. Every G0 keeps S0 (PROJECT.md #3).
-      //
-      // Short runs skip the runway entirely (effectiveOverscanMm → 0): on those
-      // the 2×overscan runway would exceed the burn, and a traced fill is mostly
-      // such runs. With overscan 0 the lead points collapse onto the burn ends,
-      // so only the seek-to-burnStart G0 and the burn G1 are emitted.
-      const overscan = effectiveOverscanMm(seg.polyline, group.overscanMm);
-      const run = expandFillHatchWithOverscan(seg.polyline, overscan);
-      if (run === null) continue;
-      chunks.push(`G0 X${fmt(run.leadStart.x)} Y${fmt(run.leadStart.y)} S0`);
-      if (overscan > 0) {
-        chunks.push(`G0 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} S0`);
-      }
-      chunks.push(`G1 X${fmt(run.burnEnd.x)} Y${fmt(run.burnEnd.y)} F${feed} S${s}`);
-      if (overscan > 0) {
-        chunks.push(`G0 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
-      }
+    for (const sweep of sweeps) {
+      const text = emitFillSweep(sweep, s, feed, group.overscanMm);
+      if (text.length > 0) chunks.push(text);
     }
   }
   return chunks.join(LINE_END) + LINE_END;
+}
+
+// One scanline as a continuous sweep. Rapid into the optional overscan runway
+// with the laser off (reusing the 1a/1b lead geometry + short-run skip), then a
+// single chain of G1s: each ink span burns at S{s}, each interior gap crosses
+// at S0 (diode dark, head still at feed so it never stops over a hole). G-code
+// S is modal, so every span re-asserts its value — a missed S0 would fire the
+// beam across a hole, so the per-segment S sequence is asserted exhaustively in
+// the tests.
+function emitFillSweep(sweep: FillSweep, s: number, feed: number, overscanMm: number): string {
+  const spans = sweep.spans;
+  const first = spans[0];
+  const last = spans[spans.length - 1];
+  if (first === undefined || last === undefined) return '';
+  const overscan = effectiveOverscanMm([first.start, last.end], overscanMm);
+  const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+  if (run === null) return '';
+  const lines: string[] = [`G0 X${fmt(run.leadStart.x)} Y${fmt(run.leadStart.y)} S0`];
+  if (overscan > 0) {
+    lines.push(`G0 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} S0`);
+  }
+  for (const line of sweepSpanLines(spans, s, feed)) lines.push(line);
+  if (overscan > 0) {
+    lines.push(`G0 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
+  }
+  return lines.join(LINE_END);
+}
+
+// The G1 chain for one sweep: burn each ink span (S{s}), blank each interior
+// gap (S0). F rides only the first G1 (modal). The runway is always a G0, so
+// the first G1 is always the first ink span.
+function sweepSpanLines(spans: ReadonlyArray<FillSpan>, s: number, feed: number): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < spans.length; i += 1) {
+    const span = spans[i];
+    if (span === undefined) continue;
+    const burn = `G1 X${fmt(span.end.x)} Y${fmt(span.end.y)}`;
+    lines.push(i === 0 ? `${burn} F${feed} S${s}` : `${burn} S${s}`);
+    const next = spans[i + 1];
+    if (next !== undefined) {
+      lines.push(`G1 X${fmt(next.start.x)} Y${fmt(next.start.y)} S0`);
+    }
+  }
+  return lines;
 }
 
 // F.2.d: raster groups emit through the dedicated raster path
