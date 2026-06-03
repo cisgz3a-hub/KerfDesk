@@ -12,6 +12,7 @@ import { LaserLog } from './LaserLog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
+import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { prepareStartJob } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
@@ -58,6 +59,7 @@ export function LaserWindow(): JSX.Element {
   return (
     <aside aria-label="Laser controls" style={panelStyle}>
       <h2 style={headingStyle}>Laser</h2>
+      <SafetyNoticeBanner />
       {!supportsSerial && (
         <p style={hintStyle}>
           Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install
@@ -68,7 +70,7 @@ export function LaserWindow(): JSX.Element {
       <ConnectionBar
         connection={connection}
         onConnect={() => void connect(platform)}
-        onDisconnect={() => void disconnect()}
+        onDisconnect={() => void disconnect().catch(() => undefined)}
         disabled={!supportsSerial || autofocusBusy}
       />
       {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
