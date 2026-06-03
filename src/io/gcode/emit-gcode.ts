@@ -3,16 +3,12 @@
 // I/O. The UI / platform adapter decides whether to actually write the file
 // based on `preflight.ok`.
 
-import {
-  runPreEmitPreflight,
-  runPreflight,
-  type PreflightOptions,
-  type PreflightResult,
-} from '../../core/preflight';
-import { applyJobOrigin, compileJob, optimizePaths, type JobOriginPlacement } from '../../core/job';
+import { runPreflight, type PreflightOptions, type PreflightResult } from '../../core/preflight';
+import type { JobOriginPlacement } from '../../core/job';
 import { grblStrategy } from '../../core/output';
 import type { Project } from '../../core/scene';
 import { gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
+import { prepareOutput } from './prepare-output';
 
 export type EmitGcodeResult = {
   readonly gcode: string;
@@ -30,21 +26,17 @@ export type EmitGcodeOptions = {
 };
 
 export function emitGcode(project: Project, options: EmitGcodeOptions = {}): EmitGcodeResult {
-  // Pre-emit budget guard FIRST: a raster that would engrave to an enormous
-  // pixel grid is refused here, before compileJob allocates the resampled luma,
-  // the dither buffers, and the G-code string (roadmap P1-A). Empty g-code +
-  // the failing preflight means the UI shows the reason instead of freezing.
-  const preEmit = runPreEmitPreflight(project);
-  if (!preEmit.ok) return { gcode: '', preflight: preEmit };
-
-  // compile → optimize → emit. The optimize step is pure path-order
-  // reduction (nearest-neighbor heuristic) — same cuts, same speeds,
-  // same passes, just shorter travel between them. Determinism
-  // preserved (PROJECT.md non-negotiable #5).
-  const compiled = compileJob(project.scene, project.device);
-  const placed = options.jobOrigin ? applyJobOrigin(compiled, options.jobOrigin) : compiled;
-  const job = optimizePaths(placed);
-  const body = grblStrategy.emit(job, project.device);
+  // Compile / place / optimize + the pre-emit budget guard all live in
+  // prepareOutput — the SAME pipeline the canvas preview and live estimate use,
+  // so what is previewed is what is emitted (roadmap P1-C). A budget failure
+  // short-circuits here with empty g-code + the failing preflight (the UI shows
+  // the reason instead of freezing, roadmap P1-A).
+  const prepared = prepareOutput(
+    project,
+    options.jobOrigin ? { jobOrigin: options.jobOrigin } : {},
+  );
+  if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
+  const body = grblStrategy.emit(prepared.job, project.device);
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
