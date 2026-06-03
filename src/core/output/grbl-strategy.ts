@@ -133,19 +133,37 @@ function emitFillSweep(sweep: FillSweep, s: number, feed: number, overscanMm: nu
 }
 
 // The G1 chain for one sweep: burn each ink span (S{s}), blank each interior
-// gap (S0). F rides only the first G1 (modal). The runway is always a G0, so
-// the first G1 is always the first ink span.
+// gap (S0). F rides only the first emitted G1 (modal). A head tracker skips any
+// move whose target equals the current position at emit precision (3 dp), so a
+// degenerate span never emits a stationary beam-on G1 and two touching spans
+// never emit a zero-length gap — defense in depth for PROJECT.md #3 ("positive
+// S only on a moving G1"). The live producer already filters sub-epsilon runs
+// (fill-hatching SCANLINE_EPS); this guards the contract at the emitter too
+// (audit 2026-06-03).
 function sweepSpanLines(spans: ReadonlyArray<FillSpan>, s: number, feed: number): string[] {
+  const first = spans[0];
+  if (first === undefined) return [];
   const lines: string[] = [];
+  // Head starts where the runway G0 left it: the first span's start.
+  let headX = fmt(first.start.x);
+  let headY = fmt(first.start.y);
+  let feedEmitted = false;
+  const moveTo = (x: number, y: number, sWord: string): void => {
+    const fx = fmt(x);
+    const fy = fmt(y);
+    if (fx === headX && fy === headY) return; // zero-length at emit precision — skip
+    const feedWord = feedEmitted ? '' : ` F${feed}`;
+    feedEmitted = true;
+    lines.push(`G1 X${fx} Y${fy}${feedWord} ${sWord}`);
+    headX = fx;
+    headY = fy;
+  };
   for (let i = 0; i < spans.length; i += 1) {
     const span = spans[i];
     if (span === undefined) continue;
-    const burn = `G1 X${fmt(span.end.x)} Y${fmt(span.end.y)}`;
-    lines.push(i === 0 ? `${burn} F${feed} S${s}` : `${burn} S${s}`);
+    moveTo(span.end.x, span.end.y, `S${s}`);
     const next = spans[i + 1];
-    if (next !== undefined) {
-      lines.push(`G1 X${fmt(next.start.x)} Y${fmt(next.start.y)} S0`);
-    }
+    if (next !== undefined) moveTo(next.start.x, next.start.y, 'S0');
   }
   return lines;
 }
