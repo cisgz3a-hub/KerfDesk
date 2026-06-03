@@ -1774,6 +1774,75 @@ PROJECT.md #3 guards) is unchanged - only the mode word that precedes it.
 
 ---
 
+## ADR-037 - Raise the image-trace decode cap 1024 -> 2048 px for small-feature fidelity
+
+**Status:** Accepted, code shipped, visual verification pending. | **Date:** 2026-06-03
+
+### Context
+
+The *wavy-edge* half of the small-text burn defect (docs/research/burn-perfection-
+small-text.md, **Cause B**): the user image-traced a raster that contained small
+text ("langebaan"); the glyphs came out wavy/faceted. A trace can be no smoother
+than the bitmap it is handed - potrace/imagetracer fit curves to a pixel-boundary
+staircase, and a few-px-tall glyph has almost no boundary to work with.
+
+`image-loader.ts` downscaled every imported image to a **1024 px** longest edge
+before tracing (`MAX_EDGE_PX`, `scaleToCap`). A detailed source (logo/photo with
+small lettering) was therefore crushed to 1024 px *before potrace ever saw it*,
+discarding exactly the resolution the small text needed. LightBurn's own guidance
+is the inverse: feed the tracer MORE pixels (upscale before tracing) for fine
+detail / small text.
+
+### Decision
+
+Raise `MAX_EDGE_PX` from **1024 to 2048** (4x the pixels, ~4x trace time). This
+doubles the linear resolution the tracer sees, recovering small-feature fidelity
+while staying interactive on modest hardware in the trace Worker (with the 300 ms
+preview debounce).
+
+Deliberately **NOT** done: upscaling images that are already *below* the cap.
+Bilinear-upscaling a deliberately low-res input (pixel art / blueprints - the
+"Sharp" preset, "every notch matters") would blur the notches the user wants
+kept. Raising the *downscale* cap only ever *keeps more* real detail, so it never
+degrades any input; upscaling-below-source can. `scaleToCap` therefore still
+passes sub-cap images through untouched.
+
+### Consequences
+
+- **Registration- and size-safe.** The overlaid trace's mm size is
+  `traceCoord / source.pixelWidth x widthMm` (`overlayTransformForRaster`,
+  scene-mutations.ts), where `widthMm` derives from the NATURAL size at 96 DPI
+  (`rasterImportGeometry`, image-import.ts) and `pixelWidth` is the sampled size.
+  Raising the cap scales `pixelWidth` and the trace coordinates together, so the
+  final mm geometry is invariant - only detail density rises. Source bitmap and
+  trace both sample through the same `loadImageAsRawData`, so they stay aligned.
+- ~4x trace/preview CPU + transient memory on the largest inputs (a 2048x2048
+  RGBA frame is 16 MB; preprocessForTrace clones it a few times). Bounded by the
+  Worker + debounce; 2048 is the chosen quality/perf knee (4096 would be ~16x and
+  risk multi-hundred-MB transients). The constant is the single tuning point.
+- No persistent `.lf2` bloat for the trace workflow: the source bitmap (which
+  stores luma at the sampled size) is deleted once the trace is committed
+  (LightBurn model), leaving only vector paths.
+
+### Verification
+
+- `image-loader.test.ts`: `scaleToCap` keeps a 1500 px source (crushed to 1024
+  before) full-size, downscales 4096 -> 2048, and never upscales a 300 px source;
+  `PREVIEW_MAX_EDGE_PX` is 2048 so preview and commit still see identical pixels.
+- Empirical (Karpathy's law): tracing a crisp disc through the real potrace
+  backend at increasing resolution monotonically reduces the trace's max radial
+  deviation from the true circle - **1024 px 0.27% -> 2048 px 0.11%** (halved);
+  the small-feature regime (256 -> 512 px) improves 2.2x. Higher decode
+  resolution provably yields truer, smoother curves.
+- Full trace suite (potrace, imagetracer, integration, import geometry) + full
+  suite + tsc --noEmit + lint green.
+- **Visual verification needed:** re-import and re-trace the original "langebaan"
+  artwork and confirm the small text traces smooth (not faceted). If the source
+  itself is low-res, the remedy is a higher-res source or native vector text
+  (the report's alternative Cause-B fix), which this change does not replace.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

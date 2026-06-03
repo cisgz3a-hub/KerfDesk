@@ -7,11 +7,24 @@
 
 import type { RawImageData } from '../../core/trace';
 
-// Hard cap on the longest image edge after decode. Keeps trace
-// runtime bounded — imagetracerjs is O(width × height × colors)
-// and starts to feel slow above ~1 megapixel on modest hardware.
-// Larger inputs are downsampled proportionally before tracing.
-const MAX_EDGE_PX = 1024;
+// Cap on the longest image edge after decode, in pixels. Two competing
+// forces: trace runtime is O(width × height × colors) (imagetracerjs and
+// potrace both), so an unbounded decode makes tracing a large photo crawl;
+// but a cap that is too LOW throws away the resolution small features —
+// especially small TEXT — need, so they trace as faceted, wavy curves: the
+// "langebaan" small-text defect (docs/research/burn-perfection-small-text.md
+// Cause B; ADR-037). 2048 (was 1024) doubles the linear resolution — 4× the
+// pixels, ~4× the trace time — recovering small-feature fidelity while staying
+// interactive on modest hardware in the trace Worker.
+//
+// RAISING this is registration- and size-safe: source.pixelWidth tracks the
+// same sampled size (image-import.ts) and the overlaid trace's mm size is
+// traceCoord/pixelWidth × widthMm — invariant to the cap (widthMm comes from
+// the NATURAL size at 96 DPI, not the sample). Only detail density changes.
+// We intentionally do NOT upscale BELOW the source's own size: bilinear-
+// upscaling deliberate pixel art (the Sharp preset) would blur the very
+// notches the user wants kept. Larger inputs are downsampled proportionally.
+const MAX_EDGE_PX = 2048;
 // Preview and commit use the same cap so the dialog does not preview one
 // pixel grid and then commit a different trace.
 export const PREVIEW_MAX_EDGE_PX = MAX_EDGE_PX;
@@ -77,7 +90,9 @@ function decodeImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-function scaleToCap(
+// Exported for unit testing the cap math directly (decodeImage needs a real
+// browser canvas, so the cap behaviour is verified here as a pure function).
+export function scaleToCap(
   width: number,
   height: number,
   cap: number,
