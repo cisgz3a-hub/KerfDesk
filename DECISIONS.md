@@ -1905,6 +1905,60 @@ calibration-free lever and the right first step.
 
 ---
 
+## ADR-039 - Split a raster row at wide white gaps so the emitter rapids across them
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+ADR-035 split a FILL scanline at gaps > 5 mm so the emitter crosses inter-region
+gaps with a G0 rapid instead of a slow G1 S0 feed move (the stray-line class). The
+raster (image-mode) emitter had the same latent defect: emit-raster swept one
+active span per row from the first ink pixel to the last, and any interior white
+run inside that span became a `G1 ... S0` feed move. For a row with two separated
+ink islands (a logo with a gap, text with a space), the head crawled across the
+white gap at cutting feed with the beam nominally off - the diode turn-off-lag
+marking risk, and a long blank feed that the P0-A `findLongBlankFeedMoves`
+preflight (added the same day) would flag in raster output.
+
+### Decision
+
+Replace the single per-row `activeSpan` with `activeSpans(row, pixelWidthMm)`:
+walk the row's ink and split into separate ink islands wherever the white gap
+between consecutive ink exceeds `RASTER_GAP_RAPID_THRESHOLD_MM` (5 mm, matching
+ADR-035 and the P0-A threshold). The row loop emits each island as its own sweep
+(`emitSpanSweep`, the former `emitRow`), so the G0 lead-in to the NEXT island
+crosses the wide gap as a rapid. A small interior gap (<= 5 mm) stays within one
+sweep, blanked at feed exactly as before. Snake direction still alternates per
+emitted ROW (within a reverse row the islands sweep right-to-left); F still rides
+only the very first G1 of the group.
+
+### Consequences
+
+- A wide interior white gap is a G0 rapid (laser hard-off, faster), not a G1 S0
+  crawl - so raster output now passes the P0-A long-blank-feed invariant.
+- Single-island rows (and rows whose gaps are all <= 5 mm) emit byte-identically
+  to before; only multi-island rows change. The 28 pre-existing raster emit +
+  property tests pass unchanged.
+- Each split island keeps its own overscan runway; the extra G0 between islands
+  is the intended trade (a few rapids vs. marking the gap).
+
+### Verification
+
+- `emit-raster.test.ts`: a two-island row (12 mm gap) crosses to the second
+  island with `G0 X16.000 Y1.000 S0` and emits NO `G1 X16...`; a 4 mm gap stays
+  one sweep (one G0, the gap blanked as `G1 X8.000 S0`).
+- Empirical (Karpathy's law) cross-check: `findLongBlankFeedMoves` on the
+  two-island emit returns [] (before this change the 12 mm gap was a `G1 S0`
+  that the invariant flags). The two safety modules corroborate each other.
+- `emit-raster.property.test.ts` (determinism + laser-off) unchanged; full suite
+  + tsc --noEmit + lint green.
+- **Hardware verification needed:** engrave an image with two separated dark
+  regions on one row and confirm the gap is travelled dark (no faint line) and
+  faster.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
