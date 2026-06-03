@@ -197,16 +197,24 @@ function RunningControls(props: {
   return (
     <div style={rowStyle}>
       {props.isStreaming && (
-        <button type="button" onClick={() => void pauseJob()} title={PAUSE_HOLD_SAFETY_MESSAGE}>
+        <button
+          type="button"
+          onClick={() => void pauseJob().catch(() => undefined)}
+          title={PAUSE_HOLD_SAFETY_MESSAGE}
+        >
           Pause
         </button>
       )}
       {props.isPaused && (
-        <button type="button" onClick={() => void resumeJob()}>
+        <button type="button" onClick={() => void resumeJob().catch(() => undefined)}>
           Resume
         </button>
       )}
-      <button type="button" onClick={() => void stopJob()} style={stopBtnStyle}>
+      <button
+        type="button"
+        onClick={() => void stopJob().catch(() => undefined)}
+        style={stopBtnStyle}
+      >
         Stop
       </button>
       <span style={runningSafetyStyle}>{PAUSE_HOLD_SAFETY_MESSAGE}</span>

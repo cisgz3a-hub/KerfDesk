@@ -31,6 +31,7 @@ afterEach(() => {
     streamer: null,
     workOriginActive: false,
     wcoCache: null,
+    safetyNotice: null,
   });
 });
 
@@ -71,6 +72,36 @@ describe('LaserWindow autofocus busy controls', () => {
         'select[aria-label="Jog step size"]',
       );
       expect(stepSelect?.disabled).toBe(true);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('surfaces a safety notice banner when the store raises one', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      safetyNotice: {
+        kind: 'disconnect-during-job',
+        message: 'USB lost mid-job. Use physical E-stop.',
+      },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      expect(host.textContent).toContain('USB lost mid-job. Use physical E-stop.');
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
