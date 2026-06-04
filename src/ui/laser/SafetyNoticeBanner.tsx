@@ -13,7 +13,11 @@ export function SafetyNoticeBanner(): JSX.Element | null {
   const clear = useLaserStore((s) => s.clearSafetyNotice);
   if (notice === null) return null;
   const title =
-    notice.kind === 'disconnect-during-job' ? 'Connection lost mid-job' : 'Command may not have sent';
+    notice.kind === 'disconnect-during-job'
+      ? 'Connection lost mid-job'
+      : notice.kind === 'controller-error'
+        ? 'Controller rejected a command'
+        : 'Command may not have sent';
   return (
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>

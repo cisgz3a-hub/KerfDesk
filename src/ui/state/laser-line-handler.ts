@@ -26,6 +26,7 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { consumeSettingsResponse } from './detected-settings-action';
+import { controllerErrorNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { hasCustomOrigin } from './origin-actions';
 
@@ -144,7 +145,11 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'error') {
-    set({ lastError: cls.code });
+    // P0-1: a controller rejection is terminal. onAck() marks the streamer
+    // 'errored' so step() sends no further bytes; raise a safety notice so the
+    // operator checks the machine - the rejected move may have left the head
+    // mispositioned and a laser-on line could have fired out of place.
+    set({ lastError: cls.code, safetyNotice: controllerErrorNotice(cls.code) });
     advanceStream(set, get, safeWrite, 'error');
     return;
   }

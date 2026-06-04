@@ -223,6 +223,7 @@ These are correctness defects on paths that can fire the beam in the wrong place
 on, or lock the UI. They take priority over every feature. Do them in the order listed.
 
 ### P0-1: GRBL error:N during an active stream is treated as progress, not a job-stop
+- **Status:** SHIPPED 2026-06-04 (ADR-041) - sender-side stream termination ('errored' status) + controller-error safety notice; the misleading "treats error like ok" test is inverted. FOLLOW-UP (separate ticket, hardware-gated): GRBL does not halt on error:N by default, so a complete halt + darking a currently-firing laser also needs a real-time feed-hold (!) / soft-reset (0x18) on error to flush GRBL's RX buffer.
 - **Problem:** When GRBL rejects a line mid-burn (`error:N` on a setup/motion/modal command),
   the streamer pops the in-flight line and immediately sends the next queued lines exactly as
   it does for an `ok`. The next line can be `M3 S255` (laser on) at a position the controller
