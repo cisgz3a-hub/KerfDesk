@@ -24,6 +24,12 @@ describe('findLongBlankFeedMoves', () => {
     expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toEqual([]);
   });
 
+  it('does not flag threshold-sized blank feeds because of floating point roundoff', () => {
+    const gcode = ['G0 X-36.999 Y0.000 S0', 'G1 X-31.999 S0'].join('\n');
+
+    expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toEqual([]);
+  });
+
   it('does not flag powered G1 moves', () => {
     const gcode = ['G1 X0.000 Y0.000 S300', 'G1 X20.000 Y0.000 S300'].join('\n');
 
@@ -39,11 +45,9 @@ describe('findLongBlankFeedMoves', () => {
   it('measures distance from where a G0 left the head (modal position)', () => {
     // A G0 moves the head with the laser off; the next G1 S0's blank distance is
     // measured from the G0's endpoint, not the prior burn.
-    const gcode = [
-      'G1 X0.000 Y0.000 S300',
-      'G0 X50.000 Y0.000 S0',
-      'G1 X58.000 Y0.000 S0',
-    ].join('\n');
+    const gcode = ['G1 X0.000 Y0.000 S300', 'G0 X50.000 Y0.000 S0', 'G1 X58.000 Y0.000 S0'].join(
+      '\n',
+    );
 
     const issues = findLongBlankFeedMoves(gcode, { thresholdMm: 5 });
     expect(issues).toHaveLength(1);

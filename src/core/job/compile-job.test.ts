@@ -322,6 +322,41 @@ describe('compileJob raster image groups', () => {
     }
   });
 
+  it('maps the source bitmap top row to the machine back on front-left devices', () => {
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
+      ditherAlgorithm: 'threshold' as const,
+      linesPerMm: 1,
+    };
+    const imageTopRowBlack: SceneObject = {
+      ...rasterObject('AAD//w=='),
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+    };
+
+    const job = compileJob({ objects: [imageTopRowBlack], layers: [layer] }, dev);
+
+    expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual([0, 0, 300, 300]);
+  });
+
+  it('maps the source bitmap left column to machine-right on front-right devices', () => {
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
+      ditherAlgorithm: 'threshold' as const,
+      linesPerMm: 1,
+    };
+    const imageLeftColumnBlack: SceneObject = {
+      ...rasterObject('AP8A/w=='),
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+    };
+
+    const job = compileJob(
+      { objects: [imageLeftColumnBlack], layers: [layer] },
+      { ...dev, origin: 'front-right' },
+    );
+
+    expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual([0, 300, 0, 300]);
+  });
+
   it('measures transformed raster bounds from all four corners', () => {
     const layer = {
       ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
