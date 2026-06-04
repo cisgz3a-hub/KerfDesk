@@ -1,0 +1,2459 @@
+{
+  "generatedAt": "2026-06-04T04:14:10.583Z",
+  "repo": "LaserForge-2.0",
+  "scope": "git ls-files src",
+  "totals": {
+    "files": 335,
+    "sourceFiles": 191,
+    "tests": 129,
+    "missingDirectSiblingTests": 84
+  },
+  "byLayer": {
+    "fixture": 13,
+    "core": 146,
+    "io": 27,
+    "platform": 8,
+    "ui": 140,
+    "other": 1
+  },
+  "byCriticality": {
+    "standard": 119,
+    "import-platform-critical": 33,
+    "safety-critical": 42,
+    "burn-fidelity-critical": 107,
+    "operator-workflow-critical": 34
+  },
+  "missingDirectSiblingTests": [
+    "src/core/controllers/grbl/alarm-codes.ts",
+    "src/core/controllers/grbl/error-codes.ts",
+    "src/core/controllers/grbl/index.ts",
+    "src/core/devices/index.ts",
+    "src/core/invariants/index.ts",
+    "src/core/job/fill-hatching-cache.ts",
+    "src/core/job/index.ts",
+    "src/core/job/job.ts",
+    "src/core/output/index.ts",
+    "src/core/output/output-strategy.ts",
+    "src/core/preflight/index.ts",
+    "src/core/raster/index.ts",
+    "src/core/raster/luma-resample.ts",
+    "src/core/scene/index.ts",
+    "src/core/text/font-registry.ts",
+    "src/core/text/index.ts",
+    "src/core/text/text-object.ts",
+    "src/core/trace/index.ts",
+    "src/core/trace/potrace-curve-optimize-geometry.ts",
+    "src/core/trace/potrace-curve-optimize-rebuild.ts",
+    "src/core/trace/potrace-curve-optimize.ts",
+    "src/core/trace/potrace-curve.ts",
+    "src/core/trace/potrace-path-scanner.ts",
+    "src/core/trace/potrace-polygon-best.ts",
+    "src/core/trace/potrace-polygon-core.ts",
+    "src/core/trace/potrace-polygon-longest.ts",
+    "src/core/trace/potrace-polygon.ts",
+    "src/io/gcode/index.ts",
+    "src/io/project/deserialize-project.ts",
+    "src/io/project/index.ts",
+    "src/io/project/serialize-project.ts",
+    "src/io/svg/index.ts",
+    "src/platform/types.ts",
+    "src/platform/web/index.ts",
+    "src/platform/web/web-adapter.ts",
+    "src/ui/app/App.tsx",
+    "src/ui/app/build-info.ts",
+    "src/ui/app/index.ts",
+    "src/ui/app/main.tsx",
+    "src/ui/app/platform-context.tsx",
+    "src/ui/app/use-global-error-handlers.ts",
+    "src/ui/app/use-import-drag-drop.ts",
+    "src/ui/app/use-shortcuts.ts",
+    "src/ui/app/use-space-pan.ts",
+    "src/ui/app/use-window-title.ts",
+    "src/ui/common/StatusBar.tsx",
+    "src/ui/common/Toasts.tsx",
+    "src/ui/common/Toolbar.tsx",
+    "src/ui/common/index.ts",
+    "src/ui/common/use-dialog-a11y.ts",
+    "src/ui/laser/AutofocusEditor.tsx",
+    "src/ui/laser/ConnectionBar.tsx",
+    "src/ui/laser/DeviceSettings.tsx",
+    "src/ui/laser/JogPad.tsx",
+    "src/ui/laser/LaserLog.tsx",
+    "src/ui/laser/PlannerAdvanced.tsx",
+    "src/ui/laser/StatusDisplay.tsx",
+    "src/ui/laser/device-settings-shared.tsx",
+    "src/ui/laser/index.ts",
+    "src/ui/layers/CutsLayersPanel.tsx",
+    "src/ui/layers/LayerRow.tsx",
+    "src/ui/layers/index.ts",
+    "src/ui/layers/use-debounced-commit.ts",
+    "src/ui/state/detected-settings-action.ts",
+    "src/ui/state/import-actions.ts",
+    "src/ui/state/index.ts",
+    "src/ui/state/laser-safety-notice.ts",
+    "src/ui/state/laser-store-helpers.ts",
+    "src/ui/state/test-helpers.ts",
+    "src/ui/state/ui-store.ts",
+    "src/ui/state/viewport-actions.ts",
+    "src/ui/text/FontPicker.tsx",
+    "src/ui/text/font-loader.ts",
+    "src/ui/trace/AdjustmentControls.tsx",
+    "src/ui/trace/TracePreview.tsx",
+    "src/ui/trace/dialog-parts.tsx",
+    "src/ui/trace/trace-worker.ts",
+    "src/ui/workspace/Workspace.tsx",
+    "src/ui/workspace/drag-state.ts",
+    "src/ui/workspace/draw-rulers.ts",
+    "src/ui/workspace/draw-scene.ts",
+    "src/ui/workspace/index.ts",
+    "src/ui/workspace/overlays.tsx",
+    "src/vite-env.d.ts"
+  ],
+  "entries": [
+    {
+      "file": "src/__fixtures__/perceptual/compare.test.ts",
+      "layer": "fixture",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/perceptual/compare.ts",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "standard",
+      "directSiblingTest": "src/__fixtures__/perceptual/compare.test.ts"
+    },
+    {
+      "file": "src/__fixtures__/perceptual/png.ts",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/perceptual/rasterize.test.ts",
+      "layer": "fixture",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/perceptual/rasterize.ts",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "standard",
+      "directSiblingTest": "src/__fixtures__/perceptual/rasterize.test.ts"
+    },
+    {
+      "file": "src/__fixtures__/perceptual/shapes.test.ts",
+      "layer": "fixture",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/perceptual/shapes.ts",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "standard",
+      "directSiblingTest": "src/__fixtures__/perceptual/shapes.test.ts"
+    },
+    {
+      "file": "src/__fixtures__/square.ts",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/svg/closed-polygon.svg",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/svg/multi-shape.svg",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/svg/rectangle-single-color.svg",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/svg/two-color-paths.svg",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/__fixtures__/svg/zigzag.svg",
+      "layer": "fixture",
+      "kind": "fixture",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/alarm-codes.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/commands.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/commands.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/core/controllers/grbl/commands.test.ts"
+    },
+    {
+      "file": "src/core/controllers/grbl/error-codes.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/parse-settings.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/parse-settings.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/core/controllers/grbl/parse-settings.test.ts"
+    },
+    {
+      "file": "src/core/controllers/grbl/response.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/response.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/core/controllers/grbl/response.test.ts"
+    },
+    {
+      "file": "src/core/controllers/grbl/status-parser.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/status-parser.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/core/controllers/grbl/status-parser.test.ts"
+    },
+    {
+      "file": "src/core/controllers/grbl/streamer.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/controllers/grbl/streamer.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/core/controllers/grbl/streamer.test.ts"
+    },
+    {
+      "file": "src/core/devices/device-profile.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/devices/device-profile.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/devices/device-profile.test.ts"
+    },
+    {
+      "file": "src/core/devices/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/devices/machine-bounds.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/devices/machine-bounds.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/devices/machine-bounds.test.ts"
+    },
+    {
+      "file": "src/core/devices/origin-transform.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/devices/origin-transform.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/devices/origin-transform.test.ts"
+    },
+    {
+      "file": "src/core/invariants/blank-feed.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/invariants/blank-feed.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/invariants/blank-feed.test.ts"
+    },
+    {
+      "file": "src/core/invariants/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/invariants/predicates.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/invariants/predicates.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/invariants/predicates.test.ts"
+    },
+    {
+      "file": "src/core/job/compile-job-fill-cache.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/compile-job-fill.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/compile-job.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/compile-job.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/compile-job.test.ts"
+    },
+    {
+      "file": "src/core/job/estimate-duration.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/estimate-duration.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/estimate-duration.test.ts"
+    },
+    {
+      "file": "src/core/job/fill-hatching-cache.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/fill-hatching.perf.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/fill-hatching.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/fill-hatching.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/fill-hatching.test.ts"
+    },
+    {
+      "file": "src/core/job/fill-overscan.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/fill-overscan.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/fill-overscan.test.ts"
+    },
+    {
+      "file": "src/core/job/fill-sweeps.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/fill-sweeps.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/fill-sweeps.test.ts"
+    },
+    {
+      "file": "src/core/job/frame-preflight.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/frame-preflight.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/frame-preflight.test.ts"
+    },
+    {
+      "file": "src/core/job/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/job-bounds.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/job-bounds.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/job-bounds.test.ts"
+    },
+    {
+      "file": "src/core/job/job-origin.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/job-origin.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/job-origin.test.ts"
+    },
+    {
+      "file": "src/core/job/job.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/optimize-paths.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/optimize-paths.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/optimize-paths.test.ts"
+    },
+    {
+      "file": "src/core/job/planner.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/planner.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/planner.test.ts"
+    },
+    {
+      "file": "src/core/job/raster-bounds.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/raster-bounds.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/raster-bounds.test.ts"
+    },
+    {
+      "file": "src/core/job/toolpath.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/job/toolpath.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/job/toolpath.test.ts"
+    },
+    {
+      "file": "src/core/output/grbl-strategy.fill-power-mode.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/output/grbl-strategy.property.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/output/grbl-strategy.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/output/grbl-strategy.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/core/output/grbl-strategy.test.ts"
+    },
+    {
+      "file": "src/core/output/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/output/output-strategy.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/preflight/controller-readiness.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/preflight/controller-readiness.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/preflight/controller-readiness.test.ts"
+    },
+    {
+      "file": "src/core/preflight/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/preflight/pre-emit.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/preflight/pre-emit.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/preflight/pre-emit.test.ts"
+    },
+    {
+      "file": "src/core/preflight/preflight.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/preflight/preflight.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/preflight/preflight.test.ts"
+    },
+    {
+      "file": "src/core/raster/dither.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/dither.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/raster/dither.test.ts"
+    },
+    {
+      "file": "src/core/raster/emit-raster.property.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/emit-raster.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/emit-raster.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/raster/emit-raster.test.ts"
+    },
+    {
+      "file": "src/core/raster/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/luma-resample.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/preview-data.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/preview-data.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/raster/preview-data.test.ts"
+    },
+    {
+      "file": "src/core/raster/raster-budget.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/raster-budget.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/raster/raster-budget.test.ts"
+    },
+    {
+      "file": "src/core/raster/rasterize-vector.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/raster/rasterize-vector.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/raster/rasterize-vector.test.ts"
+    },
+    {
+      "file": "src/core/scene/fit-to-bed.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/fit-to-bed.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/scene/fit-to-bed.test.ts"
+    },
+    {
+      "file": "src/core/scene/hit-test.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/hit-test.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/scene/hit-test.test.ts"
+    },
+    {
+      "file": "src/core/scene/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/layer.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/layer.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/scene/layer.test.ts"
+    },
+    {
+      "file": "src/core/scene/project.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/project.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/scene/project.test.ts"
+    },
+    {
+      "file": "src/core/scene/scene-object.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/scene-object.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/scene/scene-object.test.ts"
+    },
+    {
+      "file": "src/core/scene/scene.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/scene.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/scene/scene.test.ts"
+    },
+    {
+      "file": "src/core/scene/transform.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/scene/transform.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/scene/transform.test.ts"
+    },
+    {
+      "file": "src/core/text/font-registry.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/text/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/text/text-object.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/text/text-to-polylines.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/text/text-to-polylines.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/core/text/text-to-polylines.test.ts"
+    },
+    {
+      "file": "src/core/trace/centerline-distance.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/centerline-distance.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/centerline-distance.test.ts"
+    },
+    {
+      "file": "src/core/trace/centerline-fit.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/centerline-fit.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/centerline-fit.test.ts"
+    },
+    {
+      "file": "src/core/trace/centerline-mask.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/centerline-mask.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/centerline-mask.test.ts"
+    },
+    {
+      "file": "src/core/trace/centerline-merge.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/centerline-merge.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/centerline-merge.test.ts"
+    },
+    {
+      "file": "src/core/trace/centerline-polylines.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/centerline-polylines.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/centerline-polylines.test.ts"
+    },
+    {
+      "file": "src/core/trace/centerline-simplify.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/centerline-simplify.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/centerline-simplify.test.ts"
+    },
+    {
+      "file": "src/core/trace/centerline-trace.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/centerline-trace.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/centerline-trace.test.ts"
+    },
+    {
+      "file": "src/core/trace/dither-trace.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/dither-trace.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/dither-trace.test.ts"
+    },
+    {
+      "file": "src/core/trace/index.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/paths-to-svg.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/paths-to-svg.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/paths-to-svg.test.ts"
+    },
+    {
+      "file": "src/core/trace/potrace-bitmap.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-bitmap.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/potrace-bitmap.test.ts"
+    },
+    {
+      "file": "src/core/trace/potrace-curve-optimize-geometry.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-curve-optimize-rebuild.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-curve-optimize.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-curve.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-params.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-params.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/potrace-params.test.ts"
+    },
+    {
+      "file": "src/core/trace/potrace-path-scanner.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-polygon-adjust.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-polygon-adjust.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/potrace-polygon-adjust.test.ts"
+    },
+    {
+      "file": "src/core/trace/potrace-polygon-best.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-polygon-core.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-polygon-longest.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-polygon.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-trace.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/potrace-trace.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/potrace-trace.test.ts"
+    },
+    {
+      "file": "src/core/trace/preprocess.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/preprocess.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/preprocess.test.ts"
+    },
+    {
+      "file": "src/core/trace/raster-prep.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/raster-prep.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/raster-prep.test.ts"
+    },
+    {
+      "file": "src/core/trace/trace-image.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/trace-image.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/trace-image.test.ts"
+    },
+    {
+      "file": "src/core/trace/trace-perceptual.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/trace-to-paths.test.ts",
+      "layer": "core",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/core/trace/trace-to-paths.ts",
+      "layer": "core",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/core/trace/trace-to-paths.test.ts"
+    },
+    {
+      "file": "src/io/gcode/emit-gcode.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/gcode/emit-gcode.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/io/gcode/emit-gcode.test.ts"
+    },
+    {
+      "file": "src/io/gcode/gcode-metadata.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/gcode/gcode-metadata.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/io/gcode/gcode-metadata.test.ts"
+    },
+    {
+      "file": "src/io/gcode/index.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/gcode/prepare-output.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/gcode/prepare-output.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/io/gcode/prepare-output.test.ts"
+    },
+    {
+      "file": "src/io/project/deserialize-project.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/project/index.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/project/migrations.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/project/migrations.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": "src/io/project/migrations.test.ts"
+    },
+    {
+      "file": "src/io/project/project.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/project/serialize-project.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/__snapshots__/pipeline.snapshot.test.ts.snap",
+      "layer": "io",
+      "kind": "other",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/flatten-curves.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/flatten-curves.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": "src/io/svg/flatten-curves.test.ts"
+    },
+    {
+      "file": "src/io/svg/index.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/parse-path-d.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/parse-path-d.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": "src/io/svg/parse-path-d.test.ts"
+    },
+    {
+      "file": "src/io/svg/parse-svg-presentation-state.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/parse-svg.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/parse-svg.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": "src/io/svg/parse-svg.test.ts"
+    },
+    {
+      "file": "src/io/svg/pipeline.snapshot.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/sanitize.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/sanitize.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": "src/io/svg/sanitize.test.ts"
+    },
+    {
+      "file": "src/io/svg/shape-to-polylines.test.ts",
+      "layer": "io",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/io/svg/shape-to-polylines.ts",
+      "layer": "io",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": "src/io/svg/shape-to-polylines.test.ts"
+    },
+    {
+      "file": "src/platform/types.ts",
+      "layer": "platform",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/platform/web/cloudflare-pages-routing.test.ts",
+      "layer": "platform",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/platform/web/deploy-workflow-gate.test.ts",
+      "layer": "platform",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/platform/web/index.ts",
+      "layer": "platform",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/platform/web/repo-policy.test.ts",
+      "layer": "platform",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/platform/web/web-adapter.ts",
+      "layer": "platform",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/platform/web/web-serial.test.ts",
+      "layer": "platform",
+      "kind": "test",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/platform/web/web-serial.ts",
+      "layer": "platform",
+      "kind": "typescript",
+      "criticality": "import-platform-critical",
+      "directSiblingTest": "src/platform/web/web-serial.test.ts"
+    },
+    {
+      "file": "src/ui/app/App.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/build-info.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/file-actions.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/file-actions.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/app/file-actions.test.ts"
+    },
+    {
+      "file": "src/ui/app/import-toasts.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/import-toasts.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/app/import-toasts.test.ts"
+    },
+    {
+      "file": "src/ui/app/index.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/main.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/platform-context.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/shortcuts.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/shortcuts.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/app/shortcuts.test.ts"
+    },
+    {
+      "file": "src/ui/app/use-autosave.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/use-autosave.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/app/use-autosave.test.ts"
+    },
+    {
+      "file": "src/ui/app/use-global-error-handlers.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/use-import-drag-drop.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/use-shortcuts.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/use-space-pan.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/app/use-window-title.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/ErrorBoundary.test.tsx",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/ErrorBoundary.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/common/ErrorBoundary.test.tsx"
+    },
+    {
+      "file": "src/ui/common/StatusBar.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/Toasts.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/Toolbar.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/image-density.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/image-density.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/common/image-density.test.ts"
+    },
+    {
+      "file": "src/ui/common/image-import.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/image-import.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/common/image-import.test.ts"
+    },
+    {
+      "file": "src/ui/common/index.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/common/use-dialog-a11y.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/AutofocusEditor.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/ConnectionBar.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/DetectedSettingsBanner.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/DetectedSettingsBanner.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/ui/laser/DetectedSettingsBanner.test.ts"
+    },
+    {
+      "file": "src/ui/laser/DeviceSettings.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/JobControls.test.tsx",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/JobControls.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/ui/laser/JobControls.test.tsx"
+    },
+    {
+      "file": "src/ui/laser/JogPad.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/LaserLog.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/LaserWindow.test.tsx",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/LaserWindow.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/ui/laser/LaserWindow.test.tsx"
+    },
+    {
+      "file": "src/ui/laser/PlannerAdvanced.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/SafetyNoticeBanner.test.tsx",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/SafetyNoticeBanner.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/ui/laser/SafetyNoticeBanner.test.tsx"
+    },
+    {
+      "file": "src/ui/laser/StatusDisplay.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/device-settings-shared.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/index.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/job-intent-warnings.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/job-intent-warnings.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/ui/laser/job-intent-warnings.test.ts"
+    },
+    {
+      "file": "src/ui/laser/live-job-estimate.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/live-job-estimate.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/ui/laser/live-job-estimate.test.ts"
+    },
+    {
+      "file": "src/ui/laser/start-job-readiness.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "safety-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/laser/start-job-readiness.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "safety-critical",
+      "directSiblingTest": "src/ui/laser/start-job-readiness.test.ts"
+    },
+    {
+      "file": "src/ui/layers/CutsLayersPanel.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/layers/LayerRow.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/layers/debouncer.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/layers/debouncer.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/layers/debouncer.test.ts"
+    },
+    {
+      "file": "src/ui/layers/index.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/layers/use-debounced-commit.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/raster/luma-bitmap.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/raster/luma-bitmap.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/ui/raster/luma-bitmap.test.ts"
+    },
+    {
+      "file": "src/ui/raster/vector-to-bitmap.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/raster/vector-to-bitmap.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/ui/raster/vector-to-bitmap.test.ts"
+    },
+    {
+      "file": "src/ui/state/autofocus-action.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/autofocus-action.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/autofocus-action.test.ts"
+    },
+    {
+      "file": "src/ui/state/autosave.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/autosave.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/autosave.test.ts"
+    },
+    {
+      "file": "src/ui/state/convert-to-bitmap.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/convert-to-bitmap.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/convert-to-bitmap.test.ts"
+    },
+    {
+      "file": "src/ui/state/detected-settings-action.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/duplicate.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/import-actions.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/index.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/laser-line-handler.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/laser-line-handler.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/laser-line-handler.test.ts"
+    },
+    {
+      "file": "src/ui/state/laser-safety-notice.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/laser-store-helpers.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/laser-store.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/laser-store.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/laser-store.test.ts"
+    },
+    {
+      "file": "src/ui/state/origin-actions.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/origin-actions.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/origin-actions.test.ts"
+    },
+    {
+      "file": "src/ui/state/scene-mutations.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/scene-mutations.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/scene-mutations.test.ts"
+    },
+    {
+      "file": "src/ui/state/store.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/store.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/store.test.ts"
+    },
+    {
+      "file": "src/ui/state/test-helpers.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/toast-store.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/toast-store.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/state/toast-store.test.ts"
+    },
+    {
+      "file": "src/ui/state/ui-store.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/state/viewport-actions.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/text/AddTextDialog.test.tsx",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/text/AddTextDialog.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": "src/ui/text/AddTextDialog.test.tsx"
+    },
+    {
+      "file": "src/ui/text/FontPicker.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/text/font-loader.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/text/fonts/DancingScript-Regular.ttf",
+      "layer": "ui",
+      "kind": "other",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/text/fonts/Inconsolata-Regular.ttf",
+      "layer": "ui",
+      "kind": "other",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/text/fonts/Pacifico-Regular.ttf",
+      "layer": "ui",
+      "kind": "other",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/text/fonts/Roboto-Regular.ttf",
+      "layer": "ui",
+      "kind": "other",
+      "criticality": "standard",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/AdjustmentControls.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/ImportImageDialog.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/ui/trace/ImportImageDialog.test.ts"
+    },
+    {
+      "file": "src/ui/trace/TracePreview.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/dialog-parts.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/image-loader.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/image-loader.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/ui/trace/image-loader.test.ts"
+    },
+    {
+      "file": "src/ui/trace/trace-options.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/trace-options.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/ui/trace/trace-options.test.ts"
+    },
+    {
+      "file": "src/ui/trace/trace-pipeline.integration.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/trace-worker.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/use-trace-preview.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/ui/trace/use-trace-preview.test.ts"
+    },
+    {
+      "file": "src/ui/trace/use-trace-worker-client.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/trace/use-trace-worker-client.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "burn-fidelity-critical",
+      "directSiblingTest": "src/ui/trace/use-trace-worker-client.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/Workspace.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/display-polylines.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/display-polylines.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/display-polylines.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/drag-state.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-complexity.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-complexity.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/draw-complexity.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/draw-preview.parity.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-preview.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-preview.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/draw-preview.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/draw-raster-cache.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-raster-preview.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-raster-preview.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/draw-raster-preview.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/draw-raster.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-raster.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/draw-raster.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/draw-rulers.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-scene-fill-cache.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-scene-large.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-scene.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-vector-strokes.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/draw-vector-strokes.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/draw-vector-strokes.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/handles.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/handles.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/handles.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/index.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/overlays.tsx",
+      "layer": "ui",
+      "kind": "react",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/rotate-handle.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/rotate-handle.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/rotate-handle.test.ts"
+    },
+    {
+      "file": "src/ui/workspace/view-transform.test.ts",
+      "layer": "ui",
+      "kind": "test",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": null
+    },
+    {
+      "file": "src/ui/workspace/view-transform.ts",
+      "layer": "ui",
+      "kind": "typescript",
+      "criticality": "operator-workflow-critical",
+      "directSiblingTest": "src/ui/workspace/view-transform.test.ts"
+    },
+    {
+      "file": "src/vite-env.d.ts",
+      "layer": "other",
+      "kind": "typescript",
+      "criticality": "standard",
+      "directSiblingTest": null
+    }
+  ]
+}
