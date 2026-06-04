@@ -39,8 +39,11 @@ export type VectorRasterInput = {
   readonly polylines: ReadonlyArray<Polyline>;
   // The mm-space axis-aligned footprint the output bitmap spans.
   readonly bounds: Bounds;
-  // Target pixel density; pixel dimensions derive from bounds × dpi.
-  readonly dpi: number;
+  // Target pixel density. Most callers use dpi; Convert to Bitmap can pass
+  // exact dimensions after applying its raster budget and object transform.
+  readonly dpi?: number;
+  readonly pixelWidth?: number;
+  readonly pixelHeight?: number;
 };
 
 export type VectorRaster = {
@@ -55,12 +58,22 @@ export type VectorRaster = {
 // shapes). Degenerate input (no area / non-positive dpi) degrades to a 1×1
 // white pixel rather than throwing.
 export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
-  const { polylines, bounds, dpi } = input;
-  const pxPerMm = Math.max(0, dpi) / MM_PER_INCH;
-  const width = pixelExtent(bounds.maxX - bounds.minX, pxPerMm);
-  const height = pixelExtent(bounds.maxY - bounds.minY, pxPerMm);
+  const { polylines, bounds } = input;
+  const widthMm = bounds.maxX - bounds.minX;
+  const heightMm = bounds.maxY - bounds.minY;
+  const { width, height } = rasterDimensions(input, widthMm, heightMm);
   const luma = new Uint8Array(width * height).fill(BACKGROUND_LUMA);
-  fillEvenOdd(luma, width, height, toPixelContours(polylines, bounds, pxPerMm));
+  fillEvenOdd(
+    luma,
+    width,
+    height,
+    toPixelContours(
+      polylines,
+      bounds,
+      scaleForExtent(width, widthMm),
+      scaleForExtent(height, heightMm),
+    ),
+  );
   return { luma, width, height };
 }
 
@@ -68,19 +81,42 @@ function pixelExtent(mm: number, pxPerMm: number): number {
   return Math.max(MIN_PIXEL_DIM, Math.round(mm * pxPerMm));
 }
 
+function rasterDimensions(
+  input: VectorRasterInput,
+  widthMm: number,
+  heightMm: number,
+): { readonly width: number; readonly height: number } {
+  if (input.pixelWidth !== undefined && input.pixelHeight !== undefined) {
+    return {
+      width: Math.max(MIN_PIXEL_DIM, Math.floor(input.pixelWidth)),
+      height: Math.max(MIN_PIXEL_DIM, Math.floor(input.pixelHeight)),
+    };
+  }
+  const pxPerMm = Math.max(0, input.dpi ?? 0) / MM_PER_INCH;
+  return {
+    width: pixelExtent(widthMm, pxPerMm),
+    height: pixelExtent(heightMm, pxPerMm),
+  };
+}
+
+function scaleForExtent(pixelExtentPx: number, mm: number): number {
+  return mm > 0 ? pixelExtentPx / mm : 0;
+}
+
 // Map closed mm-space contours into pixel space; drop open / degenerate ones.
 function toPixelContours(
   polylines: ReadonlyArray<Polyline>,
   bounds: Bounds,
-  pxPerMm: number,
+  pxPerMmX: number,
+  pxPerMmY: number,
 ): Vec2[][] {
   const out: Vec2[][] = [];
   for (const pl of polylines) {
     if (!pl.closed || pl.points.length < MIN_CONTOUR_POINTS) continue;
     out.push(
       pl.points.map((p) => ({
-        x: (p.x - bounds.minX) * pxPerMm,
-        y: (p.y - bounds.minY) * pxPerMm,
+        x: (p.x - bounds.minX) * pxPerMmX,
+        y: (p.y - bounds.minY) * pxPerMmY,
       })),
     );
   }

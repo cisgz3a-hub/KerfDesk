@@ -7,8 +7,10 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { VectorRaster } from '../../core/raster';
+import { evaluateRasterBudget } from '../../core/raster/raster-budget';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
+  IDENTITY_TRANSFORM,
   type Bounds,
   type ColoredPath,
   type ImportedSvg,
@@ -62,7 +64,15 @@ function makeSvg(): ImportedSvg {
 function makeHugeSvg(): ImportedSvg {
   return {
     ...makeSvg(),
-    bounds: { minX: 0, minY: 0, maxX: 200.1, maxY: 200.1 },
+    bounds: { minX: 0, minY: 0, maxX: 778.2, maxY: 505 },
+    transform: IDENTITY_TRANSFORM,
+  };
+}
+
+function makeHugeFittedSvg(): ImportedSvg {
+  return {
+    ...makeHugeSvg(),
+    transform: { ...IDENTITY_TRANSFORM, scaleX: 0.25, scaleY: 0.25 },
   };
 }
 
@@ -133,17 +143,17 @@ describe('isConvertibleVector', () => {
 });
 
 describe('assembleBitmap', () => {
-  it('sizes the bitmap from bounds × DPI (20mm @ 254dpi → 200px)', () => {
+  it('sizes the bitmap from displayed bounds x lines/mm', () => {
     const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id');
-    expect(result.pixelWidth).toBe(200);
-    expect(result.pixelHeight).toBe(200);
+    expect(result.pixelWidth).toBe(400);
+    expect(result.pixelHeight).toBe(600);
   });
 
   it('rasterizes then carries the encoder output verbatim', () => {
     const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id');
-    // The echoed fields prove encode saw the 200×200 / 40000-luma grid.
-    expect(result.dataUrl).toBe('data:fake/200x200');
-    expect(result.lumaBase64).toBe('luma:40000');
+    // The echoed fields prove encode saw the physical-size pixel grid.
+    expect(result.dataUrl).toBe('data:fake/400x600');
+    expect(result.lumaBase64).toBe('luma:240000');
   });
 
   it('copies the source bounds + transform verbatim (overlay registration)', () => {
@@ -168,12 +178,25 @@ describe('assembleBitmap', () => {
     expect(assembleBitmap(makeText(), fakeEncode, 'i').source).toBe('Hi (bitmap)');
   });
 
-  it('refuses over-budget conversions before encoding a bitmap', () => {
+  it('uses the transformed display size so a fitted large vector can convert', () => {
     const encode = vi.fn(fakeEncode);
+    const result = assembleBitmap(makeHugeFittedSvg(), encode, 'new-id');
 
-    expect(() => assembleBitmap(makeHugeSvg(), encode, 'new-id')).toThrow(
-      /bitmap would be 2001x2001 px/i,
-    );
-    expect(encode).not.toHaveBeenCalled();
+    expect(result.pixelWidth).toBe(1946);
+    expect(result.pixelHeight).toBe(1263);
+    expect(result.linesPerMm).toBe(10);
+    expect(evaluateRasterBudget(result.pixelWidth, result.pixelHeight).kind).toBe('ok');
+    expect(encode).toHaveBeenCalledTimes(1);
+  });
+
+  it('reduces lines/mm instead of rejecting physically oversized conversions', () => {
+    const encode = vi.fn(fakeEncode);
+    const result = assembleBitmap(makeHugeSvg(), encode, 'new-id');
+
+    expect(result.pixelWidth).toBeLessThan(7782);
+    expect(result.pixelHeight).toBeLessThan(5050);
+    expect(result.linesPerMm).toBeLessThan(10);
+    expect(evaluateRasterBudget(result.pixelWidth, result.pixelHeight).kind).toBe('ok');
+    expect(encode).toHaveBeenCalledTimes(1);
   });
 });
