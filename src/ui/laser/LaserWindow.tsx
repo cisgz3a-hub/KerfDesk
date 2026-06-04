@@ -29,18 +29,23 @@ export function LaserWindow(): JSX.Element {
 
   const supportsSerial = platform.serial.isSupported();
   const onStartJob = async (): Promise<void> => {
-    const project = useStore.getState().project;
+    const { project, jobPlacement } = useStore.getState();
     const laser = useLaserStore.getState();
-    const prepared = prepareStartJob(project, laser.controllerSettings, {
-      statusReport: laser.statusReport,
-      alarmCode: laser.alarmCode,
-      hasActiveStreamer:
-        laser.streamer !== null &&
-        (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
-      autofocusBusy: laser.autofocusBusy,
-      workOriginActive: laser.workOriginActive,
-      wcoCache: laser.wcoCache,
-    });
+    const prepared = prepareStartJob(
+      project,
+      laser.controllerSettings,
+      {
+        statusReport: laser.statusReport,
+        alarmCode: laser.alarmCode,
+        hasActiveStreamer:
+          laser.streamer !== null &&
+          (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
+        autofocusBusy: laser.autofocusBusy,
+        workOriginActive: laser.workOriginActive,
+        wcoCache: laser.wcoCache,
+      },
+      jobPlacement,
+    );
     if (!prepared.ok) {
       const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
       window.alert(`Cannot start job:\n\n${lines}`);

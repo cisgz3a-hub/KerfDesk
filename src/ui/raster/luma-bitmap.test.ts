@@ -3,13 +3,18 @@
 // verified in-browser (A2-v); here we pin the two DOM-free helpers it
 // composes: grey RGBA expansion and base64 luma transit.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { VectorRaster } from '../../core/raster';
-import { lumaToBase64, lumaToRgba } from './luma-bitmap';
+import { lumaToBase64, lumaToBitmap, lumaToRgba } from './luma-bitmap';
 
 function raster(luma: ReadonlyArray<number>, width: number, height: number): VectorRaster {
   return { luma: new Uint8Array(luma), width, height };
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('lumaToRgba', () => {
   it('replicates each luma byte across R,G,B with opaque alpha', () => {
@@ -41,3 +46,43 @@ describe('lumaToBase64', () => {
     expect(lumaToBase64(new Uint8Array(0))).toBe('');
   });
 });
+
+describe('lumaToBitmap', () => {
+  it('encodes canvas output through async toBlob instead of synchronous toDataURL', async () => {
+    const toBlob = vi.fn((cb: BlobCallback, mime: string) => {
+      cb(new Blob(['png'], { type: mime }));
+    });
+    const toDataURL = vi.fn(() => 'data:image/png;base64,sync');
+    vi.spyOn(document, 'createElement').mockReturnValue({
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        createImageData: (width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+        }),
+        putImageData: vi.fn(),
+      }),
+      toBlob,
+      toDataURL,
+    } as unknown as HTMLCanvasElement);
+    vi.stubGlobal('FileReader', FakeFileReader);
+
+    const result = await lumaToBitmap(raster([0], 1, 1));
+
+    expect(result.dataUrl).toBe('data:image/png;base64,async');
+    expect(result.lumaBase64).toBe('AA==');
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png');
+    expect(toDataURL).not.toHaveBeenCalled();
+  });
+});
+
+class FakeFileReader {
+  result: string | ArrayBuffer | null = null;
+  onload: ((this: FileReader, ev: ProgressEvent<FileReader>) => unknown) | null = null;
+  onerror: ((this: FileReader, ev: ProgressEvent<FileReader>) => unknown) | null = null;
+
+  readAsDataURL(): void {
+    this.result = 'data:image/png;base64,async';
+    this.onload?.call(this as unknown as FileReader, {} as ProgressEvent<FileReader>);
+  }
+}

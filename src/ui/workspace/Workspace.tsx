@@ -11,8 +11,11 @@
 // HTML overlays (drop hint, preview scrubber, etc.) in `overlays.tsx`.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildToolpath, EMPTY_JOB } from '../../core/job';
 import type { Project } from '../../core/scene';
+import { resolveJobPlacement } from '../job-placement';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
 import { buildPreviewToolpath } from './draw-preview';
 import { drawScene } from './draw-scene';
@@ -32,6 +35,10 @@ export function Workspace(): JSX.Element {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const previewMode = useStore((s) => s.previewMode);
+  const jobPlacement = useStore((s) => s.jobPlacement);
+  const statusReport = useLaserStore((s) => s.statusReport);
+  const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const wcoCache = useLaserStore((s) => s.wcoCache);
   const scrubberT = useUiStore((s) => s.scrubberT);
   // Three primitive selectors — Zustand only re-runs the effect when one
   // of them actually changes. A bundled `{...}` selector would create a
@@ -46,6 +53,10 @@ export function Workspace(): JSX.Element {
     selectedObjectId,
     additionalSelectedIds,
     previewMode,
+    jobPlacement,
+    statusReport,
+    workOriginActive,
+    wcoCache,
     scrubberT,
     viewState,
   });
@@ -98,6 +109,10 @@ function useWorkspaceDraw(args: {
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
+  readonly jobPlacement: ReturnType<typeof useStore.getState>['jobPlacement'];
+  readonly statusReport: ReturnType<typeof useLaserStore.getState>['statusReport'];
+  readonly workOriginActive: boolean;
+  readonly wcoCache: ReturnType<typeof useLaserStore.getState>['wcoCache'];
   readonly scrubberT: number;
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
 }): void {
@@ -107,6 +122,10 @@ function useWorkspaceDraw(args: {
     selectedObjectId,
     additionalSelectedIds,
     previewMode,
+    jobPlacement,
+    statusReport,
+    workOriginActive,
+    wcoCache,
     scrubberT,
     viewState,
   } = args;
@@ -116,10 +135,19 @@ function useWorkspaceDraw(args: {
     displayPolylineCacheRef.current = createDisplayPolylineCache();
   }
   const displayPolylineCache = displayPolylineCacheRef.current;
-  const previewToolpath = useMemo(
-    () => (previewMode ? buildPreviewToolpath(project) : null),
-    [previewMode, project],
-  );
+  const previewToolpath = useMemo(() => {
+    if (!previewMode) return null;
+    const placement = resolveJobPlacement(jobPlacement, {
+      statusReport,
+      workOriginActive,
+      wcoCache,
+    });
+    if (!placement.ok) return buildToolpath(EMPTY_JOB);
+    return buildPreviewToolpath(
+      project,
+      placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
+    );
+  }, [previewMode, project, jobPlacement, statusReport, workOriginActive, wcoCache]);
   const requestRasterRedraw = useCallback(() => {
     setRasterRedrawTick((tick) => tick + 1);
   }, []);

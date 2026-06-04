@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import { createLayer, EMPTY_SCENE, IDENTITY_TRANSFORM, type SceneObject } from '../scene';
+import {
+  createLayer,
+  EMPTY_SCENE,
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+  type SceneObject,
+} from '../scene';
 import { compileJob } from './compile-job';
 import type { CutGroup, FillGroup, Job, RasterGroup } from './job';
 
@@ -249,7 +255,7 @@ describe('compileJob', () => {
 });
 
 describe('compileJob raster image groups', () => {
-  function rasterObject(lumaBase64?: string): SceneObject {
+  function rasterObject(lumaBase64?: string): RasterImage {
     return {
       kind: 'raster-image',
       id: 'R1',
@@ -273,6 +279,26 @@ describe('compileJob raster image groups', () => {
     };
     const job = compileJob({ objects: [rasterObject('AP//AA==')], layers: [layer] }, dev);
     expect(firstRasterGroup(job)).toMatchObject({ passes: 3 });
+  });
+
+  it('maps grayscale image layers between minPower and power while keeping white off', () => {
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
+      ditherAlgorithm: 'grayscale' as const,
+      minPower: 10,
+      power: 30,
+      linesPerMm: 1,
+    };
+    const image: SceneObject = {
+      ...rasterObject('AID/'),
+      pixelWidth: 3,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 3, maxY: 1 },
+    };
+
+    const job = compileJob({ objects: [image], layers: [layer] }, dev);
+
+    expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual([300, 200, 0]);
   });
 
   it('resamples raster dimensions from image layer lines-per-mm', () => {

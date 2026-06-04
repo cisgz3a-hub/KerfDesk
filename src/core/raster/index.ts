@@ -11,6 +11,9 @@ export { dither } from './dither';
 export type { EmitRasterInput } from './emit-raster';
 export { emitRasterGroup } from './emit-raster';
 
+export type { LumaAdjustments } from './luma-adjust';
+export { applyLumaAdjustments } from './luma-adjust';
+
 export { rasterPreviewRgba } from './preview-data';
 
 export type { LumaRaster } from './luma-resample';

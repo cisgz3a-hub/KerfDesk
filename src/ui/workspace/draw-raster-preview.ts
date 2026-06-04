@@ -22,6 +22,7 @@
 
 import type { DeviceProfile } from '../../core/devices';
 import {
+  applyLumaAdjustments,
   dither,
   pixelExtentForMm,
   rasterPreviewRgba,
@@ -91,6 +92,7 @@ function previewCanvasFor(
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
   const sMax = powerToSMax(layer.power, device.maxPowerS);
+  const sMin = minPowerToSMin(layer.minPower, layer.power, device.maxPowerS);
   const targetWidth = pixelExtentForMm(
     (obj.bounds.maxX - obj.bounds.minX) * Math.abs(obj.transform.scaleX),
     layer.linesPerMm,
@@ -100,18 +102,19 @@ function previewCanvasFor(
     layer.linesPerMm,
   );
   if (evaluateRasterBudget(targetWidth, targetHeight).kind === 'too-large') return null;
-  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${layer.ditherAlgorithm}|${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
+  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.ditherAlgorithm}|${sMin}-${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
   const cached = previewCanvasCache.get(key);
   if (cached !== undefined) return cached.canvas;
   const sourceLuma = decodeLuma(obj.lumaBase64, pixelWidth * pixelHeight);
+  const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
   const luma = resampleLumaNearest(
-    { luma: sourceLuma, width: pixelWidth, height: pixelHeight },
+    { luma: adjustedLuma, width: pixelWidth, height: pixelHeight },
     targetWidth,
     targetHeight,
   );
   const sValues = dither(
     { luma, width: targetWidth, height: targetHeight },
-    { algorithm: layer.ditherAlgorithm, sMax },
+    { algorithm: layer.ditherAlgorithm, sMax, sMin },
   );
   const rgba = rasterPreviewRgba(sValues, sMax, targetWidth, targetHeight);
   const canvas = document.createElement('canvas');
@@ -122,6 +125,10 @@ function previewCanvasFor(
   octx.putImageData(new ImageData(rgba, targetWidth, targetHeight), 0, 0);
   previewCanvasCache.set(key, { dataUrl: obj.dataUrl, canvas });
   return canvas;
+}
+
+function adjustmentKey(obj: RasterImage): string {
+  return `${obj.brightness ?? 0}:${obj.contrast ?? 0}:${obj.gamma ?? 1}`;
 }
 
 function liveRasterPreviewDataUrls(project: Project): Set<string> {
@@ -145,6 +152,12 @@ function liveRasterPreviewDataUrls(project: Project): Set<string> {
 function powerToSMax(powerPercent: number, maxPowerS: number): number {
   const clamped = Math.max(0, Math.min(PERCENT_MAX, powerPercent));
   return Math.round((clamped / PERCENT_MAX) * maxPowerS);
+}
+
+function minPowerToSMin(minPowerPercent: number, powerPercent: number, maxPowerS: number): number {
+  const maxPercent = Math.max(0, Math.min(PERCENT_MAX, powerPercent));
+  const minPercent = Math.max(0, Math.min(maxPercent, minPowerPercent));
+  return Math.round((minPercent / PERCENT_MAX) * maxPowerS);
 }
 
 // Mirror compileJob's decodeBase64Luma: missing/corrupt bytes are white

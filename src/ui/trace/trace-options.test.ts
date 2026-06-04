@@ -8,11 +8,13 @@ import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
 import { DEFAULT_ADJUSTMENTS, type AdjustmentValues } from './AdjustmentControls';
 import {
   hasAggressivePreprocessing,
+  mergeLightBurnTraceSettings,
   mergeAdjustments,
   relaxAggressivePreprocessing,
 } from './trace-options';
 
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
+const PHOTO = TRACE_PRESETS['Photo'] as TraceOptions;
 
 describe('mergeAdjustments', () => {
   it('returns an options object equivalent to the preset when adjustments are at defaults', () => {
@@ -59,6 +61,35 @@ describe('mergeAdjustments', () => {
     const presetSnapshot = JSON.stringify(LINE_ART);
     mergeAdjustments(LINE_ART, { ...DEFAULT_ADJUSTMENTS, brightness: 50, invert: true });
     expect(JSON.stringify(LINE_ART)).toBe(presetSnapshot);
+  });
+});
+
+describe('mergeLightBurnTraceSettings', () => {
+  it('layers changed LightBurn trace controls onto the preset', () => {
+    const merged = mergeLightBurnTraceSettings(LINE_ART, {
+      cutoffLuma: 12,
+      thresholdLuma: 160,
+      ignoreLessThanPixels: 7,
+      smoothness: 0.4,
+      optimize: 0.6,
+    });
+
+    expect(merged.cutoffLuma).toBe(12);
+    expect(merged.thresholdLuma).toBe(160);
+    expect(merged.ignoreLessThanPixels).toBe(7);
+    expect(merged.despeckleMinPixels).toBe(7);
+    expect(merged.smoothness).toBe(0.4);
+    expect(merged.optimize).toBe(0.6);
+    expect(merged.fixedPalette).toEqual(LINE_ART.fixedPalette);
+  });
+
+  it('does not force binary LightBurn threshold fields onto untouched photo presets', () => {
+    const merged = mergeLightBurnTraceSettings(PHOTO, {});
+    expect(merged.cutoffLuma).toBeUndefined();
+    expect(merged.thresholdLuma).toBeUndefined();
+    expect(merged.ignoreLessThanPixels).toBeUndefined();
+    expect(merged.despeckleMinPixels).toBe(PHOTO.despeckleMinPixels);
+    expect(merged.numberOfColors).toBe(PHOTO.numberOfColors);
   });
 });
 

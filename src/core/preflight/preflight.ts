@@ -95,10 +95,24 @@ export function runPreflight(
 }
 
 function appendLayerIssues(layer: Layer, maxFeed: number, issues: PreflightIssue[]): void {
-  if (layer.power < 0 || layer.power > 100) {
+  const powerInRange = layer.power >= 0 && layer.power <= 100;
+  const minPowerInRange = layer.minPower >= 0 && layer.minPower <= 100;
+  if (!powerInRange) {
     issues.push({
       code: 'power-out-of-range',
       message: `Layer ${layer.id} power ${layer.power} is outside 0..100.`,
+    });
+  }
+  if (!minPowerInRange) {
+    issues.push({
+      code: 'power-out-of-range',
+      message: `Layer ${layer.id} min power ${layer.minPower} is outside 0..100.`,
+    });
+  }
+  if (powerInRange && minPowerInRange && layer.minPower > layer.power) {
+    issues.push({
+      code: 'power-out-of-range',
+      message: `Layer ${layer.id} min power ${layer.minPower} exceeds max power ${layer.power}.`,
     });
   }
   if (layer.speed <= 0 || layer.speed > maxFeed) {

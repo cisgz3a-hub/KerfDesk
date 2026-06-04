@@ -70,6 +70,15 @@ describe('elementToSubPaths — <rect>', () => {
   it('returns no subpaths if width or height is zero', () => {
     expect(elementToSubPaths(svgEl('<rect x="0" y="0" width="0" height="10"/>'))).toEqual([]);
   });
+
+  it('preserves rounded rect rx/ry as curved corner polylines', () => {
+    const subs = elementToSubPaths(
+      svgEl('<rect x="0" y="0" width="20" height="10" rx="5" ry="3"/>'),
+    );
+    expect(subs[0]?.closed).toBe(true);
+    expect(subs[0]?.points.length).toBeGreaterThan(5);
+    expect(subs[0]?.points[0]).toEqual({ x: 5, y: 0 });
+  });
 });
 
 describe('elementToSubPaths — <circle> / <ellipse>', () => {

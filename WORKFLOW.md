@@ -222,6 +222,8 @@ Identical to F-A3 except:
   7. Output toggle — checkbox labeled "Output".
 - Row hover: light highlight + delete button (for the *Layer*, not the objects — see edge below).
 
+- Each row includes order controls. The visible Cuts/Layers list order is the generated output order.
+
 #### Default values for a new Layer
 - Power: 30 %
 - Speed: 1500 mm/min
@@ -239,6 +241,12 @@ Identical to F-A3 except:
 2. Layer's paths immediately hidden from preview render.
 3. Layer's paths *excluded* from generated G-code.
 4. Cuts/Layers row appears dimmed.
+
+#### Success - reorder a layer
+1. Click a layer's up or down order control.
+2. The row moves one position in the Cuts/Layers list.
+3. Generated output processes layers in that new list order.
+4. Undo restores the previous layer order.
 
 #### Success — toggle visibility off
 1. Click eye icon.

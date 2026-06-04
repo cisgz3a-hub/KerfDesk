@@ -7,9 +7,15 @@
 // validation is a Phase B improvement.
 
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { LAYER_DEFAULTS, PROJECT_SCHEMA_VERSION, type Project } from '../../core/scene';
+import {
+  DITHER_ALGORITHMS,
+  LAYER_DEFAULTS,
+  PROJECT_SCHEMA_VERSION,
+  type Project,
+} from '../../core/scene';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
+import { validateProjectShape } from './project-shape-validator';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -59,7 +65,7 @@ export function deserializeProject(jsonText: string): DeserializeResult {
   // Top-level shape check (audit finding I-5). A `.lf2` with a truncated or
   // hand-edited body must reach the F-A12 "Could not open" modal, not crash
   // deep in the renderer. Field-level validation is a Phase C improvement.
-  const shapeError = validateShape(workingRaw);
+  const shapeError = validateProjectShape(workingRaw);
   if (shapeError !== null) return { kind: 'invalid', reason: shapeError };
 
   // Normalize additive DeviceProfile fields. Older .lf2 files predate
@@ -136,10 +142,10 @@ function normalizeLayer(layer: unknown): unknown {
   if (typeof out['hatchAngleDeg'] !== 'number') {
     out['hatchAngleDeg'] = LAYER_DEFAULTS.hatchAngleDeg;
   }
-  if (typeof out['hatchSpacingMm'] !== 'number') {
+  if (!isPositiveNumber(out['hatchSpacingMm'])) {
     out['hatchSpacingMm'] = LAYER_DEFAULTS.hatchSpacingMm;
   }
-  if (typeof out['fillOverscanMm'] !== 'number' || out['fillOverscanMm'] < 0) {
+  if (!isNonNegativeNumber(out['fillOverscanMm'])) {
     out['fillOverscanMm'] = LAYER_DEFAULTS.fillOverscanMm;
   }
   // ADR-038: pre-unidirectional .lf2 files have no fillBidirectional — default
@@ -151,25 +157,26 @@ function normalizeLayer(layer: unknown): unknown {
   // default pattern as the hatch fields above — pre-F.2 .lf2 files
   // don't have them; treating missing as the default keeps the
   // schema additive (no schemaVersion bump).
-  if (
-    out['ditherAlgorithm'] !== 'threshold' &&
-    out['ditherAlgorithm'] !== 'floyd-steinberg' &&
-    out['ditherAlgorithm'] !== 'grayscale'
-  ) {
+  if (!DITHER_ALGORITHMS.some((algorithm) => algorithm === out['ditherAlgorithm'])) {
     out['ditherAlgorithm'] = LAYER_DEFAULTS.ditherAlgorithm;
   }
-  if (typeof out['linesPerMm'] !== 'number' || out['linesPerMm'] <= 0) {
+  if (!isPositiveNumber(out['linesPerMm'])) {
     out['linesPerMm'] = LAYER_DEFAULTS.linesPerMm;
+  }
+  if (!isPercent(out['minPower'])) {
+    out['minPower'] = LAYER_DEFAULTS.minPower;
   }
   return out;
 }
 
-function validateShape(raw: Record<string, unknown>): string | null {
-  if (!isObject(raw['device'])) return 'missing or invalid `device`';
-  if (!isObject(raw['workspace'])) return 'missing or invalid `workspace`';
-  const scene = raw['scene'];
-  if (!isObject(scene)) return 'missing or invalid `scene`';
-  if (!Array.isArray(scene['objects'])) return 'missing or invalid `scene.objects`';
-  if (!Array.isArray(scene['layers'])) return 'missing or invalid `scene.layers`';
-  return null;
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === 'number' && value >= 0;
+}
+
+function isPositiveNumber(value: unknown): value is number {
+  return typeof value === 'number' && value > 0;
+}
+
+function isPercent(value: unknown): value is number {
+  return typeof value === 'number' && value >= 0 && value <= 100;
 }

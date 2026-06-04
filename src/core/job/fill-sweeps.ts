@@ -63,8 +63,10 @@ function isOnGroupLine(first: Run, run: Run): boolean {
   const dy = first.end.y - first.start.y;
   const len = Math.hypot(dx, dy);
   if (len <= 0) return false;
-  return perpDistance(first.start, dx, dy, len, run.start) < COLLINEAR_EPS_MM &&
-    perpDistance(first.start, dx, dy, len, run.end) < COLLINEAR_EPS_MM;
+  return (
+    perpDistance(first.start, dx, dy, len, run.start) < COLLINEAR_EPS_MM &&
+    perpDistance(first.start, dx, dy, len, run.end) < COLLINEAR_EPS_MM
+  );
 }
 
 function perpDistance(origin: Vec2, dx: number, dy: number, len: number, p: Vec2): number {

@@ -106,9 +106,27 @@ describe('buildToolpath', () => {
           passes: 1,
           overscanMm: 0,
           segments: [
-            { polyline: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false },
-            { polyline: [{ x: 8, y: 0 }, { x: 12, y: 0 }], closed: false },
-            { polyline: [{ x: 15, y: 0 }, { x: 20, y: 0 }], closed: false },
+            {
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 5, y: 0 },
+              ],
+              closed: false,
+            },
+            {
+              polyline: [
+                { x: 8, y: 0 },
+                { x: 12, y: 0 },
+              ],
+              closed: false,
+            },
+            {
+              polyline: [
+                { x: 15, y: 0 },
+                { x: 20, y: 0 },
+              ],
+              closed: false,
+            },
           ],
         },
       ],
@@ -116,8 +134,18 @@ describe('buildToolpath', () => {
     // One scanline, 3 ink spans / 2 holes: ink spans are cuts, the interior
     // holes are laser-off travels — the preview matches the emitted sweep.
     expect(tp.steps.map((s) => s.kind)).toEqual(['cut', 'travel', 'cut', 'travel', 'cut']);
-    expect(tp.steps[1]).toMatchObject({ kind: 'travel', from: { x: 5, y: 0 }, to: { x: 8, y: 0 }, length: 3 });
-    expect(tp.steps[3]).toMatchObject({ kind: 'travel', from: { x: 12, y: 0 }, to: { x: 15, y: 0 }, length: 3 });
+    expect(tp.steps[1]).toMatchObject({
+      kind: 'travel',
+      from: { x: 5, y: 0 },
+      to: { x: 8, y: 0 },
+      length: 3,
+    });
+    expect(tp.steps[3]).toMatchObject({
+      kind: 'travel',
+      from: { x: 12, y: 0 },
+      to: { x: 15, y: 0 },
+      length: 3,
+    });
     expect(tp.totalLength).toBe(20);
   });
 });

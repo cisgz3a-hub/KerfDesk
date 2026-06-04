@@ -81,7 +81,12 @@ function appendFillSweepSteps(
   for (let i = 0; i < sweep.spans.length; i += 1) {
     const span = sweep.spans[i];
     if (span === undefined) continue;
-    steps.push({ kind: 'cut', color, polyline: [span.start, span.end], length: dist(span.start, span.end) });
+    steps.push({
+      kind: 'cut',
+      color,
+      polyline: [span.start, span.end],
+      length: dist(span.start, span.end),
+    });
     const next = sweep.spans[i + 1];
     if (next !== undefined) appendTravelStep(steps, span.end, next.start);
   }

@@ -18,8 +18,9 @@
 // a single discrete change.
 
 import type { Layer, LayerMode } from '../../core/scene';
-import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
 import { useStore } from '../state';
+import { LayerImageFields } from './LayerImageFields';
+import { LayerOrderControls } from './LayerOrderControls';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const cardStyle: React.CSSProperties = {
@@ -77,10 +78,14 @@ const fieldValueStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
 const wideInputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
-const ditherSelectStyle: React.CSSProperties = { flex: 1, maxWidth: 180 };
 const modeSelectStyle: React.CSSProperties = { fontSize: 13, padding: '2px 4px' };
 
-export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
+export function LayerRow(props: {
+  readonly layer: Layer;
+  readonly canMoveUp: boolean;
+  readonly canMoveDown: boolean;
+}): JSX.Element {
+  const { layer } = props;
   return (
     <section
       style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
@@ -88,6 +93,11 @@ export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
     >
       <header style={cardHeaderStyle}>
         <ColorSwatch color={layer.color} visible={layer.visible} />
+        <LayerOrderControls
+          layer={layer}
+          canMoveUp={props.canMoveUp}
+          canMoveDown={props.canMoveDown}
+        />
         <ModeSelect layer={layer} />
         <span style={headerFillerStyle} />
         <HeaderToggle label="Show" layer={layer} field="visible" />
@@ -105,7 +115,7 @@ export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
         <PassesInput layer={layer} />
       </FieldRow>
       {layer.mode === 'fill' && <FillFields layer={layer} />}
-      {layer.mode === 'image' && <ImageFields layer={layer} />}
+      {layer.mode === 'image' && <LayerImageFields layer={layer} />}
     </section>
   );
 }
@@ -275,71 +285,12 @@ function FillOverscanInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function ImageFields({ layer }: { readonly layer: Layer }): JSX.Element {
-  return (
-    <>
-      <FieldRow label="Dither">
-        <DitherSelect layer={layer} />
-      </FieldRow>
-      <FieldRow label="Resolution">
-        <LinesPerMmInput layer={layer} />
-        <span style={unitStyle}>lines / mm</span>
-      </FieldRow>
-    </>
-  );
-}
-
-function DitherSelect({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
-  return (
-    <select
-      value={layer.ditherAlgorithm}
-      onChange={(e) =>
-        setLayerParam(layer.id, {
-          ditherAlgorithm: e.target.value as Layer['ditherAlgorithm'],
-        })
-      }
-      title="Threshold: harsh binary. Floyd-Steinberg: photo-style error diffusion. Grayscale: direct luma → S."
-      aria-label={`Dither for ${layer.color}`}
-      style={ditherSelectStyle}
-    >
-      <option value="threshold">Threshold</option>
-      <option value="floyd-steinberg">Floyd-Steinberg</option>
-      <option value="grayscale">Grayscale</option>
-    </select>
-  );
-}
-
-function LinesPerMmInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
-  const debounced = useDebouncedCommit<number>({
-    value: layer.linesPerMm,
-    commit: (linesPerMm) => setLayerParam(layer.id, { linesPerMm }),
-    // 5..25 lines/mm (WORKFLOW.md). The 25 cap matches raster-budget's
-    // MAX_RASTER_LINES_PER_MM so the slider can't author an obviously
-    // over-budget raster; the pre-emit pixel budget still catches large bounds.
-    parse: (s) => clamp(numericValue(s), 5, MAX_RASTER_LINES_PER_MM),
-  });
-  return (
-    <input
-      type="number"
-      min={5}
-      max={MAX_RASTER_LINES_PER_MM}
-      step={1}
-      value={debounced.displayValue}
-      onChange={debounced.onChange}
-      onBlur={debounced.onBlur}
-      style={inputStyle}
-      aria-label={`Lines per mm for ${layer.color}`}
-    />
-  );
-}
-
 function PowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const setLayerParam = useStore((s) => s.setLayerParam);
   const debounced = useDebouncedCommit<number>({
     value: layer.power,
-    commit: (power) => setLayerParam(layer.id, { power }),
+    commit: (power) =>
+      setLayerParam(layer.id, { power, minPower: Math.min(layer.minPower, power) }),
     parse: (s) => clamp(numericValue(s), 0, 100),
   });
   return (

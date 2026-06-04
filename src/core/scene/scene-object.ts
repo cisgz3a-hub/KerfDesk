@@ -119,7 +119,21 @@ export type TracedImage = {
 // surfaced via the Image-mode layer fields, but stored on the
 // object so each image carries its own preferred quality settings
 // across save/load.
-export type DitherAlgorithm = 'threshold' | 'floyd-steinberg' | 'grayscale';
+export const DITHER_ALGORITHMS = [
+  'threshold',
+  'floyd-steinberg',
+  'jarvis',
+  'stucki',
+  'atkinson',
+  'burkes',
+  'sierra3',
+  'sierra2',
+  'sierra-lite',
+  'ordered',
+  'grayscale',
+] as const;
+
+export type DitherAlgorithm = (typeof DITHER_ALGORITHMS)[number];
 
 export type RasterImage = {
   readonly kind: 'raster-image';
@@ -142,6 +156,9 @@ export type RasterImage = {
   // strains USB bandwidth and pushes G-code past ~1 MB on a
   // 100×100 mm image.
   readonly linesPerMm: number;
+  readonly brightness?: number; // -100..100; image engrave adjustment, default 0
+  readonly contrast?: number; // -100..100; image engrave adjustment, default 0
+  readonly gamma?: number; // 0.1..5; image engrave adjustment, default 1
   // Pre-extracted greyscale luma buffer (one byte per pixel, ITU-R
   // BT.601: 0.299·R + 0.587·G + 0.114·B), base64-encoded so it can
   // round-trip through .lf2's JSON. Length after decode equals

@@ -58,7 +58,12 @@ import {
   panelStyle,
 } from './dialog-parts';
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
-import { mergeAdjustments } from './trace-options';
+import {
+  mergeAdjustments,
+  mergeLightBurnTraceSettings,
+  type LightBurnTraceSettingOverrides,
+} from './trace-options';
+import { TraceSettingsControls } from './TraceSettingsControls';
 import { traceImageWithFallback } from './use-trace-worker-client';
 import { TracePreview } from './TracePreview';
 import { useTracePreview } from './use-trace-preview';
@@ -75,6 +80,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   const pushToast = useToastStore((s) => s.pushToast);
   const [file, setFile] = useState<File | null>(null);
   const [preset, setPreset] = useState<string>('Line Art');
+  const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [adjustments, setAdjustments] = useState<AdjustmentValues>(DEFAULT_ADJUSTMENTS);
   const [busy, setBusy] = useState(false);
   // Reconstruct a File from the seed bitmap's embedded dataUrl so the
@@ -106,9 +112,10 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   // not on `presetOptions` itself, because `presetOptions` is
   // re-derived from `TRACE_PRESETS[preset]` each render and would
   // otherwise be ref-unstable too.
+  const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
   const options: TraceOptions = useMemo(
-    () => mergeAdjustments(TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS, adjustments),
-    [preset, adjustments],
+    () => mergeAdjustments(mergeLightBurnTraceSettings(presetOptions, traceSettings), adjustments),
+    [presetOptions, traceSettings, adjustments],
   );
   const preview = useTracePreview(file, options);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -148,6 +155,11 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
         <h2 style={headingStyle}>Trace Image</h2>
         <SourceLabel name={seed.source} />
         <PresetPicker value={preset} onChange={setPreset} />
+        <TraceSettingsControls
+          preset={presetOptions}
+          overrides={traceSettings}
+          onChange={setTraceSettings}
+        />
         <AdjustmentControls values={adjustments} onChange={setAdjustments} />
         <TracePreview state={preview} />
         <PresetHint />

@@ -52,6 +52,22 @@ describe('runPreflight — happy path', () => {
     expect(result.ok).toBe(true);
     expect(result.issues).toEqual([]);
   });
+
+  it('flags image minPower above layer power before output is burned', () => {
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000', mode: 'image' }),
+      minPower: 40,
+      power: 30,
+    };
+    const project = projectWith(layer);
+
+    const result = runPreflight(project, emit(project));
+
+    expect(result.issues).toContainEqual({
+      code: 'power-out-of-range',
+      message: 'Layer L1 min power 40 exceeds max power 30.',
+    });
+  });
 });
 
 describe('runPreflight laser-off travel invariant', () => {

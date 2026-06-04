@@ -89,7 +89,12 @@ const arbFillGroup = fc.record({
   layerId: fc.string({ minLength: 1, maxLength: 4 }),
   color: fc.constantFrom('#ff0000', '#00ff00', '#000000'),
   power: fc.double({ min: 0, max: 100, noNaN: true, noDefaultInfinity: true }),
-  speed: fc.double({ min: 1, max: DEFAULT_DEVICE_PROFILE.maxFeed, noNaN: true, noDefaultInfinity: true }),
+  speed: fc.double({
+    min: 1,
+    max: DEFAULT_DEVICE_PROFILE.maxFeed,
+    noNaN: true,
+    noDefaultInfinity: true,
+  }),
   passes: fc.integer({ min: 1, max: 3 }),
   overscanMm: fc.double({ min: 0, max: 5, noNaN: true, noDefaultInfinity: true }),
   segments: fc.array(arbFillSpan, { minLength: 0, maxLength: 8 }),
