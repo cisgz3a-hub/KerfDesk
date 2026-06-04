@@ -28,11 +28,12 @@ afterEach(() => {
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     autofocusBusy: false,
+    motionOperation: null,
     streamer: null,
     workOriginActive: false,
     wcoCache: null,
     safetyNotice: null,
-  });
+  } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
 describe('LaserWindow autofocus busy controls', () => {
@@ -102,6 +103,42 @@ describe('LaserWindow autofocus busy controls', () => {
       });
 
       expect(host.textContent).toContain('USB lost mid-job. Use physical E-stop.');
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('disables jog controls and shows Cancel frame while Frame is active', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      motionOperation: {
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: false,
+      },
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      expect(button(host, 'Cancel frame').disabled).toBe(false);
+      const stepSelect = host.querySelector<HTMLSelectElement>(
+        'select[aria-label="Jog step size"]',
+      );
+      expect(stepSelect?.disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());

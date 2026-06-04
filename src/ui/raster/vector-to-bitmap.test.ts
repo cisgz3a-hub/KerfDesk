@@ -5,7 +5,7 @@
 // without a real canvas. buildBitmapFromVector — the production wiring with the
 // real lumaToBitmap — is verified in-browser (A2-v), not here.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { VectorRaster } from '../../core/raster';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
@@ -56,6 +56,13 @@ function makeSvg(): ImportedSvg {
     bounds: BOUNDS_20MM,
     transform: TRANSFORM,
     paths: [SQUARE],
+  };
+}
+
+function makeHugeSvg(): ImportedSvg {
+  return {
+    ...makeSvg(),
+    bounds: { minX: 0, minY: 0, maxX: 200.1, maxY: 200.1 },
   };
 }
 
@@ -159,5 +166,14 @@ describe('assembleBitmap', () => {
     expect(assembleBitmap(makeSvg(), fakeEncode, 'i').source).toBe('logo.svg (bitmap)');
     expect(assembleBitmap(makeTraced(), fakeEncode, 'i').source).toBe('photo.png (bitmap)');
     expect(assembleBitmap(makeText(), fakeEncode, 'i').source).toBe('Hi (bitmap)');
+  });
+
+  it('refuses over-budget conversions before encoding a bitmap', () => {
+    const encode = vi.fn(fakeEncode);
+
+    expect(() => assembleBitmap(makeHugeSvg(), encode, 'new-id')).toThrow(
+      /bitmap would be 2001x2001 px/i,
+    );
+    expect(encode).not.toHaveBeenCalled();
   });
 });

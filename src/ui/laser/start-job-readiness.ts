@@ -9,7 +9,7 @@ import {
   USER_ORIGIN_JOB_PLACEMENT,
 } from '../../core/job';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
-import { runControllerReadiness } from '../../core/preflight';
+import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
 import type { Project } from '../../core/scene';
 import { emitGcode } from '../../io/gcode';
 import { hasCustomOrigin, type WorkCoordinateOffset } from '../state/origin-actions';
@@ -50,6 +50,10 @@ export function prepareStartJob(
   const originOffset = resolveUserOriginOffset(machine, useUserOrigin);
   if (originOffset === 'unknown') {
     return { ok: false, messages: [CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE] };
+  }
+  const preEmit = runPreEmitPreflight(project);
+  if (!preEmit.ok) {
+    return { ok: false, messages: preEmit.issues.map((i) => i.message) };
   }
   const originBoundsIssue = findOriginBoundsIssue(project, machine, useUserOrigin);
   if (originBoundsIssue !== null) {
