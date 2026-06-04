@@ -72,6 +72,32 @@ describe('drawRasterPreview', () => {
 
     expect(createdCanvases).toHaveLength(2);
   });
+
+  it('skips over-budget raster previews before creating an offscreen canvas', () => {
+    vi.stubGlobal('ImageData', FakeImageData);
+    const createElement = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ({ putImageData: vi.fn() }),
+      } as unknown as HTMLCanvasElement;
+    });
+    const ctx = noOpContext();
+    const view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
+    const project = projectForRaster(
+      burnRasterWithBounds('data:image/png;base64,over-budget-preview', {
+        minX: 0,
+        minY: 0,
+        maxX: 200.1,
+        maxY: 200.1,
+      }),
+    );
+
+    drawRasterPreview(ctx, project, view);
+
+    expect(createElement).not.toHaveBeenCalled();
+  });
 });
 
 class FakeImageData {
@@ -114,6 +140,10 @@ function burnRaster(dataUrl: string): RasterImage {
     dither: 'threshold',
     linesPerMm: 10,
   };
+}
+
+function burnRasterWithBounds(dataUrl: string, bounds: RasterImage['bounds']): RasterImage {
+  return { ...burnRaster(dataUrl), bounds };
 }
 
 function projectForRaster(obj: RasterImage): Project {

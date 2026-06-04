@@ -18,6 +18,7 @@
 // real lumaToBitmap + a fresh id — and is exercised in-browser (A2-v).
 
 import { rasterizeVectorToLuma, type VectorRaster } from '../../core/raster';
+import { evaluateRasterBudget } from '../../core/raster/raster-budget';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
   type DitherAlgorithm,
@@ -34,6 +35,8 @@ import { type BitmapFields, lumaToBitmap } from './luma-bitmap';
 // equals LightBurn's observed Fill-All UI value, and sits in its 120–300 DPI
 // photo band — a grounded choice, not an invented LightBurn default.
 const CONVERT_TO_BITMAP_DPI = 254;
+const MM_PER_INCH = 25.4;
+const MIN_PIXEL_DIM = 1;
 // Match the image-import raster defaults so a converted bitmap engraves exactly
 // like an imported one would (candidate de-dup with Toolbar's import handler).
 const DEFAULT_DITHER: DitherAlgorithm = 'floyd-steinberg';
@@ -62,6 +65,7 @@ export function assembleBitmap(
   encode: (raster: VectorRaster) => BitmapFields,
   id: string,
 ): RasterImage {
+  assertWithinBitmapBudget(o);
   const polylines = o.paths.flatMap((p) => p.polylines);
   const raster = rasterizeVectorToLuma({ polylines, bounds: o.bounds, dpi: CONVERT_TO_BITMAP_DPI });
   const { dataUrl, lumaBase64 } = encode(raster);
@@ -79,6 +83,24 @@ export function assembleBitmap(
     linesPerMm: DEFAULT_LINES_PER_MM,
     lumaBase64,
   };
+}
+
+function assertWithinBitmapBudget(o: ConvertibleVector): void {
+  const pixelWidth = convertedPixelExtent(o.bounds.maxX - o.bounds.minX);
+  const pixelHeight = convertedPixelExtent(o.bounds.maxY - o.bounds.minY);
+  const verdict = evaluateRasterBudget(pixelWidth, pixelHeight);
+  if (verdict.kind === 'too-large') {
+    throw new Error(
+      `Converted bitmap would be ${pixelWidth}x${pixelHeight} px (${verdict.reason}). Scale the artwork down before converting to bitmap.`,
+    );
+  }
+}
+
+function convertedPixelExtent(mm: number): number {
+  return Math.max(
+    MIN_PIXEL_DIM,
+    Math.round(Math.max(0, mm) * (CONVERT_TO_BITMAP_DPI / MM_PER_INCH)),
+  );
 }
 
 // Display name for the converted bitmap. SVG / traced images carry a `source`

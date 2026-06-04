@@ -18,6 +18,7 @@ function makeLaserState(): LaserState {
     lastWriteError: null,
     safetyNotice: null,
     autofocusBusy: false,
+    motionOperation: null,
     streamer: null,
     log: [],
     detectedSettings: null,

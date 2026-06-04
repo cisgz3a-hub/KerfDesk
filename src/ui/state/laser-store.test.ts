@@ -8,6 +8,28 @@ type FakeConnection = SerialConnection & {
   readonly emitClose: () => void;
 };
 
+type MotionOperationSnapshot = {
+  readonly kind: 'frame' | 'jog';
+  readonly sawControllerBusy: boolean;
+  readonly idleStatusReports?: number;
+  readonly dispatchComplete?: boolean;
+} | null;
+
+function getMotionOperation(): MotionOperationSnapshot {
+  return (
+    (useLaserStore.getState() as { readonly motionOperation?: MotionOperationSnapshot })
+      .motionOperation ?? null
+  );
+}
+
+function setMotionOperation(operation: MotionOperationSnapshot): void {
+  const normalized =
+    operation === null ? null : { dispatchComplete: false, idleStatusReports: 0, ...operation };
+  useLaserStore.setState({ motionOperation: normalized } as Partial<
+    ReturnType<typeof useLaserStore.getState>
+  >);
+}
+
 function makeConnection(
   write: (data: string) => Promise<void>,
   close: () => Promise<void> = async () => undefined,
@@ -113,6 +135,17 @@ describe('laser-store safety notices (P0-B)', () => {
 
     expect(useLaserStore.getState().safetyNotice).toBeNull();
   });
+
+  it('raises a disconnect-during-job notice when the USB drops during active Frame', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    setMotionOperation({ kind: 'frame', sawControllerBusy: true });
+
+    connection.emitClose();
+
+    expect(getMotionOperation()).toBeNull();
+    expect(useLaserStore.getState().safetyNotice?.kind).toBe('disconnect-during-job');
+  });
 });
 
 describe('laser-store serial write failures', () => {
@@ -212,6 +245,57 @@ describe('laser-store serial write failures', () => {
     expect(useLaserStore.getState().connection.kind).toBe('disconnected');
     expect(useLaserStore.getState().streamer).toBeNull();
   });
+
+  it('sends soft reset before disconnecting a job stopped by controller error', async () => {
+    const close = vi.fn(async () => undefined);
+    const write = vi.fn(async () => undefined);
+    const connection = makeConnection(write, close);
+    await connectWith(connection);
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    connection.emitLine('error:7');
+    expect(useLaserStore.getState().streamer?.status).toBe('errored');
+
+    write.mockClear();
+    await useLaserStore.getState().disconnect();
+
+    expect(write).toHaveBeenCalledWith(RT_SOFT_RESET);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(useLaserStore.getState().streamer).toBeNull();
+  });
+
+  it.each([
+    ['Home', 'home', () => useLaserStore.getState().home()],
+    ['Unlock', 'unlock', () => useLaserStore.getState().unlockAlarm()],
+    ['Jog', 'jog', () => useLaserStore.getState().jog({ dx: 1, feed: 1000 })],
+    ['Cancel jog', 'jog', () => useLaserStore.getState().cancelJog()],
+    [
+      'Frame',
+      'frame',
+      () => useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000),
+    ],
+    ['Set Origin', 'origin', () => useLaserStore.getState().setOriginHere()],
+    ['Reset Origin', 'origin', () => useLaserStore.getState().resetOrigin()],
+  ] as const)(
+    'raises a safety notice when the %s write fails',
+    async (_label, expectedAction, runCommand) => {
+      const write = vi.fn(async () => {
+        throw new Error(`${expectedAction} rejected`);
+      });
+      const connection = makeConnection(write);
+      await connectWith(connection);
+
+      await expect(runCommand()).rejects.toThrow(`${expectedAction} rejected`);
+
+      expect(useLaserStore.getState().safetyNotice).toMatchObject({
+        kind: 'write-failed',
+        action: expectedAction,
+      });
+      if (expectedAction === 'frame') {
+        expect(getMotionOperation()).toBeNull();
+      }
+    },
+  );
 
   it('rejects Set Origin when the G92 write fails', async () => {
     const write = vi.fn(async () => {

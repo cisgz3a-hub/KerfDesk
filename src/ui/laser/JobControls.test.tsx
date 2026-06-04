@@ -49,13 +49,29 @@ function installProject(): void {
   });
 }
 
+type MotionOperationSnapshot = {
+  readonly kind: 'frame' | 'jog';
+  readonly sawControllerBusy: boolean;
+  readonly idleStatusReports?: number;
+  readonly dispatchComplete?: boolean;
+};
+
+function setMotionOperation(operation: MotionOperationSnapshot | null): void {
+  const normalized =
+    operation === null ? null : { dispatchComplete: false, idleStatusReports: 0, ...operation };
+  useLaserStore.setState({ motionOperation: normalized } as Partial<
+    ReturnType<typeof useLaserStore.getState>
+  >);
+}
+
 afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
     streamer: null,
     workOriginActive: false,
     wcoCache: null,
-  });
+  } as Partial<ReturnType<typeof useLaserStore.getState>>);
+  setMotionOperation(null);
   useToastStore.setState({ toasts: [] });
   vi.restoreAllMocks();
 });
@@ -129,6 +145,79 @@ describe('JobControls running safety copy', () => {
       expect(host.textContent).toContain(
         'Pause is feed hold only. Use Stop or physical E-stop if unsafe.',
       );
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('keeps Stop visible after a controller error leaves the job in recovery', async () => {
+    installProject();
+    useLaserStore.setState({
+      streamer: {
+        status: 'errored',
+        queued: [],
+        inFlight: [],
+        inFlightBytes: 0,
+        completed: 2,
+        total: 5,
+        rxBufferBytes: 120,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+      });
+
+      const buttons = [...host.querySelectorAll('button')].map((button) => button.textContent);
+      expect(buttons).toContain('Stop');
+      expect(buttons).not.toContain('Pause');
+      expect(buttons).not.toContain('Resume');
+      const buttonByText = (text: string): HTMLButtonElement => {
+        const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
+        if (button === undefined) throw new Error(`${text} button not rendered`);
+        return button;
+      };
+      expect(buttonByText('Home').disabled).toBe(true);
+      expect(buttonByText('Set origin here').disabled).toBe(true);
+      expect(buttonByText('Frame').disabled).toBe(true);
+      expect(buttonByText('Start job').disabled).toBe(true);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('shows Cancel frame and disables conflicting controls while Frame is active', async () => {
+    installProject();
+    setMotionOperation({ kind: 'frame', sawControllerBusy: false });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+      });
+
+      const buttonByText = (text: string): HTMLButtonElement => {
+        const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
+        if (button === undefined) throw new Error(`${text} button not rendered`);
+        return button;
+      };
+      expect(buttonByText('Cancel frame').disabled).toBe(false);
+      expect(buttonByText('Home').disabled).toBe(true);
+      expect(buttonByText('Set origin here').disabled).toBe(true);
+      expect(buttonByText('Frame').disabled).toBe(true);
+      expect(buttonByText('Start job').disabled).toBe(true);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());

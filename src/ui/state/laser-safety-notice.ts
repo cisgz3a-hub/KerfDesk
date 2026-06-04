@@ -24,7 +24,8 @@ export type LaserSafetyAction =
   | 'frame'
   | 'origin'
   | 'jog'
-  | 'home';
+  | 'home'
+  | 'unlock';
 
 export type LaserSafetyNotice =
   | {

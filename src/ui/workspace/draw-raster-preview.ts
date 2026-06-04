@@ -28,6 +28,7 @@ import {
   resampleLumaNearest,
   whiteLuma,
 } from '../../core/raster';
+import { evaluateRasterBudget } from '../../core/raster/raster-budget';
 import type { Layer, Project, RasterImage } from '../../core/scene';
 import { drawBitmapAtTransform } from './draw-raster';
 import type { ViewTransform } from './view-transform';
@@ -98,6 +99,7 @@ function previewCanvasFor(
     (obj.bounds.maxY - obj.bounds.minY) * Math.abs(obj.transform.scaleY),
     layer.linesPerMm,
   );
+  if (evaluateRasterBudget(targetWidth, targetHeight).kind === 'too-large') return null;
   const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${layer.ditherAlgorithm}|${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
   const cached = previewCanvasCache.get(key);
   if (cached !== undefined) return cached.canvas;

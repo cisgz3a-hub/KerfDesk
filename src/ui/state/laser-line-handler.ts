@@ -27,6 +27,7 @@ import {
 } from '../../core/controllers/grbl';
 import { consumeSettingsResponse } from './detected-settings-action';
 import { controllerErrorNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import { observeMotionStatus } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 import { hasCustomOrigin } from './origin-actions';
 
@@ -122,6 +123,9 @@ export function handleLine(
   const patch = consumeSettingsResponse(refs, cls);
   if (patch !== null) set({ detectedSettings: patch, controllerSettings: patch });
   if (cls.kind === 'status') {
+    const operation = get().motionOperation;
+    const nextOperation = observeMotionStatus(operation, cls.report.state);
+    const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
     // Cache WCO across frames — GRBL only reports it intermittently
     // (every Nth status per `$10`'s WCO bit). UI reads `wcoCache`,
     // never `statusReport.wco`. F.3 / ADR-021.
@@ -130,9 +134,10 @@ export function handleLine(
         statusReport: cls.report,
         wcoCache: cls.report.wco,
         workOriginActive: hasCustomOrigin(cls.report.wco),
+        ...operationPatch,
       });
     } else {
-      set({ statusReport: cls.report });
+      set({ statusReport: cls.report, ...operationPatch });
     }
     return;
   }
@@ -140,7 +145,7 @@ export function handleLine(
     // GRBL clears G92 on alarm (1 — hard limit; soft-resets internally).
     // Mirror that in our cache so the readout stops claiming a custom
     // origin is active. F.3 / ADR-021.
-    set({ alarmCode: cls.code, wcoCache: null, workOriginActive: false });
+    set({ alarmCode: cls.code, wcoCache: null, workOriginActive: false, motionOperation: null });
     advanceStream(set, get, safeWrite, 'alarm');
     return;
   }
