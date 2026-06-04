@@ -19,6 +19,7 @@
 export type LaserSafetyAction =
   | 'pause'
   | 'resume'
+  | 'start'
   | 'stop'
   | 'disconnect'
   | 'frame'

@@ -78,9 +78,7 @@ export function initialLaserState(): Pick<
 // disconnect-during-job safety notice — GRBL may still be executing the
 // commands already in its 127-byte buffer (P0-B).
 export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
-  const wasActiveJob =
-    state.streamer !== null &&
-    (state.streamer.status === 'streaming' || state.streamer.status === 'paused');
+  const wasActiveJob = isActiveJob(state.streamer);
   const wasUnsafeActive = wasActiveJob || state.motionOperation !== null;
   const stream: StreamerState | null =
     wasActiveJob && state.streamer !== null ? disconnectStreamer(state.streamer) : state.streamer;
