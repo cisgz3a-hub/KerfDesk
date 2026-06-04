@@ -2096,6 +2096,60 @@ After the fix, the same repro prints `status=errored` and `next toSend=""`.
 
 ---
 
+## ADR-042 - Ack-driven follow-up write failure raises the disconnect safety notice (P0-3)
+
+**Status:** Accepted, code shipped. | **Date:** 2026-06-04
+
+### Context
+
+`advanceStream` (laser-line-handler.ts) pushes the next buffer chunk after each
+ack. When that follow-up `safeWrite` rejected (port lost mid-job), the `.catch`
+marked the streamer `disconnected` but raised NO `safetyNotice`. GRBL keeps
+executing the lines already in its ~120-byte buffer, so the head can keep moving
+while the UI silently leaves the streaming state with no alert to hit the physical
+E-stop. Every other write-failure path in laser-store.ts (pause/resume/stop,
+around lines 290/388/398/423) raises a notice; this one did not. The existing
+test asserted `status === 'disconnected'` but never checked the notice, which is
+why the gap survived. Captured red before the fix:
+
+    expected null to deeply equal { kind: 'disconnect-during-job', ... }
+    Received: null
+
+P0-3 in docs/REMAINING-WORK-ROADMAP-2026-06-04.md; whole-repo-lightburn-parity-
+audit-2026-06-04, karpathy-whole-repo-audit-2026-06-02 (KF-012).
+
+### Decision
+
+In the `advanceStream` `.catch`, set BOTH the disconnected streamer and a
+disconnect-during-job safetyNotice. The disconnect-during-job message is the
+correct one (not write-failed): it names the real danger - buffered motion
+continuing after the link is gone - matching the message the onClose path already
+raises. A new builder `disconnectDuringJobNotice()` in laser-safety-notice.ts is
+the single source of that notice; buildPortClosePatch (laser-store-helpers.ts) now
+uses it too, removing the duplicated inline literal. No soft-reset is sent on this
+path: the write itself failed, so there is no live link to send one over (recovery
+state is already preserved by disconnect()).
+
+### Consequences
+
+- A mid-stream follow-up write failure now shows the operator the physical E-stop
+  banner, closing the silent-teardown gap.
+- The disconnect-during-job notice has exactly one constructor, used by both the
+  onClose patch and the stream-write-failure catch; they cannot drift.
+
+### Verification
+
+- laser-line-handler.test.ts: the existing follow-up-write-failure test now also
+  asserts the disconnect-during-job safetyNotice is set (the assertion that was
+  red before the fix).
+- laser-store.test.ts: the onClose disconnect-during-job test stays green through
+  the builder refactor (same kind + message).
+- Full suite green; tsc --noEmit 0; eslint 0 on touched files.
+- No hardware verification needed (write-failure path + UI banner; the underlying
+  disconnect behavior is already hardware-exercised).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

@@ -26,7 +26,7 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { consumeSettingsResponse } from './detected-settings-action';
-import { controllerErrorNotice } from './laser-safety-notice';
+import { controllerErrorNotice, disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { hasCustomOrigin } from './origin-actions';
 
@@ -173,7 +173,15 @@ function advanceStream(
   set({ streamer: stepped.state });
   if (stepped.toSend.length > 0) {
     void safeWrite(stepped.toSend).catch(() => {
-      set({ streamer: disconnectStreamer(acked.state) });
+      // P0-3: the follow-up write failed mid-job. GRBL may keep executing the
+      // commands already in its buffer, so mark the streamer disconnected AND
+      // raise the operator-facing safety banner (this path used to tear down
+      // silently). No soft-reset: the write itself failed, so there is no live
+      // link to send one over.
+      set({
+        streamer: disconnectStreamer(acked.state),
+        safetyNotice: disconnectDuringJobNotice(),
+      });
     });
   }
 }
