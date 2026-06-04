@@ -32,7 +32,12 @@
 // only owns state + the commit flow + the dialog shell.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { IDENTITY_TRANSFORM, type RasterImage, type TracedImage } from '../../core/scene';
+import {
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+  type SceneObject,
+  type TracedImage,
+} from '../../core/scene';
 import { DEFAULT_TRACE_OPTIONS, TRACE_PRESETS, type TraceOptions } from '../../core/trace';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
@@ -118,8 +123,15 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       return;
     }
     void commit(
-      { file, options, sourceId: seed.id, source: seed.source },
-      { traceExistingImage, pushToast, close, setBusy },
+      { file, options, seed },
+      {
+        traceExistingImage,
+        pushToast,
+        close,
+        setBusy,
+        getCurrentObject: (id) =>
+          useStore.getState().project.scene.objects.find((o) => o.id === id),
+      },
     );
   };
 
@@ -145,18 +157,19 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   );
 }
 
-async function commit(
+// Exported for testing the source-revalidation guard (P2-A).
+export async function commit(
   args: {
     readonly file: File;
     readonly options: TraceOptions;
-    readonly sourceId: string;
-    readonly source: string;
+    readonly seed: RasterImage;
   },
   ctx: {
     readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
     readonly close: () => void;
     readonly setBusy: (v: boolean) => void;
+    readonly getCurrentObject: (id: string) => SceneObject | undefined;
   },
 ): Promise<void> {
   ctx.setBusy(true);
@@ -174,7 +187,7 @@ async function commit(
     const { paths, bounds } = await traceImageWithFallback(image, args.options);
     if (paths.length === 0) {
       ctx.pushToast(
-        `Tracing ${args.source} produced no paths — try a higher contrast image.`,
+        `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
         'warning',
       );
       return;
@@ -185,25 +198,50 @@ async function commit(
     const traced: TracedImage = {
       kind: 'traced-image',
       id: crypto.randomUUID(),
-      source: args.source,
+      source: args.seed.source,
       traceMode: args.options.traceMode === 'centerline' ? 'centerline' : 'filled-contours',
       bounds,
       transform: IDENTITY_TRANSFORM,
       paths,
     };
-    ctx.traceExistingImage(args.sourceId, traced);
+    // P2-A: refuse to commit if the live source changed (content/grid) or was
+    // removed while the modal was open — overlaying then would misregister the
+    // trace. A transform-only move is fine (applyTraceToExisting registers to
+    // the live source's transform).
+    if (!sameTraceSource(ctx.getCurrentObject(args.seed.id), args.seed)) {
+      ctx.pushToast(
+        `The source image for ${args.seed.source} changed or was removed — re-open Trace to continue.`,
+        'error',
+      );
+      return;
+    }
+    ctx.traceExistingImage(args.seed.id, traced);
     const colorCount = traced.paths.length;
     ctx.pushToast(
-      `Traced ${args.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, source kept`,
+      `Traced ${args.seed.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, source kept`,
       'success',
     );
     ctx.close();
   } catch (err) {
     ctx.pushToast(
-      `Could not trace ${args.source}: ${err instanceof Error ? err.message : String(err)}`,
+      `Could not trace ${args.seed.source}: ${err instanceof Error ? err.message : String(err)}`,
       'error',
     );
   } finally {
     ctx.setBusy(false);
   }
+}
+
+// True when the live object is still the same raster the trace was computed from
+// — same kind, image content (dataUrl), and pixel grid. A transform-only change
+// is allowed (the overlay registers to the live transform). Used to refuse a
+// commit whose source changed or was removed mid-dialog (P2-A).
+export function sameTraceSource(live: SceneObject | undefined, seed: RasterImage): boolean {
+  return (
+    live !== undefined &&
+    live.kind === 'raster-image' &&
+    live.dataUrl === seed.dataUrl &&
+    live.pixelWidth === seed.pixelWidth &&
+    live.pixelHeight === seed.pixelHeight
+  );
 }
