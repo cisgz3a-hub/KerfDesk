@@ -1,11 +1,28 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ImportedSvg } from '../../core/scene';
+import { IDENTITY_TRANSFORM, type ImportedSvg, type RasterImage } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore as reset, svgObj as svgObjFromHelpers } from './test-helpers';
 
 // Re-export under the original local names so the (large) body of this
 // file doesn't have to change. Pure rename, no behaviour change.
 const svgObj: (id: string, colors: ReadonlyArray<string>) => ImportedSvg = svgObjFromHelpers;
+
+function rasterObj(id: string): RasterImage {
+  return {
+    kind: 'raster-image',
+    id,
+    source: `${id}.png`,
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: 1,
+    pixelHeight: 1,
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'grayscale',
+    linesPerMm: 10,
+    lumaBase64: 'gA==',
+  };
+}
 
 describe('useStore', () => {
   beforeEach(() => {
@@ -100,13 +117,68 @@ describe('useStore', () => {
     expect(useStore.getState().project.scene.layers[0]?.power).toBe(75);
   });
 
+  it('moveLayer updates layer order and is undoable', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff', '#00ff00']));
+    useStore.setState({ dirty: false });
+
+    useStore.getState().moveLayer('#00ff00', 'up');
+
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.id)).toEqual([
+      '#ff0000',
+      '#00ff00',
+      '#0000ff',
+    ]);
+    expect(useStore.getState().dirty).toBe(true);
+    expect(useStore.getState().undoStack).toHaveLength(2);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.id)).toEqual([
+      '#ff0000',
+      '#0000ff',
+      '#00ff00',
+    ]);
+  });
+
+  it('setRasterImageAdjustments patches a raster image and pushes undo', () => {
+    useStore.getState().importRasterImage(rasterObj('R1'));
+    const undoBefore = useStore.getState().undoStack.length;
+
+    useStore
+      .getState()
+      .setRasterImageAdjustments('R1', { brightness: 20, contrast: -10, gamma: 1.4 });
+
+    const raster = useStore.getState().project.scene.objects.find((o) => o.id === 'R1');
+    expect(raster).toMatchObject({
+      kind: 'raster-image',
+      brightness: 20,
+      contrast: -10,
+      gamma: 1.4,
+    });
+    expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
+    expect(useStore.getState().dirty).toBe(true);
+  });
+
   it('newProject resets state', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setJobPlacement({ startFrom: 'current-position', anchor: 'center' });
     useStore.getState().selectObject('O1');
     useStore.getState().newProject();
     const s = useStore.getState();
     expect(s.project.scene.objects).toHaveLength(0);
     expect(s.selectedObjectId).toBeNull();
+    expect(s.jobPlacement).toEqual({ startFrom: 'absolute', anchor: 'front-left' });
+  });
+
+  it('setJobPlacement updates the start mode and anchor without marking the project dirty', () => {
+    useStore.setState({ dirty: false });
+
+    useStore.getState().setJobPlacement({ startFrom: 'user-origin', anchor: 'center' });
+
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'center',
+    });
+    expect(useStore.getState().dirty).toBe(false);
   });
 });
 

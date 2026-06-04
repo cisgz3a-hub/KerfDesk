@@ -26,6 +26,16 @@ function closedSquare(minX: number, minY: number, maxX: number, maxY: number): P
   };
 }
 
+function openLine(x1: number, y1: number, x2: number, y2: number): Polyline {
+  return {
+    closed: false,
+    points: [
+      { x: x1, y: y1 },
+      { x: x2, y: y2 },
+    ],
+  };
+}
+
 function lumaAt(r: { luma: Uint8Array; width: number }, x: number, y: number): number {
   return r.luma[y * r.width + x] ?? -1;
 }
@@ -104,6 +114,18 @@ describe('rasterizeVectorToLuma (Fill All)', () => {
       dpi: DPI_1PX_PER_MM,
     });
     expect([...r.luma].every((v) => v === BG)).toBe(true);
+  });
+
+  it('Outlines renders an open stroke instead of dropping it', () => {
+    const r = rasterizeVectorToLuma({
+      polylines: [openLine(1, 5, 9, 5)],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+      renderType: 'outlines',
+    });
+    const inked = [...r.luma].filter((v) => v === INK).length;
+    expect(inked).toBeGreaterThan(0);
+    expect(lumaAt(r, 5, 5)).toBe(INK);
   });
 
   it('degenerate input degrades to a 1×1 white pixel, not a throw', () => {

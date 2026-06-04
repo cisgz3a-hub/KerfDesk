@@ -61,6 +61,62 @@ function makeSvg(): ImportedSvg {
   };
 }
 
+function makeOpenSvg(): ImportedSvg {
+  return {
+    ...makeSvg(),
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 0, y: 10 },
+              { x: 20, y: 10 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function makeMixedSvg(): ImportedSvg {
+  return {
+    ...makeSvg(),
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 1, y: 10 },
+              { x: 19, y: 10 },
+            ],
+          },
+        ],
+      },
+      {
+        color: '#0000ff',
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 2, y: 2 },
+              { x: 8, y: 2 },
+              { x: 8, y: 8 },
+              { x: 2, y: 8 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function makeHugeSvg(): ImportedSvg {
   return {
     ...makeSvg(),
@@ -130,6 +186,10 @@ function fakeEncode(raster: VectorRaster): BitmapFields {
   };
 }
 
+function inkCount(raster: VectorRaster): number {
+  return [...raster.luma].filter((v) => v === 128).length;
+}
+
 describe('isConvertibleVector', () => {
   it('accepts the three vector-carrying kinds', () => {
     expect(isConvertibleVector(makeSvg())).toBe(true);
@@ -170,6 +230,77 @@ describe('assembleBitmap', () => {
     expect(result.color).toBe(DEFAULT_RASTER_LAYER_COLOR);
     expect(result.dither).toBe('floyd-steinberg');
     expect(result.linesPerMm).toBe(10);
+  });
+
+  it('uses explicit DPI to set the converted bitmap density', () => {
+    const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id', {
+      dpi: 127,
+      renderType: 'fill-all',
+    });
+    expect(result.pixelWidth).toBe(200);
+    expect(result.pixelHeight).toBe(300);
+    expect(result.linesPerMm).toBe(5);
+  });
+
+  it('passes Outlines through so open vector strokes survive conversion', () => {
+    let encoded: VectorRaster | null = null;
+    const result = assembleBitmap(
+      makeOpenSvg(),
+      (raster) => {
+        encoded = raster;
+        return fakeEncode(raster);
+      },
+      'new-id',
+      { dpi: 25.4, renderType: 'outlines' },
+    );
+
+    expect(result.pixelWidth).toBe(40);
+    expect(result.pixelHeight).toBe(60);
+    expect(encoded).not.toBeNull();
+    expect(encoded === null ? 0 : inkCount(encoded)).toBeGreaterThan(0);
+  });
+
+  it('Use Cut Settings renders a line-mode path as an outline', () => {
+    let encoded: VectorRaster | null = null;
+    assembleBitmap(
+      makeOpenSvg(),
+      (raster) => {
+        encoded = raster;
+        return fakeEncode(raster);
+      },
+      'new-id',
+      {
+        dpi: 25.4,
+        renderType: 'use-cut-settings',
+        layers: [{ color: '#ff0000', mode: 'line' }],
+      },
+    );
+
+    expect(encoded).not.toBeNull();
+    expect(encoded === null ? 0 : inkCount(encoded)).toBeGreaterThan(0);
+  });
+
+  it('Use Cut Settings fills a fill-mode closed path', () => {
+    let encoded: VectorRaster | null = null;
+    assembleBitmap(
+      makeMixedSvg(),
+      (raster) => {
+        encoded = raster;
+        return fakeEncode(raster);
+      },
+      'new-id',
+      {
+        dpi: 25.4,
+        renderType: 'use-cut-settings',
+        layers: [
+          { color: '#ff0000', mode: 'line' },
+          { color: '#0000ff', mode: 'fill' },
+        ],
+      },
+    );
+
+    expect(encoded).not.toBeNull();
+    expect(encoded === null ? 0 : inkCount(encoded)).toBeGreaterThan(36);
   });
 
   it('labels SVG / traced bitmaps from `source` and text from `content`', () => {

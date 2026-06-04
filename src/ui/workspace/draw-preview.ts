@@ -8,6 +8,7 @@ import {
   buildToolpath,
   EMPTY_JOB,
   sliceToolpath,
+  type JobOriginPlacement,
   type Toolpath,
   type ToolpathStep,
 } from '../../core/job';
@@ -62,12 +63,18 @@ export function drawPreview(
   if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
 }
 
-export function buildPreviewToolpath(project: Project): Toolpath {
+export function buildPreviewToolpath(
+  project: Project,
+  options: { readonly jobOrigin?: JobOriginPlacement } = {},
+): Toolpath {
   // Use the SAME prepared job (compile + optimize) as Save/Start so the preview
   // shows the exact path ORDER the machine runs (roadmap P1-C). An over-budget
   // raster prepares to nothing -> empty preview (matching the too-large
   // estimate), never a freeze.
-  const prepared = prepareOutput(project);
+  const prepared = prepareOutput(
+    project,
+    options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin },
+  );
   return buildToolpath(prepared.ok ? prepared.job : EMPTY_JOB);
 }
 

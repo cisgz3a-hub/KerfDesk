@@ -20,7 +20,12 @@ export type {
   Transform,
   Vec2,
 } from './scene-object';
-export { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, assertNever } from './scene-object';
+export {
+  DITHER_ALGORITHMS,
+  DEFAULT_RASTER_LAYER_COLOR,
+  IDENTITY_TRANSFORM,
+  assertNever,
+} from './scene-object';
 
 export { applyTransform } from './transform';
 export type { AABB } from './hit-test';
@@ -28,10 +33,12 @@ export { combinedBBox, hitTest, transformedBBox } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';
 
 export type { Scene } from './scene';
+export type { LayerMoveDirection } from './scene';
 export {
   EMPTY_SCENE,
   addLayer,
   addObject,
+  moveLayer,
   removeLayer,
   removeObject,
   replaceObject,

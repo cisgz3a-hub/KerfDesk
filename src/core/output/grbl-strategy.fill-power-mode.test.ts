@@ -26,7 +26,15 @@ const fill = (y: number): FillGroup => ({
   speed: 1500,
   passes: 1,
   overscanMm: 0,
-  segments: [{ polyline: [{ x: 10, y }, { x: 20, y }], closed: false }],
+  segments: [
+    {
+      polyline: [
+        { x: 10, y },
+        { x: 20, y },
+      ],
+      closed: false,
+    },
+  ],
 });
 
 const cut = (): CutGroup => ({
@@ -36,7 +44,15 @@ const cut = (): CutGroup => ({
   power: 50,
   speed: 1500,
   passes: 1,
-  segments: [{ polyline: [{ x: 1, y: 1 }, { x: 2, y: 2 }], closed: false }],
+  segments: [
+    {
+      polyline: [
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+      ],
+      closed: false,
+    },
+  ],
 });
 
 describe('grblStrategy fill dynamic-power mode (ADR-036)', () => {

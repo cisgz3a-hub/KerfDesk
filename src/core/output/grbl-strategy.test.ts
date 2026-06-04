@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { type Job, EMPTY_JOB } from '../job';
@@ -186,8 +187,20 @@ describe('grblStrategy fill hatch overscan', () => {
           passes: 1,
           overscanMm: 5,
           segments: [
-            { polyline: [{ x: 10, y: 0 }, { x: 30, y: 0 }], closed: false }, // 20mm -> overscan
-            { polyline: [{ x: 10, y: 5 }, { x: 13, y: 5 }], closed: false }, // 3mm  -> skip
+            {
+              polyline: [
+                { x: 10, y: 0 },
+                { x: 30, y: 0 },
+              ],
+              closed: false,
+            }, // 20mm -> overscan
+            {
+              polyline: [
+                { x: 10, y: 5 },
+                { x: 13, y: 5 },
+              ],
+              closed: false,
+            }, // 3mm  -> skip
           ],
         },
       ],
@@ -227,9 +240,27 @@ describe('grblStrategy fill hatch overscan', () => {
           passes: 1,
           overscanMm: 5,
           segments: [
-            { polyline: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false },
-            { polyline: [{ x: 8, y: 0 }, { x: 12, y: 0 }], closed: false },
-            { polyline: [{ x: 15, y: 0 }, { x: 20, y: 0 }], closed: false },
+            {
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 5, y: 0 },
+              ],
+              closed: false,
+            },
+            {
+              polyline: [
+                { x: 8, y: 0 },
+                { x: 12, y: 0 },
+              ],
+              closed: false,
+            },
+            {
+              polyline: [
+                { x: 15, y: 0 },
+                { x: 20, y: 0 },
+              ],
+              closed: false,
+            },
           ],
         },
       ],
@@ -255,7 +286,9 @@ describe('grblStrategy fill hatch overscan', () => {
     // Safety: every interior gap re-blanks to S0 and every ink span re-asserts
     // S300 (S is modal — a missed reset would fire the beam across a hole).
     const burnBody = out.slice(out.indexOf('F1500 S300'));
-    const sSequence = (burnBody.slice(0, burnBody.indexOf('G0 X25')).match(/S\d+/g) ?? []).join(',');
+    const sSequence = (burnBody.slice(0, burnBody.indexOf('G0 X25')).match(/S\d+/g) ?? []).join(
+      ',',
+    );
     expect(sSequence).toBe('S300,S0,S300,S0,S300');
   });
 
@@ -266,11 +299,28 @@ describe('grblStrategy fill hatch overscan', () => {
     const job: Job = {
       groups: [
         {
-          kind: 'fill', layerId: 'fill', color: '#000000', power: 30,
-          speed: 1500, passes: 1, overscanMm: 0,
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          overscanMm: 0,
           segments: [
-            { polyline: [{ x: 0, y: 0 }, { x: 5, y: 0 }], closed: false },
-            { polyline: [{ x: 20, y: 0 }, { x: 25, y: 0 }], closed: false },
+            {
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 5, y: 0 },
+              ],
+              closed: false,
+            },
+            {
+              polyline: [
+                { x: 20, y: 0 },
+                { x: 25, y: 0 },
+              ],
+              closed: false,
+            },
           ],
         },
       ],
@@ -412,8 +462,20 @@ describe('grblStrategy fill zero-length / coincident span guard (audit 2026-06-0
           passes: 1,
           overscanMm: 0,
           segments: [
-            { polyline: [{ x: 0, y: 5 }, { x: 5, y: 5 }], closed: false },
-            { polyline: [{ x: 5, y: 5 }, { x: 10, y: 5 }], closed: false }, // touches the first at x=5
+            {
+              polyline: [
+                { x: 0, y: 5 },
+                { x: 5, y: 5 },
+              ],
+              closed: false,
+            },
+            {
+              polyline: [
+                { x: 5, y: 5 },
+                { x: 10, y: 5 },
+              ],
+              closed: false,
+            }, // touches the first at x=5
           ],
         },
       ],
@@ -437,9 +499,27 @@ describe('grblStrategy fill zero-length / coincident span guard (audit 2026-06-0
           passes: 1,
           overscanMm: 0,
           segments: [
-            { polyline: [{ x: 0, y: 3 }, { x: 5, y: 3 }], closed: false },
-            { polyline: [{ x: 8, y: 3 }, { x: 8, y: 3 }], closed: false }, // degenerate (zero-length)
-            { polyline: [{ x: 10, y: 3 }, { x: 15, y: 3 }], closed: false },
+            {
+              polyline: [
+                { x: 0, y: 3 },
+                { x: 5, y: 3 },
+              ],
+              closed: false,
+            },
+            {
+              polyline: [
+                { x: 8, y: 3 },
+                { x: 8, y: 3 },
+              ],
+              closed: false,
+            }, // degenerate (zero-length)
+            {
+              polyline: [
+                { x: 10, y: 3 },
+                { x: 15, y: 3 },
+              ],
+              closed: false,
+            },
           ],
         },
       ],

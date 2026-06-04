@@ -221,6 +221,45 @@ describe('laser-store serial write failures', () => {
     shouldFail = false;
   });
 
+  it('marks the stream unsafe when resume refill bytes fail to send', async () => {
+    let failRefill = false;
+    const write = vi.fn(async (data: string) => {
+      if (failRefill && data.includes('G1 X')) throw new Error('resume refill rejected');
+    });
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    const gcode = [
+      'G21',
+      'G90',
+      'M3 S0',
+      ...Array.from({ length: 20 }, (_unused, i) => `G1 X${i} Y0 S10`),
+      'M5',
+    ].join('\n');
+    await useLaserStore.getState().startJob(gcode);
+    await useLaserStore.getState().pauseJob();
+    for (let i = 0; i < 10; i += 1) connection.emitLine('ok');
+
+    const paused = useLaserStore.getState().streamer;
+    expect(paused?.status).toBe('paused');
+    expect(paused?.queued.length).toBeGreaterThan(0);
+    const nextQueuedBytes = paused?.queued[0]?.length ?? Number.POSITIVE_INFINITY;
+    expect(
+      (paused?.inFlightBytes ?? Number.POSITIVE_INFINITY) + nextQueuedBytes,
+    ).toBeLessThanOrEqual(paused?.rxBufferBytes ?? 0);
+
+    failRefill = true;
+    await expect(useLaserStore.getState().resumeJob()).rejects.toThrow('resume refill rejected');
+
+    expect(useLaserStore.getState().streamer?.status).toBe('disconnected');
+    expect(useLaserStore.getState().log.join('\n')).toContain(
+      'Serial write failed: resume refill rejected',
+    );
+    expect(useLaserStore.getState().safetyNotice).toMatchObject({
+      kind: 'write-failed',
+      action: 'resume',
+    });
+  });
+
   it('keeps a streaming job active when soft-reset fails to send', async () => {
     let shouldFail = false;
     const write = vi.fn(async () => {

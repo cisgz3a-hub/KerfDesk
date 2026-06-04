@@ -10,7 +10,13 @@
 // arrays, indexed loops) → repeatable across runs.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
-import { dither, pixelExtentForMm, resampleLumaNearest, whiteLuma } from '../raster';
+import {
+  applyLumaAdjustments,
+  dither,
+  pixelExtentForMm,
+  resampleLumaNearest,
+  whiteLuma,
+} from '../raster';
 import {
   applyTransform,
   assertNever,
@@ -93,12 +99,16 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     obj.lumaBase64 !== undefined
       ? decodeBase64Luma(obj.lumaBase64, obj.pixelWidth * obj.pixelHeight)
       : whiteLuma(obj.pixelWidth * obj.pixelHeight);
-  const sMax = Math.round((clamp(layer.power, 0, 100) / 100) * device.maxPowerS);
+  const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
+  const powerPercent = clamp(layer.power, 0, 100);
+  const minPowerPercent = clamp(layer.minPower, 0, powerPercent);
+  const sMax = Math.round((powerPercent / 100) * device.maxPowerS);
+  const sMin = Math.round((minPowerPercent / 100) * device.maxPowerS);
   const bounds = rasterBoundsInMachineCoords(obj, device);
   const pixelWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
   const pixelHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
   const luma = resampleLumaNearest(
-    { luma: sourceLuma, width: obj.pixelWidth, height: obj.pixelHeight },
+    { luma: adjustedLuma, width: obj.pixelWidth, height: obj.pixelHeight },
     pixelWidth,
     pixelHeight,
   );
@@ -107,13 +117,13 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
   const orientedLuma = orientRasterLumaForMachine(luma, pixelWidth, pixelHeight, obj, device);
   const sValues = dither(
     { luma: orientedLuma, width: pixelWidth, height: pixelHeight },
-    { algorithm: layer.ditherAlgorithm, sMax },
+    { algorithm: layer.ditherAlgorithm, sMax, sMin },
   );
   return {
     kind: 'raster',
     layerId: layer.id,
     color: layer.color,
-    power: clamp(layer.power, 0, 100),
+    power: powerPercent,
     speed: Math.min(layer.speed, device.maxFeed),
     passes: Math.max(1, Math.floor(layer.passes)),
     sValues,

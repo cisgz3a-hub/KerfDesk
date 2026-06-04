@@ -460,6 +460,283 @@ long tasks after this bounded-rendering fix.
 
 ---
 
+## Raster image parity and async bitmap encode (2026-06-04)
+
+**Trigger:** combined Claude/Codex audit rated raster fidelity below
+LightBurn because Image mode lacked the full dither set, grayscale Min
+Power, and engrave-path brightness / contrast / gamma; the same audit
+flagged Convert-to-Bitmap's synchronous `canvas.toDataURL()` encode as a
+remaining memory-pressure risk.
+
+**Sources consulted:**
+- LightBurn Image Mode:
+  `https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/`.
+  Image mode exposes multiple dithering algorithms; Grayscale varies
+  power between Min and Max power.
+- LightBurn Shared Settings:
+  `https://docs.lightburnsoftware.com/2.1/Reference/CutSettingsEditor/SharedSettings/`.
+  Min Power / Max Power are part of the shared cut setting model, with
+  Grayscale image mode using the range for tonal output.
+- LightBurn Adjust Image:
+  `https://docs.lightburnsoftware.com/latest/Reference/AdjustImage/`.
+  Adjust Image uses brightness / contrast / gamma style image
+  preprocessing with live preview before output.
+- MDN HTMLCanvasElement `toBlob()`:
+  `https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/toBlob`.
+  `toBlob()` provides asynchronous canvas export to a `Blob`.
+- MDN HTMLCanvasElement `toDataURL()`:
+  `https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/toDataURL`.
+  MDN warns `toDataURL()` encodes the whole image as an in-memory string
+  and recommends `toBlob()` for larger images.
+- MDN FileReader `readAsDataURL()`:
+  `https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsDataURL`.
+  Used to convert the async PNG `Blob` back to the existing `.lf2`
+  data-URL storage format without changing project persistence.
+
+**Local evidence and outcome:**
+- `src/core/raster/dither.ts` now exposes LightBurn-style binary modes
+  beyond Threshold / Floyd plus Grayscale.
+- `Layer.minPower` is additive and defaults to 0, so old projects keep
+  identical burn output until the operator changes the setting.
+- Grayscale keeps white pixels at `S0` while mapping non-white tones
+  through `[Min Power, Power]`; preview and compile share the same
+  calculation.
+- RasterImage brightness / contrast / gamma are applied before
+  resampling / dithering in both compile and preview paths, and a small
+  selected-image adjustment panel exposes the settings.
+- Convert-to-Bitmap now uses async `canvas.toBlob()` plus
+  `FileReader.readAsDataURL()` instead of synchronous `toDataURL()`.
+
+**Decision:** keep existing data URL project storage for compatibility,
+but remove the synchronous canvas string encode from Convert-to-Bitmap.
+Further parity work remains for LightBurn-only modes not yet modelled
+exactly (Newsprint, Halftone, Sketch, full Adjust Image dialog, Material
+Test / Interval Test).
+
+---
+
+## Start From / Job Origin workflow parity (2026-06-04)
+
+**Trigger:** the combined Claude/Codex audit found that the core already
+had job-origin anchor math, but the operator workflow did not expose
+LightBurn-style Start From modes or the 9-point Job Origin selector.
+
+**Sources consulted:**
+- LightBurn Coordinates and Job Origin:
+  `https://docs.lightburnsoftware.com/latest/Reference/CoordinatesOrigin/`.
+  LightBurn separates `Start From` placement modes from the 9-dot `Job
+  Origin`; the anchor is meaningful for relative placement modes such as
+  Current Position and User Origin.
+- GRBL v1.1 streaming / coordinate behavior:
+  `https://github-wiki-see.page/m/gnea/grbl/wiki/Grbl-v1.1-Commands` and
+  `https://github-wiki-see.page/m/grbl/grbl/wiki/Interfacing-with-Grbl`.
+  LaserForge emits absolute G-code, so Current Position cannot be faked
+  as `X0 Y0`; emitted coordinates must be in work coordinates and bounds
+  checks must use the current work-to-machine offset.
+
+**Local evidence and outcome:**
+- `src/core/job/job-origin.ts` now supports `current-position` as a
+  resolved placement that moves the selected anchor to the current work
+  coordinate position.
+- `src/ui/job-placement.ts` is the single resolver for Absolute
+  Coordinates, Current Position, and User Origin. It returns both the
+  resolved job-origin transform and the physical bounds offset needed by
+  preflight.
+- `Start`, `Frame`, workspace preview, and G-code export all consume the
+  same resolver. If Current Position / User Origin cannot be resolved,
+  the app refuses instead of previewing or exporting absolute output.
+- `src/ui/laser/JobPlacementControls.tsx` exposes the Start From dropdown
+  plus a 9-anchor Job Origin picker. Pressing `Set origin here` switches
+  the visible mode to User Origin so the old ergonomic workflow remains
+  explicit.
+
+**Decision:** keep Absolute Coordinates conservative while a custom GRBL
+work origin is active: the app asks the operator to reset origin or choose
+User Origin instead of silently shifting absolute output through G92.
+
+---
+
+## `.lf2` field-level validation (2026-06-04)
+
+**Trigger:** the combined audit found that `deserializeProject` normalized
+some additive fields and then returned `normalized as unknown as Project`,
+which meant malformed nested device/layer/object fields could enter app
+state and fail later.
+
+**Sources consulted:**
+- Local schema source of truth:
+  `src/core/scene/project.ts`, `src/core/scene/layer.ts`,
+  `src/core/scene/scene-object.ts`, and
+  `src/core/devices/device-profile.ts`.
+- Existing migration / additive-field behavior:
+  `src/io/project/migrations.ts` and `src/io/project/project.test.ts`.
+  Missing additive fields must keep backfilling; present wrong-typed
+  fields should be rejected.
+
+**Local evidence and outcome:**
+- Added red tests for malformed `device.bedWidth`, malformed
+  `scene.layers[0].power`, and unknown `scene.objects[0].kind`; the old
+  deserializer accepted all three.
+- Added `src/io/project/project-shape-validator.ts`, a dependency-free
+  schema guard for current `.lf2` device, workspace, layer, and scene
+  object shapes.
+- `deserializeProject` now validates the migrated raw project before
+  normalization, then keeps the existing additive backfills for
+  `letterSpacing`, layer image/fill fields, and device planner fields.
+
+**Decision:** use hand-rolled guards for now rather than adding a schema
+library. The schema is small, local, and already typed; avoiding a new
+runtime dependency keeps project loading predictable.
+
+---
+
+## Convert to Bitmap render type and DPI parity (2026-06-04)
+
+**Trigger:** the combined audit found that LaserForge converted selected
+vectors immediately as Fill-All at a fixed density, while LightBurn exposes
+a Convert to Bitmap dialog with Render Type and DPI controls.
+
+**Sources consulted:**
+
+- LightBurn Convert to Bitmap:
+  `https://docs.lightburnsoftware.com/latest/Reference/ConvertToBitmap/`.
+  LightBurn documents `Outlines`, `Fill All`, and `Use Cut Settings` render
+  types, an explicit DPI setting, 50% gray converted pixels, and deletion of
+  the original vector graphics after conversion.
+
+**Local evidence and outcome:**
+
+- Added red tests proving explicit DPI changes pixel density, Outlines
+  preserves open vector strokes, and Use Cut Settings treats line-mode
+  source layers as outlines.
+- `src/core/raster/rasterize-vector.ts` now supports Fill-All and Outlines;
+  Use Cut Settings is resolved in the UI builder because it depends on scene
+  layer mode, not geometry alone.
+- `src/ui/raster/ConvertToBitmapDialog.tsx` exposes Render Type and DPI,
+  and `src/ui/common/Toolbar.tsx` passes the selected options plus current
+  layer modes into `buildBitmapFromVector`.
+
+**Decision:** keep converted pixels at the existing LightBurn-compatible
+50% gray (`luma=128`) and preserve the existing source-deletion behavior.
+If a requested DPI would exceed the raster budget, the existing density
+reduction path still lowers `linesPerMm` instead of freezing the app.
+
+---
+
+## Trace Image control parity (2026-06-04)
+
+**Trigger:** the combined audit found that LaserForge's trace dialog was
+preset/image-adjustment first, while LightBurn exposes trace-specific controls
+such as Cutoff, Threshold, Ignore Less Than, Smoothness, and Optimize.
+
+**Sources consulted:**
+
+- LightBurn Image Tracing:
+  `https://docs.lightburnsoftware.com/latest/Reference/ImageTracing/`.
+  LightBurn documents direct trace controls for Cutoff/Threshold brightness
+  range, Ignore Less Than noise filtering, Smoothness, Optimize, transparency,
+  fade image, and show-points style inspection.
+- Existing local trace engine:
+  `src/core/trace/trace-image.ts`, `src/core/trace/potrace-params.ts`, and
+  `src/core/trace/potrace-trace.ts`. The core already carried the main
+  LightBurn trace fields; the gap was that the operator could not tune them
+  directly from the dialog.
+
+**Local evidence and outcome:**
+
+- Added red tests proving changed LightBurn trace settings merge into
+  `TraceOptions`, while untouched Photo/Detailed presets are not forced
+  through binary Cutoff/Threshold fields.
+- Added `src/ui/trace/TraceSettingsControls.tsx` with Cutoff, Threshold,
+  Ignore Less Than, Smoothness, and Optimize controls.
+- `ImportImageDialog` now merges trace-setting overrides before image
+  adjustments, so preview and commit use the same LightBurn-style options.
+- `Ignore Less Than` maps to both `ignoreLessThanPixels` and
+  `despeckleMinPixels`, because the Potrace lane reads the former and the
+  ImageTracer preprocessing lane reads the latter.
+
+**Decision:** do not rewrite the tracing backend in this slice. The core
+already had LightBurn-field support and tests; this change makes the workflow
+reachable without destabilizing the proven worker/fallback trace path.
+
+---
+
+## SVG import fill, units, rounded rect, and local reuse parity (2026-06-04)
+
+**Trigger:** the combined audit found that SVG fill-only artwork was dropped
+and that SVG physical units, rounded rectangles, and local `<use>` references
+were incomplete compared with common LightBurn import workflows.
+
+**Sources consulted:**
+
+- LightBurn documentation identifies SVG as a first-class import format and
+  includes SVG-specific import/view behavior in its settings workflow:
+  `https://docs.lightburnsoftware.com/latest/Reference/Importing/` and
+  `https://docs.lightburnsoftware.com/latest/Reference/Settings/`.
+- MDN / SVG reference behavior for the language-level pieces:
+  SVG length units (`mm`, `cm`, `in`, `pt`, `pc`, `px`), `<rect rx ry>`
+  rounded corners, and local `<use href="#id">` reuse.
+- Existing LaserForge sanitizer constraints in `src/io/svg/sanitize.ts`:
+  external `href` / `xlink:href` is stripped, so local reuse expansion must
+  remain limited to `#id` references.
+
+**Local evidence and outcome:**
+
+- Added red tests for fill-only rect import, physical root dimensions without
+  a viewBox, rounded rect `rx/ry`, and local `<use>` placement.
+- `parseSvg` now falls back from visible stroke color to visible fill color,
+  while still skipping hidden, transparent, or colorless geometry.
+- Root `width` / `height` without a `viewBox` are converted to millimetres
+  for common SVG/CSS units.
+- `shape-to-polylines` now approximates rounded rect corners instead of
+  sharpening them.
+- Sanitization explicitly keeps safe SVG `<defs>`, `<symbol>`, `<use>`, and
+  local reference attrs while preserving the external-link/data-URI stripping
+  hooks; the parser then expands only local `#id` uses and skips `<defs>` /
+  `<symbol>` templates unless referenced.
+
+**Decision:** this slice covers safe local reuse and no-viewBox physical
+dimensions. SVGs with both `viewBox` and physical dimensions still need a
+future scale-transform pass if we want exact physical sizing independent of
+viewBox user units.
+
+---
+
+## Cuts/Layers layer-order control parity (2026-06-04)
+
+**Trigger:** the combined audit found that LaserForge processed layers in
+import/internal order because the operator could edit layer settings but could
+not reorder the Cuts/Layers list.
+
+**Sources consulted:**
+
+- LightBurn Optimization Settings:
+  `https://docs.lightburnsoftware.com/latest/Reference/OptimizationSettings/`.
+  LightBurn documents layer ordering as part of output optimization, including
+  order-by-layer behavior and priority/order controls.
+- Existing LaserForge compile path:
+  `src/core/job/compile-job.ts` already iterates `scene.layers` in order, so
+  the missing piece was operator control over that array, not a planner rewrite.
+
+**Local evidence and outcome:**
+
+- Added red tests proving `moveLayer` reorders layer arrays without mutating
+  the input scene and no-ops at boundaries.
+- Added store tests proving UI state can reorder layers, marks the project
+  dirty, and supports undo.
+- Added a Cuts/Layers panel smoke test proving visible controls call the live
+  store action and boundary controls disable.
+- Added up/down controls to each layer row. The visible Cuts/Layers list order
+  is now the generated output order because `compileJob` already uses
+  `scene.layers`.
+
+**Decision:** implement only direct layer-order controls in this slice. Full
+LightBurn Priority mode remains a separate optimization-settings feature; this
+fix removes the import-order lock without destabilizing the existing job
+compiler.
+
+---
+
 ## Notes on style
 
 - Be concrete. "Used by many projects" is not a useful claim; "4,281 npm dependents as of 2026-05-26" is.

@@ -5,9 +5,8 @@
 // 2. Parse the cleaned markup with the native DOMParser into a Document.
 // 3. Walk every geometry-bearing element (shape-to-polylines.ts) in document
 //    order — deterministic for snapshot tests.
-// 4. Attribute each element to a color (stroke attribute, with a tiny named-
-//    color map and hex/rgb normalization). Elements without a stroke are
-//    skipped — fill-only shapes aren't cut in Line mode (ADR-005).
+// 4. Attribute each element to stroke color, falling back to visible fill
+//    color for fill-only logo artwork. Elements with neither are skipped.
 // 5. Bundle into an ImportedSvg with the SVG's viewBox as the natural bounds.
 
 import {
@@ -29,6 +28,15 @@ export type ParseSvgResult = {
 };
 
 const COLOR_FALLBACK = '#000000';
+const MM_PER_INCH = 25.4;
+const CSS_PX_PER_INCH = 96;
+const SVG_LENGTH_UNITS_TO_MM: Readonly<Record<string, number>> = {
+  mm: 1,
+  cm: 10,
+  in: MM_PER_INCH,
+  pt: MM_PER_INCH / 72,
+  pc: MM_PER_INCH / 6,
+};
 
 // CSS named colors. Phase A covers the 16 HTML basic colors plus a handful of
 // common extended names. Anything else falls back to black.
@@ -99,14 +107,30 @@ function parseViewBox(svgEl: Element): Bounds {
       return { minX: x, minY: y, maxX: x + w, maxY: y + h };
     }
   }
-  const w = Number.parseFloat(svgEl.getAttribute('width') ?? '100');
-  const h = Number.parseFloat(svgEl.getAttribute('height') ?? '100');
+  const w = parseSvgLengthMm(svgEl.getAttribute('width'), 100);
+  const h = parseSvgLengthMm(svgEl.getAttribute('height'), 100);
   return {
     minX: 0,
     minY: 0,
-    maxX: Number.isFinite(w) ? w : 100,
-    maxY: Number.isFinite(h) ? h : 100,
+    maxX: w,
+    maxY: h,
   };
+}
+
+function parseSvgLengthMm(input: string | null, fallbackPx: number): number {
+  if (input === null || input.trim() === '') return pxToMm(fallbackPx);
+  const match = /^\s*([+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)\s*([a-zA-Z]*)\s*$/.exec(input);
+  if (match === null) return pxToMm(fallbackPx);
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return pxToMm(fallbackPx);
+  const unit = (match[2] ?? '').toLowerCase();
+  if (unit === '' || unit === 'px') return pxToMm(value);
+  const mmFactor = SVG_LENGTH_UNITS_TO_MM[unit];
+  return mmFactor === undefined ? pxToMm(fallbackPx) : value * mmFactor;
+}
+
+function pxToMm(px: number): number {
+  return (px / CSS_PX_PER_INCH) * MM_PER_INCH;
 }
 
 type Matrix = {
@@ -120,10 +144,12 @@ type Matrix = {
 
 type PresentationState = {
   readonly stroke: string | null;
+  readonly fill: string | null;
   readonly transform: Matrix;
   readonly hidden: boolean;
   readonly opacity: number;
   readonly strokeOpacity: number;
+  readonly fillOpacity: number;
   readonly visibility: string | null;
 };
 
@@ -131,10 +157,12 @@ const IDENTITY_MATRIX: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
 const INITIAL_PRESENTATION_STATE: PresentationState = {
   stroke: null,
+  fill: null,
   transform: IDENTITY_MATRIX,
   hidden: false,
   opacity: 1,
   strokeOpacity: 1,
+  fillOpacity: 1,
   visibility: null,
 };
 
@@ -161,6 +189,10 @@ function walkElement(
     counts.text += 1;
   } else if (tag === 'image') {
     counts.image += 1;
+  } else if (tag === 'defs' || tag === 'symbol') {
+    return;
+  } else if (tag === 'use' && !state.hidden) {
+    appendUseGeometry(el, state, byColor, counts);
   } else if (!state.hidden) {
     appendElementGeometry(el, state, byColor);
   }
@@ -170,6 +202,24 @@ function walkElement(
   }
 }
 
+function appendUseGeometry(
+  el: Element,
+  state: PresentationState,
+  byColor: Map<string, Polyline[]>,
+  counts: { text: number; image: number },
+): void {
+  const href = el.getAttribute('href') ?? el.getAttribute('xlink:href');
+  if (href === null || !href.startsWith('#') || href.length <= 1) return;
+  const owner = el.ownerDocument;
+  const referenced = owner.getElementById(href.slice(1));
+  if (referenced === null || referenced === el) return;
+  const placedState = {
+    ...state,
+    transform: multiplyMatrix(state.transform, translate(numAttr(el, 'x'), numAttr(el, 'y'))),
+  };
+  walkElement(referenced, placedState, byColor, counts);
+}
+
 function appendElementGeometry(
   el: Element,
   state: PresentationState,
@@ -177,7 +227,9 @@ function appendElementGeometry(
 ): void {
   const subs = elementToSubPaths(el);
   if (subs.length === 0) return;
-  const color = normalizeColor(state.stroke);
+  const strokeColor = state.strokeOpacity > 0 ? normalizeColor(state.stroke) : '';
+  const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill) : '';
+  const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
   const arr = byColor.get(color) ?? [];
   for (const sub of subs) {
@@ -191,11 +243,13 @@ function appendElementGeometry(
 
 function presentationStateFor(el: Element, parent: PresentationState): PresentationState {
   const stroke = presentationValue(el, 'stroke') ?? parent.stroke;
+  const fill = presentationValue(el, 'fill') ?? parent.fill;
   const visibility = presentationValue(el, 'visibility') ?? parent.visibility;
   const display = presentationValue(el, 'display');
   const opacity = parent.opacity * parseOpacity(presentationValue(el, 'opacity'));
   const strokeOpacity =
     parent.strokeOpacity * parseOpacity(presentationValue(el, 'stroke-opacity'));
+  const fillOpacity = parent.fillOpacity * parseOpacity(presentationValue(el, 'fill-opacity'));
   const transform = multiplyMatrix(
     parent.transform,
     parseTransform(presentationValue(el, 'transform')),
@@ -206,17 +260,25 @@ function presentationStateFor(el: Element, parent: PresentationState): Presentat
     display?.trim().toLowerCase() === 'none' ||
     normalizedVisibility === 'hidden' ||
     normalizedVisibility === 'collapse' ||
-    opacity <= 0 ||
-    strokeOpacity <= 0;
+    opacity <= 0;
 
   return {
     stroke,
+    fill,
     transform,
     hidden,
     opacity,
     strokeOpacity,
+    fillOpacity,
     visibility,
   };
+}
+
+function numAttr(el: Element, name: string, fallback = 0): number {
+  const raw = el.getAttribute(name);
+  if (raw === null) return fallback;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function presentationValue(el: Element, name: string): string | null {

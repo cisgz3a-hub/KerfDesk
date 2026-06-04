@@ -98,6 +98,62 @@ describe('deserializeProject', () => {
     }
   });
 
+  it('reports invalid when required device fields have the wrong type', () => {
+    const project = aProject();
+    const text = serializeProject({
+      ...project,
+      device: { ...project.device, bedWidth: '400' } as unknown as Project['device'],
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/device\.bedWidth/);
+    }
+  });
+
+  it('reports invalid when a layer has malformed output settings', () => {
+    const project = aProject();
+    const text = serializeProject({
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [
+          {
+            ...project.scene.layers[0],
+            power: 'hot',
+          } as unknown as Project['scene']['layers'][number],
+        ],
+      },
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.layers\[0\]\.power/);
+    }
+  });
+
+  it('reports invalid when a scene object has an unknown kind', () => {
+    const project = aProject();
+    const text = serializeProject({
+      ...project,
+      scene: {
+        ...project.scene,
+        objects: [{ ...project.scene.objects[0], kind: 'banana' } as unknown as SceneObject],
+      },
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.objects\[0\]\.kind/);
+    }
+  });
+
   it('reports schema-too-new for a future version', () => {
     const text = JSON.stringify({ schemaVersion: PROJECT_SCHEMA_VERSION + 1 });
     const result = deserializeProject(text);
@@ -155,6 +211,7 @@ describe('deserializeProject', () => {
       // the current default is correct.
       expect(layer?.hatchSpacingMm).toBe(0.1);
       expect(layer?.fillOverscanMm).toBe(5);
+      expect(layer?.minPower).toBe(0);
       // ADR-038: pre-unidirectional files back-fill to snake (true), matching
       // the fill they were authored against.
       expect(layer?.fillBidirectional).toBe(true);
@@ -190,7 +247,7 @@ describe('deserializeProject', () => {
             lineHeight: 1.4,
             color: '#000000',
             bounds: { minX: 0, minY: 0, maxX: 30, maxY: 10 },
-            transform: { tx: 0, ty: 0, sx: 1, sy: 1, rot: 0 },
+            transform: IDENTITY_TRANSFORM,
             paths: [],
           },
         ],

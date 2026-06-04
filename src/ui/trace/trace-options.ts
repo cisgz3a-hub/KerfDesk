@@ -19,6 +19,33 @@
 import type { TraceOptions } from '../../core/trace';
 import type { AdjustmentValues } from './AdjustmentControls';
 
+export type LightBurnTraceSettingOverrides = {
+  readonly cutoffLuma?: number;
+  readonly thresholdLuma?: number;
+  readonly ignoreLessThanPixels?: number;
+  readonly smoothness?: number;
+  readonly optimize?: number;
+};
+
+export function mergeLightBurnTraceSettings(
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): TraceOptions {
+  const out: Record<string, unknown> = { ...preset };
+  if (settings.cutoffLuma !== undefined) out['cutoffLuma'] = clampByte(settings.cutoffLuma);
+  if (settings.thresholdLuma !== undefined) {
+    out['thresholdLuma'] = clampByte(settings.thresholdLuma);
+  }
+  if (settings.ignoreLessThanPixels !== undefined) {
+    const pixels = Math.max(0, Math.round(settings.ignoreLessThanPixels));
+    out['ignoreLessThanPixels'] = pixels;
+    out['despeckleMinPixels'] = pixels;
+  }
+  if (settings.smoothness !== undefined) out['smoothness'] = clampMin(settings.smoothness, 0);
+  if (settings.optimize !== undefined) out['optimize'] = clampMin(settings.optimize, 0);
+  return out as TraceOptions;
+}
+
 // Apply user adjustments on top of a preset. Each adjustment is only
 // included if it's not at its neutral value (0 / 0 / 1 / false /
 // 'none'), so a clean reset produces the same options object the
@@ -78,4 +105,14 @@ export function relaxAggressivePreprocessing(options: TraceOptions): TraceOption
   delete next['despeckleMinPixels'];
   next['pathOmit'] = 0;
   return next as TraceOptions;
+}
+
+function clampByte(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function clampMin(value: number, min: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, value);
 }

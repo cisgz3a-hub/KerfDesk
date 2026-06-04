@@ -8,9 +8,11 @@
 // luma = light = less burn — so a converted bitmap flows straight through the
 // F.2 engrave path with no special-casing.
 //
-// A1 scope: Fill All only — even-odd fill of closed contours, holes correct.
-// Outlines and Use-Cut-Settings render types arrive in A3/A4; a render-type
-// parameter is deliberately omitted until then rather than stubbed.
+// Render types mirror LightBurn's Convert to Bitmap dialog:
+// - Fill All: even-odd fill of closed contours, holes correct.
+// - Outlines: rasterize vector strokes, including open polylines.
+// Use Cut Settings is resolved by the UI layer into fill/outline groups because
+// it depends on scene layer modes, not pure geometry.
 //
 // Pure-core: no DOM/canvas/clock/random. PNG encoding and RasterImage
 // assembly are the UI's job (ADR-029 §4) — this stops at the luma grid.
@@ -30,13 +32,23 @@ const MM_PER_INCH = 25.4;
 // Keep "vertex exactly on the scanline" off the half-open span boundary so
 // adjacent spans don't double-count (matches fill-hatching's SCANLINE_EPS).
 const SCANLINE_EPS = 1e-9;
+const OUTLINE_RADIUS_PX = 0.5;
+const OUTLINE_RADIUS_SQ = OUTLINE_RADIUS_PX * OUTLINE_RADIUS_PX;
 const MIN_CONTOUR_POINTS = 3;
+const MIN_STROKE_POINTS = 2;
 const MIN_PIXEL_DIM = 1;
+
+export type VectorRasterRenderType = 'fill-all' | 'outlines';
 
 export type VectorRasterInput = {
   // Closed contours in millimetre (scene) space. Even-odd across all
   // contours, so an inner contour cuts a hole (the centre of a letter "O").
   readonly polylines: ReadonlyArray<Polyline>;
+  readonly renderType?: VectorRasterRenderType;
+  // Explicit groups used by Convert to Bitmap's "Use Cut Settings" mode. When
+  // omitted, `renderType` determines whether `polylines` are filled or stroked.
+  readonly fillPolylines?: ReadonlyArray<Polyline>;
+  readonly outlinePolylines?: ReadonlyArray<Polyline>;
   // The mm-space axis-aligned footprint the output bitmap spans.
   readonly bounds: Bounds;
   // Target pixel density. Most callers use dpi; Convert to Bitmap can pass
@@ -63,12 +75,26 @@ export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
   const heightMm = bounds.maxY - bounds.minY;
   const { width, height } = rasterDimensions(input, widthMm, heightMm);
   const luma = new Uint8Array(width * height).fill(BACKGROUND_LUMA);
+  const fillPolylines = input.fillPolylines ?? (input.renderType === 'outlines' ? [] : polylines);
+  const outlinePolylines =
+    input.outlinePolylines ?? (input.renderType === 'outlines' ? polylines : []);
   fillEvenOdd(
     luma,
     width,
     height,
     toPixelContours(
-      polylines,
+      fillPolylines,
+      bounds,
+      scaleForExtent(width, widthMm),
+      scaleForExtent(height, heightMm),
+    ),
+  );
+  strokePolylines(
+    luma,
+    width,
+    height,
+    toPixelStrokes(
+      outlinePolylines,
       bounds,
       scaleForExtent(width, widthMm),
       scaleForExtent(height, heightMm),
@@ -123,6 +149,31 @@ function toPixelContours(
   return out;
 }
 
+type PixelStroke = {
+  readonly closed: boolean;
+  readonly points: ReadonlyArray<Vec2>;
+};
+
+function toPixelStrokes(
+  polylines: ReadonlyArray<Polyline>,
+  bounds: Bounds,
+  pxPerMmX: number,
+  pxPerMmY: number,
+): PixelStroke[] {
+  const out: PixelStroke[] = [];
+  for (const pl of polylines) {
+    if (pl.points.length < MIN_STROKE_POINTS) continue;
+    out.push({
+      closed: pl.closed,
+      points: pl.points.map((p) => ({
+        x: (p.x - bounds.minX) * pxPerMmX,
+        y: (p.y - bounds.minY) * pxPerMmY,
+      })),
+    });
+  }
+  return out;
+}
+
 // One half-open scanline per pixel row, sampled at the row centre (y + 0.5).
 function fillEvenOdd(
   luma: Uint8Array,
@@ -171,4 +222,57 @@ function fillSpan(luma: Uint8Array, width: number, y: number, xa: number, xb: nu
   for (let x = xStart; x <= xEnd; x += 1) {
     luma[rowBase + x] = INK_LUMA;
   }
+}
+
+function strokePolylines(
+  luma: Uint8Array,
+  width: number,
+  height: number,
+  strokes: ReadonlyArray<PixelStroke>,
+): void {
+  for (const stroke of strokes) {
+    const { points } = stroke;
+    for (let i = 0; i + 1 < points.length; i += 1) {
+      const a = points[i];
+      const b = points[i + 1];
+      if (a !== undefined && b !== undefined) strokeSegment(luma, width, height, a, b);
+    }
+    const first = points[0];
+    const last = points[points.length - 1];
+    if (stroke.closed && first !== undefined && last !== undefined) {
+      strokeSegment(luma, width, height, last, first);
+    }
+  }
+}
+
+function strokeSegment(luma: Uint8Array, width: number, height: number, a: Vec2, b: Vec2): void {
+  const minX = Math.max(0, Math.floor(Math.min(a.x, b.x) - OUTLINE_RADIUS_PX));
+  const maxX = Math.min(width - 1, Math.ceil(Math.max(a.x, b.x) + OUTLINE_RADIUS_PX));
+  const minY = Math.max(0, Math.floor(Math.min(a.y, b.y) - OUTLINE_RADIUS_PX));
+  const maxY = Math.min(height - 1, Math.ceil(Math.max(a.y, b.y) + OUTLINE_RADIUS_PX));
+  for (let y = minY; y <= maxY; y += 1) {
+    const rowBase = y * width;
+    for (let x = minX; x <= maxX; x += 1) {
+      if (pointSegmentDistanceSq(x + 0.5, y + 0.5, a, b) <= OUTLINE_RADIUS_SQ) {
+        luma[rowBase + x] = INK_LUMA;
+      }
+    }
+  }
+}
+
+function pointSegmentDistanceSq(px: number, py: number, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq <= SCANLINE_EPS) {
+    const pxDx = px - a.x;
+    const pyDy = py - a.y;
+    return pxDx * pxDx + pyDy * pyDy;
+  }
+  const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / lenSq));
+  const qx = a.x + t * dx;
+  const qy = a.y + t * dy;
+  const qdx = px - qx;
+  const qdy = py - qy;
+  return qdx * qdx + qdy * qdy;
 }

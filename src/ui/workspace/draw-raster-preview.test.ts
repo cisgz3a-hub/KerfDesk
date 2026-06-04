@@ -98,6 +98,86 @@ describe('drawRasterPreview', () => {
 
     expect(createElement).not.toHaveBeenCalled();
   });
+
+  it('uses image-layer minPower in grayscale preview while leaving white pixels white', () => {
+    let capturedImageData: FakeImageData | undefined;
+    vi.stubGlobal('ImageData', FakeImageData);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          putImageData: vi.fn((imageData: FakeImageData) => {
+            capturedImageData = imageData;
+          }),
+        }),
+      } as unknown as HTMLCanvasElement;
+    });
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+      ditherAlgorithm: 'grayscale' as const,
+      minPower: 10,
+      power: 30,
+      linesPerMm: 1,
+    };
+    const raster = {
+      ...burnRaster('data:image/png;base64,min-power-preview'),
+      pixelWidth: 3,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 3, maxY: 1 },
+      lumaBase64: 'AID/',
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { objects: [raster], layers: [layer] },
+    };
+
+    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+
+    expect(Array.from(capturedImageData?.data ?? [])).toEqual([
+      0, 0, 0, 255, 85, 85, 85, 255, 255, 255, 255, 255,
+    ]);
+  });
+
+  it('uses raster image brightness in grayscale preview', () => {
+    let capturedImageData: FakeImageData | undefined;
+    vi.stubGlobal('ImageData', FakeImageData);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          putImageData: vi.fn((imageData: FakeImageData) => {
+            capturedImageData = imageData;
+          }),
+        }),
+      } as unknown as HTMLCanvasElement;
+    });
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+      ditherAlgorithm: 'grayscale' as const,
+      power: 30,
+      linesPerMm: 1,
+    };
+    const raster = {
+      ...burnRaster('data:image/png;base64,brightness-preview'),
+      pixelWidth: 1,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      lumaBase64: 'gA==',
+      brightness: 20,
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { objects: [raster], layers: [layer] },
+    };
+
+    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+
+    expect(Array.from(capturedImageData?.data ?? [])).toEqual([179, 179, 179, 255]);
+  });
 });
 
 class FakeImageData {

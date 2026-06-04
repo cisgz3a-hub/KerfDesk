@@ -26,8 +26,20 @@ function twoCutProject(): Project {
       {
         color: '#000000',
         polylines: [
-          { points: [{ x: 90, y: 90 }, { x: 95, y: 95 }], closed: false },
-          { points: [{ x: 1, y: 1 }, { x: 5, y: 5 }], closed: false },
+          {
+            points: [
+              { x: 90, y: 90 },
+              { x: 95, y: 95 },
+            ],
+            closed: false,
+          },
+          {
+            points: [
+              { x: 1, y: 1 },
+              { x: 5, y: 5 },
+            ],
+            closed: false,
+          },
         ],
       },
     ],

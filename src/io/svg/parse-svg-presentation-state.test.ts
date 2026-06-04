@@ -5,15 +5,16 @@ import { parseSvg } from './parse-svg';
 const args = (svgText: string) => ({ svgText, id: 'O1', source: 'test.svg' });
 
 describe('parseSvg presentation state', () => {
-  it('skips fill-only geometry instead of importing it as black stroke output', () => {
+  it('imports fill-only geometry using its fill color', () => {
     const result = parseSvg(
       args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
   <rect x="1" y="1" width="8" height="8" fill="red"/>
 </svg>`),
     );
 
-    expect(result.object).toBeNull();
-    expect(result.notes.join(' ')).toMatch(/no drawable/);
+    expect(result.object).not.toBeNull();
+    expect(result.object?.paths[0]?.color).toBe('#ff0000');
+    expect(result.object?.paths[0]?.polylines[0]?.closed).toBe(true);
   });
 
   it('resolves inherited and inline-style stroke colors', () => {
@@ -67,5 +68,21 @@ describe('parseSvg presentation state', () => {
       { x: 0, y: 9 },
       { x: 1, y: 9 },
     ]);
+  });
+
+  it('expands safe local <use> references at their x/y placement', () => {
+    const result = parseSvg(
+      args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30">
+  <defs>
+    <rect id="tile" x="0" y="0" width="5" height="5" fill="blue"/>
+  </defs>
+  <use href="#tile" x="10" y="20"/>
+</svg>`),
+    );
+
+    const points = result.object?.paths[0]?.polylines[0]?.points;
+    expect(result.object?.paths).toHaveLength(1);
+    expect(points?.[0]).toEqual({ x: 10, y: 20 });
+    expect(points?.[1]).toEqual({ x: 15, y: 20 });
   });
 });

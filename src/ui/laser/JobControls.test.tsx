@@ -87,6 +87,7 @@ describe('JobControls Frame action', () => {
       wcoCache: null,
       streamer: null,
     });
+    useStore.getState().setJobPlacement({ startFrom: 'user-origin' });
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -114,6 +115,28 @@ describe('JobControls Frame action', () => {
         await act(async () => root?.unmount());
       }
       useLaserStore.setState({ frame: originalFrame });
+      host.remove();
+    }
+  });
+
+  it('renders explicit Start From and 9-anchor Job Origin controls', async () => {
+    installProject();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+      });
+
+      const startFrom = host.querySelector('select[aria-label="Start from"]');
+      expect(startFrom).not.toBeNull();
+      expect([...host.querySelectorAll('button[aria-label^="Job origin"]')]).toHaveLength(9);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
       host.remove();
     }
   });

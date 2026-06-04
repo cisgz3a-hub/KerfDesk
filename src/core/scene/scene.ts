@@ -9,6 +9,8 @@ export type Scene = {
   readonly layers: ReadonlyArray<Layer>;
 };
 
+export type LayerMoveDirection = 'up' | 'down';
+
 export const EMPTY_SCENE: Scene = { objects: [], layers: [] };
 
 export function addObject(scene: Scene, object: SceneObject): Scene {
@@ -47,4 +49,15 @@ export function updateLayer(
 
 export function removeLayer(scene: Scene, layerId: string): Scene {
   return { ...scene, layers: scene.layers.filter((l) => l.id !== layerId) };
+}
+
+export function moveLayer(scene: Scene, layerId: string, direction: LayerMoveDirection): Scene {
+  const index = scene.layers.findIndex((layer) => layer.id === layerId);
+  const nextIndex = direction === 'up' ? index - 1 : index + 1;
+  if (index < 0 || nextIndex < 0 || nextIndex >= scene.layers.length) return scene;
+  const layers = [...scene.layers];
+  const [layer] = layers.splice(index, 1);
+  if (layer === undefined) return scene;
+  layers.splice(nextIndex, 0, layer);
+  return { ...scene, layers };
 }

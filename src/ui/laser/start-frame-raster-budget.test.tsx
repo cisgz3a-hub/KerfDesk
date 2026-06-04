@@ -54,6 +54,11 @@ const readyMachine = {
   wcoCache: { x: 100, y: 100, z: 0 },
 };
 
+const userOriginPlacement = {
+  startFrom: 'user-origin' as const,
+  anchor: 'front-left' as const,
+};
+
 function overBudgetRasterProject(): Project {
   const color = '#808080';
   const raster: RasterImage = {
@@ -99,7 +104,12 @@ afterEach(() => {
 
 describe('custom-origin raster budget guard', () => {
   it('blocks custom-origin Start before compileJob can touch an over-budget raster', () => {
-    const result = prepareStartJob(overBudgetRasterProject(), readyController, readyMachine);
+    const result = prepareStartJob(
+      overBudgetRasterProject(),
+      readyController,
+      readyMachine,
+      userOriginPlacement,
+    );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -108,7 +118,10 @@ describe('custom-origin raster budget guard', () => {
   });
 
   it('blocks Frame before compileJob can touch an over-budget raster', async () => {
-    useStore.setState({ project: overBudgetRasterProject() });
+    useStore.setState({
+      project: overBudgetRasterProject(),
+      jobPlacement: userOriginPlacement,
+    });
     const originalFrame = useLaserStore.getState().frame;
     const frame = vi.fn(async () => undefined);
     useLaserStore.setState({

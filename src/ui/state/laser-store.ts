@@ -20,6 +20,7 @@ import {
   buildJogCommand,
   cancel as cancelStreamer,
   createStreamer,
+  disconnect as disconnectStreamer,
   idleCollector,
   type JogParams,
   pause as pauseStreamer,
@@ -377,22 +378,12 @@ function jobActions(
       }
     },
     pauseJob: async () => {
-      try {
-        await safeWrite(set, get, RT_HOLD);
-      } catch (err) {
-        set({ safetyNotice: writeFailedNotice('pause') });
-        throw err;
-      }
+      await safeWrite(set, get, RT_HOLD, 'pause');
       const s = get().streamer;
       if (s !== null) set({ streamer: pauseStreamer(s) });
     },
     resumeJob: async () => {
-      try {
-        await safeWrite(set, get, RT_RESUME);
-      } catch (err) {
-        set({ safetyNotice: writeFailedNotice('resume') });
-        throw err;
-      }
+      await safeWrite(set, get, RT_RESUME, 'resume');
       // Functional set so the snapshot is taken AT WRITE TIME — during
       // the await above, ack-driven handleLine paths can have advanced
       // the streamer via advanceStream. A `const s = get().streamer`
@@ -409,15 +400,20 @@ function jobActions(
         toSend = stepped.toSend;
         return { streamer: stepped.state };
       });
-      if (toSend.length > 0) await safeWrite(set, get, toSend);
+      if (toSend.length > 0) {
+        try {
+          await safeWrite(set, get, toSend, 'resume');
+        } catch (err) {
+          set((s) => ({
+            streamer: s.streamer === null ? s.streamer : disconnectStreamer(s.streamer),
+            safetyNotice: writeFailedNotice('resume'),
+          }));
+          throw err;
+        }
+      }
     },
     stopJob: async () => {
-      try {
-        await safeWrite(set, get, RT_SOFT_RESET);
-      } catch (err) {
-        set({ safetyNotice: writeFailedNotice('stop') });
-        throw err;
-      }
+      await safeWrite(set, get, RT_SOFT_RESET, 'stop');
       // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
       // cached WCO so the readout doesn't lie about "custom origin"
       // until the next WCO frame arrives. Same race window as

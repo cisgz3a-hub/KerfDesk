@@ -2,6 +2,8 @@
 // parameters (power, speed, passes) that the OutputStrategy consumes when
 // emitting G-code. WORKFLOW.md F-A7 defines defaults and value ranges.
 
+import type { DitherAlgorithm } from './scene-object';
+
 // Phase F: 'line' = vector cut/engrave along polylines; 'fill' =
 // parallel-line hatching inside closed contours (F.1); 'image' =
 // raster engrave with per-pixel S modulation (F.2, ADR-020).
@@ -11,12 +13,13 @@ export type LayerMode = 'line' | 'fill' | 'image';
 // pure-core enum in scene-object.ts (DitherAlgorithm) so the Layer
 // type doesn't reach into the SceneObject module. Kept aligned;
 // adding an algorithm here also needs the matching dither.ts arm.
-export type LayerDitherAlgorithm = 'threshold' | 'floyd-steinberg' | 'grayscale';
+export type LayerDitherAlgorithm = DitherAlgorithm;
 
 export type Layer = {
   readonly id: string;
   readonly color: string; // lowercase 6-digit hex
   readonly mode: LayerMode;
+  readonly minPower: number; // 0..100 (percent); grayscale image floor
   readonly power: number; // 0..100 (percent)
   readonly speed: number; // mm/min; ≤ device.maxFeed
   readonly passes: number; // integer ≥ 1
@@ -48,6 +51,7 @@ export type Layer = {
 
 export const LAYER_DEFAULTS = {
   mode: 'line',
+  minPower: 0,
   power: 30,
   speed: 1500,
   passes: 1,

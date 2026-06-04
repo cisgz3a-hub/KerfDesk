@@ -20,7 +20,15 @@ function vectorProject(): Project {
     paths: [
       {
         color: '#ff0000',
-        polylines: [{ points: [{ x: 1, y: 1 }, { x: 9, y: 9 }], closed: false }],
+        polylines: [
+          {
+            points: [
+              { x: 1, y: 1 },
+              { x: 9, y: 9 },
+            ],
+            closed: false,
+          },
+        ],
       },
     ],
   };

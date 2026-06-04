@@ -8,6 +8,7 @@ describe('createLayer', () => {
       id: 'L1',
       color: '#ff0000',
       mode: 'line',
+      minPower: 0,
       power: 30,
       speed: 1500,
       passes: 1,
@@ -35,5 +36,7 @@ describe('LAYER_DEFAULTS', () => {
     expect(LAYER_DEFAULTS.passes).toBeGreaterThanOrEqual(1);
     expect(LAYER_DEFAULTS.power).toBeGreaterThanOrEqual(0);
     expect(LAYER_DEFAULTS.power).toBeLessThanOrEqual(100);
+    expect(LAYER_DEFAULTS.minPower).toBeGreaterThanOrEqual(0);
+    expect(LAYER_DEFAULTS.minPower).toBeLessThanOrEqual(LAYER_DEFAULTS.power);
   });
 });

@@ -5,10 +5,7 @@
     "severity": "P0 safety",
     "confidence": "high",
     "module": "Runtime job control",
-    "files": [
-      "src/ui/state/laser-store.ts",
-      "src/core/controllers/grbl/commands.ts"
-    ],
+    "files": ["src/ui/state/laser-store.ts", "src/core/controllers/grbl/commands.ts"],
     "functionComponent": "pauseJob / RT_HOLD",
     "triggerPath": "Operator presses Pause during an active burn move.",
     "failureMode": "The app sends GRBL feed hold only and marks the streamer paused without sending laser-off/reset or verifying laser state.",
@@ -29,9 +26,7 @@
     "severity": "P0/P1 output correctness",
     "confidence": "high",
     "module": "Path optimization",
-    "files": [
-      "src/core/job/optimize-paths.ts"
-    ],
+    "files": ["src/core/job/optimize-paths.ts"],
     "functionComponent": "optimizePaths / optimizeGroup",
     "triggerPath": "Cutting nested closed shapes.",
     "failureMode": "Nearest-neighbor ordering can cut outer contours before inner contours.",
@@ -75,10 +70,7 @@
     "severity": "P1 workflow correctness",
     "confidence": "high",
     "module": "Job placement",
-    "files": [
-      "src/core/job/job-origin.ts",
-      "src/ui/laser/start-job-readiness.ts"
-    ],
+    "files": ["src/core/job/job-origin.ts", "src/ui/laser/start-job-readiness.ts"],
     "functionComponent": "applyJobOrigin / USER_ORIGIN_JOB_PLACEMENT",
     "triggerPath": "User frames or starts a job expecting center/corner/current-position origin behavior.",
     "failureMode": "Core has 9-anchor types, but UI/start readiness uses hardcoded front-left placement.",
@@ -171,10 +163,7 @@
     "severity": "P2 import fidelity",
     "confidence": "high",
     "module": "SVG import",
-    "files": [
-      "src/io/svg/parse-svg.ts",
-      "src/io/svg/shape-to-polylines.ts"
-    ],
+    "files": ["src/io/svg/parse-svg.ts", "src/io/svg/shape-to-polylines.ts"],
     "functionComponent": "parseSvg / parseTransform / parseViewBox",
     "triggerPath": "Import SVG using physical units, defs, symbols, or use references.",
     "failureMode": "Current parser handles recursive transforms, but remaining gaps include unit-aware scaling and use/symbol expansion.",
@@ -194,10 +183,7 @@
     "severity": "resolved/monitor",
     "confidence": "high",
     "module": "Duration estimation",
-    "files": [
-      "src/core/job/planner.ts",
-      "src/core/job/estimate-duration.ts"
-    ],
+    "files": ["src/core/job/planner.ts", "src/core/job/estimate-duration.ts"],
     "functionComponent": "estimateJobDuration / jobWithRasterSweeps",
     "triggerPath": "Estimate duration for raster jobs.",
     "failureMode": "Original audit claimed raster ETA undercount because planner skips raster groups.",
@@ -237,4 +223,3 @@
     "notes": "This is a real parity gap but not an authorization to build all LightBurn features."
   }
 ]
-

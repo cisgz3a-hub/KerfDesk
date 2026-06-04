@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dither, type DitherInput } from './dither';
+import { dither, type DitherAlgorithm, type DitherInput } from './dither';
 
 // Helpers: build canonical greyscale fixtures so the tests read like
 // the algorithm's intent.
@@ -24,6 +24,18 @@ function gradient(width: number, height: number): DitherInput {
 }
 
 const SMAX = 1000;
+const BINARY_ALGORITHMS = [
+  'threshold',
+  'floyd-steinberg',
+  'jarvis',
+  'stucki',
+  'atkinson',
+  'burkes',
+  'sierra3',
+  'sierra2',
+  'sierra-lite',
+  'ordered',
+] as const satisfies ReadonlyArray<DitherAlgorithm>;
 
 describe('dither — threshold', () => {
   it('all-black input → every pixel at sMax', () => {
@@ -65,7 +77,15 @@ describe('dither — grayscale', () => {
     expect(Math.abs((out[1] ?? 0) - 498)).toBeLessThanOrEqual(1);
   });
 
-  it('monotone — output is non-increasing along the gradient', () => {
+  it('honours sMin for non-white grayscale pixels while keeping white pixels off', () => {
+    const floorOut = dither(
+      { luma: new Uint8Array([0, 128, 254, 255]), width: 4, height: 1 },
+      { algorithm: 'grayscale', sMax: SMAX, sMin: 100 },
+    );
+    expect(Array.from(floorOut)).toEqual([SMAX, 548, 104, 0]);
+  });
+
+  it('monotone output is non-increasing along the gradient', () => {
     const out = dither(gradient(16, 1), { algorithm: 'grayscale', sMax: SMAX });
     for (let i = 1; i < out.length; i += 1) {
       expect(out[i]).toBeLessThanOrEqual(out[i - 1] ?? SMAX);
@@ -118,5 +138,28 @@ describe('dither — floyd-steinberg', () => {
     const original = new Uint8Array(buf);
     dither({ luma: buf, width: 5, height: 1 }, { algorithm: 'floyd-steinberg', sMax: SMAX });
     expect(Array.from(buf)).toEqual(Array.from(original));
+  });
+});
+
+describe('dither — expanded binary raster modes', () => {
+  it.each(BINARY_ALGORITHMS)('%s keeps black full-burn and white off', (algorithm) => {
+    const black = dither(uniform(4, 4, 0), { algorithm, sMax: SMAX });
+    const white = dither(uniform(4, 4, 255), { algorithm, sMax: SMAX });
+    expect(Array.from(black).every((v) => v === SMAX)).toBe(true);
+    expect(Array.from(white).every((v) => v === 0)).toBe(true);
+  });
+
+  it.each(BINARY_ALGORITHMS)('%s emits only 0 or sMax values', (algorithm) => {
+    const out = dither(gradient(16, 16), { algorithm, sMax: SMAX });
+    for (const v of out) {
+      expect(v === 0 || v === SMAX).toBe(true);
+    }
+  });
+
+  it.each(BINARY_ALGORITHMS)('%s is deterministic', (algorithm) => {
+    const input = gradient(16, 16);
+    const a = dither(input, { algorithm, sMax: SMAX });
+    const b = dither(input, { algorithm, sMax: SMAX });
+    expect(Array.from(a)).toEqual(Array.from(b));
   });
 });

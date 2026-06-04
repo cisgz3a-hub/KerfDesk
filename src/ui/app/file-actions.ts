@@ -14,6 +14,12 @@ import { clearAutosave } from '../state/autosave';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
+  DEFAULT_JOB_PLACEMENT,
+  resolveJobPlacement,
+  type JobPlacementSettings,
+  type MachinePlacementSnapshot,
+} from '../job-placement';
+import {
   describeImportError,
   describeImportResult,
   describeReimportOutcome,
@@ -64,6 +70,8 @@ export type SaveGcodeCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
   readonly savedName: string | null;
+  readonly jobPlacement?: JobPlacementSettings;
+  readonly machine?: MachinePlacementSnapshot;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -71,7 +79,24 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   // Saved exports carry a provenance header (build / commit / emitter) so a
   // stale file is obvious later. The streamed Start path intentionally omits it
   // for now (roadmap P0-A open Q2 — streamer comment handling unverified).
-  const { gcode, preflight } = emitGcode(ctx.project, { metadata: buildGcodeMetadata() });
+  const placement = resolveJobPlacement(ctx.jobPlacement ?? DEFAULT_JOB_PLACEMENT, {
+    statusReport: null,
+    workOriginActive: false,
+    wcoCache: null,
+    ...ctx.machine,
+  });
+  if (!placement.ok) {
+    const lines = placement.messages.map((message) => `â€¢ ${message}`).join('\n');
+    window.alert(`Cannot save G-code:\n\n${lines}`);
+    return;
+  }
+  const { gcode, preflight } = emitGcode(ctx.project, {
+    metadata: buildGcodeMetadata(),
+    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+    ...(placement.preflightMotionOffset === undefined
+      ? {}
+      : { preflightMotionOffset: placement.preflightMotionOffset }),
+  });
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
     window.alert(`Cannot save G-code:\n\n${lines}`);

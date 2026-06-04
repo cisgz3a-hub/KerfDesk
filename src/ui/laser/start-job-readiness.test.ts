@@ -8,6 +8,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import type { JobPlacementSettings } from '../job-placement';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -30,6 +31,11 @@ const readyMachine = {
   statusReport: idleStatus,
   alarmCode: null,
   hasActiveStreamer: false,
+};
+
+const userOriginFrontLeft: JobPlacementSettings = {
+  startFrom: 'user-origin',
+  anchor: 'front-left',
 };
 
 const sampleObject: SceneObject = {
@@ -238,6 +244,7 @@ describe('prepareStartJob', () => {
       calibratedProjectWith(centeredTraceObject),
       readyController,
       customOriginMachine,
+      userOriginFrontLeft,
     );
 
     expect(result.ok).toBe(true);
@@ -260,21 +267,27 @@ describe('prepareStartJob', () => {
       calibratedProjectWith(centeredTraceObject),
       readyController,
       nearEdgeOriginMachine,
+      userOriginFrontLeft,
     );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.messages.join('\n')).toMatch(/custom origin/i);
+      expect(result.messages.join('\n')).toMatch(/selected job origin/i);
       expect(result.messages.join('\n')).toMatch(/machine bed/i);
     }
   });
 
   it('allows custom-origin fill overscan when WCO keeps the runway physically on the bed', () => {
-    const result = prepareStartJob(fillOverscanProject(), readyController, {
-      ...readyMachine,
-      workOriginActive: true,
-      wcoCache: { x: 100, y: 100, z: 0 },
-    });
+    const result = prepareStartJob(
+      fillOverscanProject(),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 100, y: 100, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -283,11 +296,16 @@ describe('prepareStartJob', () => {
   });
 
   it('blocks custom-origin fill overscan when WCO puts the runway physically off the bed', () => {
-    const result = prepareStartJob(fillOverscanProject(), readyController, {
-      ...readyMachine,
-      workOriginActive: true,
-      wcoCache: { x: 2, y: 100, z: 0 },
-    });
+    const result = prepareStartJob(
+      fillOverscanProject(),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 2, y: 100, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -296,11 +314,16 @@ describe('prepareStartJob', () => {
   });
 
   it('blocks custom-origin Start when the physical origin location is not known', () => {
-    const result = prepareStartJob(calibratedProjectWith(centeredTraceObject), readyController, {
-      ...readyMachine,
-      workOriginActive: true,
-      wcoCache: null,
-    });
+    const result = prepareStartJob(
+      calibratedProjectWith(centeredTraceObject),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: null,
+      },
+      userOriginFrontLeft,
+    );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
