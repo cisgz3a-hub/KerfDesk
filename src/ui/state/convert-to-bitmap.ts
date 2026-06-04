@@ -22,6 +22,7 @@
 import { addObject, type RasterImage, removeObject } from '../../core/scene';
 import {
   ensureRasterImageLayer,
+  resolveRasterLayerColor,
   type MutationResult,
   pruneOrphanLayers,
   pushUndo,
@@ -34,19 +35,21 @@ export function applyConvertToBitmap(
   raster: RasterImage,
 ): MutationResult {
   let scene = s.project.scene;
+  const color = resolveRasterLayerColor(scene, raster.color, raster.linesPerMm);
+  const converted = color === raster.color ? raster : { ...raster, color };
   const existing = scene.objects.find((o) => o.id === sourceId);
   if (existing !== undefined) {
     scene = removeObject(scene, sourceId);
   }
-  scene = addObject(scene, raster);
-  scene = ensureRasterImageLayer(scene, raster.color);
+  scene = addObject(scene, converted);
+  scene = ensureRasterImageLayer(scene, converted.color, converted.linesPerMm);
   // Drop the source vector's color layer if nothing else references it —
   // same cleanup removeSceneObject does, so a converted shape doesn't leave
   // a stale line/fill row (with its power/speed) in the Cuts panel.
   scene = pruneOrphanLayers(scene);
   return {
     project: { ...s.project, scene },
-    selectedObjectId: raster.id,
+    selectedObjectId: converted.id,
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,

@@ -30,18 +30,15 @@ import {
 } from '../../core/scene';
 import { type BitmapFields, lumaToBitmap } from './luma-bitmap';
 
-// LaserForge default — LightBurn's docs state NO default DPI (ADR-029 #7), so
-// this is ours. 254 DPI = 10 lines/mm, which matches our image-import default,
-// equals LightBurn's observed Fill-All UI value, and sits in its 120–300 DPI
-// photo band — a grounded choice, not an invented LightBurn default.
-const CONVERT_TO_BITMAP_DPI = 254;
-const MM_PER_INCH = 25.4;
 const MIN_PIXEL_DIM = 1;
 // Match the image-import raster defaults so a converted bitmap engraves exactly
 // like an imported one would (candidate de-dup with Toolbar's import handler).
 const DEFAULT_DITHER: DitherAlgorithm = 'floyd-steinberg';
+// Default conversion density. Oversized conversions are lowered by
+// bitmapConversionPlan instead of freezing or forcing the user to guess.
 const DEFAULT_LINES_PER_MM = 10;
 const BITMAP_SOURCE_SUFFIX = ' (bitmap)';
+const DENSITY_SEARCH_STEPS = 32;
 
 // The vector-carrying SceneObject kinds Convert to Bitmap accepts — all three
 // expose `paths` + `bounds` + `transform`, so the gather step is uniform.
@@ -65,9 +62,14 @@ export function assembleBitmap(
   encode: (raster: VectorRaster) => BitmapFields,
   id: string,
 ): RasterImage {
-  assertWithinBitmapBudget(o);
+  const plan = bitmapConversionPlan(o);
   const polylines = o.paths.flatMap((p) => p.polylines);
-  const raster = rasterizeVectorToLuma({ polylines, bounds: o.bounds, dpi: CONVERT_TO_BITMAP_DPI });
+  const raster = rasterizeVectorToLuma({
+    polylines,
+    bounds: o.bounds,
+    pixelWidth: plan.pixelWidth,
+    pixelHeight: plan.pixelHeight,
+  });
   const { dataUrl, lumaBase64 } = encode(raster);
   return {
     kind: 'raster-image',
@@ -80,27 +82,57 @@ export function assembleBitmap(
     transform: o.transform,
     color: DEFAULT_RASTER_LAYER_COLOR,
     dither: DEFAULT_DITHER,
-    linesPerMm: DEFAULT_LINES_PER_MM,
+    linesPerMm: plan.linesPerMm,
     lumaBase64,
   };
 }
 
-function assertWithinBitmapBudget(o: ConvertibleVector): void {
-  const pixelWidth = convertedPixelExtent(o.bounds.maxX - o.bounds.minX);
-  const pixelHeight = convertedPixelExtent(o.bounds.maxY - o.bounds.minY);
-  const verdict = evaluateRasterBudget(pixelWidth, pixelHeight);
-  if (verdict.kind === 'too-large') {
-    throw new Error(
-      `Converted bitmap would be ${pixelWidth}x${pixelHeight} px (${verdict.reason}). Scale the artwork down before converting to bitmap.`,
-    );
+type BitmapConversionPlan = {
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  readonly linesPerMm: number;
+};
+
+function bitmapConversionPlan(o: ConvertibleVector): BitmapConversionPlan {
+  const physicalWidthMm = displayedExtentMm(o.bounds.maxX - o.bounds.minX, o.transform.scaleX);
+  const physicalHeightMm = displayedExtentMm(o.bounds.maxY - o.bounds.minY, o.transform.scaleY);
+  const defaultPlan = planAtLinesPerMm(physicalWidthMm, physicalHeightMm, DEFAULT_LINES_PER_MM);
+  if (evaluateRasterBudget(defaultPlan.pixelWidth, defaultPlan.pixelHeight).kind === 'ok') {
+    return defaultPlan;
   }
+
+  let low = 0;
+  let high = DEFAULT_LINES_PER_MM;
+  for (let i = 0; i < DENSITY_SEARCH_STEPS; i += 1) {
+    const mid = (low + high) / 2;
+    const trial = planAtLinesPerMm(physicalWidthMm, physicalHeightMm, mid);
+    if (evaluateRasterBudget(trial.pixelWidth, trial.pixelHeight).kind === 'ok') {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+  return planAtLinesPerMm(physicalWidthMm, physicalHeightMm, low);
 }
 
-function convertedPixelExtent(mm: number): number {
-  return Math.max(
-    MIN_PIXEL_DIM,
-    Math.round(Math.max(0, mm) * (CONVERT_TO_BITMAP_DPI / MM_PER_INCH)),
-  );
+function displayedExtentMm(localMm: number, scale: number): number {
+  return Math.max(0, localMm) * Math.abs(scale);
+}
+
+function planAtLinesPerMm(
+  widthMm: number,
+  heightMm: number,
+  linesPerMm: number,
+): BitmapConversionPlan {
+  return {
+    pixelWidth: convertedPixelExtent(widthMm, linesPerMm),
+    pixelHeight: convertedPixelExtent(heightMm, linesPerMm),
+    linesPerMm,
+  };
+}
+
+function convertedPixelExtent(mm: number, linesPerMm: number): number {
+  return Math.max(MIN_PIXEL_DIM, Math.round(Math.max(0, mm) * Math.max(0, linesPerMm)));
 }
 
 // Display name for the converted bitmap. SVG / traced images carry a `source`
