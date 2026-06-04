@@ -104,6 +104,12 @@ describe('handleLine streamer writes', () => {
     expect(get().streamer?.completed).toBe(1);
     expect(get().streamer?.inFlight.map((item) => item.line)).toEqual(['G1 X1234567891\n']);
     expect(get().streamer?.queued).toEqual([]);
+    // P0-3: a follow-up write failure must also raise the operator-facing safety
+    // banner - the machine may still be moving from buffered commands.
+    expect(get().safetyNotice).toEqual({
+      kind: 'disconnect-during-job',
+      message: expect.stringContaining('still be moving'),
+    });
   });
 });
 

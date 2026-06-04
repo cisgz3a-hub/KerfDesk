@@ -277,6 +277,7 @@ on, or lock the UI. They take priority over every feature. Do them in the order 
   confirms halt.
 
 ### P0-2: Pause sends only GRBL feed-hold (!) with no laser-off
+- **Status:** DEFERRED 2026-06-04 (blocked on hardware) - the fix shape depends on observing whether a GRBL feed-hold darks the diode on the Falcon (M3 vs M4), and coding blind risks breaking feed-hold resume; do this during the Tier-0 HV session. Per user direction, proceeding with code-only P0s (P0-3 onward) first.
 - **Problem:** `pauseJob` writes only `RT_HOLD` (`!`). GRBL feed-hold halts motion planning
   but does not disable the spindle/laser, so the beam can remain energized during
   deceleration and while parked at the hold point (especially mid-dwell). User-visible
@@ -324,6 +325,7 @@ on, or lock the UI. They take priority over every feature. Do them in the order 
   Resume continues correctly; the tooltip matches reality; write-failure raises a notice.
 
 ### P0-3: Ack-driven follow-up write failure tears down with no safety banner
+- **Status:** SHIPPED 2026-06-04 (ADR-042) - the advanceStream catch now raises the disconnect-during-job safety banner, and the gap test asserts the notice. Shared `disconnectDuringJobNotice()` builder dedupes the onClose path.
 - **Problem:** When the post-ack write of the next chunk rejects, `advanceStream` marks the
   streamer `disconnected` but raises no `safetyNotice`. GRBL may keep executing the commands
   already in its 120-byte buffer while the UI silently leaves the streaming state with no

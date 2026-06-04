@@ -47,6 +47,10 @@ export const DISCONNECT_DURING_JOB_MESSAGE =
   'buffered commands. Use physical E-stop or power cutoff now if unsafe. Reconnect and ' +
   'home before continuing.';
 
+export function disconnectDuringJobNotice(): LaserSafetyNotice {
+  return { kind: 'disconnect-during-job', message: DISCONNECT_DURING_JOB_MESSAGE };
+}
+
 export function writeFailedMessage(action: LaserSafetyAction): string {
   if (action === 'stop') {
     return (

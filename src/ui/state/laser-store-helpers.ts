@@ -5,7 +5,7 @@
 // at runtime.
 
 import { disconnect as disconnectStreamer, type StreamerState } from '../../core/controllers/grbl';
-import { DISCONNECT_DURING_JOB_MESSAGE } from './laser-safety-notice';
+import { disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 
 export function serialWriteErrorMessage(err: unknown): string {
@@ -64,13 +64,6 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     wcoCache: null,
     workOriginActive: false,
     streamer: stream,
-    ...(wasActive
-      ? {
-          safetyNotice: {
-            kind: 'disconnect-during-job' as const,
-            message: DISCONNECT_DURING_JOB_MESSAGE,
-          },
-        }
-      : {}),
+    ...(wasActive ? { safetyNotice: disconnectDuringJobNotice() } : {}),
   };
 }
