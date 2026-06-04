@@ -33,6 +33,7 @@ import type { CutSegment, Group, Job, RasterGroup } from './job';
 const DEFAULT_OVERSCAN_MM = 5;
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
+const WHITE_LUMA_BYTE = 255;
 
 const layerFillCache = new WeakMap<
   ReadonlyArray<SceneObject>,
@@ -103,8 +104,9 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
   );
   // Layer settings win over per-image settings so the operator can
   // re-tune one layer without editing every image on it.
+  const orientedLuma = orientRasterLumaForMachine(luma, pixelWidth, pixelHeight, obj, device);
   const sValues = dither(
-    { luma, width: pixelWidth, height: pixelHeight },
+    { luma: orientedLuma, width: pixelWidth, height: pixelHeight },
     { algorithm: layer.ditherAlgorithm, sMax },
   );
   return {
@@ -120,6 +122,37 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     bounds,
     overscanMm: DEFAULT_OVERSCAN_MM,
   };
+}
+
+function orientRasterLumaForMachine(
+  luma: Uint8Array,
+  width: number,
+  height: number,
+  obj: RasterImage,
+  device: DeviceProfile,
+): Uint8Array {
+  const flipX = originFlipsRasterX(device) !== obj.transform.mirrorX;
+  const flipY = originFlipsRasterY(device) !== obj.transform.mirrorY;
+  if (!flipX && !flipY) return luma;
+  const out = new Uint8Array(luma.length);
+  for (let y = 0; y < height; y += 1) {
+    const srcY = flipY ? height - 1 - y : y;
+    for (let x = 0; x < width; x += 1) {
+      const srcX = flipX ? width - 1 - x : x;
+      out[y * width + x] = luma[srcY * width + srcX] ?? WHITE_LUMA_BYTE;
+    }
+  }
+  return out;
+}
+
+function originFlipsRasterX(device: DeviceProfile): boolean {
+  return device.origin === 'front-right' || device.origin === 'rear-right';
+}
+
+function originFlipsRasterY(device: DeviceProfile): boolean {
+  return (
+    device.origin === 'front-left' || device.origin === 'front-right' || device.origin === 'center'
+  );
 }
 
 // Decode a base64-encoded luma buffer. Truncates / pads to the expected

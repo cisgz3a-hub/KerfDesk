@@ -27,6 +27,7 @@ const NUM = String.raw`(-?\d+(?:\.\d+)?)`;
 const X_RE = new RegExp(String.raw`\bX${NUM}`);
 const Y_RE = new RegExp(String.raw`\bY${NUM}`);
 const S_RE = new RegExp(String.raw`\bS${NUM}`);
+const DISTANCE_EPS_MM = 1e-6;
 
 function parseValue(line: string, re: RegExp): number | null {
   const m = re.exec(line);
@@ -71,7 +72,7 @@ export function findLongBlankFeedMoves(
     if (!/^G1\b/.test(stripped)) continue;
     if (stickyS !== 0) continue;
     const distanceMm = Math.hypot(x - fromX, y - fromY);
-    if (distanceMm > threshold) {
+    if (distanceMm - threshold > DISTANCE_EPS_MM) {
       issues.push({
         lineNumber: i + 1,
         line: raw,
