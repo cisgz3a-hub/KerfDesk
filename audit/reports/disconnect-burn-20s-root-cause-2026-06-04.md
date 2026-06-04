@@ -148,3 +148,31 @@ These claims were evaluated and are **wrong or overstated**; do not let them mis
 
 ### Verification provenance
 All file paths cited are under `C:/Users/Asus/LaserForge-2.0`. The disabled LaserForge 1 tree at `C:/Users/Asus/LaserForge` (DO_NOT_USE) was not read or relied upon. Hardware behavior (exact planner depth, exact ~20s) is **Hardware verification needed** on the operator's Falcon A1 Pro before any send-path change is marked shipped.
+
+---
+
+## 8. Decision (2026-06-04): must work for ALL devices, or skip
+
+Maintainer direction: any fix must apply to every supported GRBL device, not just the
+Falcon. Applying that bar to the fix space in Section 6:
+
+- **Firmware host-loss watchdog (GrblHAL / per-controller):** device- and firmware-specific
+  (requires flashing a particular board; not all supported controllers can run it).
+  **SKIP** - fails the all-devices bar.
+- **Host-side stream-ahead reduction (`DEFAULT_RX_BUFFER_BYTES`):** device-agnostic, so it
+  *meets* the bar, BUT it can only trim the small ~120-byte serial RX window (~1-3 s). It
+  cannot shrink the controller's internal motion-planner buffer - the dominant reservoir -
+  without deliberately starving it, which causes motion stutter / uneven burns on every
+  device. Marginal safety gain for a safety-critical send-path change. **SKIP** (recommended;
+  may revisit as an opt-in setting if hardware testing ever shows a clean win).
+- **Stopping a PHYSICAL yank from host software:** impossible on ANY device - there is no link
+  to transmit a stop over. Not buildable.
+
+**Conclusion:** there is no device-agnostic *software* fix worth shipping for the physical
+loss-of-link case. The device-agnostic safety that software CAN provide already exists and
+works on any GRBL controller: the in-app **Stop** button issues `RT_SOFT_RESET` and the
+**error/alarm** paths go terminal (P0-1, ADR-041), all while the link is alive; the
+disconnect/write-failure **safety banner** (P0-3, P0-B) warns when it is not. The only
+remaining gap - a true *physical* disconnect - is a hardware-layer problem identical on every
+device, so the device-agnostic answer is operational: a **hardware E-stop / power cutoff /
+interlock**, plus the existing warning. No host-software code change is taken for this report.
