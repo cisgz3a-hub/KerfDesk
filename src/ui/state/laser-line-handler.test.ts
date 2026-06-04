@@ -106,3 +106,32 @@ describe('handleLine streamer writes', () => {
     expect(get().streamer?.queued).toEqual([]);
   });
 });
+
+describe('handleLine controller error (P0-1)', () => {
+  it('stops the stream and raises a safety notice when GRBL rejects a line mid-job', () => {
+    const { refs, set, get } = makeHarness();
+    // rxBuffer 30 leaves the third line queued, so before the fix the error ack
+    // would have written the next queued bytes. Now it must write nothing.
+    const firstStep = step(
+      createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', {
+        rxBufferBytes: 30,
+      }),
+    );
+    set({ streamer: firstStep.state });
+    expect(get().streamer?.queued.length).toBeGreaterThan(0);
+    const safeWrite = vi.fn(async () => undefined);
+
+    handleLine(set, get, refs, safeWrite, 'error:7');
+
+    // Terminal: no further bytes go to the controller.
+    expect(get().streamer?.status).toBe('errored');
+    expect(safeWrite).not.toHaveBeenCalled();
+    // The code is recorded and the operator is told to check the machine.
+    expect(get().lastError).toBe(7);
+    expect(get().safetyNotice).toEqual({
+      kind: 'controller-error',
+      code: 7,
+      message: expect.stringContaining('error:7'),
+    });
+  });
+});

@@ -2018,6 +2018,84 @@ box for the framing pass (not a toolpath order) and keeps its own physical-bound
 
 ---
 
+## ADR-041 - A GRBL error:N ack is terminal for the stream (stop sending + safety notice)
+
+**Status:** Accepted, code shipped. Hardware verification needed. | **Date:** 2026-06-04
+
+### Context
+
+When GRBL replied `error:N` to an in-flight line mid-job, the streamer treated it
+exactly like `ok`: `onAck` popped the head line, freed its bytes, and left
+`status: 'streaming'`, so the next `step()` pushed the next queued line. The only
+error-specific action was setting `lastError`, which no path read to stop the job.
+Captured empirically before the fix (tiny rx buffer so lines stay queued):
+
+    initial step:  status=streaming inFlight=2 queued=3 toSend="G21\nG90\n"
+    onAck(error):  status=streaming acked="G21\n" completed=1 inFlight=1 queued=3
+    next step:     toSend="M3 S255\n" (length=8)
+
+i.e. after GRBL rejected `G21`, the very next bytes the sender emitted were
+`M3 S255` (laser on) - at a position the head may never have reached, because the
+move that should have positioned it was the rejected line. A passing test
+(`streamer.test.ts` "treats error like ok") locked this in. This is P0-1 in
+docs/REMAINING-WORK-ROADMAP-2026-06-04.md; flagged by LF-CV-001 and the
+2026-06-04 LightBurn parity audit. LightBurn treats any controller error as job
+failure.
+
+### Decision
+
+Make a controller error terminal for the stream, parallel to the existing alarm
+path:
+
+- streamer.ts: add a terminal `'errored'` status to `StreamerStatus`; `onAck`
+  maps `kind === 'error'` to `'errored'` (alarm stays `'cancelled'`; the
+  user-initiated stop stays distinct); `step()` early-returns `toSend: ''` for
+  `'errored'` like the other terminal states. The rejected line is still consumed
+  for buffer accounting (GRBL freed its bytes when it replied), but no further
+  bytes are sent.
+- laser-line-handler.ts: the `error` branch now also raises a `controller-error`
+  safetyNotice. `advanceStream` is otherwise unchanged - because the acked state
+  is `'errored'`, `step()` returns empty and no follow-up `safeWrite` fires.
+- laser-safety-notice.ts: new `controller-error` notice variant + builder (blunt
+  copy naming the physical control, like the P0-B notices).
+- SafetyNoticeBanner.tsx: a distinct title ("Controller rejected a command").
+
+After the fix, the same repro prints `status=errored` and `next toSend=""`.
+
+### Consequences
+
+- The sender no longer turns a rejected line into a laser-on line at the wrong
+  place, and the operator gets a persistent safety alert.
+- KNOWN RESIDUAL (follow-up ticket, hardware-gated): GRBL does NOT halt on
+  `error:N` by default - it discards the bad line and keeps executing the lines
+  already in its ~120-byte RX buffer. Stopping our sender prevents NEW burn lines,
+  but a complete halt (and turning a currently-firing laser off) requires issuing
+  a real-time feed-hold (`!`) and/or soft-reset (0x18) on error - a change to the
+  safety-critical send path that earns its own ticket plus hardware verification.
+  This ADR is scoped to sender termination + notification, matching the P0-1
+  done-criteria.
+- `'errored'` is terminal, so the existing `status === 'streaming' || 'paused'`
+  active-job checks (autosave, LaserWindow, buildPortClosePatch) correctly read it
+  as not-active. No exhaustive switch on `StreamerStatus` exists, so the new member
+  needed no other call-site changes.
+
+### Verification
+
+- streamer.test.ts: the old "treats error like ok" test is inverted to assert
+  `status === 'errored'` and `step().toSend === ''`; a second test feeds an error
+  with lines still queued (tiny rx buffer) and asserts the next line is NOT sent
+  (the no-laser-on-after-reject regression).
+- laser-line-handler.test.ts: feeding `error:7` mid-stream asserts streamer
+  `'errored'`, no follow-up `safeWrite`, `lastError === 7`, and a
+  `controller-error` safetyNotice carrying the code.
+- Full suite 981/981; tsc --noEmit 0; eslint 0 on touched files.
+- Hardware verification needed: on the Falcon A1 Pro, inject a rejected line and
+  confirm the stream halts and the beam does not fire after the rejection (this HV
+  also reveals whether the GRBL-buffer residual above needs the soft-reset
+  follow-up).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
