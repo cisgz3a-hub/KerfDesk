@@ -146,6 +146,18 @@ describe('laser-store safety notices (P0-B)', () => {
     expect(getMotionOperation()).toBeNull();
     expect(useLaserStore.getState().safetyNotice?.kind).toBe('disconnect-during-job');
   });
+
+  it('raises a disconnect-during-job notice when USB drops after a controller error', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    connection.emitLine('error:7');
+    expect(useLaserStore.getState().streamer?.status).toBe('errored');
+
+    connection.emitClose();
+
+    expect(useLaserStore.getState().safetyNotice?.kind).toBe('disconnect-during-job');
+  });
 });
 
 describe('laser-store serial write failures', () => {
@@ -162,6 +174,10 @@ describe('laser-store serial write failures', () => {
 
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(useLaserStore.getState().log.join('\n')).toContain('Serial write failed: port lost');
+    expect(useLaserStore.getState().safetyNotice).toMatchObject({
+      kind: 'write-failed',
+      action: 'start',
+    });
   });
 
   it('keeps an initial job ack that arrives before the first write resolves', async () => {

@@ -338,10 +338,8 @@ function jogActions(
         throw err;
       }
     },
-    cancelJog: async () => {
-      await safeWrite(set, get, RT_JOG_CANCEL, 'jog');
-      set({ motionOperation: null });
-    },
+    cancelJog: () =>
+      safeWrite(set, get, RT_JOG_CANCEL, 'jog').finally(() => set({ motionOperation: null })),
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
       set({ motionOperation: startMotionOperation('frame') });
@@ -372,7 +370,7 @@ function jobActions(
       set({ streamer: stepped.state });
       if (stepped.toSend.length === 0) return;
       try {
-        await safeWrite(set, get, stepped.toSend);
+        await safeWrite(set, get, stepped.toSend, 'start');
       } catch (err) {
         set({ streamer: null });
         throw err;

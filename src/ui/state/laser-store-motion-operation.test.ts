@@ -182,4 +182,17 @@ describe('laser-store motion operation lifecycle', () => {
     expect(write).toHaveBeenCalledWith(RT_JOG_CANCEL);
     expect(getMotionOperation()).toBeNull();
   });
+
+  it('clears the active operation even when jog-cancel write fails', async () => {
+    const write = vi.fn(async () => {
+      throw new Error('cancel rejected');
+    });
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    setMotionOperation({ kind: 'frame', sawControllerBusy: false });
+
+    await expect(useLaserStore.getState().cancelJog()).rejects.toThrow('cancel rejected');
+
+    expect(getMotionOperation()).toBeNull();
+  });
 });
