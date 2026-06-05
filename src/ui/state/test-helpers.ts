@@ -4,6 +4,7 @@
 // to update in lockstep. One place is one place.
 
 import { createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
+import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import { useStore } from './store';
 
 export function resetStore(): void {
@@ -16,6 +17,7 @@ export function resetStore(): void {
     redoStack: [],
     pendingUndo: null,
     cursorMm: null,
+    jobPlacement: DEFAULT_JOB_PLACEMENT,
     dirty: false,
     savedName: null,
     lastSaveTarget: null,

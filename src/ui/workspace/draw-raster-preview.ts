@@ -22,24 +22,32 @@
 
 import type { DeviceProfile } from '../../core/devices';
 import {
+  applyLumaAdjustments,
   dither,
   pixelExtentForMm,
   rasterPreviewRgba,
   resampleLumaNearest,
   whiteLuma,
 } from '../../core/raster';
+import { evaluateRasterBudget } from '../../core/raster/raster-budget';
 import type { Layer, Project, RasterImage } from '../../core/scene';
 import { drawBitmapAtTransform } from './draw-raster';
 import type { ViewTransform } from './view-transform';
 
 const PERCENT_MAX = 100;
-const previewCanvasCache = new Map<string, HTMLCanvasElement>();
+type PreviewCanvasCacheEntry = {
+  readonly dataUrl: string;
+  readonly canvas: HTMLCanvasElement;
+};
+
+const previewCanvasCache = new Map<string, PreviewCanvasCacheEntry>();
 
 export function drawRasterPreview(
   ctx: CanvasRenderingContext2D,
   project: Project,
   view: ViewTransform,
 ): void {
+  pruneRasterPreviewCache(liveRasterPreviewDataUrls(project));
   for (const layer of project.scene.layers) {
     if (!layer.output || layer.mode !== 'image') continue;
     for (const obj of project.scene.objects) {
@@ -47,6 +55,12 @@ export function drawRasterPreview(
       if (obj.role === 'trace-source') continue;
       drawOnePreview(ctx, obj, layer, project.device, view);
     }
+  }
+}
+
+export function pruneRasterPreviewCache(liveDataUrls: ReadonlySet<string>): void {
+  for (const [key, entry] of previewCanvasCache) {
+    if (!liveDataUrls.has(entry.dataUrl)) previewCanvasCache.delete(key);
   }
 }
 
@@ -78,6 +92,7 @@ function previewCanvasFor(
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
   const sMax = powerToSMax(layer.power, device.maxPowerS);
+  const sMin = minPowerToSMin(layer.minPower, layer.power, device.maxPowerS);
   const targetWidth = pixelExtentForMm(
     (obj.bounds.maxX - obj.bounds.minX) * Math.abs(obj.transform.scaleX),
     layer.linesPerMm,
@@ -86,18 +101,20 @@ function previewCanvasFor(
     (obj.bounds.maxY - obj.bounds.minY) * Math.abs(obj.transform.scaleY),
     layer.linesPerMm,
   );
-  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${layer.ditherAlgorithm}|${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
+  if (evaluateRasterBudget(targetWidth, targetHeight).kind === 'too-large') return null;
+  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.ditherAlgorithm}|${sMin}-${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
   const cached = previewCanvasCache.get(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return cached.canvas;
   const sourceLuma = decodeLuma(obj.lumaBase64, pixelWidth * pixelHeight);
+  const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
   const luma = resampleLumaNearest(
-    { luma: sourceLuma, width: pixelWidth, height: pixelHeight },
+    { luma: adjustedLuma, width: pixelWidth, height: pixelHeight },
     targetWidth,
     targetHeight,
   );
   const sValues = dither(
     { luma, width: targetWidth, height: targetHeight },
-    { algorithm: layer.ditherAlgorithm, sMax },
+    { algorithm: layer.ditherAlgorithm, sMax, sMin },
   );
   const rgba = rasterPreviewRgba(sValues, sMax, targetWidth, targetHeight);
   const canvas = document.createElement('canvas');
@@ -106,8 +123,27 @@ function previewCanvasFor(
   const octx = canvas.getContext('2d');
   if (octx === null) return null;
   octx.putImageData(new ImageData(rgba, targetWidth, targetHeight), 0, 0);
-  previewCanvasCache.set(key, canvas);
+  previewCanvasCache.set(key, { dataUrl: obj.dataUrl, canvas });
   return canvas;
+}
+
+function adjustmentKey(obj: RasterImage): string {
+  return `${obj.brightness ?? 0}:${obj.contrast ?? 0}:${obj.gamma ?? 1}`;
+}
+
+function liveRasterPreviewDataUrls(project: Project): Set<string> {
+  const imageLayerColors = new Set(
+    project.scene.layers
+      .filter((layer) => layer.output && layer.mode === 'image')
+      .map((layer) => layer.color),
+  );
+  const live = new Set<string>();
+  for (const obj of project.scene.objects) {
+    if (obj.kind !== 'raster-image') continue;
+    if (obj.role === 'trace-source') continue;
+    if (imageLayerColors.has(obj.color)) live.add(obj.dataUrl);
+  }
+  return live;
 }
 
 // Mirror compileRasterGroup's S-scale exactly: round(clamp(power)/100 ×
@@ -116,6 +152,12 @@ function previewCanvasFor(
 function powerToSMax(powerPercent: number, maxPowerS: number): number {
   const clamped = Math.max(0, Math.min(PERCENT_MAX, powerPercent));
   return Math.round((clamped / PERCENT_MAX) * maxPowerS);
+}
+
+function minPowerToSMin(minPowerPercent: number, powerPercent: number, maxPowerS: number): number {
+  const maxPercent = Math.max(0, Math.min(PERCENT_MAX, powerPercent));
+  const minPercent = Math.max(0, Math.min(maxPercent, minPowerPercent));
+  return Math.round((minPercent / PERCENT_MAX) * maxPowerS);
 }
 
 // Mirror compileJob's decodeBase64Luma: missing/corrupt bytes are white

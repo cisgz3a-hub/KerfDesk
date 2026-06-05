@@ -10,6 +10,7 @@ directories:
 # production dependency tree.
 files:
   - dist-electron/**/*
+  - '!dist-electron/**/*.map'
   - dist/web/**/*
   - package.json
 

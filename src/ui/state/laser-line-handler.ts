@@ -18,6 +18,7 @@
 import {
   classifyResponse,
   CMD_SETTINGS,
+  disconnect as disconnectStreamer,
   onAck,
   type SettingsCollectorState,
   startCollecting,
@@ -25,6 +26,8 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { consumeSettingsResponse } from './detected-settings-action';
+import { controllerErrorNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import { observeMotionStatus } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 import { hasCustomOrigin } from './origin-actions';
 
@@ -120,6 +123,9 @@ export function handleLine(
   const patch = consumeSettingsResponse(refs, cls);
   if (patch !== null) set({ detectedSettings: patch, controllerSettings: patch });
   if (cls.kind === 'status') {
+    const operation = get().motionOperation;
+    const nextOperation = observeMotionStatus(operation, cls.report.state);
+    const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
     // Cache WCO across frames — GRBL only reports it intermittently
     // (every Nth status per `$10`'s WCO bit). UI reads `wcoCache`,
     // never `statusReport.wco`. F.3 / ADR-021.
@@ -128,9 +134,10 @@ export function handleLine(
         statusReport: cls.report,
         wcoCache: cls.report.wco,
         workOriginActive: hasCustomOrigin(cls.report.wco),
+        ...operationPatch,
       });
     } else {
-      set({ statusReport: cls.report });
+      set({ statusReport: cls.report, ...operationPatch });
     }
     return;
   }
@@ -138,12 +145,16 @@ export function handleLine(
     // GRBL clears G92 on alarm (1 — hard limit; soft-resets internally).
     // Mirror that in our cache so the readout stops claiming a custom
     // origin is active. F.3 / ADR-021.
-    set({ alarmCode: cls.code, wcoCache: null, workOriginActive: false });
+    set({ alarmCode: cls.code, wcoCache: null, workOriginActive: false, motionOperation: null });
     advanceStream(set, get, safeWrite, 'alarm');
     return;
   }
   if (cls.kind === 'error') {
-    set({ lastError: cls.code });
+    // P0-1: a controller rejection is terminal. onAck() marks the streamer
+    // 'errored' so step() sends no further bytes; raise a safety notice so the
+    // operator checks the machine - the rejected move may have left the head
+    // mispositioned and a laser-on line could have fired out of place.
+    set({ lastError: cls.code, safetyNotice: controllerErrorNotice(cls.code) });
     advanceStream(set, get, safeWrite, 'error');
     return;
   }
@@ -165,5 +176,17 @@ function advanceStream(
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
   set({ streamer: stepped.state });
-  if (stepped.toSend.length > 0) void safeWrite(stepped.toSend).catch(() => undefined);
+  if (stepped.toSend.length > 0) {
+    void safeWrite(stepped.toSend).catch(() => {
+      // P0-3: the follow-up write failed mid-job. GRBL may keep executing the
+      // commands already in its buffer, so mark the streamer disconnected AND
+      // raise the operator-facing safety banner (this path used to tear down
+      // silently). No soft-reset: the write itself failed, so there is no live
+      // link to send one over.
+      set({
+        streamer: disconnectStreamer(acked.state),
+        safetyNotice: disconnectDuringJobNotice(),
+      });
+    });
+  }
 }

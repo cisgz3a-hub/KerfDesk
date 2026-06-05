@@ -1,0 +1,35 @@
+
+ CodeRabbit CLI Status
+
+
+ 🔄 Checking authentication status...
+
+[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[G
+ CodeRabbit CLI Status
+
+
+ ✅ Authentication: Logged in
+
+
+ User Information:
+  👤 Name: cisgz3a-hub
+  📧 Email: cisgz3a@gmail.com
+  🔧 Username: cisgz3a-hub
+
+
+ Authentication Details:
+  🔗 Provider: github
+
+
+ Organization Information:
+  🏢 Name: cisgz3a-hub
+  📊 Available orgs: 1
+
+
+ Rate Limiting Context:
+  Platform: github
+  Username: cisgz3a-hub
+  Platform+Username: github/cisgz3a-hub
+  Org+Username: cisgz3a-hub/cisgz3a-hub
+
+[?25h

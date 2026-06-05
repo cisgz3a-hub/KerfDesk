@@ -13,7 +13,7 @@
 // keeping Frame's check separate (and equally strict) so a job that
 // would fail preflight can't first trash the machine via Frame.
 
-import type { DeviceProfile } from '../devices';
+import { machineBoundsForDevice, type DeviceProfile } from '../devices';
 import type { JobBounds } from './job-bounds';
 
 // 1 µm slop — bed dimensions and bounds are both in mm to ~6 decimals,
@@ -35,11 +35,12 @@ export type FramePreflight =
     };
 
 export function framePreflight(bounds: JobBounds, device: DeviceProfile): FramePreflight {
+  const machineBounds = machineBoundsForDevice(device);
   const overhang = {
-    minX: Math.max(0, -bounds.minX),
-    minY: Math.max(0, -bounds.minY),
-    maxX: Math.max(0, bounds.maxX - device.bedWidth),
-    maxY: Math.max(0, bounds.maxY - device.bedHeight),
+    minX: Math.max(0, machineBounds.minX - bounds.minX),
+    minY: Math.max(0, machineBounds.minY - bounds.minY),
+    maxX: Math.max(0, bounds.maxX - machineBounds.maxX),
+    maxY: Math.max(0, bounds.maxY - machineBounds.maxY),
   };
   const off =
     overhang.minX > EPSILON_MM ||

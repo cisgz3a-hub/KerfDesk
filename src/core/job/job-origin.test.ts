@@ -40,6 +40,21 @@ describe('applyJobOrigin', () => {
     });
     expect(adjusted.groups[0]?.kind).toBe('cut');
   });
+
+  it('moves the selected anchor to the current work position for current-position jobs', () => {
+    const adjusted = applyJobOrigin(centeredJob, {
+      startFrom: 'current-position',
+      anchor: 'center',
+      currentPosition: { x: 120, y: 80 },
+    });
+
+    expect(computeJobBounds(adjusted)).toEqual({
+      minX: 95,
+      minY: 65,
+      maxX: 145,
+      maxY: 95,
+    });
+  });
 });
 
 describe('offsetJobBounds', () => {

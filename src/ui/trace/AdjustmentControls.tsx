@@ -1,4 +1,4 @@
-// Image-adjustment controls for the trace dialog — surfaces the LF1
+// Image-adjustment controls for the trace dialog — surfaces LF1-compatible
 // preprocessing levers (brightness / contrast / gamma / invert) and
 // the 13-mode dither picker. Each control is a thin wrapper around the
 // underlying preset; user changes layer on top of the preset's TraceOptions

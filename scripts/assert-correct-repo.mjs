@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 const expectedRepoName = 'LaserForge-2.0';
-const expectedRemote = 'https://github.com/cisgz3a-hub/LaserForge-2.0.git';
+const expectedRemote = 'https://github.com/cisgz3a-hub/LaserForge-2.0';
 
 function fail(message) {
   console.error(`Repository guard failed: ${message}`);
@@ -18,6 +18,10 @@ function git(args) {
   }
 }
 
+function normalizeGitRemoteUrl(remote) {
+  return remote.trim().replace(/\.git$/i, '');
+}
+
 const repoRoot = resolve(git(['rev-parse', '--show-toplevel']));
 const repoName = basename(repoRoot);
 if (repoName !== expectedRepoName) {
@@ -25,8 +29,8 @@ if (repoName !== expectedRepoName) {
 }
 
 const origin = git(['remote', 'get-url', 'origin']);
-if (origin !== expectedRemote) {
-  fail(`expected origin ${expectedRemote}, got ${origin}`);
+if (normalizeGitRemoteUrl(origin) !== expectedRemote) {
+  fail(`expected origin ${expectedRemote}(.git), got ${origin}`);
 }
 
 const indexHtml = readFileSync(resolve(repoRoot, 'index.html'), 'utf8');

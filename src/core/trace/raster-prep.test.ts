@@ -1,4 +1,4 @@
-// Unit tests for the LF1-ported preprocessing levers in raster-prep.ts.
+// Unit tests for the LF1-parity preprocessing levers in raster-prep.ts.
 // Each function is a pure RGBA→RGBA transform; we check identity at the
 // no-op value, the direction of effect at a non-trivial value, and the
 // immutability invariant (input buffer not mutated).

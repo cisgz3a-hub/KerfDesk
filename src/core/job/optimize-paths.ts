@@ -65,8 +65,22 @@ function optimizeGroup(group: CutGroup): CutGroup {
   if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
   // N=1 still benefits — open polylines can be entered from either
   // endpoint; reversal isn't a no-op when start ≠ origin.
-  const ordered = nearestNeighborOrder(group.segments);
+  const ordered = insideFirstNearestNeighborOrder(group.segments);
   return { ...group, segments: ordered };
+}
+
+function insideFirstNearestNeighborOrder(segments: ReadonlyArray<CutSegment>): CutSegment[] {
+  const depths = containmentDepths(segments);
+  const maxDepth = depths.reduce((m, d) => Math.max(m, d), 0);
+  const out: CutSegment[] = [];
+  let cursor = ORIGIN;
+  for (let depth = maxDepth; depth >= 0; depth -= 1) {
+    const bucket = segments.filter((_, i) => depths[i] === depth);
+    const ordered = nearestNeighborOrderFrom(bucket, cursor);
+    out.push(...ordered.segments);
+    cursor = ordered.cursor;
+  }
+  return out;
 }
 
 // Greedy: at each step, pick the segment whose nearest endpoint (start
@@ -74,11 +88,14 @@ function optimizeGroup(group: CutGroup): CutGroup {
 // Cursor starts at machine origin — matches the preamble's M3 S0 +
 // homed position. After picking, advance cursor to the segment's
 // far endpoint. Repeat until every segment is placed.
-function nearestNeighborOrder(segments: ReadonlyArray<CutSegment>): CutSegment[] {
+function nearestNeighborOrderFrom(
+  segments: ReadonlyArray<CutSegment>,
+  startCursor: Vec2,
+): { readonly segments: CutSegment[]; readonly cursor: Vec2 } {
   const remaining = new Set<number>();
   for (let i = 0; i < segments.length; i += 1) remaining.add(i);
   const out: CutSegment[] = [];
-  let cursor: Vec2 = ORIGIN;
+  let cursor: Vec2 = startCursor;
   while (remaining.size > 0) {
     const pick = pickBestNext(segments, remaining, cursor);
     if (pick === null) break;
@@ -88,7 +105,7 @@ function nearestNeighborOrder(segments: ReadonlyArray<CutSegment>): CutSegment[]
     const last = placed.polyline[placed.polyline.length - 1];
     if (last !== undefined) cursor = last;
   }
-  return out;
+  return { segments: out, cursor };
 }
 
 type Pick = { readonly index: number; readonly reverse: boolean; readonly segment: CutSegment };
@@ -146,4 +163,78 @@ function distanceSquared(a: Vec2, b: Vec2): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   return dx * dx + dy * dy;
+}
+
+type SegmentBounds = {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+};
+
+function containmentDepths(segments: ReadonlyArray<CutSegment>): number[] {
+  const bounds = segments.map(segmentBounds);
+  return segments.map((_, i) => {
+    const targetBounds = bounds[i] ?? null;
+    const ref = representativePoint(targetBounds);
+    if (ref === null) return 0;
+    let depth = 0;
+    for (let j = 0; j < segments.length; j += 1) {
+      if (i === j) continue;
+      const container = segments[j];
+      const containerBounds = bounds[j] ?? null;
+      if (container === undefined || !container.closed) continue;
+      if (containerBounds === null || targetBounds === null) continue;
+      if (!boundsContains(containerBounds, targetBounds)) continue;
+      if (pointInPolygon(ref, container.polyline)) depth += 1;
+    }
+    return depth;
+  });
+}
+
+function segmentBounds(seg: CutSegment): SegmentBounds | null {
+  if (seg.polyline.length === 0) return null;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const p of seg.polyline) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function representativePoint(bounds: SegmentBounds | null): Vec2 | null {
+  if (bounds === null) return null;
+  return {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2,
+  };
+}
+
+function boundsContains(container: SegmentBounds, target: SegmentBounds): boolean {
+  return (
+    target.minX >= container.minX &&
+    target.maxX <= container.maxX &&
+    target.minY >= container.minY &&
+    target.maxY <= container.maxY
+  );
+}
+
+function pointInPolygon(point: Vec2, polygon: ReadonlyArray<Vec2>): boolean {
+  if (polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const pi = polygon[i];
+    const pj = polygon[j];
+    if (pi === undefined || pj === undefined) continue;
+    const crosses = pi.y > point.y !== pj.y > point.y;
+    if (!crosses) continue;
+    const xAtY = ((pj.x - pi.x) * (point.y - pi.y)) / (pj.y - pi.y) + pi.x;
+    if (point.x < xAtY) inside = !inside;
+  }
+  return inside;
 }

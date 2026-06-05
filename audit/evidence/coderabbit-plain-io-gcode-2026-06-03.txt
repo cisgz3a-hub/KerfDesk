@@ -1,0 +1,27 @@
+Connecting to CodeRabbit... 5s elapsed
+
+   !   CodeRabbit could not match cisgz3a-hub/LaserForge-2.0 to an installed
+       organization you can access. This review will run with limited/free CLI
+       behavior and is subject to free CLI review limits. Install CodeRabbit for
+       cisgz3a-hub/LaserForge-2.0 to enable full review features.
+
+────────────────────────────────────────
+CodeRabbit Review
+
+Diff      : uncommitted changes only
+Compare   : codex/main-working → main
+Directory : LaserForge-2.0/src/io/gcode
+────────────────────────────────────────
+
+(\(\
+(• .•)  Costly tools don't produce better designs. Beware of vendor hype, industry dogma, and the aura of the price tag. Judge tools on their merits.
+
+Preparing review... 6s elapsed
+Summarizing changes... 51s elapsed
+Summarizing changes... 1m 04s elapsed - still working
+Writing review comments... 1m 09s elapsed - still working
+
+────────────────────────────────────────
+Review complete
+No findings ✔
+────────────────────────────────────────

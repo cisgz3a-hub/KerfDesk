@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildImageTracerOptions,
   DEFAULT_TRACE_OPTIONS,
@@ -79,6 +79,33 @@ function buildLogoLikeFixture(): Fixture {
 }
 
 describe('traceImageToSvgString', () => {
+  it('retries the imagetracer dynamic import after a transient chunk failure', async () => {
+    vi.resetModules();
+    (globalThis as { __lfImagetracerSvgAttempts?: number }).__lfImagetracerSvgAttempts = 0;
+    vi.doMock('imagetracerjs', () => {
+      const state = globalThis as { __lfImagetracerSvgAttempts?: number };
+      const attempts = (state.__lfImagetracerSvgAttempts ?? 0) + 1;
+      state.__lfImagetracerSvgAttempts = attempts;
+      if (attempts === 1) throw new Error('chunk failed');
+      return { default: { imagedataToSVG: () => '<svg data-retry="ok"></svg>' } };
+    });
+    try {
+      const fresh = await import('./trace-image');
+      const image = { width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 255]) };
+
+      await expect(fresh.traceImageToSvgString(image, fresh.DEFAULT_TRACE_OPTIONS)).rejects.toThrow(
+        /chunk failed|mocking a module/,
+      );
+      await expect(fresh.traceImageToSvgString(image, fresh.DEFAULT_TRACE_OPTIONS)).resolves.toBe(
+        '<svg data-retry="ok"></svg>',
+      );
+    } finally {
+      vi.doUnmock('imagetracerjs');
+      vi.resetModules();
+      delete (globalThis as { __lfImagetracerSvgAttempts?: number }).__lfImagetracerSvgAttempts;
+    }
+  });
+
   it('returns a string starting with <svg', async () => {
     const svg = await traceImageToSvgString(blackSquareOnWhite());
     expect(typeof svg).toBe('string');

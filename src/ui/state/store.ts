@@ -8,6 +8,8 @@ import type { DeviceProfile } from '../../core/devices';
 import {
   createProject,
   type Layer,
+  type LayerMoveDirection,
+  moveLayer as moveSceneLayer,
   type Project,
   type RasterImage,
   removeObject,
@@ -19,8 +21,13 @@ import {
   type Vec2,
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
+import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import { fitAllObjects, fitToSelection } from './viewport-actions';
 import { imageImportActions } from './import-actions';
+import {
+  rasterAdjustmentActions,
+  type RasterImageAdjustmentPatch,
+} from './raster-adjustment-actions';
 import {
   applyDuplicate,
   applyFreshImport,
@@ -53,6 +60,7 @@ export type AppState = {
   // when the pointer isn't over the canvas. Updated at mousemove cadence;
   // only the StatusBar subscribes to it, so re-render fan-out is bounded.
   readonly cursorMm: Vec2 | null;
+  readonly jobPlacement: JobPlacementSettings;
   // F-A11 dirty / save tracking. `dirty` flips true on every mutating
   // action; flips false on a successful save. `savedName` is the file the
   // project was last saved as — drives the window title. `lastSaveTarget`
@@ -94,6 +102,8 @@ export type AppState = {
   // bed-fit. Driven by Shift+F and the fit-to-selection zoom button.
   readonly fitToSelection: () => void;
   readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
+  readonly moveLayer: (layerId: string, direction: LayerMoveDirection) => void;
+  readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
   readonly undo: () => void;
@@ -106,6 +116,7 @@ export type AppState = {
   // Ctrl+A: primary = first, additional = rest.
   readonly selectAllObjects: () => void;
   readonly togglePreview: () => void;
+  readonly setJobPlacement: (patch: Partial<JobPlacementSettings>) => void;
   readonly setCursorMm: (cursor: Vec2 | null) => void;
 
   readonly beginInteraction: () => void;
@@ -131,6 +142,7 @@ function initialState(): Pick<
   | 'redoStack'
   | 'pendingUndo'
   | 'cursorMm'
+  | 'jobPlacement'
   | 'dirty'
   | 'savedName'
   | 'lastSaveTarget'
@@ -144,6 +156,7 @@ function initialState(): Pick<
     redoStack: [],
     pendingUndo: null,
     cursorMm: null,
+    jobPlacement: DEFAULT_JOB_PLACEMENT,
     // Fresh project is clean — no edits have happened, no name on disk.
     dirty: false,
     savedName: null,
@@ -186,7 +199,7 @@ function importSvgObjectAction(
 
 function sceneActions(
   set: Setter,
-): Pick<AppState, 'removeSceneObject' | 'setLayerParam' | 'updateDeviceProfile'> {
+): Pick<AppState, 'removeSceneObject' | 'setLayerParam' | 'moveLayer' | 'updateDeviceProfile'> {
   return {
     removeSceneObject: (id) =>
       set((s) => {
@@ -220,6 +233,17 @@ function sceneActions(
         redoStack: [],
         dirty: true,
       })),
+    moveLayer: (layerId, direction) =>
+      set((s) => {
+        const scene = moveSceneLayer(s.project.scene, layerId, direction);
+        if (scene === s.project.scene) return s;
+        return {
+          project: { ...s.project, scene },
+          undoStack: pushUndo(s.project, s.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
     updateDeviceProfile: (patch) =>
       set((s) => {
         const nextDevice: DeviceProfile = { ...s.project.device, ...patch };
@@ -292,7 +316,12 @@ function viewActions(
   set: Setter,
 ): Pick<
   AppState,
-  'selectObject' | 'toggleSelectObject' | 'selectAllObjects' | 'togglePreview' | 'setCursorMm'
+  | 'selectObject'
+  | 'toggleSelectObject'
+  | 'selectAllObjects'
+  | 'togglePreview'
+  | 'setJobPlacement'
+  | 'setCursorMm'
 > {
   return {
     selectObject: (id) => set({ selectedObjectId: id, additionalSelectedIds: new Set() }),
@@ -332,6 +361,13 @@ function viewActions(
         };
       }),
     togglePreview: () => set((s) => ({ previewMode: !s.previewMode })),
+    setJobPlacement: (patch) =>
+      set((s) => ({
+        jobPlacement: {
+          ...s.jobPlacement,
+          ...patch,
+        },
+      })),
     setCursorMm: (cursor) => set({ cursorMm: cursor }),
   };
 }
@@ -394,6 +430,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectActions(set),
   ...importSvgObjectAction(set, get),
   ...imageImportActions(set, get),
+  ...rasterAdjustmentActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

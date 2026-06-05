@@ -1,0 +1,5 @@
+No stored review findings found for this scope.
+Review directory: /mnt/c/Users/Asus/LaserForge-2.0
+Current branch: codex/main-working
+Base branch: main
+Run 'coderabbit review' first, or pass --dir to inspect a scoped review directory.

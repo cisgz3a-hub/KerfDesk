@@ -13,7 +13,7 @@
     "outDir": "../dist-electron",
     "rootDir": ".",
     "declaration": false,
-    "sourceMap": true
+    "sourceMap": false
   },
   "include": ["**/*.ts"],
   "exclude": ["**/*.test.ts"]

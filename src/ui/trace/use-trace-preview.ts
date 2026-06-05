@@ -74,7 +74,12 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
         // Read options through the ref so the latest preset wins even
         // if the user changed it between picking the file and decode
         // completing (R-H1 fix).
-        runTrace(img, optionsRef.current, setState);
+        void runTrace({
+          img,
+          options: optionsRef.current,
+          isCurrent: () => tokenRef.current === myToken,
+          setState,
+        });
       })
       .catch((err: unknown) => {
         if (tokenRef.current !== myToken) return;
@@ -100,7 +105,7 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
     setState({ kind: 'tracing' });
     const timer = window.setTimeout(() => {
       if (tokenRef.current !== myToken) return;
-      runTrace(img, options, setState);
+      void runTrace({ img, options, isCurrent: () => tokenRef.current === myToken, setState });
     }, DEBOUNCE_MS);
     return () => {
       window.clearTimeout(timer);
@@ -110,23 +115,25 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
   return state;
 }
 
-function runTrace(
-  img: RawImageData,
-  options: TraceOptions,
-  setState: (next: TracePreviewState) => void,
-): void {
-  // Trace is async — runs in the Worker if available, otherwise
-  // inline. Either way the work happens off the React-render-path so
-  // the "tracing" state can paint first. Output is the same shape the
-  // commit flow consumes, then stringified to SVG locally for the
-  // browser to render.
-  void (async () => {
+export function runTrace(args: {
+  readonly img: RawImageData;
+  readonly options: TraceOptions;
+  readonly isCurrent: () => boolean;
+  readonly setState: (next: TracePreviewState) => void;
+}): Promise<void> {
+  // Trace is async — runs in the Worker if available, otherwise inline. A slow
+  // trace can resolve AFTER a newer one has started; isCurrent() re-checks the
+  // latest-call token AFTER the await so a stale result never clobbers the newer
+  // preview's ready/error state (P2-A). Returns the promise so tests can await it.
+  return (async () => {
     try {
-      const { paths } = await traceImageWithFallback(img, options);
-      const svg = coloredPathsToSvg(paths, img.width, img.height);
-      setState({ kind: 'ready', svg, width: img.width, height: img.height });
+      const { paths } = await traceImageWithFallback(args.img, args.options);
+      if (!args.isCurrent()) return;
+      const svg = coloredPathsToSvg(paths, args.img.width, args.img.height);
+      args.setState({ kind: 'ready', svg, width: args.img.width, height: args.img.height });
     } catch (err) {
-      setState({
+      if (!args.isCurrent()) return;
+      args.setState({
         kind: 'error',
         message: err instanceof Error ? err.message : String(err),
       });

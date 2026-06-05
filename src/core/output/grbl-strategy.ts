@@ -10,7 +10,8 @@
 // Postamble: M5, then `G0 X0 Y0 S0` to park at origin.
 
 import type { DeviceProfile } from '../devices';
-import { expandFillHatchWithOverscan } from '../job/fill-overscan';
+import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
+import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
@@ -87,18 +88,84 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
   chunks.push(
     `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} overscan ${fmt(group.overscanMm)} mm`,
   );
+  // Each scanline's runs become ONE continuous laser-on sweep: a single G1
+  // pass across the row that blanks the interior gaps (holes) with S0 instead
+  // of lifting to a rapid and stopping at every run. This is the structural
+  // fill-speed fix (ADR-034) — it matches how emit-raster.ts sweeps a row and
+  // how LightBurn fills, collapsing thousands of short stop-start runs into a
+  // few hundred continuous sweeps. Single-run scanlines emit exactly as before
+  // (1a rapid runway + 1b short-run skip preserved).
+  const sweeps = groupFillSweeps(group.segments);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
-    for (const seg of group.segments) {
-      const run = expandFillHatchWithOverscan(seg.polyline, group.overscanMm);
-      if (run === null) continue;
-      chunks.push(`G0 X${fmt(run.leadStart.x)} Y${fmt(run.leadStart.y)} S0`);
-      chunks.push(`G1 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} F${feed} S0`);
-      chunks.push(`G1 X${fmt(run.burnEnd.x)} Y${fmt(run.burnEnd.y)} S${s}`);
-      chunks.push(`G1 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
+    for (const sweep of sweeps) {
+      const text = emitFillSweep(sweep, s, feed, group.overscanMm);
+      if (text.length > 0) chunks.push(text);
     }
   }
   return chunks.join(LINE_END) + LINE_END;
+}
+
+// One scanline as a continuous sweep. Rapid into the optional overscan runway
+// with the laser off (reusing the 1a/1b lead geometry + short-run skip), then a
+// single chain of G1s: each ink span burns at S{s}, each interior gap crosses
+// at S0 (diode dark, head still at feed so it never stops over a hole). G-code
+// S is modal, so every span re-asserts its value — a missed S0 would fire the
+// beam across a hole, so the per-segment S sequence is asserted exhaustively in
+// the tests.
+function emitFillSweep(sweep: FillSweep, s: number, feed: number, overscanMm: number): string {
+  const spans = sweep.spans;
+  const first = spans[0];
+  const last = spans[spans.length - 1];
+  if (first === undefined || last === undefined) return '';
+  const overscan = effectiveOverscanMm([first.start, last.end], overscanMm);
+  const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+  if (run === null) return '';
+  const lines: string[] = [`G0 X${fmt(run.leadStart.x)} Y${fmt(run.leadStart.y)} S0`];
+  if (overscan > 0) {
+    lines.push(`G0 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} S0`);
+  }
+  for (const line of sweepSpanLines(spans, s, feed)) lines.push(line);
+  if (overscan > 0) {
+    lines.push(`G0 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
+  }
+  return lines.join(LINE_END);
+}
+
+// The G1 chain for one sweep: burn each ink span (S{s}), blank each interior
+// gap (S0). F rides only the first emitted G1 (modal). A head tracker skips any
+// move whose target equals the current position at emit precision (3 dp), so a
+// degenerate span never emits a stationary beam-on G1 and two touching spans
+// never emit a zero-length gap — defense in depth for PROJECT.md #3 ("positive
+// S only on a moving G1"). The live producer already filters sub-epsilon runs
+// (fill-hatching SCANLINE_EPS); this guards the contract at the emitter too
+// (audit 2026-06-03).
+function sweepSpanLines(spans: ReadonlyArray<FillSpan>, s: number, feed: number): string[] {
+  const first = spans[0];
+  if (first === undefined) return [];
+  const lines: string[] = [];
+  // Head starts where the runway G0 left it: the first span's start.
+  let headX = fmt(first.start.x);
+  let headY = fmt(first.start.y);
+  let feedEmitted = false;
+  const moveTo = (x: number, y: number, sWord: string): void => {
+    const fx = fmt(x);
+    const fy = fmt(y);
+    if (fx === headX && fy === headY) return; // zero-length at emit precision — skip
+    const feedWord = feedEmitted ? '' : ` F${feed}`;
+    feedEmitted = true;
+    lines.push(`G1 X${fx} Y${fy}${feedWord} ${sWord}`);
+    headX = fx;
+    headY = fy;
+  };
+  for (let i = 0; i < spans.length; i += 1) {
+    const span = spans[i];
+    if (span === undefined) continue;
+    moveTo(span.end.x, span.end.y, `S${s}`);
+    const next = spans[i + 1];
+    if (next !== undefined) moveTo(next.start.x, next.start.y, 'S0');
+  }
+  return lines;
 }
 
 // F.2.d: raster groups emit through the dedicated raster path
@@ -133,16 +200,36 @@ function emitAnyGroup(group: Group, device: DeviceProfile): string {
   }
 }
 
+// Laser power mode is modal and spans groups. The preamble arms M3 (constant
+// power). Cut groups keep M3 — a slow corner must still cut fully through. FILL
+// groups want M4 DYNAMIC power: GRBL then scales S by actual/programmed feed, so
+// a short engrave stroke that never reaches feed (the head accelerating from
+// rest inside a few-mm glyph) deposits constant energy/mm instead of over-burning
+// the slow zones — the small-text "uneven density" defect
+// (docs/research/burn-perfection-small-text.md Cause A; supersedes ADR-020 #4,
+// see ADR-036). Raster manages its own M4 internally and ends in M5. A flip is
+// emitted ONLY when the required mode actually changes, so cut-only jobs stay
+// byte-identical. Under M4 the diode is also dark whenever the head is stopped
+// (dynamic power → 0 at 0 feed), so fill is now strictly safer on travel/pause.
 function emitJob(job: Job, device: DeviceProfile): string {
   const parts: string[] = [];
   parts.push(preamble());
-  let previousKind: Group['kind'] | null = null;
+  let mode: 'M3' | 'M4' | 'off' = 'M3'; // the preamble armed M3 S0
   for (const group of job.groups) {
-    if ((group.kind === 'cut' || group.kind === 'fill') && previousKind === 'raster') {
+    if (group.kind === 'cut' && mode !== 'M3') {
+      // Restore constant power for vector cutting.
       parts.push('M3 S0' + LINE_END);
+      mode = 'M3';
+    } else if (group.kind === 'fill' && mode !== 'M4') {
+      // Arm dynamic power. Coming from constant mode, clear M3 first (mirrors
+      // emit-raster's "M5 so we don't stay stuck in M3"), then M4 S0. Coming
+      // from a raster group the controller already issued its trailing M5, so
+      // M4 S0 alone suffices (no redundant second M5).
+      parts.push((mode === 'M3' ? 'M5' + LINE_END : '') + 'M4 S0' + LINE_END);
+      mode = 'M4';
     }
     parts.push(emitAnyGroup(group, device));
-    previousKind = group.kind;
+    if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
   }
   parts.push(postamble());
   return parts.join('');

@@ -16,6 +16,24 @@ export type Issue = {
   readonly reason: string;
 };
 
+export type MotionBoundsOffset = {
+  readonly x: number;
+  readonly y: number;
+};
+
+export type OutOfBoundsCoordOptions = {
+  readonly motionOffset?: MotionBoundsOffset | undefined;
+};
+
+type BoundsRect = {
+  readonly minX?: number;
+  readonly minY?: number;
+  readonly maxX?: number;
+  readonly maxY?: number;
+  readonly width: number;
+  readonly height: number;
+};
+
 const NUM = String.raw`(-?\d+(?:\.\d+)?)`;
 const X_RE = new RegExp(String.raw`\bX${NUM}`);
 const Y_RE = new RegExp(String.raw`\bY${NUM}`);
@@ -72,10 +90,18 @@ export function findLaserOnTravelIssues(gcode: string): readonly Issue[] {
 // rectangle [0, width] × [0, height], in machine coordinates.
 export function findOutOfBoundsCoords(
   gcode: string,
-  bed: { readonly width: number; readonly height: number },
+  bed: BoundsRect,
+  options: OutOfBoundsCoordOptions = {},
 ): readonly Issue[] {
   const lines = gcode.split('\n');
   const issues: Issue[] = [];
+  const offset = options.motionOffset ?? { x: 0, y: 0 };
+  const limits = {
+    minX: bed.minX ?? 0,
+    minY: bed.minY ?? 0,
+    maxX: bed.maxX ?? bed.width,
+    maxY: bed.maxY ?? bed.height,
+  };
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
@@ -83,14 +109,27 @@ export function findOutOfBoundsCoords(
     if (!/^G[0123]\b/.test(stripped)) continue;
     const x = parseValue(stripped, X_RE);
     const y = parseValue(stripped, Y_RE);
-    if (x !== null && (x < 0 || x > bed.width)) {
-      issues.push({ lineNumber: i + 1, line: raw, reason: `X out of bed: ${x}` });
-    }
-    if (y !== null && (y < 0 || y > bed.height)) {
-      issues.push({ lineNumber: i + 1, line: raw, reason: `Y out of bed: ${y}` });
-    }
+    appendAxisBoundsIssue(issues, 'X', x, offset.x, limits.minX, limits.maxX, i + 1, raw);
+    appendAxisBoundsIssue(issues, 'Y', y, offset.y, limits.minY, limits.maxY, i + 1, raw);
   }
   return issues;
+}
+
+function appendAxisBoundsIssue(
+  issues: Issue[],
+  axis: 'X' | 'Y',
+  value: number | null,
+  offset: number,
+  min: number,
+  max: number,
+  lineNumber: number,
+  line: string,
+): void {
+  if (value === null) return;
+  const physical = value + offset;
+  if (physical < min || physical > max) {
+    issues.push({ lineNumber, line, reason: `${axis} out of bed: ${physical}` });
+  }
 }
 
 // PROJECT.md non-negotiable #7 — Power scale honest.

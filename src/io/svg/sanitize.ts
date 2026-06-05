@@ -76,6 +76,8 @@ export function sanitizeSvg(dirty: string): SanitizeResult {
 
   const clean = DOMPurify.sanitize(dirty, {
     USE_PROFILES: { svg: true, svgFilters: true },
+    ADD_TAGS: ['defs', 'symbol', 'use'],
+    ADD_ATTR: ['href', 'xlink:href'],
     KEEP_CONTENT: false,
   });
 

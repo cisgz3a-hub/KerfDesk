@@ -37,16 +37,21 @@ type Pending = {
 };
 
 let workerInstance: Worker | null = null;
-let workerFailed = false;
 let nextRequestId = 0;
 const pendingByRequestId = new Map<number, Pending>();
 const MAX_INLINE_TRACE_PIXELS = 160_000;
+// Bound a worker request: a hung-but-alive worker (a pathological tracer loop)
+// would otherwise leave the preview/commit UI pending forever. 30s is far past
+// any legitimate trace of a budget-capped image (P2-A).
+const TRACE_WORKER_TIMEOUT_MS = 30_000;
 
 // Lazy-construct the worker. Returns null if the runtime doesn't have
 // a Worker constructor (vitest without jsdom workers, SSR) or if a
-// previous construction failed — callers fall back to the inline
-// path. Once a worker fails we don't keep retrying; one failure per
-// session is enough signal that the environment can't host it.
+// construction failed — callers fall back to the inline path for this
+// call. A fatal worker runtime error retires that instance, but it
+// must not poison the whole browser session: a stale deploy chunk or
+// transient module load failure should be recoverable by trying a fresh
+// Worker on the next trace.
 //
 // Uses the standards-compliant `new Worker(new URL('./trace-worker.ts',
 // import.meta.url), { type: 'module' })` pattern. Vite recognises this
@@ -55,9 +60,7 @@ const MAX_INLINE_TRACE_PIXELS = 160_000;
 // catch arm in non-bundler runtimes that can't resolve the worker URL.
 function ensureWorker(): Worker | null {
   if (workerInstance !== null) return workerInstance;
-  if (workerFailed) return null;
   if (typeof Worker === 'undefined') {
-    workerFailed = true;
     return null;
   }
   try {
@@ -78,7 +81,6 @@ function ensureWorker(): Worker | null {
     };
     return workerInstance;
   } catch {
-    workerFailed = true;
     return null;
   }
 }
@@ -91,21 +93,16 @@ function handleWorkerMessage(e: MessageEvent<TraceWorkerResponse>): void {
     pending.resolve({ paths: e.data.paths, bounds: e.data.bounds });
     return;
   }
-  // Worker returned a kind:'error' response. Mark the worker dead so
-  // future calls take the inline path (Vite worker bundles can fail
-  // at runtime, e.g. if imagetracerjs's dynamic import can't resolve
-  // inside the worker context). Audit finding H6, 2026-05-28.
-  retireWorker();
+  // A kind:'error' response is scoped to this request. The worker
+  // itself is still alive: retiring it here would make one bad trace
+  // poison every later large-image trace for the whole app session.
   pending.reject(new Error(e.data.message));
 }
 
-// Tear down the live worker after a fatal error (either from
-// `onerror` or from a `kind:'error'` response). All callers that race
-// the failure get their pending promises rejected; the next traceImage
-// call sees `workerFailed === true` in ensureWorker and falls back to
-// the inline path.
+// Tear down the live worker after a fatal runtime error. All callers
+// that race the failure get their pending promises rejected. The next
+// traceImage call will try to construct a fresh worker.
 function retireWorker(): void {
-  workerFailed = true;
   if (workerInstance !== null) {
     workerInstance.terminate();
     workerInstance = null;
@@ -116,11 +113,10 @@ function retireWorker(): void {
 // inline fallback. Callers don't need to branch — the same Promise
 // shape comes back either way for images small enough to run inline.
 // The try/catch around traceInWorker is the second half of H6's fix:
-// if the worker rejects (either because handleWorkerMessage marked
-// it dead, or because the worker died mid-flight), fall back to
-// inline tracing for THIS call when it is small enough. Without it,
-// every commit through the dialog would error-toast after the first
-// worker failure even though a bounded inline path would have succeeded.
+// if the worker rejects (request-level trace error, or fatal worker
+// death mid-flight), fall back to inline tracing for THIS call when it
+// is small enough. Without it, every commit through the dialog would
+// error-toast after a bounded inline path could have succeeded.
 export async function traceImage(image: RawImageData, options: TraceOptions): Promise<TraceResult> {
   const worker = ensureWorker();
   if (worker === null) {
@@ -128,8 +124,11 @@ export async function traceImage(image: RawImageData, options: TraceOptions): Pr
   }
   try {
     return await traceInWorker(worker, image, options);
-  } catch {
-    return traceInlineIfSafe(image, options);
+  } catch (err) {
+    if (canTraceInline(image)) {
+      return traceInline(image, options);
+    }
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 
@@ -162,7 +161,24 @@ function traceInWorker(
   return new Promise<TraceResult>((resolve, reject) => {
     nextRequestId += 1;
     const id = nextRequestId;
-    pendingByRequestId.set(id, { resolve, reject });
+    // On timeout: drop the pending, terminate the worker (so the next trace
+    // builds a fresh one), and reject so the caller falls back / surfaces it.
+    const timer = setTimeout(() => {
+      if (pendingByRequestId.delete(id)) {
+        retireWorker();
+        reject(new Error('Trace worker timed out'));
+      }
+    }, TRACE_WORKER_TIMEOUT_MS);
+    pendingByRequestId.set(id, {
+      resolve: (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      },
+      reject: (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    });
     const request: TraceWorkerRequest = { id, image, options };
     worker.postMessage(request);
   });

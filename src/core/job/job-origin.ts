@@ -3,7 +3,7 @@ import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '.
 import type { JobBounds } from './job-bounds';
 import { computeJobBounds } from './job-bounds';
 
-export type JobStartMode = 'absolute' | 'user-origin';
+export type JobStartMode = 'absolute' | 'current-position' | 'user-origin';
 
 export type JobOriginAnchor =
   | 'front-left'
@@ -16,10 +16,37 @@ export type JobOriginAnchor =
   | 'back-center'
   | 'back-right';
 
-export type JobOriginPlacement = {
+export type JobOriginPlacement =
+  | {
+      readonly startFrom: 'absolute';
+      readonly anchor: JobOriginAnchor;
+    }
+  | {
+      readonly startFrom: 'current-position';
+      readonly anchor: JobOriginAnchor;
+      readonly currentPosition: Vec2;
+    }
+  | {
+      readonly startFrom: 'user-origin';
+      readonly anchor: JobOriginAnchor;
+    };
+
+export type JobPlacementSettings = {
   readonly startFrom: JobStartMode;
   readonly anchor: JobOriginAnchor;
 };
+
+export const JOB_ORIGIN_ANCHORS: ReadonlyArray<JobOriginAnchor> = [
+  'back-left',
+  'back-center',
+  'back-right',
+  'center-left',
+  'center',
+  'center-right',
+  'front-left',
+  'front-center',
+  'front-right',
+];
 
 export const ABSOLUTE_JOB_PLACEMENT: JobOriginPlacement = {
   startFrom: 'absolute',
@@ -32,11 +59,12 @@ export const USER_ORIGIN_JOB_PLACEMENT: JobOriginPlacement = {
 };
 
 export function applyJobOrigin(job: Job, placement: JobOriginPlacement): Job {
-  if (placement.startFrom === 'absolute') return job;
+  const target = targetPoint(placement);
+  if (target === null) return job;
   const bounds = computeJobBounds(job);
   if (bounds === null) return job;
   const anchor = anchorPoint(bounds, placement.anchor);
-  return translateJob(job, -anchor.x, -anchor.y);
+  return translateJob(job, target.x - anchor.x, target.y - anchor.y);
 }
 
 export function offsetJobBounds(
@@ -75,6 +103,19 @@ function anchorPoint(bounds: JobBounds, anchor: JobOriginAnchor): Vec2 {
       return { x: bounds.maxX, y: bounds.maxY };
     default:
       return assertNever(anchor, 'JobOriginAnchor');
+  }
+}
+
+function targetPoint(placement: JobOriginPlacement): Vec2 | null {
+  switch (placement.startFrom) {
+    case 'absolute':
+      return null;
+    case 'user-origin':
+      return { x: 0, y: 0 };
+    case 'current-position':
+      return placement.currentPosition;
+    default:
+      return assertNever(placement, 'JobOriginPlacement');
   }
 }
 

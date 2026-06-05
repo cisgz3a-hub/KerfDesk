@@ -70,6 +70,23 @@ describe('fillHatching', () => {
     expect(alternations).toBeGreaterThan(result.length - 2);
   });
 
+  it('emits every row left-to-right when bidirectional is false (ADR-038 unidirectional)', () => {
+    const result = fillHatching({
+      polylines: [square(1)],
+      hatchAngleDeg: 0,
+      hatchSpacingMm: 0.1,
+      bidirectional: false,
+    });
+    expect(result.length).toBeGreaterThan(2);
+    // Unidirectional: NO row reverses — every hatch runs forward (x increases),
+    // so the alternating firing-lag zipper cannot form.
+    for (const pl of result) {
+      const [a, b] = pl.points;
+      if (a === undefined || b === undefined) continue;
+      expect(b.x).toBeGreaterThan(a.x);
+    }
+  });
+
   it('skips the hole in a "donut" (square with inner square hole)', () => {
     // Outer 10×10 square at (0,0); inner 4×4 square hole at (3,3)..(7,7).
     // At Y=5 (mid-height), scanline crosses outer at x=0,10 and inner at

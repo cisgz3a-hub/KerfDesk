@@ -22,16 +22,20 @@ export const DEFAULT_RX_BUFFER_BYTES = 120;
 
 // 'disconnected' is distinct from 'cancelled' so the UI can show
 // "job aborted — connection lost" vs the user-initiated stop. The
-// streamer treats both as terminal (no more bytes go out), but the
-// reducer entry-point differs (cancel = user, disconnect = cable yank).
-// CNCjs parity per MIT-T1 audit finding.
+// streamer treats them all as terminal (no more bytes go out), but the
+// reducer entry-point differs (cancel = user, disconnect = cable yank,
+// error = GRBL rejected a line mid-stream / error:N, P0-1). 'errored'
+// being terminal protects against a laser-on line firing at a
+// mispositioned head after the rejected move. CNCjs parity per MIT-T1
+// audit finding; error-as-terminal matches LightBurn.
 export type StreamerStatus =
   | 'idle'
   | 'streaming'
   | 'paused'
   | 'done'
   | 'cancelled'
-  | 'disconnected';
+  | 'disconnected'
+  | 'errored';
 
 export type StreamerState = {
   readonly status: StreamerStatus;
@@ -95,7 +99,8 @@ export function step(state: StreamerState): StepResult {
     state.status === 'paused' ||
     state.status === 'done' ||
     state.status === 'cancelled' ||
-    state.status === 'disconnected'
+    state.status === 'disconnected' ||
+    state.status === 'errored'
   ) {
     return { state, toSend: '' };
   }
@@ -127,21 +132,26 @@ export function step(state: StreamerState): StepResult {
 }
 
 // Consume one ack from GRBL (ok / error / alarm). Decrements in-flight,
-// bumps completed. Caller decides whether to surface an error / abort on
-// alarm; this function only updates state.
+// bumps completed. An 'alarm' ack makes the stream terminal ('cancelled')
+// and an 'error' ack makes it terminal ('errored') - GRBL rejected the
+// line, so no further bytes may be sent (P0-1). The caller still decides
+// how to SURFACE the failure (e.g. a safety notice); this only updates
+// state so step() refuses to send more.
 export function onAck(state: StreamerState, kind: AckKind): AckResult {
   if (state.inFlight.length === 0) return { state, acked: null };
   const head = state.inFlight[0];
   if (head === undefined) return { state, acked: null };
   const nextInFlight = state.inFlight.slice(1);
   const nextBytes = state.inFlightBytes - head.bytes;
-  const isAlarm = kind === 'alarm';
   const completed = state.completed + 1;
-  const nextStatus: StreamerStatus = isAlarm
-    ? 'cancelled'
-    : nextInFlight.length === 0 && state.queued.length === 0
-      ? 'done'
-      : state.status;
+  const nextStatus: StreamerStatus =
+    kind === 'alarm'
+      ? 'cancelled'
+      : kind === 'error'
+        ? 'errored'
+        : nextInFlight.length === 0 && state.queued.length === 0
+          ? 'done'
+          : state.status;
   return {
     state: {
       ...state,

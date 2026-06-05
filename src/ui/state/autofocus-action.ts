@@ -173,7 +173,7 @@ export function describeAutofocusResult(result: AutofocusResult): {
       };
     case 'timeout':
       return {
-        message: `Auto-focus timed out after ${Math.round(AUTOFOCUS_TIMEOUT_MS / 1000)}s. Check the log for the last response.`,
+        message: `Auto-focus timed out after ${Math.round(AUTOFOCUS_TIMEOUT_MS / 1000)}s. The machine may still be moving; use the physical stop or power cutoff now if unsafe.`,
         variant: 'warning',
       };
     case 'preflight-failed':

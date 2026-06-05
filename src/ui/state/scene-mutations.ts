@@ -123,10 +123,41 @@ function ensureLayersForMode(
 // exists, it's untouched — we don't auto-flip an existing layer's
 // mode (would surprise the user; they may have other line/fill work
 // on that color).
-export function ensureRasterImageLayer(scene: Scene, color: string): Scene {
+export function ensureRasterImageLayer(scene: Scene, color: string, linesPerMm?: number): Scene {
   const exists = scene.layers.some((l) => l.color === color);
   if (exists) return scene;
-  return addLayer(scene, createLayer({ id: color, color, mode: 'image' }));
+  const layer = createLayer({ id: color, color, mode: 'image' });
+  return addLayer(scene, linesPerMm === undefined ? layer : { ...layer, linesPerMm });
+}
+
+// A raster engraves only on an image-mode layer (compile-job's image arm). If
+// the preferred color already exists as a LINE/FILL layer — e.g. the user has
+// gray vector work on #808080 — reusing it would strand the raster on a layer
+// that won't engrave it (P2-A; preflight catches it as layer-mode-mismatch, but
+// better not to collide in the first place). Reuse the color only when it is
+// free or already an image layer; otherwise pick the first unused variant so
+// the raster gets its own image layer.
+export function resolveRasterLayerColor(
+  scene: Scene,
+  preferred: string,
+  linesPerMm?: number,
+): string {
+  const existing = scene.layers.find((l) => l.color === preferred);
+  if (existing === undefined) return preferred;
+  if (
+    existing.mode === 'image' &&
+    (linesPerMm === undefined || existing.linesPerMm === linesPerMm)
+  ) {
+    return preferred;
+  }
+  const used = new Set(scene.layers.map((l) => l.color));
+  const base = Number.parseInt(preferred.replace('#', ''), 16);
+  const start = Number.isNaN(base) ? 0x808080 : base;
+  for (let n = 1; n <= 0xffffff; n += 1) {
+    const candidate = `#${(((start + n) & 0xffffff) >>> 0).toString(16).padStart(6, '0')}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return preferred; // 16M layers in use — pathological; preflight will catch it
 }
 
 // Clone every selected SceneObject with a fresh id and a 10 mm offset.
@@ -208,7 +239,7 @@ export function applyFreshImport(
   const fitted = fitObjectToBed(object, s.project.device.bedWidth, s.project.device.bedHeight);
   // Multi-import stagger (F-A3): shift Nth file by 10 mm × N right+down.
   const offset = batchOffsetIdx * MULTI_IMPORT_OFFSET_MM;
-  const positioned =
+  let positioned: SceneObject =
     offset === 0
       ? fitted
       : {
@@ -219,6 +250,12 @@ export function applyFreshImport(
             y: fitted.transform.y + offset,
           },
         };
+  // Re-colour an imported raster onto a free/own image layer if its preferred
+  // color collides with an existing non-image layer (P2-A).
+  if (positioned.kind === 'raster-image') {
+    const color = resolveRasterLayerColor(s.project.scene, positioned.color);
+    if (color !== positioned.color) positioned = { ...positioned, color };
+  }
   let scene = addObject(s.project.scene, positioned);
   if (
     positioned.kind === 'imported-svg' ||

@@ -45,12 +45,17 @@ type OpentypeModule = {
 let opentypePromise: Promise<OpentypeModule> | null = null;
 async function loadOpentype(): Promise<OpentypeModule> {
   if (opentypePromise === null) {
-    opentypePromise = import('opentype.js').then((mod) => {
-      // opentype.js publishes both a namespace and a default export
-      // depending on bundler; prefer namespace, fall back to default.
-      const ns = mod as unknown as OpentypeModule & { default?: OpentypeModule };
-      return ns.parse !== undefined ? ns : (ns.default as OpentypeModule);
-    });
+    opentypePromise = import('opentype.js')
+      .then((mod) => {
+        // opentype.js publishes both a namespace and a default export
+        // depending on bundler; prefer namespace, fall back to default.
+        const ns = mod as unknown as OpentypeModule & { default?: OpentypeModule };
+        return ns.parse !== undefined ? ns : (ns.default as OpentypeModule);
+      })
+      .catch((error: unknown) => {
+        opentypePromise = null;
+        throw error;
+      });
   }
   return opentypePromise;
 }

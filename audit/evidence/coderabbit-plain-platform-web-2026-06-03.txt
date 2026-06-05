@@ -1,0 +1,19 @@
+Connecting to CodeRabbit... 6s elapsed
+Preparing review... 8s elapsed
+────────────────────────────────────────
+CodeRabbit Review
+
+Diff      : uncommitted changes only
+Compare   : codex/main-working → main
+Directory : LaserForge-2.0/src/platform/web
+────────────────────────────────────────
+
+(\(\
+(• .•)  Organize teams around functionality. Don't separate designers from coders, testers from data modelers. Build teams the way you build code.
+
+
+  ✗ Review limit reached
+
+  To unlock additional reviews, purchase usage credits in the billing tab.
+  https://app.coderabbit.ai/settings/subscription?tab=usage&tenantId=efda8b0b-dd4f-4c80-a2cc-e53fe5e0ed7c
+

@@ -10,7 +10,7 @@
 //   2. Background skipping — the white layer is always dropped, so a
 //      black-on-white binary trace produces exactly one ColoredPath.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   type PaletteEntry,
@@ -285,5 +285,39 @@ describe('tracedataToColoredPaths', () => {
     expect(points[8]?.x).toBeCloseTo(5, 6);
     expect(points[8]?.y).toBeCloseTo(5, 6);
     expect(points[32]).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('traceImageToColoredPaths lazy loader', () => {
+  it('retries the imagetracer tracedata import after a transient chunk failure', async () => {
+    vi.resetModules();
+    (globalThis as { __lfImagetracerTraceAttempts?: number }).__lfImagetracerTraceAttempts = 0;
+    vi.doMock('imagetracerjs', () => {
+      const state = globalThis as { __lfImagetracerTraceAttempts?: number };
+      const attempts = (state.__lfImagetracerTraceAttempts ?? 0) + 1;
+      state.__lfImagetracerTraceAttempts = attempts;
+      if (attempts === 1) throw new Error('chunk failed');
+      return {
+        default: {
+          imagedataToTracedata: () => ({ layers: [], palette: [] }),
+        },
+      };
+    });
+    try {
+      const tracePaths = await import('./trace-to-paths');
+      const traceImage = await import('./trace-image');
+      const image = { width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 255]) };
+
+      await expect(
+        tracePaths.traceImageToColoredPaths(image, traceImage.DEFAULT_TRACE_OPTIONS),
+      ).rejects.toThrow(/chunk failed|mocking a module/);
+      await expect(
+        tracePaths.traceImageToColoredPaths(image, traceImage.DEFAULT_TRACE_OPTIONS),
+      ).resolves.toEqual([]);
+    } finally {
+      vi.doUnmock('imagetracerjs');
+      vi.resetModules();
+      delete (globalThis as { __lfImagetracerTraceAttempts?: number }).__lfImagetracerTraceAttempts;
+    }
   });
 });

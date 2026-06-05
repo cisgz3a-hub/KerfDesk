@@ -1,0 +1,24 @@
+Connecting to CodeRabbit... 4s elapsed
+
+   !   CodeRabbit could not match cisgz3a-hub/LaserForge-2.0 to an installed
+       organization you can access. This review will run with limited/free CLI
+       behavior and is subject to free CLI review limits. Install CodeRabbit for
+       cisgz3a-hub/LaserForge-2.0 to enable full review features.
+
+────────────────────────────────────────
+CodeRabbit Review
+
+Diff      : uncommitted changes only
+Compare   : codex/main-working → main
+Directory : LaserForge-2.0/src/core/preflight
+────────────────────────────────────────
+
+(\(\
+(• .•)  Because, no one wants to be a human linter.
+
+Preparing review... 6s elapsed
+
+  ✗ Review limit reached
+
+  Wait for the limited/free CLI review limit to reset, or install CodeRabbit for this repository to use full review features.
+
