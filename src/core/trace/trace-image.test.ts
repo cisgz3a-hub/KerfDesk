@@ -423,9 +423,10 @@ describe('traceImageToSvgString', () => {
   it('colorsampling is 0 ONLY when a fixed palette is set', () => {
     // colorsampling=0 disables imagetracerjs's color quantization
     // entirely. Correct for 2-colour engraving (Line Art / Smooth /
-    // Sharp where we force the palette ourselves) — wrong for
-    // multi-colour (Detailed / Photo, which need adaptive quant to
-    // produce >2 layers). Pin both directions of this conditional.
+    // Sharp where we force the palette ourselves); wrong for a
+    // multi-colour options object (numberOfColors > 2, no fixedPalette),
+    // which needs adaptive quant to produce >2 layers. Pin both
+    // directions of this conditional.
     const withPalette = buildImageTracerOptions({
       ...DEFAULT_TRACE_OPTIONS,
       fixedPalette: ['#ffffff', '#000000'],

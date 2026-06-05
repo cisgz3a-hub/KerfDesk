@@ -254,32 +254,6 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     useOtsuThreshold: true,
     despeckleMinPixels: 4,
   },
-  Detailed: {
-    // For line drawings with some shading — 4 colors keeps mid-tones
-    // as distinct cut layers. Median smooths the shading bands but
-    // we don't threshold (multi-colour output).
-    numberOfColors: 4,
-    pathOmit: 8,
-    lineTolerance: 1,
-    quadraticTolerance: 1,
-    blurRadius: 1,
-    blurDelta: 10,
-    lineFilter: true,
-    medianFilter: true,
-  },
-  Photo: {
-    // For actual photographs — heavy blur + many colors. Produces
-    // many layers; intended for posterized-style engraving. Median
-    // pre-pass cleans JPEG blocks without rounding edges away.
-    numberOfColors: 8,
-    pathOmit: 8,
-    lineTolerance: 1.5,
-    quadraticTolerance: 1.5,
-    blurRadius: 3,
-    blurDelta: 30,
-    lineFilter: true,
-    medianFilter: true,
-  },
 };
 
 export async function traceImageToSvgString(
@@ -412,10 +386,13 @@ export function buildImageTracerOptions(options: TraceOptions): Record<string, u
     strokewidth: 0,
     scale: 1,
   };
-  // colorsampling 0 + fixed palette ONLY when caller forced a
-  // palette (Line Art / Smooth / Sharp). Multi-colour presets
-  // (Detailed / Photo) need imagetracerjs's adaptive quantization
-  // to produce >2 layers; colorsampling=0 there would collapse them.
+  // colorsampling 0 + fixed palette ONLY when caller forced a palette
+  // (Line Art / Smooth / Sharp). A multi-colour options object
+  // (numberOfColors > 2, no fixedPalette) needs imagetracerjs's adaptive
+  // quantization to produce >2 layers; colorsampling=0 there would
+  // collapse them. No surfaced preset does this any more: vector Trace is
+  // binary (Photo / Detailed removed, ADR-043); photos engrave via the
+  // Image/raster path, not Trace.
   if (options.fixedPalette !== undefined && options.fixedPalette.length > 0) {
     opts['colorsampling'] = 0;
     opts['pal'] = options.fixedPalette.map(hexToRgba);

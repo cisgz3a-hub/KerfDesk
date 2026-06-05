@@ -14,7 +14,20 @@ import {
 } from './trace-options';
 
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
-const PHOTO = TRACE_PRESETS['Photo'] as TraceOptions;
+// A photo-like multi-colour options object (the shape the removed "Photo"
+// preset had). Kept inline so mergeLightBurnTraceSettings behaviour on a
+// non-fixedPalette options object stays covered after Photo/Detailed were
+// dropped as surfaced presets (vector Trace is binary, ADR-043).
+const PHOTO: TraceOptions = {
+  numberOfColors: 8,
+  pathOmit: 8,
+  lineTolerance: 1.5,
+  quadraticTolerance: 1.5,
+  blurRadius: 3,
+  blurDelta: 30,
+  lineFilter: true,
+  medianFilter: true,
+};
 
 describe('mergeAdjustments', () => {
   it('returns an options object equivalent to the preset when adjustments are at defaults', () => {
@@ -83,7 +96,7 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.fixedPalette).toEqual(LINE_ART.fixedPalette);
   });
 
-  it('does not force binary LightBurn threshold fields onto untouched photo presets', () => {
+  it('does not force binary LightBurn threshold fields onto untouched multi-colour options', () => {
     const merged = mergeLightBurnTraceSettings(PHOTO, {});
     expect(merged.cutoffLuma).toBeUndefined();
     expect(merged.thresholdLuma).toBeUndefined();
