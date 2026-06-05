@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { StatusReport } from '../../core/controllers/grbl';
+import type { GrblState, StatusReport } from '../../core/controllers/grbl';
 import {
   createLayer,
   createProject,
@@ -8,6 +8,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import type { JobPlacementSettings } from '../job-placement';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -30,6 +31,11 @@ const readyMachine = {
   statusReport: idleStatus,
   alarmCode: null,
   hasActiveStreamer: false,
+};
+
+const userOriginFrontLeft: JobPlacementSettings = {
+  startFrom: 'user-origin',
+  anchor: 'front-left',
 };
 
 const sampleObject: SceneObject = {
@@ -108,6 +114,48 @@ function calibratedProject(): Project {
     scene: {
       ...project.scene,
       layers: [{ ...layer, power: 10 }],
+    },
+  };
+}
+
+function fillOverscanProject(): Project {
+  return {
+    ...createProject(),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [
+        {
+          kind: 'imported-svg',
+          id: 'fill-near-origin',
+          source: 'fill.svg',
+          bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+          transform: IDENTITY_TRANSFORM,
+          paths: [
+            {
+              color: '#ff0000',
+              polylines: [
+                {
+                  closed: true,
+                  points: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 10 },
+                    { x: 0, y: 10 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      layers: [
+        {
+          ...createLayer({ id: 'L-fill', color: '#ff0000', mode: 'fill' }),
+          fillOverscanMm: 5,
+          hatchSpacingMm: 2,
+          power: 10,
+        },
+      ],
     },
   };
 }
@@ -196,6 +244,7 @@ describe('prepareStartJob', () => {
       calibratedProjectWith(centeredTraceObject),
       readyController,
       customOriginMachine,
+      userOriginFrontLeft,
     );
 
     expect(result.ok).toBe(true);
@@ -218,12 +267,68 @@ describe('prepareStartJob', () => {
       calibratedProjectWith(centeredTraceObject),
       readyController,
       nearEdgeOriginMachine,
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/selected job origin/i);
+      expect(result.messages.join('\n')).toMatch(/machine bed/i);
+    }
+  });
+
+  it('allows custom-origin fill overscan when WCO keeps the runway physically on the bed', () => {
+    const result = prepareStartJob(
+      fillOverscanProject(),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 100, y: 100, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.gcode).toContain('X-5.000');
+    }
+  });
+
+  it('blocks custom-origin fill overscan when WCO puts the runway physically off the bed', () => {
+    const result = prepareStartJob(
+      fillOverscanProject(),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 2, y: 100, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/X out of bed: -3/);
+    }
+  });
+
+  it('blocks custom-origin Start when the physical origin location is not known', () => {
+    const result = prepareStartJob(
+      calibratedProjectWith(centeredTraceObject),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: null,
+      },
+      userOriginFrontLeft,
     );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.messages.join('\n')).toMatch(/custom origin/i);
-      expect(result.messages.join('\n')).toMatch(/machine bed/i);
+      expect(result.messages.join('\n')).toMatch(/not known/i);
     }
   });
 
@@ -253,6 +358,23 @@ describe('prepareStartJob', () => {
     }
   });
 
+  it.each(['Hold', 'Jog', 'Home'] satisfies GrblState[])(
+    'blocks Start while the controller reports %s',
+    (state) => {
+      const result = prepareStartJob(calibratedProject(), readyController, {
+        ...readyMachine,
+        statusReport: { ...idleStatus, state },
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.messages).toContain(
+          `Machine must be Idle before starting (currently ${state}).`,
+        );
+      }
+    },
+  );
+
   it('blocks Start while an alarm is active', () => {
     const result = prepareStartJob(calibratedProject(), readyController, {
       ...readyMachine,
@@ -278,6 +400,20 @@ describe('prepareStartJob', () => {
     if (!result.ok) {
       expect(result.messages).toContain(
         'A job is already active. Stop or finish it before starting another.',
+      );
+    }
+  });
+
+  it('blocks Start while autofocus is active', () => {
+    const result = prepareStartJob(calibratedProject(), readyController, {
+      ...readyMachine,
+      autofocusBusy: true,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages).toContain(
+        'Auto-focus is running. Wait for it to finish before starting a job.',
       );
     }
   });

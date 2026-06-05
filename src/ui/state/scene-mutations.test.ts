@@ -13,7 +13,12 @@ import {
   type Scene,
   type TracedImage,
 } from '../../core/scene';
-import { applyTraceToExisting, ensureRasterImageLayer, pruneOrphanLayers } from './scene-mutations';
+import {
+  applyTraceToExisting,
+  ensureRasterImageLayer,
+  pruneOrphanLayers,
+  resolveRasterLayerColor,
+} from './scene-mutations';
 
 function blankScene(): Scene {
   return { objects: [], layers: [] };
@@ -35,6 +40,30 @@ function rasterImage(color: string): RasterImage {
   };
 }
 
+describe('resolveRasterLayerColor (P2-A)', () => {
+  it('reuses a free color', () => {
+    expect(resolveRasterLayerColor(blankScene(), '#808080')).toBe('#808080');
+  });
+
+  it('reuses the color when it is already an image layer', () => {
+    const scene: Scene = {
+      objects: [],
+      layers: [createLayer({ id: '#808080', color: '#808080', mode: 'image' })],
+    };
+    expect(resolveRasterLayerColor(scene, '#808080')).toBe('#808080');
+  });
+
+  it('picks a unique color when the preferred collides with a non-image layer', () => {
+    const scene: Scene = {
+      objects: [],
+      layers: [createLayer({ id: '#808080', color: '#808080', mode: 'line' })],
+    };
+    const color = resolveRasterLayerColor(scene, '#808080');
+    expect(color).not.toBe('#808080');
+    expect(scene.layers.some((l) => l.color === color)).toBe(false);
+  });
+});
+
 describe('ensureRasterImageLayer', () => {
   it('creates an image-mode layer when the color is new', () => {
     const out = ensureRasterImageLayer(blankScene(), '#808080');
@@ -51,6 +80,7 @@ describe('ensureRasterImageLayer', () => {
           id: '#808080',
           color: '#808080',
           mode: 'line',
+          minPower: 0,
           power: 50,
           speed: 1200,
           passes: 1,
@@ -59,6 +89,7 @@ describe('ensureRasterImageLayer', () => {
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
           fillOverscanMm: 5,
+          fillBidirectional: true,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
         },
@@ -80,6 +111,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           id: '#808080',
           color: '#808080',
           mode: 'image',
+          minPower: 0,
           power: 60,
           speed: 1500,
           passes: 1,
@@ -88,6 +120,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
           fillOverscanMm: 5,
+          fillBidirectional: true,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
         },
@@ -95,6 +128,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           id: '#ff0000',
           color: '#ff0000',
           mode: 'line',
+          minPower: 0,
           power: 50,
           speed: 1500,
           passes: 1,
@@ -103,6 +137,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           hatchAngleDeg: 0,
           hatchSpacingMm: 0.2,
           fillOverscanMm: 5,
+          fillBidirectional: true,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
         },

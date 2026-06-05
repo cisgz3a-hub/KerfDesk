@@ -35,12 +35,29 @@ import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
+import { inferCurrentMachinePosition } from './infer-machine-position';
 import { handleLine, runHandshake } from './laser-line-handler';
+import {
+  buildFrameJogLines,
+  markMotionOperationDispatched,
+  startMotionOperation,
+  type LaserMotionOperation,
+} from './laser-motion-operation';
 import {
   resetOrigin as resetOriginAction,
   setOriginHere as setOriginHereAction,
   type WorkCoordinateOffset,
 } from './origin-actions';
+import { type LaserSafetyNotice, writeFailedNotice } from './laser-safety-notice';
+import {
+  assertAutofocusIdle,
+  buildPortClosePatch,
+  disconnectStopCommand,
+  initialLaserState,
+  isActiveJob,
+  pushLog,
+  serialWriteErrorMessage,
+} from './laser-store-helpers';
 
 export type { AutofocusResult } from './autofocus-action';
 export { describeAutofocusResult } from './autofocus-action';
@@ -68,6 +85,13 @@ export type LaserState = {
   readonly alarmCode: number | null;
   readonly lastError: number | null;
   readonly lastWriteError: string | null;
+  // P0-B: operator-facing safety alert raised when the store cannot guarantee
+  // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
+  // drop mid-job. null = nothing to warn about. Cleared on the next successful
+  // connect or via clearSafetyNotice.
+  readonly safetyNotice: LaserSafetyNotice | null;
+  readonly autofocusBusy: boolean;
+  readonly motionOperation: LaserMotionOperation | null;
   readonly streamer: StreamerState | null;
   readonly log: ReadonlyArray<string>;
   // F-7: settings auto-detected from the `$$` dump on connect. Non-null
@@ -108,6 +132,7 @@ export type LaserState = {
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
+  readonly clearSafetyNotice: () => void;
   readonly applyDetectedSettings: () => void;
   readonly dismissDetectedSettings: () => void;
   // F.3 origin actions. setOriginHere sends G92 X0 Y0 (transient,
@@ -146,12 +171,6 @@ const refs: LiveRefs = {
   onLineArrived: null,
 };
 
-const LOG_MAX = 200;
-
-function pushLog(state: LaserState, line: string): ReadonlyArray<string> {
-  return [...state.log, line].slice(-LOG_MAX);
-}
-
 function teardown(): void {
   refs.unsubscribeLine?.();
   refs.unsubscribeClose?.();
@@ -164,11 +183,12 @@ function teardown(): void {
   refs.onLineArrived = null;
 }
 
-function serialWriteErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-async function safeWrite(set: SetFn, get: GetFn, line: string): Promise<void> {
+async function safeWrite(
+  set: SetFn,
+  get: GetFn,
+  line: string,
+  action?: Parameters<typeof writeFailedNotice>[0],
+): Promise<void> {
   const conn = refs.connection;
   if (conn === null) {
     const message = 'No active serial connection.';
@@ -178,6 +198,7 @@ async function safeWrite(set: SetFn, get: GetFn, line: string): Promise<void> {
         get(),
         `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
       ),
+      ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
     });
     throw new Error(message);
   }
@@ -191,6 +212,7 @@ async function safeWrite(set: SetFn, get: GetFn, line: string): Promise<void> {
         get(),
         `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
       ),
+      ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
     });
     console.error('Serial write failed:', err);
     throw err instanceof Error ? err : new Error(message);
@@ -201,48 +223,6 @@ type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 type GetFn = () => LaserState;
-
-function initialLaserState(): Pick<
-  LaserState,
-  | 'connection'
-  | 'statusReport'
-  | 'alarmCode'
-  | 'lastError'
-  | 'lastWriteError'
-  | 'streamer'
-  | 'log'
-  | 'detectedSettings'
-  | 'controllerSettings'
-  | 'wcoCache'
-  | 'workOriginActive'
-> {
-  return {
-    connection: { kind: 'disconnected' },
-    statusReport: null,
-    alarmCode: null,
-    lastError: null,
-    lastWriteError: null,
-    streamer: null,
-    log: [],
-    detectedSettings: null,
-    controllerSettings: null,
-    wcoCache: null,
-    workOriginActive: false,
-  };
-}
-
-function inferCurrentMachinePosition(state: LaserState): WorkCoordinateOffset | null {
-  const report = state.statusReport;
-  if (report?.mPos !== null && report?.mPos !== undefined) return report.mPos;
-  if (report?.wPos !== null && report?.wPos !== undefined && state.wcoCache !== null) {
-    return {
-      x: report.wPos.x + state.wcoCache.x,
-      y: report.wPos.y + state.wcoCache.y,
-      z: report.wPos.z + state.wcoCache.z,
-    };
-  }
-  return null;
-}
 
 function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' | 'disconnect'> {
   return {
@@ -261,39 +241,27 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         );
         refs.unsubscribeClose = conn.onClose(() => {
           teardown();
-          // If a job was streaming or paused when the port dropped, mark
-          // the streamer 'disconnected' so the UI shows "connection lost
-          // mid-job" instead of leaving a stale 'streaming' state behind.
-          // MIT-T1 audit finding (CNCjs parity). Functional set form so
-          // we don't clobber any concurrent ack-driven update — same
-          // pattern as R-H2's resume/stop fix.
-          set((s) => ({
-            connection: { kind: 'disconnected' },
-            statusReport: null,
-            controllerSettings: null,
-            // GRBL clears G92 on the reset that fires when the port
-            // closes; our cache must match or the next connect will
-            // show "custom origin" against an actually-zeroed machine.
-            wcoCache: null,
-            workOriginActive: false,
-            streamer:
-              s.streamer !== null &&
-              (s.streamer.status === 'streaming' || s.streamer.status === 'paused')
-                ? disconnectStreamer(s.streamer)
-                : s.streamer,
-          }));
+          // If a job was streaming/paused when the port dropped, mark the
+          // streamer 'disconnected' AND raise the disconnect-during-job safety
+          // notice (GRBL may still be running buffered commands). Functional set
+          // so we don't clobber a concurrent ack-driven update. See
+          // buildPortClosePatch (laser-store-helpers) for the patch + rationale.
+          set(buildPortClosePatch);
         });
         let pollTick = 0;
         refs.pollHandle = setInterval(() => {
           pollTick++;
           const s = get();
-          const isActive =
-            s.streamer !== null &&
-            (s.streamer.status === 'streaming' || s.streamer.status === 'paused');
+          const isActive = isActiveJob(s.streamer) || s.motionOperation !== null || s.autofocusBusy;
           if (!isActive && pollTick % IDLE_POLL_DIVISOR !== 0) return;
           void safeWrite(set, get, RT_STATUS).catch(() => undefined);
         }, STATUS_POLL_MS);
-        set({ connection: { kind: 'connected' }, alarmCode: null, lastWriteError: null });
+        set({
+          connection: { kind: 'connected' },
+          alarmCode: null,
+          lastWriteError: null,
+          safetyNotice: null,
+        });
         void runHandshake(set, get, refs, (out) => safeWrite(set, get, out)).catch(() => undefined);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -301,7 +269,19 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
       }
     },
     disconnect: async () => {
+      assertAutofocusIdle(get());
       const conn = refs.connection;
+      const stopCommand = disconnectStopCommand(get());
+      if (stopCommand !== null) {
+        try {
+          await safeWrite(set, get, stopCommand, 'disconnect');
+        } catch {
+          // The stop-before-disconnect write failed (USB likely already gone),
+          // so the machine may still run buffered commands. Warn — but STILL
+          // tear down the link the operator asked to drop (don't rethrow).
+          set({ safetyNotice: writeFailedNotice('disconnect') });
+        }
+      }
       teardown();
       if (conn !== null) await conn.close().catch(() => undefined);
       set({
@@ -311,6 +291,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         streamer: null,
         wcoCache: null,
         workOriginActive: false,
+        motionOperation: null,
         lastWriteError: null,
       });
     },
@@ -323,42 +304,56 @@ function jogActions(
 ): Pick<LaserState, 'home' | 'autofocus' | 'unlockAlarm' | 'jog' | 'cancelJog' | 'frame'> {
   return {
     home: async () => {
-      await safeWrite(set, get, `${CMD_HOME}\n`);
+      assertAutofocusIdle(get());
+      await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
     },
     autofocus: async (command) => {
-      // Delegates to the protocol-aware runner (autofocus-action.ts).
-      // The runner subscribes to incoming lines, waits for ok / error /
-      // status transitions, and times out at 15s — fire-and-forget
-      // (the old behavior) was the entire reason previous attempts
-      // looked "hung" or fired the wrong command silently.
-      return runAutofocus({
-        connection: refs.connection,
-        statusReport: get().statusReport,
-        command,
-      });
+      if (get().autofocusBusy) {
+        return { kind: 'preflight-failed', reason: 'Auto-focus is already running.' };
+      }
+      set({ autofocusBusy: true });
+      try {
+        return await runAutofocus({
+          connection: refs.connection,
+          statusReport: get().statusReport,
+          command,
+        });
+      } finally {
+        set({ autofocusBusy: false });
+      }
     },
     unlockAlarm: async () => {
-      await safeWrite(set, get, `${CMD_UNLOCK}\n`);
+      await safeWrite(set, get, `${CMD_UNLOCK}\n`, 'unlock');
       set({ alarmCode: null });
     },
     jog: async (params) => {
-      await safeWrite(set, get, `${buildJogCommand(params)}\n`);
+      assertAutofocusIdle(get());
+      set({ motionOperation: startMotionOperation('jog') });
+      try {
+        await safeWrite(set, get, `${buildJogCommand(params)}\n`, 'jog');
+        set((s) => ({
+          motionOperation: markMotionOperationDispatched(s.motionOperation, 'jog'),
+        }));
+      } catch (err) {
+        set({ motionOperation: null });
+        throw err;
+      }
     },
-    cancelJog: async () => {
-      await safeWrite(set, get, RT_JOG_CANCEL);
-    },
+    cancelJog: () =>
+      safeWrite(set, get, RT_JOG_CANCEL, 'jog').finally(() => set({ motionOperation: null })),
     frame: async (bounds, feed) => {
-      const f = Math.max(1, Math.round(feed));
-      const fmt = (n: number): string => n.toFixed(3);
-      const corners = [
-        { x: bounds.minX, y: bounds.minY },
-        { x: bounds.maxX, y: bounds.minY },
-        { x: bounds.maxX, y: bounds.maxY },
-        { x: bounds.minX, y: bounds.maxY },
-        { x: bounds.minX, y: bounds.minY },
-      ];
-      for (const c of corners) {
-        await safeWrite(set, get, `$J=G90 G21 X${fmt(c.x)} Y${fmt(c.y)} F${f}\n`);
+      assertAutofocusIdle(get());
+      set({ motionOperation: startMotionOperation('frame') });
+      try {
+        for (const line of buildFrameJogLines(bounds, feed)) {
+          await safeWrite(set, get, line, 'frame');
+        }
+        set((s) => ({
+          motionOperation: markMotionOperationDispatched(s.motionOperation, 'frame'),
+        }));
+      } catch (err) {
+        set({ motionOperation: null });
+        throw err;
       }
     },
   };
@@ -370,18 +365,25 @@ function jobActions(
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
   return {
     startJob: async (gcode) => {
+      assertAutofocusIdle(get());
       const initial = createStreamer(gcode);
       const stepped = step(initial);
-      if (stepped.toSend.length > 0) await safeWrite(set, get, stepped.toSend);
       set({ streamer: stepped.state });
+      if (stepped.toSend.length === 0) return;
+      try {
+        await safeWrite(set, get, stepped.toSend, 'start');
+      } catch (err) {
+        set({ streamer: null });
+        throw err;
+      }
     },
     pauseJob: async () => {
-      await safeWrite(set, get, RT_HOLD);
+      await safeWrite(set, get, RT_HOLD, 'pause');
       const s = get().streamer;
       if (s !== null) set({ streamer: pauseStreamer(s) });
     },
     resumeJob: async () => {
-      await safeWrite(set, get, RT_RESUME);
+      await safeWrite(set, get, RT_RESUME, 'resume');
       // Functional set so the snapshot is taken AT WRITE TIME — during
       // the await above, ack-driven handleLine paths can have advanced
       // the streamer via advanceStream. A `const s = get().streamer`
@@ -398,10 +400,20 @@ function jobActions(
         toSend = stepped.toSend;
         return { streamer: stepped.state };
       });
-      if (toSend.length > 0) await safeWrite(set, get, toSend);
+      if (toSend.length > 0) {
+        try {
+          await safeWrite(set, get, toSend, 'resume');
+        } catch (err) {
+          set((s) => ({
+            streamer: s.streamer === null ? s.streamer : disconnectStreamer(s.streamer),
+            safetyNotice: writeFailedNotice('resume'),
+          }));
+          throw err;
+        }
+      }
     },
     stopJob: async () => {
-      await safeWrite(set, get, RT_SOFT_RESET);
+      await safeWrite(set, get, RT_SOFT_RESET, 'stop');
       // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
       // cached WCO so the readout doesn't lie about "custom origin"
       // until the next WCO frame arrives. Same race window as
@@ -421,15 +433,18 @@ function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere'
   // need to switch placement as soon as the write succeeds.
   return {
     setOriginHere: async () => {
-      await setOriginHereAction((out) => safeWrite(set, get, out));
-      const inferredWco = inferCurrentMachinePosition(get());
+      assertAutofocusIdle(get());
+      await setOriginHereAction((out) => safeWrite(set, get, out, 'origin'));
+      const { statusReport, wcoCache } = get();
+      const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
       set({
         workOriginActive: true,
         ...(inferredWco !== null ? { wcoCache: inferredWco } : {}),
       });
     },
     resetOrigin: async () => {
-      await resetOriginAction((out) => safeWrite(set, get, out));
+      assertAutofocusIdle(get());
+      await resetOriginAction((out) => safeWrite(set, get, out, 'origin'));
       set({ workOriginActive: false, wcoCache: null });
     },
   };
@@ -459,4 +474,5 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...jobActions(set, get),
   ...originActions(set, get),
   ...detectedSettingsActions(set, get),
+  clearSafetyNotice: () => set({ safetyNotice: null }),
 }));

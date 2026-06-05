@@ -3,12 +3,16 @@
 // no burn) into a per-pixel power schedule that the raster emit path
 // turns into S-values.
 //
-// Three modes per ADR-020 Q2:
+// Raster modes per ADR-020 Q2 plus the LightBurn-parity audit:
 //   - 'threshold'        single cut-off: pixel >= threshold → S=0, else S=Smax
 //                        Cheapest, harshest. Good for clean line art.
 //   - 'floyd-steinberg'  greyscale error-diffusion. Classic for laser
 //                        photo-engraving. Serpentine scan to avoid
 //                        directional artifacts on simple gradients.
+//   - 'jarvis' / 'stucki' / 'atkinson' / 'burkes' / 'sierra*'
+//                        alternate error-diffusion kernels exposed by
+//                        LightBurn-style image workflows.
+//   - 'ordered'          Bayer ordered dither, deterministic and crisp.
 //   - 'grayscale'        direct luma → S, no dithering. For lasers that
 //                        actually accept analogue S values; produces
 //                        smooth gradients but most diode lasers don't
@@ -26,7 +30,18 @@
 
 const TWO_FIFTY_FIVE = 255;
 
-export type DitherAlgorithm = 'threshold' | 'floyd-steinberg' | 'grayscale';
+export type DitherAlgorithm =
+  | 'threshold'
+  | 'floyd-steinberg'
+  | 'jarvis'
+  | 'stucki'
+  | 'atkinson'
+  | 'burkes'
+  | 'sierra3'
+  | 'sierra2'
+  | 'sierra-lite'
+  | 'ordered'
+  | 'grayscale';
 
 export type DitherInput = {
   // Greyscale pixels, row-major, length = width * height.
@@ -42,6 +57,7 @@ export type DitherOptions = {
   // wants 100% — typical photo work uses 60-80% to avoid charring.
   // Caller decides; this module just outputs values in [0, sMax].
   readonly sMax: number;
+  readonly sMin?: number;
   // For 'threshold' only: pixel luma below this becomes a burn pixel.
   // Default 128 (middle grey). Ignored by other algorithms.
   readonly thresholdLuma?: number;
@@ -50,13 +66,65 @@ export type DitherOptions = {
 const DEFAULT_THRESHOLD = 128;
 
 export function dither(input: DitherInput, options: DitherOptions): Uint16Array {
+  if (isErrorDiffusionMode(options.algorithm)) {
+    return ditherErrorDiffusion(input, options, kernelFor(options.algorithm));
+  }
   switch (options.algorithm) {
     case 'threshold':
       return ditherThreshold(input, options);
+    case 'ordered':
+      return ditherOrdered(input, options);
     case 'grayscale':
       return ditherGrayscale(input, options);
+  }
+}
+
+type ErrorDiffusionMode =
+  | 'floyd-steinberg'
+  | 'jarvis'
+  | 'stucki'
+  | 'atkinson'
+  | 'burkes'
+  | 'sierra3'
+  | 'sierra2'
+  | 'sierra-lite';
+
+type DiffusionKernel = {
+  readonly offsets: ReadonlyArray<readonly [number, number, number]>;
+  readonly divisor: number;
+};
+
+function isErrorDiffusionMode(mode: DitherAlgorithm): mode is ErrorDiffusionMode {
+  return (
+    mode === 'floyd-steinberg' ||
+    mode === 'jarvis' ||
+    mode === 'stucki' ||
+    mode === 'atkinson' ||
+    mode === 'burkes' ||
+    mode === 'sierra3' ||
+    mode === 'sierra2' ||
+    mode === 'sierra-lite'
+  );
+}
+
+function kernelFor(mode: ErrorDiffusionMode): DiffusionKernel {
+  switch (mode) {
     case 'floyd-steinberg':
-      return ditherFloydSteinberg(input, options);
+      return FLOYD_STEINBERG;
+    case 'jarvis':
+      return JARVIS;
+    case 'stucki':
+      return STUCKI;
+    case 'atkinson':
+      return ATKINSON;
+    case 'burkes':
+      return BURKES;
+    case 'sierra3':
+      return SIERRA3;
+    case 'sierra2':
+      return SIERRA2;
+    case 'sierra-lite':
+      return SIERRA_LITE;
   }
 }
 
@@ -77,34 +145,39 @@ function ditherThreshold(input: DitherInput, options: DitherOptions): Uint16Arra
 // whether to use this or floyd-steinberg.
 function ditherGrayscale(input: DitherInput, options: DitherOptions): Uint16Array {
   const out = new Uint16Array(input.luma.length);
+  const sMax = normalizeS(options.sMax);
+  const sMin = Math.min(sMax, normalizeS(options.sMin ?? 0));
   for (let i = 0; i < input.luma.length; i += 1) {
     const l = input.luma[i] ?? TWO_FIFTY_FIVE;
     // (255 - l) / 255 maps black to 1.0, white to 0.0.
-    out[i] = Math.round(((TWO_FIFTY_FIVE - l) / TWO_FIFTY_FIVE) * options.sMax);
+    const strength = (TWO_FIFTY_FIVE - l) / TWO_FIFTY_FIVE;
+    out[i] = strength <= 0 ? 0 : Math.round(sMin + strength * (sMax - sMin));
   }
   return out;
 }
 
-// Floyd-Steinberg error diffusion (1976). The canonical photo-laser
-// algorithm. We scan serpentine (alternate rows left-to-right and
-// right-to-left) — straight raster scan produces visible diagonal
-// banding on smooth gradients, the serpentine variant breaks the
-// directionality. Error distribution table flips with direction.
-//
-// Algorithm:
-//   For each pixel p with original luma L:
-//     quantized Q = round(L) to nearest of {0, 255} (binary FS)
-//     error E = L - Q
-//     distribute E to neighbours per the FS table:
-//             . p 7/16
-//       3/16 5/16 1/16
-//     (mirrored on right-to-left rows)
-//   Emit Q's complement scaled to sMax.
-//
-// Pure: the input.luma buffer is NOT mutated; we copy into a working
-// float buffer first so error diffusion writes don't change subsequent
-// reads of the original.
-function ditherFloydSteinberg(input: DitherInput, options: DitherOptions): Uint16Array {
+function normalizeS(value: number): number {
+  return Math.max(0, Math.round(Number.isFinite(value) ? value : 0));
+}
+
+function ditherOrdered(input: DitherInput, options: DitherOptions): Uint16Array {
+  const out = new Uint16Array(input.luma.length);
+  for (let y = 0; y < input.height; y += 1) {
+    for (let x = 0; x < input.width; x += 1) {
+      const i = y * input.width + x;
+      const l = input.luma[i] ?? TWO_FIFTY_FIVE;
+      const threshold = BAYER_4X4[y % 4]?.[x % 4] ?? DEFAULT_THRESHOLD;
+      out[i] = l < threshold ? options.sMax : 0;
+    }
+  }
+  return out;
+}
+
+function ditherErrorDiffusion(
+  input: DitherInput,
+  options: DitherOptions,
+  kernel: DiffusionKernel,
+): Uint16Array {
   const { width, height } = input;
   const buf = new Float32Array(input.luma.length);
   for (let i = 0; i < input.luma.length; i += 1) {
@@ -122,16 +195,12 @@ function ditherFloydSteinberg(input: DitherInput, options: DitherOptions): Uint1
       const quantized = old < DEFAULT_THRESHOLD ? 0 : TWO_FIFTY_FIVE;
       const err = old - quantized;
       out[i] = quantized === 0 ? options.sMax : 0;
-      diffuseError(buf, width, height, x, y, ltr, err);
+      diffuseError(buf, width, height, x, y, ltr, err, kernel);
     }
   }
   return out;
 }
 
-// Spreads `err` onto the four FS neighbours of pixel (x, y) per the
-// canonical 7/16, 3/16, 5/16, 1/16 weights. Mirrors left/right when
-// scanning right-to-left (ltr=false) so the algorithm stays symmetric.
-// Bound checks just skip edge pixels — no wrap-around.
 function diffuseError(
   buf: Float32Array,
   width: number,
@@ -140,20 +209,130 @@ function diffuseError(
   y: number,
   ltr: boolean,
   err: number,
+  kernel: DiffusionKernel,
 ): void {
-  const right = ltr ? x + 1 : x - 1;
-  const left = ltr ? x - 1 : x + 1;
-  const inRow = (xi: number): boolean => xi >= 0 && xi < width;
-  if (inRow(right)) {
-    buf[y * width + right] = (buf[y * width + right] ?? 0) + (err * 7) / 16;
-  }
-  if (y + 1 >= height) return;
-  const nextRow = (y + 1) * width;
-  if (inRow(left)) {
-    buf[nextRow + left] = (buf[nextRow + left] ?? 0) + (err * 3) / 16;
-  }
-  buf[nextRow + x] = (buf[nextRow + x] ?? 0) + (err * 5) / 16;
-  if (inRow(right)) {
-    buf[nextRow + right] = (buf[nextRow + right] ?? 0) + err / 16;
+  for (const [dx0, dy, weight] of kernel.offsets) {
+    const dx = ltr ? dx0 : -dx0;
+    const xi = x + dx;
+    const yi = y + dy;
+    if (xi < 0 || xi >= width || yi < 0 || yi >= height) continue;
+    const i = yi * width + xi;
+    buf[i] = (buf[i] ?? 0) + (err * weight) / kernel.divisor;
   }
 }
+
+const FLOYD_STEINBERG: DiffusionKernel = {
+  offsets: [
+    [1, 0, 7],
+    [-1, 1, 3],
+    [0, 1, 5],
+    [1, 1, 1],
+  ],
+  divisor: 16,
+};
+
+const JARVIS: DiffusionKernel = {
+  offsets: [
+    [1, 0, 7],
+    [2, 0, 5],
+    [-2, 1, 3],
+    [-1, 1, 5],
+    [0, 1, 7],
+    [1, 1, 5],
+    [2, 1, 3],
+    [-2, 2, 1],
+    [-1, 2, 3],
+    [0, 2, 5],
+    [1, 2, 3],
+    [2, 2, 1],
+  ],
+  divisor: 48,
+};
+
+const STUCKI: DiffusionKernel = {
+  offsets: [
+    [1, 0, 8],
+    [2, 0, 4],
+    [-2, 1, 2],
+    [-1, 1, 4],
+    [0, 1, 8],
+    [1, 1, 4],
+    [2, 1, 2],
+    [-2, 2, 1],
+    [-1, 2, 2],
+    [0, 2, 4],
+    [1, 2, 2],
+    [2, 2, 1],
+  ],
+  divisor: 42,
+};
+
+const ATKINSON: DiffusionKernel = {
+  offsets: [
+    [1, 0, 1],
+    [2, 0, 1],
+    [-1, 1, 1],
+    [0, 1, 1],
+    [1, 1, 1],
+    [0, 2, 1],
+  ],
+  divisor: 8,
+};
+
+const BURKES: DiffusionKernel = {
+  offsets: [
+    [1, 0, 8],
+    [2, 0, 4],
+    [-2, 1, 2],
+    [-1, 1, 4],
+    [0, 1, 8],
+    [1, 1, 4],
+    [2, 1, 2],
+  ],
+  divisor: 32,
+};
+
+const SIERRA3: DiffusionKernel = {
+  offsets: [
+    [1, 0, 5],
+    [2, 0, 3],
+    [-2, 1, 2],
+    [-1, 1, 4],
+    [0, 1, 5],
+    [1, 1, 4],
+    [2, 1, 2],
+    [-1, 2, 2],
+    [0, 2, 3],
+    [1, 2, 2],
+  ],
+  divisor: 32,
+};
+
+const SIERRA2: DiffusionKernel = {
+  offsets: [
+    [1, 0, 4],
+    [2, 0, 3],
+    [-2, 1, 1],
+    [-1, 1, 2],
+    [0, 1, 3],
+    [1, 1, 2],
+    [2, 1, 1],
+  ],
+  divisor: 16,
+};
+
+const SIERRA_LITE: DiffusionKernel = {
+  offsets: [
+    [1, 0, 2],
+    [-1, 1, 1],
+    [0, 1, 1],
+  ],
+  divisor: 4,
+};
+
+const BAYER_4X4: ReadonlyArray<ReadonlyArray<number>> = [
+  [8, 136, 40, 168],
+  [200, 72, 232, 104],
+  [56, 184, 24, 152],
+  [248, 120, 216, 88],
+];

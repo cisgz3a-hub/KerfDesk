@@ -1469,6 +1469,687 @@ thing.
 
 ---
 
+## ADR-033 - Skip fill overscan on short hatch runs; emit runway as rapid
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+A traced-image Fill burn took ~2 h on hardware versus ~5 min for the same
+artwork, size, and settings in LightBurn (~24x). A multi-agent audit
+(`audit/FILL-SPEED-DIAGNOSIS-2026-06-03.md`) traced the dominant cost to the
+ADR-031 overscan runway, not streaming (the streamer is character-counting):
+
+- The lead-in/lead-out (default 5 mm/side = 10 mm runway) were emitted as
+  `G1 ... S0` at the *cutting* feed (default 1500 mm/min), so ~0.4-0.5 s of
+  laser-off travel was spent per hatch run, independent of burn length.
+- A traced image fragments each 0.2 mm scanline into thousands of short runs.
+  On a short run the fixed 10 mm runway dwarfs the actual burn, and the per-run
+  runway is paid N times with no merging (Fill is also excluded from
+  `optimize-paths`). LightBurn burns the same art as a continuous raster:
+  overscan once per row, not per run.
+
+### Decision
+
+This is the first of two fixes (the second — merging collinear runs into
+continuous laser-on sweeps — is tracked separately).
+
+1. **Emit the overscan runway as a `G0` rapid, not a `G1` at cutting feed.** The
+   runway is laser-off (`S0`); GRBL still decelerates to the burn feed by
+   `burnStart` across the collinear junction, so the burn span stays at constant
+   velocity and ADR-031's edge-evening purpose is preserved. The burn `G1` now
+   carries `F` explicitly because the lead-in is no longer a `G1` that sets the
+   modal feed. The planner prices the runway at travel velocity to keep the ETA
+   honest.
+2. **Skip the runway entirely on short runs.** When the burn is shorter than
+   `OVERSCAN_MIN_BURN_RATIO` (= 2) x the per-side overscan — i.e. the runway
+   would be longer than the burn — `effectiveOverscanMm` returns 0 and the run
+   emits just a seek `G0` to `burnStart` and the burn `G1`. The threshold lives
+   in one helper so the emitter, the planner ETA, and the preview scrubber agree.
+
+This refines ADR-031: overscan still protects long fill spans, but short runs
+trade edge-evening for the large speed win. M3/M4 is unchanged (ADR-020); Fill
+stays on M3.
+
+### Consequences
+
+- Long fill runs are unchanged in coverage; their runway is faster (rapid).
+- Short fill runs lose accel/decel edge-evening. On those the burn is brief and
+  the head is in its accel ramp regardless, so the quality cost is expected to be
+  small — but it is a real tradeoff and needs hardware confirmation.
+- Burn geometry (the positive-S `G1` spans) is byte-identical to before; only
+  laser-off travel changed.
+- `OVERSCAN_MIN_BURN_RATIO` is a tunable constant if hardware shows short-run
+  edge marks.
+
+### Verification
+
+- `fill-overscan.test.ts`: `effectiveOverscanMm` applies at >= 2x, skips below,
+  and returns 0 for disabled/degenerate input.
+- `grbl-strategy.test.ts`: long run keeps the rapid runway; short run emits only
+  seek + burn; no `G1` laser-off move; the burn carries `F`.
+- Empirical (Karpathy's law): the real emitted G-code for a mixed long/short
+  fill was inspected — long run has the rapid runway, short run skips it, and the
+  burn endpoints match the input hatch exactly.
+- Full suite + `tsc --noEmit` + lint on touched files green.
+- **Hardware verification needed:** re-burn the original traced logo on the
+  Falcon A1 Pro and confirm (a) the wall-clock drop and (b) no new edge marks on
+  small filled features.
+
+---
+
+## ADR-034 - Continuous-sweep fill: one G1 per scanline, S0-blanked gaps
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+ADR-033 made the per-run overscan cheap, but the dominant structural cost of the
+~2h-vs-LightBurn-~5min traced-image Fill remained: every interior hatch run was
+emitted as its own G0-seek + burn, and the planner forced a full
+decel-to-zero / accel-from-zero at every cut<->travel boundary. A traced image
+fragments each 0.2 mm scanline into many short runs, so the head stopped
+thousands of times. LightBurn (and our own raster path, emit-raster.ts) instead
+burn a row as one continuous sweep, crossing interior gaps with the laser blanked.
+
+### Decision
+
+Emit each scanline as ONE continuous laser-on sweep.
+
+1. **New pure module `fill-sweeps.ts`.** `groupFillSweeps()` regroups
+   fillHatching's flat per-run output into one FillSweep per scanline: runs on
+   the same infinite line (collinear within 1e-6 mm) are one sweep; a change of
+   line (the next, parallel scanline) starts a new one. The sweep direction is
+   taken from the group's first run, preserving fillHatching's snake.
+   fillHatching, compile-job, the caches, and the FillGroup type are unchanged —
+   the regrouping happens at consumption.
+2. **Emitter (grbl-strategy.ts).** Per sweep: G0 into the optional overscan
+   runway (laser off; 1a rapid + 1b short-run skip preserved), then a single G1
+   chain — each ink span at S{s}, each interior gap at S0 (diode dark, head
+   still at feed so it never stops over a hole), then the G0 lead-out. S is
+   modal, so every ink span re-asserts S{s} and every gap asserts S0.
+3. **Planner (planner.ts).** A sweep is one cut block from the first span's
+   start to the last span's end at cut velocity — no per-run full stop. Gaps run
+   at feed too, so one block is accurate for total time.
+4. **Preview (toolpath.ts).** Each ink span is a cut step; each interior gap is
+   a laser-off travel step, matching the emitted path.
+
+Single-run scanlines (convex fills) emit byte-identically to before, so 1a/1b
+behavior is preserved; only multi-span scanlines (holes) change.
+
+### Consequences
+
+- A traced-image fill collapses from thousands of short stop-start runs to a few
+  hundred continuous sweeps — the structural fix for the 24x gap.
+- SAFETY: a missed S-reset would fire the beam across an interior hole at full
+  power. The per-segment S sequence is asserted exhaustively, including a
+  multi-hole (>=3 spans) fixture. Every G0 still carries S0; positive S only
+  rides a moving G1 (PROJECT.md #3, unchanged).
+- The ETA breakdown counts gap time as cut time (gaps move at feed, laser off);
+  total time is accurate, the cut/travel split is slightly biased toward cut.
+- Grouping is collinearity-based, so it is correct for angled hatches and never
+  merges two parallel scanlines (they are >= MIN_HATCH_SPACING_MM apart).
+
+### Verification
+
+- `fill-sweeps.test.ts`: forward, reverse-snake, multi-hole, scanline-boundary,
+  angled-collinear, parallel-offset (no merge), and degenerate inputs.
+- `grbl-strategy.test.ts`: a multi-hole scanline emits one continuous G1 chain
+  with the exact S sequence S{s},S0,...,S{s}; single-run output unchanged relative
+  to the post-ADR-033 emitter (the ADR-033 runway G1->G0 swap shipped in the same
+  commit). Zero-length / coincident-span guard covered (touching spans; degenerate
+  interior span) — added after the 2026-06-03 change audit.
+- `grbl-strategy.property.test.ts`: the 100-seed determinism and
+  laser-off-on-travel fuzz now include fill groups (PROJECT.md Phase-A gate that
+  previously only fed cut groups).
+- `estimate-duration.test.ts`: a multi-span sweep is priced as one continuous cut
+  block over the envelope (the planner appendFillGroupBlocks path), plus per-pass
+  repetition.
+- `toolpath.test.ts`: a multi-hole sweep renders cut / gap-travel / cut steps so
+  the preview scrubber matches the emitted path.
+- Empirical (Karpathy's law): the real emitted G-code for a 3-span / 2-hole
+  scanline was inspected — one G1 chain, holes blanked at feed, no G0 between ink
+  spans.
+- Full suite + tsc --noEmit + lint on touched files green.
+- **Hardware verification needed:** re-burn the original traced logo on the
+  Falcon A1 Pro and confirm (a) the wall-clock drops toward the LightBurn
+  reference and (b) holes are clean (no beam bleed across gaps, no scorch).
+
+---
+
+## ADR-035 - Split a fill scanline at large gaps so the emitter rapids across them
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+ADR-034 made each scanline ONE continuous laser-on sweep, crossing every interior
+gap with the laser blanked at feed (G1 ... S0). That is the right move for a true
+interior hole — a few tenths of a mm wide — where lifting to a rapid and stopping
+would cost more than it saves. But the very first hardware burn after ADR-034 (the
+user's traced "arch house" logo) printed cleanly EXCEPT for one stray line where
+"the laser should've been switched off to move to a second part."
+
+Karpathy's-law audit of the actual burned G-code (`Gcode arch house.gcode`,
+reproduced byte-for-byte from `untitled archii.lf2` by the live pipeline) found the
+cause: a single scanline can have ink in two regions of the image that are far
+apart — here up to **20.94 mm** of empty space between regions, with **164** such
+inter-region gaps wider than 5 mm. ADR-034 grouped ALL of one scanline's collinear
+runs into one sweep, so those wide gaps were crossed as slow `G1 ... S0`
+cutting-feed moves. A diode laser has a small turn-off lag; held at S0 but moving
+slowly across 20 mm, the residual/again-on transient marks a faint line — exactly
+the stray "move to a second part" line. LightBurn crosses such inter-region gaps
+with a G0 rapid (laser forced off in GRBL laser mode), not a feed move.
+`findLaserOnTravelIssues` stayed 0 throughout — the G-code was never *invalid*
+(every S0 gap is a legal blanked move); it was a feed-vs-rapid quality choice.
+
+### Decision
+
+Amend ADR-034's grouping: a scanline still groups collinear runs, but
+`buildSweeps()` (was `buildSweep()`) now SPLITS the ordered spans into multiple
+sweeps wherever the gap between consecutive spans exceeds
+`GAP_RAPID_THRESHOLD_MM` (5 mm). Small gaps (true interior holes) stay in one
+continuous sweep exactly as ADR-034 intended; wide inter-region gaps become a
+sweep boundary, and the emitter's existing per-sweep G0 seek crosses them as a
+rapid (hard laser-off, faster than feed). No change was needed in the emitter,
+planner, or preview — they already iterate sweeps and treat the space between
+sweeps as a G0 rapid. 5 mm sits above the rapid-vs-feed time break-even (~3.3 mm
+at the default feed) and cleanly separates an inter-region gap from a hole.
+
+### Consequences
+
+- The stray-line failure mode is structurally removed: no fill gap wider than
+  5 mm is ever crossed at cutting feed. The laser is hard-off (G0, forced off in
+  laser mode) across every inter-region move.
+- Marginally faster: wide gaps now move at rapid rate, not cut feed.
+- SAFETY: still PROJECT.md #3-clean — every G0 carries S0, positive S only on a
+  moving G1. Splitting a sweep only ever turns a blanked feed move into a blanked
+  rapid; it never extends a laser-on span.
+- A 5 mm-to-feed-break-even mismatch means gaps between 3.3 and 5 mm still feed
+  (a deliberate hysteresis so small detail does not stop-start); this is the
+  smoothness/speed trade ADR-034 chose, now bounded so it cannot mark.
+
+### Verification
+
+- `fill-sweeps.test.ts`: large-gap split (15 mm gap -> 2 sweeps), small-gap
+  continuity preserved (2-3 mm gaps stay one sweep), reverse-snake small-gap
+  ordering, plus all ADR-034 cases unchanged.
+- `grbl-strategy.test.ts`: a 15 mm inter-region gap emits `G0 ... S0` across it
+  and asserts NO `G1 ... S0` crosses it; the multi-hole (3 mm gaps) continuous
+  chain from ADR-034 is unchanged.
+- Empirical (Karpathy's law) on the user's real file: re-emitting
+  `untitled archii.lf2` through the live pipeline dropped the longest laser-off
+  FEED move from **20.94 mm -> 4.87 mm** and inter-region G1-S0 gaps > 5 mm from
+  **164 -> 0**; `findLaserOnTravelIssues` 0 before and after. The 16.6 mm gap that
+  produced the stray line is now crossed by G0 rapids.
+- Full suite + tsc --noEmit + lint on touched files green.
+- **Hardware verification needed:** re-burn the "arch house" logo on the Falcon
+  A1 Pro and confirm the stray cross-region line is gone.
+
+---
+
+## ADR-036 - Fill engraving emits M4 dynamic power (was M3 constant); supersedes ADR-020 #4
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+After ADR-034/035 fixed fill *speed* and the stray line, the user reported small
+traced text ("langebaan", a few mm tall) burning with **uneven density** -
+blobby, "not smooth" - while large shapes were clean. The
+`burn-perfection-research` workflow (docs/research/burn-perfection-small-text.md)
+root-caused the density half to **Cause A: M3 constant power**.
+
+With `M3`, GRBL holds the programmed laser power regardless of head speed
+(`laser_mode.md`: *"keeps the laser power as programmed, regardless if the
+machine is moving, accelerating, or stopped"*). A short engrave stroke spends a
+large fraction of its length below the commanded feed: at 1500 mm/min (25 mm/s)
+and the default accel 500 mm/s^2, the ramp-to-speed distance is
+`v^2/(2a) = 0.625 mm` at *each* end - ~30% of a 4 mm glyph stem. Constant power
+over those slow zones deposits more energy/mm -> the dark, irregular density. The
+canonical GRBL remedy is **M4 dynamic power**, which scales S by
+`actual_feed / programmed_feed` so energy/mm stays constant through accel/decel,
+with **no** offset calibration. LightBurn's GRBL default is M4 for fill/scan.
+
+The raster path already emitted M4 (`emit-raster.ts:76-77`); fill did not. The
+M3-for-fill choice was an explicit deferral in **ADR-020 decision #4**, which
+warned the change "also changes cut-depth behavior on short hatches" and parked
+it as "a separate hardware experiment if edge marks remain." Those edge marks
+are exactly this symptom. This ADR supersedes ADR-020 #4.
+
+### Decision
+
+Fill groups emit **M4 dynamic power**; cut groups keep **M3 constant power** (a
+slow corner must still cut fully through). Laser power mode is modal across
+groups, so `emitJob` now tracks the current mode (`'M3' | 'M4' | 'off'`,
+initialised to M3 by the preamble) and emits a flip ONLY when the required mode
+changes:
+
+- **cut** when not already M3 -> `M3 S0`.
+- **fill** when not already M4 -> from M3, `M5` then `M4 S0` (the M5 clears
+  constant mode, mirroring emit-raster's documented reason); from `off` (after a
+  raster group, which already issued its trailing M5), `M4 S0` alone.
+- **raster** manages its own M4 internally and ends in M5; we mark mode `off`.
+
+This generalises the old single rule (`raster -> cut/fill emits M3`) into a
+proper state machine. The fill *body* (sweeps, S-sequence, overscan, the
+PROJECT.md #3 guards) is unchanged - only the mode word that precedes it.
+
+### Consequences
+
+- Small/short engrave strokes hold constant energy/mm; the density unevenness
+  flattens with no per-machine calibration.
+- **Safer on travel/pause:** under M4 the diode is dark whenever the head is
+  stopped (dynamic power -> 0 at 0 feed). M3 keeps firing a stopped head. So fill
+  is now strictly safer for the "laser firing during pause" failure mode, on top
+  of the unchanged PROJECT.md #3 invariant (every G0 carries S0; positive S only
+  on a moving G1).
+- **Cut-only jobs are byte-identical** (the flip never fires); vector cutting
+  behaviour is untouched. Raster is untouched.
+- A fill-only job starts `M3 S0` / `M5` / `M4 S0` - a one-time, laser-off
+  redundancy from keeping the documented M3-priming preamble intact rather than
+  rippling a preamble change through every determinism baseline.
+- This is a g-code-emission (safety-path) change: the M3->M4 contract was
+  reviewed against all callers; only `emitJob`'s mode management changed.
+
+### Verification
+
+- `grbl-strategy.fill-power-mode.test.ts`: fill-only job arms M4 after the M3
+  preamble and burns under it; fill->cut restores M3; consecutive fills emit a
+  single M4 flip; cut-only never emits M4.
+- `grbl-strategy.test.ts`: the raster->fill transition now asserts `M5\nM4 S0`
+  (was M3); raster->cut still asserts `M5\nM3 S0`.
+- `grbl-strategy.property.test.ts`: determinism + laser-off-travel fuzz (incl.
+  fill groups) still green - the M4 S0 line sets sticky S=0, never false-flags.
+- `pipeline.snapshot.test.ts`: byte-identical (the SVG fixtures compile to vector
+  cuts, not fills) - confirms the change is fill-scoped.
+- Empirical (Karpathy's law) on the user's real `untitled archii.lf2`: the fill
+  group's emitted mode went **M3 -> M4** (M4 count 0 -> 1), the burn G1s follow
+  the M4 flip, `findLaserOnTravelIssues` 0 before and after.
+- Full suite + tsc --noEmit + lint on touched files green.
+- **Hardware verification needed:** re-burn the "langebaan" small text on the
+  Falcon A1 Pro and confirm the density is even (no blobby slow-zone over-burn).
+  Note: M4 fixes the *density* half; the *wavy-edge* half is trace faceting
+  (Cause B / Fix 2), a separate change.
+
+---
+
+## ADR-037 - Raise the image-trace decode cap 1024 -> 2048 px for small-feature fidelity
+
+**Status:** Accepted, code shipped, visual verification pending. | **Date:** 2026-06-03
+
+### Context
+
+The *wavy-edge* half of the small-text burn defect (docs/research/burn-perfection-
+small-text.md, **Cause B**): the user image-traced a raster that contained small
+text ("langebaan"); the glyphs came out wavy/faceted. A trace can be no smoother
+than the bitmap it is handed - potrace/imagetracer fit curves to a pixel-boundary
+staircase, and a few-px-tall glyph has almost no boundary to work with.
+
+`image-loader.ts` downscaled every imported image to a **1024 px** longest edge
+before tracing (`MAX_EDGE_PX`, `scaleToCap`). A detailed source (logo/photo with
+small lettering) was therefore crushed to 1024 px *before potrace ever saw it*,
+discarding exactly the resolution the small text needed. LightBurn's own guidance
+is the inverse: feed the tracer MORE pixels (upscale before tracing) for fine
+detail / small text.
+
+### Decision
+
+Raise `MAX_EDGE_PX` from **1024 to 2048** (4x the pixels, ~4x trace time). This
+doubles the linear resolution the tracer sees, recovering small-feature fidelity
+while staying interactive on modest hardware in the trace Worker (with the 300 ms
+preview debounce).
+
+Deliberately **NOT** done: upscaling images that are already *below* the cap.
+Bilinear-upscaling a deliberately low-res input (pixel art / blueprints - the
+"Sharp" preset, "every notch matters") would blur the notches the user wants
+kept. Raising the *downscale* cap only ever *keeps more* real detail, so it never
+degrades any input; upscaling-below-source can. `scaleToCap` therefore still
+passes sub-cap images through untouched.
+
+### Consequences
+
+- **Registration- and size-safe.** The overlaid trace's mm size is
+  `traceCoord / source.pixelWidth x widthMm` (`overlayTransformForRaster`,
+  scene-mutations.ts), where `widthMm` derives from the NATURAL size at 96 DPI
+  (`rasterImportGeometry`, image-import.ts) and `pixelWidth` is the sampled size.
+  Raising the cap scales `pixelWidth` and the trace coordinates together, so the
+  final mm geometry is invariant - only detail density rises. Source bitmap and
+  trace both sample through the same `loadImageAsRawData`, so they stay aligned.
+- ~4x trace/preview CPU + transient memory on the largest inputs (a 2048x2048
+  RGBA frame is 16 MB; preprocessForTrace clones it a few times). Bounded by the
+  Worker + debounce; 2048 is the chosen quality/perf knee (4096 would be ~16x and
+  risk multi-hundred-MB transients). The constant is the single tuning point.
+- No persistent `.lf2` bloat for the trace workflow: the source bitmap (which
+  stores luma at the sampled size) is deleted once the trace is committed
+  (LightBurn model), leaving only vector paths.
+
+### Verification
+
+- `image-loader.test.ts`: `scaleToCap` keeps a 1500 px source (crushed to 1024
+  before) full-size, downscales 4096 -> 2048, and never upscales a 300 px source;
+  `PREVIEW_MAX_EDGE_PX` is 2048 so preview and commit still see identical pixels.
+- Empirical (Karpathy's law): tracing a crisp disc through the real potrace
+  backend at increasing resolution monotonically reduces the trace's max radial
+  deviation from the true circle - **1024 px 0.27% -> 2048 px 0.11%** (halved);
+  the small-feature regime (256 -> 512 px) improves 2.2x. Higher decode
+  resolution provably yields truer, smoother curves.
+- Full trace suite (potrace, imagetracer, integration, import geometry) + full
+  suite + tsc --noEmit + lint green.
+- **Visual verification needed:** re-import and re-trace the original "langebaan"
+  artwork and confirm the small text traces smooth (not faceted). If the source
+  itself is low-res, the remedy is a higher-res source or native vector text
+  (the report's alternative Cause-B fix), which this change does not replace.
+
+---
+
+## ADR-038 - Per-layer unidirectional fill option (was: snake hardcoded)
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+The "amplifier" third of the small-text burn defect (docs/research/burn-perfection-
+small-text.md, **Cause C**). Fill hatching alternated each scanline's direction
+unconditionally (snake fill, `fill-hatching.ts` `pushScanlineHatches`), and the
+emitter applies no scan-offset compensation. A diode's laser-on lag is a fixed
+*time*; at feed it becomes a fixed *distance* offset that flips sign on each
+alternating row, so a vertical edge lands at two alternating X positions - a
+"zipper" / serration. On a glyph only a handful of scanlines tall there is no
+spatial averaging to hide it. LightBurn exposes both a Scanning Offset Adjustment
+table and a bi-/uni-directional fill toggle; LaserForge had neither, and snake was
+not even user-togglable (no per-layer flag in `src/core`).
+
+### Decision
+
+Add a per-layer **`fillBidirectional`** boolean (default `true` = the existing
+snake). When `false`, `fillHatching` emits every row in the SAME direction
+(unidirectional): the per-sweep G0 in the emitter rapids the head back between
+rows with the laser off, so the alternating firing-lag offset cannot form. The
+flag threads layer -> `compile-job` -> `memoizedFillHatching` -> `fillHatching`'s
+`HatchInput.bidirectional`, is part of BOTH fill cache keys (`layerFillCacheKey`
+and the inner hatch cache - else flipping it would silently reuse the old path),
+is back-filled to `true` for pre-ADR-038 `.lf2` files (`deserialize-project.ts`),
+and is exposed as a "Bidirectional" checkbox in the layer panel (`LayerRow.tsx`).
+
+A full scan-offset *compensation* table (correcting bidirectional rows rather
+than serialising them) is deliberately deferred - unidirectional is the simpler,
+calibration-free lever and the right first step.
+
+### Consequences
+
+- Unidirectional removes the zipper entirely at the cost of one laser-off
+  return-rapid per row (slower fill). It is opt-in; the default (snake) preserves
+  the current speed and is byte-identical, so no existing output changes.
+- This is the SMALLEST of the three small-text levers: at the user's 1500 mm/min
+  the lag zipper is ~0.025-0.075 mm. M4 dynamic power (ADR-036) and the trace
+  decode cap (ADR-037) are the larger levers; this finishes the set.
+- Old projects reopen unchanged (back-filled to snake). New layers default to
+  snake. Determinism preserved (the flag is pure input to a pure function).
+
+### Verification
+
+- `fill-hatching.test.ts`: with `bidirectional: false`, EVERY row runs
+  left-to-right (no alternation) - the zipper cannot form; the snake default test
+  is unchanged.
+- `compile-job-fill-cache.test.ts`: the compile path threads the layer flag into
+  `fillHatching` (`bidirectional: false` observed) AND flipping it re-hatches
+  rather than serving a stale cache entry (both cache keys include it).
+- `project.test.ts`: a pre-ADR-038 layer back-fills `fillBidirectional` to `true`.
+- `layer.test.ts`: `createLayer` default includes `fillBidirectional: true`.
+- Full suite + tsc --noEmit + lint green.
+- **Hardware verification needed:** burn the "langebaan" small text with the layer
+  set unidirectional and confirm the edge serration is reduced. Expect a subtle
+  effect at 1500 mm/min (the zipper is small at this feed); the bigger small-text
+  wins are ADR-036 (density) and ADR-037 (trace fidelity).
+
+---
+
+## ADR-039 - Split a raster row at wide white gaps so the emitter rapids across them
+
+**Status:** Accepted, code shipped, hardware verification pending. | **Date:** 2026-06-03
+
+### Context
+
+ADR-035 split a FILL scanline at gaps > 5 mm so the emitter crosses inter-region
+gaps with a G0 rapid instead of a slow G1 S0 feed move (the stray-line class). The
+raster (image-mode) emitter had the same latent defect: emit-raster swept one
+active span per row from the first ink pixel to the last, and any interior white
+run inside that span became a `G1 ... S0` feed move. For a row with two separated
+ink islands (a logo with a gap, text with a space), the head crawled across the
+white gap at cutting feed with the beam nominally off - the diode turn-off-lag
+marking risk, and a long blank feed that the P0-A `findLongBlankFeedMoves`
+preflight (added the same day) would flag in raster output.
+
+### Decision
+
+Replace the single per-row `activeSpan` with `activeSpans(row, pixelWidthMm)`:
+walk the row's ink and split into separate ink islands wherever the white gap
+between consecutive ink exceeds `RASTER_GAP_RAPID_THRESHOLD_MM` (5 mm, matching
+ADR-035 and the P0-A threshold). The row loop emits each island as its own sweep
+(`emitSpanSweep`, the former `emitRow`), so the G0 lead-in to the NEXT island
+crosses the wide gap as a rapid. A small interior gap (<= 5 mm) stays within one
+sweep, blanked at feed exactly as before. Snake direction still alternates per
+emitted ROW (within a reverse row the islands sweep right-to-left); F still rides
+only the very first G1 of the group.
+
+### Consequences
+
+- A wide interior white gap is a G0 rapid (laser hard-off, faster), not a G1 S0
+  crawl - so raster output now passes the P0-A long-blank-feed invariant.
+- Single-island rows (and rows whose gaps are all <= 5 mm) emit byte-identically
+  to before; only multi-island rows change. The 28 pre-existing raster emit +
+  property tests pass unchanged.
+- Each split island keeps its own overscan runway; the extra G0 between islands
+  is the intended trade (a few rapids vs. marking the gap).
+
+### Verification
+
+- `emit-raster.test.ts`: a two-island row (12 mm gap) crosses to the second
+  island with `G0 X16.000 Y1.000 S0` and emits NO `G1 X16...`; a 4 mm gap stays
+  one sweep (one G0, the gap blanked as `G1 X8.000 S0`).
+- Empirical (Karpathy's law) cross-check: `findLongBlankFeedMoves` on the
+  two-island emit returns [] (before this change the 12 mm gap was a `G1 S0`
+  that the invariant flags). The two safety modules corroborate each other.
+- `emit-raster.property.test.ts` (determinism + laser-off) unchanged; full suite
+  + tsc --noEmit + lint green.
+- **Hardware verification needed:** engrave an image with two separated dark
+  regions on one row and confirm the gap is travelled dark (no faint line) and
+  faster.
+
+---
+
+## ADR-040 - Shared prepared-output pipeline (preview = save = start = estimate)
+
+**Status:** Accepted, code shipped. | **Date:** 2026-06-03
+
+### Context
+
+The canvas Preview built its toolpath from RAW `compileJob` - no `optimizePaths`,
+no job-origin - while Save/Start emitted from the OPTIMIZED job (`emitGcode` ran
+compile -> applyJobOrigin -> optimizePaths). The live Estimate had yet a third
+copy of the compile+optimize sequence. So the operator could approve one path
+order in the preview and burn a different (re-ordered) one, and the three
+copies could drift independently (P1-C; the audit's "approve one, burn another"
+risk). The pre-emit raster budget guard (P1-A) was also wired into emit and
+estimate separately.
+
+### Decision
+
+Introduce `prepareOutput(project, options): PreparedOutput` (src/io/gcode) as the
+ONE place that turns a Project into the machine Job:
+`runPreEmitPreflight -> compileJob -> optional applyJobOrigin -> optimizePaths`.
+It returns `{ ok: true, job }` or `{ ok: false, preflight }` (over-budget raster).
+Every output-facing consumer now derives from it:
+
+- `emitGcode` emits `prepared.job`, then runs the full gcode preflight on the
+  body (unchanged external behaviour).
+- `buildPreviewToolpath` builds from `prepared.job`, so the preview shows the
+  exact optimized order the machine runs (an over-budget raster -> empty preview
+  via EMPTY_JOB, never a freeze).
+- `estimateLiveJob` times `prepared.job` (its cheap vector pre-counts still gate
+  the compile first; the standalone preEmit call from P1-A.2 folded into
+  prepareOutput).
+
+Frame is intentionally NOT routed through prepareOutput: it computes a bounding
+box for the framing pass (not a toolpath order) and keeps its own physical-bounds
+/ WCO checks.
+
+### Consequences
+
+- Preview, Save, Start, and Estimate cannot diverge in path order or budget
+  verdict - they are the same function. The optimize step moved INTO the shared
+  path, so the preview's travel lines now match the burn (cut geometry was always
+  identical; only ordering changed).
+- emitGcode is behaviour-identical (the inline compile/place/optimize moved into
+  prepareOutput verbatim). The pre-emit budget guard is now applied once, in
+  prepareOutput, for all consumers.
+
+### Verification
+
+- `prepare-output.test.ts`: ok + non-empty job for a vector project; ok:false +
+  raster-too-large for an over-budget raster; deterministic (same project ->
+  deep-equal job).
+- `draw-preview.parity.test.ts`: `buildPreviewToolpath(project)` deep-equals
+  `buildToolpath(prepareOutput(project).job)` on a project the optimizer reorders
+  - a regression lock that fails the moment the preview reverts to raw compileJob.
+- emit-gcode + live-job-estimate tests unchanged and green (behaviour preserved).
+- Full suite + tsc --noEmit + lint green.
+
+---
+
+## ADR-041 - A GRBL error:N ack is terminal for the stream (stop sending + safety notice)
+
+**Status:** Accepted, code shipped. Hardware verification needed. | **Date:** 2026-06-04
+
+### Context
+
+When GRBL replied `error:N` to an in-flight line mid-job, the streamer treated it
+exactly like `ok`: `onAck` popped the head line, freed its bytes, and left
+`status: 'streaming'`, so the next `step()` pushed the next queued line. The only
+error-specific action was setting `lastError`, which no path read to stop the job.
+Captured empirically before the fix (tiny rx buffer so lines stay queued):
+
+    initial step:  status=streaming inFlight=2 queued=3 toSend="G21\nG90\n"
+    onAck(error):  status=streaming acked="G21\n" completed=1 inFlight=1 queued=3
+    next step:     toSend="M3 S255\n" (length=8)
+
+i.e. after GRBL rejected `G21`, the very next bytes the sender emitted were
+`M3 S255` (laser on) - at a position the head may never have reached, because the
+move that should have positioned it was the rejected line. A passing test
+(`streamer.test.ts` "treats error like ok") locked this in. This is P0-1 in
+docs/REMAINING-WORK-ROADMAP-2026-06-04.md; flagged by LF-CV-001 and the
+2026-06-04 LightBurn parity audit. LightBurn treats any controller error as job
+failure.
+
+### Decision
+
+Make a controller error terminal for the stream, parallel to the existing alarm
+path:
+
+- streamer.ts: add a terminal `'errored'` status to `StreamerStatus`; `onAck`
+  maps `kind === 'error'` to `'errored'` (alarm stays `'cancelled'`; the
+  user-initiated stop stays distinct); `step()` early-returns `toSend: ''` for
+  `'errored'` like the other terminal states. The rejected line is still consumed
+  for buffer accounting (GRBL freed its bytes when it replied), but no further
+  bytes are sent.
+- laser-line-handler.ts: the `error` branch now also raises a `controller-error`
+  safetyNotice. `advanceStream` is otherwise unchanged - because the acked state
+  is `'errored'`, `step()` returns empty and no follow-up `safeWrite` fires.
+- laser-safety-notice.ts: new `controller-error` notice variant + builder (blunt
+  copy naming the physical control, like the P0-B notices).
+- SafetyNoticeBanner.tsx: a distinct title ("Controller rejected a command").
+
+After the fix, the same repro prints `status=errored` and `next toSend=""`.
+
+### Consequences
+
+- The sender no longer turns a rejected line into a laser-on line at the wrong
+  place, and the operator gets a persistent safety alert.
+- KNOWN RESIDUAL (follow-up ticket, hardware-gated): GRBL does NOT halt on
+  `error:N` by default - it discards the bad line and keeps executing the lines
+  already in its ~120-byte RX buffer. Stopping our sender prevents NEW burn lines,
+  but a complete halt (and turning a currently-firing laser off) requires issuing
+  a real-time feed-hold (`!`) and/or soft-reset (0x18) on error - a change to the
+  safety-critical send path that earns its own ticket plus hardware verification.
+  This ADR is scoped to sender termination + notification, matching the P0-1
+  done-criteria.
+- `'errored'` is terminal, so the existing `status === 'streaming' || 'paused'`
+  active-job checks (autosave, LaserWindow, buildPortClosePatch) correctly read it
+  as not-active. No exhaustive switch on `StreamerStatus` exists, so the new member
+  needed no other call-site changes.
+
+### Verification
+
+- streamer.test.ts: the old "treats error like ok" test is inverted to assert
+  `status === 'errored'` and `step().toSend === ''`; a second test feeds an error
+  with lines still queued (tiny rx buffer) and asserts the next line is NOT sent
+  (the no-laser-on-after-reject regression).
+- laser-line-handler.test.ts: feeding `error:7` mid-stream asserts streamer
+  `'errored'`, no follow-up `safeWrite`, `lastError === 7`, and a
+  `controller-error` safetyNotice carrying the code.
+- Full suite 981/981; tsc --noEmit 0; eslint 0 on touched files.
+- Hardware verification needed: on the Falcon A1 Pro, inject a rejected line and
+  confirm the stream halts and the beam does not fire after the rejection (this HV
+  also reveals whether the GRBL-buffer residual above needs the soft-reset
+  follow-up).
+
+---
+
+## ADR-042 - Ack-driven follow-up write failure raises the disconnect safety notice (P0-3)
+
+**Status:** Accepted, code shipped. | **Date:** 2026-06-04
+
+### Context
+
+`advanceStream` (laser-line-handler.ts) pushes the next buffer chunk after each
+ack. When that follow-up `safeWrite` rejected (port lost mid-job), the `.catch`
+marked the streamer `disconnected` but raised NO `safetyNotice`. GRBL keeps
+executing the lines already in its ~120-byte buffer, so the head can keep moving
+while the UI silently leaves the streaming state with no alert to hit the physical
+E-stop. Every other write-failure path in laser-store.ts (pause/resume/stop,
+around lines 290/388/398/423) raises a notice; this one did not. The existing
+test asserted `status === 'disconnected'` but never checked the notice, which is
+why the gap survived. Captured red before the fix:
+
+    expected null to deeply equal { kind: 'disconnect-during-job', ... }
+    Received: null
+
+P0-3 in docs/REMAINING-WORK-ROADMAP-2026-06-04.md; whole-repo-lightburn-parity-
+audit-2026-06-04, karpathy-whole-repo-audit-2026-06-02 (KF-012).
+
+### Decision
+
+In the `advanceStream` `.catch`, set BOTH the disconnected streamer and a
+disconnect-during-job safetyNotice. The disconnect-during-job message is the
+correct one (not write-failed): it names the real danger - buffered motion
+continuing after the link is gone - matching the message the onClose path already
+raises. A new builder `disconnectDuringJobNotice()` in laser-safety-notice.ts is
+the single source of that notice; buildPortClosePatch (laser-store-helpers.ts) now
+uses it too, removing the duplicated inline literal. No soft-reset is sent on this
+path: the write itself failed, so there is no live link to send one over (recovery
+state is already preserved by disconnect()).
+
+### Consequences
+
+- A mid-stream follow-up write failure now shows the operator the physical E-stop
+  banner, closing the silent-teardown gap.
+- The disconnect-during-job notice has exactly one constructor, used by both the
+  onClose patch and the stream-write-failure catch; they cannot drift.
+
+### Verification
+
+- laser-line-handler.test.ts: the existing follow-up-write-failure test now also
+  asserts the disconnect-during-job safetyNotice is set (the assertion that was
+  red before the fix).
+- laser-store.test.ts: the onClose disconnect-during-job test stays green through
+  the builder refactor (same kind + message).
+- Full suite green; tsc --noEmit 0; eslint 0 on touched files.
+- No hardware verification needed (write-failure path + UI banner; the underlying
+  disconnect behavior is already hardware-exercised).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

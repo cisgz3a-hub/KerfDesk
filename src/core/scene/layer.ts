@@ -2,6 +2,8 @@
 // parameters (power, speed, passes) that the OutputStrategy consumes when
 // emitting G-code. WORKFLOW.md F-A7 defines defaults and value ranges.
 
+import type { DitherAlgorithm } from './scene-object';
+
 // Phase F: 'line' = vector cut/engrave along polylines; 'fill' =
 // parallel-line hatching inside closed contours (F.1); 'image' =
 // raster engrave with per-pixel S modulation (F.2, ADR-020).
@@ -11,24 +13,34 @@ export type LayerMode = 'line' | 'fill' | 'image';
 // pure-core enum in scene-object.ts (DitherAlgorithm) so the Layer
 // type doesn't reach into the SceneObject module. Kept aligned;
 // adding an algorithm here also needs the matching dither.ts arm.
-export type LayerDitherAlgorithm = 'threshold' | 'floyd-steinberg' | 'grayscale';
+export type LayerDitherAlgorithm = DitherAlgorithm;
 
 export type Layer = {
   readonly id: string;
   readonly color: string; // lowercase 6-digit hex
   readonly mode: LayerMode;
+  readonly minPower: number; // 0..100 (percent); grayscale image floor
   readonly power: number; // 0..100 (percent)
   readonly speed: number; // mm/min; ≤ device.maxFeed
   readonly passes: number; // integer ≥ 1
   readonly visible: boolean;
   readonly output: boolean;
   // F.1 fill parameters. Ignored unless mode === 'fill'. Defaults
-  // chosen for a typical 5W diode laser: 0° = horizontal hatching,
-  // 0.2 mm spacing ≈ 5 lines/mm (good for engraved fills without
-  // visible banding at standard kerfs).
+  // chosen for a typical diode laser: 0° = horizontal hatching,
+  // 0.1 mm spacing ≈ 10 lines/mm (LightBurn's diode norm). The prior
+  // 0.2 mm ≈ 5 lines/mm showed visible banding on hardware — see the
+  // fill quality audit 2026-06-03.
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
+  // Bidirectional (snake) hatch fill: alternate each scanline's direction so
+  // the head never returns to start between rows (faster). Set false for
+  // UNIDIRECTIONAL fill — every row burns the same direction — which removes
+  // the alternating laser-firing-lag offset ("zipper") that can serrate small
+  // text on a bidirectional fill (ADR-038; burn-perfection Cause C). Default
+  // true (speed): the zipper is sub-0.1 mm at typical diode feeds, so most
+  // fills want the faster snake.
+  readonly fillBidirectional: boolean;
   // F.2 image-mode parameters. Ignored unless mode === 'image'.
   // Layer values WIN over per-RasterImage settings at compile time
   // so the operator can re-tune one layer without touching every
@@ -39,14 +51,16 @@ export type Layer = {
 
 export const LAYER_DEFAULTS = {
   mode: 'line',
+  minPower: 0,
   power: 30,
   speed: 1500,
   passes: 1,
   visible: true,
   output: true,
   hatchAngleDeg: 0,
-  hatchSpacingMm: 0.2,
+  hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
+  fillBidirectional: true,
   ditherAlgorithm: 'floyd-steinberg',
   linesPerMm: 10,
 } as const satisfies Omit<Layer, 'id' | 'color'>;

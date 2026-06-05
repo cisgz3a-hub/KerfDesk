@@ -116,14 +116,18 @@ describe('emitRasterGroup property tests', () => {
     );
   });
 
-  it('emitted G0-row count never exceeds the count of rows containing any S>0 pixel', () => {
-    // The skip-blank-rows optimization: if a row is all-zero, it
-    // must produce zero G0/G1 lines for that row's Y coordinate.
-    // Count G0s with unique Y values vs non-zero rows in the input.
+  it('emits G0 rows only for rows with content (distinct G0 Y per content row)', () => {
+    // The skip-blank-rows optimization: a row that is all-zero must produce no
+    // G0 at its Y. A content row may now emit MULTIPLE G0s — one per ink island
+    // (ADR-039 gap-split) — but they all share that row's Y, so the count of
+    // DISTINCT G0 Y-values equals the content-row count, and blank rows
+    // contribute none.
     fc.assert(
       fc.property(arbInput, (input) => {
         const out = emitRasterGroup(input);
-        const g0Count = (out.match(/^G0\s/gm) ?? []).length;
+        const g0Ys = new Set(
+          Array.from(out.matchAll(/^G0\s+X-?\d+\.\d+\s+Y(-?\d+\.\d+)/gm)).map((m) => m[1]),
+        );
         let nonZeroRows = 0;
         for (let y = 0; y < input.height; y += 1) {
           for (let x = 0; x < input.width; x += 1) {
@@ -133,7 +137,7 @@ describe('emitRasterGroup property tests', () => {
             }
           }
         }
-        return g0Count === nonZeroRows;
+        return g0Ys.size === nonZeroRows;
       }),
       { numRuns: FUZZ_RUNS },
     );

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createLayer } from './layer';
-import { addLayer, addObject, EMPTY_SCENE, removeLayer, removeObject, updateLayer } from './scene';
+import {
+  addLayer,
+  addObject,
+  EMPTY_SCENE,
+  moveLayer,
+  removeLayer,
+  removeObject,
+  updateLayer,
+} from './scene';
 import { IDENTITY_TRANSFORM, type SceneObject } from './scene-object';
 
 const sampleObject: SceneObject = {
@@ -44,5 +52,27 @@ describe('Scene layer operations', () => {
     const layer = createLayer({ id: 'L1', color: '#ff0000' });
     const withLayer = addLayer(EMPTY_SCENE, layer);
     expect(updateLayer(withLayer, 'L2', { power: 99 }).layers[0]?.power).toBe(30);
+  });
+
+  it('moveLayer reorders layers without mutating the original scene', () => {
+    const red = createLayer({ id: 'red', color: '#ff0000' });
+    const blue = createLayer({ id: 'blue', color: '#0000ff' });
+    const green = createLayer({ id: 'green', color: '#00ff00' });
+    const scene = { ...EMPTY_SCENE, layers: [red, blue, green] };
+
+    const moved = moveLayer(scene, 'green', 'up');
+
+    expect(moved.layers.map((layer) => layer.id)).toEqual(['red', 'green', 'blue']);
+    expect(scene.layers.map((layer) => layer.id)).toEqual(['red', 'blue', 'green']);
+  });
+
+  it('moveLayer is a no-op at the list boundary or for an unknown layer', () => {
+    const red = createLayer({ id: 'red', color: '#ff0000' });
+    const blue = createLayer({ id: 'blue', color: '#0000ff' });
+    const scene = { ...EMPTY_SCENE, layers: [red, blue] };
+
+    expect(moveLayer(scene, 'red', 'up')).toBe(scene);
+    expect(moveLayer(scene, 'blue', 'down')).toBe(scene);
+    expect(moveLayer(scene, 'missing', 'up')).toBe(scene);
   });
 });

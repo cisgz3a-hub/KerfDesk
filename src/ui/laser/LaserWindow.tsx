@@ -12,6 +12,7 @@ import { LaserLog } from './LaserLog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
+import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { prepareStartJob } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
@@ -22,20 +23,29 @@ export function LaserWindow(): JSX.Element {
   const disconnect = useLaserStore((s) => s.disconnect);
   const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
   const startJob = useLaserStore((s) => s.startJob);
+  const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
+  const motionOperation = useLaserStore((s) => s.motionOperation);
+  const machineOperationBusy = autofocusBusy || motionOperation !== null;
 
   const supportsSerial = platform.serial.isSupported();
   const onStartJob = async (): Promise<void> => {
-    const project = useStore.getState().project;
+    const { project, jobPlacement } = useStore.getState();
     const laser = useLaserStore.getState();
-    const prepared = prepareStartJob(project, laser.controllerSettings, {
-      statusReport: laser.statusReport,
-      alarmCode: laser.alarmCode,
-      hasActiveStreamer:
-        laser.streamer !== null &&
-        (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
-      workOriginActive: laser.workOriginActive,
-      wcoCache: laser.wcoCache,
-    });
+    const prepared = prepareStartJob(
+      project,
+      laser.controllerSettings,
+      {
+        statusReport: laser.statusReport,
+        alarmCode: laser.alarmCode,
+        hasActiveStreamer:
+          laser.streamer !== null &&
+          (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
+        autofocusBusy: laser.autofocusBusy,
+        workOriginActive: laser.workOriginActive,
+        wcoCache: laser.wcoCache,
+      },
+      jobPlacement,
+    );
     if (!prepared.ok) {
       const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
       window.alert(`Cannot start job:\n\n${lines}`);
@@ -56,6 +66,7 @@ export function LaserWindow(): JSX.Element {
   return (
     <aside aria-label="Laser controls" style={panelStyle}>
       <h2 style={headingStyle}>Laser</h2>
+      <SafetyNoticeBanner />
       {!supportsSerial && (
         <p style={hintStyle}>
           Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install
@@ -66,15 +77,15 @@ export function LaserWindow(): JSX.Element {
       <ConnectionBar
         connection={connection}
         onConnect={() => void connect(platform)}
-        onDisconnect={() => void disconnect()}
-        disabled={!supportsSerial}
+        onDisconnect={() => void disconnect().catch(() => undefined)}
+        disabled={!supportsSerial || machineOperationBusy}
       />
       {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
       <DetectedSettingsBanner />
       <StatusDisplay />
-      <JogPad disabled={connection.kind !== 'connected'} />
+      <JogPad disabled={connection.kind !== 'connected' || machineOperationBusy} />
       <JobControls
-        disabled={connection.kind !== 'connected'}
+        disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void onStartJob()}
       />
       <LaserLog />

@@ -68,11 +68,27 @@ describe('onAck — consuming acks', () => {
     expect(r.state.completed).toBe(1);
   });
 
-  it('treats error like ok for buffer accounting (still consumes)', () => {
+  it('makes an error ack terminal (errored) and refuses to send more (P0-1)', () => {
     const s = step(createStreamer('G21\nG90')).state;
     const r = onAck(s, 'error');
+    // The rejected line is still consumed for buffer accounting (GRBL freed its
+    // bytes when it replied error:N)...
     expect(r.acked).toBe('G21\n');
     expect(r.state.inFlight).toHaveLength(1);
+    // ...but the stream is now terminal: status 'errored', and step() sends
+    // nothing further, so a laser-on line cannot fire after the rejected move.
+    expect(r.state.status).toBe('errored');
+    expect(step(r.state).toSend).toBe('');
+  });
+
+  it('does not send the next queued line after an error (no laser-on after reject, P0-1)', () => {
+    // Tiny buffer so lines stay queued after the first send. This is the exact
+    // path that sent M3 S255 right after a rejected G21 before the fix.
+    const s = step(createStreamer('G21\nG90\nM3 S255\nG1 X10', { rxBufferBytes: 12 })).state;
+    expect(s.queued.length).toBeGreaterThan(0);
+    const r = onAck(s, 'error');
+    expect(r.state.status).toBe('errored');
+    expect(step(r.state).toSend).toBe('');
   });
 
   it('cancels the stream on alarm', () => {

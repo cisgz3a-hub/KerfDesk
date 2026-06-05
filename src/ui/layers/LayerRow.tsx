@@ -19,6 +19,8 @@
 
 import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
+import { LayerImageFields } from './LayerImageFields';
+import { LayerOrderControls } from './LayerOrderControls';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const cardStyle: React.CSSProperties = {
@@ -76,10 +78,14 @@ const fieldValueStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
 const wideInputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
-const ditherSelectStyle: React.CSSProperties = { flex: 1, maxWidth: 180 };
 const modeSelectStyle: React.CSSProperties = { fontSize: 13, padding: '2px 4px' };
 
-export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
+export function LayerRow(props: {
+  readonly layer: Layer;
+  readonly canMoveUp: boolean;
+  readonly canMoveDown: boolean;
+}): JSX.Element {
+  const { layer } = props;
   return (
     <section
       style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
@@ -87,6 +93,11 @@ export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
     >
       <header style={cardHeaderStyle}>
         <ColorSwatch color={layer.color} visible={layer.visible} />
+        <LayerOrderControls
+          layer={layer}
+          canMoveUp={props.canMoveUp}
+          canMoveDown={props.canMoveDown}
+        />
         <ModeSelect layer={layer} />
         <span style={headerFillerStyle} />
         <HeaderToggle label="Show" layer={layer} field="visible" />
@@ -104,7 +115,7 @@ export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
         <PassesInput layer={layer} />
       </FieldRow>
       {layer.mode === 'fill' && <FillFields layer={layer} />}
-      {layer.mode === 'image' && <ImageFields layer={layer} />}
+      {layer.mode === 'image' && <LayerImageFields layer={layer} />}
     </section>
   );
 }
@@ -185,7 +196,26 @@ function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
         <FillOverscanInput layer={layer} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
+      <FieldRow label="Bidirectional">
+        <BidirectionalInput layer={layer} />
+      </FieldRow>
     </>
+  );
+}
+
+// Snake (bidirectional) vs unidirectional fill. On = faster (no return travel);
+// off = every row burns the same direction, removing the firing-lag zipper that
+// can serrate small text (ADR-038). A discrete click, so it commits immediately
+// like Visible / Output (no debounce).
+function BidirectionalInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <input
+      type="checkbox"
+      checked={layer.fillBidirectional}
+      onChange={(e) => setLayerParam(layer.id, { fillBidirectional: e.target.checked })}
+      aria-label={`Bidirectional fill for ${layer.color}`}
+    />
   );
 }
 
@@ -255,68 +285,12 @@ function FillOverscanInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function ImageFields({ layer }: { readonly layer: Layer }): JSX.Element {
-  return (
-    <>
-      <FieldRow label="Dither">
-        <DitherSelect layer={layer} />
-      </FieldRow>
-      <FieldRow label="Resolution">
-        <LinesPerMmInput layer={layer} />
-        <span style={unitStyle}>lines / mm</span>
-      </FieldRow>
-    </>
-  );
-}
-
-function DitherSelect({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
-  return (
-    <select
-      value={layer.ditherAlgorithm}
-      onChange={(e) =>
-        setLayerParam(layer.id, {
-          ditherAlgorithm: e.target.value as Layer['ditherAlgorithm'],
-        })
-      }
-      title="Threshold: harsh binary. Floyd-Steinberg: photo-style error diffusion. Grayscale: direct luma → S."
-      aria-label={`Dither for ${layer.color}`}
-      style={ditherSelectStyle}
-    >
-      <option value="threshold">Threshold</option>
-      <option value="floyd-steinberg">Floyd-Steinberg</option>
-      <option value="grayscale">Grayscale</option>
-    </select>
-  );
-}
-
-function LinesPerMmInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
-  const debounced = useDebouncedCommit<number>({
-    value: layer.linesPerMm,
-    commit: (linesPerMm) => setLayerParam(layer.id, { linesPerMm }),
-    parse: (s) => clamp(numericValue(s), 1, 50),
-  });
-  return (
-    <input
-      type="number"
-      min={1}
-      max={50}
-      step={1}
-      value={debounced.displayValue}
-      onChange={debounced.onChange}
-      onBlur={debounced.onBlur}
-      style={inputStyle}
-      aria-label={`Lines per mm for ${layer.color}`}
-    />
-  );
-}
-
 function PowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const setLayerParam = useStore((s) => s.setLayerParam);
   const debounced = useDebouncedCommit<number>({
     value: layer.power,
-    commit: (power) => setLayerParam(layer.id, { power }),
+    commit: (power) =>
+      setLayerParam(layer.id, { power, minPower: Math.min(layer.minPower, power) }),
     parse: (s) => clamp(numericValue(s), 0, 100),
   });
   return (

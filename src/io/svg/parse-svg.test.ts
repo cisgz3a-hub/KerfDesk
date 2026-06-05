@@ -40,6 +40,15 @@ describe('parseSvg — happy path', () => {
     expect(result.object?.bounds).toEqual({ minX: 5, minY: 10, maxX: 25, maxY: 40 });
   });
 
+  it('converts physical width/height units to millimetre bounds when no viewBox exists', () => {
+    const result = parseSvg(
+      args(`<svg xmlns="http://www.w3.org/2000/svg" width="1in" height="25.4mm">
+  <rect x="0" y="0" width="10" height="10" fill="red"/>
+</svg>`),
+    );
+    expect(result.object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 25.4, maxY: 25.4 });
+  });
+
   it('normalizes color forms: 3-digit hex, named, rgb()', () => {
     const result = parseSvg(
       args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">

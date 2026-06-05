@@ -72,6 +72,23 @@ describe('framePreflight', () => {
     const tiny: JobBounds = { minX: 0, minY: 0, maxX: 400.00005, maxY: 400 };
     expect(framePreflight(tiny, bed).kind).toBe('ok');
   });
+
+  it('returns ok for negative bounds inside a center-origin bed', () => {
+    const centerBed = { ...bed, origin: 'center' as const };
+    const centered: JobBounds = { minX: -150, minY: -120, maxX: 150, maxY: 120 };
+
+    expect(framePreflight(centered, centerBed).kind).toBe('ok');
+  });
+
+  it('detects positive overhang beyond a center-origin bed half-width', () => {
+    const centerBed = { ...bed, origin: 'center' as const };
+    const r = framePreflight({ minX: 0, minY: -20, maxX: 210, maxY: 20 }, centerBed);
+
+    expect(r.kind).toBe('out-of-bounds');
+    if (r.kind === 'out-of-bounds') {
+      expect(r.overhang.maxX).toBeCloseTo(10);
+    }
+  });
 });
 
 describe('describeFramePreflightFailure', () => {

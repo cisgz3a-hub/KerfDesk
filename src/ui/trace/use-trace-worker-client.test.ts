@@ -10,10 +10,11 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { RawImageData } from '../../core/trace';
 import { canTraceInline, traceImage } from './use-trace-worker-client';
+import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 
 // Build a tiny synthetic image — single black pixel surrounded by
 // white. Just enough that imagetracerjs has *something* to trace,
@@ -37,6 +38,27 @@ function tinyImage(): RawImageData {
   return { width: w, height: h, data };
 }
 
+function largeImage(): RawImageData {
+  const w = 401;
+  const h = 400;
+  return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) };
+}
+
+const traceOptions = {
+  numberOfColors: 2,
+  pathOmit: 0,
+  lineTolerance: 1,
+  quadraticTolerance: 1,
+  blurRadius: 0,
+  blurDelta: 0,
+  lineFilter: false,
+  fixedPalette: ['#ffffff', '#000000'],
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('traceImage (worker client with inline fallback)', () => {
   it('uses Vite-recognized inline worker construction for production large traces', () => {
     const source = readFileSync(
@@ -59,16 +81,7 @@ describe('traceImage (worker client with inline fallback)', () => {
   });
 
   it('returns paths + bounds when Worker is unavailable', async () => {
-    const result = await traceImage(tinyImage(), {
-      numberOfColors: 2,
-      pathOmit: 0,
-      lineTolerance: 1,
-      quadraticTolerance: 1,
-      blurRadius: 0,
-      blurDelta: 0,
-      lineFilter: false,
-      fixedPalette: ['#ffffff', '#000000'],
-    });
+    const result = await traceImage(tinyImage(), traceOptions);
     expect(result).toHaveProperty('paths');
     expect(result).toHaveProperty('bounds');
     expect(Array.isArray(result.paths)).toBe(true);
@@ -76,5 +89,142 @@ describe('traceImage (worker client with inline fallback)', () => {
     // out from a no-result trace.
     expect(Number.isFinite(result.bounds.minX)).toBe(true);
     expect(Number.isFinite(result.bounds.maxY)).toBe(true);
+  });
+
+  it('keeps the worker alive after one request returns a trace error', async () => {
+    vi.resetModules();
+    const workers: FakeTraceWorker[] = [];
+    class FakeTraceWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      terminated = false;
+      postCount = 0;
+
+      constructor() {
+        workers.push(this);
+      }
+
+      postMessage(request: TraceWorkerRequest): void {
+        this.postCount += 1;
+        const response: TraceWorkerResponse =
+          this.postCount === 1
+            ? { id: request.id, kind: 'error', message: 'decode failed' }
+            : {
+                id: request.id,
+                kind: 'ok',
+                paths: [],
+                bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+              };
+        queueMicrotask(() => {
+          this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
+        });
+      }
+
+      terminate(): void {
+        this.terminated = true;
+      }
+    }
+    vi.stubGlobal('Worker', FakeTraceWorker);
+
+    const client = await import('./use-trace-worker-client');
+
+    await expect(client.traceImage(largeImage(), traceOptions)).rejects.toThrow('decode failed');
+    await expect(client.traceImage(largeImage(), traceOptions)).resolves.toEqual({
+      paths: [],
+      bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+    });
+    expect(workers).toHaveLength(1);
+    expect(workers[0]?.postCount).toBe(2);
+    expect(workers[0]?.terminated).toBe(false);
+  });
+
+  it('retries worker construction after a fatal worker runtime error', async () => {
+    vi.resetModules();
+    const workers: FatalThenHealthyWorker[] = [];
+    class FatalThenHealthyWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      terminated = false;
+
+      constructor() {
+        workers.push(this);
+      }
+
+      postMessage(request: TraceWorkerRequest): void {
+        const response: TraceWorkerResponse = {
+          id: request.id,
+          kind: 'ok',
+          paths: [],
+          bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+        };
+        queueMicrotask(() => {
+          if (workers[0] === this) {
+            this.onerror?.();
+            return;
+          }
+          this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
+        });
+      }
+
+      terminate(): void {
+        this.terminated = true;
+      }
+    }
+    vi.stubGlobal('Worker', FatalThenHealthyWorker);
+
+    const client = await import('./use-trace-worker-client');
+
+    await expect(client.traceImage(largeImage(), traceOptions)).rejects.toThrow(
+      'Trace worker errored',
+    );
+    await expect(client.traceImage(largeImage(), traceOptions)).resolves.toEqual({
+      paths: [],
+      bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+    });
+    expect(workers).toHaveLength(2);
+    expect(workers[0]?.terminated).toBe(true);
+    expect(workers[1]?.terminated).toBe(false);
+  });
+});
+
+describe('traceImage worker timeout (P2-A)', () => {
+  it('rejects and terminates a worker that never responds', async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    let terminated = 0;
+    let constructed = 0;
+    class HungWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor() {
+        constructed += 1;
+      }
+      postMessage(): void {
+        /* hung — intentionally never responds */
+      }
+      terminate(): void {
+        terminated += 1;
+      }
+    }
+    vi.stubGlobal('Worker', HungWorker);
+    try {
+      const client = await import('./use-trace-worker-client');
+      // Large image (> 160k px) so a failure cannot fall back inline — the
+      // timeout must surface as a rejection.
+      const rejection = expect(client.traceImage(largeImage(), traceOptions)).rejects.toThrow(
+        'timed out',
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      await rejection;
+      expect(terminated).toBe(1);
+
+      // The retired worker is replaced on the next trace.
+      const next = client.traceImage(largeImage(), traceOptions).catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(30_000);
+      await next;
+      expect(constructed).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

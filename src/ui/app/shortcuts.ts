@@ -9,6 +9,7 @@
 
 import type { Project, SceneObject, Transform } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
@@ -28,6 +29,8 @@ export type FileCtx = {
   readonly setProject: (p: Project) => void;
   readonly newProject: () => void;
   readonly savedName: string | null;
+  readonly jobPlacement: JobPlacementSettings;
+  readonly machine: MachinePlacementSnapshot;
   readonly lastSaveTarget: SaveTarget | null;
   readonly markSaved: (target: SaveTarget) => void;
   readonly markLoaded: (filename: string) => void;
@@ -116,6 +119,8 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
       platform: c.platform,
       project: c.project,
       savedName: c.savedName,
+      jobPlacement: c.jobPlacement,
+      machine: c.machine,
       pushToast: c.pushToast,
     }),
 };

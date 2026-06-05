@@ -46,7 +46,7 @@ function importedSvgSource(color: string = SOURCE_COLOR): ImportedSvg {
 
 // The bitmap the UI builds from the source: same bounds + transform so it
 // overlays exactly where the vector was, on its own image-mode color.
-function bitmapFor(source: ImportedSvg): RasterImage {
+function bitmapFor(source: ImportedSvg, linesPerMm = 10): RasterImage {
   return {
     kind: 'raster-image',
     id: 'bmp1',
@@ -58,7 +58,7 @@ function bitmapFor(source: ImportedSvg): RasterImage {
     transform: source.transform,
     color: RASTER_COLOR,
     dither: 'floyd-steinberg',
-    linesPerMm: 10,
+    linesPerMm,
     lumaBase64: 'gID/',
   };
 }
@@ -114,6 +114,43 @@ describe('applyConvertToBitmap (ADR-029)', () => {
       bitmapFor(importedSvgSource()),
     );
     expect(result.project.scene.layers.find((l) => l.color === RASTER_COLOR)?.mode).toBe('image');
+  });
+
+  it('creates the image layer at the converted bitmap density', () => {
+    const raster = bitmapFor(importedSvgSource(), 3.2);
+    const result = applyConvertToBitmap(
+      { project: projectWithVector(), undoStack: [] },
+      'src-vec',
+      raster,
+    );
+    expect(result.project.scene.layers.find((l) => l.color === raster.color)?.linesPerMm).toBe(3.2);
+  });
+
+  it('does not reuse an existing image layer with a different density', () => {
+    const source = importedSvgSource();
+    const existingRaster: RasterImage = { ...bitmapFor(source), id: 'existing-bmp' };
+    const project: Project = {
+      ...projectWithVector(),
+      scene: {
+        objects: [source, existingRaster],
+        layers: [
+          createLayer({ id: SOURCE_COLOR, color: SOURCE_COLOR }),
+          createLayer({ id: RASTER_COLOR, color: RASTER_COLOR, mode: 'image' }),
+        ],
+      },
+    };
+    const raster = bitmapFor(source, 3.2);
+
+    const result = applyConvertToBitmap({ project, undoStack: [] }, 'src-vec', raster);
+    const added = result.project.scene.objects.find(
+      (o): o is RasterImage => o.kind === 'raster-image' && o.id === raster.id,
+    );
+
+    expect(added).toBeDefined();
+    if (added === undefined) throw new Error('converted raster was not added');
+    expect(added.color).not.toBe(RASTER_COLOR);
+    expect(result.project.scene.layers.find((l) => l.color === RASTER_COLOR)?.linesPerMm).toBe(10);
+    expect(result.project.scene.layers.find((l) => l.color === added.color)?.linesPerMm).toBe(3.2);
   });
 
   it("prunes the source vector's now-orphaned color layer", () => {

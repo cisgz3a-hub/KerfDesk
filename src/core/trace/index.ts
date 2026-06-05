@@ -2,7 +2,7 @@
 //   - traceImageToSvgString: legacy SVG-string path that feeds parseSvg
 //     for the polyline conversion. Kept for the preview overlay so
 //     existing rendering code stays unchanged.
-//   - traceImageToColoredPaths: LF1-port direct path that bypasses
+//   - traceImageToColoredPaths: tracedata direct path that bypasses
 //     parseSvg's curve-flattening by sampling Q-segments at high
 //     density inline. Used by the import commit so engrave fidelity
 //     matches imagetracerjs's analytic curves.
@@ -35,7 +35,7 @@ export { coloredPathsToSvg } from './paths-to-svg';
 // (e.g. an "Advanced" trace dialog showing the auto-computed Otsu
 // threshold) can call them directly. Each is pure-core.
 export { despeckle, medianFilter, otsuThreshold } from './preprocess';
-// Phase E.3 LF1 port — dither modes catalogue for the import dialog
+// Phase E.3 LF1-parity dither catalogue for the import dialog
 // dropdown and image-level adjustment functions (brightness etc.) for
 // any future "Advanced" panel.
 export { DITHER_MODES, ditherForTrace } from './dither-trace';

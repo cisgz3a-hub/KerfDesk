@@ -10,7 +10,7 @@
 //
 // Testability split (jsdom has no real canvas: getContext('2d') is null):
 //   - lumaToRgba / lumaToBase64 are pure and unit-tested here.
-//   - lumaToBitmap wraps them with the one browser-only call (toDataURL),
+//   - lumaToBitmap wraps them with the browser-only PNG encode,
 //     which throws in jsdom — its PNG output is verified in-browser (A2-v),
 //     not in the suite.
 //
@@ -34,10 +34,10 @@ export type BitmapFields = {
 };
 
 // Encode a luma grid into a RasterImage's PNG data URL + base64 luma.
-// Browser-only (the toDataURL step); throws if no 2D canvas context.
-export function lumaToBitmap(raster: VectorRaster): BitmapFields {
+// Browser-only (the async toBlob step); throws if no 2D canvas context.
+export async function lumaToBitmap(raster: VectorRaster): Promise<BitmapFields> {
   const rgba = lumaToRgba(raster);
-  const dataUrl = rgbaToPngDataUrl(rgba, raster.width, raster.height);
+  const dataUrl = await rgbaToPngDataUrl(rgba, raster.width, raster.height);
   return { dataUrl, lumaBase64: lumaToBase64(raster.luma) };
 }
 
@@ -68,7 +68,11 @@ export function lumaToBase64(luma: Uint8Array): string {
   return btoa(bin);
 }
 
-function rgbaToPngDataUrl(rgba: Uint8ClampedArray, width: number, height: number): string {
+async function rgbaToPngDataUrl(
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -79,5 +83,30 @@ function rgbaToPngDataUrl(rgba: Uint8ClampedArray, width: number, height: number
   const imageData = ctx.createImageData(width, height);
   imageData.data.set(rgba);
   ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL(PNG_MIME);
+  const blob = await canvasToBlob(canvas);
+  return blobToDataUrl(blob);
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob === null) {
+        reject(new Error('Could not encode bitmap PNG.'));
+        return;
+      }
+      resolve(blob);
+    }, PNG_MIME);
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Could not read bitmap PNG data URL.'));
+    };
+    reader.onerror = () => reject(new Error('Could not read bitmap PNG data URL.'));
+    reader.readAsDataURL(blob);
+  });
 }

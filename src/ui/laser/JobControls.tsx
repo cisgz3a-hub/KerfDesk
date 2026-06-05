@@ -4,18 +4,20 @@
 import { useMemo } from 'react';
 import { progress } from '../../core/controllers/grbl';
 import {
-  applyJobOrigin,
-  compileJob,
   computeJobBounds,
   describeFramePreflightFailure,
   framePreflight,
   offsetJobBounds,
-  USER_ORIGIN_JOB_PLACEMENT,
 } from '../../core/job';
+import { prepareOutput } from '../../io/gcode';
+import { resolveJobPlacement } from '../job-placement';
 import { useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { JobPlacementControls } from './JobPlacementControls';
 import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
+
+const PAUSE_HOLD_SAFETY_MESSAGE = 'Pause is feed hold only. Use Stop or physical E-stop if unsafe.';
 
 type Props = {
   readonly disabled: boolean;
@@ -26,13 +28,18 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   const streamer = useLaserStore((s) => s.streamer);
   const isStreaming = streamer !== null && streamer.status === 'streaming';
   const isPaused = streamer !== null && streamer.status === 'paused';
+  const isErrored = streamer !== null && streamer.status === 'errored';
+  const motionOperation = useLaserStore((s) => s.motionOperation);
+  const jobNeedsRecovery = isStreaming || isPaused || isErrored;
+  const motionBusy = motionOperation !== null;
+  const controlsBusy = jobNeedsRecovery || motionBusy;
   return (
     <div style={containerStyle}>
-      <SetupRow disabled={disabled} streaming={isStreaming || isPaused} onStartJob={onStartJob} />
-      <OriginRow disabled={disabled} streaming={isStreaming || isPaused} />
-      {(isStreaming || isPaused) && (
-        <RunningControls isStreaming={isStreaming} isPaused={isPaused} />
-      )}
+      <JobPlacementControls disabled={disabled} streaming={controlsBusy} />
+      <OriginRow disabled={disabled} streaming={controlsBusy} />
+      <SetupRow disabled={disabled} streaming={controlsBusy} onStartJob={onStartJob} />
+      {motionOperation !== null && <MotionControls operationKind={motionOperation.kind} />}
+      {jobNeedsRecovery && <RunningControls isStreaming={isStreaming} isPaused={isPaused} />}
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
     </div>
   );
@@ -53,6 +60,7 @@ function OriginRow(props: {
   const resetOrigin = useLaserStore((s) => s.resetOrigin);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const busy = props.disabled || props.streaming;
   const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
@@ -61,7 +69,10 @@ function OriginRow(props: {
   // readout may take 1-30 frames (~0.25-7.5s) to update after a G92.
   // The toast gives instant feedback so the user doesn't re-click.
   const onSet = (): void => {
-    void setOrigin().then(() => pushToast('Origin set to current head position (G92).', 'success'));
+    void setOrigin().then(() => {
+      setJobPlacement({ startFrom: 'user-origin' });
+      pushToast('Origin set to current head position (G92).', 'success');
+    });
   };
   const onReset = (): void => {
     void resetOrigin().then(() =>
@@ -116,7 +127,7 @@ function SetupRow(props: {
       <button
         type="button"
         onClick={() => void home()}
-        disabled={props.disabled || !homingEnabled}
+        disabled={busy || !homingEnabled}
         title={
           homingEnabled
             ? 'Send $H — home all axes'
@@ -193,18 +204,40 @@ function RunningControls(props: {
   return (
     <div style={rowStyle}>
       {props.isStreaming && (
-        <button type="button" onClick={() => void pauseJob()}>
+        <button
+          type="button"
+          onClick={() => void pauseJob().catch(() => undefined)}
+          title={PAUSE_HOLD_SAFETY_MESSAGE}
+        >
           Pause
         </button>
       )}
       {props.isPaused && (
-        <button type="button" onClick={() => void resumeJob()}>
+        <button type="button" onClick={() => void resumeJob().catch(() => undefined)}>
           Resume
         </button>
       )}
-      <button type="button" onClick={() => void stopJob()} style={stopBtnStyle}>
+      <button
+        type="button"
+        onClick={() => void stopJob().catch(() => undefined)}
+        style={stopBtnStyle}
+      >
         Stop
       </button>
+      <span style={runningSafetyStyle}>{PAUSE_HOLD_SAFETY_MESSAGE}</span>
+    </div>
+  );
+}
+
+function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX.Element {
+  const cancelJog = useLaserStore((s) => s.cancelJog);
+  const label = props.operationKind === 'frame' ? 'Cancel frame' : 'Cancel jog';
+  return (
+    <div style={rowStyle}>
+      <button type="button" onClick={() => void cancelJog().catch(() => undefined)}>
+        {label}
+      </button>
+      <span style={runningSafetyStyle}>Uses GRBL jog cancel. Use physical E-stop if unsafe.</span>
     </div>
   );
 }
@@ -226,14 +259,34 @@ function ProgressBar({
 
 function useFrameAction(): () => void {
   const project = useStore((s) => s.project);
+  const jobPlacement = useStore((s) => s.jobPlacement);
   const frame = useLaserStore((s) => s.frame);
+  const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
-    const compiled = compileJob(project.scene, project.device);
-    const job = workOriginActive ? applyJobOrigin(compiled, USER_ORIGIN_JOB_PLACEMENT) : compiled;
-    const bounds = computeJobBounds(job);
+    const placement = resolveJobPlacement(jobPlacement, {
+      statusReport,
+      workOriginActive,
+      wcoCache,
+    });
+    if (!placement.ok) {
+      pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
+      return;
+    }
+    const prepared = prepareOutput(
+      project,
+      placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
+    );
+    if (!prepared.ok) {
+      pushToast(
+        prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',
+        'error',
+      );
+      return;
+    }
+    const bounds = computeJobBounds(prepared.job);
     if (bounds === null) {
       pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
       return;
@@ -244,7 +297,9 @@ function useFrameAction(): () => void {
     // collapses to a sideways line because the axis that hit the stop
     // can't keep up. Better to refuse here with a clear instruction.
     const preflightBounds =
-      workOriginActive && wcoCache !== null ? offsetJobBounds(bounds, wcoCache) : bounds;
+      placement.preflightMotionOffset === undefined
+        ? bounds
+        : offsetJobBounds(bounds, placement.preflightMotionOffset);
     const pre = framePreflight(preflightBounds, project.device);
     if (pre.kind === 'out-of-bounds') {
       pushToast(describeFramePreflightFailure(pre), 'error');
@@ -306,4 +361,9 @@ const estimateStyle: React.CSSProperties = {
   color: '#666',
   alignSelf: 'center',
   fontVariantNumeric: 'tabular-nums',
+};
+const runningSafetyStyle: React.CSSProperties = {
+  color: '#fbbf24',
+  fontSize: 12,
+  lineHeight: 1.3,
 };

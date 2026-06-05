@@ -18,7 +18,7 @@ import {
   type DisplayPolylineCache,
   type DisplayPolylines,
 } from './display-polylines';
-import { drawRasterImage } from './draw-raster';
+import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor } from './handles';
@@ -56,6 +56,7 @@ export function drawScene(
   opts: DrawOpts,
 ): void {
   ctx.clearRect(0, 0, canvasW, canvasH);
+  pruneRasterImageCaches(liveRasterDataUrls(project));
   const view = computeView(
     canvasW,
     canvasH,
@@ -92,6 +93,14 @@ export function drawScene(
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
+}
+
+function liveRasterDataUrls(project: Project): Set<string> {
+  const live = new Set<string>();
+  for (const obj of project.scene.objects) {
+    if (obj.kind === 'raster-image') live.add(obj.dataUrl);
+  }
+  return live;
 }
 
 function drawBed(ctx: CanvasRenderingContext2D, project: Project, view: ViewTransform): void {

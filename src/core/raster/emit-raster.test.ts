@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emitRasterGroup, type EmitRasterInput } from './emit-raster';
+import { findLongBlankFeedMoves } from '../invariants';
 
 // Build a minimum valid input. Tests override individual fields to
 // exercise the behaviour they care about.
@@ -17,6 +18,45 @@ function makeInput(overrides: Partial<EmitRasterInput> = {}): EmitRasterInput {
     ...overrides,
   };
 }
+
+describe('emitRasterGroup — gap-rapid split (ADR-039)', () => {
+  // Two ink islands (cols 0-1 and 8-9) with a 12mm white gap (cols 2-7 @ 2mm/px).
+  const TWO_ISLAND = {
+    sValues: new Uint16Array([100, 100, 0, 0, 0, 0, 0, 0, 100, 100]),
+    width: 10,
+    height: 1,
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 2 },
+    feedMmPerMin: 1500,
+    overscanMm: 0,
+  };
+
+  it('rapids (G0) across a wide interior white gap instead of feeding S0', () => {
+    const out = emitRasterGroup(makeInput(TWO_ISLAND));
+    expect(out).toMatch(/^G0 X16\.000 Y1\.000 S0$/m);
+    expect(out).not.toMatch(/^G1 X16\.000/m);
+  });
+
+  it('emits no long blank-feed move across the gap (clean under the P0-A invariant)', () => {
+    const out = emitRasterGroup(makeInput(TWO_ISLAND));
+    expect(findLongBlankFeedMoves(out, { thresholdMm: 5 })).toEqual([]);
+  });
+
+  it('keeps a small interior gap in one sweep, blanked at feed (no extra G0)', () => {
+    // Ink at cols 0-1 and 4-5; white cols 2-3 = 4mm @ 2mm/px, under the 5mm split.
+    const out = emitRasterGroup(
+      makeInput({
+        sValues: new Uint16Array([100, 100, 0, 0, 100, 100, 0, 0, 0, 0]),
+        width: 10,
+        height: 1,
+        bounds: { minX: 0, minY: 0, maxX: 20, maxY: 2 },
+        feedMmPerMin: 1500,
+        overscanMm: 0,
+      }),
+    );
+    expect((out.match(/^G0 /gm) ?? []).length).toBe(1);
+    expect(out).toMatch(/^G1 X8\.000 S0$/m);
+  });
+});
 
 describe('emitRasterGroup — preamble + postamble', () => {
   it('starts with M5 + M4 S0 and ends with M5', () => {

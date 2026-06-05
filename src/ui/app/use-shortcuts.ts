@@ -10,6 +10,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { usePlatform } from './platform-context';
@@ -40,6 +41,7 @@ export function useShortcuts(): void {
 function useFileEditShortcuts(): void {
   const platform = usePlatform();
   const project = useStore((s) => s.project);
+  const jobPlacement = useStore((s) => s.jobPlacement);
   const importSvgObject = useStore((s) => s.importSvgObject);
   const setProject = useStore((s) => s.setProject);
   const newProject = useStore((s) => s.newProject);
@@ -55,11 +57,15 @@ function useFileEditShortcuts(): void {
   const lastSaveTarget = useStore((s) => s.lastSaveTarget);
   const markSaved = useStore((s) => s.markSaved);
   const markLoaded = useStore((s) => s.markLoaded);
+  const statusReport = useLaserStore((s) => s.statusReport);
+  const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const wcoCache = useLaserStore((s) => s.wcoCache);
   const pushToast = useToastStore((s) => s.pushToast);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
+      const machine = { statusReport, workOriginActive, wcoCache };
       // prettier-ignore
-      const fileCtx = { platform, project, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
+      const fileCtx = { platform, project, jobPlacement, machine, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
       const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, selectObject, selectAllObjects, duplicateSelection };
       if (handleFileShortcut(e, fileCtx)) return;
@@ -70,6 +76,7 @@ function useFileEditShortcuts(): void {
   }, [
     platform,
     project,
+    jobPlacement,
     importSvgObject,
     setProject,
     newProject,
@@ -77,6 +84,9 @@ function useFileEditShortcuts(): void {
     lastSaveTarget,
     markSaved,
     markLoaded,
+    statusReport,
+    workOriginActive,
+    wcoCache,
     pushToast,
     undo,
     redo,

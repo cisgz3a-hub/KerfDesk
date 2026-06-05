@@ -1,25 +1,15 @@
-// Step 3 of the LF1 image-trace port — direct tracedata → ColoredPath
-// conversion, bypassing parseSvg's curve-flattening step. The headline
-// quality issue with the previous Phase E pipeline was that
-// imagedataToSVG emitted SVG path strings whose Q/cubic Béziers were
-// then flattened at coarse tolerance inside parseSvg, throwing away
-// the curve fidelity imagetracerjs had produced.
-//
-// LF1 solved this by using imagetracerjs's tracedata variant
-// (`imagedataToTracedata`) which returns segments-with-control-points
-// in a structured form. LF1 then walked those segments and converted
-// Q-curves to cubic Béziers (the standard 2/3 formula) before
-// rendering. We do the same thing in pure-core terms: walk the
-// tracedata layers, flatten each Q-segment at high sampling density
-// directly into a Polyline, and assemble ColoredPath[] in the shape
-// the rest of the pipeline already consumes.
+// Direct tracedata -> ColoredPath conversion, bypassing parseSvg's
+// curve-flattening step. The quality lesson from LF1 was to use
+// imagetracerjs's structured `imagedataToTracedata` output instead of
+// routing through SVG strings. LF1 converted Q segments to cubic path
+// items; LaserForge 2.0 is a clean implementation that samples those Q
+// segments directly into the polyline scene model.
 //
 // Why flatten at all instead of carrying curves further? Our internal
-// data model is polyline-only — the compile + G-code emit stages
-// produce G1 moves over Polyline points. Carrying Béziers into the
-// scene graph would require a wider refactor (Polyline → Path with
-// curve segments) which is out of scope for this port. Sampling at
-// SAMPLES_PER_QUADRATIC density keeps the visual quality
+// data model is polyline-only: the compile + G-code emit stages produce
+// G1 moves over Polyline points. Carrying Beziers into the scene graph
+// would require a wider refactor (Polyline -> Path with curve segments).
+// Sampling at SAMPLES_PER_QUADRATIC density keeps the visual quality
 // indistinguishable from a true curve for typical engrave sizes.
 //
 // Pure-core compliant: no clock, no random, no I/O. Same lazy tracer
@@ -118,10 +108,15 @@ let tracerPromise: Promise<ImageTracerModule> | null = null;
 async function loadTracer(): Promise<ImageTracerModule> {
   if (tracerPromise === null) {
     // @ts-expect-error — imagetracerjs ships no type declarations.
-    tracerPromise = import('imagetracerjs').then((mod) => {
-      const resolved = (mod.default ?? mod) as unknown as ImageTracerModule;
-      return resolved;
-    });
+    tracerPromise = import('imagetracerjs')
+      .then((mod) => {
+        const resolved = (mod.default ?? mod) as unknown as ImageTracerModule;
+        return resolved;
+      })
+      .catch((error: unknown) => {
+        tracerPromise = null;
+        throw error;
+      });
   }
   return tracerPromise;
 }

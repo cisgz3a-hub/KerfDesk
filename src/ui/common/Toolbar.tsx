@@ -2,6 +2,7 @@
 // file-actions.ts so the keyboard shortcut listener in App.tsx can call
 // the same handlers.
 
+import { useState } from 'react';
 import {
   handleImportSvg,
   handleOpenProject,
@@ -9,11 +10,22 @@ import {
   handleSaveProject,
 } from '../app/file-actions';
 import { usePlatform } from '../app/platform-context';
-import { buildBitmapFromVector, isConvertibleVector } from '../raster/vector-to-bitmap';
+import type { Layer, Project, RasterImage } from '../../core/scene';
+import {
+  ConvertToBitmapDialog,
+  type ConvertToBitmapDialogOptions,
+} from '../raster/ConvertToBitmapDialog';
+import {
+  buildBitmapFromVector,
+  isConvertibleVector,
+  type ConvertibleVector,
+} from '../raster/vector-to-bitmap';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { rasterImportGeometry } from './image-import';
+import { readImageDensity } from './image-density';
 
 // F-A13 dirty-check. Returns true if it's safe to proceed (project is clean,
 // or the user confirmed discard). Phase A uses the native confirm() —
@@ -125,13 +137,7 @@ function FileButtons(): JSX.Element {
       <ImportImageButton />
       <TraceImageButton />
       <ConvertToBitmapButton />
-      <button
-        type="button"
-        title="Export G-code for the current scene (Ctrl+E)"
-        onClick={() => void handleSaveGcode({ platform, project, savedName, pushToast })}
-      >
-        Save G-code…
-      </button>
+      <SaveGcodeButton platform={platform} project={project} savedName={savedName} />
     </>
   );
 }
@@ -139,6 +145,36 @@ function FileButtons(): JSX.Element {
 // Phase D — Add Text opens the AddTextDialog. Edit happens by
 // double-clicking an existing text in the workspace; that path is
 // in Workspace.tsx.
+function SaveGcodeButton(props: {
+  readonly platform: ReturnType<typeof usePlatform>;
+  readonly project: Project;
+  readonly savedName: string | null;
+}): JSX.Element {
+  const jobPlacement = useStore((s) => s.jobPlacement);
+  const statusReport = useLaserStore((s) => s.statusReport);
+  const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const wcoCache = useLaserStore((s) => s.wcoCache);
+  const pushToast = useToastStore((s) => s.pushToast);
+  return (
+    <button
+      type="button"
+      title="Export G-code for the current scene (Ctrl+E)"
+      onClick={() =>
+        void handleSaveGcode({
+          platform: props.platform,
+          project: props.project,
+          savedName: props.savedName,
+          jobPlacement,
+          machine: { statusReport, workOriginActive, wcoCache },
+          pushToast,
+        })
+      }
+    >
+      Save G-code…
+    </button>
+  );
+}
+
 function TextButton(): JSX.Element {
   const openTextDialog = useUiStore((s) => s.openTextDialog);
   return (
@@ -185,43 +221,75 @@ function TraceImageButton(): JSX.Element {
 // ADR-029 — Convert to Bitmap is a TOOL run on a SELECTED vector (SVG, text, or
 // traced image): it rasterizes the vector into a RasterImage engrave-source and
 // replaces the original in place. LightBurn discards the source vector on
-// convert (documented behavior), so this is one-way — hence no '…' (it is
-// immediate; no dialog in A2). Disabled until a convertible vector is selected,
-// mirroring LightBurn's greyed-out menu item. The try/catch guards the one
-// browser-only step (canvas toDataURL inside buildBitmapFromVector), surfacing
-// failure as a toast like ImportImageButton does.
+// convert (documented behavior), so this is one-way. Disabled until a
+// convertible vector is selected, mirroring LightBurn's greyed-out menu item.
 function ConvertToBitmapButton(): JSX.Element {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const convertToBitmap = useStore((s) => s.convertToBitmap);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const objects = useStore((s) => s.project.scene.objects);
+  const scene = useStore((s) => s.project.scene);
   const pushToast = useToastStore((s) => s.pushToast);
   const selected =
-    selectedObjectId === null ? undefined : objects.find((o) => o.id === selectedObjectId);
+    selectedObjectId === null ? undefined : scene.objects.find((o) => o.id === selectedObjectId);
   const convertible = selected !== undefined && isConvertibleVector(selected) ? selected : null;
   return (
-    <button
-      type="button"
-      title={
-        convertible === null
-          ? 'Select a vector (SVG, text, or trace) to convert into a bitmap'
-          : 'Convert the selected vector into a bitmap — replaces it'
-      }
-      disabled={convertible === null}
-      onClick={(): void => {
-        if (convertible === null) return;
-        try {
-          const raster = buildBitmapFromVector(convertible);
-          convertToBitmap(convertible.id, raster);
-          pushToast(`Converted to bitmap: ${raster.source}`, 'success');
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          pushToast(`Could not convert to bitmap: ${message}`, 'error');
+    <>
+      <button
+        type="button"
+        title={
+          convertible === null
+            ? 'Select a vector (SVG, text, or trace) to convert into a bitmap'
+            : 'Convert the selected vector into a bitmap — replaces it'
         }
-      }}
-    >
-      Convert to Bitmap
-    </button>
+        disabled={convertible === null}
+        onClick={(): void => {
+          if (convertible !== null) setDialogOpen(true);
+        }}
+      >
+        Convert to Bitmap...
+      </button>
+      {dialogOpen && convertible !== null ? (
+        <ConvertToBitmapDialog
+          sourceName={sourceLabel(convertible)}
+          onCancel={() => setDialogOpen(false)}
+          onConvert={(options) => {
+            setDialogOpen(false);
+            void convertSelectedVectorToBitmap(
+              convertible,
+              scene.layers,
+              options,
+              convertToBitmap,
+              pushToast,
+            );
+          }}
+        />
+      ) : null}
+    </>
   );
+}
+
+async function convertSelectedVectorToBitmap(
+  convertible: ConvertibleVector,
+  layers: ReadonlyArray<Layer>,
+  options: ConvertToBitmapDialogOptions,
+  convertToBitmap: (sourceId: string, raster: RasterImage) => void,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): Promise<void> {
+  try {
+    const raster = await buildBitmapFromVector(convertible, {
+      ...options,
+      layers: layers.map((layer) => ({ color: layer.color, mode: layer.mode })),
+    });
+    convertToBitmap(convertible.id, raster);
+    pushToast(`Converted to bitmap: ${raster.source}`, 'success');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    pushToast(`Could not convert to bitmap: ${message}`, 'error');
+  }
+}
+
+function sourceLabel(o: ConvertibleVector): string {
+  return 'source' in o ? o.source : o.content;
 }
 
 // ADR-027 — the single Import Image action. An image always enters the
@@ -239,12 +307,16 @@ function ImportImageButton(): JSX.Element {
           await import('../trace/image-loader');
         const natural = await readImageNaturalSize(file);
         const image = await loadImageAsRawData(file);
+        // Honour embedded PNG/JPEG density so the import lands at its real-world
+        // size; fall back to 96 DPI when there is none (P2-A).
+        const density = await readImageDensity(file);
         const { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM } = await import('../../core/scene');
         const geometry = rasterImportGeometry({
           naturalWidth: natural.width,
           naturalHeight: natural.height,
           sampledWidth: image.width,
           sampledHeight: image.height,
+          ...(density !== null ? { dpi: density } : {}),
         });
         const dataUrl = await readFileAsDataUrl(file);
         const lumaBase64 = extractLumaBase64(image);
