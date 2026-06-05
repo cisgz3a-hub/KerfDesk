@@ -2150,6 +2150,67 @@ state is already preserved by disconnect()).
 
 ---
 
+## ADR-043 - Trace is vector-only; remove the Photo and Detailed trace presets
+
+**Status:** Accepted, code shipped. | **Date:** 2026-06-05
+
+### Context
+
+The Trace dialog surfaced six presets. Four (Line Art, Centerline, Smooth, Sharp)
+binarize the image to pure black/white (fixedPalette ['#ffffff','#000000'] + a
+threshold) and emit clean black vector ink. Two (Detailed: numberOfColors 4; Photo:
+numberOfColors 8) set NO fixedPalette and NO threshold, so applyThreshold returns
+the image unchanged (trace-image.ts) and imagetracerjs adaptive-quantizes a
+continuous-tone image into filled light-grey tone regions. The operator reported
+that Photo and Detailed "do not trace - the whole white page remains, it looks like
+a bitmap photo." Confirmed empirically: tracing a gray-disk-on-light-gradient image
+produced, for Line Art/Smooth, paths with fill rgb(0,0,0) (real ink); for Detailed,
+only rgb(200,200,200)/rgb(220,220,220) (near-white, no ink); for Photo,
+rgb(195,195,195)/rgb(90,90,90)/rgb(225,225,225) (posterized greys). The output is
+vectorized posterization, not line-art tracing, and is useless as laser engrave
+geometry.
+
+This is also off-model versus LightBurn, the reference. Per the in-repo
+LIGHTBURN-STUDY.md (citing docs.lightburnsoftware.com): LightBurn's Trace Image is a
+VECTOR-ONLY tool; photo/grayscale engraving is a separate path - the Image layer
+mode, which engraves the raster directly with dithering. LightBurn has no
+multi-colour "Photo"/"Detailed" trace. Making the vector tracer posterize a photo is
+neither real tracing nor the correct way to engrave a photo.
+
+### Decision
+
+Trace is vector-only. Remove the Photo and Detailed presets from TRACE_PRESETS
+(trace-image.ts). The surfaced presets are now Line Art, Centerline, Smooth, Sharp -
+all binarized vector traces. Photos and continuous-tone images engrave via the
+Image/raster path (Image layer mode + dithering, per the operator-workflow plan), not
+Trace. The PresetHint copy now points the operator there.
+
+The multi-colour CAPABILITY (numberOfColors > 2, no fixedPalette -> adaptive
+quantization) stays in the engine for any direct/programmatic caller; it is simply no
+longer surfaced as a preset. Its engine path remains covered by tests via inline
+TraceOptions instead of the removed presets.
+
+### Consequences
+
+- The Trace dialog no longer offers options that produce a blank/posterized result.
+- Photo engraving has one correct home (the Image/raster path), matching LightBurn.
+- Tests that referenced TRACE_PRESETS['Photo']/['Detailed'] now use inline
+  multi-colour TraceOptions, preserving >2-colour engine coverage without the
+  surfaced presets.
+- Photo-quality work (dither breadth, min power) belongs in Convert-to-Bitmap /
+  Image-mode (operator-workflow plan), not Trace.
+
+### Verification
+
+- trace-image.test.ts, trace-options.test.ts, trace-pipeline.integration.test.ts
+  green; the multi-colour engine path is exercised via inline TraceOptions.
+- Empirical pre-removal repro: Photo/Detailed emit near-white posterized fills with
+  no black ink; Line Art/Smooth emit rgb(0,0,0) ink (see the trace research notes).
+- Full suite + tsc --noEmit + eslint on touched files: green.
+- No hardware verification needed (UI preset removal; no g-code emission change).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

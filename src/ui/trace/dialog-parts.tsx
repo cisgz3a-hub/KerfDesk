@@ -70,8 +70,9 @@ export function PresetHint(): JSX.Element {
       <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings. Forces
       pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with curves.{' '}
       <strong>Centerline</strong> — one vector path down black strokes. <strong>Sharp</strong> —
-      pixel-perfect detail, no blur. <strong>Detailed</strong> — line drawings with shading (~4
-      layers). <strong>Photo</strong> — actual photographs (~8 posterized layers).
+      pixel-perfect detail, no blur. For photos and shaded/continuous-tone images, do not
+      trace — engrave them directly as a raster image (Image layer), which is how LightBurn
+      handles photographs.
     </p>
   );
 }
