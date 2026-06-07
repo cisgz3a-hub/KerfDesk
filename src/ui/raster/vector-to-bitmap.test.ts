@@ -7,7 +7,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import type { VectorRaster } from '../../core/raster';
-import { evaluateRasterBudget } from '../../core/raster/raster-budget';
+import { MAX_RASTER_PIXELS, evaluateRasterBudget } from '../../core/raster/raster-budget';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
@@ -320,14 +320,12 @@ describe('assembleBitmap', () => {
     expect(encode).toHaveBeenCalledTimes(1);
   });
 
-  it('reduces lines/mm instead of rejecting physically oversized conversions', () => {
+  it('rejects physically oversized conversions before encoding', () => {
     const encode = vi.fn(fakeEncode);
-    const result = assembleBitmap(makeHugeSvg(), encode, 'new-id');
 
-    expect(result.pixelWidth).toBeLessThan(7782);
-    expect(result.pixelHeight).toBeLessThan(5050);
-    expect(result.linesPerMm).toBeLessThan(10);
-    expect(evaluateRasterBudget(result.pixelWidth, result.pixelHeight).kind).toBe('ok');
-    expect(encode).toHaveBeenCalledTimes(1);
+    expect(() => assembleBitmap(makeHugeSvg(), encode, 'new-id')).toThrow(
+      `exceeds the ${MAX_RASTER_PIXELS} px limit`,
+    );
+    expect(encode).not.toHaveBeenCalled();
   });
 });

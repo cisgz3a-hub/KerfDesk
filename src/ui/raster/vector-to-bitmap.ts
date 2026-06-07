@@ -18,7 +18,6 @@
 // real lumaToBitmap + a fresh id — and is exercised in-browser (A2-v).
 
 import { rasterizeVectorToLuma, type VectorRaster } from '../../core/raster';
-import { evaluateRasterBudget } from '../../core/raster/raster-budget';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
   type DitherAlgorithm,
@@ -30,20 +29,23 @@ import {
   type TextObject,
   type TracedImage,
 } from '../../core/scene';
+import {
+  assertBitmapConversionFits,
+  estimateBitmapConversion,
+  type BitmapConversionPlan,
+} from './bitmap-conversion-plan';
 import { type BitmapFields, lumaToBitmap } from './luma-bitmap';
 
-const MIN_PIXEL_DIM = 1;
 // Match the image-import raster defaults so a converted bitmap engraves exactly
 // like an imported one would (candidate de-dup with Toolbar's import handler).
 const DEFAULT_DITHER: DitherAlgorithm = 'floyd-steinberg';
-// Default conversion density. Oversized conversions are lowered by
-// bitmapConversionPlan instead of freezing or forcing the user to guess.
-const DEFAULT_LINES_PER_MM = 10;
-export const DEFAULT_CONVERT_TO_BITMAP_DPI = DEFAULT_LINES_PER_MM * 25.4;
-export const MIN_CONVERT_TO_BITMAP_DPI = 25.4;
-export const MAX_CONVERT_TO_BITMAP_DPI = 1200;
 const BITMAP_SOURCE_SUFFIX = ' (bitmap)';
-const DENSITY_SEARCH_STEPS = 32;
+
+export {
+  DEFAULT_CONVERT_TO_BITMAP_DPI,
+  MAX_CONVERT_TO_BITMAP_DPI,
+  MIN_CONVERT_TO_BITMAP_DPI,
+} from './bitmap-conversion-plan';
 
 // The vector-carrying SceneObject kinds Convert to Bitmap accepts — all three
 // expose `paths` + `bounds` + `transform`, so the gather step is uniform.
@@ -104,7 +106,8 @@ function rasterizeConvertible(
   readonly plan: BitmapConversionPlan;
   readonly raster: VectorRaster;
 } {
-  const plan = bitmapConversionPlan(o, options);
+  const plan = estimateBitmapConversion(o, options.dpi);
+  assertBitmapConversionFits(plan);
   const { fillPolylines, outlinePolylines } = conversionPolylineGroups(o, options);
   const raster = rasterizeVectorToLuma({
     polylines: o.paths.flatMap((p) => p.polylines),
@@ -163,64 +166,6 @@ function buildRasterImage(
     linesPerMm: plan.linesPerMm,
     lumaBase64: fields.lumaBase64,
   };
-}
-
-type BitmapConversionPlan = {
-  readonly pixelWidth: number;
-  readonly pixelHeight: number;
-  readonly linesPerMm: number;
-};
-
-function bitmapConversionPlan(
-  o: ConvertibleVector,
-  options: BitmapConversionOptions,
-): BitmapConversionPlan {
-  const physicalWidthMm = displayedExtentMm(o.bounds.maxX - o.bounds.minX, o.transform.scaleX);
-  const physicalHeightMm = displayedExtentMm(o.bounds.maxY - o.bounds.minY, o.transform.scaleY);
-  const requestedLinesPerMm = dpiToLinesPerMm(options.dpi ?? DEFAULT_CONVERT_TO_BITMAP_DPI);
-  const defaultPlan = planAtLinesPerMm(physicalWidthMm, physicalHeightMm, requestedLinesPerMm);
-  if (evaluateRasterBudget(defaultPlan.pixelWidth, defaultPlan.pixelHeight).kind === 'ok') {
-    return defaultPlan;
-  }
-
-  let low = 0;
-  let high = requestedLinesPerMm;
-  for (let i = 0; i < DENSITY_SEARCH_STEPS; i += 1) {
-    const mid = (low + high) / 2;
-    const trial = planAtLinesPerMm(physicalWidthMm, physicalHeightMm, mid);
-    if (evaluateRasterBudget(trial.pixelWidth, trial.pixelHeight).kind === 'ok') {
-      low = mid;
-    } else {
-      high = mid;
-    }
-  }
-  return planAtLinesPerMm(physicalWidthMm, physicalHeightMm, low);
-}
-
-export function dpiToLinesPerMm(dpi: number): number {
-  const finite = Number.isFinite(dpi) ? dpi : DEFAULT_CONVERT_TO_BITMAP_DPI;
-  const clamped = Math.max(MIN_CONVERT_TO_BITMAP_DPI, Math.min(MAX_CONVERT_TO_BITMAP_DPI, finite));
-  return clamped / 25.4;
-}
-
-function displayedExtentMm(localMm: number, scale: number): number {
-  return Math.max(0, localMm) * Math.abs(scale);
-}
-
-function planAtLinesPerMm(
-  widthMm: number,
-  heightMm: number,
-  linesPerMm: number,
-): BitmapConversionPlan {
-  return {
-    pixelWidth: convertedPixelExtent(widthMm, linesPerMm),
-    pixelHeight: convertedPixelExtent(heightMm, linesPerMm),
-    linesPerMm,
-  };
-}
-
-function convertedPixelExtent(mm: number, linesPerMm: number): number {
-  return Math.max(MIN_PIXEL_DIM, Math.round(Math.max(0, mm) * Math.max(0, linesPerMm)));
 }
 
 // Display name for the converted bitmap. SVG / traced images carry a `source`
