@@ -13,6 +13,7 @@ import { type DeviceProfile, toMachineCoords } from '../devices';
 import {
   applyLumaAdjustments,
   dither,
+  maybeInvertLuma,
   pixelExtentForMm,
   resampleLumaNearest,
   whiteLuma,
@@ -100,18 +101,25 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
       ? decodeBase64Luma(obj.lumaBase64, obj.pixelWidth * obj.pixelHeight)
       : whiteLuma(obj.pixelWidth * obj.pixelHeight);
   const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
+  const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
   const powerPercent = clamp(layer.power, 0, 100);
   const minPowerPercent = clamp(layer.minPower, 0, powerPercent);
   const sMax = Math.round((powerPercent / 100) * device.maxPowerS);
   const sMin = Math.round((minPowerPercent / 100) * device.maxPowerS);
   const bounds = rasterBoundsInMachineCoords(obj, device);
-  const pixelWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
-  const pixelHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
-  const luma = resampleLumaNearest(
-    { luma: adjustedLuma, width: obj.pixelWidth, height: obj.pixelHeight },
-    pixelWidth,
-    pixelHeight,
-  );
+  const pixelWidth = layer.passThrough
+    ? obj.pixelWidth
+    : pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
+  const pixelHeight = layer.passThrough
+    ? obj.pixelHeight
+    : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
+  const luma = layer.passThrough
+    ? preparedLuma
+    : resampleLumaNearest(
+        { luma: preparedLuma, width: obj.pixelWidth, height: obj.pixelHeight },
+        pixelWidth,
+        pixelHeight,
+      );
   // Layer settings win over per-image settings so the operator can
   // re-tune one layer without editing every image on it.
   const orientedLuma = orientRasterLumaForMachine(luma, pixelWidth, pixelHeight, obj, device);

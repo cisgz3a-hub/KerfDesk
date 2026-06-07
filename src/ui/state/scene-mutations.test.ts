@@ -92,6 +92,8 @@ describe('ensureRasterImageLayer', () => {
           fillBidirectional: true,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
+          negativeImage: false,
+          passThrough: false,
         },
       ],
     };
@@ -123,6 +125,8 @@ describe('pruneOrphanLayers — raster image branch', () => {
           fillBidirectional: true,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
+          negativeImage: false,
+          passThrough: false,
         },
         {
           id: '#ff0000',
@@ -140,6 +144,8 @@ describe('pruneOrphanLayers — raster image branch', () => {
           fillBidirectional: true,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
+          negativeImage: false,
+          passThrough: false,
         },
       ],
     };

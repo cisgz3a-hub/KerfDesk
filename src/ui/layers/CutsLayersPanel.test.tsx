@@ -67,3 +67,161 @@ describe('CutsLayersPanel layer order controls', () => {
     }
   });
 });
+
+describe('CutsLayersPanel cut settings editor', () => {
+  it('opens a staged editor and applies changes only after OK', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
+      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
+      await act(async () => {
+        edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const power = host.querySelector('input[aria-label="Cut settings power"]');
+      const speed = host.querySelector('input[aria-label="Cut settings speed"]');
+      if (!(power instanceof HTMLInputElement)) throw new Error('power input missing');
+      if (!(speed instanceof HTMLInputElement)) throw new Error('speed input missing');
+
+      await act(async () => {
+        power.value = '42';
+        power.dispatchEvent(new Event('input', { bubbles: true }));
+        speed.value = '1777';
+        speed.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(useStore.getState().project.scene.layers[0]?.power).toBe(30);
+
+      const ok = [...host.querySelectorAll('button')].find((button) => button.textContent === 'OK');
+      if (!(ok instanceof HTMLButtonElement)) throw new Error('OK button missing');
+      await act(async () => {
+        ok.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const layer = useStore.getState().project.scene.layers[0];
+      expect(layer?.power).toBe(42);
+      expect(layer?.speed).toBe(1777);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('cancels staged cut setting edits without mutating the layer', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
+      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
+      await act(async () => {
+        edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const speed = host.querySelector('input[aria-label="Cut settings speed"]');
+      if (!(speed instanceof HTMLInputElement)) throw new Error('speed input missing');
+      await act(async () => {
+        speed.value = '999';
+        speed.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+
+      const cancel = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Cancel',
+      );
+      if (!(cancel instanceof HTMLButtonElement)) throw new Error('Cancel button missing');
+      await act(async () => {
+        cancel.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(useStore.getState().project.scene.layers[0]?.speed).toBe(1500);
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('applies image toggles from the staged image editor', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
+      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
+      await act(async () => {
+        edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const negative = host.querySelector('input[name="negativeImage"]');
+      if (!(negative instanceof HTMLInputElement)) throw new Error('negative image input missing');
+      negative.checked = true;
+      const passThrough = host.querySelector('input[name="passThrough"]');
+      if (!(passThrough instanceof HTMLInputElement)) throw new Error('pass-through input missing');
+      passThrough.checked = true;
+
+      const ok = [...host.querySelectorAll('button')].find((button) => button.textContent === 'OK');
+      if (!(ok instanceof HTMLButtonElement)) throw new Error('OK button missing');
+      await act(async () => {
+        ok.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const layer = useStore.getState().project.scene.layers[0];
+      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
+      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('applies image toggles from the visible image layer row', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const negative = host.querySelector('input[aria-label="Negative image for #ff0000"]');
+      if (!(negative instanceof HTMLInputElement)) throw new Error('negative image input missing');
+      const passThrough = host.querySelector('input[aria-label="Pass-through image for #ff0000"]');
+      if (!(passThrough instanceof HTMLInputElement)) throw new Error('pass-through input missing');
+
+      await act(async () => {
+        negative.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        passThrough.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const layer = useStore.getState().project.scene.layers[0];
+      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
+      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});

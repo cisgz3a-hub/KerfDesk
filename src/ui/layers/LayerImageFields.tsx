@@ -43,6 +43,12 @@ export function LayerImageFields({ layer }: { readonly layer: Layer }): JSX.Elem
         <LinesPerMmInput layer={layer} />
         <span style={unitStyle}>lines / mm</span>
       </FieldRow>
+      <FieldRow label="Negative">
+        <NegativeImageCheckbox layer={layer} />
+      </FieldRow>
+      <FieldRow label="Pass-through">
+        <PassThroughCheckbox layer={layer} />
+      </FieldRow>
     </>
   );
 }
@@ -129,6 +135,30 @@ function MinPowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Minimum power for ${layer.color}`}
+    />
+  );
+}
+
+function NegativeImageCheckbox({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <input
+      type="checkbox"
+      checked={layer.negativeImage}
+      onChange={(event) => setLayerParam(layer.id, { negativeImage: event.target.checked })}
+      aria-label={`Negative image for ${layer.color}`}
+    />
+  );
+}
+
+function PassThroughCheckbox({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <input
+      type="checkbox"
+      checked={layer.passThrough}
+      onChange={(event) => setLayerParam(layer.id, { passThrough: event.target.checked })}
+      aria-label={`Pass-through image for ${layer.color}`}
     />
   );
 }

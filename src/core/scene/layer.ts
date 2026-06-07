@@ -47,6 +47,8 @@ export type Layer = {
   // image on it.
   readonly ditherAlgorithm: LayerDitherAlgorithm;
   readonly linesPerMm: number;
+  readonly negativeImage: boolean;
+  readonly passThrough: boolean;
 };
 
 export const LAYER_DEFAULTS = {
@@ -63,6 +65,8 @@ export const LAYER_DEFAULTS = {
   fillBidirectional: true,
   ditherAlgorithm: 'floyd-steinberg',
   linesPerMm: 10,
+  negativeImage: false,
+  passThrough: false,
 } as const satisfies Omit<Layer, 'id' | 'color'>;
 
 export function createLayer(args: { id: string; color: string; mode?: LayerMode }): Layer {

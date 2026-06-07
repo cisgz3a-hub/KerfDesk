@@ -140,6 +140,146 @@ describe('drawRasterPreview', () => {
     ]);
   });
 
+  it('inverts image-mode luma before rendering raster preview when negative image is enabled', () => {
+    let capturedImageData: FakeImageData | undefined;
+    vi.stubGlobal('ImageData', FakeImageData);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
+      return {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          putImageData: vi.fn((imageData: FakeImageData) => {
+            capturedImageData = imageData;
+          }),
+        }),
+      } as unknown as HTMLCanvasElement;
+    });
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+      ditherAlgorithm: 'threshold' as const,
+      negativeImage: true,
+      power: 30,
+      linesPerMm: 1,
+    };
+    const raster = {
+      ...burnRaster('data:image/png;base64,negative-preview'),
+      pixelWidth: 2,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 },
+      lumaBase64: 'AP8=',
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { objects: [raster], layers: [layer] },
+    };
+
+    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+
+    expect(Array.from(capturedImageData?.data ?? [])).toEqual([255, 255, 255, 255, 0, 0, 0, 255]);
+  });
+
+  it('uses the source image pixel grid in raster preview when pass-through is enabled', () => {
+    let capturedCanvas: { width: number; height: number } | undefined;
+    let capturedImageData: FakeImageData | undefined;
+    vi.stubGlobal('ImageData', FakeImageData);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          putImageData: vi.fn((imageData: FakeImageData) => {
+            capturedCanvas = { width: canvas.width, height: canvas.height };
+            capturedImageData = imageData;
+          }),
+        }),
+      };
+      return canvas as unknown as HTMLCanvasElement;
+    });
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+      ditherAlgorithm: 'threshold' as const,
+      passThrough: true,
+      power: 30,
+      linesPerMm: 10,
+    };
+    const raster = {
+      ...burnRaster('data:image/png;base64,pass-through-preview'),
+      pixelWidth: 2,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 1 },
+      lumaBase64: 'AP8=',
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { objects: [raster], layers: [layer] },
+    };
+
+    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+
+    expect(capturedCanvas).toEqual({ width: 2, height: 1 });
+    expect(Array.from(capturedImageData?.data ?? [])).toEqual([0, 0, 0, 255, 255, 255, 255, 255]);
+  });
+
+  it('does not reuse stale preview canvases when image mode toggles change', () => {
+    const captures: Array<{
+      readonly width: number;
+      readonly height: number;
+      readonly data: number[];
+    }> = [];
+    vi.stubGlobal('ImageData', FakeImageData);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          putImageData: vi.fn((imageData: FakeImageData) => {
+            captures.push({
+              width: canvas.width,
+              height: canvas.height,
+              data: Array.from(imageData.data),
+            });
+          }),
+        }),
+      };
+      return canvas as unknown as HTMLCanvasElement;
+    });
+    const raster = {
+      ...burnRaster('data:image/png;base64,same-preview-cache-key-source'),
+      pixelWidth: 2,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 1 },
+      lumaBase64: 'AP8=',
+    };
+    const baseLayer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+      ditherAlgorithm: 'threshold' as const,
+      power: 30,
+      linesPerMm: 1,
+    };
+    const drawWithLayer = (layer: typeof baseLayer): void => {
+      drawRasterPreview(
+        noOpContext(),
+        { ...createProject(), scene: { objects: [raster], layers: [layer] } },
+        { scale: 1, offsetX: 0, offsetY: 0 },
+      );
+    };
+
+    drawWithLayer(baseLayer);
+    drawWithLayer({ ...baseLayer, negativeImage: true });
+    drawWithLayer({ ...baseLayer, passThrough: true });
+
+    expect(captures).toHaveLength(3);
+    expect(captures.map(({ width, height }) => `${width}x${height}`)).toEqual([
+      '10x1',
+      '10x1',
+      '2x1',
+    ]);
+    expect(captures[0]?.data).not.toEqual(captures[1]?.data);
+  });
+
   it('uses raster image brightness in grayscale preview', () => {
     let capturedImageData: FakeImageData | undefined;
     vi.stubGlobal('ImageData', FakeImageData);

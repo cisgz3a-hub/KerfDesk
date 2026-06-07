@@ -166,6 +166,12 @@ function normalizeLayer(layer: unknown): unknown {
   if (!isPercent(out['minPower'])) {
     out['minPower'] = LAYER_DEFAULTS.minPower;
   }
+  if (typeof out['negativeImage'] !== 'boolean') {
+    out['negativeImage'] = LAYER_DEFAULTS.negativeImage;
+  }
+  if (typeof out['passThrough'] !== 'boolean') {
+    out['passThrough'] = LAYER_DEFAULTS.passThrough;
+  }
   return out;
 }
 

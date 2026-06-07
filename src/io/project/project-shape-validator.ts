@@ -74,6 +74,8 @@ function validateLayer(layer: unknown, path: string): string | null {
     optionalBoolean(layer, `${path}.fillBidirectional`),
     optionalDither(layer, `${path}.ditherAlgorithm`),
     optionalPositiveNumber(layer, `${path}.linesPerMm`),
+    optionalBoolean(layer, `${path}.negativeImage`),
+    optionalBoolean(layer, `${path}.passThrough`),
   ]);
 }
 

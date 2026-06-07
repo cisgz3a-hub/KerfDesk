@@ -19,9 +19,11 @@
 
 import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
+import { CutSettingsDialog } from './CutSettingsDialog';
 import { LayerImageFields } from './LayerImageFields';
 import { LayerOrderControls } from './LayerOrderControls';
 import { useDebouncedCommit } from './use-debounced-commit';
+import { useState } from 'react';
 
 const cardStyle: React.CSSProperties = {
   background: '#ffffff',
@@ -86,6 +88,8 @@ export function LayerRow(props: {
   readonly canMoveDown: boolean;
 }): JSX.Element {
   const { layer } = props;
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const setLayerParam = useStore((s) => s.setLayerParam);
   return (
     <section
       style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
@@ -100,6 +104,14 @@ export function LayerRow(props: {
         />
         <ModeSelect layer={layer} />
         <span style={headerFillerStyle} />
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          aria-label={`Edit cut settings for ${layer.color}`}
+          title="Open advanced cut settings"
+        >
+          Edit...
+        </button>
         <HeaderToggle label="Show" layer={layer} field="visible" />
         <HeaderToggle label="Output" layer={layer} field="output" />
       </header>
@@ -116,6 +128,16 @@ export function LayerRow(props: {
       </FieldRow>
       {layer.mode === 'fill' && <FillFields layer={layer} />}
       {layer.mode === 'image' && <LayerImageFields layer={layer} />}
+      {settingsOpen ? (
+        <CutSettingsDialog
+          layer={layer}
+          onCancel={() => setSettingsOpen(false)}
+          onApply={(patch) => {
+            setLayerParam(layer.id, patch);
+            setSettingsOpen(false);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
