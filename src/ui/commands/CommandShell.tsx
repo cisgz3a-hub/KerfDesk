@@ -74,6 +74,8 @@ function ConvertDialog(props: {
   return (
     <ConvertToBitmapDialog
       sourceName={sourceLabel(props.convertible)}
+      bounds={props.convertible.bounds}
+      transform={props.convertible.transform}
       onCancel={props.onClose}
       onConvert={onConvert}
     />
