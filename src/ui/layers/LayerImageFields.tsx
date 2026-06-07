@@ -43,6 +43,10 @@ export function LayerImageFields({ layer }: { readonly layer: Layer }): JSX.Elem
         <LinesPerMmInput layer={layer} />
         <span style={unitStyle}>lines / mm</span>
       </FieldRow>
+      <FieldRow label="Dot Width">
+        <DotWidthCorrectionInput layer={layer} />
+        <span style={unitStyle}>mm</span>
+      </FieldRow>
       <FieldRow label="Negative">
         <NegativeImageCheckbox layer={layer} />
       </FieldRow>
@@ -139,6 +143,29 @@ function MinPowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
+function DotWidthCorrectionInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const max = dotWidthCorrectionMax(layer);
+  const debounced = useDebouncedCommit<number>({
+    value: layer.dotWidthCorrectionMm,
+    commit: (dotWidthCorrectionMm) => setLayerParam(layer.id, { dotWidthCorrectionMm }),
+    parse: (s) => clamp(numericValue(s), 0, max),
+  });
+  return (
+    <input
+      type="number"
+      min={0}
+      max={max}
+      step={0.001}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Dot width correction for ${layer.color}`}
+    />
+  );
+}
+
 function NegativeImageCheckbox({ layer }: { readonly layer: Layer }): JSX.Element {
   const setLayerParam = useStore((s) => s.setLayerParam);
   return (
@@ -170,4 +197,8 @@ function numericValue(s: string): number {
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
+}
+
+function dotWidthCorrectionMax(layer: Layer): number {
+  return 1 / Math.max(1, layer.linesPerMm);
 }

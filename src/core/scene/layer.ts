@@ -49,6 +49,7 @@ export type Layer = {
   readonly linesPerMm: number;
   readonly negativeImage: boolean;
   readonly passThrough: boolean;
+  readonly dotWidthCorrectionMm: number;
 };
 
 export const LAYER_DEFAULTS = {
@@ -67,6 +68,7 @@ export const LAYER_DEFAULTS = {
   linesPerMm: 10,
   negativeImage: false,
   passThrough: false,
+  dotWidthCorrectionMm: 0,
 } as const satisfies Omit<Layer, 'id' | 'color'>;
 
 export function createLayer(args: { id: string; color: string; mode?: LayerMode }): Layer {

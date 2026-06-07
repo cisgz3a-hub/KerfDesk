@@ -172,6 +172,9 @@ function normalizeLayer(layer: unknown): unknown {
   if (typeof out['passThrough'] !== 'boolean') {
     out['passThrough'] = LAYER_DEFAULTS.passThrough;
   }
+  if (!isNonNegativeNumber(out['dotWidthCorrectionMm'])) {
+    out['dotWidthCorrectionMm'] = LAYER_DEFAULTS.dotWidthCorrectionMm;
+  }
   return out;
 }
 

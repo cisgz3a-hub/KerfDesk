@@ -69,6 +69,7 @@ function rasterGroup(opts: {
     pixelHeight,
     bounds: { minX: 10, minY: 20, maxX: 50, maxY: 30 },
     overscanMm: 5,
+    dotWidthCorrectionMm: 0,
   };
 }
 
