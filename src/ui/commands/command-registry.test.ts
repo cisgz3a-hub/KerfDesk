@@ -35,6 +35,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     deleteSelection: vi.fn(),
     clearSelection: vi.fn(),
     addText: vi.fn(),
+    adjustImage: vi.fn(),
     traceImage: vi.fn(),
     convertToBitmap: vi.fn(),
     connectLaser: vi.fn(),
@@ -96,6 +97,20 @@ describe('buildAppCommands', () => {
     expect(commandById(commands, 'tools.trace-image').enabled).toBe(true);
     expect(runCommand(commandById(commands, 'tools.trace-image'))).toBe(true);
     expect(traceImage).toHaveBeenCalled();
+  });
+
+  it('enables Adjust Image only when a raster image is selected', () => {
+    const adjustImage = vi.fn();
+    const disabledCommands = buildAppCommands(baseCtx({ hasRasterSelection: false, adjustImage }));
+
+    expect(commandById(disabledCommands, 'tools.adjust-image').enabled).toBe(false);
+    expect(runCommand(commandById(disabledCommands, 'tools.adjust-image'))).toBe(false);
+    expect(adjustImage).not.toHaveBeenCalled();
+
+    const enabledCommands = buildAppCommands(baseCtx({ hasRasterSelection: true, adjustImage }));
+    expect(commandById(enabledCommands, 'tools.adjust-image').enabled).toBe(true);
+    expect(runCommand(commandById(enabledCommands, 'tools.adjust-image'))).toBe(true);
+    expect(adjustImage).toHaveBeenCalled();
   });
 
   it('runs Arrange flip commands only when an object can be transformed', () => {
