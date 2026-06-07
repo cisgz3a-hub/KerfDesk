@@ -328,6 +328,59 @@ describe('emitRasterGroup — S modulation', () => {
   });
 });
 
+describe('emitRasterGroup — dot width correction', () => {
+  it('shortens non-zero scan runs at both ends', () => {
+    const out = emitRasterGroup(
+      makeInput({
+        width: 4,
+        height: 1,
+        bounds: { minX: 0, minY: 0, maxX: 4, maxY: 1 },
+        overscanMm: 0,
+        dotWidthCorrectionMm: 0.25,
+        sValues: new Uint16Array([0, 500, 500, 0]),
+      }),
+    );
+
+    const motion = out.split('\n').filter((line) => line.startsWith('G'));
+    expect(motion).toEqual([
+      'G0 X1.000 Y0.500 S0',
+      'G1 X1.250 F6000 S0',
+      'G1 X2.750 S500',
+      'G1 X3.000 S0',
+    ]);
+  });
+
+  it('shortens reverse-direction non-zero scan runs symmetrically', () => {
+    const out = emitRasterGroup(
+      makeInput({
+        width: 4,
+        height: 2,
+        bounds: { minX: 0, minY: 0, maxX: 4, maxY: 2 },
+        overscanMm: 0,
+        dotWidthCorrectionMm: 0.25,
+        sValues: new Uint16Array([
+          500,
+          500,
+          0,
+          0, //
+          0,
+          500,
+          500,
+          0, //
+        ]),
+      }),
+    );
+
+    const motion = out.split('\n').filter((line) => line.startsWith('G'));
+    expect(motion.slice(4)).toEqual([
+      'G0 X3.000 Y1.500 S0',
+      'G1 X2.750 S0',
+      'G1 X1.250 S500',
+      'G1 X1.000 S0',
+    ]);
+  });
+});
+
 describe('emitRasterGroup — invariants', () => {
   it('every G0 carries S0 (laser-off-on-travel invariant #3)', () => {
     const out = emitRasterGroup(

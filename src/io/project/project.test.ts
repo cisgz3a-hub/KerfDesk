@@ -147,6 +147,7 @@ describe('deserializeProject', () => {
             ...project.scene.layers[0],
             negativeImage: 'true',
             passThrough: 'true',
+            dotWidthCorrectionMm: '0.05',
           } as unknown as Project['scene']['layers'][number],
         ],
       },
@@ -238,6 +239,7 @@ describe('deserializeProject', () => {
       expect(layer?.minPower).toBe(0);
       expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(false);
       expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(false);
+      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(0);
       // ADR-038: pre-unidirectional files back-fill to snake (true), matching
       // the fill they were authored against.
       expect(layer?.fillBidirectional).toBe(true);

@@ -82,4 +82,17 @@ describe('compileJob raster image adjustments', () => {
     expect(raster?.pixelHeight).toBe(1);
     expect(Array.from(raster?.sValues ?? [])).toEqual([300, 0]);
   });
+
+  it('carries dot width correction into raster groups bounded by line interval', () => {
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
+      dotWidthCorrectionMm: 0.5,
+      linesPerMm: 10,
+    };
+    const image = twoPixelRasterObject('AP8=');
+
+    const job = compileJob({ objects: [image], layers: [layer] }, dev);
+
+    expect(firstRasterGroup(job)?.dotWidthCorrectionMm).toBeCloseTo(0.1);
+  });
 });

@@ -94,6 +94,7 @@ describe('ensureRasterImageLayer', () => {
           linesPerMm: 10,
           negativeImage: false,
           passThrough: false,
+          dotWidthCorrectionMm: 0,
         },
       ],
     };
@@ -127,6 +128,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           linesPerMm: 10,
           negativeImage: false,
           passThrough: false,
+          dotWidthCorrectionMm: 0,
         },
         {
           id: '#ff0000',
@@ -146,6 +148,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
           linesPerMm: 10,
           negativeImage: false,
           passThrough: false,
+          dotWidthCorrectionMm: 0,
         },
       ],
     };

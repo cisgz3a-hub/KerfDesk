@@ -348,6 +348,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           pixelHeight: 1,
           bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
           overscanMm: 0,
+          dotWidthCorrectionMm: 0,
         },
         {
           kind: 'cut',
@@ -386,6 +387,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           pixelHeight: 1,
           bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
           overscanMm: 0,
+          dotWidthCorrectionMm: 0,
         },
         {
           kind: 'fill',
@@ -427,6 +429,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           pixelHeight: 1,
           bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
           overscanMm: 0,
+          dotWidthCorrectionMm: 0,
         },
       ],
     };

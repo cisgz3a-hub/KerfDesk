@@ -184,6 +184,17 @@ function ImageFields(props: {
         />
         <span style={unitStyle}>lines / mm</span>
       </Field>
+      <Field label="Dot Width">
+        <NumberInput
+          name="dotWidthCorrectionMm"
+          value={props.layer.dotWidthCorrectionMm}
+          min={0}
+          max={dotWidthCorrectionMax(props.layer.linesPerMm)}
+          step={0.001}
+          label="dot width correction"
+        />
+        <span style={unitStyle}>mm</span>
+      </Field>
       <Field label="Negative">
         <input name="negativeImage" type="checkbox" defaultChecked={props.layer.negativeImage} />
       </Field>
@@ -228,6 +239,7 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
 function readLayerPatch(data: FormData, layer: Layer): LayerPatch {
   const mode = parseMode(String(data.get('mode') ?? layer.mode));
   const power = numberField(data, 'power', layer.power, 0, 100);
+  const linesPerMm = numberField(data, 'linesPerMm', layer.linesPerMm, 5, MAX_RASTER_LINES_PER_MM);
   return {
     mode,
     power,
@@ -247,7 +259,17 @@ function readLayerPatch(data: FormData, layer: Layer): LayerPatch {
     fillOverscanMm: numberField(data, 'fillOverscanMm', layer.fillOverscanMm, 0, 25),
     fillBidirectional: data.has('fillBidirectional'),
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
-    linesPerMm: numberField(data, 'linesPerMm', layer.linesPerMm, 5, MAX_RASTER_LINES_PER_MM),
+    linesPerMm,
+    dotWidthCorrectionMm:
+      mode === 'image'
+        ? numberField(
+            data,
+            'dotWidthCorrectionMm',
+            layer.dotWidthCorrectionMm,
+            0,
+            dotWidthCorrectionMax(linesPerMm),
+          )
+        : layer.dotWidthCorrectionMm,
     negativeImage: mode === 'image' ? data.has('negativeImage') : layer.negativeImage,
     passThrough: mode === 'image' ? data.has('passThrough') : layer.passThrough,
   };
@@ -285,6 +307,10 @@ function parseDither(value: string): Layer['ditherAlgorithm'] {
     'grayscale',
   ]);
   return allowed.has(value) ? (value as Layer['ditherAlgorithm']) : 'floyd-steinberg';
+}
+
+function dotWidthCorrectionMax(linesPerMm: number): number {
+  return 1 / Math.max(1, linesPerMm);
 }
 
 const backdropStyle: React.CSSProperties = {

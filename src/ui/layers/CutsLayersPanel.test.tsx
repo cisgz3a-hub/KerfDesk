@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
@@ -178,6 +179,9 @@ describe('CutsLayersPanel cut settings editor', () => {
       const passThrough = host.querySelector('input[name="passThrough"]');
       if (!(passThrough instanceof HTMLInputElement)) throw new Error('pass-through input missing');
       passThrough.checked = true;
+      const dotWidth = host.querySelector('input[name="dotWidthCorrectionMm"]');
+      if (!(dotWidth instanceof HTMLInputElement)) throw new Error('dot width input missing');
+      dotWidth.value = '0.08';
 
       const ok = [...host.querySelectorAll('button')].find((button) => button.textContent === 'OK');
       if (!(ok instanceof HTMLButtonElement)) throw new Error('OK button missing');
@@ -188,6 +192,9 @@ describe('CutsLayersPanel cut settings editor', () => {
       const layer = useStore.getState().project.scene.layers[0];
       expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
       expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
+      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(
+        0.08,
+      );
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -210,15 +217,29 @@ describe('CutsLayersPanel cut settings editor', () => {
       if (!(negative instanceof HTMLInputElement)) throw new Error('negative image input missing');
       const passThrough = host.querySelector('input[aria-label="Pass-through image for #ff0000"]');
       if (!(passThrough instanceof HTMLInputElement)) throw new Error('pass-through input missing');
+      const dotWidth = host.querySelector('input[aria-label="Dot width correction for #ff0000"]');
+      if (!(dotWidth instanceof HTMLInputElement)) throw new Error('dot width input missing');
 
       await act(async () => {
         negative.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         passThrough.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
+      await act(async () => {
+        dotWidth.value = '0.07';
+        Simulate.change(dotWidth);
+      });
+
+      await act(async () => {
+        Simulate.blur(dotWidth);
+      });
+
       const layer = useStore.getState().project.scene.layers[0];
       expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
       expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
+      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(
+        0.07,
+      );
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

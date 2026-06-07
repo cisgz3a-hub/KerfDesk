@@ -22,6 +22,7 @@ describe('createLayer', () => {
       linesPerMm: 10,
       negativeImage: false,
       passThrough: false,
+      dotWidthCorrectionMm: 0,
     });
   });
 

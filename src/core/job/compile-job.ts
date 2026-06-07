@@ -113,6 +113,7 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
   const pixelHeight = layer.passThrough
     ? obj.pixelHeight
     : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
+  const lineIntervalMm = (bounds.maxY - bounds.minY) / pixelHeight;
   const luma = layer.passThrough
     ? preparedLuma
     : resampleLumaNearest(
@@ -139,6 +140,7 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     pixelHeight,
     bounds,
     overscanMm: DEFAULT_OVERSCAN_MM,
+    dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
   };
 }
 
