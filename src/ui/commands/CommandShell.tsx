@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { useUiStore } from '../state/ui-store';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
   ConvertToBitmapDialog,
@@ -58,6 +59,7 @@ function ConvertDialog(props: {
   readonly convertible: ConvertibleVector;
   readonly onClose: () => void;
 }): JSX.Element {
+  useRegisterModal();
   const layers = useStore((s) => s.project.scene.layers);
   const convertToBitmap = useStore((s) => s.convertToBitmap);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -86,6 +88,7 @@ function AdjustDialog(props: {
   readonly image: NonNullable<ReturnType<typeof useSelectedRaster>>;
   readonly onClose: () => void;
 }): JSX.Element | null {
+  useRegisterModal();
   const layer = useStore((s) =>
     s.project.scene.layers.find((candidate) => candidate.id === props.image.color),
   );
@@ -105,6 +108,15 @@ function AdjustDialog(props: {
       onApply={onApply}
     />
   );
+}
+
+function useRegisterModal(): void {
+  const registerModal = useUiStore((s) => s.registerModal);
+  const unregisterModal = useUiStore((s) => s.unregisterModal);
+  useLayoutEffect(() => {
+    registerModal();
+    return unregisterModal;
+  }, [registerModal, unregisterModal]);
 }
 
 function useImagePickHandler(): (file: File) => void {

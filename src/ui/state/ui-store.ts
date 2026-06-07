@@ -29,7 +29,7 @@ export type TextDialogState =
       readonly color: string;
     };
 
-type UiState = {
+export type UiState = {
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
   readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
@@ -57,6 +57,11 @@ type UiState = {
   // read the same source of truth.
   readonly spaceDown: boolean;
   readonly setSpaceDown: (next: boolean) => void;
+  // Dialogs owned outside this store register here so global shortcuts can
+  // yield while any modal surface is active.
+  readonly modalDepth: number;
+  readonly registerModal: () => void;
+  readonly unregisterModal: () => void;
   // Phase D text dialog. Toolbar's "Text…" opens with mode='add';
   // Workspace's double-click-on-text opens with mode='edit' + the
   // current field values. AddTextDialog renders nothing when null.
@@ -93,6 +98,9 @@ export const useUiStore = create<UiState>((set) => ({
   },
   spaceDown: false,
   setSpaceDown: (next) => set({ spaceDown: next }),
+  modalDepth: 0,
+  registerModal: () => set((s) => ({ modalDepth: s.modalDepth + 1 })),
+  unregisterModal: () => set((s) => ({ modalDepth: Math.max(0, s.modalDepth - 1) })),
   textDialog: null,
   openTextDialog: (next) => set({ textDialog: next }),
   closeTextDialog: () => set({ textDialog: null }),
@@ -100,6 +108,12 @@ export const useUiStore = create<UiState>((set) => ({
   openImageDialog: (source) => set({ imageDialog: source }),
   closeImageDialog: () => set({ imageDialog: null }),
 }));
+
+export function isModalOpen(
+  state: Pick<UiState, 'textDialog' | 'imageDialog' | 'modalDepth'>,
+): boolean {
+  return state.textDialog !== null || state.imageDialog !== null || state.modalDepth > 0;
+}
 
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
