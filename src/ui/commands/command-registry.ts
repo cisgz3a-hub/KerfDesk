@@ -25,6 +25,7 @@ export type CommandId =
   | 'edit.delete'
   | 'edit.clear-selection'
   | 'tools.add-text'
+  | 'tools.adjust-image'
   | 'tools.trace-image'
   | 'tools.convert-to-bitmap'
   | 'arrange.flip-horizontal'
@@ -74,6 +75,7 @@ export type AppCommandContext = {
   readonly deleteSelection: () => void;
   readonly clearSelection: () => void;
   readonly addText: () => void;
+  readonly adjustImage: () => void;
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
   readonly canTransformSelection: boolean;
@@ -227,6 +229,21 @@ function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
 function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
+    ctx.hasRasterSelection
+      ? enabled(
+          'tools.adjust-image',
+          'tools',
+          'Adjust Image...',
+          'Adjust selected image',
+          ctx.adjustImage,
+        )
+      : disabled(
+          'tools.adjust-image',
+          'tools',
+          'Adjust Image...',
+          'Select an image first.',
+          ctx.adjustImage,
+        ),
     ctx.hasRasterSelection
       ? enabled(
           'tools.trace-image',

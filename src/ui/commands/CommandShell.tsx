@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
   ConvertToBitmapDialog,
   type ConvertToBitmapDialogOptions,
@@ -15,10 +16,13 @@ import { useAppCommands } from './use-app-commands';
 export function CommandShell(): JSX.Element {
   const imageInput = useRef<HTMLInputElement | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
+  const selectedRaster = useSelectedRaster();
   const commands = useAppCommands({
     requestImportImage: () => imageInput.current?.click(),
     requestConvertToBitmap: () => setConvertDialogOpen(true),
+    requestAdjustImage: () => setAdjustDialogOpen(true),
     showAbout: () => window.alert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
@@ -42,6 +46,9 @@ export function CommandShell(): JSX.Element {
           convertible={selectedConvertible}
           onClose={() => setConvertDialogOpen(false)}
         />
+      ) : null}
+      {adjustDialogOpen && selectedRaster !== null ? (
+        <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
       ) : null}
     </>
   );
@@ -73,12 +80,45 @@ function ConvertDialog(props: {
   );
 }
 
+function AdjustDialog(props: {
+  readonly image: NonNullable<ReturnType<typeof useSelectedRaster>>;
+  readonly onClose: () => void;
+}): JSX.Element | null {
+  const layer = useStore((s) =>
+    s.project.scene.layers.find((candidate) => candidate.id === props.image.color),
+  );
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const setRasterImageAdjustments = useStore((s) => s.setRasterImageAdjustments);
+  if (layer === undefined) return null;
+  const onApply = (patch: AdjustImageApply): void => {
+    props.onClose();
+    setRasterImageAdjustments(props.image.id, patch.imagePatch);
+    setLayerParam(layer.id, patch.layerPatch);
+  };
+  return (
+    <AdjustImageDialog
+      image={props.image}
+      layer={layer}
+      onCancel={props.onClose}
+      onApply={onApply}
+    />
+  );
+}
+
 function useImagePickHandler(): (file: File) => void {
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
   return (file) => {
     void importImageFile(file, importRasterImage, pushToast);
   };
+}
+
+function useSelectedRaster() {
+  const scene = useStore((s) => s.project.scene);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  if (selectedObjectId === null) return null;
+  const selected = scene.objects.find((object) => object.id === selectedObjectId);
+  return selected?.kind === 'raster-image' ? selected : null;
 }
 
 function useSelectedConvertible(): ConvertibleVector | null {

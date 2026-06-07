@@ -16,6 +16,7 @@ import { buildAppCommands, type AppCommand } from './command-registry';
 export type CommandShellCallbacks = {
   readonly requestImportImage: () => void;
   readonly requestConvertToBitmap: () => void;
+  readonly requestAdjustImage: () => void;
   readonly showAbout: () => void;
 };
 
@@ -71,6 +72,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     deleteSelection: () => deleteSelection(),
     clearSelection: () => app.selectObject(null),
     addText: () => openTextDialog({ mode: 'add' }),
+    adjustImage: callbacks.requestAdjustImage,
     traceImage: () => {
       if (selected?.kind === 'raster-image') openImageDialog(selected);
     },
