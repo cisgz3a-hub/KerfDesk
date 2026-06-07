@@ -20,6 +20,8 @@ describe('createLayer', () => {
       fillBidirectional: true,
       ditherAlgorithm: 'floyd-steinberg',
       linesPerMm: 10,
+      negativeImage: false,
+      passThrough: false,
     });
   });
 

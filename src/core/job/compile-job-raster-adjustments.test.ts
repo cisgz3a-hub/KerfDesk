@@ -28,6 +28,15 @@ function rasterObject(lumaBase64: string): RasterImage {
   };
 }
 
+function twoPixelRasterObject(lumaBase64: string): RasterImage {
+  return {
+    ...rasterObject(lumaBase64),
+    pixelWidth: 2,
+    pixelHeight: 1,
+    bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 },
+  };
+}
+
 describe('compileJob raster image adjustments', () => {
   it('applies raster image brightness before grayscale dithering', () => {
     const layer = {
@@ -41,5 +50,36 @@ describe('compileJob raster image adjustments', () => {
     const job = compileJob({ objects: [image], layers: [layer] }, dev);
 
     expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual([89]);
+  });
+
+  it('inverts image-mode luma before emitting raster power when negative image is enabled', () => {
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
+      ditherAlgorithm: 'threshold' as const,
+      negativeImage: true,
+      linesPerMm: 1,
+    };
+    const image = twoPixelRasterObject('AP8=');
+
+    const job = compileJob({ objects: [image], layers: [layer] }, dev);
+
+    expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual([0, 300]);
+  });
+
+  it('uses the source image pixel grid when pass-through is enabled', () => {
+    const layer = {
+      ...createLayer({ id: 'image', color: '#808080', mode: 'image' as const }),
+      ditherAlgorithm: 'threshold' as const,
+      passThrough: true,
+      linesPerMm: 10,
+    };
+    const image = twoPixelRasterObject('AP8=');
+
+    const job = compileJob({ objects: [image], layers: [layer] }, dev);
+    const raster = firstRasterGroup(job);
+
+    expect(raster?.pixelWidth).toBe(2);
+    expect(raster?.pixelHeight).toBe(1);
+    expect(Array.from(raster?.sValues ?? [])).toEqual([300, 0]);
   });
 });

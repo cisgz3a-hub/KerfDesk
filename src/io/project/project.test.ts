@@ -136,6 +136,30 @@ describe('deserializeProject', () => {
     }
   });
 
+  it('reports invalid when image layer toggles have the wrong type', () => {
+    const project = aProject();
+    const text = serializeProject({
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [
+          {
+            ...project.scene.layers[0],
+            negativeImage: 'true',
+            passThrough: 'true',
+          } as unknown as Project['scene']['layers'][number],
+        ],
+      },
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.layers\[0\]\.negativeImage/);
+    }
+  });
+
   it('reports invalid when a scene object has an unknown kind', () => {
     const project = aProject();
     const text = serializeProject({
@@ -212,6 +236,8 @@ describe('deserializeProject', () => {
       expect(layer?.hatchSpacingMm).toBe(0.1);
       expect(layer?.fillOverscanMm).toBe(5);
       expect(layer?.minPower).toBe(0);
+      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(false);
+      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(false);
       // ADR-038: pre-unidirectional files back-fill to snake (true), matching
       // the fill they were authored against.
       expect(layer?.fillBidirectional).toBe(true);

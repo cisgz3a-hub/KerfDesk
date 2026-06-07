@@ -4,15 +4,16 @@
 // buffers, and the full G-code string (roadmap P1-A, the "app froze after an
 // image job / image scan" class).
 //
-// It sizes each output raster from its machine-coord bounds x the layer's
-// lines/mm WITHOUT compiling, then checks the pixel budget. Returns the same
-// PreflightResult shape as runPreflight so callers (emitGcode, the live
-// estimate) treat both uniformly. Pure-core: no clock, no random, no I/O.
+// It sizes each output raster from the exact pixel grid compileJob will use:
+// bounds x lines/mm for normal image mode, source pixels for Pass-through.
+// Returns the same PreflightResult shape as runPreflight so callers (emitGcode,
+// the live estimate) treat both uniformly. Pure-core: no clock, no random, no
+// I/O.
 
 import { pixelExtentForMm } from '../raster';
 import { evaluateRasterBudget } from '../raster/raster-budget';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
-import type { Project } from '../scene';
+import type { Layer, Project, RasterImage } from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
@@ -23,16 +24,38 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
       (l) => l.output && l.mode === 'image' && l.color === obj.color,
     );
     if (layer === undefined) continue;
-    const bounds = rasterBoundsInMachineCoords(obj, project.device);
-    const pw = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
-    const ph = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
+    const { pixelWidth: pw, pixelHeight: ph, remedy } = rasterBudgetDimensions(obj, layer, project);
     const verdict = evaluateRasterBudget(pw, ph);
     if (verdict.kind === 'too-large') {
       issues.push({
         code: 'raster-too-large',
-        message: `Layer ${layer.id} image would engrave at ${pw}x${ph} px (${verdict.reason}). Lower the layer resolution (lines/mm) or scale the image down before engraving.`,
+        message: `Layer ${layer.id} image would engrave at ${pw}x${ph} px (${verdict.reason}). ${remedy}`,
       });
     }
   }
   return { ok: issues.length === 0, issues };
+}
+
+function rasterBudgetDimensions(
+  obj: RasterImage,
+  layer: Layer,
+  project: Project,
+): {
+  readonly pixelWidth: number;
+  readonly pixelHeight: number;
+  readonly remedy: string;
+} {
+  if (layer.passThrough) {
+    return {
+      pixelWidth: obj.pixelWidth,
+      pixelHeight: obj.pixelHeight,
+      remedy: 'Disable Pass-through or import a smaller/preprocessed image before engraving.',
+    };
+  }
+  const bounds = rasterBoundsInMachineCoords(obj, project.device);
+  return {
+    pixelWidth: pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm),
+    pixelHeight: pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm),
+    remedy: 'Lower the layer resolution (lines/mm) or scale the image down before engraving.',
+  };
 }

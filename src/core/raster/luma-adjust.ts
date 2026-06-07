@@ -26,6 +26,11 @@ export function applyLumaAdjustments(input: Uint8Array, adjustments: LumaAdjustm
   return out;
 }
 
+export function maybeInvertLuma(input: Uint8Array, negative: boolean): Uint8Array {
+  if (!negative) return input;
+  return mapLuma(input, (v) => BYTE_MAX - v);
+}
+
 function mapLuma(input: Uint8Array, transform: (v: number) => number): Uint8Array {
   const out = new Uint8Array(input.length);
   for (let i = 0; i < input.length; i += 1) out[i] = transform(input[i] ?? BYTE_MAX);
