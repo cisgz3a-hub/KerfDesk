@@ -23,6 +23,7 @@ export function ConvertToBitmapDialog(props: {
   readonly onConvert: (options: ConvertToBitmapDialogOptions) => void;
 }): JSX.Element {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [dpi, setDpi] = useState(DEFAULT_CONVERT_TO_BITMAP_DPI);
   const plan = useMemo(
     () => estimateBitmapConversion({ bounds: props.bounds, transform: props.transform }, dpi),
@@ -31,14 +32,13 @@ export function ConvertToBitmapDialog(props: {
   useDialogA11y(dialogRef, props.onCancel);
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    if (plan.verdict.kind === 'too-large') return;
     const form = e.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
-    const data = new FormData(form);
-    props.onConvert({
-      renderType: parseRenderType(String(data.get('renderType') ?? '')),
-      dpi: parseDpi(String(data.get('dpi') ?? '')),
-    });
+    submitConvert(form, plan.verdict.kind, props.onConvert);
+  };
+  const onConvertClick = (): void => {
+    if (formRef.current === null) return;
+    submitConvert(formRef.current, plan.verdict.kind, props.onConvert);
   };
   return (
     <div
@@ -49,7 +49,7 @@ export function ConvertToBitmapDialog(props: {
       tabIndex={-1}
       style={backdropStyle}
     >
-      <form onSubmit={onSubmit} style={panelStyle}>
+      <form ref={formRef} onSubmit={onSubmit} style={panelStyle}>
         <h2 style={headingStyle}>Convert to Bitmap</h2>
         <Field label="Source">
           <span style={sourceStyle} title={props.sourceName}>
@@ -63,13 +63,30 @@ export function ConvertToBitmapDialog(props: {
           <button type="button" onClick={props.onCancel}>
             Cancel
           </button>
-          <button type="submit" disabled={plan.verdict.kind === 'too-large'}>
+          <button
+            type="button"
+            onClick={onConvertClick}
+            disabled={plan.verdict.kind === 'too-large'}
+          >
             Convert
           </button>
         </div>
       </form>
     </div>
   );
+}
+
+function submitConvert(
+  form: HTMLFormElement,
+  verdictKind: ReturnType<typeof estimateBitmapConversion>['verdict']['kind'],
+  onConvert: (options: ConvertToBitmapDialogOptions) => void,
+): void {
+  if (verdictKind === 'too-large') return;
+  const data = new FormData(form);
+  onConvert({
+    renderType: parseRenderType(String(data.get('renderType') ?? '')),
+    dpi: parseDpi(String(data.get('dpi') ?? '')),
+  });
 }
 
 function RenderTypeField(): JSX.Element {

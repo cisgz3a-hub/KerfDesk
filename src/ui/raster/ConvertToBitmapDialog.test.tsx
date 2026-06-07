@@ -31,6 +31,21 @@ describe('ConvertToBitmapDialog', () => {
     }
   });
 
+  it('submits when the operator clicks Convert', async () => {
+    const onConvert = vi.fn();
+    const { host, root } = await renderDialog({ bounds: smallBounds, onConvert });
+    try {
+      await act(async () => {
+        Simulate.click(findButton(host, 'Convert'));
+      });
+
+      expect(onConvert).toHaveBeenCalledWith({ renderType: 'fill-all', dpi: 254 });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('disables Convert when the requested DPI exceeds the raster budget', async () => {
     const onConvert = vi.fn();
     const { host, root } = await renderDialog({ bounds: hugeBounds, onConvert });
