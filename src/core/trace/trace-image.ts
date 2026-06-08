@@ -113,7 +113,7 @@ export type TraceOptions = {
   //
   // useOtsuThreshold: when true, the cutoff is picked from the
   // image's luma histogram (Otsu 1979) instead of a fixed value.
-  // Overrides thresholdLuma when both are set.
+  // Used only when explicit cutoffLuma / thresholdLuma are absent.
   readonly useOtsuThreshold?: boolean;
   // medianFilter: 3×3 median filter (RGBA → greyscale) applied
   // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
@@ -321,17 +321,17 @@ function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawI
   return out;
 }
 
-// Otsu wins when both are set — it derives the cutoff from the
-// histogram, so a hand-set thresholdLuma would be ignored anyway.
+// Manual Cutoff/Threshold wins over Otsu. LightBurn's trace controls
+// are explicit user input; Otsu is only an automatic preset default.
 function applyThreshold(image: RawImageData, options: TraceOptions): RawImageData {
-  if (options.useOtsuThreshold === true) {
-    return thresholdToMonochrome(image, otsuThreshold(image));
-  }
   if (options.cutoffLuma !== undefined) {
     return thresholdBandToMonochrome(image, options.cutoffLuma, options.thresholdLuma ?? 128);
   }
   if (options.thresholdLuma !== undefined) {
     return thresholdToMonochrome(image, options.thresholdLuma);
+  }
+  if (options.useOtsuThreshold === true) {
+    return thresholdToMonochrome(image, otsuThreshold(image));
   }
   return image;
 }

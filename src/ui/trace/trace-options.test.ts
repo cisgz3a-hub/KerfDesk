@@ -14,6 +14,7 @@ import {
 } from './trace-options';
 
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
+const SMOOTH = TRACE_PRESETS['Smooth'] as TraceOptions;
 // A photo-like multi-colour options object (the shape the removed "Photo"
 // preset had). Kept inline so mergeLightBurnTraceSettings behaviour on a
 // non-fixedPalette options object stays covered after Photo/Detailed were
@@ -103,6 +104,31 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.ignoreLessThanPixels).toBeUndefined();
     expect(merged.despeckleMinPixels).toBe(PHOTO.despeckleMinPixels);
     expect(merged.numberOfColors).toBe(PHOTO.numberOfColors);
+  });
+
+  it('makes manual Cutoff/Threshold overrides authoritative over Otsu presets', () => {
+    expect(SMOOTH.useOtsuThreshold).toBe(true);
+
+    const merged = mergeLightBurnTraceSettings(SMOOTH, {
+      cutoffLuma: 24,
+      thresholdLuma: 160,
+    });
+
+    expect(merged.useOtsuThreshold).toBeUndefined();
+    expect(merged.cutoffLuma).toBe(24);
+    expect(merged.thresholdLuma).toBe(160);
+  });
+
+  it('keeps Otsu enabled when non-threshold trace controls change', () => {
+    expect(SMOOTH.useOtsuThreshold).toBe(true);
+
+    const merged = mergeLightBurnTraceSettings(SMOOTH, {
+      ignoreLessThanPixels: 12,
+      smoothness: 0.8,
+      optimize: 0.3,
+    });
+
+    expect(merged.useOtsuThreshold).toBe(true);
   });
 });
 
