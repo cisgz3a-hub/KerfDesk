@@ -1,14 +1,16 @@
 import * as styles from './AdjustImageDialog.styles';
+import {
+  findUserImagePreset,
+  type ImagePresetSettings,
+  type UserImagePreset,
+  userImagePresetId,
+} from './AdjustImageDialog.user-presets';
 
 export type BuiltInImagePresetId = 'custom' | 'basic' | 'black-paint-on-white';
+export type ImagePresetId = BuiltInImagePresetId | `user:${string}`;
 
-type PresetDraft = {
-  readonly presetId: BuiltInImagePresetId;
-  readonly brightness: number;
-  readonly contrast: number;
-  readonly gamma: number;
-  readonly negativeImage: boolean;
-  readonly invertDisplay: boolean;
+type PresetDraft = ImagePresetSettings & {
+  readonly presetId: ImagePresetId;
 };
 
 const BUILT_IN_IMAGE_PRESETS = [
@@ -21,16 +23,20 @@ const BUILT_IN_IMAGE_PRESETS = [
 }[];
 
 export function PresetField(props: {
-  readonly value: BuiltInImagePresetId;
-  readonly onChange: (value: BuiltInImagePresetId) => void;
+  readonly value: ImagePresetId;
+  readonly userPresets: readonly UserImagePreset[];
+  readonly onChange: (value: ImagePresetId) => void;
+  readonly onSave: () => void;
+  readonly onDelete: () => void;
 }): JSX.Element {
+  const canDelete = findUserImagePreset(props.userPresets, props.value) !== null;
   return (
     <label style={styles.fieldStyle}>
       <span style={styles.labelStyle}>Preset</span>
       <select
         name="imagePreset"
         value={props.value}
-        onChange={(event) => props.onChange(parseBuiltInImagePreset(event.target.value))}
+        onChange={(event) => props.onChange(parseImagePresetId(event.target.value))}
         style={styles.inputStyle}
       >
         {BUILT_IN_IMAGE_PRESETS.map((preset) => (
@@ -38,16 +44,35 @@ export function PresetField(props: {
             {preset.label}
           </option>
         ))}
+        {props.userPresets.map((preset) => (
+          <option key={preset.name} value={userImagePresetId(preset.name)}>
+            {preset.name}
+          </option>
+        ))}
       </select>
+      <span style={styles.presetActionsStyle}>
+        <button name="saveImagePreset" type="button" onClick={props.onSave}>
+          Save
+        </button>
+        <button
+          name="deleteImagePreset"
+          type="button"
+          disabled={!canDelete}
+          onClick={props.onDelete}
+        >
+          Delete
+        </button>
+      </span>
     </label>
   );
 }
 
 export function applyBuiltInImagePreset<T extends PresetDraft>(
   draft: T,
-  presetId: BuiltInImagePresetId,
+  presetId: ImagePresetId,
 ): T {
   if (presetId === 'custom') return { ...draft, presetId };
+  if (presetId.startsWith('user:')) return { ...draft, presetId };
   const base = {
     ...draft,
     presetId,
@@ -63,8 +88,27 @@ export function applyBuiltInImagePreset<T extends PresetDraft>(
   return base;
 }
 
-export function parseBuiltInImagePreset(value: string): BuiltInImagePresetId {
-  return BUILT_IN_IMAGE_PRESETS.some((preset) => preset.id === value)
-    ? (value as BuiltInImagePresetId)
+export function applyUserImagePreset<T extends PresetDraft>(draft: T, preset: UserImagePreset): T {
+  return { ...draft, presetId: userImagePresetId(preset.name), ...preset.settings };
+}
+
+export function imagePresetSettingsFromDraft(draft: PresetDraft): ImagePresetSettings {
+  return {
+    brightness: draft.brightness,
+    contrast: draft.contrast,
+    gamma: draft.gamma,
+    ditherAlgorithm: draft.ditherAlgorithm,
+    minPower: draft.minPower,
+    linesPerMm: draft.linesPerMm,
+    dotWidthCorrectionMm: draft.dotWidthCorrectionMm,
+    negativeImage: draft.negativeImage,
+    passThrough: draft.passThrough,
+    invertDisplay: draft.invertDisplay,
+  };
+}
+
+export function parseImagePresetId(value: string): ImagePresetId {
+  return BUILT_IN_IMAGE_PRESETS.some((preset) => preset.id === value) || value.startsWith('user:')
+    ? (value as ImagePresetId)
     : 'custom';
 }

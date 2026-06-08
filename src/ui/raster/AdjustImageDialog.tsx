@@ -1,16 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react';
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
-import { DITHER_ALGORITHMS, type Layer, type RasterImage } from '../../core/scene';
+import type { Layer, RasterImage } from '../../core/scene';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import type { RasterImageAdjustmentPatch } from '../state/raster-adjustment-actions';
+import { AdjustFields } from './AdjustImageDialog.fields';
+import { dotWidthCorrectionMax, numberValue, parseDither } from './AdjustImageDialog.form-utils';
 import {
   applyBuiltInImagePreset,
-  type BuiltInImagePresetId,
-  parseBuiltInImagePreset,
-  PresetField,
+  applyUserImagePreset,
+  imagePresetSettingsFromDraft,
+  type ImagePresetId,
+  parseImagePresetId,
 } from './AdjustImageDialog.presets';
 import { drawAdjustImagePreview } from './AdjustImageDialog.preview';
 import * as styles from './AdjustImageDialog.styles';
+import type { AdjustImageDraft } from './AdjustImageDialog.types';
+import {
+  deleteUserImagePreset,
+  findUserImagePreset,
+  readUserImagePresets,
+  saveUserImagePreset,
+  type UserImagePreset,
+  userImagePresetId,
+  writeUserImagePresets,
+} from './AdjustImageDialog.user-presets';
 
 type LayerPatch = Pick<
   Layer,
@@ -27,20 +40,6 @@ export type AdjustImageApply = {
   readonly layerPatch: LayerPatch;
 };
 
-type Draft = {
-  readonly presetId: BuiltInImagePresetId;
-  readonly brightness: number;
-  readonly contrast: number;
-  readonly gamma: number;
-  readonly ditherAlgorithm: Layer['ditherAlgorithm'];
-  readonly minPower: number;
-  readonly linesPerMm: number;
-  readonly dotWidthCorrectionMm: number;
-  readonly negativeImage: boolean;
-  readonly passThrough: boolean;
-  readonly invertDisplay: boolean;
-};
-
 export function AdjustImageDialog(props: {
   readonly image: RasterImage;
   readonly layer: Layer;
@@ -50,13 +49,14 @@ export function AdjustImageDialog(props: {
   const dialogRef = useRef<HTMLDivElement>(null);
   const sourceRef = useRef<HTMLCanvasElement>(null);
   const processedRef = useRef<HTMLCanvasElement>(null);
-  const [draft, setDraft] = useState<Draft>(() => initialDraft(props.image, props.layer));
+  const [draft, setDraft] = useState<AdjustImageDraft>(() =>
+    initialDraft(props.image, props.layer),
+  );
+  const presetControls = useImagePresetControls(draft, setDraft);
   useDialogA11y(dialogRef, props.onCancel);
   usePreviewEffects(sourceRef, processedRef, props.image, draft);
-  const update = (patch: Partial<Draft>): void =>
+  const update = (patch: Partial<AdjustImageDraft>): void =>
     setDraft((prev) => normalizeDraft({ ...prev, ...patch }));
-  const applyPreset = (presetId: BuiltInImagePresetId): void =>
-    setDraft((prev) => normalizeDraft(applyBuiltInImagePreset(prev, presetId)));
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
     props.onApply(patchFromDraft(draft));
@@ -78,7 +78,10 @@ export function AdjustImageDialog(props: {
           draft={draft}
           maxPower={props.layer.power}
           update={update}
-          applyPreset={applyPreset}
+          applyPreset={presetControls.applyPreset}
+          userPresets={presetControls.userPresets}
+          savePreset={presetControls.savePreset}
+          deletePreset={presetControls.deletePreset}
         />
         <DialogActions onCancel={props.onCancel} />
       </form>
@@ -86,11 +89,65 @@ export function AdjustImageDialog(props: {
   );
 }
 
+function useImagePresetControls(
+  draft: AdjustImageDraft,
+  setDraft: Dispatch<SetStateAction<AdjustImageDraft>>,
+): {
+  readonly userPresets: readonly UserImagePreset[];
+  readonly applyPreset: (presetId: ImagePresetId) => void;
+  readonly savePreset: () => void;
+  readonly deletePreset: () => void;
+} {
+  const [userPresets, setUserPresets] = useState<readonly UserImagePreset[]>(() =>
+    readUserImagePresets(),
+  );
+  const applyPreset = (presetId: ImagePresetId): void =>
+    setDraft((prev) => {
+      const userPreset = findUserImagePreset(userPresets, presetId);
+      return normalizeDraft(
+        userPreset === null
+          ? applyBuiltInImagePreset(prev, presetId)
+          : applyUserImagePreset(prev, userPreset),
+      );
+    });
+  const savePreset = (): void => {
+    const name = window.prompt('Preset name');
+    if (name === null) return;
+    const saveResult = saveUserImagePreset(userPresets, name, imagePresetSettingsFromDraft(draft));
+    if (saveResult.kind !== 'ok') {
+      window.alert(imagePresetSaveError(saveResult.kind));
+      return;
+    }
+    const writeResult = writeUserImagePresets(saveResult.presets);
+    if (writeResult.kind !== 'ok') {
+      window.alert('Could not save image preset. Browser storage is unavailable.');
+      return;
+    }
+    setUserPresets(saveResult.presets);
+    setDraft((prev) =>
+      normalizeDraft({ ...prev, presetId: userImagePresetId(saveResult.preset.name) }),
+    );
+  };
+  const deletePreset = (): void => {
+    const preset = findUserImagePreset(userPresets, draft.presetId);
+    if (preset === null) return;
+    const nextPresets = deleteUserImagePreset(userPresets, preset.name);
+    const writeResult = writeUserImagePresets(nextPresets);
+    if (writeResult.kind !== 'ok') {
+      window.alert('Could not delete image preset. Browser storage is unavailable.');
+      return;
+    }
+    setUserPresets(nextPresets);
+    setDraft((prev) => normalizeDraft({ ...prev, presetId: 'custom' }));
+  };
+  return { userPresets, applyPreset, savePreset, deletePreset };
+}
+
 function usePreviewEffects(
   sourceRef: React.RefObject<HTMLCanvasElement>,
   processedRef: React.RefObject<HTMLCanvasElement>,
   image: RasterImage,
-  draft: Draft,
+  draft: AdjustImageDraft,
 ): void {
   useEffect(
     () => drawAdjustImagePreview(sourceRef.current, image, draft, 'source'),
@@ -102,7 +159,7 @@ function usePreviewEffects(
   );
 }
 
-function patchFromDraft(draft: Draft): AdjustImageApply {
+function patchFromDraft(draft: AdjustImageDraft): AdjustImageApply {
   return {
     imagePatch: {
       brightness: draft.brightness,
@@ -153,124 +210,6 @@ function PreviewGrid(props: {
   );
 }
 
-function AdjustFields(props: {
-  readonly draft: Draft;
-  readonly maxPower: number;
-  readonly update: (patch: Partial<Draft>) => void;
-  readonly applyPreset: (presetId: BuiltInImagePresetId) => void;
-}): JSX.Element {
-  const { draft, update, applyPreset } = props;
-  return (
-    <div style={styles.fieldsGridStyle}>
-      <PresetField value={draft.presetId} onChange={applyPreset} />
-      <NumberField
-        name="brightness"
-        label="Brightness"
-        value={draft.brightness}
-        min={-100}
-        max={100}
-        step={1}
-        onChange={(brightness) => update({ brightness })}
-      />
-      <NumberField
-        name="contrast"
-        label="Contrast"
-        value={draft.contrast}
-        min={-100}
-        max={100}
-        step={1}
-        onChange={(contrast) => update({ contrast })}
-      />
-      <NumberField
-        name="gamma"
-        label="Gamma"
-        value={draft.gamma}
-        min={0.1}
-        max={5}
-        step={0.05}
-        onChange={(gamma) => update({ gamma })}
-      />
-      <RasterSettingsFields draft={draft} maxPower={props.maxPower} update={update} />
-      <RasterToggleFields draft={draft} update={update} />
-    </div>
-  );
-}
-
-function RasterSettingsFields(props: {
-  readonly draft: Draft;
-  readonly maxPower: number;
-  readonly update: (patch: Partial<Draft>) => void;
-}): JSX.Element {
-  const { draft, update } = props;
-  return (
-    <>
-      <SelectField
-        value={draft.ditherAlgorithm}
-        onChange={(ditherAlgorithm) => update({ ditherAlgorithm })}
-      />
-      <NumberField
-        name="minPower"
-        label="Min Power"
-        value={draft.minPower}
-        min={0}
-        max={props.maxPower}
-        step={1}
-        unit="%"
-        onChange={(minPower) => update({ minPower })}
-      />
-      <NumberField
-        name="linesPerMm"
-        label="Resolution"
-        value={draft.linesPerMm}
-        min={5}
-        max={MAX_RASTER_LINES_PER_MM}
-        step={1}
-        unit="lines / mm"
-        onChange={(linesPerMm) => update({ linesPerMm })}
-      />
-      <NumberField
-        name="dotWidthCorrectionMm"
-        label="Dot Width"
-        value={draft.dotWidthCorrectionMm}
-        min={0}
-        max={dotWidthCorrectionMax(draft.linesPerMm)}
-        step={0.001}
-        unit="mm"
-        onChange={(dotWidthCorrectionMm) => update({ dotWidthCorrectionMm })}
-      />
-    </>
-  );
-}
-
-function RasterToggleFields(props: {
-  readonly draft: Draft;
-  readonly update: (patch: Partial<Draft>) => void;
-}): JSX.Element {
-  const { draft, update } = props;
-  return (
-    <>
-      <CheckboxField
-        name="negativeImage"
-        label="Negative Image"
-        checked={draft.negativeImage}
-        onChange={(negativeImage) => update({ negativeImage })}
-      />
-      <CheckboxField
-        name="passThrough"
-        label="Pass-through"
-        checked={draft.passThrough}
-        onChange={(passThrough) => update({ passThrough })}
-      />
-      <CheckboxField
-        name="invertDisplay"
-        label="Invert Preview"
-        checked={draft.invertDisplay}
-        onChange={(invertDisplay) => update({ invertDisplay })}
-      />
-    </>
-  );
-}
-
 function DialogActions({ onCancel }: { readonly onCancel: () => void }): JSX.Element {
   return (
     <div style={styles.actionsStyle}>
@@ -294,77 +233,7 @@ function PreviewPane(props: {
   );
 }
 
-function NumberField(props: {
-  readonly name: string;
-  readonly label: string;
-  readonly value: number;
-  readonly min: number;
-  readonly max: number;
-  readonly step: number;
-  readonly unit?: string;
-  readonly onChange: (value: number) => void;
-}): JSX.Element {
-  return (
-    <label style={styles.fieldStyle}>
-      <span style={styles.labelStyle}>{props.label}</span>
-      <input
-        name={props.name}
-        type="number"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onChange={(event) => props.onChange(numberValue(event.target.value, props.min, props.max))}
-        style={styles.inputStyle}
-      />
-      {props.unit === undefined ? null : <span style={styles.unitStyle}>{props.unit}</span>}
-    </label>
-  );
-}
-
-function SelectField(props: {
-  readonly value: Layer['ditherAlgorithm'];
-  readonly onChange: (value: Layer['ditherAlgorithm']) => void;
-}): JSX.Element {
-  return (
-    <label style={styles.fieldStyle}>
-      <span style={styles.labelStyle}>Dither</span>
-      <select
-        name="ditherAlgorithm"
-        value={props.value}
-        onChange={(event) => props.onChange(parseDither(event.target.value))}
-        style={styles.inputStyle}
-      >
-        {DITHER_ALGORITHMS.map((algorithm) => (
-          <option key={algorithm} value={algorithm}>
-            {algorithmLabel(algorithm)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function CheckboxField(props: {
-  readonly name: string;
-  readonly label: string;
-  readonly checked: boolean;
-  readonly onChange: (checked: boolean) => void;
-}): JSX.Element {
-  return (
-    <label style={styles.checkboxStyle}>
-      <span style={styles.labelStyle}>{props.label}</span>
-      <input
-        name={props.name}
-        type="checkbox"
-        checked={props.checked}
-        onChange={(event) => props.onChange(event.target.checked)}
-      />
-    </label>
-  );
-}
-
-function initialDraft(image: RasterImage, layer: Layer): Draft {
+function initialDraft(image: RasterImage, layer: Layer): AdjustImageDraft {
   return normalizeDraft({
     presetId: 'custom',
     brightness: image.brightness ?? 0,
@@ -380,11 +249,11 @@ function initialDraft(image: RasterImage, layer: Layer): Draft {
   });
 }
 
-function normalizeDraft(draft: Draft): Draft {
+function normalizeDraft(draft: AdjustImageDraft): AdjustImageDraft {
   const linesPerMm = numberValue(String(draft.linesPerMm), 5, MAX_RASTER_LINES_PER_MM);
   return {
     ...draft,
-    presetId: parseBuiltInImagePreset(draft.presetId),
+    presetId: parseImagePresetId(draft.presetId),
     brightness: numberValue(String(draft.brightness), -100, 100),
     contrast: numberValue(String(draft.contrast), -100, 100),
     gamma: numberValue(String(draft.gamma), 0.1, 5),
@@ -399,25 +268,8 @@ function normalizeDraft(draft: Draft): Draft {
   };
 }
 
-function numberValue(value: string, min: number, max: number): number {
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return min;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function parseDither(value: string): Layer['ditherAlgorithm'] {
-  return DITHER_ALGORITHMS.some((algorithm) => algorithm === value)
-    ? (value as Layer['ditherAlgorithm'])
-    : 'floyd-steinberg';
-}
-
-function dotWidthCorrectionMax(linesPerMm: number): number {
-  return 1 / Math.max(1, linesPerMm);
-}
-
-function algorithmLabel(algorithm: Layer['ditherAlgorithm']): string {
-  return algorithm
-    .split('-')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+function imagePresetSaveError(kind: 'invalid-name' | 'reserved-name'): string {
+  return kind === 'invalid-name'
+    ? 'Image preset name is required.'
+    : 'That image preset name is reserved.';
 }

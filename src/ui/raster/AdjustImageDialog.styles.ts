@@ -77,6 +77,8 @@ export const inputStyle: React.CSSProperties = {
   padding: '5px 7px',
 };
 
+export const presetActionsStyle: React.CSSProperties = { display: 'flex', gap: 4 };
+
 export const unitStyle: React.CSSProperties = { color: '#666', fontSize: 12 };
 
 export const actionsStyle: React.CSSProperties = {

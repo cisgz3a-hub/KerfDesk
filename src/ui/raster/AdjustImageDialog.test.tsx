@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, type RasterImage } from '../../core/scene';
 import { AdjustImageDialog } from './AdjustImageDialog';
 
@@ -33,6 +33,15 @@ const layer = {
   minPower: 5,
   linesPerMm: 10,
 };
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
 
 describe('AdjustImageDialog', () => {
   it('stages image and layer changes until OK', async () => {
@@ -158,6 +167,73 @@ describe('AdjustImageDialog', () => {
       host.remove();
     }
   });
+
+  it('saves, reapplies, and deletes user presets without applying to the scene', async () => {
+    const onApply = vi.fn();
+    vi.spyOn(window, 'prompt').mockReturnValue('Wood logo');
+    const { host, root } = await renderDialog({ onApply });
+    try {
+      change(host, 'input[name="brightness"]', '33');
+      change(host, 'input[name="contrast"]', '-12');
+      change(host, 'input[name="gamma"]', '1.8');
+      change(host, 'select[name="ditherAlgorithm"]', 'jarvis');
+      change(host, 'input[name="minPower"]', '9');
+      change(host, 'input[name="linesPerMm"]', '15');
+      change(host, 'input[name="dotWidthCorrectionMm"]', '0.02');
+      click(host, 'input[name="negativeImage"]');
+      click(host, 'input[name="passThrough"]');
+      click(host, 'input[name="invertDisplay"]');
+
+      clickButton(host, 'button[name="saveImagePreset"]');
+
+      expect(host.querySelector('option[value="user:Wood logo"]')).not.toBeNull();
+
+      change(host, 'input[name="brightness"]', '0');
+      change(host, 'input[name="contrast"]', '0');
+      change(host, 'input[name="gamma"]', '1');
+      change(host, 'select[name="ditherAlgorithm"]', 'threshold');
+      change(host, 'input[name="minPower"]', '0');
+      change(host, 'input[name="linesPerMm"]', '10');
+      change(host, 'input[name="dotWidthCorrectionMm"]', '0');
+      click(host, 'input[name="negativeImage"]');
+      click(host, 'input[name="passThrough"]');
+      click(host, 'input[name="invertDisplay"]');
+
+      change(host, 'select[name="imagePreset"]', 'user:Wood logo');
+
+      expect((host.querySelector('input[name="brightness"]') as HTMLInputElement).value).toBe('33');
+      expect((host.querySelector('input[name="contrast"]') as HTMLInputElement).value).toBe('-12');
+      expect((host.querySelector('input[name="gamma"]') as HTMLInputElement).value).toBe('1.8');
+      expect(
+        (host.querySelector('select[name="ditherAlgorithm"]') as HTMLSelectElement).value,
+      ).toBe('jarvis');
+      expect((host.querySelector('input[name="minPower"]') as HTMLInputElement).value).toBe('9');
+      expect((host.querySelector('input[name="linesPerMm"]') as HTMLInputElement).value).toBe('15');
+      expect(
+        (host.querySelector('input[name="dotWidthCorrectionMm"]') as HTMLInputElement).value,
+      ).toBe('0.02');
+      expect((host.querySelector('input[name="negativeImage"]') as HTMLInputElement).checked).toBe(
+        true,
+      );
+      expect((host.querySelector('input[name="passThrough"]') as HTMLInputElement).checked).toBe(
+        true,
+      );
+      expect((host.querySelector('input[name="invertDisplay"]') as HTMLInputElement).checked).toBe(
+        true,
+      );
+
+      clickButton(host, 'button[name="deleteImagePreset"]');
+
+      expect(host.querySelector('option[value="user:Wood logo"]')).toBeNull();
+      expect((host.querySelector('select[name="imagePreset"]') as HTMLSelectElement).value).toBe(
+        'custom',
+      );
+      expect(onApply).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
 
 async function renderDialog(opts: {
@@ -199,5 +275,13 @@ function click(host: HTMLElement, selector: string): void {
   act(() => {
     input.checked = !input.checked;
     Simulate.change(input);
+  });
+}
+
+function clickButton(host: HTMLElement, selector: string): void {
+  const button = host.querySelector(selector);
+  if (!(button instanceof HTMLButtonElement)) throw new Error(`${selector} missing`);
+  act(() => {
+    Simulate.click(button);
   });
 }
