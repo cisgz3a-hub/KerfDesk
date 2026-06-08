@@ -2,7 +2,9 @@
 // operation returns a fresh Scene (CLAUDE.md "Mutable state — none").
 
 import type { Layer } from './layer';
-import type { SceneObject } from './scene-object';
+import { assertNever, type ColoredPath, type SceneObject } from './scene-object';
+
+const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 export type Scene = {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -30,6 +32,18 @@ export function replaceObject(scene: Scene, objectId: string, replacement: Scene
     ...scene,
     objects: scene.objects.map((o) => (o.id === objectId ? replacement : o)),
   };
+}
+
+export function assignObjectToLayer(scene: Scene, objectId: string, color: string): Scene {
+  const nextColor = normalizeLayerColor(color);
+  let changed = false;
+  const objects = scene.objects.map((object) => {
+    if (object.id !== objectId) return object;
+    const assigned = assignSceneObjectColor(object, nextColor);
+    if (assigned !== object) changed = true;
+    return assigned;
+  });
+  return changed ? { ...scene, objects } : scene;
 }
 
 export function addLayer(scene: Scene, layer: Layer): Scene {
@@ -60,4 +74,39 @@ export function moveLayer(scene: Scene, layerId: string, direction: LayerMoveDir
   if (layer === undefined) return scene;
   layers.splice(nextIndex, 0, layer);
   return { ...scene, layers };
+}
+
+function assignSceneObjectColor(object: SceneObject, color: string): SceneObject {
+  switch (object.kind) {
+    case 'imported-svg': {
+      const paths = recolorPaths(object.paths, color);
+      return paths === object.paths ? object : { ...object, paths };
+    }
+    case 'text': {
+      const paths = recolorPaths(object.paths, color);
+      return paths === object.paths && object.color === color
+        ? object
+        : { ...object, color, paths };
+    }
+    case 'traced-image': {
+      const paths = recolorPaths(object.paths, color);
+      return paths === object.paths ? object : { ...object, paths };
+    }
+    case 'raster-image':
+      return object.color === color ? object : { ...object, color };
+    default:
+      return assertNever(object, 'SceneObject');
+  }
+}
+
+function recolorPaths(
+  paths: ReadonlyArray<ColoredPath>,
+  color: string,
+): ReadonlyArray<ColoredPath> {
+  if (paths.every((path) => path.color === color)) return paths;
+  return paths.map((path) => ({ ...path, color }));
+}
+
+function normalizeLayerColor(color: string): string {
+  return LAYER_COLOR_RE.test(color) ? color.toLowerCase() : color;
 }

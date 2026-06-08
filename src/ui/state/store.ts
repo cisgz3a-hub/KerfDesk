@@ -28,6 +28,7 @@ import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
+import { layerActions } from './layer-actions';
 import {
   applyDuplicate,
   applyFreshImport,
@@ -108,6 +109,8 @@ export type AppState = {
   readonly fitToSelection: () => void;
   readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
   readonly moveLayer: (layerId: string, direction: LayerMoveDirection) => void;
+  readonly createManualLayer: (color: string) => void;
+  readonly assignSelectionToLayer: (layerId: string) => void;
   readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
@@ -436,6 +439,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...importSvgObjectAction(set, get),
   ...imageImportActions(set, get),
   ...rasterAdjustmentActions(set),
+  ...layerActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

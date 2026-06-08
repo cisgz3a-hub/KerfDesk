@@ -38,6 +38,7 @@ export {
   EMPTY_SCENE,
   addLayer,
   addObject,
+  assignObjectToLayer,
   moveLayer,
   removeLayer,
   removeObject,

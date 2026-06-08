@@ -67,6 +67,50 @@ describe('CutsLayersPanel layer order controls', () => {
       host.remove();
     }
   });
+
+  it('adds a manual layer and assigns the selected object to it', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().selectObject('O1');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const color = host.querySelector('input[aria-label="New layer color"]');
+      const add = host.querySelector('button[aria-label="Add layer"]');
+      if (!(color instanceof HTMLInputElement)) throw new Error('new layer color missing');
+      if (!(add instanceof HTMLButtonElement)) throw new Error('add layer button missing');
+
+      await act(async () => {
+        color.value = '#00ff00';
+        Simulate.change(color);
+        add.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+        '#ff0000',
+        '#00ff00',
+      ]);
+
+      const assign = host.querySelector('button[aria-label="Assign selection to #00ff00"]');
+      if (!(assign instanceof HTMLButtonElement)) throw new Error('assign button missing');
+      await act(async () => {
+        assign.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const obj = useStore.getState().project.scene.objects[0];
+      expect(obj?.kind).toBe('imported-svg');
+      if (obj?.kind !== 'imported-svg') throw new Error('expected imported svg');
+      expect(obj.paths.map((path) => path.color)).toEqual(['#00ff00']);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
 
 describe('CutsLayersPanel cut settings editor', () => {
