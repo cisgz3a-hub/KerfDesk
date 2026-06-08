@@ -52,6 +52,11 @@ export function TraceSettingsControls(props: {
         value={traceValue(props.preset, props.overrides, 'optimize')}
         onChange={(optimize) => set({ optimize })}
       />
+      <CheckboxRow
+        label="Trace Transparency"
+        checked={traceBooleanValue(props.preset, props.overrides, 'traceTransparency')}
+        onChange={(traceTransparency) => set({ traceTransparency })}
+      />
       <div style={resetRowStyle}>
         <button
           type="button"
@@ -66,12 +71,12 @@ export function TraceSettingsControls(props: {
   );
 }
 
-type TraceSettingKey = keyof LightBurnTraceSettingOverrides;
+type NumericTraceSettingKey = Exclude<keyof LightBurnTraceSettingOverrides, 'traceTransparency'>;
 
 function traceValue(
   preset: TraceOptions,
   overrides: LightBurnTraceSettingOverrides,
-  key: TraceSettingKey,
+  key: NumericTraceSettingKey,
 ): number {
   const override = overrides[key];
   if (override !== undefined) return override;
@@ -84,6 +89,16 @@ function traceValue(
   }
   const presetValue = preset[key];
   return presetValue ?? DEFAULT_LIGHTBURN_TRACE_SETTINGS[key];
+}
+
+function traceBooleanValue(
+  preset: TraceOptions,
+  overrides: LightBurnTraceSettingOverrides,
+  key: 'traceTransparency',
+): boolean {
+  const override = overrides[key];
+  if (override !== undefined) return override;
+  return preset[key] ?? DEFAULT_LIGHTBURN_TRACE_SETTINGS[key];
 }
 
 function NumberRow(props: {
@@ -106,6 +121,23 @@ function NumberRow(props: {
         onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
         style={numberStyle}
       />
+    </label>
+  );
+}
+
+function CheckboxRow(props: {
+  readonly label: string;
+  readonly checked: boolean;
+  readonly onChange: (next: boolean) => void;
+}): JSX.Element {
+  return (
+    <label style={checkboxRowStyle}>
+      <input
+        type="checkbox"
+        checked={props.checked}
+        onChange={(e) => props.onChange(e.target.checked)}
+      />
+      <span>{props.label}</span>
     </label>
   );
 }
@@ -146,6 +178,14 @@ const resetRowStyle: React.CSSProperties = {
   gridColumn: '1 / -1',
   display: 'flex',
   justifyContent: 'flex-end',
+};
+const checkboxRowStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
+  color: '#444',
 };
 const resetButtonStyle: React.CSSProperties = {
   fontSize: 11,

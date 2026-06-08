@@ -238,6 +238,35 @@ describe('traceImageToSvgString', () => {
     ]);
   });
 
+  it('Trace Transparency builds the trace mask from alpha instead of brightness', () => {
+    const data = new Uint8ClampedArray([
+      255,
+      255,
+      255,
+      255, // opaque white -> ink when tracing alpha
+      0,
+      0,
+      0,
+      0, // transparent black -> background
+      255,
+      255,
+      255,
+      64, // translucent white -> ink
+    ]);
+
+    const result = preprocessForTrace(
+      { width: 3, height: 1, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        cutoffLuma: 0,
+        thresholdLuma: 128,
+        traceTransparency: true,
+      },
+    );
+
+    expect(Array.from(result.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255]);
+  });
+
   it('preprocessForTrace applies the LightBurn brightness band when cutoffLuma is set', () => {
     const data = new Uint8ClampedArray([
       0, 0, 0, 255, 32, 32, 32, 255, 128, 128, 128, 255, 180, 180, 180, 255,

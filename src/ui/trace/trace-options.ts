@@ -15,6 +15,7 @@ export type LightBurnTraceSettingOverrides = {
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
+  readonly traceTransparency?: boolean;
 };
 
 export function mergeLightBurnTraceSettings(
@@ -35,6 +36,9 @@ export function mergeLightBurnTraceSettings(
   }
   if (settings.smoothness !== undefined) out['smoothness'] = clampMin(settings.smoothness, 0);
   if (settings.optimize !== undefined) out['optimize'] = clampMin(settings.optimize, 0);
+  if (settings.traceTransparency !== undefined) {
+    out['traceTransparency'] = settings.traceTransparency;
+  }
   return out as TraceOptions;
 }
 
