@@ -150,7 +150,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
           overrides={traceSettings}
           onChange={setTraceSettings}
         />
-        <TracePreview state={preview} />
+        <TracePreview state={preview} sourceDataUrl={seed.dataUrl} />
         <PresetHint />
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
       </form>

@@ -8,17 +8,42 @@
 // changes — important so the preset radio buttons don't jump under
 // the cursor.
 
+import { useState } from 'react';
+
 import type { TracePreviewState } from './use-trace-preview';
 
 type Props = {
   readonly state: TracePreviewState;
+  readonly sourceDataUrl?: string;
 };
 
 export function TracePreview(props: Props): JSX.Element {
   const { state } = props;
+  const [isSourceFaded, setIsSourceFaded] = useState(false);
+  const hasSource = props.sourceDataUrl !== undefined && props.sourceDataUrl.length > 0;
   return (
-    <div style={frameStyle} aria-label="Trace preview">
-      <Inner state={state} />
+    <div style={stackStyle}>
+      {hasSource ? (
+        <button
+          type="button"
+          aria-pressed={isSourceFaded}
+          onClick={() => setIsSourceFaded((next) => !next)}
+          style={fadeButtonStyle}
+        >
+          Fade Image
+        </button>
+      ) : null}
+      <div style={frameStyle} aria-label="Trace preview">
+        {hasSource ? (
+          <img
+            src={props.sourceDataUrl}
+            alt=""
+            aria-label="Trace source image"
+            style={sourceImageStyle(isSourceFaded)}
+          />
+        ) : null}
+        <Inner state={state} />
+      </div>
     </div>
   );
 }
@@ -48,7 +73,26 @@ function Inner(props: { readonly state: TracePreviewState }): JSX.Element {
   }
 }
 
+const SOURCE_NORMAL_OPACITY = 1;
+const SOURCE_FADED_OPACITY = 0.2;
+
+const stackStyle: React.CSSProperties = {
+  display: 'grid',
+  gap: 6,
+};
+
+const fadeButtonStyle: React.CSSProperties = {
+  justifySelf: 'start',
+  fontSize: 11,
+  padding: '2px 8px',
+  background: 'transparent',
+  border: '1px solid #ccc',
+  borderRadius: 3,
+  cursor: 'pointer',
+};
+
 const frameStyle: React.CSSProperties = {
+  position: 'relative',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -60,13 +104,29 @@ const frameStyle: React.CSSProperties = {
   overflow: 'hidden',
 };
 
+function sourceImageStyle(isFaded: boolean): React.CSSProperties {
+  return {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    opacity: isFaded ? SOURCE_FADED_OPACITY : SOURCE_NORMAL_OPACITY,
+    pointerEvents: 'none',
+  };
+}
+
 const hintStyle: React.CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
   fontSize: 12,
   color: '#888',
   fontStyle: 'italic',
 };
 
 const errorStyle: React.CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
   fontSize: 12,
   color: '#b00020',
   padding: 8,
@@ -74,6 +134,8 @@ const errorStyle: React.CSSProperties = {
 };
 
 const svgWrapStyle: React.CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
   width: '100%',
   height: '100%',
   display: 'flex',
