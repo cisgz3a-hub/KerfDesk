@@ -49,8 +49,8 @@ export function mergeLightBurnTraceSettings(
 }
 
 // Apply user adjustments on top of a preset. Each adjustment is only
-// included if it's not at its neutral value (0 / 0 / 1 / false /
-// 'none'), so a clean reset produces the same options object the
+// included if it's not at its neutral value (0 / 0 / 1 / false),
+// so a clean reset produces the same options object the
 // preset gave us — preserving preset semantics like "Line Art uses
 // Otsu" when the user hasn't touched a slider.
 export function mergeAdjustments(preset: TraceOptions, adj: AdjustmentValues): TraceOptions {
@@ -62,7 +62,6 @@ export function mergeAdjustments(preset: TraceOptions, adj: AdjustmentValues): T
   if (adj.contrast !== 0) out['contrast'] = adj.contrast;
   if (adj.gamma !== 1) out['gamma'] = adj.gamma;
   if (adj.invert) out['invert'] = true;
-  if (adj.ditherMode !== 'none') out['ditherMode'] = adj.ditherMode;
   return out as TraceOptions;
 }
 
@@ -98,7 +97,7 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
 //     keep everything imagetracerjs can find.
 //
 // Everything else (brightness / contrast / gamma / invert /
-// ditherMode / lineFilter / blur / tolerances / numberOfColors) is
+// lineFilter / blur / tolerances / numberOfColors) is
 // preserved so the user's image-adjustment intent survives the retry.
 export function relaxAggressivePreprocessing(options: TraceOptions): TraceOptions {
   const next: Record<string, unknown> = { ...options };

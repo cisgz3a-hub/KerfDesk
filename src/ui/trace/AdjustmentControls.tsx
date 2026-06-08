@@ -1,22 +1,17 @@
-// Image-adjustment controls for the trace dialog — surfaces LF1-compatible
-// preprocessing levers (brightness / contrast / gamma / invert) and
-// the 13-mode dither picker. Each control is a thin wrapper around the
-// underlying preset; user changes layer on top of the preset's TraceOptions
-// before they reach the preview / committer.
+// Image-adjustment controls for the trace dialog. These are minimal
+// pre-threshold cleanup levers for vector tracing; raster dither/photo
+// processing belongs in Adjust Image / Image Mode, not Trace Image.
 //
 // Kept in its own file so ImportImageDialog.tsx stays under the
 // 250-line soft cap and the controls module can grow without dragging
 // the dialog file with it (e.g. when we add Web Worker offload UI in
 // step 5, or "reset to preset defaults" affordances).
 
-import { DITHER_MODES, type DitherMode } from '../../core/trace';
-
 export type AdjustmentValues = {
   readonly brightness: number;
   readonly contrast: number;
   readonly gamma: number;
   readonly invert: boolean;
-  readonly ditherMode: DitherMode;
 };
 
 export const DEFAULT_ADJUSTMENTS: AdjustmentValues = {
@@ -24,7 +19,6 @@ export const DEFAULT_ADJUSTMENTS: AdjustmentValues = {
   contrast: 0,
   gamma: 1,
   invert: false,
-  ditherMode: 'none',
 };
 
 export function AdjustmentControls(props: {
@@ -72,10 +66,6 @@ export function AdjustmentControls(props: {
         label="Invert"
         checked={values.invert}
         onChange={(invert) => onChange({ ...values, invert })}
-      />
-      <DitherRow
-        value={values.ditherMode}
-        onChange={(ditherMode) => onChange({ ...values, ditherMode })}
       />
       <ResetRow values={values} onChange={onChange} />
     </fieldset>
@@ -130,28 +120,6 @@ function CheckboxRow(props: {
   );
 }
 
-function DitherRow(props: {
-  readonly value: DitherMode;
-  readonly onChange: (next: DitherMode) => void;
-}): JSX.Element {
-  return (
-    <label style={rowStyle}>
-      <span style={labelStyle}>Dither</span>
-      <select
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value as DitherMode)}
-        style={selectStyle}
-      >
-        {DITHER_MODES.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function ResetRow(props: {
   readonly values: AdjustmentValues;
   readonly onChange: (next: AdjustmentValues) => void;
@@ -160,8 +128,7 @@ function ResetRow(props: {
     props.values.brightness === DEFAULT_ADJUSTMENTS.brightness &&
     props.values.contrast === DEFAULT_ADJUSTMENTS.contrast &&
     props.values.gamma === DEFAULT_ADJUSTMENTS.gamma &&
-    props.values.invert === DEFAULT_ADJUSTMENTS.invert &&
-    props.values.ditherMode === DEFAULT_ADJUSTMENTS.ditherMode;
+    props.values.invert === DEFAULT_ADJUSTMENTS.invert;
   return (
     <div style={resetRowStyle}>
       <button
@@ -211,7 +178,6 @@ const valueStyle: React.CSSProperties = {
   color: '#666',
   fontVariantNumeric: 'tabular-nums',
 };
-const selectStyle: React.CSSProperties = { flex: 1, fontSize: 12 };
 const resetRowStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',

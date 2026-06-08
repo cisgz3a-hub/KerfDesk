@@ -53,14 +53,13 @@ describe('mergeAdjustments', () => {
       contrast: -30,
       gamma: 1.4,
       invert: true,
-      ditherMode: 'floyd-steinberg',
     };
     const merged = mergeAdjustments(LINE_ART, adj);
     expect(merged.brightness).toBe(25);
     expect(merged.contrast).toBe(-30);
     expect(merged.gamma).toBe(1.4);
     expect(merged.invert).toBe(true);
-    expect(merged.ditherMode).toBe('floyd-steinberg');
+    expect((merged as Record<string, unknown>)['ditherMode']).toBeUndefined();
     // Preset fields still survive.
     expect(merged.useOtsuThreshold).toBe(LINE_ART.useOtsuThreshold);
   });
