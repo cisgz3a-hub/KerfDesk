@@ -20,9 +20,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ColoredPath } from '../../core/scene';
-import { type RawImageData, type TraceOptions, coloredPathsToSvg } from '../../core/trace';
+import {
+  type RawImageData,
+  type TraceBoundary,
+  type TraceOptions,
+  coloredPathsToSvg,
+} from '../../core/trace';
 import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
-import { traceImageWithFallback } from './use-trace-worker-client';
+import { traceImageRegion } from './trace-region';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
@@ -42,7 +47,11 @@ export type TracePreviewState =
 // that a normal click feels instant.
 const DEBOUNCE_MS = 300;
 
-export function useTracePreview(file: File | null, options: TraceOptions): TracePreviewState {
+export function useTracePreview(
+  file: File | null,
+  options: TraceOptions,
+  boundary?: TraceBoundary | null,
+): TracePreviewState {
   const [state, setState] = useState<TracePreviewState>({ kind: 'idle' });
   const decodedRef = useRef<RawImageData | null>(null);
   // Monotonic token. Each effect run captures its token; on completion
@@ -57,6 +66,8 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
   // saw a trace at the original preset. R-H1 audit finding.
   const optionsRef = useRef(options);
   optionsRef.current = options;
+  const boundaryRef = useRef<TraceBoundary | null>(boundary ?? null);
+  boundaryRef.current = boundary ?? null;
 
   useEffect(() => {
     if (file === null) {
@@ -79,6 +90,7 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
         void runTrace({
           img,
           options: optionsRef.current,
+          boundary: boundaryRef.current,
           isCurrent: () => tokenRef.current === myToken,
           setState,
         });
@@ -107,12 +119,18 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
     setState({ kind: 'tracing' });
     const timer = window.setTimeout(() => {
       if (tokenRef.current !== myToken) return;
-      void runTrace({ img, options, isCurrent: () => tokenRef.current === myToken, setState });
+      void runTrace({
+        img,
+        options,
+        boundary: boundary ?? null,
+        isCurrent: () => tokenRef.current === myToken,
+        setState,
+      });
     }, DEBOUNCE_MS);
     return () => {
       window.clearTimeout(timer);
     };
-  }, [options]);
+  }, [options, boundary]);
 
   return state;
 }
@@ -120,6 +138,7 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
 export function runTrace(args: {
   readonly img: RawImageData;
   readonly options: TraceOptions;
+  readonly boundary?: TraceBoundary | null;
   readonly isCurrent: () => boolean;
   readonly setState: (next: TracePreviewState) => void;
 }): Promise<void> {
@@ -129,7 +148,7 @@ export function runTrace(args: {
   // preview's ready/error state (P2-A). Returns the promise so tests can await it.
   return (async () => {
     try {
-      const { paths } = await traceImageWithFallback(args.img, args.options);
+      const { paths } = await traceImageRegion(args.img, args.options, args.boundary ?? null);
       if (!args.isCurrent()) return;
       const svg = coloredPathsToSvg(paths, args.img.width, args.img.height);
       args.setState({

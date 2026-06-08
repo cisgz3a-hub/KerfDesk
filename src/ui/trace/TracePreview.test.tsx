@@ -1,6 +1,6 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { TracePreview } from './TracePreview';
 import type { TracePreviewState } from './use-trace-preview';
@@ -82,15 +82,69 @@ describe('TracePreview source overlay controls', () => {
       await cleanup(root, host);
     }
   });
+
+  it('reports a dragged Boundary rectangle in image pixels', async () => {
+    const onBoundaryChange = vi.fn();
+    const { host, root } = await renderPreview({
+      imageSize: { width: 100, height: 100 },
+      onBoundaryChange,
+    });
+    try {
+      const frame = host.querySelector('[aria-label="Trace preview"]') as HTMLDivElement | null;
+      expect(frame).not.toBeNull();
+      stubRect(frame!, { left: 0, top: 0, width: 100, height: 100 });
+      await act(async () => {
+        frame?.dispatchEvent(
+          new MouseEvent('mousedown', { clientX: 10, clientY: 20, bubbles: true }),
+        );
+        frame?.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 40, clientY: 60, bubbles: true }),
+        );
+        frame?.dispatchEvent(
+          new MouseEvent('mouseup', { clientX: 40, clientY: 60, bubbles: true }),
+        );
+      });
+      expect(onBoundaryChange).toHaveBeenLastCalledWith({ x: 10, y: 20, width: 30, height: 40 });
+    } finally {
+      await cleanup(root, host);
+    }
+  });
+
+  it('clears the active Boundary rectangle', async () => {
+    const onBoundaryClear = vi.fn();
+    const { host, root } = await renderPreview({
+      boundary: { x: 10, y: 20, width: 30, height: 40 },
+      imageSize: { width: 100, height: 100 },
+      onBoundaryClear,
+    });
+    try {
+      const button = findButton(host, 'Clear Boundary');
+      expect(button).not.toBeNull();
+      await act(async () => {
+        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(onBoundaryClear).toHaveBeenCalledTimes(1);
+    } finally {
+      await cleanup(root, host);
+    }
+  });
 });
 
-async function renderPreview(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
+async function renderPreview(
+  overrides: Partial<React.ComponentProps<typeof TracePreview>> = {},
+): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(createElement(TracePreview, { state: readyState, sourceDataUrl: SOURCE_DATA_URL }));
+    root.render(
+      createElement(TracePreview, {
+        state: readyState,
+        sourceDataUrl: SOURCE_DATA_URL,
+        ...overrides,
+      }),
+    );
   });
   if (root === null) throw new Error('root did not mount');
   return { host, root };
@@ -106,4 +160,24 @@ function findButton(host: HTMLElement, label: string): HTMLButtonElement | null 
     Array.from(host.querySelectorAll('button')).find((button) => button.textContent === label) ??
     null
   );
+}
+
+function stubRect(
+  element: HTMLElement,
+  rect: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  },
+): void {
+  element.getBoundingClientRect = () =>
+    ({
+      ...rect,
+      right: rect.left + rect.width,
+      bottom: rect.top + rect.height,
+      x: rect.left,
+      y: rect.top,
+      toJSON: () => undefined,
+    }) as DOMRect;
 }

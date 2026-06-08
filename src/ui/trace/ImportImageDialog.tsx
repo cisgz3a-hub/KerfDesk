@@ -37,7 +37,12 @@ import {
   type SceneObject,
   type TracedImage,
 } from '../../core/scene';
-import { DEFAULT_TRACE_OPTIONS, TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+import {
+  DEFAULT_TRACE_OPTIONS,
+  TRACE_PRESETS,
+  type TraceBoundary,
+  type TraceOptions,
+} from '../../core/trace';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -55,7 +60,7 @@ import {
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceSettingsControls } from './TraceSettingsControls';
-import { traceImageWithFallback } from './use-trace-worker-client';
+import { traceImageRegion } from './trace-region';
 import { TracePreview } from './TracePreview';
 import { useTracePreview } from './use-trace-preview';
 
@@ -69,28 +74,12 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
   const pushToast = useToastStore((s) => s.pushToast);
-  const [file, setFile] = useState<File | null>(null);
+  const file = useTraceSourceFile(seed, pushToast);
   const [preset, setPreset] = useState<string>('Line Art');
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
+  const [boundary, setBoundary] = useState<TraceBoundary | null>(null);
   const [busy, setBusy] = useState(false);
-  // Reconstruct a File from the seed bitmap's embedded dataUrl so the
-  // File-keyed preview + trace pipeline runs unchanged (image-loader.
-  // dataUrlToFile). The `cancelled` guard drops a stale decode if the
-  // seed swaps or the dialog unmounts before fetch resolves.
-  useEffect(() => {
-    let cancelled = false;
-    dataUrlToFile(seed.dataUrl, seed.source)
-      .then((f) => {
-        if (!cancelled) setFile(f);
-      })
-      .catch(() => {
-        if (!cancelled) pushToast(`Could not read ${seed.source} for tracing.`, 'error');
-      });
-    return (): void => {
-      cancelled = true;
-    };
-  }, [seed.dataUrl, seed.source, pushToast]);
   // Layer the LightBurn-style trace settings on top of the preset.
   // Image-level edits stay in Adjust Image, so Trace Image keeps one
   // authoritative vector workflow: cutoff, threshold, ignore,
@@ -109,7 +98,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
     () => mergeLightBurnTraceSettings(presetOptions, traceSettings),
     [presetOptions, traceSettings],
   );
-  const preview = useTracePreview(file, options);
+  const preview = useTracePreview(file, options, boundary);
   const dialogRef = useRef<HTMLDivElement>(null);
   // R-M1 a11y: Escape closes, Tab cycles within, focus returns to the
   // toolbar button on close.
@@ -122,7 +111,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       return;
     }
     void commit(
-      { file, options, seed, deleteSourceAfterTrace },
+      { file, options, seed, deleteSourceAfterTrace, boundary },
       {
         traceExistingImage,
         pushToast,
@@ -152,7 +141,12 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
           overrides={traceSettings}
           onChange={setTraceSettings}
         />
-        <TracePreview state={preview} sourceDataUrl={seed.dataUrl} />
+        <TracePreviewPanel
+          preview={preview}
+          seed={seed}
+          boundary={boundary}
+          setBoundary={setBoundary}
+        />
         <DeleteImageAfterTraceToggle
           checked={deleteSourceAfterTrace}
           onChange={setDeleteSourceAfterTrace}
@@ -164,6 +158,45 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   );
 }
 
+function useTraceSourceFile(
+  seed: RasterImage,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): File | null {
+  const [file, setFile] = useState<File | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    dataUrlToFile(seed.dataUrl, seed.source)
+      .then((f) => {
+        if (!cancelled) setFile(f);
+      })
+      .catch(() => {
+        if (!cancelled) pushToast(`Could not read ${seed.source} for tracing.`, 'error');
+      });
+    return (): void => {
+      cancelled = true;
+    };
+  }, [seed.dataUrl, seed.source, pushToast]);
+  return file;
+}
+
+function TracePreviewPanel(props: {
+  readonly preview: ReturnType<typeof useTracePreview>;
+  readonly seed: RasterImage;
+  readonly boundary: TraceBoundary | null;
+  readonly setBoundary: (boundary: TraceBoundary | null) => void;
+}): JSX.Element {
+  return (
+    <TracePreview
+      state={props.preview}
+      sourceDataUrl={props.seed.dataUrl}
+      imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
+      boundary={props.boundary}
+      onBoundaryChange={props.setBoundary}
+      onBoundaryClear={() => props.setBoundary(null)}
+    />
+  );
+}
+
 // Exported for testing the source-revalidation guard (P2-A).
 export async function commit(
   args: {
@@ -171,6 +204,7 @@ export async function commit(
     readonly options: TraceOptions;
     readonly seed: RasterImage;
     readonly deleteSourceAfterTrace?: boolean;
+    readonly boundary?: TraceBoundary | null;
   },
   ctx: {
     readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
@@ -188,11 +222,12 @@ export async function commit(
     // tolerance. Curves stay at imagetracerjs's analytic fidelity
     // through to compile. Runs in a Web Worker when one is available,
     // falling back to inline tracing otherwise (see
-    // use-trace-worker-client.ts). traceImageWithFallback wraps the
-    // raw call with the H3 retry semantics — on zero paths with an
-    // aggressive preset, it retries with the levers relaxed — so the
-    // preview and commit paths produce the same result.
-    const { paths, bounds } = await traceImageWithFallback(image, args.options);
+    // use-trace-worker-client.ts). traceImageRegion applies any
+    // LightBurn-style Boundary crop, traces that crop through the shared
+    // fallback path, then offsets geometry back into the source-image
+    // coordinate system. That keeps preview, commit, and overlay
+    // registration on the same pixels.
+    const { paths, bounds } = await traceImageRegion(image, args.options, args.boundary ?? null);
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,

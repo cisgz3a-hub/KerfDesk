@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./image-loader', () => ({
   PREVIEW_MAX_EDGE_PX: 2048,
@@ -20,13 +20,18 @@ vi.mock('./use-trace-worker-client', () => ({
 }));
 
 import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../../core/scene';
-import { DEFAULT_TRACE_OPTIONS } from '../../core/trace';
+import { DEFAULT_TRACE_OPTIONS, type TraceBoundary } from '../../core/trace';
 import { useUiStore } from '../state/ui-store';
 import { commit, ImportImageDialog, sameTraceSource } from './ImportImageDialog';
+import { traceImageWithFallback } from './use-trace-worker-client';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
+
+afterEach(() => {
+  vi.mocked(traceImageWithFallback).mockClear();
+});
 
 function seedRaster(over: Partial<RasterImage> = {}): RasterImage {
   return {
@@ -57,7 +62,10 @@ function ctxWith(getCurrentObject: (id: string) => SceneObject | undefined) {
 
 const args = (
   seed: RasterImage,
-  overrides: { readonly deleteSourceAfterTrace?: boolean } = {},
+  overrides: {
+    readonly deleteSourceAfterTrace?: boolean;
+    readonly boundary?: TraceBoundary | null;
+  } = {},
 ) => ({
   file: new File([''], 'logo.png'),
   options: DEFAULT_TRACE_OPTIONS,
@@ -118,6 +126,55 @@ describe('commit source revalidation (P2-A)', () => {
     expect(ctx.pushToast).toHaveBeenCalledWith(
       expect.stringContaining('source deleted'),
       'success',
+    );
+  });
+
+  it('commits a bounded trace in source-image coordinates', async () => {
+    vi.mocked(traceImageWithFallback).mockResolvedValueOnce({
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 1, y: 2 },
+              ],
+            },
+          ],
+        },
+      ],
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 2 },
+    });
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    await commit(args(seed, { boundary: { x: 1, y: 0, width: 1, height: 2 } }), ctx);
+
+    expect(traceImageWithFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 1, height: 2 }),
+      DEFAULT_TRACE_OPTIONS,
+    );
+    expect(ctx.traceExistingImage).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({
+        bounds: { minX: 1, minY: 0, maxX: 2, maxY: 2 },
+        paths: [
+          {
+            color: '#000000',
+            polylines: [
+              {
+                closed: false,
+                points: [
+                  { x: 1, y: 0 },
+                  { x: 2, y: 2 },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+      { deleteSourceAfterTrace: false },
     );
   });
 
