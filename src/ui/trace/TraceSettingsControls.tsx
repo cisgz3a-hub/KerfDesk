@@ -29,7 +29,7 @@ export function TraceSettingsControls(props: {
         onChange={(thresholdLuma) => set({ thresholdLuma })}
       />
       <NumberRow
-        label="Ignore <"
+        label="Ignore Less Than"
         min={0}
         max={10000}
         step={1}

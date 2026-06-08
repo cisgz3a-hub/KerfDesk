@@ -257,6 +257,26 @@ describe('traceImageToSvgString', () => {
     ]);
   });
 
+  it('preprocessForTrace prefers explicit Cutoff/Threshold over automatic Otsu', () => {
+    const data = new Uint8ClampedArray([
+      0, 0, 0, 255, 32, 32, 32, 255, 128, 128, 128, 255, 180, 180, 180, 255,
+    ]);
+
+    const result = preprocessForTrace(
+      { width: 4, height: 1, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        useOtsuThreshold: true,
+        cutoffLuma: 32,
+        thresholdLuma: 128,
+      },
+    );
+
+    expect(Array.from(result.data)).toEqual([
+      255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+    ]);
+  });
+
   it('Line Art preset uses LightBurn default Cutoff/Threshold range', () => {
     const lineArt = TRACE_PRESETS['Line Art'];
 
