@@ -57,6 +57,11 @@ export function TraceSettingsControls(props: {
         checked={traceBooleanValue(props.preset, props.overrides, 'traceTransparency')}
         onChange={(traceTransparency) => set({ traceTransparency })}
       />
+      <CheckboxRow
+        label="Sketch Trace"
+        checked={traceBooleanValue(props.preset, props.overrides, 'sketchTrace')}
+        onChange={(sketchTrace) => set({ sketchTrace })}
+      />
       <div style={resetRowStyle}>
         <button
           type="button"
@@ -71,7 +76,14 @@ export function TraceSettingsControls(props: {
   );
 }
 
-type NumericTraceSettingKey = Exclude<keyof LightBurnTraceSettingOverrides, 'traceTransparency'>;
+type NumericTraceSettingKey = Exclude<
+  keyof LightBurnTraceSettingOverrides,
+  'traceTransparency' | 'sketchTrace'
+>;
+type BooleanTraceSettingKey = Extract<
+  keyof LightBurnTraceSettingOverrides,
+  'traceTransparency' | 'sketchTrace'
+>;
 
 function traceValue(
   preset: TraceOptions,
@@ -94,7 +106,7 @@ function traceValue(
 function traceBooleanValue(
   preset: TraceOptions,
   overrides: LightBurnTraceSettingOverrides,
-  key: 'traceTransparency',
+  key: BooleanTraceSettingKey,
 ): boolean {
   const override = overrides[key];
   if (override !== undefined) return override;
