@@ -9,6 +9,7 @@ import { estimateBitmapConversion } from './bitmap-conversion-plan';
 import {
   assembleBitmap,
   assembleBitmapAsync,
+  bitmapConversionTarget,
   isConvertibleVector,
   type BitmapConversionOptions,
   type BitmapLayerSetting,
@@ -25,7 +26,7 @@ export {
   assertBitmapConversionFits,
   estimateBitmapConversion,
 } from './bitmap-conversion-plan';
-export { assembleBitmap, assembleBitmapAsync, isConvertibleVector };
+export { assembleBitmap, assembleBitmapAsync, bitmapConversionTarget, isConvertibleVector };
 export type {
   BitmapConversionOptions,
   BitmapLayerSetting,
@@ -38,7 +39,7 @@ export async function buildBitmapFromVector(
   options: BitmapConversionOptions = {},
 ): Promise<RasterImage> {
   const id = crypto.randomUUID();
-  const plan = estimateBitmapConversion(o, options.dpi);
+  const plan = estimateBitmapConversion(bitmapConversionTarget(o), options.dpi);
   if (plan.verdict.kind !== 'ok') {
     throw new Error(
       `Converted bitmap would be ${plan.pixelWidth}x${plan.pixelHeight} px (${plan.verdict.reason}). Lower DPI or scale the artwork down before converting to bitmap.`,
