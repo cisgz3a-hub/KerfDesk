@@ -169,6 +169,38 @@ describe('CutsLayersPanel layer order controls', () => {
       host.remove();
     }
   });
+
+  it('copies and pastes layer settings from the Cuts / Layers panel', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    useStore.getState().setLayerParam('#ff0000', { power: 71, speed: 2345, passes: 4 });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const copyRed = host.querySelector('button[aria-label="Copy settings from #ff0000"]');
+      const pasteBlue = host.querySelector('button[aria-label="Paste settings to #0000ff"]');
+      if (!(copyRed instanceof HTMLButtonElement)) throw new Error('copy button missing');
+      if (!(pasteBlue instanceof HTMLButtonElement)) throw new Error('paste button missing');
+
+      await act(async () => {
+        copyRed.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      await act(async () => {
+        pasteBlue.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const blue = useStore.getState().project.scene.layers.find((layer) => layer.id === '#0000ff');
+      expect(blue).toMatchObject({ color: '#0000ff', power: 71, speed: 2345, passes: 4 });
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
 
 describe('CutsLayersPanel cut settings editor', () => {

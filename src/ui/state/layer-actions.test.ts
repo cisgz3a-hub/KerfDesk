@@ -167,4 +167,70 @@ describe('layer store actions', () => {
     expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
     expect(useStore.getState().dirty).toBe(true);
   });
+
+  it('copyLayerSettings captures settings without dirty or undo changes', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    useStore.getState().setLayerParam('#ff0000', {
+      mode: 'fill',
+      minPower: 12,
+      power: 66,
+      speed: 2222,
+      passes: 3,
+      output: false,
+      hatchAngleDeg: 45,
+      fillBidirectional: false,
+    });
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    useStore.getState().copyLayerSettings('#ff0000');
+
+    expect(useStore.getState().dirty).toBe(false);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('pasteLayerSettings applies copied settings while preserving target id and color', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    useStore.getState().setLayerParam('#ff0000', {
+      mode: 'fill',
+      minPower: 12,
+      power: 66,
+      speed: 2222,
+      passes: 3,
+      output: false,
+      hatchAngleDeg: 45,
+      fillBidirectional: false,
+    });
+    useStore.getState().copyLayerSettings('#ff0000');
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    useStore.getState().pasteLayerSettings('#0000ff');
+
+    const pasted = useStore.getState().project.scene.layers.find((layer) => layer.id === '#0000ff');
+    expect(pasted).toMatchObject({
+      id: '#0000ff',
+      color: '#0000ff',
+      mode: 'fill',
+      minPower: 12,
+      power: 66,
+      speed: 2222,
+      passes: 3,
+      output: false,
+      hatchAngleDeg: 45,
+      fillBidirectional: false,
+    });
+    expect(useStore.getState().undoStack).toHaveLength(1);
+    expect(useStore.getState().dirty).toBe(true);
+  });
+
+  it('pasteLayerSettings without copied settings is a no-op', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const before = useStore.getState().project;
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    useStore.getState().pasteLayerSettings('#ff0000');
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useStore.getState().dirty).toBe(false);
+  });
 });

@@ -28,7 +28,7 @@ import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
-import { layerActions } from './layer-actions';
+import { layerActions, type LayerSettingsClipboard } from './layer-actions';
 import {
   applyDuplicate,
   applyFreshImport,
@@ -71,6 +71,7 @@ export type AppState = {
   readonly dirty: boolean;
   readonly savedName: string | null;
   readonly lastSaveTarget: SaveTarget | null;
+  readonly copiedLayerSettings: LayerSettingsClipboard | null;
 
   readonly setProject: (project: Project) => void;
   readonly newProject: () => void;
@@ -112,6 +113,8 @@ export type AppState = {
   readonly createManualLayer: (color: string) => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
   readonly deleteLayerAndObjects: (layerId: string) => void;
+  readonly copyLayerSettings: (layerId: string) => void;
+  readonly pasteLayerSettings: (layerId: string) => void;
   readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
@@ -156,6 +159,7 @@ function initialState(): Pick<
   | 'dirty'
   | 'savedName'
   | 'lastSaveTarget'
+  | 'copiedLayerSettings'
 > {
   return {
     project: createProject(),
@@ -171,6 +175,7 @@ function initialState(): Pick<
     dirty: false,
     savedName: null,
     lastSaveTarget: null,
+    copiedLayerSettings: null,
   };
 }
 

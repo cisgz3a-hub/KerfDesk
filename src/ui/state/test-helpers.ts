@@ -21,6 +21,7 @@ export function resetStore(): void {
     dirty: false,
     savedName: null,
     lastSaveTarget: null,
+    copiedLayerSettings: null,
   });
 }
 
