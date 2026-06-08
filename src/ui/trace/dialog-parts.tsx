@@ -44,6 +44,22 @@ export function SourceLabel(props: { readonly name: string }): JSX.Element {
   );
 }
 
+export function DeleteImageAfterTraceToggle(props: {
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+}): JSX.Element {
+  return (
+    <label style={checkboxRowStyle}>
+      <input
+        type="checkbox"
+        checked={props.checked}
+        onChange={(e) => props.onChange(e.target.checked)}
+      />
+      <span>Delete Image After trace</span>
+    </label>
+  );
+}
+
 export function DialogActions(props: {
   readonly canSubmit: boolean;
   readonly busy: boolean;
@@ -130,6 +146,13 @@ const fileNameStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 const selectStyle: React.CSSProperties = { flex: 1, fontSize: 13 };
+const checkboxRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
+  color: '#444',
+};
 const hintStyle: React.CSSProperties = {
   fontSize: 11,
   color: '#666',

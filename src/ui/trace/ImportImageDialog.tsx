@@ -44,6 +44,7 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import {
   DialogActions,
+  DeleteImageAfterTraceToggle,
   PresetHint,
   PresetPicker,
   SourceLabel,
@@ -71,6 +72,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   const [file, setFile] = useState<File | null>(null);
   const [preset, setPreset] = useState<string>('Line Art');
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
+  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
   const [busy, setBusy] = useState(false);
   // Reconstruct a File from the seed bitmap's embedded dataUrl so the
   // File-keyed preview + trace pipeline runs unchanged (image-loader.
@@ -120,7 +122,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       return;
     }
     void commit(
-      { file, options, seed },
+      { file, options, seed, deleteSourceAfterTrace },
       {
         traceExistingImage,
         pushToast,
@@ -151,6 +153,10 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
           onChange={setTraceSettings}
         />
         <TracePreview state={preview} sourceDataUrl={seed.dataUrl} />
+        <DeleteImageAfterTraceToggle
+          checked={deleteSourceAfterTrace}
+          onChange={setDeleteSourceAfterTrace}
+        />
         <PresetHint />
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
       </form>
@@ -164,6 +170,7 @@ export async function commit(
     readonly file: File;
     readonly options: TraceOptions;
     readonly seed: RasterImage;
+    readonly deleteSourceAfterTrace?: boolean;
   },
   ctx: {
     readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
@@ -216,10 +223,12 @@ export async function commit(
       );
       return;
     }
-    ctx.traceExistingImage(args.seed.id, traced);
+    const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
+    ctx.traceExistingImage(args.seed.id, traced, { deleteSourceAfterTrace });
     const colorCount = traced.paths.length;
+    const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
     ctx.pushToast(
-      `Traced ${args.seed.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, source kept`,
+      `Traced ${args.seed.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, ${sourceStatus}`,
       'success',
     );
     ctx.close();

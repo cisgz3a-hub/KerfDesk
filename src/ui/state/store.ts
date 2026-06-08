@@ -37,6 +37,7 @@ import {
   type ImportOutcome,
   pruneOrphanLayers,
   pushUndo,
+  type TraceExistingImageOptions,
 } from './scene-mutations';
 
 export type { ImportOutcome } from './scene-mutations';
@@ -86,7 +87,11 @@ export type AppState = {
   // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
   readonly importRasterImage: (object: SceneObject) => void;
   // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
-  readonly traceExistingImage: (sourceId: string, traced: TracedImage) => void;
+  readonly traceExistingImage: (
+    sourceId: string,
+    traced: TracedImage,
+    options?: TraceExistingImageOptions,
+  ) => void;
   // ADR-029 Convert to Bitmap: replace a selected vector with the raster
   // engrave-source rasterized from it (LightBurn discards the original).
   readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
