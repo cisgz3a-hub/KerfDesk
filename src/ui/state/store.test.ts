@@ -139,6 +139,51 @@ describe('useStore', () => {
     ]);
   });
 
+  it('createManualLayer adds an empty layer and is undoable', () => {
+    useStore.setState({ dirty: false });
+
+    useStore.getState().createManualLayer('#00FF00');
+
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+      '#00ff00',
+    ]);
+    expect(useStore.getState().dirty).toBe(true);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.layers).toHaveLength(0);
+  });
+
+  it('assignSelectionToLayer moves selected object colors and prunes orphan layers', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().createManualLayer('#00ff00');
+    useStore.getState().selectObject('O1');
+
+    useStore.getState().assignSelectionToLayer('#00ff00');
+
+    const obj = useStore.getState().project.scene.objects[0];
+    expect(obj?.kind).toBe('imported-svg');
+    if (obj?.kind !== 'imported-svg') throw new Error('expected imported svg');
+    expect(obj.paths.map((path) => path.color)).toEqual(['#00ff00']);
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+      '#00ff00',
+    ]);
+  });
+
+  it('assignSelectionToLayer keeps unrelated empty manual layers', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().createManualLayer('#00ff00');
+    useStore.getState().createManualLayer('#0000ff');
+    useStore.getState().selectObject('O1');
+
+    useStore.getState().assignSelectionToLayer('#00ff00');
+
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+      '#00ff00',
+      '#0000ff',
+    ]);
+  });
+
   it('setRasterImageAdjustments patches a raster image and pushes undo', () => {
     useStore.getState().importRasterImage(rasterObj('R1'));
     const undoBefore = useStore.getState().undoStack.length;
