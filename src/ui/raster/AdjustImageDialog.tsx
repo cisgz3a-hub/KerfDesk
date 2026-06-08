@@ -235,7 +235,7 @@ function RasterToggleFields(props: {
     <>
       <CheckboxField
         name="negativeImage"
-        label="Negative"
+        label="Negative Image"
         checked={draft.negativeImage}
         onChange={(negativeImage) => update({ negativeImage })}
       />
@@ -247,7 +247,7 @@ function RasterToggleFields(props: {
       />
       <CheckboxField
         name="invertDisplay"
-        label="Invert display"
+        label="Invert Preview"
         checked={draft.invertDisplay}
         onChange={(invertDisplay) => update({ invertDisplay })}
       />

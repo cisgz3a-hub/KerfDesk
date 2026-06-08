@@ -98,6 +98,33 @@ describe('AdjustImageDialog', () => {
       host.remove();
     }
   });
+
+  it('labels preview inversion separately from burn negative output', async () => {
+    const onApply = vi.fn();
+    const { host, root } = await renderDialog({ onApply });
+    try {
+      const text = host.textContent ?? '';
+      expect(text).toContain('Negative Image');
+      expect(text).toContain('Invert Preview');
+      expect(text).not.toContain('Invert display');
+
+      click(host, 'input[name="invertDisplay"]');
+
+      await act(async () => {
+        const form = host.querySelector('form');
+        if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
+        Simulate.submit(form);
+      });
+
+      const patch = onApply.mock.calls[0]?.[0];
+      expect(patch?.layerPatch).toHaveProperty('negativeImage', false);
+      expect(patch?.layerPatch).not.toHaveProperty('invertDisplay');
+      expect(patch?.imagePatch).not.toHaveProperty('invertDisplay');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
 
 async function renderDialog(opts: {
