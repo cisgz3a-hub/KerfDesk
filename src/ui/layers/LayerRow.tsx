@@ -98,6 +98,10 @@ export function LayerRow(props: {
     <section
       style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
       aria-label={`Layer ${layer.color}`}
+      onDoubleClick={(event) => {
+        if (isInteractiveDoubleClickTarget(event.target)) return;
+        setSettingsOpen(true);
+      }}
     >
       <header style={cardHeaderStyle}>
         <ColorSwatch color={layer.color} visible={layer.visible} />
@@ -387,4 +391,9 @@ function numericValue(s: string): number {
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
+}
+
+function isInteractiveDoubleClickTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.closest('button,input,select,textarea,a,label,[role="button"]') !== null;
 }
