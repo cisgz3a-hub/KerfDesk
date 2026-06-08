@@ -17,7 +17,6 @@ const POTRACE_CUBIC_SAMPLES = 16;
 export function shouldUsePotraceTraceBackend(options: TraceOptions): boolean {
   if (options.traceMode === 'centerline') return false;
   if (options.numberOfColors !== 2) return false;
-  if (options.ditherMode !== undefined && options.ditherMode !== 'none') return false;
   return options.fixedPalette?.length === 2;
 }
 
