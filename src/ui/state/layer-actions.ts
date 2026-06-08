@@ -3,16 +3,21 @@ import {
   assignObjectToLayer,
   assertNever,
   createLayer,
+  type Layer,
   type Project,
   type Scene,
+  updateLayer,
 } from '../../core/scene';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
+export type LayerSettingsClipboard = Omit<Layer, 'id' | 'color'>;
+
 type LayerActionState = StateSlice & {
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
+  readonly copiedLayerSettings: LayerSettingsClipboard | null;
 };
 
 type LayerActionMutation = {
@@ -29,10 +34,16 @@ type LayerSelectionMutation = {
   readonly additionalSelectedIds: ReadonlySet<string>;
 };
 
+type LayerClipboardMutation = {
+  readonly copiedLayerSettings: LayerSettingsClipboard | null;
+};
+
 type EmptyLayerAction = Record<string, never>;
 
 type LayerActionSet = (
-  fn: (state: LayerActionState) => LayerActionMutation | LayerSelectionMutation | EmptyLayerAction,
+  fn: (
+    state: LayerActionState,
+  ) => LayerActionMutation | LayerSelectionMutation | LayerClipboardMutation | EmptyLayerAction,
 ) => void;
 
 export type LayerActions = {
@@ -40,6 +51,8 @@ export type LayerActions = {
   readonly assignSelectionToLayer: (layerId: string) => void;
   readonly selectObjectsOnLayer: (layerId: string) => void;
   readonly deleteLayerAndObjects: (layerId: string) => void;
+  readonly copyLayerSettings: (layerId: string) => void;
+  readonly pasteLayerSettings: (layerId: string) => void;
 };
 
 export function layerActions(set: LayerActionSet): LayerActions {
@@ -88,6 +101,20 @@ export function layerActions(set: LayerActionSet): LayerActions {
           ...mutation(state, { ...state.project, scene: result.scene }),
           ...removeDeletedIdsFromSelection(state, result.removedObjectIds),
         };
+      }),
+    copyLayerSettings: (layerId) =>
+      set((state) => {
+        const layer = state.project.scene.layers.find((candidate) => candidate.id === layerId);
+        return layer === undefined ? {} : { copiedLayerSettings: layerSettingsFrom(layer) };
+      }),
+    pasteLayerSettings: (layerId) =>
+      set((state) => {
+        if (state.copiedLayerSettings === null) return {};
+        const target = state.project.scene.layers.find((layer) => layer.id === layerId);
+        if (target === undefined) return {};
+        if (layerSettingsEqual(target, state.copiedLayerSettings)) return {};
+        const scene = updateLayer(state.project.scene, layerId, state.copiedLayerSettings);
+        return mutation(state, { ...state.project, scene });
       }),
   };
 }
@@ -206,6 +233,50 @@ function removeDeletedIdsFromSelection(
         : state.selectedObjectId,
     additionalSelectedIds,
   };
+}
+
+const LAYER_SETTING_KEYS = [
+  'mode',
+  'minPower',
+  'power',
+  'speed',
+  'passes',
+  'visible',
+  'output',
+  'hatchAngleDeg',
+  'hatchSpacingMm',
+  'fillOverscanMm',
+  'fillBidirectional',
+  'ditherAlgorithm',
+  'linesPerMm',
+  'negativeImage',
+  'passThrough',
+  'dotWidthCorrectionMm',
+] as const satisfies ReadonlyArray<keyof LayerSettingsClipboard>;
+
+function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
+  return {
+    mode: layer.mode,
+    minPower: layer.minPower,
+    power: layer.power,
+    speed: layer.speed,
+    passes: layer.passes,
+    visible: layer.visible,
+    output: layer.output,
+    hatchAngleDeg: layer.hatchAngleDeg,
+    hatchSpacingMm: layer.hatchSpacingMm,
+    fillOverscanMm: layer.fillOverscanMm,
+    fillBidirectional: layer.fillBidirectional,
+    ditherAlgorithm: layer.ditherAlgorithm,
+    linesPerMm: layer.linesPerMm,
+    negativeImage: layer.negativeImage,
+    passThrough: layer.passThrough,
+    dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+  };
+}
+
+function layerSettingsEqual(layer: Layer, settings: LayerSettingsClipboard): boolean {
+  return LAYER_SETTING_KEYS.every((key) => layer[key] === settings[key]);
 }
 
 function usedLayerColors(scene: Scene): ReadonlySet<string> {

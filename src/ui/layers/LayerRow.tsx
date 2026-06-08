@@ -24,6 +24,7 @@ import { CutSettingsDialog } from './CutSettingsDialog';
 import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerImageFields } from './LayerImageFields';
 import { LayerOrderControls } from './LayerOrderControls';
+import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
 import { useDebouncedCommit } from './use-debounced-commit';
 import { useState } from 'react';
@@ -109,6 +110,7 @@ export function LayerRow(props: {
         <span style={headerFillerStyle} />
         <SelectLayerObjectsButton layer={layer} />
         <AssignSelectionButton layer={layer} />
+        <LayerSettingsClipboardButtons layer={layer} />
         <DeleteLayerButton layer={layer} />
         <button
           type="button"
