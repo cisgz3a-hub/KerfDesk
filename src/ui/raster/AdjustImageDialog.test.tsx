@@ -53,7 +53,7 @@ describe('AdjustImageDialog', () => {
       change(host, 'input[name="gamma"]', '1.4');
       change(host, 'select[name="ditherAlgorithm"]', 'grayscale');
       change(host, 'input[name="minPower"]', '12');
-      change(host, 'input[name="linesPerMm"]', '12');
+      change(host, 'input[name="imageDpi"]', '304.8');
       change(host, 'input[name="dotWidthCorrectionMm"]', '0.05');
       click(host, 'input[name="negativeImage"]');
       click(host, 'input[name="passThrough"]');
@@ -135,6 +135,27 @@ describe('AdjustImageDialog', () => {
     }
   });
 
+  it('maps DPI and line interval edits into the submitted lines-per-mm setting', async () => {
+    const onApply = vi.fn();
+    const { host, root } = await renderDialog({ onApply });
+    try {
+      change(host, 'input[name="imageDpi"]', '508');
+
+      await submit(host);
+
+      expect(onApply.mock.calls[0]?.[0]?.layerPatch.linesPerMm).toBe(20);
+
+      change(host, 'input[name="lineIntervalMm"]', '0.2');
+
+      await submit(host);
+
+      expect(onApply.mock.calls[1]?.[0]?.layerPatch.linesPerMm).toBe(5);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('applies built-in presets to the local draft before OK', async () => {
     const onApply = vi.fn();
     const { host, root } = await renderDialog({ onApply });
@@ -178,7 +199,7 @@ describe('AdjustImageDialog', () => {
       change(host, 'input[name="gamma"]', '1.8');
       change(host, 'select[name="ditherAlgorithm"]', 'jarvis');
       change(host, 'input[name="minPower"]', '9');
-      change(host, 'input[name="linesPerMm"]', '15');
+      change(host, 'input[name="imageDpi"]', '381');
       change(host, 'input[name="dotWidthCorrectionMm"]', '0.02');
       click(host, 'input[name="negativeImage"]');
       click(host, 'input[name="passThrough"]');
@@ -193,7 +214,7 @@ describe('AdjustImageDialog', () => {
       change(host, 'input[name="gamma"]', '1');
       change(host, 'select[name="ditherAlgorithm"]', 'threshold');
       change(host, 'input[name="minPower"]', '0');
-      change(host, 'input[name="linesPerMm"]', '10');
+      change(host, 'input[name="imageDpi"]', '254');
       change(host, 'input[name="dotWidthCorrectionMm"]', '0');
       click(host, 'input[name="negativeImage"]');
       click(host, 'input[name="passThrough"]');
@@ -208,7 +229,7 @@ describe('AdjustImageDialog', () => {
         (host.querySelector('select[name="ditherAlgorithm"]') as HTMLSelectElement).value,
       ).toBe('jarvis');
       expect((host.querySelector('input[name="minPower"]') as HTMLInputElement).value).toBe('9');
-      expect((host.querySelector('input[name="linesPerMm"]') as HTMLInputElement).value).toBe('15');
+      expect((host.querySelector('input[name="imageDpi"]') as HTMLInputElement).value).toBe('381');
       expect(
         (host.querySelector('input[name="dotWidthCorrectionMm"]') as HTMLInputElement).value,
       ).toBe('0.02');
@@ -283,5 +304,13 @@ function clickButton(host: HTMLElement, selector: string): void {
   if (!(button instanceof HTMLButtonElement)) throw new Error(`${selector} missing`);
   act(() => {
     Simulate.click(button);
+  });
+}
+
+async function submit(host: HTMLElement): Promise<void> {
+  await act(async () => {
+    const form = host.querySelector('form');
+    if (!(form instanceof HTMLFormElement)) throw new Error('form missing');
+    Simulate.submit(form);
   });
 }
