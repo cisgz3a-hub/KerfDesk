@@ -1,4 +1,4 @@
-import { act, createElement, type ComponentType } from 'react';
+import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
 
@@ -15,11 +15,20 @@ const readyState: TracePreviewState = {
   svg: '<svg viewBox="0 0 2 2"><path id="trace-path" d="M0 0L2 2"/></svg>',
   width: 2,
   height: 2,
-};
-
-type PreviewWithSourceProps = {
-  readonly state: TracePreviewState;
-  readonly sourceDataUrl: string;
+  paths: [
+    {
+      color: '#000000',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 0, y: 0 },
+            { x: 2, y: 2 },
+          ],
+        },
+      ],
+    },
+  ],
 };
 
 describe('TracePreview source overlay controls', () => {
@@ -55,16 +64,33 @@ describe('TracePreview source overlay controls', () => {
       await cleanup(root, host);
     }
   });
+
+  it('shows traced nodes when Show Points is toggled', async () => {
+    const { host, root } = await renderPreview();
+    try {
+      expect(host.querySelector('[aria-label="Trace points"]')).toBeNull();
+      const button = findButton(host, 'Show Points');
+      expect(button).not.toBeNull();
+      await act(async () => {
+        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      const points = host.querySelector('[aria-label="Trace points"]');
+      expect(points).not.toBeNull();
+      expect(points?.querySelectorAll('circle')).toHaveLength(2);
+      expect(host.querySelector('#trace-path')).not.toBeNull();
+    } finally {
+      await cleanup(root, host);
+    }
+  });
 });
 
 async function renderPreview(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const Component = TracePreview as unknown as ComponentType<PreviewWithSourceProps>;
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(createElement(Component, { state: readyState, sourceDataUrl: SOURCE_DATA_URL }));
+    root.render(createElement(TracePreview, { state: readyState, sourceDataUrl: SOURCE_DATA_URL }));
   });
   if (root === null) throw new Error('root did not mount');
   return { host, root };
@@ -73,4 +99,11 @@ async function renderPreview(): Promise<{ readonly host: HTMLDivElement; readonl
 async function cleanup(root: Root, host: HTMLDivElement): Promise<void> {
   await act(async () => root.unmount());
   host.remove();
+}
+
+function findButton(host: HTMLElement, label: string): HTMLButtonElement | null {
+  return (
+    Array.from(host.querySelectorAll('button')).find((button) => button.textContent === label) ??
+    null
+  );
 }

@@ -1,12 +1,6 @@
-// TracePreview — visual frame inside ImportImageDialog that shows
-// the current preset's output on the picked image. Renders the
-// sanitized SVG via dangerouslySetInnerHTML; sanitization happens
-// in useTracePreview before the string lands here.
-//
-// States: idle (no file), decoding, tracing, ready, error. Each gets
-// a stable-sized panel so the dialog doesn't reflow when the state
-// changes — important so the preset radio buttons don't jump under
-// the cursor.
+// TracePreview renders the Trace Image preview frame. It shows the
+// traced SVG over the source bitmap, plus preview-only LightBurn-style
+// toggles for fading the source and showing vector points.
 
 import { useState } from 'react';
 
@@ -20,18 +14,34 @@ type Props = {
 export function TracePreview(props: Props): JSX.Element {
   const { state } = props;
   const [isSourceFaded, setIsSourceFaded] = useState(false);
+  const [shouldShowPoints, setShouldShowPoints] = useState(false);
   const hasSource = props.sourceDataUrl !== undefined && props.sourceDataUrl.length > 0;
+  const canShowPoints = state.kind === 'ready';
   return (
     <div style={stackStyle}>
-      {hasSource ? (
-        <button
-          type="button"
-          aria-pressed={isSourceFaded}
-          onClick={() => setIsSourceFaded((next) => !next)}
-          style={fadeButtonStyle}
-        >
-          Fade Image
-        </button>
+      {hasSource || canShowPoints ? (
+        <div style={buttonRowStyle}>
+          {hasSource ? (
+            <button
+              type="button"
+              aria-pressed={isSourceFaded}
+              onClick={() => setIsSourceFaded((next) => !next)}
+              style={previewButtonStyle}
+            >
+              Fade Image
+            </button>
+          ) : null}
+          {canShowPoints ? (
+            <button
+              type="button"
+              aria-pressed={shouldShowPoints}
+              onClick={() => setShouldShowPoints((next) => !next)}
+              style={previewButtonStyle}
+            >
+              Show Points
+            </button>
+          ) : null}
+        </div>
       ) : null}
       <div style={frameStyle} aria-label="Trace preview">
         {hasSource ? (
@@ -42,47 +52,91 @@ export function TracePreview(props: Props): JSX.Element {
             style={sourceImageStyle(isSourceFaded)}
           />
         ) : null}
-        <Inner state={state} />
+        <Inner state={state} shouldShowPoints={shouldShowPoints} />
       </div>
     </div>
   );
 }
 
-function Inner(props: { readonly state: TracePreviewState }): JSX.Element {
+function Inner(props: {
+  readonly state: TracePreviewState;
+  readonly shouldShowPoints: boolean;
+}): JSX.Element {
   const { state } = props;
   switch (state.kind) {
     case 'idle':
       return <span style={hintStyle}>Pick an image to preview the trace.</span>;
     case 'decoding':
-      return <span style={hintStyle}>Decoding image…</span>;
+      return <span style={hintStyle}>Decoding image...</span>;
     case 'tracing':
-      return <span style={hintStyle}>Tracing…</span>;
+      return <span style={hintStyle}>Tracing...</span>;
     case 'error':
       return <span style={errorStyle}>Preview failed: {state.message}</span>;
     case 'ready':
       return (
-        <div
-          style={svgWrapStyle}
-          // SVG comes from imagetracerjs (trusted local dep) AND is
-          // run through sanitizeSvg before reaching here. Two layers
-          // of trust — safe enough for dangerouslySetInnerHTML.
-          dangerouslySetInnerHTML={{ __html: state.svg }}
-          aria-label={`Trace preview (${state.width}×${state.height} px)`}
-        />
+        <>
+          <div
+            style={svgWrapStyle}
+            // SVG comes from the trusted local trace path and is
+            // sanitized before reaching this component.
+            dangerouslySetInnerHTML={{ __html: state.svg }}
+            aria-label={`Trace preview (${state.width}x${state.height} px)`}
+          />
+          {props.shouldShowPoints ? <TracePointsOverlay state={state} /> : null}
+        </>
       );
   }
 }
 
+function TracePointsOverlay(props: {
+  readonly state: Extract<TracePreviewState, { readonly kind: 'ready' }>;
+}): JSX.Element {
+  const { state } = props;
+  const points = state.paths.flatMap((path) =>
+    path.polylines.flatMap((polyline) => polyline.points),
+  );
+  return (
+    <svg
+      aria-label="Trace points"
+      style={pointsOverlayStyle}
+      viewBox={`0 0 ${state.width} ${state.height}`}
+      width="100%"
+      height="100%"
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {points.map((point, index) => (
+        <circle
+          key={`${index}:${point.x}:${point.y}`}
+          cx={point.x}
+          cy={point.y}
+          r={POINT_RADIUS_PX}
+          fill={POINT_FILL_COLOR}
+          stroke={POINT_STROKE_COLOR}
+          strokeWidth={POINT_STROKE_WIDTH_PX}
+        />
+      ))}
+    </svg>
+  );
+}
+
 const SOURCE_NORMAL_OPACITY = 1;
 const SOURCE_FADED_OPACITY = 0.2;
+const POINT_RADIUS_PX = 1.6;
+const POINT_STROKE_WIDTH_PX = 0.45;
+const POINT_FILL_COLOR = '#7c3aed';
+const POINT_STROKE_COLOR = '#ffffff';
 
 const stackStyle: React.CSSProperties = {
   display: 'grid',
   gap: 6,
 };
 
-const fadeButtonStyle: React.CSSProperties = {
-  justifySelf: 'start',
+const buttonRowStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 6,
+};
+
+const previewButtonStyle: React.CSSProperties = {
   fontSize: 11,
   padding: '2px 8px',
   background: 'transparent',
@@ -141,9 +195,13 @@ const svgWrapStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  // The SVG itself is sized to its viewBox; scale it to fit the
-  // frame via the wrapper. Letterboxing is fine — the preview is
-  // about shape fidelity, not absolute mm size.
-  // The `& > svg` selector isn't possible inline; we apply the
-  // contain style on the wrapper and the SVG inherits via CSS.
+};
+
+const pointsOverlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  width: '100%',
+  height: '100%',
+  zIndex: 2,
+  pointerEvents: 'none',
 };
