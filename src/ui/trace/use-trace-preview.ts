@@ -19,6 +19,7 @@
 //      renderer sees it
 
 import { useEffect, useRef, useState } from 'react';
+import type { ColoredPath } from '../../core/scene';
 import { type RawImageData, type TraceOptions, coloredPathsToSvg } from '../../core/trace';
 import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
 import { traceImageWithFallback } from './use-trace-worker-client';
@@ -32,6 +33,7 @@ export type TracePreviewState =
       readonly svg: string;
       readonly width: number;
       readonly height: number;
+      readonly paths: ReadonlyArray<ColoredPath>;
     }
   | { readonly kind: 'error'; readonly message: string };
 
@@ -130,7 +132,13 @@ export function runTrace(args: {
       const { paths } = await traceImageWithFallback(args.img, args.options);
       if (!args.isCurrent()) return;
       const svg = coloredPathsToSvg(paths, args.img.width, args.img.height);
-      args.setState({ kind: 'ready', svg, width: args.img.width, height: args.img.height });
+      args.setState({
+        kind: 'ready',
+        svg,
+        width: args.img.width,
+        height: args.img.height,
+        paths,
+      });
     } catch (err) {
       if (!args.isCurrent()) return;
       args.setState({
