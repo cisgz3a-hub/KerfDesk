@@ -23,11 +23,8 @@
 // in, gives string out (asynchronously now, to allow the lazy
 // load; the trace work itself is still synchronous CPU).
 
-import { type DitherMode, ditherForTrace } from './dither-trace';
 import { despeckle, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
-
-export type { DitherMode } from './dither-trace';
 
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
@@ -148,15 +145,6 @@ export type TraceOptions = {
   // to engrave the dark areas — flipping the image makes that the
   // standard dark-on-light input every tracer assumes.
   readonly invert?: boolean;
-  // ditherMode: pre-trace halftone. Continuous-tone inputs (photos,
-  // shaded sketches) collapse into solid silhouettes under a simple
-  // threshold; dithering turns the tones into a spatially-distributed
-  // binary pattern that the tracer renders as halftoned ink. When set
-  // (and not 'none'), the dither replaces the threshold step — its
-  // output is already binary, and the despeckle stage is skipped to
-  // avoid erasing the dot pattern. Defaults to undefined ('none').
-  // See dither-trace.ts for the 13 supported modes.
-  readonly ditherMode?: DitherMode;
 };
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
@@ -267,18 +255,9 @@ export async function traceImageToSvgString(
 
 // Preprocessing chain — each stage is opt-in via TraceOptions flags
 // and runs in order: brightness → contrast → gamma → invert → median
-// → (dither OR threshold) → despeckle → tracer. See raster-prep.ts,
-// dither-trace.ts and preprocess.ts for rationale and algorithm
-// references. The composition matters: image-level adjustments run
-// BEFORE noise filtering so the median sees the user's intended tonal
-// range; dither/threshold then reads that range; despeckle operates
-// on the binarised result.
-//
-// Dither and threshold are mutually exclusive — both binarize the
-// image, so chaining would discard the dither pattern. When a dither
-// mode is active, the despeckle stage is also skipped because its
-// "remove small ink regions" semantics would erase the intentional
-// halftone dots.
+// → threshold → despeckle → tracer. See raster-prep.ts and
+// preprocess.ts for rationale. Trace creates vectors; raster
+// dither/photo processing belongs to Image Mode, not Trace.
 //
 // Extracted from traceImageToSvgString so complexity stays under
 // the project cap (12). Pure function — same inputs, same output.
@@ -287,18 +266,11 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
   if (options.medianFilter === true) {
     prepared = medianFilter(prepared);
   }
-  if (isDitherActive(options)) {
-    return ditherForTrace(prepared, options.ditherMode ?? 'none');
-  }
   prepared = applyThreshold(prepared, options);
   if (shouldDespeckle(options)) {
     prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
   }
   return prepared;
-}
-
-function isDitherActive(options: TraceOptions): boolean {
-  return options.ditherMode !== undefined && options.ditherMode !== 'none';
 }
 
 // Brightness → contrast → gamma → invert. Each is a no-op at its

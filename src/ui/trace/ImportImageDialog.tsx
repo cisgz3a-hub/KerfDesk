@@ -9,8 +9,8 @@
 //   2. Its embedded dataUrl is round-tripped back into a File
 //      (dataUrlToFile) so the existing File-keyed preview + trace
 //      pipeline (useTracePreview, loadImageAsRawData) runs unchanged.
-//   3. User picks a preset + tweaks brightness/contrast/gamma/invert
-//      + dither (AdjustmentControls) — live preview via
+//   3. User picks a preset + tunes Trace settings plus the temporary
+//      pre-threshold adjustment controls — live preview via
 //      useTracePreview while they tune.
 //   4. Submit → traceImage (Web Worker if available, inline fallback)
 //      → ColoredPath[] directly from imagetracerjs tracedata

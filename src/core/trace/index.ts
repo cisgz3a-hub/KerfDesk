@@ -8,9 +8,9 @@
 //     matches imagetracerjs's analytic curves.
 //
 // Both share the same preprocessing chain (raster-prep image
-// adjustments → median → dither/threshold → despeckle).
+// adjustments → median → threshold → despeckle).
 
-export type { DitherMode, RawImageData, TraceOptions } from './trace-image';
+export type { RawImageData, TraceOptions } from './trace-image';
 export {
   DEFAULT_TRACE_OPTIONS,
   TRACE_PRESETS,
@@ -35,8 +35,4 @@ export { coloredPathsToSvg } from './paths-to-svg';
 // (e.g. an "Advanced" trace dialog showing the auto-computed Otsu
 // threshold) can call them directly. Each is pure-core.
 export { despeckle, medianFilter, otsuThreshold } from './preprocess';
-// Phase E.3 LF1-parity dither catalogue for the import dialog
-// dropdown and image-level adjustment functions (brightness etc.) for
-// any future "Advanced" panel.
-export { DITHER_MODES, ditherForTrace } from './dither-trace';
 export { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
