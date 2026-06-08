@@ -3,6 +3,12 @@ import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
 import { DITHER_ALGORITHMS, type Layer, type RasterImage } from '../../core/scene';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import type { RasterImageAdjustmentPatch } from '../state/raster-adjustment-actions';
+import {
+  applyBuiltInImagePreset,
+  type BuiltInImagePresetId,
+  parseBuiltInImagePreset,
+  PresetField,
+} from './AdjustImageDialog.presets';
 import { drawAdjustImagePreview } from './AdjustImageDialog.preview';
 import * as styles from './AdjustImageDialog.styles';
 
@@ -22,6 +28,7 @@ export type AdjustImageApply = {
 };
 
 type Draft = {
+  readonly presetId: BuiltInImagePresetId;
   readonly brightness: number;
   readonly contrast: number;
   readonly gamma: number;
@@ -48,6 +55,8 @@ export function AdjustImageDialog(props: {
   usePreviewEffects(sourceRef, processedRef, props.image, draft);
   const update = (patch: Partial<Draft>): void =>
     setDraft((prev) => normalizeDraft({ ...prev, ...patch }));
+  const applyPreset = (presetId: BuiltInImagePresetId): void =>
+    setDraft((prev) => normalizeDraft(applyBuiltInImagePreset(prev, presetId)));
   const submit = (event: React.FormEvent): void => {
     event.preventDefault();
     props.onApply(patchFromDraft(draft));
@@ -65,7 +74,12 @@ export function AdjustImageDialog(props: {
       <form onSubmit={submit} style={styles.panelStyle}>
         <DialogHeader source={props.image.source} />
         <PreviewGrid sourceRef={sourceRef} processedRef={processedRef} />
-        <AdjustFields draft={draft} maxPower={props.layer.power} update={update} />
+        <AdjustFields
+          draft={draft}
+          maxPower={props.layer.power}
+          update={update}
+          applyPreset={applyPreset}
+        />
         <DialogActions onCancel={props.onCancel} />
       </form>
     </div>
@@ -143,10 +157,12 @@ function AdjustFields(props: {
   readonly draft: Draft;
   readonly maxPower: number;
   readonly update: (patch: Partial<Draft>) => void;
+  readonly applyPreset: (presetId: BuiltInImagePresetId) => void;
 }): JSX.Element {
-  const { draft, update } = props;
+  const { draft, update, applyPreset } = props;
   return (
     <div style={styles.fieldsGridStyle}>
+      <PresetField value={draft.presetId} onChange={applyPreset} />
       <NumberField
         name="brightness"
         label="Brightness"
@@ -350,6 +366,7 @@ function CheckboxField(props: {
 
 function initialDraft(image: RasterImage, layer: Layer): Draft {
   return normalizeDraft({
+    presetId: 'custom',
     brightness: image.brightness ?? 0,
     contrast: image.contrast ?? 0,
     gamma: image.gamma ?? 1,
@@ -367,6 +384,7 @@ function normalizeDraft(draft: Draft): Draft {
   const linesPerMm = numberValue(String(draft.linesPerMm), 5, MAX_RASTER_LINES_PER_MM);
   return {
     ...draft,
+    presetId: parseBuiltInImagePreset(draft.presetId),
     brightness: numberValue(String(draft.brightness), -100, 100),
     contrast: numberValue(String(draft.contrast), -100, 100),
     gamma: numberValue(String(draft.gamma), 0.1, 5),

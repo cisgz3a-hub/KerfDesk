@@ -125,6 +125,39 @@ describe('AdjustImageDialog', () => {
       host.remove();
     }
   });
+
+  it('applies built-in presets to the local draft before OK', async () => {
+    const onApply = vi.fn();
+    const { host, root } = await renderDialog({ onApply });
+    try {
+      change(host, 'input[name="brightness"]', '25');
+      click(host, 'input[name="negativeImage"]');
+      click(host, 'input[name="invertDisplay"]');
+
+      change(host, 'select[name="imagePreset"]', 'basic');
+
+      expect((host.querySelector('input[name="brightness"]') as HTMLInputElement).value).toBe('0');
+      expect((host.querySelector('input[name="negativeImage"]') as HTMLInputElement).checked).toBe(
+        false,
+      );
+      expect((host.querySelector('input[name="invertDisplay"]') as HTMLInputElement).checked).toBe(
+        false,
+      );
+
+      change(host, 'select[name="imagePreset"]', 'black-paint-on-white');
+
+      expect((host.querySelector('input[name="negativeImage"]') as HTMLInputElement).checked).toBe(
+        true,
+      );
+      expect((host.querySelector('input[name="invertDisplay"]') as HTMLInputElement).checked).toBe(
+        true,
+      );
+      expect(onApply).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
 
 async function renderDialog(opts: {
