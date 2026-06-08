@@ -123,6 +123,7 @@ export type AppState = {
   readonly toggleSelectObject: (id: string) => void;
   // Ctrl+A: primary = first, additional = rest.
   readonly selectAllObjects: () => void;
+  readonly selectObjectsOnLayer: (layerId: string) => void;
   readonly togglePreview: () => void;
   readonly setJobPlacement: (patch: Partial<JobPlacementSettings>) => void;
   readonly setCursorMm: (cursor: Vec2 | null) => void;
