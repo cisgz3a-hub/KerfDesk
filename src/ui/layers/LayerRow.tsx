@@ -23,6 +23,7 @@ import { AssignSelectionButton } from './AssignSelectionButton';
 import { CutSettingsDialog } from './CutSettingsDialog';
 import { LayerImageFields } from './LayerImageFields';
 import { LayerOrderControls } from './LayerOrderControls';
+import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
 import { useDebouncedCommit } from './use-debounced-commit';
 import { useState } from 'react';
 
@@ -105,6 +106,7 @@ export function LayerRow(props: {
         />
         <ModeSelect layer={layer} />
         <span style={headerFillerStyle} />
+        <SelectLayerObjectsButton layer={layer} />
         <AssignSelectionButton layer={layer} />
         <button
           type="button"

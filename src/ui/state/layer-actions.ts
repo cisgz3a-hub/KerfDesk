@@ -22,15 +22,21 @@ type LayerActionMutation = {
   readonly dirty: true;
 };
 
+type LayerSelectionMutation = {
+  readonly selectedObjectId: string | null;
+  readonly additionalSelectedIds: ReadonlySet<string>;
+};
+
 type EmptyLayerAction = Record<string, never>;
 
 type LayerActionSet = (
-  fn: (state: LayerActionState) => LayerActionMutation | EmptyLayerAction,
+  fn: (state: LayerActionState) => LayerActionMutation | LayerSelectionMutation | EmptyLayerAction,
 ) => void;
 
 export type LayerActions = {
   readonly createManualLayer: (color: string) => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
+  readonly selectObjectsOnLayer: (layerId: string) => void;
 };
 
 export function layerActions(set: LayerActionSet): LayerActions {
@@ -59,6 +65,16 @@ export function layerActions(set: LayerActionSet): LayerActions {
         if (scene === state.project.scene) return {};
         return mutation(state, { ...state.project, scene });
       }),
+    selectObjectsOnLayer: (layerId) =>
+      set((state) => {
+        const color = layerColorForSelection(state.project.scene, layerId);
+        if (color === null) return clearSelection();
+        return selectObjectIds(
+          state.project.scene.objects
+            .filter((object) => objectUsesLayerColor(object, color))
+            .map((object) => object.id),
+        );
+      }),
   };
 }
 
@@ -79,6 +95,37 @@ function pruneAssignmentOrphans(scene: Scene, usedBefore: ReadonlySet<string>): 
     (layer) => usedAfter.has(layer.color) || !usedBefore.has(layer.color),
   );
   return layers.length === scene.layers.length ? scene : { ...scene, layers };
+}
+
+function layerColorForSelection(scene: Scene, layerId: string): string | null {
+  const layer = scene.layers.find((candidate) => candidate.id === layerId);
+  if (layer !== undefined) return layer.color;
+  return normalizeLayerColor(layerId);
+}
+
+function selectObjectIds(ids: ReadonlyArray<string>): LayerSelectionMutation {
+  const [primary, ...rest] = ids;
+  return {
+    selectedObjectId: primary ?? null,
+    additionalSelectedIds: new Set(rest),
+  };
+}
+
+function clearSelection(): LayerSelectionMutation {
+  return { selectedObjectId: null, additionalSelectedIds: new Set() };
+}
+
+function objectUsesLayerColor(object: Scene['objects'][number], color: string): boolean {
+  switch (object.kind) {
+    case 'imported-svg':
+    case 'text':
+    case 'traced-image':
+      return object.paths.some((path) => path.color === color);
+    case 'raster-image':
+      return object.color === color;
+    default:
+      return assertNever(object, 'SceneObject');
+  }
 }
 
 function usedLayerColors(scene: Scene): ReadonlySet<string> {

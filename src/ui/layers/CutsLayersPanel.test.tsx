@@ -111,6 +111,35 @@ describe('CutsLayersPanel layer order controls', () => {
       host.remove();
     }
   });
+
+  it('selects all objects on a layer from the Cuts / Layers panel', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff', '#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O3', ['#0000ff']));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const selectRed = host.querySelector('button[aria-label="Select all objects on #ff0000"]');
+      if (!(selectRed instanceof HTMLButtonElement)) throw new Error('select layer button missing');
+
+      await act(async () => {
+        selectRed.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const state = useStore.getState();
+      expect(state.selectedObjectId).toBe('O1');
+      expect([...state.additionalSelectedIds]).toEqual(['O2']);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
 
 describe('CutsLayersPanel cut settings editor', () => {
