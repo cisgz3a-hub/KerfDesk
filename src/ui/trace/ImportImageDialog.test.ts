@@ -55,10 +55,14 @@ function ctxWith(getCurrentObject: (id: string) => SceneObject | undefined) {
   };
 }
 
-const args = (seed: RasterImage) => ({
+const args = (
+  seed: RasterImage,
+  overrides: { readonly deleteSourceAfterTrace?: boolean } = {},
+) => ({
   file: new File([''], 'logo.png'),
   options: DEFAULT_TRACE_OPTIONS,
   seed,
+  ...overrides,
 });
 
 describe('sameTraceSource', () => {
@@ -94,6 +98,27 @@ describe('commit source revalidation (P2-A)', () => {
     const ctx = ctxWith(() => seedRaster());
     await commit(args(seed), ctx);
     expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
+    expect(ctx.traceExistingImage).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({ kind: 'traced-image' }),
+      { deleteSourceAfterTrace: false },
+    );
+    expect(ctx.pushToast).toHaveBeenCalledWith(expect.stringContaining('source kept'), 'success');
+  });
+
+  it('passes Delete Image After trace through commit and reports source deleted', async () => {
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    await commit(args(seed, { deleteSourceAfterTrace: true }), ctx);
+    expect(ctx.traceExistingImage).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({ kind: 'traced-image' }),
+      { deleteSourceAfterTrace: true },
+    );
+    expect(ctx.pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('source deleted'),
+      'success',
+    );
   });
 
   it('aborts (no overlay) when the live source content changed mid-dialog', async () => {
@@ -127,6 +152,7 @@ describe('Trace Image workflow controls', () => {
       expect(text).toContain('Smoothness');
       expect(text).toContain('Optimize');
       expect(text).toContain('Fade Image');
+      expect(text).toContain('Delete Image After trace');
       expect(text).not.toContain('Image adjustments');
       expect(text).not.toContain('Brightness');
       expect(text).not.toContain('Contrast');
