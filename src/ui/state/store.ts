@@ -111,6 +111,7 @@ export type AppState = {
   readonly moveLayer: (layerId: string, direction: LayerMoveDirection) => void;
   readonly createManualLayer: (color: string) => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
+  readonly deleteLayerAndObjects: (layerId: string) => void;
   readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 

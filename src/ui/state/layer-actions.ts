@@ -20,6 +20,8 @@ type LayerActionMutation = {
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: true;
+  readonly selectedObjectId?: string | null;
+  readonly additionalSelectedIds?: ReadonlySet<string>;
 };
 
 type LayerSelectionMutation = {
@@ -37,6 +39,7 @@ export type LayerActions = {
   readonly createManualLayer: (color: string) => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
   readonly selectObjectsOnLayer: (layerId: string) => void;
+  readonly deleteLayerAndObjects: (layerId: string) => void;
 };
 
 export function layerActions(set: LayerActionSet): LayerActions {
@@ -74,6 +77,17 @@ export function layerActions(set: LayerActionSet): LayerActions {
             .filter((object) => objectUsesLayerColor(object, color))
             .map((object) => object.id),
         );
+      }),
+    deleteLayerAndObjects: (layerId) =>
+      set((state) => {
+        const target = state.project.scene.layers.find((layer) => layer.id === layerId);
+        if (target === undefined) return {};
+        const result = deleteLayerContent(state.project.scene, target.id, target.color);
+        if (result === null) return {};
+        return {
+          ...mutation(state, { ...state.project, scene: result.scene }),
+          ...removeDeletedIdsFromSelection(state, result.removedObjectIds),
+        };
       }),
   };
 }
@@ -126,6 +140,72 @@ function objectUsesLayerColor(object: Scene['objects'][number], color: string): 
     default:
       return assertNever(object, 'SceneObject');
   }
+}
+
+function deleteLayerContent(
+  scene: Scene,
+  layerId: string,
+  color: string,
+): { readonly scene: Scene; readonly removedObjectIds: ReadonlySet<string> } | null {
+  const usedBefore = usedLayerColors(scene);
+  const removedObjectIds = new Set<string>();
+  const objects: Scene['objects'][number][] = [];
+  let changed = false;
+  for (const object of scene.objects) {
+    const next = removeLayerColorFromObject(object, color);
+    if (next === null) {
+      removedObjectIds.add(object.id);
+      changed = true;
+      continue;
+    }
+    if (next !== object) changed = true;
+    objects.push(next);
+  }
+  const layers = scene.layers.filter((layer) => layer.id !== layerId);
+  if (layers.length !== scene.layers.length) changed = true;
+  if (!changed) return null;
+  return {
+    scene: pruneAssignmentOrphans({ ...scene, objects, layers }, usedBefore),
+    removedObjectIds,
+  };
+}
+
+function removeLayerColorFromObject(
+  object: Scene['objects'][number],
+  color: string,
+): Scene['objects'][number] | null {
+  switch (object.kind) {
+    case 'imported-svg':
+    case 'traced-image': {
+      const paths = object.paths.filter((path) => path.color !== color);
+      if (paths.length === object.paths.length) return object;
+      return paths.length === 0 ? null : { ...object, paths };
+    }
+    case 'text':
+      return object.color === color || object.paths.some((path) => path.color === color)
+        ? null
+        : object;
+    case 'raster-image':
+      return object.color === color ? null : object;
+    default:
+      return assertNever(object, 'SceneObject');
+  }
+}
+
+function removeDeletedIdsFromSelection(
+  state: LayerActionState,
+  removedObjectIds: ReadonlySet<string>,
+): LayerSelectionMutation {
+  const additionalSelectedIds = new Set(
+    [...state.additionalSelectedIds].filter((id) => !removedObjectIds.has(id)),
+  );
+  return {
+    selectedObjectId:
+      state.selectedObjectId !== null && removedObjectIds.has(state.selectedObjectId)
+        ? null
+        : state.selectedObjectId,
+    additionalSelectedIds,
+  };
 }
 
 function usedLayerColors(scene: Scene): ReadonlySet<string> {

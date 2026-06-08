@@ -109,4 +109,62 @@ describe('layer store actions', () => {
     expect(useStore.getState().selectedObjectId).toBeNull();
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);
   });
+
+  it('deleteLayerAndObjects removes matching vector paths and preserves unrelated paths', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#ff0000', '#0000ff']));
+    useStore.getState().importSvgObject(svgObj('O3', ['#00ff00']));
+    const undoBefore = useStore.getState().undoStack.length;
+    useStore.setState({
+      selectedObjectId: 'O1',
+      additionalSelectedIds: new Set(['O2', 'O3']),
+      dirty: false,
+    });
+
+    useStore.getState().deleteLayerAndObjects('#ff0000');
+
+    const state = useStore.getState();
+    expect(state.project.scene.objects.map((object) => object.id)).toEqual(['O2', 'O3']);
+    const kept = state.project.scene.objects[0];
+    expect(kept?.kind).toBe('imported-svg');
+    if (kept?.kind !== 'imported-svg') throw new Error('expected imported svg');
+    expect(kept.paths.map((path) => path.color)).toEqual(['#0000ff']);
+    expect(state.project.scene.layers.map((layer) => layer.color)).toEqual(['#0000ff', '#00ff00']);
+    expect(state.selectedObjectId).toBeNull();
+    expect([...state.additionalSelectedIds]).toEqual(['O2', 'O3']);
+    expect(state.undoStack).toHaveLength(undoBefore + 1);
+    expect(state.dirty).toBe(true);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
+      'O1',
+      'O2',
+      'O3',
+    ]);
+  });
+
+  it('deleteLayerAndObjects removes raster objects assigned to the layer color', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importRasterImage(rasterObj('R1'));
+
+    useStore.getState().deleteLayerAndObjects('#808080');
+
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual(['O1']);
+    expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+      '#ff0000',
+    ]);
+  });
+
+  it('deleteLayerAndObjects removes an empty manual layer', () => {
+    useStore.getState().createManualLayer('#00ff00');
+    const undoBefore = useStore.getState().undoStack.length;
+    useStore.setState({ dirty: false });
+
+    useStore.getState().deleteLayerAndObjects('#00ff00');
+
+    expect(useStore.getState().project.scene.layers).toHaveLength(0);
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(useStore.getState().undoStack).toHaveLength(undoBefore + 1);
+    expect(useStore.getState().dirty).toBe(true);
+  });
 });

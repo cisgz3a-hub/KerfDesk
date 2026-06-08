@@ -140,6 +140,35 @@ describe('CutsLayersPanel layer order controls', () => {
       host.remove();
     }
   });
+
+  it('deletes a layer and its assigned artwork from the Cuts / Layers panel', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const deleteRed = host.querySelector('button[aria-label="Delete layer #ff0000"]');
+      if (!(deleteRed instanceof HTMLButtonElement)) throw new Error('delete layer button missing');
+
+      await act(async () => {
+        deleteRed.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual(['O2']);
+      expect(useStore.getState().project.scene.layers.map((layer) => layer.color)).toEqual([
+        '#0000ff',
+      ]);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
 
 describe('CutsLayersPanel cut settings editor', () => {

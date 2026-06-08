@@ -21,6 +21,7 @@ import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
 import { AssignSelectionButton } from './AssignSelectionButton';
 import { CutSettingsDialog } from './CutSettingsDialog';
+import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerImageFields } from './LayerImageFields';
 import { LayerOrderControls } from './LayerOrderControls';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
@@ -108,6 +109,7 @@ export function LayerRow(props: {
         <span style={headerFillerStyle} />
         <SelectLayerObjectsButton layer={layer} />
         <AssignSelectionButton layer={layer} />
+        <DeleteLayerButton layer={layer} />
         <button
           type="button"
           onClick={() => setSettingsOpen(true)}
