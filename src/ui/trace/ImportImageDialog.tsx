@@ -9,9 +9,8 @@
 //   2. Its embedded dataUrl is round-tripped back into a File
 //      (dataUrlToFile) so the existing File-keyed preview + trace
 //      pipeline (useTracePreview, loadImageAsRawData) runs unchanged.
-//   3. User picks a preset + tunes Trace settings plus the temporary
-//      pre-threshold adjustment controls — live preview via
-//      useTracePreview while they tune.
+//   3. User picks a preset + tunes Trace settings, with live preview
+//      via useTracePreview while they tune.
 //   4. Submit → traceImage (Web Worker if available, inline fallback)
 //      → ColoredPath[] directly from imagetracerjs tracedata
 //      (bypassing parseSvg's curve-flattening) → overlay the vector
@@ -27,8 +26,8 @@
 //
 // Presentational pieces (SourceLabel, PresetPicker, DialogActions,
 // styles) live in dialog-parts.tsx; the pure-data option transforms
-// (mergeAdjustments, hasAggressivePreprocessing,
-// relaxAggressivePreprocessing) live in trace-options.ts. This file
+// (hasAggressivePreprocessing, relaxAggressivePreprocessing) live in
+// trace-options.ts. This file
 // only owns state + the commit flow + the dialog shell.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -44,11 +43,6 @@ import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import {
-  AdjustmentControls,
-  DEFAULT_ADJUSTMENTS,
-  type AdjustmentValues,
-} from './AdjustmentControls';
-import {
   DialogActions,
   PresetHint,
   PresetPicker,
@@ -58,11 +52,7 @@ import {
   panelStyle,
 } from './dialog-parts';
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
-import {
-  mergeAdjustments,
-  mergeLightBurnTraceSettings,
-  type LightBurnTraceSettingOverrides,
-} from './trace-options';
+import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceSettingsControls } from './TraceSettingsControls';
 import { traceImageWithFallback } from './use-trace-worker-client';
 import { TracePreview } from './TracePreview';
@@ -81,7 +71,6 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   const [file, setFile] = useState<File | null>(null);
   const [preset, setPreset] = useState<string>('Line Art');
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
-  const [adjustments, setAdjustments] = useState<AdjustmentValues>(DEFAULT_ADJUSTMENTS);
   const [busy, setBusy] = useState(false);
   // Reconstruct a File from the seed bitmap's embedded dataUrl so the
   // File-keyed preview + trace pipeline runs unchanged (image-loader.
@@ -100,9 +89,10 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       cancelled = true;
     };
   }, [seed.dataUrl, seed.source, pushToast]);
-  // Layer the user adjustments on top of the preset. The preset
-  // already pins the trace-side knobs (numberOfColors, lineFilter,
-  // etc.); we just merge the LF1-compatible image-level levers in.
+  // Layer the LightBurn-style trace settings on top of the preset.
+  // Image-level edits stay in Adjust Image, so Trace Image keeps one
+  // authoritative vector workflow: cutoff, threshold, ignore,
+  // smoothness, and optimize.
   //
   // useMemo is load-bearing — useTracePreview depends on `options` as
   // a useEffect dep, so a fresh object reference every render would
@@ -114,8 +104,8 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
   const options: TraceOptions = useMemo(
-    () => mergeAdjustments(mergeLightBurnTraceSettings(presetOptions, traceSettings), adjustments),
-    [presetOptions, traceSettings, adjustments],
+    () => mergeLightBurnTraceSettings(presetOptions, traceSettings),
+    [presetOptions, traceSettings],
   );
   const preview = useTracePreview(file, options);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -160,7 +150,6 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
           overrides={traceSettings}
           onChange={setTraceSettings}
         />
-        <AdjustmentControls values={adjustments} onChange={setAdjustments} />
         <TracePreview state={preview} />
         <PresetHint />
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />

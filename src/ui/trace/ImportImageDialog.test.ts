@@ -1,12 +1,16 @@
+import { act } from 'react';
+import { createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./image-loader', () => ({
+  PREVIEW_MAX_EDGE_PX: 2048,
   loadImageAsRawData: vi.fn(async () => ({
     width: 2,
     height: 2,
     data: new Uint8ClampedArray(16),
   })),
-  dataUrlToFile: vi.fn(),
+  dataUrlToFile: vi.fn(async () => new File(['image'], 'logo.png', { type: 'image/png' })),
 }));
 vi.mock('./use-trace-worker-client', () => ({
   traceImageWithFallback: vi.fn(async () => ({
@@ -17,7 +21,12 @@ vi.mock('./use-trace-worker-client', () => ({
 
 import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../../core/scene';
 import { DEFAULT_TRACE_OPTIONS } from '../../core/trace';
-import { commit, sameTraceSource } from './ImportImageDialog';
+import { useUiStore } from '../state/ui-store';
+import { commit, ImportImageDialog, sameTraceSource } from './ImportImageDialog';
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 function seedRaster(over: Partial<RasterImage> = {}): RasterImage {
   return {
@@ -105,3 +114,42 @@ describe('commit source revalidation (P2-A)', () => {
     expect(ctx.traceExistingImage).not.toHaveBeenCalled();
   });
 });
+
+describe('Trace Image workflow controls', () => {
+  it('shows vector trace settings without image-adjustment controls', async () => {
+    const { host, root } = await renderTraceDialog(seedRaster());
+    try {
+      const text = host.textContent ?? '';
+      expect(text).toContain('Trace settings');
+      expect(text).toContain('Cutoff');
+      expect(text).toContain('Threshold');
+      expect(text).toContain('Ignore Less Than');
+      expect(text).toContain('Smoothness');
+      expect(text).toContain('Optimize');
+      expect(text).not.toContain('Image adjustments');
+      expect(text).not.toContain('Brightness');
+      expect(text).not.toContain('Contrast');
+      expect(text).not.toContain('Gamma');
+      expect(text).not.toContain('Invert');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      useUiStore.setState({ imageDialog: null });
+    }
+  });
+});
+
+async function renderTraceDialog(
+  seed: RasterImage,
+): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  useUiStore.setState({ imageDialog: seed });
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    root.render(createElement(ImportImageDialog));
+  });
+  if (root === null) throw new Error('root did not mount');
+  return { host, root };
+}

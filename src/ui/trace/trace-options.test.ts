@@ -1,24 +1,22 @@
-// Unit coverage for the three pure-data helpers. Each is a small
-// transform, but they govern user-visible behaviour (presets layering,
-// retry-on-empty), so explicit invariants here are cheap insurance.
+// Unit coverage for the pure-data helpers. Each is a small transform,
+// but they govern visible Trace Image behavior, so explicit invariants
+// here are cheap insurance.
 
 import { describe, expect, it } from 'vitest';
 
 import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
-import { DEFAULT_ADJUSTMENTS, type AdjustmentValues } from './AdjustmentControls';
 import {
   hasAggressivePreprocessing,
   mergeLightBurnTraceSettings,
-  mergeAdjustments,
   relaxAggressivePreprocessing,
 } from './trace-options';
 
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
 const SMOOTH = TRACE_PRESETS['Smooth'] as TraceOptions;
-// A photo-like multi-colour options object (the shape the removed "Photo"
-// preset had). Kept inline so mergeLightBurnTraceSettings behaviour on a
-// non-fixedPalette options object stays covered after Photo/Detailed were
-// dropped as surfaced presets (vector Trace is binary, ADR-043).
+// A photo-like multi-color options object. Kept inline so
+// mergeLightBurnTraceSettings behavior on a non-fixedPalette options
+// object stays covered after Photo/Detailed were dropped as surfaced
+// presets because vector Trace is binary.
 const PHOTO: TraceOptions = {
   numberOfColors: 8,
   pathOmit: 8,
@@ -29,53 +27,6 @@ const PHOTO: TraceOptions = {
   lineFilter: true,
   medianFilter: true,
 };
-
-describe('mergeAdjustments', () => {
-  it('returns an options object equivalent to the preset when adjustments are at defaults', () => {
-    const merged = mergeAdjustments(LINE_ART, DEFAULT_ADJUSTMENTS);
-    // Every preset field should round-trip — same values, including
-    // the readonly tuple-ish fixedPalette.
-    expect(merged.numberOfColors).toBe(LINE_ART.numberOfColors);
-    expect(merged.useOtsuThreshold).toBe(LINE_ART.useOtsuThreshold);
-    expect(merged.fixedPalette).toEqual(LINE_ART.fixedPalette);
-    expect(merged.despeckleMinPixels).toBe(LINE_ART.despeckleMinPixels);
-    // None of the adjustment fields should be added when neutral.
-    expect((merged as Record<string, unknown>)['brightness']).toBeUndefined();
-    expect((merged as Record<string, unknown>)['contrast']).toBeUndefined();
-    expect((merged as Record<string, unknown>)['gamma']).toBeUndefined();
-    expect((merged as Record<string, unknown>)['invert']).toBeUndefined();
-    expect((merged as Record<string, unknown>)['ditherMode']).toBeUndefined();
-  });
-
-  it('layers each non-neutral adjustment field', () => {
-    const adj: AdjustmentValues = {
-      brightness: 25,
-      contrast: -30,
-      gamma: 1.4,
-      invert: true,
-    };
-    const merged = mergeAdjustments(LINE_ART, adj);
-    expect(merged.brightness).toBe(25);
-    expect(merged.contrast).toBe(-30);
-    expect(merged.gamma).toBe(1.4);
-    expect(merged.invert).toBe(true);
-    expect((merged as Record<string, unknown>)['ditherMode']).toBeUndefined();
-    // Preset fields still survive.
-    expect(merged.useOtsuThreshold).toBe(LINE_ART.useOtsuThreshold);
-  });
-
-  it('omits brightness when 0 (so the no-op early return in raster-prep fires)', () => {
-    const merged = mergeAdjustments(LINE_ART, { ...DEFAULT_ADJUSTMENTS, contrast: 10 });
-    expect((merged as Record<string, unknown>)['brightness']).toBeUndefined();
-    expect(merged.contrast).toBe(10);
-  });
-
-  it('does not mutate the input preset', () => {
-    const presetSnapshot = JSON.stringify(LINE_ART);
-    mergeAdjustments(LINE_ART, { ...DEFAULT_ADJUSTMENTS, brightness: 50, invert: true });
-    expect(JSON.stringify(LINE_ART)).toBe(presetSnapshot);
-  });
-});
 
 describe('mergeLightBurnTraceSettings', () => {
   it('layers changed LightBurn trace controls onto the preset', () => {
@@ -96,7 +47,7 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.fixedPalette).toEqual(LINE_ART.fixedPalette);
   });
 
-  it('does not force binary LightBurn threshold fields onto untouched multi-colour options', () => {
+  it('does not force binary LightBurn threshold fields onto untouched multi-color options', () => {
     const merged = mergeLightBurnTraceSettings(PHOTO, {});
     expect(merged.cutoffLuma).toBeUndefined();
     expect(merged.thresholdLuma).toBeUndefined();
@@ -187,9 +138,6 @@ describe('relaxAggressivePreprocessing', () => {
   });
 
   it('forces pathOmit to 0 so the retry keeps every path imagetracerjs emits', () => {
-    // Line Art ships pathOmit: 16, which on small / simple shapes
-    // (logos, text glyphs) drops everything. The retry should keep
-    // any path with content.
     expect(LINE_ART.pathOmit).toBe(16);
     const relaxed = relaxAggressivePreprocessing(LINE_ART);
     expect(relaxed.pathOmit).toBe(0);
@@ -211,8 +159,6 @@ describe('relaxAggressivePreprocessing', () => {
   });
 
   it('returns hasAggressivePreprocessing() === false on its own output', () => {
-    // Round-trip invariant — relaxing should always disarm the
-    // predicate, otherwise the retry loop in the dialog would spin.
     const relaxed = relaxAggressivePreprocessing(LINE_ART);
     expect(hasAggressivePreprocessing(relaxed)).toBe(false);
   });
