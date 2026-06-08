@@ -7,6 +7,7 @@ import {
 } from '../../core/raster/raster-units';
 import type { Layer, LayerMode } from '../../core/scene';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
 import { CutSettingsImageFields } from './CutSettingsImageFields';
 
 type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
@@ -19,6 +20,7 @@ export function CutSettingsDialog(props: {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<LayerMode>(props.layer.mode);
   const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
+  const [fillLineIntervalMm, setFillLineIntervalMm] = useState(props.layer.hatchSpacingMm);
   const [imageLinesPerMm, setImageLinesPerMm] = useState(props.layer.linesPerMm);
   useDialogA11y(dialogRef, props.onCancel);
   const onSubmit = (event: React.FormEvent): void => {
@@ -39,7 +41,13 @@ export function CutSettingsDialog(props: {
       <form onSubmit={onSubmit} style={panelStyle}>
         <Header layer={props.layer} />
         <CommonFields layer={props.layer} mode={mode} onModeChange={setMode} />
-        {mode === 'fill' ? <FillFields layer={props.layer} /> : null}
+        {mode === 'fill' ? (
+          <FillFields
+            layer={props.layer}
+            lineIntervalMm={fillLineIntervalMm}
+            onLineIntervalMmChange={setFillLineIntervalMm}
+          />
+        ) : null}
         {mode === 'image' ? (
           <CutSettingsImageFields
             layer={props.layer}
@@ -113,28 +121,32 @@ function CommonFields(props: {
   );
 }
 
-function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
+function FillFields(props: {
+  readonly layer: Layer;
+  readonly lineIntervalMm: number;
+  readonly onLineIntervalMmChange: (lineIntervalMm: number) => void;
+}): JSX.Element {
   return (
     <fieldset style={fieldsetStyle}>
       <legend style={legendStyle}>Fill</legend>
-      <Field label="Hatch angle">
-        <NumberInput name="hatchAngleDeg" value={layer.hatchAngleDeg} min={0} max={180} step={5} />
+      <Field label="Scan angle">
+        <NumberInput
+          name="hatchAngleDeg"
+          value={props.layer.hatchAngleDeg}
+          min={0}
+          max={180}
+          step={5}
+        />
         <span style={unitStyle}>deg</span>
       </Field>
-      <Field label="Hatch spacing">
-        <NumberInput
-          name="hatchSpacingMm"
-          value={layer.hatchSpacingMm}
-          min={0.05}
-          max={10}
-          step={0.05}
-        />
-        <span style={unitStyle}>mm</span>
-      </Field>
+      <CutSettingsFillDensityFields
+        lineIntervalMm={props.lineIntervalMm}
+        onChange={props.onLineIntervalMmChange}
+      />
       <Field label="Overscan">
         <NumberInput
           name="fillOverscanMm"
-          value={layer.fillOverscanMm}
+          value={props.layer.fillOverscanMm}
           min={0}
           max={25}
           step={0.5}
@@ -142,7 +154,11 @@ function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
         <span style={unitStyle}>mm</span>
       </Field>
       <Field label="Bidirectional">
-        <input name="fillBidirectional" type="checkbox" defaultChecked={layer.fillBidirectional} />
+        <input
+          name="fillBidirectional"
+          type="checkbox"
+          defaultChecked={props.layer.fillBidirectional}
+        />
       </Field>
     </fieldset>
   );
