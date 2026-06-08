@@ -4,6 +4,11 @@
 import { rasterizeVectorToLuma, type VectorRaster } from '../../core/raster';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
+  IDENTITY_TRANSFORM,
+  applyTransform,
+  transformedBBox,
+  type Bounds,
+  type ColoredPath,
   type DitherAlgorithm,
   type ImportedSvg,
   type LayerMode,
@@ -17,6 +22,7 @@ import {
   assertBitmapConversionFits,
   estimateBitmapConversion,
   type BitmapConversionPlan,
+  type BitmapConversionTarget,
 } from './bitmap-conversion-plan';
 import type { BitmapFields } from './luma-bitmap';
 
@@ -39,15 +45,19 @@ export function isConvertibleVector(o: SceneObject): o is ConvertibleVector {
   return o.kind === 'imported-svg' || o.kind === 'text' || o.kind === 'traced-image';
 }
 
+export function bitmapConversionTarget(o: ConvertibleVector): BitmapConversionTarget {
+  return { bounds: transformedBBox(o), transform: IDENTITY_TRANSFORM };
+}
+
 export function assembleBitmap(
   o: ConvertibleVector,
   encode: (raster: VectorRaster) => BitmapFields,
   id: string,
   options: BitmapConversionOptions = {},
 ): RasterImage {
-  const { plan, raster } = rasterizeConvertible(o, options);
+  const { bounds, plan, raster } = rasterizeConvertible(o, options);
   const fields = encode(raster);
-  return buildRasterImage(o, id, plan, raster, fields);
+  return buildRasterImage(o, id, bounds, plan, raster, fields);
 }
 
 export async function assembleBitmapAsync(
@@ -56,34 +66,39 @@ export async function assembleBitmapAsync(
   id: string,
   options: BitmapConversionOptions = {},
 ): Promise<RasterImage> {
-  const { plan, raster } = rasterizeConvertible(o, options);
+  const { bounds, plan, raster } = rasterizeConvertible(o, options);
   const fields = await encode(raster);
-  return buildRasterImage(o, id, plan, raster, fields);
+  return buildRasterImage(o, id, bounds, plan, raster, fields);
 }
 
 function rasterizeConvertible(
   o: ConvertibleVector,
   options: BitmapConversionOptions,
 ): {
+  readonly bounds: Bounds;
   readonly plan: BitmapConversionPlan;
   readonly raster: VectorRaster;
 } {
-  const plan = estimateBitmapConversion(o, options.dpi);
+  const baked = bakeConvertibleTransform(o);
+  const plan = estimateBitmapConversion(
+    { bounds: baked.bounds, transform: IDENTITY_TRANSFORM },
+    options.dpi,
+  );
   assertBitmapConversionFits(plan);
-  const { fillPolylines, outlinePolylines } = conversionPolylineGroups(o, options);
+  const { fillPolylines, outlinePolylines } = conversionPolylineGroups(baked.paths, options);
   const raster = rasterizeVectorToLuma({
-    polylines: o.paths.flatMap((p) => p.polylines),
+    polylines: baked.paths.flatMap((p) => p.polylines),
     fillPolylines,
     outlinePolylines,
-    bounds: o.bounds,
+    bounds: baked.bounds,
     pixelWidth: plan.pixelWidth,
     pixelHeight: plan.pixelHeight,
   });
-  return { plan, raster };
+  return { bounds: baked.bounds, plan, raster };
 }
 
 function conversionPolylineGroups(
-  o: ConvertibleVector,
+  paths: ReadonlyArray<ColoredPath>,
   options: BitmapConversionOptions,
 ): {
   readonly fillPolylines: ReadonlyArray<Polyline>;
@@ -91,15 +106,15 @@ function conversionPolylineGroups(
 } {
   const renderType = options.renderType ?? 'fill-all';
   if (renderType === 'fill-all') {
-    return { fillPolylines: o.paths.flatMap((p) => p.polylines), outlinePolylines: [] };
+    return { fillPolylines: paths.flatMap((p) => p.polylines), outlinePolylines: [] };
   }
   if (renderType === 'outlines') {
-    return { fillPolylines: [], outlinePolylines: o.paths.flatMap((p) => p.polylines) };
+    return { fillPolylines: [], outlinePolylines: paths.flatMap((p) => p.polylines) };
   }
   const layerModes = new Map(options.layers?.map((l) => [l.color.toLowerCase(), l.mode]) ?? []);
   const fillPolylines: Polyline[] = [];
   const outlinePolylines: Polyline[] = [];
-  for (const path of o.paths) {
+  for (const path of paths) {
     const mode = layerModes.get(path.color.toLowerCase()) ?? 'line';
     if (mode === 'fill') fillPolylines.push(...path.polylines);
     else outlinePolylines.push(...path.polylines);
@@ -107,9 +122,26 @@ function conversionPolylineGroups(
   return { fillPolylines, outlinePolylines };
 }
 
+function bakeConvertibleTransform(o: ConvertibleVector): {
+  readonly bounds: Bounds;
+  readonly paths: ReadonlyArray<ColoredPath>;
+} {
+  return {
+    bounds: transformedBBox(o),
+    paths: o.paths.map((path) => ({
+      color: path.color,
+      polylines: path.polylines.map((polyline) => ({
+        closed: polyline.closed,
+        points: polyline.points.map((point) => applyTransform(point, o.transform)),
+      })),
+    })),
+  };
+}
+
 function buildRasterImage(
   o: ConvertibleVector,
   id: string,
+  bounds: Bounds,
   plan: BitmapConversionPlan,
   raster: VectorRaster,
   fields: BitmapFields,
@@ -121,8 +153,8 @@ function buildRasterImage(
     dataUrl: fields.dataUrl,
     pixelWidth: raster.width,
     pixelHeight: raster.height,
-    bounds: o.bounds,
-    transform: o.transform,
+    bounds,
+    transform: IDENTITY_TRANSFORM,
     color: DEFAULT_RASTER_LAYER_COLOR,
     dither: DEFAULT_DITHER,
     linesPerMm: plan.linesPerMm,

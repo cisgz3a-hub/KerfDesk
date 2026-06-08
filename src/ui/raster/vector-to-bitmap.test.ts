@@ -1,16 +1,20 @@
 // ADR-029 §4 Convert to Bitmap — the UI builder's DOM-free half. assembleBitmap
 // takes the canvas encode step as a parameter, so the gather → rasterize →
-// field-assembly logic (incl. the DPI wiring and the bounds/transform copy that
-// keeps the bitmap registered over the vector it replaces) is unit-testable
+// field-assembly logic (incl. DPI wiring and transform baking so the bitmap
+// remains output-safe after replacing the vector) is unit-testable
 // without a real canvas. buildBitmapFromVector — the production wiring with the
 // real lumaToBitmap — is verified in-browser (A2-v), not here.
 
 import { describe, expect, it, vi } from 'vitest';
+import { runPreflight } from '../../core/preflight';
 import type { VectorRaster } from '../../core/raster';
 import { MAX_RASTER_PIXELS, evaluateRasterBudget } from '../../core/raster/raster-budget';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
+  createLayer,
+  createProject,
+  transformedBBox,
   type Bounds,
   type ColoredPath,
   type ImportedSvg,
@@ -204,23 +208,42 @@ describe('isConvertibleVector', () => {
 
 describe('assembleBitmap', () => {
   it('sizes the bitmap from displayed bounds x lines/mm', () => {
-    const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id');
-    expect(result.pixelWidth).toBe(400);
-    expect(result.pixelHeight).toBe(600);
+    const source = makeSvg();
+    const bounds = transformedBBox(source);
+    const result = assembleBitmap(source, fakeEncode, 'new-id');
+    expect(result.pixelWidth).toBe(Math.round((bounds.maxX - bounds.minX) * 10));
+    expect(result.pixelHeight).toBe(Math.round((bounds.maxY - bounds.minY) * 10));
   });
 
   it('rasterizes then carries the encoder output verbatim', () => {
-    const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id');
+    const source = makeSvg();
+    const bounds = transformedBBox(source);
+    const expectedWidth = Math.round((bounds.maxX - bounds.minX) * 10);
+    const expectedHeight = Math.round((bounds.maxY - bounds.minY) * 10);
+    const result = assembleBitmap(source, fakeEncode, 'new-id');
     // The echoed fields prove encode saw the physical-size pixel grid.
-    expect(result.dataUrl).toBe('data:fake/400x600');
-    expect(result.lumaBase64).toBe('luma:240000');
+    expect(result.dataUrl).toBe(`data:fake/${expectedWidth}x${expectedHeight}`);
+    expect(result.lumaBase64).toBe(`luma:${expectedWidth * expectedHeight}`);
   });
 
-  it('copies the source bounds + transform verbatim (overlay registration)', () => {
+  it('bakes the source transform into axis-aligned bitmap bounds', () => {
     const source = makeSvg();
     const result = assembleBitmap(source, fakeEncode, 'new-id');
-    expect(result.bounds).toEqual(source.bounds);
-    expect(result.transform).toEqual(source.transform);
+    expect(result.bounds).toEqual(transformedBBox(source));
+    expect(result.transform).toEqual(IDENTITY_TRANSFORM);
+  });
+
+  it('creates a raster that passes the axis-aligned output preflight', () => {
+    const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id');
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: [result],
+        layers: [createLayer({ id: result.color, color: result.color, mode: 'image' })],
+      },
+    };
+    const codes = runPreflight(project, 'G1 X0.000 Y0.000 S0\n').issues.map((issue) => issue.code);
+    expect(codes).not.toContain('unsupported-raster-transform');
   });
 
   it('uses the injected id and the image-import raster defaults', () => {
@@ -233,19 +256,23 @@ describe('assembleBitmap', () => {
   });
 
   it('uses explicit DPI to set the converted bitmap density', () => {
-    const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id', {
+    const source = makeSvg();
+    const bounds = transformedBBox(source);
+    const result = assembleBitmap(source, fakeEncode, 'new-id', {
       dpi: 127,
       renderType: 'fill-all',
     });
-    expect(result.pixelWidth).toBe(200);
-    expect(result.pixelHeight).toBe(300);
+    expect(result.pixelWidth).toBe(Math.round((bounds.maxX - bounds.minX) * 5));
+    expect(result.pixelHeight).toBe(Math.round((bounds.maxY - bounds.minY) * 5));
     expect(result.linesPerMm).toBe(5);
   });
 
   it('passes Outlines through so open vector strokes survive conversion', () => {
     let encoded: VectorRaster | null = null;
+    const source = makeOpenSvg();
+    const bounds = transformedBBox(source);
     const result = assembleBitmap(
-      makeOpenSvg(),
+      source,
       (raster) => {
         encoded = raster;
         return fakeEncode(raster);
@@ -254,8 +281,8 @@ describe('assembleBitmap', () => {
       { dpi: 25.4, renderType: 'outlines' },
     );
 
-    expect(result.pixelWidth).toBe(40);
-    expect(result.pixelHeight).toBe(60);
+    expect(result.pixelWidth).toBe(Math.round(bounds.maxX - bounds.minX));
+    expect(result.pixelHeight).toBe(Math.round(bounds.maxY - bounds.minY));
     expect(encoded).not.toBeNull();
     expect(encoded === null ? 0 : inkCount(encoded)).toBeGreaterThan(0);
   });
