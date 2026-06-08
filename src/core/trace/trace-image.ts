@@ -102,6 +102,7 @@ export type TraceOptions = {
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
   readonly traceTransparency?: boolean;
+  readonly sketchTrace?: boolean;
   // Phase E.2 quality polish — three pure-core preprocessing
   // stages (see preprocess.ts). Compose in this order:
   //   medianFilter → (otsuThreshold OR thresholdLuma) → despeckle → tracer
@@ -270,6 +271,13 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
     }
     return prepared;
   }
+  if (options.sketchTrace === true) {
+    let prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
+    if (shouldDespeckle(options)) {
+      prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
+    }
+    return prepared;
+  }
   let prepared = applyImageAdjustments(image, options);
   if (options.medianFilter === true) {
     prepared = medianFilter(prepared);
@@ -324,10 +332,80 @@ function shouldDespeckle(options: TraceOptions): boolean {
   if (min === undefined || min <= 1) return false;
   return (
     options.traceTransparency === true ||
+    options.sketchTrace === true ||
     options.useOtsuThreshold === true ||
     options.cutoffLuma !== undefined ||
     options.thresholdLuma !== undefined
   );
+}
+
+const SKETCH_RADIUS_PX = 8;
+const SKETCH_CONTRAST_BIAS = 8;
+
+function sketchTraceToMonochrome(image: RawImageData): RawImageData {
+  const luma = lumaBuffer(image);
+  const integral = integralLuma(luma, image.width, image.height);
+  const data = new Uint8ClampedArray(image.data.length);
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const pixel = y * image.width + x;
+      const mean = localMean(integral, image.width, image.height, x, y, SKETCH_RADIUS_PX);
+      const v = (luma[pixel] ?? 255) < mean - SKETCH_CONTRAST_BIAS ? 0 : 255;
+      const out = pixel * 4;
+      data[out] = v;
+      data[out + 1] = v;
+      data[out + 2] = v;
+      data[out + 3] = 255;
+    }
+  }
+  return { width: image.width, height: image.height, data };
+}
+
+function lumaBuffer(image: RawImageData): Uint8Array {
+  const luma = new Uint8Array(image.width * image.height);
+  for (let pixel = 0; pixel < luma.length; pixel += 1) {
+    const offset = pixel * 4;
+    luma[pixel] = lumaByte(
+      image.data[offset] ?? 255,
+      image.data[offset + 1] ?? 255,
+      image.data[offset + 2] ?? 255,
+    );
+  }
+  return luma;
+}
+
+function integralLuma(luma: Uint8Array, width: number, height: number): Float64Array {
+  const stride = width + 1;
+  const integral = new Float64Array((height + 1) * stride);
+  for (let y = 1; y <= height; y += 1) {
+    let rowSum = 0;
+    for (let x = 1; x <= width; x += 1) {
+      rowSum += luma[(y - 1) * width + (x - 1)] ?? 255;
+      integral[y * stride + x] = (integral[(y - 1) * stride + x] ?? 0) + rowSum;
+    }
+  }
+  return integral;
+}
+
+function localMean(
+  integral: Float64Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  radius: number,
+): number {
+  const x0 = Math.max(0, x - radius);
+  const y0 = Math.max(0, y - radius);
+  const x1 = Math.min(width, x + radius + 1);
+  const y1 = Math.min(height, y + radius + 1);
+  const stride = width + 1;
+  const sum =
+    (integral[y1 * stride + x1] ?? 0) -
+    (integral[y0 * stride + x1] ?? 0) -
+    (integral[y1 * stride + x0] ?? 0) +
+    (integral[y0 * stride + x0] ?? 0);
+  return sum / Math.max(1, (x1 - x0) * (y1 - y0));
 }
 
 function alphaToMonochrome(image: RawImageData): RawImageData {

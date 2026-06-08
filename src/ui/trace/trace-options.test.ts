@@ -37,6 +37,7 @@ describe('mergeLightBurnTraceSettings', () => {
       smoothness: 0.4,
       optimize: 0.6,
       traceTransparency: true,
+      sketchTrace: true,
     });
 
     expect(merged.cutoffLuma).toBe(12);
@@ -46,6 +47,7 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.smoothness).toBe(0.4);
     expect(merged.optimize).toBe(0.6);
     expect(merged.traceTransparency).toBe(true);
+    expect(merged.sketchTrace).toBe(true);
     expect(merged.fixedPalette).toEqual(LINE_ART.fixedPalette);
   });
 
