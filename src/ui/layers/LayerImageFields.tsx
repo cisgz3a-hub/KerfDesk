@@ -1,4 +1,11 @@
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
+import {
+  dpiToLinesPerMm,
+  lineIntervalMmToLinesPerMm,
+  linesPerMmToDpi,
+  linesPerMmToLineIntervalMm,
+  MIN_RASTER_LINES_PER_MM,
+} from '../../core/raster/raster-units';
 import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
@@ -39,9 +46,13 @@ export function LayerImageFields({ layer }: { readonly layer: Layer }): JSX.Elem
           <span style={unitStyle}>%</span>
         </FieldRow>
       ) : null}
-      <FieldRow label="Resolution">
-        <LinesPerMmInput layer={layer} />
-        <span style={unitStyle}>lines / mm</span>
+      <FieldRow label="Line Interval">
+        <LineIntervalInput layer={layer} />
+        <span style={unitStyle}>mm</span>
+      </FieldRow>
+      <FieldRow label="DPI">
+        <DpiInput layer={layer} />
+        <span style={unitStyle}>dpi</span>
       </FieldRow>
       <FieldRow label="Dot Width">
         <DotWidthCorrectionInput layer={layer} />
@@ -98,26 +109,57 @@ function DitherSelect({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function LinesPerMmInput({ layer }: { readonly layer: Layer }): JSX.Element {
+function LineIntervalInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const setLayerParam = useStore((s) => s.setLayerParam);
   const debounced = useDebouncedCommit<number>({
-    value: layer.linesPerMm,
-    commit: (linesPerMm) => setLayerParam(layer.id, { linesPerMm }),
-    // 5..25 lines/mm (WORKFLOW.md). The cap matches raster-budget so the
-    // field can't author an obviously over-budget raster by itself.
-    parse: (s) => clamp(numericValue(s), 5, MAX_RASTER_LINES_PER_MM),
+    value: displayNumber(linesPerMmToLineIntervalMm(layer.linesPerMm), 4),
+    commit: (lineIntervalMm) =>
+      setLayerParam(layer.id, { linesPerMm: lineIntervalMmToLinesPerMm(lineIntervalMm) }),
+    parse: (s) =>
+      clamp(
+        numericValue(s),
+        linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM),
+        linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM),
+      ),
   });
   return (
     <input
       type="number"
-      min={5}
-      max={MAX_RASTER_LINES_PER_MM}
+      min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
+      max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
+      step={0.001}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Line interval for ${layer.color}`}
+    />
+  );
+}
+
+function DpiInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const debounced = useDebouncedCommit<number>({
+    value: displayNumber(linesPerMmToDpi(layer.linesPerMm), 2),
+    commit: (dpi) => setLayerParam(layer.id, { linesPerMm: dpiToLinesPerMm(dpi) }),
+    parse: (s) =>
+      clamp(
+        numericValue(s),
+        linesPerMmToDpi(MIN_RASTER_LINES_PER_MM),
+        linesPerMmToDpi(MAX_RASTER_LINES_PER_MM),
+      ),
+  });
+  return (
+    <input
+      type="number"
+      min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
+      max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
       step={1}
       value={debounced.displayValue}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Lines per mm for ${layer.color}`}
+      aria-label={`DPI for ${layer.color}`}
     />
   );
 }
@@ -201,4 +243,8 @@ function clamp(n: number, lo: number, hi: number): number {
 
 function dotWidthCorrectionMax(layer: Layer): number {
   return 1 / Math.max(1, layer.linesPerMm);
+}
+
+function displayNumber(value: number, decimals: number): number {
+  return Number(value.toFixed(decimals));
 }

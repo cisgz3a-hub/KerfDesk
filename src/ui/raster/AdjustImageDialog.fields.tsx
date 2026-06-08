@@ -1,4 +1,11 @@
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
+import {
+  dpiToLinesPerMm,
+  lineIntervalMmToLinesPerMm,
+  linesPerMmToDpi,
+  linesPerMmToLineIntervalMm,
+  MIN_RASTER_LINES_PER_MM,
+} from '../../core/raster/raster-units';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import {
   algorithmLabel,
@@ -85,16 +92,8 @@ function RasterSettingsFields(props: {
         unit="%"
         onChange={(minPower) => update({ minPower })}
       />
-      <NumberField
-        name="linesPerMm"
-        label="Resolution"
-        value={draft.linesPerMm}
-        min={5}
-        max={MAX_RASTER_LINES_PER_MM}
-        step={1}
-        unit="lines / mm"
-        onChange={(linesPerMm) => update({ linesPerMm })}
-      />
+      <LineIntervalField linesPerMm={draft.linesPerMm} update={update} />
+      <DpiField linesPerMm={draft.linesPerMm} update={update} />
       <NumberField
         name="dotWidthCorrectionMm"
         label="Dot Width"
@@ -106,6 +105,44 @@ function RasterSettingsFields(props: {
         onChange={(dotWidthCorrectionMm) => update({ dotWidthCorrectionMm })}
       />
     </>
+  );
+}
+
+function LineIntervalField(props: {
+  readonly linesPerMm: number;
+  readonly update: (patch: Partial<AdjustImageDraft>) => void;
+}): JSX.Element {
+  return (
+    <NumberField
+      name="lineIntervalMm"
+      label="Line Interval"
+      value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
+      min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
+      max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
+      step={0.001}
+      unit="mm"
+      onChange={(lineIntervalMm) =>
+        props.update({ linesPerMm: lineIntervalMmToLinesPerMm(lineIntervalMm) })
+      }
+    />
+  );
+}
+
+function DpiField(props: {
+  readonly linesPerMm: number;
+  readonly update: (patch: Partial<AdjustImageDraft>) => void;
+}): JSX.Element {
+  return (
+    <NumberField
+      name="imageDpi"
+      label="DPI"
+      value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
+      min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
+      max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
+      step={1}
+      unit="dpi"
+      onChange={(dpi) => props.update({ linesPerMm: dpiToLinesPerMm(dpi) })}
+    />
   );
 }
 
@@ -206,4 +243,8 @@ function CheckboxField(props: {
       />
     </label>
   );
+}
+
+function displayNumber(value: number, decimals: number): number {
+  return Number(value.toFixed(decimals));
 }

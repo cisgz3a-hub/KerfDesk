@@ -1,7 +1,13 @@
 import { useRef, useState } from 'react';
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
+import {
+  dpiToLinesPerMm,
+  linesPerMmToDpi,
+  MIN_RASTER_LINES_PER_MM,
+} from '../../core/raster/raster-units';
 import type { Layer, LayerMode } from '../../core/scene';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { CutSettingsImageFields } from './CutSettingsImageFields';
 
 type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 
@@ -13,6 +19,7 @@ export function CutSettingsDialog(props: {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<LayerMode>(props.layer.mode);
   const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
+  const [imageLinesPerMm, setImageLinesPerMm] = useState(props.layer.linesPerMm);
   useDialogA11y(dialogRef, props.onCancel);
   const onSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
@@ -34,7 +41,13 @@ export function CutSettingsDialog(props: {
         <CommonFields layer={props.layer} mode={mode} onModeChange={setMode} />
         {mode === 'fill' ? <FillFields layer={props.layer} /> : null}
         {mode === 'image' ? (
-          <ImageFields layer={props.layer} dither={dither} onDitherChange={setDither} />
+          <CutSettingsImageFields
+            layer={props.layer}
+            dither={dither}
+            imageLinesPerMm={imageLinesPerMm}
+            onDitherChange={setDither}
+            onImageLinesPerMmChange={setImageLinesPerMm}
+          />
         ) : null}
         <div style={actionsStyle}>
           <button type="button" onClick={props.onCancel}>
@@ -135,76 +148,6 @@ function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function ImageFields(props: {
-  readonly layer: Layer;
-  readonly dither: Layer['ditherAlgorithm'];
-  readonly onDitherChange: (dither: Layer['ditherAlgorithm']) => void;
-}): JSX.Element {
-  return (
-    <fieldset style={fieldsetStyle}>
-      <legend style={legendStyle}>Image</legend>
-      <Field label="Dither">
-        <select
-          name="ditherAlgorithm"
-          value={props.dither}
-          onChange={(event) => props.onDitherChange(event.target.value as Layer['ditherAlgorithm'])}
-          aria-label="Cut settings dither"
-        >
-          <option value="threshold">Threshold</option>
-          <option value="floyd-steinberg">Floyd-Steinberg</option>
-          <option value="jarvis">Jarvis</option>
-          <option value="stucki">Stucki</option>
-          <option value="atkinson">Atkinson</option>
-          <option value="burkes">Burkes</option>
-          <option value="sierra3">Sierra 3</option>
-          <option value="sierra2">Sierra 2</option>
-          <option value="sierra-lite">Sierra Lite</option>
-          <option value="ordered">Ordered</option>
-          <option value="grayscale">Grayscale</option>
-        </select>
-      </Field>
-      {props.dither === 'grayscale' ? (
-        <Field label="Min Power">
-          <NumberInput
-            name="minPower"
-            value={props.layer.minPower}
-            min={0}
-            max={props.layer.power}
-          />
-          <span style={unitStyle}>%</span>
-        </Field>
-      ) : null}
-      <Field label="Resolution">
-        <NumberInput
-          name="linesPerMm"
-          value={props.layer.linesPerMm}
-          min={5}
-          max={MAX_RASTER_LINES_PER_MM}
-          step={1}
-        />
-        <span style={unitStyle}>lines / mm</span>
-      </Field>
-      <Field label="Dot Width">
-        <NumberInput
-          name="dotWidthCorrectionMm"
-          value={props.layer.dotWidthCorrectionMm}
-          min={0}
-          max={dotWidthCorrectionMax(props.layer.linesPerMm)}
-          step={0.001}
-          label="dot width correction"
-        />
-        <span style={unitStyle}>mm</span>
-      </Field>
-      <Field label="Negative">
-        <input name="negativeImage" type="checkbox" defaultChecked={props.layer.negativeImage} />
-      </Field>
-      <Field label="Pass-through">
-        <input name="passThrough" type="checkbox" defaultChecked={props.layer.passThrough} />
-      </Field>
-    </fieldset>
-  );
-}
-
 function NumberInput(props: {
   readonly name: string;
   readonly value: number;
@@ -239,7 +182,18 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
 function readLayerPatch(data: FormData, layer: Layer): LayerPatch {
   const mode = parseMode(String(data.get('mode') ?? layer.mode));
   const power = numberField(data, 'power', layer.power, 0, 100);
-  const linesPerMm = numberField(data, 'linesPerMm', layer.linesPerMm, 5, MAX_RASTER_LINES_PER_MM);
+  const linesPerMm =
+    mode === 'image'
+      ? dpiToLinesPerMm(
+          numberField(
+            data,
+            'imageDpi',
+            linesPerMmToDpi(layer.linesPerMm),
+            linesPerMmToDpi(MIN_RASTER_LINES_PER_MM),
+            linesPerMmToDpi(MAX_RASTER_LINES_PER_MM),
+          ),
+        )
+      : layer.linesPerMm;
   return {
     mode,
     power,

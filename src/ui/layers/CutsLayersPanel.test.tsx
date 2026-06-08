@@ -201,6 +201,41 @@ describe('CutsLayersPanel cut settings editor', () => {
     }
   });
 
+  it('maps staged cut-settings DPI into image lines per mm', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
+      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
+      await act(async () => {
+        edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const dpi = host.querySelector('input[name="imageDpi"]');
+      if (!(dpi instanceof HTMLInputElement)) throw new Error('DPI input missing');
+      dpi.value = '508';
+
+      const ok = [...host.querySelectorAll('button')].find((button) => button.textContent === 'OK');
+      if (!(ok instanceof HTMLButtonElement)) throw new Error('OK button missing');
+      await act(async () => {
+        ok.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(20);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('applies image toggles from the visible image layer row', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
@@ -240,6 +275,45 @@ describe('CutsLayersPanel cut settings editor', () => {
       expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(
         0.07,
       );
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('maps visible image line interval and DPI edits into lines per mm', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const interval = host.querySelector('input[aria-label="Line interval for #ff0000"]');
+      if (!(interval instanceof HTMLInputElement)) throw new Error('line interval input missing');
+      await act(async () => {
+        interval.value = '0.2';
+        Simulate.change(interval);
+      });
+      await act(async () => {
+        Simulate.blur(interval);
+      });
+      expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(5);
+
+      const dpi = host.querySelector('input[aria-label="DPI for #ff0000"]');
+      if (!(dpi instanceof HTMLInputElement)) throw new Error('DPI input missing');
+      await act(async () => {
+        dpi.value = '254';
+        Simulate.change(dpi);
+      });
+      await act(async () => {
+        Simulate.blur(dpi);
+      });
+      expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(10);
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
