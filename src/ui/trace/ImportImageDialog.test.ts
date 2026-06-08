@@ -126,6 +126,7 @@ describe('Trace Image workflow controls', () => {
       expect(text).toContain('Ignore Less Than');
       expect(text).toContain('Smoothness');
       expect(text).toContain('Optimize');
+      expect(text).toContain('Fade Image');
       expect(text).not.toContain('Image adjustments');
       expect(text).not.toContain('Brightness');
       expect(text).not.toContain('Contrast');
