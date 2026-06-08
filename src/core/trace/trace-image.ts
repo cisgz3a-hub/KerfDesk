@@ -101,6 +101,7 @@ export type TraceOptions = {
   // inclusive brightness band: cutoffLuma <= luma <= thresholdLuma.
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
+  readonly traceTransparency?: boolean;
   // Phase E.2 quality polish — three pure-core preprocessing
   // stages (see preprocess.ts). Compose in this order:
   //   medianFilter → (otsuThreshold OR thresholdLuma) → despeckle → tracer
@@ -262,6 +263,13 @@ export async function traceImageToSvgString(
 // Extracted from traceImageToSvgString so complexity stays under
 // the project cap (12). Pure function — same inputs, same output.
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
+  if (options.traceTransparency === true) {
+    let prepared = alphaToMonochrome(image);
+    if (shouldDespeckle(options)) {
+      prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
+    }
+    return prepared;
+  }
   let prepared = applyImageAdjustments(image, options);
   if (options.medianFilter === true) {
     prepared = medianFilter(prepared);
@@ -315,10 +323,24 @@ function shouldDespeckle(options: TraceOptions): boolean {
   const min = options.despeckleMinPixels;
   if (min === undefined || min <= 1) return false;
   return (
+    options.traceTransparency === true ||
     options.useOtsuThreshold === true ||
     options.cutoffLuma !== undefined ||
     options.thresholdLuma !== undefined
   );
+}
+
+function alphaToMonochrome(image: RawImageData): RawImageData {
+  const data = new Uint8ClampedArray(image.data.length);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const alpha = image.data[i + 3] ?? 255;
+    const v = alpha > 0 ? 0 : 255;
+    data[i] = v;
+    data[i + 1] = v;
+    data[i + 2] = v;
+    data[i + 3] = 255;
+  }
+  return { width: image.width, height: image.height, data };
 }
 
 // Phase E.2 — match LaserForge 1's proven imagetracerjs settings after

@@ -36,6 +36,7 @@ describe('mergeLightBurnTraceSettings', () => {
       ignoreLessThanPixels: 7,
       smoothness: 0.4,
       optimize: 0.6,
+      traceTransparency: true,
     });
 
     expect(merged.cutoffLuma).toBe(12);
@@ -44,6 +45,7 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.despeckleMinPixels).toBe(7);
     expect(merged.smoothness).toBe(0.4);
     expect(merged.optimize).toBe(0.6);
+    expect(merged.traceTransparency).toBe(true);
     expect(merged.fixedPalette).toEqual(LINE_ART.fixedPalette);
   });
 
