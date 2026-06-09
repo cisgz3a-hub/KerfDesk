@@ -179,6 +179,7 @@ describe('layer store actions', () => {
       output: false,
       hatchAngleDeg: 45,
       fillBidirectional: false,
+      fillCrossHatch: true,
     });
     useStore.setState({ dirty: false, undoStack: [] });
 
@@ -199,6 +200,7 @@ describe('layer store actions', () => {
       output: false,
       hatchAngleDeg: 45,
       fillBidirectional: false,
+      fillCrossHatch: true,
     });
     useStore.getState().copyLayerSettings('#ff0000');
     useStore.setState({ dirty: false, undoStack: [] });
@@ -217,6 +219,7 @@ describe('layer store actions', () => {
       output: false,
       hatchAngleDeg: 45,
       fillBidirectional: false,
+      fillCrossHatch: true,
     });
     expect(useStore.getState().undoStack).toHaveLength(1);
     expect(useStore.getState().dirty).toBe(true);

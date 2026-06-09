@@ -72,6 +72,7 @@ function validateLayer(layer: unknown, path: string): string | null {
     optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),
     optionalBoolean(layer, `${path}.fillBidirectional`),
+    optionalBoolean(layer, `${path}.fillCrossHatch`),
     optionalDither(layer, `${path}.ditherAlgorithm`),
     optionalPositiveNumber(layer, `${path}.linesPerMm`),
     optionalBoolean(layer, `${path}.negativeImage`),

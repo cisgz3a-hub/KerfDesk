@@ -139,6 +139,12 @@ function normalizeSceneObject(obj: unknown): unknown {
 function normalizeLayer(layer: unknown): unknown {
   if (!isObject(layer)) return layer;
   const out: Record<string, unknown> = { ...layer };
+  normalizeFillLayerFields(out);
+  normalizeImageLayerFields(out);
+  return out;
+}
+
+function normalizeFillLayerFields(out: Record<string, unknown>): void {
   if (typeof out['hatchAngleDeg'] !== 'number') {
     out['hatchAngleDeg'] = LAYER_DEFAULTS.hatchAngleDeg;
   }
@@ -153,6 +159,12 @@ function normalizeLayer(layer: unknown): unknown {
   if (typeof out['fillBidirectional'] !== 'boolean') {
     out['fillBidirectional'] = LAYER_DEFAULTS.fillBidirectional;
   }
+  if (typeof out['fillCrossHatch'] !== 'boolean') {
+    out['fillCrossHatch'] = LAYER_DEFAULTS.fillCrossHatch;
+  }
+}
+
+function normalizeImageLayerFields(out: Record<string, unknown>): void {
   // F.2.e: back-fill image-mode Layer fields. Same additive-with-
   // default pattern as the hatch fields above — pre-F.2 .lf2 files
   // don't have them; treating missing as the default keeps the
@@ -175,7 +187,6 @@ function normalizeLayer(layer: unknown): unknown {
   if (!isNonNegativeNumber(out['dotWidthCorrectionMm'])) {
     out['dotWidthCorrectionMm'] = LAYER_DEFAULTS.dotWidthCorrectionMm;
   }
-  return out;
 }
 
 function isNonNegativeNumber(value: unknown): value is number {
