@@ -13,6 +13,7 @@
 import { useStore } from '../state';
 import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
+import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
 
@@ -22,6 +23,7 @@ export function CutsLayersPanel(): JSX.Element {
     <aside aria-label="Cuts / Layers panel" style={panelStyle}>
       <h2 style={headingStyle}>Cuts / Layers</h2>
       <AddLayerControls />
+      <MaterialLibraryPanel />
       {layers.length === 0 ? (
         <p style={hintStyle}>Import a design to populate layers.</p>
       ) : (
