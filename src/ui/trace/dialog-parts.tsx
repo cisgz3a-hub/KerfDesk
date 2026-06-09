@@ -44,6 +44,22 @@ export function SourceLabel(props: { readonly name: string }): JSX.Element {
   );
 }
 
+export function DeleteImageAfterTraceToggle(props: {
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+}): JSX.Element {
+  return (
+    <label style={checkboxRowStyle}>
+      <input
+        type="checkbox"
+        checked={props.checked}
+        onChange={(e) => props.onChange(e.target.checked)}
+      />
+      <span>Delete Image After trace</span>
+    </label>
+  );
+}
+
 export function DialogActions(props: {
   readonly canSubmit: boolean;
   readonly busy: boolean;
@@ -70,8 +86,9 @@ export function PresetHint(): JSX.Element {
       <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings. Forces
       pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with curves.{' '}
       <strong>Centerline</strong> — one vector path down black strokes. <strong>Sharp</strong> —
-      pixel-perfect detail, no blur. <strong>Detailed</strong> — line drawings with shading (~4
-      layers). <strong>Photo</strong> — actual photographs (~8 posterized layers).
+      pixel-perfect detail, no blur. For photos and shaded/continuous-tone images, do not trace —
+      engrave them directly as a raster image (Image layer), which is how LightBurn handles
+      photographs.
     </p>
   );
 }
@@ -129,6 +146,13 @@ const fileNameStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 const selectStyle: React.CSSProperties = { flex: 1, fontSize: 13 };
+const checkboxRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
+  color: '#444',
+};
 const hintStyle: React.CSSProperties = {
   fontSize: 11,
   color: '#666',

@@ -18,8 +18,12 @@ describe('createLayer', () => {
       hatchSpacingMm: 0.1,
       fillOverscanMm: 5,
       fillBidirectional: true,
+      fillCrossHatch: false,
       ditherAlgorithm: 'floyd-steinberg',
       linesPerMm: 10,
+      negativeImage: false,
+      passThrough: false,
+      dotWidthCorrectionMm: 0,
     });
   });
 

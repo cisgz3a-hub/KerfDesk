@@ -7,6 +7,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { CommandShell, type AppCommand } from '../commands';
 
 const bitmapMocks = vi.hoisted(() => ({
   buildBitmapFromVector: vi.fn(),
@@ -109,7 +110,7 @@ describe('Toolbar Convert to Bitmap', () => {
         root = createRoot(host);
         root.render(
           <PlatformProvider adapter={mockPlatform}>
-            <Toolbar />
+            <CommandShell />
           </PlatformProvider>,
         );
       });
@@ -154,6 +155,45 @@ describe('Toolbar Convert to Bitmap', () => {
           ],
         }),
       );
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});
+
+describe('Toolbar command buttons', () => {
+  it('runs toolbar clicks through the command registry command object', async () => {
+    const onNew = vi.fn();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const commands: ReadonlyArray<AppCommand> = [
+      {
+        id: 'file.new',
+        family: 'file',
+        label: 'New',
+        title: 'New project',
+        shortcut: 'Ctrl+N',
+        enabled: true,
+        invoke: onNew,
+      },
+    ];
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={commands} />);
+      });
+
+      const button = [...host.querySelectorAll('button')].find((item) =>
+        item.textContent?.startsWith('New'),
+      );
+      if (!(button instanceof HTMLButtonElement)) throw new Error('New button missing');
+      await act(async () => {
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(onNew).toHaveBeenCalled();
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

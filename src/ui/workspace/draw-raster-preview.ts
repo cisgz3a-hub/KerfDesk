@@ -24,6 +24,7 @@ import type { DeviceProfile } from '../../core/devices';
 import {
   applyLumaAdjustments,
   dither,
+  maybeInvertLuma,
   pixelExtentForMm,
   rasterPreviewRgba,
   resampleLumaNearest,
@@ -93,25 +94,32 @@ function previewCanvasFor(
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
   const sMax = powerToSMax(layer.power, device.maxPowerS);
   const sMin = minPowerToSMin(layer.minPower, layer.power, device.maxPowerS);
-  const targetWidth = pixelExtentForMm(
-    (obj.bounds.maxX - obj.bounds.minX) * Math.abs(obj.transform.scaleX),
-    layer.linesPerMm,
-  );
-  const targetHeight = pixelExtentForMm(
-    (obj.bounds.maxY - obj.bounds.minY) * Math.abs(obj.transform.scaleY),
-    layer.linesPerMm,
-  );
+  const targetWidth = layer.passThrough
+    ? pixelWidth
+    : pixelExtentForMm(
+        (obj.bounds.maxX - obj.bounds.minX) * Math.abs(obj.transform.scaleX),
+        layer.linesPerMm,
+      );
+  const targetHeight = layer.passThrough
+    ? pixelHeight
+    : pixelExtentForMm(
+        (obj.bounds.maxY - obj.bounds.minY) * Math.abs(obj.transform.scaleY),
+        layer.linesPerMm,
+      );
   if (evaluateRasterBudget(targetWidth, targetHeight).kind === 'too-large') return null;
-  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.ditherAlgorithm}|${sMin}-${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
+  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${sMin}-${sMax}|${layer.linesPerMm}|${targetWidth}x${targetHeight}`;
   const cached = previewCanvasCache.get(key);
   if (cached !== undefined) return cached.canvas;
   const sourceLuma = decodeLuma(obj.lumaBase64, pixelWidth * pixelHeight);
   const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
-  const luma = resampleLumaNearest(
-    { luma: adjustedLuma, width: pixelWidth, height: pixelHeight },
-    targetWidth,
-    targetHeight,
-  );
+  const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
+  const luma = layer.passThrough
+    ? preparedLuma
+    : resampleLumaNearest(
+        { luma: preparedLuma, width: pixelWidth, height: pixelHeight },
+        targetWidth,
+        targetHeight,
+      );
   const sValues = dither(
     { luma, width: targetWidth, height: targetHeight },
     { algorithm: layer.ditherAlgorithm, sMax, sMin },

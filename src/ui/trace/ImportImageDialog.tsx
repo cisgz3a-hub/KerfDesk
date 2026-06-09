@@ -9,9 +9,8 @@
 //   2. Its embedded dataUrl is round-tripped back into a File
 //      (dataUrlToFile) so the existing File-keyed preview + trace
 //      pipeline (useTracePreview, loadImageAsRawData) runs unchanged.
-//   3. User picks a preset + tweaks brightness/contrast/gamma/invert
-//      + dither (AdjustmentControls) — live preview via
-//      useTracePreview while they tune.
+//   3. User picks a preset + tunes Trace settings, with live preview
+//      via useTracePreview while they tune.
 //   4. Submit → traceImage (Web Worker if available, inline fallback)
 //      → ColoredPath[] directly from imagetracerjs tracedata
 //      (bypassing parseSvg's curve-flattening) → overlay the vector
@@ -27,8 +26,8 @@
 //
 // Presentational pieces (SourceLabel, PresetPicker, DialogActions,
 // styles) live in dialog-parts.tsx; the pure-data option transforms
-// (mergeAdjustments, hasAggressivePreprocessing,
-// relaxAggressivePreprocessing) live in trace-options.ts. This file
+// (hasAggressivePreprocessing, relaxAggressivePreprocessing) live in
+// trace-options.ts. This file
 // only owns state + the commit flow + the dialog shell.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -38,18 +37,19 @@ import {
   type SceneObject,
   type TracedImage,
 } from '../../core/scene';
-import { DEFAULT_TRACE_OPTIONS, TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+import {
+  DEFAULT_TRACE_OPTIONS,
+  TRACE_PRESETS,
+  type TraceBoundary,
+  type TraceOptions,
+} from '../../core/trace';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import {
-  AdjustmentControls,
-  DEFAULT_ADJUSTMENTS,
-  type AdjustmentValues,
-} from './AdjustmentControls';
-import {
   DialogActions,
+  DeleteImageAfterTraceToggle,
   PresetHint,
   PresetPicker,
   SourceLabel,
@@ -58,13 +58,9 @@ import {
   panelStyle,
 } from './dialog-parts';
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
-import {
-  mergeAdjustments,
-  mergeLightBurnTraceSettings,
-  type LightBurnTraceSettingOverrides,
-} from './trace-options';
+import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceSettingsControls } from './TraceSettingsControls';
-import { traceImageWithFallback } from './use-trace-worker-client';
+import { traceImageRegion } from './trace-region';
 import { TracePreview } from './TracePreview';
 import { useTracePreview } from './use-trace-preview';
 
@@ -78,31 +74,16 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
   const pushToast = useToastStore((s) => s.pushToast);
-  const [file, setFile] = useState<File | null>(null);
+  const file = useTraceSourceFile(seed, pushToast);
   const [preset, setPreset] = useState<string>('Line Art');
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
-  const [adjustments, setAdjustments] = useState<AdjustmentValues>(DEFAULT_ADJUSTMENTS);
+  const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
+  const [boundary, setBoundary] = useState<TraceBoundary | null>(null);
   const [busy, setBusy] = useState(false);
-  // Reconstruct a File from the seed bitmap's embedded dataUrl so the
-  // File-keyed preview + trace pipeline runs unchanged (image-loader.
-  // dataUrlToFile). The `cancelled` guard drops a stale decode if the
-  // seed swaps or the dialog unmounts before fetch resolves.
-  useEffect(() => {
-    let cancelled = false;
-    dataUrlToFile(seed.dataUrl, seed.source)
-      .then((f) => {
-        if (!cancelled) setFile(f);
-      })
-      .catch(() => {
-        if (!cancelled) pushToast(`Could not read ${seed.source} for tracing.`, 'error');
-      });
-    return (): void => {
-      cancelled = true;
-    };
-  }, [seed.dataUrl, seed.source, pushToast]);
-  // Layer the user adjustments on top of the preset. The preset
-  // already pins the trace-side knobs (numberOfColors, lineFilter,
-  // etc.); we just merge the LF1-compatible image-level levers in.
+  // Layer the LightBurn-style trace settings on top of the preset.
+  // Image-level edits stay in Adjust Image, so Trace Image keeps one
+  // authoritative vector workflow: cutoff, threshold, ignore,
+  // smoothness, and optimize.
   //
   // useMemo is load-bearing — useTracePreview depends on `options` as
   // a useEffect dep, so a fresh object reference every render would
@@ -114,10 +95,10 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   // otherwise be ref-unstable too.
   const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
   const options: TraceOptions = useMemo(
-    () => mergeAdjustments(mergeLightBurnTraceSettings(presetOptions, traceSettings), adjustments),
-    [presetOptions, traceSettings, adjustments],
+    () => mergeLightBurnTraceSettings(presetOptions, traceSettings),
+    [presetOptions, traceSettings],
   );
-  const preview = useTracePreview(file, options);
+  const preview = useTracePreview(file, options, boundary);
   const dialogRef = useRef<HTMLDivElement>(null);
   // R-M1 a11y: Escape closes, Tab cycles within, focus returns to the
   // toolbar button on close.
@@ -130,7 +111,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       return;
     }
     void commit(
-      { file, options, seed },
+      { file, options, seed, deleteSourceAfterTrace, boundary },
       {
         traceExistingImage,
         pushToast,
@@ -160,12 +141,59 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
           overrides={traceSettings}
           onChange={setTraceSettings}
         />
-        <AdjustmentControls values={adjustments} onChange={setAdjustments} />
-        <TracePreview state={preview} />
+        <TracePreviewPanel
+          preview={preview}
+          seed={seed}
+          boundary={boundary}
+          setBoundary={setBoundary}
+        />
+        <DeleteImageAfterTraceToggle
+          checked={deleteSourceAfterTrace}
+          onChange={setDeleteSourceAfterTrace}
+        />
         <PresetHint />
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
       </form>
     </div>
+  );
+}
+
+function useTraceSourceFile(
+  seed: RasterImage,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): File | null {
+  const [file, setFile] = useState<File | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    dataUrlToFile(seed.dataUrl, seed.source)
+      .then((f) => {
+        if (!cancelled) setFile(f);
+      })
+      .catch(() => {
+        if (!cancelled) pushToast(`Could not read ${seed.source} for tracing.`, 'error');
+      });
+    return (): void => {
+      cancelled = true;
+    };
+  }, [seed.dataUrl, seed.source, pushToast]);
+  return file;
+}
+
+function TracePreviewPanel(props: {
+  readonly preview: ReturnType<typeof useTracePreview>;
+  readonly seed: RasterImage;
+  readonly boundary: TraceBoundary | null;
+  readonly setBoundary: (boundary: TraceBoundary | null) => void;
+}): JSX.Element {
+  return (
+    <TracePreview
+      state={props.preview}
+      sourceDataUrl={props.seed.dataUrl}
+      imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
+      boundary={props.boundary}
+      onBoundaryChange={props.setBoundary}
+      onBoundaryClear={() => props.setBoundary(null)}
+    />
   );
 }
 
@@ -175,6 +203,8 @@ export async function commit(
     readonly file: File;
     readonly options: TraceOptions;
     readonly seed: RasterImage;
+    readonly deleteSourceAfterTrace?: boolean;
+    readonly boundary?: TraceBoundary | null;
   },
   ctx: {
     readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
@@ -192,11 +222,12 @@ export async function commit(
     // tolerance. Curves stay at imagetracerjs's analytic fidelity
     // through to compile. Runs in a Web Worker when one is available,
     // falling back to inline tracing otherwise (see
-    // use-trace-worker-client.ts). traceImageWithFallback wraps the
-    // raw call with the H3 retry semantics — on zero paths with an
-    // aggressive preset, it retries with the levers relaxed — so the
-    // preview and commit paths produce the same result.
-    const { paths, bounds } = await traceImageWithFallback(image, args.options);
+    // use-trace-worker-client.ts). traceImageRegion applies any
+    // LightBurn-style Boundary crop, traces that crop through the shared
+    // fallback path, then offsets geometry back into the source-image
+    // coordinate system. That keeps preview, commit, and overlay
+    // registration on the same pixels.
+    const { paths, bounds } = await traceImageRegion(image, args.options, args.boundary ?? null);
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,
@@ -227,10 +258,12 @@ export async function commit(
       );
       return;
     }
-    ctx.traceExistingImage(args.seed.id, traced);
+    const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
+    ctx.traceExistingImage(args.seed.id, traced, { deleteSourceAfterTrace });
     const colorCount = traced.paths.length;
+    const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
     ctx.pushToast(
-      `Traced ${args.seed.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, source kept`,
+      `Traced ${args.seed.source} — ${colorCount} color${colorCount === 1 ? '' : 's'}, ${sourceStatus}`,
       'success',
     );
     ctx.close();

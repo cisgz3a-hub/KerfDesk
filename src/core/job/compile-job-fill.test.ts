@@ -130,4 +130,27 @@ describe('compileJob fill hatching', () => {
     expect(segmentsAtMachineY(job.groups[0] as FillGroup, dev.bedHeight - 5)[0]?.length).toBe(10);
     expect(segmentsAtMachineY(job.groups[1] as FillGroup, dev.bedHeight - 5)[0]?.length).toBe(10);
   });
+
+  it('emits a second 90 degree fill set when cross-hatch is enabled', () => {
+    const layer = { ...fillLayer(), fillCrossHatch: true };
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
+
+    const fill = firstFillGroup(compileJob({ objects: [square], layers: [layer] }, dev));
+    const segments = fill?.segments ?? [];
+
+    expect(segments.some(isHorizontalSegment)).toBe(true);
+    expect(segments.some(isVerticalSegment)).toBe(true);
+  });
 });
+
+function isHorizontalSegment(segment: FillGroup['segments'][number]): boolean {
+  const a = segment.polyline[0];
+  const b = segment.polyline[1];
+  return a !== undefined && b !== undefined && Math.abs(a.y - b.y) < 1e-6;
+}
+
+function isVerticalSegment(segment: FillGroup['segments'][number]): boolean {
+  const a = segment.polyline[0];
+  const b = segment.polyline[1];
+  return a !== undefined && b !== undefined && Math.abs(a.x - b.x) < 1e-6;
+}

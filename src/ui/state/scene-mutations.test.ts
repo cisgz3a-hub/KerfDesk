@@ -64,6 +64,31 @@ describe('resolveRasterLayerColor (P2-A)', () => {
   });
 });
 
+describe('applyTraceToExisting delete-source option', () => {
+  it('deletes the source raster when Delete Image After trace is enabled', () => {
+    const project = projectWithSource();
+    const withImageLayer: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [createLayer({ id: '#808080', color: '#808080', mode: 'image' })],
+      },
+    };
+    const result = applyTraceToExisting(
+      { project: withImageLayer, undoStack: [] },
+      'src1',
+      tracedVector(),
+      { deleteSourceAfterTrace: true },
+    );
+    const objects = result.project.scene.objects;
+    expect(objects.filter((o) => o.kind === 'raster-image')).toHaveLength(0);
+    expect(objects.filter((o) => o.kind === 'traced-image')).toHaveLength(1);
+    expect(result.project.scene.layers.some((layer) => layer.color === '#808080')).toBe(false);
+    expect(result.selectedObjectId).toBe('trace1');
+    expect(result.undoStack[0]).toBe(withImageLayer);
+  });
+});
+
 describe('ensureRasterImageLayer', () => {
   it('creates an image-mode layer when the color is new', () => {
     const out = ensureRasterImageLayer(blankScene(), '#808080');
@@ -90,8 +115,12 @@ describe('ensureRasterImageLayer', () => {
           hatchSpacingMm: 0.2,
           fillOverscanMm: 5,
           fillBidirectional: true,
+          fillCrossHatch: false,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
+          negativeImage: false,
+          passThrough: false,
+          dotWidthCorrectionMm: 0,
         },
       ],
     };
@@ -121,8 +150,12 @@ describe('pruneOrphanLayers — raster image branch', () => {
           hatchSpacingMm: 0.2,
           fillOverscanMm: 5,
           fillBidirectional: true,
+          fillCrossHatch: false,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
+          negativeImage: false,
+          passThrough: false,
+          dotWidthCorrectionMm: 0,
         },
         {
           id: '#ff0000',
@@ -138,8 +171,12 @@ describe('pruneOrphanLayers — raster image branch', () => {
           hatchSpacingMm: 0.2,
           fillOverscanMm: 5,
           fillBidirectional: true,
+          fillCrossHatch: false,
           ditherAlgorithm: 'floyd-steinberg',
           linesPerMm: 10,
+          negativeImage: false,
+          passThrough: false,
+          dotWidthCorrectionMm: 0,
         },
       ],
     };

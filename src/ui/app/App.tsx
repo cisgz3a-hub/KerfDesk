@@ -4,7 +4,8 @@
 // thin layout shell.
 
 import { CutsLayersPanel } from '../layers';
-import { StatusBar, Toasts, Toolbar } from '../common';
+import { StatusBar, Toasts } from '../common';
+import { CommandShell } from '../commands';
 import { LaserWindow } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
@@ -30,7 +31,7 @@ export function App(): JSX.Element {
   useWindowTitle();
   return (
     <div style={shellStyle}>
-      <Toolbar />
+      <CommandShell />
       <main style={mainStyle}>
         <div style={canvasAreaStyle}>
           <Workspace />

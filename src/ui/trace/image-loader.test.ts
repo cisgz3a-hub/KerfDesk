@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PREVIEW_MAX_EDGE_PX, dataUrlToFile, readFileAsDataUrl, scaleToCap } from './image-loader';
+import {
+  PREVIEW_MAX_EDGE_PX,
+  compositeRgbOverWhitePreservingAlpha,
+  dataUrlToFile,
+  readFileAsDataUrl,
+  scaleToCap,
+} from './image-loader';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -19,6 +25,35 @@ describe('image-loader trace preview sizing', () => {
     // 2048 (raised from 1024, ADR-037): doubles linear resolution so small
     // traced text keeps the detail it needs to trace as smooth curves.
     expect(PREVIEW_MAX_EDGE_PX).toBe(2048);
+  });
+});
+
+describe('image-loader alpha preservation', () => {
+  it('makes transparent pixels white for normal trace but keeps alpha for Trace Transparency', () => {
+    const image = {
+      width: 3,
+      height: 1,
+      data: new Uint8ClampedArray([
+        0,
+        0,
+        0,
+        0, // transparent black
+        0,
+        0,
+        0,
+        128, // half-transparent black
+        100,
+        150,
+        200,
+        255, // opaque color
+      ]),
+    };
+
+    const result = compositeRgbOverWhitePreservingAlpha(image);
+
+    expect(Array.from(result.data)).toEqual([
+      255, 255, 255, 0, 127, 127, 127, 128, 100, 150, 200, 255,
+    ]);
   });
 });
 

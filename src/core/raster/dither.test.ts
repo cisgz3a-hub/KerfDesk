@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DITHER_ALGORITHMS } from '../scene';
 import { dither, type DitherAlgorithm, type DitherInput } from './dither';
 
 // Helpers: build canonical greyscale fixtures so the tests read like
@@ -24,18 +25,9 @@ function gradient(width: number, height: number): DitherInput {
 }
 
 const SMAX = 1000;
-const BINARY_ALGORITHMS = [
-  'threshold',
-  'floyd-steinberg',
-  'jarvis',
-  'stucki',
-  'atkinson',
-  'burkes',
-  'sierra3',
-  'sierra2',
-  'sierra-lite',
-  'ordered',
-] as const satisfies ReadonlyArray<DitherAlgorithm>;
+const BINARY_ALGORITHMS = DITHER_ALGORITHMS.filter(
+  (algorithm): algorithm is Exclude<DitherAlgorithm, 'grayscale'> => algorithm !== 'grayscale',
+);
 
 describe('dither — threshold', () => {
   it('all-black input → every pixel at sMax', () => {

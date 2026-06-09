@@ -20,13 +20,26 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { RawImageData } from '../../core/trace';
+import type { RawImageData, TraceOptions } from '../../core/trace';
 import { TRACE_PRESETS } from '../../core/trace';
 import { traceImageWithFallback } from './use-trace-worker-client';
 
 const LINE_ART = TRACE_PRESETS['Line Art']!;
 const CENTERLINE = TRACE_PRESETS['Centerline']!;
-const DETAILED = TRACE_PRESETS['Detailed']!;
+// Inline multi-colour options (the shape the removed "Detailed" preset had).
+// Photo/Detailed are no longer surfaced presets (vector Trace is binary,
+// ADR-043), but the >2-colour adaptive-quantisation engine path stays and is
+// exercised here directly.
+const MULTICOLOUR: TraceOptions = {
+  numberOfColors: 4,
+  pathOmit: 8,
+  lineTolerance: 1,
+  quadraticTolerance: 1,
+  blurRadius: 1,
+  blurDelta: 10,
+  lineFilter: true,
+  medianFilter: true,
+};
 
 // Build a W×H white image with a filled black square inscribed at the
 // given offset. Synthetic-but-realistic shape that imagetracerjs has
@@ -117,11 +130,12 @@ describe('traceImageWithFallback — end-to-end pipeline', () => {
     expect(bounds.maxY - bounds.minY).toBeGreaterThan(0);
   });
 
-  it('traces the same square under Detailed preset (multi-colour)', async () => {
+  it('traces a multi-colour options object (>2 colours, adaptive quantisation)', async () => {
     const image = whiteWithBlackSquare(32, 32, 8, 8, 16);
-    const { paths } = await traceImageWithFallback(image, DETAILED);
-    // Detailed does adaptive quantisation; at minimum the dark layer
-    // should survive (background is dropped by the white-skip rule).
+    const { paths } = await traceImageWithFallback(image, MULTICOLOUR);
+    // Adaptive quantisation; at minimum the dark layer should survive
+    // (background dropped by the white-skip rule). Photo/Detailed were
+    // removed as presets but the >2-colour engine path is still covered.
     expect(paths.length).toBeGreaterThan(0);
   });
 

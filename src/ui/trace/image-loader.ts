@@ -29,14 +29,7 @@ const MAX_EDGE_PX = 2048;
 // pixel grid and then commit a different trace.
 export const PREVIEW_MAX_EDGE_PX = MAX_EDGE_PX;
 
-// A fresh canvas is transparent black (RGBA 0,0,0,0). Drawing a PNG
-// that has an alpha channel (e.g. artwork exported "with no
-// background") leaves its transparent regions at (0,0,0,*) — which
-// every downstream luma/threshold stage reads as solid BLACK ink, so
-// the whole image traces black. Compositing onto opaque white first
-// makes transparency the laser's unburned "paper", matching the
-// dark-on-light input every tracer assumes.
-const PAPER_WHITE = '#ffffff';
+const PAPER_WHITE = 255;
 
 export async function loadImageAsRawData(
   file: File,
@@ -59,14 +52,34 @@ export async function loadImageAsRawData(
     if (ctx === null) {
       throw new Error('Could not create 2D canvas context for image decoding.');
     }
-    ctx.fillStyle = PAPER_WHITE;
-    ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
     const imgd = ctx.getImageData(0, 0, width, height);
-    return { width: imgd.width, height: imgd.height, data: imgd.data };
+    return compositeRgbOverWhitePreservingAlpha({
+      width: imgd.width,
+      height: imgd.height,
+      data: imgd.data,
+    });
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+export function compositeRgbOverWhitePreservingAlpha(image: RawImageData): RawImageData {
+  const data = new Uint8ClampedArray(image.data.length);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const alpha = image.data[i + 3] ?? 255;
+    const opacity = alpha / 255;
+    data[i] = compositeChannel(image.data[i], opacity);
+    data[i + 1] = compositeChannel(image.data[i + 1], opacity);
+    data[i + 2] = compositeChannel(image.data[i + 2], opacity);
+    data[i + 3] = alpha;
+  }
+  return { width: image.width, height: image.height, data };
+}
+
+function compositeChannel(value: number | undefined, opacity: number): number {
+  const source = value ?? 0;
+  return Math.round(source * opacity + PAPER_WHITE * (1 - opacity));
 }
 
 export async function readImageNaturalSize(

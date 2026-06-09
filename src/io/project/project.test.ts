@@ -136,6 +136,31 @@ describe('deserializeProject', () => {
     }
   });
 
+  it('reports invalid when image layer toggles have the wrong type', () => {
+    const project = aProject();
+    const text = serializeProject({
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [
+          {
+            ...project.scene.layers[0],
+            negativeImage: 'true',
+            passThrough: 'true',
+            dotWidthCorrectionMm: '0.05',
+          } as unknown as Project['scene']['layers'][number],
+        ],
+      },
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.layers\[0\]\.negativeImage/);
+    }
+  });
+
   it('reports invalid when a scene object has an unknown kind', () => {
     const project = aProject();
     const text = serializeProject({
@@ -212,9 +237,52 @@ describe('deserializeProject', () => {
       expect(layer?.hatchSpacingMm).toBe(0.1);
       expect(layer?.fillOverscanMm).toBe(5);
       expect(layer?.minPower).toBe(0);
+      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(false);
+      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(false);
+      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(0);
       // ADR-038: pre-unidirectional files back-fill to snake (true), matching
       // the fill they were authored against.
       expect(layer?.fillBidirectional).toBe(true);
+      expect((layer as { readonly fillCrossHatch?: boolean })?.fillCrossHatch).toBe(false);
+    }
+  });
+
+  it('back-fills missing optimization settings on older .lf2 files', () => {
+    const oldShape = JSON.stringify({
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      device: {
+        name: 'Default',
+        bedWidth: 300,
+        bedHeight: 300,
+        maxFeed: 3000,
+        maxPowerS: 1000,
+        origin: 'front-left',
+        homing: { enabled: false, direction: 'front-left' },
+        autofocusCommand: '',
+      },
+      workspace: { width: 300, height: 300, units: 'mm' },
+      scene: { objects: [], layers: [] },
+    });
+
+    const result = deserializeProject(oldShape);
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project.optimization.reduceTravelMoves).toBe(true);
+    }
+  });
+
+  it('reports invalid when optimization settings have the wrong type', () => {
+    const text = serializeProject({
+      ...aProject(),
+      optimization: { reduceTravelMoves: 'sometimes' },
+    } as unknown as Project);
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/optimization\.reduceTravelMoves/);
     }
   });
 
