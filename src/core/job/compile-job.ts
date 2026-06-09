@@ -19,6 +19,11 @@ import {
   whiteLuma,
 } from '../raster';
 import {
+  effectiveObjectMinPowerPercent,
+  effectiveObjectPowerPercent,
+  objectPowerScalePercent,
+} from './object-power-scale';
+import {
   applyTransform,
   assertNever,
   type ColoredPath,
@@ -65,21 +70,7 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
       }
       continue;
     }
-    const segments = collectSegmentsForLayer(scene.objects, layer, device);
-    if (segments.length === 0) continue;
-    const common = {
-      layerId: layer.id,
-      color: layer.color,
-      power: clamp(layer.power, 0, 100),
-      speed: Math.min(layer.speed, device.maxFeed),
-      passes: Math.max(1, Math.floor(layer.passes)),
-      segments,
-    };
-    groups.push(
-      layer.mode === 'fill'
-        ? { ...common, kind: 'fill', overscanMm: Math.max(0, layer.fillOverscanMm) }
-        : { ...common, kind: 'cut' },
-    );
+    groups.push(...compileVectorGroupsForLayer(scene.objects, layer, device));
   }
   return { groups };
 }
@@ -102,8 +93,8 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
       : whiteLuma(obj.pixelWidth * obj.pixelHeight);
   const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
   const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
-  const powerPercent = clamp(layer.power, 0, 100);
-  const minPowerPercent = clamp(layer.minPower, 0, powerPercent);
+  const powerPercent = effectiveObjectPowerPercent(layer, obj);
+  const minPowerPercent = effectiveObjectMinPowerPercent(layer, obj);
   const sMax = Math.round((powerPercent / 100) * device.maxPowerS);
   const sMin = Math.round((minPowerPercent / 100) * device.maxPowerS);
   const bounds = rasterBoundsInMachineCoords(obj, device);
@@ -215,6 +206,76 @@ function collectSegmentsForLayer(
 ): CutSegment[] {
   if (layer.mode === 'fill') return collectFillSegmentsForLayer(objects, layer, device);
   return collectLineSegmentsForLayer(objects, layer, device);
+}
+
+function compileVectorGroupsForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+): Group[] {
+  const matchingObjects = objects.filter((obj) => vectorObjectMatchesLayer(obj, layer));
+  const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
+  if (sharedScale !== undefined) {
+    return vectorGroupForLayer(layer, device, collectSegmentsForLayer(objects, layer, device), {
+      powerScale: sharedScale,
+    });
+  }
+
+  const groups: Group[] = [];
+  for (const obj of matchingObjects) {
+    groups.push(
+      ...vectorGroupForLayer(layer, device, collectSegmentsForLayer([obj], layer, device), obj),
+    );
+  }
+  return groups;
+}
+
+function vectorGroupForLayer(
+  layer: Layer,
+  device: DeviceProfile,
+  segments: ReadonlyArray<CutSegment>,
+  powerSource: SceneObject | { readonly powerScale: number },
+): Group[] {
+  if (segments.length === 0) return [];
+  const common = {
+    layerId: layer.id,
+    color: layer.color,
+    power: effectiveObjectPowerPercent(layer, powerSource),
+    speed: Math.min(layer.speed, device.maxFeed),
+    passes: Math.max(1, Math.floor(layer.passes)),
+    segments,
+  };
+  return [
+    layer.mode === 'fill'
+      ? { ...common, kind: 'fill' as const, overscanMm: Math.max(0, layer.fillOverscanMm) }
+      : { ...common, kind: 'cut' as const },
+  ];
+}
+
+function sharedObjectPowerScalePercent(objects: ReadonlyArray<SceneObject>): number | undefined {
+  let sharedScale: number | undefined;
+  for (const obj of objects) {
+    const scale = objectPowerScalePercent(obj);
+    if (sharedScale === undefined) {
+      sharedScale = scale;
+    } else if (sharedScale !== scale) {
+      return undefined;
+    }
+  }
+  return sharedScale;
+}
+
+function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
+  switch (obj.kind) {
+    case 'imported-svg':
+    case 'text':
+    case 'traced-image':
+      return obj.paths.some((path) => path.color === layer.color);
+    case 'raster-image':
+      return false;
+    default:
+      assertNever(obj, 'SceneObject');
+  }
 }
 
 function collectLineSegmentsForLayer(
