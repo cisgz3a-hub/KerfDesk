@@ -2211,6 +2211,77 @@ TraceOptions instead of the removed presets.
 
 ---
 
+## ADR-044 - Minimal Material/Interval Test calibration workflow
+
+**Status:** Accepted; scope approved, implementation staged. | **Date:** 2026-06-09
+
+### Context
+
+The operator has now hardware-burned real material and observed quality changes
+from power, scan strategy, line interval, and material response. Code cannot pick
+universal burn settings. LightBurn treats this as a first-class calibration
+workflow: Material Test generates a configurable grid, usually 10x10 by default,
+varying parameters such as Power, Speed, Interval, and Passes; Interval Test
+generates sample squares to find raster line spacing for a speed/power/material
+combination. The official LightBurn Material Test documentation also says the
+grid location follows Start From / Job Origin behavior, and the Interval Test
+documentation directs users to run a speed/power material test first when they do
+not already know those settings.
+
+Before this ADR, `PROJECT.md` listed "Material library, cut tests,
+power/speed wizards" as out of scope. The maintainer has now explicitly approved
+continuing the LightBurn-parity roadmap step by step, so the scope line needs to
+move from "forbidden" to "staged and bounded."
+
+### Decision
+
+Promote a minimal calibration workflow to Phase F.5:
+
+1. Build a pure Material Test generator first. It produces ordinary
+   `Project`/`Scene` data, not ad hoc G-code, so Preview, Save G-code, Frame, and
+   Start all use the same existing pipeline.
+2. Start with speed/power grids. Speed can be represented by row layers; power
+   can be represented by the object-level `powerScale` field introduced for
+   Shape Properties. This avoids inventing per-object speed before the model
+   needs it.
+3. Add Interval Test after the Material Test foundation. Interval Test should
+   generate image/fill swatches using the existing line interval / DPI controls
+   and should not bypass raster/fill preflight.
+4. Add UI after the pure generator has tests. The UI may live under a
+   LightBurn-style Laser Tools menu entry, but the generated scene is the source
+   of truth.
+5. Keep full Material Library storage deferred. LightBurn's library supports
+   saved material/thickness presets, Assign vs Link behavior, shared library
+   files, and multi-device library switching. LaserForge should add that only
+   after generated calibration grids are useful on hardware.
+
+### Consequences
+
+- `PROJECT.md` now scopes minimal Material Test and Interval Test generators,
+  while full Material Library storage and linked presets remain out of scope.
+- The next implementation slice must be pure-core and test-first. No hardware
+  control should be added until generated project output is deterministic and
+  preview/save/start-compatible.
+- Hardware verification is required before claiming the feature produces useful
+  settings: run a small grid on scrap and record whether labels, ordering, and
+  chosen settings are readable.
+
+### Sources
+
+- LightBurn Material Test reference:
+  https://docs.lightburnsoftware.com/Tools/MaterialTest.html
+- LightBurn Interval Test reference:
+  https://docs.lightburnsoftware.com/Tools/IntervalTest.html
+- LightBurn Material Library reference:
+  https://docs.lightburnsoftware.com/UI/MaterialLibrary.html
+
+### Verification
+
+- Documentation-only scope change. No production code changed in this ADR.
+- `PROJECT.md` and `DECISIONS.md` must pass formatting and whitespace checks.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
