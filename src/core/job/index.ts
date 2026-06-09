@@ -29,3 +29,9 @@ export type {
   MaterialTestGridOptions,
 } from './material-test-grid';
 export { generateMaterialTestGrid } from './material-test-grid';
+export type {
+  IntervalTestCell,
+  IntervalTestGrid,
+  IntervalTestGridOptions,
+} from './interval-test-grid';
+export { generateIntervalTestGrid } from './interval-test-grid';
