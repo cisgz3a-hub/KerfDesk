@@ -1,7 +1,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { StreamerState } from '../../core/controllers/grbl';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { CutsLayersPanel } from './CutsLayersPanel';
 
@@ -11,6 +13,11 @@ import { CutsLayersPanel } from './CutsLayersPanel';
 
 afterEach(() => {
   resetStore();
+  useLaserStore.setState({
+    autofocusBusy: false,
+    motionOperation: null,
+    streamer: null,
+  } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
 describe('LayerRow double-click cut settings', () => {
@@ -87,4 +94,81 @@ describe('LayerRow double-click cut settings', () => {
       host.remove();
     }
   });
+
+  it.each([
+    ['active job', () => useLaserStore.setState({ streamer: activeStreamer() })],
+    [
+      'active frame',
+      () =>
+        useLaserStore.setState({
+          motionOperation: {
+            kind: 'frame',
+            sawControllerBusy: true,
+            idleStatusReports: 0,
+            dispatchComplete: true,
+          },
+        }),
+    ],
+    ['active autofocus', () => useLaserStore.setState({ autofocusBusy: true })],
+  ] as const)('blocks cut settings while %s is running', async (_label, makeBusy) => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    makeBusy();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
+      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
+      expect(edit.disabled).toBe(true);
+
+      const row = host.querySelector('section[aria-label="Layer #ff0000"]');
+      if (!(row instanceof HTMLElement)) throw new Error('layer row missing');
+      await act(async () => {
+        row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      });
+
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('closes an open cut settings dialog when machine activity starts', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<CutsLayersPanel />);
+      });
+
+      const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
+      if (!(edit instanceof HTMLButtonElement)) throw new Error('edit button missing');
+      await act(async () => {
+        edit.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+
+      await act(async () => {
+        useLaserStore.setState({ autofocusBusy: true });
+      });
+
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
+
+function activeStreamer(): StreamerState {
+  return { status: 'streaming' } as StreamerState;
+}
