@@ -2,6 +2,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { PlatformAdapter } from '../../platform/types';
+import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { CutsLayersPanel } from './CutsLayersPanel';
@@ -10,6 +12,44 @@ import { CutsLayersPanel } from './CutsLayersPanel';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+const mockPlatform: PlatformAdapter = {
+  id: 'mock',
+  pickFilesForOpen: async () => [],
+  pickFileForSave: async () => null,
+  serial: {
+    isSupported: () => false,
+    requestPort: async () => null,
+  },
+};
+
+function PanelUnderTest(): JSX.Element {
+  return (
+    <PlatformProvider adapter={mockPlatform}>
+      <CutsLayersPanel />
+    </PlatformProvider>
+  );
+}
+
+async function renderPanel(): Promise<{
+  readonly host: HTMLDivElement;
+  readonly unmount: () => Promise<void>;
+}> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    root.render(<PanelUnderTest />);
+  });
+  return {
+    host,
+    unmount: async () => {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    },
+  };
+}
+
 afterEach(() => {
   resetStore();
 });
@@ -17,15 +57,8 @@ afterEach(() => {
 describe('CutsLayersPanel layer order controls', () => {
   it('moves a layer up through the Cuts / Layers panel', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff', '#00ff00']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const { host, unmount } = await renderPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<CutsLayersPanel />);
-      });
-
       const moveBlueUp = host.querySelector('button[aria-label="Move #0000ff up"]');
       if (!(moveBlueUp instanceof HTMLButtonElement)) throw new Error('move button missing');
 
@@ -39,22 +72,14 @@ describe('CutsLayersPanel layer order controls', () => {
         '#00ff00',
       ]);
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await unmount();
     }
   });
 
   it('disables boundary layer move buttons', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const { host, unmount } = await renderPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<CutsLayersPanel />);
-      });
-
       const topUp = host.querySelector('button[aria-label="Move #ff0000 up"]');
       const bottomDown = host.querySelector('button[aria-label="Move #0000ff down"]');
       if (!(topUp instanceof HTMLButtonElement)) throw new Error('top move button missing');
@@ -63,23 +88,15 @@ describe('CutsLayersPanel layer order controls', () => {
       expect(topUp.disabled).toBe(true);
       expect(bottomDown.disabled).toBe(true);
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await unmount();
     }
   });
 
   it('adds a manual layer and assigns the selected object to it', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().selectObject('O1');
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const { host, unmount } = await renderPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<CutsLayersPanel />);
-      });
-
       const color = host.querySelector('input[aria-label="New layer color"]');
       const add = host.querySelector('button[aria-label="Add layer"]');
       if (!(color instanceof HTMLInputElement)) throw new Error('new layer color missing');
@@ -107,8 +124,7 @@ describe('CutsLayersPanel layer order controls', () => {
       if (obj?.kind !== 'imported-svg') throw new Error('expected imported svg');
       expect(obj.paths.map((path) => path.color)).toEqual(['#00ff00']);
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await unmount();
     }
   });
 
@@ -116,15 +132,8 @@ describe('CutsLayersPanel layer order controls', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#0000ff', '#ff0000']));
     useStore.getState().importSvgObject(svgObj('O3', ['#0000ff']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const { host, unmount } = await renderPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<CutsLayersPanel />);
-      });
-
       const selectRed = host.querySelector('button[aria-label="Select all objects on #ff0000"]');
       if (!(selectRed instanceof HTMLButtonElement)) throw new Error('select layer button missing');
 
@@ -136,23 +145,15 @@ describe('CutsLayersPanel layer order controls', () => {
       expect(state.selectedObjectId).toBe('O1');
       expect([...state.additionalSelectedIds]).toEqual(['O2']);
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await unmount();
     }
   });
 
   it('deletes a layer and its assigned artwork from the Cuts / Layers panel', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const { host, unmount } = await renderPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<CutsLayersPanel />);
-      });
-
       const deleteRed = host.querySelector('button[aria-label="Delete layer #ff0000"]');
       if (!(deleteRed instanceof HTMLButtonElement)) throw new Error('delete layer button missing');
 
@@ -165,23 +166,15 @@ describe('CutsLayersPanel layer order controls', () => {
         '#0000ff',
       ]);
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await unmount();
     }
   });
 
   it('copies and pastes layer settings from the Cuts / Layers panel', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
     useStore.getState().setLayerParam('#ff0000', { power: 71, speed: 2345, passes: 4 });
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
+    const { host, unmount } = await renderPanel();
     try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<CutsLayersPanel />);
-      });
-
       const copyRed = host.querySelector('button[aria-label="Copy settings from #ff0000"]');
       const pasteBlue = host.querySelector('button[aria-label="Paste settings to #0000ff"]');
       if (!(copyRed instanceof HTMLButtonElement)) throw new Error('copy button missing');
@@ -197,8 +190,7 @@ describe('CutsLayersPanel layer order controls', () => {
       const blue = useStore.getState().project.scene.layers.find((layer) => layer.id === '#0000ff');
       expect(blue).toMatchObject({ color: '#0000ff', power: 71, speed: 2345, passes: 4 });
     } finally {
-      if (root !== null) await act(async () => root?.unmount());
-      host.remove();
+      await unmount();
     }
   });
 });
@@ -212,7 +204,7 @@ describe('CutsLayersPanel cut settings editor', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
@@ -257,7 +249,7 @@ describe('CutsLayersPanel cut settings editor', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
@@ -298,7 +290,7 @@ describe('CutsLayersPanel cut settings editor', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
@@ -344,7 +336,7 @@ describe('CutsLayersPanel cut settings editor', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
@@ -379,7 +371,7 @@ describe('CutsLayersPanel cut settings editor', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const negative = host.querySelector('input[aria-label="Negative image for #ff0000"]');
@@ -424,7 +416,7 @@ describe('CutsLayersPanel cut settings editor', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const interval = host.querySelector('input[aria-label="Line interval for #ff0000"]');
