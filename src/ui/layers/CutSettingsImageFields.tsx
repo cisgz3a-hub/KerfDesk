@@ -6,7 +6,7 @@ import {
   linesPerMmToLineIntervalMm,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster/raster-units';
-import type { Layer } from '../../core/scene';
+import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 
 export function CutSettingsImageFields(props: {
   readonly layer: Layer;
@@ -25,17 +25,11 @@ export function CutSettingsImageFields(props: {
           onChange={(event) => props.onDitherChange(parseDither(event.target.value))}
           aria-label="Cut settings dither"
         >
-          <option value="threshold">Threshold</option>
-          <option value="floyd-steinberg">Floyd-Steinberg</option>
-          <option value="jarvis">Jarvis</option>
-          <option value="stucki">Stucki</option>
-          <option value="atkinson">Atkinson</option>
-          <option value="burkes">Burkes</option>
-          <option value="sierra3">Sierra 3</option>
-          <option value="sierra2">Sierra 2</option>
-          <option value="sierra-lite">Sierra Lite</option>
-          <option value="ordered">Ordered</option>
-          <option value="grayscale">Grayscale</option>
+          {DITHER_ALGORITHMS.map((algorithm) => (
+            <option key={algorithm} value={algorithm}>
+              {DITHER_LABELS[algorithm]}
+            </option>
+          ))}
         </select>
       </Field>
       {props.dither === 'grayscale' ? (
@@ -146,23 +140,24 @@ function Field(props: { readonly label: string; readonly children: React.ReactNo
 }
 
 function parseDither(value: string): Layer['ditherAlgorithm'] {
-  const allowed: ReadonlyArray<Layer['ditherAlgorithm']> = [
-    'threshold',
-    'floyd-steinberg',
-    'jarvis',
-    'stucki',
-    'atkinson',
-    'burkes',
-    'sierra3',
-    'sierra2',
-    'sierra-lite',
-    'ordered',
-    'grayscale',
-  ];
-  return allowed.includes(value as Layer['ditherAlgorithm'])
+  return DITHER_ALGORITHMS.some((algorithm) => algorithm === value)
     ? (value as Layer['ditherAlgorithm'])
     : 'floyd-steinberg';
 }
+
+const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
+  threshold: 'Threshold',
+  'floyd-steinberg': 'Floyd-Steinberg',
+  jarvis: 'Jarvis',
+  stucki: 'Stucki',
+  atkinson: 'Atkinson',
+  burkes: 'Burkes',
+  sierra3: 'Sierra 3',
+  sierra2: 'Sierra 2',
+  'sierra-lite': 'Sierra Lite',
+  ordered: 'Ordered',
+  grayscale: 'Grayscale',
+};
 
 function dotWidthCorrectionMax(linesPerMm: number): number {
   return 1 / Math.max(1, linesPerMm);
