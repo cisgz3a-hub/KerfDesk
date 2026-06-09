@@ -41,6 +41,9 @@ export type Layer = {
   // true (speed): the zipper is sub-0.1 mm at typical diode feeds, so most
   // fills want the faster snake.
   readonly fillBidirectional: boolean;
+  // LightBurn-style Cross-Hatch: add a second fill pass 90 degrees from the
+  // first. Default false so reopening older projects does not double burn time.
+  readonly fillCrossHatch: boolean;
   // F.2 image-mode parameters. Ignored unless mode === 'image'.
   // Layer values WIN over per-RasterImage settings at compile time
   // so the operator can re-tune one layer without touching every
@@ -64,6 +67,7 @@ export const LAYER_DEFAULTS = {
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
   fillBidirectional: true,
+  fillCrossHatch: false,
   ditherAlgorithm: 'floyd-steinberg',
   linesPerMm: 10,
   negativeImage: false,

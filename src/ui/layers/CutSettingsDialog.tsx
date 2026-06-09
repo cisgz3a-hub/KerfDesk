@@ -160,6 +160,14 @@ function FillFields(props: {
           defaultChecked={props.layer.fillBidirectional}
         />
       </Field>
+      <Field label="Cross-Hatch">
+        <input
+          name="fillCrossHatch"
+          type="checkbox"
+          defaultChecked={props.layer.fillCrossHatch}
+          aria-label="Cut settings cross-hatch"
+        />
+      </Field>
     </fieldset>
   );
 }
@@ -227,7 +235,8 @@ function readLayerPatch(data: FormData, layer: Layer): LayerPatch {
     hatchAngleDeg: numberField(data, 'hatchAngleDeg', layer.hatchAngleDeg, 0, 180),
     hatchSpacingMm: numberField(data, 'hatchSpacingMm', layer.hatchSpacingMm, 0.05, 10),
     fillOverscanMm: numberField(data, 'fillOverscanMm', layer.fillOverscanMm, 0, 25),
-    fillBidirectional: data.has('fillBidirectional'),
+    fillBidirectional: mode === 'fill' ? data.has('fillBidirectional') : layer.fillBidirectional,
+    fillCrossHatch: mode === 'fill' ? data.has('fillCrossHatch') : layer.fillCrossHatch,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
     dotWidthCorrectionMm:

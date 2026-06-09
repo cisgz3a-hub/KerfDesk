@@ -103,6 +103,42 @@ describe('CutSettingsDialog fill density controls', () => {
       host.remove();
     }
   });
+
+  it('saves the fill cross-hatch checkbox', async () => {
+    let applied: Partial<Layer> | null = null;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <CutSettingsDialog
+            layer={fillLayer()}
+            onCancel={() => undefined}
+            onApply={(patch) => {
+              applied = patch;
+            }}
+          />,
+        );
+      });
+
+      const crossHatch = host.querySelector('input[aria-label="Cut settings cross-hatch"]');
+      if (!(crossHatch instanceof HTMLInputElement)) throw new Error('cross-hatch input missing');
+      await act(async () => {
+        crossHatch.checked = true;
+        Simulate.change(crossHatch);
+      });
+      await submitDialog(host);
+
+      expect(
+        (requireApplied(applied) as { readonly fillCrossHatch?: boolean }).fillCrossHatch,
+      ).toBe(true);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
 
 function fillLayer(patch: Partial<Layer> = {}): Layer {

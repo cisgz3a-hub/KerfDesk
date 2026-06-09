@@ -243,6 +243,7 @@ describe('deserializeProject', () => {
       // ADR-038: pre-unidirectional files back-fill to snake (true), matching
       // the fill they were authored against.
       expect(layer?.fillBidirectional).toBe(true);
+      expect((layer as { readonly fillCrossHatch?: boolean })?.fillCrossHatch).toBe(false);
     }
   });
 
