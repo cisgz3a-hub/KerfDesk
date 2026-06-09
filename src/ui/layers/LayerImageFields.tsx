@@ -6,7 +6,7 @@ import {
   linesPerMmToLineIntervalMm,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster/raster-units';
-import type { Layer } from '../../core/scene';
+import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -94,20 +94,28 @@ function DitherSelect({ layer }: { readonly layer: Layer }): JSX.Element {
       aria-label={`Dither for ${layer.color}`}
       style={ditherSelectStyle}
     >
-      <option value="threshold">Threshold</option>
-      <option value="floyd-steinberg">Floyd-Steinberg</option>
-      <option value="jarvis">Jarvis</option>
-      <option value="stucki">Stucki</option>
-      <option value="atkinson">Atkinson</option>
-      <option value="burkes">Burkes</option>
-      <option value="sierra3">Sierra 3</option>
-      <option value="sierra2">Sierra 2</option>
-      <option value="sierra-lite">Sierra Lite</option>
-      <option value="ordered">Ordered</option>
-      <option value="grayscale">Grayscale</option>
+      {DITHER_ALGORITHMS.map((algorithm) => (
+        <option key={algorithm} value={algorithm}>
+          {DITHER_LABELS[algorithm]}
+        </option>
+      ))}
     </select>
   );
 }
+
+const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
+  threshold: 'Threshold',
+  'floyd-steinberg': 'Floyd-Steinberg',
+  jarvis: 'Jarvis',
+  stucki: 'Stucki',
+  atkinson: 'Atkinson',
+  burkes: 'Burkes',
+  sierra3: 'Sierra 3',
+  sierra2: 'Sierra 2',
+  'sierra-lite': 'Sierra Lite',
+  ordered: 'Ordered',
+  grayscale: 'Grayscale',
+};
 
 function LineIntervalInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const setLayerParam = useStore((s) => s.setLayerParam);

@@ -5,7 +5,7 @@ import {
   linesPerMmToDpi,
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster/raster-units';
-import type { Layer, LayerMode } from '../../core/scene';
+import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
 import { CutSettingsImageFields } from './CutSettingsImageFields';
@@ -272,20 +272,9 @@ function parseMode(value: string): LayerMode {
 }
 
 function parseDither(value: string): Layer['ditherAlgorithm'] {
-  const allowed: ReadonlySet<string> = new Set([
-    'threshold',
-    'floyd-steinberg',
-    'jarvis',
-    'stucki',
-    'atkinson',
-    'burkes',
-    'sierra3',
-    'sierra2',
-    'sierra-lite',
-    'ordered',
-    'grayscale',
-  ]);
-  return allowed.has(value) ? (value as Layer['ditherAlgorithm']) : 'floyd-steinberg';
+  return DITHER_ALGORITHMS.some((algorithm) => algorithm === value)
+    ? (value as Layer['ditherAlgorithm'])
+    : 'floyd-steinberg';
 }
 
 function dotWidthCorrectionMax(linesPerMm: number): number {
