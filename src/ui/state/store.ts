@@ -33,6 +33,10 @@ import { layerActions, type LayerSettingsClipboard } from './layer-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { generatedSceneActions } from './generated-scene-actions';
 import {
+  projectOptimizationActions,
+  type ProjectOptimizationActions,
+} from './project-optimization-actions';
+import {
   applyDuplicate,
   applyFreshImport,
   applyReimport,
@@ -48,102 +52,103 @@ export type { ImportOutcome } from './scene-mutations';
 
 const HISTORY_DEPTH = 50;
 
-export type AppState = ObjectPropertiesActions & {
-  readonly project: Project;
-  readonly selectedObjectId: string | null;
-  // Additional objects in the multi-selection set (F-A5). The "primary"
-  // selection is selectedObjectId; additionalSelectedIds is everything
-  // shift+clicked or marquee-added after that. Combined-bbox scale and
-  // rotate are intentionally Phase C — Phase A's transform pipeline only
-  // operates on the primary selection. Move + Delete are multi-aware.
-  readonly additionalSelectedIds: ReadonlySet<string>;
-  readonly previewMode: boolean;
-  readonly undoStack: ReadonlyArray<Project>;
-  readonly redoStack: ReadonlyArray<Project>;
-  readonly pendingUndo: Project | null;
-  // Cursor position over the workspace canvas in scene-mm coords, or null
-  // when the pointer isn't over the canvas. Updated at mousemove cadence;
-  // only the StatusBar subscribes to it, so re-render fan-out is bounded.
-  readonly cursorMm: Vec2 | null;
-  readonly jobPlacement: JobPlacementSettings;
-  // F-A11 dirty / save tracking. `dirty` flips true on every mutating
-  // action; flips false on a successful save. `savedName` is the file the
-  // project was last saved as — drives the window title. `lastSaveTarget`
-  // holds the platform's SaveTarget so Ctrl+S after a first save writes
-  // through without re-prompting; cleared by New/Open.
-  readonly dirty: boolean;
-  readonly savedName: string | null;
-  readonly lastSaveTarget: SaveTarget | null;
-  readonly copiedLayerSettings: LayerSettingsClipboard | null;
+export type AppState = ObjectPropertiesActions &
+  ProjectOptimizationActions & {
+    readonly project: Project;
+    readonly selectedObjectId: string | null;
+    // Additional objects in the multi-selection set (F-A5). The "primary"
+    // selection is selectedObjectId; additionalSelectedIds is everything
+    // shift+clicked or marquee-added after that. Combined-bbox scale and
+    // rotate are intentionally Phase C — Phase A's transform pipeline only
+    // operates on the primary selection. Move + Delete are multi-aware.
+    readonly additionalSelectedIds: ReadonlySet<string>;
+    readonly previewMode: boolean;
+    readonly undoStack: ReadonlyArray<Project>;
+    readonly redoStack: ReadonlyArray<Project>;
+    readonly pendingUndo: Project | null;
+    // Cursor position over the workspace canvas in scene-mm coords, or null
+    // when the pointer isn't over the canvas. Updated at mousemove cadence;
+    // only the StatusBar subscribes to it, so re-render fan-out is bounded.
+    readonly cursorMm: Vec2 | null;
+    readonly jobPlacement: JobPlacementSettings;
+    // F-A11 dirty / save tracking. `dirty` flips true on every mutating
+    // action; flips false on a successful save. `savedName` is the file the
+    // project was last saved as — drives the window title. `lastSaveTarget`
+    // holds the platform's SaveTarget so Ctrl+S after a first save writes
+    // through without re-prompting; cleared by New/Open.
+    readonly dirty: boolean;
+    readonly savedName: string | null;
+    readonly lastSaveTarget: SaveTarget | null;
+    readonly copiedLayerSettings: LayerSettingsClipboard | null;
 
-  readonly setProject: (project: Project) => void;
-  readonly newProject: () => void;
-  readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
+    readonly setProject: (project: Project) => void;
+    readonly newProject: () => void;
+    readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
 
-  // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
-  // right and down (F-A3 multi-import). The first file in a batch passes 0,
-  // the second passes 1, etc., so a 3-file drop produces a stagger instead
-  // of fully-overlapping designs.
-  //
-  // Returns an ImportOutcome so callers can toast the diff (Phase C
-  // re-import). For a fresh add the outcome is `{ kind: 'added' }`;
-  // for a re-import (existing object with matching source filename
-  // found) it's `{ kind: 'replaced', kept, added, removed }`.
-  readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
-  // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
-  readonly importRasterImage: (object: SceneObject) => void;
-  // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
-  readonly traceExistingImage: (
-    sourceId: string,
-    traced: TracedImage,
-    options?: TraceExistingImageOptions,
-  ) => void;
-  // ADR-029 Convert to Bitmap: replace a selected vector with the raster
-  // engrave-source rasterized from it (LightBurn discards the original).
-  readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
-  // Phase D insert / update text by id; on add it's a new id, on
-  // edit it replaces in place (preserves position/transform).
-  readonly upsertTextObject: (text: TextObject) => void;
-  readonly removeSceneObject: (id: string) => void;
-  // Clone every currently-selected SceneObject with a fresh id and a
-  // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
-  // new selection. No-op when nothing is selected.
-  readonly duplicateSelection: () => void;
-  // Zoom to current selection's bounds; falls back to fit-all then
-  // bed-fit. Driven by Shift+F and the fit-to-selection zoom button.
-  readonly fitToSelection: () => void;
-  readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
-  readonly moveLayer: (layerId: string, direction: LayerMoveDirection) => void;
-  readonly createManualLayer: (color: string) => void;
-  readonly assignSelectionToLayer: (layerId: string) => void;
-  readonly deleteLayerAndObjects: (layerId: string) => void;
-  readonly copyLayerSettings: (layerId: string) => void;
-  readonly pasteLayerSettings: (layerId: string) => void;
-  readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
-  readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
+    // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
+    // right and down (F-A3 multi-import). The first file in a batch passes 0,
+    // the second passes 1, etc., so a 3-file drop produces a stagger instead
+    // of fully-overlapping designs.
+    //
+    // Returns an ImportOutcome so callers can toast the diff (Phase C
+    // re-import). For a fresh add the outcome is `{ kind: 'added' }`;
+    // for a re-import (existing object with matching source filename
+    // found) it's `{ kind: 'replaced', kept, added, removed }`.
+    readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
+    // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
+    readonly importRasterImage: (object: SceneObject) => void;
+    // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
+    readonly traceExistingImage: (
+      sourceId: string,
+      traced: TracedImage,
+      options?: TraceExistingImageOptions,
+    ) => void;
+    // ADR-029 Convert to Bitmap: replace a selected vector with the raster
+    // engrave-source rasterized from it (LightBurn discards the original).
+    readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
+    // Phase D insert / update text by id; on add it's a new id, on
+    // edit it replaces in place (preserves position/transform).
+    readonly upsertTextObject: (text: TextObject) => void;
+    readonly removeSceneObject: (id: string) => void;
+    // Clone every currently-selected SceneObject with a fresh id and a
+    // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
+    // new selection. No-op when nothing is selected.
+    readonly duplicateSelection: () => void;
+    // Zoom to current selection's bounds; falls back to fit-all then
+    // bed-fit. Driven by Shift+F and the fit-to-selection zoom button.
+    readonly fitToSelection: () => void;
+    readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
+    readonly moveLayer: (layerId: string, direction: LayerMoveDirection) => void;
+    readonly createManualLayer: (color: string) => void;
+    readonly assignSelectionToLayer: (layerId: string) => void;
+    readonly deleteLayerAndObjects: (layerId: string) => void;
+    readonly copyLayerSettings: (layerId: string) => void;
+    readonly pasteLayerSettings: (layerId: string) => void;
+    readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
+    readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
-  readonly undo: () => void;
-  readonly redo: () => void;
+    readonly undo: () => void;
+    readonly redo: () => void;
 
-  // Single-select on plain click; clears all when id is null.
-  readonly selectObject: (id: string | null) => void;
-  // Shift+click toggle; never clears the primary.
-  readonly toggleSelectObject: (id: string) => void;
-  // Ctrl+A: primary = first, additional = rest.
-  readonly selectAllObjects: () => void;
-  readonly selectObjectsOnLayer: (layerId: string) => void;
-  readonly togglePreview: () => void;
-  readonly setJobPlacement: (patch: Partial<JobPlacementSettings>) => void;
-  readonly setCursorMm: (cursor: Vec2 | null) => void;
+    // Single-select on plain click; clears all when id is null.
+    readonly selectObject: (id: string | null) => void;
+    // Shift+click toggle; never clears the primary.
+    readonly toggleSelectObject: (id: string) => void;
+    // Ctrl+A: primary = first, additional = rest.
+    readonly selectAllObjects: () => void;
+    readonly selectObjectsOnLayer: (layerId: string) => void;
+    readonly togglePreview: () => void;
+    readonly setJobPlacement: (patch: Partial<JobPlacementSettings>) => void;
+    readonly setCursorMm: (cursor: Vec2 | null) => void;
 
-  readonly beginInteraction: () => void;
-  readonly setObjectTransform: (id: string, transform: Transform) => void;
-  readonly endInteraction: () => void;
-  readonly applyObjectTransform: (id: string, transform: Transform) => void;
+    readonly beginInteraction: () => void;
+    readonly setObjectTransform: (id: string, transform: Transform) => void;
+    readonly endInteraction: () => void;
+    readonly applyObjectTransform: (id: string, transform: Transform) => void;
 
-  readonly markSaved: (target: SaveTarget) => void;
-  readonly markLoaded: (filename: string) => void;
-};
+    readonly markSaved: (target: SaveTarget) => void;
+    readonly markLoaded: (filename: string) => void;
+  };
 
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -453,6 +458,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...layerActions(set),
   ...objectPropertiesActions(set),
   ...generatedSceneActions(set),
+  ...projectOptimizationActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

@@ -10,6 +10,7 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
+import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
   ConvertToBitmapDialog,
@@ -28,6 +29,7 @@ export function CommandShell(): JSX.Element {
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
+  const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
   const commands = useAppCommands({
@@ -36,6 +38,7 @@ export function CommandShell(): JSX.Element {
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
+    requestOptimizationSettings: () => setOptimizationDialogOpen(true),
     showAbout: () => window.alert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
@@ -69,7 +72,28 @@ export function CommandShell(): JSX.Element {
       {intervalTestDialogOpen ? (
         <IntervalDialog onClose={() => setIntervalTestDialogOpen(false)} />
       ) : null}
+      {optimizationDialogOpen ? (
+        <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
+      ) : null}
     </>
+  );
+}
+
+function OptimizationDialog(props: { readonly onClose: () => void }): JSX.Element {
+  useRegisterModal();
+  const settings = useStore((s) => s.project.optimization);
+  const setProjectOptimization = useStore((s) => s.setProjectOptimization);
+  const pushToast = useToastStore((s) => s.pushToast);
+  return (
+    <OptimizationSettingsDialog
+      settings={settings}
+      onCancel={props.onClose}
+      onApply={(patch) => {
+        setProjectOptimization(patch);
+        props.onClose();
+        pushToast('Updated optimization settings.', 'success');
+      }}
+    />
   );
 }
 

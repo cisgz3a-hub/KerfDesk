@@ -27,6 +27,7 @@ export type CommandId =
   | 'tools.add-text'
   | 'tools.material-test'
   | 'tools.interval-test'
+  | 'tools.optimization-settings'
   | 'tools.adjust-image'
   | 'tools.trace-image'
   | 'tools.convert-to-bitmap'
@@ -79,6 +80,7 @@ export type AppCommandContext = {
   readonly addText: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;
+  readonly optimizationSettings: () => void;
   readonly adjustImage: () => void;
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
@@ -250,6 +252,13 @@ function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
       () => {
         if (ctx.confirmDiscard('create an interval test')) ctx.intervalTest();
       },
+    ),
+    enabled(
+      'tools.optimization-settings',
+      'tools',
+      'Optimization Settings...',
+      'Adjust output path optimization',
+      ctx.optimizationSettings,
     ),
     ctx.hasRasterSelection
       ? enabled(

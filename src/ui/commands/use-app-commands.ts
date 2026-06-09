@@ -19,6 +19,7 @@ export type CommandShellCallbacks = {
   readonly requestAdjustImage: () => void;
   readonly requestMaterialTest: () => void;
   readonly requestIntervalTest: () => void;
+  readonly requestOptimizationSettings: () => void;
   readonly showAbout: () => void;
 };
 
@@ -76,6 +77,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     addText: () => openTextDialog({ mode: 'add' }),
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
+    optimizationSettings: callbacks.requestOptimizationSettings,
     adjustImage: callbacks.requestAdjustImage,
     traceImage: () => {
       if (selected?.kind === 'raster-image') openImageDialog(selected);

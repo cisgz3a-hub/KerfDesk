@@ -47,5 +47,5 @@ export {
   updateLayer,
 } from './scene';
 
-export type { Project, Workspace } from './project';
-export { PROJECT_SCHEMA_VERSION, createProject } from './project';
+export type { Project, ProjectOptimizationSettings, Workspace } from './project';
+export { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION, createProject } from './project';
