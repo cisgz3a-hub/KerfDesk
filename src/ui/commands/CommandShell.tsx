@@ -1,8 +1,14 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { generateMaterialTestGrid, type MaterialTestGridOptions } from '../../core/job';
+import {
+  generateIntervalTestGrid,
+  generateMaterialTestGrid,
+  type IntervalTestGridOptions,
+  type MaterialTestGridOptions,
+} from '../../core/job';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
@@ -21,6 +27,7 @@ export function CommandShell(): JSX.Element {
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
+  const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
   const commands = useAppCommands({
@@ -28,6 +35,7 @@ export function CommandShell(): JSX.Element {
     requestConvertToBitmap: () => setConvertDialogOpen(true),
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
+    requestIntervalTest: () => setIntervalTestDialogOpen(true),
     showAbout: () => window.alert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
@@ -58,8 +66,24 @@ export function CommandShell(): JSX.Element {
       {materialTestDialogOpen ? (
         <MaterialDialog onClose={() => setMaterialTestDialogOpen(false)} />
       ) : null}
+      {intervalTestDialogOpen ? (
+        <IntervalDialog onClose={() => setIntervalTestDialogOpen(false)} />
+      ) : null}
     </>
   );
+}
+
+function IntervalDialog(props: { readonly onClose: () => void }): JSX.Element {
+  useRegisterModal();
+  const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const onGenerate = (options: IntervalTestGridOptions): void => {
+    const grid = generateIntervalTestGrid(options);
+    replaceSceneWithGeneratedScene(grid.scene);
+    props.onClose();
+    pushToast(`Generated interval test grid (${grid.cells.length} swatches).`, 'success');
+  };
+  return <IntervalTestDialog onCancel={props.onClose} onGenerate={onGenerate} />;
 }
 
 function MaterialDialog(props: { readonly onClose: () => void }): JSX.Element {

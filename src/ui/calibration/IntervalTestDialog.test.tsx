@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MaterialTestDialog } from './MaterialTestDialog';
+import { IntervalTestDialog } from './IntervalTestDialog';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -17,7 +17,7 @@ async function renderDialog(onGenerate = vi.fn()): Promise<{
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<MaterialTestDialog onCancel={vi.fn()} onGenerate={onGenerate} />);
+    root.render(<IntervalTestDialog onCancel={vi.fn()} onGenerate={onGenerate} />);
   });
   return { host, root, onGenerate };
 }
@@ -26,18 +26,18 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('MaterialTestDialog', () => {
-  it('renders grid controls and generates parsed options', async () => {
+describe('IntervalTestDialog', () => {
+  it('renders interval controls and generates parsed options', async () => {
     const { host, root, onGenerate } = await renderDialog();
     try {
-      expect(host.textContent).toContain('Material Test');
-      const rows = input(host, 'Rows');
-      const speedMax = input(host, 'Max speed');
+      expect(host.textContent).toContain('Interval Test');
+      const steps = input(host, 'Steps');
+      const intervalMax = input(host, 'Max interval');
       await act(async () => {
-        rows.value = '2';
-        Simulate.change(rows);
-        speedMax.value = '3500';
-        Simulate.change(speedMax);
+        steps.value = '4';
+        Simulate.change(steps);
+        intervalMax.value = '0.25';
+        Simulate.change(intervalMax);
       });
 
       const generate = [...host.querySelectorAll('button')].find((button) =>
@@ -48,7 +48,9 @@ describe('MaterialTestDialog', () => {
         generate.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({ rows: 2, speedMax: 3500 }));
+      expect(onGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({ steps: 4, intervalMaxMm: 0.25 }),
+      );
     } finally {
       await act(async () => root.unmount());
     }
