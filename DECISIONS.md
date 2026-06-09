@@ -2282,6 +2282,71 @@ Promote a minimal calibration workflow to Phase F.5:
 
 ---
 
+## ADR-045 - Native Material Library IO foundation
+
+**Status:** Accepted; implementation staged. | **Date:** 2026-06-09
+
+### Context
+
+LightBurn's Material Library stores reusable Cut Settings presets and exposes
+Load Library, Save Library, Save Library As, Create New Library, and Merge
+Library With. The official docs identify `.clb` as LightBurn's saved library
+extension and distinguish Assign from Link: Assign copies settings to the active
+layer, while Link keeps the layer synced and disables normal Cut Settings
+editing.
+
+LaserForge now has Material Test / Interval Test generators and a pure
+MaterialRecipe model. It still lacks the storage and file-document foundation
+needed to preserve calibrated settings across projects. Public LightBurn docs do
+not describe a stable `.clb` interchange schema, so treating `.clb` as our
+canonical format would be reverse-engineering first and product work second.
+
+### Decision
+
+Add a native deterministic Material Library document format:
+
+- Extension: `.lfml.json`.
+- Format marker: `laserforge-material-library`.
+- Schema version: `librarySchemaVersion: 1`.
+- Content: library ID, display name, optional device hint, and entries.
+- Entry metadata: ID, material name, either thickness or no-thickness title,
+  description, recipe, and revision.
+- IO behavior: two-space JSON, LF endings, trailing newline, structured
+  deserialization errors, duplicate-ID rejection, and deterministic merge that
+  preserves the base library while reporting skipped duplicate IDs.
+
+Keep `.clb` import/export deferred until fixture-based research proves a stable
+and safe compatibility path. Keep Link deferred until `.lf2` schema, missing
+library UX, read-only layer controls, and preset revision handling exist.
+
+### Consequences
+
+- LaserForge can save, load, validate, and merge native material libraries
+  without UI or hidden persistence.
+- The IO foundation does not bypass preview, save, start, or preflight. Applying
+  a recipe still happens through the layer model in later UI/store work.
+- Device hints are advisory safety metadata. Later UI can warn when the active
+  machine differs, but this ADR does not block cross-machine reuse.
+- Full Material Library UI, LightBurn `.clb` compatibility, manufacturer
+  profiles, and linked presets remain out of scope.
+
+### Sources
+
+- LightBurn Material Library reference:
+  https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/
+- Repo research:
+  `audit/reports/lightburn-material-library-research-2026-06-05.md`
+
+### Verification
+
+- `src/io/material-library/material-library-io.test.ts` covers deterministic
+  serialization, round-trip deserialization, malformed documents, duplicate IDs,
+  invalid recipes, device hints, and merge behavior.
+- Full typecheck, lint, format, file-size, test, build, and browser smoke gates
+  are required before this ADR is considered implemented.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
