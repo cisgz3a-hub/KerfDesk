@@ -23,3 +23,9 @@ export { estimateJobDuration, formatDuration } from './estimate-duration';
 export { optimizePaths } from './optimize-paths';
 export type { SlicedToolpath, Toolpath, ToolpathStep } from './toolpath';
 export { buildToolpath, sliceToolpath } from './toolpath';
+export type {
+  MaterialTestCell,
+  MaterialTestGrid,
+  MaterialTestGridOptions,
+} from './material-test-grid';
+export { generateMaterialTestGrid } from './material-test-grid';
