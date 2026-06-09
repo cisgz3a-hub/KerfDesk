@@ -22,6 +22,7 @@ export type CreateMaterialPresetInput = Omit<MaterialPreset, 'recipe'>;
 
 export type MaterialLibraryActions = {
   readonly setMaterialLibrary: (library: MaterialLibraryDocument | null) => void;
+  readonly markMaterialLibrarySaved: () => void;
   readonly createMaterialPresetFromLayer: (
     layerId: string,
     input: CreateMaterialPresetInput,
@@ -57,6 +58,7 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
   return {
     setMaterialLibrary: (library) =>
       set(() => ({ materialLibrary: library, materialLibraryDirty: false })),
+    markMaterialLibrarySaved: () => set(() => ({ materialLibraryDirty: false })),
     createMaterialPresetFromLayer: (layerId, input) => {
       let created: MaterialPreset | null = null;
       set((state) => {

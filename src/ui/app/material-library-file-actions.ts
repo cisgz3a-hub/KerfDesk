@@ -1,0 +1,95 @@
+import {
+  deserializeMaterialLibrary,
+  serializeMaterialLibrary,
+  type DeserializeMaterialLibraryResult,
+  type MaterialLibraryDocument,
+} from '../../io/material-library';
+import type { PlatformAdapter } from '../../platform/types';
+import type { ToastVariant } from '../state/toast-store';
+
+type PushToast = (message: string, variant?: ToastVariant) => void;
+
+export type OpenMaterialLibraryCtx = {
+  readonly platform: PlatformAdapter;
+  readonly setMaterialLibrary: (library: MaterialLibraryDocument) => void;
+  readonly pushToast: PushToast;
+};
+
+export type SaveMaterialLibraryCtx = {
+  readonly platform: PlatformAdapter;
+  readonly library: MaterialLibraryDocument;
+  readonly markMaterialLibrarySaved: () => void;
+  readonly pushToast: PushToast;
+};
+
+export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Promise<void> {
+  let files;
+  try {
+    files = await ctx.platform.pickFilesForOpen({ accept: ['.lfml.json'], multiple: false });
+  } catch (err) {
+    ctx.pushToast(`Could not open material library: ${errMsg(err)}`, 'error');
+    return;
+  }
+
+  const file = files[0];
+  if (file === undefined) return;
+
+  let text: string;
+  try {
+    text = await file.text();
+  } catch (err) {
+    ctx.pushToast(`Could not open ${file.name}: ${errMsg(err)}`, 'error');
+    return;
+  }
+
+  const result = deserializeMaterialLibrary(text);
+  if (result.kind === 'ok') {
+    ctx.setMaterialLibrary(result.library);
+    ctx.pushToast(`Loaded material library: ${result.library.name}`, 'success');
+    return;
+  }
+
+  if (result.kind === 'schema-too-new') {
+    window.alert(
+      `This material library was saved with a newer LaserForge (schemaVersion ${result.sawVersion}). Update the app to open it.`,
+    );
+    return;
+  }
+
+  ctx.pushToast(`Could not open ${file.name}: ${describeOpenResult(result)}`, 'error');
+}
+
+export async function handleSaveMaterialLibrary(ctx: SaveMaterialLibraryCtx): Promise<void> {
+  let target;
+  try {
+    target = await ctx.platform.pickFileForSave({
+      suggestedName: `${ctx.library.name}.lfml.json`,
+      extensions: ['.lfml.json'],
+    });
+  } catch (err) {
+    ctx.pushToast(`Could not save material library: ${errMsg(err)}`, 'error');
+    return;
+  }
+  if (target === null) return;
+
+  try {
+    await target.write(serializeMaterialLibrary(ctx.library));
+    ctx.markMaterialLibrarySaved();
+    ctx.pushToast(`Saved material library to ${target.displayName}`, 'success');
+  } catch (err) {
+    ctx.pushToast(`Could not save material library: ${errMsg(err)}`, 'error');
+  }
+}
+
+function describeOpenResult(
+  result: Exclude<DeserializeMaterialLibraryResult, { readonly kind: 'ok' }>,
+): string {
+  if (result.kind === 'invalid') return result.reason;
+  if (result.kind === 'schema-too-new') return `unsupported version ${result.sawVersion}`;
+  if (result.kind === 'schema-too-old') return `legacy version ${result.sawVersion}`;
+  return 'unknown error';
+}
+
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
