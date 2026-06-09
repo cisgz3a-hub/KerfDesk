@@ -29,6 +29,7 @@ import {
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
 import { layerActions, type LayerSettingsClipboard } from './layer-actions';
+import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import {
   applyDuplicate,
   applyFreshImport,
@@ -45,7 +46,7 @@ export type { ImportOutcome } from './scene-mutations';
 
 const HISTORY_DEPTH = 50;
 
-export type AppState = {
+export type AppState = ObjectPropertiesActions & {
   readonly project: Project;
   readonly selectedObjectId: string | null;
   // Additional objects in the multi-selection set (F-A5). The "primary"
@@ -447,6 +448,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...imageImportActions(set, get),
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
+  ...objectPropertiesActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

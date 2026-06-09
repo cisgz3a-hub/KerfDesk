@@ -14,6 +14,7 @@ import { useStore } from '../state';
 import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
+import { SelectedObjectProperties } from './SelectedObjectProperties';
 
 export function CutsLayersPanel(): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
@@ -35,6 +36,7 @@ export function CutsLayersPanel(): JSX.Element {
           ))}
         </div>
       )}
+      <SelectedObjectProperties />
       <SelectedImageAdjustments />
     </aside>
   );
