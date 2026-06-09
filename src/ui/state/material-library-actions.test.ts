@@ -96,6 +96,21 @@ describe('material library store actions', () => {
     expect(useStore.getState().materialLibraryDirty).toBe(true);
   });
 
+  it('markMaterialLibrarySaved clears only the library dirty flag', () => {
+    const doc = library([preset()]);
+    useStore.getState().setMaterialLibrary(doc);
+    useStore.setState({ dirty: false, materialLibraryDirty: true, undoStack: [], redoStack: [] });
+
+    useStore.getState().markMaterialLibrarySaved();
+
+    const state = useStore.getState();
+    expect(state.materialLibrary).toEqual(doc);
+    expect(state.materialLibraryDirty).toBe(false);
+    expect(state.dirty).toBe(false);
+    expect(state.undoStack).toHaveLength(0);
+    expect(state.redoStack).toHaveLength(0);
+  });
+
   it('createMaterialPresetFromLayer appends a captured preset and dirties only the library', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', {
