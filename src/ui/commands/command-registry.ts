@@ -25,6 +25,7 @@ export type CommandId =
   | 'edit.delete'
   | 'edit.clear-selection'
   | 'tools.add-text'
+  | 'tools.material-test'
   | 'tools.adjust-image'
   | 'tools.trace-image'
   | 'tools.convert-to-bitmap'
@@ -75,6 +76,7 @@ export type AppCommandContext = {
   readonly deleteSelection: () => void;
   readonly clearSelection: () => void;
   readonly addText: () => void;
+  readonly materialTest: () => void;
   readonly adjustImage: () => void;
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
@@ -229,6 +231,15 @@ function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
 function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
+    enabled(
+      'tools.material-test',
+      'tools',
+      'Material Test...',
+      'Create a material test grid',
+      () => {
+        if (ctx.confirmDiscard('create a material test')) ctx.materialTest();
+      },
+    ),
     ctx.hasRasterSelection
       ? enabled(
           'tools.adjust-image',
