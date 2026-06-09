@@ -30,6 +30,12 @@ import {
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
 import { layerActions, type LayerSettingsClipboard } from './layer-actions';
+import {
+  MATERIAL_LIBRARY_STATE_DEFAULTS,
+  currentMaterialLibraryState,
+  materialLibraryActions,
+  type MaterialLibraryActions,
+} from './material-library-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { generatedSceneActions } from './generated-scene-actions';
 import {
@@ -53,7 +59,9 @@ export type { ImportOutcome } from './scene-mutations';
 const HISTORY_DEPTH = 50;
 
 export type AppState = ObjectPropertiesActions &
-  ProjectOptimizationActions & {
+  ProjectOptimizationActions &
+  ReturnType<typeof currentMaterialLibraryState> &
+  MaterialLibraryActions & {
     readonly project: Project;
     readonly selectedObjectId: string | null;
     // Additional objects in the multi-selection set (F-A5). The "primary"
@@ -169,7 +177,8 @@ function initialState(): Pick<
   | 'savedName'
   | 'lastSaveTarget'
   | 'copiedLayerSettings'
-> {
+> &
+  ReturnType<typeof currentMaterialLibraryState> {
   return {
     project: createProject(),
     selectedObjectId: null,
@@ -185,13 +194,15 @@ function initialState(): Pick<
     savedName: null,
     lastSaveTarget: null,
     copiedLayerSettings: null,
+    ...MATERIAL_LIBRARY_STATE_DEFAULTS,
   };
 }
 
 function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'> {
   return {
-    setProject: (project) => set({ ...initialState(), project }),
-    newProject: () => set(initialState()),
+    setProject: (project) =>
+      set((s) => ({ ...initialState(), project, ...currentMaterialLibraryState(s) })),
+    newProject: () => set((s) => ({ ...initialState(), ...currentMaterialLibraryState(s) })),
   };
 }
 
@@ -456,6 +467,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...imageImportActions(set, get),
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
+  ...materialLibraryActions(set),
   ...objectPropertiesActions(set),
   ...generatedSceneActions(set),
   ...projectOptimizationActions(set),
