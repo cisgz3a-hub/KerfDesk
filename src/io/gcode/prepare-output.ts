@@ -39,5 +39,5 @@ export function prepareOutput(
   // optimize is pure path-order reduction (nearest-neighbor) — same cuts, same
   // speeds, same passes, just shorter travel. Doing it HERE means the preview
   // shows the exact order the machine will run.
-  return { ok: true, job: optimizePaths(placed) };
+  return { ok: true, job: project.optimization.reduceTravelMoves ? optimizePaths(placed) : placed };
 }

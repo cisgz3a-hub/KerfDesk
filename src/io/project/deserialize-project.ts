@@ -9,6 +9,7 @@
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   DITHER_ALGORITHMS,
+  DEFAULT_PROJECT_OPTIMIZATION,
   LAYER_DEFAULTS,
   PROJECT_SCHEMA_VERSION,
   type Project,
@@ -112,6 +113,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
           ? dev['laserModeEnabled']
           : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
+    optimization: normalizeOptimization(raw['optimization']),
     scene: {
       ...scene,
       objects: objects.map(normalizeSceneObject),
@@ -119,6 +121,16 @@ function normalizeProject(raw: Record<string, unknown>): Project {
     },
   };
   return normalized as unknown as Project;
+}
+
+function normalizeOptimization(value: unknown): Project['optimization'] {
+  if (!isObject(value)) return DEFAULT_PROJECT_OPTIMIZATION;
+  return {
+    reduceTravelMoves:
+      typeof value['reduceTravelMoves'] === 'boolean'
+        ? value['reduceTravelMoves']
+        : DEFAULT_PROJECT_OPTIMIZATION.reduceTravelMoves,
+  };
 }
 
 // Back-fill additive TextObject fields on load. D.1 added letterSpacing —

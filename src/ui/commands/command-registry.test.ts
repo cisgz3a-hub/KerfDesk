@@ -37,6 +37,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     addText: vi.fn(),
     materialTest: vi.fn(),
     intervalTest: vi.fn(),
+    optimizationSettings: vi.fn(),
     adjustImage: vi.fn(),
     traceImage: vi.fn(),
     convertToBitmap: vi.fn(),
@@ -119,6 +120,18 @@ describe('buildAppCommands', () => {
     expect(runCommand(commandById(commands, 'tools.interval-test'))).toBe(true);
     expect(confirmDiscard).toHaveBeenCalledWith('create an interval test');
     expect(intervalTest).toHaveBeenCalled();
+  });
+
+  it('runs Optimization Settings without the destructive dirty-project guard', () => {
+    const confirmDiscard = vi.fn(() => true);
+    const optimizationSettings = vi.fn();
+    const commands = buildAppCommands(
+      baseCtx({ dirty: true, confirmDiscard, optimizationSettings }),
+    );
+
+    expect(runCommand(commandById(commands, 'tools.optimization-settings'))).toBe(true);
+    expect(confirmDiscard).not.toHaveBeenCalled();
+    expect(optimizationSettings).toHaveBeenCalled();
   });
 
   it('enables Adjust Image only when a raster image is selected', () => {

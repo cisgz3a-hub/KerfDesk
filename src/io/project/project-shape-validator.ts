@@ -9,7 +9,18 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
   if (!isObject(scene)) return 'missing or invalid `scene`';
   if (!Array.isArray(scene['objects'])) return 'missing or invalid `scene.objects`';
   if (!Array.isArray(scene['layers'])) return 'missing or invalid `scene.layers`';
-  return firstError([validateDevice(device), validateWorkspace(workspace), validateScene(scene)]);
+  return firstError([
+    validateDevice(device),
+    validateWorkspace(workspace),
+    validateOptimization(raw['optimization']),
+    validateScene(scene),
+  ]);
+}
+
+function validateOptimization(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (!isObject(value)) return 'missing or invalid `optimization`';
+  return optionalBoolean(value, 'optimization.reduceTravelMoves');
 }
 
 function validateDevice(device: Record<string, unknown>): string | null {
