@@ -95,6 +95,7 @@ function validateVectorObject(obj: Record<string, unknown>, path: string): strin
   return firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
+    optionalPercent(obj, `${path}.powerScale`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
     validateColoredPaths(obj['paths'], `${path}.paths`),
@@ -109,6 +110,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     requirePositiveNumber(obj, `${path}.sizeMm`),
     requireLiteral(obj, `${path}.alignment`, ['left', 'center', 'right']),
     requirePositiveNumber(obj, `${path}.lineHeight`),
+    optionalPercent(obj, `${path}.powerScale`),
     optionalNumber(obj, `${path}.letterSpacing`),
     requireString(obj, `${path}.color`),
     validateBounds(obj['bounds'], `${path}.bounds`),
@@ -124,6 +126,7 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     requireString(obj, `${path}.dataUrl`),
     requirePositiveInteger(obj, `${path}.pixelWidth`),
     requirePositiveInteger(obj, `${path}.pixelHeight`),
+    optionalPercent(obj, `${path}.powerScale`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
     requireString(obj, `${path}.color`),

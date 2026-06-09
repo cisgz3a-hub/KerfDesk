@@ -11,6 +11,7 @@ export type {
   DitherAlgorithm,
   FontKey,
   ImportedSvg,
+  ObjectPowerScale,
   Polyline,
   RasterImage,
   SceneObject,
