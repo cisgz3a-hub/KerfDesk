@@ -26,8 +26,8 @@ import { LayerImageFields } from './LayerImageFields';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
+import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 import { useDebouncedCommit } from './use-debounced-commit';
-import { useState } from 'react';
 
 const cardStyle: React.CSSProperties = {
   background: '#ffffff',
@@ -92,15 +92,17 @@ export function LayerRow(props: {
   readonly canMoveDown: boolean;
 }): JSX.Element {
   const { layer } = props;
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const setLayerParam = useStore((s) => s.setLayerParam);
+  const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
+    useCutSettingsLauncher();
   return (
     <section
       style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
       aria-label={`Layer ${layer.color}`}
       onDoubleClick={(event) => {
+        if (cutSettingsBlocked) return;
         if (isInteractiveDoubleClickTarget(event.target)) return;
-        setSettingsOpen(true);
+        openSettings();
       }}
     >
       <header style={cardHeaderStyle}>
@@ -118,9 +120,14 @@ export function LayerRow(props: {
         <DeleteLayerButton layer={layer} />
         <button
           type="button"
-          onClick={() => setSettingsOpen(true)}
+          onClick={openSettings}
+          disabled={cutSettingsBlocked}
           aria-label={`Edit cut settings for ${layer.color}`}
-          title="Open advanced cut settings"
+          title={
+            cutSettingsBlocked
+              ? 'Cut settings are available when the machine is idle.'
+              : 'Open advanced cut settings'
+          }
         >
           Edit...
         </button>
@@ -143,10 +150,10 @@ export function LayerRow(props: {
       {settingsOpen ? (
         <CutSettingsDialog
           layer={layer}
-          onCancel={() => setSettingsOpen(false)}
+          onCancel={closeSettings}
           onApply={(patch) => {
             setLayerParam(layer.id, patch);
-            setSettingsOpen(false);
+            closeSettings();
           }}
         />
       ) : null}
