@@ -26,6 +26,7 @@ export type CommandId =
   | 'edit.clear-selection'
   | 'tools.add-text'
   | 'tools.material-test'
+  | 'tools.interval-test'
   | 'tools.adjust-image'
   | 'tools.trace-image'
   | 'tools.convert-to-bitmap'
@@ -77,6 +78,7 @@ export type AppCommandContext = {
   readonly clearSelection: () => void;
   readonly addText: () => void;
   readonly materialTest: () => void;
+  readonly intervalTest: () => void;
   readonly adjustImage: () => void;
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
@@ -238,6 +240,15 @@ function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
       'Create a material test grid',
       () => {
         if (ctx.confirmDiscard('create a material test')) ctx.materialTest();
+      },
+    ),
+    enabled(
+      'tools.interval-test',
+      'tools',
+      'Interval Test...',
+      'Create an interval test grid',
+      () => {
+        if (ctx.confirmDiscard('create an interval test')) ctx.intervalTest();
       },
     ),
     ctx.hasRasterSelection

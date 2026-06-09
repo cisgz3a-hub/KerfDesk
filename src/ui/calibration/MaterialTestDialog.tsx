@@ -61,7 +61,8 @@ export function MaterialTestDialog(props: {
   const setField =
     (field: keyof MaterialTestDraft) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
-      setDraft((current) => ({ ...current, [field]: event.target.value }));
+      const { value } = event.target;
+      setDraft((current) => ({ ...current, [field]: value }));
     };
   return (
     <div
