@@ -68,6 +68,9 @@ export type EmitRasterInput = {
   // Distance to overshoot at each row end, in mm. 5 mm is a typical
   // default for diode lasers; higher feeds want more. 0 disables.
   readonly overscanMm: number;
+  // LightBurn-style image Dot Width Correction. Shortens non-zero scan runs
+  // at both ends to compensate for beam thickness. 0 disables.
+  readonly dotWidthCorrectionMm?: number;
   // Optional comment fields written above the data for the operator
   // (and the job-time estimator). Same shape as grbl-strategy emits.
   readonly layerId?: string;
@@ -86,6 +89,7 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   const feed = Math.round(input.feedMmPerMin);
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
+  const dotWidthCorrectionMm = Math.max(0, input.dotWidthCorrectionMm ?? 0);
   const passes = normalizedPasses(input.passes);
   // Body — one row at a time. Three optimizations on top of the naive
   // "sweep every row across the full width" version:
@@ -120,7 +124,17 @@ export function emitRasterGroup(input: EmitRasterInput): string {
         // than a slow G1 S0 feed move — the raster analogue of ADR-035 (ADR-039).
         // F rides only the very first G1 of the whole group.
         chunks.push(
-          emitSpanSweep(input, y, worldY, pixelWidthMm, feed, !feedEmitted, reverse, span),
+          emitSpanSweep(
+            input,
+            y,
+            worldY,
+            pixelWidthMm,
+            feed,
+            !feedEmitted,
+            reverse,
+            span,
+            dotWidthCorrectionMm,
+          ),
         );
         feedEmitted = true;
       }
@@ -172,6 +186,7 @@ function emitSpanSweep(
   emitFeed: boolean,
   reverse: boolean,
   span: ActiveSpan,
+  dotWidthCorrectionMm: number,
 ): string {
   const lines: string[] = [];
   // Sweep extents are the ACTIVE span's pixel edges plus overscan,
@@ -194,9 +209,13 @@ function emitSpanSweep(
   if (input.overscanMm > 0) {
     pushRun(reverse ? activeEndX : activeStartX, 0);
   }
-  emitRowRuns(input, y, pixelWidthMm, span, reverse, pushRun);
-  // Exit overscan with S0 so the diode is dark during deceleration.
-  lines.push(`G1 X${fmt(endX)} S0`);
+  emitRowRuns(input, y, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
+  // Exit overscan with S0 so the diode is dark during deceleration. The
+  // corrected path already emits a final S0 at the active edge when overscan is
+  // disabled; avoid a duplicate zero-length move in that case.
+  if (input.overscanMm > 0 || dotWidthCorrectionMm <= 0) {
+    lines.push(`G1 X${fmt(endX)} S0`);
+  }
   return lines.join(LINE_END);
 }
 
@@ -208,13 +227,115 @@ function emitRowRuns(
   pixelWidthMm: number,
   span: ActiveSpan,
   reverse: boolean,
+  dotWidthCorrectionMm: number,
   pushRun: PushRasterRun,
 ): void {
+  if (dotWidthCorrectionMm > 0) {
+    emitCorrectedRowRuns(input, y, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
+    return;
+  }
   if (reverse) {
     emitReverseRowRuns(input, y, pixelWidthMm, span, pushRun);
     return;
   }
   emitForwardRowRuns(input, y, pixelWidthMm, span, pushRun);
+}
+
+type RasterRun = {
+  readonly firstX: number;
+  readonly lastX: number;
+  readonly s: number;
+};
+
+function emitCorrectedRowRuns(
+  input: EmitRasterInput,
+  y: number,
+  pixelWidthMm: number,
+  span: ActiveSpan,
+  reverse: boolean,
+  dotWidthCorrectionMm: number,
+  pushRun: PushRasterRun,
+): void {
+  const runs = rowRuns(input, y, span);
+  if (reverse) {
+    emitCorrectedReverseRowRuns(
+      input,
+      pixelWidthMm,
+      [...runs].reverse(),
+      dotWidthCorrectionMm,
+      pushRun,
+    );
+    return;
+  }
+  emitCorrectedForwardRowRuns(input, pixelWidthMm, runs, dotWidthCorrectionMm, pushRun);
+}
+
+function rowRuns(input: EmitRasterInput, y: number, span: ActiveSpan): RasterRun[] {
+  const rowStart = y * input.width;
+  const runs: RasterRun[] = [];
+  let firstX = span.firstX;
+  let s = input.sValues[rowStart + firstX] ?? 0;
+  for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
+    const cellS = input.sValues[rowStart + i] ?? 0;
+    if (cellS === s) continue;
+    runs.push({ firstX, lastX: i - 1, s });
+    firstX = i;
+    s = cellS;
+  }
+  runs.push({ firstX, lastX: span.lastX, s });
+  return runs;
+}
+
+function emitCorrectedForwardRowRuns(
+  input: EmitRasterInput,
+  pixelWidthMm: number,
+  runs: ReadonlyArray<RasterRun>,
+  dotWidthCorrectionMm: number,
+  pushRun: PushRasterRun,
+): void {
+  for (const run of runs) {
+    const startX = input.bounds.minX + run.firstX * pixelWidthMm;
+    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm;
+    if (run.s <= 0) {
+      pushRun(endX, 0);
+      continue;
+    }
+    const burnStartX = startX + dotWidthCorrectionMm;
+    const burnEndX = endX - dotWidthCorrectionMm;
+    if (burnEndX <= burnStartX) {
+      pushRun(endX, 0);
+      continue;
+    }
+    pushRun(burnStartX, 0);
+    pushRun(burnEndX, run.s);
+    pushRun(endX, 0);
+  }
+}
+
+function emitCorrectedReverseRowRuns(
+  input: EmitRasterInput,
+  pixelWidthMm: number,
+  runs: ReadonlyArray<RasterRun>,
+  dotWidthCorrectionMm: number,
+  pushRun: PushRasterRun,
+): void {
+  for (const run of runs) {
+    const startX = input.bounds.minX + run.firstX * pixelWidthMm;
+    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm;
+    if (run.s <= 0) {
+      pushRun(startX, 0);
+      continue;
+    }
+    const burnStartX = endX - dotWidthCorrectionMm;
+    const burnEndX = startX + dotWidthCorrectionMm;
+    if (burnStartX <= burnEndX) {
+      pushRun(startX, 0);
+      continue;
+    }
+    pushRun(burnStartX, 0);
+    pushRun(burnEndX, run.s);
+    pushRun(startX, 0);
+  }
 }
 
 function emitReverseRowRuns(
@@ -276,7 +397,7 @@ function headerComment(input: EmitRasterInput): string {
   return [
     `; image layer ${layer} color ${color} power ${power}%`,
     `; ${input.width} × ${input.height} px, ${fmt(input.bounds.maxX - input.bounds.minX)} × ${fmt(input.bounds.maxY - input.bounds.minY)} mm`,
-    `; feed ${Math.round(input.feedMmPerMin)} mm/min, overscan ${fmt(input.overscanMm)} mm`,
+    `; feed ${Math.round(input.feedMmPerMin)} mm/min, overscan ${fmt(input.overscanMm)} mm, dot width correction ${fmt(input.dotWidthCorrectionMm ?? 0)} mm`,
   ].join(LINE_END);
 }
 
@@ -297,6 +418,9 @@ function validate(input: EmitRasterInput): void {
   }
   if (input.overscanMm < 0) {
     throw new Error('emitRasterGroup: overscanMm must be >= 0');
+  }
+  if ((input.dotWidthCorrectionMm ?? 0) < 0) {
+    throw new Error('emitRasterGroup: dotWidthCorrectionMm must be >= 0');
   }
 }
 

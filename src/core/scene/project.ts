@@ -12,10 +12,19 @@ export type Workspace = {
   readonly units: 'mm'; // internal model is mm (PROJECT.md non-negotiable #6)
 };
 
+export type ProjectOptimizationSettings = {
+  readonly reduceTravelMoves: boolean;
+};
+
+export const DEFAULT_PROJECT_OPTIMIZATION: ProjectOptimizationSettings = {
+  reduceTravelMoves: true,
+};
+
 export type Project = {
   readonly schemaVersion: typeof PROJECT_SCHEMA_VERSION;
   readonly device: DeviceProfile;
   readonly workspace: Workspace;
+  readonly optimization: ProjectOptimizationSettings;
   readonly scene: Scene;
 };
 
@@ -24,6 +33,7 @@ export function createProject(device: DeviceProfile = DEFAULT_DEVICE_PROFILE): P
     schemaVersion: PROJECT_SCHEMA_VERSION,
     device,
     workspace: { width: device.bedWidth, height: device.bedHeight, units: 'mm' },
+    optimization: DEFAULT_PROJECT_OPTIMIZATION,
     scene: EMPTY_SCENE,
   };
 }

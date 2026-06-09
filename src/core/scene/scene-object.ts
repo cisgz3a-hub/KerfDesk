@@ -44,7 +44,12 @@ export type Bounds = {
   readonly maxY: number;
 };
 
-export type ImportedSvg = {
+export type ObjectPowerScale = {
+  // LightBurn Shape Properties: per-shape scale applied to layer power.
+  readonly powerScale?: number;
+};
+
+export type ImportedSvg = ObjectPowerScale & {
   readonly kind: 'imported-svg';
   readonly id: string;
   readonly source: string; // filename for display (e.g. 'logo.svg')
@@ -66,7 +71,7 @@ export type TextAlignment = 'left' | 'center' | 'right';
 // fonts are bundled (so adding a font doesn't ripple here).
 export type FontKey = string;
 
-export type TextObject = {
+export type TextObject = ObjectPowerScale & {
   readonly kind: 'text';
   readonly id: string;
   readonly content: string;
@@ -94,7 +99,7 @@ export type TextObject = {
 // parseSvg) at import time and the polylines are stored on the
 // object. compileJob iterates `paths` like any other variant.
 // The `source` field carries the original filename for display.
-export type TracedImage = {
+export type TracedImage = ObjectPowerScale & {
   readonly kind: 'traced-image';
   readonly id: string;
   readonly source: string;
@@ -135,7 +140,7 @@ export const DITHER_ALGORITHMS = [
 
 export type DitherAlgorithm = (typeof DITHER_ALGORITHMS)[number];
 
-export type RasterImage = {
+export type RasterImage = ObjectPowerScale & {
   readonly kind: 'raster-image';
   readonly id: string;
   readonly source: string;

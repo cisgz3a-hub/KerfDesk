@@ -2150,6 +2150,203 @@ state is already preserved by disconnect()).
 
 ---
 
+## ADR-043 - Trace is vector-only; remove the Photo and Detailed trace presets
+
+**Status:** Accepted, code shipped. | **Date:** 2026-06-05
+
+### Context
+
+The Trace dialog surfaced six presets. Four (Line Art, Centerline, Smooth, Sharp)
+binarize the image to pure black/white (fixedPalette ['#ffffff','#000000'] + a
+threshold) and emit clean black vector ink. Two (Detailed: numberOfColors 4; Photo:
+numberOfColors 8) set NO fixedPalette and NO threshold, so applyThreshold returns
+the image unchanged (trace-image.ts) and imagetracerjs adaptive-quantizes a
+continuous-tone image into filled light-grey tone regions. The operator reported
+that Photo and Detailed "do not trace - the whole white page remains, it looks like
+a bitmap photo." Confirmed empirically: tracing a gray-disk-on-light-gradient image
+produced, for Line Art/Smooth, paths with fill rgb(0,0,0) (real ink); for Detailed,
+only rgb(200,200,200)/rgb(220,220,220) (near-white, no ink); for Photo,
+rgb(195,195,195)/rgb(90,90,90)/rgb(225,225,225) (posterized greys). The output is
+vectorized posterization, not line-art tracing, and is useless as laser engrave
+geometry.
+
+This is also off-model versus LightBurn, the reference. Per the in-repo
+LIGHTBURN-STUDY.md (citing docs.lightburnsoftware.com): LightBurn's Trace Image is a
+VECTOR-ONLY tool; photo/grayscale engraving is a separate path - the Image layer
+mode, which engraves the raster directly with dithering. LightBurn has no
+multi-colour "Photo"/"Detailed" trace. Making the vector tracer posterize a photo is
+neither real tracing nor the correct way to engrave a photo.
+
+### Decision
+
+Trace is vector-only. Remove the Photo and Detailed presets from TRACE_PRESETS
+(trace-image.ts). The surfaced presets are now Line Art, Centerline, Smooth, Sharp -
+all binarized vector traces. Photos and continuous-tone images engrave via the
+Image/raster path (Image layer mode + dithering, per the operator-workflow plan), not
+Trace. The PresetHint copy now points the operator there.
+
+The multi-colour CAPABILITY (numberOfColors > 2, no fixedPalette -> adaptive
+quantization) stays in the engine for any direct/programmatic caller; it is simply no
+longer surfaced as a preset. Its engine path remains covered by tests via inline
+TraceOptions instead of the removed presets.
+
+### Consequences
+
+- The Trace dialog no longer offers options that produce a blank/posterized result.
+- Photo engraving has one correct home (the Image/raster path), matching LightBurn.
+- Tests that referenced TRACE_PRESETS['Photo']/['Detailed'] now use inline
+  multi-colour TraceOptions, preserving >2-colour engine coverage without the
+  surfaced presets.
+- Photo-quality work (dither breadth, min power) belongs in Convert-to-Bitmap /
+  Image-mode (operator-workflow plan), not Trace.
+
+### Verification
+
+- trace-image.test.ts, trace-options.test.ts, trace-pipeline.integration.test.ts
+  green; the multi-colour engine path is exercised via inline TraceOptions.
+- Empirical pre-removal repro: Photo/Detailed emit near-white posterized fills with
+  no black ink; Line Art/Smooth emit rgb(0,0,0) ink (see the trace research notes).
+- Full suite + tsc --noEmit + eslint on touched files: green.
+- No hardware verification needed (UI preset removal; no g-code emission change).
+
+---
+
+## ADR-044 - Minimal Material/Interval Test calibration workflow
+
+**Status:** Accepted; scope approved, implementation staged. | **Date:** 2026-06-09
+
+### Context
+
+The operator has now hardware-burned real material and observed quality changes
+from power, scan strategy, line interval, and material response. Code cannot pick
+universal burn settings. LightBurn treats this as a first-class calibration
+workflow: Material Test generates a configurable grid, usually 10x10 by default,
+varying parameters such as Power, Speed, Interval, and Passes; Interval Test
+generates sample squares to find raster line spacing for a speed/power/material
+combination. The official LightBurn Material Test documentation also says the
+grid location follows Start From / Job Origin behavior, and the Interval Test
+documentation directs users to run a speed/power material test first when they do
+not already know those settings.
+
+Before this ADR, `PROJECT.md` listed "Material library, cut tests,
+power/speed wizards" as out of scope. The maintainer has now explicitly approved
+continuing the LightBurn-parity roadmap step by step, so the scope line needs to
+move from "forbidden" to "staged and bounded."
+
+### Decision
+
+Promote a minimal calibration workflow to Phase F.5:
+
+1. Build a pure Material Test generator first. It produces ordinary
+   `Project`/`Scene` data, not ad hoc G-code, so Preview, Save G-code, Frame, and
+   Start all use the same existing pipeline.
+2. Start with speed/power grids. Speed can be represented by row layers; power
+   can be represented by the object-level `powerScale` field introduced for
+   Shape Properties. This avoids inventing per-object speed before the model
+   needs it.
+3. Add Interval Test after the Material Test foundation. Interval Test should
+   generate image/fill swatches using the existing line interval / DPI controls
+   and should not bypass raster/fill preflight.
+4. Add UI after the pure generator has tests. The UI may live under a
+   LightBurn-style Laser Tools menu entry, but the generated scene is the source
+   of truth.
+5. Keep full Material Library storage deferred. LightBurn's library supports
+   saved material/thickness presets, Assign vs Link behavior, shared library
+   files, and multi-device library switching. LaserForge should add that only
+   after generated calibration grids are useful on hardware.
+
+### Consequences
+
+- `PROJECT.md` now scopes minimal Material Test and Interval Test generators,
+  while full Material Library storage and linked presets remain out of scope.
+- The next implementation slice must be pure-core and test-first. No hardware
+  control should be added until generated project output is deterministic and
+  preview/save/start-compatible.
+- Hardware verification is required before claiming the feature produces useful
+  settings: run a small grid on scrap and record whether labels, ordering, and
+  chosen settings are readable.
+
+### Sources
+
+- LightBurn Material Test reference:
+  https://docs.lightburnsoftware.com/Tools/MaterialTest.html
+- LightBurn Interval Test reference:
+  https://docs.lightburnsoftware.com/Tools/IntervalTest.html
+- LightBurn Material Library reference:
+  https://docs.lightburnsoftware.com/UI/MaterialLibrary.html
+
+### Verification
+
+- Documentation-only scope change. No production code changed in this ADR.
+- `PROJECT.md` and `DECISIONS.md` must pass formatting and whitespace checks.
+
+---
+
+## ADR-045 - Native Material Library IO foundation
+
+**Status:** Accepted; implementation staged. | **Date:** 2026-06-09
+
+### Context
+
+LightBurn's Material Library stores reusable Cut Settings presets and exposes
+Load Library, Save Library, Save Library As, Create New Library, and Merge
+Library With. The official docs identify `.clb` as LightBurn's saved library
+extension and distinguish Assign from Link: Assign copies settings to the active
+layer, while Link keeps the layer synced and disables normal Cut Settings
+editing.
+
+LaserForge now has Material Test / Interval Test generators and a pure
+MaterialRecipe model. It still lacks the storage and file-document foundation
+needed to preserve calibrated settings across projects. Public LightBurn docs do
+not describe a stable `.clb` interchange schema, so treating `.clb` as our
+canonical format would be reverse-engineering first and product work second.
+
+### Decision
+
+Add a native deterministic Material Library document format:
+
+- Extension: `.lfml.json`.
+- Format marker: `laserforge-material-library`.
+- Schema version: `librarySchemaVersion: 1`.
+- Content: library ID, display name, optional device hint, and entries.
+- Entry metadata: ID, material name, either thickness or no-thickness title,
+  description, recipe, and revision.
+- IO behavior: two-space JSON, LF endings, trailing newline, structured
+  deserialization errors, duplicate-ID rejection, and deterministic merge that
+  preserves the base library while reporting skipped duplicate IDs.
+
+Keep `.clb` import/export deferred until fixture-based research proves a stable
+and safe compatibility path. Keep Link deferred until `.lf2` schema, missing
+library UX, read-only layer controls, and preset revision handling exist.
+
+### Consequences
+
+- LaserForge can save, load, validate, and merge native material libraries
+  without UI or hidden persistence.
+- The IO foundation does not bypass preview, save, start, or preflight. Applying
+  a recipe still happens through the layer model in later UI/store work.
+- Device hints are advisory safety metadata. Later UI can warn when the active
+  machine differs, but this ADR does not block cross-machine reuse.
+- Full Material Library UI, LightBurn `.clb` compatibility, manufacturer
+  profiles, and linked presets remain out of scope.
+
+### Sources
+
+- LightBurn Material Library reference:
+  https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/
+- Repo research:
+  `audit/reports/lightburn-material-library-research-2026-06-05.md`
+
+### Verification
+
+- `src/io/material-library/material-library-io.test.ts` covers deterministic
+  serialization, round-trip deserialization, malformed documents, duplicate IDs,
+  invalid recipes, device hints, and merge behavior.
+- Full typecheck, lint, format, file-size, test, build, and browser smoke gates
+  are required before this ADR is considered implemented.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

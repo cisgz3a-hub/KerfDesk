@@ -9,7 +9,18 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
   if (!isObject(scene)) return 'missing or invalid `scene`';
   if (!Array.isArray(scene['objects'])) return 'missing or invalid `scene.objects`';
   if (!Array.isArray(scene['layers'])) return 'missing or invalid `scene.layers`';
-  return firstError([validateDevice(device), validateWorkspace(workspace), validateScene(scene)]);
+  return firstError([
+    validateDevice(device),
+    validateWorkspace(workspace),
+    validateOptimization(raw['optimization']),
+    validateScene(scene),
+  ]);
+}
+
+function validateOptimization(value: unknown): string | null {
+  if (value === undefined) return null;
+  if (!isObject(value)) return 'missing or invalid `optimization`';
+  return optionalBoolean(value, 'optimization.reduceTravelMoves');
 }
 
 function validateDevice(device: Record<string, unknown>): string | null {
@@ -72,8 +83,12 @@ function validateLayer(layer: unknown, path: string): string | null {
     optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),
     optionalBoolean(layer, `${path}.fillBidirectional`),
+    optionalBoolean(layer, `${path}.fillCrossHatch`),
     optionalDither(layer, `${path}.ditherAlgorithm`),
     optionalPositiveNumber(layer, `${path}.linesPerMm`),
+    optionalBoolean(layer, `${path}.negativeImage`),
+    optionalBoolean(layer, `${path}.passThrough`),
+    optionalNonNegativeNumber(layer, `${path}.dotWidthCorrectionMm`),
   ]);
 }
 
@@ -91,6 +106,7 @@ function validateVectorObject(obj: Record<string, unknown>, path: string): strin
   return firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
+    optionalPercent(obj, `${path}.powerScale`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
     validateColoredPaths(obj['paths'], `${path}.paths`),
@@ -105,6 +121,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     requirePositiveNumber(obj, `${path}.sizeMm`),
     requireLiteral(obj, `${path}.alignment`, ['left', 'center', 'right']),
     requirePositiveNumber(obj, `${path}.lineHeight`),
+    optionalPercent(obj, `${path}.powerScale`),
     optionalNumber(obj, `${path}.letterSpacing`),
     requireString(obj, `${path}.color`),
     validateBounds(obj['bounds'], `${path}.bounds`),
@@ -120,6 +137,7 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     requireString(obj, `${path}.dataUrl`),
     requirePositiveInteger(obj, `${path}.pixelWidth`),
     requirePositiveInteger(obj, `${path}.pixelHeight`),
+    optionalPercent(obj, `${path}.powerScale`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
     requireString(obj, `${path}.color`),

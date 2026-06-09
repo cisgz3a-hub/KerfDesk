@@ -11,32 +11,34 @@
 // fields as field rows below.
 
 import { useStore } from '../state';
+import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
+import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
+import { SelectedObjectProperties } from './SelectedObjectProperties';
 
 export function CutsLayersPanel(): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
-  if (layers.length === 0) {
-    return (
-      <aside aria-label="Cuts / Layers panel" style={panelStyle}>
-        <h2 style={headingStyle}>Cuts / Layers</h2>
-        <p style={hintStyle}>Import a design to populate layers.</p>
-      </aside>
-    );
-  }
   return (
     <aside aria-label="Cuts / Layers panel" style={panelStyle}>
       <h2 style={headingStyle}>Cuts / Layers</h2>
-      <div style={listStyle}>
-        {layers.map((layer, index) => (
-          <LayerRow
-            key={layer.id}
-            layer={layer}
-            canMoveUp={index > 0}
-            canMoveDown={index < layers.length - 1}
-          />
-        ))}
-      </div>
+      <AddLayerControls />
+      <MaterialLibraryPanel />
+      {layers.length === 0 ? (
+        <p style={hintStyle}>Import a design to populate layers.</p>
+      ) : (
+        <div style={listStyle}>
+          {layers.map((layer, index) => (
+            <LayerRow
+              key={layer.id}
+              layer={layer}
+              canMoveUp={index > 0}
+              canMoveDown={index < layers.length - 1}
+            />
+          ))}
+        </div>
+      )}
+      <SelectedObjectProperties />
       <SelectedImageAdjustments />
     </aside>
   );

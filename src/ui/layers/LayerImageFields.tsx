@@ -1,5 +1,12 @@
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
-import type { Layer } from '../../core/scene';
+import {
+  dpiToLinesPerMm,
+  lineIntervalMmToLinesPerMm,
+  linesPerMmToDpi,
+  linesPerMmToLineIntervalMm,
+  MIN_RASTER_LINES_PER_MM,
+} from '../../core/raster/raster-units';
+import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -39,9 +46,23 @@ export function LayerImageFields({ layer }: { readonly layer: Layer }): JSX.Elem
           <span style={unitStyle}>%</span>
         </FieldRow>
       ) : null}
-      <FieldRow label="Resolution">
-        <LinesPerMmInput layer={layer} />
-        <span style={unitStyle}>lines / mm</span>
+      <FieldRow label="Line Interval">
+        <LineIntervalInput layer={layer} />
+        <span style={unitStyle}>mm</span>
+      </FieldRow>
+      <FieldRow label="DPI">
+        <DpiInput layer={layer} />
+        <span style={unitStyle}>dpi</span>
+      </FieldRow>
+      <FieldRow label="Dot Width">
+        <DotWidthCorrectionInput layer={layer} />
+        <span style={unitStyle}>mm</span>
+      </FieldRow>
+      <FieldRow label="Negative">
+        <NegativeImageCheckbox layer={layer} />
+      </FieldRow>
+      <FieldRow label="Pass-through">
+        <PassThroughCheckbox layer={layer} />
       </FieldRow>
     </>
   );
@@ -73,41 +94,80 @@ function DitherSelect({ layer }: { readonly layer: Layer }): JSX.Element {
       aria-label={`Dither for ${layer.color}`}
       style={ditherSelectStyle}
     >
-      <option value="threshold">Threshold</option>
-      <option value="floyd-steinberg">Floyd-Steinberg</option>
-      <option value="jarvis">Jarvis</option>
-      <option value="stucki">Stucki</option>
-      <option value="atkinson">Atkinson</option>
-      <option value="burkes">Burkes</option>
-      <option value="sierra3">Sierra 3</option>
-      <option value="sierra2">Sierra 2</option>
-      <option value="sierra-lite">Sierra Lite</option>
-      <option value="ordered">Ordered</option>
-      <option value="grayscale">Grayscale</option>
+      {DITHER_ALGORITHMS.map((algorithm) => (
+        <option key={algorithm} value={algorithm}>
+          {DITHER_LABELS[algorithm]}
+        </option>
+      ))}
     </select>
   );
 }
 
-function LinesPerMmInput({ layer }: { readonly layer: Layer }): JSX.Element {
+const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
+  threshold: 'Threshold',
+  'floyd-steinberg': 'Floyd-Steinberg',
+  jarvis: 'Jarvis',
+  stucki: 'Stucki',
+  atkinson: 'Atkinson',
+  burkes: 'Burkes',
+  sierra3: 'Sierra 3',
+  sierra2: 'Sierra 2',
+  'sierra-lite': 'Sierra Lite',
+  ordered: 'Ordered',
+  grayscale: 'Grayscale',
+};
+
+function LineIntervalInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const setLayerParam = useStore((s) => s.setLayerParam);
   const debounced = useDebouncedCommit<number>({
-    value: layer.linesPerMm,
-    commit: (linesPerMm) => setLayerParam(layer.id, { linesPerMm }),
-    // 5..25 lines/mm (WORKFLOW.md). The cap matches raster-budget so the
-    // field can't author an obviously over-budget raster by itself.
-    parse: (s) => clamp(numericValue(s), 5, MAX_RASTER_LINES_PER_MM),
+    value: displayNumber(linesPerMmToLineIntervalMm(layer.linesPerMm), 4),
+    commit: (lineIntervalMm) =>
+      setLayerParam(layer.id, { linesPerMm: lineIntervalMmToLinesPerMm(lineIntervalMm) }),
+    parse: (s) =>
+      clamp(
+        numericValue(s),
+        linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM),
+        linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM),
+      ),
   });
   return (
     <input
       type="number"
-      min={5}
-      max={MAX_RASTER_LINES_PER_MM}
+      min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
+      max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
+      step={0.001}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Line interval for ${layer.color}`}
+    />
+  );
+}
+
+function DpiInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const debounced = useDebouncedCommit<number>({
+    value: displayNumber(linesPerMmToDpi(layer.linesPerMm), 2),
+    commit: (dpi) => setLayerParam(layer.id, { linesPerMm: dpiToLinesPerMm(dpi) }),
+    parse: (s) =>
+      clamp(
+        numericValue(s),
+        linesPerMmToDpi(MIN_RASTER_LINES_PER_MM),
+        linesPerMmToDpi(MAX_RASTER_LINES_PER_MM),
+      ),
+  });
+  return (
+    <input
+      type="number"
+      min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
+      max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
       step={1}
       value={debounced.displayValue}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Lines per mm for ${layer.color}`}
+      aria-label={`DPI for ${layer.color}`}
     />
   );
 }
@@ -133,6 +193,53 @@ function MinPowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
+function DotWidthCorrectionInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const max = dotWidthCorrectionMax(layer);
+  const debounced = useDebouncedCommit<number>({
+    value: layer.dotWidthCorrectionMm,
+    commit: (dotWidthCorrectionMm) => setLayerParam(layer.id, { dotWidthCorrectionMm }),
+    parse: (s) => clamp(numericValue(s), 0, max),
+  });
+  return (
+    <input
+      type="number"
+      min={0}
+      max={max}
+      step={0.001}
+      value={debounced.displayValue}
+      onChange={debounced.onChange}
+      onBlur={debounced.onBlur}
+      style={inputStyle}
+      aria-label={`Dot width correction for ${layer.color}`}
+    />
+  );
+}
+
+function NegativeImageCheckbox({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <input
+      type="checkbox"
+      checked={layer.negativeImage}
+      onChange={(event) => setLayerParam(layer.id, { negativeImage: event.target.checked })}
+      aria-label={`Negative image for ${layer.color}`}
+    />
+  );
+}
+
+function PassThroughCheckbox({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <input
+      type="checkbox"
+      checked={layer.passThrough}
+      onChange={(event) => setLayerParam(layer.id, { passThrough: event.target.checked })}
+      aria-label={`Pass-through image for ${layer.color}`}
+    />
+  );
+}
+
 function numericValue(s: string): number {
   const n = Number.parseFloat(s);
   return Number.isFinite(n) ? n : 0;
@@ -140,4 +247,12 @@ function numericValue(s: string): number {
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
+}
+
+function dotWidthCorrectionMax(layer: Layer): number {
+  return 1 / Math.max(1, layer.linesPerMm);
+}
+
+function displayNumber(value: number, decimals: number): number {
+  return Number(value.toFixed(decimals));
 }

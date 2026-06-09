@@ -1,11 +1,14 @@
-import { useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import type { Bounds, Transform } from '../../core/scene';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import {
   DEFAULT_CONVERT_TO_BITMAP_DPI,
+  estimateBitmapConversion,
   MAX_CONVERT_TO_BITMAP_DPI,
   MIN_CONVERT_TO_BITMAP_DPI,
-  type ConvertToBitmapRenderType,
-} from './vector-to-bitmap';
+  normalizeConvertToBitmapDpi,
+} from './bitmap-conversion-plan';
+import { type ConvertToBitmapRenderType } from './vector-to-bitmap';
 
 export type ConvertToBitmapDialogOptions = {
   readonly renderType: ConvertToBitmapRenderType;
@@ -14,20 +17,28 @@ export type ConvertToBitmapDialogOptions = {
 
 export function ConvertToBitmapDialog(props: {
   readonly sourceName: string;
+  readonly bounds: Bounds;
+  readonly transform: Transform;
   readonly onCancel: () => void;
   readonly onConvert: (options: ConvertToBitmapDialogOptions) => void;
 }): JSX.Element {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [dpi, setDpi] = useState(DEFAULT_CONVERT_TO_BITMAP_DPI);
+  const plan = useMemo(
+    () => estimateBitmapConversion({ bounds: props.bounds, transform: props.transform }, dpi),
+    [dpi, props.bounds, props.transform],
+  );
   useDialogA11y(dialogRef, props.onCancel);
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     const form = e.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
-    const data = new FormData(form);
-    props.onConvert({
-      renderType: parseRenderType(String(data.get('renderType') ?? '')),
-      dpi: parseDpi(String(data.get('dpi') ?? '')),
-    });
+    submitConvert(form, plan.verdict.kind, props.onConvert);
+  };
+  const onConvertClick = (): void => {
+    if (formRef.current === null) return;
+    submitConvert(formRef.current, plan.verdict.kind, props.onConvert);
   };
   return (
     <div
@@ -38,53 +49,94 @@ export function ConvertToBitmapDialog(props: {
       tabIndex={-1}
       style={backdropStyle}
     >
-      <form onSubmit={onSubmit} style={panelStyle}>
+      <form ref={formRef} onSubmit={onSubmit} style={panelStyle}>
         <h2 style={headingStyle}>Convert to Bitmap</h2>
         <Field label="Source">
           <span style={sourceStyle} title={props.sourceName}>
             {props.sourceName}
           </span>
         </Field>
-        <Field label="Render Type">
-          <select
-            name="renderType"
-            defaultValue="fill-all"
-            style={selectStyle}
-            aria-label="Convert render type"
-            autoFocus
-          >
-            <option value="fill-all">Fill All</option>
-            <option value="outlines">Outlines</option>
-            <option value="use-cut-settings">Use Cut Settings</option>
-          </select>
-        </Field>
-        <Field label="DPI">
-          <input
-            name="dpi"
-            type="number"
-            min={MIN_CONVERT_TO_BITMAP_DPI}
-            max={MAX_CONVERT_TO_BITMAP_DPI}
-            step={1}
-            defaultValue={DEFAULT_CONVERT_TO_BITMAP_DPI}
-            style={numberStyle}
-            aria-label="Convert DPI"
-          />
-        </Field>
+        <RenderTypeField />
+        <DpiField dpi={dpi} onChange={setDpi} />
+        <BitmapEstimate plan={plan} />
         <div style={actionsStyle}>
           <button type="button" onClick={props.onCancel}>
             Cancel
           </button>
-          <button type="submit">Convert</button>
+          <button
+            type="button"
+            onClick={onConvertClick}
+            disabled={plan.verdict.kind === 'too-large'}
+          >
+            Convert
+          </button>
         </div>
       </form>
     </div>
   );
 }
 
+function submitConvert(
+  form: HTMLFormElement,
+  verdictKind: ReturnType<typeof estimateBitmapConversion>['verdict']['kind'],
+  onConvert: (options: ConvertToBitmapDialogOptions) => void,
+): void {
+  if (verdictKind === 'too-large') return;
+  const data = new FormData(form);
+  onConvert({
+    renderType: parseRenderType(String(data.get('renderType') ?? '')),
+    dpi: parseDpi(String(data.get('dpi') ?? '')),
+  });
+}
+
+function RenderTypeField(): JSX.Element {
+  return (
+    <Field label="Render Type">
+      <select
+        name="renderType"
+        defaultValue="fill-all"
+        style={selectStyle}
+        aria-label="Convert render type"
+        autoFocus
+      >
+        <option value="fill-all">Fill All</option>
+        <option value="outlines">Outlines</option>
+        <option value="use-cut-settings">Use Cut Settings</option>
+      </select>
+    </Field>
+  );
+}
+
+function DpiField(props: { readonly dpi: number; readonly onChange: (dpi: number) => void }) {
+  return (
+    <Field label="DPI">
+      <input
+        name="dpi"
+        type="number"
+        min={MIN_CONVERT_TO_BITMAP_DPI}
+        max={MAX_CONVERT_TO_BITMAP_DPI}
+        step={1}
+        value={props.dpi}
+        onChange={(event) => props.onChange(parseDpi(event.currentTarget.value))}
+        style={numberStyle}
+        aria-label="Convert DPI"
+      />
+    </Field>
+  );
+}
+
+function BitmapEstimate(props: { readonly plan: ReturnType<typeof estimateBitmapConversion> }) {
+  const hasError = props.plan.verdict.kind === 'too-large';
+  return (
+    <div role={hasError ? 'alert' : 'status'} style={hasError ? errorStyle : estimateStyle}>
+      Bitmap size: {props.plan.pixelWidth} x {props.plan.pixelHeight} px
+      {hasError ? ` (${props.plan.verdict.reason})` : null}
+    </div>
+  );
+}
+
 function parseDpi(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return DEFAULT_CONVERT_TO_BITMAP_DPI;
-  return Math.max(MIN_CONVERT_TO_BITMAP_DPI, Math.min(MAX_CONVERT_TO_BITMAP_DPI, parsed));
+  return normalizeConvertToBitmapDpi(Number(value));
 }
 
 function parseRenderType(value: string): ConvertToBitmapRenderType {
@@ -142,6 +194,8 @@ const sourceStyle: React.CSSProperties = {
 };
 const selectStyle: React.CSSProperties = { flex: 1 };
 const numberStyle: React.CSSProperties = { width: 96 };
+const estimateStyle: React.CSSProperties = { fontSize: 12, color: '#444' };
+const errorStyle: React.CSSProperties = { ...estimateStyle, color: '#9f1239' };
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',

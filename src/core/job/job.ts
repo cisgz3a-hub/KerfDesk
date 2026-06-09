@@ -56,6 +56,7 @@ export type RasterGroup = {
   // Per ADR-020: 5 mm default overscan margin to keep accel/decel
   // out of the burn area.
   readonly overscanMm: number;
+  readonly dotWidthCorrectionMm: number;
 };
 
 export type Group = CutGroup | FillGroup | RasterGroup;

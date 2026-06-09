@@ -16,6 +16,7 @@ import {
   applyTraceToExisting,
   type MutationResult,
   type StateSlice,
+  type TraceExistingImageOptions,
 } from './scene-mutations';
 import { fitAllObjects, type ProjectSlice } from './viewport-actions';
 
@@ -31,7 +32,11 @@ export function imageImportActions(
   get: () => ProjectSlice,
 ): {
   readonly importRasterImage: (object: SceneObject) => void;
-  readonly traceExistingImage: (sourceId: string, traced: TracedImage) => void;
+  readonly traceExistingImage: (
+    sourceId: string,
+    traced: TracedImage,
+    options?: TraceExistingImageOptions,
+  ) => void;
   readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
 } {
   return {
@@ -40,8 +45,8 @@ export function imageImportActions(
       // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
       fitAllObjects(get);
     },
-    traceExistingImage: (sourceId, traced) => {
-      set((s) => applyTraceToExisting(s, sourceId, traced));
+    traceExistingImage: (sourceId, traced, options) => {
+      set((s) => applyTraceToExisting(s, sourceId, traced, options));
       fitAllObjects(get);
     },
     // No fitAllObjects: Convert replaces the vector in place (same bounds +

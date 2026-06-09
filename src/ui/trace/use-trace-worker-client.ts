@@ -109,6 +109,15 @@ function retireWorker(): void {
   }
 }
 
+function rejectAllPendingAndRetireWorker(message: string): void {
+  const pendings = Array.from(pendingByRequestId.values());
+  pendingByRequestId.clear();
+  retireWorker();
+  for (const pending of pendings) {
+    pending.reject(new Error(message));
+  }
+}
+
 // Trace via the worker if available, otherwise through the bounded
 // inline fallback. Callers don't need to branch — the same Promise
 // shape comes back either way for images small enough to run inline.
@@ -161,13 +170,11 @@ function traceInWorker(
   return new Promise<TraceResult>((resolve, reject) => {
     nextRequestId += 1;
     const id = nextRequestId;
-    // On timeout: drop the pending, terminate the worker (so the next trace
-    // builds a fresh one), and reject so the caller falls back / surfaces it.
+    // On timeout: terminate the shared worker and reject every pending caller.
+    // A timed-out worker cannot answer sibling requests already queued to it.
     const timer = setTimeout(() => {
-      if (pendingByRequestId.delete(id)) {
-        retireWorker();
-        reject(new Error('Trace worker timed out'));
-      }
+      if (!pendingByRequestId.has(id)) return;
+      rejectAllPendingAndRetireWorker('Trace worker timed out');
     }, TRACE_WORKER_TIMEOUT_MS);
     pendingByRequestId.set(id, {
       resolve: (result) => {

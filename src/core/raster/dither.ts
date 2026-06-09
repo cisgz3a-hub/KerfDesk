@@ -28,20 +28,11 @@
 // Pure-core compliant: no clock, no random, no I/O. Algorithms are
 // deterministic — same input, same output, always.
 
-const TWO_FIFTY_FIVE = 255;
+import type { DitherAlgorithm } from '../scene';
 
-export type DitherAlgorithm =
-  | 'threshold'
-  | 'floyd-steinberg'
-  | 'jarvis'
-  | 'stucki'
-  | 'atkinson'
-  | 'burkes'
-  | 'sierra3'
-  | 'sierra2'
-  | 'sierra-lite'
-  | 'ordered'
-  | 'grayscale';
+export type { DitherAlgorithm } from '../scene';
+
+const TWO_FIFTY_FIVE = 255;
 
 export type DitherInput = {
   // Greyscale pixels, row-major, length = width * height.

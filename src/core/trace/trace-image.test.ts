@@ -238,6 +238,35 @@ describe('traceImageToSvgString', () => {
     ]);
   });
 
+  it('Trace Transparency builds the trace mask from alpha instead of brightness', () => {
+    const data = new Uint8ClampedArray([
+      255,
+      255,
+      255,
+      255, // opaque white -> ink when tracing alpha
+      0,
+      0,
+      0,
+      0, // transparent black -> background
+      255,
+      255,
+      255,
+      64, // translucent white -> ink
+    ]);
+
+    const result = preprocessForTrace(
+      { width: 3, height: 1, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        cutoffLuma: 0,
+        thresholdLuma: 128,
+        traceTransparency: true,
+      },
+    );
+
+    expect(Array.from(result.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255]);
+  });
+
   it('preprocessForTrace applies the LightBurn brightness band when cutoffLuma is set', () => {
     const data = new Uint8ClampedArray([
       0, 0, 0, 255, 32, 32, 32, 255, 128, 128, 128, 255, 180, 180, 180, 255,
@@ -247,6 +276,26 @@ describe('traceImageToSvgString', () => {
       { width: 4, height: 1, data },
       {
         ...DEFAULT_TRACE_OPTIONS,
+        cutoffLuma: 32,
+        thresholdLuma: 128,
+      },
+    );
+
+    expect(Array.from(result.data)).toEqual([
+      255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+    ]);
+  });
+
+  it('preprocessForTrace prefers explicit Cutoff/Threshold over automatic Otsu', () => {
+    const data = new Uint8ClampedArray([
+      0, 0, 0, 255, 32, 32, 32, 255, 128, 128, 128, 255, 180, 180, 180, 255,
+    ]);
+
+    const result = preprocessForTrace(
+      { width: 4, height: 1, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        useOtsuThreshold: true,
         cutoffLuma: 32,
         thresholdLuma: 128,
       },
@@ -423,9 +472,10 @@ describe('traceImageToSvgString', () => {
   it('colorsampling is 0 ONLY when a fixed palette is set', () => {
     // colorsampling=0 disables imagetracerjs's color quantization
     // entirely. Correct for 2-colour engraving (Line Art / Smooth /
-    // Sharp where we force the palette ourselves) — wrong for
-    // multi-colour (Detailed / Photo, which need adaptive quant to
-    // produce >2 layers). Pin both directions of this conditional.
+    // Sharp where we force the palette ourselves); wrong for a
+    // multi-colour options object (numberOfColors > 2, no fixedPalette),
+    // which needs adaptive quant to produce >2 layers. Pin both
+    // directions of this conditional.
     const withPalette = buildImageTracerOptions({
       ...DEFAULT_TRACE_OPTIONS,
       fixedPalette: ['#ffffff', '#000000'],

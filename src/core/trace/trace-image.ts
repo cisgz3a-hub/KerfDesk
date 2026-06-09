@@ -23,11 +23,8 @@
 // in, gives string out (asynchronously now, to allow the lazy
 // load; the trace work itself is still synchronous CPU).
 
-import { type DitherMode, ditherForTrace } from './dither-trace';
 import { despeckle, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
-
-export type { DitherMode } from './dither-trace';
 
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
@@ -104,6 +101,8 @@ export type TraceOptions = {
   // inclusive brightness band: cutoffLuma <= luma <= thresholdLuma.
   readonly cutoffLuma?: number;
   readonly thresholdLuma?: number;
+  readonly traceTransparency?: boolean;
+  readonly sketchTrace?: boolean;
   // Phase E.2 quality polish — three pure-core preprocessing
   // stages (see preprocess.ts). Compose in this order:
   //   medianFilter → (otsuThreshold OR thresholdLuma) → despeckle → tracer
@@ -113,7 +112,7 @@ export type TraceOptions = {
   //
   // useOtsuThreshold: when true, the cutoff is picked from the
   // image's luma histogram (Otsu 1979) instead of a fixed value.
-  // Overrides thresholdLuma when both are set.
+  // Used only when explicit cutoffLuma / thresholdLuma are absent.
   readonly useOtsuThreshold?: boolean;
   // medianFilter: 3×3 median filter (RGBA → greyscale) applied
   // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
@@ -148,15 +147,6 @@ export type TraceOptions = {
   // to engrave the dark areas — flipping the image makes that the
   // standard dark-on-light input every tracer assumes.
   readonly invert?: boolean;
-  // ditherMode: pre-trace halftone. Continuous-tone inputs (photos,
-  // shaded sketches) collapse into solid silhouettes under a simple
-  // threshold; dithering turns the tones into a spatially-distributed
-  // binary pattern that the tracer renders as halftoned ink. When set
-  // (and not 'none'), the dither replaces the threshold step — its
-  // output is already binary, and the despeckle stage is skipped to
-  // avoid erasing the dot pattern. Defaults to undefined ('none').
-  // See dither-trace.ts for the 13 supported modes.
-  readonly ditherMode?: DitherMode;
 };
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
@@ -254,32 +244,6 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     useOtsuThreshold: true,
     despeckleMinPixels: 4,
   },
-  Detailed: {
-    // For line drawings with some shading — 4 colors keeps mid-tones
-    // as distinct cut layers. Median smooths the shading bands but
-    // we don't threshold (multi-colour output).
-    numberOfColors: 4,
-    pathOmit: 8,
-    lineTolerance: 1,
-    quadraticTolerance: 1,
-    blurRadius: 1,
-    blurDelta: 10,
-    lineFilter: true,
-    medianFilter: true,
-  },
-  Photo: {
-    // For actual photographs — heavy blur + many colors. Produces
-    // many layers; intended for posterized-style engraving. Median
-    // pre-pass cleans JPEG blocks without rounding edges away.
-    numberOfColors: 8,
-    pathOmit: 8,
-    lineTolerance: 1.5,
-    quadraticTolerance: 1.5,
-    blurRadius: 3,
-    blurDelta: 30,
-    lineFilter: true,
-    medianFilter: true,
-  },
 };
 
 export async function traceImageToSvgString(
@@ -293,38 +257,36 @@ export async function traceImageToSvgString(
 
 // Preprocessing chain — each stage is opt-in via TraceOptions flags
 // and runs in order: brightness → contrast → gamma → invert → median
-// → (dither OR threshold) → despeckle → tracer. See raster-prep.ts,
-// dither-trace.ts and preprocess.ts for rationale and algorithm
-// references. The composition matters: image-level adjustments run
-// BEFORE noise filtering so the median sees the user's intended tonal
-// range; dither/threshold then reads that range; despeckle operates
-// on the binarised result.
-//
-// Dither and threshold are mutually exclusive — both binarize the
-// image, so chaining would discard the dither pattern. When a dither
-// mode is active, the despeckle stage is also skipped because its
-// "remove small ink regions" semantics would erase the intentional
-// halftone dots.
+// → threshold → despeckle → tracer. See raster-prep.ts and
+// preprocess.ts for rationale. Trace creates vectors; raster
+// dither/photo processing belongs to Image Mode, not Trace.
 //
 // Extracted from traceImageToSvgString so complexity stays under
 // the project cap (12). Pure function — same inputs, same output.
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
+  if (options.traceTransparency === true) {
+    let prepared = alphaToMonochrome(image);
+    if (shouldDespeckle(options)) {
+      prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
+    }
+    return prepared;
+  }
+  if (options.sketchTrace === true) {
+    let prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
+    if (shouldDespeckle(options)) {
+      prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
+    }
+    return prepared;
+  }
   let prepared = applyImageAdjustments(image, options);
   if (options.medianFilter === true) {
     prepared = medianFilter(prepared);
-  }
-  if (isDitherActive(options)) {
-    return ditherForTrace(prepared, options.ditherMode ?? 'none');
   }
   prepared = applyThreshold(prepared, options);
   if (shouldDespeckle(options)) {
     prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
   }
   return prepared;
-}
-
-function isDitherActive(options: TraceOptions): boolean {
-  return options.ditherMode !== undefined && options.ditherMode !== 'none';
 }
 
 // Brightness → contrast → gamma → invert. Each is a no-op at its
@@ -347,17 +309,17 @@ function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawI
   return out;
 }
 
-// Otsu wins when both are set — it derives the cutoff from the
-// histogram, so a hand-set thresholdLuma would be ignored anyway.
+// Manual Cutoff/Threshold wins over Otsu. LightBurn's trace controls
+// are explicit user input; Otsu is only an automatic preset default.
 function applyThreshold(image: RawImageData, options: TraceOptions): RawImageData {
-  if (options.useOtsuThreshold === true) {
-    return thresholdToMonochrome(image, otsuThreshold(image));
-  }
   if (options.cutoffLuma !== undefined) {
     return thresholdBandToMonochrome(image, options.cutoffLuma, options.thresholdLuma ?? 128);
   }
   if (options.thresholdLuma !== undefined) {
     return thresholdToMonochrome(image, options.thresholdLuma);
+  }
+  if (options.useOtsuThreshold === true) {
+    return thresholdToMonochrome(image, otsuThreshold(image));
   }
   return image;
 }
@@ -369,10 +331,94 @@ function shouldDespeckle(options: TraceOptions): boolean {
   const min = options.despeckleMinPixels;
   if (min === undefined || min <= 1) return false;
   return (
+    options.traceTransparency === true ||
+    options.sketchTrace === true ||
     options.useOtsuThreshold === true ||
     options.cutoffLuma !== undefined ||
     options.thresholdLuma !== undefined
   );
+}
+
+const SKETCH_RADIUS_PX = 8;
+const SKETCH_CONTRAST_BIAS = 8;
+
+function sketchTraceToMonochrome(image: RawImageData): RawImageData {
+  const luma = lumaBuffer(image);
+  const integral = integralLuma(luma, image.width, image.height);
+  const data = new Uint8ClampedArray(image.data.length);
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const pixel = y * image.width + x;
+      const mean = localMean(integral, image.width, image.height, x, y, SKETCH_RADIUS_PX);
+      const v = (luma[pixel] ?? 255) < mean - SKETCH_CONTRAST_BIAS ? 0 : 255;
+      const out = pixel * 4;
+      data[out] = v;
+      data[out + 1] = v;
+      data[out + 2] = v;
+      data[out + 3] = 255;
+    }
+  }
+  return { width: image.width, height: image.height, data };
+}
+
+function lumaBuffer(image: RawImageData): Uint8Array {
+  const luma = new Uint8Array(image.width * image.height);
+  for (let pixel = 0; pixel < luma.length; pixel += 1) {
+    const offset = pixel * 4;
+    luma[pixel] = lumaByte(
+      image.data[offset] ?? 255,
+      image.data[offset + 1] ?? 255,
+      image.data[offset + 2] ?? 255,
+    );
+  }
+  return luma;
+}
+
+function integralLuma(luma: Uint8Array, width: number, height: number): Float64Array {
+  const stride = width + 1;
+  const integral = new Float64Array((height + 1) * stride);
+  for (let y = 1; y <= height; y += 1) {
+    let rowSum = 0;
+    for (let x = 1; x <= width; x += 1) {
+      rowSum += luma[(y - 1) * width + (x - 1)] ?? 255;
+      integral[y * stride + x] = (integral[(y - 1) * stride + x] ?? 0) + rowSum;
+    }
+  }
+  return integral;
+}
+
+function localMean(
+  integral: Float64Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  radius: number,
+): number {
+  const x0 = Math.max(0, x - radius);
+  const y0 = Math.max(0, y - radius);
+  const x1 = Math.min(width, x + radius + 1);
+  const y1 = Math.min(height, y + radius + 1);
+  const stride = width + 1;
+  const sum =
+    (integral[y1 * stride + x1] ?? 0) -
+    (integral[y0 * stride + x1] ?? 0) -
+    (integral[y1 * stride + x0] ?? 0) +
+    (integral[y0 * stride + x0] ?? 0);
+  return sum / Math.max(1, (x1 - x0) * (y1 - y0));
+}
+
+function alphaToMonochrome(image: RawImageData): RawImageData {
+  const data = new Uint8ClampedArray(image.data.length);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const alpha = image.data[i + 3] ?? 255;
+    const v = alpha > 0 ? 0 : 255;
+    data[i] = v;
+    data[i + 1] = v;
+    data[i + 2] = v;
+    data[i + 3] = 255;
+  }
+  return { width: image.width, height: image.height, data };
 }
 
 // Phase E.2 — match LaserForge 1's proven imagetracerjs settings after
@@ -412,10 +458,13 @@ export function buildImageTracerOptions(options: TraceOptions): Record<string, u
     strokewidth: 0,
     scale: 1,
   };
-  // colorsampling 0 + fixed palette ONLY when caller forced a
-  // palette (Line Art / Smooth / Sharp). Multi-colour presets
-  // (Detailed / Photo) need imagetracerjs's adaptive quantization
-  // to produce >2 layers; colorsampling=0 there would collapse them.
+  // colorsampling 0 + fixed palette ONLY when caller forced a palette
+  // (Line Art / Smooth / Sharp). A multi-colour options object
+  // (numberOfColors > 2, no fixedPalette) needs imagetracerjs's adaptive
+  // quantization to produce >2 layers; colorsampling=0 there would
+  // collapse them. No surfaced preset does this any more: vector Trace is
+  // binary (Photo / Detailed removed, ADR-043); photos engrave via the
+  // Image/raster path, not Trace.
   if (options.fixedPalette !== undefined && options.fixedPalette.length > 0) {
     opts['colorsampling'] = 0;
     opts['pal'] = options.fixedPalette.map(hexToRgba);

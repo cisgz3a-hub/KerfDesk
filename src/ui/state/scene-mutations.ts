@@ -14,6 +14,7 @@ import {
   type ImportedSvg,
   type Project,
   type RasterImage,
+  removeObject,
   replaceObject,
   type Scene,
   type SceneObject,
@@ -50,6 +51,10 @@ export type MutationResult = {
   readonly undoStack: ReadonlyArray<Project>;
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: true;
+};
+
+export type TraceExistingImageOptions = {
+  readonly deleteSourceAfterTrace?: boolean;
 };
 
 // Push the previous project onto undoStack with a depth cap. Co-located
@@ -326,14 +331,19 @@ export function applyTraceToExisting(
   s: StateSlice,
   sourceId: string,
   traced: TracedImage,
+  options: TraceExistingImageOptions = {},
 ): MutationResult {
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
   let scene = s.project.scene;
   let transform = traced.transform;
   if (existing !== undefined && existing.kind === 'raster-image') {
     transform = overlayTransformForRaster(existing);
-    const taggedSource: RasterImage = { ...existing, role: 'trace-source' };
-    scene = replaceObject(scene, existing.id, taggedSource);
+    if (options.deleteSourceAfterTrace === true) {
+      scene = removeObject(scene, existing.id);
+    } else {
+      const taggedSource: RasterImage = { ...existing, role: 'trace-source' };
+      scene = replaceObject(scene, existing.id, taggedSource);
+    }
   }
   const positionedTrace: TracedImage = { ...traced, transform };
   scene = addObject(scene, positionedTrace);
@@ -341,6 +351,9 @@ export function applyTraceToExisting(
     positionedTrace.traceMode === 'centerline'
       ? ensureLineLayersForColors(scene, positionedTrace.paths)
       : ensureFillLayersForColors(scene, positionedTrace.paths);
+  if (existing !== undefined && options.deleteSourceAfterTrace === true) {
+    scene = pruneOrphanLayers(scene);
+  }
   return {
     project: { ...s.project, scene },
     selectedObjectId: positionedTrace.id,

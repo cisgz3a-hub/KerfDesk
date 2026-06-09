@@ -82,4 +82,23 @@ describe('compileJob fill hatch cache', () => {
     // be reused for a unidirectional layer).
     expect(fillHatching).toHaveBeenCalledTimes(2);
   });
+
+  it('computes and caches both hatch angles when cross-hatch is enabled', () => {
+    const base = tracedFillScene();
+    const cross: Scene = {
+      ...base,
+      layers: base.layers.map((l) => ({ ...l, fillCrossHatch: true })),
+    };
+
+    compileJob(cross, DEFAULT_DEVICE_PROFILE);
+    compileJob(cross, DEFAULT_DEVICE_PROFILE);
+
+    expect(fillHatching).toHaveBeenCalledWith(
+      expect.objectContaining({ hatchAngleDeg: 0, bidirectional: true }),
+    );
+    expect(fillHatching).toHaveBeenCalledWith(
+      expect.objectContaining({ hatchAngleDeg: 90, bidirectional: true }),
+    );
+    expect(fillHatching).toHaveBeenCalledTimes(2);
+  });
 });

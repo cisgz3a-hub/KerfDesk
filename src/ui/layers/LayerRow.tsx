@@ -19,8 +19,14 @@
 
 import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
+import { AssignSelectionButton } from './AssignSelectionButton';
+import { CutSettingsDialog } from './CutSettingsDialog';
+import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerImageFields } from './LayerImageFields';
 import { LayerOrderControls } from './LayerOrderControls';
+import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
+import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
+import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const cardStyle: React.CSSProperties = {
@@ -86,10 +92,18 @@ export function LayerRow(props: {
   readonly canMoveDown: boolean;
 }): JSX.Element {
   const { layer } = props;
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
+    useCutSettingsLauncher();
   return (
     <section
       style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
       aria-label={`Layer ${layer.color}`}
+      onDoubleClick={(event) => {
+        if (cutSettingsBlocked) return;
+        if (isInteractiveDoubleClickTarget(event.target)) return;
+        openSettings();
+      }}
     >
       <header style={cardHeaderStyle}>
         <ColorSwatch color={layer.color} visible={layer.visible} />
@@ -100,6 +114,23 @@ export function LayerRow(props: {
         />
         <ModeSelect layer={layer} />
         <span style={headerFillerStyle} />
+        <SelectLayerObjectsButton layer={layer} />
+        <AssignSelectionButton layer={layer} />
+        <LayerSettingsClipboardButtons layer={layer} />
+        <DeleteLayerButton layer={layer} />
+        <button
+          type="button"
+          onClick={openSettings}
+          disabled={cutSettingsBlocked}
+          aria-label={`Edit cut settings for ${layer.color}`}
+          title={
+            cutSettingsBlocked
+              ? 'Cut settings are available when the machine is idle.'
+              : 'Open advanced cut settings'
+          }
+        >
+          Edit...
+        </button>
         <HeaderToggle label="Show" layer={layer} field="visible" />
         <HeaderToggle label="Output" layer={layer} field="output" />
       </header>
@@ -116,6 +147,16 @@ export function LayerRow(props: {
       </FieldRow>
       {layer.mode === 'fill' && <FillFields layer={layer} />}
       {layer.mode === 'image' && <LayerImageFields layer={layer} />}
+      {settingsOpen ? (
+        <CutSettingsDialog
+          layer={layer}
+          onCancel={closeSettings}
+          onApply={(patch) => {
+            setLayerParam(layer.id, patch);
+            closeSettings();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -357,4 +398,9 @@ function numericValue(s: string): number {
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
+}
+
+function isInteractiveDoubleClickTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.closest('button,input,select,textarea,a,label,[role="button"]') !== null;
 }

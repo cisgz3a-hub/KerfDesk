@@ -181,6 +181,7 @@ function emitRasterGroupHere(group: RasterGroup): string {
     feedMmPerMin: group.speed,
     passes: group.passes,
     overscanMm: group.overscanMm,
+    dotWidthCorrectionMm: group.dotWidthCorrectionMm,
     layerId: group.layerId,
     color: group.color,
     powerPercent: group.power,

@@ -12,7 +12,7 @@ import { useEffect } from 'react';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { useUiStore } from '../state/ui-store';
+import { isModalOpen, useUiStore } from '../state/ui-store';
 import { usePlatform } from './platform-context';
 import {
   handleEditShortcut,
@@ -63,6 +63,7 @@ function useFileEditShortcuts(): void {
   const pushToast = useToastStore((s) => s.pushToast);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
+      if (isModalOpen(useUiStore.getState())) return;
       const machine = { statusReport, workOriginActive, wcoCache };
       // prettier-ignore
       const fileCtx = { platform, project, jobPlacement, machine, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
@@ -109,6 +110,7 @@ function useTransformViewShortcuts(): void {
   const zoomBy = useUiStore((s) => s.zoomBy);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
+      if (isModalOpen(useUiStore.getState())) return;
       if (handleTransformShortcut(e, { project, selectedObjectId, applyObjectTransform })) return;
       handleViewShortcut(e, { togglePreview, resetView, zoomBy, fitToSelection });
     };

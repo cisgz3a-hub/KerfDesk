@@ -4,6 +4,7 @@ import {
   addLayer,
   addObject,
   EMPTY_SCENE,
+  assignObjectToLayer,
   moveLayer,
   removeLayer,
   removeObject,
@@ -17,7 +18,46 @@ const sampleObject: SceneObject = {
   source: 'a.svg',
   bounds: { minX: 0, minY: 0, maxX: 5, maxY: 5 },
   transform: IDENTITY_TRANSFORM,
-  paths: [],
+  paths: [
+    {
+      color: '#ff0000',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 0, y: 0 },
+            { x: 1, y: 1 },
+          ],
+        },
+      ],
+    },
+    {
+      color: '#0000ff',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 2, y: 2 },
+            { x: 3, y: 3 },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const sampleRaster: SceneObject = {
+  kind: 'raster-image',
+  id: 'R1',
+  source: 'r.png',
+  dataUrl: 'data:,',
+  pixelWidth: 1,
+  pixelHeight: 1,
+  bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+  transform: IDENTITY_TRANSFORM,
+  color: '#808080',
+  dither: 'grayscale',
+  linesPerMm: 10,
 };
 
 describe('Scene object operations', () => {
@@ -31,6 +71,22 @@ describe('Scene object operations', () => {
     const withObject = addObject(EMPTY_SCENE, sampleObject);
     expect(removeObject(withObject, 'O1').objects).toHaveLength(0);
     expect(removeObject(withObject, 'unknown').objects).toHaveLength(1);
+  });
+
+  it('assignObjectToLayer rewrites every vector path color without mutating input', () => {
+    const withObject = addObject(EMPTY_SCENE, sampleObject);
+    const assigned = assignObjectToLayer(withObject, 'O1', '#00ff00');
+    const obj = assigned.objects[0];
+    expect(obj?.kind).toBe('imported-svg');
+    if (obj?.kind !== 'imported-svg') throw new Error('expected imported svg');
+    expect(obj.paths.map((path) => path.color)).toEqual(['#00ff00', '#00ff00']);
+    expect(sampleObject.paths.map((path) => path.color)).toEqual(['#ff0000', '#0000ff']);
+  });
+
+  it('assignObjectToLayer rewrites raster image color', () => {
+    const withObject = addObject(EMPTY_SCENE, sampleRaster);
+    const assigned = assignObjectToLayer(withObject, 'R1', '#00ff00');
+    expect(assigned.objects[0]).toMatchObject({ kind: 'raster-image', color: '#00ff00' });
   });
 });
 

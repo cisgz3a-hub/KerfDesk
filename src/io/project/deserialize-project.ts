@@ -9,6 +9,7 @@
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   DITHER_ALGORITHMS,
+  DEFAULT_PROJECT_OPTIMIZATION,
   LAYER_DEFAULTS,
   PROJECT_SCHEMA_VERSION,
   type Project,
@@ -112,6 +113,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
           ? dev['laserModeEnabled']
           : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     },
+    optimization: normalizeOptimization(raw['optimization']),
     scene: {
       ...scene,
       objects: objects.map(normalizeSceneObject),
@@ -119,6 +121,16 @@ function normalizeProject(raw: Record<string, unknown>): Project {
     },
   };
   return normalized as unknown as Project;
+}
+
+function normalizeOptimization(value: unknown): Project['optimization'] {
+  if (!isObject(value)) return DEFAULT_PROJECT_OPTIMIZATION;
+  return {
+    reduceTravelMoves:
+      typeof value['reduceTravelMoves'] === 'boolean'
+        ? value['reduceTravelMoves']
+        : DEFAULT_PROJECT_OPTIMIZATION.reduceTravelMoves,
+  };
 }
 
 // Back-fill additive TextObject fields on load. D.1 added letterSpacing —
@@ -139,6 +151,12 @@ function normalizeSceneObject(obj: unknown): unknown {
 function normalizeLayer(layer: unknown): unknown {
   if (!isObject(layer)) return layer;
   const out: Record<string, unknown> = { ...layer };
+  normalizeFillLayerFields(out);
+  normalizeImageLayerFields(out);
+  return out;
+}
+
+function normalizeFillLayerFields(out: Record<string, unknown>): void {
   if (typeof out['hatchAngleDeg'] !== 'number') {
     out['hatchAngleDeg'] = LAYER_DEFAULTS.hatchAngleDeg;
   }
@@ -153,6 +171,12 @@ function normalizeLayer(layer: unknown): unknown {
   if (typeof out['fillBidirectional'] !== 'boolean') {
     out['fillBidirectional'] = LAYER_DEFAULTS.fillBidirectional;
   }
+  if (typeof out['fillCrossHatch'] !== 'boolean') {
+    out['fillCrossHatch'] = LAYER_DEFAULTS.fillCrossHatch;
+  }
+}
+
+function normalizeImageLayerFields(out: Record<string, unknown>): void {
   // F.2.e: back-fill image-mode Layer fields. Same additive-with-
   // default pattern as the hatch fields above — pre-F.2 .lf2 files
   // don't have them; treating missing as the default keeps the
@@ -166,7 +190,15 @@ function normalizeLayer(layer: unknown): unknown {
   if (!isPercent(out['minPower'])) {
     out['minPower'] = LAYER_DEFAULTS.minPower;
   }
-  return out;
+  if (typeof out['negativeImage'] !== 'boolean') {
+    out['negativeImage'] = LAYER_DEFAULTS.negativeImage;
+  }
+  if (typeof out['passThrough'] !== 'boolean') {
+    out['passThrough'] = LAYER_DEFAULTS.passThrough;
+  }
+  if (!isNonNegativeNumber(out['dotWidthCorrectionMm'])) {
+    out['dotWidthCorrectionMm'] = LAYER_DEFAULTS.dotWidthCorrectionMm;
+  }
 }
 
 function isNonNegativeNumber(value: unknown): value is number {
