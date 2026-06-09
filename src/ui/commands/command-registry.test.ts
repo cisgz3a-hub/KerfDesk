@@ -35,6 +35,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     deleteSelection: vi.fn(),
     clearSelection: vi.fn(),
     addText: vi.fn(),
+    materialTest: vi.fn(),
     adjustImage: vi.fn(),
     traceImage: vi.fn(),
     convertToBitmap: vi.fn(),
@@ -97,6 +98,16 @@ describe('buildAppCommands', () => {
     expect(commandById(commands, 'tools.trace-image').enabled).toBe(true);
     expect(runCommand(commandById(commands, 'tools.trace-image'))).toBe(true);
     expect(traceImage).toHaveBeenCalled();
+  });
+
+  it('runs Material Test through the shared dirty-project guard', () => {
+    const confirmDiscard = vi.fn(() => true);
+    const materialTest = vi.fn();
+    const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, materialTest }));
+
+    expect(runCommand(commandById(commands, 'tools.material-test'))).toBe(true);
+    expect(confirmDiscard).toHaveBeenCalledWith('create a material test');
+    expect(materialTest).toHaveBeenCalled();
   });
 
   it('enables Adjust Image only when a raster image is selected', () => {

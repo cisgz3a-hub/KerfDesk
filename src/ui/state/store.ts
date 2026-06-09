@@ -13,6 +13,7 @@ import {
   type Project,
   type RasterImage,
   removeObject,
+  type Scene,
   type SceneObject,
   type TextObject,
   type TracedImage,
@@ -30,6 +31,7 @@ import {
 } from './raster-adjustment-actions';
 import { layerActions, type LayerSettingsClipboard } from './layer-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
+import { generatedSceneActions } from './generated-scene-actions';
 import {
   applyDuplicate,
   applyFreshImport,
@@ -76,6 +78,7 @@ export type AppState = ObjectPropertiesActions & {
 
   readonly setProject: (project: Project) => void;
   readonly newProject: () => void;
+  readonly replaceSceneWithGeneratedScene: (scene: Scene) => void;
 
   // batchOffsetIdx (default 0) shifts the imported object by 10mm × N to the
   // right and down (F-A3 multi-import). The first file in a batch passes 0,
@@ -449,6 +452,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
   ...objectPropertiesActions(set),
+  ...generatedSceneActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

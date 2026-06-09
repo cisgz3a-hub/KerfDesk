@@ -17,6 +17,7 @@ export type CommandShellCallbacks = {
   readonly requestImportImage: () => void;
   readonly requestConvertToBitmap: () => void;
   readonly requestAdjustImage: () => void;
+  readonly requestMaterialTest: () => void;
   readonly showAbout: () => void;
 };
 
@@ -72,6 +73,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     deleteSelection: () => deleteSelection(),
     clearSelection: () => app.selectObject(null),
     addText: () => openTextDialog({ mode: 'add' }),
+    materialTest: callbacks.requestMaterialTest,
     adjustImage: callbacks.requestAdjustImage,
     traceImage: () => {
       if (selected?.kind === 'raster-image') openImageDialog(selected);

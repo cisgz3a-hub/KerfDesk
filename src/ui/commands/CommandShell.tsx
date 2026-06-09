@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react';
+import { generateMaterialTestGrid, type MaterialTestGridOptions } from '../../core/job';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
   ConvertToBitmapDialog,
@@ -18,12 +20,14 @@ export function CommandShell(): JSX.Element {
   const imageInput = useRef<HTMLInputElement | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
   const commands = useAppCommands({
     requestImportImage: () => imageInput.current?.click(),
     requestConvertToBitmap: () => setConvertDialogOpen(true),
     requestAdjustImage: () => setAdjustDialogOpen(true),
+    requestMaterialTest: () => setMaterialTestDialogOpen(true),
     showAbout: () => window.alert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
@@ -51,8 +55,24 @@ export function CommandShell(): JSX.Element {
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
       ) : null}
+      {materialTestDialogOpen ? (
+        <MaterialDialog onClose={() => setMaterialTestDialogOpen(false)} />
+      ) : null}
     </>
   );
+}
+
+function MaterialDialog(props: { readonly onClose: () => void }): JSX.Element {
+  useRegisterModal();
+  const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const onGenerate = (options: MaterialTestGridOptions): void => {
+    const grid = generateMaterialTestGrid(options);
+    replaceSceneWithGeneratedScene(grid.scene);
+    props.onClose();
+    pushToast(`Generated material test grid (${grid.cells.length} cells).`, 'success');
+  };
+  return <MaterialTestDialog onCancel={props.onClose} onGenerate={onGenerate} />;
 }
 
 function ConvertDialog(props: {
