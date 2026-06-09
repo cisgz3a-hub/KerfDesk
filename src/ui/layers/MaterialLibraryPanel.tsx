@@ -7,8 +7,26 @@ import {
   MATERIAL_LIBRARY_SCHEMA_VERSION,
   type MaterialLibraryDocument,
 } from '../../io/material-library';
+import {
+  handleOpenMaterialLibrary,
+  handleSaveMaterialLibrary,
+} from '../app/material-library-file-actions';
+import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import type { CreateMaterialPresetInput } from '../state/material-library-actions';
+import { useToastStore } from '../state/toast-store';
+import {
+  buttonRowStyle,
+  fieldStyle,
+  formStyle,
+  headingStyle,
+  labelStyle,
+  libraryHeaderStyle,
+  libraryNameStyle,
+  sectionStyle,
+  splitRowStyle,
+  statusStyle,
+} from './material-library-panel-styles';
 
 type CreateDraft = {
   readonly materialName: string;
@@ -35,18 +53,31 @@ export function MaterialLibraryPanel(): JSX.Element {
 }
 
 function EmptyMaterialLibraryPanel(): JSX.Element {
+  const platform = usePlatform();
   const device = useStore((state) => state.project.device);
   const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
+  const pushToast = useToastStore((state) => state.pushToast);
   return (
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
-      <button
-        type="button"
-        aria-label="Create new material library"
-        onClick={() => setMaterialLibrary(createBlankLibrary(device))}
-      >
-        New Library
-      </button>
+      <div style={buttonRowStyle}>
+        <button
+          type="button"
+          aria-label="Create new material library"
+          onClick={() => setMaterialLibrary(createBlankLibrary(device))}
+        >
+          New Library
+        </button>
+        <button
+          type="button"
+          aria-label="Load material library"
+          onClick={() => {
+            void handleOpenMaterialLibrary({ platform, setMaterialLibrary, pushToast });
+          }}
+        >
+          Load...
+        </button>
+      </div>
     </section>
   );
 }
@@ -55,9 +86,12 @@ function LoadedMaterialLibraryPanel(props: {
   readonly library: MaterialLibraryDocument;
   readonly libraryDirty: boolean;
 }): JSX.Element {
+  const platform = usePlatform();
   const layers = useStore((state) => state.project.scene.layers);
   const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
+  const markMaterialLibrarySaved = useStore((state) => state.markMaterialLibrarySaved);
   const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
+  const pushToast = useToastStore((state) => state.pushToast);
   const [targetLayerId, setTargetLayerId] = useState('');
   const [presetId, setPresetId] = useState('');
   const [status, setStatus] = useState('');
@@ -79,6 +113,18 @@ function LoadedMaterialLibraryPanel(props: {
         onUnload={() => {
           setMaterialLibrary(null);
           setStatus('');
+        }}
+        onLoad={() => {
+          setStatus('');
+          void handleOpenMaterialLibrary({ platform, setMaterialLibrary, pushToast });
+        }}
+        onSave={() => {
+          void handleSaveMaterialLibrary({
+            platform,
+            library: props.library,
+            markMaterialLibrarySaved,
+            pushToast,
+          });
         }}
       />
       <MaterialLibrarySelectors
@@ -121,6 +167,8 @@ function LibraryHeader(props: {
   readonly library: MaterialLibraryDocument;
   readonly libraryDirty: boolean;
   readonly onUnload: () => void;
+  readonly onLoad: () => void;
+  readonly onSave: () => void;
 }): JSX.Element {
   return (
     <div style={libraryHeaderStyle}>
@@ -128,9 +176,17 @@ function LibraryHeader(props: {
         {props.library.name}
         {props.libraryDirty ? ' *' : ''}
       </span>
-      <button type="button" aria-label="Unload material library" onClick={props.onUnload}>
-        Unload
-      </button>
+      <div style={buttonRowStyle}>
+        <button type="button" aria-label="Load material library" onClick={props.onLoad}>
+          Load...
+        </button>
+        <button type="button" aria-label="Save material library" onClick={props.onSave}>
+          Save...
+        </button>
+        <button type="button" aria-label="Unload material library" onClick={props.onUnload}>
+          Unload
+        </button>
+      </div>
     </div>
   );
 }
@@ -349,41 +405,3 @@ function slug(value: string): string {
       .slice(0, 48) || 'library'
   );
 }
-
-const sectionStyle: React.CSSProperties = {
-  borderTop: '1px solid #d1d5db',
-  borderBottom: '1px solid #d1d5db',
-  padding: '10px 0',
-  marginBottom: 10,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 8,
-};
-const headingStyle: React.CSSProperties = { fontSize: 14, margin: 0 };
-const libraryHeaderStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
-};
-const libraryNameStyle: React.CSSProperties = {
-  color: '#374151',
-  fontSize: 12,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
-const fieldStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '64px minmax(0, 1fr)',
-  alignItems: 'center',
-  gap: 8,
-};
-const labelStyle: React.CSSProperties = { color: '#4b5563', fontSize: 12 };
-const formStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
-const splitRowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
-  gap: 6,
-};
-const statusStyle: React.CSSProperties = { margin: 0, color: '#4b5563', fontSize: 12 };

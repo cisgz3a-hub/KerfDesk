@@ -2,6 +2,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { StreamerState } from '../../core/controllers/grbl';
+import type { PlatformAdapter } from '../../platform/types';
+import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore, svgObj } from '../state/test-helpers';
@@ -10,6 +12,24 @@ import { CutsLayersPanel } from './CutsLayersPanel';
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
+
+const mockPlatform: PlatformAdapter = {
+  id: 'mock',
+  pickFilesForOpen: async () => [],
+  pickFileForSave: async () => null,
+  serial: {
+    isSupported: () => false,
+    requestPort: async () => null,
+  },
+};
+
+function PanelUnderTest(): JSX.Element {
+  return (
+    <PlatformProvider adapter={mockPlatform}>
+      <CutsLayersPanel />
+    </PlatformProvider>
+  );
+}
 
 afterEach(() => {
   resetStore();
@@ -29,7 +49,7 @@ describe('LayerRow double-click cut settings', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const row = host.querySelector('section[aria-label="Layer #ff0000"]');
@@ -53,7 +73,7 @@ describe('LayerRow double-click cut settings', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const mode = host.querySelector('select[aria-label="Mode for #ff0000"]');
@@ -77,7 +97,7 @@ describe('LayerRow double-click cut settings', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const showToggle = Array.from(host.querySelectorAll('label')).find((label) =>
@@ -119,7 +139,7 @@ describe('LayerRow double-click cut settings', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
@@ -147,7 +167,7 @@ describe('LayerRow double-click cut settings', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<CutsLayersPanel />);
+        root.render(<PanelUnderTest />);
       });
 
       const edit = host.querySelector('button[aria-label="Edit cut settings for #ff0000"]');
