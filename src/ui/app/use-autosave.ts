@@ -12,9 +12,10 @@
 //
 // useAutosaveRecovery:
 //   Runs once on mount. If localStorage has an autosave AND the
-//   current project is empty (no objects), prompts the user via
-//   window.confirm to restore. Either path clears the slot so the
-//   user isn't re-prompted next session.
+//   current project is empty (no objects), asks the user (job-aware
+//   confirm) whether to restore. Restoring keeps the slot armed until
+//   the first manual save (M15); declining discards it so the user
+//   isn't re-prompted next session.
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
@@ -25,6 +26,7 @@ import {
   startAutosaveLoop,
   writeAutosave,
 } from '../state/autosave';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 
@@ -85,7 +87,10 @@ export function useAutosave(): void {
 }
 
 export function runAutosaveRecovery(
-  confirmRestore: (message: string) => boolean = (message) => window.confirm(message),
+  // jobAwareConfirm is a pass-through native confirm here (recovery runs at
+  // app start, before any connection), but keeps the raw-dialog lint ban
+  // (H13) airtight with a single exempt module.
+  confirmRestore: (message: string) => boolean = jobAwareConfirm,
 ): void {
   const record = readAutosave();
   if (record === null) return;
