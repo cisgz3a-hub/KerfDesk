@@ -1,16 +1,21 @@
-// useImportDragDrop — window-level drag-and-drop SVG import (F-A3). Extracted
-// from App so the App component body stays under the function-size limit.
+// useImportDragDrop — window-level drag-and-drop import (F-A3 / F-F2).
+// Extracted from App so the App component body stays under the function-size
+// limit.
 //
-// Three concerns split into pure helpers so this hook stays a thin listener:
-//   * importMany — parse + import a file list (no DOM).
+// Concerns split into pure helpers so this hook stays a thin listener:
+//   * importMany — parse + import an SVG file list (no DOM).
+//   * pickSvgFiles / pickImageFiles — sort a DataTransfer's files by kind.
+//     PNG/JPG drops route through the same pipeline as the Import Image
+//     button (M26, AUDIT-2026-06-10 — drag-drop is F-F2's primary entry and
+//     used to be SVG-extension-only).
 //   * useUiStoreFlag — drives the F-A3 dragenter overlay via the
 //     toast-store-adjacent UI store; counts enter/leave nesting because the
 //     browser fires dragenter/leave on every nested element.
-//   * pickSvgFiles — pulls .svg files out of a DataTransfer.
 
 import { useEffect, useRef } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { parseSvg } from '../../io/svg';
+import { importImageFile } from '../commands/import-image-action';
 import { useStore } from '../state';
 import type { ImportOutcome } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
@@ -23,6 +28,7 @@ import {
 
 export function useImportDragDrop(): void {
   const importSvgObject = useStore((s) => s.importSvgObject);
+  const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
   const setDragOverlay = useUiStore((s) => s.setDragOverlay);
   // useUiStore was originally useDragOverlay — the rename is mechanical;
@@ -51,12 +57,21 @@ export function useImportDragDrop(): void {
       depth.current = 0;
       setDragOverlay(false);
       if (e.dataTransfer === null) return;
-      const files = pickSvgFiles(e.dataTransfer);
-      if (e.dataTransfer.files.length > 0 && files.length === 0) {
-        pushToast('Drop ignored — no SVG files in the selection', 'warning');
+      const svgFiles = pickSvgFiles(e.dataTransfer);
+      const imageFiles = pickImageFiles(e.dataTransfer);
+      const ignored = e.dataTransfer.files.length - svgFiles.length - imageFiles.length;
+      if (e.dataTransfer.files.length > 0 && svgFiles.length === 0 && imageFiles.length === 0) {
+        pushToast('Drop ignored — no SVG or image (PNG/JPG) files in the selection', 'warning');
         return;
       }
-      void importMany(files, importSvgObject, pushToast);
+      // Mixed drops used to discard non-SVG files SILENTLY (M26) — name them.
+      if (ignored > 0) {
+        pushToast(`Ignored ${ignored} file(s) — only SVG, PNG, and JPG import`, 'warning');
+      }
+      void importMany(svgFiles, importSvgObject, pushToast);
+      for (const file of imageFiles) {
+        void importImageFile(file, importRasterImage, pushToast);
+      }
     };
     window.addEventListener('dragenter', onDragEnter);
     window.addEventListener('dragover', onDragOver);
@@ -68,7 +83,7 @@ export function useImportDragDrop(): void {
       window.removeEventListener('dragleave', onDragLeave);
       window.removeEventListener('drop', onDrop);
     };
-  }, [importSvgObject, pushToast, setDragOverlay]);
+  }, [importSvgObject, importRasterImage, pushToast, setDragOverlay]);
 }
 
 function hasFiles(e: DragEvent): boolean {
@@ -77,6 +92,17 @@ function hasFiles(e: DragEvent): boolean {
 
 function pickSvgFiles(dt: DataTransfer): ReadonlyArray<File> {
   return [...dt.files].filter((f) => f.name.toLowerCase().endsWith('.svg'));
+}
+
+// MIME type OR extension: drops from browsers carry types, drops from some
+// file managers don't. A renamed non-image fails the decode in
+// importImageFile and surfaces as a per-file error toast.
+function pickImageFiles(dt: DataTransfer): ReadonlyArray<File> {
+  return [...dt.files].filter((f) => {
+    if (f.type === 'image/png' || f.type === 'image/jpeg') return true;
+    const name = f.name.toLowerCase();
+    return name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg');
+  });
 }
 
 async function importMany(
