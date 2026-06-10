@@ -199,6 +199,24 @@ export default tseslint.config(
         { name: 'fetch', message: 'core/ must not do network I/O.' },
         { name: 'atob', message: 'core/ must not depend on browser base64 globals.' },
         { name: 'btoa', message: 'core/ must not depend on browser base64 globals.' },
+        // M29 (AUDIT-2026-06-10): these two were documented as restricted in
+        // CLAUDE.md but never configured — globals.node made `process` pass.
+        { name: 'console', message: 'core/ must not log directly; use a logger passed in.' },
+        { name: 'process', message: 'core/ is platform-agnostic. Move to ui/ or platform/.' },
+      ],
+      // M29: CLAUDE.md claims a no-restricted-imports gate for pure core;
+      // it never existed, so `import fs from "node:fs"` would have passed
+      // lint AND typecheck (@types/node is installed).
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['node:*', 'fs', 'path', 'os', 'child_process', 'worker_threads'],
+              message: 'core/ must not import Node.js APIs; push I/O to io/ or platform/.',
+            },
+          ],
+        },
       ],
       'no-restricted-syntax': [
         'error',
@@ -218,13 +236,16 @@ export default tseslint.config(
     },
   },
   // Test files: relax file-size and assertion strictness so test scaffolding
-  // can use longer describe blocks and `!` for fixture access.
+  // can use longer describe blocks and `!` for fixture access. Tests run in
+  // node, so reading fixtures via node:fs is fine (the no-restricted-imports
+  // gate protects shipped core code, not its tests).
   {
     files: ['**/*.test.ts', '**/*.test.tsx', 'src/__fixtures__/**/*.ts'],
     rules: {
       'max-lines-per-function': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       'boundaries/dependencies': 'off',
+      'no-restricted-imports': 'off',
     },
   },
   {
