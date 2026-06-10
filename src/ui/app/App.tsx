@@ -15,6 +15,7 @@ import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
 import { useShortcuts } from './use-shortcuts';
 import { useSpacePan } from './use-space-pan';
+import { useUnloadStop } from './use-unload-stop';
 import { useWindowTitle } from './use-window-title';
 
 export function App(): JSX.Element {
@@ -28,6 +29,7 @@ export function App(): JSX.Element {
   useImportDragDrop();
   useShortcuts();
   useSpacePan();
+  useUnloadStop();
   useWindowTitle();
   return (
     <div style={shellStyle}>
