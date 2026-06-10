@@ -11,6 +11,7 @@ import {
 } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
 import { buildPreviewToolpath } from './draw-preview';
+import { mapToolpathToScene } from './preview-scene-frame';
 
 // Two cuts whose natural order (far-from-origin first) the optimizer reorders
 // (near-origin first). Before P1-C the preview used raw compileJob, so it showed
@@ -59,7 +60,11 @@ describe('preview / output parity (P1-C)', () => {
     if (prepared.ok) {
       // If buildPreviewToolpath ever reverts to raw compileJob, the optimized
       // order would diverge from this prepared job and the deep-equal fails.
-      expect(buildPreviewToolpath(project)).toEqual(buildToolpath(prepared.job));
+      // The preview is the prepared job mapped into the scene frame (H3) —
+      // same steps, same order, same lengths, scene coordinates.
+      expect(buildPreviewToolpath(project)).toEqual(
+        mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device),
+      );
     }
   });
 });

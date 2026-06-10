@@ -10,20 +10,29 @@
 import {
   applyJobOrigin,
   compileJob,
+  jobOriginOffset,
   optimizePaths,
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
 import { runPreEmitPreflight, type PreflightResult } from '../../core/preflight';
-import type { Project } from '../../core/scene';
+import type { Project, Vec2 } from '../../core/scene';
 
 export type PrepareOutputOptions = {
   readonly jobOrigin?: JobOriginPlacement;
 };
 
 export type PreparedOutput =
-  | { readonly ok: true; readonly job: Job }
+  | {
+      readonly ok: true;
+      readonly job: Job;
+      // Translation applyJobOrigin applied (zero for absolute placements).
+      // The preview undoes it to register the toolpath with the scene (H3).
+      readonly jobOriginOffset: Vec2;
+    }
   | { readonly ok: false; readonly preflight: PreflightResult };
+
+const ZERO_OFFSET: Vec2 = { x: 0, y: 0 };
 
 export function prepareOutput(
   project: Project,
@@ -35,9 +44,14 @@ export function prepareOutput(
   const preEmit = runPreEmitPreflight(project);
   if (!preEmit.ok) return { ok: false, preflight: preEmit };
   const compiled = compileJob(project.scene, project.device);
+  const offset = options.jobOrigin ? jobOriginOffset(compiled, options.jobOrigin) : ZERO_OFFSET;
   const placed = options.jobOrigin ? applyJobOrigin(compiled, options.jobOrigin) : compiled;
   // optimize is pure path-order reduction (nearest-neighbor) — same cuts, same
   // speeds, same passes, just shorter travel. Doing it HERE means the preview
   // shows the exact order the machine will run.
-  return { ok: true, job: project.optimization.reduceTravelMoves ? optimizePaths(placed) : placed };
+  return {
+    ok: true,
+    job: project.optimization.reduceTravelMoves ? optimizePaths(placed) : placed,
+    jobOriginOffset: offset,
+  };
 }
