@@ -444,3 +444,25 @@ describe('laser-store autofocus lifecycle', () => {
     await expect(useLaserStore.getState().disconnect()).rejects.toThrow(/auto-focus is running/i);
   });
 });
+
+// M13 (AUDIT-2026-06-10): a line longer than the RX buffer could never send;
+// startJob stored a phantom idle streamer with all lines queued, the progress
+// bar froze at 0/N, and Start re-enabled - no error anywhere.
+describe('startJob oversized-line guard (M13)', () => {
+  it('refuses to start a job containing a line longer than the RX buffer', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    const oversized = `G1 X${'9'.repeat(130)}`;
+    await expect(useLaserStore.getState().startJob(`G21\n${oversized}\n`)).rejects.toThrow(
+      /RX buffer/i,
+    );
+
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(writes).toEqual([]);
+  });
+});

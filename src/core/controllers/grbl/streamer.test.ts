@@ -167,3 +167,22 @@ describe('disconnect', () => {
     expect(cancel(s).status).toBe('cancelled');
   });
 });
+
+// M13 (AUDIT-2026-06-10): a single line longer than the RX buffer can never
+// satisfy the send condition - step() breaks with nothing sent, no error,
+// no state change, leaving a phantom idle job and a frozen progress bar.
+describe('findOversizedLine (M13)', () => {
+  it('reports the first line that can never fit the RX buffer', async () => {
+    const { findOversizedLine } = await import('./streamer');
+    const oversized = `G1 X${'9'.repeat(130)}`;
+    const found = findOversizedLine(`G0 X0\n${oversized}\nG1 X1`);
+    expect(found).not.toBeNull();
+    expect(found?.lineNumber).toBe(2);
+    expect(found?.bytes).toBeGreaterThan(found?.limit ?? Infinity - 1);
+  });
+
+  it('returns null for normal G-code', async () => {
+    const { findOversizedLine } = await import('./streamer');
+    expect(findOversizedLine('G21\nG90\nG1 X100.000 Y200.000 S1000 F1500')).toBeNull();
+  });
+});
