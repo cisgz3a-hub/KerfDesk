@@ -4,6 +4,7 @@
 // keeps these handlers pure of React hooks, so they can be called from
 // anywhere.
 
+import { runControllerReadiness, type ControllerSettingsSnapshot } from '../../core/preflight';
 import type { Project, SceneObject } from '../../core/scene';
 import { emitGcode } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
@@ -11,7 +12,7 @@ import { deserializeProject, serializeProject } from '../../io/project';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
-import { jobAwareAlert } from '../state/job-aware-dialogs';
+import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
@@ -73,6 +74,9 @@ export type SaveGcodeCtx = {
   readonly savedName: string | null;
   readonly jobPlacement?: JobPlacementSettings;
   readonly machine?: MachinePlacementSnapshot;
+  // null = never connected this session; a snapshot = run the $30/$32
+  // comparison before saving (M11). Omitted = caller doesn't track it.
+  readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -103,6 +107,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
+  if (!confirmControllerMismatch(ctx)) return;
   let target: SaveTarget | null;
   try {
     target = await ctx.platform.pickFileForSave({
@@ -117,9 +122,30 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   try {
     await target.write(gcode);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
+    if (ctx.controllerSettings === null) {
+      ctx.pushToast(
+        `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
+        'info',
+      );
+    }
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
+}
+
+// M11 (AUDIT-2026-06-10): the $30 power-scale check used to protect only the
+// streamed Start path. A project max S of 1000 saved for a $30=255 machine
+// clamps every S>255 to 100% beam power when the file is run from an SD card
+// or another sender — gate the export behind an explicit confirmation when
+// the connected controller's settings disagree.
+function confirmControllerMismatch(ctx: SaveGcodeCtx): boolean {
+  if (ctx.controllerSettings === undefined || ctx.controllerSettings === null) return true;
+  const readiness = runControllerReadiness(ctx.project, ctx.controllerSettings);
+  if (readiness.ok) return true;
+  const lines = readiness.errors.map((e) => `• ${e.message}`).join('\n');
+  return jobAwareConfirm(
+    `The exported file may not run safely on the connected controller:\n\n${lines}\n\nSave anyway?`,
+  );
 }
 
 export type SaveProjectCtx = {

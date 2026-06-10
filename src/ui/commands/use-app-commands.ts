@@ -67,6 +67,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
         savedName: app.savedName,
         jobPlacement: app.jobPlacement,
         machine,
+        controllerSettings: laser.controllerSettings,
         pushToast,
       }),
     undo: app.undo,
