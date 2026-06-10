@@ -6,12 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import {
-  createLayer,
-  IDENTITY_TRANSFORM,
-  type RasterImage,
-  type SceneObject,
-} from '../scene';
+import { createLayer, IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../scene';
 import { compileJob } from './compile-job';
 import type { Job, RasterGroup } from './job';
 
@@ -95,10 +90,7 @@ describe('compileJob raster image groups', () => {
       writable: true,
     });
     try {
-      const job = compileJob(
-        { objects: [rasterObject('AP//AA==')], layers: [imageLayer()] },
-        dev,
-      );
+      const job = compileJob({ objects: [rasterObject('AP//AA==')], layers: [imageLayer()] }, dev);
       expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toContain(300);
     } finally {
       Object.defineProperty(globalThis, 'atob', {

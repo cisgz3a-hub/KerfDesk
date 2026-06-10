@@ -155,9 +155,7 @@ describe('webSerial wire encoding (M12)', () => {
     await conn.write('G1 X1 S100\n');
 
     const written = port.writer.write.mock.calls[0]?.[0];
-    expect(Array.from(written ?? [])).toEqual(
-      Array.from(new TextEncoder().encode('G1 X1 S100\n')),
-    );
+    expect(Array.from(written ?? [])).toEqual(Array.from(new TextEncoder().encode('G1 X1 S100\n')));
   });
 
   it('refuses characters that cannot be a single GRBL wire byte', async () => {

@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import {
-  createLayer,
-  EMPTY_SCENE,
-  IDENTITY_TRANSFORM,
-  type SceneObject,
-} from '../scene';
+import { createLayer, EMPTY_SCENE, IDENTITY_TRANSFORM, type SceneObject } from '../scene';
 import { compileJob } from './compile-job';
 import type { CutGroup, FillGroup, Job } from './job';
 

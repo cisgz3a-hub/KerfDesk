@@ -22,7 +22,10 @@ function Probe({ value, commit }: { value: number; commit: (n: number) => void }
   return null;
 }
 
-async function renderProbe(value: number, commit: (n: number) => void): Promise<() => Promise<void>> {
+async function renderProbe(
+  value: number,
+  commit: (n: number) => void,
+): Promise<() => Promise<void>> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
