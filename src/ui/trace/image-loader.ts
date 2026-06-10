@@ -132,16 +132,14 @@ export function extractLumaBase64(image: RawImageData): string {
     const b = image.data[i * 4 + 2] ?? 0;
     buf[i] = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
   }
-  // btoa wants a "binary string" (each char's code point = byte).
-  // Chunked String.fromCharCode rather than the spread form because
-  // the spread hits argument-count limits at ~64K pixels on V8.
-  const CHUNK = 8192;
+  // btoa wants a "binary string" (each char's code point = byte). One char
+  // per byte rather than String.fromCharCode(...buf) because the spread
+  // form hits V8's argument-count limit at ~64K pixels (LU10: an earlier
+  // comment claimed chunking that never existed — this loop is O(n) appends,
+  // not chunked, and that is fine).
   let bin = '';
   for (const v of buf) {
     bin += String.fromCharCode(v);
-    // The for-of accumulates naturally; the CHUNK constant above is
-    // a defensive cap for a future generator-shaped rewrite.
-    void CHUNK;
   }
   return btoa(bin);
 }

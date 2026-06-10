@@ -142,8 +142,11 @@ function Inner(props: {
         <>
           <div
             style={svgWrapStyle}
-            // SVG comes from the trusted local trace path and is
-            // sanitized before reaching this component.
+            // Safe WITHOUT sanitization (LU9): state.svg is built locally by
+            // coloredPathsToSvg — a pure stringifier interpolating rounded
+            // numbers and hex colors only. No user-controlled markup can
+            // reach this string. If a future change routes imported markup
+            // here, it MUST go through sanitizeSvg first.
             dangerouslySetInnerHTML={{ __html: state.svg }}
             aria-label={`Trace preview (${state.width}x${state.height} px)`}
           />
