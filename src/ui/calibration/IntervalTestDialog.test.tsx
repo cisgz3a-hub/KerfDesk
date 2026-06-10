@@ -8,18 +8,22 @@ import { IntervalTestDialog } from './IntervalTestDialog';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-async function renderDialog(onGenerate = vi.fn()): Promise<{
+async function renderDialog(
+  onGenerate = vi.fn(),
+  onCancel = vi.fn(),
+): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
   readonly onGenerate: typeof onGenerate;
+  readonly onCancel: typeof onCancel;
 }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<IntervalTestDialog onCancel={vi.fn()} onGenerate={onGenerate} />);
+    root.render(<IntervalTestDialog onCancel={onCancel} onGenerate={onGenerate} />);
   });
-  return { host, root, onGenerate };
+  return { host, root, onGenerate, onCancel };
 }
 
 afterEach(() => {
@@ -51,6 +55,21 @@ describe('IntervalTestDialog', () => {
       expect(onGenerate).toHaveBeenCalledWith(
         expect.objectContaining({ steps: 4, intervalMaxMm: 0.25 }),
       );
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  // Gained via the kit Dialog migration (ADR-047): the calibration dialogs
+  // previously lacked the Escape/focus-trap behavior every other modal had.
+  it('closes on Escape', async () => {
+    const { host, root, onCancel } = await renderDialog();
+    try {
+      const backdrop = host.querySelector('[role="dialog"]');
+      await act(async () => {
+        backdrop?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      });
+      expect(onCancel).toHaveBeenCalledTimes(1);
     } finally {
       await act(async () => root.unmount());
     }

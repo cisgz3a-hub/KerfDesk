@@ -13,6 +13,7 @@ export function CalibrationNumberField(props: {
       <span>{props.label}</span>
       <input
         type="number"
+        className="lf-input"
         aria-label={props.label}
         value={props.value}
         min={props.min}
@@ -31,4 +32,4 @@ const fieldStyle: CSSProperties = {
   gap: 3,
   fontSize: 12,
 };
-const inputStyle: CSSProperties = { padding: '4px 6px' };
+const inputStyle: CSSProperties = { width: '100%', boxSizing: 'border-box' };
