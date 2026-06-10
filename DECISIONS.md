@@ -2347,6 +2347,51 @@ library UX, read-only layer controls, and preset revision handling exist.
 
 ---
 
+## ADR-046 - SVG import unit resolution (viewBox scaling + 96 DPI px)
+
+**Status:** Accepted. | **Date:** 2026-06-10
+
+### Context
+
+Audit finding H9 (AUDIT-2026-06-10): the import boundary assumed 1 SVG user
+unit = 1 mm in every case. `<svg width="50mm" viewBox="0 0 500 500">` — the
+standard Inkscape/Illustrator export shape — imported 10× too large because
+the declared physical size was ignored whenever a viewBox existed, and
+px-authored files (no viewBox) imported 1 px = 1 mm where LightBurn's default
+import DPI (96) sizes 96 px at 25.4 mm. PROJECT.md non-negotiable #6 requires
+explicit conversion at the import boundary. `fitObjectToBed`'s shrink-to-90%
+masked oversize imports with plausible-looking but physically wrong sizes.
+
+### Decision
+
+Resolve units once at the root of the import (`resolveUnitScale`,
+`src/io/svg/parse-svg.ts`), seeding the transform stack so geometry and
+bounds scale together:
+
+- viewBox + physical width/height: user units scale by physical/viewBox per
+  axis; a single declared axis drives both (preserve aspect); `%` and other
+  unparseable lengths count as undeclared.
+- viewBox only: 1 user unit = 1 mm (the long-standing Phase A assumption,
+  kept — matches mm-authored plotter/laser exports).
+- No viewBox: user units are CSS px at 96 DPI (`CSS_PX_PER_INCH = 96`,
+  matching LightBurn's default import DPI), applied to geometry and to
+  width/height bounds alike.
+
+### Consequences
+
+- Inkscape/Illustrator mm-sized exports import at true physical size; an
+  import DPI *setting* (LightBurn offers one per format) stays future work.
+- px-authored viewBox-less files now import 3.78× smaller than before —
+  the previous size was the defect, not a compatibility surface.
+
+### Verification
+
+- `parse-svg.test.ts` "physical size + viewBox scaling (H9)": per-axis
+  scaling, single-axis aspect preservation, 96 DPI px geometry + bounds,
+  and the unchanged viewBox-only mm assumption.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

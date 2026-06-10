@@ -10,7 +10,6 @@
 // 5. Bundle into an ImportedSvg with the SVG's viewBox as the natural bounds.
 
 import {
-  type Bounds,
   type ColoredPath,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
@@ -18,6 +17,7 @@ import {
 } from '../../core/scene';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
 import { elementToSubPaths } from './shape-to-polylines';
+import { resolveUnitScale } from './svg-units';
 
 export type ParseSvgResult = {
   readonly object: ImportedSvg | null;
@@ -28,15 +28,6 @@ export type ParseSvgResult = {
 };
 
 const COLOR_FALLBACK = '#000000';
-const MM_PER_INCH = 25.4;
-const CSS_PX_PER_INCH = 96;
-const SVG_LENGTH_UNITS_TO_MM: Readonly<Record<string, number>> = {
-  mm: 1,
-  cm: 10,
-  in: MM_PER_INCH,
-  pt: MM_PER_INCH / 72,
-  pc: MM_PER_INCH / 6,
-};
 
 // CSS named colors. Phase A covers the 16 HTML basic colors plus a handful of
 // common extended names. Anything else falls back to black.
@@ -98,41 +89,6 @@ function normalizeColor(input: string | null): string {
   return tryParseRgb(s) ?? COLOR_FALLBACK;
 }
 
-function parseViewBox(svgEl: Element): Bounds {
-  const vb = svgEl.getAttribute('viewBox');
-  if (vb !== null) {
-    const parts = vb.split(/[\s,]+/).map(Number);
-    if (parts.length === 4 && parts.every(Number.isFinite)) {
-      const [x, y, w, h] = parts as [number, number, number, number];
-      return { minX: x, minY: y, maxX: x + w, maxY: y + h };
-    }
-  }
-  const w = parseSvgLengthMm(svgEl.getAttribute('width'), 100);
-  const h = parseSvgLengthMm(svgEl.getAttribute('height'), 100);
-  return {
-    minX: 0,
-    minY: 0,
-    maxX: w,
-    maxY: h,
-  };
-}
-
-function parseSvgLengthMm(input: string | null, fallbackPx: number): number {
-  if (input === null || input.trim() === '') return pxToMm(fallbackPx);
-  const match = /^\s*([+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)\s*([a-zA-Z]*)\s*$/.exec(input);
-  if (match === null) return pxToMm(fallbackPx);
-  const value = Number(match[1]);
-  if (!Number.isFinite(value)) return pxToMm(fallbackPx);
-  const unit = (match[2] ?? '').toLowerCase();
-  if (unit === '' || unit === 'px') return pxToMm(value);
-  const mmFactor = SVG_LENGTH_UNITS_TO_MM[unit];
-  return mmFactor === undefined ? pxToMm(fallbackPx) : value * mmFactor;
-}
-
-function pxToMm(px: number): number {
-  return (px / CSS_PX_PER_INCH) * MM_PER_INCH;
-}
-
 type Matrix = {
   readonly a: number;
   readonly b: number;
@@ -170,8 +126,14 @@ function walkGeometry(
   svgEl: Element,
   byColor: Map<string, Polyline[]>,
   counts: { text: number; image: number },
+  unitScale: { readonly scaleX: number; readonly scaleY: number },
 ): void {
-  const rootState = presentationStateFor(svgEl, INITIAL_PRESENTATION_STATE);
+  // The unit scale seeds the transform stack root so every element's
+  // geometry lands in mm (H9), composing with element/group transforms.
+  const rootState = presentationStateFor(svgEl, {
+    ...INITIAL_PRESENTATION_STATE,
+    transform: { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 },
+  });
   for (const child of Array.from(svgEl.children)) {
     walkElement(child, rootState, byColor, counts);
   }
@@ -407,10 +369,11 @@ export function parseSvg(args: { svgText: string; id: string; source: string }):
     throw new Error(`Not an SVG document: root is <${svgEl.tagName}>`);
   }
 
-  const bounds = parseViewBox(svgEl);
+  const unitScale = resolveUnitScale(svgEl);
+  const bounds = unitScale.bounds;
   const byColor = new Map<string, Polyline[]>();
   const counts = { text: 0, image: 0 };
-  walkGeometry(svgEl, byColor, counts);
+  walkGeometry(svgEl, byColor, counts, unitScale);
 
   const paths: ColoredPath[] = [...byColor.entries()].map(([color, polylines]) => ({
     color,
