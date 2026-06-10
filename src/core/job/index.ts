@@ -16,6 +16,7 @@ export {
   JOB_ORIGIN_ANCHORS,
   USER_ORIGIN_JOB_PLACEMENT,
   applyJobOrigin,
+  jobOriginOffset,
   offsetJobBounds,
 } from './job-origin';
 export type { JobDurationEstimate } from './estimate-duration';
