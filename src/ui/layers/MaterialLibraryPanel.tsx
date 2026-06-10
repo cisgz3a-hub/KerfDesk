@@ -351,8 +351,8 @@ function slug(value: string): string {
 }
 
 const sectionStyle: React.CSSProperties = {
-  borderTop: '1px solid #d1d5db',
-  borderBottom: '1px solid #d1d5db',
+  borderTop: '1px solid var(--lf-border)',
+  borderBottom: '1px solid var(--lf-border)',
   padding: '10px 0',
   marginBottom: 10,
   display: 'flex',
@@ -367,7 +367,7 @@ const libraryHeaderStyle: React.CSSProperties = {
   gap: 8,
 };
 const libraryNameStyle: React.CSSProperties = {
-  color: '#374151',
+  color: 'var(--lf-text)',
   fontSize: 12,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -379,11 +379,11 @@ const fieldStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
 };
-const labelStyle: React.CSSProperties = { color: '#4b5563', fontSize: 12 };
+const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };
 const formStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const splitRowStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
   gap: 6,
 };
-const statusStyle: React.CSSProperties = { margin: 0, color: '#4b5563', fontSize: 12 };
+const statusStyle: React.CSSProperties = { margin: 0, color: 'var(--lf-text-muted)', fontSize: 12 };

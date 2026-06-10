@@ -20,8 +20,10 @@ import { SelectedObjectProperties } from './SelectedObjectProperties';
 export function CutsLayersPanel(): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
   return (
-    <aside aria-label="Cuts / Layers panel" style={panelStyle}>
-      <h2 style={headingStyle}>Cuts / Layers</h2>
+    <aside aria-label="Cuts / Layers panel" className="lf-rail" style={panelStyle}>
+      <h2 className="lf-heading" style={headingStyle}>
+        Cuts / Layers
+      </h2>
       <AddLayerControls />
       <MaterialLibraryPanel />
       {layers.length === 0 ? (
@@ -44,20 +46,16 @@ export function CutsLayersPanel(): JSX.Element {
   );
 }
 
+// Surface chrome (background, border, scrollbars, text color) comes from
+// .lf-rail; this constant keeps only the rail's layout.
 const panelStyle: React.CSSProperties = {
-  background: '#f5f5f5',
-  borderLeft: '1px solid #ddd',
   padding: '10px 12px',
   // Card layout means we don't need 500 px of horizontal room any more.
   // 320 px holds a clean two-column field-row layout (label + control)
   // and leaves plenty of width for the Laser panel on 1280-class monitors.
   width: 320,
   flexShrink: 0,
-  overflowY: 'auto',
-  overflowX: 'hidden',
-  fontFamily: 'system-ui, sans-serif',
-  fontSize: 13,
 };
-const headingStyle: React.CSSProperties = { fontSize: 14, margin: '0 0 10px 0' };
-const hintStyle: React.CSSProperties = { color: '#666', fontStyle: 'italic' };
+const headingStyle: React.CSSProperties = { margin: '0 0 10px 0' };
+const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontStyle: 'italic' };
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
