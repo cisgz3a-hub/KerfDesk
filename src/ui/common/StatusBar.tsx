@@ -61,10 +61,10 @@ const barStyle: React.CSSProperties = {
   gap: 16,
   alignItems: 'center',
   padding: '4px 12px',
-  background: '#222',
-  color: '#ddd',
+  background: 'var(--lf-bg-0)',
+  color: 'var(--lf-text)',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 12,
-  borderTop: '1px solid #111',
+  borderTop: '1px solid var(--lf-border)',
 };
 const segStyle: React.CSSProperties = { whiteSpace: 'nowrap' };

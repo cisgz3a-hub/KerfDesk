@@ -61,6 +61,7 @@ function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
   return (
     <button
       type="button"
+      className="lf-btn"
       title={title}
       disabled={!props.command.enabled}
       onClick={() => {
@@ -103,16 +104,16 @@ const barStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   padding: '6px 12px',
-  background: '#2c2c2c',
-  color: '#ddd',
+  background: 'var(--lf-bg-0)',
+  color: 'var(--lf-text)',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 13,
-  borderBottom: '1px solid #111',
+  borderBottom: '1px solid var(--lf-border)',
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const buildBadgeStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#888',
+  color: 'var(--lf-text-faint)',
   fontFamily: 'ui-monospace, Menlo, monospace',
   cursor: 'help',
   userSelect: 'none',
@@ -121,13 +122,13 @@ const separatorStyle: React.CSSProperties = {
   display: 'inline-block',
   width: 1,
   height: 16,
-  background: '#444',
+  background: 'var(--lf-border-strong)',
   margin: '0 4px',
 };
 const hintStyle: React.CSSProperties = {
   marginLeft: 'auto',
   fontSize: 11,
-  color: '#999',
+  color: 'var(--lf-text-faint)',
   cursor: 'help',
   userSelect: 'none',
 };
