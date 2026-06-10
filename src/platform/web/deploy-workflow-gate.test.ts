@@ -26,6 +26,15 @@ describe('Cloudflare production deploy gate', () => {
     );
   });
 
+  // M33 (AUDIT-2026-06-10): for workflow_run events GITHUB_SHA is the default
+  // branch's CURRENT tip — a push race (or a re-run of an old green CI) would
+  // deploy a different commit than the one CI validated.
+  it('checks out the CI-validated commit, not the branch tip', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+
+    expect(workflow).toContain('github.event.workflow_run.head_sha');
+  });
+
   it('runs repo identity proof and CI gates before Wrangler publishes', () => {
     const workflow = repoFile('.github/workflows/deploy.yml');
     const publishIndex = workflow.indexOf('uses: cloudflare/wrangler-action@v3');
