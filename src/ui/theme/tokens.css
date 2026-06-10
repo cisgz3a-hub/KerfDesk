@@ -1,0 +1,375 @@
+/*
+ * tokens.css — the LaserForge design tokens + shared chrome classes
+ * (ADR-047). Imported exactly once, in src/ui/app/main.tsx.
+ *
+ * Why a stylesheet exists at all in an inline-style codebase: pseudo-states.
+ * Inline React styles cannot express :hover / :focus-visible / :active /
+ * :disabled, so before this file NO control in the app had hover or focus
+ * affordances. Static presentational styling migrates to these classes and
+ * tokens; DYNAMIC styling (drag readout position, layer color swatches,
+ * progress width, preview opacity) stays inline by policy.
+ *
+ * Theme: unified dark chrome. The canvas viewport keeps its light bed —
+ * its palette lives in canvas-theme.ts; the two shared values
+ * (--lf-accent ↔ selection, --lf-danger ↔ out-of-bounds) are pinned by
+ * theme-sync.test.ts. A future light theme adds a [data-theme='light']
+ * block re-declaring the custom properties; no component changes.
+ *
+ * Performance: flat colors only — no blur, no box-shadow on surfaces that
+ * re-render at the 250 ms status poll; transitions are limited to
+ * background/border color on interactive elements (80 ms).
+ */
+
+:root {
+  /* Surfaces (dark, anchored on the pre-existing #1f2933 menubar) */
+  --lf-bg-0: #1f2933; /* bars: menubar, toolbar, statusbar */
+  --lf-bg-1: #27313c; /* rails + dialog panels */
+  --lf-bg-2: #323f4b; /* cards, dropdown menus, hover wells */
+  --lf-bg-input: #1a222b; /* inputs, log scrollback */
+  --lf-border: #3e4c59;
+  --lf-border-strong: #52606d;
+
+  /* Text */
+  --lf-text: #e4e7eb;
+  --lf-text-muted: #9aa5b1;
+  --lf-text-faint: #8c98a5;
+
+  /* Semantic fills (white text on these passes AA) */
+  --lf-accent: #1976d2;
+  --lf-accent-hover: #2585e4;
+  --lf-danger: #c62828;
+  --lf-danger-hover: #d73b3b;
+  --lf-success: #2e7d32;
+  --lf-warning: #ed6c02;
+
+  /* Semantic TEXT on dark surfaces (the fills above fail as text on dark) */
+  --lf-accent-fg: #64b5f6;
+  --lf-danger-fg: #ef9a9a;
+  --lf-success-fg: #81c784;
+  --lf-warning-fg: #ffb74d;
+  --lf-trace-fg: #ce93d8;
+
+  --lf-focus: #64b5f6;
+  --lf-backdrop: rgba(0, 0, 0, 0.55);
+
+  /* Type scale */
+  --lf-font: system-ui, sans-serif;
+  --lf-font-mono: ui-monospace, Menlo, monospace;
+  --lf-text-xs: 11px;
+  --lf-text-sm: 12px;
+  --lf-text-md: 13px;
+  --lf-text-lg: 14px;
+  --lf-text-xl: 16px;
+
+  /* Space + radius */
+  --lf-space-1: 2px;
+  --lf-space-2: 4px;
+  --lf-space-3: 6px;
+  --lf-space-4: 8px;
+  --lf-space-5: 12px;
+  --lf-space-6: 16px;
+  --lf-radius-sm: 3px;
+  --lf-radius-md: 4px;
+  --lf-radius-lg: 6px;
+
+  /* Z-order map */
+  --lf-z-menu: 100;
+  --lf-z-dialog: 1000;
+  --lf-z-toast: 1100;
+}
+
+/* Keyboard-only focus ring, everywhere. */
+:focus-visible {
+  outline: 2px solid var(--lf-focus);
+  outline-offset: 1px;
+}
+
+/* ---------- Buttons ---------- */
+
+.lf-btn {
+  font: inherit;
+  font-size: var(--lf-text-md);
+  color: var(--lf-text);
+  background: var(--lf-bg-2);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-md);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition:
+    background-color 80ms,
+    border-color 80ms;
+}
+.lf-btn:hover:not(:disabled) {
+  background: #3b4a58;
+  border-color: var(--lf-border-strong);
+}
+.lf-btn:active:not(:disabled) {
+  background: var(--lf-bg-1);
+}
+.lf-btn:disabled {
+  color: var(--lf-text-faint);
+  background: var(--lf-bg-1);
+  border-color: var(--lf-border);
+  cursor: default;
+}
+
+.lf-btn--primary {
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
+  color: #fff;
+}
+.lf-btn--primary:hover:not(:disabled) {
+  background: var(--lf-accent-hover);
+  border-color: var(--lf-accent-hover);
+}
+.lf-btn--primary:active:not(:disabled) {
+  background: #1565c0;
+}
+
+.lf-btn--danger {
+  background: var(--lf-danger);
+  border-color: var(--lf-danger);
+  color: #fff;
+}
+.lf-btn--danger:hover:not(:disabled) {
+  background: var(--lf-danger-hover);
+  border-color: var(--lf-danger-hover);
+}
+.lf-btn--danger:active:not(:disabled) {
+  background: #b22222;
+}
+
+.lf-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.lf-btn--ghost:hover:not(:disabled) {
+  background: var(--lf-bg-2);
+}
+
+.lf-btn--pressed,
+.lf-btn[aria-pressed='true'] {
+  background: var(--lf-accent);
+  border-color: var(--lf-accent);
+  color: #fff;
+}
+
+/* ---------- Inputs ---------- */
+
+.lf-input,
+.lf-select {
+  font: inherit;
+  font-size: var(--lf-text-md);
+  color: var(--lf-text);
+  background: var(--lf-bg-input);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-sm);
+  padding: 2px 6px;
+  color-scheme: dark;
+}
+.lf-input:hover:not(:disabled),
+.lf-select:hover:not(:disabled) {
+  border-color: var(--lf-border-strong);
+}
+.lf-input:focus,
+.lf-select:focus {
+  border-color: var(--lf-accent);
+  outline: none;
+}
+.lf-input:disabled,
+.lf-select:disabled {
+  color: var(--lf-text-faint);
+}
+
+.lf-checkbox {
+  color-scheme: dark;
+  accent-color: var(--lf-accent);
+}
+
+/* ---------- Dialogs ---------- */
+
+.lf-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--lf-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--lf-z-dialog);
+}
+
+.lf-dialog {
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  border: 1px solid var(--lf-border-strong);
+  border-radius: var(--lf-radius-lg);
+  padding: var(--lf-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: var(--lf-font);
+  font-size: var(--lf-text-md);
+  max-height: 90vh;
+  overflow-y: auto;
+  color-scheme: dark;
+}
+.lf-dialog--sm {
+  min-width: 320px;
+  max-width: 420px;
+}
+.lf-dialog--md {
+  min-width: 420px;
+  max-width: 560px;
+}
+.lf-dialog--lg {
+  min-width: 540px;
+  max-width: 680px;
+}
+
+.lf-dialog-title {
+  margin: 0;
+  font-size: var(--lf-text-xl);
+  font-weight: 600;
+}
+
+.lf-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--lf-space-4);
+  margin-top: var(--lf-space-2);
+}
+
+/* ---------- Panels / rails / cards ---------- */
+
+.lf-rail {
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  border-left: 1px solid var(--lf-border);
+  font-family: var(--lf-font);
+  font-size: var(--lf-text-md);
+  overflow-y: auto;
+  overflow-x: hidden;
+  color-scheme: dark;
+}
+
+.lf-card {
+  background: var(--lf-bg-2);
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-md);
+  transition: border-color 80ms;
+}
+.lf-card:hover {
+  border-color: var(--lf-border-strong);
+}
+
+.lf-heading {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: 600;
+  color: var(--lf-text);
+}
+
+.lf-subheading {
+  margin: 0;
+  font-size: var(--lf-text-md);
+  font-weight: 600;
+  color: var(--lf-text-muted);
+}
+
+/* ---------- Banners ---------- */
+
+.lf-banner {
+  border-radius: var(--lf-radius-md);
+  padding: var(--lf-space-4) var(--lf-space-5);
+  font-size: var(--lf-text-sm);
+  color: var(--lf-text);
+  border: 1px solid var(--lf-border);
+  background: var(--lf-bg-2);
+}
+.lf-banner--danger {
+  border-color: var(--lf-danger);
+  background: #3a2326;
+  color: var(--lf-danger-fg);
+}
+.lf-banner--warning {
+  border-color: var(--lf-warning);
+  background: #3a2f1f;
+  color: var(--lf-warning-fg);
+}
+.lf-banner--info {
+  border-color: var(--lf-accent);
+  background: #20303f;
+  color: var(--lf-accent-fg);
+}
+
+/* ---------- Menus (AppMenuBar dropdowns) ---------- */
+
+.lf-menu {
+  background: var(--lf-bg-2);
+  color: var(--lf-text);
+  border: 1px solid var(--lf-border-strong);
+  border-radius: var(--lf-radius-md);
+  padding: var(--lf-space-2);
+  z-index: var(--lf-z-menu);
+  color-scheme: dark;
+}
+
+.lf-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--lf-space-4);
+  border: 0;
+  background: transparent;
+  color: var(--lf-text);
+  font: inherit;
+  font-size: var(--lf-text-md);
+  padding: 4px 10px;
+  border-radius: var(--lf-radius-sm);
+  cursor: pointer;
+  text-align: left;
+}
+.lf-menu-item:hover:not(:disabled) {
+  background: var(--lf-accent);
+  color: #fff;
+}
+.lf-menu-item:disabled {
+  color: var(--lf-text-faint);
+  cursor: default;
+}
+
+/* ---------- Workspace overlay chips ---------- */
+
+.lf-chip {
+  background: rgba(31, 41, 51, 0.92);
+  color: var(--lf-text);
+  border: 1px solid var(--lf-border-strong);
+  border-radius: var(--lf-radius-md);
+  color-scheme: dark;
+}
+
+/* ---------- Scrollbars (dark surfaces) ---------- */
+
+.lf-rail,
+.lf-dialog,
+.lf-scroll {
+  scrollbar-color: var(--lf-border-strong) var(--lf-bg-1);
+  scrollbar-width: thin;
+}
+.lf-rail::-webkit-scrollbar,
+.lf-dialog::-webkit-scrollbar,
+.lf-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.lf-rail::-webkit-scrollbar-thumb,
+.lf-dialog::-webkit-scrollbar-thumb,
+.lf-scroll::-webkit-scrollbar-thumb {
+  background: var(--lf-border-strong);
+  border-radius: 5px;
+}
+.lf-rail::-webkit-scrollbar-track,
+.lf-dialog::-webkit-scrollbar-track,
+.lf-scroll::-webkit-scrollbar-track {
+  background: var(--lf-bg-1);
+}

@@ -2394,6 +2394,76 @@ bounds scale together:
 
 ---
 
+## ADR-047 - Design tokens + shared chrome classes (dark chrome, light bed)
+
+**Status:** Accepted. | **Date:** 2026-06-10
+
+### Context
+
+The UI was ~260 ad-hoc inline `React.CSSProperties` objects across 77 files
+with zero CSS: no hover/focus/active/disabled styling anywhere (inline styles
+cannot express pseudo-states), an inconsistent chrome (dark menubar/toolbar/
+statusbar over light panels), eight dialogs each duplicating the same
+backdrop+panel shell, and ~15 duplicated button styles. The maintainer chose
+a unified dark chrome with the canvas bed kept light (WYSIWYG against white
+material), zero new dependencies, hand-rolled SVG icons.
+
+### Decision
+
+- **`src/ui/theme/tokens.css`** — the single global stylesheet, imported once
+  in `src/ui/app/main.tsx`. Defines `--lf-*` custom properties (surfaces,
+  text levels, semantic fills + text-on-dark variants, focus, type/space/
+  radius scales, z-order map) and shared chrome classes (`.lf-btn` +
+  variants, `.lf-input`/`.lf-select`, `.lf-dialog*`, `.lf-rail`, `.lf-card`,
+  `.lf-banner--*`, `.lf-menu*`, `.lf-chip`, scrollbars, global
+  `:focus-visible`). `color-scheme: dark` is scoped to dark-surface classes,
+  not `:root`, so native controls flip per-surface during the migration.
+- **`src/ui/theme/canvas-theme.ts`** — the Canvas2D palette as TS constants
+  (custom properties cannot reach raw ctx calls). Values byte-identical to
+  the literals they replace; the workspace viewport deliberately keeps its
+  light look. The two genuinely shared values (selection ↔ `--lf-accent`,
+  out-of-bounds ↔ `--lf-danger`) are pinned by `theme-sync.test.ts`.
+- **Policy:** static presentational styling migrates to classes/tokens;
+  DYNAMIC styling stays inline (drag-readout position, layer color swatches,
+  progress width %, preview opacity). After the migration completes, a scoped
+  `no-restricted-syntax` lint bans raw hex/`rgb(` literals in `src/ui/**`
+  (theme files and tests excluded; scene-data colors like
+  `DEFAULT_NEW_LAYER_COLOR` carry a justified disable).
+- **Primitives** live in a new `src/ui/kit/` module (Dialog composing the
+  existing `use-dialog-a11y`, Button, Field, NumberInput, IconButton,
+  PanelHeading, icons) — `common/index.ts` stays within its export budget.
+- A future light theme is a `[data-theme='light']` block re-declaring the
+  custom properties; no component changes.
+
+### Consequences
+
+- Hover/focus/disabled affordances exist for the first time; dialogs share
+  one a11y shell (the calibration dialogs gain the Escape/focus-trap they
+  lacked); duplicated style objects collapse into classes.
+- Visual output is invisible to jsdom — every migration batch requires a
+  maintainer eyeball pass on the dev server, stated plainly in reports.
+- Perf-sensitive surfaces (250 ms status poll, per-mousemove overlays,
+  canvas draw loop) get flat colors only: no blur, no shadows, transitions
+  limited to background/border color on interactive elements.
+- Bundle cost ≈ +10 KB raw CSS (budget: <1 MB gzip total, currently ~205 KB).
+
+### Alternatives rejected
+
+- `theme.ts`-only typed constants: cannot express pseudo-states — the
+  core deficiency would remain.
+- TS→CSS codegen: build machinery for exactly two shared values; the sync
+  test is cheaper and honest.
+- CSS-in-JS / CSS modules / Tailwind: new dependency (ADR-017 gauntlet) or
+  77-file churn for no additional capability at this scale.
+
+### Verification
+
+- `src/ui/theme/theme-sync.test.ts` pins the shared values; existing suite
+  stays green per batch; `pnpm build:web` confirms the stylesheet lands in
+  the bundle; per-batch maintainer eyeball checklist on `pnpm dev:web`.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

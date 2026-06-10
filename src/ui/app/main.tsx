@@ -6,6 +6,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { webAdapter } from '../../platform/web';
 import { ErrorBoundary } from '../common/ErrorBoundary';
+// Design tokens + shared chrome classes (ADR-047). Imported exactly once,
+// here — jsdom tests never load main.tsx, so styling stays out of unit tests.
+import '../theme/tokens.css';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 
