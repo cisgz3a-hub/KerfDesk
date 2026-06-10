@@ -157,11 +157,19 @@ export type SaveProjectCtx = {
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
+// LU18: the Save-before-discard flow needs to know whether the save
+// actually landed — a cancelled picker must abort the destructive action
+// that triggered it, not fall through to "discard anyway".
+export type SaveProjectOutcome = 'saved' | 'cancelled' | 'error';
+
 // F-A11 Save vs Save As. Without `forceDialog`, Ctrl+S reuses the in-memory
 // SaveTarget from the last save (no dialog, toast just says "Saved").
 // `forceDialog` = true is Save As — always prompts. New/Open clear
 // lastSaveTarget so the next save will prompt regardless.
-export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false): Promise<void> {
+export async function handleSaveProject(
+  ctx: SaveProjectCtx,
+  forceDialog = false,
+): Promise<SaveProjectOutcome> {
   const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
   let target: SaveTarget | null;
   try {
@@ -173,9 +181,9 @@ export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false
         });
   } catch (err) {
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
-    return;
+    return 'error';
   }
-  if (target === null) return;
+  if (target === null) return 'cancelled';
   try {
     await target.write(serializeProject(ctx.project));
     ctx.markSaved(target);
@@ -183,8 +191,10 @@ export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false
     // the recovery prompt doesn't fire on the next boot.
     clearAutosave();
     ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
+    return 'saved';
   } catch (err) {
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
+    return 'error';
   }
 }
 

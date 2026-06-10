@@ -11,7 +11,9 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'New',
       'New project',
       () => {
-        if (ctx.confirmDiscard('start a new project')) ctx.newProject();
+        void ctx.confirmDiscard('start a new project').then((ok) => {
+          if (ok) ctx.newProject();
+        });
       },
       'Ctrl+N',
     ),
@@ -94,7 +96,9 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Material Test...',
       'Create a material test grid',
       () => {
-        if (ctx.confirmDiscard('create a material test')) ctx.materialTest();
+        void ctx.confirmDiscard('create a material test').then((ok) => {
+          if (ok) ctx.materialTest();
+        });
       },
     ),
     enabled(
@@ -103,7 +107,9 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Interval Test...',
       'Create an interval test grid',
       () => {
-        if (ctx.confirmDiscard('create an interval test')) ctx.intervalTest();
+        void ctx.confirmDiscard('create an interval test').then((ok) => {
+          if (ok) ctx.intervalTest();
+        });
       },
     ),
     enabled(
