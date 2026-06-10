@@ -42,19 +42,19 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
         <span />
         {/* For front-left/right origin, "↑ away from operator" maps to +Y in
             machine coords. We send +dy for ↑ and -dy for ↓ accordingly. */}
-        <Btn onClick={() => send(0, 1)} disabled={disabled}>
+        <Btn onClick={() => send(0, 1)} disabled={disabled} label={`Jog +Y ${step} mm`}>
           ↑
         </Btn>
         <span />
-        <Btn onClick={() => send(-1, 0)} disabled={disabled}>
+        <Btn onClick={() => send(-1, 0)} disabled={disabled} label={`Jog -X ${step} mm`}>
           ←
         </Btn>
         <span />
-        <Btn onClick={() => send(1, 0)} disabled={disabled}>
+        <Btn onClick={() => send(1, 0)} disabled={disabled} label={`Jog +X ${step} mm`}>
           →
         </Btn>
         <span />
-        <Btn onClick={() => send(0, -1)} disabled={disabled}>
+        <Btn onClick={() => send(0, -1)} disabled={disabled} label={`Jog -Y ${step} mm`}>
           ↓
         </Btn>
         <span />
@@ -66,14 +66,23 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
 function Btn({
   onClick,
   disabled,
+  label,
   children,
 }: {
   readonly onClick: () => void;
   readonly disabled: boolean;
+  readonly label: string;
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} style={btnStyle}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={btnStyle}
+      aria-label={label}
+      title={label}
+    >
       {children}
     </button>
   );

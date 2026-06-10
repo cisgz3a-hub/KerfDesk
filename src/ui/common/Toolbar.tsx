@@ -88,11 +88,14 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ],
 ];
 
+// Keep in sync with shortcuts.ts, use-job-shortcuts.ts, and drag-state.ts —
+// the audit (M27/A.5) caught this hint omitting four shipped shortcuts.
 const SHORTCUT_HINT = [
   'File: Ctrl+N new - Ctrl+O open - Ctrl+S save - Ctrl+Shift+S save as - Ctrl+I import - Ctrl+E export G-code',
-  'Edit: Ctrl+Z undo - Ctrl+Shift+Z redo - Ctrl+A select all - Delete/Backspace remove - Escape deselect',
+  'Edit: Ctrl+Z undo - Ctrl+Shift+Z redo - Ctrl+A select all - Ctrl+D duplicate - Delete/Backspace remove - Escape deselect',
   'Transform: arrows nudge 1mm - Shift+arrows 10mm - H flip horizontal - V flip vertical',
-  'View: F or 0 fit-to-bed - +/- zoom - P preview - Space+drag pan',
+  'View: F or 0 fit-to-bed - Shift+F fit-to-selection - +/- zoom - P preview - Space or right-drag pan',
+  'Laser: Ctrl+Enter start job - Ctrl+. stop job',
 ].join('\n');
 
 const barStyle: React.CSSProperties = {
