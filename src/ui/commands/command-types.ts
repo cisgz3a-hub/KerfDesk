@@ -71,7 +71,10 @@ export type AppCommandContext = {
   readonly hasSelection: boolean;
   readonly hasRasterSelection: boolean;
   readonly hasConvertibleSelection: boolean;
-  readonly confirmDiscard: (action: string) => boolean;
+  // LU18 dirty-project guard: resolves true when the destructive action
+  // may proceed (clean, saved, or explicitly discarded). Async because it
+  // can show the Save / Don't Save / Cancel dialog and run a save.
+  readonly confirmDiscard: (action: string) => Promise<boolean>;
   readonly newProject: () => void;
   readonly openProject: () => void;
   readonly saveProject: () => void;

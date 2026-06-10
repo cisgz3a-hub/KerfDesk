@@ -141,7 +141,7 @@ describe('file actions contextual failure handling', () => {
         markSaved: vi.fn(),
         pushToast: toast.pushToast,
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe('error');
 
     expect(toast.messages).toEqual([
       { message: 'Could not save project: save picker failed', variant: 'error' },
@@ -241,14 +241,16 @@ describe('file actions contextual failure handling', () => {
       markLoaded: vi.fn(),
       pushToast: toast.pushToast,
     });
-    await handleSaveProject({
-      platform,
-      project: projectWithLine(),
-      savedName: null,
-      lastSaveTarget: null,
-      markSaved: vi.fn(),
-      pushToast: toast.pushToast,
-    });
+    await expect(
+      handleSaveProject({
+        platform,
+        project: projectWithLine(),
+        savedName: null,
+        lastSaveTarget: null,
+        markSaved: vi.fn(),
+        pushToast: toast.pushToast,
+      }),
+    ).resolves.toBe('cancelled');
     await handleSaveGcode({
       platform,
       project: projectWithLine(),
@@ -257,5 +259,48 @@ describe('file actions contextual failure handling', () => {
     });
 
     expect(toast.messages).toEqual([]);
+  });
+
+  // LU18: the Save-before-discard flow branches on this outcome — a
+  // cancelled picker must abort the destructive action, not discard.
+  it('reports saved after a successful write', async () => {
+    const write = vi.fn(async () => undefined);
+    const markSaved = vi.fn();
+    const toast = toasts();
+
+    await expect(
+      handleSaveProject({
+        platform: mockPlatform({ save: async () => ({ displayName: 'badge.lf2', write }) }),
+        project: projectWithLine(),
+        savedName: null,
+        lastSaveTarget: null,
+        markSaved,
+        pushToast: toast.pushToast,
+      }),
+    ).resolves.toBe('saved');
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(markSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports error when the write itself fails', async () => {
+    const toast = toasts();
+
+    await expect(
+      handleSaveProject({
+        platform: mockPlatform({
+          save: async () => ({ displayName: 'badge.lf2', write: () => reject('disk full') }),
+        }),
+        project: projectWithLine(),
+        savedName: null,
+        lastSaveTarget: null,
+        markSaved: vi.fn(),
+        pushToast: toast.pushToast,
+      }),
+    ).resolves.toBe('error');
+
+    expect(toast.messages).toEqual([
+      { message: 'Could not save project: disk full', variant: 'error' },
+    ]);
   });
 });

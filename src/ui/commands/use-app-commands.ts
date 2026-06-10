@@ -1,4 +1,5 @@
 import type { Project } from '../../core/scene';
+import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import {
   handleImportSvg,
@@ -7,7 +8,6 @@ import {
   handleSaveProject,
 } from '../app/file-actions';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -53,7 +53,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     hasSelection,
     hasRasterSelection: selected?.kind === 'raster-image',
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
-    confirmDiscard,
+    confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
     saveProject: () => saveProject(platform, app, pushToast, false),
@@ -106,25 +106,16 @@ function hasPreviewableContent(project: Project): boolean {
   return project.scene.layers.some((layer) => layer.output) && project.scene.objects.length > 0;
 }
 
-function confirmDiscard(action: string): boolean {
-  const state = useStore.getState();
-  if (!state.dirty) return true;
-  const name = state.savedName ?? 'this project';
-  // jobAwareConfirm fails closed while a job is active (H13): a native
-  // confirm would freeze Pause/Stop with the beam live.
-  return jobAwareConfirm(
-    `Discard unsaved changes to ${name} and ${action}? (Cancel to keep editing - Save first via Save or Ctrl+S.)`,
-  );
-}
-
 function openProject(
   platform: ReturnType<typeof usePlatform>,
   setProject: ReturnType<typeof useStore.getState>['setProject'],
   markLoaded: ReturnType<typeof useStore.getState>['markLoaded'],
   pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
 ): void {
-  if (!confirmDiscard('open another project')) return;
-  void handleOpenProject({ platform, setProject, markLoaded, pushToast });
+  void confirmDiscardAsync(platform, 'open another project').then((ok) => {
+    if (!ok) return;
+    return handleOpenProject({ platform, setProject, markLoaded, pushToast });
+  });
 }
 
 function saveProject(
