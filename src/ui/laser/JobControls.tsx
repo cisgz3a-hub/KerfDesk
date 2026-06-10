@@ -1,7 +1,6 @@
 // JobControls — Home + Start / Pause / Resume / Stop + progress bar.
 // F-B3 (Home), F-B6 (Start), F-B7 (Pause/Resume), F-B8 (Stop), F-B11 (Progress).
 
-import { useMemo } from 'react';
 import { progress } from '../../core/controllers/grbl';
 import {
   computeJobBounds,
@@ -15,7 +14,8 @@ import { useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { JobPlacementControls } from './JobPlacementControls';
-import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
+import { type LiveJobEstimate } from './live-job-estimate';
+import { useJobEstimate } from './use-job-estimate';
 
 const PAUSE_HOLD_SAFETY_MESSAGE = 'Pause is feed hold only. Use Stop or physical E-stop if unsafe.';
 
@@ -164,14 +164,6 @@ function SetupRow(props: {
   );
 }
 
-// Live ETA for the current scene + device settings. Huge vector traces
-// intentionally report "too-large" so React render never runs the full
-// compile/optimize/estimate pipeline on a main-thread hot path.
-function useJobEstimate(): LiveJobEstimate {
-  const project = useStore((s) => s.project);
-  return useMemo(() => estimateLiveJob(project), [project]);
-}
-
 function startJobTitle(estimate: LiveJobEstimate): string {
   if (estimate.kind === 'estimated') {
     return `Estimated burn time: ${estimate.label} (excludes acceleration overhead)`;
@@ -258,14 +250,15 @@ function ProgressBar({
 }
 
 function useFrameAction(): () => void {
-  const project = useStore((s) => s.project);
-  const jobPlacement = useStore((s) => s.jobPlacement);
   const frame = useLaserStore((s) => s.frame);
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const pushToast = useToastStore((s) => s.pushToast);
   return () => {
+    // Click-only consumer: read project/placement at call time instead of
+    // subscribing — a render-per-mousemove for a button handler (H16).
+    const { project, jobPlacement } = useStore.getState();
     const placement = resolveJobPlacement(jobPlacement, {
       statusReport,
       workOriginActive,
