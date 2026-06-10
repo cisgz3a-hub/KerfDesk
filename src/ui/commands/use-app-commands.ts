@@ -92,9 +92,18 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     disconnectLaser: () => void laser.disconnect().catch(() => undefined),
     homeLaser: () => void laser.home().catch(() => undefined),
     togglePreview: app.togglePreview,
+    previewActive: app.previewMode,
+    hasPreviewableContent: hasPreviewableContent(app.project),
     resetView: useUiStore.getState().resetView,
     showAbout: callbacks.showAbout,
   });
+}
+
+// M27: the Preview toolbar button greys out when nothing would render —
+// any output-enabled layer plus any object is previewable (the raster sim
+// and vector toolpath cover the kinds between them).
+function hasPreviewableContent(project: Project): boolean {
+  return project.scene.layers.some((layer) => layer.output) && project.scene.objects.length > 0;
 }
 
 function confirmDiscard(action: string): boolean {

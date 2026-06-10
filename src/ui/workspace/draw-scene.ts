@@ -23,6 +23,7 @@ import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor } from './handles';
+import { isObjectOutOfBed } from './out-of-bounds';
 import { rotateHandlePosition } from './rotate-handle';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import {
@@ -363,9 +364,8 @@ function drawOutOfBoundsOutlines(
   const bedW = project.device.bedWidth;
   const bedH = project.device.bedHeight;
   for (const obj of project.scene.objects) {
+    if (!isObjectOutOfBed(obj, bedW, bedH)) continue;
     const bbox = transformedBBox(obj);
-    const outOfBounds = bbox.minX < 0 || bbox.minY < 0 || bbox.maxX > bedW || bbox.maxY > bedH;
-    if (!outOfBounds) continue;
     ctx.save();
     ctx.strokeStyle = canvasTheme.outOfBounds;
     ctx.lineWidth = 1.5;

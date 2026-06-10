@@ -64,6 +64,7 @@ function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
       className="lf-btn"
       title={title}
       disabled={!props.command.enabled}
+      {...(props.command.active === undefined ? {} : { 'aria-pressed': props.command.active })}
       onClick={() => {
         runCommand(props.command);
       }}
@@ -87,6 +88,9 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
     'tools.convert-to-bitmap',
     'file.save-gcode',
   ],
+  // M27: Preview is the operator's primary pre-burn verification surface —
+  // it gets a visible toggle, not just the P shortcut.
+  ['window.toggle-preview'],
 ];
 
 // Keep in sync with shortcuts.ts, use-job-shortcuts.ts, and drag-state.ts —
