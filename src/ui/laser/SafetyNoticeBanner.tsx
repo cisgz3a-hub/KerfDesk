@@ -30,16 +30,16 @@ export function SafetyNoticeBanner(): JSX.Element | null {
 }
 
 const bannerStyle: React.CSSProperties = {
-  border: '2px solid #b71c1c',
-  background: '#ffcdd2',
-  color: '#7f1010',
+  border: '2px solid var(--lf-danger)',
+  background: '#3a2326',
+  color: 'var(--lf-danger-fg)',
   padding: 10,
   borderRadius: 4,
 };
 const titleStyle: React.CSSProperties = { fontSize: 13, display: 'block' };
 const messageStyle: React.CSSProperties = { margin: '6px 0', fontSize: 12, lineHeight: 1.4 };
 const dismissStyle: React.CSSProperties = {
-  background: '#b71c1c',
+  background: 'var(--lf-danger)',
   color: '#fff',
   border: 'none',
   borderRadius: 3,
