@@ -10,6 +10,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
@@ -28,7 +29,9 @@ function confirmDiscard(action: string): boolean {
   const s = useStore.getState();
   if (!s.dirty) return true;
   const name = s.savedName ?? 'this project';
-  return window.confirm(
+  // jobAwareConfirm fails closed while a job is active (H13): a native
+  // confirm would freeze Pause/Stop with the beam live.
+  return jobAwareConfirm(
     `Discard unsaved changes to ${name} and ${action}? (Cancel to keep editing — Save first via Save or Ctrl+S.)`,
   );
 }

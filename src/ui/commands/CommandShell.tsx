@@ -6,6 +6,7 @@ import {
   type MaterialTestGridOptions,
 } from '../../core/job';
 import { useStore } from '../state';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
@@ -39,7 +40,7 @@ export function CommandShell(): JSX.Element {
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
-    showAbout: () => window.alert(aboutText()),
+    showAbout: () => jobAwareAlert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
   return (

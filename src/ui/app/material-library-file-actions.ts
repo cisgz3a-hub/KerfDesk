@@ -5,6 +5,7 @@ import {
   type MaterialLibraryDocument,
 } from '../../io/material-library';
 import type { PlatformAdapter } from '../../platform/types';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
@@ -50,7 +51,7 @@ export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Pr
   }
 
   if (result.kind === 'schema-too-new') {
-    window.alert(
+    jobAwareAlert(
       `This material library was saved with a newer LaserForge (schemaVersion ${result.sawVersion}). Update the app to open it.`,
     );
     return;
