@@ -312,7 +312,7 @@ const previewButtonStyle: React.CSSProperties = {
   fontSize: 11,
   padding: '2px 8px',
   background: 'transparent',
-  border: '1px solid #ccc',
+  border: '1px solid var(--lf-border)',
   borderRadius: 3,
   cursor: 'pointer',
 };
@@ -325,7 +325,7 @@ const frameStyle: React.CSSProperties = {
   width: '100%',
   height: 240,
   background: '#fafafa',
-  border: '1px solid #ddd',
+  border: '1px solid var(--lf-border)',
   borderRadius: 4,
   overflow: 'hidden',
 };
@@ -346,7 +346,7 @@ const hintStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
   fontSize: 12,
-  color: '#888',
+  color: 'var(--lf-text-muted)',
   fontStyle: 'italic',
 };
 
@@ -354,7 +354,7 @@ const errorStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
   fontSize: 12,
-  color: '#b00020',
+  color: 'var(--lf-danger-fg)',
   padding: 8,
   textAlign: 'center',
 };
