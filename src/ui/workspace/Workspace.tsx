@@ -10,6 +10,7 @@
 // `view-transform.ts`; the drag state machine in `drag-state.ts`; the
 // HTML overlays (drop hint, preview scrubber, etc.) in `overlays.tsx`.
 
+import { canvasTheme } from '../theme/canvas-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB } from '../../core/job';
 import type { Project } from '../../core/scene';
@@ -309,7 +310,7 @@ function useDragMove(
 
 const canvasStyle: React.CSSProperties = {
   display: 'block',
-  background: '#fafafa',
+  background: canvasTheme.viewportSurround,
   width: '100%',
   height: '100%',
   // Block browser-default touch handling so trackpad gestures and
