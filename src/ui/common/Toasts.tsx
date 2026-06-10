@@ -27,13 +27,13 @@ export function Toasts(): JSX.Element {
 function variantStyle(variant: ToastVariant): React.CSSProperties {
   switch (variant) {
     case 'success':
-      return { background: '#2e7d32', color: '#fff' };
+      return { background: 'var(--lf-success)', color: '#fff' };
     case 'warning':
-      return { background: '#ed6c02', color: '#fff' };
+      return { background: 'var(--lf-warning)', color: '#fff' };
     case 'error':
-      return { background: '#c62828', color: '#fff' };
+      return { background: 'var(--lf-danger)', color: '#fff' };
     case 'info':
-      return { background: '#1976d2', color: '#fff' };
+      return { background: 'var(--lf-accent)', color: '#fff' };
   }
 }
 
