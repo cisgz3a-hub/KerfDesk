@@ -174,8 +174,10 @@ function drawObjects(
     // F.2.c: raster images render via Canvas2D drawImage rather than
     // polyline strokes. The bitmap displays at its mm-bounds; the
     // dither preview overlay is a separate render layer we can add
-    // later if needed.
-    if (obj.kind === 'raster-image') {
+    // later if needed. Hiding the layer hides its bitmaps (M23) —
+    // an orphan color with no layer stays visible so artwork never
+    // silently disappears.
+    if (obj.kind === 'raster-image' && layerByColor.get(obj.color)?.visible !== false) {
       drawRasterImage(
         ctx,
         obj,
