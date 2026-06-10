@@ -29,6 +29,7 @@ export {
 } from './scene-object';
 
 export { applyTransform } from './transform';
+export { isClosedEnough } from './polyline-closure';
 export type { AABB } from './hit-test';
 export { combinedBBox, hitTest, transformedBBox } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';

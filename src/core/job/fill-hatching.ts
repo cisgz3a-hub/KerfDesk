@@ -30,7 +30,7 @@
 // Open polylines (closed=false) don't enclose area and are silently skipped
 // — the caller decides whether to surface a warning toast.
 
-import type { Polyline, Vec2 } from '../scene';
+import { isClosedEnough, type Polyline, type Vec2 } from '../scene';
 
 // Small absolute tolerance in mm. Used to (a) collapse near-zero edge
 // lengths, (b) snap "scanline exactly on vertex" cases off the boundary
@@ -113,21 +113,6 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   }
 
   return hatchesRotated.map((pl) => rotatePolyline(pl, angle));
-}
-
-// "Closed enough" check: either the closed flag is set, or the polyline
-// returns to within FLAG_EPS_MM of its starting point. The geometric
-// half catches glyph contours whose source omitted Z (opentype.js v2)
-// and any data-at-rest polylines whose closed flag was set incorrectly
-// upstream. Same epsilon as text-to-polylines.flattenPath uses.
-const CLOSURE_EPS_MM = 1e-4;
-function isClosedEnough(pl: Polyline): boolean {
-  if (pl.points.length < 3) return false;
-  if (pl.closed) return true;
-  const first = pl.points[0];
-  const last = pl.points[pl.points.length - 1];
-  if (first === undefined || last === undefined) return false;
-  return Math.abs(first.x - last.x) < CLOSURE_EPS_MM && Math.abs(first.y - last.y) < CLOSURE_EPS_MM;
 }
 
 // Wrap hatch angle into [0, 180). Hatching at 200° looks identical to 20°

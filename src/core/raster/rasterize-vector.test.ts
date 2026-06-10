@@ -185,3 +185,37 @@ describe('converted-bitmap ink composes with the dither pipeline (M7)', () => {
     expect(Array.from(s)).toContain(300);
   });
 });
+
+// M4 (AUDIT-2026-06-10): fill-hatching accepts closed=false polylines whose
+// endpoints coincide (real data-at-rest: autosave-restored opentype glyphs),
+// but Convert to Bitmap dropped them with no fallback - Fill worked on the
+// object while conversion produced an all-white bitmap with a success toast.
+describe('geometric closure fallback (M4)', () => {
+  it('fills a contour whose endpoints coincide even when closed=false', () => {
+    const sq: Polyline = {
+      closed: false,
+      points: [
+        { x: 2, y: 2 },
+        { x: 8, y: 2 },
+        { x: 8, y: 8 },
+        { x: 2, y: 8 },
+        { x: 2, y: 2 },
+      ],
+    };
+    const r = rasterizeVectorToLuma({
+      polylines: [sq],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+    });
+    expect(lumaAt(r, 5, 5)).toBe(INK);
+  });
+
+  it('still ignores genuinely open polylines in fill mode', () => {
+    const r = rasterizeVectorToLuma({
+      polylines: [openLine(0, 5, 10, 5)],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+    });
+    expect([...r.luma].every((v) => v === BG)).toBe(true);
+  });
+});
