@@ -5,6 +5,7 @@ import { describeAlarm } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
@@ -25,7 +26,12 @@ export function LaserWindow(): JSX.Element {
   const startJob = useLaserStore((s) => s.startJob);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
+  const streamer = useLaserStore((s) => s.streamer);
   const machineOperationBusy = autofocusBusy || motionOperation !== null;
+  // H6: jog mid-job interleaves $J= acks into the character-counted stream —
+  // every ack pops the stream head, so the 120-byte RX accounting drifts and
+  // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
+  const jobActive = isActiveJob(streamer);
 
   const supportsSerial = platform.serial.isSupported();
   const onStartJob = async (): Promise<void> => {
@@ -83,7 +89,7 @@ export function LaserWindow(): JSX.Element {
       {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
       <DetectedSettingsBanner />
       <StatusDisplay />
-      <JogPad disabled={connection.kind !== 'connected' || machineOperationBusy} />
+      <JogPad disabled={connection.kind !== 'connected' || machineOperationBusy || jobActive} />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void onStartJob()}
