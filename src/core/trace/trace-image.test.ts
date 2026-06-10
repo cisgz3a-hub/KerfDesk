@@ -451,9 +451,7 @@ describe('traceImageToSvgString', () => {
       if (pl.points.length === 0) return false;
       const cx = pl.points.reduce((s, p) => s + p.x, 0) / pl.points.length;
       const cy = pl.points.reduce((s, p) => s + p.y, 0) / pl.points.length;
-      return (
-        cx >= 30 * pxToMm && cx <= 38 * pxToMm && cy >= 30 * pxToMm && cy <= 38 * pxToMm
-      );
+      return cx >= 30 * pxToMm && cx <= 38 * pxToMm && cy >= 30 * pxToMm && cy <= 38 * pxToMm;
     });
     expect(dotPresent).toBe(true);
   });

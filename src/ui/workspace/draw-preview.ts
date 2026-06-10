@@ -80,11 +80,7 @@ export function buildPreviewToolpath(
   // The prepared job is in machine/work coordinates; the canvas (ghost +
   // raster sim) draws in scene space. Map back so the overlay registers with
   // the design instead of mirroring about the bed midline (H3).
-  return mapToolpathToScene(
-    buildToolpath(prepared.job),
-    prepared.jobOriginOffset,
-    project.device,
-  );
+  return mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device);
 }
 
 function drawStep(ctx: CanvasRenderingContext2D, step: ToolpathStep, view: ViewTransform): void {

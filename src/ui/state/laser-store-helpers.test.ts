@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createStreamer, step, type StatusReport } from '../../core/controllers/grbl';
-import {
-  detectStreamStall,
-  STREAM_STALL_TIMEOUT_MS,
-  type StallProbe,
-} from './laser-store-helpers';
+import { detectStreamStall, STREAM_STALL_TIMEOUT_MS, type StallProbe } from './laser-store-helpers';
 
 function streamingState() {
   return step(createStreamer('G1 X1 S100\nG1 X2\nG1 X3')).state;
