@@ -42,7 +42,7 @@ import type { CutSegment, Group, Job, RasterGroup } from './job';
 // Default overscan kept here (not on Layer) so it can ride device
 // profiles in the future without a .lf2 schema bump. 5 mm matches
 // the ADR-020 baseline for diode lasers.
-const DEFAULT_OVERSCAN_MM = 5;
+export const DEFAULT_OVERSCAN_MM = 5;
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
 const WHITE_LUMA_BYTE = 255;
