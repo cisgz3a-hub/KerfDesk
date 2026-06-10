@@ -11,6 +11,7 @@ import { deserializeProject, serializeProject } from '../../io/project';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
@@ -86,8 +87,8 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     ...ctx.machine,
   });
   if (!placement.ok) {
-    const lines = placement.messages.map((message) => `â€¢ ${message}`).join('\n');
-    window.alert(`Cannot save G-code:\n\n${lines}`);
+    const lines = placement.messages.map((message) => `• ${message}`).join('\n');
+    jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
   const { gcode, preflight } = emitGcode(ctx.project, {
@@ -99,7 +100,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   });
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
-    window.alert(`Cannot save G-code:\n\n${lines}`);
+    jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
   let target: SaveTarget | null;
@@ -199,7 +200,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     return;
   }
   if (result.kind === 'schema-too-new') {
-    window.alert(
+    jobAwareAlert(
       `This project was saved with a newer LaserForge (schemaVersion ${result.sawVersion}). Update the app to open it.`,
     );
     return;
