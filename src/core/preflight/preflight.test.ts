@@ -373,6 +373,24 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
     expect(codes).toContain('unsupported-raster-transform');
   });
 
+  // M35 (AUDIT-2026-06-10): compile-job's orientRasterLumaForMachine handles
+  // mirror (XOR with the origin flip — pinned in compile-job.test.ts), but
+  // this gate predates that support and still rejected ANY mirror, so the
+  // H/V flip shortcuts made an image project un-emittable.
+  it('accepts a mirrored raster image now that compile orients mirrored luma', () => {
+    const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });
+    const mirroredRaster: SceneObject = {
+      ...grayRaster,
+      transform: { ...IDENTITY_TRANSFORM, mirrorX: true, mirrorY: true },
+    };
+    const project: Project = {
+      ...createProject(),
+      scene: { ...EMPTY_SCENE, objects: [mirroredRaster], layers: [imageLayer] },
+    };
+    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).not.toContain('unsupported-raster-transform');
+  });
+
   it('does not block on rotated trace-source backing images', () => {
     const imageLayer = createLayer({ id: 'L-gray', color: '#808080', mode: 'image' });
     const traceSource: SceneObject = {
