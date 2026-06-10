@@ -196,9 +196,10 @@ function NumberField(props: {
         step={props.step}
         value={props.value}
         onChange={(event) => props.onChange(numberValue(event.target.value, props.min, props.max))}
+        className="lf-input"
         style={styles.inputStyle}
       />
-      {props.unit === undefined ? null : <span style={styles.unitStyle}>{props.unit}</span>}
+      {props.unit === undefined ? null : <span className="lf-field-unit">{props.unit}</span>}
     </label>
   );
 }
@@ -214,6 +215,7 @@ function SelectField(props: {
         name="ditherAlgorithm"
         value={props.value}
         onChange={(event) => props.onChange(parseDither(event.target.value))}
+        className="lf-select"
         style={styles.inputStyle}
       >
         {DITHER_ALGORITHMS.map((algorithm) => (
@@ -238,6 +240,7 @@ function CheckboxField(props: {
       <input
         name={props.name}
         type="checkbox"
+        className="lf-checkbox"
         checked={props.checked}
         onChange={(event) => props.onChange(event.target.checked)}
       />

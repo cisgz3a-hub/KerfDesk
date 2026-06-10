@@ -281,6 +281,10 @@
   min-width: 540px;
   max-width: 680px;
 }
+.lf-dialog--xl {
+  width: min(900px, calc(100vw - 40px));
+  max-width: none;
+}
 
 .lf-dialog-title {
   margin: 0;
