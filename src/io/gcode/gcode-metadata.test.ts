@@ -11,7 +11,7 @@ const META: GcodeMetadata = {
 
 describe('gcodeMetadataHeader', () => {
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
-    const header = gcodeMetadataHeader(META);
+    const header = gcodeMetadataHeader(META, { maxPowerS: 1000 });
     expect(header).toContain('; LaserForge 2.0');
     expect(header).toContain('; version: 0.0.0');
     expect(header).toContain('; commit: abc1234');
@@ -23,5 +23,13 @@ describe('gcodeMetadataHeader', () => {
     }
     // ...and it terminates with a newline so the motion body follows cleanly.
     expect(header.endsWith('\n')).toBe(true);
+  });
+
+  // M11 (AUDIT-2026-06-10): a file emitted for $30=1000 but run on a $30=255
+  // controller clamps every S>255 to 100% beam power. The header must record
+  // the assumed $30 so the mismatch is auditable from the file alone.
+  it('records the assumed $30 power scale and laser mode', () => {
+    const header = gcodeMetadataHeader(META, { maxPowerS: 255 });
+    expect(header).toContain('; assumes: GRBL $30=255 (max S), $32=1 (laser mode)');
   });
 });

@@ -63,13 +63,14 @@ function useFileEditShortcuts(): void {
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const pushToast = useToastStore((s) => s.pushToast);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (isModalOpen(useUiStore.getState())) return;
       const machine = { statusReport, workOriginActive, wcoCache };
       // prettier-ignore
-      const fileCtx = { platform, project, jobPlacement, machine, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
+      const fileCtx = { platform, project, jobPlacement, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
       const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, selectObject, selectAllObjects, duplicateSelection };
       if (handleFileShortcut(e, fileCtx)) return;
@@ -91,6 +92,7 @@ function useFileEditShortcuts(): void {
     statusReport,
     workOriginActive,
     wcoCache,
+    controllerSettings,
     pushToast,
     undo,
     redo,
