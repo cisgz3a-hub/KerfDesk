@@ -42,6 +42,10 @@ const cardStyle: React.CSSProperties = {
 const cardDimmedStyle: React.CSSProperties = { opacity: 0.55 };
 const cardHeaderStyle: React.CSSProperties = {
   display: 'flex',
+  // The header carries swatch + reorder + mode + six actions + two
+  // toggles; without wrapping, anything past the panel width clips off
+  // screen and Delete/Edit/Show/Output become unreachable.
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 8,
   paddingBottom: 6,
