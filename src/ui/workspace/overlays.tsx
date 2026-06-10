@@ -38,7 +38,7 @@ export function ZoomControls(): JSX.Element {
   const fitToSelection = useStore((s) => s.fitToSelection);
   const percent = Math.round(zoomFactor * 100);
   return (
-    <div style={zoomControlsStyle} role="group" aria-label="Zoom">
+    <div className="lf-chip" style={zoomControlsStyle} role="group" aria-label="Zoom">
       <button
         type="button"
         onClick={() => zoomBy(1 / ZOOM_STEP)}
@@ -98,7 +98,7 @@ export function PreviewScrubber(): JSX.Element {
   const scrubberT = useUiStore((s) => s.scrubberT);
   const setScrubberT = useUiStore((s) => s.setScrubberT);
   return (
-    <div style={scrubberContainerStyle}>
+    <div className="lf-chip" style={scrubberContainerStyle}>
       <input
         type="range"
         min={0}
@@ -170,16 +170,16 @@ const emptyHintStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   pointerEvents: 'none',
+  // Dark-on-light: this hint sits on the always-light viewport (ADR-047).
   color: '#888',
   fontStyle: 'italic',
   fontSize: 14,
   fontFamily: 'system-ui, sans-serif',
-  textShadow: '0 1px 0 #fff',
 };
 const dragOverlayStyle: React.CSSProperties = {
   position: 'absolute',
   inset: 12,
-  border: '3px dashed #1976d2',
+  border: '3px dashed var(--lf-accent)',
   borderRadius: 8,
   background: 'rgba(25, 118, 210, 0.08)',
   display: 'flex',
@@ -191,15 +191,15 @@ const dragOverlayLabelStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
   fontSize: 18,
   fontWeight: 600,
-  color: '#1565c0',
-  background: '#fff',
+  color: 'var(--lf-accent-fg)',
+  background: 'var(--lf-bg-1)',
   padding: '6px 16px',
   borderRadius: 4,
-  boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
 };
+// Repositioned per mousemove — flat colors, no shadow (ADR-047 perf).
 const dragReadoutStyle: React.CSSProperties = {
   position: 'absolute',
-  background: '#1976d2',
+  background: 'var(--lf-accent)',
   color: '#fff',
   padding: '2px 6px',
   borderRadius: 3,
@@ -208,7 +208,6 @@ const dragReadoutStyle: React.CSSProperties = {
   fontWeight: 600,
   pointerEvents: 'none',
   whiteSpace: 'nowrap',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
 };
 const scrubberContainerStyle: React.CSSProperties = {
   position: 'absolute',
@@ -218,16 +217,13 @@ const scrubberContainerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 10,
-  background: 'rgba(255,255,255,0.85)',
   borderRadius: 4,
   padding: '6px 10px',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
 };
 const scrubberInputStyle: React.CSSProperties = { flex: 1 };
 const scrubberLabelStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, Menlo, monospace',
   fontSize: 11,
-  color: '#333',
   minWidth: 40,
   textAlign: 'right',
 };
@@ -238,10 +234,7 @@ const zoomControlsStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'stretch',
   gap: 0,
-  background: 'rgba(255,255,255,0.92)',
-  border: '1px solid #ccc',
   borderRadius: 4,
-  boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
   overflow: 'hidden',
   fontFamily: 'system-ui, sans-serif',
 };
@@ -252,7 +245,7 @@ const zoomBtnStyle: React.CSSProperties = {
   background: 'transparent',
   cursor: 'pointer',
   fontSize: 16,
-  color: '#333',
+  color: 'inherit',
   padding: 0,
 };
 const zoomReadoutStyle: React.CSSProperties = {
@@ -261,11 +254,10 @@ const zoomReadoutStyle: React.CSSProperties = {
   justifyContent: 'center',
   minWidth: 52,
   height: 28,
-  borderLeft: '1px solid #e0e0e0',
-  borderRight: '1px solid #e0e0e0',
+  borderLeft: '1px solid var(--lf-border-strong)',
+  borderRight: '1px solid var(--lf-border-strong)',
   fontFamily: 'ui-monospace, Menlo, monospace',
   fontSize: 11,
-  color: '#222',
   cursor: 'pointer',
   userSelect: 'none',
 };

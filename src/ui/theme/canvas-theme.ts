@@ -11,6 +11,9 @@
 // theme-sync.test.ts so the frames cannot drift apart silently.
 
 export const canvasTheme = {
+  // The DOM surface AROUND the bed (Workspace canvas area) — part of the
+  // deliberately-light viewport, not the dark chrome.
+  viewportSurround: '#fafafa',
   // Bed + grid (draw-scene)
   bedFill: '#ffffff',
   bedStroke: '#888888',

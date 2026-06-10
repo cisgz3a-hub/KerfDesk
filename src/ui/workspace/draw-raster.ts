@@ -8,6 +8,7 @@
 // First paint may land before decode finishes, so callers can
 // subscribe to the load event and schedule one redraw.
 
+import { canvasTheme } from '../theme/canvas-theme';
 import type { AABB, Transform as ObjTransform } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
 
@@ -27,7 +28,7 @@ const DEG_TO_RAD = Math.PI / 180;
 // ADR-026 trace-source tint. The source bitmap kept behind a trace is
 // washed with a cool blue so the operator can see two stacked layers and
 // tell which one (the tinted backing) to delete. Display only.
-const TRACE_SOURCE_TINT_COLOR = '#3b82c4';
+const TRACE_SOURCE_TINT_COLOR = canvasTheme.traceSourceTint;
 const TRACE_SOURCE_TINT_ALPHA = 0.4;
 
 export function pruneRasterImageCaches(liveDataUrls: ReadonlySet<string>): void {
