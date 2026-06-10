@@ -156,6 +156,55 @@ describe('compileJob raster image groups', () => {
     expect(m).toEqual([p[1], p[0], p[3], p[2]]);
   });
 
+  // M3 (AUDIT-2026-06-10): dragging a scale handle across the anchor
+  // produces a NEGATIVE scale; the canvas (and dither preview) render that
+  // as a mirror, so the burn must mirror too — previously the luma was
+  // resampled un-mirrored and the preview misrepresented the burn.
+  it('treats negative scale as a mirror so the burn matches the canvas', () => {
+    const base: SceneObject = {
+      ...rasterObject('AP8A/w=='),
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+    };
+    const negScale: SceneObject = {
+      ...base,
+      transform: { ...IDENTITY_TRANSFORM, scaleX: -1 },
+    };
+    const mirrored: SceneObject = {
+      ...base,
+      transform: { ...IDENTITY_TRANSFORM, mirrorX: true },
+    };
+
+    const fromNegScale = compileJob({ objects: [negScale], layers: [imageLayer()] }, dev);
+    const fromMirror = compileJob({ objects: [mirrored], layers: [imageLayer()] }, dev);
+    const plain = compileJob({ objects: [base], layers: [imageLayer()] }, dev);
+
+    const neg = Array.from(firstRasterGroup(fromNegScale)?.sValues ?? []);
+    const mir = Array.from(firstRasterGroup(fromMirror)?.sValues ?? []);
+    const pln = Array.from(firstRasterGroup(plain)?.sValues ?? []);
+    expect(neg).toEqual(mir);
+    expect(neg).not.toEqual(pln);
+  });
+
+  it('cancels a negative scale against an explicit mirror on the same axis', () => {
+    // scaleY=-1 + mirrorY=true is a double flip — visually upright on the
+    // canvas, so the burn must be upright too.
+    const base: SceneObject = {
+      ...rasterObject('AAD//w=='),
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+    };
+    const doubleFlip: SceneObject = {
+      ...base,
+      transform: { ...IDENTITY_TRANSFORM, scaleY: -1, mirrorY: true },
+    };
+
+    const a = compileJob({ objects: [doubleFlip], layers: [imageLayer()] }, dev);
+    const b = compileJob({ objects: [base], layers: [imageLayer()] }, dev);
+
+    expect(Array.from(firstRasterGroup(a)?.sValues ?? [])).toEqual(
+      Array.from(firstRasterGroup(b)?.sValues ?? []),
+    );
+  });
+
   it('measures transformed raster bounds from all four corners', () => {
     const rotatedRaster: SceneObject = {
       ...rasterObject('AP//AA=='),

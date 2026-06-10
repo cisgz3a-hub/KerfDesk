@@ -142,8 +142,13 @@ function orientRasterLumaForMachine(
   obj: RasterImage,
   device: DeviceProfile,
 ): Uint8Array {
-  const flipX = originFlipsRasterX(device) !== obj.transform.mirrorX;
-  const flipY = originFlipsRasterY(device) !== obj.transform.mirrorY;
+  // Negative scale (a handle dragged across the anchor) is a mirror: the
+  // canvas and dither preview render it flipped, so the burn must flip too
+  // (M3). XOR with the explicit mirror flags — a double flip is upright.
+  const objFlipX = obj.transform.mirrorX !== obj.transform.scaleX < 0;
+  const objFlipY = obj.transform.mirrorY !== obj.transform.scaleY < 0;
+  const flipX = originFlipsRasterX(device) !== objFlipX;
+  const flipY = originFlipsRasterY(device) !== objFlipY;
   if (!flipX && !flipY) return luma;
   const out = new Uint8Array(luma.length);
   for (let y = 0; y < height; y += 1) {
