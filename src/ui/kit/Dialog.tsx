@@ -8,7 +8,7 @@
 import { useId, useRef } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 
-type DialogSize = 'sm' | 'md' | 'lg';
+type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
 export function Dialog(props: {
   readonly onClose: () => void;

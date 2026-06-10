@@ -1,27 +1,8 @@
-export const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.35)',
-  zIndex: 30,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
-export const panelStyle: React.CSSProperties = {
-  width: 'min(900px, calc(100vw - 40px))',
-  maxHeight: 'calc(100vh - 40px)',
-  overflow: 'auto',
-  background: '#fff',
-  border: '1px solid #bbb',
-  borderRadius: 6,
-  boxShadow: '0 12px 32px rgba(0,0,0,0.24)',
-  padding: 16,
-};
+// Backdrop/panel/heading chrome now comes from the kit Dialog shell
+// (ADR-047); only layout + preview-surface styles remain here.
 
 export const headerStyle: React.CSSProperties = { marginBottom: 12 };
-export const headingStyle: React.CSSProperties = { margin: 0, fontSize: 18 };
-export const subheadingStyle: React.CSSProperties = { margin: '4px 0 0', color: '#555' };
+export const subheadingStyle: React.CSSProperties = { margin: '4px 0 0' };
 
 export const previewGridStyle: React.CSSProperties = {
   display: 'grid',
@@ -31,7 +12,7 @@ export const previewGridStyle: React.CSSProperties = {
 };
 
 export const previewPaneStyle: React.CSSProperties = {
-  border: '1px solid #d0d0d0',
+  border: '1px solid var(--lf-border)',
   borderRadius: 6,
   padding: 10,
   minHeight: 180,
@@ -43,6 +24,8 @@ export const previewCanvasStyle: React.CSSProperties = {
   display: 'block',
   width: '100%',
   maxHeight: 320,
+  // Artwork preview surface stays LIGHT on the dark dialog (ADR-047) -
+  // the engrave is judged against light material.
   background: '#f8f8f8',
   imageRendering: 'pixelated',
 };
@@ -67,23 +50,12 @@ export const checkboxStyle: React.CSSProperties = {
   gap: 8,
 };
 
-export const labelStyle: React.CSSProperties = { color: '#333', fontSize: 13 };
+export const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 13 };
 
+// Width only - control chrome comes from .lf-input / .lf-select.
 export const inputStyle: React.CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
-  border: '1px solid #bbb',
-  borderRadius: 4,
-  padding: '5px 7px',
 };
 
 export const presetActionsStyle: React.CSSProperties = { display: 'flex', gap: 4 };
-
-export const unitStyle: React.CSSProperties = { color: '#666', fontSize: 12 };
-
-export const actionsStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 8,
-  marginTop: 16,
-};
