@@ -148,7 +148,12 @@ function SetupRow(props: {
       >
         Auto-focus
       </button>
-      <button type="button" onClick={onFrame} disabled={busy}>
+      <button
+        type="button"
+        onClick={onFrame}
+        disabled={busy}
+        title="Trace the job's bounding box with the laser off to check placement"
+      >
         Frame
       </button>
       <button
@@ -205,7 +210,11 @@ function RunningControls(props: {
         </button>
       )}
       {props.isPaused && (
-        <button type="button" onClick={() => void resumeJob().catch(() => undefined)}>
+        <button
+          type="button"
+          onClick={() => void resumeJob().catch(() => undefined)}
+          title="Release the feed hold and continue the job"
+        >
           Resume
         </button>
       )}
@@ -213,6 +222,7 @@ function RunningControls(props: {
         type="button"
         onClick={() => void stopJob().catch(() => undefined)}
         style={stopBtnStyle}
+        title="Soft-reset the controller and halt the job (Ctrl+.)"
       >
         Stop
       </button>

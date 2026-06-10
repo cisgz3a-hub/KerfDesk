@@ -162,6 +162,34 @@ describe('Toolbar Convert to Bitmap', () => {
   });
 });
 
+describe('Toolbar shortcut hint (audit M27/A.5)', () => {
+  it('lists every shipped shortcut family, including the late arrivals', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={[]} />);
+      });
+
+      const hint = [...host.querySelectorAll('span')].find(
+        (span) => span.textContent === 'shortcuts',
+      );
+      const title = hint?.getAttribute('title') ?? '';
+      // Shipped shortcuts the hint used to omit:
+      expect(title).toContain('Ctrl+D'); // duplicate (shortcuts.ts)
+      expect(title).toContain('Shift+F'); // fit-to-selection
+      expect(title).toContain('Ctrl+Enter'); // start job (M22)
+      expect(title).toContain('Ctrl+.'); // stop job (M22)
+      expect(title.toLowerCase()).toContain('right-drag'); // pan
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});
+
 describe('Toolbar command buttons', () => {
   it('runs toolbar clicks through the command registry command object', async () => {
     const onNew = vi.fn();
