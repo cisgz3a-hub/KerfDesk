@@ -183,11 +183,15 @@ function appendUnsupportedRasterTransformIssues(
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
     if (!outputImageColors.has(obj.color)) continue;
-    if (obj.transform.rotationDeg !== 0 || obj.transform.mirrorX || obj.transform.mirrorY) {
+    // Mirror is supported: compile-job's orientRasterLumaForMachine XORs the
+    // object's mirror flags into the machine orientation flip (M35; pinned by
+    // compile-job.test.ts column-mirror test). Only rotation remains
+    // unsupported — raster emit is axis-aligned.
+    if (obj.transform.rotationDeg !== 0) {
       issues.push({
         code: 'unsupported-raster-transform',
         message:
-          'Image raster output currently supports scale and position only. Clear rotation/mirror before engraving, or convert after placing the artwork.',
+          'Image raster output currently supports scale, mirror, and position only. Clear rotation before engraving, or convert after placing the artwork.',
       });
     }
   }
