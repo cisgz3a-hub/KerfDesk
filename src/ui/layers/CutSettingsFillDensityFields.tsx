@@ -16,6 +16,7 @@ export function CutSettingsFillDensityFields(props: {
           min={0.05}
           max={10}
           step={0.001}
+          className="lf-input"
           value={displayNumber(props.lineIntervalMm, 4)}
           onChange={(event) =>
             props.onChange(clampFillLineInterval(numericValue(event.target.value)))
@@ -23,7 +24,7 @@ export function CutSettingsFillDensityFields(props: {
           style={numberStyle}
           aria-label="Cut settings line interval"
         />
-        <span style={unitStyle}>mm</span>
+        <span className="lf-field-unit">mm</span>
       </Field>
       <Field label="Lines / Inch">
         <input
@@ -31,6 +32,7 @@ export function CutSettingsFillDensityFields(props: {
           min={lineIntervalMmToLinesPerInch(10)}
           max={lineIntervalMmToLinesPerInch(0.05)}
           step={1}
+          className="lf-input"
           value={displayNumber(lineIntervalMmToLinesPerInch(props.lineIntervalMm), 2)}
           onChange={(event) =>
             props.onChange(linesPerInchToLineIntervalMm(numericValue(event.target.value)))
@@ -38,7 +40,7 @@ export function CutSettingsFillDensityFields(props: {
           style={numberStyle}
           aria-label="Cut settings lines per inch"
         />
-        <span style={unitStyle}>lpi</span>
+        <span className="lf-field-unit">lpi</span>
       </Field>
     </>
   );
@@ -46,8 +48,8 @@ export function CutSettingsFillDensityFields(props: {
 
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
-    <label style={fieldStyle}>
-      <span style={labelStyle}>{props.label}</span>
+    <label className="lf-field">
+      <span className="lf-field-label lf-field-label--md">{props.label}</span>
       <span style={controlStyle}>{props.children}</span>
     </label>
   );
@@ -74,8 +76,6 @@ function displayNumber(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));
 }
 
-const fieldStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
-const labelStyle: React.CSSProperties = { width: 112, color: '#444', fontSize: 13 };
 const controlStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
@@ -83,4 +83,3 @@ const controlStyle: React.CSSProperties = {
   gap: 6,
 };
 const numberStyle: React.CSSProperties = { width: 96 };
-const unitStyle: React.CSSProperties = { color: '#666', fontSize: 12 };
