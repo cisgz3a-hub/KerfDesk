@@ -6,7 +6,7 @@
 import { CutsLayersPanel } from '../layers';
 import { StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
-import { LaserWindow } from '../laser';
+import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { Workspace } from '../workspace';
@@ -27,6 +27,7 @@ export function App(): JSX.Element {
   useAutosave();
   useGlobalErrorHandlers();
   useImportDragDrop();
+  useJobShortcuts();
   useShortcuts();
   useSpacePan();
   useUnloadStop();
