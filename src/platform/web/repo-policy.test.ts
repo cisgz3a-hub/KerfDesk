@@ -25,6 +25,26 @@ describe('repository policy enforcement contract', () => {
     expect(eslintConfig).toContain('skipComments: true');
   });
 
+  // H14 (AUDIT-2026-06-10): CLAUDE.md documented `import/no-cycle: error`
+  // years of commits before the rule existed, and the test script's
+  // --passWithNoTests was the opposite of the documented gate. Pin both so
+  // the manual and the config cannot drift apart again silently.
+  it('actually enforces the documented no-circular-imports rule', () => {
+    const manual = repoFile('CLAUDE.md');
+    const eslintConfig = repoFile('eslint.config.mjs');
+
+    expect(manual).toContain('import/no-cycle');
+    expect(eslintConfig).toContain("'import/no-cycle': 'error'");
+  });
+
+  it('fails the test script when no tests are found', () => {
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      readonly scripts?: { readonly test?: string };
+    };
+
+    expect(packageJson.scripts?.test).not.toContain('--passWithNoTests');
+  });
+
   it('uses one cross-platform file-size backstop in CI and deploy workflows', () => {
     const packageJson = JSON.parse(repoFile('package.json')) as {
       readonly scripts?: { readonly ['check:file-size']?: string };

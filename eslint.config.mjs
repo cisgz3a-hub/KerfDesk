@@ -121,6 +121,9 @@ export default tseslint.config(
       'boundaries/dependencies': ['error', { default: 'disallow', rules: boundaryRules }],
       'boundaries/no-unknown': 'error',
       'boundaries/no-unknown-files': 'error',
+      // CLAUDE.md "No circular imports" — was documented as enforced long
+      // before the rule existed (audit H14); now it actually is.
+      'import/no-cycle': 'error',
 
       // React hooks rules (R-H4 audit finding). rules-of-hooks is an
       // error because violations break at runtime; exhaustive-deps is a
