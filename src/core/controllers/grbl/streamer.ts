@@ -219,6 +219,16 @@ export function disconnect(state: StreamerState): StreamerState {
   return { ...state, status: 'disconnected', queued: [] };
 }
 
+// Mark the streamer errored without consuming an ack — used when a
+// refill write fails mid-job. Unlike disconnect(), 'errored' stays
+// inside isActiveJob, so the Stop button and the soft-reset stop
+// command remain available: the port may still be alive and GRBL may
+// still be executing its buffered lines (AUDIT-VERIFICATION-2026-06-10,
+// HD1-adjacent finding).
+export function markErrored(state: StreamerState): StreamerState {
+  return { ...state, status: 'errored', queued: [] };
+}
+
 // Progress as a fraction [0, 1].
 export function progress(state: StreamerState): number {
   if (state.total === 0) return 1;

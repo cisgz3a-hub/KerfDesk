@@ -32,6 +32,7 @@ export {
   createStreamer,
   disconnect,
   findOversizedLine,
+  markErrored,
   onAck,
   pause,
   progress,

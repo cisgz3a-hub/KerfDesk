@@ -4,6 +4,7 @@ import {
   createStreamer,
   DEFAULT_RX_BUFFER_BYTES,
   disconnect,
+  markErrored,
   onAck,
   pause,
   progress,
@@ -129,6 +130,14 @@ describe('onAck — consuming acks', () => {
     state = onAck(state, 'ok').state;
     state = onAck(state, 'ok').state;
     expect(state.status).toBe('cancelled');
+  });
+
+  it('markErrored is terminal, clears the queue, and keeps step() silent', () => {
+    const s = step(createStreamer('G21\nG90\nM3 S255\nG1 X10', { rxBufferBytes: 12 })).state;
+    const r = markErrored(s);
+    expect(r.status).toBe('errored');
+    expect(r.queued).toHaveLength(0);
+    expect(step(r).toSend).toBe('');
   });
 });
 

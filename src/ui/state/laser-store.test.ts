@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { isActiveJob } from './laser-store-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -250,7 +251,12 @@ describe('laser-store serial write failures', () => {
     failRefill = true;
     await expect(useLaserStore.getState().resumeJob()).rejects.toThrow('resume refill rejected');
 
-    expect(useLaserStore.getState().streamer?.status).toBe('disconnected');
+    // 'errored', not 'disconnected': the port may still be alive and GRBL
+    // is still executing its buffered lines. 'disconnected' falls outside
+    // isActiveJob, which unmounts the Stop button mid-beam
+    // (AUDIT-VERIFICATION-2026-06-10, HD1-adjacent live finding).
+    expect(useLaserStore.getState().streamer?.status).toBe('errored');
+    expect(isActiveJob(useLaserStore.getState().streamer)).toBe(true);
     expect(useLaserStore.getState().log.join('\n')).toContain(
       'Serial write failed: resume refill rejected',
     );
