@@ -8,6 +8,7 @@ import {
   RT_JOG_CANCEL,
   RT_SOFT_RESET,
   disconnect as disconnectStreamer,
+  type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { disconnectDuringJobNotice } from './laser-safety-notice';
@@ -36,6 +37,49 @@ export function disconnectStopCommand(state: LaserState): string | null {
 
 export function assertAutofocusIdle(state: LaserState): void {
   if (state.autofocusBusy) throw new Error(AUTOFOCUS_BUSY_MESSAGE);
+}
+
+// M13 (AUDIT-2026-06-10): ack watchdog. The streamer is purely ack-driven —
+// if GRBL stops answering while lines are in flight, the job froze silently
+// forever. The status poll feeds this detector each tick; when nothing
+// (acks, sends, queue) changes for STREAM_STALL_TIMEOUT_MS the store raises
+// the stream-stalled safety notice. Feed hold / door states legitimately
+// silence acks (execution is paused), so they reset the clock.
+export const STREAM_STALL_TIMEOUT_MS = 10_000;
+
+export type StallProbe = {
+  readonly completed: number;
+  readonly inFlightBytes: number;
+  readonly queuedCount: number;
+  readonly at: number;
+} | null;
+
+export function detectStreamStall(
+  streamer: StreamerState | null,
+  statusReport: StatusReport | null,
+  prev: StallProbe,
+  now: number,
+): { readonly probe: StallProbe; readonly stalled: boolean } {
+  const active =
+    streamer !== null && streamer.status === 'streaming' && streamer.inFlight.length > 0;
+  if (!active) return { probe: null, stalled: false };
+  const machineState = statusReport?.state;
+  if (machineState === 'Hold' || machineState === 'Door') return { probe: null, stalled: false };
+  const unchanged =
+    prev !== null &&
+    prev.completed === streamer.completed &&
+    prev.inFlightBytes === streamer.inFlightBytes &&
+    prev.queuedCount === streamer.queued.length;
+  const at = unchanged ? prev.at : now;
+  return {
+    probe: {
+      completed: streamer.completed,
+      inFlightBytes: streamer.inFlightBytes,
+      queuedCount: streamer.queued.length,
+      at,
+    },
+    stalled: now - at >= STREAM_STALL_TIMEOUT_MS,
+  };
 }
 
 export function initialLaserState(): Pick<

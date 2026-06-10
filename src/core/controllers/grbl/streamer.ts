@@ -92,6 +92,29 @@ function splitLines(gcode: string): ReadonlyArray<string> {
     .map((l) => `${l}\n`);
 }
 
+export type OversizedLine = {
+  // 1-based index among the sendable (non-comment, non-blank) lines.
+  readonly lineNumber: number;
+  readonly bytes: number;
+  readonly limit: number;
+};
+
+// M13 (AUDIT-2026-06-10): a line longer than the RX buffer can never satisfy
+// step()'s send condition — the loop breaks with nothing sent, no error, no
+// state change. Callers must check BEFORE creating a streamer so the job is
+// refused loudly instead of freezing at 0/N.
+export function findOversizedLine(
+  gcode: string,
+  rxBufferBytes: number = DEFAULT_RX_BUFFER_BYTES,
+): OversizedLine | null {
+  const lines = splitLines(gcode);
+  for (let i = 0; i < lines.length; i += 1) {
+    const bytes = lines[i]?.length ?? 0;
+    if (bytes > rxBufferBytes) return { lineNumber: i + 1, bytes, limit: rxBufferBytes };
+  }
+  return null;
+}
+
 // Try to send as many queued lines as fit in the remaining buffer. Always
 // safe to call repeatedly; returns toSend = '' when nothing changed.
 export function step(state: StreamerState): StepResult {
