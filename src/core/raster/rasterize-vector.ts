@@ -25,8 +25,13 @@
 
 import type { Bounds, Polyline, Vec2 } from '../scene';
 
-// LightBurn sets every converted pixel to 50% gray; white is unburned material.
-const INK_LUMA = 128;
+// LightBurn sets every converted pixel to 50% gray; white is unburned
+// material. 127, not 128: ditherThreshold burns strictly BELOW its cutoff
+// (default 128), so exactly-128 ink composed to zero output — a converted
+// bitmap on a Threshold layer silently dithered to all-zero S (M7,
+// AUDIT-2026-06-10). 127 keeps the 50%-gray intent within rounding and
+// stays on the burning side of the default cutoff.
+const INK_LUMA = 127;
 const BACKGROUND_LUMA = 255;
 const MM_PER_INCH = 25.4;
 // Keep "vertex exactly on the scanline" off the half-open span boundary so
