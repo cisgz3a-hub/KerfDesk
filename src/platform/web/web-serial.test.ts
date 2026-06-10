@@ -20,7 +20,7 @@ class MockReader {
 }
 
 class MockWriter {
-  readonly write = vi.fn(async () => undefined);
+  readonly write = vi.fn(async (_chunk: Uint8Array) => undefined);
   readonly close = vi.fn(async () => undefined);
   readonly releaseLock = vi.fn();
 }
@@ -124,3 +124,46 @@ async function flushMicrotasks(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
 }
+
+// M12 (AUDIT-2026-06-10): GRBL extended realtime commands are single raw
+// bytes above 0x7F (jog-cancel 0x85, feed/spindle overrides 0x90-0xA2).
+// TextEncoder UTF-8-encodes '\x85' into TWO bytes (0xC2 0x85) - vanilla
+// GRBL happens to discard unknown high bytes so jog-cancel silently did
+// NOTHING, and a firmware that buffers them would corrupt the next line.
+describe('webSerial wire encoding (M12)', () => {
+  async function openConn(port: MockPort) {
+    installMockSerial(port);
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+    return ref.open({ baudRate: 115200 });
+  }
+
+  it('sends realtime bytes above 0x7F as exactly one wire byte', async () => {
+    const port = new MockPort();
+    const conn = await openConn(port);
+
+    await conn.write('\x85');
+
+    const written = port.writer.write.mock.calls[0]?.[0];
+    expect(Array.from(written ?? [])).toEqual([0x85]);
+  });
+
+  it('keeps ASCII lines byte-identical to UTF-8', async () => {
+    const port = new MockPort();
+    const conn = await openConn(port);
+
+    await conn.write('G1 X1 S100\n');
+
+    const written = port.writer.write.mock.calls[0]?.[0];
+    expect(Array.from(written ?? [])).toEqual(
+      Array.from(new TextEncoder().encode('G1 X1 S100\n')),
+    );
+  });
+
+  it('refuses characters that cannot be a single GRBL wire byte', async () => {
+    const port = new MockPort();
+    const conn = await openConn(port);
+
+    await expect(conn.write('Ω')).rejects.toThrow(/single-byte/i);
+  });
+});
