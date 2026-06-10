@@ -154,6 +154,25 @@
   color: #fff;
 }
 
+.lf-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.lf-iconbtn--sm {
+  width: 22px;
+  height: 22px;
+}
+.lf-iconbtn--md {
+  width: 28px;
+  height: 28px;
+}
+.lf-iconbtn--lg {
+  width: 36px;
+  height: 36px;
+}
+
 /* ---------- Inputs ---------- */
 
 .lf-input,
@@ -184,6 +203,28 @@
 .lf-checkbox {
   color-scheme: dark;
   accent-color: var(--lf-accent);
+}
+
+/* ---------- Field rows ---------- */
+
+.lf-field {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-4);
+  font-size: var(--lf-text-sm);
+}
+.lf-field-label {
+  color: var(--lf-text-muted);
+}
+.lf-field-label--sm {
+  width: 90px;
+}
+.lf-field-label--md {
+  width: 120px;
+}
+.lf-field-unit {
+  color: var(--lf-text-faint);
+  font-size: var(--lf-text-xs);
 }
 
 /* ---------- Dialogs ---------- */
