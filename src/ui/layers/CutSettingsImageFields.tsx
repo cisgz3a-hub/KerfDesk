@@ -16,11 +16,12 @@ export function CutSettingsImageFields(props: {
   readonly onImageLinesPerMmChange: (linesPerMm: number) => void;
 }): JSX.Element {
   return (
-    <fieldset style={fieldsetStyle}>
-      <legend style={legendStyle}>Image</legend>
+    <fieldset className="lf-fieldset">
+      <legend className="lf-legend">Image</legend>
       <Field label="Dither">
         <select
           name="ditherAlgorithm"
+          className="lf-select"
           value={props.dither}
           onChange={(event) => props.onDitherChange(parseDither(event.target.value))}
           aria-label="Cut settings dither"
@@ -40,7 +41,7 @@ export function CutSettingsImageFields(props: {
             min={0}
             max={props.layer.power}
           />
-          <span style={unitStyle}>%</span>
+          <span className="lf-field-unit">%</span>
         </Field>
       ) : null}
       <ImageDensityFields
@@ -56,13 +57,23 @@ export function CutSettingsImageFields(props: {
           step={0.001}
           label="dot width correction"
         />
-        <span style={unitStyle}>mm</span>
+        <span className="lf-field-unit">mm</span>
       </Field>
       <Field label="Negative">
-        <input name="negativeImage" type="checkbox" defaultChecked={props.layer.negativeImage} />
+        <input
+          name="negativeImage"
+          type="checkbox"
+          className="lf-checkbox"
+          defaultChecked={props.layer.negativeImage}
+        />
       </Field>
       <Field label="Pass-through">
-        <input name="passThrough" type="checkbox" defaultChecked={props.layer.passThrough} />
+        <input
+          name="passThrough"
+          type="checkbox"
+          className="lf-checkbox"
+          defaultChecked={props.layer.passThrough}
+        />
       </Field>
     </fieldset>
   );
@@ -81,6 +92,7 @@ function ImageDensityFields(props: {
           min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
           max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
           step={0.001}
+          className="lf-input"
           value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
           onChange={(event) =>
             props.onChange(lineIntervalMmToLinesPerMm(numericValue(event.target.value)))
@@ -88,7 +100,7 @@ function ImageDensityFields(props: {
           style={numberStyle}
           aria-label="Cut settings line interval"
         />
-        <span style={unitStyle}>mm</span>
+        <span className="lf-field-unit">mm</span>
       </Field>
       <Field label="DPI">
         <input
@@ -97,12 +109,13 @@ function ImageDensityFields(props: {
           min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
           max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
           step={1}
+          className="lf-input"
           value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
           onChange={(event) => props.onChange(dpiToLinesPerMm(numericValue(event.target.value)))}
           style={numberStyle}
           aria-label="Cut settings DPI"
         />
-        <span style={unitStyle}>dpi</span>
+        <span className="lf-field-unit">dpi</span>
       </Field>
     </>
   );
@@ -120,6 +133,7 @@ function NumberInput(props: {
     <input
       name={props.name}
       type="number"
+      className="lf-input"
       min={props.min}
       {...(props.max !== undefined ? { max: props.max } : {})}
       step={props.step ?? 1}
@@ -132,8 +146,8 @@ function NumberInput(props: {
 
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
-    <label style={fieldStyle}>
-      <span style={labelStyle}>{props.label}</span>
+    <label className="lf-field">
+      <span className="lf-field-label lf-field-label--md">{props.label}</span>
       <span style={controlStyle}>{props.children}</span>
     </label>
   );
@@ -172,21 +186,5 @@ function displayNumber(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));
 }
 
-const fieldsetStyle: React.CSSProperties = {
-  border: '1px solid #ddd',
-  borderRadius: 6,
-  padding: 10,
-  display: 'grid',
-  gap: 8,
-};
-const legendStyle: React.CSSProperties = { padding: '0 4px', fontWeight: 600 };
-const fieldStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '120px 1fr',
-  alignItems: 'center',
-  gap: 8,
-};
-const labelStyle: React.CSSProperties = { color: '#333' };
 const controlStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
 const numberStyle: React.CSSProperties = { width: 88 };
-const unitStyle: React.CSSProperties = { fontSize: 12, color: '#666' };

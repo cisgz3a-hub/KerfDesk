@@ -227,6 +227,21 @@
   font-size: var(--lf-text-xs);
 }
 
+.lf-fieldset {
+  border: 1px solid var(--lf-border);
+  border-radius: var(--lf-radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-4);
+  margin: 0;
+  padding: 10px 12px;
+}
+.lf-legend {
+  color: var(--lf-text-muted);
+  font-size: var(--lf-text-sm);
+  padding: 0 4px;
+}
+
 /* ---------- Dialogs ---------- */
 
 .lf-dialog-backdrop {
