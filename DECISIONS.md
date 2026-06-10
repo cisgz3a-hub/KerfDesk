@@ -403,8 +403,10 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
    Shipped — see `src/__fixtures__/svg/` (rectangle-single-color,
    two-color-paths, multi-shape, closed-polygon, zigzag).
 2. ~~**Bundled MIT fonts list** for Phase D~~ ✅ Resolved at Phase D
-   kickoff — bundled fonts are Inter, Roboto, Source Code Pro, Pacifico
-   (all OFL/MIT, see `src/fonts/`).
+   kickoff. The set that actually shipped (LU34 doc correction): Roboto
+   (Apache-2.0), Inconsolata, Pacifico, and Dancing Script (all OFL-1.1),
+   at `src/ui/text/fonts/`. (The kickoff note named Inter and Source Code
+   Pro and a `src/fonts/` path that never shipped.)
 
 ## ADR-018 — Proprietary license, private repo (supersedes ADR-008)
 

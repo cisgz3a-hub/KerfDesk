@@ -21,7 +21,9 @@
 //
 // Renderer source:
 //   * If env LASERFORGE_DEV_URL is set (e.g. http://localhost:5173), load that
-//     URL - Vite dev server with HMR. CSP is loosened in that mode for HMR.
+//     URL - Vite dev server. NOTE (LU26): the frozen CSP_POLICY below is
+//     applied unconditionally, dev included - there is no HMR loosening, so
+//     dev:desktop HMR features that need eval/ws may not work under it.
 //   * Otherwise load app://app/index.html which the protocol handler maps
 //     to dist/web/index.html. This is what `pnpm dev:desktop` and the
 //     packaged build both do.
