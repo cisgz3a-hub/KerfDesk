@@ -1,6 +1,10 @@
 // TracePreview renders the Trace Image preview frame. It shows the
 // traced SVG over the source bitmap, plus preview-only LightBurn-style
 // toggles for fading the source and showing vector points.
+/* eslint-disable no-restricted-syntax -- the preview frame is a deliberate
+   LIGHT surface on the dark dialog (artwork is judged against light
+   material, ADR-047 exception): its dark-on-light status text and the
+   purple trace markers are file-local literals, not chrome tokens. */
 
 import { useRef, useState } from 'react';
 

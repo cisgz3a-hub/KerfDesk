@@ -171,6 +171,7 @@ const emptyHintStyle: React.CSSProperties = {
   justifyContent: 'center',
   pointerEvents: 'none',
   // Dark-on-light: this hint sits on the always-light viewport (ADR-047).
+  // eslint-disable-next-line no-restricted-syntax -- deliberate light-surface literal (always-light canvas viewport, ADR-047 exception).
   color: '#888',
   fontStyle: 'italic',
   fontSize: 14,
@@ -181,7 +182,7 @@ const dragOverlayStyle: React.CSSProperties = {
   inset: 12,
   border: '3px dashed var(--lf-accent)',
   borderRadius: 8,
-  background: 'rgba(25, 118, 210, 0.08)',
+  background: 'var(--lf-accent-wash)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -200,7 +201,7 @@ const dragOverlayLabelStyle: React.CSSProperties = {
 const dragReadoutStyle: React.CSSProperties = {
   position: 'absolute',
   background: 'var(--lf-accent)',
-  color: '#fff',
+  color: 'var(--lf-on-fill)',
   padding: '2px 6px',
   borderRadius: 3,
   fontFamily: 'ui-monospace, Menlo, monospace',

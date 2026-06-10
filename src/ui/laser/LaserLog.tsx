@@ -114,7 +114,7 @@ const errorStyle: React.CSSProperties = {
 };
 const alarmStyle: React.CSSProperties = {
   ...defaultStyle,
-  color: '#fff',
+  color: 'var(--lf-on-fill)',
   background: 'var(--lf-danger)',
 };
 const welcomeStyle: React.CSSProperties = { ...defaultStyle, color: 'var(--lf-accent-fg)' };

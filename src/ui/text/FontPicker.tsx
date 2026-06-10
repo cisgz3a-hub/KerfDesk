@@ -140,7 +140,7 @@ function optionStyleFor(key: KnownFontKey, selected: boolean): React.CSSProperti
     ...optionBaseStyle,
     fontFamily: cssFontFamilyStack(key),
     fontWeight: selected ? 600 : 400,
-    ...(selected ? { background: 'var(--lf-accent)', color: '#fff' } : {}),
+    ...(selected ? { background: 'var(--lf-accent)', color: 'var(--lf-on-fill)' } : {}),
   };
 }
 

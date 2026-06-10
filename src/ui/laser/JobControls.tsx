@@ -335,7 +335,10 @@ function useAutofocusAction(): () => void {
 
 const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6 };
-const stopBtnStyle: React.CSSProperties = { background: 'var(--lf-danger)', color: '#fff' };
+const stopBtnStyle: React.CSSProperties = {
+  background: 'var(--lf-danger)',
+  color: 'var(--lf-on-fill)',
+};
 const progressContainerStyle: React.CSSProperties = {
   position: 'relative',
   background: 'var(--lf-bg-input)',
