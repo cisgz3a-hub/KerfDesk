@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createStreamer, step } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
@@ -139,6 +140,76 @@ describe('LaserWindow autofocus busy controls', () => {
         'select[aria-label="Jog step size"]',
       );
       expect(stepSelect?.disabled).toBe(true);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+});
+
+describe('LaserWindow jog gating during a job (H6)', () => {
+  it('disables the JogPad while a job is streaming', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      // Same path the store takes on startJob: a genuinely 'streaming' state,
+      // so the gate is tested against the real streamer status.
+      streamer: step(createStreamer('G1 X1 S100')).state,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      const arrows = [...host.querySelectorAll('button')].filter((b) =>
+        ['↑', '↓', '←', '→'].includes(b.textContent ?? ''),
+      );
+      expect(arrows.length).toBeGreaterThan(0);
+      for (const arrow of arrows) expect(arrow.disabled).toBe(true);
+      const stepSelect = host.querySelector<HTMLSelectElement>(
+        'select[aria-label="Jog step size"]',
+      );
+      expect(stepSelect?.disabled).toBe(true);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('keeps the JogPad enabled when connected with no active job', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      streamer: null,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      const arrows = [...host.querySelectorAll('button')].filter((b) =>
+        ['↑', '↓', '←', '→'].includes(b.textContent ?? ''),
+      );
+      expect(arrows.length).toBeGreaterThan(0);
+      for (const arrow of arrows) expect(arrow.disabled).toBe(false);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
