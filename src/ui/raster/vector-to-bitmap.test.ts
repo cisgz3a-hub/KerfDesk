@@ -191,7 +191,9 @@ function fakeEncode(raster: VectorRaster): BitmapFields {
 }
 
 function inkCount(raster: VectorRaster): number {
-  return [...raster.luma].filter((v) => v === 128).length;
+  // 127 = INK_LUMA: strictly below the default threshold cutoff so
+  // converted bitmaps actually burn (M7).
+  return [...raster.luma].filter((v) => v === 127).length;
 }
 
 describe('isConvertibleVector', () => {

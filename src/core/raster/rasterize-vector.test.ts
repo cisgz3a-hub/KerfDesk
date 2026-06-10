@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { Bounds, Polyline } from '../scene';
 import { rasterizeVectorToLuma } from './rasterize-vector';
 
-const INK = 128;
+// 127, not 128 — must stay strictly below ditherThreshold's default cutoff
+// so converted bitmaps actually burn (M7).
+const INK = 127;
 const BG = 255;
 const FUZZ_RUNS = 100;
 // 25.4 = MM_PER_INCH, so this DPI gives exactly 1 px per mm — keeps test
@@ -160,5 +162,26 @@ describe('rasterizeVectorToLuma (Fill All)', () => {
     const a = rasterizeVectorToLuma(input);
     const b = rasterizeVectorToLuma(input);
     expect([...a.luma]).toEqual([...b.luma]);
+  });
+});
+
+// M7 (AUDIT-2026-06-10): both boundary behaviors were individually pinned -
+// ink = 50% gray, and threshold burns strictly below the cutoff - but they
+// COMPOSED to zero output: 128 < 128 is false, so a converted bitmap on a
+// Threshold layer dithered to all-zero S (silent drop in mixed jobs, a
+// misleading "produced no cuts" preflight for image-only jobs).
+describe('converted-bitmap ink composes with the dither pipeline (M7)', () => {
+  it('ink pixels produce a burn under the default Threshold dither', async () => {
+    const { dither } = await import('./dither');
+    const r = rasterizeVectorToLuma({
+      polylines: [closedSquare(0, 0, 10, 10)],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+    });
+    const s = dither(
+      { luma: r.luma, width: r.width, height: r.height },
+      { algorithm: 'threshold', sMax: 300, sMin: 0 },
+    );
+    expect(Array.from(s)).toContain(300);
   });
 });
