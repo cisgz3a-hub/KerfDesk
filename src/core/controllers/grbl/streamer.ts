@@ -24,10 +24,12 @@ export const DEFAULT_RX_BUFFER_BYTES = 120;
 // "job aborted — connection lost" vs the user-initiated stop. The
 // streamer treats them all as terminal (no more bytes go out), but the
 // reducer entry-point differs (cancel = user, disconnect = cable yank,
-// error = GRBL rejected a line mid-stream / error:N, P0-1). 'errored'
+// errored = GRBL rejected a line mid-stream / error:N (P0-1) or a
+// refill write failed on a possibly-live port (markErrored)). 'errored'
 // being terminal protects against a laser-on line firing at a
-// mispositioned head after the rejected move. CNCjs parity per MIT-T1
-// audit finding; error-as-terminal matches LightBurn.
+// mispositioned head after the rejected move, while keeping the in-app
+// Stop path mounted. CNCjs parity per MIT-T1 audit finding;
+// error-as-terminal matches LightBurn.
 export type StreamerStatus =
   | 'idle'
   | 'streaming'
