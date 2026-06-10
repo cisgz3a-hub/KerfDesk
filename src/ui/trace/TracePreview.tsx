@@ -65,7 +65,8 @@ function PreviewControls(props: {
           type="button"
           aria-pressed={props.isSourceFaded}
           onClick={props.onToggleFade}
-          style={previewButtonStyle}
+          className="lf-btn"
+          style={previewButtonSizeStyle}
         >
           Fade Image
         </button>
@@ -75,13 +76,19 @@ function PreviewControls(props: {
           type="button"
           aria-pressed={props.shouldShowPoints}
           onClick={props.onTogglePoints}
-          style={previewButtonStyle}
+          className="lf-btn"
+          style={previewButtonSizeStyle}
         >
           Show Points
         </button>
       ) : null}
       {props.boundary !== null ? (
-        <button type="button" onClick={props.onBoundaryClear} style={previewButtonStyle}>
+        <button
+          type="button"
+          onClick={props.onBoundaryClear}
+          className="lf-btn"
+          style={previewButtonSizeStyle}
+        >
           Clear Boundary
         </button>
       ) : null}
@@ -308,13 +315,10 @@ const buttonRowStyle: React.CSSProperties = {
   gap: 6,
 };
 
-const previewButtonStyle: React.CSSProperties = {
+// Size-only override on .lf-btn — these are compact preview toggles.
+const previewButtonSizeStyle: React.CSSProperties = {
   fontSize: 11,
   padding: '2px 8px',
-  background: 'transparent',
-  border: '1px solid var(--lf-border)',
-  borderRadius: 3,
-  cursor: 'pointer',
 };
 
 const frameStyle: React.CSSProperties = {
@@ -346,7 +350,9 @@ const hintStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
   fontSize: 12,
-  color: 'var(--lf-text-muted)',
+  // Dark-on-light, NOT the theme text vars: this text sits inside the
+  // always-light preview frame (artwork previews stay light, ADR-047).
+  color: '#666',
   fontStyle: 'italic',
 };
 
@@ -354,7 +360,7 @@ const errorStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
   fontSize: 12,
-  color: 'var(--lf-danger-fg)',
+  color: '#b00020',
   padding: 8,
   textAlign: 'center',
 };
