@@ -31,7 +31,7 @@ export function SafetyNoticeBanner(): JSX.Element | null {
 
 const bannerStyle: React.CSSProperties = {
   border: '2px solid var(--lf-danger)',
-  background: '#3a2326',
+  background: 'var(--lf-tint-danger)',
   color: 'var(--lf-danger-fg)',
   padding: 10,
   borderRadius: 4,
@@ -40,7 +40,7 @@ const titleStyle: React.CSSProperties = { fontSize: 13, display: 'block' };
 const messageStyle: React.CSSProperties = { margin: '6px 0', fontSize: 12, lineHeight: 1.4 };
 const dismissStyle: React.CSSProperties = {
   background: 'var(--lf-danger)',
-  color: '#fff',
+  color: 'var(--lf-on-fill)',
   border: 'none',
   borderRadius: 3,
   padding: '4px 10px',

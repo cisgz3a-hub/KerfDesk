@@ -41,6 +41,8 @@
   --lf-danger-hover: #d73b3b;
   --lf-success: #2e7d32;
   --lf-warning: #ed6c02;
+  /* Text/icons sitting ON one of the semantic fills above */
+  --lf-on-fill: #ffffff;
 
   /* Semantic TEXT on dark surfaces (the fills above fail as text on dark) */
   --lf-accent-fg: #64b5f6;
@@ -49,8 +51,17 @@
   --lf-warning-fg: #ffb74d;
   --lf-trace-fg: #ce93d8;
 
+  /* Dark tinted panel backgrounds behind semantic banners/wells */
+  --lf-tint-danger: #3a2326;
+  --lf-tint-warning: #3a2f1f;
+  --lf-tint-info: #20303f;
+  /* Faint accent wash (drag-import overlay fill) */
+  --lf-accent-wash: rgba(25, 118, 210, 0.08);
+
   --lf-focus: #64b5f6;
   --lf-backdrop: rgba(0, 0, 0, 0.55);
+  /* Floating-surface shadow (toasts; modal panels use --lf-backdrop) */
+  --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 
   /* Type scale */
   --lf-font: system-ui, sans-serif;
@@ -348,17 +359,17 @@
 }
 .lf-banner--danger {
   border-color: var(--lf-danger);
-  background: #3a2326;
+  background: var(--lf-tint-danger);
   color: var(--lf-danger-fg);
 }
 .lf-banner--warning {
   border-color: var(--lf-warning);
-  background: #3a2f1f;
+  background: var(--lf-tint-warning);
   color: var(--lf-warning-fg);
 }
 .lf-banner--info {
   border-color: var(--lf-accent);
-  background: #20303f;
+  background: var(--lf-tint-info);
   color: var(--lf-accent-fg);
 }
 

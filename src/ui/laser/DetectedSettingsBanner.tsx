@@ -158,7 +158,7 @@ function formatLaserMode(enabled: boolean): string {
 
 const panelStyle: React.CSSProperties = {
   border: '1px solid var(--lf-accent)',
-  background: '#20303f',
+  background: 'var(--lf-tint-info)',
   padding: 8,
   borderRadius: 4,
   display: 'flex',
@@ -199,7 +199,7 @@ const actionsStyle: React.CSSProperties = {
 };
 const primaryButtonStyle: React.CSSProperties = {
   background: 'var(--lf-accent)',
-  color: '#fff',
+  color: 'var(--lf-on-fill)',
   border: 'none',
   padding: '4px 10px',
   borderRadius: 3,

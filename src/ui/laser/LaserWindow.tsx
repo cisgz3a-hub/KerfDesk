@@ -113,7 +113,7 @@ const hintStyle: React.CSSProperties = {
 };
 const alarmStyle: React.CSSProperties = {
   border: '1px solid var(--lf-danger)',
-  background: '#3a2326',
+  background: 'var(--lf-tint-danger)',
   color: 'var(--lf-danger-fg)',
   padding: 8,
   borderRadius: 4,

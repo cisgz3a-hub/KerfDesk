@@ -235,6 +235,32 @@ export default tseslint.config(
       ],
     },
   },
+  // ADR-047: chrome colors come from tokens.css custom properties — a raw
+  // hex or rgb()/rgba() string literal in src/ui is almost always a missed
+  // token (the white-on-white FontPicker regression was exactly this
+  // class). Selectors only match string LITERALS, so identifiers like
+  // lumaToRgba() and comments never trip it. Justified exceptions carry an
+  // eslint-disable with a reason: scene DATA colors (layer keys) and the
+  // deliberate light-surface palettes on canvas-adjacent previews.
+  {
+    files: ['src/ui/**/*.ts', 'src/ui/**/*.tsx'],
+    ignores: ['src/ui/theme/**', '**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/#[0-9a-fA-F]{3,8}/]',
+          message:
+            'Raw hex color in ui/ chrome — use a var(--lf-*) token from src/ui/theme/tokens.css (ADR-047). Scene-data colors get a justified eslint-disable.',
+        },
+        {
+          selector: 'Literal[value=/rgba?\\(/]',
+          message:
+            'Raw rgb()/rgba() color in ui/ chrome — use a var(--lf-*) token from src/ui/theme/tokens.css (ADR-047).',
+        },
+      ],
+    },
+  },
   // Test files: relax file-size and assertion strictness so test scaffolding
   // can use longer describe blocks and `!` for fixture access. Tests run in
   // node, so reading fixtures via node:fs is fine (the no-restricted-imports

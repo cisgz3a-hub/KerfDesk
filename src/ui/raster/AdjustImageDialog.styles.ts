@@ -26,6 +26,7 @@ export const previewCanvasStyle: React.CSSProperties = {
   maxHeight: 320,
   // Artwork preview surface stays LIGHT on the dark dialog (ADR-047) -
   // the engrave is judged against light material.
+  // eslint-disable-next-line no-restricted-syntax -- deliberate light-surface literal (canvas-adjacent preview, ADR-047 exception).
   background: '#f8f8f8',
   imageRendering: 'pixelated',
 };
