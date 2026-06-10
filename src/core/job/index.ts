@@ -1,6 +1,6 @@
 export type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from './job';
 export { EMPTY_JOB } from './job';
-export { compileJob } from './compile-job';
+export { compileJob, DEFAULT_OVERSCAN_MM } from './compile-job';
 export type { JobBounds } from './job-bounds';
 export { computeJobBounds } from './job-bounds';
 export type { RasterMachineBounds } from './raster-bounds';
