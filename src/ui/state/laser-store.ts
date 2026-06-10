@@ -12,21 +12,12 @@ import { create } from 'zustand';
 import {
   CMD_HOME,
   CMD_UNLOCK,
-  RT_HOLD,
   RT_JOG_CANCEL,
-  RT_RESUME,
-  RT_SOFT_RESET,
   RT_STATUS,
   buildJogCommand,
-  cancel as cancelStreamer,
-  createStreamer,
-  disconnect as disconnectStreamer,
   idleCollector,
   type JogParams,
-  pause as pauseStreamer,
-  resume as resumeStreamer,
   type SettingsCollectorState,
-  step,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
@@ -36,6 +27,7 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { inferCurrentMachinePosition } from './infer-machine-position';
+import { jobActions } from './laser-job-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
 import {
   buildFrameJogLines,
@@ -48,15 +40,21 @@ import {
   setOriginHere as setOriginHereAction,
   type WorkCoordinateOffset,
 } from './origin-actions';
-import { type LaserSafetyNotice, writeFailedNotice } from './laser-safety-notice';
+import {
+  type LaserSafetyNotice,
+  streamStalledNotice,
+  writeFailedNotice,
+} from './laser-safety-notice';
 import {
   assertAutofocusIdle,
   buildPortClosePatch,
+  detectStreamStall,
   disconnectStopCommand,
   initialLaserState,
   isActiveJob,
   pushLog,
   serialWriteErrorMessage,
+  type StallProbe,
 } from './laser-store-helpers';
 
 export type { AutofocusResult } from './autofocus-action';
@@ -160,6 +158,9 @@ type LiveRefs = {
   // race wants to observe a line. Held here so the shared `refs`
   // object handler functions receive carries it across calls.
   onLineArrived: (() => void) | null;
+  // M13 ack-watchdog probe: last-seen stream position + when it was first
+  // seen unchanged. Lives here (not React state) — only the poll reads it.
+  stallProbe: StallProbe;
 };
 
 const refs: LiveRefs = {
@@ -169,6 +170,7 @@ const refs: LiveRefs = {
   pollHandle: null,
   settingsCollector: idleCollector(),
   onLineArrived: null,
+  stallProbe: null,
 };
 
 function teardown(): void {
@@ -181,6 +183,7 @@ function teardown(): void {
   refs.pollHandle = null;
   refs.settingsCollector = idleCollector();
   refs.onLineArrived = null;
+  refs.stallProbe = null;
 }
 
 async function safeWrite(
@@ -252,6 +255,13 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         refs.pollHandle = setInterval(() => {
           pollTick++;
           const s = get();
+          // M13 ack watchdog: raise the stalled notice once when nothing
+          // acks for the timeout while lines are in flight.
+          const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
+          refs.stallProbe = stall.probe;
+          if (stall.stalled && s.safetyNotice === null) {
+            set({ safetyNotice: streamStalledNotice() });
+          }
           const isActive = isActiveJob(s.streamer) || s.motionOperation !== null || s.autofocusBusy;
           if (!isActive && pollTick % IDLE_POLL_DIVISOR !== 0) return;
           void safeWrite(set, get, RT_STATUS).catch(() => undefined);
@@ -359,74 +369,6 @@ function jogActions(
   };
 }
 
-function jobActions(
-  set: SetFn,
-  get: GetFn,
-): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
-  return {
-    startJob: async (gcode) => {
-      assertAutofocusIdle(get());
-      const initial = createStreamer(gcode);
-      const stepped = step(initial);
-      set({ streamer: stepped.state });
-      if (stepped.toSend.length === 0) return;
-      try {
-        await safeWrite(set, get, stepped.toSend, 'start');
-      } catch (err) {
-        set({ streamer: null });
-        throw err;
-      }
-    },
-    pauseJob: async () => {
-      await safeWrite(set, get, RT_HOLD, 'pause');
-      const s = get().streamer;
-      if (s !== null) set({ streamer: pauseStreamer(s) });
-    },
-    resumeJob: async () => {
-      await safeWrite(set, get, RT_RESUME, 'resume');
-      // Functional set so the snapshot is taken AT WRITE TIME — during
-      // the await above, ack-driven handleLine paths can have advanced
-      // the streamer via advanceStream. A `const s = get().streamer`
-      // before the set would clobber those concurrent updates with a
-      // state derived from a stale snapshot, drifting the in-flight
-      // accounting against the real GRBL 127-byte buffer (R-H2 audit
-      // finding). On a laser cutter, accounting drift can push more
-      // bytes than the buffer holds → dropped commands → uncontrolled
-      // head motion.
-      let toSend = '';
-      set((s) => {
-        if (s.streamer === null) return s;
-        const stepped = step(resumeStreamer(s.streamer));
-        toSend = stepped.toSend;
-        return { streamer: stepped.state };
-      });
-      if (toSend.length > 0) {
-        try {
-          await safeWrite(set, get, toSend, 'resume');
-        } catch (err) {
-          set((s) => ({
-            streamer: s.streamer === null ? s.streamer : disconnectStreamer(s.streamer),
-            safetyNotice: writeFailedNotice('resume'),
-          }));
-          throw err;
-        }
-      }
-    },
-    stopJob: async () => {
-      await safeWrite(set, get, RT_SOFT_RESET, 'stop');
-      // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
-      // cached WCO so the readout doesn't lie about "custom origin"
-      // until the next WCO frame arrives. Same race window as
-      // resumeJob — use functional set.
-      set((s) => ({
-        wcoCache: null,
-        workOriginActive: false,
-        streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
-      }));
-    },
-  };
-}
-
 function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere' | 'resetOrigin'> {
   // Set the local active flag immediately after a successful write.
   // The line-handler still reconciles the exact WCO later, but Frame/Start
@@ -471,7 +413,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...initialLaserState(),
   ...connectionActions(set, get),
   ...jogActions(set, get),
-  ...jobActions(set, get),
+  ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...originActions(set, get),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),

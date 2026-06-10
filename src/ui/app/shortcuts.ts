@@ -7,6 +7,7 @@
 //   * Transform: arrow keys (nudge), H/V (flip)
 //   * View: P (preview toggle)
 
+import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { Project, SceneObject, Transform } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
@@ -31,6 +32,7 @@ export type FileCtx = {
   readonly savedName: string | null;
   readonly jobPlacement: JobPlacementSettings;
   readonly machine: MachinePlacementSnapshot;
+  readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly lastSaveTarget: SaveTarget | null;
   readonly markSaved: (target: SaveTarget) => void;
   readonly markLoaded: (filename: string) => void;
@@ -121,6 +123,7 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
       savedName: c.savedName,
       jobPlacement: c.jobPlacement,
       machine: c.machine,
+      controllerSettings: c.controllerSettings,
       pushToast: c.pushToast,
     }),
 };

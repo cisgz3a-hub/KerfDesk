@@ -79,4 +79,31 @@ describe('ErrorBoundary', () => {
     });
     expect(container.textContent).toMatch(/no data leaves your machine/i);
   });
+
+  it('falls back to a manual-copy textarea instead of a blocking prompt (H13)', () => {
+    // jsdom has no Clipboard API — exactly the insecure-context fallback
+    // path. A native prompt here would suspend the renderer: if the crash
+    // happened mid-job it freezes the ack pump, the Stop button, and the
+    // M22 keyboard stop. The fallback must be non-blocking.
+    const promptSpy = vi.spyOn(window, 'prompt').mockImplementation(() => null);
+    act(() => {
+      root.render(
+        <ErrorBoundary>
+          <Boom shouldThrow={true} />
+        </ErrorBoundary>,
+      );
+    });
+    const copy = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Copy diagnostic',
+    );
+    expect(copy).toBeDefined();
+    act(() => {
+      copy?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(promptSpy).not.toHaveBeenCalled();
+    const textarea = container.querySelector('textarea');
+    expect(textarea).not.toBeNull();
+    expect(textarea?.value).toContain('test-boom');
+    promptSpy.mockRestore();
+  });
 });

@@ -19,4 +19,19 @@ describe('Cloudflare Pages routing', () => {
 
     expect(catchAllShellRewrite).toBeUndefined();
   });
+
+  // LU35 (AUDIT-2026-06-10): with no 404.html, Cloudflare Pages enables an
+  // IMPLICIT single-page-app fallback — every missing path (stale hashed
+  // chunks after a redeploy, deep links) serves index.html with a 200, and
+  // nosniff then refuses the HTML-as-module-script, leaving a permanently
+  // blank page. A real 404.html disables the implicit fallback.
+  it('ships a 404 page so Pages does not enable the implicit SPA fallback', () => {
+    const notFoundPath = resolve(process.cwd(), 'public/404.html');
+    expect(existsSync(notFoundPath)).toBe(true);
+    const html = readFileSync(notFoundPath, 'utf8');
+    expect(html).toContain('404');
+    // Self-contained: a 404 page that references hashed bundle assets would
+    // itself 404 after a redeploy.
+    expect(html).not.toMatch(/src\s*=\s*["']\/assets\//);
+  });
 });

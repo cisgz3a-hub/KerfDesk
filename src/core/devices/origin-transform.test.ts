@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile, type Origin } from './device-profile';
-import { toMachineCoords } from './origin-transform';
+import { toMachineCoords, toSceneCoords } from './origin-transform';
 
 function withOrigin(origin: Origin): DeviceProfile {
   return { ...DEFAULT_DEVICE_PROFILE, origin };
@@ -48,6 +48,42 @@ describe('toMachineCoords', () => {
     // center-origin bed (left edge, back-of-bed in machine coords).
     expect(toMachineCoords({ x: 0, y: 0 }, dev)).toEqual({
       x: -dev.bedWidth / 2,
+      y: dev.bedHeight / 2,
+    });
+  });
+});
+
+describe('toSceneCoords', () => {
+  const ALL_ORIGINS: ReadonlyArray<Origin> = [
+    'front-left',
+    'front-right',
+    'rear-left',
+    'rear-right',
+    'center',
+  ];
+
+  it('inverts toMachineCoords exactly for every origin (round trip)', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 50, y: 100 },
+      { x: 399.5, y: 1 },
+      { x: 123.25, y: 321.75 },
+    ];
+    for (const origin of ALL_ORIGINS) {
+      const dev = withOrigin(origin);
+      for (const p of points) {
+        expect(toSceneCoords(toMachineCoords(p, dev), dev)).toEqual(p);
+        expect(toMachineCoords(toSceneCoords(p, dev), dev)).toEqual(p);
+      }
+    }
+  });
+
+  it('center: machine origin (0, 0) maps back to the scene bed center', () => {
+    const dev = withOrigin('center');
+    // center is the one origin transform that is NOT its own inverse —
+    // the X axis is translated, not mirrored. Pin the inverse explicitly.
+    expect(toSceneCoords({ x: 0, y: 0 }, dev)).toEqual({
+      x: dev.bedWidth / 2,
       y: dev.bedHeight / 2,
     });
   });

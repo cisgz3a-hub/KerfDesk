@@ -121,4 +121,38 @@ describe('parsePathD — curve flattening (De Casteljau subdivision)', () => {
       expect(Math.hypot(p.x, p.y)).toBeCloseTo(10, 1);
     }
   });
+
+  // H8 (AUDIT-2026-06-10): the SVG grammar defines large-arc/sweep as
+  // single-digit flag productions needing no separator — `a4 4 0 011 7` is
+  // valid (SVGO-minified files emit exactly this) and must parse identically
+  // to the space-separated form. A greedy number tokenizer reads `011` as one
+  // number, drops the whole arc, and desyncs the relative cursor.
+  describe('compact arc flag syntax (H8)', () => {
+    it('parses flags fused with each other and the following coordinate', () => {
+      expect(parsePathD('M10 0a4 4 0 011 7')).toEqual(parsePathD('M10 0a4 4 0 0 1 1 7'));
+    });
+
+    it('parses flags fused in an absolute arc', () => {
+      expect(parsePathD('M0 0A5 5 0 1140 0')).toEqual(parsePathD('M0 0A5 5 0 1 1 40 0'));
+    });
+
+    it('parses multi-arc commands with compact flags', () => {
+      expect(parsePathD('M10 0a4 4 0 011 7 4 4 0 101 7')).toEqual(
+        parsePathD('M10 0a4 4 0 0 1 1 7 4 4 0 1 0 1 7'),
+      );
+    });
+
+    it('parses flags followed by decimal-point coordinates', () => {
+      expect(parsePathD('M0 0a.5.5 0 01.7.7')).toEqual(parsePathD('M0 0a0.5 0.5 0 0 1 0.7 0.7'));
+    });
+
+    it('keeps the relative cursor in sync for commands after a compact arc', () => {
+      const compact = parsePathD('M10 0a4 4 0 011 7l5 0');
+      const expanded = parsePathD('M10 0a4 4 0 0 1 1 7l5 0');
+      expect(compact).toEqual(expanded);
+      const pts = compact[0]?.points ?? [];
+      // Arc ends at (11, 7); the relative line lands at (16, 7).
+      expect(pts[pts.length - 1]).toEqual({ x: 16, y: 7 });
+    });
+  });
 });

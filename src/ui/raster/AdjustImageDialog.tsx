@@ -2,6 +2,7 @@ import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
 import type { Layer, RasterImage } from '../../core/scene';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { jobAwareAlert, jobAwarePrompt } from '../state/job-aware-dialogs';
 import type { RasterImageAdjustmentPatch } from '../state/raster-adjustment-actions';
 import { AdjustFields } from './AdjustImageDialog.fields';
 import { dotWidthCorrectionMax, numberValue, parseDither } from './AdjustImageDialog.form-utils';
@@ -111,16 +112,16 @@ function useImagePresetControls(
       );
     });
   const savePreset = (): void => {
-    const name = window.prompt('Preset name');
+    const name = jobAwarePrompt('Preset name');
     if (name === null) return;
     const saveResult = saveUserImagePreset(userPresets, name, imagePresetSettingsFromDraft(draft));
     if (saveResult.kind !== 'ok') {
-      window.alert(imagePresetSaveError(saveResult.kind));
+      jobAwareAlert(imagePresetSaveError(saveResult.kind));
       return;
     }
     const writeResult = writeUserImagePresets(saveResult.presets);
     if (writeResult.kind !== 'ok') {
-      window.alert('Could not save image preset. Browser storage is unavailable.');
+      jobAwareAlert('Could not save image preset. Browser storage is unavailable.');
       return;
     }
     setUserPresets(saveResult.presets);
@@ -134,7 +135,7 @@ function useImagePresetControls(
     const nextPresets = deleteUserImagePreset(userPresets, preset.name);
     const writeResult = writeUserImagePresets(nextPresets);
     if (writeResult.kind !== 'ok') {
-      window.alert('Could not delete image preset. Browser storage is unavailable.');
+      jobAwareAlert('Could not delete image preset. Browser storage is unavailable.');
       return;
     }
     setUserPresets(nextPresets);

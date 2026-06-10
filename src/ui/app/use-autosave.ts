@@ -12,9 +12,10 @@
 //
 // useAutosaveRecovery:
 //   Runs once on mount. If localStorage has an autosave AND the
-//   current project is empty (no objects), prompts the user via
-//   window.confirm to restore. Either path clears the slot so the
-//   user isn't re-prompted next session.
+//   current project is empty (no objects), asks the user (job-aware
+//   confirm) whether to restore. Restoring keeps the slot armed until
+//   the first manual save (M15); declining discards it so the user
+//   isn't re-prompted next session.
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
@@ -25,6 +26,7 @@ import {
   startAutosaveLoop,
   writeAutosave,
 } from '../state/autosave';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 
@@ -84,27 +86,41 @@ export function useAutosave(): void {
   }, [pushToast]);
 }
 
+export function runAutosaveRecovery(
+  // jobAwareConfirm is a pass-through native confirm here (recovery runs at
+  // app start, before any connection), but keeps the raw-dialog lint ban
+  // (H13) airtight with a single exempt module.
+  confirmRestore: (message: string) => boolean = jobAwareConfirm,
+): void {
+  const record = readAutosave();
+  if (record === null) return;
+  // Only prompt if the in-memory project is still the empty default.
+  // If something already loaded (URL drop, deep-link, etc.), the user
+  // is mid-workflow and recovery would clobber it. Leave the slot alone
+  // (M15: clearing here silently destroyed the only backup).
+  const s = useStore.getState();
+  if (s.dirty || s.project.scene.objects.length > 0) return;
+  const ageMin = Math.max(0, Math.round((Date.now() - record.savedAt) / 60_000));
+  const ageLabel = ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute(s) ago`;
+  const ok = confirmRestore(
+    `LaserForge found an auto-saved project from ${ageLabel}. Restore it?\n\n` +
+      '(Click Cancel to discard the auto-save and start fresh.)',
+  );
+  if (ok) {
+    s.setProject(record.project);
+    // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
+    // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload
+    // write, and the discard confirms all stay armed — and KEEP the slot;
+    // handleSaveProject clears it after the first successful manual save.
+    useStore.setState({ dirty: true });
+    return;
+  }
+  // Declining is an explicit discard — clearing stops the re-prompt loop.
+  clearAutosave();
+}
+
 export function useAutosaveRecovery(): void {
   useEffect(() => {
-    const record = readAutosave();
-    if (record === null) return;
-    // Only prompt if the in-memory project is still the empty default.
-    // If something already loaded (URL drop, deep-link, etc.), the user
-    // is mid-workflow and recovery would clobber it.
-    const s = useStore.getState();
-    if (s.dirty || s.project.scene.objects.length > 0) {
-      clearAutosave();
-      return;
-    }
-    const ageMin = Math.max(0, Math.round((Date.now() - record.savedAt) / 60_000));
-    const ageLabel = ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute(s) ago`;
-    const ok = window.confirm(
-      `LaserForge found an auto-saved project from ${ageLabel}. Restore it?\n\n` +
-        '(Click Cancel to discard the auto-save and start fresh.)',
-    );
-    if (ok) {
-      s.setProject(record.project);
-    }
-    clearAutosave();
+    runAutosaveRecovery();
   }, []);
 }

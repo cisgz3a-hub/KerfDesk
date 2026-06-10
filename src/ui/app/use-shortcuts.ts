@@ -10,6 +10,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
+import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
@@ -28,7 +29,9 @@ function confirmDiscard(action: string): boolean {
   const s = useStore.getState();
   if (!s.dirty) return true;
   const name = s.savedName ?? 'this project';
-  return window.confirm(
+  // jobAwareConfirm fails closed while a job is active (H13): a native
+  // confirm would freeze Pause/Stop with the beam live.
+  return jobAwareConfirm(
     `Discard unsaved changes to ${name} and ${action}? (Cancel to keep editing — Save first via Save or Ctrl+S.)`,
   );
 }
@@ -60,13 +63,14 @@ function useFileEditShortcuts(): void {
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const pushToast = useToastStore((s) => s.pushToast);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (isModalOpen(useUiStore.getState())) return;
       const machine = { statusReport, workOriginActive, wcoCache };
       // prettier-ignore
-      const fileCtx = { platform, project, jobPlacement, machine, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
+      const fileCtx = { platform, project, jobPlacement, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
       const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, selectObject, selectAllObjects, duplicateSelection };
       if (handleFileShortcut(e, fileCtx)) return;
@@ -88,6 +92,7 @@ function useFileEditShortcuts(): void {
     statusReport,
     workOriginActive,
     wcoCache,
+    controllerSettings,
     pushToast,
     undo,
     redo,

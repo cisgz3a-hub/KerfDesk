@@ -42,7 +42,7 @@ import type { CutSegment, Group, Job, RasterGroup } from './job';
 // Default overscan kept here (not on Layer) so it can ride device
 // profiles in the future without a .lf2 schema bump. 5 mm matches
 // the ADR-020 baseline for diode lasers.
-const DEFAULT_OVERSCAN_MM = 5;
+export const DEFAULT_OVERSCAN_MM = 5;
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
 const WHITE_LUMA_BYTE = 255;
@@ -142,8 +142,13 @@ function orientRasterLumaForMachine(
   obj: RasterImage,
   device: DeviceProfile,
 ): Uint8Array {
-  const flipX = originFlipsRasterX(device) !== obj.transform.mirrorX;
-  const flipY = originFlipsRasterY(device) !== obj.transform.mirrorY;
+  // Negative scale (a handle dragged across the anchor) is a mirror: the
+  // canvas and dither preview render it flipped, so the burn must flip too
+  // (M3). XOR with the explicit mirror flags — a double flip is upright.
+  const objFlipX = obj.transform.mirrorX !== obj.transform.scaleX < 0;
+  const objFlipY = obj.transform.mirrorY !== obj.transform.scaleY < 0;
+  const flipX = originFlipsRasterX(device) !== objFlipX;
+  const flipY = originFlipsRasterY(device) !== objFlipY;
   if (!flipX && !flipY) return luma;
   const out = new Uint8Array(luma.length);
   for (let y = 0; y < height; y += 1) {

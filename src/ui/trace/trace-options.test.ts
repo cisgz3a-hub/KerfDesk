@@ -134,11 +134,22 @@ describe('hasAggressivePreprocessing', () => {
 });
 
 describe('relaxAggressivePreprocessing', () => {
-  it('drops the three aggressive fields entirely', () => {
+  it('drops Otsu and despeckle but KEEPS fixedPalette (M10: same backend on retry)', () => {
     const relaxed = relaxAggressivePreprocessing(LINE_ART);
     expect((relaxed as Record<string, unknown>)['useOtsuThreshold']).toBeUndefined();
-    expect((relaxed as Record<string, unknown>)['fixedPalette']).toBeUndefined();
     expect((relaxed as Record<string, unknown>)['despeckleMinPixels']).toBeUndefined();
+    // Deleting fixedPalette used to switch Line Art's zero-paths retry from
+    // the potrace backend into imagetracerjs with NO palette — whose
+    // samplepalette2 seeds collapse to black/black on binary input
+    // (colorquantcycles:1 disables every recovery), committing a full-frame
+    // rectangle instead of an honest "no paths" (the IoU-0.25 degeneracy).
+    expect(relaxed.fixedPalette).toEqual(LINE_ART.fixedPalette);
+  });
+
+  it('keeps the retry on the potrace backend for two-color presets (M10)', async () => {
+    const { shouldUsePotraceTraceBackend } = await import('../../core/trace');
+    expect(shouldUsePotraceTraceBackend(LINE_ART)).toBe(true);
+    expect(shouldUsePotraceTraceBackend(relaxAggressivePreprocessing(LINE_ART))).toBe(true);
   });
 
   it('forces pathOmit to 0 so the retry keeps every path imagetracerjs emits', () => {
@@ -162,8 +173,15 @@ describe('relaxAggressivePreprocessing', () => {
     expect(JSON.stringify(LINE_ART)).toBe(snapshot);
   });
 
-  it('returns hasAggressivePreprocessing() === false on its own output', () => {
-    const relaxed = relaxAggressivePreprocessing(LINE_ART);
+  it('fully de-aggressives options that had no fixed palette', () => {
+    // With fixedPalette intentionally retained (M10), only palette-free
+    // options relax to hasAggressivePreprocessing() === false. The retry
+    // in traceImageWithFallback runs exactly once either way.
+    const relaxed = relaxAggressivePreprocessing({
+      ...PHOTO,
+      useOtsuThreshold: true,
+      despeckleMinPixels: 4,
+    });
     expect(hasAggressivePreprocessing(relaxed)).toBe(false);
   });
 });

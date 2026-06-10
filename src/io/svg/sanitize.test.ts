@@ -52,6 +52,38 @@ describe('sanitizeSvg — malicious input (WORKFLOW.md F-A3 error cases)', () =>
     expect(clean).not.toContain('evil.example.com');
   });
 
+  // LU6 (AUDIT-2026-06-10): the external-URL check was a protocol PREFIX
+  // match — protocol-relative ('//evil…') and whitespace-prefixed URLs
+  // sailed through the hook. The allowlist (same-document '#…' fragments and
+  // data:image/* only) closes the whole class.
+  it('strips protocol-relative hrefs', () => {
+    const dirty = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">
+  <use xlink:href="//evil.example.com/payload.svg#x" />
+</svg>`;
+    const { clean, stripped } = sanitizeSvg(dirty);
+    expect(stripped.externalLinks).toBeGreaterThanOrEqual(1);
+    expect(clean).not.toContain('evil.example.com');
+  });
+
+  it('strips whitespace-prefixed external hrefs', () => {
+    const dirty = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">
+  <use xlink:href="   https://evil.example.com/payload.svg" />
+</svg>`;
+    const { clean, stripped } = sanitizeSvg(dirty);
+    expect(stripped.externalLinks).toBeGreaterThanOrEqual(1);
+    expect(clean).not.toContain('evil.example.com');
+  });
+
+  it('keeps same-document fragment hrefs', () => {
+    const dirty = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+  <defs><path id="p" d="M0 0 L10 10"/></defs>
+  <use href="#p" />
+</svg>`;
+    const { clean, stripped } = sanitizeSvg(dirty);
+    expect(stripped.externalLinks).toBe(0);
+    expect(clean).toContain('#p');
+  });
+
   it('strips non-image data: URIs (keeps image/* data URIs)', () => {
     const dirty = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10">
   <use xlink:href="data:text/html,<script>alert(1)</script>" />

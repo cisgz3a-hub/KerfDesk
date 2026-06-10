@@ -283,7 +283,7 @@ Each subfolder has its own `index.ts` defining the module's public API. ESLint f
 - **Bundled fonts (Phase D)** parsed with `opentype.js` only. Never passed to native font APIs.
 - **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial` and any `fileSystem*` permission (needed for the File System Access API in Electron 33+ — see commit `2965bd0`). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
-- **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M5` start; `M5`, park at end.
+- **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
 - **No auto-update from arbitrary URLs.**
 - **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. CVE in a direct dependency blocks releases until patched.
 

@@ -59,12 +59,21 @@ export const USER_ORIGIN_JOB_PLACEMENT: JobOriginPlacement = {
 };
 
 export function applyJobOrigin(job: Job, placement: JobOriginPlacement): Job {
+  const offset = jobOriginOffset(job, placement);
+  if (offset.x === 0 && offset.y === 0) return job;
+  return translateJob(job, offset.x, offset.y);
+}
+
+// The translation applyJobOrigin applies for this job + placement (zero for
+// absolute placements). Exposed so the preview can undo the placement when
+// mapping the prepared job back into the scene frame (H3).
+export function jobOriginOffset(job: Job, placement: JobOriginPlacement): Vec2 {
   const target = targetPoint(placement);
-  if (target === null) return job;
+  if (target === null) return { x: 0, y: 0 };
   const bounds = computeJobBounds(job);
-  if (bounds === null) return job;
+  if (bounds === null) return { x: 0, y: 0 };
   const anchor = anchorPoint(bounds, placement.anchor);
-  return translateJob(job, target.x - anchor.x, target.y - anchor.y);
+  return { x: target.x - anchor.x, y: target.y - anchor.y };
 }
 
 export function offsetJobBounds(

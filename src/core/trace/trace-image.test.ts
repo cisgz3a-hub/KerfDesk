@@ -441,15 +441,17 @@ describe('traceImageToSvgString', () => {
     expect(result.object).not.toBeNull();
     if (result.object === null) return;
     // Look for ANY polyline whose bounding-box centre lies inside the
-    // expected dot region (32..36 in both axes). The dot is small —
+    // expected dot region (32..36 px in both axes). The dot is small —
     // we don't care about its exact point count, just that some
-    // polyline exists there.
+    // polyline exists there. parseSvg resolves px at 96 DPI (ADR-046),
+    // so the region is checked in mm.
+    const pxToMm = 25.4 / 96;
     const allPolylines = result.object.paths.flatMap((p) => p.polylines);
     const dotPresent = allPolylines.some((pl) => {
       if (pl.points.length === 0) return false;
       const cx = pl.points.reduce((s, p) => s + p.x, 0) / pl.points.length;
       const cy = pl.points.reduce((s, p) => s + p.y, 0) / pl.points.length;
-      return cx >= 30 && cx <= 38 && cy >= 30 && cy <= 38;
+      return cx >= 30 * pxToMm && cx <= 38 * pxToMm && cy >= 30 * pxToMm && cy <= 38 * pxToMm;
     });
     expect(dotPresent).toBe(true);
   });

@@ -86,7 +86,12 @@ function tokenize(d: string): ReadonlyArray<Token> {
       let j = i + 1;
       while (j < d.length && !COMMAND_LETTERS.has(d[j] ?? '')) j += 1;
       const slice = d.slice(i + 1, j);
-      const args = (slice.match(NUMBER_RE) ?? []).map(Number);
+      // H8: arc args need a grammar-aware scan — the two flag productions are
+      // single digits that may be fused with each other and the next number
+      // (`a4 4 0 011 7` is valid SVG and standard SVGO output). A greedy
+      // number match would read `011` as one number and drop the whole arc.
+      const args =
+        ch === 'A' || ch === 'a' ? parseArcArgs(slice) : (slice.match(NUMBER_RE) ?? []).map(Number);
       out.push({ cmd: ch, args });
       i = j;
     } else {
@@ -94,6 +99,38 @@ function tokenize(d: string): ReadonlyArray<Token> {
     }
   }
   return out;
+}
+
+// Scans `rx ry rot flag flag x y` tuples: positions 3 and 4 (mod 7) consume
+// exactly one '0'/'1' character; every other position consumes a full number.
+// Stops at the first malformed token, leaving any complete tuples parsed.
+function parseArcArgs(slice: string): number[] {
+  // Local (not module-level) because sticky regexes carry mutable lastIndex.
+  const numberAt = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/y;
+  const out: number[] = [];
+  let i = 0;
+  for (;;) {
+    while (i < slice.length && isArcSeparator(slice[i] ?? '')) i += 1;
+    if (i >= slice.length) break;
+    const argIndex = out.length % 7;
+    if (argIndex === 3 || argIndex === 4) {
+      const ch = slice[i];
+      if (ch !== '0' && ch !== '1') break;
+      out.push(ch === '1' ? 1 : 0);
+      i += 1;
+      continue;
+    }
+    numberAt.lastIndex = i;
+    const match = numberAt.exec(slice);
+    if (match === null) break;
+    out.push(Number(match[0]));
+    i = numberAt.lastIndex;
+  }
+  return out;
+}
+
+function isArcSeparator(ch: string): boolean {
+  return ch === ' ' || ch === ',' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f';
 }
 
 type Handler = (state: State, args: ReadonlyArray<number>, cmd: string) => void;

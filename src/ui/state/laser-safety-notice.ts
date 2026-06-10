@@ -42,7 +42,24 @@ export type LaserSafetyNotice =
       readonly kind: 'controller-error';
       readonly code: number;
       readonly message: string;
+    }
+  | {
+      readonly kind: 'stream-stalled';
+      readonly message: string;
     };
+
+// M13 (AUDIT-2026-06-10): the streamer is ack-driven — if GRBL stops
+// answering (wedged firmware, half-dead USB, EMI) the job sat at a frozen
+// percentage forever with no signal. The watchdog raises this notice when
+// nothing acks for STREAM_STALL_TIMEOUT_MS while lines are in flight.
+export const STREAM_STALLED_MESSAGE =
+  'The controller has not acknowledged anything for 10 seconds while a job is active. ' +
+  'The stream may be stalled. Press Stop (or physical E-stop if unsafe), then check the ' +
+  'USB link before re-running.';
+
+export function streamStalledNotice(): LaserSafetyNotice {
+  return { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE };
+}
 
 export const DISCONNECT_DURING_JOB_MESSAGE =
   'USB connection was lost during an active job. The machine may still be moving from ' +

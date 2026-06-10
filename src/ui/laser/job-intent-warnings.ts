@@ -1,4 +1,12 @@
-import { LAYER_DEFAULTS, type Layer, type LayerMode, type Project } from '../../core/scene';
+import { rasterBoundsInMachineCoords } from '../../core/job';
+import { pixelExtentForMm } from '../../core/raster';
+import {
+  LAYER_DEFAULTS,
+  type Layer,
+  type LayerMode,
+  type Project,
+  type RasterImage,
+} from '../../core/scene';
 
 export function detectJobIntentWarnings(project: Project): ReadonlyArray<string> {
   const warnings: string[] = [];
@@ -12,6 +20,11 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   const seen = new Set<string>();
 
   for (const obj of project.scene.objects) {
+    if (obj.kind === 'raster-image') {
+      const upsample = rasterUpsampleWarning(obj, outputLayersByColor, project);
+      if (upsample !== null) warnings.push(upsample);
+      continue;
+    }
     if (obj.kind !== 'traced-image') continue;
     for (const path of obj.paths) {
       const layer = outputLayersByColor.get(path.color);
@@ -24,6 +37,34 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   }
 
   return warnings;
+}
+
+// H12 (AUDIT-2026-06-10): the engrave luma comes from the import-time
+// capped decode (ADR-037 — a TRACE runtime cap), and compileRasterGroup
+// nearest-neighbor UPSAMPLES it to the burn grid while the canvas renders
+// the sharp full-resolution bitmap. The burn cannot deliver detail the
+// stored luma doesn't have — say so before the operator commits material.
+function rasterUpsampleWarning(
+  obj: RasterImage,
+  outputLayersByColor: ReadonlyMap<string, Layer>,
+  project: Project,
+): string | null {
+  const layer = outputLayersByColor.get(obj.color);
+  if (layer === undefined || layer.mode !== 'image' || obj.role === 'trace-source') return null;
+  return describeRasterUpsample(obj, layer, project);
+}
+
+function describeRasterUpsample(obj: RasterImage, layer: Layer, project: Project): string | null {
+  if (layer.passThrough) return null;
+  const bounds = rasterBoundsInMachineCoords(obj, project.device);
+  const burnWidth = pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
+  const burnHeight = pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
+  if (burnWidth <= obj.pixelWidth && burnHeight <= obj.pixelHeight) return null;
+  return (
+    `Image "${obj.source}" stores ${obj.pixelWidth} × ${obj.pixelHeight} px but the burn grid wants ` +
+    `${burnWidth} × ${burnHeight} px at ${layer.linesPerMm} lines/mm — the engrave will be softer than ` +
+    'the canvas preview. Lower lines/mm, shrink the image, or re-import a higher-resolution file.'
+  );
 }
 
 function usesUncalibratedDefaults(layer: Layer): boolean {

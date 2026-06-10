@@ -18,6 +18,7 @@ import {
   type MotionBoundsOffset,
 } from '../invariants';
 import { machineBoundsForDevice } from '../devices';
+import { DEFAULT_OVERSCAN_MM } from '../job';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -183,11 +184,15 @@ function appendUnsupportedRasterTransformIssues(
     if (obj.kind !== 'raster-image') continue;
     if (obj.role === 'trace-source') continue;
     if (!outputImageColors.has(obj.color)) continue;
-    if (obj.transform.rotationDeg !== 0 || obj.transform.mirrorX || obj.transform.mirrorY) {
+    // Mirror is supported: compile-job's orientRasterLumaForMachine XORs the
+    // object's mirror flags into the machine orientation flip (M35; pinned by
+    // compile-job.test.ts column-mirror test). Only rotation remains
+    // unsupported — raster emit is axis-aligned.
+    if (obj.transform.rotationDeg !== 0) {
       issues.push({
         code: 'unsupported-raster-transform',
         message:
-          'Image raster output currently supports scale and position only. Clear rotation/mirror before engraving, or convert after placing the artwork.',
+          'Image raster output currently supports scale, mirror, and position only. Clear rotation before engraving, or convert after placing the artwork.',
       });
     }
   }
@@ -208,6 +213,29 @@ function appendBoundsIssues(
       message: `Line ${issue.lineNumber}: ${issue.reason}`,
     });
   }
+  // M1 (AUDIT-2026-06-10): image sweeps rapid an overscan runway past each
+  // side of the artwork, so an image within that distance of the bed's X
+  // edges always fails bounds with a bare coordinate error — name the real
+  // cause and the remedy instead of pointing at the artwork.
+  if (oob.length > 0 && hasImageOutput(project.scene)) {
+    issues.push({
+      code: 'out-of-bed',
+      message:
+        `Note: image engraves sweep ${DEFAULT_OVERSCAN_MM} mm past each side of the artwork for ` +
+        `overscan (acceleration runway). If the artwork itself fits the bed, move it at least ` +
+        `${DEFAULT_OVERSCAN_MM} mm inside the left/right edges.`,
+    });
+  }
+}
+
+function hasImageOutput(scene: Scene): boolean {
+  const imageColors = new Set(
+    scene.layers.filter((l) => l.output && l.mode === 'image').map((l) => l.color),
+  );
+  return scene.objects.some(
+    (obj) =>
+      obj.kind === 'raster-image' && obj.role !== 'trace-source' && imageColors.has(obj.color),
+  );
 }
 
 function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): void {
