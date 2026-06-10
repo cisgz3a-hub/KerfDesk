@@ -10,8 +10,8 @@ import {
   RT_SOFT_RESET,
   cancel as cancelStreamer,
   createStreamer,
-  disconnect as disconnectStreamer,
   findOversizedLine,
+  markErrored,
   pause as pauseStreamer,
   resume as resumeStreamer,
   step,
@@ -81,8 +81,13 @@ export function jobActions(
         try {
           await safeWrite(toSend, 'resume');
         } catch (err) {
+          // markErrored, not disconnect: 'disconnected' falls outside
+          // isActiveJob, which unmounts the Stop button and drops the
+          // soft-reset stop command while GRBL may still be executing
+          // buffered lines on a live port. 'errored' keeps the recovery
+          // controls mounted; step() sends nothing further either way.
           set((s) => ({
-            streamer: s.streamer === null ? s.streamer : disconnectStreamer(s.streamer),
+            streamer: s.streamer === null ? s.streamer : markErrored(s.streamer),
             safetyNotice: writeFailedNotice('resume'),
           }));
           throw err;
