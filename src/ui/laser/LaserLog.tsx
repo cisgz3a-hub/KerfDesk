@@ -72,9 +72,9 @@ function styleForLine(line: string): React.CSSProperties {
 const panelStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  border: '1px solid #ddd',
+  border: '1px solid var(--lf-border)',
   borderRadius: 4,
-  background: '#fafafa',
+  background: 'var(--lf-bg-input)',
   fontFamily: 'ui-monospace, Menlo, monospace',
   fontSize: 11,
   minHeight: 0,
@@ -84,8 +84,8 @@ const headerStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   padding: '4px 6px',
-  borderBottom: '1px solid #ddd',
-  background: '#f0f0f0',
+  borderBottom: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-0)',
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const toggleStyle: React.CSSProperties = {
@@ -93,7 +93,7 @@ const toggleStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 4,
   fontSize: 10,
-  color: '#555',
+  color: 'var(--lf-text-muted)',
   cursor: 'pointer',
 };
 const scrollStyle: React.CSSProperties = {
@@ -103,12 +103,20 @@ const scrollStyle: React.CSSProperties = {
   maxHeight: 160,
   minHeight: 80,
 };
-const emptyStyle: React.CSSProperties = { color: '#888', fontStyle: 'italic' };
+const emptyStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', fontStyle: 'italic' };
 
-const defaultStyle: React.CSSProperties = { color: '#222', whiteSpace: 'pre-wrap' };
-const okStyle: React.CSSProperties = { ...defaultStyle, color: '#888' };
-const errorStyle: React.CSSProperties = { ...defaultStyle, color: '#c62828', fontWeight: 600 };
-const alarmStyle: React.CSSProperties = { ...defaultStyle, color: '#fff', background: '#c62828' };
-const welcomeStyle: React.CSSProperties = { ...defaultStyle, color: '#1565c0' };
-const messageStyle: React.CSSProperties = { ...defaultStyle, color: '#6a1b9a' };
-const statusStyle: React.CSSProperties = { ...defaultStyle, color: '#999' };
+const defaultStyle: React.CSSProperties = { color: 'var(--lf-text)', whiteSpace: 'pre-wrap' };
+const okStyle: React.CSSProperties = { ...defaultStyle, color: 'var(--lf-text-faint)' };
+const errorStyle: React.CSSProperties = {
+  ...defaultStyle,
+  color: 'var(--lf-danger-fg)',
+  fontWeight: 600,
+};
+const alarmStyle: React.CSSProperties = {
+  ...defaultStyle,
+  color: '#fff',
+  background: 'var(--lf-danger)',
+};
+const welcomeStyle: React.CSSProperties = { ...defaultStyle, color: 'var(--lf-accent-fg)' };
+const messageStyle: React.CSSProperties = { ...defaultStyle, color: 'var(--lf-trace-fg)' };
+const statusStyle: React.CSSProperties = { ...defaultStyle, color: 'var(--lf-text-faint)' };

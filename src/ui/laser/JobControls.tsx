@@ -335,10 +335,10 @@ function useAutofocusAction(): () => void {
 
 const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6 };
-const stopBtnStyle: React.CSSProperties = { background: '#c62828', color: '#fff' };
+const stopBtnStyle: React.CSSProperties = { background: 'var(--lf-danger)', color: '#fff' };
 const progressContainerStyle: React.CSSProperties = {
   position: 'relative',
-  background: '#e0e0e0',
+  background: 'var(--lf-bg-input)',
   height: 18,
   borderRadius: 3,
   overflow: 'hidden',
@@ -348,7 +348,7 @@ const progressFillStyle: React.CSSProperties = {
   top: 0,
   bottom: 0,
   left: 0,
-  background: '#1976d2',
+  background: 'var(--lf-accent)',
   transition: 'width 100ms linear',
 };
 const progressLabelStyle: React.CSSProperties = {
@@ -356,17 +356,16 @@ const progressLabelStyle: React.CSSProperties = {
   textAlign: 'center',
   fontSize: 11,
   lineHeight: '18px',
-  color: '#111',
-  textShadow: '0 0 2px #fff',
+  color: 'var(--lf-text)',
 };
 const estimateStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
   alignSelf: 'center',
   fontVariantNumeric: 'tabular-nums',
 };
 const runningSafetyStyle: React.CSSProperties = {
-  color: '#fbbf24',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
   lineHeight: 1.3,
 };

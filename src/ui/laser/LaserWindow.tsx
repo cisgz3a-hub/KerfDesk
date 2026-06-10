@@ -34,8 +34,10 @@ export function LaserWindow(): JSX.Element {
   const supportsSerial = platform.serial.isSupported();
 
   return (
-    <aside aria-label="Laser controls" style={panelStyle}>
-      <h2 style={headingStyle}>Laser</h2>
+    <aside aria-label="Laser controls" className="lf-rail" style={panelStyle}>
+      <h2 className="lf-heading" style={headingStyle}>
+        Laser
+      </h2>
       <SafetyNoticeBanner />
       {!supportsSerial && (
         <p style={hintStyle}>
@@ -91,8 +93,7 @@ const panelStyle: React.CSSProperties = {
   // collectively grow. overflowY scrolls the column internally instead of
   // forcing the parent flexbox to stretch — without this, on a narrower
   // window the canvas (flex:1, minWidth:0) collapses to zero.
-  background: '#f5f5f5',
-  borderLeft: '1px solid #ddd',
+  // Surface chrome comes from .lf-rail; layout only here.
   padding: '8px 12px',
   width: 300,
   flexShrink: 0,
@@ -104,12 +105,17 @@ const panelStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 10,
 };
-const headingStyle: React.CSSProperties = { fontSize: 14, margin: '0 0 4px 0' };
-const hintStyle: React.CSSProperties = { color: '#a04040', fontStyle: 'italic', margin: 0 };
+const headingStyle: React.CSSProperties = { margin: '0 0 4px 0' };
+const hintStyle: React.CSSProperties = {
+  color: 'var(--lf-danger-fg)',
+  fontStyle: 'italic',
+  margin: 0,
+};
 const alarmStyle: React.CSSProperties = {
-  border: '1px solid #c62828',
-  background: '#ffebee',
+  border: '1px solid var(--lf-danger)',
+  background: '#3a2326',
+  color: 'var(--lf-danger-fg)',
   padding: 8,
   borderRadius: 4,
 };
-const alarmDetailStyle: React.CSSProperties = { margin: '4px 0', color: '#5d1a1a' };
+const alarmDetailStyle: React.CSSProperties = { margin: '4px 0' };
