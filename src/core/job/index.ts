@@ -3,6 +3,8 @@ export { EMPTY_JOB } from './job';
 export { compileJob } from './compile-job';
 export type { JobBounds } from './job-bounds';
 export { computeJobBounds } from './job-bounds';
+export type { RasterMachineBounds } from './raster-bounds';
+export { rasterBoundsInMachineCoords } from './raster-bounds';
 export type { FramePreflight } from './frame-preflight';
 export { describeFramePreflightFailure, framePreflight } from './frame-preflight';
 export type {
