@@ -59,10 +59,17 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
 
 // Strip the aggressive levers without disturbing the user's other
 // trace choices. Returns a fresh object and never mutates the caller.
+//
+// fixedPalette is intentionally KEPT (M10, AUDIT-2026-06-10): deleting it
+// switched a two-color preset's zero-paths retry off the potrace backend
+// into imagetracerjs with no palette — whose adaptive quantizer collapses
+// to black/black on binary input (samplepalette2 mid-row seeds +
+// colorquantcycles:1 disabling every recovery), committing a full-frame
+// rectangle instead of an honest "no paths". The retry must stay on the
+// same backend; only Otsu, despeckle, and pathOmit relax.
 export function relaxAggressivePreprocessing(options: TraceOptions): TraceOptions {
   const next: Record<string, unknown> = { ...options };
   delete next['useOtsuThreshold'];
-  delete next['fixedPalette'];
   delete next['despeckleMinPixels'];
   next['pathOmit'] = 0;
   return next as TraceOptions;

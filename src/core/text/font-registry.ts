@@ -5,12 +5,13 @@
 // the registry; the keys themselves never change so a 3-year-old .lf2
 // still resolves.
 //
-// Phase D bundles three fonts at three different style classes (sans
-// for prose, mono for technical labels, script for decorative). All
-// are MIT-compatible per ADR-017 and ADR-012:
-//   - Roboto Regular        Apache-2.0     sans
-//   - Inconsolata Regular   OFL-1.1        mono
-//   - Pacifico Regular      OFL-1.1        script (handwritten)
+// Phase D bundles four fonts across three style classes (sans for
+// prose, mono for technical labels, script for decorative). All are
+// MIT-compatible per ADR-017 and ADR-012:
+//   - Roboto Regular          Apache-2.0     sans
+//   - Inconsolata Regular     OFL-1.1        mono
+//   - Pacifico Regular        OFL-1.1        script (handwritten)
+//   - Dancing Script Regular  OFL-1.1        script (calligraphic)
 //
 // File loading: the UI layer fetches the .ttf via a browser fetch()
 // to a known asset path. Pure-core stays binary-free; this module

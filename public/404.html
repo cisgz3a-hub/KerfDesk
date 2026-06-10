@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  404.html — its EXISTENCE is load-bearing (LU35, AUDIT-2026-06-10):
+  without it Cloudflare Pages enables an implicit SPA fallback that
+  serves index.html with a 200 for every missing path, so stale hashed
+  chunks after a redeploy turn into nosniff-refused HTML and a blank
+  page. Keep this file fully self-contained (no bundle assets).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>404 — LaserForge 2.0</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        background: #14161a;
+        color: #e6e8eb;
+      }
+      main {
+        text-align: center;
+        padding: 2rem;
+      }
+      a {
+        color: #6ab0ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>404 — not found</h1>
+      <p>
+        This page doesn't exist. If you followed a stale link after an update, the app itself is
+        still at the root.
+      </p>
+      <p><a href="/">Open LaserForge 2.0</a></p>
+    </main>
+  </body>
+</html>

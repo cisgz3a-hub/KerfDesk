@@ -967,3 +967,37 @@ the live in-app render/placement of the swapped bitmap on the
 workspace canvas, and a side-by-side pixel comparison against
 LightBurn's own Convert output — both deferred (need a live import or
 a LightBurn session).
+
+### F-ML1. Material library — save, load, and session persistence
+
+**Code:** `src/ui/layers/MaterialLibraryPanel.tsx`,
+`src/ui/app/material-library-file-actions.ts`,
+`src/ui/state/material-library-persistence.ts`. The library is
+app-level state (like LightBurn's `.clb`), deliberately NOT stored in
+the `.lf2` project file.
+
+**Operator intent.** Keep per-material cut presets across sessions and
+share them as files.
+
+**Flows.**
+
+1. **Save.** Panel **Save...** opens a save picker suggesting
+   `<library name>.lfml.json`; success toasts "Saved material library
+   to <name>" and clears the dirty `*`. Failure (picker error, write
+   error) toasts the reason; the in-memory library is untouched.
+2. **Load.** **Load...** (shown in both the empty and loaded panel)
+   opens a picker filtered to `.lfml.json`. A valid file replaces the
+   current library and toasts "Loaded material library: <name>". A
+   file from a newer LaserForge raises the schema-too-new alert; any
+   other invalid file toasts the validation reason and keeps the
+   current library.
+3. **Session persistence (automatic).** Whenever the library or its
+   dirty marker changes, the serialized library is written to
+   `localStorage` (`laserforge.material-library.v1`). On launch, if no
+   library is loaded, the persisted one is restored — including the
+   dirty `*`. **Unload clears the persisted copy** (edge: unload means
+   forget, not stash). A corrupt persisted slot is discarded silently
+   rather than failing every boot.
+4. **Persistence failure (edge).** If the localStorage write fails
+   (quota), a single warning toast points the operator at **Save...**;
+   editing continues unaffected.

@@ -27,6 +27,7 @@ import {
   panOffsetForDrag,
 } from './drag-state';
 import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
+import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { canvasMouseToScene, clientToCanvasPx, zoomAtCursorPx } from './view-transform';
 
 export function Workspace(): JSX.Element {
@@ -47,6 +48,7 @@ export function Workspace(): JSX.Element {
   const panX = useUiStore((s) => s.panX);
   const panY = useUiStore((s) => s.panY);
   const viewState = useMemo(() => ({ zoomFactor, panX, panY }), [zoomFactor, panX, panY]);
+  const canvasSize = useCanvasBitmapSize(ref);
   useWorkspaceDraw({
     ref,
     project,
@@ -59,6 +61,7 @@ export function Workspace(): JSX.Element {
     wcoCache,
     scrubberT,
     viewState,
+    canvasSize,
   });
 
   const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
@@ -68,8 +71,8 @@ export function Workspace(): JSX.Element {
     <>
       <canvas
         ref={ref}
-        width={800}
-        height={600}
+        width={canvasSize.width}
+        height={canvasSize.height}
         onMouseDown={handlers.onMouseDown}
         onMouseMove={handlers.onMouseMove}
         onMouseUp={handlers.onMouseUp}
@@ -115,6 +118,9 @@ function useWorkspaceDraw(args: {
   readonly wcoCache: ReturnType<typeof useLaserStore.getState>['wcoCache'];
   readonly scrubberT: number;
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
+  // Not read directly — the draw effect reads canvas.width/height — but a
+  // bitmap resize clears the canvas, so the effect must re-run on it.
+  readonly canvasSize: CanvasBitmapSize;
 }): void {
   const {
     ref,
@@ -128,6 +134,7 @@ function useWorkspaceDraw(args: {
     wcoCache,
     scrubberT,
     viewState,
+    canvasSize,
   } = args;
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const displayPolylineCacheRef = useRef<DisplayPolylineCache | null>(null);
@@ -174,6 +181,7 @@ function useWorkspaceDraw(args: {
     previewMode,
     scrubberT,
     viewState,
+    canvasSize,
     rasterRedrawTick,
     displayPolylineCache,
     previewToolpath,

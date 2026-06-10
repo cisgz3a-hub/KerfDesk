@@ -32,11 +32,6 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   const debounceMs = args.debounceMs ?? DEFAULT_DEBOUNCE_MS;
 
   const [draft, setDraft] = useState<string>(() => format(value));
-  const debouncerRef = useRef<Debouncer<T>>();
-  if (debouncerRef.current === undefined) {
-    debouncerRef.current = createDebouncer<T>({ initial: value, debounceMs, commit });
-  }
-
   // Mirror callbacks + draft via refs so the reconcile-effect below can
   // depend only on `value` (the deliberate trigger) without the
   // exhaustive-deps rule flagging the closure-captures as missing
@@ -48,6 +43,24 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   parseRef.current = parse;
   const formatRef = useRef(format);
   formatRef.current = format;
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+
+  const debouncerRef = useRef<Debouncer<T>>();
+  if (debouncerRef.current === undefined) {
+    debouncerRef.current = createDebouncer<T>({
+      initial: value,
+      debounceMs,
+      // M25 (AUDIT-2026-06-10): when the commit fires, snap the displayed
+      // text to the value actually committed. parse() clamps silently, so
+      // typing 9999 into Speed (max 6000) used to keep DISPLAYING 9999 while
+      // the store, G-code, and ETA all used 6000 — the field lied.
+      commit: (next) => {
+        commitRef.current(next);
+        setDraft(formatRef.current(next));
+      },
+    });
+  }
 
   // Reconcile when the store changes the canonical value out from under us
   // (e.g. undo / external setLayerParam from a different surface). We only
@@ -76,7 +89,12 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
       debouncerRef.current?.schedule(parse(nextText));
     },
     onBlur: () => {
-      debouncerRef.current?.flush(parse(draft));
+      const committed = parse(draft);
+      debouncerRef.current?.flush(committed);
+      // Snap even when the clamped value equals the already-committed value
+      // (flush may skip the commit callback then, but the text can still be
+      // out of range — e.g. 9999 typed while the store already holds 6000).
+      setDraft(format(committed));
     },
   };
 }

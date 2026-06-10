@@ -43,6 +43,8 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   const preflight = runPreflight(project, body, {
     motionOffset: options.preflightMotionOffset,
   });
-  const gcode = options.metadata ? gcodeMetadataHeader(options.metadata) + body : body;
+  const gcode = options.metadata
+    ? gcodeMetadataHeader(options.metadata, { maxPowerS: project.device.maxPowerS }) + body
+    : body;
   return { gcode, preflight };
 }

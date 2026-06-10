@@ -1,16 +1,20 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
+import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
 import {
   MATERIAL_LIBRARY_FORMAT,
   MATERIAL_LIBRARY_SCHEMA_VERSION,
+  serializeMaterialLibrary,
   type MaterialLibraryDocument,
   type MaterialPreset,
 } from '../../io/material-library';
+import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
+import { useToastStore } from '../state/toast-store';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 
 (
@@ -19,6 +23,8 @@ import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 
 afterEach(() => {
   resetStore();
+  useToastStore.setState({ toasts: [] });
+  vi.restoreAllMocks();
 });
 
 function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
@@ -54,7 +60,7 @@ function preset(overrides: Partial<MaterialPreset> = {}): MaterialPreset {
   };
 }
 
-function library(entries: ReadonlyArray<MaterialPreset>): MaterialLibraryDocument {
+function library(entries: ReadonlyArray<MaterialPreset> = []): MaterialLibraryDocument {
   return {
     format: MATERIAL_LIBRARY_FORMAT,
     librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
@@ -64,13 +70,40 @@ function library(entries: ReadonlyArray<MaterialPreset>): MaterialLibraryDocumen
   };
 }
 
-async function renderPanel(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
+function file(name: string, text: string): FileHandle {
+  return { name, text: async () => text };
+}
+
+function mockPlatform(
+  args: {
+    readonly open?: () => Promise<ReadonlyArray<FileHandle>>;
+    readonly save?: () => Promise<SaveTarget | null>;
+  } = {},
+): PlatformAdapter {
+  return {
+    id: 'mock',
+    pickFilesForOpen: args.open ?? (async () => []),
+    pickFileForSave: args.save ?? (async () => null),
+    serial: {
+      isSupported: () => false,
+      requestPort: async () => null,
+    },
+  };
+}
+
+async function renderPanel(
+  platform: PlatformAdapter = mockPlatform(),
+): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(<MaterialLibraryPanel />);
+    root.render(
+      <PlatformProvider adapter={platform}>
+        <MaterialLibraryPanel />
+      </PlatformProvider>,
+    );
   });
   if (root === null) throw new Error('root missing');
   return { host, root };
@@ -114,6 +147,16 @@ async function setSelectValue(element: HTMLSelectElement, value: string): Promis
 }
 
 describe('MaterialLibraryPanel', () => {
+  it('shows new and load actions when no material library is loaded', async () => {
+    const { host, root } = await renderPanel();
+    try {
+      expect(button(host, 'Create new material library')).toBeDefined();
+      expect(button(host, 'Load material library')).toBeDefined();
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
   it('creates a blank device-scoped material library from the panel', async () => {
     const { host, root } = await renderPanel();
     try {
@@ -129,6 +172,68 @@ describe('MaterialLibraryPanel', () => {
       });
       expect(state.materialLibrary?.deviceHint?.name).toBe(state.project.device.name);
       expect(state.materialLibraryDirty).toBe(false);
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('loads a material library through the panel file picker', async () => {
+    const doc = library([preset()]);
+    const { host, root } = await renderPanel(
+      mockPlatform({
+        open: async () => [file('shop.lfml.json', serializeMaterialLibrary(doc))],
+      }),
+    );
+    try {
+      await act(async () => {
+        button(host, 'Load material library').click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(useStore.getState().materialLibrary).toEqual(doc);
+      expect(useStore.getState().materialLibraryDirty).toBe(false);
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('shows loaded material library file actions', async () => {
+    useStore.getState().setMaterialLibrary(library([preset()]));
+    const { host, root } = await renderPanel();
+    try {
+      expect(button(host, 'Load material library')).toBeDefined();
+      expect(button(host, 'Save material library')).toBeDefined();
+      expect(button(host, 'Unload material library')).toBeDefined();
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('saves a material library through the panel and clears dirty state', async () => {
+    const doc = library([preset()]);
+    const writes: string[] = [];
+    useStore.getState().setMaterialLibrary(doc);
+    useStore.setState({ materialLibraryDirty: true });
+    const { host, root } = await renderPanel(
+      mockPlatform({
+        save: async () => ({
+          displayName: 'shop.lfml.json',
+          write: async (text) => {
+            writes.push(text);
+          },
+        }),
+      }),
+    );
+    try {
+      await act(async () => {
+        button(host, 'Save material library').click();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(writes).toEqual([serializeMaterialLibrary(doc)]);
+      expect(useStore.getState().materialLibraryDirty).toBe(false);
     } finally {
       await unmount(root, host);
     }

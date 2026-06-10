@@ -123,7 +123,7 @@ function makeConnection(port: SerialPort): SerialConnection {
   return {
     write: async (data: string) => {
       if (ctx.writer === undefined) throw new Error('Serial port not writable.');
-      await ctx.writer.write(new TextEncoder().encode(data));
+      await ctx.writer.write(encodeWireBytes(data));
     },
     onLine: (handler) => {
       lineSubs.add(handler);
@@ -159,6 +159,27 @@ function makeConnection(port: SerialPort): SerialConnection {
       for (const h of closeSubs) h();
     },
   };
+}
+
+// One byte per character, NOT UTF-8 (M12, AUDIT-2026-06-10). GRBL's wire
+// protocol is ASCII lines plus single raw realtime bytes above 0x7F
+// (jog-cancel 0x85, feed/spindle overrides 0x90–0xA2). TextEncoder turned
+// '\x85' into the two bytes 0xC2 0x85 — vanilla GRBL discards unknown high
+// bytes, so jog-cancel silently did nothing, and firmwares that buffer them
+// would corrupt the following line. Byte-per-char is identical to UTF-8 for
+// every ASCII string we emit and exact for the realtime bytes.
+function encodeWireBytes(data: string): Uint8Array {
+  const out = new Uint8Array(data.length);
+  for (let i = 0; i < data.length; i += 1) {
+    const code = data.charCodeAt(i);
+    if (code > 0xff) {
+      throw new Error(
+        `Serial write contains a character that is not a single-byte GRBL code: U+${code.toString(16).toUpperCase()}`,
+      );
+    }
+    out[i] = code;
+  }
+  return out;
 }
 
 async function runReadLoop(

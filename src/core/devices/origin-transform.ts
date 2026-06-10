@@ -22,6 +22,30 @@ export function toMachineCoords(p: Vec2, device: DeviceProfile): Vec2 {
   return originTransform(p, device.origin, device.bedWidth, device.bedHeight);
 }
 
+// Exact inverse of toMachineCoords. Most origin transforms are their own
+// inverse (axis mirrors), but 'center' is not: its X axis is translated,
+// so the preview frame mapping (H3) needs a real inverse, not a re-apply.
+export function toSceneCoords(p: Vec2, device: DeviceProfile): Vec2 {
+  return inverseOriginTransform(p, device.origin, device.bedWidth, device.bedHeight);
+}
+
+function inverseOriginTransform(p: Vec2, origin: Origin, bedW: number, bedH: number): Vec2 {
+  switch (origin) {
+    case 'front-left':
+      return { x: p.x, y: bedH - p.y };
+    case 'front-right':
+      return { x: bedW - p.x, y: bedH - p.y };
+    case 'rear-left':
+      return { x: p.x, y: p.y };
+    case 'rear-right':
+      return { x: bedW - p.x, y: p.y };
+    case 'center':
+      return { x: p.x + bedW / 2, y: bedH / 2 - p.y };
+    default:
+      return assertNever(origin, 'Origin');
+  }
+}
+
 function originTransform(p: Vec2, origin: Origin, bedW: number, bedH: number): Vec2 {
   switch (origin) {
     case 'front-left':

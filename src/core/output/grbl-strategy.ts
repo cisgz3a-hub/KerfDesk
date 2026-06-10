@@ -6,8 +6,12 @@
 //      indexed iteration (no Set/Map iteration order).
 //   #7 Power scale honest: S = round((power/100) * device.maxPowerS).
 //
-// Preamble:  G21 (mm), G90 (absolute), M5 (laser off).
+// Preamble:  G21 (mm), G90 (absolute), M3 S0 (arm laser at zero power —
+//            see preamble() for the $32=0 priming rationale; M3 S0 is
+//            laser-off in laser mode, and deliberately NOT M5).
 // Postamble: M5, then `G0 X0 Y0 S0` to park at origin.
+// LightBurn divergence (LIGHTBURN-STUDY §8): stock GRBL headers there are
+// units/positioning only, with M3/M4 issued per cut layer — ours pre-arms.
 
 import type { DeviceProfile } from '../devices';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';

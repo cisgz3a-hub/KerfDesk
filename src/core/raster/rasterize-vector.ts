@@ -23,10 +23,15 @@
 // binary mask (not luma) and the fixture is test-only; extracting a shared
 // scanline primitive across all three is a candidate refactor, not done here.
 
-import type { Bounds, Polyline, Vec2 } from '../scene';
+import { isClosedEnough, type Bounds, type Polyline, type Vec2 } from '../scene';
 
-// LightBurn sets every converted pixel to 50% gray; white is unburned material.
-const INK_LUMA = 128;
+// LightBurn sets every converted pixel to 50% gray; white is unburned
+// material. 127, not 128: ditherThreshold burns strictly BELOW its cutoff
+// (default 128), so exactly-128 ink composed to zero output — a converted
+// bitmap on a Threshold layer silently dithered to all-zero S (M7,
+// AUDIT-2026-06-10). 127 keeps the 50%-gray intent within rounding and
+// stays on the burning side of the default cutoff.
+const INK_LUMA = 127;
 const BACKGROUND_LUMA = 255;
 const MM_PER_INCH = 25.4;
 // Keep "vertex exactly on the scanline" off the half-open span boundary so
@@ -129,7 +134,10 @@ function scaleForExtent(pixelExtentPx: number, mm: number): number {
   return mm > 0 ? pixelExtentPx / mm : 0;
 }
 
-// Map closed mm-space contours into pixel space; drop open / degenerate ones.
+// Map closed mm-space contours into pixel space; drop open / degenerate
+// ones. isClosedEnough (shared with fill-hatching, M4) accepts contours
+// whose endpoints coincide without the closed flag — the same data-at-rest
+// shape Fill was patched for, so Fill and Convert to Bitmap agree.
 function toPixelContours(
   polylines: ReadonlyArray<Polyline>,
   bounds: Bounds,
@@ -138,7 +146,7 @@ function toPixelContours(
 ): Vec2[][] {
   const out: Vec2[][] = [];
   for (const pl of polylines) {
-    if (!pl.closed || pl.points.length < MIN_CONTOUR_POINTS) continue;
+    if (!isClosedEnough(pl) || pl.points.length < MIN_CONTOUR_POINTS) continue;
     out.push(
       pl.points.map((p) => ({
         x: (p.x - bounds.minX) * pxPerMmX,

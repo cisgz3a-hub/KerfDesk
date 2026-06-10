@@ -121,6 +121,9 @@ export default tseslint.config(
       'boundaries/dependencies': ['error', { default: 'disallow', rules: boundaryRules }],
       'boundaries/no-unknown': 'error',
       'boundaries/no-unknown-files': 'error',
+      // CLAUDE.md "No circular imports" — was documented as enforced long
+      // before the rule existed (audit H14); now it actually is.
+      'import/no-cycle': 'error',
 
       // React hooks rules (R-H4 audit finding). rules-of-hooks is an
       // error because violations break at runtime; exhaustive-deps is a
@@ -128,6 +131,36 @@ export default tseslint.config(
       // fail CI, but it surfaces in every editor.
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+
+      // H13 (AUDIT-2026-06-10): native blocking dialogs suspend the renderer
+      // event loop — mid-job that freezes the ack pump, the Stop button, and
+      // the M22 keyboard stop. Every dialog goes through
+      // src/ui/state/job-aware-dialogs.ts (the one exempt module below),
+      // which degrades to toasts while a job is active.
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'alert',
+          message: 'Use jobAwareAlert — a native dialog freezes Stop mid-job (H13).',
+        },
+        {
+          object: 'window',
+          property: 'confirm',
+          message: 'Use jobAwareConfirm — a native dialog freezes Stop mid-job (H13).',
+        },
+        {
+          object: 'window',
+          property: 'prompt',
+          message: 'Use jobAwarePrompt — a native dialog freezes Stop mid-job (H13).',
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'alert', message: 'Use jobAwareAlert (H13).' },
+        { name: 'confirm', message: 'Use jobAwareConfirm (H13).' },
+        { name: 'prompt', message: 'Use jobAwarePrompt (H13).' },
+      ],
 
       // Type strictness (CLAUDE.md "Type strictness")
       '@typescript-eslint/no-explicit-any': 'error',
@@ -196,6 +229,29 @@ export default tseslint.config(
         { name: 'fetch', message: 'core/ must not do network I/O.' },
         { name: 'atob', message: 'core/ must not depend on browser base64 globals.' },
         { name: 'btoa', message: 'core/ must not depend on browser base64 globals.' },
+        // M29 (AUDIT-2026-06-10): these two were documented as restricted in
+        // CLAUDE.md but never configured — globals.node made `process` pass.
+        { name: 'console', message: 'core/ must not log directly; use a logger passed in.' },
+        { name: 'process', message: 'core/ is platform-agnostic. Move to ui/ or platform/.' },
+        // This block REPLACES the src-wide no-restricted-globals for core
+        // files, so the H13 dialog ban must be restated here.
+        { name: 'alert', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
+        { name: 'confirm', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
+        { name: 'prompt', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
+      ],
+      // M29: CLAUDE.md claims a no-restricted-imports gate for pure core;
+      // it never existed, so `import fs from "node:fs"` would have passed
+      // lint AND typecheck (@types/node is installed).
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['node:*', 'fs', 'path', 'os', 'child_process', 'worker_threads'],
+              message: 'core/ must not import Node.js APIs; push I/O to io/ or platform/.',
+            },
+          ],
+        },
       ],
       'no-restricted-syntax': [
         'error',
@@ -214,14 +270,26 @@ export default tseslint.config(
       ],
     },
   },
+  // H13: the job-aware wrapper module is the ONE place allowed to touch the
+  // native blocking dialogs — everything else must go through it.
+  {
+    files: ['src/ui/state/job-aware-dialogs.ts'],
+    rules: {
+      'no-restricted-properties': 'off',
+      'no-restricted-globals': 'off',
+    },
+  },
   // Test files: relax file-size and assertion strictness so test scaffolding
-  // can use longer describe blocks and `!` for fixture access.
+  // can use longer describe blocks and `!` for fixture access. Tests run in
+  // node, so reading fixtures via node:fs is fine (the no-restricted-imports
+  // gate protects shipped core code, not its tests).
   {
     files: ['**/*.test.ts', '**/*.test.tsx', 'src/__fixtures__/**/*.ts'],
     rules: {
       'max-lines-per-function': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       'boundaries/dependencies': 'off',
+      'no-restricted-imports': 'off',
     },
   },
   {

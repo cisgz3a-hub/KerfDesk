@@ -16,6 +16,7 @@ import { prepareOutput } from '../../io/gcode';
 import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
+import { mapToolpathToScene } from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
 
 export function drawObjectsFaint(
@@ -75,7 +76,11 @@ export function buildPreviewToolpath(
     project,
     options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin },
   );
-  return buildToolpath(prepared.ok ? prepared.job : EMPTY_JOB);
+  if (!prepared.ok) return buildToolpath(EMPTY_JOB);
+  // The prepared job is in machine/work coordinates; the canvas (ghost +
+  // raster sim) draws in scene space. Map back so the overlay registers with
+  // the design instead of mirroring about the bed midline (H3).
+  return mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device);
 }
 
 function drawStep(ctx: CanvasRenderingContext2D, step: ToolpathStep, view: ViewTransform): void {

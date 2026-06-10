@@ -33,7 +33,7 @@ export type SanitizeResult = {
   readonly stripped: SvgStripCounts;
 };
 
-const EXTERNAL_URL = /^(https?:|file:|ftp:)/i;
+const DATA_IMAGE_URL = /^data:image\//i;
 
 export function sanitizeSvg(dirty: string): SanitizeResult {
   const counts = {
@@ -56,22 +56,20 @@ export function sanitizeSvg(dirty: string): SanitizeResult {
 
   DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
     const name = data.attrName.toLowerCase();
-    const value = data.attrValue ?? '';
-    if (name === 'href' || name === 'xlink:href') {
-      if (EXTERNAL_URL.test(value)) {
-        counts.externalLinks += 1;
-        data.keepAttr = false;
-        return;
-      }
-      if (value.startsWith('data:')) {
-        // Allow image/* data URIs (harmless geometry assets); drop everything
-        // else (text/html, application/*, etc.).
-        if (!/^data:image\//i.test(value)) {
-          counts.dataUris += 1;
-          data.keepAttr = false;
-        }
-      }
+    if (name !== 'href' && name !== 'xlink:href') return;
+    // LU6 (AUDIT-2026-06-10): ALLOWLIST, not a protocol blocklist. The old
+    // /^(https?:|file:|ftp:)/ prefix match let protocol-relative ('//evil…')
+    // and whitespace-prefixed URLs through. Only same-document fragments and
+    // image data URIs have a legitimate use in imported artwork.
+    const value = (data.attrValue ?? '').trim();
+    if (value === '' || value.startsWith('#')) return;
+    if (DATA_IMAGE_URL.test(value)) return;
+    if (value.toLowerCase().startsWith('data:')) {
+      counts.dataUris += 1;
+    } else {
+      counts.externalLinks += 1;
     }
+    data.keepAttr = false;
   });
 
   const clean = DOMPurify.sanitize(dirty, {

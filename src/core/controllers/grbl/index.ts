@@ -18,12 +18,21 @@ export {
   startCollecting,
 } from './parse-settings';
 
-export type { AckKind, AckResult, StepResult, StreamerState, StreamerStatus } from './streamer';
+export type {
+  AckKind,
+  AckResult,
+  OversizedLine,
+  StepResult,
+  StreamerState,
+  StreamerStatus,
+} from './streamer';
 export {
   DEFAULT_RX_BUFFER_BYTES,
   cancel,
   createStreamer,
   disconnect,
+  findOversizedLine,
+  markErrored,
   onAck,
   pause,
   progress,

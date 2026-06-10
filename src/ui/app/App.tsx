@@ -6,15 +6,17 @@
 import { CutsLayersPanel } from '../layers';
 import { StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
-import { LaserWindow } from '../laser';
+import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { Workspace } from '../workspace';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
+import { useMaterialLibraryPersistence } from './use-material-library-persistence';
 import { useShortcuts } from './use-shortcuts';
 import { useSpacePan } from './use-space-pan';
+import { useUnloadStop } from './use-unload-stop';
 import { useWindowTitle } from './use-window-title';
 
 export function App(): JSX.Element {
@@ -24,10 +26,13 @@ export function App(): JSX.Element {
   // can't (event-handler throws + unhandled promise rejections).
   useAutosaveRecovery();
   useAutosave();
+  useMaterialLibraryPersistence();
   useGlobalErrorHandlers();
   useImportDragDrop();
+  useJobShortcuts();
   useShortcuts();
   useSpacePan();
+  useUnloadStop();
   useWindowTitle();
   return (
     <div style={shellStyle}>

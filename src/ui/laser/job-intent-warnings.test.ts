@@ -42,7 +42,57 @@ function projectWith(object: SceneObject, mode: 'line' | 'fill' | 'image'): Proj
   };
 }
 
+const smallRaster: SceneObject = {
+  kind: 'raster-image',
+  id: 'R1',
+  source: 'photo.png',
+  dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+  lumaBase64: 'AP//AA==',
+  pixelWidth: 100,
+  pixelHeight: 100,
+  // 100 px of stored detail over 50 mm: fine at 10 lines/mm (500 px grid →
+  // upsampled 5×).
+  bounds: { minX: 0, minY: 0, maxX: 50, maxY: 50 },
+  transform: IDENTITY_TRANSFORM,
+  color: '#ff0000',
+  dither: 'threshold',
+  linesPerMm: 10,
+};
+
 describe('detectJobIntentWarnings', () => {
+  // H12 (AUDIT-2026-06-10): the engrave luma is extracted from the
+  // 2048-px-capped decode (ADR-037, a TRACE runtime cap), and compile
+  // nearest-neighbor UPSAMPLES it to the burn grid — silently, while the
+  // canvas shows the sharp full-res bitmap. Surface the mismatch.
+  it('warns when the burn grid exceeds the stored image resolution (silent upsample)', () => {
+    const warnings = detectJobIntentWarnings(projectWith(smallRaster, 'image'));
+    expect(
+      warnings.some(
+        (w) => w.includes('photo.png') && w.includes('100 × 100 px') && w.includes('500 × 500 px'),
+      ),
+    ).toBe(true);
+  });
+
+  it('does not warn when the stored resolution covers the burn grid', () => {
+    const denseRaster: SceneObject = { ...smallRaster, pixelWidth: 600, pixelHeight: 600 };
+    const warnings = detectJobIntentWarnings(projectWith(denseRaster, 'image'));
+    expect(warnings.some((w) => w.includes('photo.png'))).toBe(false);
+  });
+
+  it('does not emit the upsample warning for pass-through layers', () => {
+    const project = projectWith(smallRaster, 'image');
+    const layer = project.scene.layers[0];
+    const passThroughProject: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: layer === undefined ? project.scene.layers : [{ ...layer, passThrough: true }],
+      },
+    };
+    const warnings = detectJobIntentWarnings(passThroughProject);
+    expect(warnings.some((w) => w.includes('photo.png'))).toBe(false);
+  });
+
   it('warns when output layers still use uncalibrated first-run power and speed defaults', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'line'))).toContain(
       'Layer L1 is still using uncalibrated defaults: 30% power, 1500 mm/min, 1 pass. Run a material test on scrap before burning final material.',

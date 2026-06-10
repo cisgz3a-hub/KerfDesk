@@ -41,6 +41,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # M33 (AUDIT-2026-06-10): for workflow_run events GITHUB_SHA is the
+          # default branch's CURRENT tip, not the commit whose CI succeeded —
+          # a push race (or a re-run of an old green CI) would deploy a
+          # different commit than the one validated. Pin the checkout to the
+          # triggering run's head SHA; manual dispatches deploy the selected
+          # ref (gated to main above) and re-prove everything below anyway.
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
           # Fetch full history so the version-badge `git rev-parse
           # --short HEAD` step finds a real commit (the default shallow
           # clone has depth 1 and works, but a deeper clone helps

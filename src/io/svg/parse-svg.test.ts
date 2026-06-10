@@ -49,6 +49,66 @@ describe('parseSvg — happy path', () => {
     expect(result.object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 25.4, maxY: 25.4 });
   });
 
+  // H9 (AUDIT-2026-06-10): when width/height AND viewBox both exist, user
+  // units must be scaled by physical / viewBox — the standard Inkscape /
+  // Illustrator export shape (`width="50mm" viewBox="0 0 500 500"`) was
+  // importing 10× too large because viewBox units were taken as raw mm.
+  describe('physical size + viewBox scaling (H9)', () => {
+    it('scales user units by physicalWidth/viewBoxWidth — geometry and bounds', () => {
+      const result = parseSvg(
+        args(`<svg xmlns="http://www.w3.org/2000/svg" width="50mm" height="50mm" viewBox="0 0 500 500">
+  <line x1="0" y1="0" x2="500" y2="0" stroke="red"/>
+</svg>`),
+      );
+      expect(result.object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 50, maxY: 50 });
+      const points = result.object?.paths[0]?.polylines[0]?.points ?? [];
+      expect(points[points.length - 1]).toEqual({ x: 50, y: 0 });
+    });
+
+    it('scales each axis independently when width and height disagree', () => {
+      const result = parseSvg(
+        args(`<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 200 200">
+  <line x1="200" y1="200" x2="0" y2="0" stroke="red"/>
+</svg>`),
+      );
+      expect(result.object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 50 });
+      const points = result.object?.paths[0]?.polylines[0]?.points ?? [];
+      expect(points[0]).toEqual({ x: 100, y: 50 });
+    });
+
+    it('uses the width scale for both axes when only width is declared', () => {
+      const result = parseSvg(
+        args(`<svg xmlns="http://www.w3.org/2000/svg" width="1in" viewBox="0 0 96 96">
+  <line x1="96" y1="96" x2="0" y2="0" stroke="red"/>
+</svg>`),
+      );
+      expect(result.object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 25.4, maxY: 25.4 });
+    });
+
+    it('converts px user units at 96 DPI when no viewBox exists (LightBurn parity)', () => {
+      // A 96 px square is 1 inch = 25.4 mm, not 96 mm.
+      const result = parseSvg(
+        args(`<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96">
+  <line x1="0" y1="0" x2="96" y2="0" stroke="red"/>
+</svg>`),
+      );
+      expect(result.object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 25.4, maxY: 25.4 });
+      const points = result.object?.paths[0]?.polylines[0]?.points ?? [];
+      expect(points[points.length - 1]?.x).toBeCloseTo(25.4);
+    });
+
+    it('keeps the 1-user-unit = 1 mm assumption for viewBox-only files', () => {
+      const result = parseSvg(
+        args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <line x1="0" y1="0" x2="100" y2="0" stroke="red"/>
+</svg>`),
+      );
+      expect(result.object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 100 });
+      const points = result.object?.paths[0]?.polylines[0]?.points ?? [];
+      expect(points[points.length - 1]).toEqual({ x: 100, y: 0 });
+    });
+  });
+
   it('normalizes color forms: 3-digit hex, named, rgb()', () => {
     const result = parseSvg(
       args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">

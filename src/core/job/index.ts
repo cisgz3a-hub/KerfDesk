@@ -1,8 +1,10 @@
 export type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from './job';
 export { EMPTY_JOB } from './job';
-export { compileJob } from './compile-job';
+export { compileJob, DEFAULT_OVERSCAN_MM } from './compile-job';
 export type { JobBounds } from './job-bounds';
 export { computeJobBounds } from './job-bounds';
+export type { RasterMachineBounds } from './raster-bounds';
+export { rasterBoundsInMachineCoords } from './raster-bounds';
 export type { FramePreflight } from './frame-preflight';
 export { describeFramePreflightFailure, framePreflight } from './frame-preflight';
 export type {
@@ -16,6 +18,7 @@ export {
   JOB_ORIGIN_ANCHORS,
   USER_ORIGIN_JOB_PLACEMENT,
   applyJobOrigin,
+  jobOriginOffset,
   offsetJobBounds,
 } from './job-origin';
 export type { JobDurationEstimate } from './estimate-duration';

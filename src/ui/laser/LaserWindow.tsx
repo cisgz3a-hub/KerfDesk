@@ -3,8 +3,8 @@
 
 import { describeAlarm } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
-import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
@@ -13,7 +13,7 @@ import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
-import { prepareStartJob } from './start-job-readiness';
+import { runStartJobFlow } from './start-job-flow';
 
 export function LaserWindow(): JSX.Element {
   const platform = usePlatform();
@@ -22,46 +22,16 @@ export function LaserWindow(): JSX.Element {
   const connect = useLaserStore((s) => s.connect);
   const disconnect = useLaserStore((s) => s.disconnect);
   const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
-  const startJob = useLaserStore((s) => s.startJob);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
+  const streamer = useLaserStore((s) => s.streamer);
   const machineOperationBusy = autofocusBusy || motionOperation !== null;
+  // H6: jog mid-job interleaves $J= acks into the character-counted stream —
+  // every ack pops the stream head, so the 120-byte RX accounting drifts and
+  // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
+  const jobActive = isActiveJob(streamer);
 
   const supportsSerial = platform.serial.isSupported();
-  const onStartJob = async (): Promise<void> => {
-    const { project, jobPlacement } = useStore.getState();
-    const laser = useLaserStore.getState();
-    const prepared = prepareStartJob(
-      project,
-      laser.controllerSettings,
-      {
-        statusReport: laser.statusReport,
-        alarmCode: laser.alarmCode,
-        hasActiveStreamer:
-          laser.streamer !== null &&
-          (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
-        autofocusBusy: laser.autofocusBusy,
-        workOriginActive: laser.workOriginActive,
-        wcoCache: laser.wcoCache,
-      },
-      jobPlacement,
-    );
-    if (!prepared.ok) {
-      const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
-      window.alert(`Cannot start job:\n\n${lines}`);
-      return;
-    }
-    if (prepared.warnings.length > 0) {
-      const lines = prepared.warnings.map((message) => `• ${message}`).join('\n');
-      if (!window.confirm(`Controller warning:\n\n${lines}\n\nStart anyway?`)) return;
-    }
-    try {
-      await startJob(prepared.gcode);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      window.alert(`Could not start job:\n\n${message}`);
-    }
-  };
 
   return (
     <aside aria-label="Laser controls" style={panelStyle}>
@@ -83,10 +53,10 @@ export function LaserWindow(): JSX.Element {
       {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
       <DetectedSettingsBanner />
       <StatusDisplay />
-      <JogPad disabled={connection.kind !== 'connected' || machineOperationBusy} />
+      <JogPad disabled={connection.kind !== 'connected' || machineOperationBusy || jobActive} />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
-        onStartJob={() => void onStartJob()}
+        onStartJob={() => void runStartJobFlow()}
       />
       <LaserLog />
     </aside>

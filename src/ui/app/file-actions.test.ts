@@ -165,6 +165,71 @@ describe('file actions contextual failure handling', () => {
     ]);
   });
 
+  // M11 (AUDIT-2026-06-10): the $30 power-scale check used to protect only
+  // the streamed Start path — a project max S of 1000 saved for a $30=255
+  // machine clamps every S>255 to 100% beam power from the saved file.
+  it('gates the export behind a confirm when the connected controller $30 disagrees', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const save = vi.fn(async () => null);
+    const toast = toasts();
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save }),
+      project: projectWithLine(),
+      savedName: null,
+      controllerSettings: { maxPowerS: 255, laserModeEnabled: true },
+      pushToast: toast.pushToast,
+    });
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(confirm.mock.calls[0]?.[0]).toContain('$30 is 255');
+    expect(save).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it('saves anyway when the operator confirms the controller mismatch', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const save = vi.fn(async () => null);
+    const toast = toasts();
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save }),
+      project: projectWithLine(),
+      savedName: null,
+      controllerSettings: { maxPowerS: 255, laserModeEnabled: true },
+      pushToast: toast.pushToast,
+    });
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
+  });
+
+  it('notes the assumed $30 after saving while never connected', async () => {
+    const written: string[] = [];
+    const target: SaveTarget = {
+      displayName: 'out.gcode',
+      write: async (text: string) => {
+        written.push(text);
+      },
+    };
+    const toast = toasts();
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save: async () => target }),
+      project: projectWithLine(),
+      savedName: null,
+      controllerSettings: null,
+      pushToast: toast.pushToast,
+    });
+
+    expect(written).toHaveLength(1);
+    expect(written[0]).toContain('; assumes: GRBL $30=');
+    expect(
+      toast.messages.some((m) => m.message.includes('not verified against a connected controller')),
+    ).toBe(true);
+  });
+
   it('keeps cancelled open/save pickers silent', async () => {
     const toast = toasts();
     const platform = mockPlatform();
