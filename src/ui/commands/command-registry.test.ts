@@ -45,6 +45,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     disconnectLaser: vi.fn(),
     homeLaser: vi.fn(),
     togglePreview: vi.fn(),
+    previewActive: false,
+    hasPreviewableContent: true,
     resetView: vi.fn(),
     showAbout: vi.fn(),
     canTransformSelection: false,
@@ -161,5 +163,46 @@ describe('buildAppCommands', () => {
     expect(commandById(enabledCommands, 'arrange.flip-horizontal').enabled).toBe(true);
     expect(runCommand(commandById(enabledCommands, 'arrange.flip-horizontal'))).toBe(true);
     expect(flipHorizontal).toHaveBeenCalled();
+  });
+});
+
+// M27 (AUDIT-2026-06-10): preview had exactly one entry point (the P key);
+// the command now carries content gating + an active flag the toolbar
+// renders as aria-pressed.
+describe('window.toggle-preview command (M27)', () => {
+  it('is disabled with a reason when nothing is previewable', () => {
+    const command = commandById(
+      buildAppCommands(baseCtx({ hasPreviewableContent: false })),
+      'window.toggle-preview',
+    );
+    expect(command.enabled).toBe(false);
+    expect(command.disabledReason).toContain('Enable Output');
+  });
+
+  it('is enabled and inactive with previewable content', () => {
+    const command = commandById(buildAppCommands(baseCtx()), 'window.toggle-preview');
+    expect(command.enabled).toBe(true);
+    expect(command.active).toBe(false);
+  });
+
+  it('reports active while preview mode is on', () => {
+    const command = commandById(
+      buildAppCommands(baseCtx({ previewActive: true })),
+      'window.toggle-preview',
+    );
+    expect(command.active).toBe(true);
+  });
+
+  it('stays exit-able when the scene empties mid-preview', () => {
+    const togglePreview = vi.fn();
+    const command = commandById(
+      buildAppCommands(
+        baseCtx({ hasPreviewableContent: false, previewActive: true, togglePreview }),
+      ),
+      'window.toggle-preview',
+    );
+    expect(command.enabled).toBe(true);
+    expect(runCommand(command)).toBe(true);
+    expect(togglePreview).toHaveBeenCalledTimes(1);
   });
 });
