@@ -2096,6 +2096,20 @@ After the fix, the same repro prints `status=errored` and `next toSend=""`.
   also reveals whether the GRBL-buffer residual above needs the soft-reset
   follow-up).
 
+### Correction (2026-06-10, H5 fix-verification)
+
+As shipped, `'errored'` was NOT fully terminal: `onAck` computed the ok-path
+status without checking the current one, so when the error landed while later
+lines were still in flight (the final RX window), the trailing `ok` acks
+drained the queue and promoted the status back to `'done'` — the UI reported a
+clean finish over a real rejection. `step()` did refuse to send after the
+error, so the no-new-bytes safety property above always held; only the
+reported outcome was wrong. Fixed by making all terminal statuses absorbing in
+`onAck` (`isTerminal` guard, shared with `step()`), pinned by the
+"keeps errored terminal when trailing oks drain the in-flight tail" tests in
+`streamer.test.ts`. The same guard stops a straggler ack from flipping
+`'cancelled'` (alarm) to `'errored'` or vice versa.
+
 ---
 
 ## ADR-042 - Ack-driven follow-up write failure raises the disconnect safety notice (P0-3)

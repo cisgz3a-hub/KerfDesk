@@ -115,16 +115,21 @@ export function findOversizedLine(
   return null;
 }
 
+// Terminal statuses are absorbing: once the stream is done, cancelled,
+// disconnected, or errored, no ack may move it anywhere else. H5
+// (AUDIT-2026-06-10): without this, the ok acks trailing an error:N in the
+// final RX window drained the queue and promoted the stream back to 'done',
+// reporting a clean finish over a real rejection.
+function isTerminal(status: StreamerStatus): boolean {
+  return (
+    status === 'done' || status === 'cancelled' || status === 'disconnected' || status === 'errored'
+  );
+}
+
 // Try to send as many queued lines as fit in the remaining buffer. Always
 // safe to call repeatedly; returns toSend = '' when nothing changed.
 export function step(state: StreamerState): StepResult {
-  if (
-    state.status === 'paused' ||
-    state.status === 'done' ||
-    state.status === 'cancelled' ||
-    state.status === 'disconnected' ||
-    state.status === 'errored'
-  ) {
+  if (state.status === 'paused' || isTerminal(state.status)) {
     return { state, toSend: '' };
   }
   let queued = state.queued;
@@ -157,9 +162,12 @@ export function step(state: StreamerState): StepResult {
 // Consume one ack from GRBL (ok / error / alarm). Decrements in-flight,
 // bumps completed. An 'alarm' ack makes the stream terminal ('cancelled')
 // and an 'error' ack makes it terminal ('errored') - GRBL rejected the
-// line, so no further bytes may be sent (P0-1). The caller still decides
-// how to SURFACE the failure (e.g. a safety notice); this only updates
-// state so step() refuses to send more.
+// line, so no further bytes may be sent (P0-1). Terminal statuses absorb
+// later acks: buffer accounting still runs (GRBL freed the bytes), but the
+// status cannot change — trailing oks after an error must not report a
+// clean finish (H5). The caller still decides how to SURFACE the failure
+// (e.g. a safety notice); this only updates state so step() refuses to
+// send more.
 export function onAck(state: StreamerState, kind: AckKind): AckResult {
   if (state.inFlight.length === 0) return { state, acked: null };
   const head = state.inFlight[0];
@@ -167,8 +175,9 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
   const nextInFlight = state.inFlight.slice(1);
   const nextBytes = state.inFlightBytes - head.bytes;
   const completed = state.completed + 1;
-  const nextStatus: StreamerStatus =
-    kind === 'alarm'
+  const nextStatus: StreamerStatus = isTerminal(state.status)
+    ? state.status
+    : kind === 'alarm'
       ? 'cancelled'
       : kind === 'error'
         ? 'errored'
