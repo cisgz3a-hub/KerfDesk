@@ -26,6 +26,28 @@ function jpegWithJfif(units: number, density: number): Uint8Array {
   return new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...u16(data.length + 2), ...data]);
 }
 
+function u16le(n: number): number[] {
+  return [n & 0xff, (n >> 8) & 0xff];
+}
+function u32le(n: number): number[] {
+  return [n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >>> 24) & 0xff];
+}
+
+// A minimal little-endian EXIF APP1 JPEG: TIFF header + IFD0 with XResolution
+// (RATIONAL at offset 38) and ResolutionUnit. unit 2 = inch, 3 = cm.
+function jpegWithExif(dpi: number, unit: number): Uint8Array {
+  const tiff = [
+    0x49, 0x49, ...u16le(0x2a), ...u32le(8), // 'II', magic, IFD0 offset
+    ...u16le(2), // entry count
+    ...u16le(0x011a), ...u16le(5), ...u32le(1), ...u32le(38), // XResolution -> rational @38
+    ...u16le(0x0128), ...u16le(3), ...u32le(1), ...u16le(unit), 0, 0, // ResolutionUnit inline
+    ...u32le(0), // next IFD
+    ...u32le(dpi), ...u32le(1), // rational num/den
+  ];
+  const body = [...ascii('Exif'), 0, 0, ...tiff];
+  return new Uint8Array([0xff, 0xd8, 0xff, 0xe1, ...u16(body.length + 2), ...body]);
+}
+
 describe('densityFromBytes', () => {
   it('reads PNG pHYs (11811 px/m, unit=metre) as ~300 DPI', () => {
     expect(densityFromBytes(pngWithPhys(11811, 1))).toBe(300);
@@ -52,6 +74,23 @@ describe('densityFromBytes', () => {
   it('converts JPEG JFIF units=2 (dots/cm) to DPI', () => {
     // 118 dots/cm * 2.54 = 299.72 -> 300
     expect(densityFromBytes(jpegWithJfif(2, 118))).toBe(300);
+  });
+
+  it('reads EXIF (APP1) XResolution as DPI for inch units', () => {
+    expect(densityFromBytes(jpegWithExif(300, 2))).toBe(300);
+  });
+
+  it('converts EXIF cm units to DPI', () => {
+    // 118 dots/cm * 2.54 = 299.72 -> 300
+    expect(densityFromBytes(jpegWithExif(118, 3))).toBe(300);
+  });
+
+  it('skips 0xFF fill bytes between JPEG segments', () => {
+    // A spurious 0xFF fill byte after SOI used to be read as a marker with a
+    // garbage length, aborting the scan before the JFIF segment.
+    const base = jpegWithJfif(1, 300);
+    const withFill = new Uint8Array([...base.slice(0, 2), 0xff, ...base.slice(2)]);
+    expect(densityFromBytes(withFill)).toBe(300);
   });
 
   it('returns null when there is no recognisable density metadata', () => {
