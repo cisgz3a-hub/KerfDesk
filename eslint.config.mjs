@@ -132,6 +132,36 @@ export default tseslint.config(
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
 
+      // H13 (AUDIT-2026-06-10): native blocking dialogs suspend the renderer
+      // event loop — mid-job that freezes the ack pump, the Stop button, and
+      // the M22 keyboard stop. Every dialog goes through
+      // src/ui/state/job-aware-dialogs.ts (the one exempt module below),
+      // which degrades to toasts while a job is active.
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'window',
+          property: 'alert',
+          message: 'Use jobAwareAlert — a native dialog freezes Stop mid-job (H13).',
+        },
+        {
+          object: 'window',
+          property: 'confirm',
+          message: 'Use jobAwareConfirm — a native dialog freezes Stop mid-job (H13).',
+        },
+        {
+          object: 'window',
+          property: 'prompt',
+          message: 'Use jobAwarePrompt — a native dialog freezes Stop mid-job (H13).',
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'alert', message: 'Use jobAwareAlert (H13).' },
+        { name: 'confirm', message: 'Use jobAwareConfirm (H13).' },
+        { name: 'prompt', message: 'Use jobAwarePrompt (H13).' },
+      ],
+
       // Type strictness (CLAUDE.md "Type strictness")
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
@@ -203,6 +233,11 @@ export default tseslint.config(
         // CLAUDE.md but never configured — globals.node made `process` pass.
         { name: 'console', message: 'core/ must not log directly; use a logger passed in.' },
         { name: 'process', message: 'core/ is platform-agnostic. Move to ui/ or platform/.' },
+        // This block REPLACES the src-wide no-restricted-globals for core
+        // files, so the H13 dialog ban must be restated here.
+        { name: 'alert', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
+        { name: 'confirm', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
+        { name: 'prompt', message: 'core/ is platform-agnostic (and H13 bans raw dialogs).' },
       ],
       // M29: CLAUDE.md claims a no-restricted-imports gate for pure core;
       // it never existed, so `import fs from "node:fs"` would have passed
@@ -259,6 +294,15 @@ export default tseslint.config(
             'Raw rgb()/rgba() color in ui/ chrome — use a var(--lf-*) token from src/ui/theme/tokens.css (ADR-047).',
         },
       ],
+    },
+  },
+  // H13: the job-aware wrapper module is the ONE place allowed to touch the
+  // native blocking dialogs — everything else must go through it.
+  {
+    files: ['src/ui/state/job-aware-dialogs.ts'],
+    rules: {
+      'no-restricted-properties': 'off',
+      'no-restricted-globals': 'off',
     },
   },
   // Test files: relax file-size and assertion strictness so test scaffolding

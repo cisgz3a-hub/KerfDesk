@@ -4,6 +4,7 @@ import {
   createStreamer,
   DEFAULT_RX_BUFFER_BYTES,
   disconnect,
+  markErrored,
   onAck,
   pause,
   progress,
@@ -107,6 +108,36 @@ describe('onAck — consuming acks', () => {
     state = onAck(state, 'ok').state;
     state = onAck(state, 'ok').state;
     expect(state.status).toBe('done');
+  });
+
+  it('keeps errored terminal when trailing oks drain the in-flight tail (H5)', () => {
+    // All three lines fit in flight at once — the final RX window. G21 is
+    // rejected; the trailing oks for G90/M5 must not promote the stream back
+    // to 'done', or the UI reports a clean finish over a real rejection.
+    let state = step(createStreamer('G21\nG90\nM5')).state;
+    state = onAck(state, 'error').state;
+    expect(state.status).toBe('errored');
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.inFlight).toHaveLength(0);
+    expect(state.queued).toHaveLength(0);
+    expect(state.status).toBe('errored');
+  });
+
+  it('keeps cancelled terminal when trailing oks drain the in-flight tail', () => {
+    let state = step(createStreamer('G21\nG90\nM5')).state;
+    state = onAck(state, 'alarm').state;
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.status).toBe('cancelled');
+  });
+
+  it('markErrored is terminal, clears the queue, and keeps step() silent', () => {
+    const s = step(createStreamer('G21\nG90\nM3 S255\nG1 X10', { rxBufferBytes: 12 })).state;
+    const r = markErrored(s);
+    expect(r.status).toBe('errored');
+    expect(r.queued).toHaveLength(0);
+    expect(step(r).toSend).toBe('');
   });
 });
 

@@ -2,8 +2,9 @@
 //
 // Errors arrive as `error:N` after a line GRBL couldn't accept. Unlike
 // alarms, the machine stays in its previous state and can keep running;
-// the offending line just gets rejected. The UI surfaces these in the
-// status bar (transient toast) and the job log (persistent).
+// the offending line just gets rejected. Mid-job an error is terminal for
+// the stream (ADR-041): no further bytes are sent, `lastError` records the
+// code, and a persistent controller-error safety notice is raised.
 
 export type ErrorDescription = {
   readonly code: number;
