@@ -31,7 +31,7 @@ export function imageImportActions(
   set: ImportSet,
   get: () => ProjectSlice,
 ): {
-  readonly importRasterImage: (object: SceneObject) => void;
+  readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
   readonly traceExistingImage: (
     sourceId: string,
     traced: TracedImage,
@@ -40,8 +40,10 @@ export function imageImportActions(
   readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
 } {
   return {
-    importRasterImage: (object) => {
-      set((s) => applyFreshImport(s, object, 0));
+    importRasterImage: (object, batchIdx) => {
+      // batchIdx staggers multi-image drops by 10 mm each (F-A3); a single
+      // import or the toolbar picker passes nothing → 0.
+      set((s) => applyFreshImport(s, object, batchIdx ?? 0));
       // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
       fitAllObjects(get);
     },

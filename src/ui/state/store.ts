@@ -104,7 +104,7 @@ export type AppState = ObjectPropertiesActions &
     // found) it's `{ kind: 'replaced', kept, added, removed }`.
     readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
     // Raster bitmap import + ADR-026 trace-on-selection — both in import-actions.ts.
-    readonly importRasterImage: (object: SceneObject) => void;
+    readonly importRasterImage: (object: SceneObject, batchIdx?: number) => void;
     // Overlay a vector trace onto an already-imported bitmap (the Trace tool).
     readonly traceExistingImage: (
       sourceId: string,
