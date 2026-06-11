@@ -26,6 +26,7 @@ import {
   describeImportResult,
   describeReimportOutcome,
 } from './import-toasts';
+import { detectJobIntentWarnings } from '../laser/job-intent-warnings';
 
 export async function handleImportSvg(
   platform: PlatformAdapter,
@@ -122,6 +123,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   try {
     await target.write(gcode);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
+    // H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
+    // still see the same job-intent warnings the Start path surfaces (luma
+    // upsample softer than preview, uncalibrated defaults, trace-vector cut
+    // risk) — non-blocking, since the export itself succeeded.
+    for (const warning of detectJobIntentWarnings(ctx.project)) {
+      ctx.pushToast(warning, 'warning');
+    }
     if (ctx.controllerSettings === null) {
       ctx.pushToast(
         `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,

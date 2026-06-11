@@ -230,6 +230,25 @@ describe('file actions contextual failure handling', () => {
     ).toBe(true);
   });
 
+  // H12 (AUDIT-2026-06-10): job-intent warnings (luma upsample, uncalibrated
+  // defaults, trace-vector) used to surface only on the streamed Start path —
+  // a saved-to-disk export carried no warning at all. Surface them on Save too.
+  it('surfaces job intent warnings as warning toasts on the Save G-code path', async () => {
+    const target: SaveTarget = { displayName: 'out.gcode', write: async () => undefined };
+    const toast = toasts();
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save: async () => target }),
+      project: projectWithLine(), // a default-params layer trips the uncalibrated warning
+      savedName: null,
+      pushToast: toast.pushToast,
+    });
+
+    expect(
+      toast.messages.some((m) => m.variant === 'warning' && m.message.includes('uncalibrated')),
+    ).toBe(true);
+  });
+
   it('keeps cancelled open/save pickers silent', async () => {
     const toast = toasts();
     const platform = mockPlatform();
