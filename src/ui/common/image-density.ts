@@ -12,8 +12,18 @@
 const MM_NONE = null;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
+// A crafted/corrupt density (e.g. a pHYs of 1-19 px/m rounds to 0 DPI) must be
+// treated as absent, not honored: a 0 DPI propagated to Infinity image bounds
+// and a NaN transform that silently wrote unloadable .lf2 files and overwrote
+// the autosave slot. Anything outside this range is rejected so the caller
+// falls back to the default import DPI instead.
+const MIN_VALID_DPI = 10;
+const MAX_VALID_DPI = 10_000;
+
 export function densityFromBytes(bytes: Uint8Array): number | null {
-  return pngDensity(bytes) ?? jpegDensity(bytes);
+  const dpi = pngDensity(bytes) ?? jpegDensity(bytes);
+  if (dpi === null || dpi < MIN_VALID_DPI || dpi > MAX_VALID_DPI) return null;
+  return dpi;
 }
 
 export async function readImageDensity(file: File): Promise<number | null> {

@@ -18,7 +18,13 @@ export type RasterImportGeometry = {
 };
 
 export function rasterImportGeometry(input: RasterImportGeometryInput): RasterImportGeometry {
-  const dpi = input.dpi ?? DEFAULT_DPI;
+  // Defense in depth: a non-positive or non-finite dpi (poison metadata, a 0
+  // that slipped past the density parser) would make widthMm Infinity/NaN and
+  // poison every downstream save. Fall back to the default rather than emit it.
+  const dpi =
+    input.dpi !== undefined && Number.isFinite(input.dpi) && input.dpi > 0
+      ? input.dpi
+      : DEFAULT_DPI;
   const widthMm = (input.naturalWidth / dpi) * MM_PER_INCH;
   const heightMm = (input.naturalHeight / dpi) * MM_PER_INCH;
   return {
