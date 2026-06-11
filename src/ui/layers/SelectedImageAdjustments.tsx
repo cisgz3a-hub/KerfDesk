@@ -87,7 +87,7 @@ function clamp(value: number, min: number, max: number, fallback: number): numbe
 }
 
 const sectionStyle: React.CSSProperties = {
-  borderTop: '1px solid #ddd',
+  borderTop: '1px solid var(--lf-border)',
   marginTop: 12,
   paddingTop: 10,
 };
@@ -99,11 +99,13 @@ const rowStyle: React.CSSProperties = {
   gap: 8,
   marginBottom: 6,
 };
-const labelStyle: React.CSSProperties = { color: '#333' };
+const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 const inputStyle: React.CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
   padding: '4px 6px',
-  border: '1px solid #ccc',
+  border: '1px solid var(--lf-border)',
+  background: 'var(--lf-bg-input)',
+  color: 'var(--lf-text)',
   borderRadius: 4,
 };

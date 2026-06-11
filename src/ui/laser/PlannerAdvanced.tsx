@@ -58,12 +58,12 @@ export function PlannerAdvanced(props: {
 
 const advancedDetailsStyle: React.CSSProperties = {
   marginTop: 4,
-  borderTop: '1px solid #eee',
+  borderTop: '1px solid var(--lf-border)',
   paddingTop: 4,
 };
 const advancedSummaryStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
   cursor: 'pointer',
   userSelect: 'none',
 };
@@ -75,7 +75,7 @@ const advancedBodyStyle: React.CSSProperties = {
 };
 const advancedHintStyle: React.CSSProperties = {
   fontSize: 10,
-  color: '#777',
+  color: 'var(--lf-text-faint)',
   margin: '4px 0 0 0',
   fontStyle: 'italic',
 };

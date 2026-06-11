@@ -24,7 +24,7 @@ export const rowStyle: React.CSSProperties = {
   gap: 6,
   fontSize: 12,
 };
-export const labelStyle: React.CSSProperties = { width: 80, color: '#444' };
+export const labelStyle: React.CSSProperties = { width: 80, color: 'var(--lf-text-muted)' };
 export const fieldStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -32,10 +32,10 @@ export const fieldStyle: React.CSSProperties = {
   flex: 1,
 };
 export const numInputStyle: React.CSSProperties = { width: 64 };
-export const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
+export const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 export const inlineCodeStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, Menlo, monospace',
-  background: '#eee',
+  background: 'var(--lf-bg-2)',
   padding: '0 3px',
   borderRadius: 2,
   fontStyle: 'normal',

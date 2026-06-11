@@ -3,6 +3,7 @@
 // rendered as cut polylines + travel dashed lines, optionally truncated
 // at a 0..1 scrubber fraction with a red head marker at the cut point.
 
+import { canvasTheme } from '../theme/canvas-theme';
 import { type Layer, type Project, type SceneObject, type Vec2 } from '../../core/scene';
 import {
   buildToolpath,
@@ -118,8 +119,8 @@ function drawHead(ctx: CanvasRenderingContext2D, head: Vec2, view: ViewTransform
   const cx = view.offsetX + head.x * view.scale;
   const cy = view.offsetY + head.y * view.scale;
   ctx.save();
-  ctx.fillStyle = '#ff3b30';
-  ctx.strokeStyle = '#fff';
+  ctx.fillStyle = canvasTheme.previewHeadFill;
+  ctx.strokeStyle = canvasTheme.previewHeadStroke;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.arc(cx, cy, 5, 0, Math.PI * 2);
@@ -134,7 +135,7 @@ function drawTravel(
   to: Vec2,
   view: ViewTransform,
 ): void {
-  ctx.strokeStyle = '#bbbbbb';
+  ctx.strokeStyle = canvasTheme.previewTravel;
   ctx.lineWidth = 0.5;
   ctx.setLineDash([2, 3]);
   ctx.beginPath();

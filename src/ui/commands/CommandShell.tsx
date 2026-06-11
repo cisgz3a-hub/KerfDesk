@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   generateIntervalTestGrid,
   generateMaterialTestGrid,
@@ -8,7 +8,6 @@ import {
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
-import { useUiStore } from '../state/ui-store';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
@@ -19,6 +18,7 @@ import {
 } from '../raster/ConvertToBitmapDialog';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { Toolbar } from '../common/Toolbar';
+import { useRegisterModal } from '../common/use-register-modal';
 import { AppMenuBar } from './AppMenuBar';
 import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
@@ -177,15 +177,6 @@ function AdjustDialog(props: {
       onApply={onApply}
     />
   );
-}
-
-function useRegisterModal(): void {
-  const registerModal = useUiStore((s) => s.registerModal);
-  const unregisterModal = useUiStore((s) => s.unregisterModal);
-  useLayoutEffect(() => {
-    registerModal();
-    return unregisterModal;
-  }, [registerModal, unregisterModal]);
 }
 
 function useImagePickHandler(): (file: File) => void {

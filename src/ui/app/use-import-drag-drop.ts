@@ -16,6 +16,7 @@ import { useEffect, useRef } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
+import { confirmOversizeImport } from './import-size-guard';
 import { useStore } from '../state';
 import type { ImportOutcome } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
@@ -69,9 +70,7 @@ export function useImportDragDrop(): void {
         pushToast(`Ignored ${ignored} file(s) — only SVG, PNG, and JPG import`, 'warning');
       }
       void importMany(svgFiles, importSvgObject, pushToast);
-      for (const file of imageFiles) {
-        void importImageFile(file, importRasterImage, pushToast);
-      }
+      void importImagesInOrder(imageFiles, importRasterImage, pushToast);
     };
     window.addEventListener('dragenter', onDragEnter);
     window.addEventListener('dragover', onDragOver);
@@ -105,6 +104,23 @@ function pickImageFiles(dt: DataTransfer): ReadonlyArray<File> {
   });
 }
 
+// Sequenced (not fire-and-forget) so the Nth image lands at the F-A3 10 mm
+// stagger offset N and z-order/selection follow drop order — the image arm
+// previously fired each import with no index, stacking every drop pixel-exactly
+// at bed centre with selection landing on whichever decode finished last.
+async function importImagesInOrder(
+  files: ReadonlyArray<File>,
+  importRasterImage: (object: SceneObject, batchIdx?: number) => void,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): Promise<void> {
+  let batchIdx = 0;
+  for (const file of files) {
+    const idx = batchIdx;
+    await importImageFile(file, (obj) => importRasterImage(obj, idx), pushToast);
+    batchIdx += 1;
+  }
+}
+
 async function importMany(
   files: ReadonlyArray<File>,
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
@@ -112,6 +128,7 @@ async function importMany(
 ): Promise<void> {
   let successIdx = 0;
   for (const file of files) {
+    if (!confirmOversizeImport(file.name, file.size)) continue;
     try {
       const text = await file.text();
       const id = crypto.randomUUID();

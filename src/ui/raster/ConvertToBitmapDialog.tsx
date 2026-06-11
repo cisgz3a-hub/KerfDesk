@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
+import { Button, Dialog, DialogActions } from '../kit';
 import type { Bounds, Transform } from '../../core/scene';
-import { useDialogA11y } from '../common/use-dialog-a11y';
 import {
   DEFAULT_CONVERT_TO_BITMAP_DPI,
   estimateBitmapConversion,
@@ -22,14 +22,12 @@ export function ConvertToBitmapDialog(props: {
   readonly onCancel: () => void;
   readonly onConvert: (options: ConvertToBitmapDialogOptions) => void;
 }): JSX.Element {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [dpi, setDpi] = useState(DEFAULT_CONVERT_TO_BITMAP_DPI);
   const plan = useMemo(
     () => estimateBitmapConversion({ bounds: props.bounds, transform: props.transform }, dpi),
     [dpi, props.bounds, props.transform],
   );
-  useDialogA11y(dialogRef, props.onCancel);
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -40,17 +38,13 @@ export function ConvertToBitmapDialog(props: {
     if (formRef.current === null) return;
     submitConvert(formRef.current, plan.verdict.kind, props.onConvert);
   };
+  // kit Dialog owns the a11y wiring; the inner <form> keeps its ref so the
+  // Convert button (type=button by design - submit is verdict-gated) can
+  // read FormData.
   return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Convert to Bitmap"
-      tabIndex={-1}
-      style={backdropStyle}
-    >
-      <form ref={formRef} onSubmit={onSubmit} style={panelStyle}>
-        <h2 style={headingStyle}>Convert to Bitmap</h2>
+    <Dialog onClose={props.onCancel} ariaLabel="Convert to Bitmap" size="sm">
+      <form ref={formRef} onSubmit={onSubmit} style={formStyle}>
+        <h2 className="lf-dialog-title">Convert to Bitmap</h2>
         <Field label="Source">
           <span style={sourceStyle} title={props.sourceName}>
             {props.sourceName}
@@ -59,20 +53,18 @@ export function ConvertToBitmapDialog(props: {
         <RenderTypeField />
         <DpiField dpi={dpi} onChange={setDpi} />
         <BitmapEstimate plan={plan} />
-        <div style={actionsStyle}>
-          <button type="button" onClick={props.onCancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
+        <DialogActions>
+          <Button onClick={props.onCancel}>Cancel</Button>
+          <Button
+            variant="primary"
             onClick={onConvertClick}
             disabled={plan.verdict.kind === 'too-large'}
           >
             Convert
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       </form>
-    </div>
+    </Dialog>
   );
 }
 
@@ -95,6 +87,7 @@ function RenderTypeField(): JSX.Element {
       <select
         name="renderType"
         defaultValue="fill-all"
+        className="lf-select"
         style={selectStyle}
         aria-label="Convert render type"
         autoFocus
@@ -118,6 +111,7 @@ function DpiField(props: { readonly dpi: number; readonly onChange: (dpi: number
         step={1}
         value={props.dpi}
         onChange={(event) => props.onChange(parseDpi(event.currentTarget.value))}
+        className="lf-input"
         style={numberStyle}
         aria-label="Convert DPI"
       />
@@ -146,41 +140,19 @@ function parseRenderType(value: string): ConvertToBitmapRenderType {
 
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
-    <label style={fieldStyle}>
-      <span style={labelStyle}>{props.label}</span>
+    <label className="lf-field">
+      <span className="lf-field-label lf-field-label--sm">{props.label}</span>
       <span style={controlStyle}>{props.children}</span>
     </label>
   );
 }
 
-const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-};
-const panelStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 6,
-  padding: 16,
-  minWidth: 360,
-  maxWidth: 480,
+// The panel itself is the kit Dialog; this inner form only stacks rows.
+const formStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 10,
-  fontFamily: 'system-ui, sans-serif',
 };
-const headingStyle: React.CSSProperties = { margin: 0, fontSize: 16 };
-const fieldStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  fontSize: 13,
-};
-const labelStyle: React.CSSProperties = { width: 92, color: '#444' };
 const controlStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
@@ -194,11 +166,5 @@ const sourceStyle: React.CSSProperties = {
 };
 const selectStyle: React.CSSProperties = { flex: 1 };
 const numberStyle: React.CSSProperties = { width: 96 };
-const estimateStyle: React.CSSProperties = { fontSize: 12, color: '#444' };
-const errorStyle: React.CSSProperties = { ...estimateStyle, color: '#9f1239' };
-const actionsStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 8,
-  marginTop: 8,
-};
+const estimateStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)' };
+const errorStyle: React.CSSProperties = { ...estimateStyle, color: 'var(--lf-danger-fg)' };

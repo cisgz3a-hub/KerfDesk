@@ -98,7 +98,7 @@ function anchorButtonStyle(active: boolean): React.CSSProperties {
     padding: 0,
     fontSize: 10,
     fontVariantNumeric: 'tabular-nums',
-    background: active ? '#1976d2' : undefined,
-    color: active ? '#fff' : undefined,
+    background: active ? 'var(--lf-accent)' : undefined,
+    color: active ? 'var(--lf-on-fill)' : undefined,
   };
 }

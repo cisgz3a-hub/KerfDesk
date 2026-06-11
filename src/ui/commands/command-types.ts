@@ -1,0 +1,140 @@
+// command-types — the command registry's shared shapes plus the
+// enabled()/disabled() constructors. Split from command-registry.ts when
+// it hit the 400-line cap; a third file (not two) so command-registry ->
+// command-families -> command-types stays acyclic (import/no-cycle).
+
+export const COMMAND_FAMILY_ORDER = [
+  'file',
+  'edit',
+  'tools',
+  'arrange',
+  'laser',
+  'window',
+  'help',
+] as const;
+
+export type CommandFamily = (typeof COMMAND_FAMILY_ORDER)[number];
+
+export type CommandId =
+  | 'file.new'
+  | 'file.open'
+  | 'file.save'
+  | 'file.save-as'
+  | 'file.import-svg'
+  | 'file.import-image'
+  | 'file.save-gcode'
+  | 'edit.undo'
+  | 'edit.redo'
+  | 'edit.select-all'
+  | 'edit.duplicate'
+  | 'edit.delete'
+  | 'edit.clear-selection'
+  | 'tools.add-text'
+  | 'tools.material-test'
+  | 'tools.interval-test'
+  | 'tools.optimization-settings'
+  | 'tools.adjust-image'
+  | 'tools.trace-image'
+  | 'tools.convert-to-bitmap'
+  | 'arrange.flip-horizontal'
+  | 'arrange.flip-vertical'
+  | 'laser.connect'
+  | 'laser.disconnect'
+  | 'laser.home'
+  | 'window.toggle-preview'
+  | 'window.fit-view'
+  | 'help.about';
+
+export type AppCommand = {
+  readonly id: CommandId;
+  readonly family: CommandFamily;
+  readonly label: string;
+  readonly title: string;
+  readonly shortcut?: string;
+  readonly enabled: boolean;
+  readonly disabledReason?: string;
+  // Toggle commands (Preview): surfaces render aria-pressed from this so
+  // the on/off state is visible in the toolbar (M27).
+  readonly active?: boolean;
+  readonly invoke: () => void;
+};
+
+export type AppCommandContext = {
+  readonly dirty: boolean;
+  readonly savedName: string | null;
+  readonly serialSupported: boolean;
+  readonly connected: boolean;
+  readonly machineBusy: boolean;
+  readonly homingEnabled: boolean;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  readonly hasSelection: boolean;
+  readonly hasRasterSelection: boolean;
+  readonly hasConvertibleSelection: boolean;
+  // LU18 dirty-project guard: resolves true when the destructive action
+  // may proceed (clean, saved, or explicitly discarded). Async because it
+  // can show the Save / Don't Save / Cancel dialog and run a save.
+  readonly confirmDiscard: (action: string) => Promise<boolean>;
+  readonly newProject: () => void;
+  readonly openProject: () => void;
+  readonly saveProject: () => void;
+  readonly saveProjectAs: () => void;
+  readonly importSvg: () => void;
+  readonly importImage: () => void;
+  readonly saveGcode: () => void;
+  readonly undo: () => void;
+  readonly redo: () => void;
+  readonly selectAll: () => void;
+  readonly duplicateSelection: () => void;
+  readonly deleteSelection: () => void;
+  readonly clearSelection: () => void;
+  readonly addText: () => void;
+  readonly materialTest: () => void;
+  readonly intervalTest: () => void;
+  readonly optimizationSettings: () => void;
+  readonly adjustImage: () => void;
+  readonly traceImage: () => void;
+  readonly convertToBitmap: () => void;
+  readonly canTransformSelection: boolean;
+  readonly flipHorizontal: () => void;
+  readonly flipVertical: () => void;
+  readonly connectLaser: () => void;
+  readonly disconnectLaser: () => void;
+  readonly homeLaser: () => void;
+  readonly togglePreview: () => void;
+  readonly previewActive: boolean;
+  readonly hasPreviewableContent: boolean;
+  readonly resetView: () => void;
+  readonly showAbout: () => void;
+};
+
+export function enabled(
+  id: CommandId,
+  family: CommandFamily,
+  label: string,
+  title: string,
+  invoke: () => void,
+  shortcut?: string,
+): AppCommand {
+  return { id, family, label, title, enabled: true, invoke, ...(shortcut ? { shortcut } : {}) };
+}
+
+export function disabled(
+  id: CommandId,
+  family: CommandFamily,
+  label: string,
+  reason: string,
+  invoke: () => void,
+  shortcut?: string,
+): AppCommand {
+  return {
+    id,
+    family,
+    label,
+    title: reason,
+    enabled: false,
+    disabledReason: reason,
+    invoke,
+    ...(shortcut ? { shortcut } : {}),
+  };
+}

@@ -55,12 +55,13 @@ function MenuFamily(props: {
       >
         {familyLabel(props.family)}
       </summary>
-      <div role="menu" style={menuStyle}>
+      <div role="menu" className="lf-menu" style={menuStyle}>
         {commands.map((command) => (
           <button
             key={command.id}
             type="button"
             role="menuitem"
+            className="lf-menu-item"
             disabled={!command.enabled}
             title={command.disabledReason ?? command.title}
             style={menuItemStyle}
@@ -103,9 +104,9 @@ const menuBarStyle: React.CSSProperties = {
   alignItems: 'stretch',
   gap: 2,
   padding: '2px 8px',
-  background: '#1f2933',
-  color: '#e5e7eb',
-  borderBottom: '1px solid #111827',
+  background: 'var(--lf-bg-0)',
+  color: 'var(--lf-text)',
+  borderBottom: '1px solid var(--lf-border)',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 13,
   position: 'relative',
@@ -119,6 +120,8 @@ const summaryStyle: React.CSSProperties = {
   borderRadius: 4,
   userSelect: 'none',
 };
+// Surface chrome (background, border, hover) comes from .lf-menu /
+// .lf-menu-item; these keep dropdown positioning + the two-column row.
 const menuStyle: React.CSSProperties = {
   position: 'absolute',
   top: '100%',
@@ -127,27 +130,14 @@ const menuStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 1,
-  padding: 4,
-  background: '#f8fafc',
-  color: '#111827',
-  border: '1px solid #cbd5e1',
-  boxShadow: '0 8px 20px rgba(15, 23, 42, 0.22)',
 };
 const menuItemStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   gap: 16,
-  width: '100%',
-  padding: '5px 8px',
-  border: 0,
-  background: 'transparent',
-  color: 'inherit',
-  textAlign: 'left',
-  font: 'inherit',
-  cursor: 'pointer',
 };
 const shortcutStyle: React.CSSProperties = {
-  color: '#64748b',
+  color: 'var(--lf-text-faint)',
   fontSize: 12,
   whiteSpace: 'nowrap',
 };

@@ -20,7 +20,7 @@ const fieldRowStyle: React.CSSProperties = {
 const fieldLabelStyle: React.CSSProperties = {
   width: 96,
   fontSize: 12,
-  color: '#333',
+  color: 'var(--lf-text-muted)',
 };
 
 const fieldValueStyle: React.CSSProperties = {
@@ -31,7 +31,7 @@ const fieldValueStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
+const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 const ditherSelectStyle: React.CSSProperties = { flex: 1, maxWidth: 180 };
 
 export function LayerImageFields({ layer }: { readonly layer: Layer }): JSX.Element {

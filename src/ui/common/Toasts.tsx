@@ -27,13 +27,13 @@ export function Toasts(): JSX.Element {
 function variantStyle(variant: ToastVariant): React.CSSProperties {
   switch (variant) {
     case 'success':
-      return { background: '#2e7d32', color: '#fff' };
+      return { background: 'var(--lf-success)', color: 'var(--lf-on-fill)' };
     case 'warning':
-      return { background: '#ed6c02', color: '#fff' };
+      return { background: 'var(--lf-warning)', color: 'var(--lf-on-fill)' };
     case 'error':
-      return { background: '#c62828', color: '#fff' };
+      return { background: 'var(--lf-danger)', color: 'var(--lf-on-fill)' };
     case 'info':
-      return { background: '#1976d2', color: '#fff' };
+      return { background: 'var(--lf-accent)', color: 'var(--lf-on-fill)' };
   }
 }
 
@@ -44,7 +44,10 @@ const containerStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 8,
-  zIndex: 1000,
+  // csstype only admits numbers for zIndex, so var(--lf-z-toast) needs an
+  // assertion; browsers resolve the custom property fine (toasts layer
+  // above dialog backdrops, per the tokens.css z-map).
+  zIndex: 'var(--lf-z-toast)' as React.CSSProperties['zIndex'],
   pointerEvents: 'none',
 };
 const toastStyle: React.CSSProperties = {
@@ -54,7 +57,7 @@ const toastStyle: React.CSSProperties = {
   border: 'none',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 13,
-  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+  boxShadow: 'var(--lf-shadow)',
   cursor: 'pointer',
   textAlign: 'left',
   maxWidth: 360,

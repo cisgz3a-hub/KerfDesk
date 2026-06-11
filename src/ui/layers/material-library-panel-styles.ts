@@ -1,8 +1,8 @@
 import type { CSSProperties } from 'react';
 
 export const sectionStyle: CSSProperties = {
-  borderTop: '1px solid #d1d5db',
-  borderBottom: '1px solid #d1d5db',
+  borderTop: '1px solid var(--lf-border)',
+  borderBottom: '1px solid var(--lf-border)',
   padding: '10px 0',
   marginBottom: 10,
   display: 'flex',
@@ -20,7 +20,7 @@ export const libraryHeaderStyle: CSSProperties = {
 };
 
 export const libraryNameStyle: CSSProperties = {
-  color: '#374151',
+  color: 'var(--lf-text)',
   fontSize: 12,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -36,7 +36,7 @@ export const fieldStyle: CSSProperties = {
   gap: 8,
 };
 
-export const labelStyle: CSSProperties = { color: '#4b5563', fontSize: 12 };
+export const labelStyle: CSSProperties = { color: 'var(--lf-text-muted)', fontSize: 12 };
 
 export const formStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 
@@ -46,4 +46,8 @@ export const splitRowStyle: CSSProperties = {
   gap: 6,
 };
 
-export const statusStyle: CSSProperties = { margin: 0, color: '#4b5563', fontSize: 12 };
+export const statusStyle: CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+};

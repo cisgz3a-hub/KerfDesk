@@ -61,8 +61,10 @@ function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
   return (
     <button
       type="button"
+      className="lf-btn"
       title={title}
       disabled={!props.command.enabled}
+      {...(props.command.active === undefined ? {} : { 'aria-pressed': props.command.active })}
       onClick={() => {
         runCommand(props.command);
       }}
@@ -86,13 +88,19 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
     'tools.convert-to-bitmap',
     'file.save-gcode',
   ],
+  // M27: Preview is the operator's primary pre-burn verification surface —
+  // it gets a visible toggle, not just the P shortcut.
+  ['window.toggle-preview'],
 ];
 
+// Keep in sync with shortcuts.ts, use-job-shortcuts.ts, and drag-state.ts —
+// the audit (M27/A.5) caught this hint omitting four shipped shortcuts.
 const SHORTCUT_HINT = [
   'File: Ctrl+N new - Ctrl+O open - Ctrl+S save - Ctrl+Shift+S save as - Ctrl+I import - Ctrl+E export G-code',
-  'Edit: Ctrl+Z undo - Ctrl+Shift+Z redo - Ctrl+A select all - Delete/Backspace remove - Escape deselect',
+  'Edit: Ctrl+Z undo - Ctrl+Shift+Z redo - Ctrl+A select all - Ctrl+D duplicate - Delete/Backspace remove - Escape deselect',
   'Transform: arrows nudge 1mm - Shift+arrows 10mm - H flip horizontal - V flip vertical',
-  'View: F or 0 fit-to-bed - +/- zoom - P preview - Space+drag pan',
+  'View: F or 0 fit-to-bed - Shift+F fit-to-selection - +/- zoom - P preview - Space or right-drag pan',
+  'Laser: Ctrl+Enter start job - Ctrl+. stop job',
 ].join('\n');
 
 const barStyle: React.CSSProperties = {
@@ -100,16 +108,16 @@ const barStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   padding: '6px 12px',
-  background: '#2c2c2c',
-  color: '#ddd',
+  background: 'var(--lf-bg-0)',
+  color: 'var(--lf-text)',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 13,
-  borderBottom: '1px solid #111',
+  borderBottom: '1px solid var(--lf-border)',
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const buildBadgeStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#888',
+  color: 'var(--lf-text-faint)',
   fontFamily: 'ui-monospace, Menlo, monospace',
   cursor: 'help',
   userSelect: 'none',
@@ -118,13 +126,13 @@ const separatorStyle: React.CSSProperties = {
   display: 'inline-block',
   width: 1,
   height: 16,
-  background: '#444',
+  background: 'var(--lf-border-strong)',
   margin: '0 4px',
 };
 const hintStyle: React.CSSProperties = {
   marginLeft: 'auto',
   fontSize: 11,
-  color: '#999',
+  color: 'var(--lf-text-faint)',
   cursor: 'help',
   userSelect: 'none',
 };

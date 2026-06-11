@@ -7,6 +7,14 @@ import {
   type AppCommandContext,
 } from './command-registry';
 
+// The dirty-project guard resolves through a promise chain
+// (confirmDiscard(...).then(...)); two hops cover mock-promise unwrap +
+// the .then callback.
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext {
   return {
     dirty: false,
@@ -20,7 +28,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     hasSelection: false,
     hasRasterSelection: false,
     hasConvertibleSelection: false,
-    confirmDiscard: vi.fn(() => true),
+    confirmDiscard: vi.fn(async () => true),
     newProject: vi.fn(),
     openProject: vi.fn(),
     saveProject: vi.fn(),
@@ -45,6 +53,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     disconnectLaser: vi.fn(),
     homeLaser: vi.fn(),
     togglePreview: vi.fn(),
+    previewActive: false,
+    hasPreviewableContent: true,
     resetView: vi.fn(),
     showAbout: vi.fn(),
     canTransformSelection: false,
@@ -74,14 +84,25 @@ describe('buildAppCommands', () => {
     );
   });
 
-  it('runs the New command through the shared dirty-project guard', () => {
-    const confirmDiscard = vi.fn(() => true);
+  it('runs the New command through the shared dirty-project guard', async () => {
+    const confirmDiscard = vi.fn(async () => true);
     const newProject = vi.fn();
     const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, newProject }));
 
     expect(runCommand(commandById(commands, 'file.new'))).toBe(true);
     expect(confirmDiscard).toHaveBeenCalledWith('start a new project');
+    await flushMicrotasks();
     expect(newProject).toHaveBeenCalled();
+  });
+
+  it('does not run New when the guard resolves false (LU18 Cancel)', async () => {
+    const confirmDiscard = vi.fn(async () => false);
+    const newProject = vi.fn();
+    const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, newProject }));
+
+    expect(runCommand(commandById(commands, 'file.new'))).toBe(true);
+    await flushMicrotasks();
+    expect(newProject).not.toHaveBeenCalled();
   });
 
   it('does not run disabled image tools', () => {
@@ -102,28 +123,30 @@ describe('buildAppCommands', () => {
     expect(traceImage).toHaveBeenCalled();
   });
 
-  it('runs Material Test through the shared dirty-project guard', () => {
-    const confirmDiscard = vi.fn(() => true);
+  it('runs Material Test through the shared dirty-project guard', async () => {
+    const confirmDiscard = vi.fn(async () => true);
     const materialTest = vi.fn();
     const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, materialTest }));
 
     expect(runCommand(commandById(commands, 'tools.material-test'))).toBe(true);
     expect(confirmDiscard).toHaveBeenCalledWith('create a material test');
+    await flushMicrotasks();
     expect(materialTest).toHaveBeenCalled();
   });
 
-  it('runs Interval Test through the shared dirty-project guard', () => {
-    const confirmDiscard = vi.fn(() => true);
+  it('runs Interval Test through the shared dirty-project guard', async () => {
+    const confirmDiscard = vi.fn(async () => true);
     const intervalTest = vi.fn();
     const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, intervalTest }));
 
     expect(runCommand(commandById(commands, 'tools.interval-test'))).toBe(true);
     expect(confirmDiscard).toHaveBeenCalledWith('create an interval test');
+    await flushMicrotasks();
     expect(intervalTest).toHaveBeenCalled();
   });
 
   it('runs Optimization Settings without the destructive dirty-project guard', () => {
-    const confirmDiscard = vi.fn(() => true);
+    const confirmDiscard = vi.fn(async () => true);
     const optimizationSettings = vi.fn();
     const commands = buildAppCommands(
       baseCtx({ dirty: true, confirmDiscard, optimizationSettings }),
@@ -161,5 +184,46 @@ describe('buildAppCommands', () => {
     expect(commandById(enabledCommands, 'arrange.flip-horizontal').enabled).toBe(true);
     expect(runCommand(commandById(enabledCommands, 'arrange.flip-horizontal'))).toBe(true);
     expect(flipHorizontal).toHaveBeenCalled();
+  });
+});
+
+// M27 (AUDIT-2026-06-10): preview had exactly one entry point (the P key);
+// the command now carries content gating + an active flag the toolbar
+// renders as aria-pressed.
+describe('window.toggle-preview command (M27)', () => {
+  it('is disabled with a reason when nothing is previewable', () => {
+    const command = commandById(
+      buildAppCommands(baseCtx({ hasPreviewableContent: false })),
+      'window.toggle-preview',
+    );
+    expect(command.enabled).toBe(false);
+    expect(command.disabledReason).toContain('Enable Output');
+  });
+
+  it('is enabled and inactive with previewable content', () => {
+    const command = commandById(buildAppCommands(baseCtx()), 'window.toggle-preview');
+    expect(command.enabled).toBe(true);
+    expect(command.active).toBe(false);
+  });
+
+  it('reports active while preview mode is on', () => {
+    const command = commandById(
+      buildAppCommands(baseCtx({ previewActive: true })),
+      'window.toggle-preview',
+    );
+    expect(command.active).toBe(true);
+  });
+
+  it('stays exit-able when the scene empties mid-preview', () => {
+    const togglePreview = vi.fn();
+    const command = commandById(
+      buildAppCommands(
+        baseCtx({ hasPreviewableContent: false, previewActive: true, togglePreview }),
+      ),
+      'window.toggle-preview',
+    );
+    expect(command.enabled).toBe(true);
+    expect(runCommand(command)).toBe(true);
+    expect(togglePreview).toHaveBeenCalledTimes(1);
   });
 });

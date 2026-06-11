@@ -30,7 +30,7 @@
 // trace-options.ts. This file
 // only owns state + the commit flow + the dialog shell.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   IDENTITY_TRANSFORM,
   type RasterImage,
@@ -43,19 +43,16 @@ import {
   type TraceBoundary,
   type TraceOptions,
 } from '../../core/trace';
-import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
+import { Dialog } from '../kit';
 import {
   DialogActions,
   DeleteImageAfterTraceToggle,
   PresetHint,
   PresetPicker,
   SourceLabel,
-  backdropStyle,
-  headingStyle,
-  panelStyle,
 } from './dialog-parts';
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
@@ -99,10 +96,6 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
     [presetOptions, traceSettings],
   );
   const preview = useTracePreview(file, options, boundary);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // R-M1 a11y: Escape closes, Tab cycles within, focus returns to the
-  // toolbar button on close.
-  useDialogA11y(dialogRef, close);
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -123,38 +116,30 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
     );
   };
 
+  // kit Dialog owns the a11y wiring (Escape, focus trap, focus return).
   return (
-    <div
-      ref={dialogRef}
-      style={backdropStyle}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Trace image"
-      tabIndex={-1}
-    >
-      <form onSubmit={onSubmit} style={panelStyle}>
-        <h2 style={headingStyle}>Trace Image</h2>
-        <SourceLabel name={seed.source} />
-        <PresetPicker value={preset} onChange={setPreset} />
-        <TraceSettingsControls
-          preset={presetOptions}
-          overrides={traceSettings}
-          onChange={setTraceSettings}
-        />
-        <TracePreviewPanel
-          preview={preview}
-          seed={seed}
-          boundary={boundary}
-          setBoundary={setBoundary}
-        />
-        <DeleteImageAfterTraceToggle
-          checked={deleteSourceAfterTrace}
-          onChange={setDeleteSourceAfterTrace}
-        />
-        <PresetHint />
-        <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
-      </form>
-    </div>
+    <Dialog onClose={close} ariaLabel="Trace image" as="form" onSubmit={onSubmit} size="md">
+      <h2 className="lf-dialog-title">Trace Image</h2>
+      <SourceLabel name={seed.source} />
+      <PresetPicker value={preset} onChange={setPreset} />
+      <TraceSettingsControls
+        preset={presetOptions}
+        overrides={traceSettings}
+        onChange={setTraceSettings}
+      />
+      <TracePreviewPanel
+        preview={preview}
+        seed={seed}
+        boundary={boundary}
+        setBoundary={setBoundary}
+      />
+      <DeleteImageAfterTraceToggle
+        checked={deleteSourceAfterTrace}
+        onChange={setDeleteSourceAfterTrace}
+      />
+      <PresetHint />
+      <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
+    </Dialog>
   );
 }
 

@@ -268,10 +268,10 @@ function FeedRows(props: DeviceRowsProps): JSX.Element {
 // PlannerAdvanced lives in device-settings-shared.tsx; what's left
 // here is genuinely DeviceSettings-only.
 const panelStyle: React.CSSProperties = {
-  border: '1px solid #ddd',
+  border: '1px solid var(--lf-border)',
   borderRadius: 4,
   padding: 6,
-  background: '#fff',
+  background: 'var(--lf-bg-2)',
 };
 const summaryStyle: React.CSSProperties = {
   fontSize: 12,
@@ -286,7 +286,7 @@ const bodyStyle: React.CSSProperties = {
   marginTop: 6,
 };
 const textInputStyle: React.CSSProperties = { width: 140 };
-const timesStyle: React.CSSProperties = { fontSize: 12, color: '#666' };
+const timesStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
 const inlineLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',

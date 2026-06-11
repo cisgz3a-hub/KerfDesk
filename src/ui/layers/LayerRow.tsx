@@ -30,8 +30,8 @@ import { useCutSettingsLauncher } from './use-cut-settings-launcher';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const cardStyle: React.CSSProperties = {
-  background: '#ffffff',
-  border: '1px solid #e0e0e0',
+  background: 'var(--lf-bg-2)',
+  border: '1px solid var(--lf-border)',
   borderRadius: 6,
   padding: '10px 12px',
   marginBottom: 10,
@@ -49,7 +49,7 @@ const cardHeaderStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 8,
   paddingBottom: 6,
-  borderBottom: '1px solid #f0f0f0',
+  borderBottom: '1px solid var(--lf-border)',
 };
 const swatchStyle: React.CSSProperties = {
   display: 'inline-block',
@@ -64,7 +64,7 @@ const headerToggleStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 4,
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
 };
 // A field row inside the card: label on the left at fixed width so
 // the inputs align vertically across rows.
@@ -77,7 +77,7 @@ const fieldRowStyle: React.CSSProperties = {
 const fieldLabelStyle: React.CSSProperties = {
   width: 96,
   fontSize: 12,
-  color: '#333',
+  color: 'var(--lf-text-muted)',
 };
 const fieldValueStyle: React.CSSProperties = {
   display: 'flex',
@@ -87,7 +87,7 @@ const fieldValueStyle: React.CSSProperties = {
 };
 const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
 const wideInputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
+const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 const modeSelectStyle: React.CSSProperties = { fontSize: 13, padding: '2px 4px' };
 
 export function LayerRow(props: {
@@ -184,7 +184,9 @@ function ColorSwatch(props: { readonly color: string; readonly visible: boolean 
       style={{
         ...swatchStyle,
         background: props.visible ? props.color : 'transparent',
-        border: props.visible ? '1px solid #333' : '1px dashed #999',
+        border: props.visible
+          ? '1px solid var(--lf-border-strong)'
+          : '1px dashed var(--lf-text-faint)',
       }}
     />
   );

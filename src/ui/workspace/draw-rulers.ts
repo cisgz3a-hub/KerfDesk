@@ -3,6 +3,7 @@
 // respect zoom + pan. Drawn over the canvas content (origin marker stays
 // visible at the top-left corner where the rulers meet).
 
+import { canvasTheme } from '../theme/canvas-theme';
 import type { ViewTransform } from './view-transform';
 
 const RULER_THICKNESS_PX = 18;
@@ -16,10 +17,10 @@ export function drawRulers(
   view: ViewTransform,
 ): void {
   ctx.save();
-  ctx.fillStyle = '#f0f0f0';
+  ctx.fillStyle = canvasTheme.rulerBackground;
   ctx.fillRect(0, 0, canvasW, RULER_THICKNESS_PX);
   ctx.fillRect(0, 0, RULER_THICKNESS_PX, canvasH);
-  ctx.strokeStyle = '#bbb';
+  ctx.strokeStyle = canvasTheme.rulerBorder;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, RULER_THICKNESS_PX + 0.5);
@@ -27,7 +28,7 @@ export function drawRulers(
   ctx.moveTo(RULER_THICKNESS_PX + 0.5, 0);
   ctx.lineTo(RULER_THICKNESS_PX + 0.5, canvasH);
   ctx.stroke();
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = canvasTheme.rulerText;
   ctx.font = '10px ui-monospace, Menlo, monospace';
   ctx.textBaseline = 'top';
   drawHorizontalRuler(ctx, canvasW, view);
@@ -46,7 +47,7 @@ function drawHorizontalRuler(
     const px = view.offsetX + mm * view.scale;
     if (px < RULER_THICKNESS_PX || px > canvasW) continue;
     const major = mm % RULER_LABEL_EVERY_MM === 0;
-    ctx.strokeStyle = major ? '#666' : '#aaa';
+    ctx.strokeStyle = major ? canvasTheme.rulerMajorTick : canvasTheme.rulerMinorTick;
     ctx.beginPath();
     ctx.moveTo(px + 0.5, RULER_THICKNESS_PX - (major ? 8 : 4));
     ctx.lineTo(px + 0.5, RULER_THICKNESS_PX);
@@ -66,7 +67,7 @@ function drawVerticalRuler(
     const py = view.offsetY + mm * view.scale;
     if (py < RULER_THICKNESS_PX || py > canvasH) continue;
     const major = mm % RULER_LABEL_EVERY_MM === 0;
-    ctx.strokeStyle = major ? '#666' : '#aaa';
+    ctx.strokeStyle = major ? canvasTheme.rulerMajorTick : canvasTheme.rulerMinorTick;
     ctx.beginPath();
     ctx.moveTo(RULER_THICKNESS_PX - (major ? 8 : 4), py + 0.5);
     ctx.lineTo(RULER_THICKNESS_PX, py + 0.5);

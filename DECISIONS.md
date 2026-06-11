@@ -2408,6 +2408,134 @@ bounds scale together:
 
 ---
 
+## ADR-047 - Design tokens + shared chrome classes (dark chrome, light bed)
+
+**Status:** Accepted. | **Date:** 2026-06-10
+
+### Context
+
+The UI was ~260 ad-hoc inline `React.CSSProperties` objects across 77 files
+with zero CSS: no hover/focus/active/disabled styling anywhere (inline styles
+cannot express pseudo-states), an inconsistent chrome (dark menubar/toolbar/
+statusbar over light panels), eight dialogs each duplicating the same
+backdrop+panel shell, and ~15 duplicated button styles. The maintainer chose
+a unified dark chrome with the canvas bed kept light (WYSIWYG against white
+material), zero new dependencies, hand-rolled SVG icons.
+
+### Decision
+
+- **`src/ui/theme/tokens.css`** — the single global stylesheet, imported once
+  in `src/ui/app/main.tsx`. Defines `--lf-*` custom properties (surfaces,
+  text levels, semantic fills + text-on-dark variants, focus, type/space/
+  radius scales, z-order map) and shared chrome classes (`.lf-btn` +
+  variants, `.lf-input`/`.lf-select`, `.lf-dialog*`, `.lf-rail`, `.lf-card`,
+  `.lf-banner--*`, `.lf-menu*`, `.lf-chip`, scrollbars, global
+  `:focus-visible`). `color-scheme: dark` is scoped to dark-surface classes,
+  not `:root`, so native controls flip per-surface during the migration.
+- **`src/ui/theme/canvas-theme.ts`** — the Canvas2D palette as TS constants
+  (custom properties cannot reach raw ctx calls). Values byte-identical to
+  the literals they replace; the workspace viewport deliberately keeps its
+  light look. The two genuinely shared values (selection ↔ `--lf-accent`,
+  out-of-bounds ↔ `--lf-danger`) are pinned by `theme-sync.test.ts`.
+- **Policy:** static presentational styling migrates to classes/tokens;
+  DYNAMIC styling stays inline (drag-readout position, layer color swatches,
+  progress width %, preview opacity). After the migration completes, a scoped
+  `no-restricted-syntax` lint bans raw hex/`rgb(` literals in `src/ui/**`
+  (theme files and tests excluded; scene-data colors like
+  `DEFAULT_NEW_LAYER_COLOR` carry a justified disable).
+- **Primitives** live in a new `src/ui/kit/` module (Dialog composing the
+  existing `use-dialog-a11y`, Button, Field, NumberInput, IconButton,
+  PanelHeading, icons) — `common/index.ts` stays within its export budget.
+- A future light theme is a `[data-theme='light']` block re-declaring the
+  custom properties; no component changes.
+
+### Consequences
+
+- Hover/focus/disabled affordances exist for the first time; dialogs share
+  one a11y shell (the calibration dialogs gain the Escape/focus-trap they
+  lacked); duplicated style objects collapse into classes.
+- Visual output is invisible to jsdom — every migration batch requires a
+  maintainer eyeball pass on the dev server, stated plainly in reports.
+- Perf-sensitive surfaces (250 ms status poll, per-mousemove overlays,
+  canvas draw loop) get flat colors only: no blur, no shadows, transitions
+  limited to background/border color on interactive elements.
+- Bundle cost ≈ +10 KB raw CSS (budget: <1 MB gzip total, currently ~205 KB).
+
+### Alternatives rejected
+
+- `theme.ts`-only typed constants: cannot express pseudo-states — the
+  core deficiency would remain.
+- TS→CSS codegen: build machinery for exactly two shared values; the sync
+  test is cheaper and honest.
+- CSS-in-JS / CSS modules / Tailwind: new dependency (ADR-017 gauntlet) or
+  77-file churn for no additional capability at this scale.
+
+### Verification
+
+- `src/ui/theme/theme-sync.test.ts` pins the shared values; existing suite
+  stays green per batch; `pnpm build:web` confirms the stylesheet lands in
+  the bundle; per-batch maintainer eyeball checklist on `pnpm dev:web`.
+
+---
+
+## ADR-048 — Metadata-less bitmap imports default to 254 DPI (LightBurn parity)
+
+**Status:** Accepted. | **Date:** 2026-06-11
+
+### Context
+
+A raster import with no embedded density metadata (the common case —
+screenshots, web images, WhatsApp-stripped JPEGs) was sized at a hardcoded
+96 DPI (`DEFAULT_DPI`, `src/ui/common/image-import.ts`). LightBurn's reference
+default for the same input is **254 DPI** (0.1 mm/pixel). That is a 2.65×
+physical-size divergence on the most common bitmap input, on a tool whose
+declared user is a LightBurn switcher (PROJECT.md) and whose ADR-027 treats an
+undocumented divergence from LightBurn as a defect. The 96 value was never
+weighed against the reference: ADR-046 chose 96 DPI deliberately, but only for
+**SVG** user units (LightBurn's separate SVG-import convention), and the bitmap
+path inherited the same number without a decision (the feature audit,
+FEATURE-AUDIT-2026-06-10.md, flagged this). The oversize-masking fit-to-bed
+rescale hid the wrong physical size further.
+
+### Decision
+
+The metadata-less **bitmap** import default becomes **254 DPI** (a single named
+constant, `DEFAULT_DPI = 254`). A 1000 px image now lands at 100 mm, matching
+LightBurn. Images that *do* carry density metadata (PNG `pHYs`, JPEG JFIF/EXIF)
+continue to import at their embedded DPI; the poison-density guard (the 10–10000
+DPI sane range) still applies before the default is reached.
+
+This changes the **bitmap** default only. **SVG px stay at 96 DPI per ADR-046** —
+that is a separate LightBurn convention for vector user units and is unaffected.
+
+### Consequences
+
+- No-metadata bitmaps import 2.65× smaller than before — correct, but a behavior
+  change for existing muscle memory. Surfaced in WORKFLOW.md F-F2.
+- The trace overlay (`overlayTransformForRaster`) is unaffected: it reads the
+  bitmap's stored mm bounds and px grid, so it is density-agnostic by
+  construction (the stale "fixed 25.4/96 ratio" comments were refreshed).
+- No change to images with real density metadata, which is the fidelity-critical
+  path (scans, exports).
+
+### Alternatives rejected
+
+- **Keep 96 + record it as a deliberate divergence** (screenshots are authored at
+  96 DPI): rejected — the maintainer chose LightBurn parity; a switcher's files
+  and expectations are calibrated to 254, and ADR-027 makes parity the default.
+- **Adopt a user-configurable import-DPI setting** (LightBurn has one): deferred —
+  a preferences surface is a separate piece of work; 254 is the right default
+  until then.
+
+### Verification
+
+- `src/ui/common/image-import.test.ts` pins the 254 fallback for absent/poison
+  DPI; the explicit-DPI test is unchanged (it passes its own dpi). The
+  `importImageFile` decode path stays jsdom-untestable and rests on the live
+  pass / a LightBurn side-by-side, which is **not yet done**.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

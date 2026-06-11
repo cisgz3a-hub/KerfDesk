@@ -20,7 +20,7 @@ import type { RawImageData } from '../../core/trace';
 // RAISING this is registration- and size-safe: source.pixelWidth tracks the
 // same sampled size (image-import.ts) and the overlaid trace's mm size is
 // traceCoord/pixelWidth × widthMm — invariant to the cap (widthMm comes from
-// the NATURAL size at 96 DPI, not the sample). Only detail density changes.
+// the NATURAL size at the import DPI, not the sample). Only detail density changes.
 // We intentionally do NOT upscale BELOW the source's own size: bilinear-
 // upscaling deliberate pixel art (the Sharp preset) would blur the very
 // notches the user wants kept. Larger inputs are downsampled proportionally.

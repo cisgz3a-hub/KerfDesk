@@ -289,19 +289,25 @@ function parseTransformNumbers(input: string): ReadonlyArray<number> {
     .filter(Number.isFinite);
 }
 
+// Dispatch table per SVG transform function (lower-cased). A map keeps the
+// per-op cyclomatic complexity out of one switch as the op set grows (skewX/
+// skewY were added for H4); each builder applies the SVG spec defaults for
+// its own missing args. Unknown ops resolve to identity.
+const TRANSFORM_BUILDERS: Record<string, (nums: ReadonlyArray<number>) => Matrix> = {
+  matrix: (n) => matrixFromNumbers(n),
+  translate: (n) => translate(n[0] ?? 0, n[1] ?? 0),
+  scale: (n) => scale(n[0] ?? 1, n[1] ?? n[0] ?? 1),
+  rotate: (n) => rotate(n[0] ?? 0, n[1], n[2]),
+  skewx: (n) => ({ a: 1, b: 0, c: tanDeg(n[0] ?? 0), d: 1, e: 0, f: 0 }),
+  skewy: (n) => ({ a: 1, b: tanDeg(n[0] ?? 0), c: 0, d: 1, e: 0, f: 0 }),
+};
+
 function transformOperation(op: string, nums: ReadonlyArray<number>): Matrix {
-  switch (op) {
-    case 'matrix':
-      return matrixFromNumbers(nums);
-    case 'translate':
-      return translate(nums[0] ?? 0, nums[1] ?? 0);
-    case 'scale':
-      return scale(nums[0] ?? 1, nums[1] ?? nums[0] ?? 1);
-    case 'rotate':
-      return rotate(nums[0] ?? 0, nums[1], nums[2]);
-    default:
-      return IDENTITY_MATRIX;
-  }
+  return (TRANSFORM_BUILDERS[op] ?? (() => IDENTITY_MATRIX))(nums);
+}
+
+function tanDeg(deg: number): number {
+  return Math.tan((deg / 180) * Math.PI);
 }
 
 function matrixFromNumbers(nums: ReadonlyArray<number>): Matrix {

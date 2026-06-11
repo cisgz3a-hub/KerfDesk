@@ -7,13 +7,17 @@ import {
 } from '../trace/image-loader';
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
-import { rasterImportGeometry } from '../common/image-import';
+import { describeImportedImageSize, rasterImportGeometry } from '../common/image-import';
+import { confirmOversizeImport } from '../app/import-size-guard';
 
 export async function importImageFile(
   file: File,
   importRasterImage: (object: SceneObject) => void,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<void> {
+  // F-A3: confirm before importing a very large file (both the toolbar picker
+  // and drag-drop route through here).
+  if (!confirmOversizeImport(file.name, file.size)) return;
   try {
     const natural = await readImageNaturalSize(file);
     const image = await loadImageAsRawData(file);
@@ -39,7 +43,10 @@ export async function importImageFile(
       linesPerMm: 10,
       lumaBase64: extractLumaBase64(image),
     });
-    pushToast(`Added image: ${file.name} (${image.width}x${image.height} px)`, 'success');
+    pushToast(
+      `Added image: ${file.name} (${describeImportedImageSize(natural, image)})`,
+      'success',
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not load image: ${message}`, 'error');

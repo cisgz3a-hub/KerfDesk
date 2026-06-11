@@ -76,10 +76,14 @@ const focusBlockStyle: React.CSSProperties = {
   flexDirection: 'column',
   gap: 2,
   marginTop: 4,
-  borderTop: '1px solid #eee',
+  borderTop: '1px solid var(--lf-border)',
   paddingTop: 4,
 };
-const focusLabelStyle: React.CSSProperties = { fontSize: 12, color: '#444', fontWeight: 500 };
+const focusLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+  fontWeight: 500,
+};
 const textareaStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, Menlo, monospace',
   fontSize: 11,
@@ -89,7 +93,7 @@ const textareaStyle: React.CSSProperties = {
 };
 const focusHintStyle: React.CSSProperties = {
   fontSize: 10,
-  color: '#777',
+  color: 'var(--lf-text-faint)',
   margin: '2px 0 0 0',
   fontStyle: 'italic',
 };

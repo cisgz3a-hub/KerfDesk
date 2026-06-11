@@ -45,18 +45,18 @@ export function StatusDisplay(): JSX.Element {
 const panelStyle: React.CSSProperties = {
   fontFamily: 'ui-monospace, Menlo, monospace',
   fontSize: 12,
-  background: '#fff',
-  border: '1px solid #ddd',
+  background: 'var(--lf-bg-input)',
+  border: '1px solid var(--lf-border)',
   padding: 6,
   borderRadius: 4,
 };
-const stateRowStyle: React.CSSProperties = { color: '#1b5e20' };
-const posRowStyle: React.CSSProperties = { color: '#212121' };
-const feedRowStyle: React.CSSProperties = { color: '#555' };
+const stateRowStyle: React.CSSProperties = { color: 'var(--lf-success-fg)' };
+const posRowStyle: React.CSSProperties = { color: 'var(--lf-text)' };
+const feedRowStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 // Default origin row is muted (it's the boring case). Custom origin gets
 // the same accent red as the Stop button so the operator notices that
 // their next job won't run at machine zero — important when picking up a
 // previous workpiece or recovering after a power-cycle.
-const originDefaultStyle: React.CSSProperties = { color: '#777' };
-const originCustomStyle: React.CSSProperties = { color: '#c62828', fontWeight: 600 };
-const dimStyle: React.CSSProperties = { fontStyle: 'italic', color: '#777' };
+const originDefaultStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
+const originCustomStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)', fontWeight: 600 };
+const dimStyle: React.CSSProperties = { fontStyle: 'italic', color: 'var(--lf-text-faint)' };

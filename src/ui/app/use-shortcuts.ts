@@ -10,10 +10,10 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
+import { confirmDiscardAsync } from './confirm-discard';
 import { usePlatform } from './platform-context';
 import {
   handleEditShortcut,
@@ -21,20 +21,6 @@ import {
   handleTransformShortcut,
   handleViewShortcut,
 } from './shortcuts';
-
-// F-A13 dirty check. Lives outside the hook so it doesn't reread state at
-// useEffect-rebuild time — it queries the current store imperatively when
-// the keyboard event fires.
-function confirmDiscard(action: string): boolean {
-  const s = useStore.getState();
-  if (!s.dirty) return true;
-  const name = s.savedName ?? 'this project';
-  // jobAwareConfirm fails closed while a job is active (H13): a native
-  // confirm would freeze Pause/Stop with the beam live.
-  return jobAwareConfirm(
-    `Discard unsaved changes to ${name} and ${action}? (Cancel to keep editing — Save first via Save or Ctrl+S.)`,
-  );
-}
 
 export function useShortcuts(): void {
   useFileEditShortcuts();
@@ -69,6 +55,10 @@ function useFileEditShortcuts(): void {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (isModalOpen(useUiStore.getState())) return;
       const machine = { statusReport, workOriginActive, wcoCache };
+      // F-A13 dirty check (LU18 three-way dialog). Queries the store
+      // imperatively when the key fires, so no stale captures.
+      const confirmDiscard = (action: string): Promise<boolean> =>
+        confirmDiscardAsync(platform, action);
       // prettier-ignore
       const fileCtx = { platform, project, jobPlacement, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore

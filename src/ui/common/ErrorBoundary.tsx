@@ -119,18 +119,18 @@ function buildDiagnostic(err: Error, when: number): string {
 const overlayStyle: React.CSSProperties = {
   position: 'fixed',
   inset: 0,
-  background: '#fff',
-  color: '#222',
+  background: 'var(--lf-bg-1)',
+  color: 'var(--lf-text)',
   padding: 24,
   overflow: 'auto',
   fontFamily: 'system-ui, sans-serif',
   zIndex: 9999,
 };
-const titleStyle: React.CSSProperties = { margin: 0, fontSize: 20, color: '#c62828' };
+const titleStyle: React.CSSProperties = { margin: 0, fontSize: 20, color: 'var(--lf-danger-fg)' };
 const messageStyle: React.CSSProperties = { margin: '8px 0', fontSize: 14 };
 const stackStyle: React.CSSProperties = {
-  background: '#f5f5f5',
-  border: '1px solid #ddd',
+  background: 'var(--lf-bg-input)',
+  border: '1px solid var(--lf-border)',
   borderRadius: 4,
   padding: 8,
   maxHeight: 320,
@@ -150,6 +150,6 @@ const fallbackStyle: React.CSSProperties = {
 const hintStyle: React.CSSProperties = {
   marginTop: 8,
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
   fontStyle: 'italic',
 };

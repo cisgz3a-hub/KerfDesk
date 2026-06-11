@@ -1,8 +1,8 @@
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react';
 import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
 import type { Layer, RasterImage } from '../../core/scene';
-import { useDialogA11y } from '../common/use-dialog-a11y';
 import { jobAwareAlert, jobAwarePrompt } from '../state/job-aware-dialogs';
+import { Button, Dialog, DialogActions as KitDialogActions } from '../kit';
 import type { RasterImageAdjustmentPatch } from '../state/raster-adjustment-actions';
 import { AdjustFields } from './AdjustImageDialog.fields';
 import { dotWidthCorrectionMax, numberValue, parseDither } from './AdjustImageDialog.form-utils';
@@ -47,14 +47,12 @@ export function AdjustImageDialog(props: {
   readonly onCancel: () => void;
   readonly onApply: (patch: AdjustImageApply) => void;
 }): JSX.Element {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const sourceRef = useRef<HTMLCanvasElement>(null);
   const processedRef = useRef<HTMLCanvasElement>(null);
   const [draft, setDraft] = useState<AdjustImageDraft>(() =>
     initialDraft(props.image, props.layer),
   );
   const presetControls = useImagePresetControls(draft, setDraft);
-  useDialogA11y(dialogRef, props.onCancel);
   usePreviewEffects(sourceRef, processedRef, props.image, draft);
   const update = (patch: Partial<AdjustImageDraft>): void =>
     setDraft((prev) => normalizeDraft({ ...prev, ...patch }));
@@ -64,29 +62,20 @@ export function AdjustImageDialog(props: {
   };
 
   return (
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Adjust Image"
-      tabIndex={-1}
-      style={styles.backdropStyle}
-    >
-      <form onSubmit={submit} style={styles.panelStyle}>
-        <DialogHeader source={props.image.source} />
-        <PreviewGrid sourceRef={sourceRef} processedRef={processedRef} />
-        <AdjustFields
-          draft={draft}
-          maxPower={props.layer.power}
-          update={update}
-          applyPreset={presetControls.applyPreset}
-          userPresets={presetControls.userPresets}
-          savePreset={presetControls.savePreset}
-          deletePreset={presetControls.deletePreset}
-        />
-        <DialogActions onCancel={props.onCancel} />
-      </form>
-    </div>
+    <Dialog onClose={props.onCancel} ariaLabel="Adjust Image" as="form" onSubmit={submit} size="xl">
+      <DialogHeader source={props.image.source} />
+      <PreviewGrid sourceRef={sourceRef} processedRef={processedRef} />
+      <AdjustFields
+        draft={draft}
+        maxPower={props.layer.power}
+        update={update}
+        applyPreset={presetControls.applyPreset}
+        userPresets={presetControls.userPresets}
+        savePreset={presetControls.savePreset}
+        deletePreset={presetControls.deletePreset}
+      />
+      <FormActions onCancel={props.onCancel} />
+    </Dialog>
   );
 }
 
@@ -181,8 +170,10 @@ function patchFromDraft(draft: AdjustImageDraft): AdjustImageApply {
 function DialogHeader({ source }: { readonly source: string }): JSX.Element {
   return (
     <header style={styles.headerStyle}>
-      <h2 style={styles.headingStyle}>Adjust Image</h2>
-      <p style={styles.subheadingStyle}>{source}</p>
+      <h2 className="lf-dialog-title">Adjust Image</h2>
+      <p className="lf-subheading" style={styles.subheadingStyle}>
+        {source}
+      </p>
     </header>
   );
 }
@@ -211,14 +202,14 @@ function PreviewGrid(props: {
   );
 }
 
-function DialogActions({ onCancel }: { readonly onCancel: () => void }): JSX.Element {
+function FormActions({ onCancel }: { readonly onCancel: () => void }): JSX.Element {
   return (
-    <div style={styles.actionsStyle}>
-      <button type="button" onClick={onCancel}>
-        Cancel
-      </button>
-      <button type="submit">OK</button>
-    </div>
+    <KitDialogActions>
+      <Button onClick={onCancel}>Cancel</Button>
+      <Button type="submit" variant="primary">
+        OK
+      </Button>
+    </KitDialogActions>
   );
 }
 

@@ -4,6 +4,7 @@
 // per-feature renderers live in sibling files so no single file grows
 // beyond the 250-line soft cap (CLAUDE.md).
 
+import { canvasTheme } from '../theme/canvas-theme';
 import type { Toolpath } from '../../core/job';
 import {
   type Layer,
@@ -22,6 +23,7 @@ import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor } from './handles';
+import { isObjectOutOfBed } from './out-of-bounds';
 import { rotateHandlePosition } from './rotate-handle';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import {
@@ -104,14 +106,14 @@ function liveRasterDataUrls(project: Project): Set<string> {
 }
 
 function drawBed(ctx: CanvasRenderingContext2D, project: Project, view: ViewTransform): void {
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = canvasTheme.bedFill;
   ctx.fillRect(
     view.offsetX,
     view.offsetY,
     project.device.bedWidth * view.scale,
     project.device.bedHeight * view.scale,
   );
-  ctx.strokeStyle = '#888888';
+  ctx.strokeStyle = canvasTheme.bedStroke;
   ctx.lineWidth = 1;
   ctx.strokeRect(
     view.offsetX,
@@ -122,7 +124,7 @@ function drawBed(ctx: CanvasRenderingContext2D, project: Project, view: ViewTran
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, project: Project, view: ViewTransform): void {
-  ctx.strokeStyle = '#d8d8d8';
+  ctx.strokeStyle = canvasTheme.grid;
   ctx.lineWidth = 0.5;
   for (let x = 10; x < project.device.bedWidth; x += 10) {
     ctx.beginPath();
@@ -142,7 +144,7 @@ function drawOriginMarker(ctx: CanvasRenderingContext2D, view: ViewTransform): v
   const cx = view.offsetX;
   const cy = view.offsetY;
   const armPx = 8;
-  ctx.strokeStyle = '#cc0000';
+  ctx.strokeStyle = canvasTheme.origin;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(cx - armPx, cy);
@@ -266,7 +268,7 @@ function drawSelectionBox(
   view: ViewTransform,
 ): void {
   const bbox = transformedBBox(obj);
-  ctx.strokeStyle = '#1976d2';
+  ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(
@@ -289,7 +291,7 @@ function drawSecondarySelectionBox(
 ): void {
   const bbox = transformedBBox(obj);
   ctx.save();
-  ctx.strokeStyle = '#1976d2';
+  ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
   ctx.globalAlpha = 0.7;
@@ -303,8 +305,8 @@ function drawSecondarySelectionBox(
 }
 
 function drawHandles(ctx: CanvasRenderingContext2D, obj: SceneObject, view: ViewTransform): void {
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = '#1976d2';
+  ctx.fillStyle = canvasTheme.selectionHandleFill;
+  ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   const half = HANDLE_SCREEN_PX / 2;
   for (const h of handlesFor(obj)) drawSingleHandle(ctx, h, view, half);
@@ -333,7 +335,7 @@ function drawRotateHandle(
   const cy = view.offsetY + pos.y * view.scale;
   const bboxTopMidScreenY = cy + 24 * view.scale;
   ctx.save();
-  ctx.strokeStyle = '#1976d2';
+  ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1;
   ctx.setLineDash([2, 2]);
   ctx.beginPath();
@@ -341,12 +343,12 @@ function drawRotateHandle(
   ctx.lineTo(cx, cy);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = '#1976d2';
+  ctx.fillStyle = canvasTheme.selection;
   ctx.beginPath();
   ctx.arc(cx, cy, 5, 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = canvasTheme.rotateHandleStroke;
   ctx.stroke();
   ctx.restore();
 }
@@ -362,11 +364,10 @@ function drawOutOfBoundsOutlines(
   const bedW = project.device.bedWidth;
   const bedH = project.device.bedHeight;
   for (const obj of project.scene.objects) {
+    if (!isObjectOutOfBed(obj, bedW, bedH)) continue;
     const bbox = transformedBBox(obj);
-    const outOfBounds = bbox.minX < 0 || bbox.minY < 0 || bbox.maxX > bedW || bbox.maxY > bedH;
-    if (!outOfBounds) continue;
     ctx.save();
-    ctx.strokeStyle = '#c62828';
+    ctx.strokeStyle = canvasTheme.outOfBounds;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
     ctx.strokeRect(
