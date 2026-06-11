@@ -1,6 +1,7 @@
 import { estimateJobDuration, formatDuration, type Job } from '../../core/job';
 import {
   applyTransform,
+  isClosedEnough,
   type ColoredPath,
   type Layer,
   type Project,
@@ -94,7 +95,7 @@ function countEstimatedFillSegments(scene: Scene): number {
 function countPathEstimatedHatches(path: ColoredPath, transform: Transform, layer: Layer): number {
   let count = 0;
   for (const polyline of path.polylines) {
-    if (!isClosedEnough(polyline.points, polyline.closed)) continue;
+    if (!isClosedEnough(polyline)) continue;
     count += estimateHatchRows(polyline.points, transform, layer);
   }
   return count;
@@ -167,11 +168,3 @@ function normalizeHatchAngle(deg: number): number {
   return angle;
 }
 
-function isClosedEnough(points: ReadonlyArray<Vec2>, closed: boolean): boolean {
-  if (points.length < 3) return false;
-  if (closed) return true;
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (first === undefined || last === undefined) return false;
-  return Math.abs(first.x - last.x) < 1e-4 && Math.abs(first.y - last.y) < 1e-4;
-}
