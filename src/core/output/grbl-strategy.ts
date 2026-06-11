@@ -42,9 +42,15 @@ function preamble(): string {
   return ['G21', 'G90', 'M3 S0'].join(LINE_END) + LINE_END;
 }
 
-function postamble(): string {
-  // M5: definitively turn the spindle/laser off at end of job, then park.
-  return ['M5', 'G0 X0.000 Y0.000 S0'].join(LINE_END) + LINE_END;
+function postamble(laserAlreadyOff: boolean): string {
+  // M5: definitively turn the spindle/laser off at end of job, then park. When
+  // the last group was raster it already emitted its trailing M5, so skip the
+  // redundant one; the park move still carries S0, so the laser-off invariant
+  // holds either way.
+  const lines = laserAlreadyOff
+    ? ['G0 X0.000 Y0.000 S0']
+    : ['M5', 'G0 X0.000 Y0.000 S0'];
+  return lines.join(LINE_END) + LINE_END;
 }
 
 function emitSegment(seg: CutSegment, s: number, feed: number): string {
@@ -236,7 +242,9 @@ function emitJob(job: Job, device: DeviceProfile): string {
     parts.push(emitAnyGroup(group, device));
     if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
   }
-  parts.push(postamble());
+  // A raster group last in the job already issued its trailing M5, so the
+  // postamble must not emit a redundant second one (mode === 'off').
+  parts.push(postamble(mode === 'off'));
   return parts.join('');
 }
 
