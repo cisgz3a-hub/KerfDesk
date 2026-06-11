@@ -291,13 +291,15 @@ export function applyFreshImport(
 // Build the transform that lands a trace pixel-for-pixel over the bitmap
 // it was traced from. imagetracerjs emits polylines in the source's PIXEL
 // space (1 unit = 1 px), but the bitmap was imported in millimetres — its
-// object-local `bounds` span the mm size (96-DPI sizing at import, ADR-027)
-// while `pixelWidth/Height` record the original px grid. Both objects are
+// object-local `bounds` span the mm size (import-DPI sizing — density
+// metadata when present, else the ADR-048 default; ADR-027) while
+// `pixelWidth/Height` record the original px grid. Both objects are
 // drawn through the SAME applyTransform (scale→mirror→rotate→translate),
 // so reusing the bitmap's raw transform would leave pixel-unit vectors
-// (extent = pixelWidth) over an mm-unit bitmap (extent = widthMm): a fixed
-// widthMm/pixelWidth = 25.4/96 ratio, i.e. the trace renders ~3.78x too
-// large. Folding the bitmap's mm-per-pixel into the trace's scale converts
+// (extent = pixelWidth) over an mm-unit bitmap (extent = widthMm) — off by
+// the bitmap's own widthMm/pixelWidth (mm-per-pixel) ratio, so the trace
+// renders far too large. Folding the bitmap's mm-per-pixel into the trace's
+// scale converts
 // the pixel points into the same mm frame. Rotation, mirror, and the
 // translate are inherited unchanged; this is exact because imported rasters
 // always have bounds anchored at (0,0) (so there is no bounds offset for

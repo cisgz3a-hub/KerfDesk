@@ -2478,6 +2478,64 @@ material), zero new dependencies, hand-rolled SVG icons.
 
 ---
 
+## ADR-048 — Metadata-less bitmap imports default to 254 DPI (LightBurn parity)
+
+**Status:** Accepted. | **Date:** 2026-06-11
+
+### Context
+
+A raster import with no embedded density metadata (the common case —
+screenshots, web images, WhatsApp-stripped JPEGs) was sized at a hardcoded
+96 DPI (`DEFAULT_DPI`, `src/ui/common/image-import.ts`). LightBurn's reference
+default for the same input is **254 DPI** (0.1 mm/pixel). That is a 2.65×
+physical-size divergence on the most common bitmap input, on a tool whose
+declared user is a LightBurn switcher (PROJECT.md) and whose ADR-027 treats an
+undocumented divergence from LightBurn as a defect. The 96 value was never
+weighed against the reference: ADR-046 chose 96 DPI deliberately, but only for
+**SVG** user units (LightBurn's separate SVG-import convention), and the bitmap
+path inherited the same number without a decision (the feature audit,
+FEATURE-AUDIT-2026-06-10.md, flagged this). The oversize-masking fit-to-bed
+rescale hid the wrong physical size further.
+
+### Decision
+
+The metadata-less **bitmap** import default becomes **254 DPI** (a single named
+constant, `DEFAULT_DPI = 254`). A 1000 px image now lands at 100 mm, matching
+LightBurn. Images that *do* carry density metadata (PNG `pHYs`, JPEG JFIF/EXIF)
+continue to import at their embedded DPI; the poison-density guard (the 10–10000
+DPI sane range) still applies before the default is reached.
+
+This changes the **bitmap** default only. **SVG px stay at 96 DPI per ADR-046** —
+that is a separate LightBurn convention for vector user units and is unaffected.
+
+### Consequences
+
+- No-metadata bitmaps import 2.65× smaller than before — correct, but a behavior
+  change for existing muscle memory. Surfaced in WORKFLOW.md F-F2.
+- The trace overlay (`overlayTransformForRaster`) is unaffected: it reads the
+  bitmap's stored mm bounds and px grid, so it is density-agnostic by
+  construction (the stale "fixed 25.4/96 ratio" comments were refreshed).
+- No change to images with real density metadata, which is the fidelity-critical
+  path (scans, exports).
+
+### Alternatives rejected
+
+- **Keep 96 + record it as a deliberate divergence** (screenshots are authored at
+  96 DPI): rejected — the maintainer chose LightBurn parity; a switcher's files
+  and expectations are calibrated to 254, and ADR-027 makes parity the default.
+- **Adopt a user-configurable import-DPI setting** (LightBurn has one): deferred —
+  a preferences surface is a separate piece of work; 254 is the right default
+  until then.
+
+### Verification
+
+- `src/ui/common/image-import.test.ts` pins the 254 fallback for absent/poison
+  DPI; the explicit-DPI test is unchanged (it passes its own dpi). The
+  `importImageFile` decode path stays jsdom-untestable and rests on the live
+  pass / a LightBurn side-by-side, which is **not yet done**.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

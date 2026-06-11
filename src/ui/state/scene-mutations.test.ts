@@ -203,7 +203,7 @@ describe('pruneOrphanLayers — raster image branch', () => {
 // ADR-026 — Trace runs on a bitmap the operator ALREADY imported: the
 // source raster is already in the scene, and the trace overlays it.
 // Trace polylines come back in source-PIXEL units, but the bitmap was
-// imported in mm (96-DPI sizing), so the overlay transform must inherit
+// imported in mm (import-DPI sizing), so the overlay transform must inherit
 // the bitmap's translate/rotation/mirror while folding its mm-per-pixel
 // into the scale. The fixture below makes bounds (mm) deliberately differ
 // from the pixel grid — and uses distinct, binary-clean per-axis ratios
