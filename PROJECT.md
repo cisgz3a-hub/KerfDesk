@@ -82,7 +82,7 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 
 - Bundled MIT-licensed fonts only.
 - Text-to-path via `opentype.js` (MIT).
-- Live editing UI: content, font picker with preview, size, alignment, character spacing, line height, weld toggle.
+- Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
@@ -304,7 +304,7 @@ Each subfolder has its own `index.ts` defining the module's public API. ESLint f
 
 Reject any of these mid-development without a `PROJECT.md` revision and a `DECISIONS.md` entry. **MIT availability does not change this list.**
 
-- Raster engrave (Fill, Image modes).
+- ~~Raster engrave (Fill, Image modes).~~ **Shipped in Phase F** (F.1 Fill, F.2 Image) — no longer out of scope.
 - Non-GRBL controllers (Marlin, Smoothie, Ruida, Trocen, TopWisdom).
 - macOS / Linux desktop builds.
 - Node editing of imported paths.

@@ -171,7 +171,7 @@ function SetupRow(props: {
 
 function startJobTitle(estimate: LiveJobEstimate): string {
   if (estimate.kind === 'estimated') {
-    return `Estimated burn time: ${estimate.label} (excludes acceleration overhead)`;
+    return `Estimated burn time: ${estimate.label}`;
   }
   if (estimate.kind === 'too-large') {
     return 'Large trace: live estimate paused for performance. Start still generates full G-code.';
