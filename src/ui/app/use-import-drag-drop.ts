@@ -16,6 +16,7 @@ import { useEffect, useRef } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
+import { confirmOversizeImport } from './import-size-guard';
 import { useStore } from '../state';
 import type { ImportOutcome } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
@@ -127,6 +128,7 @@ async function importMany(
 ): Promise<void> {
   let successIdx = 0;
   for (const file of files) {
+    if (!confirmOversizeImport(file.name, file.size)) continue;
     try {
       const text = await file.text();
       const id = crypto.randomUUID();
