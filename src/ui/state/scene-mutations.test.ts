@@ -14,6 +14,7 @@ import {
   type TracedImage,
 } from '../../core/scene';
 import {
+  applyFreshImport,
   applyTraceToExisting,
   ensureRasterImageLayer,
   pruneOrphanLayers,
@@ -39,6 +40,18 @@ function rasterImage(color: string): RasterImage {
     linesPerMm: 10,
   };
 }
+
+describe('applyFreshImport selection', () => {
+  it('collapses any prior multi-selection by returning an empty additionalSelectedIds', () => {
+    // The store applies a MutationResult via a shallow merge, so an import that
+    // omits additionalSelectedIds leaves a prior multi-selection's extras live —
+    // Delete/duplicate would then act on the old ghost set (F-A3: the imported
+    // object is the sole selection).
+    const result = applyFreshImport({ project: createProject(), undoStack: [] }, rasterImage('#808080'), 0);
+    expect(result.selectedObjectId).toBe('r1');
+    expect(result.additionalSelectedIds.size).toBe(0);
+  });
+});
 
 describe('resolveRasterLayerColor (P2-A)', () => {
   it('reuses a free color', () => {
