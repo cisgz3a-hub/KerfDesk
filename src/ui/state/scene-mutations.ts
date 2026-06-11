@@ -238,7 +238,7 @@ export function applyFreshImport(
   s: StateSlice,
   object: SceneObject,
   batchOffsetIdx: number,
-): MutationResult {
+): MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> } {
   // Auto-fit + center on the bed so a 1000 mm SVG dropped on a 400 mm
   // bed doesn't disappear off the corner. Small designs stay at scale 1.
   const fitted = fitObjectToBed(object, s.project.device.bedWidth, s.project.device.bedHeight);
@@ -279,6 +279,9 @@ export function applyFreshImport(
   return {
     project: { ...s.project, scene },
     selectedObjectId: positioned.id,
+    // A fresh import is the sole selection (F-A3): clear any prior
+    // multi-selection so Delete/duplicate cannot act on a stale ghost set.
+    additionalSelectedIds: new Set<string>(),
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,
