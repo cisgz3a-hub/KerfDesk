@@ -6,9 +6,11 @@
 // message + stack and offers two actions:
 //
 //   * Copy diagnostic → builds a JSON blob (error + stack + timestamp +
-//     user agent + URL) and writes it to the clipboard. Falls back to
-//     window.prompt() if the Clipboard API is unavailable (insecure
-//     context / older browsers).
+//     user agent + URL) and writes it to the clipboard. Falls back to a
+//     select-all textarea if the Clipboard API is unavailable (insecure
+//     context / older browsers) — never a native prompt: a blocking
+//     dialog here would freeze the ack pump and the Stop button if the
+//     crash happened mid-job (H13, AUDIT-2026-06-10).
 //   * Try again → resets boundary state and re-renders children. If
 //     the underlying issue persists the boundary re-catches.
 //
@@ -16,7 +18,7 @@
 // and ADR-018 license posture (proprietary). The diagnostic blob is
 // for the user to paste into a bug report — never sent automatically.
 
-import { Component, type ReactNode } from 'react';
+import { Component, useState, type ReactNode } from 'react';
 
 type Props = { readonly children: ReactNode };
 type State =
@@ -56,19 +58,44 @@ function CrashScreen(props: {
   readonly onRetry: () => void;
 }): JSX.Element {
   const blob = buildDiagnostic(props.error, props.when);
+  // 'manual' renders a select-all textarea instead of any native dialog. A
+  // blocking window.prompt would suspend the renderer — fatal if the crash
+  // happened mid-job, when the ack pump and Stop must stay alive (H13).
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'manual'>('idle');
+
+  const handleCopy = (): void => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText !== undefined) {
+      navigator.clipboard.writeText(blob).then(
+        () => setCopyState('copied'),
+        () => setCopyState('manual'),
+      );
+      return;
+    }
+    setCopyState('manual');
+  };
+
   return (
     <div role="alert" style={overlayStyle}>
       <h2 style={titleStyle}>Something broke</h2>
       <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
       <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
       <div style={actionsStyle}>
-        <button type="button" onClick={() => copyDiagnostic(blob)}>
-          Copy diagnostic
+        <button type="button" onClick={handleCopy}>
+          {copyState === 'copied' ? 'Copied' : 'Copy diagnostic'}
         </button>
         <button type="button" onClick={props.onRetry}>
           Try again
         </button>
       </div>
+      {copyState === 'manual' && (
+        <textarea
+          readOnly
+          value={blob}
+          aria-label="Crash diagnostic — select and copy manually"
+          style={fallbackStyle}
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      )}
       <p style={hintStyle}>
         No data leaves your machine. The diagnostic is for your own bug report.
       </p>
@@ -87,16 +114,6 @@ function buildDiagnostic(err: Error, when: number): string {
     null,
     2,
   );
-}
-
-function copyDiagnostic(blob: string): void {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText !== undefined) {
-    navigator.clipboard.writeText(blob).catch(() => {
-      window.prompt('Copy this diagnostic:', blob);
-    });
-    return;
-  }
-  window.prompt('Copy this diagnostic:', blob);
 }
 
 const overlayStyle: React.CSSProperties = {
@@ -123,6 +140,13 @@ const stackStyle: React.CSSProperties = {
   whiteSpace: 'pre-wrap',
 };
 const actionsStyle: React.CSSProperties = { display: 'flex', gap: 8, marginTop: 12 };
+const fallbackStyle: React.CSSProperties = {
+  width: '100%',
+  minHeight: 120,
+  marginTop: 8,
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontSize: 12,
+};
 const hintStyle: React.CSSProperties = {
   marginTop: 8,
   fontSize: 11,

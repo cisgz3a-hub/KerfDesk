@@ -24,10 +24,12 @@ export const DEFAULT_RX_BUFFER_BYTES = 120;
 // "job aborted — connection lost" vs the user-initiated stop. The
 // streamer treats them all as terminal (no more bytes go out), but the
 // reducer entry-point differs (cancel = user, disconnect = cable yank,
-// error = GRBL rejected a line mid-stream / error:N, P0-1). 'errored'
+// errored = GRBL rejected a line mid-stream / error:N (P0-1) or a
+// refill write failed on a possibly-live port (markErrored)). 'errored'
 // being terminal protects against a laser-on line firing at a
-// mispositioned head after the rejected move. CNCjs parity per MIT-T1
-// audit finding; error-as-terminal matches LightBurn.
+// mispositioned head after the rejected move, while keeping the in-app
+// Stop path mounted. CNCjs parity per MIT-T1 audit finding;
+// error-as-terminal matches LightBurn.
 export type StreamerStatus =
   | 'idle'
   | 'streaming'
@@ -115,16 +117,21 @@ export function findOversizedLine(
   return null;
 }
 
+// Terminal statuses are absorbing: once the stream is done, cancelled,
+// disconnected, or errored, no ack may move it anywhere else. H5
+// (AUDIT-2026-06-10): without this, the ok acks trailing an error:N in the
+// final RX window drained the queue and promoted the stream back to 'done',
+// reporting a clean finish over a real rejection.
+function isTerminal(status: StreamerStatus): boolean {
+  return (
+    status === 'done' || status === 'cancelled' || status === 'disconnected' || status === 'errored'
+  );
+}
+
 // Try to send as many queued lines as fit in the remaining buffer. Always
 // safe to call repeatedly; returns toSend = '' when nothing changed.
 export function step(state: StreamerState): StepResult {
-  if (
-    state.status === 'paused' ||
-    state.status === 'done' ||
-    state.status === 'cancelled' ||
-    state.status === 'disconnected' ||
-    state.status === 'errored'
-  ) {
+  if (state.status === 'paused' || isTerminal(state.status)) {
     return { state, toSend: '' };
   }
   let queued = state.queued;
@@ -157,9 +164,12 @@ export function step(state: StreamerState): StepResult {
 // Consume one ack from GRBL (ok / error / alarm). Decrements in-flight,
 // bumps completed. An 'alarm' ack makes the stream terminal ('cancelled')
 // and an 'error' ack makes it terminal ('errored') - GRBL rejected the
-// line, so no further bytes may be sent (P0-1). The caller still decides
-// how to SURFACE the failure (e.g. a safety notice); this only updates
-// state so step() refuses to send more.
+// line, so no further bytes may be sent (P0-1). Terminal statuses absorb
+// later acks: buffer accounting still runs (GRBL freed the bytes), but the
+// status cannot change — trailing oks after an error must not report a
+// clean finish (H5). The caller still decides how to SURFACE the failure
+// (e.g. a safety notice); this only updates state so step() refuses to
+// send more.
 export function onAck(state: StreamerState, kind: AckKind): AckResult {
   if (state.inFlight.length === 0) return { state, acked: null };
   const head = state.inFlight[0];
@@ -167,8 +177,9 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
   const nextInFlight = state.inFlight.slice(1);
   const nextBytes = state.inFlightBytes - head.bytes;
   const completed = state.completed + 1;
-  const nextStatus: StreamerStatus =
-    kind === 'alarm'
+  const nextStatus: StreamerStatus = isTerminal(state.status)
+    ? state.status
+    : kind === 'alarm'
       ? 'cancelled'
       : kind === 'error'
         ? 'errored'
@@ -208,6 +219,16 @@ export function cancel(state: StreamerState): StreamerState {
 // notification correctly. MIT-T1 audit finding (CNCjs parity).
 export function disconnect(state: StreamerState): StreamerState {
   return { ...state, status: 'disconnected', queued: [] };
+}
+
+// Mark the streamer errored without consuming an ack — used when a
+// refill write fails mid-job. Unlike disconnect(), 'errored' stays
+// inside isActiveJob, so the Stop button and the soft-reset stop
+// command remain available: the port may still be alive and GRBL may
+// still be executing its buffered lines (AUDIT-VERIFICATION-2026-06-10,
+// HD1-adjacent finding).
+export function markErrored(state: StreamerState): StreamerState {
+  return { ...state, status: 'errored', queued: [] };
 }
 
 // Progress as a fraction [0, 1].
