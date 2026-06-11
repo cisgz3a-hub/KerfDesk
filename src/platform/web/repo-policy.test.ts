@@ -59,6 +59,24 @@ describe('repository policy enforcement contract', () => {
     expect(repoFile('scripts/check-licenses.mjs')).toContain('pnpm licenses list --prod --json');
   });
 
+  // M29 (AUDIT-2026-06-10): CLAUDE.md claimed a no-restricted-imports / console
+  // gate for pure core that never existed until 01907f2 added it — but that
+  // commit shipped no pinning test, so the exact config-drift class the audit
+  // caught (documented-but-unconfigured rule) could recur for these rules too.
+  it('enforces the pure-core console/process and node-import bans', () => {
+    const eslintConfig = repoFile('eslint.config.mjs');
+
+    // The bans are scoped to pure core.
+    expect(eslintConfig).toContain("files: ['src/core/**/*.ts', 'src/core/**/*.tsx']");
+    // console + process are banned globals in core (logger / platform pushed out).
+    expect(eslintConfig).toContain("name: 'console'");
+    expect(eslintConfig).toContain("name: 'process'");
+    // Node built-ins are banned imports in core (I/O pushed to io/ or platform/).
+    expect(eslintConfig).toContain(
+      "group: ['node:*', 'fs', 'path', 'os', 'child_process', 'worker_threads']",
+    );
+  });
+
   it('uses one cross-platform file-size backstop in CI and deploy workflows', () => {
     const packageJson = JSON.parse(repoFile('package.json')) as {
       readonly scripts?: { readonly ['check:file-size']?: string };

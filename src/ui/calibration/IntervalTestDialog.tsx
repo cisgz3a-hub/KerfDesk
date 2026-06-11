@@ -1,13 +1,8 @@
 import { useState, type ChangeEvent } from 'react';
 import type { IntervalTestGridOptions } from '../../core/job';
 import { CalibrationNumberField } from './CalibrationNumberField';
-import {
-  calibrationBackdropStyle,
-  calibrationButtonRowStyle,
-  calibrationDialogStyle,
-  calibrationGridStyle,
-  calibrationHeadingStyle,
-} from './calibration-dialog-styles';
+import { Button, Dialog, DialogActions } from '../kit';
+import { calibrationGridStyle } from './calibration-dialog-styles';
 
 type IntervalTestDraft = {
   readonly steps: string;
@@ -58,32 +53,27 @@ export function IntervalTestDialog(props: {
       const { value } = event.target;
       setDraft((current) => ({ ...current, [field]: value }));
     };
+  // kit Dialog adds the Escape/focus-trap behavior these two dialogs were
+  // missing (every other modal had it via use-dialog-a11y).
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="interval-test-title"
-      style={calibrationBackdropStyle}
+    <Dialog
+      onClose={props.onCancel}
+      title="Interval Test"
+      as="form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onGenerate(parseDraft(draft));
+      }}
+      size="sm"
     >
-      <form
-        style={calibrationDialogStyle}
-        onSubmit={(event) => {
-          event.preventDefault();
-          props.onGenerate(parseDraft(draft));
-        }}
-      >
-        <h2 id="interval-test-title" style={calibrationHeadingStyle}>
-          Interval Test
-        </h2>
-        <IntervalTestFields draft={draft} setField={setField} />
-        <div style={calibrationButtonRowStyle}>
-          <button type="button" onClick={props.onCancel}>
-            Cancel
-          </button>
-          <button type="submit">Generate</button>
-        </div>
-      </form>
-    </div>
+      <IntervalTestFields draft={draft} setField={setField} />
+      <DialogActions>
+        <Button onClick={props.onCancel}>Cancel</Button>
+        <Button type="submit" variant="primary">
+          Generate
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

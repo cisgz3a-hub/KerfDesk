@@ -1,3 +1,4 @@
+import { canvasTheme } from '../theme/canvas-theme';
 import { applyTransform, type Polyline, type SceneObject, type Vec2 } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
 
@@ -55,12 +56,12 @@ export function drawLargeSceneNotice(ctx: CanvasRenderingContext2D): void {
   ctx.font = '12px system-ui, sans-serif';
   const w = ctx.measureText(msg).width + padX * 2;
   const h = 24;
-  ctx.fillStyle = 'rgba(255, 248, 225, 0.95)';
-  ctx.strokeStyle = '#d6a100';
+  ctx.fillStyle = canvasTheme.noticeFill;
+  ctx.strokeStyle = canvasTheme.noticeStroke;
   ctx.lineWidth = 1;
   ctx.fillRect(x, y, w, h);
   ctx.strokeRect(x, y, w, h);
-  ctx.fillStyle = '#5f4200';
+  ctx.fillStyle = canvasTheme.noticeText;
   ctx.fillText(msg, x + padX, y + h - padY - 1);
   ctx.restore();
 }

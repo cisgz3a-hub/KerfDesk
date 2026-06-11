@@ -9,6 +9,7 @@
 // parts and would otherwise duplicate.
 
 import { TRACE_PRESETS } from '../../core/trace';
+import { Button, DialogActions as KitDialogActions } from '../kit';
 
 export function PresetPicker(props: {
   readonly value: string;
@@ -19,6 +20,7 @@ export function PresetPicker(props: {
       <select
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
+        className="lf-select"
         style={selectStyle}
       >
         {Object.keys(TRACE_PRESETS).map((key) => (
@@ -52,6 +54,7 @@ export function DeleteImageAfterTraceToggle(props: {
     <label style={checkboxRowStyle}>
       <input
         type="checkbox"
+        className="lf-checkbox"
         checked={props.checked}
         onChange={(e) => props.onChange(e.target.checked)}
       />
@@ -66,14 +69,14 @@ export function DialogActions(props: {
   readonly onCancel: () => void;
 }): JSX.Element {
   return (
-    <div style={actionsStyle}>
-      <button type="button" onClick={props.onCancel} disabled={props.busy}>
+    <KitDialogActions>
+      <Button onClick={props.onCancel} disabled={props.busy}>
         Cancel
-      </button>
-      <button type="submit" disabled={!props.canSubmit}>
+      </Button>
+      <Button type="submit" variant="primary" disabled={!props.canSubmit}>
         {props.busy ? 'Tracing…' : 'Trace'}
-      </button>
-    </div>
+      </Button>
+    </KitDialogActions>
   );
 }
 
@@ -95,41 +98,13 @@ export function PresetHint(): JSX.Element {
 
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
-    <label style={fieldStyle}>
-      <span style={fieldLabelStyle}>{props.label}</span>
+    <label className="lf-field">
+      <span className="lf-field-label lf-field-label--sm">{props.label}</span>
       <span style={fieldControlStyle}>{props.children}</span>
     </label>
   );
 }
 
-export const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-};
-export const panelStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 6,
-  padding: 16,
-  minWidth: 380,
-  maxWidth: 520,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  fontFamily: 'system-ui, sans-serif',
-};
-export const headingStyle: React.CSSProperties = { margin: 0, fontSize: 16 };
-const fieldStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  fontSize: 13,
-};
-const fieldLabelStyle: React.CSSProperties = { width: 90, color: '#444' };
 const fieldControlStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
@@ -139,7 +114,7 @@ const fieldControlStyle: React.CSSProperties = {
 };
 const fileNameStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#555',
+  color: 'var(--lf-text-muted)',
   maxWidth: 240,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -151,17 +126,10 @@ const checkboxRowStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 6,
   fontSize: 12,
-  color: '#444',
 };
 const hintStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
   margin: '4px 0 0 0',
   fontStyle: 'italic',
-};
-const actionsStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 8,
-  marginTop: 8,
 };

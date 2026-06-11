@@ -26,6 +26,8 @@ import {
   describeImportResult,
   describeReimportOutcome,
 } from './import-toasts';
+import { detectJobIntentWarnings } from '../laser/job-intent-warnings';
+import { confirmOversizeImport } from './import-size-guard';
 
 export async function handleImportSvg(
   platform: PlatformAdapter,
@@ -43,6 +45,9 @@ export async function handleImportSvg(
   for (const file of files) {
     try {
       const text = await file.text();
+      // F-A4 mirrors F-A3's oversize confirm. The platform FileHandle has no
+      // size, so gate on the loaded text length (chars ≈ bytes for SVG).
+      if (!confirmOversizeImport(file.name, text.length)) continue;
       const id = crypto.randomUUID();
       const result = parseSvg({ svgText: text, id, source: file.name });
       if (result.object !== null) {
@@ -122,6 +127,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   try {
     await target.write(gcode);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
+    // H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
+    // still see the same job-intent warnings the Start path surfaces (luma
+    // upsample softer than preview, uncalibrated defaults, trace-vector cut
+    // risk) — non-blocking, since the export itself succeeded.
+    for (const warning of detectJobIntentWarnings(ctx.project)) {
+      ctx.pushToast(warning, 'warning');
+    }
     if (ctx.controllerSettings === null) {
       ctx.pushToast(
         `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
@@ -157,11 +169,19 @@ export type SaveProjectCtx = {
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
+// LU18: the Save-before-discard flow needs to know whether the save
+// actually landed — a cancelled picker must abort the destructive action
+// that triggered it, not fall through to "discard anyway".
+export type SaveProjectOutcome = 'saved' | 'cancelled' | 'error';
+
 // F-A11 Save vs Save As. Without `forceDialog`, Ctrl+S reuses the in-memory
 // SaveTarget from the last save (no dialog, toast just says "Saved").
 // `forceDialog` = true is Save As — always prompts. New/Open clear
 // lastSaveTarget so the next save will prompt regardless.
-export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false): Promise<void> {
+export async function handleSaveProject(
+  ctx: SaveProjectCtx,
+  forceDialog = false,
+): Promise<SaveProjectOutcome> {
   const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
   let target: SaveTarget | null;
   try {
@@ -173,9 +193,9 @@ export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false
         });
   } catch (err) {
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
-    return;
+    return 'error';
   }
-  if (target === null) return;
+  if (target === null) return 'cancelled';
   try {
     await target.write(serializeProject(ctx.project));
     ctx.markSaved(target);
@@ -183,8 +203,10 @@ export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false
     // the recovery prompt doesn't fire on the next boot.
     clearAutosave();
     ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
+    return 'saved';
   } catch (err) {
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
+    return 'error';
   }
 }
 

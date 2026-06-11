@@ -10,14 +10,12 @@
 // `view-transform.ts`; the drag state machine in `drag-state.ts`; the
 // HTML overlays (drop hint, preview scrubber, etc.) in `overlays.tsx`.
 
+import { canvasTheme } from '../theme/canvas-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { buildToolpath, EMPTY_JOB } from '../../core/job';
+import { type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
-import { resolveJobPlacement } from '../job-placement';
 import { useStore } from '../state';
-import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
-import { buildPreviewToolpath } from './draw-preview';
 import { drawScene } from './draw-scene';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
 import {
@@ -27,7 +25,9 @@ import {
   panOffsetForDrag,
 } from './drag-state';
 import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
+import { PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
+import { usePreviewToolpath } from './use-preview-toolpath';
 import { canvasMouseToScene, clientToCanvasPx, zoomAtCursorPx } from './view-transform';
 
 export function Workspace(): JSX.Element {
@@ -36,10 +36,6 @@ export function Workspace(): JSX.Element {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const previewMode = useStore((s) => s.previewMode);
-  const jobPlacement = useStore((s) => s.jobPlacement);
-  const statusReport = useLaserStore((s) => s.statusReport);
-  const workOriginActive = useLaserStore((s) => s.workOriginActive);
-  const wcoCache = useLaserStore((s) => s.wcoCache);
   const scrubberT = useUiStore((s) => s.scrubberT);
   // Three primitive selectors — Zustand only re-runs the effect when one
   // of them actually changes. A bundled `{...}` selector would create a
@@ -48,6 +44,7 @@ export function Workspace(): JSX.Element {
   const panX = useUiStore((s) => s.panX);
   const panY = useUiStore((s) => s.panY);
   const viewState = useMemo(() => ({ zoomFactor, panX, panY }), [zoomFactor, panX, panY]);
+  const previewToolpath = usePreviewToolpath(project, previewMode);
   const canvasSize = useCanvasBitmapSize(ref);
   useWorkspaceDraw({
     ref,
@@ -55,10 +52,7 @@ export function Workspace(): JSX.Element {
     selectedObjectId,
     additionalSelectedIds,
     previewMode,
-    jobPlacement,
-    statusReport,
-    workOriginActive,
-    wcoCache,
+    previewToolpath,
     scrubberT,
     viewState,
     canvasSize,
@@ -98,6 +92,9 @@ export function Workspace(): JSX.Element {
           viewState={viewState}
         />
       )}
+      {previewMode && previewToolpath !== null && (
+        <PreviewStatusOverlays project={project} toolpath={previewToolpath} />
+      )}
       {previewMode && <PreviewScrubber />}
       {/* Bottom-right zoom controls — hidden during preview so the
           scrubber gets the whole bottom strip. */}
@@ -112,10 +109,7 @@ function useWorkspaceDraw(args: {
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
-  readonly jobPlacement: ReturnType<typeof useStore.getState>['jobPlacement'];
-  readonly statusReport: ReturnType<typeof useLaserStore.getState>['statusReport'];
-  readonly workOriginActive: boolean;
-  readonly wcoCache: ReturnType<typeof useLaserStore.getState>['wcoCache'];
+  readonly previewToolpath: Toolpath | null;
   readonly scrubberT: number;
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
   // Not read directly — the draw effect reads canvas.width/height — but a
@@ -128,10 +122,7 @@ function useWorkspaceDraw(args: {
     selectedObjectId,
     additionalSelectedIds,
     previewMode,
-    jobPlacement,
-    statusReport,
-    workOriginActive,
-    wcoCache,
+    previewToolpath,
     scrubberT,
     viewState,
     canvasSize,
@@ -142,19 +133,6 @@ function useWorkspaceDraw(args: {
     displayPolylineCacheRef.current = createDisplayPolylineCache();
   }
   const displayPolylineCache = displayPolylineCacheRef.current;
-  const previewToolpath = useMemo(() => {
-    if (!previewMode) return null;
-    const placement = resolveJobPlacement(jobPlacement, {
-      statusReport,
-      workOriginActive,
-      wcoCache,
-    });
-    if (!placement.ok) return buildToolpath(EMPTY_JOB);
-    return buildPreviewToolpath(
-      project,
-      placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
-    );
-  }, [previewMode, project, jobPlacement, statusReport, workOriginActive, wcoCache]);
   const requestRasterRedraw = useCallback(() => {
     setRasterRedrawTick((tick) => tick + 1);
   }, []);
@@ -317,7 +295,7 @@ function useDragMove(
 
 const canvasStyle: React.CSSProperties = {
   display: 'block',
-  background: '#fafafa',
+  background: canvasTheme.viewportSurround,
   width: '100%',
   height: '100%',
   // Block browser-default touch handling so trackpad gestures and

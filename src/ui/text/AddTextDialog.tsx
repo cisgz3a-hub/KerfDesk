@@ -11,7 +11,7 @@
 // scripts opentype's getPath handles word-spacing and Unicode glyph
 // lookup; we just split on '\n' for line breaks.
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   DEFAULT_FONT_KEY,
   FONT_REGISTRY,
@@ -26,7 +26,7 @@ import {
   DEFAULT_TEXT_SIZE_MM,
 } from '../../core/text';
 import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
-import { useDialogA11y } from '../common/use-dialog-a11y';
+import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -53,35 +53,23 @@ function DialogForm(props: {
   const pushToast = useToastStore((s) => s.pushToast);
   const fields = useTextDialogFields(state);
   const [submitting, setSubmitting] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // R-M1 a11y: Escape closes, Tab cycles within, focus returns to the
-  // toolbar button on close. Hook installs keydown listener and
-  // initial-focus + cleanup-focus behaviour.
-  useDialogA11y(dialogRef, close);
-  const onSubmit = (e: React.FormEvent): void => {
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
     void commitText(state, fields.values, { upsert, close, pushToast, setSubmitting });
   };
+  // kit Dialog owns the a11y wiring (Escape closes, Tab cycles, focus
+  // returns to the opener) and the aria-label.
   return (
-    <div
-      ref={dialogRef}
-      style={backdropStyle}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Add or edit text"
-      tabIndex={-1}
-    >
-      <form onSubmit={onSubmit} style={panelStyle}>
-        <h2 style={headingStyle}>{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
-        <FormFields fields={fields} />
-        <DialogActions
-          mode={state.mode}
-          canSubmit={fields.values.content.trim() !== '' && !submitting}
-          submitting={submitting}
-          onCancel={close}
-        />
-      </form>
-    </div>
+    <Dialog onClose={close} ariaLabel="Add or edit text" as="form" onSubmit={onSubmit} size="sm">
+      <h2 className="lf-dialog-title">{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
+      <FormFields fields={fields} />
+      <FormActions
+        mode={state.mode}
+        canSubmit={fields.values.content.trim() !== '' && !submitting}
+        submitting={submitting}
+        onCancel={close}
+      />
+    </Dialog>
   );
 }
 
@@ -209,6 +197,7 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           value={values.content}
           onChange={(e) => setContent(e.target.value)}
           rows={3}
+          className="lf-input"
           style={textareaStyle}
           autoFocus
         />
@@ -223,9 +212,10 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           step={1}
           value={values.sizeMm}
           onChange={(e) => setSizeMm(Math.max(1, Number(e.target.value) || 0))}
+          className="lf-input"
           style={numStyle}
         />
-        <span style={unitStyle}>mm</span>
+        <span className="lf-field-unit">mm</span>
       </Field>
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />
@@ -238,9 +228,10 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           step={0.1}
           value={values.lineHeight}
           onChange={(e) => setLineHeight(Math.max(0.5, Number(e.target.value) || 1))}
+          className="lf-input"
           style={numStyle}
         />
-        <span style={unitStyle}>× size</span>
+        <span className="lf-field-unit">× size</span>
       </Field>
       <Field label="Spacing">
         <input
@@ -250,30 +241,31 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           step={0.05}
           value={values.letterSpacing}
           onChange={(e) => setLetterSpacing(Number(e.target.value) || 0)}
+          className="lf-input"
           style={numStyle}
           title="Letter spacing (tracking). 0 = font's natural spacing. Positive widens, negative tightens."
         />
-        <span style={unitStyle}>× size (0 = natural)</span>
+        <span className="lf-field-unit">× size (0 = natural)</span>
       </Field>
     </>
   );
 }
 
-function DialogActions(props: {
+function FormActions(props: {
   readonly mode: 'add' | 'edit';
   readonly canSubmit: boolean;
   readonly submitting: boolean;
   readonly onCancel: () => void;
 }): JSX.Element {
   return (
-    <div style={actionsStyle}>
-      <button type="button" onClick={props.onCancel} disabled={props.submitting}>
+    <DialogActions>
+      <Button onClick={props.onCancel} disabled={props.submitting}>
         Cancel
-      </button>
-      <button type="submit" disabled={!props.canSubmit}>
+      </Button>
+      <Button type="submit" variant="primary" disabled={!props.canSubmit}>
         {props.submitting ? 'Rendering…' : props.mode === 'add' ? 'Add' : 'Save'}
-      </button>
-    </div>
+      </Button>
+    </DialogActions>
   );
 }
 
@@ -292,8 +284,10 @@ function fontDisplayName(key: KnownFontKey): string {
 
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
   return (
-    <label style={fieldStyle}>
-      <span style={fieldLabelStyle}>{props.label}</span>
+    <label className="lf-field" style={fieldAlignStyle}>
+      <span className="lf-field-label lf-field-label--sm" style={fieldLabelPadStyle}>
+        {props.label}
+      </span>
       <span style={fieldControlStyle}>{props.children}</span>
     </label>
   );
@@ -321,34 +315,10 @@ function AlignmentRadio(props: {
   );
 }
 
-const backdropStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1000,
-};
-const panelStyle: React.CSSProperties = {
-  background: '#fff',
-  borderRadius: 6,
-  padding: 16,
-  minWidth: 360,
-  maxWidth: 480,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  fontFamily: 'system-ui, sans-serif',
-};
-const headingStyle: React.CSSProperties = { margin: 0, fontSize: 16 };
-const fieldStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'flex-start',
-  gap: 8,
-  fontSize: 13,
-};
-const fieldLabelStyle: React.CSSProperties = { width: 90, paddingTop: 4, color: '#444' };
+// Multi-line rows (textarea, wrapped radios) top-align, unlike .lf-field's
+// default center alignment - layout-only overrides per ADR-047.
+const fieldAlignStyle: React.CSSProperties = { alignItems: 'flex-start' };
+const fieldLabelPadStyle: React.CSSProperties = { paddingTop: 4 };
 const fieldControlStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
@@ -363,17 +333,10 @@ const textareaStyle: React.CSSProperties = {
   resize: 'vertical',
 };
 const numStyle: React.CSSProperties = { width: 80 };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
 const alignmentStyle: React.CSSProperties = { display: 'flex', gap: 12 };
 const alignmentLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 4,
   textTransform: 'capitalize',
-};
-const actionsStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 8,
-  marginTop: 8,
 };

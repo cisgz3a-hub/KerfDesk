@@ -160,7 +160,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 const fieldsetStyle: React.CSSProperties = {
-  border: '1px solid #ddd',
+  border: '1px solid var(--lf-border)',
   borderRadius: 4,
   padding: '6px 10px 8px 10px',
   margin: '4px 0',
@@ -170,7 +170,7 @@ const fieldsetStyle: React.CSSProperties = {
 };
 const legendStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
   padding: '0 4px',
 };
 const rowStyle: React.CSSProperties = {
@@ -180,7 +180,7 @@ const rowStyle: React.CSSProperties = {
   gap: 6,
   fontSize: 12,
 };
-const labelStyle: React.CSSProperties = { color: '#444' };
+const labelStyle: React.CSSProperties = { color: 'var(--lf-text-muted)' };
 const numberStyle: React.CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
@@ -197,13 +197,13 @@ const checkboxRowStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 6,
   fontSize: 12,
-  color: '#444',
+  color: 'var(--lf-text-muted)',
 };
 const resetButtonStyle: React.CSSProperties = {
   fontSize: 11,
   padding: '2px 8px',
   background: 'transparent',
-  border: '1px solid #ccc',
+  border: '1px solid var(--lf-border)',
   borderRadius: 3,
   cursor: 'pointer',
 };

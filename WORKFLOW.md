@@ -150,7 +150,11 @@ Identical to F-A3 except:
 2. Both objects are now selected; selection box wraps their combined bounding box.
 3. Resize handles operate on the combined box.
 
-#### Multi — marquee
+#### Multi — marquee — **NOT YET IMPLEMENTED**
+> This flow is specified but not built: `computeMouseDownDrag` returns null on
+> empty space, so click+drag in empty workspace does nothing today. Tracked for
+> the drawing-tools work (LIGHTBURN-GAP Increment 2). The spec below is the
+> intended behavior, not current behavior.
 1. Click+drag in empty workspace area.
 2. Dashed-blue marquee box follows cursor.
 3. On release, every object whose bounding box is fully or partially inside the marquee is selected.
@@ -739,8 +743,8 @@ correct M4-mode raster G-code from Compile.
 1. Operator drags a `.png` (or `.jpg`) onto the canvas, OR clicks
    "Add Image" in the Toolbar.
 2. App decodes the image, computes intrinsic mm-bounds from the
-   image's DPI metadata (defaulting to 96 DPI when none), inserts a
-   `RasterImage` SceneObject at the canvas centre.
+   image's DPI metadata (defaulting to LightBurn's 254 DPI when none —
+   ADR-048), inserts a `RasterImage` SceneObject at the canvas centre.
 3. The image renders on the workspace via Canvas2D `drawImage` —
    real bitmap, scaled into mm-bounds. (Distinct from the Phase E
    "trace this image" flow, which converts to vectors immediately.)

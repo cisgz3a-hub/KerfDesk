@@ -1,5 +1,6 @@
 import { useStore } from '../state';
 
+// eslint-disable-next-line no-restricted-syntax -- scene DATA: the new layer's color key (what the laser cuts by), not chrome (ADR-047).
 const DEFAULT_NEW_LAYER_COLOR = '#000000';
 const NEW_LAYER_COLOR_FIELD = 'newLayerColor';
 

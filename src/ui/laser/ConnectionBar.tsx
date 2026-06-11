@@ -41,12 +41,12 @@ export function ConnectionBar(props: Props): JSX.Element {
 function StatusDot({ connection }: { readonly connection: ConnectionState }): JSX.Element {
   const color =
     connection.kind === 'connected'
-      ? '#2e7d32'
+      ? 'var(--lf-success)'
       : connection.kind === 'connecting'
-        ? '#f9a825'
+        ? 'var(--lf-warning)'
         : connection.kind === 'failed'
-          ? '#c62828'
-          : '#9e9e9e';
+          ? 'var(--lf-danger)'
+          : 'var(--lf-text-faint)';
   return (
     <span
       title={connection.kind}
@@ -62,4 +62,4 @@ function StatusDot({ connection }: { readonly connection: ConnectionState }): JS
 }
 
 const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8 };
-const errorStyle: React.CSSProperties = { color: '#c62828', fontSize: 11 };
+const errorStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)', fontSize: 11 };

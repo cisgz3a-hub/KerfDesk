@@ -123,6 +123,52 @@ describe('parseSvg — happy path', () => {
   });
 });
 
+// H4 (AUDIT-2026-06-10): the transform stack landed translate/scale/rotate but
+// skewX/skewY fell through to identity (silently dropped), and rotate(deg,cx,cy)
+// and matrix() had zero coverage. Pin all four.
+describe('parseSvg — transform stack (H4)', () => {
+  const lastPoint = (svg: string) => {
+    const pts = parseSvg(args(svg)).object?.paths[0]?.polylines[0]?.points ?? [];
+    return pts[pts.length - 1];
+  };
+  const vb = (inner: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${inner}</svg>`;
+
+  it('applies skewX (was silently ignored)', () => {
+    // skewX(45): x' = x + tan(45)·y. (0,10) → (10,10).
+    const p = lastPoint(
+      vb('<line x1="0" y1="0" x2="0" y2="10" stroke="red" transform="skewX(45)"/>'),
+    );
+    expect(p?.x).toBeCloseTo(10, 6);
+    expect(p?.y).toBeCloseTo(10, 6);
+  });
+
+  it('applies skewY (was silently ignored)', () => {
+    // skewY(45): y' = tan(45)·x + y. (10,0) → (10,10).
+    const p = lastPoint(
+      vb('<line x1="0" y1="0" x2="10" y2="0" stroke="red" transform="skewY(45)"/>'),
+    );
+    expect(p?.x).toBeCloseTo(10, 6);
+    expect(p?.y).toBeCloseTo(10, 6);
+  });
+
+  it('applies rotate(deg, cx, cy) about a center', () => {
+    // rotate 90° about (5,5): (10,5) → (5,10).
+    const p = lastPoint(
+      vb('<line x1="5" y1="5" x2="10" y2="5" stroke="red" transform="rotate(90 5 5)"/>'),
+    );
+    expect(p?.x).toBeCloseTo(5, 6);
+    expect(p?.y).toBeCloseTo(10, 6);
+  });
+
+  it('applies a raw matrix()', () => {
+    // matrix(2,0,0,3,5,7): (2,2) → (2·2+5, 3·2+7) = (9,13).
+    const p = lastPoint(vb('<path d="M1 1 L2 2" stroke="red" transform="matrix(2,0,0,3,5,7)"/>'));
+    expect(p?.x).toBeCloseTo(9, 6);
+    expect(p?.y).toBeCloseTo(13, 6);
+  });
+});
+
 describe('parseSvg — empty / no geometry', () => {
   it('returns object=null when no strokes match (e.g., text-only SVG)', () => {
     const result = parseSvg(

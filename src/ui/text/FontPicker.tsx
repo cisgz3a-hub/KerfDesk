@@ -43,6 +43,7 @@ export function FontPicker(props: Props): JSX.Element {
     <div ref={rootRef} style={rootStyle}>
       <button
         type="button"
+        className="lf-btn"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -64,16 +65,17 @@ export function FontPicker(props: Props): JSX.Element {
         </span>
       </button>
       {open && (
-        <ul role="listbox" style={menuStyle}>
+        <ul role="listbox" className="lf-menu" style={menuStyle}>
           {FONT_REGISTRY.map((f) => (
             <li key={f.key} role="option" aria-selected={f.key === props.value}>
               <button
                 type="button"
+                className="lf-menu-item"
                 onClick={() => handleSelect(f.key)}
                 style={optionStyleFor(f.key, f.key === props.value)}
               >
                 <span style={optionNameStyle}>{f.displayName}</span>
-                <span style={optionClassStyle}>({f.styleClass})</span>
+                <span style={optionMetaStyle(f.key === props.value)}>({f.styleClass})</span>
               </button>
             </li>
           ))}
@@ -121,9 +123,11 @@ function useOutsideClickToClose(
   }, [open, close, ref]);
 }
 
-// Inline styles only — matches the rest of the dialog. Keeping the
-// font-family hop as a function of the key so the trigger and each
-// option independently use the bundled font.
+// Chrome comes from tokens.css (.lf-btn trigger, .lf-menu/.lf-menu-item
+// rows — hover and focus states for free); inline styles carry only the
+// per-row font-family hop and layout. The regression this replaces:
+// rows hardcoded a white background with INHERITED text color, which
+// turned white-on-white the moment the dialog went dark (ADR-047).
 function triggerStyleFor(key: KnownFontKey): React.CSSProperties {
   return {
     ...triggerBaseStyle,
@@ -135,8 +139,16 @@ function optionStyleFor(key: KnownFontKey, selected: boolean): React.CSSProperti
   return {
     ...optionBaseStyle,
     fontFamily: cssFontFamilyStack(key),
-    background: selected ? '#eef4ff' : '#fff',
     fontWeight: selected ? 600 : 400,
+    ...(selected ? { background: 'var(--lf-accent)', color: 'var(--lf-on-fill)' } : {}),
+  };
+}
+
+function optionMetaStyle(selected: boolean): React.CSSProperties {
+  return {
+    fontFamily: 'system-ui, sans-serif',
+    fontSize: 11,
+    color: selected ? 'inherit' : 'var(--lf-text-muted)',
   };
 }
 
@@ -158,12 +170,7 @@ const triggerBaseStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 6,
   width: '100%',
-  padding: '4px 8px',
   fontSize: 14,
-  background: '#fff',
-  border: '1px solid #ccc',
-  borderRadius: 4,
-  cursor: 'pointer',
   textAlign: 'left',
 };
 
@@ -171,47 +178,28 @@ const triggerNameStyle: React.CSSProperties = { flex: 1 };
 const triggerClassStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
 };
 const caretStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
 };
 
+// Position/scroll only — surface chrome comes from .lf-menu.
 const menuStyle: React.CSSProperties = {
   position: 'absolute',
   top: 'calc(100% + 2px)',
   left: 0,
   right: 0,
   margin: 0,
-  padding: 4,
   listStyle: 'none',
-  background: '#fff',
-  border: '1px solid #ccc',
-  borderRadius: 4,
-  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-  zIndex: 10,
   maxHeight: 240,
   overflowY: 'auto',
 };
 
 const optionBaseStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  width: '100%',
-  padding: '6px 8px',
   fontSize: 16,
-  border: 'none',
-  borderRadius: 3,
-  cursor: 'pointer',
-  textAlign: 'left',
 };
 
 const optionNameStyle: React.CSSProperties = { flex: 1 };
-const optionClassStyle: React.CSSProperties = {
-  fontFamily: 'system-ui, sans-serif',
-  fontSize: 11,
-  color: '#666',
-};

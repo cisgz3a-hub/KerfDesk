@@ -1,6 +1,10 @@
 // TracePreview renders the Trace Image preview frame. It shows the
 // traced SVG over the source bitmap, plus preview-only LightBurn-style
 // toggles for fading the source and showing vector points.
+/* eslint-disable no-restricted-syntax -- the preview frame is a deliberate
+   LIGHT surface on the dark dialog (artwork is judged against light
+   material, ADR-047 exception): its dark-on-light status text and the
+   purple trace markers are file-local literals, not chrome tokens. */
 
 import { useRef, useState } from 'react';
 
@@ -65,7 +69,8 @@ function PreviewControls(props: {
           type="button"
           aria-pressed={props.isSourceFaded}
           onClick={props.onToggleFade}
-          style={previewButtonStyle}
+          className="lf-btn"
+          style={previewButtonSizeStyle}
         >
           Fade Image
         </button>
@@ -75,13 +80,19 @@ function PreviewControls(props: {
           type="button"
           aria-pressed={props.shouldShowPoints}
           onClick={props.onTogglePoints}
-          style={previewButtonStyle}
+          className="lf-btn"
+          style={previewButtonSizeStyle}
         >
           Show Points
         </button>
       ) : null}
       {props.boundary !== null ? (
-        <button type="button" onClick={props.onBoundaryClear} style={previewButtonStyle}>
+        <button
+          type="button"
+          onClick={props.onBoundaryClear}
+          className="lf-btn"
+          style={previewButtonSizeStyle}
+        >
           Clear Boundary
         </button>
       ) : null}
@@ -308,13 +319,10 @@ const buttonRowStyle: React.CSSProperties = {
   gap: 6,
 };
 
-const previewButtonStyle: React.CSSProperties = {
+// Size-only override on .lf-btn — these are compact preview toggles.
+const previewButtonSizeStyle: React.CSSProperties = {
   fontSize: 11,
   padding: '2px 8px',
-  background: 'transparent',
-  border: '1px solid #ccc',
-  borderRadius: 3,
-  cursor: 'pointer',
 };
 
 const frameStyle: React.CSSProperties = {
@@ -325,7 +333,7 @@ const frameStyle: React.CSSProperties = {
   width: '100%',
   height: 240,
   background: '#fafafa',
-  border: '1px solid #ddd',
+  border: '1px solid var(--lf-border)',
   borderRadius: 4,
   overflow: 'hidden',
 };
@@ -346,7 +354,9 @@ const hintStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
   fontSize: 12,
-  color: '#888',
+  // Dark-on-light, NOT the theme text vars: this text sits inside the
+  // always-light preview frame (artwork previews stay light, ADR-047).
+  color: '#666',
   fontStyle: 'italic',
 };
 

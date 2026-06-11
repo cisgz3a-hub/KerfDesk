@@ -148,7 +148,12 @@ function SetupRow(props: {
       >
         Auto-focus
       </button>
-      <button type="button" onClick={onFrame} disabled={busy}>
+      <button
+        type="button"
+        onClick={onFrame}
+        disabled={busy}
+        title="Trace the job's bounding box with the laser off to check placement"
+      >
         Frame
       </button>
       <button
@@ -166,7 +171,7 @@ function SetupRow(props: {
 
 function startJobTitle(estimate: LiveJobEstimate): string {
   if (estimate.kind === 'estimated') {
-    return `Estimated burn time: ${estimate.label} (excludes acceleration overhead)`;
+    return `Estimated burn time: ${estimate.label}`;
   }
   if (estimate.kind === 'too-large') {
     return 'Large trace: live estimate paused for performance. Start still generates full G-code.';
@@ -205,7 +210,11 @@ function RunningControls(props: {
         </button>
       )}
       {props.isPaused && (
-        <button type="button" onClick={() => void resumeJob().catch(() => undefined)}>
+        <button
+          type="button"
+          onClick={() => void resumeJob().catch(() => undefined)}
+          title="Release the feed hold and continue the job"
+        >
           Resume
         </button>
       )}
@@ -213,6 +222,7 @@ function RunningControls(props: {
         type="button"
         onClick={() => void stopJob().catch(() => undefined)}
         style={stopBtnStyle}
+        title="Soft-reset the controller and halt the job (Ctrl+.)"
       >
         Stop
       </button>
@@ -325,10 +335,13 @@ function useAutofocusAction(): () => void {
 
 const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 const rowStyle: React.CSSProperties = { display: 'flex', gap: 6 };
-const stopBtnStyle: React.CSSProperties = { background: '#c62828', color: '#fff' };
+const stopBtnStyle: React.CSSProperties = {
+  background: 'var(--lf-danger)',
+  color: 'var(--lf-on-fill)',
+};
 const progressContainerStyle: React.CSSProperties = {
   position: 'relative',
-  background: '#e0e0e0',
+  background: 'var(--lf-bg-input)',
   height: 18,
   borderRadius: 3,
   overflow: 'hidden',
@@ -338,7 +351,7 @@ const progressFillStyle: React.CSSProperties = {
   top: 0,
   bottom: 0,
   left: 0,
-  background: '#1976d2',
+  background: 'var(--lf-accent)',
   transition: 'width 100ms linear',
 };
 const progressLabelStyle: React.CSSProperties = {
@@ -346,17 +359,16 @@ const progressLabelStyle: React.CSSProperties = {
   textAlign: 'center',
   fontSize: 11,
   lineHeight: '18px',
-  color: '#111',
-  textShadow: '0 0 2px #fff',
+  color: 'var(--lf-text)',
 };
 const estimateStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#666',
+  color: 'var(--lf-text-muted)',
   alignSelf: 'center',
   fontVariantNumeric: 'tabular-nums',
 };
 const runningSafetyStyle: React.CSSProperties = {
-  color: '#fbbf24',
+  color: 'var(--lf-warning-fg)',
   fontSize: 12,
   lineHeight: 1.3,
 };

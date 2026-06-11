@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
+import { useConfirmSaveStore } from '../state/confirm-save-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { PlatformProvider } from './platform-context';
@@ -56,7 +57,17 @@ async function pressKey(init: KeyboardEventInit & { readonly key: string }): Pro
   });
 }
 
+async function chooseAndFlush(choice: 'save' | 'discard' | 'cancel'): Promise<void> {
+  await act(async () => {
+    useConfirmSaveStore.getState().choose(choice);
+    // The Save path chains several awaits (choice → saveNow → picker →
+    // outcome). A macrotask hop drains the whole microtask queue first.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 afterEach(() => {
+  useConfirmSaveStore.getState().choose('cancel'); // resolve any dangling request
   useStore.getState().newProject();
   useLaserStore.setState({ streamer: null } as Partial<ReturnType<typeof useLaserStore.getState>>);
   for (const toast of useToastStore.getState().toasts) {
@@ -65,13 +76,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// H13 (AUDIT-2026-06-10): a native confirm suspends the renderer event loop —
-// Pause/Stop unclickable, status poll stopped, ack-driven sends stalled,
-// while M3 holds the beam at cut power on a stationary head. The dirty-
-// discard confirm must never open while a job is active.
+// H13 (AUDIT-2026-06-10): the dirty-discard prompt must never open while a
+// job is active — its backdrop would cover Pause/Stop with the beam live.
+// LU18 replaced the native confirm with the in-app Save / Don't Save /
+// Cancel dialog; the fail-closed policy carries over.
 describe('file shortcuts while a job is streaming (H13)', () => {
-  it('Ctrl+N does not open a native confirm or discard the project mid-job', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('Ctrl+N opens no confirm dialog and keeps the project mid-job', async () => {
     useStore.setState({ dirty: true });
     const project = useStore.getState().project;
     useLaserStore.setState({
@@ -81,20 +91,72 @@ describe('file shortcuts while a job is streaming (H13)', () => {
 
     await pressKey({ key: 'n', ctrlKey: true });
 
-    expect(confirm).not.toHaveBeenCalled();
+    expect(useConfirmSaveStore.getState().request).toBeNull();
+    expect(useStore.getState().project).toBe(project);
+    expect(useToastStore.getState().toasts.some((t) => t.message.includes('job is running'))).toBe(
+      true,
+    );
+
+    await unmount();
+  });
+});
+
+// LU18 (AUDIT-2026-06-10 / F-A13): the three-way dialog flow when idle.
+describe('Ctrl+N dirty-project guard when no job is active (LU18)', () => {
+  it("opens the confirm-save request; Don't Save resets the project", async () => {
+    useStore.setState({ dirty: true });
+    const project = useStore.getState().project;
+    const unmount = await renderHarness();
+
+    await pressKey({ key: 'n', ctrlKey: true });
+
+    const request = useConfirmSaveStore.getState().request;
+    expect(request).not.toBeNull();
+    expect(request?.action).toBe('start a new project');
+    // The project is untouched until the user chooses.
+    expect(useStore.getState().project).toBe(project);
+
+    await chooseAndFlush('discard');
+    expect(useStore.getState().project).not.toBe(project);
+    expect(useConfirmSaveStore.getState().request).toBeNull();
+
+    await unmount();
+  });
+
+  it('Cancel keeps the project and resolves nothing else', async () => {
+    useStore.setState({ dirty: true });
+    const project = useStore.getState().project;
+    const unmount = await renderHarness();
+
+    await pressKey({ key: 'n', ctrlKey: true });
+    await chooseAndFlush('cancel');
+
     expect(useStore.getState().project).toBe(project);
 
     await unmount();
   });
 
-  it('Ctrl+N still confirms and resets when no job is active', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    useStore.setState({ dirty: true });
+  it('Save with a cancelled picker aborts the reset (save-cancel aborts)', async () => {
+    useStore.setState({ dirty: true, lastSaveTarget: null });
+    const project = useStore.getState().project;
+    const unmount = await renderHarness();
+
+    await pressKey({ key: 'n', ctrlKey: true });
+    await chooseAndFlush('save'); // mockPlatform's pickFileForSave resolves null
+
+    expect(mockPlatform.pickFileForSave).toHaveBeenCalled();
+    expect(useStore.getState().project).toBe(project);
+
+    await unmount();
+  });
+
+  it('skips the dialog entirely when the project is clean', async () => {
+    useStore.setState({ dirty: false });
     const unmount = await renderHarness();
 
     await pressKey({ key: 'n', ctrlKey: true });
 
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(useConfirmSaveStore.getState().request).toBeNull();
 
     await unmount();
   });

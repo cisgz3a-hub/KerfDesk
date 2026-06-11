@@ -37,10 +37,10 @@ export type FileCtx = {
   readonly markSaved: (target: SaveTarget) => void;
   readonly markLoaded: (filename: string) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
-  // F-A13 dirty-check. Returns false to abort destructive actions (New /
-  // Open). Wired in use-shortcuts.ts to the same window.confirm() the
-  // toolbar uses; tests can stub a true-returning fn.
-  readonly confirmDiscard: (action: string) => boolean;
+  // F-A13 dirty-check. Resolves false to abort destructive actions (New /
+  // Open). Wired in use-shortcuts.ts to the Save / Don't Save / Cancel
+  // dialog flow (LU18); tests can stub an async true-returning fn.
+  readonly confirmDiscard: (action: string) => Promise<boolean>;
 };
 
 export type EditCtx = {
@@ -95,15 +95,19 @@ function isEditableTarget(e: KeyboardEvent): boolean {
 const FILE_KEYS: ReadonlyArray<string> = ['n', 'o', 's', 'i', 'e'];
 const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
   n: (c) => {
-    if (c.confirmDiscard('start a new project')) c.newProject();
+    void c.confirmDiscard('start a new project').then((ok) => {
+      if (ok) c.newProject();
+    });
   },
   o: (c) => {
-    if (!c.confirmDiscard('open another project')) return;
-    void handleOpenProject({
-      platform: c.platform,
-      setProject: c.setProject,
-      markLoaded: c.markLoaded,
-      pushToast: c.pushToast,
+    void c.confirmDiscard('open another project').then((ok) => {
+      if (!ok) return;
+      return handleOpenProject({
+        platform: c.platform,
+        setProject: c.setProject,
+        markLoaded: c.markLoaded,
+        pushToast: c.pushToast,
+      });
     });
   },
   s: (c) =>

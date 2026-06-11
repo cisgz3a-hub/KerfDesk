@@ -4,7 +4,7 @@
 // thin layout shell.
 
 import { CutsLayersPanel } from '../layers';
-import { StatusBar, Toasts } from '../common';
+import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
 import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
@@ -48,6 +48,7 @@ export function App(): JSX.Element {
       <Toasts />
       <AddTextDialog />
       <ImportImageDialog />
+      <ConfirmSaveDialog />
     </div>
   );
 }

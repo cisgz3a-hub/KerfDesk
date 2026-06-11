@@ -157,16 +157,20 @@ function formatLaserMode(enabled: boolean): string {
 }
 
 const panelStyle: React.CSSProperties = {
-  border: '1px solid #6b8db5',
-  background: '#eef4fb',
+  border: '1px solid var(--lf-accent)',
+  background: 'var(--lf-tint-info)',
   padding: 8,
   borderRadius: 4,
   display: 'flex',
   flexDirection: 'column',
   gap: 4,
 };
-const titleStyle: React.CSSProperties = { fontSize: 13, color: '#1a3552' };
-const hintStyle: React.CSSProperties = { margin: '2px 0 4px 0', fontSize: 11, color: '#4a5a70' };
+const titleStyle: React.CSSProperties = { fontSize: 13, color: 'var(--lf-accent-fg)' };
+const hintStyle: React.CSSProperties = {
+  margin: '2px 0 4px 0',
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+};
 const listStyle: React.CSSProperties = { margin: 0, padding: 0, listStyle: 'none', fontSize: 12 };
 const rowStyle: React.CSSProperties = {
   display: 'flex',
@@ -174,16 +178,19 @@ const rowStyle: React.CSSProperties = {
   gap: 6,
   padding: '2px 0',
 };
-const rowLabelStyle: React.CSSProperties = { width: 130, color: '#555' };
+const rowLabelStyle: React.CSSProperties = { width: 130, color: 'var(--lf-text-muted)' };
 const rowValueStyle: React.CSSProperties = {
   display: 'inline-flex',
   gap: 4,
   alignItems: 'baseline',
 };
-const oldStyle: React.CSSProperties = { color: '#888', textDecoration: 'line-through' };
-const arrowStyle: React.CSSProperties = { color: '#888' };
-const newStyle: React.CSSProperties = { color: '#1a3552', fontWeight: 600 };
-const unchangedStyle: React.CSSProperties = { color: '#888' };
+const oldStyle: React.CSSProperties = {
+  color: 'var(--lf-text-faint)',
+  textDecoration: 'line-through',
+};
+const arrowStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
+const newStyle: React.CSSProperties = { color: 'var(--lf-text)', fontWeight: 600 };
+const unchangedStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
 const actionsStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'flex-end',
@@ -191,8 +198,8 @@ const actionsStyle: React.CSSProperties = {
   marginTop: 4,
 };
 const primaryButtonStyle: React.CSSProperties = {
-  background: '#1a3552',
-  color: '#fff',
+  background: 'var(--lf-accent)',
+  color: 'var(--lf-on-fill)',
   border: 'none',
   padding: '4px 10px',
   borderRadius: 3,
