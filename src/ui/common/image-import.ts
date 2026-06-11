@@ -17,6 +17,19 @@ export type RasterImportGeometry = {
   readonly pixelHeight: number;
 };
 
+// The import success toast must report the source image's real pixel size, not
+// the <=2048 px decode grid loadImageAsRawData samples for luma — telling the
+// operator a 6000x4000 photo is "2048x1365 px" misstates the file. When the
+// source exceeded the cap, append the working resolution so the cap is visible.
+export function describeImportedImageSize(
+  natural: { readonly width: number; readonly height: number },
+  sampled: { readonly width: number; readonly height: number },
+): string {
+  const naturalLabel = `${natural.width}x${natural.height} px`;
+  if (sampled.width === natural.width && sampled.height === natural.height) return naturalLabel;
+  return `${naturalLabel}, processed at ${sampled.width}x${sampled.height}`;
+}
+
 export function rasterImportGeometry(input: RasterImportGeometryInput): RasterImportGeometry {
   // Defense in depth: a non-positive or non-finite dpi (poison metadata, a 0
   // that slipped past the density parser) would make widthMm Infinity/NaN and
