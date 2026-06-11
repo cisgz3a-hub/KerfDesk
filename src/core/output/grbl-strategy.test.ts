@@ -437,6 +437,30 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
     expect(out.match(/^; raster pass /gm)).toHaveLength(2);
     expect(out.match(/^G0 X0\.000 Y0\.500 S0/gm)).toHaveLength(2);
   });
+
+  it('does not double the M5 when a raster group is the last in the job', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'raster',
+          layerId: 'image',
+          color: '#808080',
+          power: 50,
+          speed: 1000,
+          passes: 1,
+          sValues: new Uint16Array([500]),
+          pixelWidth: 1,
+          pixelHeight: 1,
+          bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+          overscanMm: 0,
+          dotWidthCorrectionMm: 0,
+        },
+      ],
+    };
+    // The raster group emits its own trailing M5; the postamble must not add a
+    // second one — a raster-last job had M5\nM5 before the park move.
+    expect(emit(job)).not.toContain('M5\nM5');
+  });
 });
 
 describe('grblStrategy fill zero-length / coincident span guard (audit 2026-06-03)', () => {
