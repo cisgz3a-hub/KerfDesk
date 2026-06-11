@@ -69,9 +69,7 @@ export function useImportDragDrop(): void {
         pushToast(`Ignored ${ignored} file(s) — only SVG, PNG, and JPG import`, 'warning');
       }
       void importMany(svgFiles, importSvgObject, pushToast);
-      for (const file of imageFiles) {
-        void importImageFile(file, importRasterImage, pushToast);
-      }
+      void importImagesInOrder(imageFiles, importRasterImage, pushToast);
     };
     window.addEventListener('dragenter', onDragEnter);
     window.addEventListener('dragover', onDragOver);
@@ -103,6 +101,23 @@ function pickImageFiles(dt: DataTransfer): ReadonlyArray<File> {
     const name = f.name.toLowerCase();
     return name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg');
   });
+}
+
+// Sequenced (not fire-and-forget) so the Nth image lands at the F-A3 10 mm
+// stagger offset N and z-order/selection follow drop order — the image arm
+// previously fired each import with no index, stacking every drop pixel-exactly
+// at bed centre with selection landing on whichever decode finished last.
+async function importImagesInOrder(
+  files: ReadonlyArray<File>,
+  importRasterImage: (object: SceneObject, batchIdx?: number) => void,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): Promise<void> {
+  let batchIdx = 0;
+  for (const file of files) {
+    const idx = batchIdx;
+    await importImageFile(file, (obj) => importRasterImage(obj, idx), pushToast);
+    batchIdx += 1;
+  }
 }
 
 async function importMany(
