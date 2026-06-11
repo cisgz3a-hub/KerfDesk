@@ -7,7 +7,7 @@ import {
 } from '../trace/image-loader';
 import type { ToastVariant } from '../state/toast-store';
 import { readImageDensity } from '../common/image-density';
-import { rasterImportGeometry } from '../common/image-import';
+import { describeImportedImageSize, rasterImportGeometry } from '../common/image-import';
 
 export async function importImageFile(
   file: File,
@@ -39,7 +39,7 @@ export async function importImageFile(
       linesPerMm: 10,
       lumaBase64: extractLumaBase64(image),
     });
-    pushToast(`Added image: ${file.name} (${image.width}x${image.height} px)`, 'success');
+    pushToast(`Added image: ${file.name} (${describeImportedImageSize(natural, image)})`, 'success');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not load image: ${message}`, 'error');
