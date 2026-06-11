@@ -37,12 +37,24 @@ function u32le(n: number): number[] {
 // (RATIONAL at offset 38) and ResolutionUnit. unit 2 = inch, 3 = cm.
 function jpegWithExif(dpi: number, unit: number): Uint8Array {
   const tiff = [
-    0x49, 0x49, ...u16le(0x2a), ...u32le(8), // 'II', magic, IFD0 offset
+    0x49,
+    0x49,
+    ...u16le(0x2a),
+    ...u32le(8), // 'II', magic, IFD0 offset
     ...u16le(2), // entry count
-    ...u16le(0x011a), ...u16le(5), ...u32le(1), ...u32le(38), // XResolution -> rational @38
-    ...u16le(0x0128), ...u16le(3), ...u32le(1), ...u16le(unit), 0, 0, // ResolutionUnit inline
+    ...u16le(0x011a),
+    ...u16le(5),
+    ...u32le(1),
+    ...u32le(38), // XResolution -> rational @38
+    ...u16le(0x0128),
+    ...u16le(3),
+    ...u32le(1),
+    ...u16le(unit),
+    0,
+    0, // ResolutionUnit inline
     ...u32le(0), // next IFD
-    ...u32le(dpi), ...u32le(1), // rational num/den
+    ...u32le(dpi),
+    ...u32le(1), // rational num/den
   ];
   const body = [...ascii('Exif'), 0, 0, ...tiff];
   return new Uint8Array([0xff, 0xd8, 0xff, 0xe1, ...u16(body.length + 2), ...body]);

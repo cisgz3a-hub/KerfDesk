@@ -47,7 +47,11 @@ describe('applyFreshImport selection', () => {
     // omits additionalSelectedIds leaves a prior multi-selection's extras live —
     // Delete/duplicate would then act on the old ghost set (F-A3: the imported
     // object is the sole selection).
-    const result = applyFreshImport({ project: createProject(), undoStack: [] }, rasterImage('#808080'), 0);
+    const result = applyFreshImport(
+      { project: createProject(), undoStack: [] },
+      rasterImage('#808080'),
+      0,
+    );
     expect(result.selectedObjectId).toBe('r1');
     expect(result.additionalSelectedIds.size).toBe(0);
   });

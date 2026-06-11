@@ -43,7 +43,10 @@ export async function importImageFile(
       linesPerMm: 10,
       lumaBase64: extractLumaBase64(image),
     });
-    pushToast(`Added image: ${file.name} (${describeImportedImageSize(natural, image)})`, 'success');
+    pushToast(
+      `Added image: ${file.name} (${describeImportedImageSize(natural, image)})`,
+      'success',
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not load image: ${message}`, 'error');

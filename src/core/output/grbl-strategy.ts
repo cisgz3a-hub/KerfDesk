@@ -47,9 +47,7 @@ function postamble(laserAlreadyOff: boolean): string {
   // the last group was raster it already emitted its trailing M5, so skip the
   // redundant one; the park move still carries S0, so the laser-off invariant
   // holds either way.
-  const lines = laserAlreadyOff
-    ? ['G0 X0.000 Y0.000 S0']
-    : ['M5', 'G0 X0.000 Y0.000 S0'];
+  const lines = laserAlreadyOff ? ['G0 X0.000 Y0.000 S0'] : ['M5', 'G0 X0.000 Y0.000 S0'];
   return lines.join(LINE_END) + LINE_END;
 }
 

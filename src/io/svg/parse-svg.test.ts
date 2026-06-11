@@ -136,21 +136,27 @@ describe('parseSvg — transform stack (H4)', () => {
 
   it('applies skewX (was silently ignored)', () => {
     // skewX(45): x' = x + tan(45)·y. (0,10) → (10,10).
-    const p = lastPoint(vb('<line x1="0" y1="0" x2="0" y2="10" stroke="red" transform="skewX(45)"/>'));
+    const p = lastPoint(
+      vb('<line x1="0" y1="0" x2="0" y2="10" stroke="red" transform="skewX(45)"/>'),
+    );
     expect(p?.x).toBeCloseTo(10, 6);
     expect(p?.y).toBeCloseTo(10, 6);
   });
 
   it('applies skewY (was silently ignored)', () => {
     // skewY(45): y' = tan(45)·x + y. (10,0) → (10,10).
-    const p = lastPoint(vb('<line x1="0" y1="0" x2="10" y2="0" stroke="red" transform="skewY(45)"/>'));
+    const p = lastPoint(
+      vb('<line x1="0" y1="0" x2="10" y2="0" stroke="red" transform="skewY(45)"/>'),
+    );
     expect(p?.x).toBeCloseTo(10, 6);
     expect(p?.y).toBeCloseTo(10, 6);
   });
 
   it('applies rotate(deg, cx, cy) about a center', () => {
     // rotate 90° about (5,5): (10,5) → (5,10).
-    const p = lastPoint(vb('<line x1="5" y1="5" x2="10" y2="5" stroke="red" transform="rotate(90 5 5)"/>'));
+    const p = lastPoint(
+      vb('<line x1="5" y1="5" x2="10" y2="5" stroke="red" transform="rotate(90 5 5)"/>'),
+    );
     expect(p?.x).toBeCloseTo(5, 6);
     expect(p?.y).toBeCloseTo(10, 6);
   });
