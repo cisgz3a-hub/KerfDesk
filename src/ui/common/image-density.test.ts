@@ -35,6 +35,16 @@ describe('densityFromBytes', () => {
     expect(densityFromBytes(pngWithPhys(11811, 0))).toBeNull();
   });
 
+  it('rejects an absurdly low PNG pHYs density (1-19 px/m would round to 0 DPI)', () => {
+    // A crafted/corrupt pHYs of 10 px/m rounds to 0 DPI; returning 0 produced
+    // Infinity bounds + a NaN transform downstream that corrupted .lf2 saves.
+    expect(densityFromBytes(pngWithPhys(10, 1))).toBeNull();
+  });
+
+  it('rejects an absurdly high PNG pHYs density (out of the sane DPI range)', () => {
+    expect(densityFromBytes(pngWithPhys(40_000_000, 1))).toBeNull();
+  });
+
   it('reads JPEG JFIF units=1 density=300 as 300 DPI', () => {
     expect(densityFromBytes(jpegWithJfif(1, 300))).toBe(300);
   });
