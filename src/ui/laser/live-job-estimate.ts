@@ -167,4 +167,3 @@ function normalizeHatchAngle(deg: number): number {
   if (angle < 0) angle += 180;
   return angle;
 }
-

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createProject, IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../../core/scene';
+import {
+  createProject,
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+  type SceneObject,
+} from '../../core/scene';
 import { imageImportActions } from './import-actions';
 import type { MutationResult, StateSlice } from './scene-mutations';
 

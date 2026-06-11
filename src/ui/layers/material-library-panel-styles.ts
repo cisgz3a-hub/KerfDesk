@@ -46,4 +46,8 @@ export const splitRowStyle: CSSProperties = {
   gap: 6,
 };
 
-export const statusStyle: CSSProperties = { margin: 0, color: 'var(--lf-text-muted)', fontSize: 12 };
+export const statusStyle: CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+};

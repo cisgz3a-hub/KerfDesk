@@ -3,9 +3,9 @@ import { describeImportedImageSize, rasterImportGeometry } from './image-import'
 
 describe('describeImportedImageSize', () => {
   it('reports the natural size when the decode was not capped', () => {
-    expect(describeImportedImageSize({ width: 400, height: 300 }, { width: 400, height: 300 })).toBe(
-      '400x300 px',
-    );
+    expect(
+      describeImportedImageSize({ width: 400, height: 300 }, { width: 400, height: 300 }),
+    ).toBe('400x300 px');
   });
 
   it('reports natural size and appends the working resolution when capped', () => {
