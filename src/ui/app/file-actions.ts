@@ -27,6 +27,7 @@ import {
   describeReimportOutcome,
 } from './import-toasts';
 import { detectJobIntentWarnings } from '../laser/job-intent-warnings';
+import { confirmOversizeImport } from './import-size-guard';
 
 export async function handleImportSvg(
   platform: PlatformAdapter,
@@ -44,6 +45,9 @@ export async function handleImportSvg(
   for (const file of files) {
     try {
       const text = await file.text();
+      // F-A4 mirrors F-A3's oversize confirm. The platform FileHandle has no
+      // size, so gate on the loaded text length (chars ≈ bytes for SVG).
+      if (!confirmOversizeImport(file.name, text.length)) continue;
       const id = crypto.randomUUID();
       const result = parseSvg({ svgText: text, id, source: file.name });
       if (result.object !== null) {
