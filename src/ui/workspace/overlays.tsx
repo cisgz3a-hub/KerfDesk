@@ -12,7 +12,7 @@ import { computeView } from './view-transform';
 export function EmptyHint(): JSX.Element {
   return (
     <div style={emptyHintStyle} aria-hidden="true">
-      Drag an SVG here, or use File → Import
+      Drag an SVG or image here, or use File → Import
     </div>
   );
 }
