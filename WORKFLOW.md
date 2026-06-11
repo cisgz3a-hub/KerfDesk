@@ -739,8 +739,8 @@ correct M4-mode raster G-code from Compile.
 1. Operator drags a `.png` (or `.jpg`) onto the canvas, OR clicks
    "Add Image" in the Toolbar.
 2. App decodes the image, computes intrinsic mm-bounds from the
-   image's DPI metadata (defaulting to 96 DPI when none), inserts a
-   `RasterImage` SceneObject at the canvas centre.
+   image's DPI metadata (defaulting to LightBurn's 254 DPI when none —
+   ADR-048), inserts a `RasterImage` SceneObject at the canvas centre.
 3. The image renders on the workspace via Canvas2D `drawImage` —
    real bitmap, scaled into mm-bounds. (Distinct from the Phase E
    "trace this image" flow, which converts to vectors immediately.)

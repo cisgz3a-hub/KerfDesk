@@ -37,7 +37,8 @@ describe('rasterImportGeometry', () => {
   it('falls back to the default DPI for a non-positive or non-finite dpi (no Infinity/NaN bounds)', () => {
     // Defense in depth against a poison density (0 px/m, NaN, Infinity): the
     // bounds must stay finite so the import cannot NaN-poison saves/autosave.
-    const fallback = (4000 / 96) * 25.4;
+    // The default is 254 DPI (ADR-048).
+    const fallback = (4000 / 254) * 25.4;
     for (const dpi of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
       const geometry = rasterImportGeometry({
         naturalWidth: 4000,

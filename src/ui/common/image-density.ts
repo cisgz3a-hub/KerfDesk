@@ -1,5 +1,5 @@
 // image-density — read an image's embedded physical density (DPI) so an import
-// lands at its intended real-world size instead of a hardcoded 96 DPI (P2-A).
+// lands at its intended real-world size instead of the default DPI (P2-A).
 // Two common carriers:
 //   - PNG `pHYs` chunk: pixels-per-unit X/Y + a unit byte (1 = metre). DPI =
 //     pixelsPerMetre * 0.0254.
@@ -7,7 +7,8 @@
 //     density * 2.54.
 // densityFromBytes is a pure parser (unit-tested with inline fixtures);
 // readImageDensity is the thin File-reading wrapper. Returns null when no
-// supported metadata is present, so the caller falls back to the 96 DPI default.
+// supported metadata is present, so the caller falls back to the default DPI
+// (254, ADR-048).
 
 const MM_NONE = null;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
