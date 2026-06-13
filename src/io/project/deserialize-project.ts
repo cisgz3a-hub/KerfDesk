@@ -120,6 +120,14 @@ function normalizeProject(raw: Record<string, unknown>): Project {
       layers: layers.map(normalizeLayer),
     },
   };
+  // Cast justification: validateProjectShape (called in deserializeProject
+  // before normalize) has already deep-validated every field of device /
+  // workspace / optimization / scene / layers / objects — including the
+  // bounds-order invariant — and normalizeProject only back-fills additive
+  // defaults onto that validated shape. TypeScript can't carry the validator's
+  // runtime guarantees across the Record<string, unknown> boundary, so this is
+  // the single trusted point. Replacing it with typed builders is tracked as a
+  // Phase C improvement (audit CQ-006); the runtime is already validated.
   return normalized as unknown as Project;
 }
 
