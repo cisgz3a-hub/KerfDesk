@@ -153,12 +153,25 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
 
 function validateBounds(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
-  return firstError([
+  const fieldError = firstError([
     requireNumber(value, `${path}.minX`),
     requireNumber(value, `${path}.minY`),
     requireNumber(value, `${path}.maxX`),
     requireNumber(value, `${path}.maxY`),
   ]);
+  if (fieldError !== null) return fieldError;
+  // Cross-field invariant (CQ-006): bounds are normalized (min <= max) by
+  // construction, so an inverted bound is a corrupt/hand-edited .lf2. Reject it
+  // to the "Could not open" modal instead of loading a negative-extent object.
+  // `<=` keeps zero-extent bounds valid (a single point / axis-aligned line).
+  const { minX, minY, maxX, maxY } = value;
+  if (typeof minX === 'number' && typeof maxX === 'number' && minX > maxX) {
+    return `invalid \`${path}\`: minX must be <= maxX`;
+  }
+  if (typeof minY === 'number' && typeof maxY === 'number' && minY > maxY) {
+    return `invalid \`${path}\`: minY must be <= maxY`;
+  }
+  return null;
 }
 
 function validateTransform(value: unknown, path: string): string | null {
