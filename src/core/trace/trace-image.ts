@@ -264,7 +264,12 @@ export async function traceImageToSvgString(
 // Extracted from traceImageToSvgString so complexity stays under
 // the project cap (12). Pure function — same inputs, same output.
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
-  if (options.traceTransparency === true) {
+  // Trace Transparency keys the mask off the alpha channel (alphaToMonochrome).
+  // On an image with no transparent pixels that marks EVERY pixel as ink — a
+  // solid black trace. When there is no transparency to key off, fall through
+  // to the brightness/threshold path so an opaque image traces as it would with
+  // the toggle off, instead of producing a black page.
+  if (options.traceTransparency === true && imageHasTransparency(image)) {
     let prepared = alphaToMonochrome(image);
     if (shouldDespeckle(options)) {
       prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
@@ -406,6 +411,17 @@ function localMean(
     (integral[y1 * stride + x0] ?? 0) +
     (integral[y0 * stride + x0] ?? 0);
   return sum / Math.max(1, (x1 - x0) * (y1 - y0));
+}
+
+// True when at least one pixel is fully transparent — the only pixels
+// alphaToMonochrome turns into background. Without one, Trace Transparency would
+// mark the whole image as ink, so preprocessForTrace falls back to the
+// brightness path instead of emitting a solid-black trace.
+function imageHasTransparency(image: RawImageData): boolean {
+  for (let i = 3; i < image.data.length; i += 4) {
+    if (image.data[i] === 0) return true;
+  }
+  return false;
 }
 
 function alphaToMonochrome(image: RawImageData): RawImageData {
