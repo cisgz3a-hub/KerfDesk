@@ -47,6 +47,9 @@ const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
 const WHITE_LUMA_BYTE = 255;
 
+// Allowed module-level cache (narrow exception to "no module-level mutable") —
+// see ADR-050. Identity-keyed via WeakMap (GC-bounded), output-invariant, inner
+// map capped at MAX_LAYER_FILL_CACHE_ENTRIES, pinned by compile-job-fill-cache.test.ts.
 const layerFillCache = new WeakMap<
   ReadonlyArray<SceneObject>,
   Map<string, ReadonlyArray<Polyline>>
