@@ -84,6 +84,13 @@ describe('buildAppCommands', () => {
     );
   });
 
+  it('uses the LightBurn-compatible Save G-code shortcut', () => {
+    const commands = buildAppCommands(baseCtx());
+
+    expect(commandById(commands, 'file.save-gcode').shortcut).toBe('Alt+Shift+L');
+    expect(commands.map((command) => command.shortcut)).not.toContain('Ctrl+E');
+  });
+
   it('runs the New command through the shared dirty-project guard', async () => {
     const confirmDiscard = vi.fn(async () => true);
     const newProject = vi.fn();

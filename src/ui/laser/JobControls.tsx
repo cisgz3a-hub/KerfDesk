@@ -3,12 +3,11 @@
 
 import { progress } from '../../core/controllers/grbl';
 import {
-  computeJobBounds,
+  computeFrameBounds,
   describeFramePreflightFailure,
   framePreflight,
   offsetJobBounds,
 } from '../../core/job';
-import { prepareOutput } from '../../io/gcode';
 import { resolveJobPlacement } from '../job-placement';
 import { useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
@@ -174,7 +173,7 @@ function startJobTitle(estimate: LiveJobEstimate): string {
     return `Estimated burn time: ${estimate.label}`;
   }
   if (estimate.kind === 'too-large') {
-    return 'Large trace: live estimate paused for performance. Start still generates full G-code.';
+    return 'Large job: Start will block until you reduce the artwork size or lower the raster settings.';
   }
   return 'Enable Output on at least one layer to start a job';
 }
@@ -278,18 +277,11 @@ function useFrameAction(): () => void {
       pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
       return;
     }
-    const prepared = prepareOutput(
-      project,
+    const bounds = computeFrameBounds(
+      project.scene,
+      project.device,
       placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
     );
-    if (!prepared.ok) {
-      pushToast(
-        prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',
-        'error',
-      );
-      return;
-    }
-    const bounds = computeJobBounds(prepared.job);
     if (bounds === null) {
       pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
       return;

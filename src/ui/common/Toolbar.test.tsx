@@ -182,6 +182,8 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
       expect(title).toContain('Shift+F'); // fit-to-selection
       expect(title).toContain('Ctrl+Enter'); // start job (M22)
       expect(title).toContain('Ctrl+.'); // stop job (M22)
+      expect(title).toContain('Alt+Shift+L'); // save G-code (LightBurn-compatible)
+      expect(title).not.toContain('Ctrl+E export G-code'); // reserved for future ellipse tool
       expect(title.toLowerCase()).toContain('right-drag'); // pan
     } finally {
       if (root !== null) await act(async () => root?.unmount());
