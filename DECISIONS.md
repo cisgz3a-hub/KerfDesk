@@ -2616,6 +2616,75 @@ change the 2026-06-13 audit flagged as contradicting ADR-047's then-current
 
 ---
 
+## ADR-050 — Module-level memoization caches in core/job (narrow exception to "no module-level mutable")
+
+**Status:** Accepted. | **Date:** 2026-06-13
+
+> Numbered after ADR-049 (light chrome), which lands via a separate change.
+
+### Context
+
+CLAUDE.md bans module-level mutable variables, and `src/core/` must be pure. Two
+module-level `WeakMap` caches exist in the compile path:
+`src/core/job/compile-job.ts` (`layerFillCache`) and
+`src/core/job/fill-hatching-cache.ts` (`hatchCache`). The 2026-06-13 code-quality
+audit flagged these (finding CQ-005) as contradicting the policy. This ADR
+records why they are a **narrow, allowed exception** rather than a violation — so
+future maintainers and audits stop re-flagging them.
+
+### Decision
+
+Module-level caches are permitted in `src/core/job` **only** when they are
+*observationally-pure transparent memoization*, i.e. all of:
+
+- **Identity-keyed via `WeakMap`** on an input object — `ReadonlyArray<Polyline>`
+  / `ReadonlyArray<SceneObject>`. Entries are GC-bounded (they vanish when the
+  input is collected) and scoped to specific inputs; no unbounded growth, no
+  leakage across documents/sessions.
+- **Output-invariant.** The cache key includes *every* setting that affects the
+  result (`hatchAngleDeg`, `hatchSpacingMm`, `fillBidirectional`,
+  `fillCrossHatch`). A settings change can never return a stale geometry; the
+  function's output is identical whether or not the cache hits.
+- **Bounded inner map.** The per-input `Map` caps at 8 entries
+  (`MAX_SETTINGS_PER_POLYLINE_SET` / `MAX_LAYER_FILL_CACHE_ENTRIES`) with
+  oldest-entry eviction.
+- **Test-protected.** `src/core/job/compile-job-fill-cache.test.ts` pins the
+  hit / stale-bust / eviction behavior.
+- **Justified by the hot path.** Fill hatching recompute is expensive and the
+  compile path runs on every preview / estimate / save / start (ADR-040), so
+  memoization keeps interactive recompiles responsive.
+
+This is **not** a general license for module state. It does **not** permit caches
+that change output, time- or seed-dependent state, unbounded maps, or state keyed
+by anything other than input identity. Any other module-level mutable still
+violates the rule and needs its own ADR. Each cache declaration carries a comment
+pointing here.
+
+### Consequences
+
+- The two caches stay in place; no refactor to a caller-threaded cache.
+- Auditors who see the `WeakMap` find this ADR (and the in-file comment) instead
+  of re-opening CQ-005.
+- A future cache here that changes output or grows unbounded falls **outside**
+  this exception and is a real violation.
+
+### Alternatives rejected
+
+- **Thread an explicit `CompileJobCache` through `compileJob` /
+  `memoizedFillHatching` callers:** rejected — pushes a cache parameter through
+  the UI / preview / estimate call chain for zero behavioral change; the WeakMap
+  identity-keying already gives correct invalidation and GC bounding.
+- **Remove the caches:** rejected — measurable recompute cost on a path ADR-040
+  runs on every preview and estimate.
+
+### Verification
+
+- `src/core/job/compile-job-fill-cache.test.ts` passes (a cache hit returns
+  identical geometry; a settings change busts the key; eviction bounds the inner
+  map). Full suite green.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
