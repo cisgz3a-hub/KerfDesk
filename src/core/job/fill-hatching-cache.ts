@@ -3,6 +3,10 @@ import { fillHatching } from './fill-hatching';
 
 const MAX_SETTINGS_PER_POLYLINE_SET = 8;
 
+// Allowed module-level cache (narrow exception to "no module-level mutable") —
+// see ADR-050. Identity-keyed via WeakMap (GC-bounded), output-invariant (the
+// key below holds every setting that affects geometry), inner map capped at
+// MAX_SETTINGS_PER_POLYLINE_SET, behavior pinned by compile-job-fill-cache.test.ts.
 const hatchCache = new WeakMap<ReadonlyArray<Polyline>, Map<string, ReadonlyArray<Polyline>>>();
 
 export function memoizedFillHatching(
