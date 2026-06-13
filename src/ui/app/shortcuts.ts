@@ -2,7 +2,7 @@
 // handler and bindings table so individual functions stay small per ADR-015.
 //
 // Categories:
-//   * File: Cmd/Ctrl+N, O, S, I, E
+//   * File: Cmd/Ctrl+N, O, S, I; Alt+Shift+L for Save G-code
 //   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
 //   * Transform: arrow keys (nudge), H/V (flip)
 //   * View: P (preview toggle)
@@ -92,7 +92,7 @@ function isEditableTarget(e: KeyboardEvent): boolean {
   return false;
 }
 
-const FILE_KEYS: ReadonlyArray<string> = ['n', 'o', 's', 'i', 'e'];
+const FILE_KEYS: ReadonlyArray<string> = ['n', 'o', 's', 'i'];
 const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
   n: (c) => {
     void c.confirmDiscard('start a new project').then((ok) => {
@@ -120,19 +120,14 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
       pushToast: c.pushToast,
     }),
   i: (c) => void handleImportSvg(c.platform, c.importSvgObject, c.pushToast),
-  e: (c) =>
-    void handleSaveGcode({
-      platform: c.platform,
-      project: c.project,
-      savedName: c.savedName,
-      jobPlacement: c.jobPlacement,
-      machine: c.machine,
-      controllerSettings: c.controllerSettings,
-      pushToast: c.pushToast,
-    }),
 };
 
 export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
+  if (!hasMeta(e) && e.altKey && e.shiftKey && e.key.toLowerCase() === 'l') {
+    e.preventDefault();
+    runSaveGcode(ctx);
+    return true;
+  }
   if (!hasMeta(e)) return false;
   // Ctrl+Shift+S = Save As (F-A15); always opens the dialog.
   if (e.shiftKey && e.key.toLowerCase() === 's') {
@@ -156,6 +151,18 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
   e.preventDefault();
   FILE_DISPATCH[key]?.(ctx);
   return true;
+}
+
+function runSaveGcode(c: FileCtx): void {
+  void handleSaveGcode({
+    platform: c.platform,
+    project: c.project,
+    savedName: c.savedName,
+    jobPlacement: c.jobPlacement,
+    machine: c.machine,
+    controllerSettings: c.controllerSettings,
+    pushToast: c.pushToast,
+  });
 }
 
 type EditBinding = {

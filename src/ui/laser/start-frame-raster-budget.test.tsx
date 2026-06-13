@@ -117,7 +117,7 @@ describe('custom-origin raster budget guard', () => {
     }
   });
 
-  it('blocks Frame before compileJob can touch an over-budget raster', async () => {
+  it('frames an over-budget raster by physical bounds before compileJob can touch it', async () => {
     useStore.setState({
       project: overBudgetRasterProject(),
       jobPlacement: userOriginPlacement,
@@ -147,10 +147,8 @@ describe('custom-origin raster budget guard', () => {
         frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(frame).not.toHaveBeenCalled();
-      expect(useToastStore.getState().toasts.at(-1)?.message).toContain(
-        'image would engrave at 7500x7500 px',
-      );
+      expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 0, maxX: 300, maxY: 300 }, 6000);
+      expect(useToastStore.getState().toasts).toEqual([]);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
