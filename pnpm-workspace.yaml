@@ -22,10 +22,20 @@ minimumReleaseAgeExclude:
   - tmp@0.2.6
   - miniflare@4.20260526.0
   - wrangler@4.95.0
+  - esbuild@0.28.1
 # Force newer transitive `tmp` to clear CVE GHSA-ph9p-34f9-6g65 (path
 # traversal). The vulnerable copy is pulled in by
 # @malept/flatpak-bundler (Linux Flatpak builder), which is dead code
 # for our Windows NSIS target — but the override is the clean way to
 # get a green audit anyway. Safe: tmp@0.2.x patches are ABI-stable.
+#
+# Force transitive `esbuild` >=0.28.1 to clear GHSA-gv7w-rqvm-qjhr (high,
+# Deno-installer binary-integrity RCE) and GHSA-g7r4-m6w7-qqqr (low, Windows
+# dev-server file read). Both are dev-tooling-only (the production web bundle
+# is clean) and neither attack path is reachable here — we do not run
+# esbuild's Deno installer or its `serve`; vite only uses esbuild for
+# transform/bundle. vite 6.x pins ~0.25 and wrangler pins 0.27.3 exactly, so
+# neither parent moves on its own.
 overrides:
   tmp@<0.2.6: ^0.2.6
+  esbuild@<0.28.1: ^0.28.1

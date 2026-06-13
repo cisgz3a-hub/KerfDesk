@@ -57,6 +57,9 @@ jobs:
       - name: License audit (ADR-008 / ADR-017)
         run: pnpm license-check
 
+      - name: Dependency vulnerability audit
+        run: pnpm audit:deps
+
       - name: Vitest (unit + property + snapshot)
         run: pnpm test
 
