@@ -2410,7 +2410,10 @@ bounds scale together:
 
 ## ADR-047 - Design tokens + shared chrome classes (dark chrome, light bed)
 
-**Status:** Accepted. | **Date:** 2026-06-10
+**Status:** Superseded by ADR-049 (chrome is now light; the token/class
+architecture, kit primitives, and styling policy below remain in force — only
+the dark color values and the `[data-theme='light']` future-theme mechanism are
+replaced). | **Date:** 2026-06-10
 
 ### Context
 
@@ -2533,6 +2536,83 @@ that is a separate LightBurn convention for vector user units and is unaffected.
   DPI; the explicit-DPI test is unchanged (it passes its own dpi). The
   `importImageFile` decode path stays jsdom-untestable and rests on the live
   pass / a LightBurn side-by-side, which is **not yet done**.
+
+---
+
+## ADR-049 — Unified light chrome (supersedes ADR-047's dark-chrome decision)
+
+**Status:** Accepted. | **Date:** 2026-06-13
+
+### Context
+
+ADR-047 built the design-token system with a **unified dark chrome** over a
+deliberately **light canvas bed** (WYSIWYG against white material), and
+anticipated a future light theme as a `[data-theme='light']` block re-declaring
+the custom properties. ADR-047 itself named "inconsistent chrome (dark menubar/
+toolbar over light panels)" as part of the original problem. The maintainer has
+since decided the app should have a **single light chrome** — unifying the
+chrome with the always-light bed into one consistent surface, rather than dark
+chrome contrasting a light bed.
+
+This decision records a switch the code already implements (the working-tree
+change the 2026-06-13 audit flagged as contradicting ADR-047's then-current
+"Accepted" dark-chrome text — finding CQ-004).
+
+### Decision
+
+- **`src/ui/theme/tokens.css`** — the `--lf-*` custom properties at `:root` are
+  redefined to a **light palette**: surfaces `#f8fafc / #ffffff / #f1f5f9`,
+  inputs `#ffffff`, borders `#d0d7de / #9aa4af`; text `#111827 / #4b5563 /
+  #6b7280`; light semantic text-on-surface (`--lf-*-fg`), light tints
+  (`--lf-tint-*`), light `--lf-focus`, `--lf-backdrop`, `--lf-shadow`. The base
+  semantic **fills** (`--lf-accent` `#1976d2`, `--lf-danger`, `--lf-success`,
+  `--lf-warning`, `--lf-trace`) are **unchanged**.
+- The light values live directly at `:root`; the dark values are **removed**,
+  not kept behind a toggle. This **replaces ADR-047's `[data-theme='light']`
+  mechanism** — there is one chrome, not a dark+light pair, so a second theme
+  block would be dead complexity. The six per-surface `color-scheme: dark`
+  declarations (`.lf-input`, `.lf-checkbox`, `.lf-dialog*`, `.lf-menu`,
+  `.lf-chip`) become `light`; the three hardcoded dark hexes in `.lf-btn:hover`,
+  `.lf-btn--primary:active`, and `.lf-chip` background move to light equivalents.
+- **`index.html`** — `color-scheme` narrows from `light dark` to `light`.
+- **`public/404.html`** — the static error page flips to the light palette
+  (`#f8fafc` bg, `#111827` text, `#1976d2` link) to match.
+- **Unchanged from ADR-047:** the token architecture and shared `.lf-*` classes,
+  the `src/ui/kit/` primitives, the static-vs-dynamic styling policy, the
+  `no-restricted-syntax` color-literal ban, and `src/ui/theme/canvas-theme.ts`
+  (the canvas bed was already light; the two shared values `--lf-accent` ↔
+  selection and `--lf-danger` ↔ out-of-bounds are unchanged, so
+  `theme-sync.test.ts` is unaffected).
+
+### Consequences
+
+- One consistent light surface across chrome and canvas bed; WYSIWYG against
+  white material is preserved and the chrome no longer contrasts the bed.
+- Native form controls render light (`color-scheme: light` per surface), and the
+  `color-scheme: light` meta means an OS dark-mode preference no longer flips the
+  chrome — deliberate, since there is no dark theme to flip to.
+- No component code changes — only token/values plus the two static HTML files.
+- ADR-047's dark-specific guidance (dark-scoped `color-scheme`, dark tints) is
+  superseded; future theme work re-declares the `:root` tokens here, centrally.
+
+### Alternatives rejected
+
+- **Keep dark chrome (ADR-047 as-is):** rejected — the maintainer chose a light
+  UI; leaving the ADR "Accepted" while the code shipped light is the CQ-004
+  docs-as-spec contradiction this ADR resolves.
+- **Implement light as a `[data-theme='light']` block alongside dark** (ADR-047's
+  anticipated mechanism): rejected — a single chrome makes a second theme block
+  dead complexity; the light values live at `:root`.
+
+### Verification
+
+- `src/ui/theme/theme-sync.test.ts` still pins the canvas-shared values
+  (unchanged) and passes; the full suite stays green (197 files / 1411 tests);
+  `prettier --check` clean; `pnpm build:web` lands the stylesheet.
+- Visual output is jsdom-invisible (per ADR-047) — the rendered light chrome
+  rests on a maintainer eyeball pass on `pnpm dev:web`. The token values here are
+  the maintainer's authored change; this ADR records the decision, it does not
+  re-design it.
 
 ---
 

@@ -9,11 +9,11 @@
  * tokens; DYNAMIC styling (drag readout position, layer color swatches,
  * progress width, preview opacity) stays inline by policy.
  *
- * Theme: unified dark chrome. The canvas viewport keeps its light bed —
+ * Theme: unified light chrome. The canvas viewport keeps its light bed —
  * its palette lives in canvas-theme.ts; the two shared values
  * (--lf-accent ↔ selection, --lf-danger ↔ out-of-bounds) are pinned by
- * theme-sync.test.ts. A future light theme adds a [data-theme='light']
- * block re-declaring the custom properties; no component changes.
+ * theme-sync.test.ts. Keep component code on tokens so theme changes stay
+ * centralized here.
  *
  * Performance: flat colors only — no blur, no box-shadow on surfaces that
  * re-render at the 250 ms status poll; transitions are limited to
@@ -21,22 +21,22 @@
  */
 
 :root {
-  /* Surfaces (dark, anchored on the pre-existing #1f2933 menubar) */
-  --lf-bg-0: #1f2933; /* bars: menubar, toolbar, statusbar */
-  --lf-bg-1: #27313c; /* rails + dialog panels */
-  --lf-bg-2: #323f4b; /* cards, dropdown menus, hover wells */
-  --lf-bg-input: #1a222b; /* inputs, log scrollback */
-  --lf-border: #3e4c59;
-  --lf-border-strong: #52606d;
+  /* Surfaces */
+  --lf-bg-0: #f8fafc; /* bars: menubar, toolbar, statusbar */
+  --lf-bg-1: #ffffff; /* rails + dialog panels */
+  --lf-bg-2: #f1f5f9; /* cards, dropdown menus, hover wells */
+  --lf-bg-input: #ffffff; /* inputs, log scrollback */
+  --lf-border: #d0d7de;
+  --lf-border-strong: #9aa4af;
 
   /* Text */
-  --lf-text: #e4e7eb;
-  --lf-text-muted: #9aa5b1;
-  --lf-text-faint: #8c98a5;
+  --lf-text: #111827;
+  --lf-text-muted: #4b5563;
+  --lf-text-faint: #6b7280;
 
   /* Semantic fills (white text on these passes AA) */
   --lf-accent: #1976d2;
-  --lf-accent-hover: #2585e4;
+  --lf-accent-hover: #1565c0;
   --lf-danger: #c62828;
   --lf-danger-hover: #d73b3b;
   --lf-success: #2e7d32;
@@ -44,24 +44,24 @@
   /* Text/icons sitting ON one of the semantic fills above */
   --lf-on-fill: #ffffff;
 
-  /* Semantic TEXT on dark surfaces (the fills above fail as text on dark) */
-  --lf-accent-fg: #64b5f6;
-  --lf-danger-fg: #ef9a9a;
-  --lf-success-fg: #81c784;
-  --lf-warning-fg: #ffb74d;
-  --lf-trace-fg: #ce93d8;
+  /* Semantic text on light surfaces */
+  --lf-accent-fg: #0d47a1;
+  --lf-danger-fg: #9f1d1d;
+  --lf-success-fg: #1b5e20;
+  --lf-warning-fg: #7a3f00;
+  --lf-trace-fg: #6a1b9a;
 
-  /* Dark tinted panel backgrounds behind semantic banners/wells */
-  --lf-tint-danger: #3a2326;
-  --lf-tint-warning: #3a2f1f;
-  --lf-tint-info: #20303f;
+  /* Tinted panel backgrounds behind semantic banners/wells */
+  --lf-tint-danger: #fff1f1;
+  --lf-tint-warning: #fff7e6;
+  --lf-tint-info: #eef6ff;
   /* Faint accent wash (drag-import overlay fill) */
   --lf-accent-wash: rgba(25, 118, 210, 0.08);
 
-  --lf-focus: #64b5f6;
-  --lf-backdrop: rgba(0, 0, 0, 0.55);
+  --lf-focus: #1976d2;
+  --lf-backdrop: rgba(17, 24, 39, 0.35);
   /* Floating-surface shadow (toasts; modal panels use --lf-backdrop) */
-  --lf-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --lf-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
 
   /* Type scale */
   --lf-font: system-ui, sans-serif;
@@ -111,7 +111,7 @@
     border-color 80ms;
 }
 .lf-btn:hover:not(:disabled) {
-  background: #3b4a58;
+  background: #e5eaf0;
   border-color: var(--lf-border-strong);
 }
 .lf-btn:active:not(:disabled) {
@@ -134,7 +134,7 @@
   border-color: var(--lf-accent-hover);
 }
 .lf-btn--primary:active:not(:disabled) {
-  background: #1565c0;
+  background: #0d47a1;
 }
 
 .lf-btn--danger {
@@ -195,7 +195,7 @@
   border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius-sm);
   padding: 2px 6px;
-  color-scheme: dark;
+  color-scheme: light;
 }
 .lf-input:hover:not(:disabled),
 .lf-select:hover:not(:disabled) {
@@ -212,7 +212,7 @@
 }
 
 .lf-checkbox {
-  color-scheme: dark;
+  color-scheme: light;
   accent-color: var(--lf-accent);
 }
 
@@ -278,7 +278,7 @@
   font-size: var(--lf-text-md);
   max-height: 90vh;
   overflow-y: auto;
-  color-scheme: dark;
+  color-scheme: light;
 }
 .lf-dialog--sm {
   min-width: 320px;
@@ -320,7 +320,7 @@
   font-size: var(--lf-text-md);
   overflow-y: auto;
   overflow-x: hidden;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 .lf-card {
@@ -382,7 +382,7 @@
   border-radius: var(--lf-radius-md);
   padding: var(--lf-space-2);
   z-index: var(--lf-z-menu);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 .lf-menu-item {
@@ -412,14 +412,14 @@
 /* ---------- Workspace overlay chips ---------- */
 
 .lf-chip {
-  background: rgba(31, 41, 51, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   color: var(--lf-text);
   border: 1px solid var(--lf-border-strong);
   border-radius: var(--lf-radius-md);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
-/* ---------- Scrollbars (dark surfaces) ---------- */
+/* ---------- Scrollbars (light surfaces) ---------- */
 
 .lf-rail,
 .lf-dialog,
