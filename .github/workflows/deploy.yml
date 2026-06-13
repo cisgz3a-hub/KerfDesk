@@ -87,6 +87,9 @@ jobs:
       - name: License audit
         run: pnpm license-check
 
+      - name: Dependency vulnerability audit
+        run: pnpm audit:deps
+
       - name: Vitest
         run: pnpm test
 
