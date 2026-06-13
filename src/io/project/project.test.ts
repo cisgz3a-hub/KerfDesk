@@ -205,6 +205,37 @@ describe('deserializeProject', () => {
     }
   });
 
+  it('reports invalid when a raster object has absurd source pixel dimensions (DoS guard)', () => {
+    // A hand-edited .lf2 with pixelWidth*pixelHeight in the billions makes
+    // compile-job allocate a multi-GB luma buffer (whiteLuma / decodeBase64Luma)
+    // before the target-grid raster budget ever runs. Reject it at deserialize.
+    const base = createProject();
+    const raster = {
+      kind: 'raster-image',
+      id: 'R1',
+      source: 'big.png',
+      dataUrl: 'data:image/png;base64,',
+      pixelWidth: 100000,
+      pixelHeight: 100000,
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      color: '#808080',
+      dither: 'floyd-steinberg',
+      linesPerMm: 10,
+    } as unknown as SceneObject;
+
+    const text = serializeProject({
+      ...base,
+      scene: { ...base.scene, objects: [raster] },
+    });
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/pixel/i);
+    }
+  });
+
   it('reports schema-too-new for a future version', () => {
     const text = JSON.stringify({ schemaVersion: PROJECT_SCHEMA_VERSION + 1 });
     const result = deserializeProject(text);

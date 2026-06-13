@@ -1,5 +1,14 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
 
+// Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
+// deserialize. Distinct from the TARGET burn-grid budget (core/raster
+// MAX_RASTER_PIXELS): compile-job allocates the source luma buffer as
+// pixelWidth*pixelHeight (decodeBase64Luma / whiteLuma) BEFORE that budget runs,
+// so a hand-edited .lf2 with absurd dims (e.g. 2^30 x 1) could allocate
+// gigabytes here first. 256M px is far above any real import (2048-edge cap) or
+// Convert-to-Bitmap source, but fatal to the integer bomb (security audit 2026-06-14).
+const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
+
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
   const device = raw['device'];
   if (!isObject(device)) return 'missing or invalid `device`';
@@ -131,7 +140,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
 }
 
 function validateRasterObject(obj: Record<string, unknown>, path: string): string | null {
-  return firstError([
+  const fieldError = firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
     requireString(obj, `${path}.dataUrl`),
@@ -149,6 +158,20 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     optionalString(obj, `${path}.lumaBase64`),
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
   ]);
+  if (fieldError !== null) return fieldError;
+  // Cross-field DoS guard: bound the source luma allocation (see
+  // MAX_RASTER_SOURCE_PIXELS). pixelWidth/pixelHeight are validated positive
+  // integers above, so the typeof guards only satisfy the type checker.
+  const pixelWidth = obj['pixelWidth'];
+  const pixelHeight = obj['pixelHeight'];
+  if (
+    typeof pixelWidth === 'number' &&
+    typeof pixelHeight === 'number' &&
+    pixelWidth * pixelHeight > MAX_RASTER_SOURCE_PIXELS
+  ) {
+    return `invalid \`${path}\`: pixelWidth*pixelHeight exceeds ${MAX_RASTER_SOURCE_PIXELS}`;
+  }
+  return null;
 }
 
 function validateBounds(value: unknown, path: string): string | null {
