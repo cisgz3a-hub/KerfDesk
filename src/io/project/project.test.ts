@@ -179,6 +179,32 @@ describe('deserializeProject', () => {
     }
   });
 
+  it('reports invalid when an object has inverted bounds (minX > maxX) (CQ-006)', () => {
+    // A hand-edited or corrupt .lf2 with min > max would currently load and
+    // produce a negative-extent object. Bounds are normalized (min <= max) by
+    // construction, so an inverted bound is corruption — reject it.
+    const project = aProject();
+    const text = serializeProject({
+      ...project,
+      scene: {
+        ...project.scene,
+        objects: [
+          {
+            ...project.scene.objects[0],
+            bounds: { minX: 10, minY: 0, maxX: 0, maxY: 10 },
+          } as unknown as SceneObject,
+        ],
+      },
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.objects\[0\]\.bounds/);
+    }
+  });
+
   it('reports schema-too-new for a future version', () => {
     const text = JSON.stringify({ schemaVersion: PROJECT_SCHEMA_VERSION + 1 });
     const result = deserializeProject(text);
