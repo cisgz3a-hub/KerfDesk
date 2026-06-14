@@ -29,6 +29,13 @@ export type TextDialogState =
       readonly color: string;
     };
 
+// Phase G (ADR-051) drawing tool-mode. 'select' is the default (select +
+// transform); a draw mode arms the Workspace to create that shape on the next
+// canvas drag. Ephemeral like zoom — never persisted; Esc returns to select.
+export type ToolMode =
+  | { readonly kind: 'select' }
+  | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' };
+
 export type UiState = {
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
@@ -76,6 +83,10 @@ export type UiState = {
   readonly imageDialog: RasterImage | null;
   readonly openImageDialog: (source: RasterImage) => void;
   readonly closeImageDialog: () => void;
+  // Phase G drawing tool-mode (ADR-051).
+  readonly toolMode: ToolMode;
+  readonly setToolMode: (next: ToolMode) => void;
+  readonly resetToolMode: () => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -107,6 +118,9 @@ export const useUiStore = create<UiState>((set) => ({
   imageDialog: null,
   openImageDialog: (source) => set({ imageDialog: source }),
   closeImageDialog: () => set({ imageDialog: null }),
+  toolMode: { kind: 'select' },
+  setToolMode: (next) => set({ toolMode: next }),
+  resetToolMode: () => set({ toolMode: { kind: 'select' } }),
 }));
 
 export function isModalOpen(

@@ -22,7 +22,11 @@ export type IconName =
   | 'pause'
   | 'stop'
   | 'home'
-  | 'trash';
+  | 'trash'
+  | 'cursor'
+  | 'square'
+  | 'circle'
+  | 'pentagon';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   'arrow-up': <path d="M8 13V3M4 7l4-4 4 4" />,
@@ -56,6 +60,10 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   stop: <rect x="4" y="4" width="8" height="8" rx="1" />,
   home: <path d="M2.5 8 8 2.5 13.5 8M4.5 7v6.5h7V7" />,
   trash: <path d="M2.5 4.5h11M6.5 4.5v-2h3v2M4 4.5l.7 9h6.6l.7-9M6.5 7v4M9.5 7v4" />,
+  cursor: <path d="M4 3l8 4.5-3.3 1L11 13l-1.7.8-2.3-4.5L4 11.5V3Z" />,
+  square: <rect x="3" y="3" width="10" height="10" rx="1" />,
+  circle: <circle cx="8" cy="8" r="5.5" />,
+  pentagon: <path d="M8 2.5l5.2 3.8-2 6.2H4.8l-2-6.2L8 2.5Z" />,
 };
 
 export function Icon({ name, size = 16 }: { readonly name: IconName; readonly size?: number }) {

@@ -207,7 +207,12 @@ function drawObjectPolylines(
   // ColoredPath[] shape — single drawing path. Each variant
   // populates `paths` upstream (parseSvg for SVG, textToPolylines
   // for text, traceImageToSvgString→parseSvg for traced image).
-  if (obj.kind !== 'imported-svg' && obj.kind !== 'text' && obj.kind !== 'traced-image') {
+  if (
+    obj.kind !== 'imported-svg' &&
+    obj.kind !== 'text' &&
+    obj.kind !== 'traced-image' &&
+    obj.kind !== 'shape'
+  ) {
     return false;
   }
   let simplified = false;

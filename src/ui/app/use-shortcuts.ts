@@ -40,6 +40,7 @@ function useFileEditShortcuts(): void {
   const selectObject = useStore((s) => s.selectObject);
   const selectAllObjects = useStore((s) => s.selectAllObjects);
   const duplicateSelection = useStore((s) => s.duplicateSelection);
+  const resetToolMode = useUiStore((s) => s.resetToolMode);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const savedName = useStore((s) => s.savedName);
@@ -62,7 +63,7 @@ function useFileEditShortcuts(): void {
       // prettier-ignore
       const fileCtx = { platform, project, jobPlacement, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
-      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, selectObject, selectAllObjects, duplicateSelection };
+      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, selectObject, selectAllObjects, duplicateSelection, resetToolMode };
       if (handleFileShortcut(e, fileCtx)) return;
       handleEditShortcut(e, editCtx);
     };
@@ -92,6 +93,7 @@ function useFileEditShortcuts(): void {
     selectObject,
     selectAllObjects,
     duplicateSelection,
+    resetToolMode,
   ]);
 }
 
