@@ -202,9 +202,20 @@ export type RectangleShape = {
   readonly cornerRadiusMm: number;
 };
 
-// The parametric block. Widens to | EllipseShape | PolygonShape | PolylineShape
-// in later Phase G increments.
-export type ShapeSpec = RectangleShape;
+export type EllipseShape = {
+  readonly kind: 'ellipse';
+  readonly widthMm: number;
+  readonly heightMm: number;
+};
+
+export type PolygonShape = {
+  readonly kind: 'polygon';
+  readonly sides: number; // circumscribed regular polygon, 3..64
+  readonly radiusMm: number; // circumradius
+};
+
+// The parametric block. Polyline (pen) follows in a later Phase G increment.
+export type ShapeSpec = RectangleShape | EllipseShape | PolygonShape;
 
 export type ShapeObject = ObjectPowerScale & {
   readonly kind: 'shape';

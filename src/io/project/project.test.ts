@@ -9,7 +9,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { createRectangle } from '../../core/shapes';
+import { createEllipse, createPolygon, createRectangle } from '../../core/shapes';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 
@@ -70,6 +70,36 @@ describe('deserializeProject', () => {
       color: '#ff0000',
       spec: { widthMm: 30, heightMm: 20, cornerRadiusMm: 5 },
     });
+    const base = createProject();
+    const original: Project = { ...base, scene: addObject(base.scene, shape) };
+
+    const result = deserializeProject(serializeProject(original));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project).toEqual(original);
+    }
+  });
+
+  it('roundtrips an ellipse shape (Phase G, B3)', () => {
+    const shape = createEllipse({
+      id: 'E1',
+      color: '#00ff00',
+      spec: { widthMm: 40, heightMm: 25 },
+    });
+    const base = createProject();
+    const original: Project = { ...base, scene: addObject(base.scene, shape) };
+
+    const result = deserializeProject(serializeProject(original));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project).toEqual(original);
+    }
+  });
+
+  it('roundtrips a polygon shape (Phase G, B3)', () => {
+    const shape = createPolygon({ id: 'P1', color: '#0000ff', spec: { sides: 5, radiusMm: 12 } });
     const base = createProject();
     const original: Project = { ...base, scene: addObject(base.scene, shape) };
 
