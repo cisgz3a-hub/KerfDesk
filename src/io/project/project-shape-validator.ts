@@ -188,6 +188,14 @@ function validateShapeSpec(value: unknown, path: string): string | null {
       requirePositiveNumber(value, `${path}.radiusMm`),
     ]);
   }
+  if (kind === 'polyline') {
+    // Empty points are accepted (they round-trip to a no-op render), matching
+    // how validatePolyline tolerates empty ColoredPath polylines.
+    return firstError([
+      validatePoints(value['points'], `${path}.points`),
+      requireBoolean(value, `${path}.closed`),
+    ]);
+  }
   return `missing or invalid \`${path}.kind\``;
 }
 

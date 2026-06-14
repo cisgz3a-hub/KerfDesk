@@ -12,5 +12,8 @@ export { createEllipse } from './create-ellipse';
 export { polygonToPolylines } from './polygon';
 export type { PolygonSpec } from './polygon';
 export { createPolygon } from './create-polygon';
+export { polylineToPolylines } from './polyline';
+export type { PolylineSpec } from './polyline';
+export { createPolyline } from './create-polyline';
 export { shapeFromDrag, isDrawDragSignificant, MIN_DRAW_SIZE_MM } from './shape-from-drag';
 export type { DrawShapeKind } from './shape-from-drag';

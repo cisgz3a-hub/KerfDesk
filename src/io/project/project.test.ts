@@ -9,7 +9,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { createEllipse, createPolygon, createRectangle } from '../../core/shapes';
+import { createEllipse, createPolygon, createPolyline, createRectangle } from '../../core/shapes';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 
@@ -100,6 +100,32 @@ describe('deserializeProject', () => {
 
   it('roundtrips a polygon shape (Phase G, B3)', () => {
     const shape = createPolygon({ id: 'P1', color: '#0000ff', spec: { sides: 5, radiusMm: 12 } });
+    const base = createProject();
+    const original: Project = { ...base, scene: addObject(base.scene, shape) };
+
+    const result = deserializeProject(serializeProject(original));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project).toEqual(original);
+    }
+  });
+
+  it('roundtrips a closed polyline shape (Phase G, B6)', () => {
+    // `closed` must survive — Fill mode only hatches closed paths, so a lost
+    // flag would silently turn a filled polygon into an outline on reload.
+    const shape = createPolyline({
+      id: 'PL1',
+      color: '#0000ff',
+      spec: {
+        points: [
+          { x: 0, y: 0 },
+          { x: 20, y: 0 },
+          { x: 10, y: 15 },
+        ],
+        closed: true,
+      },
+    });
     const base = createProject();
     const original: Project = { ...base, scene: addObject(base.scene, shape) };
 
