@@ -35,7 +35,14 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'Import PNG/JPG image',
       ctx.importImage,
     ),
-    enabled('file.save-gcode', 'file', 'Save G-code...', 'Export G-code', ctx.saveGcode, 'Ctrl+E'),
+    enabled(
+      'file.save-gcode',
+      'file',
+      'Save G-code...',
+      'Export G-code',
+      ctx.saveGcode,
+      'Ctrl+Shift+E',
+    ),
   ];
 }
 
