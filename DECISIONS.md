@@ -2745,6 +2745,17 @@ ADR + an ADR-017 polygon-clipping library evaluation).
   are deferred (P2 — they need the variant first). Text-on-path, node editing, and
   the geometry kernel remain out of scope.
 
+### B7 as-built (2026-06-14)
+
+The staging line above proposed *Ellipse-only* on `Ctrl+E` with Save G-code moving
+to `Alt+Shift+L`. As shipped (maintainer-approved), B7 instead binds LightBurn's
+**full tool set** — `Ctrl+R` rectangle, `Ctrl+E` ellipse, `Ctrl+L` pen — and moves
+export G-code to **`Ctrl+Shift+E`**, not `Alt+Shift+L`. Reason: a LightBurn-binding
+check found `Alt+Shift+L` is *not* a LightBurn shortcut and collides conceptually
+with LightBurn's `L` = Line tool; `Ctrl+Shift+E` keeps the export mnemonic without
+colliding with the tool keys. `Ctrl+R` / `Ctrl+L` deliberately override the browser
+reload / address-bar defaults in the web build (acceptable on a CAD surface).
+
 ### Alternatives rejected
 
 - **A generic node-edited "path" object:** rejected — needs a node editor (out of
