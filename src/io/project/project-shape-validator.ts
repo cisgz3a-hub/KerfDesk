@@ -9,6 +9,16 @@ import { DITHER_ALGORITHMS } from '../../core/scene';
 // Convert-to-Bitmap source, but fatal to the integer bomb (security audit 2026-06-14).
 const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
 
+// Ceiling on any stored coordinate magnitude (mm). A coordinate >= 1e21 passes
+// Number.isFinite but renders in exponential notation when emitted (toFixed),
+// which the G-code bounds-check regex can't read — defeating the bounds
+// invariant. Any real bed is < 2 m; 1e6 mm (1 km) is absurdly generous yet far
+// below the exponential threshold (security audit 2026-06-14).
+const MAX_COORDINATE_MAGNITUDE_MM = 1_000_000;
+// Ceiling on a transform scale factor, so scale * coordinate can't blow past the
+// coordinate ceiling either.
+const MAX_TRANSFORM_SCALE = 100_000;
+
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
   const device = raw['device'];
   if (!isObject(device)) return 'missing or invalid `device`';
@@ -177,10 +187,10 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
 function validateBounds(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   const fieldError = firstError([
-    requireNumber(value, `${path}.minX`),
-    requireNumber(value, `${path}.minY`),
-    requireNumber(value, `${path}.maxX`),
-    requireNumber(value, `${path}.maxY`),
+    requireCoordinate(value, `${path}.minX`),
+    requireCoordinate(value, `${path}.minY`),
+    requireCoordinate(value, `${path}.maxX`),
+    requireCoordinate(value, `${path}.maxY`),
   ]);
   if (fieldError !== null) return fieldError;
   // Cross-field invariant (CQ-006): bounds are normalized (min <= max) by
@@ -200,10 +210,10 @@ function validateBounds(value: unknown, path: string): string | null {
 function validateTransform(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([
-    requireNumber(value, `${path}.x`),
-    requireNumber(value, `${path}.y`),
-    requireNumber(value, `${path}.scaleX`),
-    requireNumber(value, `${path}.scaleY`),
+    requireCoordinate(value, `${path}.x`),
+    requireCoordinate(value, `${path}.y`),
+    requireScale(value, `${path}.scaleX`),
+    requireScale(value, `${path}.scaleY`),
     requireNumber(value, `${path}.rotationDeg`),
     requireBoolean(value, `${path}.mirrorX`),
     requireBoolean(value, `${path}.mirrorY`),
@@ -243,7 +253,7 @@ function validatePoints(value: unknown, path: string): string | null {
 
 function validatePoint(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
-  return firstError([requireNumber(value, `${path}.x`), requireNumber(value, `${path}.y`)]);
+  return firstError([requireCoordinate(value, `${path}.x`), requireCoordinate(value, `${path}.y`)]);
 }
 
 function validateArray(
@@ -287,6 +297,20 @@ function optionalBoolean(obj: Record<string, unknown>, path: string): string | n
 
 function requireNumber(obj: Record<string, unknown>, path: string): string | null {
   return isFiniteNumber(valueAtPath(obj, path)) ? null : `missing or invalid \`${path}\``;
+}
+
+function requireCoordinate(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return isFiniteNumber(value) && Math.abs(value) <= MAX_COORDINATE_MAGNITUDE_MM
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
+function requireScale(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return isFiniteNumber(value) && Math.abs(value) <= MAX_TRANSFORM_SCALE
+    ? null
+    : `missing or invalid \`${path}\``;
 }
 
 function optionalNumber(obj: Record<string, unknown>, path: string): string | null {
