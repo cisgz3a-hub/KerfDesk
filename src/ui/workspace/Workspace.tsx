@@ -61,6 +61,13 @@ export function Workspace(): JSX.Element {
   });
 
   const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
+  // Phase G (B6) — drop a half-drawn pen polyline when the project is replaced
+  // wholesale (New / Open / undo / redo); otherwise it renders as a ghost over an
+  // unrelated scene. Guarded so the per-frame project churn of a transform drag
+  // (penDraft already null) doesn't touch the store.
+  useEffect(() => {
+    if (useUiStore.getState().penDraft !== null) useUiStore.getState().setPenDraft(null);
+  }, [project]);
   const isEmpty = project.scene.objects.length === 0;
   const dragOverlay = useUiStore((s) => s.dragOverlay);
   return (

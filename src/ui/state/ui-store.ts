@@ -136,8 +136,15 @@ export const useUiStore = create<UiState>((set) => ({
   openImageDialog: (source) => set({ imageDialog: source }),
   closeImageDialog: () => set({ imageDialog: null }),
   toolMode: { kind: 'select' },
-  setToolMode: (next) => set({ toolMode: next }),
-  // Leaving any draw tool also discards a half-drawn pen polyline.
+  // Switching to any non-pen tool discards a half-drawn pen polyline so it can't
+  // linger as a ghost (or get appended to on return). Re-selecting the pen keeps
+  // the draft. resetToolMode (Esc / Select) clears it too.
+  setToolMode: (next) =>
+    set(
+      next.kind === 'draw' && next.shape === 'polyline'
+        ? { toolMode: next }
+        : { toolMode: next, penDraft: null },
+    ),
   resetToolMode: () => set({ toolMode: { kind: 'select' }, penDraft: null }),
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),

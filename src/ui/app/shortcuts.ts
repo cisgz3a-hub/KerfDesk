@@ -208,11 +208,20 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
     // handleEditShortcut preventDefaults BEFORE invoke runs; without it a bare
     // Enter anywhere would be swallowed. Gated on !previewMode so it can't
     // commit into a previewed scene.
-    match: (e) =>
-      !hasMeta(e) &&
-      e.key === 'Enter' &&
-      useUiStore.getState().penDraft !== null &&
-      !useStore.getState().previewMode,
+    match: (e) => {
+      // Re-check the pen is the active tool (not just that a draft exists), so a
+      // leaked draft can never be committed from another mode — consistent with
+      // the double-click finisher's guard.
+      const ui = useUiStore.getState();
+      return (
+        !hasMeta(e) &&
+        e.key === 'Enter' &&
+        ui.toolMode.kind === 'draw' &&
+        ui.toolMode.shape === 'polyline' &&
+        ui.penDraft !== null &&
+        !useStore.getState().previewMode
+      );
+    },
     invoke: () => {
       const s = useStore.getState();
       finishPen({ closed: false, project: s.project, drawShape: s.drawShape });
