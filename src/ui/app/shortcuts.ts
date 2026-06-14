@@ -8,7 +8,12 @@
 //   * View: P (preview toggle)
 
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
-import type { Project, SceneObject, Transform } from '../../core/scene';
+import {
+  flipTransformAboutCenter,
+  type Project,
+  type SceneObject,
+  type Transform,
+} from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
@@ -314,11 +319,7 @@ function tryFlip(e: KeyboardEvent, ctx: TransformCtx): boolean {
   e.preventDefault();
   const obj = ctx.project.scene.objects.find((o) => o.id === ctx.selectedObjectId);
   if (obj === undefined) return true;
-  const next: Transform = {
-    ...obj.transform,
-    mirrorX: key === 'h' ? !obj.transform.mirrorX : obj.transform.mirrorX,
-    mirrorY: key === 'v' ? !obj.transform.mirrorY : obj.transform.mirrorY,
-  };
+  const next: Transform = flipTransformAboutCenter(obj, key === 'h' ? 'horizontal' : 'vertical');
   ctx.applyObjectTransform(obj.id, next);
   return true;
 }

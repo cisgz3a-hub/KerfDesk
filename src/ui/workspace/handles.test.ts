@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
-import { handlesFor, hitHandle, scaleObjectByHandleDrag } from './handles';
+import { handlesFor, hitHandle, scaleObjectByHandleDrag, selectionFrameFor } from './handles';
 
 function obj(args: {
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
@@ -8,6 +8,7 @@ function obj(args: {
   ty?: number;
   sx?: number;
   sy?: number;
+  rot?: number;
 }): SceneObject {
   return {
     kind: 'imported-svg',
@@ -20,6 +21,7 @@ function obj(args: {
       y: args.ty ?? 0,
       scaleX: args.sx ?? 1,
       scaleY: args.sy ?? 1,
+      rotationDeg: args.rot ?? 0,
     },
     paths: [],
   };
@@ -48,7 +50,29 @@ describe('handlesFor', () => {
   });
 });
 
-describe('scaleObjectByHandleDrag — edge + alt-drag', () => {
+describe('selectionFrameFor', () => {
+  it('returns the transformed local bounds corners in draw order', () => {
+    const o = obj({
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      tx: 20,
+      ty: 30,
+      rot: 90,
+    });
+
+    const frame = selectionFrameFor(o);
+
+    expect(frame[0]?.x).toBeCloseTo(20);
+    expect(frame[0]?.y).toBeCloseTo(30);
+    expect(frame[1]?.x).toBeCloseTo(20);
+    expect(frame[1]?.y).toBeCloseTo(40);
+    expect(frame[2]?.x).toBeCloseTo(10);
+    expect(frame[2]?.y).toBeCloseTo(40);
+    expect(frame[3]?.x).toBeCloseTo(10);
+    expect(frame[3]?.y).toBeCloseTo(30);
+  });
+});
+
+describe('scaleObjectByHandleDrag — edge + center-out scaling', () => {
   it('east-edge drag only scales X, not Y', () => {
     const o = obj({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } });
     const next = scaleObjectByHandleDrag({
@@ -142,4 +166,36 @@ describe('scaleObjectByHandleDrag', () => {
     expect(Math.abs(next.scaleX)).toBeGreaterThan(0);
     expect(Math.abs(next.scaleY)).toBeGreaterThan(0);
   });
+
+  it('keeps the opposite anchor fixed when resizing a rotated object', () => {
+    const o = obj({
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+      tx: 80,
+      ty: 60,
+      rot: 30,
+    });
+    const beforeAnchor = handlePosition(o, 'nw');
+    const beforeDragHandle = handlePosition(o, 'se');
+
+    const next = scaleObjectByHandleDrag({
+      object: o,
+      handle: 'se',
+      dragTo: { x: beforeDragHandle.x + 25, y: beforeDragHandle.y + 15 },
+      lockAspect: false,
+    });
+    const after = { ...o, transform: next };
+    const afterAnchor = handlePosition(after, 'nw');
+
+    expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 5);
+    expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 5);
+  });
 });
+
+function handlePosition(
+  object: SceneObject,
+  kind: 'nw' | 'se',
+): { readonly x: number; readonly y: number } {
+  const handle = handlesFor(object).find((item) => item.kind === kind);
+  if (handle === undefined) throw new Error(`missing ${kind} handle`);
+  return handle.position;
+}

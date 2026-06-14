@@ -1,7 +1,8 @@
 // Workspace — Canvas2D viewport React component. Renders bed, grid, scene
 // polylines, optional preview overlay (F-A8), selection outline + corner
-// handles (F-A5/F-A6). Mouse: click-and-drag a handle to scale (Shift
-// locks aspect, Alt scales from center), click-and-drag the body to move,
+// handles (F-A5/F-A6). Mouse: click-and-drag a handle to scale (corner
+// handles keep aspect; Shift allows stretch; Ctrl/Cmd scales from center),
+// click-and-drag the body to move,
 // drag the rotate handle to rotate (Shift snaps to 15°), Space-drag pans
 // the viewport. Wheel+Ctrl zooms. Shift+click on objects toggles into the
 // multi-select set.
@@ -13,7 +14,7 @@
 import { canvasTheme } from '../theme/canvas-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Toolpath } from '../../core/job';
-import type { Project, Transform, Vec2 } from '../../core/scene';
+import type { Project, ShapeObject, Transform, Vec2 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { drawScene } from './draw-scene';
@@ -24,7 +25,12 @@ import {
   nextTransformForDrag,
   panOffsetForDrag,
 } from './drag-state';
-import { beginDrawDrag, commitDraftShape, draftForDrawDrag } from './draw-tool';
+import {
+  beginDrawDrag,
+  commitDraftShape,
+  draftForDrawDrag,
+  drawModifiersFromEvent,
+} from './draw-tool';
 import { finishPen, handlePenMouseDown, updatePenCursor } from './pen-tool';
 import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
 import { PreviewStatusOverlays } from './preview-overlays';
@@ -260,7 +266,7 @@ function openTextEditForSelectedText(): void {
 type DragHandlers = {
   readonly onMouseDown: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   readonly onMouseMove: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  readonly onMouseUp: () => void;
+  readonly onMouseUp: (e: React.MouseEvent<HTMLCanvasElement>) => void;
 };
 
 type DragMoveResult = {
@@ -290,11 +296,7 @@ function useDragMove(
   const [drag, setDrag] = useState<DragState | null>(null);
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>): void => {
     if (previewMode) return;
-    // Draw tool armed + a plain left press (no Space/middle/right pan) starts a
-    // shape drag; pan triggers still fall through to computeMouseDownDrag.
     if (toolMode.kind === 'draw' && e.button === 0 && !useUiStore.getState().spaceDown) {
-      // The pen is multi-click (places a vertex per click, no drag); the
-      // parametric shapes rubber-band out on a single drag.
       if (toolMode.shape === 'polyline') {
         handlePenMouseDown({ e, ref, project, viewState, drawShape });
         return;
@@ -328,20 +330,20 @@ function useDragMove(
       const point = canvasMouseToScene(e, canvas, project, viewState);
       setCursorMm(point);
       if (toolMode.kind === 'draw' && toolMode.shape === 'polyline') {
-        updatePenCursor(point); // rubber-band to the cursor; no-op if not drawing
+        updatePenCursor(point, e.shiftKey); // rubber-band to the cursor; no-op if not drawing
         return;
       }
       if (drag?.kind === 'draw') {
-        if (point !== null) setDraftShape(draftForDrawDrag(drag, point, project));
+        updateDrawDraft({ drag, point, project, e, setDraftShape });
         return;
       }
       applyTransformDrag({ drag, point, e, project, setObjectTransform });
     },
-    onMouseUp: () => {
+    onMouseUp: (e) => {
       setCursorMm(null);
       if (drag === null) return;
       if (drag.kind === 'draw') {
-        commitDraftShape(drawShape);
+        commitDrawDraft({ drag, e, ref, project, viewState, setDraftShape, drawShape });
         setDrag(null);
         return;
       }
@@ -354,6 +356,33 @@ function useDragMove(
   const visibleKind =
     drag === null || drag.kind === 'pan' || drag.kind === 'draw' ? null : drag.kind;
   return { handlers, dragKind: visibleKind };
+}
+
+function updateDrawDraft(args: {
+  readonly drag: Extract<DragState, { kind: 'draw' }>;
+  readonly point: Vec2 | null;
+  readonly project: Project;
+  readonly e: React.MouseEvent<HTMLCanvasElement>;
+  readonly setDraftShape: (shape: ShapeObject | null) => void;
+}): void {
+  if (args.point === null) return;
+  args.setDraftShape(
+    draftForDrawDrag(args.drag, args.point, args.project, drawModifiersFromEvent(args.e)),
+  );
+}
+
+function commitDrawDraft(args: {
+  readonly drag: Extract<DragState, { kind: 'draw' }>;
+  readonly e: React.MouseEvent<HTMLCanvasElement>;
+  readonly ref: React.RefObject<HTMLCanvasElement | null>;
+  readonly project: Project;
+  readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
+  readonly setDraftShape: (shape: ShapeObject | null) => void;
+  readonly drawShape: (shape: ShapeObject) => void;
+}): void {
+  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  updateDrawDraft({ ...args, point });
+  commitDraftShape(args.drawShape);
 }
 
 // The move/scale/rotate tail of the mousemove handler, split out so useDragMove

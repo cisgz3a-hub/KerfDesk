@@ -9,7 +9,7 @@
 import { assertNever, type Project, type ShapeObject, type Vec2 } from '../../core/scene';
 import { createPolyline } from '../../core/shapes';
 import { type PenDraft, useUiStore } from '../state/ui-store';
-import { DEFAULT_SHAPE_COLOR } from './draw-tool';
+import { currentDrawingColor } from './draw-tool';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 
 type ViewArg = { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
@@ -62,10 +62,11 @@ export function handlePenMouseDown(args: {
   readonly viewState: ViewArg;
   readonly drawShape: (shape: ShapeObject) => void;
 }): void {
-  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-  if (point === null) return;
+  const rawPoint = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  if (rawPoint === null) return;
   const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
   const penDraft = useUiStore.getState().penDraft;
+  const point = constrainPenPoint(penDraft, rawPoint, args.e.shiftKey);
   const outcome = penClickOutcome({
     detail: args.e.detail,
     point,
@@ -103,10 +104,30 @@ function applyPenClickOutcome(
 }
 
 // Update the rubber-band endpoint on mousemove. No-op when the pen isn't drawing.
-export function updatePenCursor(point: Vec2 | null): void {
+export function updatePenCursor(point: Vec2 | null, constrain = false): void {
   const current = useUiStore.getState().penDraft;
   if (current === null) return;
-  useUiStore.getState().setPenDraft({ vertices: current.vertices, cursor: point });
+  const cursor = point === null ? null : constrainPenPoint(current, point, constrain);
+  useUiStore.getState().setPenDraft({ vertices: current.vertices, cursor });
+}
+
+export function constrainPenPoint(
+  penDraft: PenDraft | null,
+  point: Vec2,
+  constrain: boolean,
+): Vec2 {
+  if (!constrain) return point;
+  const anchor = penDraft?.vertices[penDraft.vertices.length - 1];
+  if (anchor === undefined) return point;
+  const dx = point.x - anchor.x;
+  const dy = point.y - anchor.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return point;
+  const snappedAngle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+  return {
+    x: anchor.x + Math.cos(snappedAngle) * length,
+    y: anchor.y + Math.sin(snappedAngle) * length,
+  };
 }
 
 // Commit the in-progress polyline as a kind:'shape' object, then clear the draft.
@@ -117,15 +138,17 @@ export function finishPen(args: {
   readonly closed: boolean;
   readonly project: Project;
   readonly drawShape: (shape: ShapeObject) => void;
-}): void {
+}): boolean {
   const penDraft = useUiStore.getState().penDraft;
-  if (penDraft === null) return;
+  if (penDraft === null) return false;
   const points = penDraft.vertices;
   const min = args.closed ? MIN_PEN_VERTICES_CLOSED : MIN_PEN_VERTICES_OPEN;
-  if (points.length < min) return;
-  const color = args.project.scene.layers[0]?.color ?? DEFAULT_SHAPE_COLOR;
+  if (points.length < min) return false;
+  const color = currentDrawingColor(args.project);
   args.drawShape(
     createPolyline({ id: crypto.randomUUID(), color, spec: { points, closed: args.closed } }),
   );
   useUiStore.getState().setPenDraft(null);
+  useUiStore.getState().resetToolMode();
+  return true;
 }

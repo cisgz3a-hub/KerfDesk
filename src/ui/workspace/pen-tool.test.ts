@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createProject } from '../../core/scene';
+import { createLayer, createProject, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import { finishPen, penClickOutcome } from './pen-tool';
+import { constrainPenPoint, finishPen, penClickOutcome } from './pen-tool';
 
 const TRIANGLE = [
   { x: 0, y: 0 },
@@ -68,8 +68,47 @@ describe('penClickOutcome', () => {
   });
 });
 
+describe('constrainPenPoint', () => {
+  it('returns the raw point when Shift-style constraint is not active', () => {
+    expect(
+      constrainPenPoint({ vertices: TRIANGLE, cursor: null }, { x: 17, y: 13 }, false),
+    ).toEqual({
+      x: 17,
+      y: 13,
+    });
+  });
+
+  it('snaps the next point to the nearest 45 degree increment from the previous vertex', () => {
+    const point = constrainPenPoint(
+      { vertices: [{ x: 0, y: 0 }], cursor: null },
+      { x: 10, y: 3 },
+      true,
+    );
+
+    expect(point.x).toBeCloseTo(Math.hypot(10, 3), 5);
+    expect(point.y).toBeCloseTo(0, 5);
+  });
+
+  it('snaps diagonal placement to 45 degrees while preserving distance', () => {
+    const point = constrainPenPoint(
+      { vertices: [{ x: 5, y: 5 }], cursor: null },
+      { x: 15, y: 14 },
+      true,
+    );
+    const dx = point.x - 5;
+    const dy = point.y - 5;
+
+    expect(dx).toBeCloseTo(dy, 5);
+    expect(Math.hypot(dx, dy)).toBeCloseTo(Math.hypot(10, 9), 5);
+  });
+});
+
 describe('finishPen', () => {
-  beforeEach(() => useUiStore.getState().setPenDraft(null));
+  beforeEach(() => {
+    useUiStore.getState().setPenDraft(null);
+    useUiStore.getState().setActiveLayerColor(null);
+    useUiStore.getState().setToolMode({ kind: 'select' });
+  });
 
   it('commits an open polyline with >=2 vertices and clears the draft', () => {
     const drawShape = vi.fn();
@@ -80,21 +119,25 @@ describe('finishPen', () => {
       ],
       cursor: null,
     });
-    finishPen({ closed: false, project: createProject(), drawShape });
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
+    expect(finishPen({ closed: false, project: createProject(), drawShape })).toBe(true);
     expect(drawShape).toHaveBeenCalledTimes(1);
     const shape = drawShape.mock.calls[0]?.[0];
     expect(shape?.spec.kind).toBe('polyline');
     expect(shape?.spec.closed).toBe(false);
     expect(shape?.spec.points).toHaveLength(2);
     expect(useUiStore.getState().penDraft).toBeNull();
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
   });
 
   it('does not commit an open finish with <2 vertices (keeps the draft)', () => {
     const drawShape = vi.fn();
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
     useUiStore.getState().setPenDraft({ vertices: [{ x: 0, y: 0 }], cursor: null });
-    finishPen({ closed: false, project: createProject(), drawShape });
+    expect(finishPen({ closed: false, project: createProject(), drawShape })).toBe(false);
     expect(drawShape).not.toHaveBeenCalled();
     expect(useUiStore.getState().penDraft).not.toBeNull();
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'polyline' });
   });
 
   it('requires >=3 vertices to close (a 2-point closed path is degenerate)', () => {
@@ -106,16 +149,30 @@ describe('finishPen', () => {
       ],
       cursor: null,
     });
-    finishPen({ closed: true, project: createProject(), drawShape });
+    expect(finishPen({ closed: true, project: createProject(), drawShape })).toBe(false);
     expect(drawShape).not.toHaveBeenCalled();
   });
 
   it('commits a closed polyline with >=3 vertices', () => {
     const drawShape = vi.fn();
     useUiStore.getState().setPenDraft({ vertices: TRIANGLE, cursor: null });
-    finishPen({ closed: true, project: createProject(), drawShape });
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
+    expect(finishPen({ closed: true, project: createProject(), drawShape })).toBe(true);
     expect(drawShape).toHaveBeenCalledTimes(1);
     expect(drawShape.mock.calls[0]?.[0]?.spec.closed).toBe(true);
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
+  });
+
+  it('uses the current drawing layer color for committed pen geometry', () => {
+    const drawShape = vi.fn();
+    useUiStore.getState().setActiveLayerColor('#00ff00');
+    useUiStore.getState().setPenDraft({ vertices: TRIANGLE, cursor: null });
+
+    expect(finishPen({ closed: false, project: twoLayerProject(), drawShape })).toBe(true);
+
+    const shape = drawShape.mock.calls[0]?.[0];
+    expect(shape?.color).toBe('#00ff00');
+    expect(shape?.paths[0]?.color).toBe('#00ff00');
   });
 
   it('commits via the real store action, pushing exactly one undo entry', () => {
@@ -123,13 +180,29 @@ describe('finishPen', () => {
     // single store write, so one undo fully reverses it.
     useStore.getState().newProject();
     useUiStore.getState().setPenDraft({ vertices: TRIANGLE, cursor: null });
-    finishPen({
-      closed: false,
-      project: useStore.getState().project,
-      drawShape: useStore.getState().drawShape,
-    });
+    expect(
+      finishPen({
+        closed: false,
+        project: useStore.getState().project,
+        drawShape: useStore.getState().drawShape,
+      }),
+    ).toBe(true);
     expect(useStore.getState().project.scene.objects).toHaveLength(1);
     expect(useStore.getState().undoStack).toHaveLength(1);
     expect(useUiStore.getState().penDraft).toBeNull();
   });
 });
+
+function twoLayerProject(): Project {
+  const project = createProject();
+  return {
+    ...project,
+    scene: {
+      objects: [],
+      layers: [
+        createLayer({ id: '#ff0000', color: '#ff0000', mode: 'line' }),
+        createLayer({ id: '#00ff00', color: '#00ff00', mode: 'line' }),
+      ],
+    },
+  };
+}

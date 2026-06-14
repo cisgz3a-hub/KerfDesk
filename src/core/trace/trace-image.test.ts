@@ -251,7 +251,7 @@ describe('traceImageToSvgString', () => {
       255,
       255,
       255,
-      64, // translucent white -> ink
+      64, // translucent white below the default alpha cutoff -> background
     ]);
 
     const result = preprocessForTrace(
@@ -264,7 +264,7 @@ describe('traceImageToSvgString', () => {
       },
     );
 
-    expect(Array.from(result.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255]);
+    expect(Array.from(result.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255]);
   });
 
   it('preprocessForTrace applies the LightBurn brightness band when cutoffLuma is set', () => {

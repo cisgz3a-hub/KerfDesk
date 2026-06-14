@@ -121,6 +121,33 @@ describe('AppMenuBar', () => {
       await act(async () => root.unmount());
     }
   });
+
+  it('closes the open top menu when the user clicks outside the menu bar', async () => {
+    const { host, root } = await renderMenu(commands());
+    const outside = document.createElement('button');
+    outside.textContent = 'Workspace';
+    document.body.appendChild(outside);
+    try {
+      const file = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'File',
+      );
+      if (!(file instanceof HTMLElement)) throw new Error('File menu missing');
+
+      await act(async () => {
+        file.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(openFamilyLabels(host)).toEqual(['File']);
+
+      await act(async () => {
+        outside.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      });
+
+      expect(openFamilyLabels(host)).toEqual([]);
+    } finally {
+      outside.remove();
+      await act(async () => root.unmount());
+    }
+  });
 });
 
 function openFamilyLabels(host: HTMLElement): Array<string | undefined> {

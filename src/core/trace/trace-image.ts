@@ -265,7 +265,7 @@ export async function traceImageToSvgString(
 // the project cap (12). Pure function — same inputs, same output.
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
   if (options.traceTransparency === true) {
-    let prepared = alphaToMonochrome(image);
+    let prepared = alphaToMonochrome(image, options.cutoffLuma ?? 0, options.thresholdLuma ?? 128);
     if (shouldDespeckle(options)) {
       prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
     }
@@ -408,17 +408,24 @@ function localMean(
   return sum / Math.max(1, (x1 - x0) * (y1 - y0));
 }
 
-function alphaToMonochrome(image: RawImageData): RawImageData {
+function alphaToMonochrome(image: RawImageData, cutoff: number, threshold: number): RawImageData {
   const data = new Uint8ClampedArray(image.data.length);
+  const lo = clampLuma(Math.min(cutoff, threshold));
+  const hi = clampLuma(Math.max(cutoff, threshold));
   for (let i = 0; i < image.data.length; i += 4) {
     const alpha = image.data[i + 3] ?? 255;
-    const v = alpha > 0 ? 0 : 255;
+    const alphaLuma = 255 - alpha;
+    const v = alphaLuma >= lo && alphaLuma <= hi ? 0 : 255;
     data[i] = v;
     data[i + 1] = v;
     data[i + 2] = v;
     data[i + 3] = 255;
   }
   return { width: image.width, height: image.height, data };
+}
+
+function clampLuma(value: number): number {
+  return Math.max(0, Math.min(255, value));
 }
 
 // Phase E.2 — match LaserForge 1's proven imagetracerjs settings after

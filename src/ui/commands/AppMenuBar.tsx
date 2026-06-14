@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   COMMAND_FAMILY_ORDER,
   runCommand,
@@ -8,8 +8,21 @@ import {
 
 export function AppMenuBar(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
   const [openFamily, setOpenFamily] = useState<CommandFamily | null>(null);
+  const menuBarRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (openFamily === null) return;
+    const closeOnOutsidePointerDown = (event: PointerEvent): void => {
+      const target = event.target;
+      if (target instanceof Node && menuBarRef.current?.contains(target)) return;
+      setOpenFamily(null);
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true);
+  }, [openFamily]);
+
   return (
-    <nav aria-label="Application menu" style={menuBarStyle}>
+    <nav ref={menuBarRef} aria-label="Application menu" style={menuBarStyle}>
       {COMMAND_FAMILY_ORDER.map((family) => (
         <MenuFamily
           key={family}

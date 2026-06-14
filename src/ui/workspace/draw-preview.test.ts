@@ -7,6 +7,7 @@ import {
   type Project,
   type Vec2,
 } from '../../core/scene';
+import { createRectangle } from '../../core/shapes';
 import type { Toolpath } from '../../core/job';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
 import type { ViewTransform } from './view-transform';
@@ -147,6 +148,16 @@ describe('drawPreview', () => {
     expect(calls.lineTo).toBeLessThan(12_000);
     expect(pointReads).toBeLessThan(readBudget);
   });
+
+  it('draws drawn-shape source geometry in the faint preview layer', () => {
+    const project = shapeLineProject();
+    const { ctx, calls } = countingContext();
+
+    drawObjectsFaint(ctx, project, view);
+
+    expect(calls.moveTo).toBeGreaterThan(0);
+    expect(calls.lineTo).toBeGreaterThan(0);
+  });
 });
 
 function importedSvgLineProject(points: ReadonlyArray<Vec2>): Project {
@@ -179,4 +190,21 @@ function watchedPoints(length: number, onRead: () => void): ReadonlyArray<Vec2> 
       },
     },
   );
+}
+
+function shapeLineProject(): Project {
+  const project = createProject();
+  return {
+    ...project,
+    scene: {
+      layers: [createLayer({ id: '#00ff00', color: '#00ff00', mode: 'line' })],
+      objects: [
+        createRectangle({
+          id: 'shape-1',
+          color: '#00ff00',
+          spec: { widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+        }),
+      ],
+    },
+  };
 }

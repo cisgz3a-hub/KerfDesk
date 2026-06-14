@@ -16,4 +16,4 @@ export { polylineToPolylines } from './polyline';
 export type { PolylineSpec } from './polyline';
 export { createPolyline } from './create-polyline';
 export { shapeFromDrag, isDrawDragSignificant, MIN_DRAW_SIZE_MM } from './shape-from-drag';
-export type { DrawShapeKind } from './shape-from-drag';
+export type { DrawShapeKind, DrawShapeModifiers } from './shape-from-drag';

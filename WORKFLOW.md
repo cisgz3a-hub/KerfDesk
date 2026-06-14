@@ -185,10 +185,10 @@ Identical to F-A3 except:
 - No other modifiers in Phase A.
 
 #### Scale — drag handles
-- Corner handles: free aspect ratio.
+- Corner handles: locked aspect ratio by default.
 - Edge handles: scale along one axis.
-- Shift+drag corner: lock aspect ratio.
-- Alt/Opt+drag: scale from center instead of opposite edge.
+- Shift+drag corner: unlock aspect ratio / stretch.
+- Ctrl/Cmd+drag: scale from center instead of opposite edge.
 - Live mm dimensions shown next to handle while dragging.
 
 #### Rotate — handle above selection

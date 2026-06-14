@@ -24,11 +24,11 @@ export function DeviceSettings(): JSX.Element {
   // Whole panel collapses to one row by default. <details> gives us the
   // disclosure widget without any React state — the user's last-chosen
   // open/closed status persists for the session (browser DOM owns it).
-  // Open by default the first time you see the app, then your choice
-  // sticks. PlannerAdvanced has its own nested <details> for the
+  // Closed by default keeps the laser rail compact; opening it is an explicit
+  // operator choice. PlannerAdvanced has its own nested <details> for the
   // power-user knobs — that nesting is intentional, not accidental.
   return (
-    <details style={panelStyle} open>
+    <details style={panelStyle}>
       <summary style={summaryStyle}>Device</summary>
       <div style={bodyStyle}>
         <BasicRows device={device} update={update} />

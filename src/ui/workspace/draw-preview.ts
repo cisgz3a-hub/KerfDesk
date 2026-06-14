@@ -4,7 +4,13 @@
 // at a 0..1 scrubber fraction with a red head marker at the cut point.
 
 import { canvasTheme } from '../theme/canvas-theme';
-import { type Layer, type Project, type SceneObject, type Vec2 } from '../../core/scene';
+import {
+  assertNever,
+  type Layer,
+  type Project,
+  type SceneObject,
+  type Vec2,
+} from '../../core/scene';
 import {
   buildToolpath,
   EMPTY_JOB,
@@ -20,6 +26,11 @@ import { strokePolylinesBatched } from './draw-vector-strokes';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
 
+type FaintVectorObject = Extract<
+  SceneObject,
+  { readonly kind: 'imported-svg' | 'text' | 'traced-image' | 'shape' }
+>;
+
 export function drawObjectsFaint(
   ctx: CanvasRenderingContext2D,
   project: Project,
@@ -29,19 +40,33 @@ export function drawObjectsFaint(
   ctx.globalAlpha = 0.3;
   const layerByColor = new Map(project.scene.layers.map((l) => [l.color, l]));
   for (const obj of project.scene.objects) {
-    if (obj.kind !== 'imported-svg') continue;
+    if (!hasFaintVectorGeometry(obj)) continue;
     drawObjectPolylinesFaint(ctx, obj, layerByColor, view);
   }
   ctx.restore();
 }
 
+function hasFaintVectorGeometry(obj: SceneObject): obj is FaintVectorObject {
+  switch (obj.kind) {
+    case 'imported-svg':
+    case 'text':
+    case 'traced-image':
+    case 'shape':
+      return true;
+    case 'raster-image':
+      return false;
+    default:
+      return assertNever(obj, 'SceneObject');
+  }
+}
+
 function drawObjectPolylinesFaint(
   ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
+  obj: FaintVectorObject,
   layerByColor: Map<string, Layer>,
   view: ViewTransform,
 ): void {
-  if (obj.kind !== 'imported-svg') return;
+  if (!hasFaintVectorGeometry(obj)) return;
   for (const path of obj.paths) {
     const layer = layerByColor.get(path.color);
     if (layer === undefined || !layer.visible) continue;

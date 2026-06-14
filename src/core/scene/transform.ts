@@ -5,7 +5,7 @@
 // This matches LightBurn's behavior for nested transforms and produces the
 // affine equivalent of [translate][rotate][mirror][scale] applied to a point.
 
-import type { Transform, Vec2 } from './scene-object';
+import type { Bounds, SceneObject, Transform, Vec2 } from './scene-object';
 
 export function applyTransform(p: Vec2, t: Transform): Vec2 {
   let x = p.x * t.scaleX;
@@ -18,4 +18,30 @@ export function applyTransform(p: Vec2, t: Transform): Vec2 {
   const xr = x * cos - y * sin;
   const yr = x * sin + y * cos;
   return { x: xr + t.x, y: yr + t.y };
+}
+
+export function flipTransformAboutCenter(
+  object: SceneObject,
+  axis: 'horizontal' | 'vertical',
+): Transform {
+  const center = boundsCenter(object.bounds);
+  const before = applyTransform(center, object.transform);
+  const flipped: Transform = {
+    ...object.transform,
+    mirrorX: axis === 'horizontal' ? !object.transform.mirrorX : object.transform.mirrorX,
+    mirrorY: axis === 'vertical' ? !object.transform.mirrorY : object.transform.mirrorY,
+  };
+  const after = applyTransform(center, flipped);
+  return {
+    ...flipped,
+    x: flipped.x + before.x - after.x,
+    y: flipped.y + before.y - after.y,
+  };
+}
+
+function boundsCenter(bounds: Bounds): Vec2 {
+  return {
+    x: (bounds.minX + bounds.maxX) / 2,
+    y: (bounds.minY + bounds.maxY) / 2,
+  };
 }

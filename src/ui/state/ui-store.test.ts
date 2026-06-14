@@ -7,6 +7,7 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
   beforeEach(() => {
     useUiStore.getState().setToolMode({ kind: 'select' });
     useUiStore.getState().setPenDraft(null);
+    useUiStore.getState().setActiveLayerColor(null);
   });
 
   it('setToolMode clears the pen draft when switching to a non-pen draw tool', () => {
@@ -36,5 +37,13 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().resetToolMode();
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
     expect(useUiStore.getState().penDraft).toBeNull();
+  });
+
+  it('tracks the current drawing layer color outside undoable project data', () => {
+    useUiStore.getState().setActiveLayerColor('#00FF00');
+    expect(useUiStore.getState().activeLayerColor).toBe('#00ff00');
+
+    useUiStore.getState().setActiveLayerColor(null);
+    expect(useUiStore.getState().activeLayerColor).toBeNull();
   });
 });

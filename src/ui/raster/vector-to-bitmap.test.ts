@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runPreflight } from '../../core/preflight';
 import type { VectorRaster } from '../../core/raster';
 import { MAX_RASTER_PIXELS, evaluateRasterBudget } from '../../core/raster/raster-budget';
+import { createRectangle } from '../../core/shapes';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
@@ -19,6 +20,7 @@ import {
   type ColoredPath,
   type ImportedSvg,
   type RasterImage,
+  type ShapeObject,
   type TextObject,
   type TracedImage,
   type Transform,
@@ -164,6 +166,15 @@ function makeTraced(): TracedImage {
   };
 }
 
+function makeShape(): ShapeObject {
+  return createRectangle({
+    id: 'shape-1',
+    color: '#000000',
+    spec: { widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
+    transform: TRANSFORM,
+  });
+}
+
 function makeRaster(): RasterImage {
   return {
     kind: 'raster-image',
@@ -197,10 +208,11 @@ function inkCount(raster: VectorRaster): number {
 }
 
 describe('isConvertibleVector', () => {
-  it('accepts the three vector-carrying kinds', () => {
+  it('accepts all vector-carrying kinds', () => {
     expect(isConvertibleVector(makeSvg())).toBe(true);
     expect(isConvertibleVector(makeText())).toBe(true);
     expect(isConvertibleVector(makeTraced())).toBe(true);
+    expect(isConvertibleVector(makeShape())).toBe(true);
   });
 
   it('rejects a raster-image (already a bitmap)', () => {
@@ -336,6 +348,15 @@ describe('assembleBitmap', () => {
     expect(assembleBitmap(makeSvg(), fakeEncode, 'i').source).toBe('logo.svg (bitmap)');
     expect(assembleBitmap(makeTraced(), fakeEncode, 'i').source).toBe('photo.png (bitmap)');
     expect(assembleBitmap(makeText(), fakeEncode, 'i').source).toBe('Hi (bitmap)');
+    expect(assembleBitmap(makeShape(), fakeEncode, 'i').source).toBe('rect shape (bitmap)');
+  });
+
+  it('rasterizes drawn shapes as vector artwork', () => {
+    const result = assembleBitmap(makeShape(), fakeEncode, 'shape-bitmap');
+
+    expect(result.id).toBe('shape-bitmap');
+    expect(result.pixelWidth).toBeGreaterThan(0);
+    expect(result.pixelHeight).toBeGreaterThan(0);
   });
 
   it('uses the transformed display size so a fitted large vector can convert', () => {
