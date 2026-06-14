@@ -18,11 +18,14 @@ describe('createRectangle', () => {
     expect(shape.bounds).toEqual({ minX: 0, minY: 0, maxX: 80, maxY: 50 });
     expect(shape.paths).toHaveLength(1);
     expect(shape.paths[0]?.color).toBe('#ff0000');
+    // 4 corners + the repeated first point that closes the loop (the stroke
+    // renderer never calls closePath; see io/svg/shape-to-polylines).
     expect(shape.paths[0]?.polylines[0]?.points).toEqual([
       { x: 0, y: 0 },
       { x: 80, y: 0 },
       { x: 80, y: 50 },
       { x: 0, y: 50 },
+      { x: 0, y: 0 },
     ]);
   });
 

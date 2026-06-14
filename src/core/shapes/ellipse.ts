@@ -24,6 +24,10 @@ export function ellipseToPolylines(spec: EllipseSpec): ReadonlyArray<Polyline> {
     const t = (2 * Math.PI * i) / segments;
     points.push({ x: a + a * Math.cos(t), y: b + b * Math.sin(t) });
   }
+  // Repeat the first point so the line renderer draws the closing segment (it
+  // strokes points as-is and never calls closePath — see shape-to-polylines).
+  const first = points[0];
+  if (first !== undefined) points.push(first);
   return [{ points, closed: true }];
 }
 

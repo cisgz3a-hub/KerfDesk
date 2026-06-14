@@ -13,5 +13,12 @@ export type PolylineSpec = {
 
 export function polylineToPolylines(spec: PolylineSpec): ReadonlyArray<Polyline> {
   if (spec.points.length === 0) return [];
+  // A closed pen polyline repeats its first vertex so the line renderer draws
+  // the closing edge (it strokes points as-is and never calls closePath — the
+  // same convention as rect/ellipse/polygon and io/svg/shape-to-polylines).
+  if (spec.closed) {
+    const first = spec.points[0];
+    if (first !== undefined) return [{ points: [...spec.points, first], closed: true }];
+  }
   return [{ points: spec.points, closed: spec.closed }];
 }
