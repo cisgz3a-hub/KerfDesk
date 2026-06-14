@@ -218,3 +218,17 @@ describe('parseSvg — surfaces sanitize counts', () => {
     expect(result.object).not.toBeNull();
   });
 });
+
+describe('parseSvg — denial-of-service guards', () => {
+  it('does not stack-overflow on circular <use> references', () => {
+    // <use id="a" href="#b"/> and <use id="b" href="#a"/> reference each other;
+    // without a recursion guard, resolving them recurses until the JS stack
+    // overflows (RangeError). The walk-depth cap must let parsing finish.
+    const svgText = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <use id="a" href="#b"/>
+  <use id="b" href="#a"/>
+  <path d="M 0 0 L 10 10" stroke="#ff0000"/>
+</svg>`;
+    expect(() => parseSvg(args(svgText))).not.toThrow();
+  });
+});
