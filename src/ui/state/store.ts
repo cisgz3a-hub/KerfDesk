@@ -44,6 +44,10 @@ import {
   type ProjectOptimizationActions,
 } from './project-optimization-actions';
 import {
+  selectionTransformActions,
+  type SelectionTransformActions,
+} from './selection-transform-actions';
+import {
   applyDuplicate,
   type ImportOutcome,
   pruneOrphanLayers,
@@ -58,6 +62,7 @@ const HISTORY_DEPTH = 50;
 
 export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
+  SelectionTransformActions &
   ReturnType<typeof currentMaterialLibraryState> &
   MaterialLibraryActions & {
     readonly project: Project;
@@ -445,6 +450,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...objectPropertiesActions(set),
   ...generatedSceneActions(set),
   ...projectOptimizationActions(set),
+  ...selectionTransformActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

@@ -34,6 +34,19 @@ export {
 } from './scene-object';
 
 export { applyTransform, flipTransformAboutCenter } from './transform';
+export type {
+  SelectionAnchor,
+  SelectionMetrics,
+  SelectionTransform,
+  SelectionTransformEdit,
+  SelectionTransformError,
+  SelectionTransformResult,
+} from './selection-transform';
+export {
+  buildSelectionTransformEdit,
+  selectionAnchorPoint,
+  selectionMetrics,
+} from './selection-transform';
 export { isClosedEnough } from './polyline-closure';
 export type { AABB } from './hit-test';
 export { combinedBBox, hitTest, transformedBBox } from './hit-test';
