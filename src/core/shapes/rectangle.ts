@@ -29,14 +29,25 @@ export function rectangleToPolylines(spec: RectangleSpec): ReadonlyArray<Polylin
   const h = Math.max(0, spec.heightMm);
   const r = clampRadius(spec.cornerRadiusMm, w, h);
   if (r <= 0) {
-    return [{ points: [pt(0, 0), pt(w, 0), pt(w, h), pt(0, h)], closed: true }];
+    // The final point repeats the first so the line renderer draws the closing
+    // edge — it strokes points as-is and never calls closePath (see
+    // io/svg/shape-to-polylines, which builds every closed shape the same way).
+    return [{ points: [pt(0, 0), pt(w, 0), pt(w, h), pt(0, h), pt(0, 0)], closed: true }];
   }
   const points: Vec2[] = [];
   pushArc(points, w - r, r, r, -90, 0); // top-right
   pushArc(points, w - r, h - r, r, 0, 90); // bottom-right
   pushArc(points, r, h - r, r, 90, 180); // bottom-left
   pushArc(points, r, r, r, 180, 270); // top-left
+  closeLoop(points);
   return [{ points, closed: true }];
+}
+
+// Repeat the first point so the polyline visually closes — the codebase
+// convention for closed shapes (the stroke renderer does not closePath).
+function closeLoop(points: Vec2[]): void {
+  const first = points[0];
+  if (first !== undefined) points.push(first);
 }
 
 function clampRadius(r: number, w: number, h: number): number {

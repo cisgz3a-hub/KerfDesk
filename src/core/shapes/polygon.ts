@@ -23,6 +23,10 @@ export function polygonToPolylines(spec: PolygonSpec): ReadonlyArray<Polyline> {
     const angle = START_ANGLE_RAD + (2 * Math.PI * i) / sides;
     points.push({ x: r + r * Math.cos(angle), y: r + r * Math.sin(angle) });
   }
+  // Repeat the first vertex so the line renderer draws the closing edge (it
+  // strokes points as-is and never calls closePath — see shape-to-polylines).
+  const first = points[0];
+  if (first !== undefined) points.push(first);
   return [{ points, closed: true }];
 }
 

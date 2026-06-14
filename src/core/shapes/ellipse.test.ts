@@ -9,6 +9,9 @@ describe('ellipseToPolylines', () => {
     expect(polyline?.closed).toBe(true);
     const points = polyline?.points ?? [];
     expect(points.length).toBeGreaterThanOrEqual(24);
+    // Closes the loop: the last point repeats the first (stroke renderer never
+    // closePaths).
+    expect(points[points.length - 1]).toEqual(points[0]);
     const a = 40;
     const b = 20; // radii; ellipse centered at (a, b)
     for (const p of points) {

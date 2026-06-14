@@ -7,7 +7,10 @@ describe('polygonToPolylines', () => {
     const [polyline] = polygonToPolylines({ sides: 6, radiusMm: 10 });
     const points = polyline?.points ?? [];
     expect(polyline?.closed).toBe(true);
-    expect(points).toHaveLength(6);
+    // 6 vertices + the repeated first vertex that closes the loop (the stroke
+    // renderer never calls closePath).
+    expect(points).toHaveLength(7);
+    expect(points[points.length - 1]).toEqual(points[0]);
     // Centered at (10, 10); every vertex is the circumradius from the center.
     for (const p of points) {
       expect(Math.hypot(p.x - 10, p.y - 10)).toBeCloseTo(10, 5);
@@ -17,9 +20,9 @@ describe('polygonToPolylines', () => {
     expect(points[0]?.y).toBeCloseTo(0);
   });
 
-  it('clamps sides into [3, 64]', () => {
-    expect(polygonToPolylines({ sides: 2, radiusMm: 5 })[0]?.points).toHaveLength(3);
-    expect(polygonToPolylines({ sides: 1000, radiusMm: 5 })[0]?.points).toHaveLength(64);
+  it('clamps sides into [3, 64] (point count is sides + 1 for the closing vertex)', () => {
+    expect(polygonToPolylines({ sides: 2, radiusMm: 5 })[0]?.points).toHaveLength(4);
+    expect(polygonToPolylines({ sides: 1000, radiusMm: 5 })[0]?.points).toHaveLength(65);
   });
 });
 

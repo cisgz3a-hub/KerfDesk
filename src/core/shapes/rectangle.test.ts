@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { rectangleToPolylines } from './rectangle';
 
 describe('rectangleToPolylines', () => {
-  it('produces one closed 4-corner polyline for a sharp rectangle', () => {
+  it('produces a sharp rectangle as a 5-point loop (corners + repeated first)', () => {
     const [polyline, ...rest] = rectangleToPolylines({
       widthMm: 80,
       heightMm: 50,
@@ -10,29 +10,34 @@ describe('rectangleToPolylines', () => {
     });
     expect(rest).toHaveLength(0);
     expect(polyline?.closed).toBe(true);
+    // The first point repeats at the end so the stroke renderer (no closePath)
+    // draws the closing edge — matches io/svg/shape-to-polylines's convention.
     expect(polyline?.points).toEqual([
       { x: 0, y: 0 },
       { x: 80, y: 0 },
       { x: 80, y: 50 },
       { x: 0, y: 50 },
+      { x: 0, y: 0 },
     ]);
   });
 
   it('treats a non-positive or non-finite corner radius as sharp', () => {
     expect(
       rectangleToPolylines({ widthMm: 10, heightMm: 10, cornerRadiusMm: -5 })[0]?.points,
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(
       rectangleToPolylines({ widthMm: 10, heightMm: 10, cornerRadiusMm: NaN })[0]?.points,
-    ).toHaveLength(4);
+    ).toHaveLength(5);
   });
 
   it('rounds the corners with arcs that stay inside the rectangle bounds', () => {
     const [polyline] = rectangleToPolylines({ widthMm: 80, heightMm: 50, cornerRadiusMm: 10 });
     const points = polyline?.points ?? [];
     expect(polyline?.closed).toBe(true);
-    // Four quarter arcs at 8 segments each = 4 * 9 points.
-    expect(points).toHaveLength(36);
+    // Four quarter arcs at 8 segments each = 4 * 9 points, plus the repeated
+    // first point that closes the loop.
+    expect(points).toHaveLength(37);
+    expect(points[points.length - 1]).toEqual(points[0]);
     // Every point lies within the [0,80] x [0,50] box (no overshoot).
     for (const p of points) {
       expect(p.x).toBeGreaterThanOrEqual(0);
