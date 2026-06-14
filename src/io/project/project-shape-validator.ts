@@ -168,12 +168,27 @@ function validateShapeObject(obj: Record<string, unknown>, path: string): string
 // here as core/shapes grows.
 function validateShapeSpec(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
-  if (value['kind'] !== 'rect') return `missing or invalid \`${path}.kind\``;
-  return firstError([
-    requirePositiveNumber(value, `${path}.widthMm`),
-    requirePositiveNumber(value, `${path}.heightMm`),
-    requireNumber(value, `${path}.cornerRadiusMm`),
-  ]);
+  const kind = value['kind'];
+  if (kind === 'rect') {
+    return firstError([
+      requirePositiveNumber(value, `${path}.widthMm`),
+      requirePositiveNumber(value, `${path}.heightMm`),
+      requireNumber(value, `${path}.cornerRadiusMm`),
+    ]);
+  }
+  if (kind === 'ellipse') {
+    return firstError([
+      requirePositiveNumber(value, `${path}.widthMm`),
+      requirePositiveNumber(value, `${path}.heightMm`),
+    ]);
+  }
+  if (kind === 'polygon') {
+    return firstError([
+      requirePositiveInteger(value, `${path}.sides`),
+      requirePositiveNumber(value, `${path}.radiusMm`),
+    ]);
+  }
+  return `missing or invalid \`${path}.kind\``;
 }
 
 function validateBounds(value: unknown, path: string): string | null {
