@@ -29,7 +29,7 @@ export function AddLayerControls(): JSX.Element {
         aria-label="New layer color"
         style={colorInputStyle}
       />
-      <button type="submit" aria-label="Add layer">
+      <button type="submit" aria-label="Add layer" title="Create a new cut layer using this color.">
         Add
       </button>
     </form>

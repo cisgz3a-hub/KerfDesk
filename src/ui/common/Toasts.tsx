@@ -16,6 +16,7 @@ export function Toasts(): JSX.Element {
           onClick={() => dismiss(t.id)}
           style={{ ...toastStyle, ...variantStyle(t.variant) }}
           aria-label={`Dismiss notification: ${t.message}`}
+          title={`Dismiss notification: ${t.message}`}
         >
           {t.message}
         </button>

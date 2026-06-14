@@ -236,7 +236,11 @@ function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX
   const label = props.operationKind === 'frame' ? 'Cancel frame' : 'Cancel jog';
   return (
     <div style={rowStyle}>
-      <button type="button" onClick={() => void cancelJog().catch(() => undefined)}>
+      <button
+        type="button"
+        onClick={() => void cancelJog().catch(() => undefined)}
+        title="Cancel the active framing or jog motion. Use physical E-stop if unsafe."
+      >
         {label}
       </button>
       <span style={runningSafetyStyle}>Uses GRBL jog cancel. Use physical E-stop if unsafe.</span>

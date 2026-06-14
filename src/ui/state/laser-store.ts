@@ -47,10 +47,12 @@ import {
 } from './laser-safety-notice';
 import {
   assertAutofocusIdle,
+  assertNoActiveJob,
   buildPortClosePatch,
   detectStreamStall,
   disconnectStopCommand,
   initialLaserState,
+  idleOnlyDollarCommandBlockMessage,
   isActiveJob,
   pushLog,
   serialWriteErrorMessage,
@@ -192,6 +194,14 @@ async function safeWrite(
   line: string,
   action?: Parameters<typeof writeFailedNotice>[0],
 ): Promise<void> {
+  const blockedMessage = idleOnlyDollarCommandBlockMessage(get(), line);
+  if (blockedMessage !== null) {
+    set({
+      lastWriteError: blockedMessage,
+      log: pushLog(get(), `[lf2] Serial write blocked: ${blockedMessage}`),
+    });
+    throw new Error(blockedMessage);
+  }
   const conn = refs.connection;
   if (conn === null) {
     const message = 'No active serial connection.';
@@ -318,6 +328,8 @@ function jogActions(
       await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
     },
     autofocus: async (command) => {
+      const activeJobBlock = idleCommandBlockResult(get());
+      if (activeJobBlock !== null) return activeJobBlock;
       if (get().autofocusBusy) {
         return { kind: 'preflight-failed', reason: 'Auto-focus is already running.' };
       }
@@ -376,6 +388,7 @@ function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere'
   return {
     setOriginHere: async () => {
       assertAutofocusIdle(get());
+      assertNoActiveJob(get());
       await setOriginHereAction((out) => safeWrite(set, get, out, 'origin'));
       const { statusReport, wcoCache } = get();
       const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
@@ -386,6 +399,7 @@ function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere'
     },
     resetOrigin: async () => {
       assertAutofocusIdle(get());
+      assertNoActiveJob(get());
       await resetOriginAction((out) => safeWrite(set, get, out, 'origin'));
       set({ workOriginActive: false, wcoCache: null });
     },
@@ -418,3 +432,13 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),
 }));
+
+function idleCommandBlockResult(state: LaserState): AutofocusResult | null {
+  try {
+    assertNoActiveJob(state);
+    return null;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return { kind: 'preflight-failed', reason };
+  }
+}

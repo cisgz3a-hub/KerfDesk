@@ -12,6 +12,7 @@ import {
   handleSaveMaterialLibrary,
 } from '../app/material-library-file-actions';
 import { usePlatform } from '../app/platform-context';
+import { Button } from '../kit';
 import { useStore } from '../state';
 import type { CreateMaterialPresetInput } from '../state/material-library-actions';
 import { useToastStore } from '../state/toast-store';
@@ -35,12 +36,7 @@ type CreateDraft = {
   readonly description: string;
 };
 
-const EMPTY_DRAFT: CreateDraft = {
-  materialName: '',
-  thicknessMm: '',
-  title: '',
-  description: '',
-};
+const EMPTY_DRAFT: CreateDraft = { materialName: '', thicknessMm: '', title: '', description: '' };
 
 export function MaterialLibraryPanel(): JSX.Element {
   const library = useStore((state) => state.materialLibrary);
@@ -61,22 +57,22 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
       <div style={buttonRowStyle}>
-        <button
-          type="button"
+        <Button
           aria-label="Create new material library"
+          title="Create a new material library for the current device profile."
           onClick={() => setMaterialLibrary(createBlankLibrary(device))}
         >
           New Library
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           aria-label="Load material library"
+          title="Load a saved LaserForge material library file."
           onClick={() => {
             void handleOpenMaterialLibrary({ platform, setMaterialLibrary, pushToast });
           }}
         >
           Load...
-        </button>
+        </Button>
       </div>
     </section>
   );
@@ -135,9 +131,9 @@ function LoadedMaterialLibraryPanel(props: {
         onLayerChange={setTargetLayerId}
         onPresetChange={setPresetId}
       />
-      <button
-        type="button"
+      <Button
         aria-label="Assign selected material preset"
+        title="Apply the selected material preset to the selected layer."
         disabled={assignDisabled}
         onClick={() => {
           setStatus(
@@ -148,7 +144,7 @@ function LoadedMaterialLibraryPanel(props: {
         }}
       >
         Assign
-      </button>
+      </Button>
       <CreatePresetForm
         targetLayerId={activeLayerId}
         entryCount={props.library.entries.length}
@@ -177,15 +173,27 @@ function LibraryHeader(props: {
         {props.libraryDirty ? ' *' : ''}
       </span>
       <div style={buttonRowStyle}>
-        <button type="button" aria-label="Load material library" onClick={props.onLoad}>
+        <Button
+          aria-label="Load material library"
+          title="Load a different material library file."
+          onClick={props.onLoad}
+        >
           Load...
-        </button>
-        <button type="button" aria-label="Save material library" onClick={props.onSave}>
+        </Button>
+        <Button
+          aria-label="Save material library"
+          title="Save the current material library to disk."
+          onClick={props.onSave}
+        >
           Save...
-        </button>
-        <button type="button" aria-label="Unload material library" onClick={props.onUnload}>
+        </Button>
+        <Button
+          aria-label="Unload material library"
+          title="Close the loaded material library without deleting the file."
+          onClick={props.onUnload}
+        >
           Unload
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -290,13 +298,14 @@ function CreatePresetForm(props: {
         value={draft.description}
         onChange={(event) => setDraftValue(setDraft, 'description', event.currentTarget.value)}
       />
-      <button
+      <Button
         type="submit"
         aria-label="Create preset from selected layer"
+        title="Create a new material preset from the selected layer settings."
         disabled={createDisabled}
       >
         Create from Layer
-      </button>
+      </Button>
     </form>
   );
 }

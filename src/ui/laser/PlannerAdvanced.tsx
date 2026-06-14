@@ -18,7 +18,12 @@ export function PlannerAdvanced(props: {
 }): JSX.Element {
   return (
     <details style={advancedDetailsStyle}>
-      <summary style={advancedSummaryStyle}>Advanced: estimator tuning</summary>
+      <summary
+        style={advancedSummaryStyle}
+        title="Open or close advanced acceleration and junction-deviation estimator settings."
+      >
+        Advanced: estimator tuning
+      </summary>
       <div style={advancedBodyStyle}>
         <Row label="$120 accel">
           <input

@@ -66,6 +66,18 @@ describe('kit Button', () => {
     expect(toggle?.getAttribute('aria-pressed')).toBe('true');
     expect(plain?.hasAttribute('aria-pressed')).toBe(false);
   });
+
+  it('uses text children as the default hover explanation', async () => {
+    const h = await render(
+      <>
+        <Button>Cancel</Button>
+        <Button title="Keep this custom explanation">Save</Button>
+      </>,
+    );
+    const [cancel, save] = [...h.querySelectorAll('button')];
+    expect(cancel?.getAttribute('title')).toBe('Cancel');
+    expect(save?.getAttribute('title')).toBe('Keep this custom explanation');
+  });
 });
 
 describe('kit IconButton', () => {

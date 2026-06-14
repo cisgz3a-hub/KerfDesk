@@ -20,7 +20,12 @@ export function ConnectionBar(props: Props): JSX.Element {
   return (
     <div style={rowStyle}>
       {connection.kind === 'connected' ? (
-        <button type="button" onClick={onDisconnect} disabled={disabled}>
+        <button
+          type="button"
+          onClick={onDisconnect}
+          disabled={disabled}
+          title="Close the current laser serial connection."
+        >
           Disconnect
         </button>
       ) : (
@@ -28,6 +33,7 @@ export function ConnectionBar(props: Props): JSX.Element {
           type="button"
           onClick={onConnect}
           disabled={disabled || connection.kind === 'connecting'}
+          title="Open the browser serial picker and connect to your laser controller."
         >
           {connection.kind === 'connecting' ? 'Connecting…' : 'Connect…'}
         </button>

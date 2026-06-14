@@ -49,10 +49,19 @@ export function DetectedSettingsBanner(): JSX.Element | null {
         ))}
       </ul>
       <div style={actionsStyle}>
-        <button type="button" onClick={dismiss}>
+        <button
+          type="button"
+          onClick={dismiss}
+          title="Ignore these detected firmware settings for now."
+        >
           Dismiss
         </button>
-        <button type="button" onClick={apply} style={primaryButtonStyle}>
+        <button
+          type="button"
+          onClick={apply}
+          style={primaryButtonStyle}
+          title="Apply the detected firmware settings to this device profile."
+        >
           Apply
         </button>
       </div>

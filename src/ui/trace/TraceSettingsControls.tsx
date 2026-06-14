@@ -68,6 +68,7 @@ export function TraceSettingsControls(props: {
           onClick={() => props.onChange({})}
           disabled={Object.keys(props.overrides).length === 0}
           style={resetButtonStyle}
+          title="Reset all trace controls to the selected tracing preset."
         >
           Reset trace settings
         </button>

@@ -26,14 +26,29 @@ export function Button({
   variant = 'default',
   pressed,
   type = 'button',
+  title,
+  children,
   ...rest
 }: ButtonProps): JSX.Element {
+  const hoverTitle = title === undefined ? titleFromChildren(children) : title;
   return (
     <button
       {...rest}
       type={type}
+      title={hoverTitle}
       className={VARIANT_CLASS[variant]}
       {...(pressed === undefined ? {} : { 'aria-pressed': pressed })}
-    />
+    >
+      {children}
+    </button>
   );
+}
+
+function titleFromChildren(children: React.ReactNode): string | undefined {
+  if (typeof children === 'string') {
+    const text = children.trim();
+    return text === '' ? undefined : text;
+  }
+  if (typeof children === 'number') return String(children);
+  return undefined;
 }

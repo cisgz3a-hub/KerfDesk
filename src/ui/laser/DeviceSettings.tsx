@@ -29,7 +29,12 @@ export function DeviceSettings(): JSX.Element {
   // power-user knobs — that nesting is intentional, not accidental.
   return (
     <details style={panelStyle}>
-      <summary style={summaryStyle}>Device</summary>
+      <summary
+        style={summaryStyle}
+        title="Open or close machine bed, origin, feed, and GRBL settings."
+      >
+        Device
+      </summary>
       <div style={bodyStyle}>
         <BasicRows device={device} update={update} />
         <Row label="Homing">

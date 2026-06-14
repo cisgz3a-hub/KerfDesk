@@ -17,6 +17,8 @@ import type { LaserState } from './laser-store';
 const LOG_MAX = 200;
 const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
+export const ACTIVE_JOB_COMMAND_MESSAGE =
+  'A job is active. Press Stop before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -30,6 +32,18 @@ export function isActiveJob(streamer: StreamerState | null): boolean {
   return streamer !== null && ['streaming', 'paused', 'errored'].includes(streamer.status);
 }
 
+export function activeJobCommandBlockMessage(state: LaserState): string | null {
+  return isActiveJob(state.streamer) ? ACTIVE_JOB_COMMAND_MESSAGE : null;
+}
+
+export function idleOnlyDollarCommandBlockMessage(
+  state: LaserState,
+  payload: string,
+): string | null {
+  if (!payloadContainsDollarLineCommand(payload)) return null;
+  return activeJobCommandBlockMessage(state);
+}
+
 export function disconnectStopCommand(state: LaserState): string | null {
   if (isActiveJob(state.streamer)) return RT_SOFT_RESET;
   return state.motionOperation !== null ? RT_JOG_CANCEL : null;
@@ -37,6 +51,15 @@ export function disconnectStopCommand(state: LaserState): string | null {
 
 export function assertAutofocusIdle(state: LaserState): void {
   if (state.autofocusBusy) throw new Error(AUTOFOCUS_BUSY_MESSAGE);
+}
+
+export function assertNoActiveJob(state: LaserState): void {
+  const message = activeJobCommandBlockMessage(state);
+  if (message !== null) throw new Error(message);
+}
+
+function payloadContainsDollarLineCommand(payload: string): boolean {
+  return payload.split(/\r?\n/).some((line) => line.trim().startsWith('$'));
 }
 
 // M13 (AUDIT-2026-06-10): ack watchdog. The streamer is purely ack-driven —
