@@ -4,6 +4,7 @@
 import { progress } from '../../core/controllers/grbl';
 import {
   computeJobBounds,
+  computeJobMotionBounds,
   describeFramePreflightFailure,
   framePreflight,
   offsetJobBounds,
@@ -311,6 +312,7 @@ function useFrameAction(): () => void {
       pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
       return;
     }
+    const motionBounds = computeJobMotionBounds(prepared.job) ?? bounds;
     // Refuse to drive the head off-bed. The Falcon (and most diode
     // lasers) ship with $20=0, so any X/Y past the soft-limits skips
     // steps mechanically — the operator hears grinding and the trace
@@ -318,11 +320,14 @@ function useFrameAction(): () => void {
     // can't keep up. Better to refuse here with a clear instruction.
     const preflightBounds =
       placement.preflightMotionOffset === undefined
-        ? bounds
-        : offsetJobBounds(bounds, placement.preflightMotionOffset);
+        ? motionBounds
+        : offsetJobBounds(motionBounds, placement.preflightMotionOffset);
     const pre = framePreflight(preflightBounds, project.device);
     if (pre.kind === 'out-of-bounds') {
-      pushToast(describeFramePreflightFailure(pre), 'error');
+      pushToast(
+        `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`,
+        'error',
+      );
       return;
     }
     // Frame uses its own dedicated feed so changing layer / cut speed

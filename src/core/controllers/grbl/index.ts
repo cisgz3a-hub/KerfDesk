@@ -10,10 +10,11 @@ export { parseStatusReport } from './status-parser';
 export type { GrblResponse } from './response';
 export { classifyResponse } from './response';
 
-export type { SettingsCollectorState } from './parse-settings';
+export type { ControllerSettingsSnapshot, SettingsCollectorState } from './parse-settings';
 export {
   idleCollector,
   onResponse as collectorOnResponse,
+  settingsMapToControllerSettings,
   settingsMapToProfilePatch,
   startCollecting,
 } from './parse-settings';

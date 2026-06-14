@@ -2,7 +2,7 @@ export type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '.
 export { EMPTY_JOB } from './job';
 export { compileJob, DEFAULT_OVERSCAN_MM } from './compile-job';
 export type { JobBounds } from './job-bounds';
-export { computeJobBounds } from './job-bounds';
+export { computeJobBounds, computeJobMotionBounds } from './job-bounds';
 export type { RasterMachineBounds } from './raster-bounds';
 export { rasterBoundsInMachineCoords } from './raster-bounds';
 export type { FramePreflight } from './frame-preflight';

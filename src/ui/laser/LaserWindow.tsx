@@ -9,6 +9,7 @@ import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
+import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
 import { LaserLog } from './LaserLog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
@@ -37,6 +38,7 @@ export function LaserWindow(): JSX.Element {
   const jobActive = isActiveJob(streamer);
   const controllerIdle = statusReport?.state === 'Idle';
   const showAlarmBanner = hasAlarmRecovery(alarmCode, statusReport?.state);
+  const connected = connection.kind === 'connected';
 
   const supportsSerial = platform.serial.isSupported();
 
@@ -59,6 +61,9 @@ export function LaserWindow(): JSX.Element {
         onDisconnect={() => void disconnect().catch(() => undefined)}
         disabled={!supportsSerial || machineOperationBusy}
       />
+      <GrblLaserSetupPanel
+        disabled={isSetupPanelDisabled(connected, machineOperationBusy, jobActive)}
+      />
       {showAlarmBanner && (
         <AlarmBanner
           code={alarmCode}
@@ -70,9 +75,7 @@ export function LaserWindow(): JSX.Element {
       <DetectedSettingsBanner />
       <StatusDisplay />
       <JogPad
-        disabled={
-          connection.kind !== 'connected' || !controllerIdle || machineOperationBusy || jobActive
-        }
+        disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobActive)}
       />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
@@ -85,6 +88,23 @@ export function LaserWindow(): JSX.Element {
 
 function hasAlarmRecovery(code: number | null, state: string | undefined): boolean {
   return code !== null || state === 'Alarm';
+}
+
+function isSetupPanelDisabled(
+  connected: boolean,
+  machineOperationBusy: boolean,
+  jobActive: boolean,
+): boolean {
+  return !connected || machineOperationBusy || jobActive;
+}
+
+function isJogPadDisabled(
+  connected: boolean,
+  controllerIdle: boolean,
+  machineOperationBusy: boolean,
+  jobActive: boolean,
+): boolean {
+  return !connected || !controllerIdle || machineOperationBusy || jobActive;
 }
 
 function AlarmBanner({

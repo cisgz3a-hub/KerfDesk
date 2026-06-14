@@ -45,6 +45,7 @@ import {
   streamStalledNotice,
   writeFailedNotice,
 } from './laser-safety-notice';
+import { setupActions } from './laser-setup-actions';
 import {
   assertAutofocusIdle,
   assertNoActiveJob,
@@ -119,6 +120,7 @@ export type LaserState = {
   readonly home: () => Promise<void>;
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
   readonly unlockAlarm: () => Promise<void>;
+  readonly configureGrblLaserSetup: () => Promise<void>;
   readonly jog: (params: JogParams) => Promise<void>;
   readonly cancelJog: () => Promise<void>;
   readonly frame: (
@@ -460,6 +462,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...connectionActions(set, get),
   ...jogActions(set, get),
   ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
+  ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
   ...originActions(set, get),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),

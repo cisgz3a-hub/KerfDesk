@@ -112,8 +112,13 @@ export function handleLine(
     refs.onLineArrived = null;
     cb();
   }
-  const patch = consumeSettingsResponse(refs, cls);
-  if (patch !== null) set({ detectedSettings: patch, controllerSettings: patch });
+  const detected = consumeSettingsResponse(refs, cls);
+  if (detected !== null) {
+    set({
+      detectedSettings: Object.keys(detected.patch).length > 0 ? detected.patch : null,
+      controllerSettings: detected.controllerSettings,
+    });
+  }
   if (cls.kind === 'status') {
     handleStatusLine(set, get, safeWrite, cls.report);
     return;

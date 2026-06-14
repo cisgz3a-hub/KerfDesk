@@ -3,6 +3,7 @@ import { classifyResponse } from './response';
 import {
   idleCollector,
   onResponse,
+  settingsMapToControllerSettings,
   settingsMapToProfilePatch,
   startCollecting,
 } from './parse-settings';
@@ -12,6 +13,7 @@ import {
 // confirm we ignore unknown settings cleanly.
 const FALCON_DUMP = [
   '$11=0.010',
+  '$22=0',
   '$30=1000',
   '$31=0',
   '$32=1',
@@ -27,6 +29,7 @@ describe('settingsMapToProfilePatch', () => {
   it('maps a complete Falcon-like dump to a full DeviceProfile patch', () => {
     const map = new Map<number, string>([
       [11, '0.010'],
+      [22, '0'],
       [30, '1000'],
       [31, '0'],
       [32, '1'],
@@ -45,6 +48,19 @@ describe('settingsMapToProfilePatch', () => {
     expect(patch.accelMmPerSec2).toBe(2500);
     expect(patch.bedWidth).toBe(400);
     expect(patch.bedHeight).toBe(400);
+  });
+
+  it('maps $22 into controller settings without mutating the device profile patch', () => {
+    const map = new Map<number, string>([
+      [22, '1'],
+      [30, '1000'],
+    ]);
+
+    expect(settingsMapToControllerSettings(map)).toMatchObject({
+      homingEnabled: true,
+      maxPowerS: 1000,
+    });
+    expect(settingsMapToProfilePatch(map)).not.toHaveProperty('homing');
   });
 
   it('takes the max of $110/$111 for maxFeed (vector reach)', () => {
@@ -120,6 +136,7 @@ describe('SettingsCollector state machine', () => {
     if (state.kind === 'done') {
       expect(state.patch.bedWidth).toBe(400);
       expect(state.patch.accelMmPerSec2).toBe(2500);
+      expect(state.controllerSettings.homingEnabled).toBe(false);
     }
   });
 

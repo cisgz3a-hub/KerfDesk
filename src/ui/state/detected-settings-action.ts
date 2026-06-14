@@ -20,6 +20,7 @@ import {
   type GrblResponse,
   idleCollector,
   type SettingsCollectorState,
+  type ControllerSettingsSnapshot,
 } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
 import { useStore } from './store';
@@ -31,6 +32,11 @@ export type DetectedSettingsRefs = {
   settingsCollector: SettingsCollectorState;
 };
 
+export type DetectedSettingsResult = {
+  readonly patch: Partial<DeviceProfile>;
+  readonly controllerSettings: ControllerSettingsSnapshot;
+};
+
 // Feed one classified response to the collector. Returns the patch if
 // the window just closed (collector reached `done`), otherwise null.
 // Callers (handleLine in laser-store) should publish the patch to
@@ -38,11 +44,14 @@ export type DetectedSettingsRefs = {
 export function consumeSettingsResponse(
   refs: DetectedSettingsRefs,
   response: GrblResponse,
-): Partial<DeviceProfile> | null {
+): DetectedSettingsResult | null {
   const next = collectorOnResponse(refs.settingsCollector, response);
   if (next.kind === 'done') {
     refs.settingsCollector = idleCollector();
-    return Object.keys(next.patch).length > 0 ? next.patch : null;
+    if (Object.keys(next.patch).length === 0 && Object.keys(next.controllerSettings).length === 0) {
+      return null;
+    }
+    return { patch: next.patch, controllerSettings: next.controllerSettings };
   }
   refs.settingsCollector = next;
   return null;
