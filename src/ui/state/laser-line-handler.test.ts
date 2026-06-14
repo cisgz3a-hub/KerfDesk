@@ -43,6 +43,7 @@ function makeLaserState(): LaserState {
     dismissDetectedSettings: () => undefined,
     setOriginHere: async () => undefined,
     resetOrigin: async () => undefined,
+    configureGrblLaserSetup: async () => undefined,
   };
 }
 
@@ -67,7 +68,7 @@ describe('handleLine detected controller settings', () => {
   it('publishes detected settings both for the banner and for live Start readiness', () => {
     const { refs, set, get } = makeHarness();
 
-    for (const line of ['$30=255', '$31=0', '$32=1', 'ok']) {
+    for (const line of ['$22=1', '$30=255', '$31=0', '$32=1', 'ok']) {
       handleLine(set, get, refs, async () => undefined, line);
     }
 
@@ -78,6 +79,7 @@ describe('handleLine detected controller settings', () => {
       laserModeEnabled: true,
     });
     expect(get().controllerSettings).toMatchObject({
+      homingEnabled: true,
       maxPowerS: 255,
       minPowerS: 0,
       laserModeEnabled: true,

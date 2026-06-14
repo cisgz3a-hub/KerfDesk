@@ -218,25 +218,34 @@ function appendBoundsIssues(
   // side of the artwork, so an image within that distance of the bed's X
   // edges always fails bounds with a bare coordinate error — name the real
   // cause and the remedy instead of pointing at the artwork.
-  if (oob.length > 0 && hasImageOutput(project.scene)) {
+  const overscanMm = maxOutputOverscanMm(project.scene);
+  if (oob.length > 0 && overscanMm > 0) {
     issues.push({
       code: 'out-of-bed',
       message:
-        `Note: image engraves sweep ${DEFAULT_OVERSCAN_MM} mm past each side of the artwork for ` +
+        `Note: fill/image engraves can sweep ${overscanMm} mm past each side of the artwork for ` +
         `overscan (acceleration runway). If the artwork itself fits the bed, move it at least ` +
-        `${DEFAULT_OVERSCAN_MM} mm inside the left/right edges.`,
+        `${overscanMm} mm inside the left/right edges.`,
     });
   }
 }
 
-function hasImageOutput(scene: Scene): boolean {
+function maxOutputOverscanMm(scene: Scene): number {
   const imageColors = new Set(
     scene.layers.filter((l) => l.output && l.mode === 'image').map((l) => l.color),
   );
-  return scene.objects.some(
+  const hasImageOutput = scene.objects.some(
     (obj) =>
       obj.kind === 'raster-image' && obj.role !== 'trace-source' && imageColors.has(obj.color),
   );
+  const imageOverscan = hasImageOutput ? DEFAULT_OVERSCAN_MM : 0;
+  const fillOverscan = Math.max(
+    0,
+    ...scene.layers
+      .filter((l) => l.output && l.mode === 'fill')
+      .map((l) => Math.max(0, l.fillOverscanMm)),
+  );
+  return Math.max(imageOverscan, fillOverscan);
 }
 
 function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): void {

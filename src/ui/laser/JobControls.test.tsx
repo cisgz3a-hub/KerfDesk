@@ -49,6 +49,50 @@ function installProject(): void {
   });
 }
 
+function installFillProjectAtLeftEdge(): void {
+  useStore.setState({
+    project: {
+      ...createProject(),
+      scene: {
+        ...EMPTY_SCENE,
+        layers: [
+          {
+            ...createLayer({ id: 'L-fill', color: '#ff0000', mode: 'fill' }),
+            fillOverscanMm: 5,
+            hatchSpacingMm: 2,
+            power: 10,
+          },
+        ],
+        objects: [
+          {
+            kind: 'imported-svg',
+            id: 'fill-edge',
+            source: 'fill.svg',
+            bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+            transform: IDENTITY_TRANSFORM,
+            paths: [
+              {
+                color: '#ff0000',
+                polylines: [
+                  {
+                    closed: true,
+                    points: [
+                      { x: 0, y: 0 },
+                      { x: 10, y: 0 },
+                      { x: 10, y: 10 },
+                      { x: 0, y: 10 },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
+  });
+}
+
 type MotionOperationSnapshot = {
   readonly kind: 'frame' | 'jog';
   readonly sawControllerBusy: boolean;
@@ -78,6 +122,51 @@ afterEach(() => {
 });
 
 describe('JobControls Frame action', () => {
+  it('blocks Frame when fill overscan would make Start fail out of bounds', async () => {
+    installFillProjectAtLeftEdge();
+    const originalFrame = useLaserStore.getState().frame;
+    const frame = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      frame,
+      streamer: null,
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+      });
+      const frameButton = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Frame',
+      );
+      if (frameButton === undefined) throw new Error('Frame button not rendered');
+
+      await act(async () => {
+        frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(frame).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts.at(-1)?.message).toMatch(/overscan/i);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      useLaserStore.setState({ frame: originalFrame });
+      host.remove();
+    }
+  });
+
   it('blocks Frame when a custom origin is active but WCO is unknown', async () => {
     installProject();
     const originalFrame = useLaserStore.getState().frame;

@@ -1,9 +1,7 @@
-import type { DeviceProfile } from '../devices';
+import type { ControllerSettingsSnapshot as GrblControllerSettingsSnapshot } from '../controllers/grbl';
 import type { Project } from '../scene';
 
-export type ControllerSettingsSnapshot = Partial<
-  Pick<DeviceProfile, 'maxPowerS' | 'minPowerS' | 'laserModeEnabled'>
->;
+export type ControllerSettingsSnapshot = GrblControllerSettingsSnapshot;
 
 export type ControllerReadinessErrorCode =
   | 'controller-settings-unknown'

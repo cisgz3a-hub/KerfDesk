@@ -1,0 +1,93 @@
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { PlatformAdapter } from '../../platform/types';
+import { PlatformProvider } from '../app/platform-context';
+import { useLaserStore } from '../state/laser-store';
+import { LaserWindow } from './LaserWindow';
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+const mockPlatform: PlatformAdapter = {
+  id: 'mock',
+  pickFilesForOpen: async () => [],
+  pickFileForSave: async () => null,
+  serial: {
+    isSupported: () => true,
+    requestPort: async () => null,
+  },
+};
+
+afterEach(() => {
+  useLaserStore.setState({
+    connection: { kind: 'disconnected' },
+    statusReport: null,
+    alarmCode: null,
+    lastWriteError: null,
+    autofocusBusy: false,
+    motionOperation: null,
+    streamer: null,
+    safetyNotice: null,
+  } as Partial<ReturnType<typeof useLaserStore.getState>>);
+});
+
+describe('GRBL laser setup panel', () => {
+  it('renders a confirmed GRBL laser setup action for connected controllers', async () => {
+    const originalSetup = useLaserStore.getState().configureGrblLaserSetup;
+    const configure = vi.fn(async () => undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+      configureGrblLaserSetup: configure,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      await act(async () => {
+        button(host, 'GRBL laser setup').click();
+        await Promise.resolve();
+      });
+
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('$32=1'));
+      expect(configure).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => {
+        useLaserStore.setState({ configureGrblLaserSetup: originalSetup });
+      });
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+      confirm.mockRestore();
+    }
+  });
+});
+
+function button(host: HTMLElement, label: string): HTMLButtonElement {
+  const match = [...host.querySelectorAll('button')].find((candidate) =>
+    candidate.textContent?.includes(label),
+  );
+  if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
+  return match;
+}

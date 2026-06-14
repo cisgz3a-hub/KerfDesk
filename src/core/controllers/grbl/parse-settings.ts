@@ -32,10 +32,30 @@
 import type { DeviceProfile } from '../../devices/device-profile';
 import type { GrblResponse } from './response';
 
+export type ControllerSettingsSnapshot = Partial<
+  Pick<
+    DeviceProfile,
+    | 'maxPowerS'
+    | 'minPowerS'
+    | 'laserModeEnabled'
+    | 'maxFeed'
+    | 'accelMmPerSec2'
+    | 'bedWidth'
+    | 'bedHeight'
+    | 'junctionDeviationMm'
+  >
+> & {
+  readonly homingEnabled?: boolean;
+};
+
 export type SettingsCollectorState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'collecting'; readonly map: ReadonlyMap<number, string> }
-  | { readonly kind: 'done'; readonly patch: Partial<DeviceProfile> };
+  | {
+      readonly kind: 'done';
+      readonly patch: Partial<DeviceProfile>;
+      readonly controllerSettings: ControllerSettingsSnapshot;
+    };
 
 export function idleCollector(): SettingsCollectorState {
   return { kind: 'idle' };
@@ -65,7 +85,11 @@ export function onResponse(
     return { kind: 'collecting', map: next };
   }
   if (response.kind === 'ok' && state.map.size > 0) {
-    return { kind: 'done', patch: settingsMapToProfilePatch(state.map) };
+    return {
+      kind: 'done',
+      patch: settingsMapToProfilePatch(state.map),
+      controllerSettings: settingsMapToControllerSettings(state.map),
+    };
   }
   return state;
 }
@@ -102,6 +126,23 @@ export function settingsMapToProfilePatch(
   pushPositiveSetting(fields, map, 131, (value) => ({ bedHeight: value }));
 
   return Object.assign({}, ...fields) as Partial<DeviceProfile>;
+}
+
+export function settingsMapToControllerSettings(
+  map: ReadonlyMap<number, string>,
+): ControllerSettingsSnapshot {
+  const homingEnabled = parseHomingEnabled(map);
+  return {
+    ...settingsMapToProfilePatch(map),
+    ...(homingEnabled === undefined ? {} : { homingEnabled }),
+  };
+}
+
+function parseHomingEnabled(map: ReadonlyMap<number, string>): boolean | undefined {
+  const homing = parseFiniteNumber(map.get(22));
+  if (homing === 0) return false;
+  if (homing === 1) return true;
+  return undefined;
 }
 
 function pushPositiveSetting(

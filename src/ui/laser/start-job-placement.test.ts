@@ -68,6 +68,48 @@ const centeredTraceObject: SceneObject = {
   ],
 };
 
+function fillOverscanProject(): Project {
+  return {
+    ...createProject(),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [
+        {
+          kind: 'imported-svg',
+          id: 'fill-near-origin',
+          source: 'fill.svg',
+          bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+          transform: IDENTITY_TRANSFORM,
+          paths: [
+            {
+              color: '#ff0000',
+              polylines: [
+                {
+                  closed: true,
+                  points: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                    { x: 10, y: 10 },
+                    { x: 0, y: 10 },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      layers: [
+        {
+          ...createLayer({ id: 'L-fill', color: '#ff0000', mode: 'fill' }),
+          fillOverscanMm: 5,
+          hatchSpacingMm: 2,
+          power: 10,
+        },
+      ],
+    },
+  };
+}
+
 describe('prepareStartJob job placement', () => {
   it('places the selected anchor at the current machine position for Current Position jobs', () => {
     const result = prepareStartJob(
@@ -102,6 +144,16 @@ describe('prepareStartJob job placement', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.messages.join('\n')).toMatch(/set origin/i);
+    }
+  });
+
+  it('names fill overscan when an absolute fill job is too close to the bed edge', () => {
+    const result = prepareStartJob(fillOverscanProject(), readyController, readyMachine);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/overscan/i);
+      expect(result.messages.join('\n')).toMatch(/5 mm/);
     }
   });
 });
