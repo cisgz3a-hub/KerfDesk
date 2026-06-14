@@ -114,9 +114,11 @@ function SetupRow(props: {
   const onAutofocus = useAutofocusAction();
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const statusReport = useLaserStore((s) => s.statusReport);
   const home = useLaserStore((s) => s.home);
   const estimate = useJobEstimate();
   const busy = props.disabled || props.streaming;
+  const frameReady = statusReport?.state === 'Idle';
   // Disabled when the command is empty — there's no portable autofocus
   // G-code (see DeviceProfile.autofocusCommand docs); shipping a default
   // we picked would break someone's machine, so the button is dark until
@@ -151,8 +153,12 @@ function SetupRow(props: {
       <button
         type="button"
         onClick={onFrame}
-        disabled={busy}
-        title="Trace the job's bounding box with the laser off to check placement"
+        disabled={busy || !frameReady}
+        title={
+          frameReady
+            ? "Trace the job's bounding box with the laser off to check placement"
+            : frameBlockedTitle(statusReport?.state)
+        }
       >
         Frame
       </button>
@@ -167,6 +173,13 @@ function SetupRow(props: {
       <EstimateBadge estimate={estimate} />
     </div>
   );
+}
+
+function frameBlockedTitle(state: string | undefined): string {
+  if (state === undefined) {
+    return 'Wait for an Idle status report before framing.';
+  }
+  return `Machine must be Idle before framing (currently ${state}).`;
 }
 
 function startJobTitle(estimate: LiveJobEstimate): string {

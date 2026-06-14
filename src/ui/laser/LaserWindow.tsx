@@ -25,11 +25,13 @@ export function LaserWindow(): JSX.Element {
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const streamer = useLaserStore((s) => s.streamer);
+  const statusReport = useLaserStore((s) => s.statusReport);
   const machineOperationBusy = autofocusBusy || motionOperation !== null;
   // H6: jog mid-job interleaves $J= acks into the character-counted stream —
   // every ack pops the stream head, so the 120-byte RX accounting drifts and
   // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
+  const controllerIdle = statusReport?.state === 'Idle';
 
   const supportsSerial = platform.serial.isSupported();
 
@@ -55,7 +57,11 @@ export function LaserWindow(): JSX.Element {
       {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
       <DetectedSettingsBanner />
       <StatusDisplay />
-      <JogPad disabled={connection.kind !== 'connected' || machineOperationBusy || jobActive} />
+      <JogPad
+        disabled={
+          connection.kind !== 'connected' || !controllerIdle || machineOperationBusy || jobActive
+        }
+      />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void runStartJobFlow()}

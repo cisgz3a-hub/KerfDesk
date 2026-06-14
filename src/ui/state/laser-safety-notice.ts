@@ -91,14 +91,35 @@ export function writeFailedNotice(action: LaserSafetyAction): LaserSafetyNotice 
 // ('errored') so no more bytes are sent, but the rejected move may have left
 // the head mispositioned and a subsequent laser-on line may have fired out of
 // place. The copy names the PHYSICAL control for the same reason as the others.
-export function controllerErrorMessage(code: number): string {
+export type ControllerErrorContext = 'job' | 'frame' | 'jog' | 'command';
+
+export function controllerErrorMessage(
+  code: number,
+  context: ControllerErrorContext = 'job',
+): string {
+  if (context === 'job') {
+    return (
+      `The controller rejected a command (error:${code}) during the job, so the job was ` +
+      'stopped. The head may be mispositioned and the laser may have fired out of place. ' +
+      'Use physical E-stop or power cutoff now if unsafe, then home before re-running.'
+    );
+  }
+  if (context === 'frame' || context === 'jog') {
+    return (
+      `The controller rejected a ${context} command (error:${code}). ` +
+      'Wait until the controller reports Idle before jogging or framing again. ' +
+      'If the head moved unexpectedly, use physical E-stop or power cutoff now if unsafe.'
+    );
+  }
   return (
-    `The controller rejected a command (error:${code}) during the job, so the job was ` +
-    'stopped. The head may be mispositioned and the laser may have fired out of place. ' +
-    'Use physical E-stop or power cutoff now if unsafe, then home before re-running.'
+    `The controller rejected a command (error:${code}). ` +
+    'Check the Laser Log, wait for Idle, and home before continuing if position is uncertain.'
   );
 }
 
-export function controllerErrorNotice(code: number): LaserSafetyNotice {
-  return { kind: 'controller-error', code, message: controllerErrorMessage(code) };
+export function controllerErrorNotice(
+  code: number,
+  context: ControllerErrorContext = 'job',
+): LaserSafetyNotice {
+  return { kind: 'controller-error', code, message: controllerErrorMessage(code, context) };
 }

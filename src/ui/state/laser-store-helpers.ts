@@ -19,6 +19,8 @@ const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
   'A job is active. Press Stop before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
+export const UNKNOWN_IDLE_STATUS_MESSAGE =
+  'Controller status is not known yet. Wait for an Idle status report before jogging or framing.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -37,6 +39,16 @@ export function isActiveJob(streamer: StreamerState | null): boolean {
 
 export function activeJobCommandBlockMessage(state: LaserState): string | null {
   return isActiveJob(state.streamer) ? ACTIVE_JOB_COMMAND_MESSAGE : null;
+}
+
+export function jogFrameCommandBlockMessage(state: LaserState): string | null {
+  const activeJobMessage = activeJobCommandBlockMessage(state);
+  if (activeJobMessage !== null) return activeJobMessage;
+  if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
+  if (state.statusReport.state !== 'Idle') {
+    return `Machine must be Idle before jogging or framing (currently ${state.statusReport.state}).`;
+  }
+  return null;
 }
 
 export function idleOnlyDollarCommandBlockMessage(

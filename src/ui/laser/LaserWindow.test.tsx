@@ -182,6 +182,56 @@ describe('LaserWindow autofocus busy controls', () => {
 });
 
 describe('LaserWindow jog gating during a job (H6)', () => {
+  it('keeps Jog and Frame disabled until GRBL reports Idle after connect', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: null,
+      streamer: null,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      const arrows = [...host.querySelectorAll('button')].filter((b) =>
+        ['↑', '↓', '←', '→'].includes(b.textContent ?? ''),
+      );
+      expect(arrows.length).toBeGreaterThan(0);
+      for (const arrow of arrows) expect(arrow.disabled).toBe(true);
+      expect(button(host, 'Frame').disabled).toBe(true);
+
+      await act(async () => {
+        useLaserStore.setState({
+          statusReport: {
+            state: 'Idle',
+            subState: null,
+            mPos: { x: 0, y: 0, z: 0 },
+            wPos: null,
+            wco: null,
+            feed: 0,
+            spindle: 0,
+          },
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+
+      for (const arrow of arrows) expect(arrow.disabled).toBe(false);
+      expect(button(host, 'Frame').disabled).toBe(false);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
   it('disables the JogPad while a job is streaming', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
@@ -222,6 +272,15 @@ describe('LaserWindow jog gating during a job (H6)', () => {
   it('keeps the JogPad enabled when connected with no active job', async () => {
     useLaserStore.setState({
       connection: { kind: 'connected' },
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
       streamer: null,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const host = document.createElement('div');
