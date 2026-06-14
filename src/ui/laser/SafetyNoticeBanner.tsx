@@ -22,7 +22,12 @@ export function SafetyNoticeBanner(): JSX.Element | null {
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>
       <p style={messageStyle}>{notice.message}</p>
-      <button type="button" onClick={clear} style={dismissStyle}>
+      <button
+        type="button"
+        onClick={clear}
+        style={dismissStyle}
+        title="Dismiss this safety notice after you have checked the machine."
+      >
         Dismiss
       </button>
     </div>

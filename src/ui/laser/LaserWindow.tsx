@@ -80,7 +80,11 @@ function AlarmBanner({
       </strong>
       <p style={alarmDetailStyle}>{alarm?.detail ?? ''}</p>
       <p style={alarmDetailStyle}>{alarm?.action ?? ''}</p>
-      <button type="button" onClick={onUnlock}>
+      <button
+        type="button"
+        onClick={onUnlock}
+        title="Send $X to unlock the controller after you have confirmed the machine is safe."
+      >
         $X — Unlock
       </button>
     </div>

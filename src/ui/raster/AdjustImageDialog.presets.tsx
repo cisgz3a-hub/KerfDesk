@@ -51,7 +51,12 @@ export function PresetField(props: {
         ))}
       </select>
       <span style={styles.presetActionsStyle}>
-        <button name="saveImagePreset" type="button" onClick={props.onSave}>
+        <button
+          name="saveImagePreset"
+          type="button"
+          onClick={props.onSave}
+          title="Save the current image adjustment settings as a reusable preset."
+        >
           Save
         </button>
         <button
@@ -59,6 +64,11 @@ export function PresetField(props: {
           type="button"
           disabled={!canDelete}
           onClick={props.onDelete}
+          title={
+            canDelete
+              ? 'Delete the selected user image preset.'
+              : 'Only user-saved image presets can be deleted.'
+          }
         >
           Delete
         </button>

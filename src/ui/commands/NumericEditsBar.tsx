@@ -16,16 +16,16 @@ const DISPLAY_DECIMALS = 3;
 
 const ANCHORS: ReadonlyArray<SelectionAnchor> = ['nw', 'n', 'ne', 'w', 'c', 'e', 'sw', 's', 'se'];
 
-const ANCHOR_LABELS: Readonly<Record<SelectionAnchor, string>> = {
-  nw: 'Top left anchor',
-  n: 'Top anchor',
-  ne: 'Top right anchor',
-  w: 'Left anchor',
-  c: 'Center anchor',
-  e: 'Right anchor',
-  sw: 'Bottom left anchor',
-  s: 'Bottom anchor',
-  se: 'Bottom right anchor',
+const ANCHOR_NAMES: Readonly<Record<SelectionAnchor, string>> = {
+  nw: 'top left',
+  n: 'top center',
+  ne: 'top right',
+  w: 'middle left',
+  c: 'center',
+  e: 'middle right',
+  sw: 'bottom left',
+  s: 'bottom center',
+  se: 'bottom right',
 };
 
 export function NumericEditsBar(): JSX.Element {
@@ -128,6 +128,7 @@ function NumericFields(props: { readonly model: NumericEditModel }): JSX.Element
         type="button"
         className="lf-btn lf-iconbtn lf-iconbtn--sm"
         aria-label="Lock aspect ratio"
+        title="Keep width and height proportional when resizing the selection."
         aria-pressed={model.preserveAspect}
         disabled={!model.hasSelection}
         onClick={() => model.setPreserveAspect((value) => !value)}
@@ -176,16 +177,44 @@ function AnchorGrid(props: {
           key={anchor}
           type="button"
           className="lf-btn lf-iconbtn lf-iconbtn--sm"
-          aria-label={ANCHOR_LABELS[anchor]}
+          aria-label={`Numeric edit anchor: ${ANCHOR_NAMES[anchor]}`}
+          title={anchorTitle(anchor)}
           aria-pressed={props.active === anchor}
           disabled={props.disabled}
           onClick={() => props.onChange(anchor)}
         >
-          .
+          <span aria-hidden="true" style={anchorMarkerStyle} />
         </button>
       ))}
     </div>
   );
+}
+
+function anchorTitle(anchor: SelectionAnchor): string {
+  return `Use the selection ${anchorPointName(anchor)} point as the X/Y reference, resize anchor, and rotation pivot.`;
+}
+
+function anchorPointName(anchor: SelectionAnchor): string {
+  switch (anchor) {
+    case 'nw':
+      return 'top-left';
+    case 'n':
+      return 'top';
+    case 'ne':
+      return 'top-right';
+    case 'w':
+      return 'left';
+    case 'c':
+      return 'center';
+    case 'e':
+      return 'right';
+    case 'sw':
+      return 'bottom-left';
+    case 's':
+      return 'bottom';
+    case 'se':
+      return 'bottom-right';
+  }
 }
 
 function NumberField(props: {
@@ -268,6 +297,13 @@ const anchorGridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, 22px)',
   gap: 2,
+};
+const anchorMarkerStyle: React.CSSProperties = {
+  display: 'block',
+  width: 7,
+  height: 7,
+  borderRadius: 2,
+  background: 'currentColor',
 };
 const fieldStyle: React.CSSProperties = {
   display: 'flex',

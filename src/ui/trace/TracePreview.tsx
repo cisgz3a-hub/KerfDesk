@@ -71,6 +71,7 @@ function PreviewControls(props: {
           onClick={props.onToggleFade}
           className="lf-btn"
           style={previewButtonSizeStyle}
+          title="Fade the source image so the traced vectors are easier to inspect."
         >
           Fade Image
         </button>
@@ -82,6 +83,7 @@ function PreviewControls(props: {
           onClick={props.onTogglePoints}
           className="lf-btn"
           style={previewButtonSizeStyle}
+          title="Show or hide traced vector points in the preview."
         >
           Show Points
         </button>
@@ -92,6 +94,7 @@ function PreviewControls(props: {
           onClick={props.onBoundaryClear}
           className="lf-btn"
           style={previewButtonSizeStyle}
+          title="Clear the selected trace boundary and trace the full image again."
         >
           Clear Boundary
         </button>

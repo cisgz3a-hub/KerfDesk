@@ -47,6 +47,7 @@ export function FontPicker(props: Props): JSX.Element {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        title="Open the font picker and choose the text typeface."
         style={selected === undefined ? triggerBaseStyle : triggerStyleFor(selected.key)}
       >
         {selected === undefined ? (
@@ -72,6 +73,7 @@ export function FontPicker(props: Props): JSX.Element {
                 type="button"
                 className="lf-menu-item"
                 onClick={() => handleSelect(f.key)}
+                title={`Use ${f.displayName} for this text object.`}
                 style={optionStyleFor(f.key, f.key === props.value)}
               >
                 <span style={optionNameStyle}>{f.displayName}</span>

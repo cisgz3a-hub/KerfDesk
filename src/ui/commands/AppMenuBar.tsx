@@ -56,6 +56,7 @@ function MenuFamily(props: {
     <details open={props.open} style={familyStyle}>
       <summary
         style={summaryStyle}
+        title={`Open the ${familyLabel(props.family)} menu.`}
         onClick={(event) => {
           event.preventDefault();
           toggle();

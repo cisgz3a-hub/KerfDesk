@@ -32,6 +32,14 @@ describe('NumericEditsBar', () => {
     expect(input(container, 'Selection width').disabled).toBe(true);
   });
 
+  it('explains the 9-point anchor buttons on hover', async () => {
+    const container = await render(<NumericEditsBar />);
+    const anchor = button(container, 'Numeric edit anchor: top right');
+
+    expect(anchor.title).toContain('top-right point');
+    expect(anchor.textContent).not.toBe('.');
+  });
+
   it('commits an exact X position edit through the selection transform path', async () => {
     installProject();
     const container = await render(<NumericEditsBar />);
@@ -62,6 +70,12 @@ async function render(node: JSX.Element): Promise<HTMLDivElement> {
 function input(container: HTMLDivElement, label: string): HTMLInputElement {
   const found = container.querySelector(`input[aria-label="${label}"]`);
   if (!(found instanceof HTMLInputElement)) throw new Error(`${label} missing`);
+  return found;
+}
+
+function button(container: HTMLDivElement, label: string): HTMLButtonElement {
+  const found = container.querySelector(`button[aria-label="${label}"]`);
+  if (!(found instanceof HTMLButtonElement)) throw new Error(`${label} missing`);
   return found;
 }
 

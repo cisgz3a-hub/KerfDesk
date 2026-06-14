@@ -80,10 +80,18 @@ function CrashScreen(props: {
       <p style={messageStyle}>{props.error.message || 'Unknown error'}</p>
       <pre style={stackStyle}>{props.error.stack ?? '(no stack available)'}</pre>
       <div style={actionsStyle}>
-        <button type="button" onClick={handleCopy}>
+        <button
+          type="button"
+          onClick={handleCopy}
+          title="Copy the local crash diagnostic so you can paste it into a bug report."
+        >
           {copyState === 'copied' ? 'Copied' : 'Copy diagnostic'}
         </button>
-        <button type="button" onClick={props.onRetry}>
+        <button
+          type="button"
+          onClick={props.onRetry}
+          title="Try to reload the LaserForge interface without closing the app."
+        >
           Try again
         </button>
       </div>
