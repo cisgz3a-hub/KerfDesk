@@ -20,7 +20,7 @@ import {
   handleSaveProject,
 } from './file-actions';
 import { useStore } from '../state';
-import { useUiStore } from '../state/ui-store';
+import { useUiStore, type ToolMode } from '../state/ui-store';
 import { finishPen } from '../workspace/pen-tool';
 
 const NUDGE_MM = 1;
@@ -96,7 +96,9 @@ function isEditableTarget(e: KeyboardEvent): boolean {
   return false;
 }
 
-const FILE_KEYS: ReadonlyArray<string> = ['n', 'o', 's', 'i', 'e'];
+// Ctrl+E moved to the Ellipse tool (LightBurn parity, ADR-051 B7); export
+// G-code is now Ctrl+Shift+E, handled as a special case in handleFileShortcut.
+const FILE_KEYS: ReadonlyArray<string> = ['n', 'o', 's', 'i'];
 const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
   n: (c) => {
     void c.confirmDiscard('start a new project').then((ok) => {
@@ -124,16 +126,6 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
       pushToast: c.pushToast,
     }),
   i: (c) => void handleImportSvg(c.platform, c.importSvgObject, c.pushToast),
-  e: (c) =>
-    void handleSaveGcode({
-      platform: c.platform,
-      project: c.project,
-      savedName: c.savedName,
-      jobPlacement: c.jobPlacement,
-      machine: c.machine,
-      controllerSettings: c.controllerSettings,
-      pushToast: c.pushToast,
-    }),
 };
 
 export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
@@ -152,6 +144,21 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
       },
       true,
     );
+    return true;
+  }
+  // Ctrl+Shift+E = export G-code (moved off Ctrl+E, which now arms the Ellipse
+  // tool — LightBurn parity, ADR-051 B7).
+  if (e.shiftKey && e.key.toLowerCase() === 'e') {
+    e.preventDefault();
+    void handleSaveGcode({
+      platform: ctx.platform,
+      project: ctx.project,
+      savedName: ctx.savedName,
+      jobPlacement: ctx.jobPlacement,
+      machine: ctx.machine,
+      controllerSettings: ctx.controllerSettings,
+      pushToast: ctx.pushToast,
+    });
     return true;
   }
   if (e.shiftKey) return false;
@@ -254,6 +261,29 @@ export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
     }
   }
   return false;
+}
+
+export type ToolCtx = {
+  readonly setToolMode: (mode: ToolMode) => void;
+};
+
+// Ctrl/Cmd + letter arms a drawing tool, matching LightBurn (ADR-051 B7):
+// R = rectangle, E = ellipse, L = line/pen. Plain Ctrl+letter only — the Shift
+// variants belong to Save-As (S) and export-G-code (E).
+const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
+  r: { kind: 'draw', shape: 'rect' },
+  e: { kind: 'draw', shape: 'ellipse' },
+  l: { kind: 'draw', shape: 'polyline' },
+};
+
+export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
+  if (!hasMeta(e) || e.shiftKey || e.altKey) return false;
+  if (isEditableTarget(e)) return false;
+  const mode = TOOL_BINDINGS[e.key.toLowerCase()];
+  if (mode === undefined) return false;
+  e.preventDefault();
+  ctx.setToolMode(mode);
+  return true;
 }
 
 const ARROW_DELTAS: Readonly<Record<string, { dx: number; dy: number }>> = {

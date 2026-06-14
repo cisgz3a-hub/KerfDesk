@@ -18,6 +18,7 @@ import { usePlatform } from './platform-context';
 import {
   handleEditShortcut,
   handleFileShortcut,
+  handleToolShortcut,
   handleTransformShortcut,
   handleViewShortcut,
 } from './shortcuts';
@@ -41,6 +42,7 @@ function useFileEditShortcuts(): void {
   const selectAllObjects = useStore((s) => s.selectAllObjects);
   const duplicateSelection = useStore((s) => s.duplicateSelection);
   const resetToolMode = useUiStore((s) => s.resetToolMode);
+  const setToolMode = useUiStore((s) => s.setToolMode);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const savedName = useStore((s) => s.savedName);
@@ -65,6 +67,10 @@ function useFileEditShortcuts(): void {
       // prettier-ignore
       const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, selectObject, selectAllObjects, duplicateSelection, resetToolMode };
       if (handleFileShortcut(e, fileCtx)) return;
+      // Tool-arming (Ctrl+R/E/L) runs between File and Edit: File owns the
+      // Shift variants (Save-As, export G-code), and no Edit binding uses a
+      // bare Ctrl+R/E/L, so order is unambiguous.
+      if (handleToolShortcut(e, { setToolMode })) return;
       handleEditShortcut(e, editCtx);
     };
     window.addEventListener('keydown', onKeyDown);
@@ -94,6 +100,7 @@ function useFileEditShortcuts(): void {
     selectAllObjects,
     duplicateSelection,
     resetToolMode,
+    setToolMode,
   ]);
 }
 
