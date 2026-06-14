@@ -9,6 +9,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { createRectangle } from '../../core/shapes';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 
@@ -57,6 +58,23 @@ describe('deserializeProject', () => {
   it('roundtrips a populated project', () => {
     const original = aProject();
     const result = deserializeProject(serializeProject(original));
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project).toEqual(original);
+    }
+  });
+
+  it('roundtrips a shape object (Phase G, ADR-051)', () => {
+    const shape = createRectangle({
+      id: 'S1',
+      color: '#ff0000',
+      spec: { widthMm: 30, heightMm: 20, cornerRadiusMm: 5 },
+    });
+    const base = createProject();
+    const original: Project = { ...base, scene: addObject(base.scene, shape) };
+
+    const result = deserializeProject(serializeProject(original));
+
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
       expect(result.project).toEqual(original);

@@ -155,6 +155,7 @@ function isStrandedOnLayer(obj: SceneObject, layer: Layer): boolean {
     case 'imported-svg':
     case 'text':
     case 'traced-image':
+    case 'shape':
       // Vectors emit only on line/fill layers; an image layer ignores them.
       return layer.mode === 'image' && obj.paths.some((p) => p.color === layer.color);
     case 'raster-image':

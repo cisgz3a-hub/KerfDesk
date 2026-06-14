@@ -82,7 +82,9 @@ function assignSceneObjectColor(object: SceneObject, color: string): SceneObject
       const paths = recolorPaths(object.paths, color);
       return paths === object.paths ? object : { ...object, paths };
     }
-    case 'text': {
+    case 'text':
+    case 'shape': {
+      // text + shape both carry an explicit `color` alongside `paths`.
       const paths = recolorPaths(object.paths, color);
       return paths === object.paths && object.color === color
         ? object

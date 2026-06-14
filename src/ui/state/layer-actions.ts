@@ -161,6 +161,7 @@ function objectUsesLayerColor(object: Scene['objects'][number], color: string): 
     case 'imported-svg':
     case 'text':
     case 'traced-image':
+    case 'shape':
       return object.paths.some((path) => path.color === color);
     case 'raster-image':
       return object.color === color;
@@ -209,6 +210,7 @@ function removeLayerColorFromObject(
       return paths.length === 0 ? null : { ...object, paths };
     }
     case 'text':
+    case 'shape':
       return object.color === color || object.paths.some((path) => path.color === color)
         ? null
         : object;
@@ -288,6 +290,7 @@ function usedLayerColors(scene: Scene): ReadonlySet<string> {
       case 'imported-svg':
       case 'text':
       case 'traced-image':
+      case 'shape':
         for (const path of object.paths) colors.add(path.color);
         break;
       case 'raster-image':

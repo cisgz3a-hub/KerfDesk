@@ -5,3 +5,4 @@
 
 export { rectangleToPolylines } from './rectangle';
 export type { RectangleSpec } from './rectangle';
+export { createRectangle } from './create-rectangle';
