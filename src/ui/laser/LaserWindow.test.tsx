@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject } from '../../core/scene';
@@ -201,9 +201,7 @@ describe('LaserWindow jog gating during a job (H6)', () => {
         );
       });
 
-      const arrows = [...host.querySelectorAll('button')].filter((b) =>
-        ['↑', '↓', '←', '→'].includes(b.textContent ?? ''),
-      );
+      const arrows = [...host.querySelectorAll<HTMLButtonElement>('button[aria-label^="Jog "]')];
       expect(arrows.length).toBeGreaterThan(0);
       for (const arrow of arrows) expect(arrow.disabled).toBe(true);
       expect(button(host, 'Frame').disabled).toBe(true);
@@ -225,6 +223,74 @@ describe('LaserWindow jog gating during a job (H6)', () => {
       for (const arrow of arrows) expect(arrow.disabled).toBe(false);
       expect(button(host, 'Frame').disabled).toBe(false);
     } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('shows recovery controls when GRBL reports status-only Alarm after connect', async () => {
+    const originalHome = useLaserStore.getState().home;
+    const originalUnlock = useLaserStore.getState().unlockAlarm;
+    const unlock = vi.fn(async () => undefined);
+    useStore.setState({
+      project: createProject({
+        ...DEFAULT_DEVICE_PROFILE,
+        homing: { enabled: true, direction: 'front-left' },
+      }),
+    });
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: {
+        state: 'Alarm',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 12.089 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+      alarmCode: null,
+      streamer: null,
+      home: vi.fn(async () => undefined),
+      unlockAlarm: unlock,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      expect(host.textContent).toContain('Controller reports Alarm');
+      expect(host.textContent).toContain('Home ($H)');
+      const arrows = [...host.querySelectorAll('button')].filter((b) =>
+        ['â†‘', 'â†“', 'â†', 'â†’'].includes(b.textContent ?? ''),
+      );
+      for (const arrow of arrows) expect(arrow.disabled).toBe(true);
+      const stepSelect = host.querySelector<HTMLSelectElement>(
+        'select[aria-label="Jog step size"]',
+      );
+      expect(stepSelect?.disabled).toBe(true);
+      expect(button(host, 'Frame').disabled).toBe(true);
+
+      await act(async () => {
+        button(host, '$X').click();
+        await Promise.resolve();
+      });
+
+      expect(unlock).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => {
+        useLaserStore.setState({ home: originalHome, unlockAlarm: originalUnlock });
+      });
       if (root !== null) {
         await act(async () => root?.unmount());
       }

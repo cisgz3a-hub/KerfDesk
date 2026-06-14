@@ -15,6 +15,8 @@ import { detectJobIntentWarnings } from './job-intent-warnings';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
+export const STATUS_ALARM_START_MESSAGE =
+  'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
 
 export type StartJobPreparation =
   | {
@@ -115,6 +117,8 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
     issues.push(
       'Controller status is not known yet. Wait for an Idle status report before starting.',
     );
+  } else if (machine.statusReport.state === 'Alarm' && machine.alarmCode === null) {
+    issues.push(STATUS_ALARM_START_MESSAGE);
   } else if (machine.statusReport.state !== 'Idle') {
     issues.push(`Machine must be Idle before starting (currently ${machine.statusReport.state}).`);
   }

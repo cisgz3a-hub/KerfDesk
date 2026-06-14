@@ -390,6 +390,21 @@ describe('prepareStartJob', () => {
     }
   });
 
+  it('blocks Start with alarm recovery copy when status reports Alarm without ALARM:N', () => {
+    const result = prepareStartJob(calibratedProject(), readyController, {
+      ...readyMachine,
+      alarmCode: null,
+      statusReport: { ...idleStatus, state: 'Alarm' },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages).toContain(
+        'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.',
+      );
+    }
+  });
+
   it('blocks Start while a local streamer is already active', () => {
     const result = prepareStartJob(calibratedProject(), readyController, {
       ...readyMachine,
