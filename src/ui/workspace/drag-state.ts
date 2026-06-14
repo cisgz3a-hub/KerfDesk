@@ -40,6 +40,14 @@ export type DragState =
       readonly startClientY: number;
       readonly startPanX: number;
       readonly startPanY: number;
+    }
+  // Phase G (ADR-051, B5): dragging out a new shape from `startScenePoint`.
+  // Handled entirely in the Workspace mouse layer (like 'pan') — never reaches
+  // nextTransformForDrag, since there's no object to transform until commit.
+  | {
+      readonly kind: 'draw';
+      readonly shape: 'rect' | 'ellipse' | 'polygon';
+      readonly startScenePoint: Vec2;
     };
 
 // Decide what kind of drag a mouse-down on `point` initiates, based on the
@@ -146,7 +154,7 @@ export function panOffsetForDrag(args: {
 // drags never reach this function (the caller handles them before
 // computing a scene point).
 export function nextTransformForDrag(
-  drag: Exclude<DragState, { kind: 'pan' }>,
+  drag: Exclude<DragState, { kind: 'pan' | 'draw' }>,
   obj: SceneObject,
   point: Vec2,
   e: { readonly shiftKey: boolean; readonly altKey: boolean },

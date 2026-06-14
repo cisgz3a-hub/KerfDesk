@@ -5,7 +5,7 @@
 // an editable action.
 
 import { create } from 'zustand';
-import type { Bounds, RasterImage } from '../../core/scene';
+import type { Bounds, RasterImage, ShapeObject } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
 
 export const MIN_ZOOM = 0.1;
@@ -87,6 +87,11 @@ export type UiState = {
   readonly toolMode: ToolMode;
   readonly setToolMode: (next: ToolMode) => void;
   readonly resetToolMode: () => void;
+  // Live draft of the shape currently being dragged out (B5). Null when not
+  // drawing. Ephemeral — the canvas renders it as a dashed preview; mouse-up
+  // commits it to the project store (where undo/redo can see it) and clears it.
+  readonly draftShape: ShapeObject | null;
+  readonly setDraftShape: (next: ShapeObject | null) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -121,6 +126,8 @@ export const useUiStore = create<UiState>((set) => ({
   toolMode: { kind: 'select' },
   setToolMode: (next) => set({ toolMode: next }),
   resetToolMode: () => set({ toolMode: { kind: 'select' } }),
+  draftShape: null,
+  setDraftShape: (next) => set({ draftShape: next }),
 }));
 
 export function isModalOpen(
