@@ -28,8 +28,11 @@ export function pushLog(state: LaserState, line: string): ReadonlyArray<string> 
   return [...state.log, line].slice(-LOG_MAX);
 }
 
+// "done" only means GRBL acknowledged every line, not that the planner has
+// physically finished motion. laser-line-handler clears the streamer after a
+// later Idle status report.
 export function isActiveJob(streamer: StreamerState | null): boolean {
-  return streamer !== null && ['streaming', 'paused', 'errored'].includes(streamer.status);
+  return streamer !== null && ['streaming', 'paused', 'done', 'errored'].includes(streamer.status);
 }
 
 export function activeJobCommandBlockMessage(state: LaserState): string | null {

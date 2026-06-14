@@ -124,8 +124,11 @@ export function handleLine(
   if (patch !== null) set({ detectedSettings: patch, controllerSettings: patch });
   if (cls.kind === 'status') {
     const operation = get().motionOperation;
+    const streamer = get().streamer;
     const nextOperation = observeMotionStatus(operation, cls.report.state);
     const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
+    const completedStreamerPatch =
+      streamer?.status === 'done' && cls.report.state === 'Idle' ? { streamer: null } : {};
     // Cache WCO across frames — GRBL only reports it intermittently
     // (every Nth status per `$10`'s WCO bit). UI reads `wcoCache`,
     // never `statusReport.wco`. F.3 / ADR-021.
@@ -135,9 +138,10 @@ export function handleLine(
         wcoCache: cls.report.wco,
         workOriginActive: hasCustomOrigin(cls.report.wco),
         ...operationPatch,
+        ...completedStreamerPatch,
       });
     } else {
-      set({ statusReport: cls.report, ...operationPatch });
+      set({ statusReport: cls.report, ...operationPatch, ...completedStreamerPatch });
     }
     return;
   }

@@ -145,4 +145,21 @@ describe('laser-store active-job command guard', () => {
     expect(writes).toEqual([]);
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
   });
+
+  it('keeps idle-only $ commands blocked after all lines are acked until GRBL reports Idle', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
+    for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    writes.length = 0;
+
+    await expect(useLaserStore.getState().home()).rejects.toThrow(/job is active/i);
+
+    expect(writes.some((line) => line.startsWith('$H'))).toBe(false);
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+  });
 });

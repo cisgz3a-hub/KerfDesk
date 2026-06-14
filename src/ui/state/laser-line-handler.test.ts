@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createStreamer,
   idleCollector,
+  onAck,
   startCollecting,
   step,
   type SettingsCollectorState,
@@ -85,6 +86,22 @@ describe('handleLine detected controller settings', () => {
 });
 
 describe('handleLine streamer writes', () => {
+  it('keeps a fully acked job busy until a later Idle status confirms physical motion is done', () => {
+    const { refs, set, get } = makeHarness();
+    let streamer = step(createStreamer('G21\nG90\nG1 X10 F600\nM5\n')).state;
+    for (let i = 0; i < 4; i += 1) streamer = onAck(streamer, 'ok').state;
+    set({ streamer });
+    expect(get().streamer?.status).toBe('done');
+
+    handleLine(set, get, refs, async () => undefined, '<Run|MPos:1.000,0.000,0.000|FS:600,0>');
+
+    expect(get().streamer?.status).toBe('done');
+
+    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+
+    expect(get().streamer).toBeNull();
+  });
+
   it('marks the streamer disconnected if an ack-triggered follow-up write fails', async () => {
     const { refs, set, get } = makeHarness();
     const firstStep = step(
