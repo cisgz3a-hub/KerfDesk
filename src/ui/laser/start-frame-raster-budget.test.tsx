@@ -95,6 +95,7 @@ afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
     streamer: null,
+    statusReport: null,
     workOriginActive: false,
     wcoCache: null,
   });
@@ -127,6 +128,7 @@ describe('custom-origin raster budget guard', () => {
     useLaserStore.setState({
       frame,
       streamer: null,
+      statusReport: idleStatus,
       workOriginActive: true,
       wcoCache: { x: 100, y: 100, z: 0 },
     });

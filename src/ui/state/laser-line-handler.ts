@@ -26,7 +26,11 @@ import {
   type StreamerState,
 } from '../../core/controllers/grbl';
 import { consumeSettingsResponse } from './detected-settings-action';
-import { controllerErrorNotice, disconnectDuringJobNotice } from './laser-safety-notice';
+import {
+  controllerErrorNotice,
+  disconnectDuringJobNotice,
+  type ControllerErrorContext,
+} from './laser-safety-notice';
 import { observeMotionStatus } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 import { hasCustomOrigin } from './origin-actions';
@@ -158,7 +162,11 @@ export function handleLine(
     // 'errored' so step() sends no further bytes; raise a safety notice so the
     // operator checks the machine - the rejected move may have left the head
     // mispositioned and a laser-on line could have fired out of place.
-    set({ lastError: cls.code, safetyNotice: controllerErrorNotice(cls.code) });
+    const state = get();
+    set({
+      lastError: cls.code,
+      safetyNotice: controllerErrorNotice(cls.code, controllerErrorContext(state)),
+    });
     advanceStream(set, get, safeWrite, 'error');
     return;
   }
@@ -193,4 +201,11 @@ function advanceStream(
       });
     });
   }
+}
+
+function controllerErrorContext(state: LaserState): ControllerErrorContext {
+  if (state.streamer !== null) return 'job';
+  if (state.motionOperation?.kind === 'frame') return 'frame';
+  if (state.motionOperation?.kind === 'jog') return 'jog';
+  return 'command';
 }

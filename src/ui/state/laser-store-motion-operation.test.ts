@@ -131,6 +131,7 @@ describe('laser-store motion operation lifecycle', () => {
     const write = vi.fn(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
 
     await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
 

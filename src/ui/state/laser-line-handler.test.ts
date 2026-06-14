@@ -158,4 +158,26 @@ describe('handleLine controller error (P0-1)', () => {
       message: expect.stringContaining('error:7'),
     });
   });
+
+  it('uses non-job wording when GRBL rejects a frame jog command', () => {
+    const { refs, set, get } = makeHarness();
+    set({
+      motionOperation: {
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+      },
+    });
+
+    handleLine(set, get, refs, async () => undefined, 'error:8');
+
+    expect(get().lastError).toBe(8);
+    expect(get().safetyNotice).toEqual({
+      kind: 'controller-error',
+      code: 8,
+      message: expect.stringContaining('frame command'),
+    });
+    expect(get().safetyNotice?.message).not.toContain('during the job');
+  });
 });

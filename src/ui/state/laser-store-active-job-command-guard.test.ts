@@ -84,6 +84,28 @@ afterEach(async () => {
 
 describe('laser-store active-job command guard', () => {
   it.each([
+    ['Jog', () => useLaserStore.getState().jog({ dx: 1, feed: 1000 })],
+    ['Frame', () => useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000)],
+  ] as const)(
+    'blocks %s before the first Idle status so GRBL never sees a premature $J command',
+    async (_label, runCommand) => {
+      const writes: string[] = [];
+      const connection = makeConnection(async (data) => {
+        writes.push(data);
+      });
+      await connectWith(connection);
+      expect(useLaserStore.getState().statusReport).toBeNull();
+      writes.length = 0;
+
+      await expect(runCommand()).rejects.toThrow(/Idle status report/i);
+
+      expect(writes.some((line) => line.startsWith('$J='))).toBe(false);
+      expect(useLaserStore.getState().lastWriteError).toMatch(/Idle status report/i);
+      expect(getMotionOperation()).toBeNull();
+    },
+  );
+
+  it.each([
     ['Home', () => useLaserStore.getState().home(), '$H'],
     ['Unlock', () => useLaserStore.getState().unlockAlarm(), '$X'],
     ['Jog', () => useLaserStore.getState().jog({ dx: 1, feed: 1000 }), '$J='],
@@ -107,7 +129,9 @@ describe('laser-store active-job command guard', () => {
 
       expect(writes.some((line) => line.startsWith(forbiddenPrefix))).toBe(false);
       expect(useLaserStore.getState().streamer?.status).toBe('streaming');
-      expect(useLaserStore.getState().log.join('\n')).toContain('Serial write blocked');
+      expect(useLaserStore.getState().log.join('\n')).toMatch(
+        /(Serial write blocked|Motion command blocked)/,
+      );
       expect(getMotionOperation()).toBeNull();
     },
   );

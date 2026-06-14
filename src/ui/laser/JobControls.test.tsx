@@ -68,6 +68,7 @@ afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
     streamer: null,
+    statusReport: null,
     workOriginActive: false,
     wcoCache: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
@@ -86,6 +87,15 @@ describe('JobControls Frame action', () => {
       workOriginActive: true,
       wcoCache: null,
       streamer: null,
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
     });
     useStore.getState().setJobPlacement({ startFrom: 'user-origin' });
     const host = document.createElement('div');

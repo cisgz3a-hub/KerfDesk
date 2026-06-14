@@ -54,6 +54,7 @@ import {
   initialLaserState,
   idleOnlyDollarCommandBlockMessage,
   isActiveJob,
+  jogFrameCommandBlockMessage,
   pushLog,
   serialWriteErrorMessage,
   type StallProbe,
@@ -350,6 +351,7 @@ function jogActions(
     },
     jog: async (params) => {
       assertAutofocusIdle(get());
+      assertJogFrameReady(set, get);
       set({ motionOperation: startMotionOperation('jog') });
       try {
         await safeWrite(set, get, `${buildJogCommand(params)}\n`, 'jog');
@@ -365,6 +367,7 @@ function jogActions(
       safeWrite(set, get, RT_JOG_CANCEL, 'jog').finally(() => set({ motionOperation: null })),
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
+      assertJogFrameReady(set, get);
       set({ motionOperation: startMotionOperation('frame') });
       try {
         for (const line of buildFrameJogLines(bounds, feed)) {
@@ -379,6 +382,16 @@ function jogActions(
       }
     },
   };
+}
+
+function assertJogFrameReady(set: SetFn, get: GetFn): void {
+  const blockedMessage = jogFrameCommandBlockMessage(get());
+  if (blockedMessage === null) return;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
 }
 
 function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere' | 'resetOrigin'> {
