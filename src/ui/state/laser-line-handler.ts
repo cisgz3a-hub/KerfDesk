@@ -145,6 +145,15 @@ function handleStatusLine(
 ): void {
   const operation = get().motionOperation;
   const streamer = get().streamer;
+  if (report.state === 'Alarm') {
+    set({
+      statusReport: report,
+      wcoCache: null,
+      workOriginActive: false,
+      motionOperation: null,
+    });
+    return;
+  }
   const observedOperation = observeMotionStatus(operation, report.state);
   const queuedFrameDispatch =
     operation !== null && observedOperation === null ? takeNextFrameJogLine(operation) : null;

@@ -3,6 +3,7 @@
 
 import { describeAlarm } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
+import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
@@ -14,6 +15,7 @@ import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { runStartJobFlow } from './start-job-flow';
+import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
   const platform = usePlatform();
@@ -21,17 +23,20 @@ export function LaserWindow(): JSX.Element {
   const alarmCode = useLaserStore((s) => s.alarmCode);
   const connect = useLaserStore((s) => s.connect);
   const disconnect = useLaserStore((s) => s.disconnect);
+  const home = useLaserStore((s) => s.home);
   const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const streamer = useLaserStore((s) => s.streamer);
   const statusReport = useLaserStore((s) => s.statusReport);
+  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const machineOperationBusy = autofocusBusy || motionOperation !== null;
   // H6: jog mid-job interleaves $J= acks into the character-counted stream —
   // every ack pops the stream head, so the 120-byte RX accounting drifts and
   // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
   const controllerIdle = statusReport?.state === 'Idle';
+  const showAlarmBanner = hasAlarmRecovery(alarmCode, statusReport?.state);
 
   const supportsSerial = platform.serial.isSupported();
 
@@ -54,7 +59,14 @@ export function LaserWindow(): JSX.Element {
         onDisconnect={() => void disconnect().catch(() => undefined)}
         disabled={!supportsSerial || machineOperationBusy}
       />
-      {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
+      {showAlarmBanner && (
+        <AlarmBanner
+          code={alarmCode}
+          homingEnabled={homingEnabled}
+          onHome={() => void home().catch(() => undefined)}
+          onUnlock={() => void unlockAlarm().catch(() => undefined)}
+        />
+      )}
       <DetectedSettingsBanner />
       <StatusDisplay />
       <JogPad
@@ -71,21 +83,45 @@ export function LaserWindow(): JSX.Element {
   );
 }
 
+function hasAlarmRecovery(code: number | null, state: string | undefined): boolean {
+  return code !== null || state === 'Alarm';
+}
+
 function AlarmBanner({
   code,
+  homingEnabled,
+  onHome,
   onUnlock,
 }: {
-  readonly code: number;
+  readonly code: number | null;
+  readonly homingEnabled: boolean;
+  readonly onHome: () => void;
   readonly onUnlock: () => void;
 }): JSX.Element {
-  const alarm = describeAlarm(code);
+  const alarm = code === null ? null : describeAlarm(code);
   return (
     <div style={alarmStyle} role="alert">
       <strong>
-        Alarm {code}: {alarm?.title ?? 'unknown'}
+        {code === null ? 'Controller reports Alarm' : `Alarm ${code}: ${alarm?.title ?? 'unknown'}`}
       </strong>
-      <p style={alarmDetailStyle}>{alarm?.detail ?? ''}</p>
-      <p style={alarmDetailStyle}>{alarm?.action ?? ''}</p>
+      <p style={alarmDetailStyle}>
+        {code === null
+          ? 'GRBL has locked jog, frame, and start until the machine is homed or unlocked.'
+          : (alarm?.detail ?? '')}
+      </p>
+      <p style={alarmDetailStyle}>{alarm?.action ?? STATUS_ALARM_START_MESSAGE}</p>
+      <button
+        type="button"
+        onClick={onHome}
+        title="Send $H. Use this only when the machine has working homing switches."
+      >
+        Home ($H)
+      </button>
+      {!homingEnabled && (
+        <span style={alarmHintStyle}>
+          Enable &quot;$H supported&quot; in Device settings if this machine has homing switches.
+        </span>
+      )}
       <button
         type="button"
         onClick={onUnlock}
@@ -129,3 +165,4 @@ const alarmStyle: React.CSSProperties = {
   borderRadius: 4,
 };
 const alarmDetailStyle: React.CSSProperties = { margin: '4px 0' };
+const alarmHintStyle: React.CSSProperties = { display: 'block', fontSize: 11, lineHeight: 1.3 };

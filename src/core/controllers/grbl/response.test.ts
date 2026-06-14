@@ -23,6 +23,15 @@ describe('classifyResponse', () => {
     }
   });
 
+  it('parses status-only Alarm reports as status, not coded ALARM events', () => {
+    const r = classifyResponse('<Alarm|MPos:0.000,0.000,12.089|FS:0,0>');
+    expect(r.kind).toBe('status');
+    if (r.kind === 'status') {
+      expect(r.report.state).toBe('Alarm');
+      expect(r.report.mPos?.z).toBe(12.089);
+    }
+  });
+
   it('parses settings lines ($N=value)', () => {
     expect(classifyResponse('$30=1000')).toEqual({
       kind: 'setting',

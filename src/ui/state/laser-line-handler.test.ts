@@ -182,3 +182,29 @@ describe('handleLine controller error (P0-1)', () => {
     expect(get().safetyNotice?.message).not.toContain('during the job');
   });
 });
+
+describe('handleLine status-only Alarm recovery state', () => {
+  it('clears motion and custom-origin state when GRBL reports Alarm without ALARM:N', () => {
+    const { refs, set, get } = makeHarness();
+    set({
+      alarmCode: null,
+      wcoCache: { x: 25, y: 40, z: 0 },
+      workOriginActive: true,
+      motionOperation: {
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    });
+
+    handleLine(set, get, refs, async () => undefined, '<Alarm|MPos:0.000,0.000,12.089|FS:0,0>');
+
+    expect(get().statusReport?.state).toBe('Alarm');
+    expect(get().alarmCode).toBeNull();
+    expect(get().motionOperation).toBeNull();
+    expect(get().wcoCache).toBeNull();
+    expect(get().workOriginActive).toBe(false);
+  });
+});
