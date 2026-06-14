@@ -14,6 +14,8 @@ import {
   transformedBBox,
 } from '../../core/scene';
 import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
+import { drawPenDraft } from './draw-pen-preview';
+import { type PenDraft } from '../state/ui-store';
 import {
   buildDisplayPolylines,
   type DisplayPolylineCache,
@@ -52,6 +54,9 @@ export type DrawOpts = {
   // accent outline so size + position are visible live before commit. Null
   // when not drawing.
   readonly draft?: SceneObject;
+  // Phase G (B6): the pen tool's in-progress polyline (placed vertices +
+  // rubber-band to the cursor). Null unless the pen is mid-draw.
+  readonly penDraft?: PenDraft;
 };
 
 export function drawScene(
@@ -96,6 +101,7 @@ export function drawScene(
     );
     if (simplified) drawLargeSceneNotice(ctx);
     if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
+    if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
   }
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).

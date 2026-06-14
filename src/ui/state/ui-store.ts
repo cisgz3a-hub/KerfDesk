@@ -5,7 +5,7 @@
 // an editable action.
 
 import { create } from 'zustand';
-import type { Bounds, RasterImage, ShapeObject } from '../../core/scene';
+import type { Bounds, RasterImage, ShapeObject, Vec2 } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
 
 export const MIN_ZOOM = 0.1;
@@ -34,7 +34,16 @@ export type TextDialogState =
 // canvas drag. Ephemeral like zoom — never persisted; Esc returns to select.
 export type ToolMode =
   | { readonly kind: 'select' }
-  | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' };
+  | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'polyline' };
+
+// Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.
+// `vertices` are committed clicks (scene mm); `cursor` is the live rubber-band
+// endpoint, updated on mousemove. Ephemeral like draftShape — never persisted,
+// cleared on finish/cancel. Distinct from draftShape (the single-drag snapshot).
+export type PenDraft = {
+  readonly vertices: ReadonlyArray<Vec2>;
+  readonly cursor: Vec2 | null;
+};
 
 export type UiState = {
   readonly dragOverlay: boolean;
@@ -92,6 +101,9 @@ export type UiState = {
   // commits it to the project store (where undo/redo can see it) and clears it.
   readonly draftShape: ShapeObject | null;
   readonly setDraftShape: (next: ShapeObject | null) => void;
+  // Pen-tool in-progress polyline (B6). See PenDraft. Cleared by resetToolMode.
+  readonly penDraft: PenDraft | null;
+  readonly setPenDraft: (next: PenDraft | null) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -125,9 +137,12 @@ export const useUiStore = create<UiState>((set) => ({
   closeImageDialog: () => set({ imageDialog: null }),
   toolMode: { kind: 'select' },
   setToolMode: (next) => set({ toolMode: next }),
-  resetToolMode: () => set({ toolMode: { kind: 'select' } }),
+  // Leaving any draw tool also discards a half-drawn pen polyline.
+  resetToolMode: () => set({ toolMode: { kind: 'select' }, penDraft: null }),
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),
+  penDraft: null,
+  setPenDraft: (next) => set({ penDraft: next }),
 }));
 
 export function isModalOpen(
