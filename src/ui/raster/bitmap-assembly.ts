@@ -15,6 +15,7 @@ import {
   type Polyline,
   type RasterImage,
   type SceneObject,
+  type ShapeObject,
   type TextObject,
   type TracedImage,
 } from '../../core/scene';
@@ -29,7 +30,7 @@ import type { BitmapFields } from './luma-bitmap';
 const DEFAULT_DITHER: DitherAlgorithm = 'floyd-steinberg';
 const BITMAP_SOURCE_SUFFIX = ' (bitmap)';
 
-export type ConvertibleVector = ImportedSvg | TextObject | TracedImage;
+export type ConvertibleVector = ImportedSvg | TextObject | TracedImage | ShapeObject;
 export type ConvertToBitmapRenderType = 'fill-all' | 'outlines' | 'use-cut-settings';
 export type BitmapLayerSetting = {
   readonly color: string;
@@ -42,7 +43,12 @@ export type BitmapConversionOptions = {
 };
 
 export function isConvertibleVector(o: SceneObject): o is ConvertibleVector {
-  return o.kind === 'imported-svg' || o.kind === 'text' || o.kind === 'traced-image';
+  return (
+    o.kind === 'imported-svg' ||
+    o.kind === 'text' ||
+    o.kind === 'traced-image' ||
+    o.kind === 'shape'
+  );
 }
 
 export function bitmapConversionTarget(o: ConvertibleVector): BitmapConversionTarget {
@@ -163,5 +169,7 @@ function buildRasterImage(
 }
 
 function sourceLabel(o: ConvertibleVector): string {
-  return 'source' in o ? o.source : o.content;
+  if ('source' in o) return o.source;
+  if ('content' in o) return o.content;
+  return `${o.spec.kind} shape`;
 }

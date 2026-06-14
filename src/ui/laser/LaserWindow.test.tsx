@@ -38,6 +38,38 @@ afterEach(() => {
 });
 
 describe('LaserWindow autofocus busy controls', () => {
+  it('renders the Device settings collapsed by default and lets the user open it', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      const deviceDetails = detailsBySummary(host, 'Device');
+      expect(deviceDetails.open).toBe(false);
+
+      const summary = deviceDetails.querySelector('summary');
+      if (!(summary instanceof HTMLElement)) throw new Error('Device summary missing');
+      await act(async () => {
+        summary.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(deviceDetails.open).toBe(true);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
   it('disables motion, origin, and disconnect controls while autofocus is active', async () => {
     useStore.setState({
       project: createProject({
@@ -224,5 +256,13 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
     candidate.textContent?.includes(label),
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
+  return match;
+}
+
+function detailsBySummary(host: HTMLElement, label: string): HTMLDetailsElement {
+  const match = [...host.querySelectorAll('details')].find(
+    (details) => details.querySelector('summary')?.textContent === label,
+  );
+  if (!(match instanceof HTMLDetailsElement)) throw new Error(`Details not rendered: ${label}`);
   return match;
 }

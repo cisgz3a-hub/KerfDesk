@@ -19,6 +19,7 @@
 
 import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { AssignSelectionButton } from './AssignSelectionButton';
 import { CutSettingsDialog } from './CutSettingsDialog';
 import { DeleteLayerButton } from './DeleteLayerButton';
@@ -40,6 +41,10 @@ const cardStyle: React.CSSProperties = {
   gap: 8,
 };
 const cardDimmedStyle: React.CSSProperties = { opacity: 0.55 };
+const cardActiveStyle: React.CSSProperties = {
+  border: '1px solid var(--lf-accent)',
+  boxShadow: 'inset 3px 0 0 var(--lf-accent)',
+};
 const cardHeaderStyle: React.CSSProperties = {
   display: 'flex',
   // The header carries swatch + reorder + mode + six actions + two
@@ -97,12 +102,17 @@ export function LayerRow(props: {
 }): JSX.Element {
   const { layer } = props;
   const setLayerParam = useStore((s) => s.setLayerParam);
+  const activeLayerColor = useUiStore((s) => s.activeLayerColor);
+  const setActiveLayerColor = useUiStore((s) => s.setActiveLayerColor);
   const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
     useCutSettingsLauncher();
+  const isActive = activeLayerColor === layer.color;
   return (
     <section
-      style={layer.output ? cardStyle : { ...cardStyle, ...cardDimmedStyle }}
+      style={layerCardStyle(layer.output, isActive)}
       aria-label={`Layer ${layer.color}`}
+      aria-current={isActive ? 'true' : undefined}
+      onClick={() => setActiveLayerColor(layer.color)}
       onDoubleClick={(event) => {
         if (cutSettingsBlocked) return;
         if (isInteractiveDoubleClickTarget(event.target)) return;
@@ -163,6 +173,14 @@ export function LayerRow(props: {
       ) : null}
     </section>
   );
+}
+
+function layerCardStyle(output: boolean, active: boolean): React.CSSProperties {
+  return {
+    ...cardStyle,
+    ...(!output ? cardDimmedStyle : {}),
+    ...(active ? cardActiveStyle : {}),
+  };
 }
 
 function FieldRow(props: {

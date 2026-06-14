@@ -3,6 +3,7 @@
 // store.test.ts and duplicate.test.ts.
 
 import { describe, expect, it } from 'vitest';
+import { createRectangle } from '../../core/shapes';
 import {
   applyTransform,
   createLayer,
@@ -201,6 +202,25 @@ describe('pruneOrphanLayers — raster image branch', () => {
     // Image layer kept (referenced by the raster); red layer dropped
     // (no remaining consumer).
     expect(pruned.layers.map((l) => l.color)).toEqual(['#808080']);
+  });
+
+  it('keeps the layer that a drawn shape references', () => {
+    const shape = createRectangle({
+      id: 'shape-1',
+      color: '#00ff00',
+      spec: { widthMm: 10, heightMm: 5, cornerRadiusMm: 0 },
+    });
+    const seeded: Scene = {
+      objects: [shape],
+      layers: [
+        createLayer({ id: '#00ff00', color: '#00ff00', mode: 'line' }),
+        createLayer({ id: '#ff0000', color: '#ff0000', mode: 'line' }),
+      ],
+    };
+
+    const pruned = pruneOrphanLayers(seeded);
+
+    expect(pruned.layers.map((l) => l.color)).toEqual(['#00ff00']);
   });
 });
 

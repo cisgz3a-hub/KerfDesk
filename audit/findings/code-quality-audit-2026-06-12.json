@@ -1,0 +1,99 @@
+[
+  {
+    "id": "CQ-001",
+    "severity": "P1",
+    "confidence": "high",
+    "module": "package.json devDependencies",
+    "triggerPath": "Run pnpm audit --audit-level=low or run vulnerable Vitest UI/browser-mode tooling.",
+    "failureMode": "The dev dependency tree contains vulnerable vitest <3.2.6.",
+    "consequence": "Developer tooling dependency hygiene is red even though production dependencies are clean.",
+    "fix": "Bump vitest and @vitest/coverage-v8 to >=3.2.6, refresh pnpm-lock.yaml, rerun audit, tests, and typecheck.",
+    "evidence": [
+      "package.json:53",
+      "package.json:70",
+      "audit/evidence/code-quality-audit-low-2026-06-12.txt:2-18"
+    ]
+  },
+  {
+    "id": "CQ-002",
+    "severity": "P1",
+    "confidence": "high",
+    "module": ".github/workflows and package scripts",
+    "triggerPath": "Push or deploy a commit with a vulnerable dependency that still passes existing CI gates.",
+    "failureMode": "CI and deploy run license/test/build/file-size gates but no dependency audit.",
+    "consequence": "Dependency advisories rely on a local manual command instead of the same gate discipline used elsewhere.",
+    "fix": "Add an audit:deps script and run it in CI and deploy, or at least in CI before deploy is allowed.",
+    "evidence": [
+      ".github/workflows/ci.yml:57-69",
+      ".github/workflows/deploy.yml:87-99",
+      "audit/evidence/code-quality-audit-low-2026-06-12.txt"
+    ]
+  },
+  {
+    "id": "CQ-003",
+    "severity": "P2",
+    "confidence": "high",
+    "module": "web bundle entry graph",
+    "triggerPath": "Run pnpm build:web.",
+    "failureMode": "The main web chunk exceeds the configured 500 kB warning limit.",
+    "consequence": "Initial app load and future feature additions are more likely to regress performance.",
+    "fix": "Inspect the bundle graph, lazy-load optional heavy surfaces, and consider explicit manual chunks without raising the warning threshold.",
+    "evidence": ["vite.config.ts:56", "audit/evidence/code-quality-build-web-2026-06-12.txt:24-30"]
+  },
+  {
+    "id": "CQ-004",
+    "severity": "P2",
+    "confidence": "high",
+    "module": "theme decision docs",
+    "triggerPath": "Future theme work follows ADR-047 instead of the current light UI code.",
+    "failureMode": "DECISIONS.md still describes dark chrome as accepted while tokens.css and index.html now implement light chrome.",
+    "consequence": "Future agents can accidentally reintroduce the dark UI or mis-audit the theme.",
+    "fix": "Add or amend an ADR to supersede ADR-047 with the current light-chrome decision.",
+    "evidence": ["src/ui/theme/tokens.css:12", "index.html:6", "DECISIONS.md:2411-2449"]
+  },
+  {
+    "id": "CQ-005",
+    "severity": "P2",
+    "confidence": "medium-high",
+    "module": "core job compile caches",
+    "triggerPath": "Repeated compileJob calls with unchanged object arrays and fill settings.",
+    "failureMode": "Pure-core compile logic contains module-level WeakMap state despite the repo policy banning module-level mutable variables.",
+    "consequence": "Pure function reasoning and long-session testability are weaker unless this is made explicit.",
+    "fix": "Pass an explicit compile cache from the caller, or write a narrow ADR exception documenting invalidation and tests.",
+    "evidence": [
+      "CLAUDE.md:144",
+      "src/core/job/compile-job.ts:50-52",
+      "src/core/job/fill-hatching-cache.ts:6",
+      "src/core/job/compile-job-fill-cache.test.ts"
+    ]
+  },
+  {
+    "id": "CQ-006",
+    "severity": "P2",
+    "confidence": "medium",
+    "module": ".lf2 project deserialization",
+    "triggerPath": "Open a hand-edited or older .lf2 file that passes current shape validation but violates deeper invariants.",
+    "failureMode": "deserializeProject normalizes raw JSON and then returns normalized as unknown as Project.",
+    "consequence": "Future schema changes can accidentally be trusted by a broad cast instead of a typed construction path.",
+    "fix": "Replace the final cast with typed builders for Project, Layer, and SceneObject variants, plus malformed .lf2 tests for cross-field invariants.",
+    "evidence": [
+      "src/io/project/deserialize-project.ts:68-69",
+      "src/io/project/deserialize-project.ts:123",
+      "src/io/project/project-shape-validator.ts"
+    ]
+  },
+  {
+    "id": "CQ-007",
+    "severity": "P3",
+    "confidence": "high",
+    "module": "large high-risk production files",
+    "triggerPath": "Editing trace, raster, compile, scene state, or laser state modules.",
+    "failureMode": "Several high-risk files are physically large even though formal counted-code and raw-line gates pass.",
+    "consequence": "Review and regression risk is higher in the modules most tied to image trace, raster output, job generation, and live laser control.",
+    "fix": "Extract cohesive helpers during the next functional change in each large file; avoid unrelated refactor-only churn.",
+    "evidence": [
+      "audit/evidence/code-quality-largest-files-2026-06-12.txt",
+      "audit/evidence/code-quality-file-size-2026-06-12.txt"
+    ]
+  }
+]

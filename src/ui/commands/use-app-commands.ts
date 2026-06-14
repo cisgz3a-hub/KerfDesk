@@ -1,4 +1,4 @@
-import type { Project } from '../../core/scene';
+import { flipTransformAboutCenter, type Project } from '../../core/scene';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import {
@@ -155,9 +155,5 @@ function flipSelected(axis: 'horizontal' | 'vertical'): void {
   const state = useStore.getState();
   const selected = selectedObject(state.project, state.selectedObjectId);
   if (selected === null) return;
-  state.applyObjectTransform(selected.id, {
-    ...selected.transform,
-    mirrorX: axis === 'horizontal' ? !selected.transform.mirrorX : selected.transform.mirrorX,
-    mirrorY: axis === 'vertical' ? !selected.transform.mirrorY : selected.transform.mirrorY,
-  });
+  state.applyObjectTransform(selected.id, flipTransformAboutCenter(selected, axis));
 }

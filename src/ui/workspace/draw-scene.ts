@@ -24,7 +24,7 @@ import {
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
-import { type Handle, HANDLE_SCREEN_PX, handlesFor } from './handles';
+import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
 import { isObjectOutOfBed } from './out-of-bounds';
 import { rotateHandlePosition } from './rotate-handle';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
@@ -300,16 +300,10 @@ function drawSelectionBox(
   obj: SceneObject,
   view: ViewTransform,
 ): void {
-  const bbox = transformedBBox(obj);
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([4, 3]);
-  ctx.strokeRect(
-    view.offsetX + bbox.minX * view.scale,
-    view.offsetY + bbox.minY * view.scale,
-    (bbox.maxX - bbox.minX) * view.scale,
-    (bbox.maxY - bbox.minY) * view.scale,
-  );
+  strokeSelectionFrame(ctx, selectionFrameFor(obj), view);
   ctx.setLineDash([]);
   drawHandles(ctx, obj, view);
 }
@@ -322,19 +316,29 @@ function drawSecondarySelectionBox(
   obj: SceneObject,
   view: ViewTransform,
 ): void {
-  const bbox = transformedBBox(obj);
   ctx.save();
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
   ctx.globalAlpha = 0.7;
-  ctx.strokeRect(
-    view.offsetX + bbox.minX * view.scale,
-    view.offsetY + bbox.minY * view.scale,
-    (bbox.maxX - bbox.minX) * view.scale,
-    (bbox.maxY - bbox.minY) * view.scale,
-  );
+  strokeSelectionFrame(ctx, selectionFrameFor(obj), view);
   ctx.restore();
+}
+
+function strokeSelectionFrame(
+  ctx: CanvasRenderingContext2D,
+  frame: ReadonlyArray<{ readonly x: number; readonly y: number }>,
+  view: ViewTransform,
+): void {
+  const [first, ...rest] = frame;
+  if (first === undefined) return;
+  ctx.beginPath();
+  ctx.moveTo(view.offsetX + first.x * view.scale, view.offsetY + first.y * view.scale);
+  for (const point of rest) {
+    ctx.lineTo(view.offsetX + point.x * view.scale, view.offsetY + point.y * view.scale);
+  }
+  ctx.closePath();
+  ctx.stroke();
 }
 
 function drawHandles(ctx: CanvasRenderingContext2D, obj: SceneObject, view: ViewTransform): void {

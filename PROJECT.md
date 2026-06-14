@@ -106,8 +106,8 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 On-canvas parametric shape creation — the first geometry that does NOT enter via import. Closes the largest LightBurn-parity gap (J1 "draw a sign from nothing" was impossible; J3 batch effectively impossible). See ADR-051.
 
 - New pure `src/core/shapes/` (shape→polylines) + a `kind:'shape'` SceneObject variant (Rectangle / Ellipse / Polygon / Polyline parametric blocks + materialized `paths`, the ADR-014 / TextObject precedent) so compile/preview/emit/save are untouched.
-- A tool-mode discriminated union + vertical tool strip (Esc returns to Select); `Workspace` mousedown draws on the currently-selected layer with a live mm readout.
-- Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → migrate `Ctrl+E` (Save G-code → Alt+Shift+L) to Ellipse. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
+- A tool-mode discriminated union + vertical tool strip (Esc returns to Select); `Workspace` mousedown draws on the current drawing layer color with a live mm readout.
+- Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
 - OUT of this phase (still out of scope; a future phase + ADR + an ADR-017 polygon-clipping library evaluation): the geometry KERNEL — weld, boolean ops, offset, node editing.
 
 ### Anything past Phase F

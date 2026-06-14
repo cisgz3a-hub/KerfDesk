@@ -24,5 +24,7 @@ export async function convertSelectedVectorToBitmap(
 }
 
 export function sourceLabel(o: ConvertibleVector): string {
-  return 'source' in o ? o.source : o.content;
+  if ('source' in o) return o.source;
+  if ('content' in o) return o.content;
+  return `${o.spec.kind} shape`;
 }

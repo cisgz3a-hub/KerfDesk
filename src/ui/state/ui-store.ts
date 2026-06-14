@@ -50,6 +50,11 @@ export type UiState = {
   readonly setDragOverlay: (next: boolean) => void;
   readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
   readonly setScrubberT: (next: number) => void;
+  // Current drawing layer color. LightBurn's color/layer palette sets the
+  // target color for subsequently-created vectors; this mirrors that behavior
+  // without making layer selection undoable project data.
+  readonly activeLayerColor: string | null;
+  readonly setActiveLayerColor: (next: string | null) => void;
   // F-A15 zoom + pan. zoomFactor is multiplicative over the fit-to-bed
   // baseline scale, so 1.0 = "frame all". panMm shifts the view in scene
   // millimeters (positive panX shifts the camera right = content left).
@@ -111,6 +116,8 @@ export const useUiStore = create<UiState>((set) => ({
   setDragOverlay: (next) => set({ dragOverlay: next }),
   scrubberT: 1,
   setScrubberT: (next) => set({ scrubberT: clamp01(next) }),
+  activeLayerColor: null,
+  setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,
   panX: 0,
   panY: 0,
@@ -165,6 +172,10 @@ function clamp01(n: number): number {
 function clampZoom(n: number): number {
   if (!Number.isFinite(n)) return 1;
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, n));
+}
+
+function normalizeLayerColor(next: string | null): string | null {
+  return next === null ? null : next.toLowerCase();
 }
 
 // Target fraction of the canvas the bounds should occupy after zoom.

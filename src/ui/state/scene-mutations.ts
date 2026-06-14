@@ -217,13 +217,18 @@ export function applyDuplicate(
 // Drop layers whose color isn't referenced by any remaining object.
 // Called after removeSceneObject so the Cuts/Layers panel doesn't
 // stay polluted with stale per-color settings. Two consumer shapes:
-// objects with `paths` (imported-svg, text, traced-image) contribute
-// one used-color per path; raster-image contributes its single
-// `color` field (F.2.c). Match the same kinds compileJob walks.
+// objects with `paths` (imported-svg, text, traced-image, shape) contribute
+// one used-color per path; raster-image contributes its single `color` field
+// (F.2.c). Match the same kinds compileJob walks.
 export function pruneOrphanLayers(scene: Scene): Scene {
   const usedColors = new Set<string>();
   for (const obj of scene.objects) {
-    if (obj.kind === 'imported-svg' || obj.kind === 'text' || obj.kind === 'traced-image') {
+    if (
+      obj.kind === 'imported-svg' ||
+      obj.kind === 'text' ||
+      obj.kind === 'traced-image' ||
+      obj.kind === 'shape'
+    ) {
       for (const p of obj.paths) usedColors.add(p.color);
     } else if (obj.kind === 'raster-image') {
       usedColors.add(obj.color);

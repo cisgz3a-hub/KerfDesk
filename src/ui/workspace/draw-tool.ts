@@ -5,7 +5,12 @@
 // a draw-mode mouse event into a DragState, a live draft ShapeObject, or a
 // commit.
 
-import { type DrawShapeKind, isDrawDragSignificant, shapeFromDrag } from '../../core/shapes';
+import {
+  type DrawShapeKind,
+  type DrawShapeModifiers,
+  isDrawDragSignificant,
+  shapeFromDrag,
+} from '../../core/shapes';
 import { type Project, type ShapeObject, type Vec2 } from '../../core/scene';
 import { useUiStore } from '../state/ui-store';
 import { type DragState } from './drag-state';
@@ -14,8 +19,9 @@ import { canvasMouseToScene } from './view-transform';
 type ViewArg = { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
 
 // Fallback colour for a shape drawn into a scene that has no layers yet. With
-// any layers present, the new shape inherits the first layer's colour. Scene
-// data (the object's stroke), not UI chrome — exempt from the token rule (ADR-047).
+// any layers present, the new shape inherits the current layer colour when it
+// still exists, then the first layer. Scene data (the object's stroke), not UI
+// chrome — exempt from the token rule (ADR-047).
 // eslint-disable-next-line no-restricted-syntax
 export const DEFAULT_SHAPE_COLOR = '#000000';
 // Placeholder id for the live draft; the committed shape gets a fresh uuid so
@@ -42,23 +48,43 @@ export function draftForDrawDrag(
   drag: Extract<DragState, { kind: 'draw' }>,
   point: Vec2,
   project: Project,
+  modifiers?: DrawShapeModifiers,
 ): ShapeObject | null {
-  if (!isDrawDragSignificant(drag.startScenePoint, point)) return null;
+  if (!isDrawDragSignificant(drag.startScenePoint, point, modifiers)) return null;
   return shapeFromDrag({
     kind: drag.shape,
     start: drag.startScenePoint,
     end: point,
     id: DRAFT_SHAPE_ID,
-    color: project.scene.layers[0]?.color ?? DEFAULT_SHAPE_COLOR,
+    color: currentDrawingColor(project),
+    ...(modifiers === undefined ? {} : { modifiers }),
   });
+}
+
+export function drawModifiersFromEvent(e: {
+  readonly shiftKey: boolean;
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+}): DrawShapeModifiers {
+  return { regular: e.shiftKey, fromCenter: e.ctrlKey || e.metaKey };
+}
+
+export function currentDrawingColor(project: Project): string {
+  const active = useUiStore.getState().activeLayerColor;
+  if (active !== null && project.scene.layers.some((layer) => layer.color === active)) {
+    return active;
+  }
+  return project.scene.layers[0]?.color ?? DEFAULT_SHAPE_COLOR;
 }
 
 // Commit the current draft (the last significant draft from the drag) as a real
 // scene object with a fresh id, then clear it. No-op when the drag never
 // cleared the threshold (draft is null), so a plain click draws nothing.
-export function commitDraftShape(drawShape: (shape: ShapeObject) => void): void {
+export function commitDraftShape(drawShape: (shape: ShapeObject) => void): boolean {
   const draft = useUiStore.getState().draftShape;
-  if (draft === null) return;
+  if (draft === null) return false;
   drawShape({ ...draft, id: crypto.randomUUID() });
   useUiStore.getState().setDraftShape(null);
+  useUiStore.getState().resetToolMode();
+  return true;
 }

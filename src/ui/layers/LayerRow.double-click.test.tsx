@@ -6,6 +6,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { useUiStore } from '../state/ui-store';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { CutsLayersPanel } from './CutsLayersPanel';
 
@@ -33,6 +34,7 @@ function PanelUnderTest(): JSX.Element {
 
 afterEach(() => {
   resetStore();
+  useUiStore.getState().setActiveLayerColor(null);
   useLaserStore.setState({
     autofocusBusy: false,
     motionOperation: null,
@@ -41,6 +43,31 @@ afterEach(() => {
 });
 
 describe('LayerRow double-click cut settings', () => {
+  it('selects a layer row as the current drawing layer', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<PanelUnderTest />);
+      });
+
+      const row = host.querySelector('section[aria-label="Layer #ff0000"]');
+      if (!(row instanceof HTMLElement)) throw new Error('layer row missing');
+      await act(async () => {
+        row.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(useUiStore.getState().activeLayerColor).toBe('#ff0000');
+      expect(row.getAttribute('aria-current')).toBe('true');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('opens the cut settings dialog by double-clicking a layer entry', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const host = document.createElement('div');

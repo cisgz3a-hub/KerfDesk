@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, type Transform } from './scene-object';
-import { applyTransform } from './transform';
+import { IDENTITY_TRANSFORM, type SceneObject, type Transform } from './scene-object';
+import { applyTransform, flipTransformAboutCenter } from './transform';
 
 describe('applyTransform', () => {
   it('returns the input point unchanged under the identity transform', () => {
@@ -49,3 +49,67 @@ describe('applyTransform', () => {
     expect(got.y).toBeCloseTo(48);
   });
 });
+
+describe('flipTransformAboutCenter', () => {
+  it('keeps the transformed center fixed when flipping horizontally', () => {
+    const object = objectWithTransform({
+      x: 40,
+      y: 25,
+      scaleX: 1.5,
+      scaleY: 0.75,
+      rotationDeg: 90,
+      mirrorX: false,
+      mirrorY: false,
+    });
+    const before = transformedCenter(object);
+
+    const next = flipTransformAboutCenter(object, 'horizontal');
+    const after = transformedCenter({ ...object, transform: next });
+
+    expect(next.mirrorX).toBe(true);
+    expect(after.x).toBeCloseTo(before.x, 6);
+    expect(after.y).toBeCloseTo(before.y, 6);
+  });
+
+  it('keeps the transformed center fixed when flipping vertically', () => {
+    const object = objectWithTransform({
+      x: -12,
+      y: 80,
+      scaleX: 0.8,
+      scaleY: 1.25,
+      rotationDeg: 30,
+      mirrorX: false,
+      mirrorY: false,
+    });
+    const before = transformedCenter(object);
+
+    const next = flipTransformAboutCenter(object, 'vertical');
+    const after = transformedCenter({ ...object, transform: next });
+
+    expect(next.mirrorY).toBe(true);
+    expect(after.x).toBeCloseTo(before.x, 6);
+    expect(after.y).toBeCloseTo(before.y, 6);
+  });
+});
+
+function objectWithTransform(transform: Transform): SceneObject {
+  return {
+    kind: 'shape',
+    id: 'shape-1',
+    spec: { kind: 'rect', widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
+    color: '#000000',
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+    transform,
+    paths: [],
+  };
+}
+
+function transformedCenter(object: SceneObject): { readonly x: number; readonly y: number } {
+  return applyTransform(
+    {
+      x: (object.bounds.minX + object.bounds.maxX) / 2,
+      y: (object.bounds.minY + object.bounds.maxY) / 2,
+    },
+    object.transform,
+  );
+}

@@ -157,7 +157,7 @@ export function nextTransformForDrag(
   drag: Exclude<DragState, { kind: 'pan' | 'draw' }>,
   obj: SceneObject,
   point: Vec2,
-  e: { readonly shiftKey: boolean; readonly altKey: boolean },
+  e: { readonly shiftKey: boolean; readonly ctrlKey: boolean; readonly metaKey: boolean },
 ): Transform {
   if (drag.kind === 'move') {
     return {
@@ -171,8 +171,8 @@ export function nextTransformForDrag(
       object: obj,
       handle: drag.handle,
       dragTo: point,
-      lockAspect: e.shiftKey,
-      fromCenter: e.altKey,
+      lockAspect: !e.shiftKey,
+      fromCenter: e.ctrlKey || e.metaKey,
     });
   }
   return rotateObjectByDrag({ object: obj, dragTo: point, snap: e.shiftKey });

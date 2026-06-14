@@ -24,6 +24,7 @@ const TOOLS: ReadonlyArray<Tool> = [
 export function ToolStrip(): JSX.Element {
   const toolMode = useUiStore((s) => s.toolMode);
   const setToolMode = useUiStore((s) => s.setToolMode);
+  const resetToolMode = useUiStore((s) => s.resetToolMode);
   return (
     <aside aria-label="Drawing tools" className="lf-rail" style={stripStyle}>
       {TOOLS.map((tool) => (
@@ -31,7 +32,10 @@ export function ToolStrip(): JSX.Element {
           key={tool.label}
           icon={tool.icon}
           label={tool.label}
-          onClick={() => setToolMode(tool.mode)}
+          onClick={() => {
+            if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
+            else setToolMode(tool.mode);
+          }}
           pressed={isActive(toolMode, tool.mode)}
         />
       ))}

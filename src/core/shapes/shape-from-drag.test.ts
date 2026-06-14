@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { transformedBBox, type ShapeObject } from '../scene';
 import { isDrawDragSignificant, MIN_DRAW_SIZE_MM, shapeFromDrag } from './shape-from-drag';
 
 describe('shapeFromDrag', () => {
@@ -45,7 +46,7 @@ describe('shapeFromDrag', () => {
     expect(shape.transform.y).toBe(0);
   });
 
-  it('inscribes a centered hexagon in the drag box for a polygon', () => {
+  it('fills the visual drag box for a polygon', () => {
     const shape = shapeFromDrag({
       kind: 'polygon',
       start: { x: 0, y: 0 },
@@ -53,11 +54,52 @@ describe('shapeFromDrag', () => {
       id: 'P1',
       color: '#0000ff',
     });
-    // radius = min(40, 20) / 2 = 10; default 6 sides.
-    expect(shape.spec).toEqual({ kind: 'polygon', sides: 6, radiusMm: 10 });
-    // Centre the local (radius,radius) point at the box centre (20,10).
+    expect(shape.spec.kind).toBe('polygon');
+    if (shape.spec.kind !== 'polygon') throw new Error('expected polygon shape');
+    expect(shape.spec.sides).toBe(6);
+    expectShapeBox(shape, { minX: 0, minY: 0, maxX: 40, maxY: 20 });
+  });
+
+  it('uses Ctrl/Cmd-style center-out drawing when requested', () => {
+    const shape = shapeFromDrag({
+      kind: 'ellipse',
+      start: { x: 50, y: 50 },
+      end: { x: 70, y: 60 },
+      id: 'E2',
+      color: '#00ff00',
+      modifiers: { fromCenter: true },
+    });
+    expect(shape.spec).toEqual({ kind: 'ellipse', widthMm: 40, heightMm: 20 });
+    expect(shape.transform.x).toBe(30);
+    expect(shape.transform.y).toBe(40);
+  });
+
+  it('uses Shift-style regular drawing when requested', () => {
+    const shape = shapeFromDrag({
+      kind: 'rect',
+      start: { x: 10, y: 20 },
+      end: { x: 40, y: 30 },
+      id: 'R3',
+      color: '#ff0000',
+      modifiers: { regular: true },
+    });
+    expect(shape.spec).toEqual({ kind: 'rect', widthMm: 30, heightMm: 30, cornerRadiusMm: 0 });
     expect(shape.transform.x).toBe(10);
-    expect(shape.transform.y).toBe(0);
+    expect(shape.transform.y).toBe(20);
+  });
+
+  it('combines center-out and regular modifiers', () => {
+    const shape = shapeFromDrag({
+      kind: 'rect',
+      start: { x: 50, y: 50 },
+      end: { x: 70, y: 60 },
+      id: 'R4',
+      color: '#ff0000',
+      modifiers: { fromCenter: true, regular: true },
+    });
+    expect(shape.spec).toEqual({ kind: 'rect', widthMm: 40, heightMm: 40, cornerRadiusMm: 0 });
+    expect(shape.transform.x).toBe(30);
+    expect(shape.transform.y).toBe(30);
   });
 });
 
@@ -67,8 +109,39 @@ describe('isDrawDragSignificant', () => {
     expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: 0.4, y: 0.4 })).toBe(false);
   });
 
-  it('accepts a drag that clears the threshold on either axis', () => {
-    expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: MIN_DRAW_SIZE_MM, y: 0 })).toBe(true);
-    expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: 0, y: 10 })).toBe(true);
+  it('rejects a zero-area drag for non-regular closed shapes', () => {
+    expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: MIN_DRAW_SIZE_MM, y: 0 })).toBe(false);
+    expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: 0, y: 10 })).toBe(false);
+  });
+
+  it('accepts an intentionally thin non-regular shape when the drag is otherwise clear', () => {
+    expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: 0.1, y: 10 })).toBe(true);
+  });
+
+  it('accepts a one-axis Shift-style regular drag because it can become square/circle', () => {
+    expect(
+      isDrawDragSignificant({ x: 0, y: 0 }, { x: MIN_DRAW_SIZE_MM, y: 0 }, { regular: true }),
+    ).toBe(true);
+    expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: 0, y: 10 }, { regular: true })).toBe(true);
+  });
+
+  it('accepts a drag that clears the threshold on both axes', () => {
+    expect(isDrawDragSignificant({ x: 0, y: 0 }, { x: MIN_DRAW_SIZE_MM, y: 10 })).toBe(true);
   });
 });
+
+function expectShapeBox(
+  shape: ShapeObject,
+  expected: {
+    readonly minX: number;
+    readonly minY: number;
+    readonly maxX: number;
+    readonly maxY: number;
+  },
+): void {
+  const actual = transformedBBox(shape);
+  expect(actual.minX).toBeCloseTo(expected.minX, 5);
+  expect(actual.minY).toBeCloseTo(expected.minY, 5);
+  expect(actual.maxX).toBeCloseTo(expected.maxX, 5);
+  expect(actual.maxY).toBeCloseTo(expected.maxY, 5);
+}
