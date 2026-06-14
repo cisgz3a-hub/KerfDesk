@@ -127,23 +127,50 @@ describe('laser-store motion operation disconnect safety', () => {
 });
 
 describe('laser-store motion operation lifecycle', () => {
-  it('keeps Frame busy until GRBL reports motion and returns to Idle', async () => {
+  it('keeps Jog busy until GRBL reports motion and returns to Idle', async () => {
     const write = vi.fn(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
 
-    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
+    await useLaserStore.getState().jog({ dx: 10, feed: 1000 });
 
-    expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
+    expect(getMotionOperation()).toMatchObject({ kind: 'jog', sawControllerBusy: false });
 
     connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:0,0>');
 
-    expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: true });
+    expect(getMotionOperation()).toMatchObject({ kind: 'jog', sawControllerBusy: true });
 
     connection.emitLine('<Idle|MPos:10.000,10.000,0.000|FS:0,0>');
 
     expect(getMotionOperation()).toBeNull();
+  });
+
+  it('dispatches Frame jog legs one at a time after each leg completes', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    writes.length = 0;
+
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      '$J=G90 G21 X0.000 Y0.000 F1000\n',
+    ]);
+    expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
+
+    connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:1000,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await Promise.resolve();
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      '$J=G90 G21 X0.000 Y0.000 F1000\n',
+      '$J=G90 G21 X10.000 Y0.000 F1000\n',
+    ]);
+    expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
   });
 
   it('clears Frame after stable Idle reports when polling misses the Jog state', async () => {

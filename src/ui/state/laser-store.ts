@@ -55,6 +55,7 @@ import {
   idleOnlyDollarCommandBlockMessage,
   isActiveJob,
   jogFrameCommandBlockMessage,
+  motionOperationCommandBlockMessage,
   pushLog,
   serialWriteErrorMessage,
   type StallProbe,
@@ -326,11 +327,16 @@ function jogActions(
   return {
     home: async () => {
       assertAutofocusIdle(get());
+      assertNoMotionOperation(set, get);
       await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
     },
     autofocus: async (command) => {
       const activeJobBlock = idleCommandBlockResult(get());
       if (activeJobBlock !== null) return activeJobBlock;
+      const motionOperationBlock = motionOperationCommandBlockMessage(get());
+      if (motionOperationBlock !== null) {
+        return { kind: 'preflight-failed', reason: motionOperationBlock };
+      }
       if (get().autofocusBusy) {
         return { kind: 'preflight-failed', reason: 'Auto-focus is already running.' };
       }
@@ -346,6 +352,7 @@ function jogActions(
       }
     },
     unlockAlarm: async () => {
+      assertNoMotionOperation(set, get);
       await safeWrite(set, get, `${CMD_UNLOCK}\n`, 'unlock');
       set({ alarmCode: null });
     },
@@ -368,11 +375,11 @@ function jogActions(
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
-      set({ motionOperation: startMotionOperation('frame') });
+      const [firstLine, ...pendingLines] = buildFrameJogLines(bounds, feed);
+      if (firstLine === undefined) return;
+      set({ motionOperation: startMotionOperation('frame', pendingLines) });
       try {
-        for (const line of buildFrameJogLines(bounds, feed)) {
-          await safeWrite(set, get, line, 'frame');
-        }
+        await safeWrite(set, get, firstLine, 'frame');
         set((s) => ({
           motionOperation: markMotionOperationDispatched(s.motionOperation, 'frame'),
         }));
@@ -394,6 +401,16 @@ function assertJogFrameReady(set: SetFn, get: GetFn): void {
   throw new Error(blockedMessage);
 }
 
+function assertNoMotionOperation(set: SetFn, get: GetFn): void {
+  const blockedMessage = motionOperationCommandBlockMessage(get());
+  if (blockedMessage === null) return;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
+}
+
 function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere' | 'resetOrigin'> {
   // Set the local active flag immediately after a successful write.
   // The line-handler still reconciles the exact WCO later, but Frame/Start
@@ -402,6 +419,7 @@ function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere'
     setOriginHere: async () => {
       assertAutofocusIdle(get());
       assertNoActiveJob(get());
+      assertNoMotionOperation(set, get);
       await setOriginHereAction((out) => safeWrite(set, get, out, 'origin'));
       const { statusReport, wcoCache } = get();
       const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
@@ -413,6 +431,7 @@ function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere'
     resetOrigin: async () => {
       assertAutofocusIdle(get());
       assertNoActiveJob(get());
+      assertNoMotionOperation(set, get);
       await resetOriginAction((out) => safeWrite(set, get, out, 'origin'));
       set({ workOriginActive: false, wcoCache: null });
     },

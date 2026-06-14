@@ -21,6 +21,8 @@ export const ACTIVE_JOB_COMMAND_MESSAGE =
   'A job is active. Press Stop before sending setup, jog, home, unlock, origin, settings, or autofocus commands.';
 export const UNKNOWN_IDLE_STATUS_MESSAGE =
   'Controller status is not known yet. Wait for an Idle status report before jogging or framing.';
+export const MOTION_OPERATION_ACTIVE_MESSAGE =
+  'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -41,9 +43,19 @@ export function activeJobCommandBlockMessage(state: LaserState): string | null {
   return isActiveJob(state.streamer) ? ACTIVE_JOB_COMMAND_MESSAGE : null;
 }
 
+export function motionOperationCommandBlockMessage(state: LaserState): string | null {
+  return state.motionOperation !== null ? MOTION_OPERATION_ACTIVE_MESSAGE : null;
+}
+
+export function setupCommandBlockMessage(state: LaserState): string | null {
+  return activeJobCommandBlockMessage(state) ?? motionOperationCommandBlockMessage(state);
+}
+
 export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   const activeJobMessage = activeJobCommandBlockMessage(state);
   if (activeJobMessage !== null) return activeJobMessage;
+  const motionOperationMessage = motionOperationCommandBlockMessage(state);
+  if (motionOperationMessage !== null) return motionOperationMessage;
   if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
   if (state.statusReport.state !== 'Idle') {
     return `Machine must be Idle before jogging or framing (currently ${state.statusReport.state}).`;
