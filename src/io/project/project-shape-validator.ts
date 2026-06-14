@@ -99,6 +99,7 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   if (kind === 'text') return validateTextObject(obj, path);
   if (kind === 'traced-image') return validateVectorObject(obj, path);
   if (kind === 'raster-image') return validateRasterObject(obj, path);
+  if (kind === 'shape') return validateShapeObject(obj, path);
   return `missing or invalid \`${path}.kind\``;
 }
 
@@ -148,6 +149,30 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     optionalNumber(obj, `${path}.gamma`),
     optionalString(obj, `${path}.lumaBase64`),
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
+  ]);
+}
+
+function validateShapeObject(obj: Record<string, unknown>, path: string): string | null {
+  return firstError([
+    requireString(obj, `${path}.id`),
+    validateShapeSpec(obj['spec'], `${path}.spec`),
+    requireString(obj, `${path}.color`),
+    optionalPercent(obj, `${path}.powerScale`),
+    validateBounds(obj['bounds'], `${path}.bounds`),
+    validateTransform(obj['transform'], `${path}.transform`),
+    validateColoredPaths(obj['paths'], `${path}.paths`),
+  ]);
+}
+
+// Phase G (ADR-051). One arm today (rect); ellipse / polygon / polyline add arms
+// here as core/shapes grows.
+function validateShapeSpec(value: unknown, path: string): string | null {
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  if (value['kind'] !== 'rect') return `missing or invalid \`${path}.kind\``;
+  return firstError([
+    requirePositiveNumber(value, `${path}.widthMm`),
+    requirePositiveNumber(value, `${path}.heightMm`),
+    requireNumber(value, `${path}.cornerRadiusMm`),
   ]);
 }
 

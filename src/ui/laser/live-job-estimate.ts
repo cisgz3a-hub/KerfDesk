@@ -106,6 +106,7 @@ function vectorPaths(obj: SceneObject): ReadonlyArray<ColoredPath> {
     case 'imported-svg':
     case 'text':
     case 'traced-image':
+    case 'shape':
       return obj.paths;
     case 'raster-image':
       return [];
@@ -117,6 +118,7 @@ function vectorTransform(obj: SceneObject): Transform | null {
     case 'imported-svg':
     case 'text':
     case 'traced-image':
+    case 'shape':
       return obj.transform;
     case 'raster-image':
       return null;

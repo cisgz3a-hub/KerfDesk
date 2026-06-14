@@ -278,6 +278,7 @@ function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
     case 'imported-svg':
     case 'text':
     case 'traced-image':
+    case 'shape':
       return obj.paths.some((path) => path.color === layer.color);
     case 'raster-image':
       return false;
@@ -378,6 +379,9 @@ function appendSegmentsFromObject(
     case 'traced-image':
       appendPathSegments(obj.paths, obj.transform, layer, device, out);
       return;
+    case 'shape':
+      appendPathSegments(obj.paths, obj.transform, layer, device, out);
+      return;
     case 'raster-image':
       // F.2.c: SceneObject union now includes raster-image. The
       // dedicated raster emit path (compileRasterGroup → emitRaster)
@@ -405,6 +409,9 @@ function appendFillContoursFromObject(
       appendFillPathContours(obj.paths, obj.transform, layer, device, out);
       return;
     case 'traced-image':
+      appendFillPathContours(obj.paths, obj.transform, layer, device, out);
+      return;
+    case 'shape':
       appendFillPathContours(obj.paths, obj.transform, layer, device, out);
       return;
     case 'raster-image':

@@ -190,9 +190,35 @@ export type RasterImage = ObjectPowerScale & {
 // accidentally collide with a real layer the user created.
 export const DEFAULT_RASTER_LAYER_COLOR = '#808080';
 
-// Full union expanded through Phase F.2 (ADR-014, ADR-020). Future
+// Drawing-primitive shape, Phase G (ADR-051). Unlike imported geometry, a shape
+// is created on-canvas from a parametric block (kind:'rect' for now; ellipse /
+// polygon / polyline follow in later increments). `paths` is the materialized
+// outline; editing the block re-materializes it. compileJob / preview / emit
+// iterate `paths` like every other variant, so nothing downstream changes.
+export type RectangleShape = {
+  readonly kind: 'rect';
+  readonly widthMm: number;
+  readonly heightMm: number;
+  readonly cornerRadiusMm: number;
+};
+
+// The parametric block. Widens to | EllipseShape | PolygonShape | PolylineShape
+// in later Phase G increments.
+export type ShapeSpec = RectangleShape;
+
+export type ShapeObject = ObjectPowerScale & {
+  readonly kind: 'shape';
+  readonly id: string;
+  readonly spec: ShapeSpec;
+  readonly color: string; // lowercase hex; the layer key, like TextObject
+  readonly bounds: Bounds; // local-space bounds of the materialized outline
+  readonly transform: Transform;
+  readonly paths: ReadonlyArray<ColoredPath>;
+};
+
+// Full union expanded through Phase G (ADR-014, ADR-020, ADR-051). Future
 // variants require an ADR + a PROJECT.md scope revision.
-export type SceneObject = ImportedSvg | TextObject | TracedImage | RasterImage;
+export type SceneObject = ImportedSvg | TextObject | TracedImage | RasterImage | ShapeObject;
 
 // Exhaustiveness helper. Place in the default arm of every `switch` over a
 // discriminated union so adding a variant produces exactly one TS error (the
