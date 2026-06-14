@@ -55,14 +55,14 @@ describe('installUnloadStop (C3: laser-off on tab close mid-job)', () => {
     uninstall();
   });
 
-  it('does not send a stop after a completed job', () => {
+  it('initiates stopJob after all lines are acked but before Idle confirms completion', () => {
     const stopJob = vi.fn(async () => undefined);
     patchStore({ streamer: createStreamer(''), stopJob });
     const uninstall = installUnloadStop(window);
 
     window.dispatchEvent(new Event('pagehide'));
 
-    expect(stopJob).not.toHaveBeenCalled();
+    expect(stopJob).toHaveBeenCalledTimes(1);
     uninstall();
   });
 
