@@ -214,8 +214,16 @@ export type PolygonShape = {
   readonly radiusMm: number; // circumradius
 };
 
-// The parametric block. Polyline (pen) follows in a later Phase G increment.
-export type ShapeSpec = RectangleShape | EllipseShape | PolygonShape;
+// An open or closed run of points — the pen tool's freeform primitive (B6).
+// The points are absolute (the factory places them at IDENTITY_TRANSFORM).
+export type PolylineShape = {
+  readonly kind: 'polyline';
+  readonly points: ReadonlyArray<Vec2>;
+  readonly closed: boolean;
+};
+
+// The parametric block.
+export type ShapeSpec = RectangleShape | EllipseShape | PolygonShape | PolylineShape;
 
 export type ShapeObject = ObjectPowerScale & {
   readonly kind: 'shape';
