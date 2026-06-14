@@ -236,6 +236,45 @@ describe('deserializeProject', () => {
     }
   });
 
+  it('reports invalid when a coordinate magnitude is absurd (exponential bounds-check bypass)', () => {
+    // A coordinate >= 1e21 passes Number.isFinite but renders in exponential
+    // notation when emitted (toFixed -> "1e+50"), which the G-code bounds-check
+    // regex can't read — silently defeating the bounds invariant. Reject it here.
+    const obj = {
+      kind: 'imported-svg',
+      id: 'O1',
+      source: 'a.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              points: [
+                { x: 1e50, y: 0 },
+                { x: 5, y: 5 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    } as unknown as SceneObject;
+    const base = createProject();
+    const text = serializeProject({
+      ...base,
+      scene: { ...base.scene, objects: [obj] },
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/points\[0\]\.x/);
+    }
+  });
+
   it('reports schema-too-new for a future version', () => {
     const text = JSON.stringify({ schemaVersion: PROJECT_SCHEMA_VERSION + 1 });
     const result = deserializeProject(text);
