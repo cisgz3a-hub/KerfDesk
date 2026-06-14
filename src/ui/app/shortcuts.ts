@@ -19,6 +19,9 @@ import {
   handleSaveGcode,
   handleSaveProject,
 } from './file-actions';
+import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
+import { finishPen } from '../workspace/pen-tool';
 
 const NUDGE_MM = 1;
 const NUDGE_BIG_MM = 10;
@@ -200,8 +203,25 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
     },
   },
   {
+    // Phase G (B6) — Enter finishes the pen's in-progress polyline as an OPEN
+    // path. The penDraft guard lives in `match` (not `invoke`) because
+    // handleEditShortcut preventDefaults BEFORE invoke runs; without it a bare
+    // Enter anywhere would be swallowed. Gated on !previewMode so it can't
+    // commit into a previewed scene.
+    match: (e) =>
+      !hasMeta(e) &&
+      e.key === 'Enter' &&
+      useUiStore.getState().penDraft !== null &&
+      !useStore.getState().previewMode,
+    invoke: () => {
+      const s = useStore.getState();
+      finishPen({ closed: false, project: s.project, drawShape: s.drawShape });
+    },
+  },
+  {
     match: (e) => !hasMeta(e) && e.key === 'Escape',
     invoke: (c) => {
+      // resetToolMode also clears any in-progress pen polyline (ADR-051 B6).
       c.resetToolMode(); // Esc always returns to the Select tool (ADR-051)
       c.selectObject(null);
     },

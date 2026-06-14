@@ -18,6 +18,7 @@ const TOOLS: ReadonlyArray<Tool> = [
   { mode: { kind: 'draw', shape: 'rect' }, icon: 'square', label: 'Draw rectangle' },
   { mode: { kind: 'draw', shape: 'ellipse' }, icon: 'circle', label: 'Draw ellipse' },
   { mode: { kind: 'draw', shape: 'polygon' }, icon: 'pentagon', label: 'Draw polygon' },
+  { mode: { kind: 'draw', shape: 'polyline' }, icon: 'pen', label: 'Draw polyline (pen)' },
 ];
 
 export function ToolStrip(): JSX.Element {

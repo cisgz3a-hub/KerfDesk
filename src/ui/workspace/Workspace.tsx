@@ -13,7 +13,7 @@
 import { canvasTheme } from '../theme/canvas-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Toolpath } from '../../core/job';
-import type { Project } from '../../core/scene';
+import type { Project, Transform, Vec2 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { drawScene } from './draw-scene';
@@ -25,6 +25,7 @@ import {
   panOffsetForDrag,
 } from './drag-state';
 import { beginDrawDrag, commitDraftShape, draftForDrawDrag } from './draw-tool';
+import { finishPen, handlePenMouseDown, updatePenCursor } from './pen-tool';
 import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
 import { PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
@@ -72,7 +73,7 @@ export function Workspace(): JSX.Element {
         onMouseMove={handlers.onMouseMove}
         onMouseUp={handlers.onMouseUp}
         onMouseLeave={handlers.onMouseUp}
-        onDoubleClick={openTextEditForSelectedText}
+        onDoubleClick={handleCanvasDoubleClick}
         onWheel={(e) => handleCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY })}
         onContextMenu={(e) => {
           // Right-click is rebound to pan; suppress the OS context
@@ -131,6 +132,9 @@ function useWorkspaceDraw(args: {
   // Phase G (B5): the live shape being dragged out, rendered as a dashed
   // preview. Identity changes each mouse-move, so it belongs in the deps below.
   const draftShape = useUiStore((s) => s.draftShape);
+  // Phase G (B6): the pen tool's in-progress polyline (also redraws per click /
+  // cursor move).
+  const penDraft = useUiStore((s) => s.penDraft);
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const displayPolylineCacheRef = useRef<DisplayPolylineCache | null>(null);
   if (displayPolylineCacheRef.current === null) {
@@ -155,6 +159,7 @@ function useWorkspaceDraw(args: {
       displayPolylineCache,
       ...(previewToolpath === null ? {} : { previewToolpath }),
       ...(draftShape === null ? {} : { draft: draftShape }),
+      ...(penDraft === null ? {} : { penDraft }),
     });
   }, [
     ref,
@@ -170,6 +175,7 @@ function useWorkspaceDraw(args: {
     previewToolpath,
     requestRasterRedraw,
     draftShape,
+    penDraft,
   ]);
 }
 
@@ -201,6 +207,23 @@ function handleCanvasWheel(
   });
   useUiStore.getState().setZoom(next.zoomFactor);
   useUiStore.getState().setPan(next.panX, next.panY);
+}
+
+// Phase G (B6) — in pen mode a double-click finishes the in-progress polyline
+// as an OPEN path; otherwise it falls through to the Phase D text-edit. Module-
+// level so the canvas onDoubleClick prop reference stays stable.
+function handleCanvasDoubleClick(): void {
+  const ui = useUiStore.getState();
+  if (ui.toolMode.kind === 'draw' && ui.toolMode.shape === 'polyline') {
+    const s = useStore.getState();
+    // Gated on !previewMode so a stray dblclick can't commit into a previewed
+    // scene; the draft is preserved across a preview toggle either way.
+    if (ui.penDraft !== null && !s.previewMode) {
+      finishPen({ closed: false, project: s.project, drawShape: s.drawShape });
+    }
+    return; // in pen mode, never open the text editor
+  }
+  openTextEditForSelectedText();
 }
 
 // Phase D — double-click on a selected text opens the edit dialog
@@ -263,6 +286,12 @@ function useDragMove(
     // Draw tool armed + a plain left press (no Space/middle/right pan) starts a
     // shape drag; pan triggers still fall through to computeMouseDownDrag.
     if (toolMode.kind === 'draw' && e.button === 0 && !useUiStore.getState().spaceDown) {
+      // The pen is multi-click (places a vertex per click, no drag); the
+      // parametric shapes rubber-band out on a single drag.
+      if (toolMode.shape === 'polyline') {
+        handlePenMouseDown({ e, ref, project, viewState, drawShape });
+        return;
+      }
       const drawDrag = beginDrawDrag({ e, ref, project, viewState, shape: toolMode.shape });
       if (drawDrag !== null) setDrag(drawDrag);
       return;
@@ -291,14 +320,15 @@ function useDragMove(
       }
       const point = canvasMouseToScene(e, canvas, project, viewState);
       setCursorMm(point);
+      if (toolMode.kind === 'draw' && toolMode.shape === 'polyline') {
+        updatePenCursor(point); // rubber-band to the cursor; no-op if not drawing
+        return;
+      }
       if (drag?.kind === 'draw') {
         if (point !== null) setDraftShape(draftForDrawDrag(drag, point, project));
         return;
       }
-      if (drag === null || drag.kind === 'pan' || point === null) return;
-      const obj = project.scene.objects.find((o) => o.id === drag.objectId);
-      if (obj === undefined) return;
-      setObjectTransform(drag.objectId, nextTransformForDrag(drag, obj, point, e));
+      applyTransformDrag({ drag, point, e, project, setObjectTransform });
     },
     onMouseUp: () => {
       setCursorMm(null);
@@ -317,6 +347,24 @@ function useDragMove(
   const visibleKind =
     drag === null || drag.kind === 'pan' || drag.kind === 'draw' ? null : drag.kind;
   return { handlers, dragKind: visibleKind };
+}
+
+// The move/scale/rotate tail of the mousemove handler, split out so useDragMove
+// stays under the function-line cap and onMouseMove under the complexity cap
+// (the pen + draw arms pushed both over). Pan / pen / draw are handled by the
+// caller first, so `drag` here is always move/scale/rotate.
+function applyTransformDrag(args: {
+  readonly drag: DragState | null;
+  readonly point: Vec2 | null;
+  readonly e: React.MouseEvent<HTMLCanvasElement>;
+  readonly project: Project;
+  readonly setObjectTransform: (id: string, transform: Transform) => void;
+}): void {
+  const { drag, point } = args;
+  if (drag === null || drag.kind === 'pan' || drag.kind === 'draw' || point === null) return;
+  const obj = args.project.scene.objects.find((o) => o.id === drag.objectId);
+  if (obj === undefined) return;
+  args.setObjectTransform(drag.objectId, nextTransformForDrag(drag, obj, point, args.e));
 }
 
 const canvasStyle: React.CSSProperties = {

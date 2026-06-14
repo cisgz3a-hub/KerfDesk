@@ -17,7 +17,7 @@ type ViewArg = { readonly zoomFactor: number; readonly panX: number; readonly pa
 // any layers present, the new shape inherits the first layer's colour. Scene
 // data (the object's stroke), not UI chrome — exempt from the token rule (ADR-047).
 // eslint-disable-next-line no-restricted-syntax
-const DEFAULT_SHAPE_COLOR = '#000000';
+export const DEFAULT_SHAPE_COLOR = '#000000';
 // Placeholder id for the live draft; the committed shape gets a fresh uuid so
 // undo/redo and selection track a stable identity.
 const DRAFT_SHAPE_ID = 'draft';
