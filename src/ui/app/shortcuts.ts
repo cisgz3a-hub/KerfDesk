@@ -52,6 +52,7 @@ export type EditCtx = {
   readonly selectObject: (id: string | null) => void;
   readonly selectAllObjects: () => void;
   readonly duplicateSelection: () => void;
+  readonly resetToolMode: () => void;
 };
 
 export type TransformCtx = {
@@ -200,7 +201,10 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
   },
   {
     match: (e) => !hasMeta(e) && e.key === 'Escape',
-    invoke: (c) => c.selectObject(null),
+    invoke: (c) => {
+      c.resetToolMode(); // Esc always returns to the Select tool (ADR-051)
+      c.selectObject(null);
+    },
   },
 ];
 

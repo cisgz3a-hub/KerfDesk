@@ -15,6 +15,7 @@ function editCtx(
     selectObject: vi.fn(),
     selectAllObjects: vi.fn(),
     duplicateSelection: vi.fn(),
+    resetToolMode: vi.fn(),
     ...overrides,
   };
 }
