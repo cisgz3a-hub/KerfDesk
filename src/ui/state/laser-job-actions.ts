@@ -17,7 +17,7 @@ import {
   step,
 } from '../../core/controllers/grbl';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
-import { assertAutofocusIdle } from './laser-store-helpers';
+import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
 type SetFn = (
@@ -34,6 +34,14 @@ export function jobActions(
   return {
     startJob: async (gcode) => {
       assertAutofocusIdle(get());
+      const blockedMessage = setupCommandBlockMessage(get());
+      if (blockedMessage !== null) {
+        set({
+          lastWriteError: blockedMessage,
+          log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
+        });
+        throw new Error(blockedMessage);
+      }
       // M13: a line longer than the RX buffer can never send — step() would
       // break silently, leaving a phantom idle job and a frozen progress bar.
       const oversized = findOversizedLine(gcode);

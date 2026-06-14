@@ -153,6 +153,7 @@ describe('LayerRow double-click cut settings', () => {
             sawControllerBusy: true,
             idleStatusReports: 0,
             dispatchComplete: true,
+            pendingLines: [],
           },
         }),
     ],

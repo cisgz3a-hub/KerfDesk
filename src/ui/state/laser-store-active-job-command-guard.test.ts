@@ -106,6 +106,70 @@ describe('laser-store active-job command guard', () => {
   );
 
   it.each([
+    ['Jog', () => useLaserStore.getState().jog({ dx: 1, feed: 1000 })],
+    ['Frame', () => useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000)],
+  ] as const)(
+    'blocks %s while a prior jog/frame operation is still active even if the last status was Idle',
+    async (_label, runCommand) => {
+      const writes: string[] = [];
+      const connection = makeConnection(async (data) => {
+        writes.push(data);
+      });
+      await connectWith(connection);
+      connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+      useLaserStore.setState({
+        motionOperation: {
+          kind: 'jog',
+          sawControllerBusy: false,
+          idleStatusReports: 0,
+          dispatchComplete: true,
+          pendingLines: [],
+        },
+      } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      writes.length = 0;
+
+      await expect(runCommand()).rejects.toThrow(/operation is active/i);
+
+      expect(writes.some((line) => line.startsWith('$J='))).toBe(false);
+      expect(useLaserStore.getState().lastWriteError).toMatch(/operation is active/i);
+      expect(getMotionOperation()).toMatchObject({ kind: 'jog' });
+    },
+  );
+
+  it.each([
+    ['Home', () => useLaserStore.getState().home()],
+    ['Unlock', () => useLaserStore.getState().unlockAlarm()],
+    ['Set Origin', () => useLaserStore.getState().setOriginHere()],
+    ['Reset Origin', () => useLaserStore.getState().resetOrigin()],
+    ['Start job', () => useLaserStore.getState().startJob('G21\nG90\nG1 X1 F1000\nM5\n')],
+  ] as const)('blocks %s while a jog/frame operation is active', async (_label, runCommand) => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    useLaserStore.setState({
+      workOriginActive: true,
+      wcoCache: { x: 1, y: 1, z: 0 },
+      motionOperation: {
+        kind: 'jog',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    writes.length = 0;
+
+    await expect(runCommand()).rejects.toThrow(/operation is active/i);
+
+    expect(writes).toEqual([]);
+    expect(useLaserStore.getState().lastWriteError).toMatch(/operation is active/i);
+    expect(getMotionOperation()).toMatchObject({ kind: 'jog' });
+  });
+
+  it.each([
     ['Home', () => useLaserStore.getState().home(), '$H'],
     ['Unlock', () => useLaserStore.getState().unlockAlarm(), '$X'],
     ['Jog', () => useLaserStore.getState().jog({ dx: 1, feed: 1000 }), '$J='],

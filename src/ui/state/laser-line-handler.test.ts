@@ -167,6 +167,7 @@ describe('handleLine controller error (P0-1)', () => {
         sawControllerBusy: false,
         idleStatusReports: 0,
         dispatchComplete: true,
+        pendingLines: [],
       },
     });
 
