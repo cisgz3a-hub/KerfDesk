@@ -182,6 +182,32 @@ function encodeWireBytes(data: string): Uint8Array {
   return out;
 }
 
+// Cap on an in-progress (unterminated) serial line. GRBL status/response lines
+// are well under 200 bytes; a device streaming bytes WITHOUT a newline (line
+// noise, or a spoofed-device DoS) would otherwise grow the read buffer without
+// bound until OOM. Past this length the partial is dropped (security audit 2026-06-14).
+const MAX_SERIAL_LINE_LENGTH = 64 * 1024;
+
+// Pure line extractor for the serial read loop: appends `chunk` to `buffer`,
+// pulls out every \n-terminated line (trailing \r stripped), and returns the
+// remaining partial. An over-length partial (no newline in sight) is dropped so
+// the buffer cannot grow without bound. Exported for unit testing.
+export function extractSerialLines(
+  buffer: string,
+  chunk: string,
+): { readonly lines: ReadonlyArray<string>; readonly buffer: string } {
+  let next = buffer + chunk;
+  const lines: string[] = [];
+  let nl = next.indexOf('\n');
+  while (nl >= 0) {
+    lines.push(next.slice(0, nl).replace(/\r$/, ''));
+    next = next.slice(nl + 1);
+    nl = next.indexOf('\n');
+  }
+  if (next.length > MAX_SERIAL_LINE_LENGTH) next = '';
+  return { lines, buffer: next };
+}
+
 async function runReadLoop(
   reader: ReadableStreamDefaultReader<Uint8Array> | undefined,
   lineSubs: Subscribers<string>,
@@ -194,13 +220,10 @@ async function runReadLoop(
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let nl = buffer.indexOf('\n');
-      while (nl >= 0) {
-        const line = buffer.slice(0, nl).replace(/\r$/, '');
-        buffer = buffer.slice(nl + 1);
+      const extracted = extractSerialLines(buffer, decoder.decode(value, { stream: true }));
+      buffer = extracted.buffer;
+      for (const line of extracted.lines) {
         for (const h of lineSubs) h(line);
-        nl = buffer.indexOf('\n');
       }
     }
   } catch (err) {
