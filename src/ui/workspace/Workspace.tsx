@@ -24,6 +24,7 @@ import {
   nextTransformForDrag,
   panOffsetForDrag,
 } from './drag-state';
+import { beginDrawDrag, commitDraftShape, draftForDrawDrag } from './draw-tool';
 import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
 import { PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
@@ -127,6 +128,9 @@ function useWorkspaceDraw(args: {
     viewState,
     canvasSize,
   } = args;
+  // Phase G (B5): the live shape being dragged out, rendered as a dashed
+  // preview. Identity changes each mouse-move, so it belongs in the deps below.
+  const draftShape = useUiStore((s) => s.draftShape);
   const [rasterRedrawTick, setRasterRedrawTick] = useState(0);
   const displayPolylineCacheRef = useRef<DisplayPolylineCache | null>(null);
   if (displayPolylineCacheRef.current === null) {
@@ -150,6 +154,7 @@ function useWorkspaceDraw(args: {
       onRasterBitmapReady: requestRasterRedraw,
       displayPolylineCache,
       ...(previewToolpath === null ? {} : { previewToolpath }),
+      ...(draftShape === null ? {} : { draft: draftShape }),
     });
   }, [
     ref,
@@ -164,6 +169,7 @@ function useWorkspaceDraw(args: {
     displayPolylineCache,
     previewToolpath,
     requestRasterRedraw,
+    draftShape,
   ]);
 }
 
@@ -248,9 +254,19 @@ function useDragMove(
   const beginInteraction = useStore((s) => s.beginInteraction);
   const setObjectTransform = useStore((s) => s.setObjectTransform);
   const endInteraction = useStore((s) => s.endInteraction);
+  const toolMode = useUiStore((s) => s.toolMode);
+  const drawShape = useStore((s) => s.drawShape);
+  const setDraftShape = useUiStore((s) => s.setDraftShape);
   const [drag, setDrag] = useState<DragState | null>(null);
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>): void => {
     if (previewMode) return;
+    // Draw tool armed + a plain left press (no Space/middle/right pan) starts a
+    // shape drag; pan triggers still fall through to computeMouseDownDrag.
+    if (toolMode.kind === 'draw' && e.button === 0 && !useUiStore.getState().spaceDown) {
+      const drawDrag = beginDrawDrag({ e, ref, project, viewState, shape: toolMode.shape });
+      if (drawDrag !== null) setDrag(drawDrag);
+      return;
+    }
     const next = computeMouseDownDrag({
       e,
       ref,
@@ -275,6 +291,10 @@ function useDragMove(
       }
       const point = canvasMouseToScene(e, canvas, project, viewState);
       setCursorMm(point);
+      if (drag?.kind === 'draw') {
+        if (point !== null) setDraftShape(draftForDrawDrag(drag, point, project));
+        return;
+      }
       if (drag === null || drag.kind === 'pan' || point === null) return;
       const obj = project.scene.objects.find((o) => o.id === drag.objectId);
       if (obj === undefined) return;
@@ -283,13 +303,19 @@ function useDragMove(
     onMouseUp: () => {
       setCursorMm(null);
       if (drag === null) return;
+      if (drag.kind === 'draw') {
+        commitDraftShape(drawShape);
+        setDrag(null);
+        return;
+      }
       // Pan doesn't push undo (no project state changed), so skip
       // endInteraction in that case.
       if (drag.kind !== 'pan') endInteraction();
       setDrag(null);
     },
   };
-  const visibleKind = drag === null || drag.kind === 'pan' ? null : drag.kind;
+  const visibleKind =
+    drag === null || drag.kind === 'pan' || drag.kind === 'draw' ? null : drag.kind;
   return { handlers, dragKind: visibleKind };
 }
 

@@ -48,6 +48,10 @@ export type DrawOpts = {
   readonly previewToolpath?: Toolpath;
   // User zoom + pan (F-A15). Defaults to fit-to-bed when omitted.
   readonly view?: ViewState;
+  // Phase G (B5): the shape being dragged out right now, drawn as a dashed
+  // accent outline so size + position are visible live before commit. Null
+  // when not drawing.
+  readonly draft?: SceneObject;
 };
 
 export function drawScene(
@@ -91,10 +95,28 @@ export function drawScene(
       opts.displayPolylineCache,
     );
     if (simplified) drawLargeSceneNotice(ctx);
+    if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
   }
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
+}
+
+// Phase G (B5): render the shape being dragged out as a dashed accent outline.
+// Reuses the object stroke path (strokePolylinesBatched applies the object's
+// own transform), so the preview matches exactly what mouse-up will commit.
+function drawDraftShape(
+  ctx: CanvasRenderingContext2D,
+  draft: SceneObject,
+  view: ViewTransform,
+): void {
+  if (draft.kind !== 'shape') return;
+  ctx.save();
+  ctx.strokeStyle = draft.color;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  for (const path of draft.paths) strokePolylinesBatched(ctx, draft, path.polylines, view);
+  ctx.restore();
 }
 
 function liveRasterDataUrls(project: Project): Set<string> {

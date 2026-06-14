@@ -15,6 +15,7 @@ import {
   removeObject,
   type Scene,
   type SceneObject,
+  type ShapeObject,
   type TextObject,
   type TracedImage,
   type Transform,
@@ -23,7 +24,7 @@ import {
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
-import { fitAllObjects, fitToSelection } from './viewport-actions';
+import { fitToSelection } from './viewport-actions';
 import { imageImportActions } from './import-actions';
 import {
   rasterAdjustmentActions,
@@ -44,15 +45,12 @@ import {
 } from './project-optimization-actions';
 import {
   applyDuplicate,
-  applyFreshImport,
-  applyReimport,
-  applyUpsertText,
-  findReimportTarget,
   type ImportOutcome,
   pruneOrphanLayers,
   pushUndo,
   type TraceExistingImageOptions,
 } from './scene-mutations';
+import { objectInsertActions } from './object-insert-actions';
 
 export type { ImportOutcome } from './scene-mutations';
 
@@ -117,6 +115,8 @@ export type AppState = ObjectPropertiesActions &
     // Phase D insert / update text by id; on add it's a new id, on
     // edit it replaces in place (preserves position/transform).
     readonly upsertTextObject: (text: TextObject) => void;
+    // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
+    readonly drawShape: (shape: ShapeObject) => void;
     readonly removeSceneObject: (id: string) => void;
     // Clone every currently-selected SceneObject with a fresh id and a
     // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
@@ -203,32 +203,6 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
     setProject: (project) =>
       set((s) => ({ ...initialState(), project, ...currentMaterialLibraryState(s) })),
     newProject: () => set((s) => ({ ...initialState(), ...currentMaterialLibraryState(s) })),
-  };
-}
-
-function importSvgObjectAction(
-  set: Setter,
-  get: () => AppState,
-): Pick<AppState, 'importSvgObject' | 'upsertTextObject'> {
-  return {
-    importSvgObject: (object, batchOffsetIdx = 0): ImportOutcome => {
-      const existing = findReimportTarget(get().project.scene, object);
-      let outcome: ImportOutcome = { kind: 'added' };
-      set((s) => {
-        if (existing !== null && object.kind === 'imported-svg') {
-          const next = applyReimport(s, existing, object);
-          outcome = next.outcome;
-          return next.state;
-        }
-        return applyFreshImport(s, object, batchOffsetIdx);
-      });
-      // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
-      fitAllObjects(get);
-      return outcome;
-    },
-    upsertTextObject: (text) => {
-      set((s) => applyUpsertText(s, text));
-    },
   };
 }
 
@@ -463,7 +437,7 @@ function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | 'markLoa
 export const useStore = create<AppState>((set, get) => ({
   ...initialState(),
   ...projectActions(set),
-  ...importSvgObjectAction(set, get),
+  ...objectInsertActions(set, get),
   ...imageImportActions(set, get),
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
