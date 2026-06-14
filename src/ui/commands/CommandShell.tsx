@@ -22,6 +22,7 @@ import { useRegisterModal } from '../common/use-register-modal';
 import { AppMenuBar } from './AppMenuBar';
 import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
+import { NumericEditsBar } from './NumericEditsBar';
 import { useAppCommands } from './use-app-commands';
 
 export function CommandShell(): JSX.Element {
@@ -47,6 +48,7 @@ export function CommandShell(): JSX.Element {
     <>
       <AppMenuBar commands={commands} />
       <Toolbar commands={commands} />
+      <NumericEditsBar />
       <input
         ref={imageInput}
         type="file"
