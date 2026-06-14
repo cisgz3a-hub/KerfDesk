@@ -2685,6 +2685,87 @@ pointing here.
 
 ---
 
+## ADR-051 — Phase G: on-canvas drawing tools (shape SceneObject variant + tool-mode)
+
+**Status:** Proposed (pending maintainer ratification). | **Date:** 2026-06-14
+
+### Context
+
+LaserForge is a "LightBurn-style CAM app" (PROJECT.md), but geometry can ONLY
+enter via SVG / image / text import — there are zero drawing tools (no rectangle,
+ellipse, polygon, or line). The 2026-06-13/14 LightBurn parity audits confirmed
+this is the single largest divergence: journey J1 ("draw a sign from nothing") is
+*impossible*, and J3 ("batch 20 keychains") is effectively impossible.
+
+Parametric primitive creation is NOT on PROJECT.md's out-of-scope list, but adding
+it is past-Phase-F work, so it needs this ADR + a PROJECT.md phase entry. This ADR
+covers **parametric primitive creation only**. The geometry *kernel* — weld,
+boolean ops, offset, node editing — stays out of scope (a future phase + its own
+ADR + an ADR-017 polygon-clipping library evaluation).
+
+### Decision
+
+- **`src/core/shapes/`** — a new pure module: shape → polylines geometry.
+  Rectangle (with corner radius), Ellipse (adaptive flattening, reusing
+  `io/svg/flatten-curves` math), regular Polygon, and open/closed Polyline. Pure,
+  deterministic, unit-tested; imports from `core/` only.
+- **A `kind: 'shape'` `SceneObject` variant** carrying a discriminated parametric
+  block — `{ kind: 'rect'; widthMm; heightMm; cornerRadiusMm } | { kind: 'ellipse';
+  widthMm; heightMm } | { kind: 'polygon'; sides; radiusMm } | { kind: 'polyline';
+  points; closed }` — PLUS materialized `paths: ColoredPath[]`. This is exactly the
+  `TextObject` precedent (`scene-object.ts`): `compileJob` / preview / emit /
+  serialize iterate `paths` **unchanged**, and `assertNever` forces exactly one new
+  switch arm per consumer (the ADR-014 extensibility contract). The `.lf2` schema
+  change is additive (new variant) — `schemaVersion` stays 1
+  (additive-with-default, like every prior variant); `project-shape-validator`
+  gains a `validateShapeObject` arm.
+- **Tool-mode** in the UI store: a discriminated union
+  `{ kind: 'select' } | { kind: 'draw'; shape: 'rect' | 'ellipse' | 'polygon' |
+  'polyline' }`. A vertical tool strip sets it; **Esc always returns to Select**.
+  `Workspace` mousedown dispatches on tool-mode BEFORE the existing select/drag
+  logic; a drag creates the shape on the **currently-selected layer** with a live
+  mm readout (reusing the existing DragReadout).
+- **Staged, each its own reviewed diff:** B1 `core/shapes` rect→polylines → B2
+  'shape' variant + Rectangle + all `assertNever` arms → B3 ellipse + polygon → B4
+  tool-mode + tool strip + Esc → B5 `Workspace` draw-on-drag (rect) → B6 ellipse /
+  polygon / pen → B7 migrate `Ctrl+E` (Save G-code → Alt+Shift+L) to Ellipse, the
+  LightBurn binding, before muscle memory entrenches.
+
+### Consequences
+
+- J1 (draw a sign) flips impossible → possible after B5; the full primitive set
+  lands at B6. J3 (batch) is unblocked by the follow-on layout increment (clipboard
+  / group / align / grid array), a separate ADR/phase.
+- `compile` / preview / emit / save are **untouched** — a shape materializes
+  `paths` like `TextObject`, so new shapes flow through the existing pipeline
+  (line / fill / image modes, path optimization, preflight, undo/redo, transform,
+  selection) for free. The `SceneObject` union grows to five variants; `assertNever`
+  keeps every consumer honest.
+- Interactive parametric handles (drag corner-radius / sides) and Convert-to-Path
+  are deferred (P2 — they need the variant first). Text-on-path, node editing, and
+  the geometry kernel remain out of scope.
+
+### Alternatives rejected
+
+- **A generic node-edited "path" object:** rejected — needs a node editor (out of
+  scope) and gives no parametric W/H/radius. The parametric variant is the
+  LightBurn model and the smaller build.
+- **Draw by emitting SVG and re-importing:** rejected — loses parametric
+  editability and round-trips through the importer for no benefit.
+- **A separate non-`SceneObject` "shapes layer":** rejected — breaks the
+  single-pipeline model; shapes must be ordinary `SceneObject`s so compile /
+  preview / emit / select / transform all work unchanged.
+
+### Verification
+
+- `core/shapes` geometry is unit-tested (shape→polylines correctness, closure,
+  adaptive ellipse tolerance). The 'shape' variant adds a G-code snapshot + a
+  round-trip `.lf2` test. Per CLAUDE.md rule 2, drawn shapes are verified by
+  **rendering** — draw a 50×80 mm box, confirm it appears and compiles to the
+  expected G-code — not by green tests alone.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

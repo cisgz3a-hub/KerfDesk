@@ -101,12 +101,21 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 
 - **F.5 - Material calibration workflow** [Approved; staged]. Minimal LightBurn-style Material Test and Interval Test generators are now in scope so operators can calibrate speed, power, passes, and image line interval on scrap before burning final work. Start with pure Scene generators that flow through the existing preview/save/start pipeline; UI and hardware verification follow. The native Material Library recipe foundation and deterministic `.lfml.json` IO are now scoped as support infrastructure for those calibrated settings; full Material Library UI, hidden persistence, LightBurn `.clb` compatibility, manufacturer profiles, and linked presets remain deferred. ADR-044, ADR-045.
 
+### Phase G — v0.7 "Drawing tools" [In progress]
+
+On-canvas parametric shape creation — the first geometry that does NOT enter via import. Closes the largest LightBurn-parity gap (J1 "draw a sign from nothing" was impossible; J3 batch effectively impossible). See ADR-051.
+
+- New pure `src/core/shapes/` (shape→polylines) + a `kind:'shape'` SceneObject variant (Rectangle / Ellipse / Polygon / Polyline parametric blocks + materialized `paths`, the ADR-014 / TextObject precedent) so compile/preview/emit/save are untouched.
+- A tool-mode discriminated union + vertical tool strip (Esc returns to Select); `Workspace` mousedown draws on the currently-selected layer with a live mm readout.
+- Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → migrate `Ctrl+E` (Save G-code → Alt+Shift+L) to Ellipse. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
+- OUT of this phase (still out of scope; a future phase + ADR + an ADR-017 polygon-clipping library evaluation): the geometry KERNEL — weld, boolean ops, offset, node editing.
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
 
-- Phase G: additional `OutputStrategy` implementations (Marlin et al). MIT references available (CNCjs has working Marlin/Smoothie code) — but ADR-006 still says one strategy ships per phase.
-- Phase H: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP.
+- Phase H: additional `OutputStrategy` implementations (Marlin et al). MIT references available (CNCjs has working Marlin/Smoothie code) — but ADR-006 still says one strategy ships per phase. (Renumbered from Phase G; drawing tools took that slot — ADR-051.)
+- Phase I: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP.
 
 **MIT-availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the policy.
 
