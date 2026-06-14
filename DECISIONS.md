@@ -2687,7 +2687,7 @@ pointing here.
 
 ## ADR-051 — Phase G: on-canvas drawing tools (shape SceneObject variant + tool-mode)
 
-**Status:** Proposed (pending maintainer ratification). | **Date:** 2026-06-14
+**Status:** Accepted. | **Date:** 2026-06-14
 
 ### Context
 
