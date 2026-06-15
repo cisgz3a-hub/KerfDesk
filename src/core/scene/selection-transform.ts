@@ -1,4 +1,5 @@
 import { combinedBBox, type AABB } from './hit-test';
+import { applyTransform } from './transform';
 import type { SceneObject, Transform, Vec2 } from './scene-object';
 
 const MIN_DIMENSION_MM = 0.000001;
@@ -12,6 +13,8 @@ export type SelectionTransform = {
   readonly id: string;
   readonly transform: Transform;
 };
+
+export type SelectionFlipAxis = 'horizontal' | 'vertical';
 
 export type SelectionMetrics = {
   readonly bbox: AABB;
@@ -69,6 +72,41 @@ export function buildSelectionTransformEdit(
   if (edit.kind === 'position') return positionSelection(objects, metrics.bbox, edit);
   if (edit.kind === 'resize') return resizeSelection(objects, metrics, edit);
   return rotateSelection(objects, metrics.bbox, edit);
+}
+
+export function buildSelectionNudgeEdit(
+  objects: ReadonlyArray<SceneObject>,
+  dx: number,
+  dy: number,
+): SelectionTransformResult {
+  if (objects.length === 0) return { kind: 'error', reason: 'empty-selection' };
+  return {
+    kind: 'ok',
+    transforms: objects.map((object) => ({
+      id: object.id,
+      transform: {
+        ...object.transform,
+        x: object.transform.x + dx,
+        y: object.transform.y + dy,
+      },
+    })),
+  };
+}
+
+export function buildSelectionFlipEdit(
+  objects: ReadonlyArray<SceneObject>,
+  axis: SelectionFlipAxis,
+): SelectionTransformResult {
+  const bbox = combinedBBox(objects);
+  if (bbox === null) return { kind: 'error', reason: 'empty-selection' };
+  const anchor = anchorPointForBBox(bbox, 'c');
+  return {
+    kind: 'ok',
+    transforms: objects.map((object) => ({
+      id: object.id,
+      transform: flipTransformAboutPoint(object, axis, anchor),
+    })),
+  };
 }
 
 function positionSelection(
@@ -190,6 +228,37 @@ function rotatePoint(point: Vec2, anchor: Vec2, deltaDeg: number): Vec2 {
   return {
     x: anchor.x + dx * cos - dy * sin,
     y: anchor.y + dx * sin + dy * cos,
+  };
+}
+
+function flipTransformAboutPoint(
+  object: SceneObject,
+  axis: SelectionFlipAxis,
+  anchor: Vec2,
+): Transform {
+  const center = objectLocalCenter(object);
+  const before = applyTransform(center, object.transform);
+  const target =
+    axis === 'horizontal'
+      ? { x: anchor.x * 2 - before.x, y: before.y }
+      : { x: before.x, y: anchor.y * 2 - before.y };
+  const flipped: Transform = {
+    ...object.transform,
+    mirrorX: axis === 'horizontal' ? !object.transform.mirrorX : object.transform.mirrorX,
+    mirrorY: axis === 'vertical' ? !object.transform.mirrorY : object.transform.mirrorY,
+  };
+  const after = applyTransform(center, flipped);
+  return {
+    ...flipped,
+    x: flipped.x + target.x - after.x,
+    y: flipped.y + target.y - after.y,
+  };
+}
+
+function objectLocalCenter(object: SceneObject): Vec2 {
+  return {
+    x: (object.bounds.minX + object.bounds.maxX) / 2,
+    y: (object.bounds.minY + object.bounds.maxY) / 2,
   };
 }
 

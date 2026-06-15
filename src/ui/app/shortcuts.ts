@@ -8,12 +8,7 @@
 //   * View: P (preview toggle)
 
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
-import {
-  flipTransformAboutCenter,
-  type Project,
-  type SceneObject,
-  type Transform,
-} from '../../core/scene';
+import type { Project, SceneObject, SelectionFlipAxis, Transform } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
@@ -57,6 +52,7 @@ export type EditCtx = {
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly removeSceneObject: (id: string) => void;
+  readonly removeSceneObjects: (ids: ReadonlyArray<string>) => void;
   readonly selectObject: (id: string | null) => void;
   readonly selectAllObjects: () => void;
   readonly duplicateSelection: () => void;
@@ -67,6 +63,8 @@ export type TransformCtx = {
   readonly project: Project;
   readonly selectedObjectId: string | null;
   readonly applyObjectTransform: (id: string, transform: Transform) => void;
+  readonly nudgeSelection: (dx: number, dy: number) => void;
+  readonly flipSelection: (axis: SelectionFlipAxis) => void;
 };
 
 export type ViewCtx = {
@@ -204,14 +202,11 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
   {
     match: (e) => !hasMeta(e) && (e.key === 'Delete' || e.key === 'Backspace'),
     invoke: (c) => {
-      // Multi-delete (F-A14 / F-A5). Remove the primary first, then every
-      // extra. removeSceneObject auto-clears the matching selection so we
-      // can iterate the captured set safely.
       const all = [
         ...(c.selectedObjectId !== null ? [c.selectedObjectId] : []),
         ...c.additionalSelectedIds,
       ];
-      for (const id of all) c.removeSceneObject(id);
+      c.removeSceneObjects(all);
     },
   },
   {
@@ -302,14 +297,8 @@ function tryNudge(e: KeyboardEvent, ctx: TransformCtx): boolean {
   const arrow = ARROW_DELTAS[e.key];
   if (arrow === undefined) return false;
   e.preventDefault();
-  const obj = ctx.project.scene.objects.find((o) => o.id === ctx.selectedObjectId);
-  if (obj === undefined) return true;
   const step = e.shiftKey ? NUDGE_BIG_MM : NUDGE_MM;
-  ctx.applyObjectTransform(obj.id, {
-    ...obj.transform,
-    x: obj.transform.x + arrow.dx * step,
-    y: obj.transform.y + arrow.dy * step,
-  });
+  ctx.nudgeSelection(arrow.dx * step, arrow.dy * step);
   return true;
 }
 
@@ -317,10 +306,7 @@ function tryFlip(e: KeyboardEvent, ctx: TransformCtx): boolean {
   const key = e.key.toLowerCase();
   if (key !== 'h' && key !== 'v') return false;
   e.preventDefault();
-  const obj = ctx.project.scene.objects.find((o) => o.id === ctx.selectedObjectId);
-  if (obj === undefined) return true;
-  const next: Transform = flipTransformAboutCenter(obj, key === 'h' ? 'horizontal' : 'vertical');
-  ctx.applyObjectTransform(obj.id, next);
+  ctx.flipSelection(key === 'h' ? 'horizontal' : 'vertical');
   return true;
 }
 

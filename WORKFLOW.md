@@ -331,7 +331,7 @@ Identical to F-A3 except:
 ### F-A9. Save G-code
 
 #### Success — desktop
-1. User clicks `File → Save G-code` (`Cmd/Ctrl+E`).
+1. User clicks `File → Save G-code` (`Cmd/Ctrl+Shift+E`).
 2. Pre-flight runs (F-A10).
 3. If pre-flight passes, OS native Save dialog opens.
 4. Default filename: `<project-name>.gcode` if project saved, else `untitled.gcode`.
@@ -478,7 +478,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
 - `Cmd/Ctrl+I` — Import SVG
-- `Cmd/Ctrl+E` — Save G-code (Export)
+- `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
 #### Edit
 - `Cmd/Ctrl+Z` — Undo
@@ -496,6 +496,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - Shift+Arrow — Nudge 10 mm
 - `H` — Flip horizontal
 - `V` — Flip vertical
+
+#### Tools
+- `Cmd/Ctrl+E` - Ellipse
 
 #### View
 - `P` — Toggle preview

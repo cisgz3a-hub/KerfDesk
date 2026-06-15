@@ -58,6 +58,10 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     resetView: vi.fn(),
     showAbout: vi.fn(),
     canTransformSelection: false,
+    canAlignSelection: false,
+    alignSelection: vi.fn(),
+    canDistributeSelection: false,
+    distributeSelection: vi.fn(),
     flipHorizontal: vi.fn(),
     flipVertical: vi.fn(),
     ...overrides,
@@ -184,6 +188,44 @@ describe('buildAppCommands', () => {
     expect(commandById(enabledCommands, 'arrange.flip-horizontal').enabled).toBe(true);
     expect(runCommand(commandById(enabledCommands, 'arrange.flip-horizontal'))).toBe(true);
     expect(flipHorizontal).toHaveBeenCalled();
+  });
+
+  it('runs Arrange align commands only when at least two objects are selected', () => {
+    const alignSelection = vi.fn();
+    const disabledCommands = buildAppCommands(baseCtx({ alignSelection }));
+
+    expect(commandById(disabledCommands, 'arrange.align-left').enabled).toBe(false);
+    expect(runCommand(commandById(disabledCommands, 'arrange.align-left'))).toBe(false);
+    expect(alignSelection).not.toHaveBeenCalled();
+
+    const enabledCommands = buildAppCommands(baseCtx({ canAlignSelection: true, alignSelection }));
+    expect(commandById(enabledCommands, 'arrange.align-left').enabled).toBe(true);
+    expect(runCommand(commandById(enabledCommands, 'arrange.align-left'))).toBe(true);
+    expect(alignSelection).toHaveBeenCalledWith('left');
+  });
+
+  it('runs Arrange distribute commands only when at least three objects are selected', () => {
+    const distributeSelection = vi.fn();
+    const disabledCommands = buildAppCommands(baseCtx({ distributeSelection }));
+
+    expect(commandById(disabledCommands, 'arrange.distribute-horizontal-centers').enabled).toBe(
+      false,
+    );
+    expect(runCommand(commandById(disabledCommands, 'arrange.distribute-horizontal-centers'))).toBe(
+      false,
+    );
+    expect(distributeSelection).not.toHaveBeenCalled();
+
+    const enabledCommands = buildAppCommands(
+      baseCtx({ canDistributeSelection: true, distributeSelection }),
+    );
+    expect(commandById(enabledCommands, 'arrange.distribute-horizontal-centers').enabled).toBe(
+      true,
+    );
+    expect(runCommand(commandById(enabledCommands, 'arrange.distribute-horizontal-centers'))).toBe(
+      true,
+    );
+    expect(distributeSelection).toHaveBeenCalledWith('horizontal-centers');
   });
 });
 
