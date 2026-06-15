@@ -187,6 +187,24 @@ describe('prepareStartJob job placement', () => {
     }
   });
 
+  it('does not treat unhomed custom-origin overscan runway as absolute machine overhang', () => {
+    const result = prepareStartJob(
+      fillOverscanProject(),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 0, y: -90, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.gcode).toContain('X-5.000');
+    }
+  });
+
   it('blocks Start when a homed custom work origin would push the adjusted job off the physical bed', () => {
     const result = prepareStartJob(
       homedProjectWith(centeredTraceObject),

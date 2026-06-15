@@ -46,6 +46,7 @@ export type PreflightResult = {
 
 export type PreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
+  readonly coordinateMode?: 'machine' | 'relative-origin';
 };
 
 const MAX_BOUNDS_ISSUES = 5;
@@ -80,7 +81,7 @@ export function runPreflight(
 
   appendUnsupportedRasterTransformIssues(project.scene, outputLayers, issues);
 
-  appendBoundsIssues(project, gcode, issues, options.motionOffset);
+  appendBoundsIssues(project, gcode, issues, options);
 
   appendLaserOnTravelIssues(gcode, issues);
 
@@ -204,10 +205,21 @@ function appendBoundsIssues(
   project: Project,
   gcode: string,
   issues: PreflightIssue[],
-  motionOffset: MotionBoundsOffset | undefined,
+  options: PreflightOptions,
 ): void {
+  const machineBounds = machineBoundsForDevice(project.device);
+  if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
+    const envelopeIssues = findRelativeMotionEnvelopeIssues(gcode, {
+      width: machineBounds.width,
+      height: machineBounds.height,
+    });
+    for (const issue of envelopeIssues.slice(0, MAX_BOUNDS_ISSUES)) {
+      issues.push({ code: 'out-of-bed', message: issue });
+    }
+    return;
+  }
   const oob = findOutOfBoundsCoords(gcode, machineBoundsForDevice(project.device), {
-    motionOffset,
+    motionOffset: options.motionOffset,
   });
   for (const issue of oob.slice(0, MAX_BOUNDS_ISSUES)) {
     issues.push({
@@ -229,6 +241,63 @@ function appendBoundsIssues(
         `${overscanMm} mm inside the left/right edges.`,
     });
   }
+}
+
+function findRelativeMotionEnvelopeIssues(
+  gcode: string,
+  bed: { readonly width: number; readonly height: number },
+): ReadonlyArray<string> {
+  const bounds = collectRelativeMotionEnvelope(gcode);
+  if (bounds === null) return [];
+  const issues: string[] = [];
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  if (width > bed.width) {
+    issues.push(
+      `Relative job motion spans ${width.toFixed(3)} mm in X, exceeding the ${bed.width} mm bed width. Scale the artwork down or reduce overscan.`,
+    );
+  }
+  if (height > bed.height) {
+    issues.push(
+      `Relative job motion spans ${height.toFixed(3)} mm in Y, exceeding the ${bed.height} mm bed height. Scale the artwork down.`,
+    );
+  }
+  return issues;
+}
+
+function collectRelativeMotionEnvelope(gcode: string): {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+} | null {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let any = false;
+  for (const raw of gcode.split('\n')) {
+    const stripped = raw.split(';', 1)[0]?.trim() ?? '';
+    if (!/^G[0123]\b/.test(stripped)) continue;
+    const x = parseMotionAxis(stripped, 'X');
+    const y = parseMotionAxis(stripped, 'Y');
+    if (x !== null) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      any = true;
+    }
+    if (y !== null) {
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      any = true;
+    }
+  }
+  return any ? { minX, minY, maxX, maxY } : null;
+}
+
+function parseMotionAxis(line: string, axis: 'X' | 'Y'): number | null {
+  const match = new RegExp(String.raw`\b${axis}(-?\d+(?:\.\d+)?)`).exec(line);
+  return match?.[1] === undefined ? null : Number.parseFloat(match[1]);
 }
 
 function maxOutputOverscanMm(scene: Scene): number {

@@ -295,7 +295,7 @@ function HatchAngleInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: layer.hatchAngleDeg,
     commit: (hatchAngleDeg) => setLayerParam(layer.id, { hatchAngleDeg }),
-    parse: (s) => clamp(numericValue(s), 0, 180),
+    parse: (s) => clamp(numericValue(s, layer.hatchAngleDeg), 0, 180),
   });
   return (
     <input
@@ -318,7 +318,7 @@ function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: layer.hatchSpacingMm,
     commit: (hatchSpacingMm) => setLayerParam(layer.id, { hatchSpacingMm }),
-    parse: (s) => clamp(numericValue(s), 0.05, 10),
+    parse: (s) => clamp(numericValue(s, layer.hatchSpacingMm), 0.05, 10),
   });
   return (
     <input
@@ -341,7 +341,7 @@ function FillOverscanInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: layer.fillOverscanMm,
     commit: (fillOverscanMm) => setLayerParam(layer.id, { fillOverscanMm }),
-    parse: (s) => clamp(numericValue(s), 0, 25),
+    parse: (s) => clamp(numericValue(s, layer.fillOverscanMm), 0, 25),
   });
   return (
     <input
@@ -365,7 +365,7 @@ function PowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
     value: layer.power,
     commit: (power) =>
       setLayerParam(layer.id, { power, minPower: Math.min(layer.minPower, power) }),
-    parse: (s) => clamp(numericValue(s), 0, 100),
+    parse: (s) => clamp(numericValue(s, layer.power), 0, 100),
   });
   return (
     <input
@@ -388,7 +388,7 @@ function SpeedInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: layer.speed,
     commit: (speed) => setLayerParam(layer.id, { speed }),
-    parse: (s) => clamp(numericValue(s), 1, maxFeed),
+    parse: (s) => clamp(numericValue(s, layer.speed), 1, maxFeed),
   });
   return (
     <input
@@ -410,7 +410,7 @@ function PassesInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: layer.passes,
     commit: (passes) => setLayerParam(layer.id, { passes }),
-    parse: (s) => Math.max(1, Math.floor(numericValue(s))),
+    parse: (s) => Math.max(1, Math.floor(numericValue(s, layer.passes))),
   });
   return (
     <input
@@ -427,9 +427,9 @@ function PassesInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function numericValue(s: string): number {
+function numericValue(s: string, fallback: number): number {
   const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function clamp(n: number, lo: number, hi: number): number {

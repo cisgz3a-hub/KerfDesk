@@ -2,11 +2,14 @@
 // F-B3 (Home), F-B6 (Start), F-B7 (Pause/Resume), F-B8 (Stop), F-B11 (Progress).
 
 import { progress } from '../../core/controllers/grbl';
+import type { DeviceProfile } from '../../core/devices';
+import type { MotionBoundsOffset } from '../../core/invariants';
 import {
   computeJobBounds,
   computeJobMotionBounds,
   describeFramePreflightFailure,
   framePreflight,
+  type JobBounds,
   offsetJobBounds,
 } from '../../core/job';
 import { prepareOutput } from '../../io/gcode';
@@ -321,14 +324,14 @@ function useFrameAction(): () => void {
     // steps mechanically — the operator hears grinding and the trace
     // collapses to a sideways line because the axis that hit the stop
     // can't keep up. Better to refuse here with a clear instruction.
-    const preflightBounds =
-      motionOffset === undefined ? motionBounds : offsetJobBounds(motionBounds, motionOffset);
-    const pre = framePreflight(preflightBounds, project.device);
-    if (pre.kind === 'out-of-bounds') {
-      pushToast(
-        `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`,
-        'error',
-      );
+    const motionIssue = describeFrameMotionPreflightIssue(
+      motionBounds,
+      motionOffset,
+      placement.jobOrigin !== undefined,
+      project.device,
+    );
+    if (motionIssue !== null) {
+      pushToast(motionIssue, 'error');
       return;
     }
     // Frame uses its own dedicated feed so changing layer / cut speed
@@ -338,6 +341,36 @@ function useFrameAction(): () => void {
     const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
     void frame(bounds, feed);
   };
+}
+
+function describeFrameMotionPreflightIssue(
+  motionBounds: JobBounds,
+  motionOffset: MotionBoundsOffset | undefined,
+  hasRelativeOrigin: boolean,
+  device: DeviceProfile,
+): string | null {
+  if (motionOffset === undefined && hasRelativeOrigin) {
+    return describeRelativeMotionTooLarge(motionBounds, device);
+  }
+  const preflightBounds =
+    motionOffset === undefined ? motionBounds : offsetJobBounds(motionBounds, motionOffset);
+  const pre = framePreflight(preflightBounds, device);
+  return pre.kind === 'out-of-bounds'
+    ? `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`
+    : null;
+}
+
+function describeRelativeMotionTooLarge(
+  bounds: JobBounds,
+  device: { readonly bedWidth: number; readonly bedHeight: number },
+): string | null {
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  if (width <= device.bedWidth && height <= device.bedHeight) return null;
+  const parts: string[] = [];
+  if (width > device.bedWidth) parts.push(`X span ${width.toFixed(1)} mm`);
+  if (height > device.bedHeight) parts.push(`Y span ${height.toFixed(1)} mm`);
+  return `Cannot frame: generated motion (${parts.join(', ')}) is larger than the ${device.bedWidth}×${device.bedHeight} mm bed. Scale the artwork down or reduce overscan.`;
 }
 
 function useAutofocusAction(): () => void {

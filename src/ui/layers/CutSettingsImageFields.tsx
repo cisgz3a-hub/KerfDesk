@@ -98,7 +98,11 @@ function ImageDensityFields(props: {
           className="lf-input"
           value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
           onChange={(event) =>
-            props.onChange(lineIntervalMmToLinesPerMm(numericValue(event.target.value)))
+            props.onChange(
+              lineIntervalMmToLinesPerMm(
+                numericValue(event.target.value, linesPerMmToLineIntervalMm(props.linesPerMm)),
+              ),
+            )
           }
           style={numberStyle}
           aria-label="Cut settings line interval"
@@ -115,7 +119,11 @@ function ImageDensityFields(props: {
           step={1}
           className="lf-input"
           value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
-          onChange={(event) => props.onChange(dpiToLinesPerMm(numericValue(event.target.value)))}
+          onChange={(event) =>
+            props.onChange(
+              dpiToLinesPerMm(numericValue(event.target.value, linesPerMmToDpi(props.linesPerMm))),
+            )
+          }
           style={numberStyle}
           aria-label="Cut settings DPI"
           title="Image engraving resolution in dots per inch. Higher values create more scan lines."
@@ -183,9 +191,9 @@ function dotWidthCorrectionMax(linesPerMm: number): number {
   return 1 / Math.max(1, linesPerMm);
 }
 
-function numericValue(s: string): number {
+function numericValue(s: string, fallback: number): number {
   const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function displayNumber(value: number, decimals: number): number {

@@ -104,6 +104,50 @@ describe('CutSettingsDialog fill density controls', () => {
     }
   });
 
+  it('preserves fill density when interval or lines-per-inch edits are blank', async () => {
+    let applied: Partial<Layer> | null = null;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <CutSettingsDialog
+            layer={fillLayer({ hatchSpacingMm: 0.2 })}
+            onCancel={() => undefined}
+            onApply={(patch) => {
+              applied = patch;
+            }}
+          />,
+        );
+      });
+
+      const interval = host.querySelector('input[aria-label="Cut settings line interval"]');
+      if (!(interval instanceof HTMLInputElement)) throw new Error('line interval input missing');
+      await act(async () => {
+        interval.value = '';
+        Simulate.change(interval);
+      });
+      await submitDialog(host);
+
+      expect(requireApplied(applied).hatchSpacingMm).toBe(0.2);
+
+      const lpi = host.querySelector('input[aria-label="Cut settings lines per inch"]');
+      if (!(lpi instanceof HTMLInputElement)) throw new Error('lines per inch input missing');
+      await act(async () => {
+        lpi.value = '';
+        Simulate.change(lpi);
+      });
+      await submitDialog(host);
+
+      expect(requireApplied(applied).hatchSpacingMm).toBe(0.2);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('saves the fill cross-hatch checkbox', async () => {
     let applied: Partial<Layer> | null = null;
     const host = document.createElement('div');
