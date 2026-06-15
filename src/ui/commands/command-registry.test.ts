@@ -6,6 +6,7 @@ import {
   runCommand,
   type AppCommandContext,
 } from './command-registry';
+import { COMMAND_HELP } from '../help/help-topics';
 
 // The dirty-project guard resolves through a promise chain
 // (confirmDiscard(...).then(...)); two hops cover mock-promise unwrap +
@@ -86,6 +87,27 @@ describe('buildAppCommands', () => {
     expect(commands.map((command) => command.family)).toEqual(
       expect.arrayContaining(['file', 'edit', 'tools', 'arrange', 'laser', 'window', 'help']),
     );
+  });
+
+  it('uses the central help registry for enabled command hover text', () => {
+    const commands = buildAppCommands(
+      baseCtx({
+        canUndo: true,
+        canRedo: true,
+        hasSelection: true,
+        hasRasterSelection: true,
+        hasConvertibleSelection: true,
+        connected: true,
+        serialSupported: true,
+        canTransformSelection: true,
+        canAlignSelection: true,
+        canDistributeSelection: true,
+      }),
+    );
+
+    for (const command of commands.filter((candidate) => candidate.enabled)) {
+      expect(command.title).toBe(COMMAND_HELP[command.id].tooltip);
+    }
   });
 
   it('runs the New command through the shared dirty-project guard', async () => {

@@ -15,6 +15,7 @@ export function CalibrationNumberField(props: {
         type="number"
         className="lf-input"
         aria-label={props.label}
+        title={`Set ${props.label.toLowerCase()} for this generated test pattern.`}
         value={props.value}
         min={props.min}
         max={props.max}

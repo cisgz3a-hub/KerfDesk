@@ -34,6 +34,7 @@ export function LaserLog(): JSX.Element {
           <input
             type="checkbox"
             checked={showStatus}
+            title="Show periodic GRBL status poll replies in the laser log."
             onChange={(e) => setShowStatus(e.target.checked)}
           />
           Show status polls

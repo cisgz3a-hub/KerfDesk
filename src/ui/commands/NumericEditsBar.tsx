@@ -242,6 +242,7 @@ function NumberField(props: {
       <input
         className="lf-input"
         aria-label={props.label}
+        title={`${props.label}. Values are measured from the selected anchor point.`}
         type="number"
         step={props.step ?? FIELD_STEP_MM}
         value={draft}

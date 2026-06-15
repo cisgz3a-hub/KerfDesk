@@ -110,6 +110,7 @@ function HomingEditor(props: {
             props.onChange({ enabled: e.target.checked, direction: props.direction })
           }
           aria-label="Homing enabled"
+          title="Enable this only when the controller supports GRBL $H homing."
         />
         <span>$H supported</span>
       </label>
@@ -147,6 +148,7 @@ function BasicRows(props: DeviceRowsProps): JSX.Element {
           onChange={(e) => update({ name: e.target.value })}
           style={textInputStyle}
           aria-label="Device name"
+          title="Name for this machine profile."
         />
       </Row>
       <Row label="Bed">
@@ -158,6 +160,7 @@ function BasicRows(props: DeviceRowsProps): JSX.Element {
           onChange={(e) => update({ bedWidth: Math.max(10, Number(e.target.value) || 0) })}
           style={numInputStyle}
           aria-label="Bed width (mm)"
+          title="Usable machine bed width in millimeters. Match GRBL $130."
         />
         <span style={timesStyle}>×</span>
         <input
@@ -168,6 +171,7 @@ function BasicRows(props: DeviceRowsProps): JSX.Element {
           onChange={(e) => update({ bedHeight: Math.max(10, Number(e.target.value) || 0) })}
           style={numInputStyle}
           aria-label="Bed height (mm)"
+          title="Usable machine bed height in millimeters. Match GRBL $131."
         />
         <span style={unitStyle}>mm</span>
       </Row>
@@ -195,6 +199,7 @@ function PowerRows(props: DeviceRowsProps): JSX.Element {
           }
           style={numInputStyle}
           aria-label="GRBL $30 max power S"
+          title="Maximum GRBL spindle/laser S value. Match your controller's $30 setting."
         />
       </Row>
       <Row label="$31 (min S)">
@@ -221,6 +226,7 @@ function PowerRows(props: DeviceRowsProps): JSX.Element {
             checked={device.laserModeEnabled}
             onChange={(e) => update({ laserModeEnabled: e.target.checked })}
             aria-label="GRBL $32 laser mode enabled"
+            title="Enable GRBL laser mode ($32=1) for laser jobs."
           />
           <span>Enabled</span>
         </label>

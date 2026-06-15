@@ -5,20 +5,21 @@
 // lf-btn pressed fill); the active name lives on each IconButton.
 
 import { IconButton, type IconName } from '../kit';
+import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 
 type Tool = {
   readonly mode: ToolMode;
+  readonly helpKey: ToolHelpKey;
   readonly icon: IconName;
-  readonly label: string;
 };
 
 const TOOLS: ReadonlyArray<Tool> = [
-  { mode: { kind: 'select' }, icon: 'cursor', label: 'Select / transform (Esc)' },
-  { mode: { kind: 'draw', shape: 'rect' }, icon: 'square', label: 'Draw rectangle' },
-  { mode: { kind: 'draw', shape: 'ellipse' }, icon: 'circle', label: 'Draw ellipse' },
-  { mode: { kind: 'draw', shape: 'polygon' }, icon: 'pentagon', label: 'Draw polygon' },
-  { mode: { kind: 'draw', shape: 'polyline' }, icon: 'pen', label: 'Draw polyline (pen)' },
+  { mode: { kind: 'select' }, helpKey: 'select', icon: 'cursor' },
+  { mode: { kind: 'draw', shape: 'rect' }, helpKey: 'rect', icon: 'square' },
+  { mode: { kind: 'draw', shape: 'ellipse' }, helpKey: 'ellipse', icon: 'circle' },
+  { mode: { kind: 'draw', shape: 'polygon' }, helpKey: 'polygon', icon: 'pentagon' },
+  { mode: { kind: 'draw', shape: 'polyline' }, helpKey: 'polyline', icon: 'pen' },
 ];
 
 export function ToolStrip(): JSX.Element {
@@ -29,9 +30,11 @@ export function ToolStrip(): JSX.Element {
     <aside aria-label="Drawing tools" className="lf-rail" style={stripStyle}>
       {TOOLS.map((tool) => (
         <IconButton
-          key={tool.label}
+          key={tool.helpKey}
           icon={tool.icon}
-          label={tool.label}
+          label={TOOL_HELP[tool.helpKey].label}
+          title={TOOL_HELP[tool.helpKey].tooltip}
+          helpId={toolHelpId(tool.helpKey)}
           onClick={() => {
             if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
             else setToolMode(tool.mode);

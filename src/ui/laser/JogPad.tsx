@@ -30,6 +30,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
           onChange={(e) => setStep(Number(e.target.value))}
           disabled={disabled}
           aria-label="Jog step size"
+          title="Distance moved by each jog arrow click."
         >
           {STEPS_MM.map((s) => (
             <option key={s} value={s}>

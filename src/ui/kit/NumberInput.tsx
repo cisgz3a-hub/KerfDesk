@@ -8,6 +8,19 @@ export type NumberInputProps = Omit<
   'className' | 'type'
 >;
 
-export function NumberInput(props: NumberInputProps): JSX.Element {
-  return <input {...props} type="number" className="lf-input" />;
+export function NumberInput({
+  title,
+  'aria-label': ariaLabel,
+  ...props
+}: NumberInputProps): JSX.Element {
+  const hoverTitle = title ?? (typeof ariaLabel === 'string' ? ariaLabel : undefined);
+  return (
+    <input
+      {...props}
+      type="number"
+      className="lf-input"
+      aria-label={ariaLabel}
+      title={hoverTitle}
+    />
+  );
 }

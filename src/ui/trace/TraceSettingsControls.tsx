@@ -133,6 +133,8 @@ function NumberRow(props: {
         value={props.value}
         onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
         style={numberStyle}
+        aria-label={`Trace ${props.label}`}
+        title={traceNumberTitle(props.label)}
       />
     </label>
   );
@@ -148,6 +150,7 @@ function CheckboxRow(props: {
       <input
         type="checkbox"
         checked={props.checked}
+        title={traceCheckboxTitle(props.label)}
         onChange={(e) => props.onChange(e.target.checked)}
       />
       <span>{props.label}</span>
@@ -158,6 +161,34 @@ function CheckboxRow(props: {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
+}
+
+function traceNumberTitle(label: string): string {
+  switch (label) {
+    case 'Cutoff':
+      return 'Lowest brightness treated as traceable artwork.';
+    case 'Threshold':
+      return 'Brightness split used to separate artwork from background.';
+    case 'Ignore Less Than':
+      return 'Discard traced specks smaller than this pixel area.';
+    case 'Smoothness':
+      return 'Smooth traced edges to reduce jagged vector paths.';
+    case 'Optimize':
+      return 'Simplify traced paths while preserving shape.';
+    default:
+      return `Trace ${label.toLowerCase()} setting.`;
+  }
+}
+
+function traceCheckboxTitle(label: string): string {
+  switch (label) {
+    case 'Trace Transparency':
+      return 'Use transparent pixels as background while tracing.';
+    case 'Sketch Trace':
+      return 'Trace sketch-like strokes instead of filled silhouettes.';
+    default:
+      return `Toggle ${label.toLowerCase()} for tracing.`;
+  }
 }
 
 const fieldsetStyle: React.CSSProperties = {

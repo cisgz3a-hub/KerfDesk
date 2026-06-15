@@ -91,6 +91,7 @@ function CommonFields(props: {
           value={props.mode}
           onChange={(event) => props.onModeChange(parseMode(event.target.value))}
           aria-label="Cut settings mode"
+          title="Choose whether this layer cuts outlines, fills closed shapes, or raster engraves images."
           autoFocus
         >
           <option value="line">Line</option>
@@ -115,6 +116,7 @@ function CommonFields(props: {
           type="checkbox"
           className="lf-checkbox"
           defaultChecked={props.layer.visible}
+          title="Show or hide this layer on the workspace without changing output."
         />
       </Field>
       <Field label="Output">
@@ -123,6 +125,7 @@ function CommonFields(props: {
           type="checkbox"
           className="lf-checkbox"
           defaultChecked={props.layer.output}
+          title="Include or exclude this layer when previewing, framing, exporting, or starting jobs."
         />
       </Field>
     </>
@@ -167,6 +170,7 @@ function FillFields(props: {
           type="checkbox"
           className="lf-checkbox"
           defaultChecked={props.layer.fillBidirectional}
+          title="Scan fill lines in both directions to reduce travel time."
         />
       </Field>
       <Field label="Cross-Hatch">
@@ -176,6 +180,7 @@ function FillFields(props: {
           className="lf-checkbox"
           defaultChecked={props.layer.fillCrossHatch}
           aria-label="Cut settings cross-hatch"
+          title="Add a second fill pass at 90 degrees for denser engraving."
         />
       </Field>
     </fieldset>
@@ -201,6 +206,7 @@ function NumberInput(props: {
       defaultValue={props.value}
       style={numberStyle}
       aria-label={`Cut settings ${props.label ?? props.name}`}
+      title={`Set cut settings ${props.label ?? props.name}.`}
     />
   );
 }

@@ -227,4 +227,34 @@ describe('Toolbar command buttons', () => {
       host.remove();
     }
   });
+
+  it('marks toolbar command buttons with stable help ids', async () => {
+    const onNew = vi.fn();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const commands: ReadonlyArray<AppCommand> = [
+      {
+        id: 'file.new',
+        family: 'file',
+        label: 'New',
+        title: 'Create a new blank project.',
+        shortcut: 'Ctrl+N',
+        enabled: true,
+        invoke: onNew,
+      },
+    ];
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={commands} />);
+      });
+
+      const button = host.querySelector('button[data-help-id="command:file.new"]');
+      expect(button?.getAttribute('title')).toBe('Create a new blank project. (Ctrl+N)');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
