@@ -14,9 +14,9 @@ import type { ViewTransform } from './view-transform';
 
 function countingContext(): {
   readonly ctx: CanvasRenderingContext2D;
-  readonly calls: { lineTo: number; moveTo: number };
+  readonly calls: { lineTo: number; moveTo: number; setLineDash: number };
 } {
-  const calls = { lineTo: 0, moveTo: 0 };
+  const calls = { lineTo: 0, moveTo: 0, setLineDash: 0 };
   const ctx = new Proxy(
     {},
     {
@@ -29,6 +29,11 @@ function countingContext(): {
         if (prop === 'moveTo') {
           return () => {
             calls.moveTo += 1;
+          };
+        }
+        if (prop === 'setLineDash') {
+          return () => {
+            calls.setLineDash += 1;
           };
         }
         return () => undefined;
@@ -66,6 +71,27 @@ describe('drawPreview', () => {
 
     expect(calls.moveTo).toBe(1);
     expect(calls.lineTo).toBe(2);
+  });
+
+  it('draws preview travel moves by default', () => {
+    const toolpath = travelThenCutToolpath();
+    const { ctx, calls } = countingContext();
+
+    drawPreview(ctx, toolpath, view, 1);
+
+    expect(calls.setLineDash).toBeGreaterThan(0);
+    expect(calls.lineTo).toBeGreaterThan(0);
+  });
+
+  it('can hide preview travel moves without hiding laser-on cuts', () => {
+    const toolpath = travelThenCutToolpath();
+    const { ctx, calls } = countingContext();
+
+    drawPreview(ctx, toolpath, view, 1, { showTravel: false });
+
+    expect(calls.setLineDash).toBe(0);
+    expect(calls.moveTo).toBe(1);
+    expect(calls.lineTo).toBe(1);
   });
 
   it('samples oversized preview cuts without visiting every point on each redraw', () => {
@@ -159,6 +185,29 @@ describe('drawPreview', () => {
     expect(calls.lineTo).toBeGreaterThan(0);
   });
 });
+
+function travelThenCutToolpath(): Toolpath {
+  return {
+    totalLength: 20,
+    steps: [
+      {
+        kind: 'travel',
+        from: { x: 0, y: 0 },
+        to: { x: 10, y: 0 },
+        length: 10,
+      },
+      {
+        kind: 'cut',
+        color: '#000000',
+        length: 10,
+        polyline: [
+          { x: 10, y: 0 },
+          { x: 20, y: 0 },
+        ],
+      },
+    ],
+  };
+}
 
 function importedSvgLineProject(points: ReadonlyArray<Vec2>): Project {
   const project = createProject();

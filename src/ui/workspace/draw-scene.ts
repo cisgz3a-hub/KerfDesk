@@ -48,6 +48,7 @@ export type DrawOpts = {
   readonly onRasterBitmapReady?: () => void;
   readonly displayPolylineCache?: DisplayPolylineCache;
   readonly previewToolpath?: Toolpath;
+  readonly previewShowTravel?: boolean;
   // User zoom + pan (F-A15). Defaults to fit-to-bed when omitted.
   readonly view?: ViewState;
   // Phase G (B5): the shape being dragged out right now, drawn as a dashed
@@ -88,6 +89,7 @@ export function drawScene(
       opts.previewToolpath ?? buildPreviewToolpath(project),
       view,
       opts.scrubberT ?? 1,
+      { showTravel: opts.previewShowTravel !== false },
     );
   } else {
     const simplified = drawObjects(

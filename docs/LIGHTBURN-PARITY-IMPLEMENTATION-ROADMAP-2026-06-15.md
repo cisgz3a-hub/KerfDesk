@@ -631,6 +631,11 @@ Definition of done:
    - Implemented first slice: Cut Selected Graphics and Use Selection Origin now share the same Preview, Frame, Start, Save G-code, and estimate output scope.
    - Deferred from Lane 4: Position Laser, Move Laser to Selection, and node-level Set Start Point because they physically move the head and require separate hardware verification.
 6. Lane 5: preview parity and estimates.
+   - Implemented first slice: Preview now has a traversal-move visibility toggle
+     and cut/travel/total distance stats derived from the same preview toolpath
+     used for rendering.
+   - Deferred from Lane 5: playback, Start Here, Save Preview Image,
+     shade-by-power, raster-row synthetic toolpaths, and time breakdowns.
 7. Lane 6: full GRBL Cut Settings Editor.
 8. Lane 7: raster calibration and burn-quality diagnostics.
 9. Lane 8: image tool completion.

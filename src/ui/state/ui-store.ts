@@ -50,6 +50,8 @@ export type UiState = {
   readonly setDragOverlay: (next: boolean) => void;
   readonly scrubberT: number; // 0..1 fraction along total path length; F-A8
   readonly setScrubberT: (next: number) => void;
+  readonly showPreviewTravel: boolean;
+  readonly setShowPreviewTravel: (next: boolean) => void;
   // Current drawing layer color. LightBurn's color/layer palette sets the
   // target color for subsequently-created vectors; this mirrors that behavior
   // without making layer selection undoable project data.
@@ -116,6 +118,8 @@ export const useUiStore = create<UiState>((set) => ({
   setDragOverlay: (next) => set({ dragOverlay: next }),
   scrubberT: 1,
   setScrubberT: (next) => set({ scrubberT: clamp01(next) }),
+  showPreviewTravel: true,
+  setShowPreviewTravel: (next) => set({ showPreviewTravel: next }),
   activeLayerColor: null,
   setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,

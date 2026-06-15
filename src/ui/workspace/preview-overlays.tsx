@@ -4,8 +4,9 @@
 // verification surface — a silently-empty preview or an unexplained red
 // outline is a trust leak.
 
-import type { Toolpath } from '../../core/job';
+import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
+import { useUiStore } from '../state/ui-store';
 import { hasOutOfBoundsObjects } from './out-of-bounds';
 import { previewHasBurnableContent } from './preview-status';
 
@@ -33,6 +34,38 @@ export function PreviewStatusOverlays(props: {
   );
 }
 
+export function PreviewStatsPanel(props: { readonly toolpath: Toolpath }): JSX.Element {
+  const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
+  const setShowPreviewTravel = useUiStore((s) => s.setShowPreviewTravel);
+  const stats = summarizeToolpathDistances(props.toolpath);
+  return (
+    <div className="lf-chip" style={statsPanelStyle} role="group" aria-label="Preview options">
+      <label
+        style={travelToggleStyle}
+        title="Show or hide laser-off traversal moves in Preview only. G-code output is unchanged."
+      >
+        <input
+          type="checkbox"
+          checked={showPreviewTravel}
+          onChange={(e) => setShowPreviewTravel(e.currentTarget.checked)}
+          title="Show traversal moves in Preview only."
+          aria-label="Show traversal moves in Preview"
+          data-help-id="preview.showTraversalMoves"
+        />
+        Traversal moves
+      </label>
+      <div style={statsGridStyle} aria-label="Preview distance statistics">
+        <span>Cut</span>
+        <strong>{formatMm(stats.cutMm)}</strong>
+        <span>Travel</span>
+        <strong>{formatMm(stats.travelMm)}</strong>
+        <span>Total</span>
+        <strong>{formatMm(stats.totalMm)}</strong>
+      </div>
+    </div>
+  );
+}
+
 const stackStyle: React.CSSProperties = {
   position: 'absolute',
   top: 36,
@@ -55,3 +88,38 @@ const hintStyle: React.CSSProperties = {
 const bannerStyle: React.CSSProperties = {
   fontFamily: 'system-ui, sans-serif',
 };
+
+const statsPanelStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: 24,
+  bottom: 56,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  borderRadius: 4,
+  padding: '7px 10px',
+  fontFamily: 'system-ui, sans-serif',
+  fontSize: 12,
+};
+
+const travelToggleStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  whiteSpace: 'nowrap',
+};
+
+const statsGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'auto auto',
+  columnGap: 8,
+  rowGap: 2,
+  alignItems: 'baseline',
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontSize: 11,
+};
+
+function formatMm(value: number): string {
+  if (!Number.isFinite(value)) return '0.0 mm';
+  return `${value.toFixed(1)} mm`;
+}
