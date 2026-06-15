@@ -1,4 +1,4 @@
-import { flipTransformAboutCenter, type Project } from '../../core/scene';
+import type { Project } from '../../core/scene';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import {
@@ -13,6 +13,7 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { isConvertibleVector } from '../raster/vector-to-bitmap';
 import { buildAppCommands, type AppCommand } from './command-registry';
+import { hasPreviewableContent } from './previewable-content';
 
 export type CommandShellCallbacks = {
   readonly requestImportImage: () => void;
@@ -32,7 +33,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const openTextDialog = useUiStore((s) => s.openTextDialog);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const selected = selectedObject(app.project, app.selectedObjectId);
-  const hasSelection = app.selectedObjectId !== null || app.additionalSelectedIds.size > 0;
+  const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
+  const hasSelection = selectedIds.length > 0;
   const activeStreamer =
     laser.streamer !== null &&
     (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
@@ -86,8 +88,12 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     },
     convertToBitmap: callbacks.requestConvertToBitmap,
     canTransformSelection: selected !== null,
-    flipHorizontal: () => flipSelected('horizontal'),
-    flipVertical: () => flipSelected('vertical'),
+    canAlignSelection: selectedIds.length >= 2,
+    alignSelection: app.alignSelection,
+    canDistributeSelection: selectedIds.length >= 3,
+    distributeSelection: app.distributeSelection,
+    flipHorizontal: () => app.flipSelection('horizontal'),
+    flipVertical: () => app.flipSelection('vertical'),
     connectLaser: () => void laser.connect(platform),
     disconnectLaser: () => void laser.disconnect().catch(() => undefined),
     homeLaser: () => void laser.home().catch(() => undefined),
@@ -97,13 +103,6 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     resetView: useUiStore.getState().resetView,
     showAbout: callbacks.showAbout,
   });
-}
-
-// M27: the Preview toolbar button greys out when nothing would render —
-// any output-enabled layer plus any object is previewable (the raster sim
-// and vector toolpath cover the kinds between them).
-function hasPreviewableContent(project: Project): boolean {
-  return project.scene.layers.some((layer) => layer.output) && project.scene.objects.length > 0;
 }
 
 function openProject(
@@ -142,18 +141,18 @@ function selectedObject(project: Project, selectedObjectId: string | null) {
   return project.scene.objects.find((object) => object.id === selectedObjectId) ?? null;
 }
 
+function selectedObjectIds(
+  selectedObjectId: string | null,
+  additionalSelectedIds: ReadonlySet<string>,
+): ReadonlyArray<string> {
+  return [...(selectedObjectId === null ? [] : [selectedObjectId]), ...additionalSelectedIds];
+}
+
 function deleteSelection(): void {
   const state = useStore.getState();
   const ids = [
     ...(state.selectedObjectId !== null ? [state.selectedObjectId] : []),
     ...state.additionalSelectedIds,
   ];
-  for (const id of ids) state.removeSceneObject(id);
-}
-
-function flipSelected(axis: 'horizontal' | 'vertical'): void {
-  const state = useStore.getState();
-  const selected = selectedObject(state.project, state.selectedObjectId);
-  if (selected === null) return;
-  state.applyObjectTransform(selected.id, flipTransformAboutCenter(selected, axis));
+  state.removeSceneObjects(ids);
 }

@@ -1,4 +1,15 @@
-import type { Project, Transform } from '../../core/scene';
+import {
+  buildSelectionAlignEdit,
+  buildSelectionDistributeEdit,
+  buildSelectionFlipEdit,
+  buildSelectionNudgeEdit,
+  type Project,
+  type SceneObject,
+  type SelectionAlignKind,
+  type SelectionDistributeKind,
+  type SelectionFlipAxis,
+  type Transform,
+} from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 
@@ -9,6 +20,10 @@ export type SelectionTransformEdit = {
 
 export type SelectionTransformActions = {
   readonly applySelectionTransforms: (edits: ReadonlyArray<SelectionTransformEdit>) => void;
+  readonly alignSelection: (kind: SelectionAlignKind) => void;
+  readonly distributeSelection: (kind: SelectionDistributeKind) => void;
+  readonly nudgeSelection: (dx: number, dy: number) => void;
+  readonly flipSelection: (axis: SelectionFlipAxis) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -17,7 +32,59 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
   return {
     applySelectionTransforms: (edits) =>
       set((state) => applySelectionTransformsToState(state, edits)),
+    alignSelection: (kind) => set((state) => applySelectionAlignToState(state, kind)),
+    distributeSelection: (kind) => set((state) => applySelectionDistributeToState(state, kind)),
+    nudgeSelection: (dx, dy) => set((state) => applySelectionNudgeToState(state, dx, dy)),
+    flipSelection: (axis) => set((state) => applySelectionFlipToState(state, axis)),
   };
+}
+
+function applySelectionAlignToState(
+  state: AppState,
+  kind: SelectionAlignKind,
+): AppState | Partial<AppState> {
+  const ids = selectedObjectIds(state);
+  const referenceId = ids[ids.length - 1];
+  if (referenceId === undefined) return state;
+  const result = buildSelectionAlignEdit(selectedObjects(state.project.scene.objects, ids), {
+    kind,
+    referenceId,
+  });
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+function applySelectionDistributeToState(
+  state: AppState,
+  kind: SelectionDistributeKind,
+): AppState | Partial<AppState> {
+  const ids = selectedObjectIds(state);
+  const result = buildSelectionDistributeEdit(selectedObjects(state.project.scene.objects, ids), {
+    kind,
+  });
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+function applySelectionNudgeToState(
+  state: AppState,
+  dx: number,
+  dy: number,
+): AppState | Partial<AppState> {
+  const ids = selectedObjectIds(state);
+  const result = buildSelectionNudgeEdit(selectedObjects(state.project.scene.objects, ids), dx, dy);
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
+}
+
+function applySelectionFlipToState(
+  state: AppState,
+  axis: SelectionFlipAxis,
+): AppState | Partial<AppState> {
+  const ids = selectedObjectIds(state);
+  const result = buildSelectionFlipEdit(selectedObjects(state.project.scene.objects, ids), axis);
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
 }
 
 function applySelectionTransformsToState(
@@ -46,4 +113,20 @@ function applySelectionTransformsToState(
     redoStack: [],
     dirty: true,
   };
+}
+
+function selectedObjectIds(state: AppState): ReadonlyArray<string> {
+  return [
+    ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
+    ...state.additionalSelectedIds,
+  ];
+}
+
+function selectedObjects(
+  objects: ReadonlyArray<SceneObject>,
+  ids: ReadonlyArray<string>,
+): ReadonlyArray<SceneObject> {
+  return ids
+    .map((id) => objects.find((object) => object.id === id))
+    .filter((object): object is SceneObject => object !== undefined);
 }

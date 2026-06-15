@@ -12,7 +12,6 @@ import {
   moveLayer as moveSceneLayer,
   type Project,
   type RasterImage,
-  removeObject,
   type Scene,
   type SceneObject,
   type ShapeObject,
@@ -50,11 +49,11 @@ import {
 import {
   applyDuplicate,
   type ImportOutcome,
-  pruneOrphanLayers,
   pushUndo,
   type TraceExistingImageOptions,
 } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
+import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
 
 export type { ImportOutcome } from './scene-mutations';
 
@@ -63,6 +62,7 @@ const HISTORY_DEPTH = 50;
 export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
   SelectionTransformActions &
+  ObjectDeleteActions &
   ReturnType<typeof currentMaterialLibraryState> &
   MaterialLibraryActions & {
     readonly project: Project;
@@ -122,7 +122,6 @@ export type AppState = ObjectPropertiesActions &
     readonly upsertTextObject: (text: TextObject) => void;
     // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
     readonly drawShape: (shape: ShapeObject) => void;
-    readonly removeSceneObject: (id: string) => void;
     // Clone every currently-selected SceneObject with a fresh id and a
     // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
     // new selection. No-op when nothing is selected.
@@ -213,30 +212,8 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
 
 function sceneActions(
   set: Setter,
-): Pick<AppState, 'removeSceneObject' | 'setLayerParam' | 'moveLayer' | 'updateDeviceProfile'> {
+): Pick<AppState, 'setLayerParam' | 'moveLayer' | 'updateDeviceProfile'> {
   return {
-    removeSceneObject: (id) =>
-      set((s) => {
-        // Clear `id` from BOTH the primary and the multi-select extras so
-        // a deleted object can't linger as a ghost selection.
-        const nextExtras = new Set(s.additionalSelectedIds);
-        nextExtras.delete(id);
-        // Drop orphan layers — those whose color is no longer
-        // referenced by any remaining object. Without this the
-        // Cuts/Layers panel keeps a row (with its stale
-        // power/speed/passes) for the deleted object's color,
-        // which clutters the UI and confuses re-imports later.
-        const afterRemove = removeObject(s.project.scene, id);
-        const scene = pruneOrphanLayers(afterRemove);
-        return {
-          project: { ...s.project, scene },
-          selectedObjectId: s.selectedObjectId === id ? null : s.selectedObjectId,
-          additionalSelectedIds: nextExtras,
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
     setLayerParam: (layerId, patch) =>
       set((s) => ({
         project: {
@@ -451,6 +428,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...generatedSceneActions(set),
   ...projectOptimizationActions(set),
   ...selectionTransformActions(set),
+  ...objectDeleteActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),
   ...fitToSelectionAction(get),

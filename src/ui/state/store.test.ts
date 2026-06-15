@@ -420,6 +420,38 @@ describe('useStore — multi-select (F-A5)', () => {
     useStore.getState().removeSceneObject('O2');
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);
   });
+
+  it('removeSceneObjects deletes a multi-selection as one undoable action', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#00ff00']));
+    useStore.setState({
+      selectedObjectId: 'O1',
+      additionalSelectedIds: new Set(['O2']),
+      undoStack: [],
+      dirty: false,
+    });
+
+    useStore.getState().removeSceneObjects(['O1', 'O2']);
+
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(useStore.getState().project.scene.layers).toHaveLength(0);
+    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().additionalSelectedIds.size).toBe(0);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+
+    useStore.getState().undo();
+
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
+      'O1',
+      'O2',
+    ]);
+    expect(
+      useStore
+        .getState()
+        .project.scene.layers.map((layer) => layer.color)
+        .sort(),
+    ).toEqual(['#00ff00', '#ff0000']);
+  });
 });
 
 describe('useStore — preview toggle (F-A8)', () => {

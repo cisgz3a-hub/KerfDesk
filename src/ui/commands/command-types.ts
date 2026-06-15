@@ -3,6 +3,8 @@
 // it hit the 400-line cap; a third file (not two) so command-registry ->
 // command-families -> command-types stays acyclic (import/no-cycle).
 
+import type { SelectionAlignKind, SelectionDistributeKind } from '../../core/scene';
+
 export const COMMAND_FAMILY_ORDER = [
   'file',
   'edit',
@@ -36,6 +38,17 @@ export type CommandId =
   | 'tools.adjust-image'
   | 'tools.trace-image'
   | 'tools.convert-to-bitmap'
+  | 'arrange.align-left'
+  | 'arrange.align-center-x'
+  | 'arrange.align-right'
+  | 'arrange.align-top'
+  | 'arrange.align-center-y'
+  | 'arrange.align-bottom'
+  | 'arrange.align-centers'
+  | 'arrange.distribute-horizontal-centers'
+  | 'arrange.distribute-horizontal-spacing'
+  | 'arrange.distribute-vertical-centers'
+  | 'arrange.distribute-vertical-spacing'
   | 'arrange.flip-horizontal'
   | 'arrange.flip-vertical'
   | 'laser.connect'
@@ -96,6 +109,10 @@ export type AppCommandContext = {
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
   readonly canTransformSelection: boolean;
+  readonly canAlignSelection: boolean;
+  readonly alignSelection: (kind: SelectionAlignKind) => void;
+  readonly canDistributeSelection: boolean;
+  readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly flipHorizontal: () => void;
   readonly flipVertical: () => void;
   readonly connectLaser: () => void;

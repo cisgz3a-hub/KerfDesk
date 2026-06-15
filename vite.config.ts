@@ -55,6 +55,14 @@ export default defineConfig({
     // compressed. Warn if a chunk pushes past 500 KB compressed.
     chunkSizeWarningLimit: 500,
   },
+  optimizeDeps: {
+    esbuildOptions: {
+      // Keep dev dependency pre-bundling aligned with the production build.
+      // Without this, Vite's optimizer can fall back to its lower default
+      // browser target and fail on modern ESM syntax in dependencies.
+      target: 'es2022',
+    },
+  },
   worker: {
     // Trace worker imports the lazy trace pipeline, so production workers must
     // emit as ES modules. Vite's default iife worker format cannot code-split.

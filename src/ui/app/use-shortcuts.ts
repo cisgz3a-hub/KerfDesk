@@ -38,6 +38,7 @@ function useFileEditShortcuts(): void {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const removeSceneObject = useStore((s) => s.removeSceneObject);
+  const removeSceneObjects = useStore((s) => s.removeSceneObjects);
   const selectObject = useStore((s) => s.selectObject);
   const selectAllObjects = useStore((s) => s.selectAllObjects);
   const duplicateSelection = useStore((s) => s.duplicateSelection);
@@ -65,7 +66,7 @@ function useFileEditShortcuts(): void {
       // prettier-ignore
       const fileCtx = { platform, project, jobPlacement, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
-      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, selectObject, selectAllObjects, duplicateSelection, resetToolMode };
+      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, removeSceneObjects, selectObject, selectAllObjects, duplicateSelection, resetToolMode };
       if (handleFileShortcut(e, fileCtx)) return;
       // Tool-arming (Ctrl+R/E/L) runs between File and Edit: File owns the
       // Shift variants (Save-As, export G-code), and no Edit binding uses a
@@ -96,6 +97,7 @@ function useFileEditShortcuts(): void {
     selectedObjectId,
     additionalSelectedIds,
     removeSceneObject,
+    removeSceneObjects,
     selectObject,
     selectAllObjects,
     duplicateSelection,
@@ -108,6 +110,8 @@ function useTransformViewShortcuts(): void {
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const applyObjectTransform = useStore((s) => s.applyObjectTransform);
+  const nudgeSelection = useStore((s) => s.nudgeSelection);
+  const flipSelection = useStore((s) => s.flipSelection);
   const togglePreview = useStore((s) => s.togglePreview);
   const fitToSelection = useStore((s) => s.fitToSelection);
   const resetView = useUiStore((s) => s.resetView);
@@ -115,7 +119,16 @@ function useTransformViewShortcuts(): void {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (isModalOpen(useUiStore.getState())) return;
-      if (handleTransformShortcut(e, { project, selectedObjectId, applyObjectTransform })) return;
+      if (
+        handleTransformShortcut(e, {
+          project,
+          selectedObjectId,
+          applyObjectTransform,
+          nudgeSelection,
+          flipSelection,
+        })
+      )
+        return;
       handleViewShortcut(e, { togglePreview, resetView, zoomBy, fitToSelection });
     };
     window.addEventListener('keydown', onKeyDown);
@@ -124,6 +137,8 @@ function useTransformViewShortcuts(): void {
     project,
     selectedObjectId,
     applyObjectTransform,
+    nudgeSelection,
+    flipSelection,
     togglePreview,
     resetView,
     zoomBy,

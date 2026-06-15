@@ -6,7 +6,6 @@ import {
   handleViewShortcut,
 } from './shortcuts';
 import {
-  applyTransform,
   createProject,
   IDENTITY_TRANSFORM,
   type Project,
@@ -25,6 +24,7 @@ function editCtx(
     selectedObjectId: 'O1',
     additionalSelectedIds: new Set<string>(),
     removeSceneObject: vi.fn(),
+    removeSceneObjects: vi.fn(),
     selectObject: vi.fn(),
     selectAllObjects: vi.fn(),
     duplicateSelection: vi.fn(),
@@ -66,12 +66,13 @@ describe('handleEditShortcut — input-focus guard (regression)', () => {
     input.remove();
   });
 
-  it('Backspace outside an input DOES trigger remove on the selection', () => {
+  it('Backspace outside an input deletes the full selection as one batch action', () => {
     const div = document.createElement('div');
     document.body.appendChild(div);
-    const ctx = editCtx();
+    const ctx = editCtx({ additionalSelectedIds: new Set(['O2']) });
     handleEditShortcut(fakeKeydown({ key: 'Backspace', target: div }), ctx);
-    expect(ctx.removeSceneObject).toHaveBeenCalledWith('O1');
+    expect(ctx.removeSceneObjects).toHaveBeenCalledWith(['O1', 'O2']);
+    expect(ctx.removeSceneObject).not.toHaveBeenCalled();
     div.remove();
   });
 
@@ -254,22 +255,18 @@ describe('handleTransformShortcut — flip keeps object position', () => {
       mirrorY: false,
     });
     const project = projectWithObject(object);
-    const before = transformedCenter(object);
-    const applyObjectTransform = vi.fn();
+    const flipSelection = vi.fn();
 
     const handled = handleTransformShortcut(fakeKeydown({ key: 'h' }), {
       project,
       selectedObjectId: object.id,
-      applyObjectTransform,
+      applyObjectTransform: vi.fn(),
+      nudgeSelection: vi.fn(),
+      flipSelection,
     });
 
     expect(handled).toBe(true);
-    expect(applyObjectTransform).toHaveBeenCalledTimes(1);
-    const next = applyObjectTransform.mock.calls[0]?.[1] as Transform;
-    const after = transformedCenter({ ...object, transform: next });
-    expect(next.mirrorX).toBe(true);
-    expect(after.x).toBeCloseTo(before.x, 6);
-    expect(after.y).toBeCloseTo(before.y, 6);
+    expect(flipSelection).toHaveBeenCalledWith('horizontal');
   });
 });
 
@@ -288,14 +285,4 @@ function shapeObject(transform: Transform): SceneObject {
     transform: { ...IDENTITY_TRANSFORM, ...transform },
     paths: [],
   };
-}
-
-function transformedCenter(object: SceneObject): { readonly x: number; readonly y: number } {
-  return applyTransform(
-    {
-      x: (object.bounds.minX + object.bounds.maxX) / 2,
-      y: (object.bounds.minY + object.bounds.maxY) / 2,
-    },
-    object.transform,
-  );
 }
