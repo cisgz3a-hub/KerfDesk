@@ -10,7 +10,7 @@ import {
   offsetJobBounds,
 } from '../../core/job';
 import { prepareOutput } from '../../io/gcode';
-import { resolveJobPlacement } from '../job-placement';
+import { resolveJobPlacement, trustedMotionOffsetForPreflight } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -315,15 +315,14 @@ function useFrameAction(): () => void {
       return;
     }
     const motionBounds = computeJobMotionBounds(prepared.job) ?? bounds;
+    const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
     // Refuse to drive the head off-bed. The Falcon (and most diode
     // lasers) ship with $20=0, so any X/Y past the soft-limits skips
     // steps mechanically — the operator hears grinding and the trace
     // collapses to a sideways line because the axis that hit the stop
     // can't keep up. Better to refuse here with a clear instruction.
     const preflightBounds =
-      placement.preflightMotionOffset === undefined
-        ? motionBounds
-        : offsetJobBounds(motionBounds, placement.preflightMotionOffset);
+      motionOffset === undefined ? motionBounds : offsetJobBounds(motionBounds, motionOffset);
     const pre = framePreflight(preflightBounds, project.device);
     if (pre.kind === 'out-of-bounds') {
       pushToast(

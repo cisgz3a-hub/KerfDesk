@@ -147,6 +147,120 @@ describe('prepareStartJob job placement', () => {
     }
   });
 
+  it('anchors a centered traced image to the custom work origin before emitting G-code', () => {
+    const result = prepareStartJob(
+      calibratedProjectWith(centeredTraceObject),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 120, y: 80, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.gcode).not.toContain('X175.000');
+      expect(result.gcode).not.toContain('Y185.000');
+      expect(result.gcode).toContain('X0.000 Y30.000');
+      expect(result.gcode).toContain('X50.000 Y30.000');
+    }
+  });
+
+  it('does not treat negative WCO as a physical overhang when homing is disabled', () => {
+    const result = prepareStartJob(
+      calibratedProjectWith(centeredTraceObject),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 0, y: -90, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.gcode).toContain('X0.000 Y30.000');
+      expect(result.gcode).toContain('X50.000 Y30.000');
+    }
+  });
+
+  it('blocks Start when a homed custom work origin would push the adjusted job off the physical bed', () => {
+    const result = prepareStartJob(
+      homedProjectWith(centeredTraceObject),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 380, y: 390, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/selected job origin/i);
+      expect(result.messages.join('\n')).toMatch(/machine bed/i);
+    }
+  });
+
+  it('allows homed custom-origin fill overscan when WCO keeps the runway physically on the bed', () => {
+    const result = prepareStartJob(
+      withHoming(fillOverscanProject()),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 100, y: 100, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.gcode).toContain('X-5.000');
+    }
+  });
+
+  it('blocks homed custom-origin fill overscan when WCO puts the runway physically off the bed', () => {
+    const result = prepareStartJob(
+      withHoming(fillOverscanProject()),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 2, y: 100, z: 0 },
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/X out of bed: -3/);
+    }
+  });
+
+  it('blocks custom-origin Start when the physical origin location is not known', () => {
+    const result = prepareStartJob(
+      calibratedProjectWith(centeredTraceObject),
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: null,
+      },
+      userOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/custom origin/i);
+      expect(result.messages.join('\n')).toMatch(/not known/i);
+    }
+  });
+
   it('names fill overscan when an absolute fill job is too close to the bed edge', () => {
     const result = prepareStartJob(fillOverscanProject(), readyController, readyMachine);
 
@@ -165,6 +279,20 @@ function calibratedProjectWith(object: SceneObject): Project {
       ...EMPTY_SCENE,
       objects: [object],
       layers: [{ ...createLayer({ id: 'L1', color: '#ff0000' }), power: 10 }],
+    },
+  };
+}
+
+function homedProjectWith(object: SceneObject): Project {
+  return withHoming(calibratedProjectWith(object));
+}
+
+function withHoming(project: Project): Project {
+  return {
+    ...project,
+    device: {
+      ...project.device,
+      homing: { ...project.device.homing, enabled: true },
     },
   };
 }

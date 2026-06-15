@@ -13,6 +13,7 @@ import type { WorkCoordinateOffset } from '../state/origin-actions';
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveJobPlacement,
+  trustedMotionOffsetForPreflight,
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
@@ -55,9 +56,10 @@ export function prepareStartJob(
 
   const placement = resolveJobPlacement(jobPlacement, machine);
   if (!placement.ok) return { ok: false, messages: placement.messages };
+  const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
   const preEmitIssues = findScopedPreEmitIssues(project, outputScope);
   if (preEmitIssues.length > 0) return { ok: false, messages: preEmitIssues };
-  const originBoundsIssue = findPlacementBoundsIssue(project, placement, outputScope);
+  const originBoundsIssue = findPlacementBoundsIssue(project, placement, outputScope, motionOffset);
   if (originBoundsIssue !== null) {
     return { ok: false, messages: [originBoundsIssue] };
   }
@@ -65,9 +67,7 @@ export function prepareStartJob(
   const { gcode, preflight } = emitGcode(project, {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
-    ...(placement.preflightMotionOffset === undefined
-      ? {}
-      : { preflightMotionOffset: placement.preflightMotionOffset }),
+    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
   });
   if (!preflight.ok) {
     return { ok: false, messages: preflight.issues.map((i) => i.message) };
@@ -101,8 +101,9 @@ function findPlacementBoundsIssue(
   project: Project,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
   outputScope: OutputScope,
+  motionOffset: { readonly x: number; readonly y: number } | undefined,
 ): string | null {
-  if (placement.jobOrigin === undefined || placement.preflightMotionOffset === undefined) {
+  if (placement.jobOrigin === undefined || motionOffset === undefined) {
     return null;
   }
   const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
@@ -110,10 +111,10 @@ function findPlacementBoundsIssue(
   const bounds = computeJobBounds(prepared.job);
   if (bounds === null) return null;
   const physicalBounds = {
-    minX: bounds.minX + placement.preflightMotionOffset.x,
-    minY: bounds.minY + placement.preflightMotionOffset.y,
-    maxX: bounds.maxX + placement.preflightMotionOffset.x,
-    maxY: bounds.maxY + placement.preflightMotionOffset.y,
+    minX: bounds.minX + motionOffset.x,
+    minY: bounds.minY + motionOffset.y,
+    maxX: bounds.maxX + motionOffset.x,
+    maxY: bounds.maxY + motionOffset.y,
   };
   const preflight = framePreflight(physicalBounds, project.device);
   if (preflight.kind === 'ok') return null;

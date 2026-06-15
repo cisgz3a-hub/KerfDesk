@@ -18,6 +18,7 @@ import type { ToastVariant } from '../state/toast-store';
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveJobPlacement,
+  trustedMotionOffsetForPreflight,
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
   type ResolvedJobPlacement,
@@ -145,13 +146,12 @@ function emitSaveGcode(
   ctx: SaveGcodeCtx,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
 ): ReturnType<typeof emitGcode> {
+  const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
   return emitGcode(ctx.project, {
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
-    ...(placement.preflightMotionOffset === undefined
-      ? {}
-      : { preflightMotionOffset: placement.preflightMotionOffset }),
+    ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
   });
 }
 
