@@ -125,7 +125,7 @@ function LineIntervalInput({ layer }: { readonly layer: Layer }): JSX.Element {
       setLayerParam(layer.id, { linesPerMm: lineIntervalMmToLinesPerMm(lineIntervalMm) }),
     parse: (s) =>
       clamp(
-        numericValue(s),
+        numericValue(s, linesPerMmToLineIntervalMm(layer.linesPerMm)),
         linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM),
         linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM),
       ),
@@ -153,7 +153,7 @@ function DpiInput({ layer }: { readonly layer: Layer }): JSX.Element {
     commit: (dpi) => setLayerParam(layer.id, { linesPerMm: dpiToLinesPerMm(dpi) }),
     parse: (s) =>
       clamp(
-        numericValue(s),
+        numericValue(s, linesPerMmToDpi(layer.linesPerMm)),
         linesPerMmToDpi(MIN_RASTER_LINES_PER_MM),
         linesPerMmToDpi(MAX_RASTER_LINES_PER_MM),
       ),
@@ -179,7 +179,7 @@ function MinPowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
   const debounced = useDebouncedCommit<number>({
     value: layer.minPower,
     commit: (minPower) => setLayerParam(layer.id, { minPower }),
-    parse: (s) => clamp(numericValue(s), 0, layer.power),
+    parse: (s) => clamp(numericValue(s, layer.minPower), 0, layer.power),
   });
   return (
     <input
@@ -202,7 +202,7 @@ function DotWidthCorrectionInput({ layer }: { readonly layer: Layer }): JSX.Elem
   const debounced = useDebouncedCommit<number>({
     value: layer.dotWidthCorrectionMm,
     commit: (dotWidthCorrectionMm) => setLayerParam(layer.id, { dotWidthCorrectionMm }),
-    parse: (s) => clamp(numericValue(s), 0, max),
+    parse: (s) => clamp(numericValue(s, layer.dotWidthCorrectionMm), 0, max),
   });
   return (
     <input
@@ -246,9 +246,9 @@ function PassThroughCheckbox({ layer }: { readonly layer: Layer }): JSX.Element 
   );
 }
 
-function numericValue(s: string): number {
+function numericValue(s: string, fallback: number): number {
   const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function clamp(n: number, lo: number, hi: number): number {

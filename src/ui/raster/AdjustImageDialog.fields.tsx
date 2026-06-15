@@ -10,7 +10,7 @@ import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import {
   algorithmLabel,
   dotWidthCorrectionMax,
-  numberValue,
+  numberValueOr,
   parseDither,
 } from './AdjustImageDialog.form-utils';
 import { type ImagePresetId, PresetField } from './AdjustImageDialog.presets';
@@ -195,7 +195,9 @@ function NumberField(props: {
         max={props.max}
         step={props.step}
         value={props.value}
-        onChange={(event) => props.onChange(numberValue(event.target.value, props.min, props.max))}
+        onChange={(event) =>
+          props.onChange(numberValueOr(event.target.value, props.value, props.min, props.max))
+        }
         className="lf-input"
         style={styles.inputStyle}
         aria-label={`Adjust image ${props.label}`}

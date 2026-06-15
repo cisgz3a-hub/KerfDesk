@@ -156,6 +156,25 @@ describe('AdjustImageDialog', () => {
     }
   });
 
+  it('preserves image density when interval or DPI edits are blank', async () => {
+    const onApply = vi.fn();
+    const { host, root } = await renderDialog({ onApply });
+    try {
+      change(host, 'input[name="lineIntervalMm"]', '');
+      await submit(host);
+
+      expect(onApply.mock.calls[0]?.[0]?.layerPatch.linesPerMm).toBe(10);
+
+      change(host, 'input[name="imageDpi"]', '');
+      await submit(host);
+
+      expect(onApply.mock.calls[1]?.[0]?.layerPatch.linesPerMm).toBe(10);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('applies built-in presets to the local draft before OK', async () => {
     const onApply = vi.fn();
     const { host, root } = await renderDialog({ onApply });

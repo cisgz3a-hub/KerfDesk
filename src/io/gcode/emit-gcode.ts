@@ -41,8 +41,13 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
+  const coordinateMode =
+    options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
+      ? 'relative-origin'
+      : 'machine';
   const preflight = runPreflight(prepared.project, body, {
     motionOffset: options.preflightMotionOffset,
+    coordinateMode,
   });
   const gcode = options.metadata
     ? gcodeMetadataHeader(options.metadata, { maxPowerS: prepared.project.device.maxPowerS }) + body

@@ -20,7 +20,9 @@ export function CutSettingsFillDensityFields(props: {
           className="lf-input"
           value={displayNumber(props.lineIntervalMm, 4)}
           onChange={(event) =>
-            props.onChange(clampFillLineInterval(numericValue(event.target.value)))
+            props.onChange(
+              clampFillLineInterval(numericValue(event.target.value, props.lineIntervalMm)),
+            )
           }
           style={numberStyle}
           aria-label="Cut settings line interval"
@@ -37,7 +39,14 @@ export function CutSettingsFillDensityFields(props: {
           className="lf-input"
           value={displayNumber(lineIntervalMmToLinesPerInch(props.lineIntervalMm), 2)}
           onChange={(event) =>
-            props.onChange(linesPerInchToLineIntervalMm(numericValue(event.target.value)))
+            props.onChange(
+              linesPerInchToLineIntervalMm(
+                numericValue(
+                  event.target.value,
+                  lineIntervalMmToLinesPerInch(props.lineIntervalMm),
+                ),
+              ),
+            )
           }
           style={numberStyle}
           aria-label="Cut settings lines per inch"
@@ -70,9 +79,9 @@ function clampFillLineInterval(lineIntervalMm: number): number {
   return Math.max(0.05, Math.min(10, lineIntervalMm));
 }
 
-function numericValue(s: string): number {
+function numericValue(s: string, fallback: number): number {
   const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function displayNumber(value: number, decimals: number): number {

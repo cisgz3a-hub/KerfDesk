@@ -1,8 +1,12 @@
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 
 export function numberValue(value: string, min: number, max: number): number {
+  return numberValueOr(value, min, min, max);
+}
+
+export function numberValueOr(value: string, fallback: number, min: number, max: number): number {
   const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return min;
+  if (!Number.isFinite(parsed)) return Math.max(min, Math.min(max, fallback));
   return Math.max(min, Math.min(max, parsed));
 }
 
