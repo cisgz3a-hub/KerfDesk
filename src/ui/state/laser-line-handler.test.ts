@@ -22,6 +22,7 @@ function makeLaserState(): LaserState {
     motionOperation: null,
     streamer: null,
     log: [],
+    transcript: [],
     detectedSettings: null,
     controllerSettings: null,
     wcoCache: null,
@@ -44,6 +45,8 @@ function makeLaserState(): LaserState {
     setOriginHere: async () => undefined,
     resetOrigin: async () => undefined,
     configureGrblLaserSetup: async () => undefined,
+    sendConsoleCommand: async () => undefined,
+    clearTranscript: () => undefined,
   };
 }
 

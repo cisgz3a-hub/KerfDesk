@@ -648,6 +648,40 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 #### Edge — re-connect after yank
 1. User plugs the cable back in and clicks **Connect…** again. Picker shows the same port. App treats it as a fresh connection — the user must `$H` to re-establish position before resuming work.
 
+### F-B13. GRBL Console
+
+#### Success — inspect controller traffic
+1. The Laser panel shows a docked **Console** with controller replies and app-sent commands.
+2. Startup banners, `ok`, `error:N`, `ALARM:N`, settings lines, and GRBL messages are visible with lightweight labels.
+3. Periodic status poll replies and high-volume job stream writes are hidden by default but can be shown with toggles.
+4. **Copy visible** copies the filtered transcript. **Clear** clears the local transcript only; it sends no command to the controller.
+
+#### Success — send diagnostic query
+1. User clicks `$I`, `$$`, `$#`, `$G`, or `?`.
+2. App sends the command through the same guarded serial write path as all other controller writes.
+3. `$$` starts the existing settings collector so detected controller settings refresh when the dump completes.
+
+#### Success — unlock alarm
+1. When the controller is in `Alarm`, user can send `$X` from the console or the alarm banner after confirming the head is safe.
+2. App sends `$X\n` only when no job, jog, frame, or autofocus operation is active.
+
+#### Error — disconnected
+1. Console input and quick actions are disabled.
+2. Tooltip / disabled text says to connect to the laser first.
+
+#### Error — active job or motion
+1. Console commands are blocked while a job, jog, frame, or autofocus operation is active.
+2. `?` status query remains available because it is a GRBL realtime status request and does not enter the streamed buffer.
+3. Blocked commands are recorded as local diagnostics and no bytes are sent.
+
+#### Error — unsafe persistent command
+1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, and `$I=...` are blocked in Lane 2.
+2. `$number=value` settings writes require connected, idle controller state and explicit confirmation.
+
+#### Edge — arbitrary G-code
+1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
+2. Multiline input is rejected; persistent macros are deferred to a later lane.
+
 ---
 
 ## Phase C flows — STUB

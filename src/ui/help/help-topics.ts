@@ -4,6 +4,18 @@ export type CommandHelpId = `command:${CommandId}`;
 export type MenuHelpId = `menu:${CommandFamily}`;
 export type ToolHelpKey = 'select' | 'rect' | 'ellipse' | 'polygon' | 'polyline';
 export type ToolHelpId = `tool:${ToolHelpKey}`;
+export type ControlHelpKey =
+  | 'laser.console'
+  | 'laser.console.copy'
+  | 'laser.console.clear'
+  | 'laser.console.input'
+  | 'laser.console.send'
+  | 'laser.console.quick.$X'
+  | 'laser.console.quick.$$'
+  | 'laser.console.quick.$#'
+  | 'laser.console.quick.$I'
+  | 'laser.console.quick.$G'
+  | 'laser.console.quick.?';
 export type ControlHelpId = `control:${string}`;
 export type HelpTopicId = CommandHelpId | MenuHelpId | ToolHelpId | ControlHelpId;
 
@@ -230,6 +242,53 @@ export const MENU_HELP: Readonly<Record<CommandFamily, HelpTopic>> = {
   },
 };
 
+export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
+  'laser.console': {
+    label: 'GRBL console',
+    tooltip: 'Inspect controller traffic and send guarded one-line GRBL diagnostics.',
+  },
+  'laser.console.copy': {
+    label: 'Copy console',
+    tooltip: 'Copy the visible console transcript to the clipboard.',
+  },
+  'laser.console.clear': {
+    label: 'Clear console',
+    tooltip: 'Clear the local console transcript without sending anything to the controller.',
+  },
+  'laser.console.input': {
+    label: 'Console command',
+    tooltip: 'Enter one GRBL or G-code command; multi-line macros are not sent here.',
+  },
+  'laser.console.send': {
+    label: 'Send console command',
+    tooltip: 'Send one validated command through the same guarded serial write path.',
+  },
+  'laser.console.quick.$X': {
+    label: 'Unlock alarm',
+    tooltip: 'Send $X to unlock GRBL only after confirming the machine is safe.',
+  },
+  'laser.console.quick.$$': {
+    label: 'Read settings',
+    tooltip: 'Send $$ to read GRBL settings and refresh the detected controller profile.',
+  },
+  'laser.console.quick.$#': {
+    label: 'Read offsets',
+    tooltip: 'Send $# to read GRBL coordinate offsets and active work coordinate state.',
+  },
+  'laser.console.quick.$I': {
+    label: 'Controller info',
+    tooltip: 'Send $I to request firmware build and controller identification details.',
+  },
+  'laser.console.quick.$G': {
+    label: 'Modal state',
+    tooltip: 'Send $G to request the active GRBL parser modal state.',
+  },
+  'laser.console.quick.?': {
+    label: 'Status query',
+    tooltip: 'Send realtime ? to request one immediate GRBL status report.',
+  },
+};
+
 export function commandHelpId(id: CommandId): CommandHelpId {
   return `command:${id}`;
 }
@@ -272,6 +331,9 @@ function topicById(id: HelpTopicId): HelpTopic | CommandHelpTopic | undefined {
   }
   if (id.startsWith('menu:')) {
     return MENU_HELP[id.slice('menu:'.length) as CommandFamily];
+  }
+  if (id.startsWith('control:')) {
+    return CONTROL_HELP[id.slice('control:'.length) as ControlHelpKey];
   }
   return undefined;
 }

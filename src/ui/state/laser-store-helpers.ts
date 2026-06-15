@@ -144,6 +144,7 @@ export function initialLaserState(): Pick<
   | 'motionOperation'
   | 'streamer'
   | 'log'
+  | 'transcript'
   | 'detectedSettings'
   | 'controllerSettings'
   | 'wcoCache'
@@ -160,6 +161,7 @@ export function initialLaserState(): Pick<
     motionOperation: null,
     streamer: null,
     log: [],
+    transcript: [],
     detectedSettings: null,
     controllerSettings: null,
     wcoCache: null,

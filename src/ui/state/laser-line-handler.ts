@@ -38,6 +38,7 @@ import {
   takeNextFrameJogLine,
 } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
+import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
 import { hasCustomOrigin } from './origin-actions';
 
 export type HandlerRefs = {
@@ -47,6 +48,7 @@ export type HandlerRefs = {
   // calling. Lets the handshake be event-driven instead of busy-polling
   // get().log.length on a 50 ms loop (R-L2 audit finding).
   onLineArrived: (() => void) | null;
+  nextTranscriptId?: number;
 };
 
 export type SetFn = (
@@ -106,7 +108,14 @@ export function handleLine(
   line: string,
 ): void {
   const cls = classifyResponse(line);
-  set({ log: appendLog(get(), line) });
+  const state = get();
+  set({
+    log: appendLog(state, line),
+    transcript: appendTranscript(
+      state.transcript,
+      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line),
+    ),
+  });
   if (refs.onLineArrived !== null) {
     const cb = refs.onLineArrived;
     refs.onLineArrived = null;
@@ -140,6 +149,12 @@ export function handleLine(
   if (cls.kind === 'ok') {
     advanceStream(set, get, safeWrite, 'ok');
   }
+}
+
+function nextTranscriptId(refs: HandlerRefs): number {
+  const id = refs.nextTranscriptId ?? 1;
+  refs.nextTranscriptId = id + 1;
+  return id;
 }
 
 function handleStatusLine(

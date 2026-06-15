@@ -7,10 +7,10 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
+import { ConsolePanel } from './ConsolePanel';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
 import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
-import { LaserLog } from './LaserLog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
@@ -81,7 +81,7 @@ export function LaserWindow(): JSX.Element {
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void runStartJobFlow()}
       />
-      <LaserLog />
+      <ConsolePanel />
     </aside>
   );
 }

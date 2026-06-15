@@ -10,6 +10,13 @@ export { parseStatusReport } from './status-parser';
 export type { GrblResponse } from './response';
 export { classifyResponse } from './response';
 
+export type {
+  ConsoleCommandKind,
+  ConsoleCommandResult,
+  PreparedConsoleCommand,
+} from './console-command';
+export { CMD_MODAL_STATE, CMD_OFFSETS, prepareConsoleCommand } from './console-command';
+
 export type { ControllerSettingsSnapshot, SettingsCollectorState } from './parse-settings';
 export {
   idleCollector,

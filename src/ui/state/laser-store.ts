@@ -25,6 +25,7 @@ import type { DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
+import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import { jobActions } from './laser-job-actions';
@@ -45,7 +46,9 @@ import {
   streamStalledNotice,
   writeFailedNotice,
 } from './laser-safety-notice';
+import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
+import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import {
   assertAutofocusIdle,
   assertNoActiveJob,
@@ -53,12 +56,10 @@ import {
   detectStreamStall,
   disconnectStopCommand,
   initialLaserState,
-  idleOnlyDollarCommandBlockMessage,
   isActiveJob,
   jogFrameCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
-  serialWriteErrorMessage,
   type StallProbe,
 } from './laser-store-helpers';
 
@@ -97,6 +98,7 @@ export type LaserState = {
   readonly motionOperation: LaserMotionOperation | null;
   readonly streamer: StreamerState | null;
   readonly log: ReadonlyArray<string>;
+  readonly transcript: ReadonlyArray<SerialTranscriptEntry>;
   // F-7: settings auto-detected from the `$$` dump on connect. Non-null
   // means "the user hasn't responded to the detection banner yet" —
   // null after either Apply (which dispatched updateDeviceProfile) or
@@ -121,6 +123,8 @@ export type LaserState = {
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
   readonly unlockAlarm: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
+  readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
+  readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
   readonly cancelJog: () => Promise<void>;
   readonly frame: (
@@ -164,6 +168,7 @@ type LiveRefs = {
   // race wants to observe a line. Held here so the shared `refs`
   // object handler functions receive carries it across calls.
   onLineArrived: (() => void) | null;
+  nextTranscriptId: number;
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
@@ -176,6 +181,7 @@ const refs: LiveRefs = {
   pollHandle: null,
   settingsCollector: idleCollector(),
   onLineArrived: null,
+  nextTranscriptId: 1,
   stallProbe: null,
 };
 
@@ -189,6 +195,7 @@ function teardown(): void {
   refs.pollHandle = null;
   refs.settingsCollector = idleCollector();
   refs.onLineArrived = null;
+  refs.nextTranscriptId = 1;
   refs.stallProbe = null;
 }
 
@@ -197,43 +204,9 @@ async function safeWrite(
   get: GetFn,
   line: string,
   action?: Parameters<typeof writeFailedNotice>[0],
+  source?: TranscriptSource,
 ): Promise<void> {
-  const blockedMessage = idleOnlyDollarCommandBlockMessage(get(), line);
-  if (blockedMessage !== null) {
-    set({
-      lastWriteError: blockedMessage,
-      log: pushLog(get(), `[lf2] Serial write blocked: ${blockedMessage}`),
-    });
-    throw new Error(blockedMessage);
-  }
-  const conn = refs.connection;
-  if (conn === null) {
-    const message = 'No active serial connection.';
-    set({
-      lastWriteError: message,
-      log: pushLog(
-        get(),
-        `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
-      ),
-      ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
-    });
-    throw new Error(message);
-  }
-  try {
-    await conn.write(line);
-  } catch (err) {
-    const message = serialWriteErrorMessage(err);
-    set({
-      lastWriteError: message,
-      log: pushLog(
-        get(),
-        `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
-      ),
-      ...(action === undefined ? {} : { safetyNotice: writeFailedNotice(action) }),
-    });
-    console.error('Serial write failed:', err);
-    throw err instanceof Error ? err : new Error(message);
-  }
+  await createSafeWrite(set, get, refs)(line, action, source);
 }
 
 type SetFn = (
@@ -244,7 +217,8 @@ type GetFn = () => LaserState;
 function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' | 'disconnect'> {
   return {
     connect: async (adapter) => {
-      set({ connection: { kind: 'connecting' }, log: [] });
+      refs.nextTranscriptId = 1;
+      set({ connection: { kind: 'connecting' }, log: [], transcript: [] });
       const portRef = await adapter.serial.requestPort();
       if (portRef === null) {
         set({ connection: { kind: 'disconnected' } });
@@ -463,6 +437,9 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...jogActions(set, get),
   ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
+  ...consoleActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
   ...originActions(set, get),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),
