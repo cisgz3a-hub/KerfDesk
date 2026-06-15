@@ -1,4 +1,5 @@
 import type { StatusReport } from '../core/controllers/grbl';
+import type { DeviceProfile } from '../core/devices';
 import type { JobOriginPlacement, JobPlacementSettings, JobStartMode } from '../core/job';
 import type { MotionBoundsOffset } from '../core/invariants';
 import { hasCustomOrigin, type WorkCoordinateOffset } from './state/origin-actions';
@@ -49,6 +50,14 @@ export function resolveJobPlacement(
     default:
       return assertNeverStartMode(settings.startFrom);
   }
+}
+
+export function trustedMotionOffsetForPreflight(
+  device: DeviceProfile,
+  placement: Extract<ResolvedJobPlacement, { ok: true }>,
+): MotionBoundsOffset | undefined {
+  if (!device.homing.enabled) return undefined;
+  return placement.preflightMotionOffset;
 }
 
 function resolveAbsolute(machine: MachinePlacementSnapshot): ResolvedJobPlacement {
