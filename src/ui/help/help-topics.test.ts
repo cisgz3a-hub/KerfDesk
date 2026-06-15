@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMMAND_HELP, TOOL_HELP, controlHelp, helpProps } from './help-topics';
+import { COMMAND_HELP, CONTROL_HELP, TOOL_HELP, controlHelp, helpProps } from './help-topics';
 import { COMMAND_FAMILY_ORDER, type CommandId } from '../commands/command-registry';
 
 const COMMAND_IDS: ReadonlyArray<CommandId> = [
@@ -72,11 +72,39 @@ describe('help topics', () => {
     });
   });
 
+  it('defines meaningful help for the GRBL console controls', () => {
+    const consoleIds = [
+      'laser.console',
+      'laser.console.copy',
+      'laser.console.clear',
+      'laser.console.input',
+      'laser.console.send',
+      'laser.console.quick.$X',
+      'laser.console.quick.$$',
+      'laser.console.quick.$#',
+      'laser.console.quick.$I',
+      'laser.console.quick.$G',
+      'laser.console.quick.?',
+    ] as const;
+
+    const missing = consoleIds.filter((id) => CONTROL_HELP[id] === undefined);
+    const weak = consoleIds.filter((id) => !isMeaningful(CONTROL_HELP[id]?.tooltip ?? ''));
+
+    expect(missing).toEqual([]);
+    expect(weak).toEqual([]);
+  });
+
   it('keeps disabled reasons first while preserving the normal explanation', () => {
     const title = controlHelp('command:tools.trace-image', 'Select an image first.');
 
     expect(title.startsWith('Select an image first.')).toBe(true);
     expect(title).toContain(COMMAND_HELP['tools.trace-image'].tooltip);
+  });
+
+  it('resolves registered control help by id', () => {
+    expect(controlHelp('control:laser.console.quick.$I')).toBe(
+      CONTROL_HELP['laser.console.quick.$I'].tooltip,
+    );
   });
 });
 

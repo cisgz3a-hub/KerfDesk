@@ -26,7 +26,8 @@ export type LaserSafetyAction =
   | 'origin'
   | 'jog'
   | 'home'
-  | 'unlock';
+  | 'unlock'
+  | 'console';
 
 export type LaserSafetyNotice =
   | {
@@ -75,6 +76,12 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
     return (
       'Stop command was not written to the controller. Use physical E-stop or power ' +
       'cutoff now if unsafe. The machine may still be running.'
+    );
+  }
+  if (action === 'console') {
+    return (
+      'The console command was not written to the controller; the machine may not have ' +
+      'responded. Use physical E-stop or power cutoff now if unsafe.'
     );
   }
   return (
