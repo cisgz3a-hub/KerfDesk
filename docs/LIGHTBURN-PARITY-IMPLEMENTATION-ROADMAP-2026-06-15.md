@@ -636,6 +636,8 @@ Definition of done:
      used for rendering.
    - Deferred from Lane 5: playback, Start Here, Save Preview Image,
      shade-by-power, raster-row synthetic toolpaths, and time breakdowns.
+   - Implemented second slice: Preview now shows the existing total live job
+     estimate in the same stats panel, reusing Start Job's estimate truth.
 7. Lane 6: full GRBL Cut Settings Editor.
 8. Lane 7: raster calibration and burn-quality diagnostics.
 9. Lane 8: image tool completion.

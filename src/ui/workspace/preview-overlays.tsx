@@ -6,6 +6,7 @@
 
 import { summarizeToolpathDistances, type Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
+import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore } from '../state/ui-store';
 import { hasOutOfBoundsObjects } from './out-of-bounds';
 import { previewHasBurnableContent } from './preview-status';
@@ -34,7 +35,10 @@ export function PreviewStatusOverlays(props: {
   );
 }
 
-export function PreviewStatsPanel(props: { readonly toolpath: Toolpath }): JSX.Element {
+export function PreviewStatsPanel(props: {
+  readonly toolpath: Toolpath;
+  readonly estimate: LiveJobEstimate;
+}): JSX.Element {
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   const setShowPreviewTravel = useUiStore((s) => s.setShowPreviewTravel);
   const stats = summarizeToolpathDistances(props.toolpath);
@@ -61,6 +65,8 @@ export function PreviewStatsPanel(props: { readonly toolpath: Toolpath }): JSX.E
         <strong>{formatMm(stats.travelMm)}</strong>
         <span>Total</span>
         <strong>{formatMm(stats.totalMm)}</strong>
+        <span>Time</span>
+        <strong>{formatEstimate(props.estimate)}</strong>
       </div>
     </div>
   );
@@ -122,4 +128,10 @@ const statsGridStyle: React.CSSProperties = {
 function formatMm(value: number): string {
   if (!Number.isFinite(value)) return '0.0 mm';
   return `${value.toFixed(1)} mm`;
+}
+
+function formatEstimate(estimate: LiveJobEstimate): string {
+  if (estimate.kind === 'estimated') return estimate.label;
+  if (estimate.kind === 'too-large') return 'large job';
+  return '-';
 }

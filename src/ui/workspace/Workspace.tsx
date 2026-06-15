@@ -37,6 +37,7 @@ import { PreviewStatsPanel, PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewToolpath } from './use-preview-toolpath';
 import { canvasMouseToScene, clientToCanvasPx, zoomAtCursorPx } from './view-transform';
+import { useJobEstimate } from '../laser/use-job-estimate';
 
 export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -54,6 +55,7 @@ export function Workspace(): JSX.Element {
   const panY = useUiStore((s) => s.panY);
   const viewState = useMemo(() => ({ zoomFactor, panX, panY }), [zoomFactor, panX, panY]);
   const previewToolpath = usePreviewToolpath(project, previewMode);
+  const jobEstimate = useJobEstimate();
   const canvasSize = useCanvasBitmapSize(ref);
   useWorkspaceDraw({
     ref,
@@ -112,7 +114,7 @@ export function Workspace(): JSX.Element {
       {previewMode && previewToolpath !== null && (
         <>
           <PreviewStatusOverlays project={project} toolpath={previewToolpath} />
-          <PreviewStatsPanel toolpath={previewToolpath} />
+          <PreviewStatsPanel toolpath={previewToolpath} estimate={jobEstimate} />
         </>
       )}
       {previewMode && <PreviewScrubber />}
