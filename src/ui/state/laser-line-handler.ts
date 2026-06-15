@@ -95,6 +95,8 @@ export async function runHandshake(
     log: appendLog(get(), '[lf2] Connected. Querying settings ($$)...'),
     detectedSettings: null,
     controllerSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
   });
   refs.settingsCollector = startCollecting();
   await safeWrite(`${CMD_SETTINGS}\n`);
@@ -126,6 +128,8 @@ export function handleLine(
     set({
       detectedSettings: Object.keys(detected.patch).length > 0 ? detected.patch : null,
       controllerSettings: detected.controllerSettings,
+      grblSettingsRows: detected.settingsRows,
+      lastSettingsReadAt: Date.now(),
     });
   }
   if (cls.kind === 'status') {

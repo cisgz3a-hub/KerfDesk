@@ -15,7 +15,11 @@ export type ControlHelpKey =
   | 'laser.console.quick.$#'
   | 'laser.console.quick.$I'
   | 'laser.console.quick.$G'
-  | 'laser.console.quick.?';
+  | 'laser.console.quick.?'
+  | 'laser.machine-settings'
+  | 'laser.machine-settings.read'
+  | 'laser.machine-settings.export'
+  | 'laser.machine-settings.table';
 export type ControlHelpId = `control:${string}`;
 export type HelpTopicId = CommandHelpId | MenuHelpId | ToolHelpId | ControlHelpId;
 
@@ -286,6 +290,22 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.console.quick.?': {
     label: 'Status query',
     tooltip: 'Send realtime ? to request one immediate GRBL status report.',
+  },
+  'laser.machine-settings': {
+    label: 'Machine Settings',
+    tooltip: 'Read GRBL firmware settings and export a backup before changing controller setup.',
+  },
+  'laser.machine-settings.read': {
+    label: 'Read machine settings',
+    tooltip: 'Send $$ through the guarded serial path to read GRBL firmware settings.',
+  },
+  'laser.machine-settings.export': {
+    label: 'Export machine settings backup',
+    tooltip: 'Save the last read GRBL settings as a LaserForge backup JSON file.',
+  },
+  'laser.machine-settings.table': {
+    label: 'Machine settings table',
+    tooltip: 'Review each reported GRBL setting value, unit, and meaning without editing firmware.',
   },
 };
 

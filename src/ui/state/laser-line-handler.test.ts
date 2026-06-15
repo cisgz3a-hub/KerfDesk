@@ -25,6 +25,8 @@ function makeLaserState(): LaserState {
     transcript: [],
     detectedSettings: null,
     controllerSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
     wcoCache: null,
     workOriginActive: false,
     connect: async () => undefined,
@@ -45,6 +47,7 @@ function makeLaserState(): LaserState {
     setOriginHere: async () => undefined,
     resetOrigin: async () => undefined,
     configureGrblLaserSetup: async () => undefined,
+    readMachineSettings: async () => undefined,
     sendConsoleCommand: async () => undefined,
     clearTranscript: () => undefined,
   };
@@ -87,6 +90,7 @@ describe('handleLine detected controller settings', () => {
       minPowerS: 0,
       laserModeEnabled: true,
     });
+    expect(get().grblSettingsRows.map((row) => row.code)).toEqual(['$22', '$30', '$31', '$32']);
   });
 });
 

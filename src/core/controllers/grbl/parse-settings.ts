@@ -30,6 +30,7 @@
 // Pure-core compliant: no I/O, no clock, no random.
 
 import type { DeviceProfile } from '../../devices/device-profile';
+import { settingsMapToRows, type GrblSettingRow } from './grbl-settings';
 import type { GrblResponse } from './response';
 
 export type ControllerSettingsSnapshot = Partial<
@@ -55,6 +56,7 @@ export type SettingsCollectorState =
       readonly kind: 'done';
       readonly patch: Partial<DeviceProfile>;
       readonly controllerSettings: ControllerSettingsSnapshot;
+      readonly settingsRows: ReadonlyArray<GrblSettingRow>;
     };
 
 export function idleCollector(): SettingsCollectorState {
@@ -89,6 +91,7 @@ export function onResponse(
       kind: 'done',
       patch: settingsMapToProfilePatch(state.map),
       controllerSettings: settingsMapToControllerSettings(state.map),
+      settingsRows: settingsMapToRows(state.map),
     };
   }
   return state;

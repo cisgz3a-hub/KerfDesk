@@ -73,7 +73,7 @@ describe('help topics', () => {
   });
 
   it('defines meaningful help for the GRBL console controls', () => {
-    const consoleIds = [
+    const controlIds = [
       'laser.console',
       'laser.console.copy',
       'laser.console.clear',
@@ -85,10 +85,14 @@ describe('help topics', () => {
       'laser.console.quick.$I',
       'laser.console.quick.$G',
       'laser.console.quick.?',
+      'laser.machine-settings',
+      'laser.machine-settings.read',
+      'laser.machine-settings.export',
+      'laser.machine-settings.table',
     ] as const;
 
-    const missing = consoleIds.filter((id) => CONTROL_HELP[id] === undefined);
-    const weak = consoleIds.filter((id) => !isMeaningful(CONTROL_HELP[id]?.tooltip ?? ''));
+    const missing = controlIds.filter((id) => CONTROL_HELP[id] === undefined);
+    const weak = controlIds.filter((id) => !isMeaningful(CONTROL_HELP[id]?.tooltip ?? ''));
 
     expect(missing).toEqual([]);
     expect(weak).toEqual([]);

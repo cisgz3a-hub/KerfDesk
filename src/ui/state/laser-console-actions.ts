@@ -52,7 +52,12 @@ export function consoleActions(
       if (idleBlocked !== null) return block(set, get, refs, idleBlocked);
       if (prepared.command.kind === 'settings-query') {
         refs.settingsCollector = startCollecting();
-        set({ detectedSettings: null, controllerSettings: null });
+        set({
+          detectedSettings: null,
+          controllerSettings: null,
+          grblSettingsRows: [],
+          lastSettingsReadAt: null,
+        });
       }
       await write(prepared.command.wire, actionForConsoleCommand(prepared.command.kind), 'console');
     },

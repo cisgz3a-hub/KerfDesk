@@ -11,6 +11,14 @@ export type { GrblResponse } from './response';
 export { classifyResponse } from './response';
 
 export type {
+  GrblSettingCategory,
+  GrblSettingRow,
+  GrblSettingsBackup,
+  GrblSettingWriteRisk,
+} from './grbl-settings';
+export { createGrblSettingsBackup, settingsMapToRows } from './grbl-settings';
+
+export type {
   ConsoleCommandKind,
   ConsoleCommandResult,
   PreparedConsoleCommand,

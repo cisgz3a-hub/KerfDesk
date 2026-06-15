@@ -609,6 +609,11 @@ Why:
 - The GT/GRBL4040 setup issue shows this is needed.
 - Read-only plus backup is safer than immediately adding write controls.
 
+Implementation status:
+
+- Implemented in Lane 3 as a read-only Machine Settings panel.
+- Firmware writes remain deferred until read/export is hardware-verified.
+
 Definition of done:
 
 - `$$` parses into settings rows.
