@@ -25,6 +25,12 @@ export type Toolpath = {
   readonly totalLength: number;
 };
 
+export type ToolpathDistanceSummary = {
+  readonly cutMm: number;
+  readonly travelMm: number;
+  readonly totalMm: number;
+};
+
 export function buildToolpath(job: Job): Toolpath {
   const steps: ToolpathStep[] = [];
   let prevEnd: Vec2 | null = null;
@@ -57,6 +63,16 @@ export function buildToolpath(job: Job): Toolpath {
   }
   const totalLength = steps.reduce((sum, s) => sum + s.length, 0);
   return { steps, totalLength };
+}
+
+export function summarizeToolpathDistances(toolpath: Toolpath): ToolpathDistanceSummary {
+  let cutMm = 0;
+  let travelMm = 0;
+  for (const step of toolpath.steps) {
+    if (step.kind === 'cut') cutMm += step.length;
+    else travelMm += step.length;
+  }
+  return { cutMm, travelMm, totalMm: cutMm + travelMm };
 }
 
 // One fill scanline as preview steps matching the emitted continuous sweep

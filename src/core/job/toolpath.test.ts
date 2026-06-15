@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from './job';
-import { buildToolpath, sliceToolpath } from './toolpath';
+import { buildToolpath, sliceToolpath, summarizeToolpathDistances } from './toolpath';
 
 function aJob(): Job {
   return {
@@ -147,6 +147,18 @@ describe('buildToolpath', () => {
       length: 3,
     });
     expect(tp.totalLength).toBe(20);
+  });
+});
+
+describe('summarizeToolpathDistances', () => {
+  it('separates laser-on cut distance from laser-off travel distance', () => {
+    const tp = buildToolpath(aJob());
+
+    expect(summarizeToolpathDistances(tp)).toEqual({
+      cutMm: 15,
+      travelMm: 10,
+      totalMm: 25,
+    });
   });
 });
 

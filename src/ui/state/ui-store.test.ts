@@ -8,6 +8,7 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().setToolMode({ kind: 'select' });
     useUiStore.getState().setPenDraft(null);
     useUiStore.getState().setActiveLayerColor(null);
+    useUiStore.getState().setShowPreviewTravel(true);
   });
 
   it('setToolMode clears the pen draft when switching to a non-pen draw tool', () => {
@@ -45,5 +46,13 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
 
     useUiStore.getState().setActiveLayerColor(null);
     expect(useUiStore.getState().activeLayerColor).toBeNull();
+  });
+
+  it('keeps the preview traversal toggle as ephemeral UI state', () => {
+    expect(useUiStore.getState().showPreviewTravel).toBe(true);
+
+    useUiStore.getState().setShowPreviewTravel(false);
+
+    expect(useUiStore.getState().showPreviewTravel).toBe(false);
   });
 });

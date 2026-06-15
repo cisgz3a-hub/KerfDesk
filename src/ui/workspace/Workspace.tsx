@@ -33,7 +33,7 @@ import {
 } from './draw-tool';
 import { finishPen, handlePenMouseDown, updatePenCursor } from './pen-tool';
 import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
-import { PreviewStatusOverlays } from './preview-overlays';
+import { PreviewStatsPanel, PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewToolpath } from './use-preview-toolpath';
 import { canvasMouseToScene, clientToCanvasPx, zoomAtCursorPx } from './view-transform';
@@ -45,6 +45,7 @@ export function Workspace(): JSX.Element {
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const previewMode = useStore((s) => s.previewMode);
   const scrubberT = useUiStore((s) => s.scrubberT);
+  const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   // Three primitive selectors — Zustand only re-runs the effect when one
   // of them actually changes. A bundled `{...}` selector would create a
   // fresh object every store update and force unnecessary redraws.
@@ -62,6 +63,7 @@ export function Workspace(): JSX.Element {
     previewMode,
     previewToolpath,
     scrubberT,
+    showPreviewTravel,
     viewState,
     canvasSize,
   });
@@ -108,7 +110,10 @@ export function Workspace(): JSX.Element {
         />
       )}
       {previewMode && previewToolpath !== null && (
-        <PreviewStatusOverlays project={project} toolpath={previewToolpath} />
+        <>
+          <PreviewStatusOverlays project={project} toolpath={previewToolpath} />
+          <PreviewStatsPanel toolpath={previewToolpath} />
+        </>
       )}
       {previewMode && <PreviewScrubber />}
       {/* Bottom-right zoom controls — hidden during preview so the
@@ -126,6 +131,7 @@ function useWorkspaceDraw(args: {
   readonly previewMode: boolean;
   readonly previewToolpath: Toolpath | null;
   readonly scrubberT: number;
+  readonly showPreviewTravel: boolean;
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
   // Not read directly — the draw effect reads canvas.width/height — but a
   // bitmap resize clears the canvas, so the effect must re-run on it.
@@ -139,6 +145,7 @@ function useWorkspaceDraw(args: {
     previewMode,
     previewToolpath,
     scrubberT,
+    showPreviewTravel,
     viewState,
     canvasSize,
   } = args;
@@ -167,6 +174,7 @@ function useWorkspaceDraw(args: {
       additionalSelectedIds,
       preview: previewMode,
       scrubberT,
+      previewShowTravel: showPreviewTravel,
       view: viewState,
       onRasterBitmapReady: requestRasterRedraw,
       displayPolylineCache,
@@ -181,6 +189,7 @@ function useWorkspaceDraw(args: {
     additionalSelectedIds,
     previewMode,
     scrubberT,
+    showPreviewTravel,
     viewState,
     canvasSize,
     rasterRedrawTick,

@@ -83,11 +83,13 @@ export function drawPreview(
   toolpath: Toolpath,
   view: ViewTransform,
   scrubberT: number,
+  options: { readonly showTravel?: boolean } = {},
 ): void {
   if (toolpath.totalLength === 0) return;
+  const showTravel = options.showTravel !== false;
   const sliced = sliceToolpath(toolpath, scrubberT * toolpath.totalLength);
-  drawWholeSteps(ctx, sliced.whole, view);
-  if (sliced.partial !== null) drawStep(ctx, sliced.partial, view);
+  drawWholeSteps(ctx, sliced.whole, view, showTravel);
+  if (sliced.partial !== null) drawStep(ctx, sliced.partial, view, showTravel);
   if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
 }
 
@@ -110,19 +112,26 @@ export function buildPreviewToolpath(
   return mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device);
 }
 
-function drawStep(ctx: CanvasRenderingContext2D, step: ToolpathStep, view: ViewTransform): void {
-  if (step.kind === 'travel') drawTravel(ctx, step.from, step.to, view);
-  else drawCut(ctx, step.polyline, step.color, view);
+function drawStep(
+  ctx: CanvasRenderingContext2D,
+  step: ToolpathStep,
+  view: ViewTransform,
+  showTravel: boolean,
+): void {
+  if (step.kind === 'travel') {
+    if (showTravel) drawTravel(ctx, step.from, step.to, view);
+  } else drawCut(ctx, step.polyline, step.color, view);
 }
 
 function drawWholeSteps(
   ctx: CanvasRenderingContext2D,
   steps: ReadonlyArray<ToolpathStep>,
   view: ViewTransform,
+  showTravel: boolean,
 ): void {
   const stride = strideForSegmentBudget(steps.length);
   if (stride <= 1) {
-    for (const step of steps) drawStep(ctx, step, view);
+    for (const step of steps) drawStep(ctx, step, view, showTravel);
     return;
   }
 
@@ -130,14 +139,14 @@ function drawWholeSteps(
   for (let i = 0; i < steps.length; i += stride) {
     const step = steps[i];
     if (step === undefined) continue;
-    drawStep(ctx, step, view);
+    drawStep(ctx, step, view, showTravel);
     lastDrawnIndex = i;
   }
 
   const finalIndex = steps.length - 1;
   if (finalIndex > lastDrawnIndex) {
     const finalStep = steps[finalIndex];
-    if (finalStep !== undefined) drawStep(ctx, finalStep, view);
+    if (finalStep !== undefined) drawStep(ctx, finalStep, view, showTravel);
   }
 }
 
