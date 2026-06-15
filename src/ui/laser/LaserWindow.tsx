@@ -11,6 +11,7 @@ import { ConsolePanel } from './ConsolePanel';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
 import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
+import { MachineSettingsPanel } from './MachineSettingsPanel';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
@@ -64,6 +65,7 @@ export function LaserWindow(): JSX.Element {
       <GrblLaserSetupPanel
         disabled={isSetupPanelDisabled(connected, machineOperationBusy, jobActive)}
       />
+      <MachineSettingsPanel />
       {showAlarmBanner && (
         <AlarmBanner
           code={alarmCode}

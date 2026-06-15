@@ -682,6 +682,42 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
 2. Multiline input is rejected; persistent macros are deferred to a later lane.
 
+### F-B14. Machine Settings read-only backup
+
+#### Success — read connected controller settings
+1. The Laser panel shows **Machine Settings** collapsed by default.
+2. User opens the panel and clicks **Read ($$)**.
+3. App sends `$$\n` through the guarded serial write path; it does not use a separate serial shortcut.
+4. The existing settings collector parses the response into visible rows.
+5. Known settings show their code, value, unit, and LaserForge-authored meaning.
+6. Unknown settings remain visible as unknown rows instead of being dropped.
+
+#### Success — export backup
+1. After at least one setting row has been read, **Export backup** is enabled.
+2. User chooses a save target.
+3. App writes `.lfgrbl-settings.json` containing every visible row, including unknown settings.
+4. Exporting a backup sends no command to the controller.
+
+#### Error — disconnected
+1. **Read ($$)** is disabled.
+2. Tooltip says to connect to the laser first.
+3. **Export backup** remains disabled until settings have been read in the current connection context.
+
+#### Error — active job or motion
+1. **Read ($$)** is blocked while a job, jog, frame, or autofocus operation is active.
+2. No bytes are sent when blocked.
+3. The operator-facing message explains which operation must finish first.
+
+#### Edge — alarm state
+1. Reading settings is allowed when connected and no job or motion operation is active.
+2. Alarm recovery remains separate: `$X` and `$H` stay in the alarm banner / Console workflow.
+
+#### Explicit non-goals for this lane
+1. No firmware setting edit inputs.
+2. No Write button.
+3. No Load-from-backup button.
+4. No `$RST`, startup block, manufacturer, or axis calibration workflow.
+
 ---
 
 ## Phase C flows — STUB

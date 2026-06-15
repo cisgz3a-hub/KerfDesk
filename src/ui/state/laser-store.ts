@@ -12,6 +12,7 @@ import { create } from 'zustand';
 import {
   CMD_HOME,
   CMD_UNLOCK,
+  type GrblSettingRow,
   RT_JOG_CANCEL,
   RT_STATUS,
   buildJogCommand,
@@ -27,6 +28,7 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
+import { grblSettingsActions } from './grbl-settings-actions';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import { jobActions } from './laser-job-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
@@ -105,6 +107,8 @@ export type LaserState = {
   // Dismiss (which left the profile alone).
   readonly detectedSettings: Partial<DeviceProfile> | null;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
+  readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
+  readonly lastSettingsReadAt: number | null;
   /**
    * F.3 — last-seen Work Coordinate Offset from the GRBL controller.
    * GRBL only reports WCO on a cadence (~every Nth status frame), so
@@ -123,6 +127,7 @@ export type LaserState = {
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
   readonly unlockAlarm: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
+  readonly readMachineSettings: () => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
@@ -286,6 +291,8 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         connection: { kind: 'disconnected' },
         statusReport: null,
         controllerSettings: null,
+        grblSettingsRows: [],
+        lastSettingsReadAt: null,
         streamer: null,
         wcoCache: null,
         workOriginActive: false,
@@ -437,6 +444,9 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...jogActions(set, get),
   ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
+  ...grblSettingsActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
   ...consoleActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),

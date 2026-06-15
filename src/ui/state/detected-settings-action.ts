@@ -18,6 +18,7 @@
 import {
   collectorOnResponse,
   type GrblResponse,
+  type GrblSettingRow,
   idleCollector,
   type SettingsCollectorState,
   type ControllerSettingsSnapshot,
@@ -35,6 +36,7 @@ export type DetectedSettingsRefs = {
 export type DetectedSettingsResult = {
   readonly patch: Partial<DeviceProfile>;
   readonly controllerSettings: ControllerSettingsSnapshot;
+  readonly settingsRows: ReadonlyArray<GrblSettingRow>;
 };
 
 // Feed one classified response to the collector. Returns the patch if
@@ -48,10 +50,18 @@ export function consumeSettingsResponse(
   const next = collectorOnResponse(refs.settingsCollector, response);
   if (next.kind === 'done') {
     refs.settingsCollector = idleCollector();
-    if (Object.keys(next.patch).length === 0 && Object.keys(next.controllerSettings).length === 0) {
+    if (
+      Object.keys(next.patch).length === 0 &&
+      Object.keys(next.controllerSettings).length === 0 &&
+      next.settingsRows.length === 0
+    ) {
       return null;
     }
-    return { patch: next.patch, controllerSettings: next.controllerSettings };
+    return {
+      patch: next.patch,
+      controllerSettings: next.controllerSettings,
+      settingsRows: next.settingsRows,
+    };
   }
   refs.settingsCollector = next;
   return null;

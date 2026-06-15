@@ -137,6 +137,28 @@ describe('SettingsCollector state machine', () => {
       expect(state.patch.bedWidth).toBe(400);
       expect(state.patch.accelMmPerSec2).toBe(2500);
       expect(state.controllerSettings.homingEnabled).toBe(false);
+      expect(state.settingsRows.map((row) => row.code)).toContain('$32');
+    }
+  });
+
+  it('collector done state keeps unknown settings visible for Machine Settings backup', () => {
+    let state: ReturnType<typeof startCollecting> | ReturnType<typeof onResponse> =
+      startCollecting();
+    state = onResponse(state, classifyResponse('$30=1000'));
+    state = onResponse(state, classifyResponse('$999=custom'));
+    state = onResponse(state, classifyResponse('ok'));
+
+    expect(state.kind).toBe('done');
+    if (state.kind === 'done') {
+      expect(state.settingsRows).toEqual([
+        expect.objectContaining({ code: '$30', known: true }),
+        expect.objectContaining({
+          code: '$999',
+          rawValue: 'custom',
+          known: false,
+          name: 'Unknown GRBL setting',
+        }),
+      ]);
     }
   });
 
