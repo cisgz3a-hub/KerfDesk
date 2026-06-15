@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { USER_ORIGIN_JOB_PLACEMENT } from '../../core/job';
 import {
   addLayer,
   addObject,
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  type OutputScope,
   type Project,
   type SceneObject,
 } from '../../core/scene';
@@ -96,7 +98,46 @@ describe('prepareOutput', () => {
     }
   });
 
-  it('is deterministic — the same project yields the same job', () => {
+  it('compiles only selected objects when Cut Selected Graphics is enabled', () => {
+    const prepared = prepareOutput(twoObjectProject(), { outputScope: selectedScope(['B']) });
+
+    expect(cutSegmentStarts(prepared)).toEqual([{ x: 120, y: 400 }]);
+  });
+
+  it('returns a scoped preflight failure when Cut Selected Graphics has no selection', () => {
+    const prepared = prepareOutput(twoObjectProject(), { outputScope: selectedScope([]) });
+
+    expect(prepared.ok).toBe(false);
+    if (!prepared.ok) {
+      expect(prepared.preflight.issues).toEqual([
+        {
+          code: 'selected-output-empty',
+          message:
+            'Cut Selected Graphics is enabled, but no artwork is selected. Select artwork or turn off Cut Selected Graphics.',
+        },
+      ]);
+    }
+  });
+
+  it('uses selected bounds for origin when Use Selection Origin is enabled', () => {
+    const prepared = prepareOutput(twoObjectProject(), {
+      jobOrigin: USER_ORIGIN_JOB_PLACEMENT,
+      outputScope: { ...selectedScope(['B']), useSelectionOrigin: true },
+    });
+
+    expect(cutSegmentStarts(prepared)).toEqual([{ x: 0, y: 0 }]);
+  });
+
+  it('uses full-design bounds for origin when Use Selection Origin is disabled', () => {
+    const prepared = prepareOutput(twoObjectProject(), {
+      jobOrigin: USER_ORIGIN_JOB_PLACEMENT,
+      outputScope: { ...selectedScope(['B']), useSelectionOrigin: false },
+    });
+
+    expect(cutSegmentStarts(prepared)).toEqual([{ x: 110, y: 0 }]);
+  });
+
+  it('is deterministic - the same project yields the same job', () => {
     const project = vectorProject();
     expect(prepareOutput(project)).toEqual(prepareOutput(project));
   });
@@ -148,4 +189,62 @@ function firstCutSegmentStart(prepared: ReturnType<typeof prepareOutput>): {
   const first = group.segments[0]?.polyline[0];
   if (first === undefined) throw new Error('expected first cut segment');
   return first;
+}
+
+function cutSegmentStarts(prepared: ReturnType<typeof prepareOutput>): ReadonlyArray<{
+  readonly x: number;
+  readonly y: number;
+}> {
+  if (!prepared.ok) throw new Error('expected prepared output');
+  return prepared.job.groups.flatMap((group) => {
+    if (group.kind !== 'cut') return [];
+    return group.segments.map((segment) => {
+      const first = segment.polyline[0];
+      if (first === undefined) throw new Error('expected segment start');
+      return first;
+    });
+  });
+}
+
+function twoObjectProject(): Project {
+  const base = createProject();
+  return {
+    ...base,
+    scene: {
+      layers: [createLayer({ id: 'L1', color: '#ff0000' })],
+      objects: [lineObject('A', 10), lineObject('B', 120)],
+    },
+  };
+}
+
+function lineObject(id: string, x: number): SceneObject {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: x, minY: 0, maxX: x + 10, maxY: 0 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            points: [
+              { x, y: 0 },
+              { x: x + 10, y: 0 },
+            ],
+            closed: false,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
+  return {
+    cutSelectedGraphics: true,
+    useSelectionOrigin: false,
+    selectedObjectIds,
+  };
 }

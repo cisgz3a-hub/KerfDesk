@@ -60,6 +60,10 @@ export const USER_ORIGIN_JOB_PLACEMENT: JobOriginPlacement = {
 
 export function applyJobOrigin(job: Job, placement: JobOriginPlacement): Job {
   const offset = jobOriginOffset(job, placement);
+  return applyJobOriginOffset(job, offset);
+}
+
+export function applyJobOriginOffset(job: Job, offset: Vec2): Job {
   if (offset.x === 0 && offset.y === 0) return job;
   return translateJob(job, offset.x, offset.y);
 }
@@ -72,6 +76,13 @@ export function jobOriginOffset(job: Job, placement: JobOriginPlacement): Vec2 {
   if (target === null) return { x: 0, y: 0 };
   const bounds = computeJobBounds(job);
   if (bounds === null) return { x: 0, y: 0 };
+  const anchor = anchorPoint(bounds, placement.anchor);
+  return { x: target.x - anchor.x, y: target.y - anchor.y };
+}
+
+export function jobOriginOffsetFromBounds(bounds: JobBounds, placement: JobOriginPlacement): Vec2 {
+  const target = targetPoint(placement);
+  if (target === null) return { x: 0, y: 0 };
   const anchor = anchorPoint(bounds, placement.anchor);
   return { x: target.x - anchor.x, y: target.y - anchor.y };
 }

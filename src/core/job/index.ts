@@ -18,9 +18,12 @@ export {
   JOB_ORIGIN_ANCHORS,
   USER_ORIGIN_JOB_PLACEMENT,
   applyJobOrigin,
+  applyJobOriginOffset,
   jobOriginOffset,
+  jobOriginOffsetFromBounds,
   offsetJobBounds,
 } from './job-origin';
+export { computeSceneOutputBounds } from './scene-output-bounds';
 export type { JobDurationEstimate } from './estimate-duration';
 export { estimateJobDuration, formatDuration } from './estimate-duration';
 export { optimizePaths } from './optimize-paths';

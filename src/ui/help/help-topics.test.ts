@@ -89,6 +89,8 @@ describe('help topics', () => {
       'laser.machine-settings.read',
       'laser.machine-settings.export',
       'laser.machine-settings.table',
+      'laser.output-scope.cut-selected',
+      'laser.output-scope.selection-origin',
     ] as const;
 
     const missing = controlIds.filter((id) => CONTROL_HELP[id] === undefined);

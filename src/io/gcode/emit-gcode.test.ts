@@ -5,6 +5,7 @@ import {
   createLayer,
   createProject,
   IDENTITY_TRANSFORM,
+  type OutputScope,
   type SceneObject,
 } from '../../core/scene';
 import { emitGcode } from './emit-gcode';
@@ -106,6 +107,25 @@ describe('emitGcode', () => {
     expect(gcode).toBe('');
   });
 
+  it('emits only selected artwork when Cut Selected Graphics is enabled', () => {
+    const base = createProject();
+    const project = {
+      ...base,
+      scene: {
+        layers: [createLayer({ id: 'L1', color: '#ff0000' })],
+        objects: [lineObject('A', 10), lineObject('B', 120)],
+      },
+    };
+
+    const { gcode, preflight } = emitGcode(project, {
+      outputScope: selectedScope(['B']),
+    });
+
+    expect(preflight.ok).toBe(true);
+    expect(gcode).toContain('X120');
+    expect(gcode).not.toContain('X10');
+  });
+
   it('returns a failing preflight when the project has no output layers', () => {
     const project = createProject();
     const { preflight } = emitGcode(project);
@@ -113,3 +133,35 @@ describe('emitGcode', () => {
     expect(preflight.issues.some((i) => i.code === 'no-output-layer')).toBe(true);
   });
 });
+
+function lineObject(id: string, x: number): SceneObject {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: x, minY: 0, maxX: x + 10, maxY: 0 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            points: [
+              { x, y: 0 },
+              { x: x + 10, y: 0 },
+            ],
+            closed: false,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
+  return {
+    cutSelectedGraphics: true,
+    useSelectionOrigin: false,
+    selectedObjectIds,
+  };
+}

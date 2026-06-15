@@ -9,6 +9,7 @@ import {
   type Layer,
   type Project,
   type SceneObject,
+  type OutputScope,
   type Vec2,
 } from '../../core/scene';
 import {
@@ -92,16 +93,16 @@ export function drawPreview(
 
 export function buildPreviewToolpath(
   project: Project,
-  options: { readonly jobOrigin?: JobOriginPlacement } = {},
+  options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope } = {},
 ): Toolpath {
   // Use the SAME prepared job (compile + optimize) as Save/Start so the preview
   // shows the exact path ORDER the machine runs (roadmap P1-C). An over-budget
   // raster prepares to nothing -> empty preview (matching the too-large
   // estimate), never a freeze.
-  const prepared = prepareOutput(
-    project,
-    options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin },
-  );
+  const prepared = prepareOutput(project, {
+    ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
+    ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
+  });
   if (!prepared.ok) return buildToolpath(EMPTY_JOB);
   // The prepared job is in machine/work coordinates; the canvas (ghost +
   // raster sim) draws in scene space. Map back so the overlay registers with

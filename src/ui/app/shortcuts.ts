@@ -8,7 +8,13 @@
 //   * View: P (preview toggle)
 
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
-import type { Project, SceneObject, SelectionFlipAxis, Transform } from '../../core/scene';
+import type {
+  OutputScope,
+  Project,
+  SceneObject,
+  SelectionFlipAxis,
+  Transform,
+} from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
 import type { ImportOutcome } from '../state/store';
@@ -34,6 +40,7 @@ export type FileCtx = {
   readonly newProject: () => void;
   readonly savedName: string | null;
   readonly jobPlacement: JobPlacementSettings;
+  readonly outputScope: OutputScope;
   readonly machine: MachinePlacementSnapshot;
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly lastSaveTarget: SaveTarget | null;
@@ -158,6 +165,7 @@ export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
       project: ctx.project,
       savedName: ctx.savedName,
       jobPlacement: ctx.jobPlacement,
+      outputScope: ctx.outputScope,
       machine: ctx.machine,
       controllerSettings: ctx.controllerSettings,
       pushToast: ctx.pushToast,

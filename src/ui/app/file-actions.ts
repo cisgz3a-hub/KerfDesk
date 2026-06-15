@@ -5,7 +5,7 @@
 // anywhere.
 
 import { runControllerReadiness, type ControllerSettingsSnapshot } from '../../core/preflight';
-import type { Project, SceneObject } from '../../core/scene';
+import type { OutputScope, Project, SceneObject } from '../../core/scene';
 import { emitGcode } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
 import { deserializeProject, serializeProject } from '../../io/project';
@@ -20,6 +20,7 @@ import {
   resolveJobPlacement,
   type JobPlacementSettings,
   type MachinePlacementSnapshot,
+  type ResolvedJobPlacement,
 } from '../job-placement';
 import {
   describeImportError,
@@ -78,6 +79,7 @@ export type SaveGcodeCtx = {
   readonly project: Project;
   readonly savedName: string | null;
   readonly jobPlacement?: JobPlacementSettings;
+  readonly outputScope?: OutputScope;
   readonly machine?: MachinePlacementSnapshot;
   // null = never connected this session; a snapshot = run the $30/$32
   // comparison before saving (M11). Omitted = caller doesn't track it.
@@ -100,13 +102,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
-  const { gcode, preflight } = emitGcode(ctx.project, {
-    metadata: buildGcodeMetadata(),
-    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
-    ...(placement.preflightMotionOffset === undefined
-      ? {}
-      : { preflightMotionOffset: placement.preflightMotionOffset }),
-  });
+  const { gcode, preflight } = emitSaveGcode(ctx, placement);
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
@@ -143,6 +139,20 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
   }
+}
+
+function emitSaveGcode(
+  ctx: SaveGcodeCtx,
+  placement: Extract<ResolvedJobPlacement, { ok: true }>,
+): ReturnType<typeof emitGcode> {
+  return emitGcode(ctx.project, {
+    metadata: buildGcodeMetadata(),
+    ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+    ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
+    ...(placement.preflightMotionOffset === undefined
+      ? {}
+      : { preflightMotionOffset: placement.preflightMotionOffset }),
+  });
 }
 
 // M11 (AUDIT-2026-06-10): the $30 power-scale check used to protect only the

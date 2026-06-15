@@ -2,8 +2,11 @@ import { estimateJobDuration, formatDuration, type Job } from '../../core/job';
 import {
   applyTransform,
   isClosedEnough,
+  DEFAULT_OUTPUT_SCOPE,
+  validateOutputScope,
   type ColoredPath,
   type Layer,
+  type OutputScope,
   type Project,
   type Scene,
   type SceneObject,
@@ -21,26 +24,33 @@ export type LiveJobEstimate =
   | { readonly kind: 'estimated'; readonly label: string }
   | { readonly kind: 'too-large' };
 
-export function estimateLiveJob(project: Project): LiveJobEstimate {
+export function estimateLiveJob(
+  project: Project,
+  outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
+): LiveJobEstimate {
+  const scoped = validateOutputScope(project.scene, outputScope);
+  if (!scoped.ok) return { kind: 'empty' };
+  const outputProject =
+    scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
   // Cheap vector pre-counts gate the compile so a huge trace never reaches it.
-  if (countOutputVectorSegments(project.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
+  if (countOutputVectorSegments(outputProject.scene) > LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
-  if (countEstimatedFillSegments(project.scene) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
+  if (countEstimatedFillSegments(outputProject.scene) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
 
   // Same prepared job (budget guard + compile + optimize) as Save / Start /
   // Preview, so the ETA times the exact path the machine runs (roadmap P1-C). A
   // raster over the pixel budget prepares to nothing -> too-large (roadmap P1-A).
-  const prepared = prepareOutput(project);
+  const prepared = prepareOutput(project, { outputScope });
   if (!prepared.ok) return { kind: 'too-large' };
   if (prepared.job.groups.length === 0) return { kind: 'empty' };
   if (countCompiledCutSegments(prepared.job) > LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET) {
     return { kind: 'too-large' };
   }
 
-  const result = estimateJobDuration(prepared.job, project.device);
+  const result = estimateJobDuration(prepared.job, prepared.project.device);
   return result.totalSeconds > 0
     ? { kind: 'estimated', label: formatDuration(result.totalSeconds) }
     : { kind: 'empty' };

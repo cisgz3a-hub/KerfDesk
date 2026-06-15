@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createLayer, createProject, IDENTITY_TRANSFORM, type Project } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  IDENTITY_TRANSFORM,
+  type OutputScope,
+  type Project,
+  type SceneObject,
+} from '../../core/scene';
 import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
 import {
   handleImportSvg,
@@ -56,6 +63,49 @@ function projectWithLine(): Project {
         },
       ],
     },
+  };
+}
+
+function projectWithTwoLines(): Project {
+  const project = createProject();
+  return {
+    ...project,
+    scene: {
+      layers: [createLayer({ id: '#000000', color: '#000000', mode: 'line' })],
+      objects: [lineObject('A', 10), lineObject('B', 120)],
+    },
+  };
+}
+
+function lineObject(id: string, x: number): SceneObject {
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: x, minY: 0, maxX: x + 10, maxY: 0 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x, y: 0 },
+              { x: x + 10, y: 0 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
+  return {
+    cutSelectedGraphics: true,
+    useSelectionOrigin: false,
+    selectedObjectIds,
   };
 }
 
@@ -228,6 +278,29 @@ describe('file actions contextual failure handling', () => {
     expect(
       toast.messages.some((m) => m.message.includes('not verified against a connected controller')),
     ).toBe(true);
+  });
+
+  it('saves only selected artwork when Cut Selected Graphics is enabled', async () => {
+    const written: string[] = [];
+    const target: SaveTarget = {
+      displayName: 'selected.gcode',
+      write: async (text: string) => {
+        written.push(text);
+      },
+    };
+    const toast = toasts();
+
+    await handleSaveGcode({
+      platform: mockPlatform({ save: async () => target }),
+      project: projectWithTwoLines(),
+      savedName: null,
+      outputScope: selectedScope(['B']),
+      pushToast: toast.pushToast,
+    });
+
+    expect(written).toHaveLength(1);
+    expect(written[0]).toContain('X120');
+    expect(written[0]).not.toContain('X10');
   });
 
   // H12 (AUDIT-2026-06-10): job-intent warnings (luma upsample, uncalibrated

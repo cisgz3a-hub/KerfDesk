@@ -11,7 +11,7 @@ import {
 } from '../../core/job';
 import { prepareOutput } from '../../io/gcode';
 import { resolveJobPlacement } from '../job-placement';
-import { useStore } from '../state';
+import { currentOutputScope, useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { JobPlacementControls } from './JobPlacementControls';
@@ -286,7 +286,9 @@ function useFrameAction(): () => void {
   return () => {
     // Click-only consumer: read project/placement at call time instead of
     // subscribing — a render-per-mousemove for a button handler (H16).
-    const { project, jobPlacement } = useStore.getState();
+    const app = useStore.getState();
+    const { project, jobPlacement } = app;
+    const outputScope = currentOutputScope(app);
     const placement = resolveJobPlacement(jobPlacement, {
       statusReport,
       workOriginActive,
@@ -296,10 +298,10 @@ function useFrameAction(): () => void {
       pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
       return;
     }
-    const prepared = prepareOutput(
-      project,
-      placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
-    );
+    const prepared = prepareOutput(project, {
+      ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+      outputScope,
+    });
     if (!prepared.ok) {
       pushToast(
         prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',

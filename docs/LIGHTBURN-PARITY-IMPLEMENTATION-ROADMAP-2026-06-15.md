@@ -628,6 +628,8 @@ Definition of done:
 3. Lane 2: GRBL Console.
 4. Lane 3: read-only Machine Settings plus backup.
 5. Lane 4: selected-output and positioning parity.
+   - Implemented first slice: Cut Selected Graphics and Use Selection Origin now share the same Preview, Frame, Start, Save G-code, and estimate output scope.
+   - Deferred from Lane 4: Position Laser, Move Laser to Selection, and node-level Set Start Point because they physically move the head and require separate hardware verification.
 6. Lane 5: preview parity and estimates.
 7. Lane 6: full GRBL Cut Settings Editor.
 8. Lane 7: raster calibration and burn-quality diagnostics.

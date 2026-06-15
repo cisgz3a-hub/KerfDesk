@@ -7,7 +7,7 @@ import {
   handleSaveGcode,
   handleSaveProject,
 } from '../app/file-actions';
-import { useStore } from '../state';
+import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -68,6 +68,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
         project: app.project,
         savedName: app.savedName,
         jobPlacement: app.jobPlacement,
+        outputScope: currentOutputScope(app),
         machine,
         controllerSettings: laser.controllerSettings,
         pushToast,

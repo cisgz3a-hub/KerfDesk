@@ -19,7 +19,9 @@ export type ControlHelpKey =
   | 'laser.machine-settings'
   | 'laser.machine-settings.read'
   | 'laser.machine-settings.export'
-  | 'laser.machine-settings.table';
+  | 'laser.machine-settings.table'
+  | 'laser.output-scope.cut-selected'
+  | 'laser.output-scope.selection-origin';
 export type ControlHelpId = `control:${string}`;
 export type HelpTopicId = CommandHelpId | MenuHelpId | ToolHelpId | ControlHelpId;
 
@@ -306,6 +308,16 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-settings.table': {
     label: 'Machine settings table',
     tooltip: 'Review each reported GRBL setting value, unit, and meaning without editing firmware.',
+  },
+  'laser.output-scope.cut-selected': {
+    label: 'Cut Selected Graphics',
+    tooltip:
+      'Output only the currently selected artwork for preview, frame, start, and G-code export.',
+  },
+  'laser.output-scope.selection-origin': {
+    label: 'Use Selection Origin',
+    tooltip:
+      'Calculate job origin from the selected artwork instead of the whole workspace design.',
   },
 };
 

@@ -5,6 +5,7 @@ import {
   createProject,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
+  type OutputScope,
   type Project,
   type RasterImage,
   type TracedImage,
@@ -147,6 +148,13 @@ describe('live job estimate', () => {
     expect(estimateLiveJob(hugeRasterProject())).toEqual({ kind: 'too-large' });
   });
 
+  it('ignores unselected over-budget raster work when estimating selected-only output', () => {
+    expect(
+      estimateLiveJob(selectedLineWithHugeUnselectedRasterProject(), selectedScope(['line-1']))
+        .kind,
+    ).toBe('estimated');
+  });
+
   it('skips dense fill jobs even when their raw vector count is small', () => {
     const project = denseFillProject();
 
@@ -156,3 +164,51 @@ describe('live job estimate', () => {
     expect(estimateLiveJob(project)).toEqual({ kind: 'too-large' });
   });
 });
+
+function selectedLineWithHugeUnselectedRasterProject(): Project {
+  const raster = hugeRasterProject().scene.objects[0];
+  if (raster === undefined) throw new Error('expected huge raster');
+  const project = createProject();
+  return {
+    ...project,
+    scene: {
+      layers: [
+        createLayer({ id: '#000000', color: '#000000', mode: 'line' }),
+        { ...createLayer({ id: '#808080', color: '#808080', mode: 'image' }), linesPerMm: 25 },
+      ],
+      objects: [lineObject(), raster],
+    },
+  };
+}
+
+function lineObject(): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id: 'line-1',
+    source: 'line.svg',
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 0, y: 0 },
+              { x: 10, y: 0 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function selectedScope(selectedObjectIds: ReadonlyArray<string>): OutputScope {
+  return {
+    cutSelectedGraphics: true,
+    useSelectionOrigin: false,
+    selectedObjectIds,
+  };
+}

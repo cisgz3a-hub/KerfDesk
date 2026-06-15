@@ -10,6 +10,7 @@ import {
   type Layer,
   type LayerMoveDirection,
   moveLayer as moveSceneLayer,
+  type OutputScope,
   type Project,
   type RasterImage,
   type Scene,
@@ -59,6 +60,16 @@ export type { ImportOutcome } from './scene-mutations';
 
 const HISTORY_DEPTH = 50;
 
+export type OutputScopeSettings = {
+  readonly cutSelectedGraphics: boolean;
+  readonly useSelectionOrigin: boolean;
+};
+
+export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
+  cutSelectedGraphics: false,
+  useSelectionOrigin: false,
+};
+
 export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
   SelectionTransformActions &
@@ -82,6 +93,7 @@ export type AppState = ObjectPropertiesActions &
     // only the StatusBar subscribes to it, so re-render fan-out is bounded.
     readonly cursorMm: Vec2 | null;
     readonly jobPlacement: JobPlacementSettings;
+    readonly outputScopeSettings: OutputScopeSettings;
     // F-A11 dirty / save tracking. `dirty` flips true on every mutating
     // action; flips false on a successful save. `savedName` is the file the
     // project was last saved as — drives the window title. `lastSaveTarget`
@@ -151,6 +163,7 @@ export type AppState = ObjectPropertiesActions &
     readonly selectObjectsOnLayer: (layerId: string) => void;
     readonly togglePreview: () => void;
     readonly setJobPlacement: (patch: Partial<JobPlacementSettings>) => void;
+    readonly setOutputScopeSettings: (patch: Partial<OutputScopeSettings>) => void;
     readonly setCursorMm: (cursor: Vec2 | null) => void;
 
     readonly beginInteraction: () => void;
@@ -177,6 +190,7 @@ function initialState(): Pick<
   | 'pendingUndo'
   | 'cursorMm'
   | 'jobPlacement'
+  | 'outputScopeSettings'
   | 'dirty'
   | 'savedName'
   | 'lastSaveTarget'
@@ -193,6 +207,7 @@ function initialState(): Pick<
     pendingUndo: null,
     cursorMm: null,
     jobPlacement: DEFAULT_JOB_PLACEMENT,
+    outputScopeSettings: DEFAULT_OUTPUT_SCOPE_SETTINGS,
     // Fresh project is clean — no edits have happened, no name on disk.
     dirty: false,
     savedName: null,
@@ -312,6 +327,7 @@ function viewActions(
   | 'selectAllObjects'
   | 'togglePreview'
   | 'setJobPlacement'
+  | 'setOutputScopeSettings'
   | 'setCursorMm'
 > {
   return {
@@ -359,7 +375,28 @@ function viewActions(
           ...patch,
         },
       })),
+    setOutputScopeSettings: (patch) =>
+      set((s) => {
+        const next = { ...s.outputScopeSettings, ...patch };
+        return {
+          outputScopeSettings: {
+            ...next,
+            useSelectionOrigin: next.cutSelectedGraphics ? next.useSelectionOrigin : false,
+          },
+        };
+      }),
     setCursorMm: (cursor) => set({ cursorMm: cursor }),
+  };
+}
+
+export function currentOutputScope(state: AppState): OutputScope {
+  return {
+    cutSelectedGraphics: state.outputScopeSettings.cutSelectedGraphics,
+    useSelectionOrigin: state.outputScopeSettings.useSelectionOrigin,
+    selectedObjectIds: [
+      ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
+      ...state.additionalSelectedIds,
+    ],
   };
 }
 
