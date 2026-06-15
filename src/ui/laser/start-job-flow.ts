@@ -9,13 +9,14 @@
 // startJob-failed alert in the catch arm can fire after streaming began,
 // and a native dialog there would freeze the ack pump and Stop button.
 
-import { useStore } from '../state';
+import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 import { prepareStartJob } from './start-job-readiness';
 
 export async function runStartJobFlow(): Promise<void> {
-  const { project, jobPlacement } = useStore.getState();
+  const app = useStore.getState();
+  const { project, jobPlacement } = app;
   const laser = useLaserStore.getState();
   const prepared = prepareStartJob(
     project,
@@ -31,6 +32,7 @@ export async function runStartJobFlow(): Promise<void> {
       wcoCache: laser.wcoCache,
     },
     jobPlacement,
+    currentOutputScope(app),
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');

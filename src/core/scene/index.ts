@@ -65,6 +65,12 @@ export type {
 } from './selection-distribute';
 export { buildSelectionDistributeEdit } from './selection-distribute';
 export { isClosedEnough } from './polyline-closure';
+export type { OutputScope, OutputScopeValidation } from './output-scope';
+export {
+  DEFAULT_OUTPUT_SCOPE,
+  filterSceneForOutputScope,
+  validateOutputScope,
+} from './output-scope';
 export type { AABB } from './hit-test';
 export { combinedBBox, hitTest, transformedBBox } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';

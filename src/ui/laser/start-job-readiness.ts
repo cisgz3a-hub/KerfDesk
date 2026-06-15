@@ -2,7 +2,12 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import { computeJobBounds, describeFramePreflightFailure, framePreflight } from '../../core/job';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
-import type { Project } from '../../core/scene';
+import {
+  DEFAULT_OUTPUT_SCOPE,
+  validateOutputScope,
+  type OutputScope,
+  type Project,
+} from '../../core/scene';
 import { emitGcode, prepareOutput } from '../../io/gcode';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import {
@@ -43,23 +48,23 @@ export function prepareStartJob(
   controllerSettings: ControllerSettingsSnapshot | null,
   machine: MachineStartSnapshot,
   jobPlacement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
+  outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
 ): StartJobPreparation {
   const machineIssues = findMachineStartIssues(machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
 
   const placement = resolveJobPlacement(jobPlacement, machine);
   if (!placement.ok) return { ok: false, messages: placement.messages };
-  const preEmit = runPreEmitPreflight(project);
-  if (!preEmit.ok) {
-    return { ok: false, messages: preEmit.issues.map((i) => i.message) };
-  }
-  const originBoundsIssue = findPlacementBoundsIssue(project, placement);
+  const preEmitIssues = findScopedPreEmitIssues(project, outputScope);
+  if (preEmitIssues.length > 0) return { ok: false, messages: preEmitIssues };
+  const originBoundsIssue = findPlacementBoundsIssue(project, placement, outputScope);
   if (originBoundsIssue !== null) {
     return { ok: false, messages: [originBoundsIssue] };
   }
 
   const { gcode, preflight } = emitGcode(project, {
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+    outputScope,
     ...(placement.preflightMotionOffset === undefined
       ? {}
       : { preflightMotionOffset: placement.preflightMotionOffset }),
@@ -80,14 +85,27 @@ export function prepareStartJob(
   };
 }
 
+function findScopedPreEmitIssues(
+  project: Project,
+  outputScope: OutputScope,
+): ReadonlyArray<string> {
+  const scoped = validateOutputScope(project.scene, outputScope);
+  if (!scoped.ok) return scoped.messages;
+  const outputProject =
+    scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
+  const preEmit = runPreEmitPreflight(outputProject);
+  return preEmit.ok ? [] : preEmit.issues.map((issue) => issue.message);
+}
+
 function findPlacementBoundsIssue(
   project: Project,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
+  outputScope: OutputScope,
 ): string | null {
   if (placement.jobOrigin === undefined || placement.preflightMotionOffset === undefined) {
     return null;
   }
-  const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin });
+  const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
   if (!prepared.ok) return null;
   const bounds = computeJobBounds(prepared.job);
   if (bounds === null) return null;

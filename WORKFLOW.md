@@ -718,6 +718,30 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 3. No Load-from-backup button.
 4. No `$RST`, startup block, manufacturer, or axis calibration workflow.
 
+### F-B15. Cut Selected Graphics and Selection Origin
+
+#### Success - output only selected artwork
+1. The Laser panel shows **Cut selected** near Start From / Job Origin.
+2. User selects one or more objects and enables **Cut selected**.
+3. Preview, live estimate, Frame, Start job, and Save G-code all compile the same selected-only output scope.
+4. Source scene geometry is not moved or deleted.
+5. If selected-only output is enabled with no current selection, output generation returns a clear blocker instead of silently burning the full design.
+
+#### Success - Use Selection Origin
+1. **Selection origin** is enabled only when **Cut selected** is on and Start From is not Absolute Coordinates.
+2. When enabled, job-origin math uses the selected artwork bounds.
+3. When disabled, job-origin math uses the full output design bounds, while still emitting only the selected artwork.
+4. This matches LightBurn's separation between cutting selected graphics and using the selected graphics as the origin reference.
+
+#### Error - Absolute Coordinates
+1. **Selection origin** is disabled in Absolute Coordinates.
+2. Tooltip explains that selection origin is not used in Absolute Coordinates.
+
+#### Explicit non-goals for this lane
+1. No Position Laser physical move.
+2. No Move Laser to Selection physical move.
+3. No Set Start Point or node-level start ordering.
+
 ---
 
 ## Phase C flows — STUB

@@ -10,30 +10,38 @@
 
 import { useEffect, useState } from 'react';
 import type { Project } from '../../core/scene';
-import { useStore } from '../state';
+import { currentOutputScope, useStore } from '../state';
 import { estimateLiveJob, type LiveJobEstimate } from './live-job-estimate';
 
 export const JOB_ESTIMATE_DEBOUNCE_MS = 250;
 
 type Settled = {
   readonly project: Project;
+  readonly outputScopeKey: string;
   readonly estimate: LiveJobEstimate;
 };
 
 export function useJobEstimate(): LiveJobEstimate {
   const project = useStore((s) => s.project);
+  const outputScope = useStore((s) => currentOutputScope(s));
+  const outputScopeKey = JSON.stringify(outputScope);
   // First render computes synchronously so the badge is present on load;
   // later project mutations re-estimate only after a quiet period.
   const [settled, setSettled] = useState<Settled>(() => ({
     project,
-    estimate: estimateLiveJob(project),
+    outputScopeKey,
+    estimate: estimateLiveJob(project, outputScope),
   }));
   useEffect(() => {
-    if (settled.project === project) return undefined;
+    if (settled.project === project && settled.outputScopeKey === outputScopeKey) return undefined;
     const handle = setTimeout(() => {
-      setSettled({ project, estimate: estimateLiveJob(project) });
+      setSettled({
+        project,
+        outputScopeKey,
+        estimate: estimateLiveJob(project, outputScope),
+      });
     }, JOB_ESTIMATE_DEBOUNCE_MS);
     return () => clearTimeout(handle);
-  }, [project, settled.project]);
+  }, [project, outputScope, outputScopeKey, settled.project, settled.outputScopeKey]);
   return settled.estimate;
 }

@@ -9,7 +9,7 @@
 // guard themselves (modifier checks, isEditableTarget, kind-of-event).
 
 import { useEffect } from 'react';
-import { useStore } from '../state';
+import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { isModalOpen, useUiStore } from '../state/ui-store';
@@ -32,6 +32,7 @@ function useFileEditShortcuts(): void {
   const platform = usePlatform();
   const project = useStore((s) => s.project);
   const jobPlacement = useStore((s) => s.jobPlacement);
+  const outputScope = useStore((s) => currentOutputScope(s));
   const importSvgObject = useStore((s) => s.importSvgObject);
   const setProject = useStore((s) => s.setProject);
   const newProject = useStore((s) => s.newProject);
@@ -64,7 +65,7 @@ function useFileEditShortcuts(): void {
       const confirmDiscard = (action: string): Promise<boolean> =>
         confirmDiscardAsync(platform, action);
       // prettier-ignore
-      const fileCtx = { platform, project, jobPlacement, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
+      const fileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
       const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, removeSceneObjects, selectObject, selectAllObjects, duplicateSelection, resetToolMode };
       if (handleFileShortcut(e, fileCtx)) return;
@@ -80,6 +81,7 @@ function useFileEditShortcuts(): void {
     platform,
     project,
     jobPlacement,
+    outputScope,
     importSvgObject,
     setProject,
     newProject,

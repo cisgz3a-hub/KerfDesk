@@ -1,2 +1,2 @@
-export type { AppState } from './store';
-export { useStore } from './store';
+export type { AppState, OutputScopeSettings } from './store';
+export { DEFAULT_OUTPUT_SCOPE_SETTINGS, currentOutputScope, useStore } from './store';
