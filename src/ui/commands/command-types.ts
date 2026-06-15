@@ -4,6 +4,7 @@
 // command-families -> command-types stays acyclic (import/no-cycle).
 
 import type { SelectionAlignKind, SelectionDistributeKind } from '../../core/scene';
+import { commandHelpId, commandTitle, controlHelp } from '../help/help-topics';
 
 export const COMMAND_FAMILY_ORDER = [
   'file',
@@ -133,7 +134,15 @@ export function enabled(
   invoke: () => void,
   shortcut?: string,
 ): AppCommand {
-  return { id, family, label, title, enabled: true, invoke, ...(shortcut ? { shortcut } : {}) };
+  return {
+    id,
+    family,
+    label,
+    title: commandTitle(id, title),
+    enabled: true,
+    invoke,
+    ...(shortcut ? { shortcut } : {}),
+  };
 }
 
 export function disabled(
@@ -148,7 +157,7 @@ export function disabled(
     id,
     family,
     label,
-    title: reason,
+    title: controlHelp(commandHelpId(id), reason),
     enabled: false,
     disabledReason: reason,
     invoke,

@@ -35,6 +35,7 @@ export function JobPlacementControls(props: {
           aria-label="Start from"
           value={placement.startFrom}
           disabled={busy}
+          title="Choose whether the job uses absolute machine coordinates, current head position, or the saved user origin."
           onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
         >
           {Object.entries(START_FROM_LABELS).map(([value, label]) => (

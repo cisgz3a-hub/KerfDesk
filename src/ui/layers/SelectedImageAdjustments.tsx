@@ -76,6 +76,7 @@ function AdjustmentInput(props: {
         onBlur={debounced.onBlur}
         style={inputStyle}
         aria-label={`${props.label} for ${props.image.source}`}
+        title={`Adjust ${props.label.toLowerCase()} for the selected image.`}
       />
     </label>
   );

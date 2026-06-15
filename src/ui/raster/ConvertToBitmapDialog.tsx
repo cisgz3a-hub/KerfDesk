@@ -90,6 +90,7 @@ function RenderTypeField(): JSX.Element {
         className="lf-select"
         style={selectStyle}
         aria-label="Convert render type"
+        title="Choose how vector artwork is drawn before it is rasterized into pixels."
         autoFocus
       >
         <option value="fill-all">Fill All</option>
@@ -114,6 +115,7 @@ function DpiField(props: { readonly dpi: number; readonly onChange: (dpi: number
         className="lf-input"
         style={numberStyle}
         aria-label="Convert DPI"
+        title="Bitmap resolution for the rasterized vector. Higher DPI creates more pixels."
       />
     </Field>
   );

@@ -27,6 +27,7 @@ export function AddLayerControls(): JSX.Element {
         type="color"
         defaultValue={DEFAULT_NEW_LAYER_COLOR}
         aria-label="New layer color"
+        title="Choose the color for a new cut layer."
         style={colorInputStyle}
       />
       <button type="submit" aria-label="Add layer" title="Create a new cut layer using this color.">

@@ -45,6 +45,7 @@ function PowerScaleInput(props: { readonly objects: ReadonlyArray<SceneObject> }
           onChange={debounced.onChange}
           onBlur={debounced.onBlur}
           aria-label="Power scale for selected objects"
+          title="Scale laser power for the selected object or objects without changing the layer setting."
           style={inputStyle}
         />
         <span style={unitStyle}>%</span>

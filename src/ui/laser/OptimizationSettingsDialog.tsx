@@ -25,6 +25,7 @@ export function OptimizationSettingsDialog(props: {
           type="checkbox"
           className="lf-checkbox"
           checked={reduceTravelMoves}
+          title="Reorder cuts inside each layer to reduce non-cutting travel moves."
           onChange={(event) => setReduceTravelMoves(event.currentTarget.checked)}
         />
         <span>Reduce travel moves</span>

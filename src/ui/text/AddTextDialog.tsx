@@ -199,6 +199,8 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           rows={3}
           className="lf-input"
           style={textareaStyle}
+          aria-label="Text content"
+          title="Text content to render as editable vector paths."
           autoFocus
         />
       </Field>
@@ -214,6 +216,8 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           onChange={(e) => setSizeMm(Math.max(1, Number(e.target.value) || 0))}
           className="lf-input"
           style={numStyle}
+          aria-label="Text size"
+          title="Text height in millimeters."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
@@ -230,6 +234,8 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           onChange={(e) => setLineHeight(Math.max(0.5, Number(e.target.value) || 1))}
           className="lf-input"
           style={numStyle}
+          aria-label="Text line height"
+          title="Vertical distance between text lines, relative to text size."
         />
         <span className="lf-field-unit">× size</span>
       </Field>
@@ -243,6 +249,7 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           onChange={(e) => setLetterSpacing(Number(e.target.value) || 0)}
           className="lf-input"
           style={numStyle}
+          aria-label="Text letter spacing"
           title="Letter spacing (tracking). 0 = font's natural spacing. Positive widens, negative tightens."
         />
         <span className="lf-field-unit">× size (0 = natural)</span>
@@ -306,6 +313,7 @@ function AlignmentRadio(props: {
             name="text-alignment"
             value={a}
             checked={props.value === a}
+            title={`Align text ${a}.`}
             onChange={() => props.onChange(a)}
           />
           {a}

@@ -25,6 +25,7 @@ export function CutSettingsImageFields(props: {
           value={props.dither}
           onChange={(event) => props.onDitherChange(parseDither(event.target.value))}
           aria-label="Cut settings dither"
+          title="Choose how image brightness is converted into laser dots or grayscale power."
         >
           {DITHER_ALGORITHMS.map((algorithm) => (
             <option key={algorithm} value={algorithm}>
@@ -65,6 +66,7 @@ export function CutSettingsImageFields(props: {
           type="checkbox"
           className="lf-checkbox"
           defaultChecked={props.layer.negativeImage}
+          title="Invert image brightness before engraving this layer."
         />
       </Field>
       <Field label="Pass-through">
@@ -73,6 +75,7 @@ export function CutSettingsImageFields(props: {
           type="checkbox"
           className="lf-checkbox"
           defaultChecked={props.layer.passThrough}
+          title="Use the image pixels as-is and skip LaserForge image processing."
         />
       </Field>
     </fieldset>
@@ -99,6 +102,7 @@ function ImageDensityFields(props: {
           }
           style={numberStyle}
           aria-label="Cut settings line interval"
+          title="Distance between raster scan lines. Smaller values engrave denser images."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
@@ -114,6 +118,7 @@ function ImageDensityFields(props: {
           onChange={(event) => props.onChange(dpiToLinesPerMm(numericValue(event.target.value)))}
           style={numberStyle}
           aria-label="Cut settings DPI"
+          title="Image engraving resolution in dots per inch. Higher values create more scan lines."
         />
         <span className="lf-field-unit">dpi</span>
       </Field>
@@ -140,6 +145,7 @@ function NumberInput(props: {
       defaultValue={props.value}
       style={numberStyle}
       aria-label={`Cut settings ${props.label ?? props.name}`}
+      title={`Set image cut setting ${props.label ?? props.name}.`}
     />
   );
 }

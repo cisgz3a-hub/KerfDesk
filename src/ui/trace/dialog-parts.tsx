@@ -22,6 +22,8 @@ export function PresetPicker(props: {
         onChange={(e) => props.onChange(e.target.value)}
         className="lf-select"
         style={selectStyle}
+        aria-label="Trace preset"
+        title="Choose a trace preset tuned for line art, smooth logos, centerlines, or sharp detail."
       >
         {Object.keys(TRACE_PRESETS).map((key) => (
           <option key={key} value={key}>
@@ -56,6 +58,7 @@ export function DeleteImageAfterTraceToggle(props: {
         type="checkbox"
         className="lf-checkbox"
         checked={props.checked}
+        title="Remove the source bitmap from the workspace after creating traced vectors."
         onChange={(e) => props.onChange(e.target.checked)}
       />
       <span>Delete Image After trace</span>

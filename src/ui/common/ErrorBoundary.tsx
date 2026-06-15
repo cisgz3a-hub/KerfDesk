@@ -100,6 +100,7 @@ function CrashScreen(props: {
           readOnly
           value={blob}
           aria-label="Crash diagnostic — select and copy manually"
+          title="Crash diagnostic text. Select and copy it manually if clipboard access failed."
           style={fallbackStyle}
           onFocus={(event) => event.currentTarget.select()}
         />

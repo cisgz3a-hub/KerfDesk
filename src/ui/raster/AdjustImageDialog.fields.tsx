@@ -198,6 +198,8 @@ function NumberField(props: {
         onChange={(event) => props.onChange(numberValue(event.target.value, props.min, props.max))}
         className="lf-input"
         style={styles.inputStyle}
+        aria-label={`Adjust image ${props.label}`}
+        title={numberFieldTitle(props.name, props.label)}
       />
       {props.unit === undefined ? null : <span className="lf-field-unit">{props.unit}</span>}
     </label>
@@ -217,6 +219,8 @@ function SelectField(props: {
         onChange={(event) => props.onChange(parseDither(event.target.value))}
         className="lf-select"
         style={styles.inputStyle}
+        aria-label="Adjust image dither"
+        title="Choose how image brightness is converted into laser dots or grayscale power."
       >
         {DITHER_ALGORITHMS.map((algorithm) => (
           <option key={algorithm} value={algorithm}>
@@ -242,6 +246,7 @@ function CheckboxField(props: {
         type="checkbox"
         className="lf-checkbox"
         checked={props.checked}
+        title={checkboxFieldTitle(props.name, props.label)}
         onChange={(event) => props.onChange(event.target.checked)}
       />
     </label>
@@ -250,4 +255,32 @@ function CheckboxField(props: {
 
 function displayNumber(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));
+}
+
+function numberFieldTitle(name: string, label: string): string {
+  switch (name) {
+    case 'lineIntervalMm':
+      return 'Distance between raster scan lines. Smaller values engrave denser images.';
+    case 'imageDpi':
+      return 'Image engraving resolution in dots per inch.';
+    case 'dotWidthCorrectionMm':
+      return 'Compensate for physical laser dot width when raster engraving.';
+    case 'minPower':
+      return 'Lowest laser power used by grayscale image engraving.';
+    default:
+      return `Adjust image ${label.toLowerCase()}.`;
+  }
+}
+
+function checkboxFieldTitle(name: string, label: string): string {
+  switch (name) {
+    case 'negativeImage':
+      return 'Invert image brightness before engraving.';
+    case 'passThrough':
+      return 'Use image pixels as-is and skip LaserForge image processing.';
+    case 'invertDisplay':
+      return 'Invert only the dialog preview display for inspection.';
+    default:
+      return `Toggle ${label.toLowerCase()} for image adjustment.`;
+  }
 }

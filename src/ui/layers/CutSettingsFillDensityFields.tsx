@@ -9,6 +9,7 @@ export function CutSettingsFillDensityFields(props: {
         name="hatchSpacingMm"
         value={displayNumber(props.lineIntervalMm, 4)}
         readOnly
+        title="Hidden synchronized fill line interval value used when saving cut settings."
       />
       <Field label="Line Interval">
         <input
@@ -23,6 +24,7 @@ export function CutSettingsFillDensityFields(props: {
           }
           style={numberStyle}
           aria-label="Cut settings line interval"
+          title="Distance between fill scan lines. Smaller values engrave denser fills."
         />
         <span className="lf-field-unit">mm</span>
       </Field>
@@ -39,6 +41,7 @@ export function CutSettingsFillDensityFields(props: {
           }
           style={numberStyle}
           aria-label="Cut settings lines per inch"
+          title="Fill scan density in lines per inch. Higher values engrave denser fills."
         />
         <span className="lf-field-unit">lpi</span>
       </Field>

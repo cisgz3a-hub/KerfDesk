@@ -38,6 +38,8 @@ export function PresetField(props: {
         value={props.value}
         onChange={(event) => props.onChange(parseImagePresetId(event.target.value))}
         style={styles.inputStyle}
+        aria-label="Image adjustment preset"
+        title="Choose a built-in or saved image adjustment preset."
       >
         {BUILT_IN_IMAGE_PRESETS.map((preset) => (
           <option key={preset.id} value={preset.id}>

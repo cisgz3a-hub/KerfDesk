@@ -18,12 +18,15 @@ const ICON_PX: Readonly<Record<IconButtonSize, number>> = { sm: 12, md: 16, lg: 
 export function IconButton(props: {
   readonly icon: IconName;
   readonly label: string;
+  readonly title?: string;
+  readonly helpId?: string;
   readonly onClick: () => void;
   readonly disabled?: boolean;
   readonly size?: IconButtonSize;
   readonly pressed?: boolean;
 }): JSX.Element {
   const size = props.size ?? 'md';
+  const title = props.title ?? props.label;
   return (
     <button
       type="button"
@@ -31,7 +34,8 @@ export function IconButton(props: {
       onClick={props.onClick}
       disabled={props.disabled ?? false}
       aria-label={props.label}
-      title={props.label}
+      title={title}
+      {...(props.helpId === undefined ? {} : { 'data-help-id': props.helpId })}
       {...(props.pressed === undefined ? {} : { 'aria-pressed': props.pressed })}
     >
       <Icon name={props.icon} size={ICON_PX[size]} />

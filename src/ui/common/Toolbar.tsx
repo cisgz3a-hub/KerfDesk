@@ -2,6 +2,7 @@
 // registry so menu, toolbar, and future native-menu surfaces share handlers.
 
 import { runCommand, type AppCommand, type CommandId } from '../commands/command-registry';
+import { commandHelpId, controlHelp } from '../help/help-topics';
 
 export function Toolbar(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
   return (
@@ -57,12 +58,17 @@ function ToolbarGroup(props: {
 }
 
 function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
-  const title = props.command.disabledReason ?? toolbarTitle(props.command);
+  const helpId = commandHelpId(props.command.id);
+  const title =
+    props.command.disabledReason === undefined
+      ? toolbarTitle(props.command)
+      : controlHelp(helpId, props.command.disabledReason);
   return (
     <button
       type="button"
       className="lf-btn"
       title={title}
+      data-help-id={helpId}
       disabled={!props.command.enabled}
       {...(props.command.active === undefined ? {} : { 'aria-pressed': props.command.active })}
       onClick={() => {

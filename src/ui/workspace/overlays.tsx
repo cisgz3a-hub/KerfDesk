@@ -107,6 +107,7 @@ export function PreviewScrubber(): JSX.Element {
         value={scrubberT}
         onChange={(e) => setScrubberT(Number.parseFloat(e.target.value))}
         aria-label="Preview toolpath scrubber"
+        title="Scrub through the previewed machine toolpath."
         style={scrubberInputStyle}
       />
       <span style={scrubberLabelStyle}>{Math.round(scrubberT * 100)}%</span>

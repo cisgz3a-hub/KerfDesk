@@ -53,6 +53,8 @@ export function CommandShell(): JSX.Element {
         ref={imageInput}
         type="file"
         accept="image/png,image/jpeg"
+        aria-label="Import image file picker"
+        title="Choose a PNG or JPG image to import into the workspace."
         style={{ display: 'none' }}
         onChange={(event) => {
           const file = event.target.files?.[0];

@@ -240,6 +240,11 @@ function HeaderToggle(props: {
         checked={props.layer[props.field]}
         onChange={(e) => setLayerParam(props.layer.id, { [props.field]: e.target.checked })}
         aria-label={`${props.label} for ${props.layer.color}`}
+        title={
+          props.field === 'visible'
+            ? 'Show or hide this layer on the workspace without changing output.'
+            : 'Include or exclude this layer from preview, frame, export, and job output.'
+        }
       />
       {props.label}
     </label>
@@ -280,6 +285,7 @@ function BidirectionalInput({ layer }: { readonly layer: Layer }): JSX.Element {
       checked={layer.fillBidirectional}
       onChange={(e) => setLayerParam(layer.id, { fillBidirectional: e.target.checked })}
       aria-label={`Bidirectional fill for ${layer.color}`}
+      title="Scan alternating fill lines in both directions to reduce travel time."
     />
   );
 }
@@ -302,6 +308,7 @@ function HatchAngleInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Hatch angle for ${layer.color}`}
+      title="Fill scan angle in degrees for this layer."
     />
   );
 }
@@ -324,6 +331,7 @@ function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Hatch spacing for ${layer.color}`}
+      title="Distance between fill hatch lines. Smaller spacing engraves denser fills."
     />
   );
 }
@@ -346,6 +354,7 @@ function FillOverscanInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Fill overscan for ${layer.color}`}
+      title="Extra travel beyond fill edges so the laser reaches speed before firing."
     />
   );
 }
@@ -368,6 +377,7 @@ function PowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Power for ${layer.color}`}
+      title="Laser power percentage for this layer."
     />
   );
 }
@@ -390,6 +400,7 @@ function SpeedInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={wideInputStyle}
       aria-label={`Speed for ${layer.color}`}
+      title="Feed rate in millimeters per minute for this layer."
     />
   );
 }
@@ -411,6 +422,7 @@ function PassesInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Passes for ${layer.color}`}
+      title="Number of times this layer is repeated in the job."
     />
   );
 }

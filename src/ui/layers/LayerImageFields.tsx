@@ -141,6 +141,7 @@ function LineIntervalInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Line interval for ${layer.color}`}
+      title="Distance between raster scan lines for this image layer."
     />
   );
 }
@@ -168,6 +169,7 @@ function DpiInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`DPI for ${layer.color}`}
+      title="Raster engraving resolution for this image layer."
     />
   );
 }
@@ -189,6 +191,7 @@ function MinPowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Minimum power for ${layer.color}`}
+      title="Lowest laser power used by grayscale image engraving on this layer."
     />
   );
 }
@@ -212,6 +215,7 @@ function DotWidthCorrectionInput({ layer }: { readonly layer: Layer }): JSX.Elem
       onBlur={debounced.onBlur}
       style={inputStyle}
       aria-label={`Dot width correction for ${layer.color}`}
+      title="Compensate for physical laser dot width when raster engraving this layer."
     />
   );
 }
@@ -224,6 +228,7 @@ function NegativeImageCheckbox({ layer }: { readonly layer: Layer }): JSX.Elemen
       checked={layer.negativeImage}
       onChange={(event) => setLayerParam(layer.id, { negativeImage: event.target.checked })}
       aria-label={`Negative image for ${layer.color}`}
+      title="Invert image brightness before engraving this layer."
     />
   );
 }
@@ -236,6 +241,7 @@ function PassThroughCheckbox({ layer }: { readonly layer: Layer }): JSX.Element 
       checked={layer.passThrough}
       onChange={(event) => setLayerParam(layer.id, { passThrough: event.target.checked })}
       aria-label={`Pass-through image for ${layer.color}`}
+      title="Use image pixels as-is and skip LaserForge image adjustment for this layer."
     />
   );
 }

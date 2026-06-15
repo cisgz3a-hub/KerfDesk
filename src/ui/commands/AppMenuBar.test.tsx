@@ -97,6 +97,25 @@ describe('AppMenuBar', () => {
     }
   });
 
+  it('marks menu families and command items with stable help ids', async () => {
+    const { host, root } = await renderMenu(commands());
+    try {
+      expect(
+        host.querySelector('summary[data-help-id="menu:file"]')?.getAttribute('title'),
+      ).toContain('File menu');
+      expect(
+        host.querySelector('button[data-help-id="command:file.new"]')?.getAttribute('title'),
+      ).toContain('new blank project');
+      expect(
+        host
+          .querySelector('button[data-help-id="command:tools.trace-image"]')
+          ?.getAttribute('title'),
+      ).toContain('Select an image first.');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('keeps only one top menu family open at a time', async () => {
     const { host, root } = await renderMenu(commands());
     try {

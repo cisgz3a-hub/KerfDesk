@@ -34,6 +34,15 @@ afterEach(async () => {
 });
 
 describe('ToolStrip', () => {
+  it('uses help topics for drawing tool hover explanations', async () => {
+    const h = await render(<ToolStrip />);
+    const pen = h.querySelector('button[data-help-id="tool:polyline"]');
+
+    expect(pen?.getAttribute('aria-label')).toBe('Draw polyline');
+    expect(pen?.getAttribute('title')).toContain('Enter');
+    expect(pen?.getAttribute('title')).toContain('double-click');
+  });
+
   it('toggles an already-active draw tool back to Select mode', async () => {
     useUiStore.getState().setToolMode({ kind: 'draw', shape: 'rect' });
     const h = await render(<ToolStrip />);
@@ -46,9 +55,7 @@ describe('ToolStrip', () => {
 
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
     expect(
-      h
-        .querySelector('button[aria-label="Select / transform (Esc)"]')
-        ?.getAttribute('aria-pressed'),
+      h.querySelector('button[aria-label="Select / transform"]')?.getAttribute('aria-pressed'),
     ).toBe('true');
   });
 });

@@ -5,6 +5,7 @@ import {
   type AppCommand,
   type CommandFamily,
 } from './command-registry';
+import { commandHelpId, controlHelp, menuHelpId } from '../help/help-topics';
 
 export function AppMenuBar(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
   const [openFamily, setOpenFamily] = useState<CommandFamily | null>(null);
@@ -52,11 +53,13 @@ function MenuFamily(props: {
   const commands = props.commands.filter((command) => command.family === props.family);
   if (commands.length === 0) return null;
   const toggle = (): void => props.onOpenChange(!props.open);
+  const familyHelpId = menuHelpId(props.family);
   return (
     <details open={props.open} style={familyStyle}>
       <summary
         style={summaryStyle}
-        title={`Open the ${familyLabel(props.family)} menu.`}
+        title={controlHelp(familyHelpId)}
+        data-help-id={familyHelpId}
         onClick={(event) => {
           event.preventDefault();
           toggle();
@@ -70,25 +73,29 @@ function MenuFamily(props: {
         {familyLabel(props.family)}
       </summary>
       <div role="menu" className="lf-menu" style={menuStyle}>
-        {commands.map((command) => (
-          <button
-            key={command.id}
-            type="button"
-            role="menuitem"
-            className="lf-menu-item"
-            disabled={!command.enabled}
-            title={command.disabledReason ?? command.title}
-            style={menuItemStyle}
-            onClick={() => {
-              if (runCommand(command)) props.onCommandRun();
-            }}
-          >
-            <span>{command.label}</span>
-            {command.shortcut !== undefined ? (
-              <span style={shortcutStyle}>{command.shortcut}</span>
-            ) : null}
-          </button>
-        ))}
+        {commands.map((command) => {
+          const commandHelp = commandHelpId(command.id);
+          return (
+            <button
+              key={command.id}
+              type="button"
+              role="menuitem"
+              className="lf-menu-item"
+              disabled={!command.enabled}
+              title={controlHelp(commandHelp, command.disabledReason)}
+              data-help-id={commandHelp}
+              style={menuItemStyle}
+              onClick={() => {
+                if (runCommand(command)) props.onCommandRun();
+              }}
+            >
+              <span>{command.label}</span>
+              {command.shortcut !== undefined ? (
+                <span style={shortcutStyle}>{command.shortcut}</span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
     </details>
   );
