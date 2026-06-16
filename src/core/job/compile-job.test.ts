@@ -4,6 +4,7 @@ import {
   createLayer,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
+  type Layer,
   type RasterImage,
   type SceneObject,
 } from '../scene';
@@ -29,6 +30,7 @@ function svgObj(args: {
   id: string;
   color: string;
   points: ReadonlyArray<{ x: number; y: number }>;
+  closed?: boolean;
 }): SceneObject {
   return {
     kind: 'imported-svg',
@@ -36,7 +38,9 @@ function svgObj(args: {
     source: `${args.id}.svg`,
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,
-    paths: [{ color: args.color, polylines: [{ points: args.points, closed: false }] }],
+    paths: [
+      { color: args.color, polylines: [{ points: args.points, closed: args.closed ?? false }] },
+    ],
   };
 }
 
@@ -326,4 +330,125 @@ describe('compileJob', () => {
       { x: 390, y: 400 },
     ]);
   });
+
+  it('applies line-mode kerf offset to closed contours without mutating scene geometry', () => {
+    const layer: Layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      kerfOffsetMm: 1,
+    };
+    const square = svgObj({
+      id: 'O1',
+      color: '#ff0000',
+      closed: true,
+      points: [
+        { x: 10, y: 10 },
+        { x: 20, y: 10 },
+        { x: 20, y: 20 },
+        { x: 10, y: 20 },
+      ],
+    });
+    const before = JSON.stringify(square);
+
+    const job = compileJob({ objects: [square], layers: [layer] }, dev);
+
+    expect(JSON.stringify(square)).toBe(before);
+    expect(cutBounds(firstCutGroup(job))).toEqual({ minX: 9, minY: 379, maxX: 21, maxY: 391 });
+  });
+
+  it('does not apply kerf offset to open line-mode paths', () => {
+    const layer: Layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      kerfOffsetMm: 1,
+    };
+    const open = svgObj({
+      id: 'O1',
+      color: '#ff0000',
+      points: [
+        { x: 10, y: 10 },
+        { x: 20, y: 10 },
+      ],
+    });
+
+    const job = compileJob({ objects: [open], layers: [layer] }, dev);
+
+    expect(firstCutGroup(job)?.segments[0]?.polyline).toEqual([
+      { x: 10, y: 390 },
+      { x: 20, y: 390 },
+    ]);
+  });
+
+  it('shrinks inner closed contours when positive kerf offsets a same-color hole', () => {
+    const layer: Layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      kerfOffsetMm: 1,
+    };
+    const annulus: SceneObject = {
+      kind: 'imported-svg',
+      id: 'O1',
+      source: 'annulus.svg',
+      bounds: { minX: 0, minY: 0, maxX: 30, maxY: 30 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 10, y: 10 },
+                { x: 20, y: 10 },
+                { x: 20, y: 20 },
+                { x: 10, y: 20 },
+              ],
+            },
+            {
+              closed: true,
+              points: [
+                { x: 13, y: 13 },
+                { x: 17, y: 13 },
+                { x: 17, y: 17 },
+                { x: 13, y: 17 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const group = firstCutGroup(compileJob({ objects: [annulus], layers: [layer] }, dev));
+    const boxes = (group?.segments ?? []).map((segment) => segmentBounds(segment.polyline));
+
+    expect(boxes).toContainEqual({ minX: 9, minY: 379, maxX: 21, maxY: 391 });
+    expect(boxes).toContainEqual({ minX: 14, minY: 384, maxX: 16, maxY: 386 });
+  });
 });
+
+function cutBounds(group: CutGroup | undefined): {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+} {
+  if (group === undefined) throw new Error('expected cut group');
+  const points = group.segments.flatMap((segment) => segment.polyline);
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  };
+}
+
+function segmentBounds(polyline: ReadonlyArray<{ readonly x: number; readonly y: number }>): {
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
+} {
+  return {
+    minX: Math.min(...polyline.map((point) => point.x)),
+    minY: Math.min(...polyline.map((point) => point.y)),
+    maxX: Math.max(...polyline.map((point) => point.x)),
+    maxY: Math.max(...polyline.map((point) => point.y)),
+  };
+}

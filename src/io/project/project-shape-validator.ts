@@ -100,6 +100,7 @@ function validateLayer(layer: unknown, path: string): string | null {
     requireBoolean(layer, `${path}.visible`),
     requireBoolean(layer, `${path}.output`),
     optionalBoolean(layer, `${path}.airAssist`),
+    optionalNumber(layer, `${path}.kerfOffsetMm`),
     optionalNumber(layer, `${path}.hatchAngleDeg`),
     optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),

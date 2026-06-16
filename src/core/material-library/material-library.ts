@@ -7,6 +7,7 @@ export type MaterialRecipe = {
   readonly speed: number;
   readonly passes: number;
   readonly airAssist?: boolean;
+  readonly kerfOffsetMm?: number;
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
@@ -26,6 +27,7 @@ export const MATERIAL_RECIPE_FIELDS = [
   'speed',
   'passes',
   'airAssist',
+  'kerfOffsetMm',
   'hatchAngleDeg',
   'hatchSpacingMm',
   'fillOverscanMm',
@@ -49,6 +51,7 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     speed: layer.speed,
     passes: layer.passes,
     airAssist: layer.airAssist,
+    kerfOffsetMm: layer.kerfOffsetMm,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
     fillOverscanMm: layer.fillOverscanMm,
@@ -83,6 +86,7 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     speed: Math.max(1, finiteOr(recipe.speed, 1)),
     passes: Math.max(1, Math.floor(finiteOr(recipe.passes, 1))),
     ...(recipe.airAssist !== undefined ? { airAssist: recipe.airAssist } : {}),
+    kerfOffsetMm: finiteOr(recipe.kerfOffsetMm ?? 0, 0),
     hatchAngleDeg: finiteOr(recipe.hatchAngleDeg, 0),
     hatchSpacingMm: Math.max(MIN_SPACING, finiteOr(recipe.hatchSpacingMm, MIN_SPACING)),
     fillOverscanMm: Math.max(0, finiteOr(recipe.fillOverscanMm, 0)),
@@ -132,6 +136,7 @@ function hasMotionNumbers(value: Record<string, unknown>): boolean {
   return (
     isPositiveFinite(value.speed) &&
     isPositiveInteger(value.passes) &&
+    (value.kerfOffsetMm === undefined || isFiniteNumber(value.kerfOffsetMm)) &&
     isFiniteNumber(value.hatchAngleDeg) &&
     isPositiveFinite(value.hatchSpacingMm) &&
     isNonNegativeFinite(value.fillOverscanMm)

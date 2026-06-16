@@ -2777,6 +2777,54 @@ reload / address-bar defaults in the web build (acceptable on a CAD surface).
 
 ---
 
+## ADR-052 - Lane 6D: Line-mode kerf compensation
+
+LightBurn exposes Kerf Offset in Line mode to compensate for the material removed
+by the laser beam. Its documented behavior is output-only: source artwork is not
+modified, Preview shows the offset result, positive values expand outer closed
+contours, and inner closed contours act as holes.
+
+Decision:
+
+- Add `Layer.kerfOffsetMm` as an additive-with-default layer field, default `0`.
+  Schema version stays `1`; older `.lf2` files back-fill `0`.
+- Scope v1 to closed vector contours on Line-mode layers only. Open paths,
+  Fill, Image, Offset Fill, tabs/bridges, lead-in/out, and node editing remain
+  out of scope.
+- Apply kerf after object transforms and device-origin conversion, so the offset
+  distance is real machine millimeters and all device origins share one behavior.
+- Use `clipper2-ts` / Clipper2 for polygon offsetting instead of a hand-rolled
+  offset kernel. The dependency is Boost-licensed, TypeScript-native, and
+  purpose-built for polygon clipping/offsetting. ADR-052 explicitly adds
+  `BSL-1.0` to the production license gate because Boost Software License is a
+  permissive license and this dependency is the reviewed kerf/offset engine.
+- Keep holes explicit by containment-orienting paths before offset: even-depth
+  paths are outer contours, odd-depth paths are holes. This gives LightBurn-style
+  "outer expands, hole shrinks" behavior for same-color nested closed contours.
+- Replace raw scene-output bounds with compiled job bounds so Preview, Save,
+  Start, Frame/bounds checks, and selected-output origin math share the same
+  kerfed geometry.
+
+Consequences:
+
+- `0 mm` kerf is byte-compatible with prior jobs except for the new serialized
+  additive field.
+- Operators can tune kerf from Cut Settings without destructively editing the
+  artwork.
+- Full geometry-kernel work is still deferred. This lane does not authorize
+  boolean editing, node editing, Offset Fill, tabs, or bridges.
+
+Verification:
+
+- Red-first tests cover layer defaults, `.lf2` back-fill, Cut Settings draft/UI,
+  closed contour expansion, nested-hole shrinkage, open-path no-op behavior,
+  scene immutability, scene-output bounds, and prepared-output/preview/G-code
+  parity.
+- Hardware proof still requires a scrap kerf test: cut a measured square with
+  kerf off/on, measure fit, and save the material-specific kerf value.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

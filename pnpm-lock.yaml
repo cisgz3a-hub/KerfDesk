@@ -15,6 +15,9 @@ importers:
 
   .:
     dependencies:
+      clipper2-ts:
+        specifier: 2.0.1-17
+        version: 2.0.1-17
       dompurify:
         specifier: ^3.4.10
         version: 3.4.10
@@ -1491,6 +1494,10 @@ packages:
   ci-info@4.4.0:
     resolution: {integrity: sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg==}
     engines: {node: '>=8'}
+
+  clipper2-ts@2.0.1-17:
+    resolution: {integrity: sha512-GGVAMyjLnaFKkwiIW4U2TDqnbvIqHAmcE1YzY4uAJOq9IvSIO4PFRi3ZT0q++XZ2uXE7BnAhhGd8L6p1gNmymg==}
+    engines: {node: '>=14.0.0'}
 
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
@@ -4857,6 +4864,8 @@ snapshots:
   ci-info@4.3.1: {}
 
   ci-info@4.4.0: {}
+
+  clipper2-ts@2.0.1-17: {}
 
   cliui@8.0.1:
     dependencies:

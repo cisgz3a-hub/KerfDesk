@@ -28,6 +28,11 @@ export type Layer = {
   // LightBurn-style per-layer Air Assist intent. It only emits G-code when
   // the active device profile maps air assist to M7 or M8.
   readonly airAssist: boolean;
+  // LightBurn-style Line mode kerf compensation in millimeters. Applied only
+  // to closed vector contours during output/preview preparation; source
+  // artwork stays unchanged. Positive offsets cut outside outer contours and
+  // inside holes.
+  readonly kerfOffsetMm: number;
   // F.1 fill parameters. Ignored unless mode === 'fill'. Defaults
   // chosen for a typical diode laser: 0° = horizontal hatching,
   // 0.1 mm spacing ≈ 10 lines/mm (LightBurn's diode norm). The prior
@@ -67,6 +72,7 @@ export const LAYER_DEFAULTS = {
   visible: true,
   output: true,
   airAssist: false,
+  kerfOffsetMm: 0,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,

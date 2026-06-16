@@ -17,6 +17,7 @@ function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
     speed: 1900,
     passes: 2,
     airAssist: false,
+    kerfOffsetMm: 0,
     hatchAngleDeg: 15,
     hatchSpacingMm: 0.08,
     fillOverscanMm: 3,

@@ -191,6 +191,16 @@ describe('material library recipes', () => {
     expect(materialRecipePatch(legacyRecipe).airAssist).toBe(false);
   });
 
+  it('defaults older recipes without kerf compensation to zero', () => {
+    const { kerfOffsetMm: _kerfOffsetMm, ...legacyRecipe } = captureMaterialRecipe(
+      makeLayer({ kerfOffsetMm: 0.2, mode: 'line' }),
+    );
+
+    expect(isMaterialRecipe(legacyRecipe)).toBe(true);
+    expect(normalizeMaterialRecipe(legacyRecipe).kerfOffsetMm).toBe(0);
+    expect(materialRecipePatch(legacyRecipe).kerfOffsetMm).toBe(0);
+  });
+
   it('normalizes recipe numbers for safe assignment', () => {
     const recipe = captureMaterialRecipe(
       makeLayer({

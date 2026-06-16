@@ -19,6 +19,7 @@ const lineRecipe: MaterialRecipe = {
   speed: 1400,
   passes: 1,
   airAssist: false,
+  kerfOffsetMm: 0,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
