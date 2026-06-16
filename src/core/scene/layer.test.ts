@@ -14,6 +14,7 @@ describe('createLayer', () => {
       passes: 1,
       visible: true,
       output: true,
+      kerfOffsetMm: 0,
       hatchAngleDeg: 0,
       hatchSpacingMm: 0.1,
       fillOverscanMm: 5,
@@ -48,5 +49,10 @@ describe('LAYER_DEFAULTS', () => {
   it('defaults air assist off for every new layer', () => {
     expect(LAYER_DEFAULTS.airAssist).toBe(false);
     expect(createLayer({ id: 'L1', color: '#000000' }).airAssist).toBe(false);
+  });
+
+  it('defaults kerf compensation off for every new layer', () => {
+    expect(LAYER_DEFAULTS.kerfOffsetMm).toBe(0);
+    expect(createLayer({ id: 'L1', color: '#000000' }).kerfOffsetMm).toBe(0);
   });
 });

@@ -12,7 +12,7 @@ function projectWithLayer(): Project {
 }
 
 describe('project air assist persistence', () => {
-  it('backfills missing air assist fields from older projects', () => {
+  it('backfills missing additive layer fields from older projects', () => {
     const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
     const device = raw.device as Record<string, unknown>;
     delete device.airAssistCommand;
@@ -20,6 +20,7 @@ describe('project air assist persistence', () => {
     const firstLayer = scene.layers[0];
     if (firstLayer === undefined) throw new Error('expected project fixture layer');
     delete firstLayer.airAssist;
+    delete firstLayer.kerfOffsetMm;
 
     const result = deserializeProject(JSON.stringify(raw));
 
@@ -27,6 +28,7 @@ describe('project air assist persistence', () => {
     if (result.kind !== 'ok') return;
     expect(result.project.device.airAssistCommand).toBe('none');
     expect(result.project.scene.layers[0]?.airAssist).toBe(false);
+    expect(result.project.scene.layers[0]?.kerfOffsetMm).toBe(0);
   });
 
   it('reports invalid when the device air assist command is unknown', () => {

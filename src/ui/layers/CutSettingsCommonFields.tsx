@@ -60,6 +60,20 @@ export function CutSettingsCommonFields(props: {
           title="Turn on air assist for this layer when the device profile is configured for M7 or M8."
         />
       </Field>
+      {props.mode === 'line' ? (
+        <Field label="Kerf Offset">
+          <NumberInput
+            name="kerfOffsetMm"
+            value={props.layer.kerfOffsetMm}
+            min={-10}
+            max={10}
+            step={0.01}
+            label="kerf offset"
+            title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer contours and inside holes; source artwork is unchanged."
+          />
+          <span className="lf-field-unit">mm</span>
+        </Field>
+      ) : null}
     </>
   );
 }
@@ -71,6 +85,7 @@ function NumberInput(props: {
   readonly max?: number;
   readonly step?: number;
   readonly label?: string;
+  readonly title?: string;
 }): JSX.Element {
   return (
     <input
@@ -83,7 +98,7 @@ function NumberInput(props: {
       defaultValue={props.value}
       style={numberStyle}
       aria-label={`Cut settings ${props.label ?? props.name}`}
-      title={`Set cut settings ${props.label ?? props.name}.`}
+      title={props.title ?? `Set cut settings ${props.label ?? props.name}.`}
     />
   );
 }

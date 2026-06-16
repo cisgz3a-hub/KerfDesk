@@ -28,6 +28,7 @@ describe('CutSettingsDialog fill density controls', () => {
 
       const mode = host.querySelector('select[aria-label="Cut settings mode"]');
       if (!(mode instanceof HTMLSelectElement)) throw new Error('mode select missing');
+      expect(host.textContent).toContain('Kerf Offset');
       expect(host.textContent).not.toContain('Line Interval');
       expect(host.textContent).not.toContain('Dither');
 
@@ -36,6 +37,7 @@ describe('CutSettingsDialog fill density controls', () => {
         Simulate.change(mode);
       });
       expect(host.textContent).toContain('Line Interval');
+      expect(host.textContent).not.toContain('Kerf Offset');
       expect(host.textContent).not.toContain('Dither');
 
       await act(async () => {
@@ -43,6 +45,7 @@ describe('CutSettingsDialog fill density controls', () => {
         Simulate.change(mode);
       });
       expect(host.textContent).not.toContain('Lines / Inch');
+      expect(host.textContent).not.toContain('Kerf Offset');
       expect(host.textContent).toContain('Dither');
     } finally {
       if (root !== null) await act(async () => root?.unmount());

@@ -10,6 +10,8 @@ import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene'
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
 
+const MAX_KERF_OFFSET_MM = 10;
+
 export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
   const mode = parseMode(String(data.get('mode') ?? layer.mode));
   const power = numberField(data, 'power', layer.power, 0, 100);
@@ -29,6 +31,16 @@ export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
     visible: data.has('visible'),
     output: data.has('output'),
     airAssist: data.has('airAssist'),
+    kerfOffsetMm:
+      mode === 'line'
+        ? numberField(
+            data,
+            'kerfOffsetMm',
+            layer.kerfOffsetMm,
+            -MAX_KERF_OFFSET_MM,
+            MAX_KERF_OFFSET_MM,
+          )
+        : layer.kerfOffsetMm,
     hatchAngleDeg: numberField(data, 'hatchAngleDeg', layer.hatchAngleDeg, 0, 180),
     hatchSpacingMm: mode === 'fill' ? readFillLineIntervalMm(data, layer) : layer.hatchSpacingMm,
     fillOverscanMm: numberField(data, 'fillOverscanMm', layer.fillOverscanMm, 0, 25),

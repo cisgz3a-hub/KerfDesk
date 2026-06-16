@@ -329,7 +329,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync.
 - DXF, AI, PDF import.
-- Tabs / bridges, kerf compensation, lead-in / lead-out, fill patterns.
+- Tabs / bridges, lead-in / lead-out, fill patterns. Narrow Line-mode kerf
+  compensation is scoped by ADR-052; broader offset/boolean/node editing remains
+  out of scope.
 - Macros, scripting, command palette, plugins, extensions.
 - Variable text (CSV / counter / date).
 - System fonts.

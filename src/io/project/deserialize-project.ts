@@ -174,6 +174,9 @@ function normalizeCommonLayerFields(out: Record<string, unknown>): void {
   if (typeof out['airAssist'] !== 'boolean') {
     out['airAssist'] = LAYER_DEFAULTS.airAssist;
   }
+  if (typeof out['kerfOffsetMm'] !== 'number' || !Number.isFinite(out['kerfOffsetMm'])) {
+    out['kerfOffsetMm'] = LAYER_DEFAULTS.kerfOffsetMm;
+  }
 }
 
 function normalizeFillLayerFields(out: Record<string, unknown>): void {

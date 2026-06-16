@@ -10,6 +10,7 @@
 // arrays, indexed loops) → repeatable across runs.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
+import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import {
   applyLumaAdjustments,
   dither,
@@ -459,11 +460,23 @@ function appendPathSegments(
 ): void {
   for (const path of paths) {
     if (path.color !== layer.color) continue;
+    const closedForKerf: Polyline[] = [];
     for (const polyline of path.polylines) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, transform), device),
       );
-      out.push({ polyline: points, closed: polyline.closed });
+      if (shouldApplyKerf(polyline, layer)) {
+        closedForKerf.push({ points, closed: true });
+      } else {
+        out.push({ polyline: points, closed: polyline.closed });
+      }
+    }
+    for (const offset of offsetClosedPolylinesForKerf(closedForKerf, layer.kerfOffsetMm)) {
+      out.push({ polyline: offset.points, closed: true });
     }
   }
+}
+
+function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {
+  return layer.mode === 'line' && layer.kerfOffsetMm !== 0 && polyline.closed;
 }
