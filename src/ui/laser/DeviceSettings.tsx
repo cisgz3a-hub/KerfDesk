@@ -32,9 +32,9 @@ export function DeviceSettings(): JSX.Element {
     <details style={panelStyle}>
       <summary
         style={summaryStyle}
-        title="Open or close machine bed, origin, feed, and GRBL settings."
+        title="Choose the local LaserForge machine profile: bed size, origin, feed limits, power range, homing, focus, and air assist. This does not write firmware settings."
       >
-        Device
+        Device Profile
       </summary>
       <div style={bodyStyle}>
         <BasicRows device={device} update={update} />

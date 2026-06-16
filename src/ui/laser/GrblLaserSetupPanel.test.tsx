@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe('GRBL laser setup panel', () => {
-  it('renders a confirmed GRBL laser setup action for connected controllers', async () => {
+  it('renders a clearly labeled one-time setup write action for connected controllers', async () => {
     const originalSetup = useLaserStore.getState().configureGrblLaserSetup;
     const configure = vi.fn(async () => undefined);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -64,8 +64,10 @@ describe('GRBL laser setup panel', () => {
         );
       });
 
+      expect(host.textContent).toContain('One-time GRBL Setup');
+      expect(host.textContent).toContain('Writes only the listed GRBL values');
       await act(async () => {
-        button(host, 'GRBL laser setup').click();
+        button(host, 'Apply one-time GRBL setup').click();
         await Promise.resolve();
       });
 

@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('LaserWindow autofocus busy controls', () => {
-  it('renders the Device settings collapsed by default and lets the user open it', async () => {
+  it('renders the Device Profile settings collapsed by default and lets the user open it', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -52,11 +52,11 @@ describe('LaserWindow autofocus busy controls', () => {
         );
       });
 
-      const deviceDetails = detailsBySummary(host, 'Device');
+      const deviceDetails = detailsBySummary(host, 'Device Profile');
       expect(deviceDetails.open).toBe(false);
 
       const summary = deviceDetails.querySelector('summary');
-      if (!(summary instanceof HTMLElement)) throw new Error('Device summary missing');
+      if (!(summary instanceof HTMLElement)) throw new Error('Device Profile summary missing');
       await act(async () => {
         summary.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
