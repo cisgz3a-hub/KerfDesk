@@ -16,6 +16,7 @@ import type { DeviceProfile, Origin } from '../../core/devices';
 import { useStore } from '../state';
 import { AutofocusEditor } from './AutofocusEditor';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
+import { ProfileRows, ZRows } from './DeviceProfileRows';
 import { PlannerAdvanced } from './PlannerAdvanced';
 
 export function DeviceSettings(): JSX.Element {
@@ -37,6 +38,8 @@ export function DeviceSettings(): JSX.Element {
       </summary>
       <div style={bodyStyle}>
         <BasicRows device={device} update={update} />
+        <ProfileRows device={device} update={update} />
+        <ZRows device={device} update={update} />
         <Row label="Homing">
           <HomingEditor
             enabled={device.homing.enabled}

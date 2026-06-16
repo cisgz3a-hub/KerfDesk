@@ -25,4 +25,17 @@ describe('describePatch', () => {
       changed: true,
     });
   });
+
+  it('surfaces detected Z max travel from GRBL $132', () => {
+    const rows = describePatch({ zTravelMm: 75 }, DEFAULT_DEVICE_PROFILE);
+
+    expect(rows).toEqual([
+      expect.objectContaining({
+        label: 'Z travel',
+        oldText: 'Not set',
+        newText: '75.000 mm',
+        changed: true,
+      }),
+    ]);
+  });
 });

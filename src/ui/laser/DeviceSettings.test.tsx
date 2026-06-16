@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { DeviceSettings } from './DeviceSettings';
@@ -56,4 +56,47 @@ describe('DeviceSettings air assist command', () => {
       await unmount();
     }
   });
+
+  it('applies the Neotronics 4040 Max laser profile deliberately and lets Z be confirmed', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      details.open = true;
+
+      const apply = button(host, 'Use Neotronics 4040 Max');
+      await act(async () => {
+        apply.click();
+      });
+
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Neotronics 4040 Max'));
+      expect(useStore.getState().project.device).toMatchObject({
+        machineFamily: 'neotronics-4040-max',
+        laserSubProfile: { model: 'LASER TREE LT-4LDS-V2' },
+        zTravelMm: 75,
+        zTravelConfirmed: false,
+      });
+
+      const confirmed = host.querySelector('input[aria-label="Z travel confirmed"]');
+      if (!(confirmed instanceof HTMLInputElement)) throw new Error('Z confirm checkbox missing');
+      await act(async () => {
+        confirmed.checked = true;
+        Simulate.change(confirmed);
+      });
+
+      expect(useStore.getState().project.device.zTravelConfirmed).toBe(true);
+    } finally {
+      confirm.mockRestore();
+      await unmount();
+    }
+  });
 });
+
+function button(host: HTMLElement, label: string): HTMLButtonElement {
+  const match = [...host.querySelectorAll('button')].find((candidate) =>
+    candidate.textContent?.includes(label),
+  );
+  if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
+  return match;
+}

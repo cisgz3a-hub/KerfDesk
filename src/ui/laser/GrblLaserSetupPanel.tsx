@@ -2,9 +2,9 @@ import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 
 const SETUP_CONFIRMATION =
-  'Send persistent GRBL setup commands?\n\n' +
-  '$X\n$32=1\n$22=0\n$30=1000\n$130=400\n$131=400\n$$\n\n' +
-  'Only continue if this controller should be configured like the tested GT4040 / GRBL laser workflow.';
+  'Send persistent Neotronics / GRBL diode setup commands?\n\n' +
+  '$32=1\n$30=1000\n$130=400\n$131=400\n$$\n\n' +
+  'LaserForge does not change $22 homing here. Read $$ and export a backup first, then confirm Z travel, homing, and air assist wiring on the machine.';
 
 export function GrblLaserSetupPanel({ disabled }: { readonly disabled: boolean }): JSX.Element {
   const configure = useLaserStore((s) => s.configureGrblLaserSetup);
@@ -22,13 +22,14 @@ export function GrblLaserSetupPanel({ disabled }: { readonly disabled: boolean }
       </summary>
       <div style={bodyStyle}>
         <p style={copyStyle}>
-          Sends persistent laser-mode settings used by the GT4040 LightBurn workflow.
+          Sends the small Neotronics-safe laser setup subset after you have read and backed up
+          machine settings.
         </p>
         <button
           type="button"
           onClick={handleSetup}
           disabled={disabled}
-          title="Confirm and send $X, $32=1, $22=0, $30=1000, $130=400, $131=400, then $$."
+          title="Confirm and send $32=1, $30=1000, $130=400, $131=400, then $$. Homing is not changed."
         >
           GRBL laser setup
         </button>

@@ -43,10 +43,16 @@ export type ControllerSettingsSnapshot = Partial<
     | 'accelMmPerSec2'
     | 'bedWidth'
     | 'bedHeight'
+    | 'zTravelMm'
     | 'junctionDeviationMm'
   >
 > & {
+  readonly softLimitsEnabled?: boolean;
+  readonly hardLimitsEnabled?: boolean;
   readonly homingEnabled?: boolean;
+  readonly homingDirectionMask?: number;
+  readonly zMaxFeed?: number;
+  readonly zAccelMmPerSec2?: number;
 };
 
 export type SettingsCollectorState =
@@ -127,6 +133,7 @@ export function settingsMapToProfilePatch(
 
   pushPositiveSetting(fields, map, 130, (value) => ({ bedWidth: value }));
   pushPositiveSetting(fields, map, 131, (value) => ({ bedHeight: value }));
+  pushPositiveSetting(fields, map, 132, (value) => ({ zTravelMm: value }));
 
   return Object.assign({}, ...fields) as Partial<DeviceProfile>;
 }
@@ -134,18 +141,38 @@ export function settingsMapToProfilePatch(
 export function settingsMapToControllerSettings(
   map: ReadonlyMap<number, string>,
 ): ControllerSettingsSnapshot {
-  const homingEnabled = parseHomingEnabled(map);
+  const softLimitsEnabled = parseBooleanSetting(map, 20);
+  const hardLimitsEnabled = parseBooleanSetting(map, 21);
+  const homingEnabled = parseBooleanSetting(map, 22);
+  const homingDirectionMask = parseNonNegativeInteger(map.get(23));
+  const zMaxFeed = parsePositiveNumber(map.get(112));
+  const zAccelMmPerSec2 = parsePositiveNumber(map.get(122));
   return {
     ...settingsMapToProfilePatch(map),
+    ...(softLimitsEnabled === undefined ? {} : { softLimitsEnabled }),
+    ...(hardLimitsEnabled === undefined ? {} : { hardLimitsEnabled }),
     ...(homingEnabled === undefined ? {} : { homingEnabled }),
+    ...(homingDirectionMask === undefined ? {} : { homingDirectionMask }),
+    ...(zMaxFeed === undefined ? {} : { zMaxFeed }),
+    ...(zAccelMmPerSec2 === undefined ? {} : { zAccelMmPerSec2 }),
   };
 }
 
-function parseHomingEnabled(map: ReadonlyMap<number, string>): boolean | undefined {
-  const homing = parseFiniteNumber(map.get(22));
-  if (homing === 0) return false;
-  if (homing === 1) return true;
+function parseBooleanSetting(map: ReadonlyMap<number, string>, id: number): boolean | undefined {
+  const value = parseFiniteNumber(map.get(id));
+  if (value === 0) return false;
+  if (value === 1) return true;
   return undefined;
+}
+
+function parsePositiveNumber(value: string | undefined): number | undefined {
+  const parsed = parseFiniteNumber(value);
+  return parsed !== null && parsed > 0 ? parsed : undefined;
+}
+
+function parseNonNegativeInteger(value: string | undefined): number | undefined {
+  const parsed = parseFiniteNumber(value);
+  return parsed !== null && Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function pushPositiveSetting(
