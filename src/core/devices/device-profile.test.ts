@@ -38,6 +38,27 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(valid).toContain(DEFAULT_DEVICE_PROFILE.airAssistCommand);
   });
 
+  it('defaults to the existing Falcon-compatible GRBL streaming and dialect behavior', () => {
+    expect(DEFAULT_DEVICE_PROFILE.controller).toMatchObject({
+      baudRate: 115200,
+      rxBufferBytes: 120,
+      streamingMode: 'char-counted',
+      pollDuringJob: '4hz',
+      requiresHomingBeforeJob: false,
+      supportsStatusBufferReport: true,
+      supportsWcs: true,
+      safeModeDefault: false,
+    });
+    expect(DEFAULT_DEVICE_PROFILE.gcodeDialect).toMatchObject({
+      dialectId: 'creality-falcon-compatible',
+      returnToOriginOnEnd: true,
+      emitSOnTravel: true,
+      emitSOnEveryBurnMove: false,
+      modalFeedrate: true,
+      laserModeCommand: 'mixed',
+    });
+  });
+
   it('is shaped so the workspace can be derived (bed* are positive numbers)', () => {
     expect(DEFAULT_DEVICE_PROFILE.bedWidth).toBeGreaterThan(0);
     expect(DEFAULT_DEVICE_PROFILE.bedHeight).toBeGreaterThan(0);
@@ -90,6 +111,7 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
       minPowerS: 0,
       laserModeEnabled: true,
       airAssistCommand: 'none',
+      homing: { enabled: true, direction: 'front-left' },
       zTravelMm: 75,
       zTravelConfirmed: false,
       zProbePresent: true,
@@ -102,6 +124,27 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
         focusMode: 'fixed-lever',
         airAssist: 'built-in',
       },
+    });
+  });
+
+  it('puts Neotronics on the conservative GRBL compatibility path', () => {
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.controller).toMatchObject({
+      baudRate: 115200,
+      rxBufferBytes: 80,
+      streamingMode: 'ping-pong',
+      pollDuringJob: 'off',
+      requiresHomingBeforeJob: true,
+      supportsStatusBufferReport: false,
+      supportsWcs: true,
+      safeModeDefault: true,
+    });
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.gcodeDialect).toMatchObject({
+      dialectId: 'neotronics-4040-safe',
+      returnToOriginOnEnd: false,
+      emitSOnTravel: true,
+      emitSOnEveryBurnMove: true,
+      modalFeedrate: false,
+      laserModeCommand: 'M4',
     });
   });
 });

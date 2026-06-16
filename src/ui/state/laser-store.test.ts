@@ -162,6 +162,26 @@ describe('laser-store safety notices (P0-B)', () => {
 });
 
 describe('laser-store serial write failures', () => {
+  it('confirms homing only after the Home command is followed by Idle status', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('unknown');
+
+    await useLaserStore.getState().home();
+
+    expect(writes).toContain('$H\n');
+    expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('homing');
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+
+    expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('confirmed');
+  });
+
   it('does not enter streaming state when the initial job write fails', async () => {
     const write = vi.fn(async () => {
       throw new Error('port lost');

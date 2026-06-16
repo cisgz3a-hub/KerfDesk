@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GrblState, StatusReport } from '../../core/controllers/grbl';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import {
   createLayer,
   createProject,
@@ -63,9 +64,12 @@ const tracedObject: SceneObject = {
   paths: sampleObject.paths,
 };
 
-function runnableProject(object: SceneObject = sampleObject): Project {
+function runnableProject(
+  object: SceneObject = sampleObject,
+  device = createProject().device,
+): Project {
   return {
-    ...createProject(),
+    ...createProject(device),
     scene: {
       ...EMPTY_SCENE,
       objects: [object],
@@ -74,8 +78,8 @@ function runnableProject(object: SceneObject = sampleObject): Project {
   };
 }
 
-function calibratedProject(): Project {
-  const project = runnableProject();
+function calibratedProject(device = createProject().device): Project {
+  const project = runnableProject(sampleObject, device);
   const layer = project.scene.layers[0];
   if (layer === undefined) return project;
   return {
@@ -259,5 +263,43 @@ describe('prepareStartJob', () => {
         'Auto-focus is running. Wait for it to finish before starting a job.',
       );
     }
+  });
+
+  it('blocks Start when the selected profile requires homing but the session has not confirmed it', () => {
+    const result = prepareStartJob(
+      calibratedProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+      readyController,
+      readyMachine,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages).toContain(
+        'This device profile requires homing before Start. Home the machine and wait for Idle before starting.',
+      );
+    }
+  });
+
+  it('does not trap a non-homing profile behind a required-homing gate', () => {
+    const result = prepareStartJob(
+      calibratedProject({
+        ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+        homing: { enabled: false, direction: 'front-left' },
+      }),
+      readyController,
+      readyMachine,
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('allows Start when a required-homing profile has confirmed homing this session', () => {
+    const result = prepareStartJob(
+      calibratedProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+      readyController,
+      { ...readyMachine, homingState: 'confirmed' },
+    );
+
+    expect(result.ok).toBe(true);
   });
 });

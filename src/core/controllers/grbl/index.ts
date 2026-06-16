@@ -37,10 +37,13 @@ export {
 export type {
   AckKind,
   AckResult,
+  CreateStreamerOptions,
   OversizedLine,
+  PollDuringJob,
   StepResult,
   StreamerState,
   StreamerStatus,
+  StreamingMode,
 } from './streamer';
 export {
   DEFAULT_RX_BUFFER_BYTES,

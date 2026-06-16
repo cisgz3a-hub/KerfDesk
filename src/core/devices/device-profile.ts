@@ -7,6 +7,9 @@ export type AirAssistCommand = 'none' | 'M7' | 'M8';
 export type ControllerKind = 'grbl-v1.1';
 export type LaserFocusMode = 'fixed-lever' | 'manual' | 'unknown';
 export type LaserAirAssistHardware = 'built-in' | 'manual' | 'none' | 'unknown';
+export type GrblStreamingMode = 'char-counted' | 'ping-pong';
+export type GrblPollDuringJob = 'off' | '1hz' | '2hz' | '4hz';
+export type GrblLaserModeCommand = 'M3' | 'M4' | 'mixed';
 
 export type HomingConfig = {
   readonly enabled: boolean;
@@ -27,11 +30,34 @@ export type LaserSubProfile = {
   readonly notes?: string;
 };
 
+export type DeviceControllerCompatibility = {
+  readonly baudRate: number;
+  readonly rxBufferBytes: number;
+  readonly streamingMode: GrblStreamingMode;
+  readonly pollDuringJob: GrblPollDuringJob;
+  readonly requiresHomingBeforeJob: boolean;
+  readonly supportsStatusBufferReport: boolean;
+  readonly supportsWcs: boolean;
+  readonly safeModeDefault: boolean;
+};
+
+export type DeviceGcodeDialect = {
+  readonly dialectId: string;
+  readonly returnToOriginOnEnd: boolean;
+  readonly emitSOnTravel: boolean;
+  readonly emitSOnEveryBurnMove: boolean;
+  readonly modalFeedrate: boolean;
+  readonly airAssistCommand: AirAssistCommand;
+  readonly laserModeCommand: GrblLaserModeCommand;
+};
+
 export type DeviceProfile = {
   readonly name: string;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
   readonly laserSubProfile?: LaserSubProfile;
+  readonly controller: DeviceControllerCompatibility;
+  readonly gcodeDialect: DeviceGcodeDialect;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
   // treats these as mm. G-code output is `G21` (mm). Reference work
@@ -103,6 +129,25 @@ const DEFAULT_AUTOFOCUS_COMMAND = '';
 // First-run default per WORKFLOW.md F-A1.
 export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   name: 'Default 400×400',
+  controller: {
+    baudRate: 115200,
+    rxBufferBytes: 120,
+    streamingMode: 'char-counted',
+    pollDuringJob: '4hz',
+    requiresHomingBeforeJob: false,
+    supportsStatusBufferReport: true,
+    supportsWcs: true,
+    safeModeDefault: false,
+  },
+  gcodeDialect: {
+    dialectId: 'creality-falcon-compatible',
+    returnToOriginOnEnd: true,
+    emitSOnTravel: true,
+    emitSOnEveryBurnMove: false,
+    modalFeedrate: true,
+    airAssistCommand: 'none',
+    laserModeCommand: 'mixed',
+  },
   bedWidth: 400,
   bedHeight: 400,
   maxFeed: 6000,
@@ -125,6 +170,23 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   name: 'Neotronics 4040 Max / LT-4LDS-V2 20W',
   machineFamily: 'neotronics-4040-max',
   controllerKind: 'grbl-v1.1',
+  controller: {
+    ...DEFAULT_DEVICE_PROFILE.controller,
+    rxBufferBytes: 80,
+    streamingMode: 'ping-pong',
+    pollDuringJob: 'off',
+    requiresHomingBeforeJob: true,
+    supportsStatusBufferReport: false,
+    safeModeDefault: true,
+  },
+  gcodeDialect: {
+    ...DEFAULT_DEVICE_PROFILE.gcodeDialect,
+    dialectId: 'neotronics-4040-safe',
+    returnToOriginOnEnd: false,
+    emitSOnEveryBurnMove: true,
+    modalFeedrate: false,
+    laserModeCommand: 'M4',
+  },
   bedWidth: 400,
   bedHeight: 400,
   maxFeed: 6000,
@@ -132,6 +194,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   minPowerS: 0,
   laserModeEnabled: true,
   airAssistCommand: 'none',
+  homing: { enabled: true, direction: 'front-left' },
   zTravelMm: 75,
   zTravelConfirmed: false,
   zProbePresent: true,

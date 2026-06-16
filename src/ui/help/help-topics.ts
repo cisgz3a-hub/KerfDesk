@@ -18,7 +18,9 @@ export type ControlHelpKey =
   | 'laser.console.quick.?'
   | 'laser.machine-settings'
   | 'laser.machine-settings.read'
+  | 'laser.machine-settings.diagnostic'
   | 'laser.machine-settings.export'
+  | 'laser.machine-settings.export-diagnostic'
   | 'laser.machine-settings.table'
   | 'laser.output-scope.cut-selected'
   | 'laser.output-scope.selection-origin';
@@ -302,9 +304,19 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     label: 'Read machine settings',
     tooltip: 'Send $$ through the guarded serial path to read GRBL firmware settings.',
   },
+  'laser.machine-settings.diagnostic': {
+    label: 'Run machine diagnostic',
+    tooltip:
+      'Send read-only GRBL probes for build info, settings, offsets, modal state, and status.',
+  },
   'laser.machine-settings.export': {
     label: 'Export machine settings backup',
     tooltip: 'Save the last read GRBL settings as a LaserForge backup JSON file.',
+  },
+  'laser.machine-settings.export-diagnostic': {
+    label: 'Export machine diagnostic',
+    tooltip:
+      'Save a local JSON diagnostic with active profile, controller settings, stream state, and recent serial transcript.',
   },
   'laser.machine-settings.table': {
     label: 'Machine settings table',

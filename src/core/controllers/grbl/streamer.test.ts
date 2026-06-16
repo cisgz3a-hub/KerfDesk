@@ -29,6 +29,11 @@ describe('createStreamer', () => {
     expect(createStreamer('G21').rxBufferBytes).toBe(DEFAULT_RX_BUFFER_BYTES);
     expect(createStreamer('G21', { rxBufferBytes: 64 }).rxBufferBytes).toBe(64);
   });
+
+  it('can be configured for ping-pong streaming', () => {
+    const s = createStreamer('G21\nG90\nM5', { streamingMode: 'ping-pong' });
+    expect(s.streamingMode).toBe('ping-pong');
+  });
 });
 
 describe('step — buffer filling', () => {
@@ -50,6 +55,20 @@ describe('step — buffer filling', () => {
     const r = step(s);
     expect(r.state.inFlight).toHaveLength(2);
     expect(r.state.queued).toHaveLength(1);
+  });
+
+  it('sends exactly one queued line per step in ping-pong mode', () => {
+    const first = step(createStreamer('G21\nG90\nM5', { streamingMode: 'ping-pong' }));
+    expect(first.toSend).toBe('G21\n');
+    expect(first.state.inFlight.map((item) => item.line)).toEqual(['G21\n']);
+    expect(first.state.queued).toEqual(['G90\n', 'M5\n']);
+
+    const acked = onAck(first.state, 'ok').state;
+    const second = step(acked);
+
+    expect(second.toSend).toBe('G90\n');
+    expect(second.state.inFlight.map((item) => item.line)).toEqual(['G90\n']);
+    expect(second.state.queued).toEqual(['M5\n']);
   });
 
   it('returns toSend="" when paused', () => {

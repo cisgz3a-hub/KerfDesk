@@ -434,4 +434,21 @@ describe('deserializeProject', () => {
       expect(r.project.device.junctionDeviationMm).toBeGreaterThan(0);
     }
   });
+
+  it('back-fills missing machine compatibility fields on old .lf2 files', () => {
+    const raw = JSON.parse(serializeProject(createProject())) as Record<string, unknown>;
+    const device = raw['device'] as Record<string, unknown>;
+    delete device['controller'];
+    delete device['gcodeDialect'];
+
+    const r = deserializeProject(JSON.stringify(raw));
+
+    expect(r.kind).toBe('ok');
+    if (r.kind === 'ok') {
+      expect(r.project.device.controller.streamingMode).toBe('char-counted');
+      expect(r.project.device.controller.pollDuringJob).toBe('4hz');
+      expect(r.project.device.gcodeDialect.dialectId).toBe('creality-falcon-compatible');
+      expect(r.project.device.gcodeDialect.returnToOriginOnEnd).toBe(true);
+    }
+  });
 });

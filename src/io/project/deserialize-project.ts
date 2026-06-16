@@ -113,6 +113,11 @@ function normalizeProject(raw: Record<string, unknown>): Project {
           ? dev['laserModeEnabled']
           : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
       airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
+      controller: normalizeDeviceController(dev['controller']),
+      gcodeDialect: normalizeGcodeDialect(
+        dev['gcodeDialect'],
+        normalizeAirAssistCommand(dev['airAssistCommand']),
+      ),
     },
     optimization: normalizeOptimization(raw['optimization']),
     scene: {
@@ -144,6 +149,91 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
 
 function normalizeAirAssistCommand(value: unknown): Project['device']['airAssistCommand'] {
   return value === 'M7' || value === 'M8' ? value : DEFAULT_DEVICE_PROFILE.airAssistCommand;
+}
+
+function normalizeDeviceController(value: unknown): Project['device']['controller'] {
+  if (!isObject(value)) return DEFAULT_DEVICE_PROFILE.controller;
+  return {
+    baudRate: positiveFiniteOrDefault(
+      value['baudRate'],
+      DEFAULT_DEVICE_PROFILE.controller.baudRate,
+    ),
+    rxBufferBytes: positiveFiniteOrDefault(
+      value['rxBufferBytes'],
+      DEFAULT_DEVICE_PROFILE.controller.rxBufferBytes,
+    ),
+    streamingMode:
+      value['streamingMode'] === 'ping-pong' || value['streamingMode'] === 'char-counted'
+        ? value['streamingMode']
+        : DEFAULT_DEVICE_PROFILE.controller.streamingMode,
+    pollDuringJob:
+      value['pollDuringJob'] === 'off' ||
+      value['pollDuringJob'] === '1hz' ||
+      value['pollDuringJob'] === '2hz' ||
+      value['pollDuringJob'] === '4hz'
+        ? value['pollDuringJob']
+        : DEFAULT_DEVICE_PROFILE.controller.pollDuringJob,
+    requiresHomingBeforeJob: booleanOrDefault(
+      value['requiresHomingBeforeJob'],
+      DEFAULT_DEVICE_PROFILE.controller.requiresHomingBeforeJob,
+    ),
+    supportsStatusBufferReport: booleanOrDefault(
+      value['supportsStatusBufferReport'],
+      DEFAULT_DEVICE_PROFILE.controller.supportsStatusBufferReport,
+    ),
+    supportsWcs: booleanOrDefault(
+      value['supportsWcs'],
+      DEFAULT_DEVICE_PROFILE.controller.supportsWcs,
+    ),
+    safeModeDefault: booleanOrDefault(
+      value['safeModeDefault'],
+      DEFAULT_DEVICE_PROFILE.controller.safeModeDefault,
+    ),
+  };
+}
+
+function normalizeGcodeDialect(
+  value: unknown,
+  airAssistCommand: Project['device']['airAssistCommand'],
+): Project['device']['gcodeDialect'] {
+  if (!isObject(value)) return { ...DEFAULT_DEVICE_PROFILE.gcodeDialect, airAssistCommand };
+  return {
+    dialectId:
+      typeof value['dialectId'] === 'string' && value['dialectId'].trim() !== ''
+        ? value['dialectId']
+        : DEFAULT_DEVICE_PROFILE.gcodeDialect.dialectId,
+    returnToOriginOnEnd: booleanOrDefault(
+      value['returnToOriginOnEnd'],
+      DEFAULT_DEVICE_PROFILE.gcodeDialect.returnToOriginOnEnd,
+    ),
+    emitSOnTravel: booleanOrDefault(
+      value['emitSOnTravel'],
+      DEFAULT_DEVICE_PROFILE.gcodeDialect.emitSOnTravel,
+    ),
+    emitSOnEveryBurnMove: booleanOrDefault(
+      value['emitSOnEveryBurnMove'],
+      DEFAULT_DEVICE_PROFILE.gcodeDialect.emitSOnEveryBurnMove,
+    ),
+    modalFeedrate: booleanOrDefault(
+      value['modalFeedrate'],
+      DEFAULT_DEVICE_PROFILE.gcodeDialect.modalFeedrate,
+    ),
+    airAssistCommand,
+    laserModeCommand:
+      value['laserModeCommand'] === 'M3' ||
+      value['laserModeCommand'] === 'M4' ||
+      value['laserModeCommand'] === 'mixed'
+        ? value['laserModeCommand']
+        : DEFAULT_DEVICE_PROFILE.gcodeDialect.laserModeCommand,
+  };
+}
+
+function positiveFiniteOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function booleanOrDefault(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
 }
 
 // Back-fill additive TextObject fields on load. D.1 added letterSpacing —

@@ -17,7 +17,7 @@
 import {
   classifyResponse,
   CMD_SETTINGS,
-  disconnect as disconnectStreamer,
+  markErrored,
   onAck,
   type SettingsCollectorState,
   startCollecting,
@@ -137,7 +137,13 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'alarm') {
-    set({ alarmCode: cls.code, wcoCache: null, workOriginActive: false, motionOperation: null });
+    set({
+      alarmCode: cls.code,
+      wcoCache: null,
+      workOriginActive: false,
+      homingState: 'unknown',
+      motionOperation: null,
+    });
     advanceStream(set, get, safeWrite, 'alarm');
     return;
   }
@@ -167,13 +173,15 @@ function handleStatusLine(
   safeWrite: SafeWriteFn,
   report: StatusReport,
 ): void {
-  const operation = get().motionOperation;
-  const streamer = get().streamer;
+  const state = get();
+  const operation = state.motionOperation;
+  const streamer = state.streamer;
   if (report.state === 'Alarm') {
     set({
       statusReport: report,
       wcoCache: null,
       workOriginActive: false,
+      homingState: 'unknown',
       motionOperation: null,
     });
     return;
@@ -185,6 +193,7 @@ function handleStatusLine(
   const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
   const completedStreamerPatch =
     streamer?.status === 'done' && report.state === 'Idle' ? { streamer: null } : {};
+  const homingPatch = homingPatchForStatus(state.homingState, report);
 
   if (report.wco !== null) {
     set({
@@ -193,12 +202,22 @@ function handleStatusLine(
       workOriginActive: hasCustomOrigin(report.wco),
       ...operationPatch,
       ...completedStreamerPatch,
+      ...homingPatch,
     });
   } else {
-    set({ statusReport: report, ...operationPatch, ...completedStreamerPatch });
+    set({ statusReport: report, ...operationPatch, ...completedStreamerPatch, ...homingPatch });
   }
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
+}
+
+function homingPatchForStatus(
+  homingState: LaserState['homingState'],
+  report: StatusReport,
+): Partial<Pick<LaserState, 'homingState'>> {
+  if (report.state === 'Home') return { homingState: 'homing' };
+  if (homingState === 'homing' && report.state === 'Idle') return { homingState: 'confirmed' };
+  return {};
 }
 
 function dispatchQueuedFrameLine(set: SetFn, safeWrite: SafeWriteFn, line: string): void {
@@ -227,7 +246,7 @@ function advanceStream(
   if (stepped.toSend.length > 0) {
     void safeWrite(stepped.toSend).catch(() => {
       set({
-        streamer: disconnectStreamer(acked.state),
+        streamer: markErrored(acked.state),
         safetyNotice: disconnectDuringJobNotice(),
       });
     });
