@@ -11,10 +11,12 @@ import {
   type SceneObject,
   type OutputScope,
   type Vec2,
+  validateOutputScope,
 } from '../../core/scene';
 import {
   buildToolpath,
   EMPTY_JOB,
+  scenePreparationTooComplex,
   sliceToolpath,
   type JobOriginPlacement,
   type Toolpath,
@@ -98,9 +100,14 @@ export function buildPreviewToolpath(
   options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope } = {},
 ): Toolpath {
   // Use the SAME prepared job (compile + optimize) as Save/Start so the preview
-  // shows the exact path ORDER the machine runs (roadmap P1-C). An over-budget
-  // raster prepares to nothing -> empty preview (matching the too-large
-  // estimate), never a freeze.
+  // shows the exact path ORDER the machine runs (roadmap P1-C). Cheap scoped
+  // complexity gates run first so huge traces/fills never reach synchronous
+  // compile. Over-budget rasters still fail in prepareOutput before large work.
+  const scoped =
+    options.outputScope === undefined ? null : validateOutputScope(project.scene, options.outputScope);
+  if (scoped !== null && !scoped.ok) return buildToolpath(EMPTY_JOB);
+  const complexityScene = scoped === null ? project.scene : scoped.scene;
+  if (scenePreparationTooComplex(complexityScene)) return buildToolpath(EMPTY_JOB);
   const prepared = prepareOutput(project, {
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),

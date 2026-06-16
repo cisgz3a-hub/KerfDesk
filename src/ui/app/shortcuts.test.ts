@@ -1,17 +1,72 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   handleEditShortcut,
+  handleFileShortcut,
   handleToolShortcut,
   handleTransformShortcut,
   handleViewShortcut,
 } from './shortcuts';
 import {
   createProject,
+  DEFAULT_OUTPUT_SCOPE,
   IDENTITY_TRANSFORM,
   type Project,
   type SceneObject,
   type Transform,
 } from '../../core/scene';
+import type { PlatformAdapter } from '../../platform/types';
+import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
+import type { ImportOutcome } from '../state/store';
+
+const mockPlatform: PlatformAdapter = {
+  id: 'mock',
+  pickFilesForOpen: vi.fn(async () => []),
+  pickFileForSave: vi.fn(async () => null),
+  serial: {
+    isSupported: () => false,
+    requestPort: vi.fn(async () => null),
+  },
+};
+
+function fileCtx(
+  overrides: Partial<Parameters<typeof handleFileShortcut>[1]> = {},
+): Parameters<typeof handleFileShortcut>[1] {
+  return {
+    platform: mockPlatform,
+    project: createProject(),
+    importSvgObject: vi.fn((): ImportOutcome => ({ kind: 'added' })),
+    setProject: vi.fn(),
+    newProject: vi.fn(),
+    savedName: null,
+    jobPlacement: DEFAULT_JOB_PLACEMENT,
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    machine: { statusReport: null, workOriginActive: false, wcoCache: null },
+    controllerSettings: null,
+    lastSaveTarget: null,
+    markSaved: vi.fn(),
+    markLoaded: vi.fn(),
+    pushToast: vi.fn(),
+    confirmDiscard: vi.fn(async () => true),
+    ...overrides,
+  };
+}
+
+describe('handleFileShortcut - LightBurn-compatible Save G-code binding', () => {
+  it('leaves Ctrl+E free for the future Ellipse tool instead of exporting G-code', () => {
+    const event = fakeKeydown({ key: 'e', ctrlKey: true });
+
+    expect(handleFileShortcut(event, fileCtx())).toBe(false);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('handles Ctrl+Shift+E as Save G-code', () => {
+    vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    const event = fakeKeydown({ key: 'e', ctrlKey: true, shiftKey: true });
+
+    expect(handleFileShortcut(event, fileCtx())).toBe(true);
+    expect(event.defaultPrevented).toBe(true);
+  });
+});
 
 // Minimal stub for the EditCtx so each test only spies on the action it
 // cares about. Anything that fires unexpectedly trips its assertion.
@@ -37,6 +92,7 @@ function fakeKeydown(opts: {
   readonly key: string;
   readonly ctrlKey?: boolean;
   readonly metaKey?: boolean;
+  readonly altKey?: boolean;
   readonly shiftKey?: boolean;
   readonly target?: HTMLElement | null;
 }): KeyboardEvent {
@@ -46,6 +102,7 @@ function fakeKeydown(opts: {
     key: opts.key,
     ctrlKey: opts.ctrlKey ?? false,
     metaKey: opts.metaKey ?? false,
+    altKey: opts.altKey ?? false,
     shiftKey: opts.shiftKey ?? false,
     bubbles: true,
     cancelable: true,

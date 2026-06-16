@@ -5,6 +5,7 @@ import { progress } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
 import type { MotionBoundsOffset } from '../../core/invariants';
 import {
+  computeFrameBounds,
   computeJobBounds,
   computeJobMotionBounds,
   describeFramePreflightFailure,
@@ -191,7 +192,7 @@ function startJobTitle(estimate: LiveJobEstimate): string {
     return `Estimated burn time: ${estimate.label}`;
   }
   if (estimate.kind === 'too-large') {
-    return 'Large trace: live estimate paused for performance. Start still generates full G-code.';
+    return 'Large job: Start will block until you reduce the artwork size or lower the raster settings.';
   }
   return 'Enable Output on at least one layer to start a job';
 }
@@ -301,11 +302,32 @@ function useFrameAction(): () => void {
       pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
       return;
     }
+    const frameBounds = computeFrameBounds(
+      project.scene,
+      project.device,
+      placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
+    );
     const prepared = prepareOutput(project, {
       ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
       outputScope,
     });
     if (!prepared.ok) {
+      if (isRasterBudgetOnlyFailure(prepared.preflight) && frameBounds !== null) {
+        const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
+        const motionIssue = describeFrameMotionPreflightIssue(
+          frameBounds,
+          motionOffset,
+          placement.jobOrigin !== undefined,
+          project.device,
+        );
+        if (motionIssue !== null) {
+          pushToast(motionIssue, 'error');
+          return;
+        }
+        const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
+        void frame(frameBounds, feed);
+        return;
+      }
       pushToast(
         prepared.preflight.issues[0]?.message ?? 'Raster job is too large to frame.',
         'error',
@@ -341,6 +363,15 @@ function useFrameAction(): () => void {
     const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
     void frame(bounds, feed);
   };
+}
+
+function isRasterBudgetOnlyFailure(
+  preflight: Extract<ReturnType<typeof prepareOutput>, { readonly ok: false }>['preflight'],
+): boolean {
+  return (
+    preflight.issues.length > 0 &&
+    preflight.issues.every((issue) => issue.code === 'raster-too-large')
+  );
 }
 
 function describeFrameMotionPreflightIssue(

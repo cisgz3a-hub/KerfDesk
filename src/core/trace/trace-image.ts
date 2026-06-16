@@ -264,7 +264,9 @@ export async function traceImageToSvgString(
 // Extracted from traceImageToSvgString so complexity stays under
 // the project cap (12). Pure function — same inputs, same output.
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
-  if (options.traceTransparency === true) {
+  // Trace Transparency keys the mask off alpha. If an image is fully opaque,
+  // tracing alpha would turn the whole page black, so fall back to luma trace.
+  if (options.traceTransparency === true && imageHasTransparency(image)) {
     let prepared = alphaToMonochrome(image, options.cutoffLuma ?? 0, options.thresholdLuma ?? 128);
     if (shouldDespeckle(options)) {
       prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
@@ -406,6 +408,13 @@ function localMean(
     (integral[y1 * stride + x0] ?? 0) +
     (integral[y0 * stride + x0] ?? 0);
   return sum / Math.max(1, (x1 - x0) * (y1 - y0));
+}
+
+function imageHasTransparency(image: RawImageData): boolean {
+  for (let i = 3; i < image.data.length; i += 4) {
+    if (image.data[i] === 0) return true;
+  }
+  return false;
 }
 
 function alphaToMonochrome(image: RawImageData, cutoff: number, threshold: number): RawImageData {

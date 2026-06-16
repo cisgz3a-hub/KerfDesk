@@ -267,6 +267,28 @@ describe('traceImageToSvgString', () => {
     expect(Array.from(result.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255]);
   });
 
+  it('Trace Transparency falls back to the brightness band on a fully opaque image (no black page)', () => {
+    // All three pixels are opaque (alpha 255): black, white, black. The alpha
+    // mask would mark every alpha>0 pixel as ink — a solid black trace. With no
+    // transparency to key off, preprocessForTrace must fall back to the
+    // brightness band so an opaque image still traces (the white pixel stays
+    // background instead of going black).
+    const data = new Uint8ClampedArray([0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255]);
+
+    const result = preprocessForTrace(
+      { width: 3, height: 1, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        cutoffLuma: 0,
+        thresholdLuma: 128,
+        traceTransparency: true,
+      },
+    );
+
+    // Middle (opaque white) is background, not ink — proves it is not all-black.
+    expect(Array.from(result.data)).toEqual([0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255]);
+  });
+
   it('preprocessForTrace applies the LightBurn brightness band when cutoffLuma is set', () => {
     const data = new Uint8ClampedArray([
       0, 0, 0, 255, 32, 32, 32, 255, 128, 128, 128, 255, 180, 180, 180, 255,
