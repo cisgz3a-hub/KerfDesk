@@ -13,6 +13,7 @@ import { ToolStrip, Workspace } from '../workspace';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
+import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
 import { useMaterialLibraryPersistence } from './use-material-library-persistence';
 import { useShortcuts } from './use-shortcuts';
 import { useSpacePan } from './use-space-pan';
@@ -27,6 +28,7 @@ export function App(): JSX.Element {
   useAutosaveRecovery();
   useAutosave();
   useMaterialLibraryPersistence();
+  useLayerDefaultsPersistence();
   useGlobalErrorHandlers();
   useImportDragDrop();
   useJobShortcuts();

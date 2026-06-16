@@ -9,7 +9,6 @@ import {
   createProject,
   type Layer,
   type LayerMoveDirection,
-  moveLayer as moveSceneLayer,
   type OutputScope,
   type Project,
   type RasterImage,
@@ -19,18 +18,21 @@ import {
   type TextObject,
   type TracedImage,
   type Transform,
-  updateLayer,
   type Vec2,
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
-import { fitToSelection } from './viewport-actions';
 import { imageImportActions } from './import-actions';
 import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
 import { layerActions, type LayerSettingsClipboard } from './layer-actions';
+import {
+  DEFAULT_LAYER_DEFAULTS_STATE,
+  layerDefaultActions,
+  type LayerDefaultsState,
+} from './layer-default-actions';
 import {
   MATERIAL_LIBRARY_STATE_DEFAULTS,
   currentMaterialLibraryState,
@@ -47,18 +49,20 @@ import {
   selectionTransformActions,
   type SelectionTransformActions,
 } from './selection-transform-actions';
-import {
-  applyDuplicate,
-  type ImportOutcome,
-  pushUndo,
-  type TraceExistingImageOptions,
-} from './scene-mutations';
+import { type ImportOutcome, type TraceExistingImageOptions } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
 import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
+import {
+  duplicateAction,
+  fitToSelectionAction,
+  historyActions,
+  interactionActions,
+  saveTrackingActions,
+  sceneActions,
+  viewActions,
+} from './store-actions';
 
 export type { ImportOutcome } from './scene-mutations';
-
-const HISTORY_DEPTH = 50;
 
 export type OutputScopeSettings = {
   readonly cutSelectedGraphics: boolean;
@@ -103,6 +107,7 @@ export type AppState = ObjectPropertiesActions &
     readonly savedName: string | null;
     readonly lastSaveTarget: SaveTarget | null;
     readonly copiedLayerSettings: LayerSettingsClipboard | null;
+    readonly layerDefaults: LayerDefaultsState;
 
     readonly setProject: (project: Project) => void;
     readonly newProject: () => void;
@@ -148,6 +153,10 @@ export type AppState = ObjectPropertiesActions &
     readonly deleteLayerAndObjects: (layerId: string) => void;
     readonly copyLayerSettings: (layerId: string) => void;
     readonly pasteLayerSettings: (layerId: string) => void;
+    readonly makeLayerDefault: (layerId: string) => void;
+    readonly makeLayerDefaultForAll: (layerId: string) => void;
+    readonly resetLayerToDefault: (layerId: string) => void;
+    readonly setLayerDefaults: (layerDefaults: LayerDefaultsState) => void;
     readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
     readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
@@ -195,6 +204,7 @@ function initialState(): Pick<
   | 'savedName'
   | 'lastSaveTarget'
   | 'copiedLayerSettings'
+  | 'layerDefaults'
 > &
   ReturnType<typeof currentMaterialLibraryState> {
   return {
@@ -213,179 +223,32 @@ function initialState(): Pick<
     savedName: null,
     lastSaveTarget: null,
     copiedLayerSettings: null,
+    layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
     ...MATERIAL_LIBRARY_STATE_DEFAULTS,
   };
+}
+
+function currentLayerDefaultsState(
+  state: Pick<AppState, 'layerDefaults'>,
+): Pick<AppState, 'layerDefaults'> {
+  return { layerDefaults: state.layerDefaults };
 }
 
 function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'> {
   return {
     setProject: (project) =>
-      set((s) => ({ ...initialState(), project, ...currentMaterialLibraryState(s) })),
-    newProject: () => set((s) => ({ ...initialState(), ...currentMaterialLibraryState(s) })),
-  };
-}
-
-function sceneActions(
-  set: Setter,
-): Pick<AppState, 'setLayerParam' | 'moveLayer' | 'updateDeviceProfile'> {
-  return {
-    setLayerParam: (layerId, patch) =>
       set((s) => ({
-        project: {
-          ...s.project,
-          scene: updateLayer(s.project.scene, layerId, patch),
-        },
-        undoStack: pushUndo(s.project, s.undoStack),
-        redoStack: [],
-        dirty: true,
+        ...initialState(),
+        project,
+        ...currentMaterialLibraryState(s),
+        ...currentLayerDefaultsState(s),
       })),
-    moveLayer: (layerId, direction) =>
-      set((s) => {
-        const scene = moveSceneLayer(s.project.scene, layerId, direction);
-        if (scene === s.project.scene) return s;
-        return {
-          project: { ...s.project, scene },
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
-    updateDeviceProfile: (patch) =>
-      set((s) => {
-        const nextDevice: DeviceProfile = { ...s.project.device, ...patch };
-        // When the bed dimensions change, keep the workspace in sync.
-        const nextWorkspace =
-          patch.bedWidth !== undefined || patch.bedHeight !== undefined
-            ? {
-                ...s.project.workspace,
-                width: nextDevice.bedWidth,
-                height: nextDevice.bedHeight,
-              }
-            : s.project.workspace;
-        return {
-          project: { ...s.project, device: nextDevice, workspace: nextWorkspace },
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
-  };
-}
-
-function duplicateAction(set: Setter): Pick<AppState, 'duplicateSelection'> {
-  return {
-    duplicateSelection: () =>
-      set((s) => {
-        const result = applyDuplicate(s, () => crypto.randomUUID());
-        if (result === null) return s;
-        return result;
-      }),
-  };
-}
-
-function fitToSelectionAction(get: () => AppState): Pick<AppState, 'fitToSelection'> {
-  return {
-    fitToSelection: () => fitToSelection(get),
-  };
-}
-
-function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
-  return {
-    undo: () =>
-      set((s) => {
-        const prev = s.undoStack[s.undoStack.length - 1];
-        if (prev === undefined) return s;
-        return {
-          project: prev,
-          undoStack: s.undoStack.slice(0, -1),
-          redoStack: [...s.redoStack, s.project].slice(-HISTORY_DEPTH),
-          selectedObjectId: null,
-          dirty: true,
-        };
-      }),
-    redo: () =>
-      set((s) => {
-        const next = s.redoStack[s.redoStack.length - 1];
-        if (next === undefined) return s;
-        return {
-          project: next,
-          redoStack: s.redoStack.slice(0, -1),
-          undoStack: [...s.undoStack, s.project].slice(-HISTORY_DEPTH),
-          selectedObjectId: null,
-          dirty: true,
-        };
-      }),
-  };
-}
-
-function viewActions(
-  set: Setter,
-): Pick<
-  AppState,
-  | 'selectObject'
-  | 'toggleSelectObject'
-  | 'selectAllObjects'
-  | 'togglePreview'
-  | 'setJobPlacement'
-  | 'setOutputScopeSettings'
-  | 'setCursorMm'
-> {
-  return {
-    selectObject: (id) => set({ selectedObjectId: id, additionalSelectedIds: new Set() }),
-    toggleSelectObject: (id) =>
-      set((s) => {
-        // If `id` is the current primary and there are no extras: clear all.
-        if (s.selectedObjectId === id && s.additionalSelectedIds.size === 0) {
-          return { selectedObjectId: null, additionalSelectedIds: new Set() };
-        }
-        // If `id` is the primary and there ARE extras: promote one of the
-        // extras to primary so the user can keep multi-selecting.
-        if (s.selectedObjectId === id) {
-          const next = new Set(s.additionalSelectedIds);
-          const promoted = next.values().next().value as string | undefined;
-          if (promoted !== undefined) next.delete(promoted);
-          return { selectedObjectId: promoted ?? null, additionalSelectedIds: next };
-        }
-        const next = new Set(s.additionalSelectedIds);
-        if (next.has(id)) {
-          next.delete(id);
-          return { additionalSelectedIds: next };
-        }
-        // If nothing is selected yet, the toggle becomes the primary.
-        if (s.selectedObjectId === null) {
-          return { selectedObjectId: id, additionalSelectedIds: next };
-        }
-        next.add(id);
-        return { additionalSelectedIds: next };
-      }),
-    selectAllObjects: () =>
-      set((s) => {
-        const ids = s.project.scene.objects.map((o) => o.id);
-        const [primary, ...rest] = ids;
-        return {
-          selectedObjectId: primary ?? null,
-          additionalSelectedIds: new Set(rest),
-        };
-      }),
-    togglePreview: () => set((s) => ({ previewMode: !s.previewMode })),
-    setJobPlacement: (patch) =>
+    newProject: () =>
       set((s) => ({
-        jobPlacement: {
-          ...s.jobPlacement,
-          ...patch,
-        },
+        ...initialState(),
+        ...currentMaterialLibraryState(s),
+        ...currentLayerDefaultsState(s),
       })),
-    setOutputScopeSettings: (patch) =>
-      set((s) => {
-        const next = { ...s.outputScopeSettings, ...patch };
-        return {
-          outputScopeSettings: {
-            ...next,
-            useSelectionOrigin: next.cutSelectedGraphics ? next.useSelectionOrigin : false,
-          },
-        };
-      }),
-    setCursorMm: (cursor) => set({ cursorMm: cursor }),
   };
 }
 
@@ -400,59 +263,6 @@ export function currentOutputScope(state: AppState): OutputScope {
   };
 }
 
-function applyTransformToScene(project: Project, id: string, transform: Transform): Project {
-  return {
-    ...project,
-    scene: {
-      ...project.scene,
-      objects: project.scene.objects.map((o) => (o.id === id ? { ...o, transform } : o)),
-    },
-  };
-}
-
-function interactionActions(
-  set: Setter,
-): Pick<
-  AppState,
-  'beginInteraction' | 'setObjectTransform' | 'endInteraction' | 'applyObjectTransform'
-> {
-  return {
-    beginInteraction: () => set((s) => ({ pendingUndo: s.project })),
-    setObjectTransform: (id, transform) =>
-      set((s) => ({ project: applyTransformToScene(s.project, id, transform), dirty: true })),
-    endInteraction: () =>
-      set((s) => {
-        if (s.pendingUndo === null) return s;
-        if (s.pendingUndo === s.project) return { pendingUndo: null };
-        return {
-          pendingUndo: null,
-          undoStack: pushUndo(s.pendingUndo, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
-    applyObjectTransform: (id, transform) =>
-      set((s) => ({
-        project: applyTransformToScene(s.project, id, transform),
-        undoStack: pushUndo(s.project, s.undoStack),
-        redoStack: [],
-        dirty: true,
-      })),
-  };
-}
-
-function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | 'markLoaded'> {
-  return {
-    markSaved: (target) =>
-      set({ dirty: false, savedName: target.displayName, lastSaveTarget: target }),
-    // Opening a file: clear dirty, remember the name for the title bar, but
-    // drop any save target — the next Ctrl+S re-prompts (we'd need to keep
-    // the FileSystemFileHandle / Electron path to write through without a
-    // dialog, which is Phase C autosave-territory).
-    markLoaded: (filename) => set({ dirty: false, savedName: filename, lastSaveTarget: null }),
-  };
-}
-
 export const useStore = create<AppState>((set, get) => ({
   ...initialState(),
   ...projectActions(set),
@@ -460,6 +270,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...imageImportActions(set, get),
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
+  ...layerDefaultActions(set),
   ...materialLibraryActions(set),
   ...objectPropertiesActions(set),
   ...generatedSceneActions(set),

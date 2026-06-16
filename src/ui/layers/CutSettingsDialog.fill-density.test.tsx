@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createLayer, type Layer } from '../../core/scene';
 import { CutSettingsDialog } from './CutSettingsDialog';
 
@@ -10,6 +10,46 @@ import { CutSettingsDialog } from './CutSettingsDialog';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 describe('CutSettingsDialog fill density controls', () => {
+  it('shows only the backed field group for the selected mode', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <CutSettingsDialog
+            layer={lineLayer()}
+            onCancel={() => undefined}
+            onApply={() => undefined}
+          />,
+        );
+      });
+
+      const mode = host.querySelector('select[aria-label="Cut settings mode"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('mode select missing');
+      expect(host.textContent).not.toContain('Line Interval');
+      expect(host.textContent).not.toContain('Dither');
+
+      await act(async () => {
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+      expect(host.textContent).toContain('Line Interval');
+      expect(host.textContent).not.toContain('Dither');
+
+      await act(async () => {
+        mode.value = 'image';
+        Simulate.change(mode);
+      });
+      expect(host.textContent).not.toContain('Lines / Inch');
+      expect(host.textContent).toContain('Dither');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('shows LightBurn-style line interval and lines per inch controls for fill layers', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -183,10 +223,58 @@ describe('CutSettingsDialog fill density controls', () => {
       host.remove();
     }
   });
+
+  it('exposes default layer settings actions without applying staged edits', async () => {
+    const onApply = vi.fn();
+    const onMakeDefault = vi.fn();
+    const onMakeDefaultForAll = vi.fn();
+    const onResetToDefault = vi.fn();
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <CutSettingsDialog
+            layer={fillLayer({ power: 44 })}
+            onCancel={() => undefined}
+            onApply={onApply}
+            onMakeDefault={onMakeDefault}
+            onMakeDefaultForAll={onMakeDefaultForAll}
+            onResetToDefault={onResetToDefault}
+          />,
+        );
+      });
+
+      const makeDefault = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Make Default',
+      );
+      if (!(makeDefault instanceof HTMLButtonElement)) {
+        throw new Error('Make Default button missing');
+      }
+
+      await act(async () => {
+        makeDefault.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(onMakeDefault).toHaveBeenCalledTimes(1);
+      expect(onMakeDefaultForAll).not.toHaveBeenCalled();
+      expect(onResetToDefault).not.toHaveBeenCalled();
+      expect(onApply).not.toHaveBeenCalled();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
 });
 
 function fillLayer(patch: Partial<Layer> = {}): Layer {
   return { ...createLayer({ id: '#ff0000', color: '#ff0000', mode: 'fill' }), ...patch };
+}
+
+function lineLayer(patch: Partial<Layer> = {}): Layer {
+  return { ...createLayer({ id: '#ff0000', color: '#ff0000', mode: 'line' }), ...patch };
 }
 
 function requireApplied(patch: Partial<Layer> | null): Partial<Layer> {

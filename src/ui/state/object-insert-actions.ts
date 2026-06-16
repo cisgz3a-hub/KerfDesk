@@ -4,7 +4,15 @@
 // store.ts so the root store stays under the file-size cap; all three share the
 // same "add an object + auto-create layers + select + push undo" shape.
 
-import { type SceneObject, type ShapeObject, type TextObject } from '../../core/scene';
+import {
+  type Layer,
+  type Project,
+  type SceneObject,
+  type ShapeObject,
+  type TextObject,
+} from '../../core/scene';
+import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
+import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
 import { fitAllObjects } from './viewport-actions';
 import {
@@ -33,7 +41,11 @@ export function objectInsertActions(
           outcome = next.outcome;
           return next.state;
         }
-        return applyFreshImport(s, object, batchOffsetIdx);
+        return applyLayerDefaultsToFreshLayers(
+          s.project.scene.layers,
+          applyFreshImport(s, object, batchOffsetIdx),
+          s.layerDefaults,
+        );
       });
       // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
       fitAllObjects(get);
@@ -44,6 +56,30 @@ export function objectInsertActions(
     },
     drawShape: (shape: ShapeObject) => {
       set((s) => applyDrawShape(s, shape));
+    },
+  };
+}
+
+function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }>(
+  previousLayers: ReadonlyArray<Layer>,
+  result: T,
+  defaults: LayerDefaultsState,
+): T {
+  const existing = new Set(previousLayers.map((layer) => layer.id));
+  let changed = false;
+  const layers = result.project.scene.layers.map((layer) => {
+    if (existing.has(layer.id)) return layer;
+    const settings = defaultSettingsForColor(defaults, layer.color);
+    if (Object.keys(settings).length === 0) return layer;
+    changed = true;
+    return applyLayerDefaultSettings(layer, settings);
+  });
+  if (!changed) return result;
+  return {
+    ...result,
+    project: {
+      ...result.project,
+      scene: { ...result.project.scene, layers },
     },
   };
 }

@@ -236,4 +236,85 @@ describe('layer store actions', () => {
     expect(useStore.getState().undoStack).toHaveLength(0);
     expect(useStore.getState().dirty).toBe(false);
   });
+
+  it('makeLayerDefault remembers current settings without mutating project history', () => {
+    useStore.getState().createManualLayer('#ff0000');
+    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 22, speed: 3333 });
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    useStore.getState().makeLayerDefault('#ff0000');
+
+    expect(useStore.getState().layerDefaults.byColor['#ff0000']).toMatchObject({
+      mode: 'fill',
+      power: 22,
+      speed: 3333,
+    });
+    expect(useStore.getState().dirty).toBe(false);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('resetLayerToDefault applies the saved color default through one undoable patch', () => {
+    useStore.getState().createManualLayer('#ff0000');
+    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 22 });
+    useStore.getState().makeLayerDefault('#ff0000');
+    useStore.getState().setLayerParam('#ff0000', { mode: 'line', power: 80 });
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    useStore.getState().resetLayerToDefault('#ff0000');
+
+    expect(useStore.getState().project.scene.layers[0]).toMatchObject({
+      mode: 'fill',
+      power: 22,
+    });
+    expect(useStore.getState().dirty).toBe(true);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
+
+  it('createManualLayer applies the saved color default to a later matching layer', () => {
+    useStore.getState().createManualLayer('#ff0000');
+    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 22 });
+    useStore.getState().makeLayerDefault('#ff0000');
+    useStore.getState().deleteLayerAndObjects('#ff0000');
+
+    useStore.getState().createManualLayer('#ff0000');
+
+    expect(useStore.getState().project.scene.layers[0]).toMatchObject({
+      id: '#ff0000',
+      color: '#ff0000',
+      mode: 'fill',
+      power: 22,
+    });
+  });
+
+  it('import-created layers apply the saved color default', () => {
+    useStore.getState().createManualLayer('#ff0000');
+    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 22 });
+    useStore.getState().makeLayerDefault('#ff0000');
+    useStore.getState().deleteLayerAndObjects('#ff0000');
+
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+
+    expect(useStore.getState().project.scene.layers[0]).toMatchObject({
+      id: '#ff0000',
+      color: '#ff0000',
+      mode: 'fill',
+      power: 22,
+    });
+  });
+
+  it('makeLayerDefaultForAll applies the saved default to later colors', () => {
+    useStore.getState().createManualLayer('#ff0000');
+    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 35, speed: 2444 });
+    useStore.getState().makeLayerDefaultForAll('#ff0000');
+
+    useStore.getState().createManualLayer('#00ff00');
+
+    expect(useStore.getState().project.scene.layers[1]).toMatchObject({
+      id: '#00ff00',
+      color: '#00ff00',
+      mode: 'fill',
+      power: 35,
+      speed: 2444,
+    });
+  });
 });
