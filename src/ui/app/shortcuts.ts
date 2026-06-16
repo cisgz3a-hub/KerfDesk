@@ -2,7 +2,7 @@
 // handler and bindings table so individual functions stay small per ADR-015.
 //
 // Categories:
-//   * File: Cmd/Ctrl+N, O, S, I, E
+//   * File: Cmd/Ctrl+N, O, S, I; Cmd/Ctrl+Shift+E for Save G-code
 //   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
 //   * Transform: arrow keys (nudge), H/V (flip)
 //   * View: P (preview toggle)

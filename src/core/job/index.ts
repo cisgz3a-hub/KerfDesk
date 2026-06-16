@@ -3,8 +3,17 @@ export { EMPTY_JOB } from './job';
 export { compileJob, DEFAULT_OVERSCAN_MM } from './compile-job';
 export type { JobBounds } from './job-bounds';
 export { computeJobBounds, computeJobMotionBounds } from './job-bounds';
+export type { ComputeFrameBoundsOptions } from './frame-bounds';
+export { computeFrameBounds } from './frame-bounds';
 export type { RasterMachineBounds } from './raster-bounds';
 export { rasterBoundsInMachineCoords } from './raster-bounds';
+export {
+  countEstimatedFillSegments,
+  countOutputVectorSegments,
+  PREPARATION_COMPILED_SEGMENT_BUDGET,
+  PREPARATION_RAW_VECTOR_SEGMENT_BUDGET,
+  scenePreparationTooComplex,
+} from './preparation-complexity';
 export type { FramePreflight } from './frame-preflight';
 export { describeFramePreflightFailure, framePreflight } from './frame-preflight';
 export type {
