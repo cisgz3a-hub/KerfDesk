@@ -11,6 +11,7 @@
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
   applyLumaAdjustments,
   dither,
@@ -299,7 +300,11 @@ function collectLineSegmentsForLayer(
   for (const obj of objects) {
     appendSegmentsFromObject(obj, layer, device, out);
   }
-  return out;
+  if (!layer.tabsEnabled) return out;
+  return applyAutomaticTabsToPolylines(
+    out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
+    layer,
+  ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed }));
 }
 
 function collectFillSegmentsForLayer(

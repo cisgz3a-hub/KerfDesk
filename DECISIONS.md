@@ -2825,6 +2825,51 @@ Verification:
 
 ---
 
+## ADR-053 - Lane 6E: Automatic Line-mode tabs / bridges
+
+LightBurn supports tabs/bridges as a Line-mode cut aid: small intentionally
+uncut gaps keep parts attached to stock until the operator removes them after
+the job. Its full workflow includes manual Add Tabs placement, editing, even
+spacing controls, and optional tab-cut power. LaserForge's first slice is the
+smaller backed subset needed for safe production output.
+
+Decision:
+
+- Add additive layer fields with safe defaults: `tabsEnabled=false`,
+  `tabSizeMm=0.5`, `tabsPerShape=4`, and `tabSkipInnerShapes=true`.
+  Schema version stays `1`; older `.lf2` files back-fill those defaults.
+- Scope v1 to automatic hard-skip tabs on closed Line-mode contours only.
+  Fill, Image, open paths, manual tab placement, per-shape tab points,
+  Even Spacing, Limit Max Tabs, Tab Cut Power, and lead-in/out remain deferred.
+- Apply tabs after object transforms, device-origin conversion, and kerf
+  compensation. This keeps tab size in real machine millimeters and makes
+  Preview, Frame, Save, Start, and bounds checks use the same split geometry.
+- Preserve source artwork. A tabbed closed contour compiles into multiple open
+  burn segments with laser-off rapid/travel gaps between them; no node data is
+  written back to the scene object.
+- Skip inner same-color contours by default so holes stay fully cut. Operators
+  can disable that checkbox when they deliberately want bridges on every closed
+  contour.
+
+Consequences:
+
+- Jobs are byte-compatible with prior output when `tabsEnabled=false`.
+- The feature is honest: it creates real G-code gaps, not UI-only settings.
+- Manual LightBurn-style tab placement still needs a dedicated tool and scene
+  schema for per-contour tab points; this ADR deliberately does not add that.
+
+Verification:
+
+- Red-first tests cover geometry splitting, open-path no-op behavior, inner
+  contour skip behavior, compile-job output after machine transforms, layer
+  defaults, `.lf2` back-fill, Cut Settings draft/UI, material recipe
+  capture/apply/back-fill, and layer copy/paste wiring.
+- Hardware proof still requires a scrap cut: enable four tabs on a simple
+  closed shape, verify the part remains attached, then confirm the bridge size
+  breaks cleanly by hand.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

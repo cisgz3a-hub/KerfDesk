@@ -329,9 +329,10 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync.
 - DXF, AI, PDF import.
-- Tabs / bridges, lead-in / lead-out, fill patterns. Narrow Line-mode kerf
-  compensation is scoped by ADR-052; broader offset/boolean/node editing remains
-  out of scope.
+- Manual tabs / bridges, lead-in / lead-out, fill patterns. Narrow Line-mode
+  kerf compensation is scoped by ADR-052, and automatic Line-mode hard-skip
+  tabs are scoped by ADR-053; broader offset/boolean/node editing remains out of
+  scope.
 - Macros, scripting, command palette, plugins, extensions.
 - Variable text (CSV / counter / date).
 - System fonts.

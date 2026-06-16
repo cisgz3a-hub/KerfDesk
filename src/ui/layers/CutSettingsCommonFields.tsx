@@ -60,20 +60,76 @@ export function CutSettingsCommonFields(props: {
           title="Turn on air assist for this layer when the device profile is configured for M7 or M8."
         />
       </Field>
-      {props.mode === 'line' ? (
-        <Field label="Kerf Offset">
+      {props.mode === 'line' ? <LineModeFields layer={props.layer} /> : null}
+    </>
+  );
+}
+
+function LineModeFields(props: { readonly layer: Layer }): JSX.Element {
+  return (
+    <>
+      <Field label="Kerf Offset">
+        <NumberInput
+          name="kerfOffsetMm"
+          value={props.layer.kerfOffsetMm}
+          min={-10}
+          max={10}
+          step={0.01}
+          label="kerf offset"
+          title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer contours and inside holes; source artwork is unchanged."
+        />
+        <span className="lf-field-unit">mm</span>
+      </Field>
+      <fieldset
+        className="lf-fieldset"
+        title="Leave small uncut bridges on closed Line cuts so parts stay attached until you remove them."
+      >
+        <legend>Tabs / Bridges</legend>
+        <Field label="Enable">
+          <input
+            name="tabsEnabled"
+            type="checkbox"
+            className="lf-checkbox"
+            defaultChecked={props.layer.tabsEnabled}
+            aria-label="Cut settings enable tabs"
+            title="Enable automatic bridge gaps on closed Line cuts."
+          />
+        </Field>
+        <Field label="Size">
           <NumberInput
-            name="kerfOffsetMm"
-            value={props.layer.kerfOffsetMm}
-            min={-10}
-            max={10}
+            name="tabSizeMm"
+            value={props.layer.tabSizeMm}
+            min={0.01}
+            max={100}
             step={0.01}
-            label="kerf offset"
-            title="Compensate laser beam width on closed Line cuts. Positive cuts outside outer contours and inside holes; source artwork is unchanged."
+            label="tab size"
+            title="Set the length of each uncut bridge gap in millimeters."
           />
           <span className="lf-field-unit">mm</span>
         </Field>
-      ) : null}
+        <Field label="Count">
+          <NumberInput
+            name="tabsPerShape"
+            value={props.layer.tabsPerShape}
+            min={1}
+            max={100}
+            step={1}
+            label="tabs per shape"
+            title="Set how many evenly spaced bridge gaps to add to each closed outer contour."
+          />
+        </Field>
+        <Field label="Holes">
+          <input
+            name="tabSkipInnerShapes"
+            type="checkbox"
+            className="lf-checkbox"
+            defaultChecked={props.layer.tabSkipInnerShapes}
+            aria-label="Cut settings skip inner tabs"
+            title="Leave inner contours and holes whole instead of adding tabs to them."
+          />
+          <span className="lf-field-help">Skip inner shapes</span>
+        </Field>
+      </fieldset>
     </>
   );
 }

@@ -21,6 +21,10 @@ describe('project air assist persistence', () => {
     if (firstLayer === undefined) throw new Error('expected project fixture layer');
     delete firstLayer.airAssist;
     delete firstLayer.kerfOffsetMm;
+    delete firstLayer.tabsEnabled;
+    delete firstLayer.tabSizeMm;
+    delete firstLayer.tabsPerShape;
+    delete firstLayer.tabSkipInnerShapes;
 
     const result = deserializeProject(JSON.stringify(raw));
 
@@ -29,6 +33,10 @@ describe('project air assist persistence', () => {
     expect(result.project.device.airAssistCommand).toBe('none');
     expect(result.project.scene.layers[0]?.airAssist).toBe(false);
     expect(result.project.scene.layers[0]?.kerfOffsetMm).toBe(0);
+    expect(result.project.scene.layers[0]?.tabsEnabled).toBe(false);
+    expect(result.project.scene.layers[0]?.tabSizeMm).toBe(0.5);
+    expect(result.project.scene.layers[0]?.tabsPerShape).toBe(4);
+    expect(result.project.scene.layers[0]?.tabSkipInnerShapes).toBe(true);
   });
 
   it('reports invalid when the device air assist command is unknown', () => {

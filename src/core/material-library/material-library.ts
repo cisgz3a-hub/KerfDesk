@@ -8,6 +8,10 @@ export type MaterialRecipe = {
   readonly passes: number;
   readonly airAssist?: boolean;
   readonly kerfOffsetMm?: number;
+  readonly tabsEnabled?: boolean;
+  readonly tabSizeMm?: number;
+  readonly tabsPerShape?: number;
+  readonly tabSkipInnerShapes?: boolean;
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
@@ -28,6 +32,10 @@ export const MATERIAL_RECIPE_FIELDS = [
   'passes',
   'airAssist',
   'kerfOffsetMm',
+  'tabsEnabled',
+  'tabSizeMm',
+  'tabsPerShape',
+  'tabSkipInnerShapes',
   'hatchAngleDeg',
   'hatchSpacingMm',
   'fillOverscanMm',
@@ -52,6 +60,10 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     passes: layer.passes,
     airAssist: layer.airAssist,
     kerfOffsetMm: layer.kerfOffsetMm,
+    tabsEnabled: layer.tabsEnabled,
+    tabSizeMm: layer.tabSizeMm,
+    tabsPerShape: layer.tabsPerShape,
+    tabSkipInnerShapes: layer.tabSkipInnerShapes,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
     fillOverscanMm: layer.fillOverscanMm,
@@ -87,6 +99,10 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     passes: Math.max(1, Math.floor(finiteOr(recipe.passes, 1))),
     ...(recipe.airAssist !== undefined ? { airAssist: recipe.airAssist } : {}),
     kerfOffsetMm: finiteOr(recipe.kerfOffsetMm ?? 0, 0),
+    tabsEnabled: recipe.tabsEnabled === true,
+    tabSizeMm: Math.max(0.01, finiteOr(recipe.tabSizeMm ?? 0.5, 0.5)),
+    tabsPerShape: Math.max(1, Math.floor(finiteOr(recipe.tabsPerShape ?? 4, 4))),
+    tabSkipInnerShapes: recipe.tabSkipInnerShapes !== false,
     hatchAngleDeg: finiteOr(recipe.hatchAngleDeg, 0),
     hatchSpacingMm: Math.max(MIN_SPACING, finiteOr(recipe.hatchSpacingMm, MIN_SPACING)),
     fillOverscanMm: Math.max(0, finiteOr(recipe.fillOverscanMm, 0)),
@@ -137,6 +153,8 @@ function hasMotionNumbers(value: Record<string, unknown>): boolean {
     isPositiveFinite(value.speed) &&
     isPositiveInteger(value.passes) &&
     (value.kerfOffsetMm === undefined || isFiniteNumber(value.kerfOffsetMm)) &&
+    (value.tabSizeMm === undefined || isPositiveFinite(value.tabSizeMm)) &&
+    (value.tabsPerShape === undefined || isPositiveInteger(value.tabsPerShape)) &&
     isFiniteNumber(value.hatchAngleDeg) &&
     isPositiveFinite(value.hatchSpacingMm) &&
     isNonNegativeFinite(value.fillOverscanMm)
@@ -152,6 +170,8 @@ function hasRecipeBooleans(value: Record<string, unknown>): boolean {
     typeof value.fillBidirectional === 'boolean' &&
     typeof value.fillCrossHatch === 'boolean' &&
     (value.airAssist === undefined || typeof value.airAssist === 'boolean') &&
+    (value.tabsEnabled === undefined || typeof value.tabsEnabled === 'boolean') &&
+    (value.tabSkipInnerShapes === undefined || typeof value.tabSkipInnerShapes === 'boolean') &&
     typeof value.negativeImage === 'boolean' &&
     typeof value.passThrough === 'boolean'
   );
