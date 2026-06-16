@@ -7,6 +7,7 @@ import {
   MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster/raster-units';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
+import { dotWidthCorrectionMax } from './cut-settings-draft';
 
 export function CutSettingsImageFields(props: {
   readonly layer: Layer;
@@ -186,10 +187,6 @@ const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
   ordered: 'Ordered',
   grayscale: 'Grayscale',
 };
-
-function dotWidthCorrectionMax(linesPerMm: number): number {
-  return 1 / Math.max(1, linesPerMm);
-}
 
 function numericValue(s: string, fallback: number): number {
   const n = Number.parseFloat(s);

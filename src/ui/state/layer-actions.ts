@@ -8,6 +8,8 @@ import {
   type Scene,
   updateLayer,
 } from '../../core/scene';
+import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
+import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -18,6 +20,7 @@ type LayerActionState = StateSlice & {
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly copiedLayerSettings: LayerSettingsClipboard | null;
+  readonly layerDefaults: LayerDefaultsState;
 };
 
 type LayerActionMutation = {
@@ -62,9 +65,10 @@ export function layerActions(set: LayerActionSet): LayerActions {
         const normalized = normalizeLayerColor(color);
         if (normalized === null) return {};
         if (state.project.scene.layers.some((layer) => layer.color === normalized)) return {};
+        const defaults = defaultSettingsForColor(state.layerDefaults, normalized);
         const scene = addLayer(
           state.project.scene,
-          createLayer({ id: normalized, color: normalized }),
+          applyLayerDefaultSettings(createLayer({ id: normalized, color: normalized }), defaults),
         );
         return mutation(state, { ...state.project, scene });
       }),
