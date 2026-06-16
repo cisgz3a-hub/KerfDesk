@@ -294,8 +294,9 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     tooltip: 'Send realtime ? to request one immediate GRBL status report.',
   },
   'laser.machine-settings': {
-    label: 'Machine Settings',
-    tooltip: 'Read GRBL firmware settings and export a backup before changing controller setup.',
+    label: 'Read / Backup Controller Settings',
+    tooltip:
+      'Read live GRBL firmware settings with $$ and export a backup before changing controller setup.',
   },
   'laser.machine-settings.read': {
     label: 'Read machine settings',

@@ -44,7 +44,8 @@ describe('MachineSettingsPanel', () => {
   it('renders collapsed by default', async () => {
     const { host, cleanup } = await renderPanel();
     try {
-      expect(detailsBySummary(host, 'Machine Settings').open).toBe(false);
+      expect(detailsBySummary(host, 'Read / Backup Controller Settings').open).toBe(false);
+      expect(host.textContent).toContain('Reads live controller settings with $$');
     } finally {
       await cleanup();
     }

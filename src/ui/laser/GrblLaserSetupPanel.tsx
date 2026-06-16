@@ -16,22 +16,22 @@ export function GrblLaserSetupPanel({ disabled }: { readonly disabled: boolean }
     <details style={panelStyle}>
       <summary
         style={summaryStyle}
-        title="Open GRBL firmware setup commands for GT4040-style controllers."
+        title="Open the one-time GRBL firmware write helper for Neotronics / GT4040-style diode controllers."
       >
-        GRBL setup
+        One-time GRBL Setup
       </summary>
       <div style={bodyStyle}>
         <p style={copyStyle}>
-          Sends the small Neotronics-safe laser setup subset after you have read and backed up
-          machine settings.
+          Writes only the listed GRBL values after you have read and backed up controller settings.
+          Normal connect already reads live settings; do not run setup every time.
         </p>
         <button
           type="button"
           onClick={handleSetup}
           disabled={disabled}
-          title="Confirm and send $32=1, $30=1000, $130=400, $131=400, then $$. Homing is not changed."
+          title="Confirm and send persistent firmware writes: $32=1, $30=1000, $130=400, $131=400, then $$. Homing is not changed."
         >
-          GRBL laser setup
+          Apply one-time GRBL setup
         </button>
       </div>
     </details>

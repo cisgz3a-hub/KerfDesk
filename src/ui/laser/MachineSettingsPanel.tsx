@@ -57,11 +57,9 @@ export function MachineSettingsPanel(): JSX.Element {
         title={panelHelp.title}
         data-help-id={panelHelp['data-help-id']}
       >
-        Machine Settings
+        Read / Backup Controller Settings
       </summary>
-      <p style={noticeStyle}>
-        Read-only in this version. Back up settings before changing firmware.
-      </p>
+      <MachineSettingsNotice />
       <div style={buttonRowStyle}>
         <button
           type="button"
@@ -87,6 +85,15 @@ export function MachineSettingsPanel(): JSX.Element {
       ) : null}
       <SettingsTable rows={rows} />
     </details>
+  );
+}
+
+function MachineSettingsNotice(): JSX.Element {
+  return (
+    <p style={noticeStyle}>
+      Reads live controller settings with <code>$$</code>. Read-only in this version; export a
+      backup before changing firmware.
+    </p>
   );
 }
 

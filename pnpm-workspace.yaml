@@ -36,6 +36,15 @@ minimumReleaseAgeExclude:
 # esbuild's Deno installer or its `serve`; vite only uses esbuild for
 # transform/bundle. vite 6.x pins ~0.25 and wrangler pins 0.27.3 exactly, so
 # neither parent moves on its own.
+#
+# Force the remaining transitive package advisories to their patched minors.
+# These are toolchain-only except `form-data` through jsdom test tooling:
+# wrangler/miniflare pins ws below the GHSA-96hv-2xvq-fx4p patch, jsdom pins
+# form-data below the GHSA-hmw2-7cc7-3qxx patch, and ESLint's config parser
+# pins js-yaml below the GHSA-h67p-54hq-rp68 patch.
 overrides:
   tmp@<0.2.6: ^0.2.6
   esbuild@<0.28.1: ^0.28.1
+  ws@<8.21.0: 8.21.0
+  form-data@<4.0.6: 4.0.6
+  js-yaml@<4.2.0: 4.2.0
