@@ -104,7 +104,9 @@ export function buildPreviewToolpath(
   // complexity gates run first so huge traces/fills never reach synchronous
   // compile. Over-budget rasters still fail in prepareOutput before large work.
   const scoped =
-    options.outputScope === undefined ? null : validateOutputScope(project.scene, options.outputScope);
+    options.outputScope === undefined
+      ? null
+      : validateOutputScope(project.scene, options.outputScope);
   if (scoped !== null && !scoped.ok) return buildToolpath(EMPTY_JOB);
   const complexityScene = scoped === null ? project.scene : scoped.scene;
   if (scenePreparationTooComplex(complexityScene)) return buildToolpath(EMPTY_JOB);

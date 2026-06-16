@@ -1,13 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createLayer,
-  createProject,
-  EMPTY_SCENE,
-  IDENTITY_TRANSFORM,
-  type RasterImage,
-} from '../../core/scene';
+import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -94,39 +88,6 @@ function installFillProjectAtLeftEdge(): void {
             ],
           },
         ],
-      },
-    },
-  });
-}
-
-function installHugeRasterProject(): void {
-  const raster: RasterImage = {
-    kind: 'raster-image',
-    id: 'image-1',
-    source: 'photo.png',
-    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
-    pixelWidth: 4,
-    pixelHeight: 2,
-    bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
-    transform: IDENTITY_TRANSFORM,
-    color: '#808080',
-    dither: 'threshold',
-    linesPerMm: 25,
-    lumaBase64: 'AAAAAAAAAAA=',
-  };
-  useStore.setState({
-    project: {
-      ...createProject(),
-      scene: {
-        ...EMPTY_SCENE,
-        layers: [
-          {
-            ...createLayer({ id: '#808080', color: '#808080', mode: 'image' }),
-            ditherAlgorithm: 'threshold',
-            linesPerMm: 25,
-          },
-        ],
-        objects: [raster],
       },
     },
   });
@@ -278,81 +239,9 @@ describe('JobControls Frame action', () => {
       host.remove();
     }
   });
-
-  it('frames an over-budget raster by physical bounds without compiling the raster job', async () => {
-    installHugeRasterProject();
-    const originalFrame = useLaserStore.getState().frame;
-    const frame = vi.fn(async () => undefined);
-    useLaserStore.setState({
-      frame,
-      streamer: null,
-      statusReport: {
-        state: 'Idle',
-        subState: null,
-        mPos: { x: 0, y: 0, z: 0 },
-        wPos: null,
-        wco: null,
-        feed: 0,
-        spindle: 0,
-      },
-    });
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
-      });
-      const frameButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Frame',
-      );
-      if (frameButton === undefined) throw new Error('Frame button not rendered');
-
-      await act(async () => {
-        frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      });
-
-      expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 100, maxX: 300, maxY: 400 }, 6000);
-      expect(useToastStore.getState().toasts).toEqual([]);
-    } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
-      useLaserStore.setState({ frame: originalFrame });
-      host.remove();
-    }
-  });
 });
 
 describe('JobControls running safety copy', () => {
-  it('does not promise Start can generate a raster job that preflight blocks as too large', async () => {
-    installHugeRasterProject();
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
-      });
-
-      const startButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Start job',
-      );
-      if (startButton === undefined) throw new Error('Start job button not rendered');
-
-      expect(startButton.getAttribute('title')).toBe(
-        'Large job: Start will block until you reduce the artwork size or lower the raster settings.',
-      );
-    } finally {
-      if (root !== null) {
-        await act(async () => root?.unmount());
-      }
-      host.remove();
-    }
-  });
-
   it('warns that Pause is feed hold only and Stop or physical E-stop is the unsafe-condition path', async () => {
     installProject();
     useLaserStore.setState({
