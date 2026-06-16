@@ -135,16 +135,24 @@ function walkGeometry(
     transform: { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 },
   });
   for (const child of Array.from(svgEl.children)) {
-    walkElement(child, rootState, byColor, counts);
+    walkElement(child, rootState, byColor, counts, 0);
   }
 }
+
+// Recursion-depth cap for the element walk. A circular <use> chain
+// (<use href="#b"/> + <use href="#a"/>) recurses without bound and overflows the
+// stack; this also caps pathologically deep nesting. 256 is far beyond any real
+// SVG's nesting depth (security audit 2026-06-14).
+const MAX_WALK_DEPTH = 256;
 
 function walkElement(
   el: Element,
   parent: PresentationState,
   byColor: Map<string, Polyline[]>,
   counts: { text: number; image: number },
+  depth: number,
 ): void {
+  if (depth > MAX_WALK_DEPTH) return;
   const state = presentationStateFor(el, parent);
   const tag = el.tagName.toLowerCase();
   if (tag === 'text' || tag === 'tspan') {
@@ -154,13 +162,13 @@ function walkElement(
   } else if (tag === 'defs' || tag === 'symbol') {
     return;
   } else if (tag === 'use' && !state.hidden) {
-    appendUseGeometry(el, state, byColor, counts);
+    appendUseGeometry(el, state, byColor, counts, depth);
   } else if (!state.hidden) {
     appendElementGeometry(el, state, byColor);
   }
 
   for (const child of Array.from(el.children)) {
-    walkElement(child, state, byColor, counts);
+    walkElement(child, state, byColor, counts, depth + 1);
   }
 }
 
@@ -169,6 +177,7 @@ function appendUseGeometry(
   state: PresentationState,
   byColor: Map<string, Polyline[]>,
   counts: { text: number; image: number },
+  depth: number,
 ): void {
   const href = el.getAttribute('href') ?? el.getAttribute('xlink:href');
   if (href === null || !href.startsWith('#') || href.length <= 1) return;
@@ -179,7 +188,7 @@ function appendUseGeometry(
     ...state,
     transform: multiplyMatrix(state.transform, translate(numAttr(el, 'x'), numAttr(el, 'y'))),
   };
-  walkElement(referenced, placedState, byColor, counts);
+  walkElement(referenced, placedState, byColor, counts, depth + 1);
 }
 
 function appendElementGeometry(
