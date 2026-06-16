@@ -5,6 +5,7 @@
 // at runtime.
 
 import {
+  CMD_COOLANT_OFF,
   RT_JOG_CANCEL,
   RT_SOFT_RESET,
   disconnect as disconnectStreamer,
@@ -71,9 +72,9 @@ export function idleOnlyDollarCommandBlockMessage(
   return activeJobCommandBlockMessage(state);
 }
 
-export function disconnectStopCommand(state: LaserState): string | null {
-  if (isActiveJob(state.streamer)) return RT_SOFT_RESET;
-  return state.motionOperation !== null ? RT_JOG_CANCEL : null;
+export function disconnectStopCommands(state: LaserState): ReadonlyArray<string> {
+  if (isActiveJob(state.streamer)) return [RT_SOFT_RESET, `${CMD_COOLANT_OFF}\n`];
+  return state.motionOperation !== null ? [RT_JOG_CANCEL] : [];
 }
 
 export function assertAutofocusIdle(state: LaserState): void {

@@ -12,6 +12,7 @@ function aJob(): Job {
         power: 30,
         speed: 1000,
         passes: 1,
+        airAssist: false,
         segments: [
           {
             polyline: [
@@ -55,6 +56,7 @@ describe('buildToolpath', () => {
           power: 30,
           speed: 1000,
           passes: 1,
+          airAssist: false,
           overscanMm: 2,
           segments: [
             {
@@ -104,6 +106,7 @@ describe('buildToolpath', () => {
           power: 30,
           speed: 1000,
           passes: 1,
+          airAssist: false,
           overscanMm: 0,
           segments: [
             {

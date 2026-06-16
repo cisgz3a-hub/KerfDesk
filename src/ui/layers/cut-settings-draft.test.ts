@@ -25,6 +25,24 @@ describe('cut settings draft helpers', () => {
     expect(patch.passes).toBe(2);
   });
 
+  it('reads air assist checkbox from the shared cut settings form', () => {
+    const layer = createLayer({ id: 'L1', color: '#000000' });
+    const patch = readCutSettingsPatch(
+      formData({
+        mode: 'line',
+        power: '30',
+        speed: '1500',
+        passes: '1',
+        visible: 'on',
+        output: 'on',
+        airAssist: 'on',
+      }),
+      layer,
+    );
+
+    expect(patch.airAssist).toBe(true);
+  });
+
   it('maps fill line interval and lines-per-inch values to hatch spacing', () => {
     const layer = fillLayer({ hatchSpacingMm: 0.2 });
 

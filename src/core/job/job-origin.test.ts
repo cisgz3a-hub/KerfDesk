@@ -12,6 +12,7 @@ const centeredJob: Job = {
       power: 10,
       speed: 1500,
       passes: 1,
+      airAssist: false,
       segments: [
         {
           closed: true,

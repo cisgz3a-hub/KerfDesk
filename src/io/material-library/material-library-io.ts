@@ -16,7 +16,12 @@ export type MaterialLibraryDeviceHint = {
   readonly maxPowerS: number;
   readonly minPowerS: number;
   readonly laserModeEnabled: boolean;
+  readonly airAssistCommand: DeviceProfile['airAssistCommand'];
   readonly origin: Origin;
+};
+
+type MaterialLibraryDeviceHintInput = Omit<MaterialLibraryDeviceHint, 'airAssistCommand'> & {
+  readonly airAssistCommand?: DeviceProfile['airAssistCommand'];
 };
 
 export type MaterialPreset = {
@@ -60,6 +65,7 @@ export function createMaterialLibraryDeviceHint(device: DeviceProfile): Material
     maxPowerS: device.maxPowerS,
     minPowerS: device.minPowerS,
     laserModeEnabled: device.laserModeEnabled,
+    airAssistCommand: device.airAssistCommand,
     origin: device.origin,
   };
 }
@@ -302,7 +308,7 @@ function parseOptionalDeviceHint(
   return { kind: 'ok', deviceHint: canonicalDeviceHint(value) };
 }
 
-function isDeviceHint(value: Record<string, unknown>): value is MaterialLibraryDeviceHint {
+function isDeviceHint(value: Record<string, unknown>): value is MaterialLibraryDeviceHintInput {
   return (
     isNonEmptyString(value.name) &&
     isPositiveFinite(value.bedWidth) &&
@@ -311,6 +317,7 @@ function isDeviceHint(value: Record<string, unknown>): value is MaterialLibraryD
     isPositiveFinite(value.maxPowerS) &&
     isNonNegativeFinite(value.minPowerS) &&
     typeof value.laserModeEnabled === 'boolean' &&
+    (value.airAssistCommand === undefined || isAirAssistCommand(value.airAssistCommand)) &&
     isOrigin(value.origin)
   );
 }
@@ -340,7 +347,9 @@ function canonicalPreset(preset: MaterialPreset): MaterialPreset {
   };
 }
 
-function canonicalDeviceHint(deviceHint: MaterialLibraryDeviceHint): MaterialLibraryDeviceHint {
+function canonicalDeviceHint(
+  deviceHint: MaterialLibraryDeviceHintInput,
+): MaterialLibraryDeviceHint {
   return {
     name: deviceHint.name,
     bedWidth: deviceHint.bedWidth,
@@ -349,6 +358,7 @@ function canonicalDeviceHint(deviceHint: MaterialLibraryDeviceHint): MaterialLib
     maxPowerS: deviceHint.maxPowerS,
     minPowerS: deviceHint.minPowerS,
     laserModeEnabled: deviceHint.laserModeEnabled,
+    airAssistCommand: deviceHint.airAssistCommand ?? 'none',
     origin: deviceHint.origin,
   };
 }
@@ -378,4 +388,8 @@ function isNonNegativeFinite(value: unknown): value is number {
 
 function isOrigin(value: unknown): value is Origin {
   return ORIGINS.some((origin) => origin === value);
+}
+
+function isAirAssistCommand(value: unknown): value is DeviceProfile['airAssistCommand'] {
+  return value === 'none' || value === 'M7' || value === 'M8';
 }

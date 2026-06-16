@@ -10,12 +10,13 @@ describe('layer default settings helpers', () => {
   it('captures backed settings without id or color', () => {
     const layer = {
       ...createLayer({ id: '#ff0000', color: '#ff0000', mode: 'fill' }),
+      airAssist: true,
       power: 44,
     };
 
     const captured = captureLayerDefaultSettings(layer);
 
-    expect(captured).toMatchObject({ mode: 'fill', power: 44 });
+    expect(captured).toMatchObject({ airAssist: true, mode: 'fill', power: 44 });
     expect(captured).not.toHaveProperty('id');
     expect(captured).not.toHaveProperty('color');
   });

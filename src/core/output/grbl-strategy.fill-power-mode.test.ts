@@ -25,6 +25,7 @@ const fill = (y: number): FillGroup => ({
   power: 30,
   speed: 1500,
   passes: 1,
+  airAssist: false,
   overscanMm: 0,
   segments: [
     {
@@ -44,6 +45,7 @@ const cut = (): CutGroup => ({
   power: 50,
   speed: 1500,
   passes: 1,
+  airAssist: false,
   segments: [
     {
       polyline: [

@@ -28,6 +28,7 @@ export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
     ),
     visible: data.has('visible'),
     output: data.has('output'),
+    airAssist: data.has('airAssist'),
     hatchAngleDeg: numberField(data, 'hatchAngleDeg', layer.hatchAngleDeg, 0, 180),
     hatchSpacingMm: mode === 'fill' ? readFillLineIntervalMm(data, layer) : layer.hatchSpacingMm,
     fillOverscanMm: numberField(data, 'fillOverscanMm', layer.fillOverscanMm, 0, 25),

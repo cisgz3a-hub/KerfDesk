@@ -5,6 +5,7 @@
 // LaserState import — no runtime cycle.
 
 import {
+  CMD_COOLANT_OFF,
   RT_HOLD,
   RT_RESUME,
   RT_SOFT_RESET,
@@ -104,6 +105,12 @@ export function jobActions(
     },
     stopJob: async () => {
       await safeWrite(RT_SOFT_RESET, 'stop');
+      try {
+        await safeWrite(`${CMD_COOLANT_OFF}\n`, 'stop');
+      } catch {
+        // Soft reset is the safety-critical command; coolant cleanup is best
+        // effort and may fail if the serial link is already gone.
+      }
       // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
       // cached WCO so the readout doesn't lie about "custom origin"
       // until the next WCO frame arrives. Same race window as

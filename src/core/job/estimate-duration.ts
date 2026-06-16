@@ -59,6 +59,7 @@ function rasterAsFillSweepGroup(group: RasterGroup): FillGroup {
     power: group.power,
     speed: group.speed,
     passes: group.passes,
+    airAssist: group.airAssist,
     overscanMm: group.overscanMm,
     segments: rasterActiveSweepSegments(group),
   };

@@ -112,6 +112,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
         typeof dev['laserModeEnabled'] === 'boolean'
           ? dev['laserModeEnabled']
           : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
+      airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
     },
     optimization: normalizeOptimization(raw['optimization']),
     scene: {
@@ -141,6 +142,10 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
   };
 }
 
+function normalizeAirAssistCommand(value: unknown): Project['device']['airAssistCommand'] {
+  return value === 'M7' || value === 'M8' ? value : DEFAULT_DEVICE_PROFILE.airAssistCommand;
+}
+
 // Back-fill additive TextObject fields on load. D.1 added letterSpacing —
 // .lf2 files saved before D.1 don't have it. Treating missing as the
 // default (0 = natural spacing) keeps the schema additive without forcing
@@ -159,9 +164,16 @@ function normalizeSceneObject(obj: unknown): unknown {
 function normalizeLayer(layer: unknown): unknown {
   if (!isObject(layer)) return layer;
   const out: Record<string, unknown> = { ...layer };
+  normalizeCommonLayerFields(out);
   normalizeFillLayerFields(out);
   normalizeImageLayerFields(out);
   return out;
+}
+
+function normalizeCommonLayerFields(out: Record<string, unknown>): void {
+  if (typeof out['airAssist'] !== 'boolean') {
+    out['airAssist'] = LAYER_DEFAULTS.airAssist;
+  }
 }
 
 function normalizeFillLayerFields(out: Record<string, unknown>): void {

@@ -12,7 +12,7 @@
 // AutofocusEditor + PlannerAdvanced live in sibling files (F-1 audit
 // fix) so this file stays under the 400-line hard cap.
 
-import type { Origin } from '../../core/devices';
+import type { DeviceProfile, Origin } from '../../core/devices';
 import { useStore } from '../state';
 import { AutofocusEditor } from './AutofocusEditor';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
@@ -230,6 +230,20 @@ function PowerRows(props: DeviceRowsProps): JSX.Element {
           />
           <span>Enabled</span>
         </label>
+      </Row>
+      <Row label="Air assist">
+        <select
+          value={device.airAssistCommand}
+          onChange={(e) =>
+            update({ airAssistCommand: e.target.value as DeviceProfile['airAssistCommand'] })
+          }
+          aria-label="Air assist command"
+          title="Choose the GRBL coolant command wired to your air assist. Leave Disabled unless you have tested the output."
+        >
+          <option value="none">Disabled</option>
+          <option value="M8">M8 flood coolant</option>
+          <option value="M7">M7 mist coolant</option>
+        </select>
       </Row>
     </>
   );

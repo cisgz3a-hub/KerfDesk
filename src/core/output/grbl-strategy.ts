@@ -23,6 +23,7 @@ import type { OutputStrategy } from './output-strategy';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
+type CoolantMode = 'off' | 'M7' | 'M8';
 
 function fmt(n: number): string {
   return n.toFixed(DECIMAL_PLACES);
@@ -209,6 +210,18 @@ function emitAnyGroup(group: Group, device: DeviceProfile): string {
   }
 }
 
+function groupCoolantMode(group: Group, device: DeviceProfile): CoolantMode {
+  if (!group.airAssist) return 'off';
+  return device.airAssistCommand === 'none' ? 'off' : device.airAssistCommand;
+}
+
+function coolantTransition(from: CoolantMode, to: CoolantMode): string {
+  if (from === to) return '';
+  if (to === 'off') return `M9${LINE_END}`;
+  if (from !== 'off') return `M9${LINE_END}${to}${LINE_END}`;
+  return `${to}${LINE_END}`;
+}
+
 // Laser power mode is modal and spans groups. The preamble arms M3 (constant
 // power). Cut groups keep M3 — a slow corner must still cut fully through. FILL
 // groups want M4 DYNAMIC power: GRBL then scales S by actual/programmed feed, so
@@ -224,6 +237,7 @@ function emitJob(job: Job, device: DeviceProfile): string {
   const parts: string[] = [];
   parts.push(preamble());
   let mode: 'M3' | 'M4' | 'off' = 'M3'; // the preamble armed M3 S0
+  let coolant: CoolantMode = 'off';
   for (const group of job.groups) {
     if (group.kind === 'cut' && mode !== 'M3') {
       // Restore constant power for vector cutting.
@@ -237,9 +251,13 @@ function emitJob(job: Job, device: DeviceProfile): string {
       parts.push((mode === 'M3' ? 'M5' + LINE_END : '') + 'M4 S0' + LINE_END);
       mode = 'M4';
     }
+    const nextCoolant = groupCoolantMode(group, device);
+    parts.push(coolantTransition(coolant, nextCoolant));
+    coolant = nextCoolant;
     parts.push(emitAnyGroup(group, device));
     if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
   }
+  parts.push(coolantTransition(coolant, 'off'));
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
   parts.push(postamble(mode === 'off'));

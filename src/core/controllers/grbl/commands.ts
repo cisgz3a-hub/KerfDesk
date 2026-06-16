@@ -37,6 +37,9 @@ export const CMD_SETTINGS = '$$';
 /** Build info. */
 export const CMD_BUILD_INFO = '$I';
 
+/** Coolant / air assist off. Normal queued G-code line, not a realtime byte. */
+export const CMD_COOLANT_OFF = 'M9';
+
 // --- Work coordinate offset (Phase F.3 set-work-origin) ---
 // GRBL applies a machine-to-work offset on top of the active WCS (G54 by
 // default). G92 modifies that offset transiently — it's cleared on alarm,

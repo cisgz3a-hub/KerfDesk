@@ -19,6 +19,7 @@ describe('createLayer', () => {
       fillOverscanMm: 5,
       fillBidirectional: true,
       fillCrossHatch: false,
+      airAssist: false,
       ditherAlgorithm: 'floyd-steinberg',
       linesPerMm: 10,
       negativeImage: false,
@@ -42,5 +43,10 @@ describe('LAYER_DEFAULTS', () => {
     expect(LAYER_DEFAULTS.power).toBeLessThanOrEqual(100);
     expect(LAYER_DEFAULTS.minPower).toBeGreaterThanOrEqual(0);
     expect(LAYER_DEFAULTS.minPower).toBeLessThanOrEqual(LAYER_DEFAULTS.power);
+  });
+
+  it('defaults air assist off for every new layer', () => {
+    expect(LAYER_DEFAULTS.airAssist).toBe(false);
+    expect(createLayer({ id: 'L1', color: '#000000' }).airAssist).toBe(false);
   });
 });

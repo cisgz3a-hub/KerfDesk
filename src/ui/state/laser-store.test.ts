@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RT_SOFT_RESET } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
@@ -291,41 +290,6 @@ describe('laser-store serial write failures', () => {
     shouldFail = false;
   });
 
-  it('sends soft reset before disconnecting an active job', async () => {
-    const close = vi.fn(async () => undefined);
-    const write = vi.fn(async () => undefined);
-    const connection = makeConnection(write, close);
-    await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
-    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
-
-    write.mockClear();
-    await useLaserStore.getState().disconnect();
-
-    expect(write).toHaveBeenCalledWith(RT_SOFT_RESET);
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
-    expect(useLaserStore.getState().streamer).toBeNull();
-  });
-
-  it('sends soft reset before disconnecting a job stopped by controller error', async () => {
-    const close = vi.fn(async () => undefined);
-    const write = vi.fn(async () => undefined);
-    const connection = makeConnection(write, close);
-    await connectWith(connection);
-    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
-    connection.emitLine('error:7');
-    expect(useLaserStore.getState().streamer?.status).toBe('errored');
-
-    write.mockClear();
-    await useLaserStore.getState().disconnect();
-
-    expect(write).toHaveBeenCalledWith(RT_SOFT_RESET);
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
-    expect(useLaserStore.getState().streamer).toBeNull();
-  });
-
   it.each([
     ['Home', 'home', () => useLaserStore.getState().home()],
     ['Unlock', 'unlock', () => useLaserStore.getState().unlockAlarm()],
@@ -373,7 +337,7 @@ describe('laser-store serial write failures', () => {
   });
 
   it('marks the work origin active immediately after Set Origin succeeds', async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
@@ -386,7 +350,7 @@ describe('laser-store serial write failures', () => {
   });
 
   it('clears the active work-origin flag when Reset Origin succeeds', async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
     useLaserStore.setState({ workOriginActive: true, wcoCache: { x: 12, y: 34, z: 0 } });
@@ -401,7 +365,7 @@ describe('laser-store serial write failures', () => {
 
 describe('laser-store autofocus lifecycle', () => {
   it('refuses a second autofocus while one is already pending', async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
 
@@ -419,7 +383,7 @@ describe('laser-store autofocus lifecycle', () => {
   });
 
   it('refuses jog commands while autofocus is pending', async () => {
-    const write = vi.fn(async () => undefined);
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
 

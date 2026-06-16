@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from './device-profile';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from './device-profile';
 
 describe('DEFAULT_DEVICE_PROFILE', () => {
   it('matches the WORKFLOW.md F-A1 first-run defaults exactly', () => {
@@ -23,6 +23,15 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     // until the user pastes their machine's actual command — see the
     // DeviceProfile docs and the UI hint in DeviceSettings for context.
     expect(DEFAULT_DEVICE_PROFILE.autofocusCommand).toBe('');
+  });
+
+  it('defaults air assist command to none so output is unchanged until configured', () => {
+    expect(DEFAULT_DEVICE_PROFILE.airAssistCommand).toBe('none');
+  });
+
+  it('uses a narrow air assist command enum', () => {
+    const valid: ReadonlyArray<DeviceProfile['airAssistCommand']> = ['none', 'M7', 'M8'];
+    expect(valid).toContain(DEFAULT_DEVICE_PROFILE.airAssistCommand);
   });
 
   it('is shaped so the workspace can be derived (bed* are positive numbers)', () => {

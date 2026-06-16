@@ -58,6 +58,7 @@ const arbGroup = fc.record({
     noDefaultInfinity: true,
   }),
   passes: fc.integer({ min: 1, max: 3 }),
+  airAssist: fc.boolean(),
   segments: fc.array(arbSegment, { minLength: 0, maxLength: 4 }),
 });
 
@@ -96,6 +97,7 @@ const arbFillGroup = fc.record({
     noDefaultInfinity: true,
   }),
   passes: fc.integer({ min: 1, max: 3 }),
+  airAssist: fc.boolean(),
   overscanMm: fc.double({ min: 0, max: 5, noNaN: true, noDefaultInfinity: true }),
   segments: fc.array(arbFillSpan, { minLength: 0, maxLength: 8 }),
 });
@@ -154,6 +156,7 @@ describe('grblStrategy property tests', () => {
           power: 50,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           segments: [
             {
               polyline: [
@@ -187,6 +190,7 @@ describe('grblStrategy property tests', () => {
           power: 50,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 5,
           segments: [
             {

@@ -60,6 +60,7 @@ export type { JogParams } from './commands';
 export {
   CMD_BUILD_INFO,
   CMD_CLEAR_ORIGIN,
+  CMD_COOLANT_OFF,
   CMD_HOME,
   CMD_SET_ORIGIN_HERE,
   CMD_SETTINGS,

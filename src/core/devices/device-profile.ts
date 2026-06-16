@@ -3,6 +3,7 @@
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
+export type AirAssistCommand = 'none' | 'M7' | 'M8';
 
 export type HomingConfig = {
   readonly enabled: boolean;
@@ -24,6 +25,10 @@ export type DeviceProfile = {
   readonly maxPowerS: number; // GRBL $30 value (e.g. 1000)
   readonly minPowerS: number; // GRBL $31 value; normally 0 for diode lasers
   readonly laserModeEnabled: boolean; // GRBL $32; true means laser mode is enabled
+  // GRBL coolant command wired to software-controlled air assist. LightBurn
+  // exposes this as a device choice (M7 vs M8); default disabled because many
+  // hobby controllers leave these pins unwired or use M7 only when compiled in.
+  readonly airAssistCommand: AirAssistCommand;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. Capped at maxFeed at
@@ -79,6 +84,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   maxPowerS: 1000,
   minPowerS: 0,
   laserModeEnabled: true,
+  airAssistCommand: 'none',
   origin: 'front-left',
   homing: { enabled: false, direction: 'front-left' },
   autofocusCommand: DEFAULT_AUTOFOCUS_COMMAND,
