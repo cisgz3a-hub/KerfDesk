@@ -45,3 +45,6 @@ Thumbs.db
 
 # Local Claude / planning artifacts that should not ship to the repo
 .claude/
+
+# Reference repos for study only — never part of the app runtime or commits
+references/
