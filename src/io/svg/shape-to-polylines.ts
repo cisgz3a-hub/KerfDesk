@@ -9,9 +9,9 @@
 // patterns — these are walked transparently in parse-svg.ts where applicable.
 
 import type { Vec2 } from '../../core/scene';
+import { ellipseSegmentCount } from '../../core/shapes';
 import { parsePathD, type SubPath } from './parse-path-d';
 
-const CIRCLE_SEGMENTS = 72; // 5° per segment — coarse but adequate for Phase A
 const RECT_CORNER_SEGMENTS = 8;
 
 export function elementToSubPaths(el: Element): ReadonlyArray<SubPath> {
@@ -152,9 +152,10 @@ function closePoint(a: Vec2, b: Vec2): boolean {
 }
 
 function arcPolygon(cx: number, cy: number, rx: number, ry: number): SubPath {
+  const segments = ellipseSegmentCount(Math.max(Math.abs(rx), Math.abs(ry)));
   const points: Vec2[] = [];
-  for (let i = 0; i <= CIRCLE_SEGMENTS; i += 1) {
-    const t = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
+  for (let i = 0; i <= segments; i += 1) {
+    const t = (i / segments) * Math.PI * 2;
     points.push({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
   }
   return { points, closed: true };

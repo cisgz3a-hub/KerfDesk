@@ -6,7 +6,7 @@
 export { rectangleToPolylines } from './rectangle';
 export type { RectangleSpec } from './rectangle';
 export { createRectangle } from './create-rectangle';
-export { ellipseToPolylines } from './ellipse';
+export { ellipseSegmentCount, ellipseToPolylines } from './ellipse';
 export type { EllipseSpec } from './ellipse';
 export { createEllipse } from './create-ellipse';
 export { polygonToPolylines } from './polygon';
