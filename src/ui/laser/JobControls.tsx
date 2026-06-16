@@ -18,6 +18,16 @@ import { resolveJobPlacement, trustedMotionOffsetForPreflight } from '../job-pla
 import { currentOutputScope, useStore } from '../state';
 import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import {
+  containerStyle,
+  estimateStyle,
+  progressContainerStyle,
+  progressFillStyle,
+  progressLabelStyle,
+  rowStyle,
+  runningSafetyStyle,
+  stopBtnStyle,
+} from './JobControls.styles';
 import { JobPlacementControls } from './JobPlacementControls';
 import { type LiveJobEstimate } from './live-job-estimate';
 import { useJobEstimate } from './use-job-estimate';
@@ -312,20 +322,9 @@ function useFrameAction(): () => void {
       outputScope,
     });
     if (!prepared.ok) {
-      if (isRasterBudgetOnlyFailure(prepared.preflight) && frameBounds !== null) {
-        const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
-        const motionIssue = describeFrameMotionPreflightIssue(
-          frameBounds,
-          motionOffset,
-          placement.jobOrigin !== undefined,
-          project.device,
-        );
-        if (motionIssue !== null) {
-          pushToast(motionIssue, 'error');
-          return;
-        }
-        const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
-        void frame(frameBounds, feed);
+      const fallbackBounds = rasterBudgetFallbackBounds(prepared.preflight, frameBounds);
+      if (fallbackBounds !== null) {
+        dispatchFrameIfSafe(frame, pushToast, fallbackBounds, fallbackBounds, placement, project);
         return;
       }
       pushToast(
@@ -340,38 +339,46 @@ function useFrameAction(): () => void {
       return;
     }
     const motionBounds = computeJobMotionBounds(prepared.job) ?? bounds;
-    const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
     // Refuse to drive the head off-bed. The Falcon (and most diode
     // lasers) ship with $20=0, so any X/Y past the soft-limits skips
     // steps mechanically — the operator hears grinding and the trace
     // collapses to a sideways line because the axis that hit the stop
     // can't keep up. Better to refuse here with a clear instruction.
-    const motionIssue = describeFrameMotionPreflightIssue(
-      motionBounds,
-      motionOffset,
-      placement.jobOrigin !== undefined,
-      project.device,
-    );
-    if (motionIssue !== null) {
-      pushToast(motionIssue, 'error');
-      return;
-    }
-    // Frame uses its own dedicated feed so changing layer / cut speed
-    // doesn't slow the framing pass. Capped at maxFeed so we never
-    // command past the machine's hardware rate. See ADR / device-profile
-    // notes on framingFeedMmPerMin.
-    const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
-    void frame(bounds, feed);
+    dispatchFrameIfSafe(frame, pushToast, bounds, motionBounds, placement, project);
   };
 }
 
-function isRasterBudgetOnlyFailure(
+function rasterBudgetFallbackBounds(
   preflight: Extract<ReturnType<typeof prepareOutput>, { readonly ok: false }>['preflight'],
-): boolean {
-  return (
+  frameBounds: JobBounds | null,
+): JobBounds | null {
+  const rasterOnly =
     preflight.issues.length > 0 &&
-    preflight.issues.every((issue) => issue.code === 'raster-too-large')
+    preflight.issues.every((issue) => issue.code === 'raster-too-large');
+  return rasterOnly ? frameBounds : null;
+}
+
+function dispatchFrameIfSafe(
+  frame: (bounds: JobBounds, feed: number) => Promise<void>,
+  pushToast: (message: string, variant: 'error') => void,
+  bounds: JobBounds,
+  motionBounds: JobBounds,
+  placement: Extract<ReturnType<typeof resolveJobPlacement>, { readonly ok: true }>,
+  project: ReturnType<typeof useStore.getState>['project'],
+): void {
+  const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
+  const motionIssue = describeFrameMotionPreflightIssue(
+    motionBounds,
+    motionOffset,
+    placement.jobOrigin !== undefined,
+    project.device,
   );
+  if (motionIssue !== null) {
+    pushToast(motionIssue, 'error');
+    return;
+  }
+  const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
+  void frame(bounds, feed);
 }
 
 function describeFrameMotionPreflightIssue(
@@ -419,43 +426,3 @@ function useAutofocusAction(): () => void {
     });
   };
 }
-
-const containerStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 6 };
-const stopBtnStyle: React.CSSProperties = {
-  background: 'var(--lf-danger)',
-  color: 'var(--lf-on-fill)',
-};
-const progressContainerStyle: React.CSSProperties = {
-  position: 'relative',
-  background: 'var(--lf-bg-input)',
-  height: 18,
-  borderRadius: 3,
-  overflow: 'hidden',
-};
-const progressFillStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 0,
-  bottom: 0,
-  left: 0,
-  background: 'var(--lf-accent)',
-  transition: 'width 100ms linear',
-};
-const progressLabelStyle: React.CSSProperties = {
-  position: 'relative',
-  textAlign: 'center',
-  fontSize: 11,
-  lineHeight: '18px',
-  color: 'var(--lf-text)',
-};
-const estimateStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  alignSelf: 'center',
-  fontVariantNumeric: 'tabular-nums',
-};
-const runningSafetyStyle: React.CSSProperties = {
-  color: 'var(--lf-warning-fg)',
-  fontSize: 12,
-  lineHeight: 1.3,
-};

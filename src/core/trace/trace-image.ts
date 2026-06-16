@@ -266,7 +266,7 @@ export async function traceImageToSvgString(
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
   // Trace Transparency keys the mask off alpha. If an image is fully opaque,
   // tracing alpha would turn the whole page black, so fall back to luma trace.
-  if (options.traceTransparency === true && imageHasTransparency(image)) {
+  if (shouldTraceAlphaMask(image, options)) {
     let prepared = alphaToMonochrome(image, options.cutoffLuma ?? 0, options.thresholdLuma ?? 128);
     if (shouldDespeckle(options)) {
       prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
@@ -341,6 +341,10 @@ function shouldDespeckle(options: TraceOptions): boolean {
   );
 }
 
+function shouldTraceAlphaMask(image: RawImageData, options: TraceOptions): boolean {
+  return options.traceTransparency === true && imageHasTransparency(image);
+}
+
 const SKETCH_RADIUS_PX = 8;
 const SKETCH_CONTRAST_BIAS = 8;
 
@@ -412,7 +416,7 @@ function localMean(
 
 function imageHasTransparency(image: RawImageData): boolean {
   for (let i = 3; i < image.data.length; i += 4) {
-    if (image.data[i] === 0) return true;
+    if ((image.data[i] ?? 255) < 255) return true;
   }
   return false;
 }
