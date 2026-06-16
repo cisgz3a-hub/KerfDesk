@@ -16,6 +16,7 @@ import {
   pause as pauseStreamer,
   resume as resumeStreamer,
   step,
+  type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
@@ -26,6 +27,16 @@ type SetFn = (
 ) => void;
 type GetFn = () => LaserState;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+type StartJobDevice = Parameters<LaserState['startJob']>[1];
+
+function streamerOptionsForDevice(device: StartJobDevice): CreateStreamerOptions {
+  if (device === undefined) return {};
+  return {
+    rxBufferBytes: device.controller.rxBufferBytes,
+    streamingMode: device.controller.streamingMode,
+    pollDuringJob: device.controller.pollDuringJob,
+  };
+}
 
 export function jobActions(
   set: SetFn,
@@ -33,7 +44,7 @@ export function jobActions(
   safeWrite: SafeWriteFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
   return {
-    startJob: async (gcode) => {
+    startJob: async (gcode, device) => {
       assertAutofocusIdle(get());
       const blockedMessage = setupCommandBlockMessage(get());
       if (blockedMessage !== null) {
@@ -45,14 +56,15 @@ export function jobActions(
       }
       // M13: a line longer than the RX buffer can never send — step() would
       // break silently, leaving a phantom idle job and a frozen progress bar.
-      const oversized = findOversizedLine(gcode);
+      const streamerOptions = streamerOptionsForDevice(device);
+      const oversized = findOversizedLine(gcode, streamerOptions.rxBufferBytes);
       if (oversized !== null) {
         throw new Error(
           `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
             `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
         );
       }
-      const initial = createStreamer(gcode);
+      const initial = createStreamer(gcode, streamerOptions);
       const stepped = step(initial);
       set({ streamer: stepped.state });
       if (stepped.toSend.length === 0) return;
@@ -118,6 +130,7 @@ export function jobActions(
       set((s) => ({
         wcoCache: null,
         workOriginActive: false,
+        homingState: 'unknown',
         streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
       }));
     },

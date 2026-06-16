@@ -3,10 +3,6 @@
 // React-observable state) so 60-Hz status updates don't churn the React
 // tree any more than necessary. Components subscribe to `connection`,
 // `statusReport`, `alarmCode`, and `streamer` for live UI updates.
-//
-// Status polling: every 250 ms while connected we write '?' to the port.
-// GRBL replies with <Idle|...> or <Run|...>, which the classifier turns into
-// `kind: 'status'` and the store fans into `statusReport`.
 
 import { create } from 'zustand';
 import {
@@ -24,6 +20,7 @@ import {
 } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { Bounds } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
@@ -32,6 +29,7 @@ import { grblSettingsActions } from './grbl-settings-actions';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import { jobActions } from './laser-job-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
+import { machineDiagnosticActions } from './machine-diagnostic-actions';
 import {
   buildFrameJogLines,
   markMotionOperationDispatched,
@@ -58,10 +56,10 @@ import {
   detectStreamStall,
   disconnectStopCommands,
   initialLaserState,
-  isActiveJob,
   jogFrameCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
+  statusPollDivisor,
   type StallProbe,
 } from './laser-store-helpers';
 
@@ -71,19 +69,14 @@ export { hasCustomOrigin } from './origin-actions';
 export type { WorkCoordinateOffset } from './origin-actions';
 
 const DEFAULT_BAUD = 115200;
-// Status poll tick. We tick at 250 ms always, but when no job is active
-// we only emit a `?` every 4th tick (effective 1000 ms). MIT-T2 audit
-// finding: CNCjs / LightBurn both ramp polling down when idle to cut
-// serial chatter and CPU. While streaming/paused we keep the fast cadence
-// so the live progress UI stays smooth.
 const STATUS_POLL_MS = 250;
-const IDLE_POLL_DIVISOR = 4;
 
 export type ConnectionState =
   | { readonly kind: 'disconnected' }
   | { readonly kind: 'connecting' }
   | { readonly kind: 'connected' }
   | { readonly kind: 'failed'; readonly error: string };
+export type HomingState = 'unknown' | 'homing' | 'confirmed';
 
 export type LaserState = {
   readonly connection: ConnectionState;
@@ -120,6 +113,7 @@ export type LaserState = {
    */
   readonly wcoCache: WorkCoordinateOffset | null;
   readonly workOriginActive: boolean;
+  readonly homingState: HomingState;
 
   readonly connect: (adapter: PlatformAdapter) => Promise<void>;
   readonly disconnect: () => Promise<void>;
@@ -128,20 +122,13 @@ export type LaserState = {
   readonly unlockAlarm: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
+  readonly runMachineDiagnostic: () => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
   readonly cancelJog: () => Promise<void>;
-  readonly frame: (
-    bounds: {
-      readonly minX: number;
-      readonly minY: number;
-      readonly maxX: number;
-      readonly maxY: number;
-    },
-    feed: number,
-  ) => Promise<void>;
-  readonly startJob: (gcode: string) => Promise<void>;
+  readonly frame: (bounds: Bounds, feed: number) => Promise<void>;
+  readonly startJob: (gcode: string, device?: DeviceProfile) => Promise<void>;
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
@@ -223,7 +210,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
   return {
     connect: async (adapter) => {
       refs.nextTranscriptId = 1;
-      set({ connection: { kind: 'connecting' }, log: [], transcript: [] });
+      set({ connection: { kind: 'connecting' }, log: [], transcript: [], homingState: 'unknown' });
       const portRef = await adapter.serial.requestPort();
       if (portRef === null) {
         set({ connection: { kind: 'disconnected' } });
@@ -255,8 +242,8 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
           if (stall.stalled && s.safetyNotice === null) {
             set({ safetyNotice: streamStalledNotice() });
           }
-          const isActive = isActiveJob(s.streamer) || s.motionOperation !== null || s.autofocusBusy;
-          if (!isActive && pollTick % IDLE_POLL_DIVISOR !== 0) return;
+          const divisor = statusPollDivisor(s);
+          if (divisor === null || pollTick % divisor !== 0) return;
           void safeWrite(set, get, RT_STATUS).catch(() => undefined);
         }, STATUS_POLL_MS);
         set({
@@ -264,6 +251,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
           alarmCode: null,
           lastWriteError: null,
           safetyNotice: null,
+          homingState: 'unknown',
         });
         void runHandshake(set, get, refs, (out) => safeWrite(set, get, out)).catch(() => undefined);
       } catch (err) {
@@ -298,6 +286,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         streamer: null,
         wcoCache: null,
         workOriginActive: false,
+        homingState: 'unknown',
         motionOperation: null,
         lastWriteError: null,
       });
@@ -313,7 +302,13 @@ function jogActions(
     home: async () => {
       assertAutofocusIdle(get());
       assertNoMotionOperation(set, get);
-      await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
+      try {
+        await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
+        set({ homingState: 'homing' });
+      } catch (err) {
+        set({ homingState: 'unknown' });
+        throw err;
+      }
     },
     autofocus: async (command) => {
       const activeJobBlock = idleCommandBlockResult(get());
@@ -339,7 +334,7 @@ function jogActions(
     unlockAlarm: async () => {
       assertNoMotionOperation(set, get);
       await safeWrite(set, get, `${CMD_UNLOCK}\n`, 'unlock');
-      set({ alarmCode: null });
+      set({ alarmCode: null, homingState: 'unknown' });
     },
     jog: async (params) => {
       assertAutofocusIdle(get());
@@ -447,6 +442,9 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
   ...grblSettingsActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
+  ...machineDiagnosticActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),
   ...consoleActions(set, get, refs, (line, action, source) =>

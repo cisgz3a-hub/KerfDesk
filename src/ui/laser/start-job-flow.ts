@@ -30,6 +30,7 @@ export async function runStartJobFlow(): Promise<void> {
       autofocusBusy: laser.autofocusBusy,
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,
+      homingState: laser.homingState,
     },
     jobPlacement,
     currentOutputScope(app),
@@ -44,7 +45,7 @@ export async function runStartJobFlow(): Promise<void> {
     if (!jobAwareConfirm(`Controller warning:\n\n${lines}\n\nStart anyway?`)) return;
   }
   try {
-    await laser.startJob(prepared.gcode);
+    await laser.startJob(prepared.gcode, project.device);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     jobAwareAlert(`Could not start job:\n\n${message}`);

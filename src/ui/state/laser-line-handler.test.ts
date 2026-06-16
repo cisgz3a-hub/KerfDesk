@@ -29,6 +29,7 @@ function makeLaserState(): LaserState {
     lastSettingsReadAt: null,
     wcoCache: null,
     workOriginActive: false,
+    homingState: 'unknown',
     connect: async () => undefined,
     disconnect: async () => undefined,
     home: async () => undefined,
@@ -48,6 +49,7 @@ function makeLaserState(): LaserState {
     resetOrigin: async () => undefined,
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
+    runMachineDiagnostic: async () => undefined,
     sendConsoleCommand: async () => undefined,
     clearTranscript: () => undefined,
   };
@@ -111,7 +113,7 @@ describe('handleLine streamer writes', () => {
     expect(get().streamer).toBeNull();
   });
 
-  it('marks the streamer disconnected if an ack-triggered follow-up write fails', async () => {
+  it('marks the streamer errored if an ack-triggered follow-up write fails', async () => {
     const { refs, set, get } = makeHarness();
     const firstStep = step(
       createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', {
@@ -127,7 +129,7 @@ describe('handleLine streamer writes', () => {
     await Promise.resolve();
 
     expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n');
-    expect(get().streamer?.status).toBe('disconnected');
+    expect(get().streamer?.status).toBe('errored');
     expect(get().streamer?.completed).toBe(1);
     expect(get().streamer?.inFlight.map((item) => item.line)).toEqual(['G1 X1234567891\n']);
     expect(get().streamer?.queued).toEqual([]);

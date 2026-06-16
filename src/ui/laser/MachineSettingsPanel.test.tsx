@@ -85,6 +85,29 @@ describe('MachineSettingsPanel', () => {
     }
   });
 
+  it('calls runMachineDiagnostic when Run diagnostic is clicked', async () => {
+    const original = useLaserStore.getState().runMachineDiagnostic;
+    const runMachineDiagnostic = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      runMachineDiagnostic,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel();
+    try {
+      await act(async () => {
+        button(host, 'Run diagnostic').click();
+        await Promise.resolve();
+      });
+
+      expect(runMachineDiagnostic).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => {
+        useLaserStore.setState({ runMachineDiagnostic: original });
+      });
+      await cleanup();
+    }
+  });
+
   it('renders known and unknown settings rows', async () => {
     useLaserStore.setState({
       grblSettingsRows: settingsMapToRows(
@@ -140,6 +163,49 @@ describe('MachineSettingsPanel', () => {
       expect(JSON.parse(written).settings).toEqual([
         expect.objectContaining({ code: '$30', rawValue: '1000' }),
       ]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('exports a machine diagnostic bundle through PlatformAdapter', async () => {
+    let written = '';
+    const target: SaveTarget = {
+      displayName: 'diagnostic.lf-machine-diagnostic.json',
+      write: async (text) => {
+        written = text;
+      },
+    };
+    const platform = makePlatform(async () => target);
+    useLaserStore.setState({
+      controllerSettings: { maxPowerS: 1000 },
+      grblSettingsRows: settingsMapToRows(new Map([[30, '1000']])),
+      transcript: [
+        {
+          id: 1,
+          at: 1,
+          direction: 'out',
+          raw: '$I\n',
+          kind: 'build-info-query',
+          source: 'console',
+        },
+      ],
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel(platform);
+    try {
+      await act(async () => {
+        button(host, 'Export diagnostic').click();
+        await Promise.resolve();
+      });
+
+      const bundle = JSON.parse(written) as {
+        readonly format: string;
+        readonly profile: { readonly controller: unknown };
+        readonly evidence: { readonly outboundCommandKinds: ReadonlyArray<string> };
+      };
+      expect(bundle.format).toBe('laserforge-machine-diagnostic');
+      expect(bundle.profile.controller).toBeTruthy();
+      expect(bundle.evidence.outboundCommandKinds).toEqual(['build-info-query']);
     } finally {
       await cleanup();
     }

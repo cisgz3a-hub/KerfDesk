@@ -23,6 +23,10 @@ export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
 export const STATUS_ALARM_START_MESSAGE =
   'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
+export const REQUIRED_HOMING_START_MESSAGE =
+  'This device profile requires homing before Start. Home the machine and wait for Idle before starting.';
+
+export type HomingState = 'unknown' | 'homing' | 'confirmed';
 
 export type StartJobPreparation =
   | {
@@ -42,6 +46,7 @@ export type MachineStartSnapshot = {
   readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
+  readonly homingState?: HomingState;
 };
 
 export function prepareStartJob(
@@ -51,7 +56,7 @@ export function prepareStartJob(
   jobPlacement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
 ): StartJobPreparation {
-  const machineIssues = findMachineStartIssues(machine);
+  const machineIssues = findMachineStartIssues(project, machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
 
   const placement = resolveJobPlacement(jobPlacement, machine);
@@ -121,7 +126,10 @@ function findPlacementBoundsIssue(
   return `Selected job origin would place this job outside the machine bed. ${describeFramePreflightFailure(preflight)}`;
 }
 
-function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<string> {
+function findMachineStartIssues(
+  project: Project,
+  machine: MachineStartSnapshot,
+): ReadonlyArray<string> {
   const issues: string[] = [];
   if (machine.hasActiveStreamer) {
     issues.push('A job is already active. Stop or finish it before starting another.');
@@ -140,6 +148,13 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
     issues.push(STATUS_ALARM_START_MESSAGE);
   } else if (machine.statusReport.state !== 'Idle') {
     issues.push(`Machine must be Idle before starting (currently ${machine.statusReport.state}).`);
+  }
+  if (
+    project.device.homing.enabled &&
+    project.device.controller.requiresHomingBeforeJob &&
+    machine.homingState !== 'confirmed'
+  ) {
+    issues.push(REQUIRED_HOMING_START_MESSAGE);
   }
   return issues;
 }

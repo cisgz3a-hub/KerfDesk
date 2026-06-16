@@ -16,6 +16,7 @@ import { disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 
 const LOG_MAX = 200;
+const IDLE_POLL_DIVISOR = 4;
 const AUTOFOCUS_BUSY_MESSAGE =
   'Auto-focus is running. Wait for it to finish before sending other motion commands.';
 export const ACTIVE_JOB_COMMAND_MESSAGE =
@@ -38,6 +39,27 @@ export function pushLog(state: LaserState, line: string): ReadonlyArray<string> 
 // later Idle status report.
 export function isActiveJob(streamer: StreamerState | null): boolean {
   return streamer !== null && ['streaming', 'paused', 'done', 'errored'].includes(streamer.status);
+}
+
+export function statusPollDivisor(
+  state: Pick<LaserState, 'streamer' | 'motionOperation' | 'autofocusBusy'>,
+): number | null {
+  const activeJob = isActiveJob(state.streamer);
+  if (activeJob) return activeJobPollDivisor(state.streamer);
+  return state.motionOperation !== null || state.autofocusBusy ? 1 : IDLE_POLL_DIVISOR;
+}
+
+function activeJobPollDivisor(streamer: StreamerState | null): number | null {
+  switch (streamer?.pollDuringJob ?? '4hz') {
+    case 'off':
+      return null;
+    case '1hz':
+      return 4;
+    case '2hz':
+      return 2;
+    case '4hz':
+      return 1;
+  }
 }
 
 export function activeJobCommandBlockMessage(state: LaserState): string | null {
@@ -152,6 +174,7 @@ export function initialLaserState(): Pick<
   | 'lastSettingsReadAt'
   | 'wcoCache'
   | 'workOriginActive'
+  | 'homingState'
 > {
   return {
     connection: { kind: 'disconnected' },
@@ -171,6 +194,7 @@ export function initialLaserState(): Pick<
     lastSettingsReadAt: null,
     wcoCache: null,
     workOriginActive: false,
+    homingState: 'unknown',
   };
 }
 
@@ -193,6 +217,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // must match or the next connect shows "custom origin" against a zeroed machine.
     wcoCache: null,
     workOriginActive: false,
+    homingState: 'unknown',
     motionOperation: null,
     streamer: stream,
     ...(wasUnsafeActive ? { safetyNotice: disconnectDuringJobNotice() } : {}),

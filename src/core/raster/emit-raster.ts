@@ -76,6 +76,9 @@ export type EmitRasterInput = {
   readonly layerId?: string;
   readonly color?: string;
   readonly powerPercent?: number;
+  readonly laserModeCommand?: 'M3' | 'M4';
+  readonly modalFeedrate?: boolean;
+  readonly emitSOnEveryBurnMove?: boolean;
 };
 
 export function emitRasterGroup(input: EmitRasterInput): string {
@@ -83,9 +86,9 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   const chunks: string[] = [];
   chunks.push(headerComment(input));
   // M5 first so we don't get stuck in M3 from a preceding cut group.
-  // Then M4 S0 to arm dynamic-power mode at zero output.
+  // Then arm the profile-selected raster laser mode at zero output.
   chunks.push('M5');
-  chunks.push('M4 S0');
+  chunks.push(`${input.laserModeCommand ?? 'M4'} S0`);
   const feed = Math.round(input.feedMmPerMin);
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
@@ -202,7 +205,17 @@ function emitSpanSweep(
   let prevS = -1;
   let shouldEmitFeed = emitFeed;
   const pushRun = (x: number, s: number): void => {
-    lines.push(formatRunG1(x, s, prevS, feed, shouldEmitFeed));
+    lines.push(
+      formatRunG1(
+        x,
+        s,
+        prevS,
+        feed,
+        shouldEmitFeed,
+        input.modalFeedrate ?? true,
+        input.emitSOnEveryBurnMove ?? false,
+      ),
+    );
     shouldEmitFeed = false;
     prevS = s;
   };
@@ -214,7 +227,7 @@ function emitSpanSweep(
   // corrected path already emits a final S0 at the active edge when overscan is
   // disabled; avoid a duplicate zero-length move in that case.
   if (input.overscanMm > 0 || dotWidthCorrectionMm <= 0) {
-    lines.push(`G1 X${fmt(endX)} S0`);
+    lines.push(formatLaserOffG1(endX, feed, input.modalFeedrate ?? true));
   }
   return lines.join(LINE_END);
 }
@@ -383,10 +396,19 @@ function formatRunG1(
   prevS: number,
   feed: number,
   isVeryFirstG1: boolean,
+  modalFeedrate: boolean,
+  emitSOnEveryBurnMove: boolean,
 ): string {
   const parts: string[] = [`G1 X${fmt(x)}`];
-  if (isVeryFirstG1) parts.push(`F${feed}`);
-  if (s !== prevS) parts.push(`S${s}`);
+  if (isVeryFirstG1 || !modalFeedrate) parts.push(`F${feed}`);
+  if (s !== prevS || (s > 0 && emitSOnEveryBurnMove)) parts.push(`S${s}`);
+  return parts.join(' ');
+}
+
+function formatLaserOffG1(x: number, feed: number, modalFeedrate: boolean): string {
+  const parts: string[] = [`G1 X${fmt(x)}`];
+  if (!modalFeedrate) parts.push(`F${feed}`);
+  parts.push('S0');
   return parts.join(' ');
 }
 

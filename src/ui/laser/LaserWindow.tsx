@@ -135,7 +135,12 @@ function AlarmBanner({
       <button
         type="button"
         onClick={onHome}
-        title="Send $H. Use this only when the machine has working homing switches."
+        disabled={!homingEnabled}
+        title={
+          homingEnabled
+            ? 'Send $H. Use this only when the machine has working homing switches.'
+            : 'Homing is disabled in Device settings.'
+        }
       >
         Home ($H)
       </button>
