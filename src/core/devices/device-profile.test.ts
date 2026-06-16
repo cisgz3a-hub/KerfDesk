@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from './device-profile';
+import {
+  DEFAULT_DEVICE_PROFILE,
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  type DeviceProfile,
+} from './device-profile';
 
 describe('DEFAULT_DEVICE_PROFILE', () => {
   it('matches the WORKFLOW.md F-A1 first-run defaults exactly', () => {
@@ -73,5 +77,31 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     // gantries.
     expect(DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin).toBeGreaterThanOrEqual(1000);
     expect(DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin).toBeLessThanOrEqual(15000);
+  });
+
+  it('ships a Neotronics 4040 Max / LT-4LDS-V2 20W diode profile without guessing Z or air wiring', () => {
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE).toMatchObject({
+      name: 'Neotronics 4040 Max / LT-4LDS-V2 20W',
+      machineFamily: 'neotronics-4040-max',
+      controllerKind: 'grbl-v1.1',
+      bedWidth: 400,
+      bedHeight: 400,
+      maxPowerS: 1000,
+      minPowerS: 0,
+      laserModeEnabled: true,
+      airAssistCommand: 'none',
+      zTravelMm: 75,
+      zTravelConfirmed: false,
+      zProbePresent: true,
+      laserSubProfile: {
+        model: 'LASER TREE LT-4LDS-V2',
+        opticalPowerW: 20,
+        wavelengthNm: 455,
+        spotSizeMm: { x: 0.16, y: 0.18 },
+        focusLengthMm: 40,
+        focusMode: 'fixed-lever',
+        airAssist: 'built-in',
+      },
+    });
   });
 });

@@ -4,14 +4,34 @@
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
+export type ControllerKind = 'grbl-v1.1';
+export type LaserFocusMode = 'fixed-lever' | 'manual' | 'unknown';
+export type LaserAirAssistHardware = 'built-in' | 'manual' | 'none' | 'unknown';
 
 export type HomingConfig = {
   readonly enabled: boolean;
   readonly direction: Origin;
 };
 
+export type LaserSubProfile = {
+  readonly model: string;
+  readonly opticalPowerW?: number;
+  readonly wavelengthNm?: number;
+  readonly spotSizeMm?: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly focusLengthMm?: number;
+  readonly focusMode: LaserFocusMode;
+  readonly airAssist: LaserAirAssistHardware;
+  readonly notes?: string;
+};
+
 export type DeviceProfile = {
   readonly name: string;
+  readonly machineFamily?: string;
+  readonly controllerKind?: ControllerKind;
+  readonly laserSubProfile?: LaserSubProfile;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
   // treats these as mm. G-code output is `G21` (mm). Reference work
@@ -29,6 +49,11 @@ export type DeviceProfile = {
   // exposes this as a device choice (M7 vs M8); default disabled because many
   // hobby controllers leave these pins unwired or use M7 only when compiled in.
   readonly airAssistCommand: AirAssistCommand;
+  // Optional Z metadata. XY bed dimensions are used for bounds checks today;
+  // Z is informational/setup-facing until a dedicated Z workflow is enabled.
+  readonly zTravelMm?: number;
+  readonly zTravelConfirmed?: boolean;
+  readonly zProbePresent?: boolean;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. Capped at maxFeed at
@@ -93,4 +118,32 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   accelMmPerSec2: 500,
   junctionDeviationMm: 0.01,
   framingFeedMmPerMin: 6000,
+};
+
+export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  name: 'Neotronics 4040 Max / LT-4LDS-V2 20W',
+  machineFamily: 'neotronics-4040-max',
+  controllerKind: 'grbl-v1.1',
+  bedWidth: 400,
+  bedHeight: 400,
+  maxFeed: 6000,
+  maxPowerS: 1000,
+  minPowerS: 0,
+  laserModeEnabled: true,
+  airAssistCommand: 'none',
+  zTravelMm: 75,
+  zTravelConfirmed: false,
+  zProbePresent: true,
+  laserSubProfile: {
+    model: 'LASER TREE LT-4LDS-V2',
+    opticalPowerW: 20,
+    wavelengthNm: 455,
+    spotSizeMm: { x: 0.16, y: 0.18 },
+    focusLengthMm: 40,
+    focusMode: 'fixed-lever',
+    airAssist: 'built-in',
+    notes:
+      'Neotronics/OEM documents 400x400 XY and 75 mm Z, but related 4040 variants list 95 mm Z. Confirm Z travel and air-assist wiring during setup.',
+  },
 };

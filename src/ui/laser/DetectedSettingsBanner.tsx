@@ -86,6 +86,7 @@ export function describePatch(
   const rows: Row[] = [];
   pushNumericRow(rows, 'Bed width', patch.bedWidth, current.bedWidth, formatMm);
   pushNumericRow(rows, 'Bed height', patch.bedHeight, current.bedHeight, formatMm);
+  pushOptionalNumericRow(rows, 'Z travel', patch.zTravelMm, current.zTravelMm, formatMm);
   pushNumericRow(rows, 'Max feed', patch.maxFeed, current.maxFeed, formatFeed);
   pushNumericRow(rows, 'Max power (S)', patch.maxPowerS, current.maxPowerS, formatInt);
   pushNumericRow(rows, 'Min power (S)', patch.minPowerS, current.minPowerS, formatInt);
@@ -136,6 +137,22 @@ function pushNumericRow(
     oldText: format(prev),
     newText: format(next),
     changed: !numbersClose(next, prev),
+  });
+}
+
+function pushOptionalNumericRow(
+  rows: Row[],
+  label: string,
+  next: number | undefined,
+  prev: number | undefined,
+  format: (n: number) => string,
+): void {
+  if (next === undefined) return;
+  rows.push({
+    label,
+    oldText: prev === undefined ? 'Not set' : format(prev),
+    newText: format(next),
+    changed: prev === undefined || !numbersClose(next, prev),
   });
 }
 

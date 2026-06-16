@@ -178,6 +178,28 @@ describe('MaterialLibraryPanel', () => {
     }
   });
 
+  it('creates a Neotronics starter material library from the researched 20W diode pack', async () => {
+    const { host, root } = await renderPanel();
+    try {
+      await act(async () => {
+        button(host, 'Create Neotronics starter material library').click();
+      });
+
+      const state = useStore.getState();
+      const ids = state.materialLibrary?.entries.map((entry) => entry.id) ?? [];
+      expect(state.materialLibrary?.name).toContain('Neotronics 4040 Max');
+      expect(ids).toContain('neotronics-lt4lds-wood-engrave-254dpi');
+      expect(ids).toContain('neotronics-lt4lds-clear-acrylic-unsupported');
+      expect(
+        state.materialLibrary?.entries.find((entry) => entry.id.includes('clear-acrylic'))
+          ?.description,
+      ).toMatch(/not recommended/i);
+      expect(state.materialLibraryDirty).toBe(false);
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
   it('loads a material library through the panel file picker', async () => {
     const doc = library([preset()]);
     const { host, root } = await renderPanel(

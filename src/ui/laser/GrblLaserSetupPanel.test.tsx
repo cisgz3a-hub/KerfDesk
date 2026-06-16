@@ -69,7 +69,8 @@ describe('GRBL laser setup panel', () => {
         await Promise.resolve();
       });
 
-      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('$32=1'));
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Neotronics'));
+      expect(confirm).not.toHaveBeenCalledWith(expect.stringContaining('$22=0'));
       expect(configure).toHaveBeenCalledTimes(1);
     } finally {
       await act(async () => {

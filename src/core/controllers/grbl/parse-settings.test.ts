@@ -63,6 +63,29 @@ describe('settingsMapToProfilePatch', () => {
     expect(settingsMapToProfilePatch(map)).not.toHaveProperty('homing');
   });
 
+  it('captures Neotronics-relevant limit, homing, and Z-axis settings from $$', () => {
+    const map = new Map<number, string>([
+      [20, '1'],
+      [21, '1'],
+      [22, '1'],
+      [23, '3'],
+      [112, '800.000'],
+      [122, '50.000'],
+      [132, '75.000'],
+    ]);
+
+    expect(settingsMapToControllerSettings(map)).toMatchObject({
+      softLimitsEnabled: true,
+      hardLimitsEnabled: true,
+      homingEnabled: true,
+      homingDirectionMask: 3,
+      zMaxFeed: 800,
+      zAccelMmPerSec2: 50,
+      zTravelMm: 75,
+    });
+    expect(settingsMapToProfilePatch(map)).toEqual({ zTravelMm: 75 });
+  });
+
   it('takes the max of $110/$111 for maxFeed (vector reach)', () => {
     const map = new Map([
       [110, '3000'],

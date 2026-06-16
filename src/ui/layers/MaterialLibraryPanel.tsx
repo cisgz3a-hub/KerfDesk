@@ -1,11 +1,17 @@
 import { useState } from 'react';
-import type { DeviceProfile } from '../../core/devices';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../../core/devices';
+import {
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS,
+  materialPresetWarnings,
+  type StarterMaterialPreset,
+} from '../../core/material-library';
 import type { Layer } from '../../core/scene';
 import {
   createMaterialLibraryDeviceHint,
   MATERIAL_LIBRARY_FORMAT,
   MATERIAL_LIBRARY_SCHEMA_VERSION,
   type MaterialLibraryDocument,
+  type MaterialPreset,
 } from '../../io/material-library';
 import {
   handleOpenMaterialLibrary,
@@ -52,6 +58,13 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
           onClick={() => setMaterialLibrary(createBlankLibrary(device))}
         >
           New Library
+        </Button>
+        <Button
+          aria-label="Create Neotronics starter material library"
+          title="Create a starter library for the Neotronics 4040 Max / LT-4LDS-V2 20W diode profile. These are researched starting points, not guaranteed burn settings."
+          onClick={() => setMaterialLibrary(createNeotronicsStarterLibrary())}
+        >
+          Neotronics Starters
         </Button>
         <Button
           aria-label="Load material library"
@@ -248,6 +261,32 @@ function createBlankLibrary(device: DeviceProfile): MaterialLibraryDocument {
     name: `${device.name} Library`,
     deviceHint: createMaterialLibraryDeviceHint(device),
     entries: [],
+  };
+}
+
+function createNeotronicsStarterLibrary(): MaterialLibraryDocument {
+  return {
+    format: MATERIAL_LIBRARY_FORMAT,
+    librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
+    libraryId: 'laserforge-neotronics-4040-max-lt4lds-v2',
+    name: 'Neotronics 4040 Max Starter Library',
+    deviceHint: createMaterialLibraryDeviceHint(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+    entries: NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS.map(toMaterialPreset),
+  };
+}
+
+function toMaterialPreset(preset: StarterMaterialPreset): MaterialPreset {
+  const warnings = materialPresetWarnings(preset);
+  const warningText = warnings.length === 0 ? '' : ` Warnings: ${warnings.join(' ')}`;
+  const unsupportedText = preset.unsupported === true ? ' Unsupported on this diode profile.' : '';
+  return {
+    id: preset.id,
+    materialName: preset.materialName,
+    ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
+    ...(preset.title !== undefined ? { title: preset.title } : {}),
+    description: `${preset.description}${unsupportedText}${warningText}`,
+    recipe: preset.recipe,
+    revision: preset.revision,
   };
 }
 

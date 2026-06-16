@@ -69,7 +69,7 @@ afterEach(async () => {
 });
 
 describe('laser-store GRBL laser setup', () => {
-  it('sends the explicit GRBL laser setup sequence and refreshes $$ settings', async () => {
+  it('blocks GRBL laser setup until controller settings have been read', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -77,17 +77,25 @@ describe('laser-store GRBL laser setup', () => {
     await connectWith(connection);
     writes.length = 0;
 
+    await expect(useLaserStore.getState().configureGrblLaserSetup()).rejects.toThrow(
+      /read machine settings/i,
+    );
+
+    expect(writes).toEqual([]);
+  });
+
+  it('sends the explicit Neotronics-safe GRBL laser setup sequence and refreshes $$ settings', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    seedSettingsRead(connection);
+    writes.length = 0;
+
     await useLaserStore.getState().configureGrblLaserSetup();
 
-    expect(writes).toEqual([
-      '$X\n',
-      '$32=1\n',
-      '$22=0\n',
-      '$30=1000\n',
-      '$130=400\n',
-      '$131=400\n',
-      '$$\n',
-    ]);
+    expect(writes).toEqual(['$32=1\n', '$30=1000\n', '$130=400\n', '$131=400\n', '$$\n']);
   });
 
   it('blocks GRBL laser setup while a job is active', async () => {
@@ -96,6 +104,7 @@ describe('laser-store GRBL laser setup', () => {
       writes.push(data);
     });
     await connectWith(connection);
+    seedSettingsRead(connection);
     writes.length = 0;
     await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     writes.length = 0;
@@ -107,3 +116,17 @@ describe('laser-store GRBL laser setup', () => {
     expect(writes).toEqual([]);
   });
 });
+
+function seedSettingsRead(connection: FakeConnection): void {
+  connection.emitLine('$20=1');
+  connection.emitLine('$21=1');
+  connection.emitLine('$22=1');
+  connection.emitLine('$23=3');
+  connection.emitLine('$30=1000');
+  connection.emitLine('$31=0');
+  connection.emitLine('$32=1');
+  connection.emitLine('$130=400');
+  connection.emitLine('$131=400');
+  connection.emitLine('$132=75');
+  connection.emitLine('ok');
+}
