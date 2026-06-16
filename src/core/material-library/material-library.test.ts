@@ -28,6 +28,10 @@ describe('material library recipes', () => {
       speed: 1800,
       passes: 3,
       airAssist: true,
+      tabsEnabled: true,
+      tabSizeMm: 1.5,
+      tabsPerShape: 6,
+      tabSkipInnerShapes: false,
       visible: false,
       output: false,
       hatchAngleDeg: 37,
@@ -52,6 +56,10 @@ describe('material library recipes', () => {
       speed: 1800,
       passes: 3,
       airAssist: true,
+      tabsEnabled: true,
+      tabSizeMm: 1.5,
+      tabsPerShape: 6,
+      tabSkipInnerShapes: false,
       hatchAngleDeg: 37,
       hatchSpacingMm: 0.08,
       fillOverscanMm: 2.5,
@@ -97,6 +105,10 @@ describe('material library recipes', () => {
       speed: 2200,
       passes: 2,
       airAssist: true,
+      tabsEnabled: false,
+      tabSizeMm: 0.5,
+      tabsPerShape: 4,
+      tabSkipInnerShapes: true,
       hatchAngleDeg: 15,
       hatchSpacingMm: 0.12,
       fillOverscanMm: 1.5,
@@ -199,6 +211,26 @@ describe('material library recipes', () => {
     expect(isMaterialRecipe(legacyRecipe)).toBe(true);
     expect(normalizeMaterialRecipe(legacyRecipe).kerfOffsetMm).toBe(0);
     expect(materialRecipePatch(legacyRecipe).kerfOffsetMm).toBe(0);
+  });
+
+  it('defaults older recipes without tabs / bridges to off', () => {
+    const {
+      tabsEnabled: _tabsEnabled,
+      tabSizeMm: _tabSizeMm,
+      tabsPerShape: _tabsPerShape,
+      tabSkipInnerShapes: _tabSkipInnerShapes,
+      ...legacyRecipe
+    } = captureMaterialRecipe(
+      makeLayer({ tabsEnabled: true, tabSizeMm: 2, tabsPerShape: 8, tabSkipInnerShapes: false }),
+    );
+
+    expect(isMaterialRecipe(legacyRecipe)).toBe(true);
+    expect(materialRecipePatch(legacyRecipe)).toMatchObject({
+      tabsEnabled: false,
+      tabSizeMm: 0.5,
+      tabsPerShape: 4,
+      tabSkipInnerShapes: true,
+    });
   });
 
   it('normalizes recipe numbers for safe assignment', () => {

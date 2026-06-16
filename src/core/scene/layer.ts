@@ -33,6 +33,12 @@ export type Layer = {
   // artwork stays unchanged. Positive offsets cut outside outer contours and
   // inside holes.
   readonly kerfOffsetMm: number;
+  // LightBurn-style Tabs / Bridges subset for Line mode. Automatic tabs are
+  // applied to closed contours at output time; source artwork stays unchanged.
+  readonly tabsEnabled: boolean;
+  readonly tabSizeMm: number;
+  readonly tabsPerShape: number;
+  readonly tabSkipInnerShapes: boolean;
   // F.1 fill parameters. Ignored unless mode === 'fill'. Defaults
   // chosen for a typical diode laser: 0° = horizontal hatching,
   // 0.1 mm spacing ≈ 10 lines/mm (LightBurn's diode norm). The prior
@@ -73,6 +79,10 @@ export const LAYER_DEFAULTS = {
   output: true,
   airAssist: false,
   kerfOffsetMm: 0,
+  tabsEnabled: false,
+  tabSizeMm: 0.5,
+  tabsPerShape: 4,
+  tabSkipInnerShapes: true,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,

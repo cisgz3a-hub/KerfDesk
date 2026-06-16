@@ -177,6 +177,18 @@ function normalizeCommonLayerFields(out: Record<string, unknown>): void {
   if (typeof out['kerfOffsetMm'] !== 'number' || !Number.isFinite(out['kerfOffsetMm'])) {
     out['kerfOffsetMm'] = LAYER_DEFAULTS.kerfOffsetMm;
   }
+  if (typeof out['tabsEnabled'] !== 'boolean') {
+    out['tabsEnabled'] = LAYER_DEFAULTS.tabsEnabled;
+  }
+  if (!isPositiveNumber(out['tabSizeMm'])) {
+    out['tabSizeMm'] = LAYER_DEFAULTS.tabSizeMm;
+  }
+  if (!isPositiveInteger(out['tabsPerShape'])) {
+    out['tabsPerShape'] = LAYER_DEFAULTS.tabsPerShape;
+  }
+  if (typeof out['tabSkipInnerShapes'] !== 'boolean') {
+    out['tabSkipInnerShapes'] = LAYER_DEFAULTS.tabSkipInnerShapes;
+  }
 }
 
 function normalizeFillLayerFields(out: Record<string, unknown>): void {
@@ -230,6 +242,10 @@ function isNonNegativeNumber(value: unknown): value is number {
 
 function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && value > 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
 function isPercent(value: unknown): value is number {

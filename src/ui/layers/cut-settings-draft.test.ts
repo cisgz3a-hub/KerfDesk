@@ -65,6 +65,49 @@ describe('cut settings draft helpers', () => {
     ).toBe(0.2);
   });
 
+  it('reads and clamps line-mode tabs / bridges controls', () => {
+    const layer = lineLayer({ tabSizeMm: 0.5, tabsPerShape: 4, tabSkipInnerShapes: true });
+    const patch = readCutSettingsPatch(
+      formData({
+        mode: 'line',
+        tabsEnabled: 'on',
+        tabSizeMm: '0',
+        tabsPerShape: '4.9',
+      }),
+      layer,
+    );
+
+    expect(patch.tabsEnabled).toBe(true);
+    expect(patch.tabSizeMm).toBe(0.01);
+    expect(patch.tabsPerShape).toBe(4);
+    expect(patch.tabSkipInnerShapes).toBe(false);
+  });
+
+  it('preserves tabs / bridges settings outside line mode', () => {
+    const layer = fillLayer({
+      tabsEnabled: true,
+      tabSizeMm: 1.25,
+      tabsPerShape: 6,
+      tabSkipInnerShapes: false,
+    });
+
+    const patch = readCutSettingsPatch(
+      formData({
+        mode: 'fill',
+        tabsEnabled: '',
+        tabSizeMm: '0.01',
+        tabsPerShape: '1',
+        tabSkipInnerShapes: 'on',
+      }),
+      layer,
+    );
+
+    expect(patch.tabsEnabled).toBe(true);
+    expect(patch.tabSizeMm).toBe(1.25);
+    expect(patch.tabsPerShape).toBe(6);
+    expect(patch.tabSkipInnerShapes).toBe(false);
+  });
+
   it('maps fill line interval and lines-per-inch values to hatch spacing', () => {
     const layer = fillLayer({ hatchSpacingMm: 0.2 });
 

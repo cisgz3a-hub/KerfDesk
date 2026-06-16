@@ -15,6 +15,10 @@ describe('createLayer', () => {
       visible: true,
       output: true,
       kerfOffsetMm: 0,
+      tabsEnabled: false,
+      tabSizeMm: 0.5,
+      tabsPerShape: 4,
+      tabSkipInnerShapes: true,
       hatchAngleDeg: 0,
       hatchSpacingMm: 0.1,
       fillOverscanMm: 5,
@@ -54,5 +58,13 @@ describe('LAYER_DEFAULTS', () => {
   it('defaults kerf compensation off for every new layer', () => {
     expect(LAYER_DEFAULTS.kerfOffsetMm).toBe(0);
     expect(createLayer({ id: 'L1', color: '#000000' }).kerfOffsetMm).toBe(0);
+  });
+
+  it('defaults automatic tabs off for every new layer', () => {
+    expect(LAYER_DEFAULTS.tabsEnabled).toBe(false);
+    expect(LAYER_DEFAULTS.tabSizeMm).toBe(0.5);
+    expect(LAYER_DEFAULTS.tabsPerShape).toBe(4);
+    expect(LAYER_DEFAULTS.tabSkipInnerShapes).toBe(true);
+    expect(createLayer({ id: 'L1', color: '#000000' }).tabsEnabled).toBe(false);
   });
 });

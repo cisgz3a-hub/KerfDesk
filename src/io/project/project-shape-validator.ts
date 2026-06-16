@@ -101,6 +101,10 @@ function validateLayer(layer: unknown, path: string): string | null {
     requireBoolean(layer, `${path}.output`),
     optionalBoolean(layer, `${path}.airAssist`),
     optionalNumber(layer, `${path}.kerfOffsetMm`),
+    optionalBoolean(layer, `${path}.tabsEnabled`),
+    optionalPositiveNumber(layer, `${path}.tabSizeMm`),
+    optionalPositiveInteger(layer, `${path}.tabsPerShape`),
+    optionalBoolean(layer, `${path}.tabSkipInnerShapes`),
     optionalNumber(layer, `${path}.hatchAngleDeg`),
     optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),
@@ -384,6 +388,13 @@ function optionalPositiveNumber(obj: Record<string, unknown>, path: string): str
 function optionalNonNegativeNumber(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined || (isFiniteNumber(value) && value >= 0)
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
+function optionalPositiveInteger(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return value === undefined || (isFiniteNumber(value) && Number.isInteger(value) && value > 0)
     ? null
     : `missing or invalid \`${path}\``;
 }
