@@ -1,5 +1,24 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
 
+// Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
+// deserialize. Distinct from the TARGET burn-grid budget (core/raster
+// MAX_RASTER_PIXELS): compile-job allocates the source luma buffer as
+// pixelWidth*pixelHeight (decodeBase64Luma / whiteLuma) BEFORE that budget runs,
+// so a hand-edited .lf2 with absurd dims (e.g. 2^30 x 1) could allocate
+// gigabytes here first. 256M px is far above any real import (2048-edge cap) or
+// Convert-to-Bitmap source, but fatal to the integer bomb (security audit 2026-06-14).
+const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
+
+// Ceiling on any stored coordinate magnitude (mm). A coordinate >= 1e21 passes
+// Number.isFinite but renders in exponential notation when emitted (toFixed),
+// which the G-code bounds-check regex can't read — defeating the bounds
+// invariant. Any real bed is < 2 m; 1e6 mm (1 km) is absurdly generous yet far
+// below the exponential threshold (security audit 2026-06-14).
+const MAX_COORDINATE_MAGNITUDE_MM = 1_000_000;
+// Ceiling on a transform scale factor, so scale * coordinate can't blow past the
+// coordinate ceiling either.
+const MAX_TRANSFORM_SCALE = 100_000;
+
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
   const device = raw['device'];
   if (!isObject(device)) return 'missing or invalid `device`';
@@ -134,7 +153,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
 }
 
 function validateRasterObject(obj: Record<string, unknown>, path: string): string | null {
-  return firstError([
+  const fieldError = firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
     requireString(obj, `${path}.dataUrl`),
@@ -152,6 +171,20 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     optionalString(obj, `${path}.lumaBase64`),
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
   ]);
+  if (fieldError !== null) return fieldError;
+  // Cross-field DoS guard: bound the source luma allocation (see
+  // MAX_RASTER_SOURCE_PIXELS). pixelWidth/pixelHeight are validated positive
+  // integers above, so the typeof guards only satisfy the type checker.
+  const pixelWidth = obj['pixelWidth'];
+  const pixelHeight = obj['pixelHeight'];
+  if (
+    typeof pixelWidth === 'number' &&
+    typeof pixelHeight === 'number' &&
+    pixelWidth * pixelHeight > MAX_RASTER_SOURCE_PIXELS
+  ) {
+    return `invalid \`${path}\`: pixelWidth*pixelHeight exceeds ${MAX_RASTER_SOURCE_PIXELS}`;
+  }
+  return null;
 }
 
 function validateShapeObject(obj: Record<string, unknown>, path: string): string | null {
@@ -204,10 +237,10 @@ function validateShapeSpec(value: unknown, path: string): string | null {
 function validateBounds(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   const fieldError = firstError([
-    requireNumber(value, `${path}.minX`),
-    requireNumber(value, `${path}.minY`),
-    requireNumber(value, `${path}.maxX`),
-    requireNumber(value, `${path}.maxY`),
+    requireCoordinate(value, `${path}.minX`),
+    requireCoordinate(value, `${path}.minY`),
+    requireCoordinate(value, `${path}.maxX`),
+    requireCoordinate(value, `${path}.maxY`),
   ]);
   if (fieldError !== null) return fieldError;
   // Cross-field invariant (CQ-006): bounds are normalized (min <= max) by
@@ -227,10 +260,10 @@ function validateBounds(value: unknown, path: string): string | null {
 function validateTransform(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([
-    requireNumber(value, `${path}.x`),
-    requireNumber(value, `${path}.y`),
-    requireNumber(value, `${path}.scaleX`),
-    requireNumber(value, `${path}.scaleY`),
+    requireCoordinate(value, `${path}.x`),
+    requireCoordinate(value, `${path}.y`),
+    requireScale(value, `${path}.scaleX`),
+    requireScale(value, `${path}.scaleY`),
     requireNumber(value, `${path}.rotationDeg`),
     requireBoolean(value, `${path}.mirrorX`),
     requireBoolean(value, `${path}.mirrorY`),
@@ -270,7 +303,7 @@ function validatePoints(value: unknown, path: string): string | null {
 
 function validatePoint(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
-  return firstError([requireNumber(value, `${path}.x`), requireNumber(value, `${path}.y`)]);
+  return firstError([requireCoordinate(value, `${path}.x`), requireCoordinate(value, `${path}.y`)]);
 }
 
 function validateArray(
@@ -314,6 +347,20 @@ function optionalBoolean(obj: Record<string, unknown>, path: string): string | n
 
 function requireNumber(obj: Record<string, unknown>, path: string): string | null {
   return isFiniteNumber(valueAtPath(obj, path)) ? null : `missing or invalid \`${path}\``;
+}
+
+function requireCoordinate(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return isFiniteNumber(value) && Math.abs(value) <= MAX_COORDINATE_MAGNITUDE_MM
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
+function requireScale(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return isFiniteNumber(value) && Math.abs(value) <= MAX_TRANSFORM_SCALE
+    ? null
+    : `missing or invalid \`${path}\``;
 }
 
 function optionalNumber(obj: Record<string, unknown>, path: string): string | null {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { webSerial } from './web-serial';
+import { extractSerialLines, webSerial } from './web-serial';
 
 const originalSerialDescriptor = Object.getOwnPropertyDescriptor(navigator, 'serial');
 
@@ -163,5 +163,29 @@ describe('webSerial wire encoding (M12)', () => {
     const conn = await openConn(port);
 
     await expect(conn.write('Ω')).rejects.toThrow(/single-byte/i);
+  });
+});
+
+describe('extractSerialLines', () => {
+  it('emits complete newline-terminated lines and strips trailing CR', () => {
+    expect(extractSerialLines('', 'ok\r\n')).toEqual({ lines: ['ok'], buffer: '' });
+    expect(extractSerialLines('', 'a\nb\n')).toEqual({ lines: ['a', 'b'], buffer: '' });
+  });
+
+  it('holds a partial line across chunks', () => {
+    const first = extractSerialLines('', '<Idle');
+    expect(first).toEqual({ lines: [], buffer: '<Idle' });
+    expect(extractSerialLines(first.buffer, '|MPos>\n')).toEqual({
+      lines: ['<Idle|MPos>'],
+      buffer: '',
+    });
+  });
+
+  it('drops an over-length partial so the buffer cannot grow without bound (DoS guard)', () => {
+    // A device streaming bytes with no newline must not accumulate unbounded.
+    const garbage = 'A'.repeat(70_000);
+    expect(extractSerialLines('', garbage)).toEqual({ lines: [], buffer: '' });
+    // A normal short partial is preserved.
+    expect(extractSerialLines('', 'short').buffer).toBe('short');
   });
 });
