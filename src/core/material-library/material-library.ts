@@ -6,6 +6,7 @@ export type MaterialRecipe = {
   readonly power: number;
   readonly speed: number;
   readonly passes: number;
+  readonly airAssist?: boolean;
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
@@ -24,6 +25,7 @@ export const MATERIAL_RECIPE_FIELDS = [
   'power',
   'speed',
   'passes',
+  'airAssist',
   'hatchAngleDeg',
   'hatchSpacingMm',
   'fillOverscanMm',
@@ -46,6 +48,7 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     power: layer.power,
     speed: layer.speed,
     passes: layer.passes,
+    airAssist: layer.airAssist,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
     fillOverscanMm: layer.fillOverscanMm,
@@ -60,7 +63,7 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
 }
 
 export function materialRecipePatch(recipe: MaterialRecipe): MaterialRecipe {
-  return normalizeMaterialRecipe(recipe);
+  return { ...normalizeMaterialRecipe(recipe), airAssist: recipe.airAssist === true };
 }
 
 export function applyMaterialRecipe(layer: Layer, recipe: MaterialRecipe): Layer {
@@ -79,6 +82,7 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     power,
     speed: Math.max(1, finiteOr(recipe.speed, 1)),
     passes: Math.max(1, Math.floor(finiteOr(recipe.passes, 1))),
+    ...(recipe.airAssist !== undefined ? { airAssist: recipe.airAssist } : {}),
     hatchAngleDeg: finiteOr(recipe.hatchAngleDeg, 0),
     hatchSpacingMm: Math.max(MIN_SPACING, finiteOr(recipe.hatchSpacingMm, MIN_SPACING)),
     fillOverscanMm: Math.max(0, finiteOr(recipe.fillOverscanMm, 0)),
@@ -142,6 +146,7 @@ function hasRecipeBooleans(value: Record<string, unknown>): boolean {
   return (
     typeof value.fillBidirectional === 'boolean' &&
     typeof value.fillCrossHatch === 'boolean' &&
+    (value.airAssist === undefined || typeof value.airAssist === 'boolean') &&
     typeof value.negativeImage === 'boolean' &&
     typeof value.passThrough === 'boolean'
   );

@@ -129,6 +129,7 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     power: powerPercent,
     speed: Math.min(layer.speed, device.maxFeed),
     passes: Math.max(1, Math.floor(layer.passes)),
+    airAssist: layer.airAssist,
     sValues,
     pixelWidth,
     pixelHeight,
@@ -251,6 +252,7 @@ function vectorGroupForLayer(
     power: effectiveObjectPowerPercent(layer, powerSource),
     speed: Math.min(layer.speed, device.maxFeed),
     passes: Math.max(1, Math.floor(layer.passes)),
+    airAssist: layer.airAssist,
     segments,
   };
   return [

@@ -22,6 +22,7 @@ function group(opts: Partial<CutGroup> & { segments: ReadonlyArray<CutSegment> }
     power: 50,
     speed: 1000, // 16.667 mm/s cut
     passes: 1,
+    airAssist: false,
     ...opts,
   };
 }

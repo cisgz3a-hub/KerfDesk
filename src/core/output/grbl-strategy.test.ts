@@ -27,6 +27,7 @@ describe('grblStrategy single-segment job', () => {
         power: 50,
         speed: 1500,
         passes: 1,
+        airAssist: false,
         segments: [
           {
             polyline: [
@@ -78,6 +79,7 @@ describe('grblStrategy is deterministic (non-negotiable #5)', () => {
           power: 33.333,
           speed: 2000,
           passes: 2,
+          airAssist: false,
           segments: [
             {
               polyline: [
@@ -107,6 +109,7 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
           power: 100,
           speed: 1000,
           passes: 3,
+          airAssist: false,
           segments: [
             {
               polyline: [
@@ -139,6 +142,7 @@ describe('grblStrategy fill hatch overscan', () => {
           power: 30,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 2,
           segments: [
             {
@@ -185,6 +189,7 @@ describe('grblStrategy fill hatch overscan', () => {
           power: 30,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 5,
           segments: [
             {
@@ -238,6 +243,7 @@ describe('grblStrategy fill hatch overscan', () => {
           power: 30,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 5,
           segments: [
             {
@@ -305,6 +311,7 @@ describe('grblStrategy fill hatch overscan', () => {
           power: 30,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 0,
           segments: [
             {
@@ -343,6 +350,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           power: 50,
           speed: 1000,
           passes: 1,
+          airAssist: false,
           sValues: new Uint16Array([500]),
           pixelWidth: 1,
           pixelHeight: 1,
@@ -357,6 +365,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           power: 50,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           segments: [
             {
               polyline: [
@@ -382,6 +391,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           power: 50,
           speed: 1000,
           passes: 1,
+          airAssist: false,
           sValues: new Uint16Array([500]),
           pixelWidth: 1,
           pixelHeight: 1,
@@ -396,6 +406,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           power: 50,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 1,
           segments: [
             {
@@ -424,6 +435,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           power: 50,
           speed: 1000,
           passes: 2,
+          airAssist: false,
           sValues: new Uint16Array([500]),
           pixelWidth: 1,
           pixelHeight: 1,
@@ -448,6 +460,7 @@ describe('grblStrategy mixed raster/vector mode transitions', () => {
           power: 50,
           speed: 1000,
           passes: 1,
+          airAssist: false,
           sValues: new Uint16Array([500]),
           pixelWidth: 1,
           pixelHeight: 1,
@@ -487,6 +500,7 @@ describe('grblStrategy fill zero-length / coincident span guard (audit 2026-06-0
           power: 30,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 0,
           segments: [
             {
@@ -524,6 +538,7 @@ describe('grblStrategy fill zero-length / coincident span guard (audit 2026-06-0
           power: 30,
           speed: 1500,
           passes: 1,
+          airAssist: false,
           overscanMm: 0,
           segments: [
             {

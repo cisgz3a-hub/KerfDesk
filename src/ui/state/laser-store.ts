@@ -56,7 +56,7 @@ import {
   assertNoActiveJob,
   buildPortClosePatch,
   detectStreamStall,
-  disconnectStopCommand,
+  disconnectStopCommands,
   initialLaserState,
   isActiveJob,
   jogFrameCommandBlockMessage,
@@ -274,10 +274,12 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
     disconnect: async () => {
       assertAutofocusIdle(get());
       const conn = refs.connection;
-      const stopCommand = disconnectStopCommand(get());
-      if (stopCommand !== null) {
+      const stopCommands = disconnectStopCommands(get());
+      if (stopCommands.length > 0) {
         try {
-          await safeWrite(set, get, stopCommand, 'disconnect');
+          for (const stopCommand of stopCommands) {
+            await safeWrite(set, get, stopCommand, 'disconnect');
+          }
         } catch {
           // The stop-before-disconnect write failed (USB likely already gone),
           // so the machine may still run buffered commands. Warn — but STILL

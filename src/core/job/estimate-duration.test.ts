@@ -32,6 +32,7 @@ function group(opts: {
     power: 50,
     speed: opts.speed ?? 1000, // mm/min
     passes: opts.passes ?? 1,
+    airAssist: false,
     segments: opts.segments ?? [],
   };
 }
@@ -44,6 +45,7 @@ function fillGroup(overscanMm: number): FillGroup {
     power: 50,
     speed: 1000,
     passes: 1,
+    airAssist: false,
     overscanMm,
     segments: [seg([10, 0], [20, 0])],
   };
@@ -64,6 +66,7 @@ function rasterGroup(opts: {
     power: 30,
     speed: 1200,
     passes: opts.passes ?? 1,
+    airAssist: false,
     sValues: opts.sValues ?? new Uint16Array(pixelWidth * pixelHeight).fill(500),
     pixelWidth,
     pixelHeight,
@@ -164,6 +167,7 @@ describe('estimateJobDuration', () => {
       power: 50,
       speed: 1000,
       passes: 1,
+      airAssist: false,
       overscanMm: 0,
       segments: [seg([0, 0], [5, 0]), seg([8, 0], [12, 0]), seg([15, 0], [20, 0])],
     };
@@ -181,6 +185,7 @@ describe('estimateJobDuration', () => {
       color: '#000',
       power: 50,
       speed: 1000,
+      airAssist: false,
       overscanMm: 0,
       segments: [seg([0, 0], [5, 0]), seg([8, 0], [12, 0])],
     };
@@ -245,6 +250,7 @@ describe('estimateJobDuration', () => {
               power: 50,
               speed: g.speed,
               passes: g.passes,
+              airAssist: false,
               segments: [{ polyline: g.pts.map(([x, y]) => ({ x, y })), closed: false }],
             })),
           };

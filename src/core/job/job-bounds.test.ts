@@ -13,6 +13,7 @@ const job: Job = {
       power: 30,
       speed: 1500,
       passes: 1,
+      airAssist: false,
       segments: [
         {
           polyline: [
@@ -58,6 +59,7 @@ describe('computeJobBounds', () => {
             power: 30,
             speed: 1500,
             passes: 1,
+            airAssist: false,
             overscanMm: 5,
             segments: [
               {

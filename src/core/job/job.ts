@@ -25,6 +25,7 @@ export type CutGroup = {
   readonly power: number; // 0..100 (percent)
   readonly speed: number; // mm/min; already capped to device.maxFeed
   readonly passes: number; // integer ≥ 1
+  readonly airAssist: boolean;
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
@@ -43,6 +44,7 @@ export type RasterGroup = {
   readonly power: number; // 0..100 (percent)
   readonly speed: number; // mm/min; already capped to device.maxFeed
   readonly passes: number; // integer â‰¥ 1
+  readonly airAssist: boolean;
   // S-values per pixel, already scaled by power %. Row-major.
   readonly sValues: Uint16Array;
   readonly pixelWidth: number;

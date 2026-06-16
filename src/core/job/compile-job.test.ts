@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import { createLayer, EMPTY_SCENE, IDENTITY_TRANSFORM, type SceneObject } from '../scene';
+import {
+  createLayer,
+  EMPTY_SCENE,
+  IDENTITY_TRANSFORM,
+  type RasterImage,
+  type SceneObject,
+} from '../scene';
 import { compileJob } from './compile-job';
 import type { CutGroup, FillGroup, Job } from './job';
 
@@ -31,6 +37,23 @@ function svgObj(args: {
     bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
     transform: IDENTITY_TRANSFORM,
     paths: [{ color: args.color, polylines: [{ points: args.points, closed: false }] }],
+  };
+}
+
+function rasterObject(color: string): RasterImage {
+  return {
+    kind: 'raster-image',
+    id: 'R1',
+    source: 'one-pixel.png',
+    dataUrl: 'data:image/png;base64,',
+    pixelWidth: 1,
+    pixelHeight: 1,
+    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    transform: IDENTITY_TRANSFORM,
+    color,
+    dither: 'threshold',
+    linesPerMm: 10,
+    lumaBase64: 'AA==',
   };
 }
 
@@ -94,6 +117,22 @@ describe('compileJob', () => {
     });
     const job = compileJob({ objects: [obj], layers: [layer] }, dev);
     expect(job.groups[0]?.speed).toBe(dev.maxFeed);
+  });
+
+  it('carries air assist intent onto line groups', () => {
+    const layer = { ...createLayer({ id: 'L1', color: '#ff0000' }), airAssist: true };
+    const obj = svgObj({
+      id: 'O1',
+      color: '#ff0000',
+      points: [
+        { x: 0, y: 0 },
+        { x: 5, y: 0 },
+      ],
+    });
+
+    const job = compileJob({ objects: [obj], layers: [layer] }, dev);
+
+    expect(job.groups[0]).toMatchObject({ kind: 'cut', airAssist: true });
   });
 
   it('clamps power to [0,100] and passes to ≥1', () => {
@@ -220,6 +259,53 @@ describe('compileJob', () => {
     // svgObj() returns closed: false. Fill ignores → group dropped
     // entirely (empty segments → no group emitted).
     expect(compileJob({ objects: [open], layers: [layer] }, dev).groups).toEqual([]);
+  });
+
+  it('carries air assist intent onto fill groups', () => {
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      mode: 'fill' as const,
+      airAssist: true,
+      hatchSpacingMm: 1,
+    };
+    const square: SceneObject = {
+      kind: 'imported-svg',
+      id: 'O1',
+      source: 'sq.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+                { x: 10, y: 10 },
+                { x: 0, y: 10 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const job = compileJob({ objects: [square], layers: [layer] }, dev);
+
+    expect(job.groups[0]).toMatchObject({ kind: 'fill', airAssist: true });
+  });
+
+  it('carries air assist intent onto raster groups', () => {
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#808080', mode: 'image' }),
+      airAssist: true,
+    };
+
+    const job = compileJob({ objects: [rasterObject('#808080')], layers: [layer] }, dev);
+
+    expect(job.groups[0]).toMatchObject({ kind: 'raster', airAssist: true });
   });
 
   it('applies the device origin transform on top of the object transform', () => {

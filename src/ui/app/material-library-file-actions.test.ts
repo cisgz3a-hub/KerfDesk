@@ -24,6 +24,7 @@ const recipe: MaterialRecipe = {
   power: 35,
   speed: 1400,
   passes: 1,
+  airAssist: false,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,

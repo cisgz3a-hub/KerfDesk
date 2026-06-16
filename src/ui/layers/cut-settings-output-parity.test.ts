@@ -83,6 +83,38 @@ describe('cut settings editor output parity', () => {
     expect(emitGcode(project).gcode).not.toBe(emitGcode(base).gcode);
     expect(estimateLiveJob(project).kind).toBe('estimated');
   });
+
+  it('routes air assist through prepared output and changes only coolant commands', () => {
+    const base = lineProjectWithAirDevice();
+    const patch = readCutSettingsPatch(
+      formData({
+        mode: 'line',
+        power: '55',
+        speed: '1400',
+        passes: '1',
+        airAssist: 'on',
+        visible: 'on',
+        output: 'on',
+      }),
+      base.scene.layers[0]!,
+    );
+    const project = patchFirstLayer(base, patch);
+    const prepared = prepareOutput(project);
+
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) throw new Error('expected prepared air-assist output');
+    expect(prepared.job.groups[0]).toMatchObject({ kind: 'cut', airAssist: true });
+
+    const off = emitGcode(base);
+    const on = emitGcode(project);
+
+    expect(off.preflight.ok).toBe(true);
+    expect(on.preflight.ok).toBe(true);
+    expect(off.gcode).not.toMatch(/^M[789]$/m);
+    expect(on.gcode).toMatch(/^M8$/m);
+    expect(on.gcode).toMatch(/^M9$/m);
+    expect(stripCoolant(on.gcode)).toBe(off.gcode);
+  });
 });
 
 function formData(entries: Record<string, string>): FormData {
@@ -146,6 +178,47 @@ function imageProject(): Project {
       objects: [rasterObject(color)],
     },
   };
+}
+
+function lineProjectWithAirDevice(): Project {
+  const color = '#000000';
+  const base = createProject();
+  return {
+    ...base,
+    device: { ...base.device, airAssistCommand: 'M8' },
+    scene: {
+      layers: [{ ...createLayer({ id: color, color, mode: 'line' }), power: 55, speed: 1400 }],
+      objects: [lineObject(color)],
+    },
+  };
+}
+
+function lineObject(color: string): SceneObject {
+  return {
+    kind: 'imported-svg',
+    id: 'line',
+    source: 'line.svg',
+    bounds: { minX: 20, minY: 20, maxX: 30, maxY: 20 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color,
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 20, y: 20 },
+              { x: 30, y: 20 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function stripCoolant(gcode: string): string {
+  return gcode.replace(/^(?:M7|M8|M9)\n/gm, '');
 }
 
 function rasterObject(color: string): RasterImage {

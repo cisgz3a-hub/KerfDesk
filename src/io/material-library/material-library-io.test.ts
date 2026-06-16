@@ -18,6 +18,7 @@ const lineRecipe: MaterialRecipe = {
   power: 35,
   speed: 1400,
   passes: 1,
+  airAssist: false,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
@@ -183,8 +184,45 @@ describe('material library IO', () => {
       maxPowerS: DEFAULT_DEVICE_PROFILE.maxPowerS,
       minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
+      airAssistCommand: DEFAULT_DEVICE_PROFILE.airAssistCommand,
       origin: DEFAULT_DEVICE_PROFILE.origin,
     });
+  });
+
+  it('accepts older device hints without air assist and defaults them to disabled', () => {
+    const deviceHint = createMaterialLibraryDeviceHint(DEFAULT_DEVICE_PROFILE);
+    const { airAssistCommand: _airAssistCommand, ...legacyDeviceHint } = deviceHint;
+    const result = deserializeMaterialLibrary(
+      JSON.stringify({
+        ...library(),
+        deviceHint: legacyDeviceHint,
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.library.deviceHint).toEqual({
+        ...deviceHint,
+        airAssistCommand: 'none',
+      });
+    }
+  });
+
+  it('rejects invalid air assist command hints', () => {
+    const result = deserializeMaterialLibrary(
+      JSON.stringify({
+        ...library(),
+        deviceHint: {
+          ...createMaterialLibraryDeviceHint(DEFAULT_DEVICE_PROFILE),
+          airAssistCommand: 'M106',
+        },
+      }),
+    );
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/deviceHint/);
+    }
   });
 
   it('merges unique incoming presets and reports skipped duplicate ids', () => {

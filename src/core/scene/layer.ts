@@ -25,6 +25,9 @@ export type Layer = {
   readonly passes: number; // integer ≥ 1
   readonly visible: boolean;
   readonly output: boolean;
+  // LightBurn-style per-layer Air Assist intent. It only emits G-code when
+  // the active device profile maps air assist to M7 or M8.
+  readonly airAssist: boolean;
   // F.1 fill parameters. Ignored unless mode === 'fill'. Defaults
   // chosen for a typical diode laser: 0° = horizontal hatching,
   // 0.1 mm spacing ≈ 10 lines/mm (LightBurn's diode norm). The prior
@@ -63,6 +66,7 @@ export const LAYER_DEFAULTS = {
   passes: 1,
   visible: true,
   output: true,
+  airAssist: false,
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,

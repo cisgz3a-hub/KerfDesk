@@ -32,6 +32,7 @@ function group(segments: ReadonlyArray<CutSegment>): CutGroup {
     power: 50,
     speed: 1000,
     passes: 1,
+    airAssist: false,
     segments,
   };
 }
