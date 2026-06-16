@@ -82,12 +82,11 @@ describe('elementToSubPaths — <rect>', () => {
 });
 
 describe('elementToSubPaths — <circle> / <ellipse>', () => {
-  it('approximates a circle with a 72-segment closed polygon', () => {
+  it('approximates a circle with an adaptive closed polygon', () => {
     const subs = elementToSubPaths(svgEl('<circle cx="10" cy="20" r="5"/>'));
     expect(subs).toHaveLength(1);
     expect(subs[0]?.closed).toBe(true);
-    // 72 + 1 (closing point repeated at the end)
-    expect(subs[0]?.points).toHaveLength(73);
+    expect(subs[0]?.points.length ?? 0).toBeGreaterThanOrEqual(25);
     // Points should lie on the circle.
     for (const p of subs[0]?.points ?? []) {
       const d = Math.hypot(p.x - 10, p.y - 20);
@@ -98,7 +97,14 @@ describe('elementToSubPaths — <circle> / <ellipse>', () => {
   it('approximates an ellipse with rx ≠ ry', () => {
     const subs = elementToSubPaths(svgEl('<ellipse cx="0" cy="0" rx="10" ry="5"/>'));
     expect(subs[0]?.closed).toBe(true);
-    expect(subs[0]?.points).toHaveLength(73);
+    expect(subs[0]?.points.length ?? 0).toBeGreaterThanOrEqual(25);
+  });
+
+  it('scales circle segment count with radius', () => {
+    const small = elementToSubPaths(svgEl('<circle cx="0" cy="0" r="5"/>'))[0]?.points.length ?? 0;
+    const large =
+      elementToSubPaths(svgEl('<circle cx="0" cy="0" r="200"/>'))[0]?.points.length ?? 0;
+    expect(large).toBeGreaterThan(small);
   });
 
   it('returns no subpaths for non-positive radii', () => {

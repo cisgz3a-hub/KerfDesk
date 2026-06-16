@@ -11,14 +11,14 @@ export type EllipseSpec = {
   readonly heightMm: number;
 };
 
-const ELLIPSE_TOLERANCE_MM = 0.05;
-const MIN_SEGMENTS = 24;
-const MAX_SEGMENTS = 512;
+export const ELLIPSE_TOLERANCE_MM = 0.05;
+export const ELLIPSE_MIN_SEGMENTS = 24;
+export const ELLIPSE_MAX_SEGMENTS = 512;
 
 export function ellipseToPolylines(spec: EllipseSpec): ReadonlyArray<Polyline> {
   const a = Math.max(0, spec.widthMm) / 2;
   const b = Math.max(0, spec.heightMm) / 2;
-  const segments = segmentCount(Math.max(a, b));
+  const segments = ellipseSegmentCount(Math.max(a, b));
   const points: Vec2[] = [];
   for (let i = 0; i < segments; i += 1) {
     const t = (2 * Math.PI * i) / segments;
@@ -34,8 +34,8 @@ export function ellipseToPolylines(spec: EllipseSpec): ReadonlyArray<Polyline> {
 // Chord-tolerance segment count for a circle of radius r: keeping the sagitta
 // r(1 - cos(theta/2)) under tol gives theta ~= 2*sqrt(2*tol/r), so the count is
 // ceil(pi * sqrt(r / (2*tol))). Clamped to a sane interactive range.
-function segmentCount(maxRadius: number): number {
-  if (maxRadius <= 0) return MIN_SEGMENTS;
+export function ellipseSegmentCount(maxRadius: number): number {
+  if (maxRadius <= 0) return ELLIPSE_MIN_SEGMENTS;
   const n = Math.ceil(Math.PI * Math.sqrt(maxRadius / (2 * ELLIPSE_TOLERANCE_MM)));
-  return Math.min(MAX_SEGMENTS, Math.max(MIN_SEGMENTS, n));
+  return Math.min(ELLIPSE_MAX_SEGMENTS, Math.max(ELLIPSE_MIN_SEGMENTS, n));
 }
