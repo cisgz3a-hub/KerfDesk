@@ -1,4 +1,5 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
+import { isScanOffsetTable } from '../../core/devices';
 
 // Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
 // deserialize. Distinct from the TARGET burn-grid budget (core/raster
@@ -55,6 +56,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalLiteral(device, 'device.airAssistCommand', ['none', 'M7', 'M8']),
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
+    optionalScanOffsetTable(device, 'device.scanningOffsets'),
     optionalPositiveNumber(device, 'device.framingFeedMmPerMin'),
     optionalPositiveNumber(device, 'device.accelMmPerSec2'),
     optionalPositiveNumber(device, 'device.junctionDeviationMm'),
@@ -385,6 +387,11 @@ function optionalNonNegativeNumber(obj: Record<string, unknown>, path: string): 
   return value === undefined || (isFiniteNumber(value) && value >= 0)
     ? null
     : `missing or invalid \`${path}\``;
+}
+
+function optionalScanOffsetTable(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return value === undefined || isScanOffsetTable(value) ? null : `missing or invalid \`${path}\``;
 }
 
 function requirePositiveInteger(obj: Record<string, unknown>, path: string): string | null {

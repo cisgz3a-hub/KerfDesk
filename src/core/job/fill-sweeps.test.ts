@@ -1,17 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { groupFillSweeps } from './fill-sweeps';
 
-const seg = (x0: number, y0: number, x1: number, y1: number) => ({
+const seg = (x0: number, y0: number, x1: number, y1: number, reverse = false) => ({
   polyline: [
     { x: x0, y: y0 },
     { x: x1, y: y1 },
   ],
+  reverse,
 });
 
 describe('groupFillSweeps', () => {
   it('returns one sweep with one span for a single run, preserving direction', () => {
     const sweeps = groupFillSweeps([seg(10, 0, 30, 0)]);
-    expect(sweeps).toEqual([{ spans: [{ start: { x: 10, y: 0 }, end: { x: 30, y: 0 } }] }]);
+    expect(sweeps).toEqual([
+      { reverse: false, spans: [{ start: { x: 10, y: 0 }, end: { x: 30, y: 0 } }] },
+    ]);
   });
 
   it('merges the runs of one forward scanline into a single left-to-right sweep', () => {
@@ -29,8 +32,9 @@ describe('groupFillSweeps', () => {
     // fillHatching reverse scanline: left pair first, each run reversed. The 2mm
     // gap stays under the rapid threshold, so it is one continuous sweep with the
     // rightmost region burned first.
-    const sweeps = groupFillSweeps([seg(9, 5, 3, 5), seg(17, 5, 11, 5)]);
+    const sweeps = groupFillSweeps([seg(9, 5, 3, 5, true), seg(17, 5, 11, 5, true)]);
     expect(sweeps).toHaveLength(1);
+    expect(sweeps[0]?.reverse).toBe(true);
     expect(sweeps[0]?.spans).toEqual([
       { start: { x: 17, y: 5 }, end: { x: 11, y: 5 } },
       { start: { x: 9, y: 5 }, end: { x: 3, y: 5 } },
@@ -43,8 +47,23 @@ describe('groupFillSweeps', () => {
     // laser-off) instead of a slow G1 S0 feed move (the stray-line audit fix).
     const sweeps = groupFillSweeps([seg(0, 0, 5, 0), seg(20, 0, 25, 0)]);
     expect(sweeps).toHaveLength(2);
-    expect(sweeps[0]?.spans).toEqual([{ start: { x: 0, y: 0 }, end: { x: 5, y: 0 } }]);
-    expect(sweeps[1]?.spans).toEqual([{ start: { x: 20, y: 0 }, end: { x: 25, y: 0 } }]);
+    expect(sweeps[0]).toEqual({
+      reverse: false,
+      spans: [{ start: { x: 0, y: 0 }, end: { x: 5, y: 0 } }],
+    });
+    expect(sweeps[1]).toEqual({
+      reverse: false,
+      spans: [{ start: { x: 20, y: 0 }, end: { x: 25, y: 0 } }],
+    });
+  });
+
+  it('splits collinear runs when reverse metadata differs', () => {
+    const sweeps = groupFillSweeps([seg(0, 0, 5, 0), seg(15, 0, 10, 0, true)]);
+
+    expect(sweeps).toEqual([
+      { reverse: false, spans: [{ start: { x: 0, y: 0 }, end: { x: 5, y: 0 } }] },
+      { reverse: true, spans: [{ start: { x: 15, y: 0 }, end: { x: 10, y: 0 } }] },
+    ]);
   });
 
   it('starts a new sweep when the line changes (next scanline)', () => {
@@ -72,6 +91,6 @@ describe('groupFillSweeps', () => {
 
   it('skips degenerate segments and returns [] for empty input', () => {
     expect(groupFillSweeps([])).toEqual([]);
-    expect(groupFillSweeps([{ polyline: [{ x: 1, y: 1 }] }])).toEqual([]);
+    expect(groupFillSweeps([{ polyline: [{ x: 1, y: 1 }], reverse: false }])).toEqual([]);
   });
 });

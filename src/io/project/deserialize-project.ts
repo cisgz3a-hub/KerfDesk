@@ -6,7 +6,7 @@
 // validation in Phase A is "trust the file was ours" — Zod-style schema
 // validation is a Phase B improvement.
 
-import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { DEFAULT_DEVICE_PROFILE, normalizeScanOffsetTable } from '../../core/devices';
 import {
   DITHER_ALGORITHMS,
   DEFAULT_PROJECT_OPTIMIZATION,
@@ -113,6 +113,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
           ? dev['laserModeEnabled']
           : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
       airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
+      scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
     },
     optimization: normalizeOptimization(raw['optimization']),
     scene: {

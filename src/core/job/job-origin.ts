@@ -174,7 +174,7 @@ function translateRasterGroup(group: RasterGroup, dx: number, dy: number): Raste
   return { ...group, bounds: offsetJobBounds(group.bounds, { x: dx, y: dy }) };
 }
 
-function translateSegment(segment: CutSegment, dx: number, dy: number): CutSegment {
+function translateSegment<T extends CutSegment>(segment: T, dx: number, dy: number): T {
   return {
     ...segment,
     polyline: segment.polyline.map((point) => ({ x: point.x + dx, y: point.y + dy })),

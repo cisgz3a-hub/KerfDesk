@@ -33,6 +33,11 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(DEFAULT_DEVICE_PROFILE.airAssistCommand).toBe('none');
   });
 
+  it('defaults scan offsets to empty so output is unchanged until calibrated', () => {
+    expect(DEFAULT_DEVICE_PROFILE.scanningOffsets).toEqual([]);
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.scanningOffsets).toEqual([]);
+  });
+
   it('uses a narrow air assist command enum', () => {
     const valid: ReadonlyArray<DeviceProfile['airAssistCommand']> = ['none', 'M7', 'M8'];
     expect(valid).toContain(DEFAULT_DEVICE_PROFILE.airAssistCommand);

@@ -18,6 +18,10 @@ export type CutSegment = {
   readonly closed: boolean;
 };
 
+export type FillSegment = CutSegment & {
+  readonly reverse: boolean;
+};
+
 export type CutGroup = {
   readonly kind: 'cut';
   readonly layerId: string;
@@ -29,9 +33,10 @@ export type CutGroup = {
   readonly segments: ReadonlyArray<CutSegment>;
 };
 
-export type FillGroup = Omit<CutGroup, 'kind'> & {
+export type FillGroup = Omit<CutGroup, 'kind' | 'segments'> & {
   readonly kind: 'fill';
   readonly overscanMm: number;
+  readonly segments: ReadonlyArray<FillSegment>;
 };
 
 // F.2 raster group. Carries the pre-dithered S-value buffer plus

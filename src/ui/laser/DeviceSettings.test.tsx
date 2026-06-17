@@ -93,10 +93,80 @@ describe('DeviceSettings air assist command', () => {
   });
 });
 
+describe('DeviceSettings scan offsets', () => {
+  it('lets the operator edit calibrated scan-offset points on the device profile', async () => {
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      details.open = true;
+
+      await act(async () => {
+        button(host, 'Add offset').click();
+      });
+
+      expect(useStore.getState().project.device.scanningOffsets).toEqual([
+        { speedMmPerMin: 3000, offsetMm: 0 },
+      ]);
+
+      const speed = input(host, 'Scan offset speed 1');
+      await act(async () => {
+        speed.value = '6000';
+        Simulate.change(speed);
+      });
+
+      const offset = input(host, 'Scan offset value 1');
+      await act(async () => {
+        offset.value = '0.12';
+        Simulate.change(offset);
+      });
+
+      await act(async () => {
+        button(host, 'Add offset').click();
+      });
+
+      const secondOffset = input(host, 'Scan offset value 2');
+      await act(async () => {
+        secondOffset.value = '0.05';
+        Simulate.change(secondOffset);
+      });
+
+      const updatedSecondSpeed = input(host, 'Scan offset speed 2');
+      await act(async () => {
+        updatedSecondSpeed.value = '3000';
+        Simulate.change(updatedSecondSpeed);
+      });
+
+      expect(useStore.getState().project.device.scanningOffsets).toEqual([
+        { speedMmPerMin: 3000, offsetMm: 0.05 },
+        { speedMmPerMin: 6000, offsetMm: 0.12 },
+      ]);
+
+      await act(async () => {
+        button(host, 'Remove scan offset 1').click();
+      });
+
+      expect(useStore.getState().project.device.scanningOffsets).toEqual([
+        { speedMmPerMin: 6000, offsetMm: 0.12 },
+      ]);
+    } finally {
+      await unmount();
+    }
+  });
+});
+
 function button(host: HTMLElement, label: string): HTMLButtonElement {
-  const match = [...host.querySelectorAll('button')].find((candidate) =>
-    candidate.textContent?.includes(label),
+  const match = [...host.querySelectorAll('button')].find(
+    (candidate) =>
+      candidate.textContent?.includes(label) ||
+      candidate.getAttribute('aria-label')?.includes(label),
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
+  return match;
+}
+
+function input(host: HTMLElement, label: string): HTMLInputElement {
+  const match = host.querySelector(`input[aria-label="${label}"]`);
+  if (!(match instanceof HTMLInputElement)) throw new Error(`Input not rendered: ${label}`);
   return match;
 }

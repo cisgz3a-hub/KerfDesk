@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import type { Vec2 } from '../scene';
 import { estimateJobDuration, formatDuration } from './estimate-duration';
-import type { CutGroup, CutSegment, FillGroup, Job, RasterGroup } from './job';
+import type { CutGroup, CutSegment, FillGroup, FillSegment, Job, RasterGroup } from './job';
 
 // Pin accel + junctionDeviation explicitly. The shipping defaults are
 // 500 / 0.01; this suite was written against accel=1000 so we'd get
@@ -18,6 +18,10 @@ const device = {
 
 function seg(...pts: Array<[number, number]>): CutSegment {
   return { polyline: pts.map(([x, y]) => ({ x, y })), closed: false };
+}
+
+function fillSeg(...pts: Array<[number, number]>): FillSegment {
+  return { ...seg(...pts), reverse: false };
 }
 
 function group(opts: {
@@ -47,7 +51,7 @@ function fillGroup(overscanMm: number): FillGroup {
     passes: 1,
     airAssist: false,
     overscanMm,
-    segments: [seg([10, 0], [20, 0])],
+    segments: [fillSeg([10, 0], [20, 0])],
   };
 }
 
@@ -169,9 +173,9 @@ describe('estimateJobDuration', () => {
       passes: 1,
       airAssist: false,
       overscanMm: 0,
-      segments: [seg([0, 0], [5, 0]), seg([8, 0], [12, 0]), seg([15, 0], [20, 0])],
+      segments: [fillSeg([0, 0], [5, 0]), fillSeg([8, 0], [12, 0]), fillSeg([15, 0], [20, 0])],
     };
-    const oneSpan: FillGroup = { ...multiSpan, segments: [seg([0, 0], [20, 0])] };
+    const oneSpan: FillGroup = { ...multiSpan, segments: [fillSeg([0, 0], [20, 0])] };
     const multi = estimateJobDuration({ groups: [multiSpan] }, device);
     const single = estimateJobDuration({ groups: [oneSpan] }, device);
     expect(multi.breakdown.cutSeconds).toBeCloseTo(single.breakdown.cutSeconds, 6);
@@ -187,7 +191,7 @@ describe('estimateJobDuration', () => {
       speed: 1000,
       airAssist: false,
       overscanMm: 0,
-      segments: [seg([0, 0], [5, 0]), seg([8, 0], [12, 0])],
+      segments: [fillSeg([0, 0], [5, 0]), fillSeg([8, 0], [12, 0])],
     };
     const onePass = estimateJobDuration({ groups: [{ ...base, passes: 1 }] }, device);
     const twoPass = estimateJobDuration({ groups: [{ ...base, passes: 2 }] }, device);

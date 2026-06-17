@@ -65,6 +65,7 @@ describe('buildToolpath', () => {
                 { x: 20, y: 5 },
               ],
               closed: false,
+              reverse: false,
             },
           ],
         },
@@ -115,6 +116,7 @@ describe('buildToolpath', () => {
                 { x: 5, y: 0 },
               ],
               closed: false,
+              reverse: false,
             },
             {
               polyline: [
@@ -122,6 +124,7 @@ describe('buildToolpath', () => {
                 { x: 12, y: 0 },
               ],
               closed: false,
+              reverse: false,
             },
             {
               polyline: [
@@ -129,6 +132,7 @@ describe('buildToolpath', () => {
                 { x: 20, y: 0 },
               ],
               closed: false,
+              reverse: false,
             },
           ],
         },

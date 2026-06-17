@@ -1,5 +1,5 @@
 import type { Layer, Polyline } from '../scene';
-import { fillHatching } from './fill-hatching';
+import { fillHatchingWithMetadata, type HatchPolyline } from './fill-hatching';
 
 const MAX_SETTINGS_PER_POLYLINE_SET = 8;
 
@@ -7,32 +7,42 @@ const MAX_SETTINGS_PER_POLYLINE_SET = 8;
 // see ADR-050. Identity-keyed via WeakMap (GC-bounded), output-invariant (the
 // key below holds every setting that affects geometry), inner map capped at
 // MAX_SETTINGS_PER_POLYLINE_SET, behavior pinned by compile-job-fill-cache.test.ts.
-const hatchCache = new WeakMap<ReadonlyArray<Polyline>, Map<string, ReadonlyArray<Polyline>>>();
+const hatchCache = new WeakMap<
+  ReadonlyArray<Polyline>,
+  Map<string, ReadonlyArray<HatchPolyline>>
+>();
 
 export function memoizedFillHatching(
   polylines: ReadonlyArray<Polyline>,
   layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional' | 'fillCrossHatch'>,
 ): ReadonlyArray<Polyline> {
+  return memoizedFillHatchingWithMetadata(polylines, layer).map(stripHatchMetadata);
+}
+
+export function memoizedFillHatchingWithMetadata(
+  polylines: ReadonlyArray<Polyline>,
+  layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional' | 'fillCrossHatch'>,
+): ReadonlyArray<HatchPolyline> {
   // fillBidirectional is part of the key: toggling snake/unidirectional changes
   // the hatch geometry, so a stale cache entry would silently keep the old path.
   const cacheKey = `${layer.hatchAngleDeg}:${layer.hatchSpacingMm}:${layer.fillBidirectional}:${layer.fillCrossHatch}`;
   let bySettings = hatchCache.get(polylines);
   if (bySettings === undefined) {
-    bySettings = new Map<string, ReadonlyArray<Polyline>>();
+    bySettings = new Map<string, ReadonlyArray<HatchPolyline>>();
     hatchCache.set(polylines, bySettings);
   }
 
   const cached = bySettings.get(cacheKey);
   if (cached !== undefined) return cached;
 
-  const hatches = fillHatching({
+  const hatches = fillHatchingWithMetadata({
     polylines,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
     bidirectional: layer.fillBidirectional,
   });
   const crossHatches = layer.fillCrossHatch
-    ? fillHatching({
+    ? fillHatchingWithMetadata({
         polylines,
         hatchAngleDeg: layer.hatchAngleDeg + 90,
         hatchSpacingMm: layer.hatchSpacingMm,
@@ -46,4 +56,8 @@ export function memoizedFillHatching(
   }
   bySettings.set(cacheKey, output);
   return output;
+}
+
+function stripHatchMetadata(pl: HatchPolyline): Polyline {
+  return { points: pl.points, closed: pl.closed };
 }

@@ -2,6 +2,8 @@
 // laser-power scale, and coordinate origin. Used by JobCompiler to honor
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
+import type { ScanOffsetPoint } from './scan-offset-profile';
+
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
 export type ControllerKind = 'grbl-v1.1';
@@ -51,6 +53,9 @@ export type DeviceProfile = {
   readonly airAssistCommand: AirAssistCommand;
   // Optional Z metadata. XY bed dimensions are used for bounds checks today;
   // Z is informational/setup-facing until a dedicated Z workflow is enabled.
+  // Bidirectional fill/raster compensation. Empty keeps emitted output
+  // unchanged until the operator calibrates a machine-specific table.
+  readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
   readonly zTravelMm?: number;
   readonly zTravelConfirmed?: boolean;
   readonly zProbePresent?: boolean;
@@ -110,6 +115,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   minPowerS: 0,
   laserModeEnabled: true,
   airAssistCommand: 'none',
+  scanningOffsets: [],
   origin: 'front-left',
   homing: { enabled: false, direction: 'front-left' },
   autofocusCommand: DEFAULT_AUTOFOCUS_COMMAND,

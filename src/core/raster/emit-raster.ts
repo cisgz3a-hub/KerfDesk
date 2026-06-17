@@ -71,6 +71,8 @@ export type EmitRasterInput = {
   // LightBurn-style image Dot Width Correction. Shortens non-zero scan runs
   // at both ends to compensate for beam thickness. 0 disables.
   readonly dotWidthCorrectionMm?: number;
+  // ADR-052 bidirectional scan-lag compensation. Applied to reverse rows only.
+  readonly scanOffsetMm?: number;
   // Optional comment fields written above the data for the operator
   // (and the job-time estimator). Same shape as grbl-strategy emits.
   readonly layerId?: string;
@@ -197,12 +199,13 @@ function emitSpanSweep(
   const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
   const startX = reverse ? activeEndX + input.overscanMm : activeStartX - input.overscanMm;
   const endX = reverse ? activeStartX - input.overscanMm : activeEndX + input.overscanMm;
+  const rowShiftX = reverse ? -(input.scanOffsetMm ?? 0) : 0;
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
-  lines.push(`G0 X${fmt(startX)} Y${fmt(worldY)} S0`);
+  lines.push(`G0 X${fmt(startX + rowShiftX)} Y${fmt(worldY)} S0`);
   let prevS = -1;
   let shouldEmitFeed = emitFeed;
   const pushRun = (x: number, s: number): void => {
-    lines.push(formatRunG1(x, s, prevS, feed, shouldEmitFeed));
+    lines.push(formatRunG1(x + rowShiftX, s, prevS, feed, shouldEmitFeed));
     shouldEmitFeed = false;
     prevS = s;
   };
@@ -214,7 +217,7 @@ function emitSpanSweep(
   // corrected path already emits a final S0 at the active edge when overscan is
   // disabled; avoid a duplicate zero-length move in that case.
   if (input.overscanMm > 0 || dotWidthCorrectionMm <= 0) {
-    lines.push(`G1 X${fmt(endX)} S0`);
+    lines.push(`G1 X${fmt(endX + rowShiftX)} S0`);
   }
   return lines.join(LINE_END);
 }
@@ -421,6 +424,9 @@ function validate(input: EmitRasterInput): void {
   }
   if ((input.dotWidthCorrectionMm ?? 0) < 0) {
     throw new Error('emitRasterGroup: dotWidthCorrectionMm must be >= 0');
+  }
+  if (!Number.isFinite(input.scanOffsetMm ?? 0)) {
+    throw new Error('emitRasterGroup: scanOffsetMm must be finite');
   }
 }
 

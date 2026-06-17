@@ -55,7 +55,15 @@ export type HatchInput = {
   readonly bidirectional?: boolean;
 };
 
+export type HatchPolyline = Polyline & {
+  readonly reverse: boolean;
+};
+
 export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
+  return fillHatchingWithMetadata(input).map(stripHatchMetadata);
+}
+
+export function fillHatchingWithMetadata(input: HatchInput): ReadonlyArray<HatchPolyline> {
   const spacing = Math.max(MIN_HATCH_SPACING_MM, input.hatchSpacingMm);
   // Accept polylines whose `closed` flag is set, OR whose first and
   // last points coincide within float epsilon. Defense-in-depth for
@@ -82,7 +90,7 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   // it actually spans, so the cost tracks the geometry, not bed height.
   const edges = buildSortedEdges(rotated);
   const bidirectional = input.bidirectional ?? true;
-  const hatchesRotated: Polyline[] = [];
+  const hatchesRotated: HatchPolyline[] = [];
   // Snap the first scanline to a multiple of `spacing` so two adjacent
   // shapes hatched separately use the same Y grid — avoids visible
   // seams where two regions abut.
@@ -112,7 +120,11 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
     pushScanlineHatches(intersections, y, scanIndex, bidirectional, hatchesRotated);
   }
 
-  return hatchesRotated.map((pl) => rotatePolyline(pl, angle));
+  return hatchesRotated.map((pl) => rotateHatchPolyline(pl, angle));
+}
+
+function stripHatchMetadata(pl: HatchPolyline): Polyline {
+  return { points: pl.points, closed: pl.closed };
 }
 
 // Wrap hatch angle into [0, 180). Hatching at 200° looks identical to 20°
@@ -135,6 +147,11 @@ function rotatePolyline(pl: Polyline, deg: number): Polyline {
     y: p.x * sin + p.y * cos,
   }));
   return { points, closed: pl.closed };
+}
+
+function rotateHatchPolyline(pl: HatchPolyline, deg: number): HatchPolyline {
+  if (deg === 0) return pl;
+  return { ...rotatePolyline(pl, deg), reverse: pl.reverse };
 }
 
 // Snap cos/sin results near 0, ±1 to exact values. Math.cos(±π/2)
@@ -225,7 +242,7 @@ function pushScanlineHatches(
   y: number,
   scanIndex: number,
   bidirectional: boolean,
-  out: Polyline[],
+  out: HatchPolyline[],
 ): void {
   if (xs.length < 2) return;
   xs.sort((a, b) => a - b);
@@ -242,6 +259,7 @@ function pushScanlineHatches(
         { x: x1, y },
       ],
       closed: false,
+      reverse: !forward,
     });
   }
 }

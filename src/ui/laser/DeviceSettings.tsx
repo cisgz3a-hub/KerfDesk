@@ -18,6 +18,7 @@ import { AutofocusEditor } from './AutofocusEditor';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 import { ProfileRows, ZRows } from './DeviceProfileRows';
 import { PlannerAdvanced } from './PlannerAdvanced';
+import { ScanOffsetEditor } from './ScanOffsetEditor';
 
 export function DeviceSettings(): JSX.Element {
   const device = useStore((s) => s.project.device);
@@ -38,6 +39,10 @@ export function DeviceSettings(): JSX.Element {
       </summary>
       <div style={bodyStyle}>
         <BasicRows device={device} update={update} />
+        <ScanOffsetEditor
+          value={device.scanningOffsets}
+          onChange={(scanningOffsets) => update({ scanningOffsets })}
+        />
         <ProfileRows device={device} update={update} />
         <ZRows device={device} update={update} />
         <Row label="Homing">
