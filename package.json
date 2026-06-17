@@ -37,6 +37,7 @@
     "deploy:web:preview": "pnpm guard:repo && pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
   },
   "dependencies": {
+    "clipper2-ts": "2.0.1-17",
     "dompurify": "^3.4.10",
     "imagetracerjs": "^1.2.6",
     "opentype.js": "^2.0.0",

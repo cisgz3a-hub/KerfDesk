@@ -13,7 +13,12 @@
 // LightBurn divergence (LIGHTBURN-STUDY §8): stock GRBL headers there are
 // units/positioning only, with M3/M4 issued per cut layer — ours pre-arms.
 
-import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
+import {
+  resolveGrblDialect,
+  type DeviceProfile,
+  type GrblGcodeDialect,
+  type GrblPowerMode,
+} from '../devices';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
@@ -34,14 +39,27 @@ function scaleS(powerPercent: number, maxPowerS: number): number {
   return Math.round((powerPercent / 100) * maxPowerS);
 }
 
-function preamble(): string {
+function laserModeWord(mode: GrblPowerMode): 'M3' | 'M4' {
+  return mode === 'dynamic' ? 'M4' : 'M3';
+}
+
+function travelLine(x: number, y: number, dialect: GrblGcodeDialect): string {
+  const controlledFeed = dialect.controlledLaserOffTravelFeedMmPerMin;
+  if (typeof controlledFeed === 'number' && Number.isFinite(controlledFeed) && controlledFeed > 0) {
+    return `G1 X${fmt(x)} Y${fmt(y)} F${Math.round(controlledFeed)} S0`;
+  }
+  const base = `G0 X${fmt(x)} Y${fmt(y)}`;
+  return dialect.requiresS0OnRapid ? `${base} S0` : base;
+}
+
+function preamble(dialect: GrblGcodeDialect): string {
   // M3 S0: enable spindle/laser at power 0. Subsequent G1 with S>0 fires the
   // laser without needing another M3. Without M3 in the preamble, GRBL
   // controllers that aren't in laser mode ($32=0) won't fire the diode even
   // when G1 carries S>0 — the move happens but the beam stays off. M3 S0 is
   // safe (no power) and primes the controller for any subsequent S-driven
   // cutting move.
-  return ['G21', 'G90', 'M3 S0'].join(LINE_END) + LINE_END;
+  return ['G21', 'G90', `${laserModeWord(dialect.cutPowerMode)} S0`].join(LINE_END) + LINE_END;
 }
 
 function postamble(laserAlreadyOff: boolean, dialect: GrblGcodeDialect): string {
@@ -50,32 +68,35 @@ function postamble(laserAlreadyOff: boolean, dialect: GrblGcodeDialect): string 
   // redundant one; the park move still carries S0, so the laser-off invariant
   // holds either way.
   const lines = laserAlreadyOff ? [] : ['M5'];
-  if (dialect.parkAtOriginAfterJob) lines.push('G0 X0.000 Y0.000 S0');
+  if (dialect.parkAtOriginAfterJob) lines.push(travelLine(0, 0, dialect));
   return lines.join(LINE_END) + LINE_END;
 }
 
-function emitSegment(seg: CutSegment, s: number, feed: number): string {
+function emitSegment(
+  seg: CutSegment,
+  s: number,
+  feed: number,
+  dialect: GrblGcodeDialect,
+): string {
   const lines: string[] = [];
   const first = seg.polyline[0];
   if (first === undefined) {
     return '';
   }
   // Rapid to start with laser off.
-  lines.push(`G0 X${fmt(first.x)} Y${fmt(first.y)} S0`);
+  lines.push(travelLine(first.x, first.y, dialect));
   // First G1 carries F and S; subsequent G1s inherit.
   for (let i = 1; i < seg.polyline.length; i += 1) {
     const pt = seg.polyline[i];
     if (pt === undefined) continue;
-    if (i === 1) {
-      lines.push(`G1 X${fmt(pt.x)} Y${fmt(pt.y)} F${feed} S${s}`);
-    } else {
-      lines.push(`G1 X${fmt(pt.x)} Y${fmt(pt.y)}`);
-    }
+    const feedWord = i === 1 || !dialect.modalFeedrate ? ` F${feed}` : '';
+    const sWord = i === 1 || dialect.emitSOnEveryBurnMove ? ` S${s}` : '';
+    lines.push(`G1 X${fmt(pt.x)} Y${fmt(pt.y)}${feedWord}${sWord}`);
   }
   return lines.join(LINE_END) + LINE_END;
 }
 
-function emitGroup(group: CutGroup, device: DeviceProfile): string {
+function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDialect): string {
   const s = scaleS(group.power, device.maxPowerS);
   const feed = Math.round(group.speed);
   const chunks: string[] = [];
@@ -85,14 +106,16 @@ function emitGroup(group: CutGroup, device: DeviceProfile): string {
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const seg of group.segments) {
-      const segText = emitSegment(seg, s, feed);
+      const segText = emitSegment(seg, s, feed, dialect);
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
     }
   }
   return chunks.join(LINE_END) + LINE_END;
 }
 
-function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
+function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGcodeDialect): string {
+  if ((group.fillStyle ?? 'scanline') === 'offset')
+    return emitOffsetFillGroup(group, device, dialect);
   const s = scaleS(group.power, device.maxPowerS);
   const feed = Math.round(group.speed);
   const chunks: string[] = [];
@@ -111,8 +134,29 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const sweep of sweeps) {
-      const text = emitFillSweep(sweep, s, feed, group.overscanMm, scanOffsetMm);
+      const text = emitFillSweep(sweep, s, feed, group.overscanMm, scanOffsetMm, dialect);
       if (text.length > 0) chunks.push(text);
+    }
+  }
+  return chunks.join(LINE_END) + LINE_END;
+}
+
+function emitOffsetFillGroup(
+  group: FillGroup,
+  device: DeviceProfile,
+  dialect: GrblGcodeDialect,
+): string {
+  const s = scaleS(group.power, device.maxPowerS);
+  const feed = Math.round(group.speed);
+  const chunks: string[] = [];
+  chunks.push(
+    `; offset fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes}`,
+  );
+  for (let p = 0; p < group.passes; p += 1) {
+    chunks.push(`; pass ${p + 1} of ${group.passes}`);
+    for (const seg of group.segments) {
+      const segText = emitSegment(seg, s, feed, dialect);
+      if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
     }
   }
   return chunks.join(LINE_END) + LINE_END;
@@ -131,6 +175,7 @@ function emitFillSweep(
   feed: number,
   overscanMm: number,
   scanOffsetMm: number,
+  dialect: GrblGcodeDialect,
 ): string {
   const spans = scanOffsetSpans(sweep, scanOffsetMm);
   const first = spans[0];
@@ -139,13 +184,13 @@ function emitFillSweep(
   const overscan = effectiveOverscanMm([first.start, last.end], overscanMm);
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return '';
-  const lines: string[] = [`G0 X${fmt(run.leadStart.x)} Y${fmt(run.leadStart.y)} S0`];
+  const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, dialect)];
   if (overscan > 0) {
-    lines.push(`G0 X${fmt(run.burnStart.x)} Y${fmt(run.burnStart.y)} S0`);
+    lines.push(travelLine(run.burnStart.x, run.burnStart.y, dialect));
   }
-  for (const line of sweepSpanLines(spans, s, feed)) lines.push(line);
+  for (const line of sweepSpanLines(spans, s, feed, dialect)) lines.push(line);
   if (overscan > 0) {
-    lines.push(`G0 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
+    lines.push(travelLine(run.leadEnd.x, run.leadEnd.y, dialect));
   }
   return lines.join(LINE_END);
 }
@@ -166,7 +211,12 @@ function scanOffsetSpans(sweep: FillSweep, scanOffsetMm: number): ReadonlyArray<
 // S only on a moving G1"). The live producer already filters sub-epsilon runs
 // (fill-hatching SCANLINE_EPS); this guards the contract at the emitter too
 // (audit 2026-06-03).
-function sweepSpanLines(spans: ReadonlyArray<FillSpan>, s: number, feed: number): string[] {
+function sweepSpanLines(
+  spans: ReadonlyArray<FillSpan>,
+  s: number,
+  feed: number,
+  dialect: GrblGcodeDialect,
+): string[] {
   const first = spans[0];
   if (first === undefined) return [];
   const lines: string[] = [];
@@ -178,7 +228,7 @@ function sweepSpanLines(spans: ReadonlyArray<FillSpan>, s: number, feed: number)
     const fx = fmt(x);
     const fy = fmt(y);
     if (fx === headX && fy === headY) return; // zero-length at emit precision — skip
-    const feedWord = feedEmitted ? '' : ` F${feed}`;
+    const feedWord = feedEmitted && dialect.modalFeedrate ? '' : ` F${feed}`;
     feedEmitted = true;
     lines.push(`G1 X${fx} Y${fy}${feedWord} ${sWord}`);
     headX = fx;
@@ -198,7 +248,11 @@ function sweepSpanLines(spans: ReadonlyArray<FillSpan>, s: number, feed: number)
 // (emit-raster.ts), which handles the M4 flip + per-pixel S
 // modulation. The strategy stays one-arm-per-kind so adding new
 // group types lights up the exhaustiveness check.
-function emitRasterGroupHere(group: RasterGroup, device: DeviceProfile): string {
+function emitRasterGroupHere(
+  group: RasterGroup,
+  device: DeviceProfile,
+  dialect: GrblGcodeDialect,
+): string {
   return emitRasterGroupGcode({
     sValues: group.sValues,
     width: group.pixelWidth,
@@ -209,20 +263,27 @@ function emitRasterGroupHere(group: RasterGroup, device: DeviceProfile): string 
     overscanMm: group.overscanMm,
     dotWidthCorrectionMm: group.dotWidthCorrectionMm,
     scanOffsetMm: offsetForSpeed(device.scanningOffsets, group.speed),
+    ...(group.bidirectional !== undefined ? { bidirectional: group.bidirectional } : {}),
+    laserModeCommand: laserModeWord(dialect.rasterPowerMode),
+    ...(dialect.controlledLaserOffTravelFeedMmPerMin !== undefined
+      ? { controlledLaserOffTravelFeedMmPerMin: dialect.controlledLaserOffTravelFeedMmPerMin }
+      : {}),
+    modalFeedrate: dialect.modalFeedrate,
+    emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
     layerId: group.layerId,
     color: group.color,
     powerPercent: group.power,
   });
 }
 
-function emitAnyGroup(group: Group, device: DeviceProfile): string {
+function emitAnyGroup(group: Group, device: DeviceProfile, dialect: GrblGcodeDialect): string {
   switch (group.kind) {
     case 'cut':
-      return emitGroup(group, device);
+      return emitGroup(group, device, dialect);
     case 'fill':
-      return emitFillGroup(group, device);
+      return emitFillGroup(group, device, dialect);
     case 'raster':
-      return emitRasterGroupHere(group, device);
+      return emitRasterGroupHere(group, device, dialect);
     default:
       return assertNever(group, 'Group');
   }
@@ -254,8 +315,8 @@ function coolantTransition(from: CoolantMode, to: CoolantMode): string {
 function emitJob(job: Job, device: DeviceProfile): string {
   const dialect = resolveGrblDialect(device);
   const parts: string[] = [];
-  parts.push(preamble());
-  let mode: 'M3' | 'M4' | 'off' = 'M3'; // the preamble armed M3 S0
+  parts.push(preamble(dialect));
+  let mode: 'M3' | 'M4' | 'off' = laserModeWord(dialect.cutPowerMode);
   let coolant: CoolantMode = 'off';
   for (const group of job.groups) {
     const wantedMode = powerModeForGroup(group, dialect);
@@ -274,7 +335,7 @@ function emitJob(job: Job, device: DeviceProfile): string {
     const nextCoolant = groupCoolantMode(group, device);
     parts.push(coolantTransition(coolant, nextCoolant));
     coolant = nextCoolant;
-    parts.push(emitAnyGroup(group, device));
+    parts.push(emitAnyGroup(group, device, dialect));
     if (group.kind === 'raster') mode = 'off'; // raster emits its own trailing M5
   }
   parts.push(coolantTransition(coolant, 'off'));
@@ -287,7 +348,7 @@ function emitJob(job: Job, device: DeviceProfile): string {
 function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {
   if (group.kind === 'fill') return dialect.fillPowerMode === 'dynamic' ? 'M4' : 'M3';
   if (group.kind === 'raster') return 'group-managed';
-  return 'M3';
+  return laserModeWord(dialect.cutPowerMode);
 }
 
 export const grblStrategy: OutputStrategy = {

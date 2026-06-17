@@ -126,6 +126,8 @@ describe('ConsolePanel', () => {
       connection: { kind: 'connected' },
       streamer: {
         status: 'streaming',
+        streamingMode: 'char-counted',
+        pollDuringJob: '4hz',
         queued: [],
         inFlight: [{ line: 'G1 X10 Y10 S500\n', bytes: 16 }],
         inFlightBytes: 16,

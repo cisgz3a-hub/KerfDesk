@@ -10,14 +10,21 @@
 //   5. Passes ≥ 1 (integer) for every output layer.
 //   6. Generated G-code is non-empty (at least one G1 line).
 //
-import { assertNever, type Layer, type Project, type Scene, type SceneObject } from '../scene';
+import {
+  assertNever,
+  isClosedEnough,
+  type Layer,
+  type Project,
+  type Scene,
+  type SceneObject,
+} from '../scene';
 import {
   findLaserOnTravelIssues,
   findLongBlankFeedMoves,
   findOutOfBoundsCoords,
   type MotionBoundsOffset,
 } from '../invariants';
-import { machineBoundsForDevice } from '../devices';
+import { machineBoundsForDevice, resolveGrblDialect } from '../devices';
 import { DEFAULT_OVERSCAN_MM } from '../job';
 import { findNoGoZoneCollisions } from './no-go-zone-preflight';
 
@@ -28,6 +35,7 @@ export type PreflightCode =
   | 'speed-out-of-range'
   | 'passes-below-one'
   | 'layer-mode-mismatch'
+  | 'offset-fill-open-contour'
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
@@ -81,6 +89,8 @@ export function runPreflight(
 
   appendModeMismatchIssues(project.scene, outputLayers, issues);
 
+  appendOffsetFillOpenContourIssues(project.scene, outputLayers, issues);
+
   appendUnsupportedRasterTransformIssues(project.scene, outputLayers, issues);
 
   appendBoundsIssues(project, gcode, issues, options);
@@ -89,7 +99,7 @@ export function runPreflight(
 
   appendLaserOnTravelIssues(gcode, issues);
 
-  appendLongBlankFeedIssues(gcode, issues);
+  appendLongBlankFeedIssues(project, gcode, issues);
 
   if (!/\bG1\b/.test(gcode)) {
     issues.push({
@@ -202,6 +212,40 @@ function mismatchMessage(layer: Layer): string {
   return layer.mode === 'image'
     ? `Layer ${layer.id} is in Image mode but has vector objects assigned; they will not be engraved. Set the layer to Line or Fill, or move the objects to another layer.`
     : `Layer ${layer.id} is in ${layer.mode === 'fill' ? 'Fill' : 'Line'} mode but has an image assigned; it will not be engraved. Set the layer to Image mode.`;
+}
+
+function appendOffsetFillOpenContourIssues(
+  scene: Scene,
+  outputLayers: ReadonlyArray<Layer>,
+  issues: PreflightIssue[],
+): void {
+  for (const layer of outputLayers) {
+    if (layer.mode !== 'fill' || layer.fillStyle !== 'offset') continue;
+    if (scene.objects.some((obj) => objectHasOpenContourOnLayer(obj, layer))) {
+      issues.push({
+        code: 'offset-fill-open-contour',
+        message: `Layer ${layer.id} uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.`,
+      });
+    }
+  }
+}
+
+function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {
+  switch (obj.kind) {
+    case 'imported-svg':
+    case 'text':
+    case 'traced-image':
+    case 'shape':
+      return obj.paths.some(
+        (path) =>
+          path.color === layer.color &&
+          path.polylines.some((polyline) => !isClosedEnough(polyline)),
+      );
+    case 'raster-image':
+      return false;
+    default:
+      return assertNever(obj, 'SceneObject');
+  }
 }
 
 function appendUnsupportedRasterTransformIssues(
@@ -361,7 +405,12 @@ function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): voi
 // (G1 ... S0). Distinct from laser-on-travel: this is the marking / stale-export
 // invariant (the "moved to the second part and left a stray line" class). Fresh
 // post-ADR-035 output is clean; a hit means a regression or an old export.
-function appendLongBlankFeedIssues(gcode: string, issues: PreflightIssue[]): void {
+function appendLongBlankFeedIssues(
+  project: Project,
+  gcode: string,
+  issues: PreflightIssue[],
+): void {
+  if (usesControlledLaserOffTravel(project)) return;
   const blankFeed = findLongBlankFeedMoves(gcode, { thresholdMm: LONG_BLANK_FEED_THRESHOLD_MM });
   for (const issue of blankFeed.slice(0, MAX_BOUNDS_ISSUES)) {
     issues.push({
@@ -369,4 +418,9 @@ function appendLongBlankFeedIssues(gcode: string, issues: PreflightIssue[]): voi
       message: `Line ${issue.lineNumber}: blank G1 feed move ${issue.distanceMm.toFixed(3)} mm exceeds ${LONG_BLANK_FEED_THRESHOLD_MM.toFixed(3)} mm. Regenerate output or lower the fill blank-feed threshold after hardware verification.`,
     });
   }
+}
+
+function usesControlledLaserOffTravel(project: Project): boolean {
+  const feed = resolveGrblDialect(project.device).controlledLaserOffTravelFeedMmPerMin;
+  return typeof feed === 'number' && Number.isFinite(feed) && feed > 0;
 }

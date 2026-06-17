@@ -17,6 +17,12 @@ export type {
   GrblSettingWriteRisk,
 } from './grbl-settings';
 export { createGrblSettingsBackup, settingsMapToRows } from './grbl-settings';
+export type {
+  BuildGrblSettingWriteInput,
+  BuildGrblSettingWriteResult,
+  GrblSettingWriteConfirmation,
+} from './grbl-setting-write';
+export { buildGrblSettingWrite } from './grbl-setting-write';
 
 export type {
   ConsoleCommandKind,
@@ -37,10 +43,13 @@ export {
 export type {
   AckKind,
   AckResult,
+  CreateStreamerOptions,
   OversizedLine,
+  PollDuringJob,
   StepResult,
   StreamerState,
   StreamerStatus,
+  StreamingMode,
 } from './streamer';
 export {
   DEFAULT_RX_BUFFER_BYTES,

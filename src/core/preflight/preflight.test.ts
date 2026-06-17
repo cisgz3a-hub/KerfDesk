@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { compileJob } from '../job';
 import { grblStrategy } from '../output';
 import {
@@ -185,6 +185,30 @@ describe('runPreflight long blank-feed invariant', () => {
 
     expect(result.issues.every((i) => i.code !== 'long-blank-feed')).toBe(true);
   });
+
+  it('allows long G1 S0 moves for profiles with controlled laser-off travel', () => {
+    const project: Project = {
+      ...createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+      scene: {
+        ...EMPTY_SCENE,
+        objects: [sampleObject],
+        layers: [createLayer({ id: 'L1', color: '#ff0000' })],
+      },
+    };
+    const controlledTravelGcode = [
+      'G21',
+      'G90',
+      'M4 S0',
+      'G1 X1.000 Y1.000 F800 S0',
+      'G1 X21.000 Y1.000 F800 S0',
+      'G1 X25.000 Y1.000 F800 S900',
+      'M5',
+    ].join('\n');
+
+    const result = runPreflight(project, controlledTravelGcode);
+
+    expect(result.issues.every((i) => i.code !== 'long-blank-feed')).toBe(true);
+  });
 });
 
 describe('runPreflight — F-A10 check 1: no output layer', () => {
@@ -256,6 +280,25 @@ describe('runPreflight — F-A10 check 6: empty output', () => {
     const result = runPreflight(project, emit(project));
     // Empty project has no output layers (different check) AND no G1 lines.
     expect(result.issues.map((i) => i.code)).toContain('empty-output');
+  });
+});
+
+describe('runPreflight offset fill validation', () => {
+  it('blocks offset fill on open vector contours instead of silently producing empty output', () => {
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000', mode: 'fill' }),
+      fillStyle: 'offset' as const,
+    };
+    const project = projectWith(layer);
+
+    const result = runPreflight(project, emit(project));
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: 'offset-fill-open-contour',
+      message:
+        'Layer L1 uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.',
+    });
   });
 });
 

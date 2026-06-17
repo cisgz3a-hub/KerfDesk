@@ -9,7 +9,7 @@
 // Consumers that only operate on vectors (optimizer, planner, estimator's
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
-import type { Vec2 } from '../scene';
+import type { LayerFillStyle, Vec2 } from '../scene';
 
 export type CutSegment = {
   // Polyline in mm, in machine coordinates (post-origin-transform). For a
@@ -35,6 +35,7 @@ export type CutGroup = {
 
 export type FillGroup = Omit<CutGroup, 'kind' | 'segments'> & {
   readonly kind: 'fill';
+  readonly fillStyle?: LayerFillStyle;
   readonly overscanMm: number;
   readonly segments: ReadonlyArray<FillSegment>;
 };
@@ -64,6 +65,9 @@ export type RasterGroup = {
   // out of the burn area.
   readonly overscanMm: number;
   readonly dotWidthCorrectionMm: number;
+  readonly initialXOffsetMm?: number;
+  readonly bidirectionalScanOffsetMm?: number;
+  readonly bidirectional?: boolean;
 };
 
 export type Group = CutGroup | FillGroup | RasterGroup;

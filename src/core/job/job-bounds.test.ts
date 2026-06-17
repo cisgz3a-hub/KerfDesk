@@ -82,6 +82,41 @@ describe('computeJobBounds', () => {
       maxY: 20,
     });
   });
+
+  it('includes profile raster scan offsets in motion bounds', () => {
+    const rasterJob: Job = {
+      groups: [
+        {
+          kind: 'raster',
+          layerId: 'image',
+          color: '#808080',
+          power: 30,
+          speed: 1000,
+          passes: 1,
+          airAssist: false,
+          sValues: new Uint16Array([100, 100, 100, 100]),
+          pixelWidth: 2,
+          pixelHeight: 2,
+          bounds: { minX: 10, minY: 0, maxX: 12, maxY: 2 },
+          overscanMm: 1,
+          dotWidthCorrectionMm: 0,
+        },
+      ],
+    };
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.25 }],
+    };
+
+    expect(
+      computeJobMotionBounds(rasterJob, device),
+    ).toEqual({
+      minX: 8.75,
+      minY: 0,
+      maxX: 13,
+      maxY: 2,
+    });
+  });
 });
 
 describe('computeJobMotionBounds', () => {

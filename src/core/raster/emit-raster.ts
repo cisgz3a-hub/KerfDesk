@@ -73,6 +73,11 @@ export type EmitRasterInput = {
   readonly dotWidthCorrectionMm?: number;
   // ADR-052 bidirectional scan-lag compensation. Applied to reverse rows only.
   readonly scanOffsetMm?: number;
+  readonly bidirectional?: boolean;
+  readonly laserModeCommand?: 'M3' | 'M4';
+  readonly controlledLaserOffTravelFeedMmPerMin?: number;
+  readonly modalFeedrate?: boolean;
+  readonly emitSOnEveryBurnMove?: boolean;
   // Optional comment fields written above the data for the operator
   // (and the job-time estimator). Same shape as grbl-strategy emits.
   readonly layerId?: string;
@@ -87,7 +92,7 @@ export function emitRasterGroup(input: EmitRasterInput): string {
   // M5 first so we don't get stuck in M3 from a preceding cut group.
   // Then M4 S0 to arm dynamic-power mode at zero output.
   chunks.push('M5');
-  chunks.push('M4 S0');
+  chunks.push(`${input.laserModeCommand ?? 'M4'} S0`);
   const feed = Math.round(input.feedMmPerMin);
   const pixelWidthMm = (input.bounds.maxX - input.bounds.minX) / input.width;
   const pixelHeightMm = (input.bounds.maxY - input.bounds.minY) / input.height;
@@ -118,7 +123,7 @@ export function emitRasterGroup(input: EmitRasterInput): string {
       const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
       // Snake direction alternates per emitted ROW; within a reverse row the
       // ink islands sweep right-to-left too.
-      const reverse = emittedRowCount % 2 === 1;
+      const reverse = (input.bidirectional ?? true) && emittedRowCount % 2 === 1;
       const ordered = reverse ? [...spans].reverse() : spans;
       for (const span of ordered) {
         // Each island is its own sweep, so the G0 lead-in to the NEXT island
@@ -201,11 +206,21 @@ function emitSpanSweep(
   const endX = reverse ? activeStartX - input.overscanMm : activeEndX + input.overscanMm;
   const rowShiftX = reverse ? -(input.scanOffsetMm ?? 0) : 0;
   // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
-  lines.push(`G0 X${fmt(startX + rowShiftX)} Y${fmt(worldY)} S0`);
+  lines.push(formatLaserOffTravel(startX + rowShiftX, worldY, input));
   let prevS = -1;
   let shouldEmitFeed = emitFeed;
   const pushRun = (x: number, s: number): void => {
-    lines.push(formatRunG1(x + rowShiftX, s, prevS, feed, shouldEmitFeed));
+    lines.push(
+      formatRunG1(
+        x + rowShiftX,
+        s,
+        prevS,
+        feed,
+        shouldEmitFeed,
+        input.modalFeedrate ?? true,
+        input.emitSOnEveryBurnMove ?? false,
+      ),
+    );
     shouldEmitFeed = false;
     prevS = s;
   };
@@ -217,9 +232,22 @@ function emitSpanSweep(
   // corrected path already emits a final S0 at the active edge when overscan is
   // disabled; avoid a duplicate zero-length move in that case.
   if (input.overscanMm > 0 || dotWidthCorrectionMm <= 0) {
-    lines.push(`G1 X${fmt(endX + rowShiftX)} S0`);
+    lines.push(formatLaserOffG1(endX + rowShiftX, feed, input.modalFeedrate ?? true));
   }
   return lines.join(LINE_END);
+}
+
+function formatLaserOffTravel(x: number, y: number, input: EmitRasterInput): string {
+  const controlledFeed = input.controlledLaserOffTravelFeedMmPerMin;
+  if (typeof controlledFeed === 'number' && Number.isFinite(controlledFeed) && controlledFeed > 0) {
+    return `G1 X${fmt(x)} Y${fmt(y)} F${Math.round(controlledFeed)} S0`;
+  }
+  return `G0 X${fmt(x)} Y${fmt(y)} S0`;
+}
+
+function formatLaserOffG1(x: number, feed: number, modalFeedrate: boolean): string {
+  const feedWord = modalFeedrate ? '' : ` F${feed}`;
+  return `G1 X${fmt(x)}${feedWord} S0`;
 }
 
 type PushRasterRun = (x: number, s: number) => void;
@@ -386,10 +414,12 @@ function formatRunG1(
   prevS: number,
   feed: number,
   isVeryFirstG1: boolean,
+  modalFeedrate: boolean,
+  emitSOnEveryBurnMove: boolean,
 ): string {
   const parts: string[] = [`G1 X${fmt(x)}`];
-  if (isVeryFirstG1) parts.push(`F${feed}`);
-  if (s !== prevS) parts.push(`S${s}`);
+  if (isVeryFirstG1 || !modalFeedrate) parts.push(`F${feed}`);
+  if (s !== prevS || emitSOnEveryBurnMove) parts.push(`S${s}`);
   return parts.join(' ');
 }
 
@@ -427,6 +457,13 @@ function validate(input: EmitRasterInput): void {
   }
   if (!Number.isFinite(input.scanOffsetMm ?? 0)) {
     throw new Error('emitRasterGroup: scanOffsetMm must be finite');
+  }
+  assertValidControlledTravelFeed(input.controlledLaserOffTravelFeedMmPerMin);
+}
+
+function assertValidControlledTravelFeed(feed: number | undefined): void {
+  if (feed !== undefined && (!Number.isFinite(feed) || feed <= 0)) {
+    throw new Error('emitRasterGroup: controlledLaserOffTravelFeedMmPerMin must be > 0');
   }
 }
 

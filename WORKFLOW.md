@@ -787,11 +787,21 @@ or traced image) with at least one closed polyline.
 2. Click the **Mode** dropdown → choose **Fill**.
 3. The row expands: a sub-row appears underneath showing Fill-specific
    inputs: **° angle**, **mm spacing**, and **Overscan**. Defaults are
-   0° (horizontal hatching), 0.2 mm (≈ 5 lines/mm), and 5 mm overscan.
+   0° (horizontal hatching), 0.1 mm (10 lines/mm), and 5 mm overscan.
 4. (Optional) Adjust the inputs. All three commit on the 300 ms F-A7 debounce.
 5. Compile + emit G-code as usual (Save G-code, or Start job in the
    Laser panel). The FillGroup for that color now contains hatch lines
    with laser-off overscan runway instead of the outline.
+6. If **Cross-Hatch** is enabled, the same fill region emits a second hatch
+   set at `hatchAngleDeg + 90`. The scan-direction preview shows both passes.
+7. If **Offset Fill** is selected, closed regions emit inward contour-following
+   fill paths spaced by the line interval. Offset Fill uses the Fill layer's
+   dynamic-power output path but does not use scanline overscan runways.
+8. Use **Sub-layers > Add** to add a second operation for the same color. The
+   primary layer operation emits first, then enabled sub-layers emit in row
+   order using their own mode, power, speed, passes, fill, image, kerf, tab,
+   and air settings. This supports simple LightBurn-style "fill then line"
+   workflows without duplicating artwork.
 
 **Error**:
 - *No closed polylines on this color* — the layer's mode is Fill, but
@@ -799,6 +809,11 @@ or traced image) with at least one closed polyline.
   The compile step silently emits nothing for that layer (no error
   toast; the empty result is itself the diagnostic). Switch back to
   Line mode to engrave the outline instead.
+- *Offset Fill on open contours* - Start / Save G-code preflight blocks with
+  a specific Offset Fill message. Close the shapes or switch the layer back to
+  Scanline Fill.
+- *Sub-layer disabled* - the sub-layer stays saved on the project but does not
+  compile into Preview, Frame, Save G-code, or Start output.
 
 **Empty**:
 - *No SceneObjects yet* — the Mode dropdown still works, but no

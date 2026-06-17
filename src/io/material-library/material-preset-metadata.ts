@@ -4,7 +4,14 @@ import type {
 } from '../../core/material-library';
 
 const RECIPE_CONFIDENCES = ['starter', 'calibrated', 'imported', 'unsupported'] as const;
-const RECIPE_OPERATIONS = ['cut', 'engrave', 'score', 'image'] as const;
+const RECIPE_OPERATIONS = [
+  'cut',
+  'engrave',
+  'score',
+  'image',
+  'material-test',
+  'interval-test',
+] as const;
 
 export type MaterialPresetMatchMetadata = {
   readonly material?: string;

@@ -14,6 +14,7 @@ import {
   transformedBBox,
 } from '../../core/scene';
 import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
+import { drawNoGoZones } from './draw-no-go-zones';
 import { drawPenDraft } from './draw-pen-preview';
 import { type PenDraft } from '../state/ui-store';
 import {
@@ -24,7 +25,6 @@ import {
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
-import { drawNoGoZones } from './draw-no-go-zones';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
 import { isObjectOutOfBed } from './out-of-bounds';
 import { rotateHandlePosition } from './rotate-handle';
@@ -290,7 +290,7 @@ function drawFilledDesignGeometry(
 
   if (closed.length > 0) {
     ctx.fillStyle = color;
-    fillClosedPolylinesBatched(ctx, obj, closed, view);
+    fillClosedPolylinesBatched(ctx, obj, closed, view, obj.kind === 'text' ? 'nonzero' : 'evenodd');
   }
   if (open.length === 0) return;
 

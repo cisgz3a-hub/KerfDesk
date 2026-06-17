@@ -19,6 +19,9 @@ export type GrblGcodeDialect = {
   readonly rasterPowerMode: GrblPowerMode;
   readonly requiresS0OnRapid: boolean;
   readonly parkAtOriginAfterJob: boolean;
+  readonly controlledLaserOffTravelFeedMmPerMin?: number;
+  readonly emitSOnEveryBurnMove: boolean;
+  readonly modalFeedrate: boolean;
 };
 
 const DEFAULT_DIALECT_ID: GrblGcodeDialectId = 'grbl-dynamic';
@@ -32,6 +35,8 @@ const GRBL_DYNAMIC_DIALECT: GrblGcodeDialect = {
   rasterPowerMode: 'dynamic',
   requiresS0OnRapid: true,
   parkAtOriginAfterJob: true,
+  emitSOnEveryBurnMove: false,
+  modalFeedrate: true,
 };
 
 export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
@@ -44,6 +49,8 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     rasterPowerMode: 'dynamic',
     requiresS0OnRapid: true,
     parkAtOriginAfterJob: true,
+    emitSOnEveryBurnMove: false,
+    modalFeedrate: true,
   },
   GRBL_DYNAMIC_DIALECT,
   {
@@ -55,16 +62,21 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     rasterPowerMode: 'dynamic',
     requiresS0OnRapid: true,
     parkAtOriginAfterJob: true,
+    emitSOnEveryBurnMove: false,
+    modalFeedrate: true,
   },
   {
     id: 'neotronics-4040-safe',
     label: 'Neotronics 4040 Safe',
     description: 'Conservative GRBL dialect for the Neotronics 4040 profile family.',
-    cutPowerMode: 'constant',
+    cutPowerMode: 'dynamic',
     fillPowerMode: 'dynamic',
     rasterPowerMode: 'dynamic',
     requiresS0OnRapid: true,
-    parkAtOriginAfterJob: true,
+    parkAtOriginAfterJob: false,
+    controlledLaserOffTravelFeedMmPerMin: 800,
+    emitSOnEveryBurnMove: true,
+    modalFeedrate: false,
   },
 ];
 

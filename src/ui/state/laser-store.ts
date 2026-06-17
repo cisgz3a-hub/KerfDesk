@@ -81,6 +81,7 @@ export type ConnectionState =
   | { readonly kind: 'connecting' }
   | { readonly kind: 'connected' }
   | { readonly kind: 'failed'; readonly error: string };
+export type HomingState = 'unknown' | 'homing' | 'confirmed';
 
 export type LaserState = {
   readonly connection: ConnectionState;
@@ -96,6 +97,7 @@ export type LaserState = {
   readonly autofocusBusy: boolean;
   readonly motionOperation: LaserMotionOperation | null;
   readonly streamer: StreamerState | null;
+  readonly homingState: HomingState;
   readonly log: ReadonlyArray<string>;
   readonly transcript: ReadonlyArray<SerialTranscriptEntry>;
   // F-7: settings auto-detected from the `$$` dump on connect. Non-null
@@ -236,7 +238,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
   return {
     connect: async (adapter) => {
       refs.nextTranscriptId = 1;
-      set({ connection: { kind: 'connecting' }, log: [], transcript: [] });
+      set({ connection: { kind: 'connecting' }, log: [], transcript: [], homingState: 'unknown' });
       const portRef = await adapter.serial.requestPort();
       if (portRef === null) {
         set({ connection: { kind: 'disconnected' } });
@@ -277,6 +279,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
           alarmCode: null,
           lastWriteError: null,
           safetyNotice: null,
+          homingState: 'unknown',
         });
         void runHandshake(set, get, refs, (out) => safeWrite(set, get, out)).catch(() => undefined);
       } catch (err) {
@@ -313,6 +316,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         workOriginActive: false,
         frameVerification: null,
         motionOperation: null,
+        homingState: 'unknown',
         lastWriteError: null,
       });
     },
@@ -327,7 +331,13 @@ function jogActions(
     home: async () => {
       assertAutofocusIdle(get());
       assertNoMotionOperation(set, get);
-      await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
+      try {
+        await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
+        set({ homingState: 'homing' });
+      } catch (err) {
+        set({ homingState: 'unknown' });
+        throw err;
+      }
     },
     autofocus: async (command) => {
       const activeJobBlock = idleCommandBlockResult(get());
@@ -353,7 +363,7 @@ function jogActions(
     unlockAlarm: async () => {
       assertNoMotionOperation(set, get);
       await safeWrite(set, get, `${CMD_UNLOCK}\n`, 'unlock');
-      set({ alarmCode: null });
+      set({ alarmCode: null, homingState: 'unknown' });
     },
     jog: async (params) => {
       assertAutofocusIdle(get());

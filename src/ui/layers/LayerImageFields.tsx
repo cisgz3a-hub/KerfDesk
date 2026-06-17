@@ -61,6 +61,9 @@ export function LayerImageFields({ layer }: { readonly layer: Layer }): JSX.Elem
       <FieldRow label="Negative">
         <NegativeImageCheckbox layer={layer} />
       </FieldRow>
+      <FieldRow label="Bidirectional">
+        <BidirectionalImageCheckbox layer={layer} />
+      </FieldRow>
       <FieldRow label="Pass-through">
         <PassThroughCheckbox layer={layer} />
       </FieldRow>
@@ -229,6 +232,19 @@ function NegativeImageCheckbox({ layer }: { readonly layer: Layer }): JSX.Elemen
       onChange={(event) => setLayerParam(layer.id, { negativeImage: event.target.checked })}
       aria-label={`Negative image for ${layer.color}`}
       title="Invert image brightness before engraving this layer."
+    />
+  );
+}
+
+function BidirectionalImageCheckbox({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  return (
+    <input
+      type="checkbox"
+      checked={layer.imageBidirectional}
+      onChange={(event) => setLayerParam(layer.id, { imageBidirectional: event.target.checked })}
+      aria-label={`Bidirectional image scan for ${layer.color}`}
+      title="Alternate raster rows in both directions. Turn off while diagnosing scan-offset drift."
     />
   );
 }

@@ -9,7 +9,10 @@
 // Determinism: iteration order matches scene.layers and scene.objects (both
 // arrays, indexed loops) → repeatable across runs.
 
+/* eslint-disable max-lines -- Merge keeps raster/vector/lane compilation together; split next. */
 import { type DeviceProfile, toMachineCoords } from '../devices';
+import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
   applyLumaAdjustments,
   dither,
@@ -28,6 +31,7 @@ import {
   assertNever,
   type ColoredPath,
   type Layer,
+  layerFromSubLayer,
   type Polyline,
   type RasterImage,
   type Scene,
@@ -36,6 +40,8 @@ import {
   type Vec2,
 } from '../scene';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
+import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
+import { offsetFillContours } from './offset-fill';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
 import type { CutSegment, FillSegment, Group, Job, RasterGroup } from './job';
 
@@ -59,23 +65,31 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: Group[] = [];
   for (const layer of scene.layers) {
     if (!layer.output) continue;
-    if (layer.mode === 'image') {
-      // F.2.d: image-mode layer dispatches to raster compile. The
-      // layer's color binds to RasterImage objects via obj.color;
-      // every matching raster becomes its own RasterGroup. Open
-      // question for future: multi-image-on-one-layer behaviour
-      // (today we emit one group per image — operators can split
-      // by layer if they want different power/dither per image).
-      for (const obj of scene.objects) {
-        if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
-        if (obj.role === 'trace-source') continue;
-        groups.push(compileRasterGroup(obj, layer, device));
+    for (const operationLayer of outputOperationLayers(layer)) {
+      if (operationLayer.mode === 'image') {
+        // F.2.d: image-mode layer dispatches to raster compile. The
+        // layer's color binds to RasterImage objects via obj.color;
+        // every matching raster becomes its own RasterGroup. Open
+        // question for future: multi-image-on-one-layer behaviour
+        // (today we emit one group per image — operators can split
+        // by layer if they want different power/dither per image).
+        for (const obj of scene.objects) {
+          if (obj.kind !== 'raster-image' || obj.color !== operationLayer.color) continue;
+          if (obj.role === 'trace-source') continue;
+          groups.push(compileRasterGroup(obj, operationLayer, device));
+        }
+        continue;
       }
-      continue;
+      groups.push(...compileVectorGroupsForLayer(scene.objects, operationLayer, device));
     }
-    groups.push(...compileVectorGroupsForLayer(scene.objects, layer, device));
   }
   return { groups };
+}
+
+function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {
+  return [layer, ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer))].filter(
+    (operationLayer) => operationLayer.output,
+  );
 }
 
 // Builds a RasterGroup from one RasterImage + its Layer settings.
@@ -136,6 +150,7 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     bounds,
     overscanMm: DEFAULT_OVERSCAN_MM,
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
+    bidirectional: layer.imageBidirectional,
   };
 }
 
@@ -259,6 +274,7 @@ function vectorGroupForLayer(
       ? {
           ...common,
           kind: 'fill' as const,
+          fillStyle: layer.fillStyle,
           overscanMm: Math.max(0, layer.fillOverscanMm),
           segments: segments as ReadonlyArray<FillSegment>,
         }
@@ -302,7 +318,11 @@ function collectLineSegmentsForLayer(
   for (const obj of objects) {
     appendSegmentsFromObject(obj, layer, device, out);
   }
-  return out;
+  if (!layer.tabsEnabled) return out;
+  return applyAutomaticTabsToPolylines(
+    out.map((segment) => ({ points: segment.polyline, closed: segment.closed })),
+    layer,
+  ).map((polyline) => ({ polyline: polyline.points, closed: polyline.closed }));
 }
 
 function collectFillSegmentsForLayer(
@@ -310,7 +330,14 @@ function collectFillSegmentsForLayer(
   layer: Layer,
   device: DeviceProfile,
 ): FillSegment[] {
-  return memoizedLayerFillHatching(objects, layer, device).map((polyline) => ({
+  const polylines =
+    layer.fillStyle === 'offset'
+      ? offsetFillContours({
+          polylines: collectFillContoursForLayer(objects, layer, device),
+          spacingMm: layer.hatchSpacingMm,
+        }).map((polyline) => ({ ...polyline, reverse: false }))
+      : memoizedLayerFillHatching(objects, layer, device);
+  return polylines.map((polyline) => ({
     polyline: polyline.points,
     closed: polyline.closed,
     reverse: polyline.reverse,
@@ -322,7 +349,8 @@ function memoizedLayerFillHatching(
   layer: Layer,
   device: DeviceProfile,
 ): ReadonlyArray<FillSegmentAsPolyline> {
-  const cacheKey = layerFillCacheKey(layer, device);
+  const fillRule = fillRuleForLayer(objects, layer);
+  const cacheKey = layerFillCacheKey(layer, device, fillRule);
   let bySettings = layerFillCache.get(objects);
   if (bySettings === undefined) {
     bySettings = new Map<string, ReadonlyArray<FillSegmentAsPolyline>>();
@@ -332,7 +360,7 @@ function memoizedLayerFillHatching(
   if (cached !== undefined) return cached;
 
   const contours = collectFillContoursForLayer(objects, layer, device);
-  const hatches = memoizedFillHatchingWithMetadata(contours, layer);
+  const hatches = memoizedFillHatchingWithMetadata(contours, layer, fillRule);
   if (bySettings.size >= MAX_LAYER_FILL_CACHE_ENTRIES) {
     const oldestKey = bySettings.keys().next().value;
     if (oldestKey !== undefined) bySettings.delete(oldestKey);
@@ -342,19 +370,6 @@ function memoizedLayerFillHatching(
 }
 
 type FillSegmentAsPolyline = Polyline & { readonly reverse: boolean };
-
-function layerFillCacheKey(layer: Layer, device: DeviceProfile): string {
-  return [
-    layer.color,
-    layer.hatchAngleDeg,
-    layer.hatchSpacingMm,
-    layer.fillBidirectional,
-    layer.fillCrossHatch,
-    device.origin,
-    device.bedWidth,
-    device.bedHeight,
-  ].join(':');
-}
 
 function collectFillContoursForLayer(
   objects: ReadonlyArray<SceneObject>,
@@ -466,11 +481,23 @@ function appendPathSegments(
 ): void {
   for (const path of paths) {
     if (path.color !== layer.color) continue;
+    const closedForKerf: Polyline[] = [];
     for (const polyline of path.polylines) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, transform), device),
       );
-      out.push({ polyline: points, closed: polyline.closed });
+      if (shouldApplyKerf(polyline, layer)) {
+        closedForKerf.push({ points, closed: true });
+      } else {
+        out.push({ polyline: points, closed: polyline.closed });
+      }
+    }
+    for (const offset of offsetClosedPolylinesForKerf(closedForKerf, layer.kerfOffsetMm)) {
+      out.push({ polyline: offset.points, closed: true });
     }
   }
+}
+
+function shouldApplyKerf(polyline: Polyline, layer: Layer): boolean {
+  return layer.mode === 'line' && layer.kerfOffsetMm !== 0 && polyline.closed;
 }

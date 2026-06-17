@@ -2,8 +2,16 @@
 // Internal files MUST NOT be imported from outside this module (ESLint
 // boundaries enforced). Cross-module callers import only from this index.
 
-export type { Layer, LayerMode } from './layer';
-export { LAYER_DEFAULTS, createLayer } from './layer';
+export type { Layer, LayerFillStyle, LayerMode, LayerOperationSettings, LayerSubLayer } from './layer';
+export {
+  LAYER_DEFAULTS,
+  captureLayerOperationSettings,
+  createLayer,
+  createLayerSubLayer,
+  layerFromSubLayer,
+  layerOperationSettingsEqual,
+  nextLayerSubLayerId,
+} from './layer';
 
 export type {
   Bounds,

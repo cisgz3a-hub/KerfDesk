@@ -77,6 +77,31 @@ describe('compileJob raster image groups', () => {
     expect(raster?.sValues).toHaveLength(200);
   });
 
+  it('keeps scan-offset compensation profile-scoped instead of baking it into raster groups', () => {
+    const layer = imageLayer({ speed: 1000 });
+    const calibratedDevice = {
+      ...dev,
+      scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.3 }],
+    };
+
+    const job = compileJob(
+      { objects: [rasterObject('AP//AA==')], layers: [layer] },
+      calibratedDevice,
+    );
+    const raster = firstRasterGroup(job);
+
+    expect(raster?.initialXOffsetMm).toBeUndefined();
+    expect(raster?.bidirectionalScanOffsetMm).toBeUndefined();
+  });
+
+  it('carries the image bidirectional setting into the raster group', () => {
+    const layer = imageLayer({ imageBidirectional: false });
+
+    const job = compileJob({ objects: [rasterObject('AP//AA==')], layers: [layer] }, dev);
+
+    expect(firstRasterGroup(job)?.bidirectional).toBe(false);
+  });
+
   it('treats missing luma as white so legacy rasters fail safe', () => {
     const job = compileJob({ objects: [rasterObject()], layers: [imageLayer()] }, dev);
     expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual(new Array(50).fill(0));
