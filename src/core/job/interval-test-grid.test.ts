@@ -18,9 +18,9 @@ describe('generateIntervalTestGrid', () => {
     });
 
     expect(grid.scene.layers).toHaveLength(4);
-    expect(grid.scene.objects.filter((object) => sourceOf(object) === 'interval-test-grid')).toHaveLength(
-      3,
-    );
+    expect(
+      grid.scene.objects.filter((object) => sourceOf(object) === 'interval-test-grid'),
+    ).toHaveLength(3);
     expect(grid.scene.layers.map((layer) => layer.mode)).toEqual(['fill', 'fill', 'fill', 'line']);
     expect(grid.cells.map((cell) => [cell.step, cell.intervalMm])).toEqual([
       [0, 0.2],
@@ -67,7 +67,9 @@ describe('generateIntervalTestGrid', () => {
       .map((object) => sourceOf(object).replace('calibration-label:', ''));
 
     expect(labels).toEqual(['0.20', '0.15', '0.10']);
-    expect(grid.scene.objects.find((object) => object.id === 'interval-test-label-1')).toMatchObject({
+    expect(
+      grid.scene.objects.find((object) => object.id === 'interval-test-label-1'),
+    ).toMatchObject({
       source: 'calibration-label:0.15',
     });
   });
@@ -99,9 +101,9 @@ describe('generateIntervalTestGrid', () => {
     });
 
     expect(grid.scene.layers.filter((layer) => layer.mode === 'fill')).toHaveLength(1);
-    expect(grid.scene.objects.filter((object) => sourceOf(object) === 'interval-test-grid')).toHaveLength(
-      1,
-    );
+    expect(
+      grid.scene.objects.filter((object) => sourceOf(object) === 'interval-test-grid'),
+    ).toHaveLength(1);
     expect(grid.cells[0]).toMatchObject({ intervalMm: 0.1, power: 100, speed: 1 });
     expect(grid.scene.layers[0]).toMatchObject({
       hatchSpacingMm: 0.1,

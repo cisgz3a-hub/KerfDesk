@@ -20,9 +20,9 @@ describe('generateMaterialTestGrid', () => {
     });
 
     expect(grid.scene.layers).toHaveLength(3);
-    expect(grid.scene.objects.filter((object) => sourceOf(object) === 'material-test-grid')).toHaveLength(
-      6,
-    );
+    expect(
+      grid.scene.objects.filter((object) => sourceOf(object) === 'material-test-grid'),
+    ).toHaveLength(6);
     expect(grid.scene.layers.map((layer) => layer.mode)).toEqual(['fill', 'fill', 'line']);
     expect(grid.cells.map((cell) => [cell.row, cell.column])).toEqual([
       [0, 0],
@@ -74,10 +74,14 @@ describe('generateMaterialTestGrid', () => {
       .map((object) => sourceOf(object).replace('calibration-label:', ''));
 
     expect(labels).toEqual(['10', '25', '40', '3000', '1000']);
-    expect(grid.scene.objects.find((object) => object.id === 'material-test-power-c1')).toMatchObject({
+    expect(
+      grid.scene.objects.find((object) => object.id === 'material-test-power-c1'),
+    ).toMatchObject({
       source: 'calibration-label:25',
     });
-    expect(grid.scene.objects.find((object) => object.id === 'material-test-speed-r0')).toMatchObject({
+    expect(
+      grid.scene.objects.find((object) => object.id === 'material-test-speed-r0'),
+    ).toMatchObject({
       source: 'calibration-label:3000',
     });
   });
@@ -120,9 +124,9 @@ describe('generateMaterialTestGrid', () => {
     const job = compileJob(grid.scene, DEFAULT_DEVICE_PROFILE);
 
     expect(job.groups[0]).toMatchObject({ kind: 'fill', speed: 3000, power: 10 });
-    expect(job.groups.filter((group) => group.kind === 'fill').map((group) => group.power)).toEqual([
-      10, 40, 10, 40,
-    ]);
+    expect(job.groups.filter((group) => group.kind === 'fill').map((group) => group.power)).toEqual(
+      [10, 40, 10, 40],
+    );
     expect(job.groups.at(-1)).toMatchObject({
       kind: 'cut',
       layerId: 'material-test-labels',

@@ -105,7 +105,9 @@ function buildRasterDiagnostics(
   rows: ReadonlyArray<GrblSettingRow>,
   lastSettingsReadAt: number | null,
 ): RasterDiagnostics {
-  const activeLayers = flattenOperationLayers(project).filter((layer) => layer.visible && layer.output);
+  const activeLayers = flattenOperationLayers(project).filter(
+    (layer) => layer.visible && layer.output,
+  );
   const imageLayers = activeLayers.filter((layer) => layer.mode === 'image');
   const fillLayers = activeLayers.filter((layer) => layer.mode === 'fill');
   const bidirectionalImageLayers = imageLayers.filter((layer) => layer.imageBidirectional);
@@ -183,7 +185,9 @@ function rasterWarnings(args: {
     warnings.push('Laser mode is off; GRBL $32 should normally be 1 for diode laser engraving.');
   }
   if (args.sMax.value !== null && args.sMax.value !== args.project.device.maxPowerS) {
-    warnings.push('$30 differs from the active profile S max. Power scaling may not match previews.');
+    warnings.push(
+      '$30 differs from the active profile S max. Power scaling may not match previews.',
+    );
   }
   if (args.laserMode.kind === 'missing' || args.sMax.kind === 'missing') {
     warnings.push('Read controller settings to compare $30 and $32 against the active profile.');
@@ -308,7 +312,11 @@ function settingSummary(
   if (row === undefined || lastSettingsReadAt === null) {
     return { kind: 'missing', display: 'not read this session', value: null };
   }
-  return { kind: 'known', display: `${row.code} ${row.name}: ${row.rawValue}`, value: row.numericValue };
+  return {
+    kind: 'known',
+    display: `${row.code} ${row.name}: ${row.rawValue}`,
+    value: row.numericValue,
+  };
 }
 
 function flattenOperationLayers(project: Project): ReadonlyArray<Layer> {
