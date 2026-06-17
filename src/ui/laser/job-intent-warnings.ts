@@ -1,3 +1,4 @@
+import { resolveGrblDialect, type GrblPowerMode } from '../../core/devices';
 import { rasterBoundsInMachineCoords } from '../../core/job';
 import { pixelExtentForMm } from '../../core/raster';
 import {
@@ -32,7 +33,7 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
       const key = `${obj.id}:${layer.id}:${layer.mode}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      warnings.push(traceVectorWarning(obj.source, layer.mode));
+      warnings.push(traceVectorWarning(obj.source, layer.mode, project));
     }
   }
 
@@ -80,10 +81,31 @@ function uncalibratedLayerWarning(layerId: string): string {
   return `Layer ${layerId} is still using uncalibrated defaults: ${LAYER_DEFAULTS.power}% power, ${LAYER_DEFAULTS.speed} mm/min, ${LAYER_DEFAULTS.passes} pass. Run a material test on scrap before burning final material.`;
 }
 
-function traceVectorWarning(source: string, mode: Exclude<LayerMode, 'image'>): string {
-  return `Trace "${source}" is vector ${modeLabel(mode)} output, not raster image engraving. It will run with M3 constant-power moves and can cut if power/speed are too aggressive.`;
+function traceVectorWarning(
+  source: string,
+  mode: Exclude<LayerMode, 'image'>,
+  project: Project,
+): string {
+  const dialect = resolveGrblDialect(project.device);
+  const powerMode = mode === 'fill' ? dialect.fillPowerMode : dialect.cutPowerMode;
+  if (mode === 'fill') {
+    return (
+      `Trace "${source}" is vector Fill output, not raster image engraving. ` +
+      `It will run as ${powerModeCommand(powerMode)} ${powerModeLabel(powerMode)} fill sweeps from traced vector geometry; ` +
+      'tiny traced text can stay wavy if the source outline is poor.'
+    );
+  }
+  return (
+    `Trace "${source}" is vector Line output, not raster image engraving. ` +
+    `It will run as ${powerModeCommand(powerMode)} ${powerModeLabel(powerMode)} vector moves ` +
+    'and can cut if power/speed are too aggressive.'
+  );
 }
 
-function modeLabel(mode: Exclude<LayerMode, 'image'>): string {
-  return mode === 'fill' ? 'Fill' : 'Line';
+function powerModeCommand(mode: GrblPowerMode): 'M3' | 'M4' {
+  return mode === 'dynamic' ? 'M4' : 'M3';
+}
+
+function powerModeLabel(mode: GrblPowerMode): 'constant-power' | 'dynamic-power' {
+  return mode === 'dynamic' ? 'dynamic-power' : 'constant-power';
 }
