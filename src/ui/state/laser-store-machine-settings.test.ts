@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 
@@ -129,4 +130,58 @@ describe('laser-store machine settings', () => {
     expect(useLaserStore.getState().grblSettingsRows).toEqual([]);
     expect(useLaserStore.getState().lastSettingsReadAt).toBeNull();
   });
+
+  it('writes one guarded common GRBL setting and re-reads $$', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({
+      statusReport: idleStatus(),
+      grblSettingsRows: settingsMapToRows(new Map([[30, '900']])),
+      lastSettingsReadAt: Date.now(),
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    writes.length = 0;
+
+    await useLaserStore.getState().writeGrblSetting(30, '1000');
+
+    expect(writes).toEqual(['$30=1000\n', '$$\n']);
+  });
+
+  it('blocks guarded writes without a current settings backup', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({ statusReport: idleStatus(), grblSettingsRows: [], lastSettingsReadAt: null });
+
+    await expect(useLaserStore.getState().writeGrblSetting(30, '1000')).rejects.toThrow(
+      /read and export/i,
+    );
+  });
+
+  it('blocks guarded writes for unknown controller settings', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({
+      statusReport: idleStatus(),
+      grblSettingsRows: settingsMapToRows(new Map([[999, 'custom']])),
+      lastSettingsReadAt: Date.now(),
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+
+    await expect(useLaserStore.getState().writeGrblSetting(999, '1')).rejects.toThrow(
+      /unknown/i,
+    );
+  });
 });
+
+function idleStatus(): ReturnType<typeof useLaserStore.getState>['statusReport'] {
+  return {
+    state: 'Idle',
+    subState: null,
+    mPos: { x: 0, y: 0, z: 0 },
+    wPos: null,
+    wco: null,
+    feed: 0,
+    spindle: 0,
+  };
+}

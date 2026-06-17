@@ -9,6 +9,7 @@ import {
   computeJobBounds,
   computeJobMotionBounds,
   describeFramePreflightFailure,
+  frameBoundsSignature,
   framePreflight,
   type JobBounds,
   offsetJobBounds,
@@ -16,7 +17,7 @@ import {
 import { prepareOutput } from '../../io/gcode';
 import { resolveJobPlacement, trustedMotionOffsetForPreflight } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
-import { describeAutofocusResult, hasCustomOrigin, useLaserStore } from '../state/laser-store';
+import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
   containerStyle,
@@ -29,6 +30,7 @@ import {
   stopBtnStyle,
 } from './JobControls.styles';
 import { JobPlacementControls } from './JobPlacementControls';
+import { OriginRow } from './OriginRow';
 import { type LiveJobEstimate } from './live-job-estimate';
 import { useJobEstimate } from './use-job-estimate';
 
@@ -56,66 +58,6 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
       {motionOperation !== null && <MotionControls operationKind={motionOperation.kind} />}
       {jobNeedsRecovery && <RunningControls isStreaming={isStreaming} isPaused={isPaused} />}
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
-    </div>
-  );
-}
-
-// F.3 — Set / Reset the work-coordinate origin to the current head
-// position. See ADR-021. Two buttons:
-//   - "Set origin here" sends G92 X0 Y0. Always enabled (subject to
-//     `busy`) — the operator can re-set the origin whenever the head
-//     is at a new corner.
-//   - "Reset origin" sends G92.1. Only enabled when wcoCache shows a
-//     non-trivial offset; disabled otherwise (nothing to clear).
-function OriginRow(props: {
-  readonly disabled: boolean;
-  readonly streaming: boolean;
-}): JSX.Element {
-  const setOrigin = useLaserStore((s) => s.setOriginHere);
-  const resetOrigin = useLaserStore((s) => s.resetOrigin);
-  const wcoCache = useLaserStore((s) => s.wcoCache);
-  const workOriginActive = useLaserStore((s) => s.workOriginActive);
-  const setJobPlacement = useStore((s) => s.setJobPlacement);
-  const pushToast = useToastStore((s) => s.pushToast);
-  const busy = props.disabled || props.streaming;
-  const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
-  // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
-  // intermittently (every Nth status per `$10`), so the StatusDisplay
-  // readout may take 1-30 frames (~0.25-7.5s) to update after a G92.
-  // The toast gives instant feedback so the user doesn't re-click.
-  const onSet = (): void => {
-    void setOrigin().then(() => {
-      setJobPlacement({ startFrom: 'user-origin' });
-      pushToast('Origin set to current head position (G92).', 'success');
-    });
-  };
-  const onReset = (): void => {
-    void resetOrigin().then(() =>
-      pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'),
-    );
-  };
-  return (
-    <div style={rowStyle}>
-      <button
-        type="button"
-        onClick={onSet}
-        disabled={busy}
-        title="Declare the current head position as the workpiece (0, 0). Cleared on alarm or stop."
-      >
-        Set origin here
-      </button>
-      <button
-        type="button"
-        onClick={onReset}
-        disabled={busy || !hasCustom}
-        title={
-          hasCustom
-            ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
-            : 'No custom origin active. Set one with "Set origin here" first.'
-        }
-      >
-        Reset origin
-      </button>
     </div>
   );
 }
@@ -378,7 +320,22 @@ function dispatchFrameIfSafe(
     return;
   }
   const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
-  void frame(bounds, feed);
+  const isVerifiedOrigin = placement.jobOrigin?.startFrom === 'verified-origin';
+  void frame(bounds, feed)
+    .then(() => {
+      // Record the Verified Frame on a clean dispatch. The frame motion is still
+      // running, but Start is separately gated on Idle + no-alarm, so a frame
+      // that is mid-flight, hit a limit (alarm), or was cancelled can never
+      // authorize a burn from this record (ADR-053 P2).
+      if (!isVerifiedOrigin) return;
+      const laser = useLaserStore.getState();
+      laser.markFrameVerified({
+        boundsSignature: frameBoundsSignature(bounds),
+        wco: laser.wcoCache,
+        workOriginActive: laser.workOriginActive,
+      });
+    })
+    .catch(() => undefined);
 }
 
 function describeFrameMotionPreflightIssue(
@@ -393,9 +350,13 @@ function describeFrameMotionPreflightIssue(
   const preflightBounds =
     motionOffset === undefined ? motionBounds : offsetJobBounds(motionBounds, motionOffset);
   const pre = framePreflight(preflightBounds, device);
-  return pre.kind === 'out-of-bounds'
-    ? `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`
-    : null;
+  if (pre.kind === 'out-of-bounds') {
+    return `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`;
+  }
+  if (pre.kind === 'no-go-zone') {
+    return `Cannot frame: generated motion crosses no-go zone "${pre.zoneName}".`;
+  }
+  return null;
 }
 
 function describeRelativeMotionTooLarge(

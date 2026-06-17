@@ -5,6 +5,7 @@ export type { JobBounds } from './job-bounds';
 export { computeJobBounds, computeJobMotionBounds } from './job-bounds';
 export type { ComputeFrameBoundsOptions } from './frame-bounds';
 export { computeFrameBounds } from './frame-bounds';
+export { frameBoundsSignature } from './frame-verification';
 export type { RasterMachineBounds } from './raster-bounds';
 export { rasterBoundsInMachineCoords } from './raster-bounds';
 export {

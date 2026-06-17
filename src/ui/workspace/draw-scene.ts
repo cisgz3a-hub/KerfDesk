@@ -24,6 +24,7 @@ import {
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
+import { drawNoGoZones } from './draw-no-go-zones';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
 import { isObjectOutOfBed } from './out-of-bounds';
 import { rotateHandlePosition } from './rotate-handle';
@@ -78,6 +79,7 @@ export function drawScene(
   );
   drawBed(ctx, project, view);
   drawGrid(ctx, project, view);
+  drawNoGoZones(ctx, project, view);
   drawOriginMarker(ctx, view);
   if (opts.preview) {
     drawObjectsFaint(ctx, project, view);

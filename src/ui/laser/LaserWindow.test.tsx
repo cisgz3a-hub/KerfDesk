@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('LaserWindow autofocus busy controls', () => {
-  it('renders the Device Profile settings collapsed by default and lets the user open it', async () => {
+  it('opens Machine Setup from a compact rail entry', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -52,16 +52,15 @@ describe('LaserWindow autofocus busy controls', () => {
         );
       });
 
-      const deviceDetails = detailsBySummary(host, 'Device Profile');
-      expect(deviceDetails.open).toBe(false);
+      expect(host.textContent).not.toContain('Use Neotronics 4040 Max');
+      expect(button(host, 'Machine Setup')).toBeInstanceOf(HTMLButtonElement);
 
-      const summary = deviceDetails.querySelector('summary');
-      if (!(summary instanceof HTMLElement)) throw new Error('Device Profile summary missing');
       await act(async () => {
-        summary.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        button(host, 'Machine Setup').click();
       });
 
-      expect(deviceDetails.open).toBe(true);
+      expect(host.textContent).toContain('Profile Catalog');
+      expect(host.textContent).toContain('Import / Export');
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -381,13 +380,5 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
     candidate.textContent?.includes(label),
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
-  return match;
-}
-
-function detailsBySummary(host: HTMLElement, label: string): HTMLDetailsElement {
-  const match = [...host.querySelectorAll('details')].find(
-    (details) => details.querySelector('summary')?.textContent === label,
-  );
-  if (!(match instanceof HTMLDetailsElement)) throw new Error(`Details not rendered: ${label}`);
   return match;
 }

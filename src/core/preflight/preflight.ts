@@ -19,6 +19,7 @@ import {
 } from '../invariants';
 import { machineBoundsForDevice } from '../devices';
 import { DEFAULT_OVERSCAN_MM } from '../job';
+import { findNoGoZoneCollisions } from './no-go-zone-preflight';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -30,6 +31,7 @@ export type PreflightCode =
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
+  | 'no-go-zone-collision'
   | 'raster-too-large'
   | 'selected-output-empty'
   | 'empty-output';
@@ -83,6 +85,8 @@ export function runPreflight(
 
   appendBoundsIssues(project, gcode, issues, options);
 
+  appendNoGoZoneIssues(project, gcode, issues, options);
+
   appendLaserOnTravelIssues(gcode, issues);
 
   appendLongBlankFeedIssues(gcode, issues);
@@ -95,6 +99,31 @@ export function runPreflight(
   }
 
   return { ok: issues.length === 0, issues };
+}
+
+function appendNoGoZoneIssues(
+  project: Project,
+  gcode: string,
+  issues: PreflightIssue[],
+  options: PreflightOptions,
+): void {
+  const zones = project.device.noGoZones.filter((zone) => zone.enabled);
+  if (zones.length === 0) return;
+  if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
+    issues.push({
+      code: 'no-go-zone-collision',
+      message: 'No-go zones require trusted machine position for relative-origin output.',
+    });
+    return;
+  }
+  const offset = options.motionOffset ?? { x: 0, y: 0 };
+  const collisions = findNoGoZoneCollisions(gcode, zones, offset);
+  for (const collision of collisions.slice(0, MAX_BOUNDS_ISSUES)) {
+    issues.push({
+      code: 'no-go-zone-collision',
+      message: `Line ${collision.lineNumber}: motion crosses no-go zone "${collision.zone.name}".`,
+    });
+  }
 }
 
 function appendLayerIssues(layer: Layer, maxFeed: number, issues: PreflightIssue[]): void {

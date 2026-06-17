@@ -1,6 +1,6 @@
 /* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, profileCatalogEntryById, resolveGrblDialect } from '../devices';
 import { type Job, EMPTY_JOB } from '../job';
 import { grblStrategy } from './grbl-strategy';
 
@@ -65,6 +65,42 @@ describe('grblStrategy single-segment job', () => {
     const out = grblStrategy.emit(job, dev255);
     // 50% × 255 = 127.5 → rounds to 128
     expect(out).toContain('S128');
+  });
+});
+
+describe('grblStrategy data-driven dialect resolution', () => {
+  it('keeps Falcon-compatible output byte-stable under its catalog dialect', () => {
+    const falcon = profileCatalogEntryById('creality-falcon-a1-pro-compatible')?.profile;
+    expect(falcon).toBeDefined();
+    if (falcon === undefined) return;
+    expect(resolveGrblDialect(falcon).fillPowerMode).toBe('dynamic');
+
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          overscanMm: 1,
+          segments: [
+            {
+              polyline: [
+                { x: 10, y: 5 },
+                { x: 20, y: 5 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(grblStrategy.emit(job, falcon)).toBe(grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE));
   });
 });
 

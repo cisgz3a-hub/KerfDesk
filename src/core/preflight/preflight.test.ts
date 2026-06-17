@@ -70,6 +70,58 @@ describe('runPreflight — happy path', () => {
   });
 });
 
+describe('runPreflight no-go zone invariant', () => {
+  it('blocks emitted motion that crosses an enabled no-go zone', () => {
+    const project = {
+      ...projectWith(createLayer({ id: 'L1', color: '#ff0000' })),
+      device: {
+        ...DEFAULT_DEVICE_PROFILE,
+        noGoZones: [
+          {
+            id: 'clamp',
+            name: 'Front clamp',
+            enabled: true,
+            x: 4,
+            y: 392,
+            width: 4,
+            height: 4,
+          },
+        ],
+      },
+    };
+    const result = runPreflight(project, emit(project));
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: 'no-go-zone-collision',
+      message: 'Line 7: motion crosses no-go zone "Front clamp".',
+    });
+  });
+
+  it('ignores disabled no-go zones', () => {
+    const project = {
+      ...projectWith(createLayer({ id: 'L1', color: '#ff0000' })),
+      device: {
+        ...DEFAULT_DEVICE_PROFILE,
+        noGoZones: [
+          {
+            id: 'clamp',
+            name: 'Front clamp',
+            enabled: false,
+            x: 4,
+            y: 392,
+            width: 4,
+            height: 4,
+          },
+        ],
+      },
+    };
+    const result = runPreflight(project, emit(project));
+
+    expect(result.issues.map((issue) => issue.code)).not.toContain('no-go-zone-collision');
+  });
+});
+
 describe('runPreflight laser-off travel invariant', () => {
   it('flags G0 travel while the laser may still be armed', () => {
     const project = projectWith(createLayer({ id: 'L1', color: '#ff0000' }));

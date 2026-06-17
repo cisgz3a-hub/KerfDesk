@@ -3,12 +3,38 @@
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
 import type { ScanOffsetPoint } from './scan-offset-profile';
+import type { GcodeDialectSelection } from './gcode-dialects';
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
 export type ControllerKind = 'grbl-v1.1';
 export type LaserFocusMode = 'fixed-lever' | 'manual' | 'unknown';
 export type LaserAirAssistHardware = 'built-in' | 'manual' | 'none' | 'unknown';
+export type MachineProfileSource = 'built-in' | 'custom' | 'imported' | 'lightburn';
+export type ProfileCapability =
+  | 'grbl'
+  | 'wcs'
+  | 'air-assist'
+  | 'no-go-zones'
+  | 'scan-offsets'
+  | 'verified-origin';
+export type ProfileEvidenceStatus = 'default' | 'researched' | 'user-imported' | 'unverified';
+
+export type ProfileEvidence = {
+  readonly label: string;
+  readonly status: ProfileEvidenceStatus;
+  readonly note: string;
+};
+
+export type NoGoZone = {
+  readonly id: string;
+  readonly name: string;
+  readonly enabled: boolean;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
 
 export type HomingConfig = {
   readonly enabled: boolean;
@@ -31,8 +57,16 @@ export type LaserSubProfile = {
 
 export type DeviceProfile = {
   readonly name: string;
+  readonly profileId?: string;
+  readonly vendor?: string;
+  readonly model?: string;
+  readonly profileSource?: MachineProfileSource;
+  readonly catalogVersion?: string;
+  readonly capabilities?: ReadonlyArray<ProfileCapability>;
+  readonly evidence?: ReadonlyArray<ProfileEvidence>;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
+  readonly gcodeDialect: GcodeDialectSelection;
   readonly laserSubProfile?: LaserSubProfile;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
@@ -56,6 +90,7 @@ export type DeviceProfile = {
   // Bidirectional fill/raster compensation. Empty keeps emitted output
   // unchanged until the operator calibrates a machine-specific table.
   readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
+  readonly noGoZones: ReadonlyArray<NoGoZone>;
   readonly zTravelMm?: number;
   readonly zTravelConfirmed?: boolean;
   readonly zProbePresent?: boolean;
@@ -107,6 +142,19 @@ const DEFAULT_AUTOFOCUS_COMMAND = '';
 
 // First-run default per WORKFLOW.md F-A1.
 export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
+  profileId: 'generic-grbl-400x400',
+  vendor: 'Generic',
+  model: 'GRBL 400x400',
+  profileSource: 'built-in',
+  catalogVersion: '2026-06-17',
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'LaserForge default',
+      status: 'default',
+      note: 'Starter GRBL profile. Confirm bed size, homing, and S range before first job.',
+    },
+  ],
   name: 'Default 400×400',
   bedWidth: 400,
   bedHeight: 400,
@@ -115,7 +163,9 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   minPowerS: 0,
   laserModeEnabled: true,
   airAssistCommand: 'none',
+  gcodeDialect: { dialectId: 'grbl-dynamic' },
   scanningOffsets: [],
+  noGoZones: [],
   origin: 'front-left',
   homing: { enabled: false, direction: 'front-left' },
   autofocusCommand: DEFAULT_AUTOFOCUS_COMMAND,
@@ -128,6 +178,9 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
 
 export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'neotronics-4040-max-lt4lds-v2-20w',
+  vendor: 'Neotronics',
+  model: '4040 Max / LT-4LDS-V2 20W',
   name: 'Neotronics 4040 Max / LT-4LDS-V2 20W',
   machineFamily: 'neotronics-4040-max',
   controllerKind: 'grbl-v1.1',
@@ -138,6 +191,16 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   minPowerS: 0,
   laserModeEnabled: true,
   airAssistCommand: 'none',
+  gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+  noGoZones: [],
+  capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'User-provided 4040 profile',
+      status: 'researched',
+      note: '400x400 XY and LT-4LDS-V2 20W laser metadata captured for the Neotronics 4040 class.',
+    },
+  ],
   zTravelMm: 75,
   zTravelConfirmed: false,
   zProbePresent: true,

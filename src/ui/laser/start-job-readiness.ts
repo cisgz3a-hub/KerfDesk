@@ -1,5 +1,10 @@
 import type { StatusReport } from '../../core/controllers/grbl';
-import { computeJobBounds, describeFramePreflightFailure, framePreflight } from '../../core/job';
+import {
+  computeJobBounds,
+  describeFramePreflightFailure,
+  frameBoundsSignature,
+  framePreflight,
+} from '../../core/job';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
 import {
@@ -10,6 +15,7 @@ import {
 } from '../../core/scene';
 import { emitGcode, prepareOutput } from '../../io/gcode';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
+import { isVerifiedFrameValid, type FrameVerification } from '../state/frame-verification';
 import {
   DEFAULT_JOB_PLACEMENT,
   resolveJobPlacement,
@@ -42,6 +48,8 @@ export type MachineStartSnapshot = {
   readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
+  // ADR-053 P2 — the last clean Verified Frame, gating verified-origin starts.
+  readonly frameVerification?: FrameVerification | null;
 };
 
 export function prepareStartJob(
@@ -71,6 +79,11 @@ export function prepareStartJob(
   });
   if (!preflight.ok) {
     return { ok: false, messages: preflight.issues.map((i) => i.message) };
+  }
+
+  const verifiedFrameIssue = findVerifiedFrameGateIssue(project, placement, outputScope, machine);
+  if (verifiedFrameIssue !== null) {
+    return { ok: false, messages: [verifiedFrameIssue] };
   }
 
   const controller = runControllerReadiness(project, controllerSettings);
@@ -108,7 +121,7 @@ function findPlacementBoundsIssue(
   }
   const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
   if (!prepared.ok) return null;
-  const bounds = computeJobBounds(prepared.job);
+  const bounds = computeJobBounds(prepared.job, project.device);
   if (bounds === null) return null;
   const physicalBounds = {
     minX: bounds.minX + motionOffset.x,
@@ -118,7 +131,39 @@ function findPlacementBoundsIssue(
   };
   const preflight = framePreflight(physicalBounds, project.device);
   if (preflight.kind === 'ok') return null;
+  if (preflight.kind === 'no-go-zone') {
+    return `Selected job origin would place this job through no-go zone "${preflight.zoneName}".`;
+  }
   return `Selected job origin would place this job outside the machine bed. ${describeFramePreflightFailure(preflight)}`;
+}
+
+// ADR-053 P2 — Verified Origin requires a clean Verified Frame for the current
+// job at the current origin before Start. The frame is the physical bounds check
+// that replaces the absolute position check we can't do without homing. A
+// mismatch (no frame yet, or the job moved/resized or the origin changed since)
+// means the frame's guarantee no longer holds, so re-frame. Other start modes
+// are unaffected.
+function findVerifiedFrameGateIssue(
+  project: Project,
+  placement: Extract<ResolvedJobPlacement, { ok: true }>,
+  outputScope: OutputScope,
+  machine: MachineStartSnapshot,
+): string | null {
+  if (placement.jobOrigin?.startFrom !== 'verified-origin') return null;
+  const prepared = prepareOutput(project, { jobOrigin: placement.jobOrigin, outputScope });
+  if (!prepared.ok) return null;
+  const bounds = computeJobBounds(prepared.job, project.device);
+  if (bounds === null) return null;
+  const valid = isVerifiedFrameValid(machine.frameVerification ?? null, {
+    boundsSignature: frameBoundsSignature(bounds),
+    wco: machine.wcoCache ?? null,
+    workOriginActive: machine.workOriginActive === true,
+  });
+  if (valid) return null;
+  return (
+    'Verified Origin needs a Verified Frame first: click Frame to trace the job and confirm ' +
+    'it fits, then Start. Re-frame after moving the origin or changing the job.'
+  );
 }
 
 function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<string> {

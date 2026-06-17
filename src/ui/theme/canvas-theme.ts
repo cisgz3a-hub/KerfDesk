@@ -24,6 +24,7 @@ export const canvasTheme = {
   selectionHandleFill: '#ffffff',
   rotateHandleStroke: '#fff',
   outOfBounds: '#c62828',
+  noGoZoneFill: 'rgba(198, 40, 40, 0.12)',
   // Rulers (draw-rulers)
   rulerBackground: '#f0f0f0',
   rulerBorder: '#bbb',
