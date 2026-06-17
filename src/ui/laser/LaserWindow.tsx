@@ -1,17 +1,16 @@
 // LaserWindow — Phase B controller panel. Connection, status, jog, job
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
+import { useState } from 'react';
 import { describeAlarm } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
+import { Button } from '../kit';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { ConsolePanel } from './ConsolePanel';
-import { DetectedSettingsBanner } from './DetectedSettingsBanner';
-import { DeviceSettings } from './DeviceSettings';
-import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
-import { MachineSettingsPanel } from './MachineSettingsPanel';
+import { MachineSetupDialog } from './MachineSetupDialog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
@@ -20,6 +19,7 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
+  const [machineSetupOpen, setMachineSetupOpen] = useState(false);
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -55,17 +55,14 @@ export function LaserWindow(): JSX.Element {
           the Windows desktop app.
         </p>
       )}
-      <DeviceSettings />
+      <Button onClick={() => setMachineSetupOpen(true)}>Machine Setup</Button>
+      {machineSetupOpen && <MachineSetupDialog onClose={() => setMachineSetupOpen(false)} />}
       <ConnectionBar
         connection={connection}
         onConnect={() => void connect(platform)}
         onDisconnect={() => void disconnect().catch(() => undefined)}
         disabled={!supportsSerial || machineOperationBusy}
       />
-      <GrblLaserSetupPanel
-        disabled={isSetupPanelDisabled(connected, machineOperationBusy, jobActive)}
-      />
-      <MachineSettingsPanel />
       {showAlarmBanner && (
         <AlarmBanner
           code={alarmCode}
@@ -74,7 +71,6 @@ export function LaserWindow(): JSX.Element {
           onUnlock={() => void unlockAlarm().catch(() => undefined)}
         />
       )}
-      <DetectedSettingsBanner />
       <StatusDisplay />
       <JogPad
         disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobActive)}
@@ -90,14 +86,6 @@ export function LaserWindow(): JSX.Element {
 
 function hasAlarmRecovery(code: number | null, state: string | undefined): boolean {
   return code !== null || state === 'Alarm';
-}
-
-function isSetupPanelDisabled(
-  connected: boolean,
-  machineOperationBusy: boolean,
-  jobActive: boolean,
-): boolean {
-  return !connected || machineOperationBusy || jobActive;
 }
 
 function isJogPadDisabled(
