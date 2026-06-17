@@ -1,5 +1,5 @@
 import type { GrblSettingRow } from '../../core/controllers/grbl';
-import type { Layer, Project } from '../../core/scene';
+import { LAYER_DEFAULTS, type Layer, type Project } from '../../core/scene';
 import { layerFromSubLayer } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -36,6 +36,10 @@ export function RasterDiagnosticsPanel(): JSX.Element {
           <dd>{diagnostics.fillSummary}</dd>
           <dt>Overscan</dt>
           <dd>{diagnostics.overscanSummary}</dd>
+          <dt>Recipe calibration</dt>
+          <dd>{diagnostics.recipeSummary}</dd>
+          <dt>Line interval</dt>
+          <dd>{diagnostics.intervalSummary}</dd>
           <dt>$30 S max</dt>
           <dd>{diagnostics.sMaxSummary}</dd>
           <dt>$32 Laser mode</dt>
@@ -82,6 +86,8 @@ type RasterDiagnostics = {
   readonly imageSummary: string;
   readonly fillSummary: string;
   readonly overscanSummary: string;
+  readonly recipeSummary: string;
+  readonly intervalSummary: string;
   readonly sMaxSummary: string;
   readonly laserModeSummary: string;
   readonly warnings: ReadonlyArray<string>;
@@ -108,12 +114,16 @@ function buildRasterDiagnostics(
   );
   const bidirectionalLayers = [...bidirectionalImageLayers, ...bidirectionalFillLayers];
   const lowOverscanLayers = bidirectionalLayers.filter((layer) => layer.fillOverscanMm < 2);
+  const defaultRecipeLayers = activeLayers.filter(usesStarterRecipe);
+  const defaultLineIntervalLayers = [...imageLayers, ...fillLayers].filter(usesStarterLineInterval);
   const sMax = settingSummary(rows, 30, lastSettingsReadAt);
   const laserMode = settingSummary(rows, 32, lastSettingsReadAt);
   const warnings = rasterWarnings({
     project,
     bidirectionalLayers,
     lowOverscanLayers,
+    defaultRecipeLayers,
+    defaultLineIntervalLayers,
     laserMode,
     sMax,
   });
@@ -126,6 +136,8 @@ function buildRasterDiagnostics(
     imageSummary: `${imageLayers.length} active, Bidirectional image layers: ${bidirectionalImageLayers.length}`,
     fillSummary: `${fillLayers.length} active, Bidirectional fill layers: ${bidirectionalFillLayers.length}`,
     overscanSummary: `Low overscan layers: ${lowOverscanLayers.length}`,
+    recipeSummary: `Default recipe layers: ${defaultRecipeLayers.length}`,
+    intervalSummary: `Default line intervals: ${defaultLineIntervalLayers.length}`,
     sMaxSummary: sMax.display,
     laserModeSummary: laserMode.display,
     warnings,
@@ -133,6 +145,8 @@ function buildRasterDiagnostics(
       project,
       bidirectionalLayers,
       lowOverscanLayers,
+      defaultRecipeLayers,
+      defaultLineIntervalLayers,
       laserMode,
       sMax,
     }),
@@ -143,6 +157,8 @@ function rasterWarnings(args: {
   readonly project: Project;
   readonly bidirectionalLayers: ReadonlyArray<Layer>;
   readonly lowOverscanLayers: ReadonlyArray<Layer>;
+  readonly defaultRecipeLayers: ReadonlyArray<Layer>;
+  readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<string> {
@@ -154,6 +170,14 @@ function rasterWarnings(args: {
   }
   if (args.lowOverscanLayers.length > 0) {
     warnings.push('Low overscan layers may leave the head accelerating during burn moves.');
+  }
+  if (args.defaultRecipeLayers.length > 0) {
+    warnings.push('Run Material Test on scrap before production.');
+  }
+  if (args.defaultLineIntervalLayers.length > 0) {
+    warnings.push(
+      'Run Interval Test on the same material before trusting fine raster or fill detail.',
+    );
   }
   if (args.laserMode.value === 0) {
     warnings.push('Laser mode is off; GRBL $32 should normally be 1 for diode laser engraving.');
@@ -171,44 +195,102 @@ function diagnosticChecks(args: {
   readonly project: Project;
   readonly bidirectionalLayers: ReadonlyArray<Layer>;
   readonly lowOverscanLayers: ReadonlyArray<Layer>;
+  readonly defaultRecipeLayers: ReadonlyArray<Layer>;
+  readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<DiagnosticCheck> {
   return [
-    {
-      label: 'Bidirectional compensation',
-      status:
-        args.bidirectionalLayers.length > 0 && args.project.device.scanningOffsets.length === 0
-          ? 'warn'
-          : 'ok',
-      detail:
-        args.bidirectionalLayers.length > 0
-          ? 'Disable bidirectional output for a test burn, then add calibrated scan offsets if the doubled letters disappear.'
-          : 'No active bidirectional raster or fill layers were found.',
-    },
-    {
-      label: 'Controller laser mode',
-      status: args.laserMode.value === 0 || args.laserMode.kind === 'missing' ? 'warn' : 'ok',
-      detail:
-        args.laserMode.kind === 'missing'
-          ? 'Read controller settings before trusting raster diagnostics.'
-          : `Current controller readback is ${args.laserMode.display}.`,
-    },
-    {
-      label: 'Head acceleration margin',
-      status: args.lowOverscanLayers.length > 0 ? 'check' : 'ok',
-      detail:
-        args.lowOverscanLayers.length > 0
-          ? 'Increase overscan on bidirectional raster or fill layers if edges look darker, stretched, or uneven.'
-          : 'Active bidirectional layers have at least 2 mm overscan.',
-    },
-    {
-      label: 'Mechanical focus and motion',
-      status: 'check',
-      detail:
-        'If unidirectional output still doubles, inspect belt tension, pulley set screws, frame squareness, focus height, lens cleanliness, and workpiece hold-down.',
-    },
+    bidirectionalCheck(args),
+    controllerLaserModeCheck(args.laserMode),
+    accelerationMarginCheck(args.lowOverscanLayers),
+    materialRecipeCheck(args.defaultRecipeLayers),
+    lineIntervalCheck(args.defaultLineIntervalLayers),
+    mechanicalFocusCheck(),
   ];
+}
+
+function bidirectionalCheck(args: {
+  readonly project: Project;
+  readonly bidirectionalLayers: ReadonlyArray<Layer>;
+}): DiagnosticCheck {
+  const missingOffsets =
+    args.bidirectionalLayers.length > 0 && args.project.device.scanningOffsets.length === 0;
+  return {
+    label: 'Bidirectional compensation',
+    status: missingOffsets ? 'warn' : 'ok',
+    detail:
+      args.bidirectionalLayers.length > 0
+        ? 'Disable bidirectional output for a test burn, then add calibrated scan offsets if the doubled letters disappear.'
+        : 'No active bidirectional raster or fill layers were found.',
+  };
+}
+
+function controllerLaserModeCheck(laserMode: SettingDiagnostic): DiagnosticCheck {
+  return {
+    label: 'Controller laser mode',
+    status: laserMode.value === 0 || laserMode.kind === 'missing' ? 'warn' : 'ok',
+    detail:
+      laserMode.kind === 'missing'
+        ? 'Read controller settings before trusting raster diagnostics.'
+        : `Current controller readback is ${laserMode.display}.`,
+  };
+}
+
+function accelerationMarginCheck(lowOverscanLayers: ReadonlyArray<Layer>): DiagnosticCheck {
+  return {
+    label: 'Head acceleration margin',
+    status: lowOverscanLayers.length > 0 ? 'check' : 'ok',
+    detail:
+      lowOverscanLayers.length > 0
+        ? 'Increase overscan on bidirectional raster or fill layers if edges look darker, stretched, or uneven.'
+        : 'Active bidirectional layers have at least 2 mm overscan.',
+  };
+}
+
+function materialRecipeCheck(defaultRecipeLayers: ReadonlyArray<Layer>): DiagnosticCheck {
+  return {
+    label: 'Material recipe',
+    status: defaultRecipeLayers.length > 0 ? 'check' : 'ok',
+    detail:
+      defaultRecipeLayers.length > 0
+        ? 'Burn a Material Test on scrap and copy the winning speed, power, and passes into the output layer.'
+        : 'Active output layers have moved away from first-run starter settings.',
+  };
+}
+
+function lineIntervalCheck(defaultLineIntervalLayers: ReadonlyArray<Layer>): DiagnosticCheck {
+  return {
+    label: 'Line interval',
+    status: defaultLineIntervalLayers.length > 0 ? 'check' : 'ok',
+    detail:
+      defaultLineIntervalLayers.length > 0
+        ? 'Use Interval Test to tune hatch spacing or image lines/mm for this material and focus height.'
+        : 'Active raster/fill layers are not using the default line interval.',
+  };
+}
+
+function mechanicalFocusCheck(): DiagnosticCheck {
+  return {
+    label: 'Mechanical focus and motion',
+    status: 'check',
+    detail:
+      'If unidirectional output still doubles, inspect belt tension, pulley set screws, frame squareness, focus height, lens cleanliness, and workpiece hold-down.',
+  };
+}
+
+function usesStarterRecipe(layer: Layer): boolean {
+  return (
+    layer.power === LAYER_DEFAULTS.power &&
+    layer.speed === LAYER_DEFAULTS.speed &&
+    layer.passes === LAYER_DEFAULTS.passes
+  );
+}
+
+function usesStarterLineInterval(layer: Layer): boolean {
+  if (layer.mode === 'image') return layer.linesPerMm === LAYER_DEFAULTS.linesPerMm;
+  if (layer.mode === 'fill') return layer.hatchSpacingMm === LAYER_DEFAULTS.hatchSpacingMm;
+  return false;
 }
 
 type SettingDiagnostic = {

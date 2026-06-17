@@ -112,14 +112,12 @@ describe('MachineSetupDialog', () => {
           ...createLayer({ id: 'image-layer', color: '#111111', mode: 'image' }),
           imageBidirectional: true,
           linesPerMm: 12,
-          speed: 2500,
           fillOverscanMm: 0,
         },
         {
           ...createLayer({ id: 'fill-layer', color: '#222222', mode: 'fill' }),
           fillBidirectional: true,
           fillOverscanMm: 0,
-          speed: 1800,
         },
       ]),
     );
@@ -143,6 +141,10 @@ describe('MachineSetupDialog', () => {
       expect(host.textContent).toContain('$32 Laser mode: 0');
       expect(host.textContent).toContain('Laser mode is off');
       expect(host.textContent).toContain('Low overscan layers: 2');
+      expect(host.textContent).toContain('Default recipe layers: 2');
+      expect(host.textContent).toContain('Default line intervals: 1');
+      expect(host.textContent).toContain('Run Material Test on scrap before production.');
+      expect(host.textContent).toContain('Run Interval Test on the same material');
     } finally {
       await unmount();
     }
