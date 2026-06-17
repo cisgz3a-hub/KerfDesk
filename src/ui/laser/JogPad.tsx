@@ -1,6 +1,6 @@
 // JogPad — directional jog grid. F-B5.
 //
-// Step sizes: 0.1 / 1 / 10 / 100 mm (selectable). Feed rate matches the
+// Step sizes cover fine alignment through coarse positioning. Feed rate matches the
 // device's max feed for fast positioning. Clicking a direction sends one
 // $J= command for that step. Phase B initial is step-only; continuous /
 // hold-down jogging is Phase B polish.
@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 
-const STEPS_MM = [0.1, 1, 10, 100] as const;
+const STEPS_MM = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100] as const;
 
 export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Element {
   const [step, setStep] = useState<number>(10);

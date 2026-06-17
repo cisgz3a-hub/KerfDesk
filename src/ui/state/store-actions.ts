@@ -129,6 +129,7 @@ export function viewActions(
   | 'selectObject'
   | 'toggleSelectObject'
   | 'selectAllObjects'
+  | 'selectObjects'
   | 'togglePreview'
   | 'setJobPlacement'
   | 'setOutputScopeSettings'
@@ -162,6 +163,8 @@ export function viewActions(
           additionalSelectedIds: new Set(rest),
         };
       }),
+    selectObjects: (ids, options = {}) =>
+      set((s) => selectionFromIds(s, ids, options.additive === true)),
     togglePreview: () => set((s) => ({ previewMode: !s.previewMode })),
     setJobPlacement: (patch) =>
       set((s) => ({ jobPlacement: mergeJobPlacement(s.jobPlacement, patch) })),
@@ -208,6 +211,44 @@ export function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | '
       set({ dirty: false, savedName: target.displayName, lastSaveTarget: target }),
     markLoaded: (filename) => set({ dirty: false, savedName: filename, lastSaveTarget: null }),
   };
+}
+
+function selectionFromIds(
+  state: AppState,
+  ids: ReadonlyArray<string>,
+  additive: boolean,
+): Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> {
+  const current = additive ? currentSelectionIds(state) : [];
+  const selected = liveUniqueIds(state, [...current, ...ids]);
+  const [primary, ...rest] = selected;
+  return {
+    selectedObjectId: primary ?? null,
+    additionalSelectedIds: new Set(rest),
+  };
+}
+
+function currentSelectionIds(
+  state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
+): ReadonlyArray<string> {
+  return [
+    ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
+    ...state.additionalSelectedIds,
+  ];
+}
+
+function liveUniqueIds(
+  state: Pick<AppState, 'project'>,
+  ids: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  const live = new Set(state.project.scene.objects.map((object) => object.id));
+  const seen = new Set<string>();
+  const selected: string[] = [];
+  for (const id of ids) {
+    if (!live.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    selected.push(id);
+  }
+  return selected;
 }
 
 function promoteAdditionalSelection(

@@ -9,12 +9,12 @@ import { rowStyle } from './JobControls.styles';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
-// release -> hand-move -> reconnect/reset -> Set origin LAST.
+// release -> hand-move -> Wake (Ctrl-X) -> Set origin LAST.
 const RELEASE_MOTORS_CONFIRM =
   'Release motors?\n\n' +
   'This sends $SLP to put the controller to sleep so you can push the head by hand. ' +
-  'The controller will ignore commands until you reconnect (or soft-reset), which clears ' +
-  'the work origin. Move the head first, then reconnect, then Set origin again. ' +
+  'The controller will ignore normal commands until you Wake it with Ctrl-X, which clears ' +
+  'the work origin. Move the head first, then Wake, wait for Idle, and Set origin again. ' +
   'Do not release motors during a job.';
 
 // F.3 — Set / Reset the work-coordinate origin to the current head
@@ -57,7 +57,7 @@ export function OriginRow(props: {
     if (!jobAwareConfirm(RELEASE_MOTORS_CONFIRM)) return;
     void releaseMotors().then(() =>
       pushToast(
-        'Motors released ($SLP). Move the head by hand, then reconnect and Set origin again.',
+        'Motors released ($SLP). Move the head by hand, then Wake and Set origin again.',
         'success',
       ),
     );
@@ -88,7 +88,7 @@ export function OriginRow(props: {
         type="button"
         onClick={onRelease}
         disabled={busy}
-        title="Release the motors ($SLP) so you can move the head by hand. Clears the work origin — reconnect and Set origin again afterward."
+        title="Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward."
       >
         Release motors
       </button>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
+import { applyTransform, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import {
   hitRotateHandle,
   ROTATE_HANDLE_OFFSET_MM,
@@ -49,5 +49,21 @@ describe('rotate-handle', () => {
       snap: true,
     });
     expect(Number.isInteger(t.rotationDeg / 15)).toBe(true);
+  });
+  it('keeps the selected canvas anchor fixed while rotating', () => {
+    const object = obj();
+    const beforeAnchor = applyTransform({ x: 0, y: 0 }, object.transform);
+
+    const t = rotateObjectByDrag({
+      object,
+      dragTo: { x: 50, y: 0 },
+      snap: false,
+      anchor: 'nw',
+    });
+    const afterAnchor = applyTransform({ x: 0, y: 0 }, t);
+
+    expect(t.rotationDeg).toBeCloseTo(90);
+    expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 6);
+    expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 6);
   });
 });

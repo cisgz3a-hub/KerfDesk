@@ -215,6 +215,18 @@ function handleStatusLine(
     });
     return;
   }
+  if (report.state === 'Sleep') {
+    set({
+      statusReport: report,
+      alarmCode: null,
+      wcoCache: null,
+      workOriginActive: false,
+      motionOperation: null,
+      frameVerification: null,
+      homingState: 'unknown',
+    });
+    return;
+  }
   const observedOperation = observeMotionStatus(operation, report.state);
   const queuedFrameDispatch =
     operation !== null && observedOperation === null ? takeNextFrameJogLine(operation) : null;

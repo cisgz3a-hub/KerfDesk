@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProject, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
+import { useUiStore } from '../state/ui-store';
 import { NumericEditsBar } from './NumericEditsBar';
 
 (
@@ -15,6 +16,7 @@ let root: Root | null = null;
 
 beforeEach(() => {
   resetStore();
+  useUiStore.setState({ selectionAnchor: 'nw' });
 });
 
 afterEach(async () => {
@@ -33,11 +35,24 @@ describe('NumericEditsBar', () => {
   });
 
   it('explains the 9-point anchor buttons on hover', async () => {
+    installProject();
     const container = await render(<NumericEditsBar />);
-    const anchor = button(container, 'Numeric edit anchor: top right');
+    const anchor = button(container, 'Transform anchor: top right');
 
     expect(anchor.title).toContain('top-right point');
     expect(anchor.textContent).not.toBe('.');
+  });
+
+  it('stores the selected anchor for numeric fields and canvas transforms', async () => {
+    installProject();
+    const container = await render(<NumericEditsBar />);
+    const anchor = button(container, 'Transform anchor: middle right');
+
+    await act(async () => {
+      anchor.click();
+    });
+
+    expect(useUiStore.getState().selectionAnchor).toBe('e');
   });
 
   it('commits an exact X position edit through the selection transform path', async () => {

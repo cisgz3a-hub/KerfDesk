@@ -222,4 +222,31 @@ describe('CutsLayersPanel layer order controls', () => {
       await unmount();
     }
   });
+
+  it('keeps sub-layer action controls inside a narrow layer card', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const { host, unmount } = await renderPanel();
+    try {
+      const addSubLayer = host.querySelector('button[aria-label="Add sub-layer for #ff0000"]');
+      if (!(addSubLayer instanceof HTMLButtonElement)) throw new Error('add sub-layer missing');
+
+      await act(async () => {
+        addSubLayer.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const deleteButton = host.querySelector(
+        'button[aria-label="Delete Sub-layer 1 for #ff0000"]',
+      );
+      if (!(deleteButton instanceof HTMLButtonElement)) throw new Error('delete button missing');
+      const row = deleteButton.parentElement;
+      if (!(row instanceof HTMLDivElement)) throw new Error('sub-layer row missing');
+
+      expect(row.style.display).toBe('flex');
+      expect(row.style.flexWrap).toBe('wrap');
+      expect(row.style.minWidth).toBe('0');
+      expect(row.style.overflow).toBe('hidden');
+    } finally {
+      await unmount();
+    }
+  });
 });

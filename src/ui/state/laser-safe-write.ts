@@ -85,6 +85,7 @@ function transcriptSourceForWrite(
   if (action === 'start' || action === 'resume') return 'job';
   if (action === 'frame' || action === 'jog' || action === 'home') return 'motion';
   if (action === 'origin') return 'origin';
+  if (action === 'wake') return 'system';
   if (action === 'unlock' || action === 'console') return 'console';
   return 'system';
 }

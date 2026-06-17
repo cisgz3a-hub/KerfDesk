@@ -104,7 +104,9 @@ function inboundKind(response: GrblResponse): TranscriptKind {
 
 function outboundKind(raw: string): TranscriptKind {
   const trimmed = raw.trim();
-  if (raw === '?') return 'realtime';
+  if (raw === '?' || raw === '\x18' || raw === '!' || raw === '~' || raw === '\x85') {
+    return 'realtime';
+  }
   if (trimmed === '$$') return 'settings-query';
   if (trimmed === '$#') return 'offset-query';
   if (trimmed.toUpperCase() === '$I') return 'build-info-query';

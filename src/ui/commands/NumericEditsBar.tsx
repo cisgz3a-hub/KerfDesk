@@ -9,6 +9,7 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { useUiStore } from '../state/ui-store';
 
 const FIELD_STEP_MM = 0.1;
 const ROTATION_STEP_DEG = 1;
@@ -58,7 +59,8 @@ function useNumericEditModel(): NumericEditModel {
   const additionalSelectedIds = useStore((state) => state.additionalSelectedIds);
   const applySelectionTransforms = useStore((state) => state.applySelectionTransforms);
   const pushToast = useToastStore((state) => state.pushToast);
-  const [anchor, setAnchor] = useState<SelectionAnchor>('nw');
+  const anchor = useUiStore((state) => state.selectionAnchor);
+  const setAnchor = useUiStore((state) => state.setSelectionAnchor);
   const [preserveAspect, setPreserveAspect] = useState(true);
   const objects = useMemo(
     () => selectedObjects(project.scene.objects, selectedObjectId, additionalSelectedIds),
@@ -171,13 +173,13 @@ function AnchorGrid(props: {
   readonly onChange: (anchor: SelectionAnchor) => void;
 }): JSX.Element {
   return (
-    <div aria-label="Numeric edit anchor" style={anchorGridStyle}>
+    <div aria-label="Transform anchor" style={anchorGridStyle}>
       {ANCHORS.map((anchor) => (
         <button
           key={anchor}
           type="button"
           className="lf-btn lf-iconbtn lf-iconbtn--sm"
-          aria-label={`Numeric edit anchor: ${ANCHOR_NAMES[anchor]}`}
+          aria-label={`Transform anchor: ${ANCHOR_NAMES[anchor]}`}
           title={anchorTitle(anchor)}
           aria-pressed={props.active === anchor}
           disabled={props.disabled}

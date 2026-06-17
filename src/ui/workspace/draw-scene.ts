@@ -16,7 +16,8 @@ import {
 import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawNoGoZones } from './draw-no-go-zones';
 import { drawPenDraft } from './draw-pen-preview';
-import { type PenDraft } from '../state/ui-store';
+import { type PenDraft, type SelectionMarquee } from '../state/ui-store';
+import { drawSelectionMarquee } from './draw-selection-marquee';
 import {
   buildDisplayPolylines,
   type DisplayPolylineCache,
@@ -59,6 +60,7 @@ export type DrawOpts = {
   // Phase G (B6): the pen tool's in-progress polyline (placed vertices +
   // rubber-band to the cursor). Null unless the pen is mid-draw.
   readonly penDraft?: PenDraft;
+  readonly selectionMarquee?: SelectionMarquee;
 };
 
 export function drawScene(
@@ -106,6 +108,7 @@ export function drawScene(
     if (simplified) drawLargeSceneNotice(ctx);
     if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
     if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
+    if (opts.selectionMarquee !== undefined) drawSelectionMarquee(ctx, opts.selectionMarquee, view);
   }
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).

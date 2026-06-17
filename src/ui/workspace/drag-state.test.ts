@@ -7,7 +7,7 @@ import {
 } from '../../core/scene';
 import { nextTransformForDrag, type DragState } from './drag-state';
 
-const SE_SCALE: Exclude<DragState, { kind: 'pan' | 'draw' }> = {
+const SE_SCALE: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }> = {
   kind: 'scale',
   objectId: 'O1',
   handle: 'se',

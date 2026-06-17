@@ -69,4 +69,24 @@ describe('JogPad accessible labels', () => {
 
     await unmount();
   });
+
+  it('offers fine, medium, and coarse jog distances', async () => {
+    const { host, unmount } = await renderJogPad();
+
+    const select = host.querySelector<HTMLSelectElement>('select[aria-label="Jog step size"]');
+    if (select === null) throw new Error('step select missing');
+    expect([...select.options].map((option) => option.value)).toEqual([
+      '0.1',
+      '0.5',
+      '1',
+      '2',
+      '5',
+      '10',
+      '25',
+      '50',
+      '100',
+    ]);
+
+    await unmount();
+  });
 });

@@ -181,6 +181,10 @@ export type AppState = ObjectPropertiesActions &
     readonly toggleSelectObject: (id: string) => void;
     // Ctrl+A: primary = first, additional = rest.
     readonly selectAllObjects: () => void;
+    readonly selectObjects: (
+      ids: ReadonlyArray<string>,
+      options?: { readonly additive?: boolean },
+    ) => void;
     readonly selectObjectsOnLayer: (layerId: string) => void;
     readonly togglePreview: () => void;
     readonly setJobPlacement: (patch: Partial<JobPlacementSettings>) => void;

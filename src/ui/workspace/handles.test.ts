@@ -85,6 +85,46 @@ describe('scaleObjectByHandleDrag — edge + center-out scaling', () => {
     expect(next.scaleY).toBeCloseTo(1);
   });
 
+  it('west-edge drag still scales when the selected anchor shares the west edge', () => {
+    const o = obj({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } });
+    const beforeAnchor = handlePosition(o, 'e');
+
+    const next = scaleObjectByHandleDrag({
+      object: o,
+      handle: 'w',
+      dragTo: { x: -5, y: 100 },
+      lockAspect: false,
+      anchor: 'nw',
+    });
+    const after = { ...o, transform: next };
+    const afterAnchor = handlePosition(after, 'e');
+
+    expect(next.scaleX).toBeCloseTo(1.5);
+    expect(next.scaleY).toBeCloseTo(1);
+    expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 6);
+    expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 6);
+  });
+
+  it('north-edge drag still scales when the selected anchor shares the north edge', () => {
+    const o = obj({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } });
+    const beforeAnchor = handlePosition(o, 's');
+
+    const next = scaleObjectByHandleDrag({
+      object: o,
+      handle: 'n',
+      dragTo: { x: 100, y: -5 },
+      lockAspect: false,
+      anchor: 'nw',
+    });
+    const after = { ...o, transform: next };
+    const afterAnchor = handlePosition(after, 's');
+
+    expect(next.scaleX).toBeCloseTo(1);
+    expect(next.scaleY).toBeCloseTo(1.5);
+    expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 6);
+    expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 6);
+  });
+
   it('alt-drag (fromCenter) anchors at bbox center, doubles both halves', () => {
     const o = obj({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } });
     // Drag SE corner to (10, 10) → original SE was already at (10,10), so
@@ -189,11 +229,31 @@ describe('scaleObjectByHandleDrag', () => {
     expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 5);
     expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 5);
   });
+
+  it('keeps the selected canvas anchor fixed when resizing from a different handle', () => {
+    const o = obj({ bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 } });
+    const beforeAnchor = handlePosition(o, 'w');
+
+    const next = scaleObjectByHandleDrag({
+      object: o,
+      handle: 'se',
+      dragTo: { x: 20, y: 30 },
+      lockAspect: false,
+      anchor: 'w',
+    });
+    const after = { ...o, transform: next };
+    const afterAnchor = handlePosition(after, 'w');
+
+    expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 6);
+    expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 6);
+    expect(next.scaleX).toBeCloseTo(2);
+    expect(next.scaleY).toBeCloseTo(5);
+  });
 });
 
 function handlePosition(
   object: SceneObject,
-  kind: 'nw' | 'se',
+  kind: 'nw' | 'e' | 's' | 'se' | 'w',
 ): { readonly x: number; readonly y: number } {
   const handle = handlesFor(object).find((item) => item.kind === kind);
   if (handle === undefined) throw new Error(`missing ${kind} handle`);
