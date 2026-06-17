@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from 'react';
 import type { MaterialTestGridOptions } from '../../core/job';
 import { CalibrationNumberField } from './CalibrationNumberField';
 import { Button, Dialog, DialogActions } from '../kit';
+import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
 import { calibrationGridStyle } from './calibration-dialog-styles';
 
 type MaterialTestDraft = {
@@ -36,6 +37,11 @@ const DEFAULT_DRAFT: MaterialTestDraft = {
   gapMm: '1',
 };
 
+const MATERIAL_TEST_DRAFT_KEY = 'laserforge.calibration.materialTestDraft.v1';
+const MATERIAL_TEST_DRAFT_FIELDS = Object.keys(DEFAULT_DRAFT) as ReadonlyArray<
+  keyof MaterialTestDraft
+>;
+
 const FIELD_SPECS: ReadonlyArray<MaterialTestField> = [
   { key: 'rows', label: 'Rows', min: 1, max: 20, step: undefined },
   { key: 'columns', label: 'Columns', min: 1, max: 20, step: undefined },
@@ -52,7 +58,9 @@ export function MaterialTestDialog(props: {
   readonly onCancel: () => void;
   readonly onGenerate: (options: MaterialTestGridOptions) => void;
 }): JSX.Element {
-  const [draft, setDraft] = useState(DEFAULT_DRAFT);
+  const [draft, setDraft] = useState(() =>
+    restoreCalibrationDraft(MATERIAL_TEST_DRAFT_KEY, DEFAULT_DRAFT, MATERIAL_TEST_DRAFT_FIELDS),
+  );
   const setField =
     (field: keyof MaterialTestDraft) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
@@ -68,6 +76,7 @@ export function MaterialTestDialog(props: {
       as="form"
       onSubmit={(event) => {
         event.preventDefault();
+        persistCalibrationDraft(MATERIAL_TEST_DRAFT_KEY, draft);
         props.onGenerate(parseDraft(draft));
       }}
       size="sm"
