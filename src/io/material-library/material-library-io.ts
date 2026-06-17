@@ -9,6 +9,8 @@ import {
   isMaterialRecipe,
   normalizeMaterialRecipe,
   type MaterialRecipe,
+  type MaterialRecipeConfidence,
+  type MaterialRecipeOperation,
 } from '../../core/material-library';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
@@ -38,8 +40,17 @@ type MaterialLibraryDeviceHintInput = Omit<
 export type MaterialPreset = {
   readonly id: string;
   readonly materialName: string;
+  readonly material?: string;
   readonly thicknessMm?: number;
   readonly title?: string;
+  readonly operation?: MaterialRecipeOperation;
+  readonly profileId?: string;
+  readonly machineFamily?: string;
+  readonly laserModel?: string;
+  readonly opticalPowerW?: number;
+  readonly confidence?: MaterialRecipeConfidence;
+  readonly warning?: string;
+  readonly calibrationProvenance?: string;
   readonly description: string;
   readonly recipe: MaterialRecipe;
   readonly revision: string;
@@ -66,6 +77,8 @@ export type MergeMaterialLibrariesResult = {
 };
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
+const RECIPE_CONFIDENCES = ['starter', 'calibrated', 'imported', 'unsupported'] as const;
+const RECIPE_OPERATIONS = ['cut', 'engrave', 'score', 'image'] as const;
 
 export function createMaterialLibraryDeviceHint(device: DeviceProfile): MaterialLibraryDeviceHint {
   return {
@@ -225,12 +238,15 @@ function parsePreset(
   if (!isMaterialRecipe(value['recipe'])) {
     return { kind: 'invalid', reason: `entries[${index}].recipe is invalid` };
   }
+  const matchMetadata = parsePresetMatchMetadata(value, index);
+  if (matchMetadata.kind === 'invalid') return matchMetadata;
 
   return {
     kind: 'ok',
     entry: canonicalPreset({
       id: strings.id,
       materialName: strings.materialName,
+      ...matchMetadata.metadata,
       ...(thickness.thicknessMm !== undefined ? { thicknessMm: thickness.thicknessMm } : {}),
       ...(thickness.title !== undefined ? { title: thickness.title } : {}),
       description: strings.description,
@@ -263,6 +279,58 @@ function parsePresetStrings(
   if (!isNonEmptyString(revision)) return invalidField(index, 'revision');
 
   return { kind: 'ok', id, materialName, description, revision };
+}
+
+function parsePresetMatchMetadata(
+  value: Record<string, unknown>,
+  index: number,
+):
+  | {
+      readonly kind: 'ok';
+      readonly metadata: Pick<
+        MaterialPreset,
+        | 'material'
+        | 'operation'
+        | 'profileId'
+        | 'machineFamily'
+        | 'laserModel'
+        | 'opticalPowerW'
+        | 'confidence'
+        | 'warning'
+        | 'calibrationProvenance'
+      >;
+    }
+  | { readonly kind: 'invalid'; readonly reason: string } {
+  const metadata: Record<string, unknown> = {};
+  const stringFields = [
+    'material',
+    'profileId',
+    'machineFamily',
+    'laserModel',
+    'warning',
+    'calibrationProvenance',
+  ] as const;
+  for (const field of stringFields) {
+    const raw = value[field];
+    if (raw === undefined) continue;
+    if (!isNonEmptyString(raw)) return invalidPresetMetadata(index, field);
+    metadata[field] = raw;
+  }
+  if (value['operation'] !== undefined) {
+    if (!isRecipeOperation(value['operation'])) return invalidPresetMetadata(index, 'operation');
+    metadata['operation'] = value['operation'];
+  }
+  if (value['confidence'] !== undefined) {
+    if (!isRecipeConfidence(value['confidence'])) return invalidPresetMetadata(index, 'confidence');
+    metadata['confidence'] = value['confidence'];
+  }
+  if (value['opticalPowerW'] !== undefined) {
+    if (!isPositiveFinite(value['opticalPowerW'])) {
+      return invalidPresetMetadata(index, 'opticalPowerW');
+    }
+    metadata['opticalPowerW'] = value['opticalPowerW'];
+  }
+  return { kind: 'ok', metadata };
 }
 
 function parseThicknessTitle(
@@ -352,8 +420,19 @@ function canonicalPreset(preset: MaterialPreset): MaterialPreset {
   return {
     id: preset.id,
     materialName: preset.materialName,
+    ...(preset.material !== undefined ? { material: preset.material } : {}),
     ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
     ...(preset.title !== undefined ? { title: preset.title } : {}),
+    ...(preset.operation !== undefined ? { operation: preset.operation } : {}),
+    ...(preset.profileId !== undefined ? { profileId: preset.profileId } : {}),
+    ...(preset.machineFamily !== undefined ? { machineFamily: preset.machineFamily } : {}),
+    ...(preset.laserModel !== undefined ? { laserModel: preset.laserModel } : {}),
+    ...(preset.opticalPowerW !== undefined ? { opticalPowerW: preset.opticalPowerW } : {}),
+    ...(preset.confidence !== undefined ? { confidence: preset.confidence } : {}),
+    ...(preset.warning !== undefined ? { warning: preset.warning } : {}),
+    ...(preset.calibrationProvenance !== undefined
+      ? { calibrationProvenance: preset.calibrationProvenance }
+      : {}),
     description: preset.description,
     recipe: normalizeMaterialRecipe(preset.recipe),
     revision: preset.revision,
@@ -384,6 +463,13 @@ function invalidField(
   return { kind: 'invalid', reason: `entries[${index}].${field} must be a non-empty string` };
 }
 
+function invalidPresetMetadata(
+  index: number,
+  field: string,
+): { readonly kind: 'invalid'; readonly reason: string } {
+  return { kind: 'invalid', reason: `entries[${index}].${field} is invalid` };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -406,4 +492,12 @@ function isOrigin(value: unknown): value is Origin {
 
 function isAirAssistCommand(value: unknown): value is DeviceProfile['airAssistCommand'] {
   return value === 'none' || value === 'M7' || value === 'M8';
+}
+
+function isRecipeConfidence(value: unknown): value is MaterialRecipeConfidence {
+  return RECIPE_CONFIDENCES.some((confidence) => confidence === value);
+}
+
+function isRecipeOperation(value: unknown): value is MaterialRecipeOperation {
+  return RECIPE_OPERATIONS.some((operation) => operation === value);
 }
