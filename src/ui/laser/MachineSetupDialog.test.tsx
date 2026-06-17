@@ -6,6 +6,13 @@ import { settingsMapToRows } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../platform/types';
 import {
+  EMPTY_SCENE,
+  createLayer,
+  createProject,
+  type Layer,
+  type Project,
+} from '../../core/scene';
+import {
   serializeMachineProfileDocument,
   MACHINE_PROFILE_FORMAT,
   MACHINE_PROFILE_SCHEMA_VERSION,
@@ -80,6 +87,7 @@ describe('MachineSetupDialog', () => {
         'Controller Settings',
         'Firmware Writes',
         'Safety Zones',
+        'Raster Diagnostics',
         'Import / Export',
       ]) {
         expect(button(host, label)).toBeInstanceOf(HTMLButtonElement);
@@ -92,6 +100,49 @@ describe('MachineSetupDialog', () => {
         'creality-falcon-a1-pro-compatible',
       );
       expect(useStore.getState().dirty).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('summarizes raster calibration risks for bidirectional output', async () => {
+    useStore.getState().setProject(
+      projectWithLayers([
+        {
+          ...createLayer({ id: 'image-layer', color: '#111111', mode: 'image' }),
+          imageBidirectional: true,
+          linesPerMm: 12,
+          speed: 2500,
+          fillOverscanMm: 0,
+        },
+        {
+          ...createLayer({ id: 'fill-layer', color: '#222222', mode: 'fill' }),
+          fillBidirectional: true,
+          fillOverscanMm: 0,
+          speed: 1800,
+        },
+      ]),
+    );
+    useLaserStore.setState({
+      grblSettingsRows: settingsMapToRows(
+        new Map<number, string>([
+          [30, '1000'],
+          [32, '0'],
+        ]),
+      ),
+      lastSettingsReadAt: 1718600000000,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+
+    const { host, unmount } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Raster Diagnostics').click());
+
+      expect(host.textContent).toContain('No scan-offset calibration');
+      expect(host.textContent).toContain('Bidirectional image layers: 1');
+      expect(host.textContent).toContain('Bidirectional fill layers: 1');
+      expect(host.textContent).toContain('$32 Laser mode: 0');
+      expect(host.textContent).toContain('Laser mode is off');
+      expect(host.textContent).toContain('Low overscan layers: 2');
     } finally {
       await unmount();
     }
@@ -216,4 +267,16 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
   return match;
+}
+
+function projectWithLayers(layers: ReadonlyArray<Layer>): Project {
+  return {
+    ...createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      name: 'Neotronics 4040 Max LT-4LDS-V2 20W',
+      profileId: 'neotronics-4040-max-lt4lds-v2-20w',
+      scanningOffsets: [],
+    }),
+    scene: { ...EMPTY_SCENE, layers },
+  };
 }
