@@ -53,8 +53,7 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   // needs an explicit Stop. Mounting Stop through the 'done' window means a job
   // whose Idle report is delayed or never arrives still has an in-app escape
   // instead of forcing a disconnect/reconnect.
-  const jobNeedsRecovery =
-    isStreaming || isPaused || status === 'errored' || status === 'done';
+  const jobNeedsRecovery = isStreaming || isPaused || status === 'errored' || status === 'done';
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const motionBusy = motionOperation !== null;
   const controlsBusy = jobNeedsRecovery || motionBusy;
