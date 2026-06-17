@@ -134,6 +134,7 @@ export type LaserState = {
   readonly unlockAlarm: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
+  readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
