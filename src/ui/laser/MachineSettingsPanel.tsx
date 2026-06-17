@@ -1,3 +1,4 @@
+import { Fragment, useMemo, useState } from 'react';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
 import { helpProps } from '../help/help-topics';
@@ -98,37 +99,117 @@ function MachineSettingsNotice(): JSX.Element {
 }
 
 function SettingsTable({ rows }: { readonly rows: ReadonlyArray<GrblSettingRow> }): JSX.Element {
+  const [search, setSearch] = useState('');
   const tableHelp = helpProps('control:laser.machine-settings.table');
+  const filteredRows = useMemo(() => filterRows(rows, search), [rows, search]);
   if (rows.length === 0) {
     return <p style={emptyStyle}>No settings read yet.</p>;
   }
   return (
-    <div style={tableWrapStyle} title={tableHelp.title} data-help-id={tableHelp['data-help-id']}>
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={cellStyle}>Setting</th>
-            <th style={cellStyle}>Value</th>
-            <th style={cellStyle}>Unit</th>
-            <th style={cellStyle}>Meaning</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.code}>
-              <td style={cellStyle}>{row.code}</td>
-              <td style={cellStyle}>{row.rawValue}</td>
-              <td style={cellStyle}>{row.unit ?? '-'}</td>
-              <td style={cellStyle}>
-                <strong>{row.name}</strong>
-                <span style={descriptionStyle}> {row.description}</span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <input
+        type="search"
+        aria-label="Search controller settings"
+        title="Search controller settings by code, name, unit, category, or value."
+        placeholder="Search settings"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        style={searchStyle}
+      />
+      {filteredRows.length === 0 ? (
+        <p style={emptyStyle}>No settings match.</p>
+      ) : (
+        <div style={tableWrapStyle} title={tableHelp.title} data-help-id={tableHelp['data-help-id']}>
+          <table style={tableStyle}>
+            <thead>
+              <tr>
+                <th style={cellStyle}>Setting</th>
+                <th style={cellStyle}>Value</th>
+                <th style={cellStyle}>Unit</th>
+                <th style={cellStyle}>Risk</th>
+                <th style={cellStyle}>Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupRows(filteredRows).map((group) => (
+                <Fragment key={group.category}>
+                  <tr>
+                    <th colSpan={5} style={groupCellStyle}>
+                      {CATEGORY_LABELS[group.category]}
+                    </th>
+                  </tr>
+                  {group.rows.map((row) => (
+                    <tr key={row.code}>
+                      <td style={cellStyle}>{row.code}</td>
+                      <td style={cellStyle}>{row.rawValue}</td>
+                      <td style={cellStyle}>{row.unit ?? '-'}</td>
+                      <td style={cellStyle}>
+                        <span style={riskBadgeStyle}>{riskLabel(row.writeRisk)}</span>
+                      </td>
+                      <td style={cellStyle}>
+                        <strong>{row.name}</strong>
+                        <span style={descriptionStyle}> {row.description}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
+}
+
+const CATEGORY_ORDER = ['laser', 'motion', 'homing', 'limits', 'reporting', 'system', 'unknown'] as const;
+const CATEGORY_LABELS: Readonly<Record<GrblSettingRow['category'], string>> = {
+  laser: 'Laser',
+  motion: 'Motion',
+  homing: 'Homing',
+  limits: 'Limits',
+  reporting: 'Reporting',
+  system: 'System',
+  unknown: 'Unknown',
+};
+
+function filterRows(
+  rows: ReadonlyArray<GrblSettingRow>,
+  search: string,
+): ReadonlyArray<GrblSettingRow> {
+  const needle = search.trim().toLowerCase();
+  if (needle === '') return rows;
+  return rows.filter((row) =>
+    [row.code, row.rawValue, row.name, row.unit ?? '', row.category]
+      .join(' ')
+      .toLowerCase()
+      .includes(needle),
+  );
+}
+
+function groupRows(
+  rows: ReadonlyArray<GrblSettingRow>,
+): ReadonlyArray<{
+  readonly category: GrblSettingRow['category'];
+  readonly rows: ReadonlyArray<GrblSettingRow>;
+}> {
+  return CATEGORY_ORDER.map((category) => ({
+    category,
+    rows: rows.filter((row) => row.category === category),
+  })).filter((group) => group.rows.length > 0);
+}
+
+function riskLabel(risk: GrblSettingRow['writeRisk']): string {
+  switch (risk) {
+    case 'common':
+      return 'Common';
+    case 'machine-critical':
+      return 'Critical';
+    case 'read-only':
+      return 'Read-only';
+    case 'unknown':
+      return 'Unknown';
+  }
 }
 
 function machineSettingsReadDisabledReason(state: {
@@ -178,6 +259,12 @@ const readAtStyle: React.CSSProperties = {
   fontSize: 11,
   marginBottom: 4,
 };
+const searchStyle: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  margin: '0 0 6px',
+  padding: '4px 6px',
+};
 const emptyStyle: React.CSSProperties = {
   margin: '6px 0 0',
   color: 'var(--lf-text-faint)',
@@ -199,6 +286,21 @@ const cellStyle: React.CSSProperties = {
   padding: '3px 4px',
   textAlign: 'left',
   verticalAlign: 'top',
+};
+const groupCellStyle: React.CSSProperties = {
+  ...cellStyle,
+  background: 'var(--lf-bg-2)',
+  color: 'var(--lf-text-muted)',
+  fontSize: 11,
+  textTransform: 'uppercase',
+};
+const riskBadgeStyle: React.CSSProperties = {
+  display: 'inline-block',
+  border: '1px solid var(--lf-border)',
+  borderRadius: 4,
+  padding: '0 4px',
+  color: 'var(--lf-text-muted)',
+  whiteSpace: 'nowrap',
 };
 const descriptionStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',

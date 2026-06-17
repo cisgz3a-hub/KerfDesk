@@ -9,7 +9,10 @@ import {
   isMaterialRecipe,
   normalizeMaterialRecipe,
   type MaterialRecipe,
+  type MaterialRecipeConfidence,
+  type MaterialRecipeOperation,
 } from '../../core/material-library';
+import { parsePresetMatchMetadata } from './material-preset-metadata';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
 export const MATERIAL_LIBRARY_SCHEMA_VERSION = 1;
@@ -38,8 +41,17 @@ type MaterialLibraryDeviceHintInput = Omit<
 export type MaterialPreset = {
   readonly id: string;
   readonly materialName: string;
+  readonly material?: string;
   readonly thicknessMm?: number;
   readonly title?: string;
+  readonly operation?: MaterialRecipeOperation;
+  readonly profileId?: string;
+  readonly machineFamily?: string;
+  readonly laserModel?: string;
+  readonly opticalPowerW?: number;
+  readonly confidence?: MaterialRecipeConfidence;
+  readonly warning?: string;
+  readonly calibrationProvenance?: string;
   readonly description: string;
   readonly recipe: MaterialRecipe;
   readonly revision: string;
@@ -225,12 +237,15 @@ function parsePreset(
   if (!isMaterialRecipe(value['recipe'])) {
     return { kind: 'invalid', reason: `entries[${index}].recipe is invalid` };
   }
+  const matchMetadata = parsePresetMatchMetadata(value, index);
+  if (matchMetadata.kind === 'invalid') return matchMetadata;
 
   return {
     kind: 'ok',
     entry: canonicalPreset({
       id: strings.id,
       materialName: strings.materialName,
+      ...matchMetadata.metadata,
       ...(thickness.thicknessMm !== undefined ? { thicknessMm: thickness.thicknessMm } : {}),
       ...(thickness.title !== undefined ? { title: thickness.title } : {}),
       description: strings.description,
@@ -352,8 +367,19 @@ function canonicalPreset(preset: MaterialPreset): MaterialPreset {
   return {
     id: preset.id,
     materialName: preset.materialName,
+    ...(preset.material !== undefined ? { material: preset.material } : {}),
     ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
     ...(preset.title !== undefined ? { title: preset.title } : {}),
+    ...(preset.operation !== undefined ? { operation: preset.operation } : {}),
+    ...(preset.profileId !== undefined ? { profileId: preset.profileId } : {}),
+    ...(preset.machineFamily !== undefined ? { machineFamily: preset.machineFamily } : {}),
+    ...(preset.laserModel !== undefined ? { laserModel: preset.laserModel } : {}),
+    ...(preset.opticalPowerW !== undefined ? { opticalPowerW: preset.opticalPowerW } : {}),
+    ...(preset.confidence !== undefined ? { confidence: preset.confidence } : {}),
+    ...(preset.warning !== undefined ? { warning: preset.warning } : {}),
+    ...(preset.calibrationProvenance !== undefined
+      ? { calibrationProvenance: preset.calibrationProvenance }
+      : {}),
     description: preset.description,
     recipe: normalizeMaterialRecipe(preset.recipe),
     revision: preset.revision,

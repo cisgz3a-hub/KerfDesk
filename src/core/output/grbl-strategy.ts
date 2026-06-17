@@ -13,7 +13,7 @@
 // LightBurn divergence (LIGHTBURN-STUDY §8): stock GRBL headers there are
 // units/positioning only, with M3/M4 issued per cut layer — ours pre-arms.
 
-import type { DeviceProfile } from '../devices';
+import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
@@ -44,12 +44,13 @@ function preamble(): string {
   return ['G21', 'G90', 'M3 S0'].join(LINE_END) + LINE_END;
 }
 
-function postamble(laserAlreadyOff: boolean): string {
+function postamble(laserAlreadyOff: boolean, dialect: GrblGcodeDialect): string {
   // M5: definitively turn the spindle/laser off at end of job, then park. When
   // the last group was raster it already emitted its trailing M5, so skip the
   // redundant one; the park move still carries S0, so the laser-off invariant
   // holds either way.
-  const lines = laserAlreadyOff ? ['G0 X0.000 Y0.000 S0'] : ['M5', 'G0 X0.000 Y0.000 S0'];
+  const lines = laserAlreadyOff ? [] : ['M5'];
+  if (dialect.parkAtOriginAfterJob) lines.push('G0 X0.000 Y0.000 S0');
   return lines.join(LINE_END) + LINE_END;
 }
 
@@ -251,16 +252,18 @@ function coolantTransition(from: CoolantMode, to: CoolantMode): string {
 // byte-identical. Under M4 the diode is also dark whenever the head is stopped
 // (dynamic power → 0 at 0 feed), so fill is now strictly safer on travel/pause.
 function emitJob(job: Job, device: DeviceProfile): string {
+  const dialect = resolveGrblDialect(device);
   const parts: string[] = [];
   parts.push(preamble());
   let mode: 'M3' | 'M4' | 'off' = 'M3'; // the preamble armed M3 S0
   let coolant: CoolantMode = 'off';
   for (const group of job.groups) {
-    if (group.kind === 'cut' && mode !== 'M3') {
+    const wantedMode = powerModeForGroup(group, dialect);
+    if (wantedMode === 'M3' && mode !== 'M3') {
       // Restore constant power for vector cutting.
       parts.push('M3 S0' + LINE_END);
       mode = 'M3';
-    } else if (group.kind === 'fill' && mode !== 'M4') {
+    } else if (wantedMode === 'M4' && mode !== 'M4') {
       // Arm dynamic power. Coming from constant mode, clear M3 first (mirrors
       // emit-raster's "M5 so we don't stay stuck in M3"), then M4 S0. Coming
       // from a raster group the controller already issued its trailing M5, so
@@ -277,8 +280,14 @@ function emitJob(job: Job, device: DeviceProfile): string {
   parts.push(coolantTransition(coolant, 'off'));
   // A raster group last in the job already issued its trailing M5, so the
   // postamble must not emit a redundant second one (mode === 'off').
-  parts.push(postamble(mode === 'off'));
+  parts.push(postamble(mode === 'off', dialect));
   return parts.join('');
+}
+
+function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {
+  if (group.kind === 'fill') return dialect.fillPowerMode === 'dynamic' ? 'M4' : 'M3';
+  if (group.kind === 'raster') return 'group-managed';
+  return 'M3';
 }
 
 export const grblStrategy: OutputStrategy = {

@@ -31,6 +31,12 @@ export const CMD_HOME = '$H';
 /** Unlock from alarm — clears $X lock, leaves position unknown until $H. */
 export const CMD_UNLOCK = '$X';
 
+/** Sleep — de-energizes the steppers so the gantry can be pushed by hand. GRBL
+ *  stays asleep until a soft-reset (Ctrl-X), which also clears the G92 work
+ *  origin, so the operator must re-set the origin after waking. The only
+ *  portable GRBL v1.1 way to release the motors (no $MD / M18 in stock GRBL). */
+export const CMD_SLEEP = '$SLP';
+
 /** Settings dump. */
 export const CMD_SETTINGS = '$$';
 

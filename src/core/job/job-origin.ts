@@ -3,7 +3,7 @@ import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '.
 import type { JobBounds } from './job-bounds';
 import { computeJobBounds } from './job-bounds';
 
-export type JobStartMode = 'absolute' | 'current-position' | 'user-origin';
+export type JobStartMode = 'absolute' | 'current-position' | 'user-origin' | 'verified-origin';
 
 export type JobOriginAnchor =
   | 'front-left'
@@ -28,6 +28,13 @@ export type JobOriginPlacement =
     }
   | {
       readonly startFrom: 'user-origin';
+      readonly anchor: JobOriginAnchor;
+    }
+  // Hand-set origin on a no-homing / hand-positioned machine. Same geometry as
+  // user-origin (anchor -> work-zero), but treated as position-untrusted so
+  // preflight checks job size, not absolute bed position (ADR-053).
+  | {
+      readonly startFrom: 'verified-origin';
       readonly anchor: JobOriginAnchor;
     };
 
@@ -131,6 +138,7 @@ function targetPoint(placement: JobOriginPlacement): Vec2 | null {
     case 'absolute':
       return null;
     case 'user-origin':
+    case 'verified-origin':
       return { x: 0, y: 0 };
     case 'current-position':
       return placement.currentPosition;

@@ -8,12 +8,14 @@
 //   <Door:1|WPos:...|FS:...|Ov:100,100,100>
 //
 // We extract: state (with optional substate), MPos or WPos, feed+spindle,
-// and WCO (Work Coordinate Offset). WCO is reported intermittently by
-// GRBL (every Nth status frame per `$10`'s WCO bit), so consumers that
-// need the *current* offset must cache the last non-null value across
-// frames — see laser-store's `wcoCache`. UI code MUST NOT read
+// WCO (Work Coordinate Offset), and Pn (active input pins). WCO is reported
+// intermittently by GRBL (every Nth status frame per `$10`'s WCO bit), so
+// consumers that need the *current* offset must cache the last non-null value
+// across frames — see laser-store's `wcoCache`. UI code MUST NOT read
 // `StatusReport.wco` directly (it would flicker on most frames).
-// Other fields (Bf, Ln, Pn, Ov) are still not parsed.
+// Pn is OMITTED by GRBL whenever no pin is triggered, so `pins` is null on
+// those frames — it appears only while a limit / probe / door is active.
+// Other fields (Bf, Ln, Ov) are still not parsed.
 
 export type GrblState =
   | 'Idle'
@@ -26,6 +28,17 @@ export type GrblState =
   | 'Home'
   | 'Sleep';
 
+// Active input pins, decoded from the `Pn:` field. GRBL flags limit switches
+// per axis (X/Y/Z), plus probe (P) and door (D). Other Pn letters (hold/reset/
+// cycle-start) are not decoded — they aren't safety-relevant to framing.
+export type GrblPins = {
+  readonly limitX: boolean;
+  readonly limitY: boolean;
+  readonly limitZ: boolean;
+  readonly probe: boolean;
+  readonly door: boolean;
+};
+
 export type StatusReport = {
   readonly state: GrblState;
   readonly subState: number | null;
@@ -33,6 +46,13 @@ export type StatusReport = {
   readonly wPos: { x: number; y: number; z: number } | null;
   readonly feed: number | null;
   readonly spindle: number | null;
+  /**
+   * Active input pins from the `Pn:` field, or null when GRBL reports no pins
+   * triggered (the field is omitted on the wire). Optional so hand-built test
+   * mocks need not set it. Used to name which limit a Verified Frame hit
+   * (ADR-053 P3).
+   */
+  readonly pins?: GrblPins | null;
   /**
    * Work Coordinate Offset — the machine-to-work translation that
    * GRBL is currently applying. WPos = MPos - WCO. Reported on a
@@ -74,7 +94,23 @@ export function parseStatusReport(line: string): StatusReport | null {
     feed: pickFsValue(fields, 0),
     spindle: pickFsValue(fields, 1),
     wco: pickAxisField(fields, 'WCO'),
+    pins: pickPins(fields),
   };
+}
+
+function pickPins(fields: ReadonlyArray<string>): GrblPins | null {
+  for (const f of fields) {
+    if (!f.startsWith('Pn:')) continue;
+    const body = f.slice('Pn:'.length);
+    return {
+      limitX: body.includes('X'),
+      limitY: body.includes('Y'),
+      limitZ: body.includes('Z'),
+      probe: body.includes('P'),
+      door: body.includes('D'),
+    };
+  }
+  return null;
 }
 
 function parseState(token: string): { state: GrblState; subState: number | null } | null {

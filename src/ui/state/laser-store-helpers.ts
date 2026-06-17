@@ -152,6 +152,7 @@ export function initialLaserState(): Pick<
   | 'lastSettingsReadAt'
   | 'wcoCache'
   | 'workOriginActive'
+  | 'frameVerification'
 > {
   return {
     connection: { kind: 'disconnected' },
@@ -171,6 +172,7 @@ export function initialLaserState(): Pick<
     lastSettingsReadAt: null,
     wcoCache: null,
     workOriginActive: false,
+    frameVerification: null,
   };
 }
 
@@ -193,6 +195,8 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // must match or the next connect shows "custom origin" against a zeroed machine.
     wcoCache: null,
     workOriginActive: false,
+    // The origin is gone, so any Verified Frame is void (ADR-053 P2).
+    frameVerification: null,
     motionOperation: null,
     streamer: stream,
     ...(wasUnsafeActive ? { safetyNotice: disconnectDuringJobNotice() } : {}),

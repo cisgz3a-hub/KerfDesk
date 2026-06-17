@@ -2889,7 +2889,149 @@ guessed default.
   4040, populate the table, then re-burn the "langebaan" small text bidirectional
   and confirm the edge serration is gone at full fill speed — green tests prove
   the math, not the fidelity (CLAUDE.md rule 2).
+---
 
+## ADR-053 — Verified Origin: hand-set origin + mandatory verified frame for no-homing / hand-positioned machines
+
+**Status:** Accepted; P1–P4 code shipped, hardware verification pending. | **Date:** 2026-06-17
+
+> Numbered after ADR-052 (scan-offset compensation), which lands via a separate
+> branch. 052/053 are concurrent feature branches off the same main.
+
+### Context
+
+On machines without usable homing, the operator positions the head by hand (or
+jogs it) and uses **Set origin here** (`G92`, ADR-021), then Start/Frame reject
+with "design overhangs the bed." Disabling Homing in the device profile does
+**not** fix it. Root cause, traced through the code:
+
+- Bed-bounds preflight needs **absolute machine position**, which only exists
+  after `$H` homing. ADR-022 added a `relative-origin` mode that checks job
+  **size** (does it fit the bed) instead of **position** (where on the bed) when
+  no trusted offset exists.
+- But that relative path is entered only when **both** (a) a job origin is set
+  (`jobOrigin !== undefined`, i.e. User Origin / Current Position) **and**
+  (b) `trustedMotionOffsetForPreflight` returns `undefined` (which it does only
+  when `device.homing.enabled === false`). In the **default Absolute** start
+  mode, `jobOrigin` is undefined, so `describeFrameMotionPreflightIssue`
+  (`JobControls.tsx`) and `findPlacementBoundsIssue` (`start-job-readiness.ts`)
+  fall through to the absolute `framePreflight` against the artwork's *canvas
+  placement* — and the homing flag is never consulted on that path. So "Homing
+  off" alone does not stop the false block.
+- Worse: **hand-jogging desyncs GRBL's step counter.** After a hand-move the
+  reported machine position is fiction, so on a homing-*capable* machine the
+  `homing.enabled === true` path trusts a bogus `mPos`/WCO and maps the job to a
+  confidently-wrong absolute location — also a false "overhangs."
+
+There is no first-class, discoverable, *safe* workflow for "I put the head here
+by hand; trust me; just check it fits, and let me frame it." User Origin +
+homing-off approximates it but is a side-effect, still trusts position when
+homing is enabled, and provides no frame gate or limit-switch safety.
+
+### Decision
+
+Introduce a first-class **Verified Origin** start mode. Four parts:
+
+1. **New `JobStartMode = 'verified-origin'`.** Placement resolves like
+   `user-origin` (anchor → `G92` work-zero) but is **always position-untrusted**:
+   `trustedMotionOffsetForPreflight` returns `undefined` for this mode
+   *regardless of* `device.homing.enabled`, forcing the relative / size-only
+   preflight. The absolute "overhangs the bed" **position** block cannot fire in
+   this mode.
+
+2. **Mandatory frame-verified gate.** Start is disabled until a clean **Verified
+   Frame** has run from the current origin. New laser-store state
+   `frameVerification` records a signature over `{ WCO/origin, anchor,
+   prepared-job identity }`; a successful frame sets it, Start checks it.
+
+3. **Invalidation rules — the core correctness burden.** `frameVerification`
+   clears on ANY of: origin moved (WCO change / Set origin / Reset origin), job
+   or output scope changed (signature mismatch), controller `Alarm` or
+   soft-reset (which itself clears `G92`), disconnect / streamer reset, or
+   start-mode change. A stale verification must **never** authorize a burn.
+
+4. **Limit-switch-aware Verified Frame.** Extend the GRBL status parser to read
+   the `Pn:` field (currently unparsed — `status-parser.ts:16`) into
+   `StatusReport.pins`. During the Verified Frame: if a limit pin reports active,
+   or hard-limit `ALARM:1` fires (already modeled, `alarm-codes.ts`), abort and
+   name the edge ("Verified frame hit the X+ limit — move the origin or shrink
+   the job"). Reliability scales with hardware: best with switches wired and
+   `$21` hard limits enabled (we already parse `hardLimitsEnabled`); with
+   `$21=0` it is best-effort plus the operator's eyes.
+
+**Keeps (safety preserved or strengthened):**
+- The **size / envelope** check stays a HARD block — a job larger than the bed
+  can never fit and would slam both travel ends; always-correct, cheap, kept.
+- The frame becomes **required** (stronger than today's optional frame).
+- Hard-limit `ALARM:1` abort is surfaced as a frame failure.
+
+**Drops (only the unknowable check):**
+- The absolute bed-**position** block — meaningless after a hand-set origin — no
+  longer fires *in this mode*. Other modes are unchanged.
+
+**Hand-jog support (sub-decision, phased).** A "Release motors" control
+de-energizes the steppers so the gantry can be pushed by hand. Captured caveat:
+`$SLP` sleep needs a soft-reset to resume, and a soft-reset **clears the `G92`
+origin** — so the UI sequence MUST be release → hand-move → wake → **Set Verified
+Origin last**, never the reverse. Where the GRBL build supports a gentler
+stepper-disable (`$MD` / `M18`) without a reset, prefer it.
+
+**Phasing (smallest reviewable diffs, CLAUDE.md "tight leash"):**
+- **P1** — `'verified-origin'` mode + force-relative preflight (fixes the false
+  block). Pure core (`job-origin` / `job-placement`) + the UI mode toggle.
+- **P2** — `frameVerification` state + invalidation + the Start gate.
+- **P3** — `Pn:` parsing + limit surfacing during the Verified Frame.
+- **P4** — Release-motors control + the hand-jog sequence UI.
+
+### Consequences
+
+- The false "overhangs" disappears for hand-positioned machines **without**
+  weakening protection — net safety is *higher* (mandatory + limit-aware frame).
+- The new `frameVerification` state with strict invalidation is the main
+  complexity and the main test surface; a verification bug authorizes a wrong
+  burn, so it is treated as safety-critical.
+- `Pn:` parsing is a small, well-scoped status-parser extension that also unlocks
+  a live limit/probe-pin display later.
+- Decoupling trust from `device.homing.enabled` also fixes homing-capable
+  machines that were hand-jogged (previously mis-trusted).
+- Mirrors LightBurn's User Origin + framing model (clears the ADR-027
+  source-of-truth bar) and stays GRBL-generic (ADR-006) — no homing required.
+
+### Alternatives rejected
+
+- **Tell users to use User Origin + homing-off:** rejected — a non-obvious
+  side-effect, still trusts position when homing is enabled, no frame gate, no
+  limit safety; the field problem persists (reported still-blocking).
+- **Relax bed-bounds globally:** rejected — destroys the only crash protection on
+  `$20=0` machines (`frame-preflight.ts` rationale). We drop only POSITION, only
+  in this mode, and keep SIZE.
+- **Trust GRBL position without homing (assume boot-zero):** rejected —
+  hand-jogging desyncs the step counter; the position is fiction and yields
+  confidently-wrong bounds.
+- **Make the frame optional in verified mode:** rejected — the frame *is* the
+  safety substitute for the dropped position check; optional = no net safety.
+- **Require homing instead:** rejected — these machines have no `$H`-usable
+  switches (or the operator is deliberately hand-positioning); ADR-006 keeps us
+  GRBL-generic, not homing-required.
+
+### Verification
+
+- **Core unit tests:** `'verified-origin'` resolves to a relative placement with
+  an undefined trusted offset **even when `homing.enabled === true`**; a
+  size-too-big job still blocks; a position-off-bed job does NOT block.
+- **State-machine tests:** a clean frame sets verification; each invalidation
+  trigger (origin move, job edit, alarm, soft-reset, disconnect, mode change)
+  clears it; Start is blocked until verified and allowed after.
+- **status-parser tests:** `Pn:XYZ` / `Pn:X` / field-absent parse into
+  `pins` correctly; a Verified Frame aborts on an active limit pin and on
+  `ALARM:1` with the right edge message.
+- Full suite + `tsc --noEmit` + lint green. This mode changes placement / preflight
+  gating, not emitted toolpath geometry for a given origin — confirm no existing
+  G-code snapshot moves.
+- **Hardware (gates "done"):** on a no-homing machine, hand-position, Set Verified
+  Origin, run a Verified Frame that trips a limit and confirm it names the edge;
+  then a clean frame enables Burn; confirm Start is blocked until framed and after
+  any origin nudge.
 ---
 
 ## Future ADRs (anticipated, not yet written)

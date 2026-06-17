@@ -4,7 +4,7 @@ export { ALARM_CODES, describeAlarm } from './alarm-codes';
 export type { ErrorDescription } from './error-codes';
 export { ALL_ERROR_CODES, describeError } from './error-codes';
 
-export type { GrblState, StatusReport } from './status-parser';
+export type { GrblPins, GrblState, StatusReport } from './status-parser';
 export { parseStatusReport } from './status-parser';
 
 export type { GrblResponse } from './response';
@@ -64,6 +64,7 @@ export {
   CMD_HOME,
   CMD_SET_ORIGIN_HERE,
   CMD_SETTINGS,
+  CMD_SLEEP,
   CMD_UNLOCK,
   RT_HOLD,
   RT_JOG_CANCEL,

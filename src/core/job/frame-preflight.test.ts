@@ -11,6 +11,30 @@ describe('framePreflight', () => {
     expect(framePreflight(okBounds, bed).kind).toBe('ok');
   });
 
+  it('blocks a frame path that crosses an enabled no-go zone', () => {
+    const device = {
+      ...bed,
+      noGoZones: [
+        {
+          id: 'clamp',
+          name: 'Front clamp',
+          enabled: true,
+          x: 50,
+          y: 10,
+          width: 6,
+          height: 6,
+        },
+      ],
+    };
+
+    const result = framePreflight(okBounds, device);
+
+    expect(result).toEqual({
+      kind: 'no-go-zone',
+      zoneName: 'Front clamp',
+    });
+  });
+
   it('returns ok when bounds touch the edge exactly (max corners on the bed)', () => {
     // 400×400 design on a 400×400 bed — flush, not over.
     const flush: JobBounds = { minX: 0, minY: 0, maxX: 400, maxY: 400 };

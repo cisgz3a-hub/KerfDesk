@@ -7,6 +7,15 @@ export {
   materialRecipePatch,
   normalizeMaterialRecipe,
 } from './material-library';
+export type {
+  MaterialRecipeCandidate,
+  MaterialRecipeConfidence,
+  MaterialRecipeMatch,
+  MaterialRecipeMatchQuery,
+  MaterialRecipeMatchScope,
+  MaterialRecipeOperation,
+} from './material-matching';
+export { rankMaterialRecipeCandidates, recipeConfidence } from './material-matching';
 export {
   isUnsupportedPreset,
   materialPresetWarnings,

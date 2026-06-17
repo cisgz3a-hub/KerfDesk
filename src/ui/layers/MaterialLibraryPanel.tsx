@@ -3,6 +3,7 @@ import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../..
 import {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS,
   materialPresetWarnings,
+  type MaterialRecipeOperation,
   type StarterMaterialPreset,
 } from '../../core/material-library';
 import type { Layer } from '../../core/scene';
@@ -282,12 +283,52 @@ function toMaterialPreset(preset: StarterMaterialPreset): MaterialPreset {
   return {
     id: preset.id,
     materialName: preset.materialName,
+    material: preset.materialName,
     ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
     ...(preset.title !== undefined ? { title: preset.title } : {}),
+    ...starterPresetMetadata(preset, warnings),
     description: `${preset.description}${unsupportedText}${warningText}`,
     recipe: preset.recipe,
     revision: preset.revision,
   };
+}
+
+function starterPresetMetadata(
+  preset: StarterMaterialPreset,
+  warnings: ReadonlyArray<string>,
+): Pick<
+  MaterialPreset,
+  | 'operation'
+  | 'profileId'
+  | 'machineFamily'
+  | 'laserModel'
+  | 'opticalPowerW'
+  | 'confidence'
+  | 'warning'
+  | 'calibrationProvenance'
+> {
+  const profile = NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
+  return {
+    operation: starterPresetOperation(preset),
+    ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
+    ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
+    ...(profile.laserSubProfile?.model !== undefined
+      ? { laserModel: profile.laserSubProfile.model }
+      : {}),
+    ...(profile.laserSubProfile?.opticalPowerW !== undefined
+      ? { opticalPowerW: profile.laserSubProfile.opticalPowerW }
+      : {}),
+    confidence: preset.unsupported === true ? 'unsupported' : 'starter',
+    ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
+    calibrationProvenance: preset.revision,
+  };
+}
+
+function starterPresetOperation(preset: StarterMaterialPreset): MaterialRecipeOperation {
+  const text = `${preset.id} ${preset.description} ${preset.title ?? ''}`.toLowerCase();
+  if (text.includes('cut')) return 'cut';
+  if (preset.recipe.mode === 'image') return 'engrave';
+  return 'engrave';
 }
 
 function activeId(candidate: string, ids: ReadonlyArray<string>): string {

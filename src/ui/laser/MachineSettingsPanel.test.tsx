@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
@@ -101,6 +102,38 @@ describe('MachineSettingsPanel', () => {
       expect(host.textContent).toContain('Max spindle speed');
       expect(host.textContent).toContain('$999');
       expect(host.textContent).toContain('Unknown GRBL setting');
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('groups settings by category and filters by search text', async () => {
+    useLaserStore.setState({
+      grblSettingsRows: settingsMapToRows(
+        new Map<number, string>([
+          [30, '1000'],
+          [100, '80'],
+          [999, 'custom'],
+        ]),
+      ),
+      lastSettingsReadAt: 1,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, cleanup } = await renderPanel();
+    try {
+      expect(host.textContent).toContain('Laser');
+      expect(host.textContent).toContain('Motion');
+      expect(host.textContent).toContain('Unknown');
+
+      const search = host.querySelector('input[aria-label="Search controller settings"]');
+      if (!(search instanceof HTMLInputElement)) throw new Error('Search input missing');
+      await act(async () => {
+        search.value = 'laser';
+        Simulate.change(search);
+      });
+
+      expect(host.textContent).toContain('$30');
+      expect(host.textContent).not.toContain('$100');
+      expect(host.textContent).not.toContain('$999');
     } finally {
       await cleanup();
     }

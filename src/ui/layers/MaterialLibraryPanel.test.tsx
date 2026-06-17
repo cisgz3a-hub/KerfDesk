@@ -191,6 +191,19 @@ describe('MaterialLibraryPanel', () => {
       expect(ids).toContain('neotronics-lt4lds-wood-engrave-254dpi');
       expect(ids).toContain('neotronics-lt4lds-clear-acrylic-unsupported');
       expect(
+        state.materialLibrary?.entries.find((entry) => entry.id === 'neotronics-lt4lds-wood-engrave-254dpi'),
+      ).toMatchObject({
+        profileId: 'neotronics-4040-max-lt4lds-v2-20w',
+        machineFamily: 'neotronics-4040-max',
+        opticalPowerW: 20,
+        confidence: 'starter',
+      });
+      expect(
+        state.materialLibrary?.entries.find((entry) => entry.id.includes('clear-acrylic')),
+      ).toMatchObject({
+        confidence: 'unsupported',
+      });
+      expect(
         state.materialLibrary?.entries.find((entry) => entry.id.includes('clear-acrylic'))
           ?.description,
       ).toMatch(/not recommended/i);

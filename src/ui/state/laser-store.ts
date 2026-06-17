@@ -29,7 +29,6 @@ import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
-import { inferCurrentMachinePosition } from './infer-machine-position';
 import { jobActions } from './laser-job-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
 import {
@@ -38,11 +37,9 @@ import {
   startMotionOperation,
   type LaserMotionOperation,
 } from './laser-motion-operation';
-import {
-  resetOrigin as resetOriginAction,
-  setOriginHere as setOriginHereAction,
-  type WorkCoordinateOffset,
-} from './origin-actions';
+import { type WorkCoordinateOffset } from './origin-actions';
+import { originActions } from './laser-origin-actions';
+import type { FrameVerification } from './frame-verification';
 import {
   type LaserSafetyNotice,
   streamStalledNotice,
@@ -120,6 +117,15 @@ export type LaserState = {
    */
   readonly wcoCache: WorkCoordinateOffset | null;
   readonly workOriginActive: boolean;
+  /**
+   * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
+   * the current origin. Set when a frame is dispatched in 'verified-origin'
+   * mode; required by Start in that mode. Cleared whenever the origin or
+   * connection changes (set/reset origin, disconnect, port close) or a frame is
+   * cancelled, and invalidated structurally when the job moves/resizes (the
+   * bounds signature stops matching). null = not verified.
+   */
+  readonly frameVerification: FrameVerification | null;
 
   readonly connect: (adapter: PlatformAdapter) => Promise<void>;
   readonly disconnect: () => Promise<void>;
@@ -128,6 +134,7 @@ export type LaserState = {
   readonly unlockAlarm: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
+  readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
@@ -154,6 +161,12 @@ export type LaserState = {
   // WCO-bearing status arrives.
   readonly setOriginHere: () => Promise<void>;
   readonly resetOrigin: () => Promise<void>;
+  // ADR-053 P4 — $SLP to release the steppers for hand-positioning. Drops the
+  // origin + Verified Frame, since the head is about to move and waking needs a
+  // soft-reset that clears G92.
+  readonly releaseMotors: () => Promise<void>;
+  // ADR-053 P2 — record a clean Verified Frame for the current job + origin.
+  readonly markFrameVerified: (verification: FrameVerification) => void;
 };
 
 // Live state held outside Zustand. The connection / pollHandle references are
@@ -298,6 +311,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         streamer: null,
         wcoCache: null,
         workOriginActive: false,
+        frameVerification: null,
         motionOperation: null,
         lastWriteError: null,
       });
@@ -356,7 +370,9 @@ function jogActions(
       }
     },
     cancelJog: () =>
-      safeWrite(set, get, RT_JOG_CANCEL, 'jog').finally(() => set({ motionOperation: null })),
+      safeWrite(set, get, RT_JOG_CANCEL, 'jog').finally(() =>
+        set({ motionOperation: null, frameVerification: null }),
+      ),
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
@@ -396,33 +412,6 @@ function assertNoMotionOperation(set: SetFn, get: GetFn): void {
   throw new Error(blockedMessage);
 }
 
-function originActions(set: SetFn, get: GetFn): Pick<LaserState, 'setOriginHere' | 'resetOrigin'> {
-  // Set the local active flag immediately after a successful write.
-  // The line-handler still reconciles the exact WCO later, but Frame/Start
-  // need to switch placement as soon as the write succeeds.
-  return {
-    setOriginHere: async () => {
-      assertAutofocusIdle(get());
-      assertNoActiveJob(get());
-      assertNoMotionOperation(set, get);
-      await setOriginHereAction((out) => safeWrite(set, get, out, 'origin'));
-      const { statusReport, wcoCache } = get();
-      const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
-      set({
-        workOriginActive: true,
-        ...(inferredWco !== null ? { wcoCache: inferredWco } : {}),
-      });
-    },
-    resetOrigin: async () => {
-      assertAutofocusIdle(get());
-      assertNoActiveJob(get());
-      assertNoMotionOperation(set, get);
-      await resetOriginAction((out) => safeWrite(set, get, out, 'origin'));
-      set({ workOriginActive: false, wcoCache: null });
-    },
-  };
-}
-
 function detectedSettingsActions(
   set: SetFn,
   get: GetFn,
@@ -452,9 +441,10 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...consoleActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),
-  ...originActions(set, get),
+  ...originActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),
+  markFrameVerified: (verification) => set({ frameVerification: verification }),
 }));
 
 function idleCommandBlockResult(state: LaserState): AutofocusResult | null {
