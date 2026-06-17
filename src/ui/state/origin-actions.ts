@@ -15,7 +15,7 @@
 // module receives it as a parameter so the actions stay pure functions
 // of their inputs and trivially testable with a mock.
 
-import { CMD_CLEAR_ORIGIN, CMD_SET_ORIGIN_HERE } from '../../core/controllers/grbl';
+import { CMD_CLEAR_ORIGIN, CMD_SET_ORIGIN_HERE, CMD_SLEEP } from '../../core/controllers/grbl';
 
 /**
  * Threshold for `hasCustomOrigin`. WCO values arrive as decimals from
@@ -49,6 +49,17 @@ export async function setOriginHere(safeWrite: (line: string) => Promise<void>):
  */
 export async function resetOrigin(safeWrite: (line: string) => Promise<void>): Promise<void> {
   await safeWrite(`${CMD_CLEAR_ORIGIN}\n`);
+}
+
+/**
+ * Send `$SLP` to put GRBL to sleep, de-energizing the steppers so the operator
+ * can push the gantry by hand (ADR-053 P4). The controller then ignores commands
+ * until a soft-reset, which clears the G92 origin — so the store action that
+ * wraps this also drops the cached origin and any Verified Frame, and the
+ * operator must Set origin again after waking.
+ */
+export async function releaseMotors(safeWrite: (line: string) => Promise<void>): Promise<void> {
+  await safeWrite(`${CMD_SLEEP}\n`);
 }
 
 /**
