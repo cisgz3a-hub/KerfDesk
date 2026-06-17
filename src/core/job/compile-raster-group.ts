@@ -1,4 +1,4 @@
-import { type DeviceProfile } from '../devices';
+import { resolveRasterScanCalibration, type DeviceProfile } from '../devices';
 import {
   applyLumaAdjustments,
   dither,
@@ -8,10 +8,7 @@ import {
   whiteLuma,
 } from '../raster';
 import { type Layer, type RasterImage } from '../scene';
-import {
-  effectiveObjectMinPowerPercent,
-  effectiveObjectPowerPercent,
-} from './object-power-scale';
+import { effectiveObjectMinPowerPercent, effectiveObjectPowerPercent } from './object-power-scale';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
 import type { RasterGroup } from './job';
 
@@ -33,6 +30,8 @@ export function compileRasterGroup(
   const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
   const minPowerPercent = effectiveObjectMinPowerPercent(layer, obj);
+  const speed = Math.min(layer.speed, device.maxFeed);
+  const scanCalibration = resolveRasterScanCalibration(device.rasterCalibration, speed);
   const sMax = Math.round((powerPercent / 100) * device.maxPowerS);
   const sMin = Math.round((minPowerPercent / 100) * device.maxPowerS);
   const bounds = rasterBoundsInMachineCoords(obj, device);
@@ -60,7 +59,7 @@ export function compileRasterGroup(
     layerId: layer.id,
     color: layer.color,
     power: powerPercent,
-    speed: Math.min(layer.speed, device.maxFeed),
+    speed,
     passes: Math.max(1, Math.floor(layer.passes)),
     airAssist: layer.airAssist,
     sValues,
@@ -69,6 +68,9 @@ export function compileRasterGroup(
     bounds,
     overscanMm: DEFAULT_OVERSCAN_MM,
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
+    initialXOffsetMm: scanCalibration.initialXOffsetMm,
+    bidirectionalScanOffsetMm: scanCalibration.bidirectionalOffsetMm,
+    bidirectional: layer.imageBidirectional,
   };
 }
 

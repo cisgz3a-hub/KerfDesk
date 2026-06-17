@@ -38,6 +38,7 @@ function validateLayerOperationSettings(value: unknown, path: string): string | 
     optionalBoolean(value, `${path}.fillCrossHatch`),
     optionalDither(value, `${path}.ditherAlgorithm`),
     optionalPositiveNumber(value, `${path}.linesPerMm`),
+    optionalBoolean(value, `${path}.imageBidirectional`),
     optionalBoolean(value, `${path}.negativeImage`),
     optionalBoolean(value, `${path}.passThrough`),
     optionalNonNegativeNumber(value, `${path}.dotWidthCorrectionMm`),

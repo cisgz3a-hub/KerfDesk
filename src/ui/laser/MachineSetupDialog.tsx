@@ -3,6 +3,7 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
 import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
+import { MachineCalibrationPanel } from './MachineCalibrationPanel';
 import { MachineProfileCatalogPanel } from './MachineProfileCatalogPanel';
 import { MachineProfileImportExportPanel } from './MachineProfileImportExportPanel';
 import { MachineProfileSuggestionPanel } from './MachineProfileSuggestionPanel';
@@ -14,6 +15,7 @@ type MachineSetupTab =
   | 'catalog'
   | 'controller'
   | 'firmware'
+  | 'calibration'
   | 'safety'
   | 'import-export';
 
@@ -22,6 +24,7 @@ const TABS: ReadonlyArray<{ readonly id: MachineSetupTab; readonly label: string
   { id: 'catalog', label: 'Profile Catalog' },
   { id: 'controller', label: 'Controller Settings' },
   { id: 'firmware', label: 'Firmware Writes' },
+  { id: 'calibration', label: 'Calibration' },
   { id: 'safety', label: 'Safety Zones' },
   { id: 'import-export', label: 'Import / Export' },
 ];
@@ -69,6 +72,7 @@ function renderTab(tab: MachineSetupTab, setupDisabled: boolean): JSX.Element {
   if (tab === 'catalog') return <MachineProfileCatalogPanel />;
   if (tab === 'controller') return <MachineSettingsPanel />;
   if (tab === 'firmware') return <GrblLaserSetupPanel disabled={setupDisabled} />;
+  if (tab === 'calibration') return <MachineCalibrationPanel />;
   if (tab === 'safety') return <SafetyZonesPanel />;
   return <MachineProfileImportExportPanel />;
 }

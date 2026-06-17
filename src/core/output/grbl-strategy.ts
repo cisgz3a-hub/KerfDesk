@@ -265,6 +265,11 @@ function emitRasterGroupHere(group: RasterGroup, dialect: ResolvedGcodeDialect):
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
     controlledLaserOffTravelFeedMmPerMin: dialect.controlledLaserOffTravelFeedMmPerMin,
+    ...(group.initialXOffsetMm !== undefined ? { initialXOffsetMm: group.initialXOffsetMm } : {}),
+    ...(group.bidirectionalScanOffsetMm !== undefined
+      ? { bidirectionalScanOffsetMm: group.bidirectionalScanOffsetMm }
+      : {}),
+    ...(group.bidirectional !== undefined ? { bidirectional: group.bidirectional } : {}),
   });
 }
 

@@ -30,6 +30,8 @@
 //   - Async-iterable emit for >100 KB jobs (ADR-020 Q3 threshold).
 //   - Per-pixel feed modulation for grayscale-on-non-M4 controllers.
 
+import { scanAxisOffsetForDirection } from '../devices';
+
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
 
@@ -71,6 +73,12 @@ export type EmitRasterInput = {
   // LightBurn-style image Dot Width Correction. Shortens non-zero scan runs
   // at both ends to compensate for beam thickness. 0 disables.
   readonly dotWidthCorrectionMm?: number;
+  // Machine/profile scan calibration. `initialXOffsetMm` shifts all raster
+  // rows in machine X; `bidirectionalScanOffsetMm` commands each row ahead in
+  // its travel direction to compensate direction-dependent laser/mechanical lag.
+  readonly initialXOffsetMm?: number;
+  readonly bidirectionalScanOffsetMm?: number;
+  readonly bidirectional?: boolean;
   // Optional comment fields written above the data for the operator
   // (and the job-time estimator). Same shape as grbl-strategy emits.
   readonly layerId?: string;
@@ -120,7 +128,7 @@ export function emitRasterGroup(input: EmitRasterInput): string {
       const worldY = input.bounds.minY + (y + 0.5) * pixelHeightMm;
       // Snake direction alternates per emitted ROW; within a reverse row the
       // ink islands sweep right-to-left too.
-      const reverse = emittedRowCount % 2 === 1;
+      const reverse = input.bidirectional !== false && emittedRowCount % 2 === 1;
       const ordered = reverse ? [...spans].reverse() : spans;
       for (const span of ordered) {
         // Each island is its own sweep, so the G0 lead-in to the NEXT island
@@ -193,12 +201,13 @@ function emitSpanSweep(
   dotWidthCorrectionMm: number,
 ): string {
   const lines: string[] = [];
+  const xOffset = scanXOffsetForRow(input, reverse);
   // Sweep extents are the ACTIVE span's pixel edges plus overscan,
   // not the full image bounds. For a row with content only in cols
   // 40..60 of a 200-col image, the head only visits world X from
   // (minX + 40*pw - overscan) to (minX + 61*pw + overscan).
-  const activeStartX = input.bounds.minX + span.firstX * pixelWidthMm;
-  const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
+  const activeStartX = input.bounds.minX + span.firstX * pixelWidthMm + xOffset;
+  const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm + xOffset;
   const startX = reverse ? activeEndX + input.overscanMm : activeStartX - input.overscanMm;
   const endX = reverse ? activeStartX - input.overscanMm : activeEndX + input.overscanMm;
   // Move into the overscan zone with the laser off (M4 + S0 → diode dark).
@@ -225,7 +234,7 @@ function emitSpanSweep(
   if (input.overscanMm > 0) {
     pushRun(reverse ? activeEndX : activeStartX, 0);
   }
-  emitRowRuns(input, y, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
+  emitRowRuns(input, y, pixelWidthMm, span, reverse, dotWidthCorrectionMm, xOffset, pushRun);
   // Exit overscan with S0 so the diode is dark during deceleration. The
   // corrected path already emits a final S0 at the active edge when overscan is
   // disabled; avoid a duplicate zero-length move in that case.
@@ -244,17 +253,27 @@ function emitRowRuns(
   span: ActiveSpan,
   reverse: boolean,
   dotWidthCorrectionMm: number,
+  xOffset: number,
   pushRun: PushRasterRun,
 ): void {
   if (dotWidthCorrectionMm > 0) {
-    emitCorrectedRowRuns(input, y, pixelWidthMm, span, reverse, dotWidthCorrectionMm, pushRun);
+    emitCorrectedRowRuns(
+      input,
+      y,
+      pixelWidthMm,
+      span,
+      reverse,
+      dotWidthCorrectionMm,
+      xOffset,
+      pushRun,
+    );
     return;
   }
   if (reverse) {
-    emitReverseRowRuns(input, y, pixelWidthMm, span, pushRun);
+    emitReverseRowRuns(input, y, pixelWidthMm, span, xOffset, pushRun);
     return;
   }
-  emitForwardRowRuns(input, y, pixelWidthMm, span, pushRun);
+  emitForwardRowRuns(input, y, pixelWidthMm, span, xOffset, pushRun);
 }
 
 type RasterRun = {
@@ -270,6 +289,7 @@ function emitCorrectedRowRuns(
   span: ActiveSpan,
   reverse: boolean,
   dotWidthCorrectionMm: number,
+  xOffset: number,
   pushRun: PushRasterRun,
 ): void {
   const runs = rowRuns(input, y, span);
@@ -279,11 +299,12 @@ function emitCorrectedRowRuns(
       pixelWidthMm,
       [...runs].reverse(),
       dotWidthCorrectionMm,
+      xOffset,
       pushRun,
     );
     return;
   }
-  emitCorrectedForwardRowRuns(input, pixelWidthMm, runs, dotWidthCorrectionMm, pushRun);
+  emitCorrectedForwardRowRuns(input, pixelWidthMm, runs, dotWidthCorrectionMm, xOffset, pushRun);
 }
 
 function rowRuns(input: EmitRasterInput, y: number, span: ActiveSpan): RasterRun[] {
@@ -307,11 +328,12 @@ function emitCorrectedForwardRowRuns(
   pixelWidthMm: number,
   runs: ReadonlyArray<RasterRun>,
   dotWidthCorrectionMm: number,
+  xOffset: number,
   pushRun: PushRasterRun,
 ): void {
   for (const run of runs) {
-    const startX = input.bounds.minX + run.firstX * pixelWidthMm;
-    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm;
+    const startX = input.bounds.minX + run.firstX * pixelWidthMm + xOffset;
+    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm + xOffset;
     if (run.s <= 0) {
       pushRun(endX, 0);
       continue;
@@ -333,11 +355,12 @@ function emitCorrectedReverseRowRuns(
   pixelWidthMm: number,
   runs: ReadonlyArray<RasterRun>,
   dotWidthCorrectionMm: number,
+  xOffset: number,
   pushRun: PushRasterRun,
 ): void {
   for (const run of runs) {
-    const startX = input.bounds.minX + run.firstX * pixelWidthMm;
-    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm;
+    const startX = input.bounds.minX + run.firstX * pixelWidthMm + xOffset;
+    const endX = input.bounds.minX + (run.lastX + 1) * pixelWidthMm + xOffset;
     if (run.s <= 0) {
       pushRun(startX, 0);
       continue;
@@ -359,17 +382,18 @@ function emitReverseRowRuns(
   y: number,
   pixelWidthMm: number,
   span: ActiveSpan,
+  xOffset: number,
   pushRun: PushRasterRun,
 ): void {
   let runS = input.sValues[y * input.width + span.lastX] ?? 0;
   for (let i = span.lastX - 1; i >= span.firstX; i -= 1) {
     const cellS = input.sValues[y * input.width + i] ?? 0;
     if (cellS !== runS) {
-      pushRun(input.bounds.minX + (i + 1) * pixelWidthMm, runS);
+      pushRun(input.bounds.minX + (i + 1) * pixelWidthMm + xOffset, runS);
       runS = cellS;
     }
   }
-  pushRun(input.bounds.minX + span.firstX * pixelWidthMm, runS);
+  pushRun(input.bounds.minX + span.firstX * pixelWidthMm + xOffset, runS);
 }
 
 function emitForwardRowRuns(
@@ -377,17 +401,32 @@ function emitForwardRowRuns(
   y: number,
   pixelWidthMm: number,
   span: ActiveSpan,
+  xOffset: number,
   pushRun: PushRasterRun,
 ): void {
   let runS = input.sValues[y * input.width + span.firstX] ?? 0;
   for (let i = span.firstX + 1; i <= span.lastX; i += 1) {
     const cellS = input.sValues[y * input.width + i] ?? 0;
     if (cellS !== runS) {
-      pushRun(input.bounds.minX + i * pixelWidthMm, runS);
+      pushRun(input.bounds.minX + i * pixelWidthMm + xOffset, runS);
       runS = cellS;
     }
   }
-  pushRun(input.bounds.minX + (span.lastX + 1) * pixelWidthMm, runS);
+  pushRun(input.bounds.minX + (span.lastX + 1) * pixelWidthMm + xOffset, runS);
+}
+
+function scanXOffsetForRow(input: EmitRasterInput, reverse: boolean): number {
+  return scanAxisOffsetForDirection(
+    {
+      initialXOffsetMm: finiteOrZero(input.initialXOffsetMm),
+      bidirectionalOffsetMm: finiteOrZero(input.bidirectionalScanOffsetMm),
+    },
+    reverse ? -1 : 1,
+  );
+}
+
+function finiteOrZero(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 // One G1 closing a run. Emits S only when it changed from the

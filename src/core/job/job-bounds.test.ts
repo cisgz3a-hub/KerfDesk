@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Job } from './job';
-import { computeJobBounds } from './job-bounds';
+import { computeJobBounds, computeJobMotionBounds } from './job-bounds';
 
 const empty: Job = { groups: [] };
 
@@ -78,6 +78,37 @@ describe('computeJobBounds', () => {
       minY: 20,
       maxX: 100,
       maxY: 20,
+    });
+  });
+
+  it('includes raster scan calibration offsets in motion bounds', () => {
+    expect(
+      computeJobMotionBounds({
+        groups: [
+          {
+            kind: 'raster',
+            layerId: 'image',
+            color: '#808080',
+            power: 30,
+            speed: 1000,
+            passes: 1,
+            airAssist: false,
+            sValues: new Uint16Array([100, 100, 100, 100]),
+            pixelWidth: 2,
+            pixelHeight: 2,
+            bounds: { minX: 10, minY: 0, maxX: 12, maxY: 2 },
+            overscanMm: 1,
+            dotWidthCorrectionMm: 0,
+            initialXOffsetMm: 0.1,
+            bidirectionalScanOffsetMm: 0.25,
+          },
+        ],
+      }),
+    ).toEqual({
+      minX: 8.85,
+      minY: 0,
+      maxX: 13.35,
+      maxY: 2,
     });
   });
 });

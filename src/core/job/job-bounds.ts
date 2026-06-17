@@ -104,8 +104,9 @@ function extendBoundsForRaster(
   if (group.bounds.minY < b.minY) b.minY = group.bounds.minY;
   if (group.bounds.maxY > b.maxY) b.maxY = group.bounds.maxY;
   if (includeOverscanMotion && hasActiveRasterPixel(group)) {
-    b.minX = Math.min(b.minX, group.bounds.minX - group.overscanMm);
-    b.maxX = Math.max(b.maxX, group.bounds.maxX + group.overscanMm);
+    const shift = rasterScanShiftRange(group);
+    b.minX = Math.min(b.minX, group.bounds.minX + shift.minX - group.overscanMm);
+    b.maxX = Math.max(b.maxX, group.bounds.maxX + shift.maxX + group.overscanMm);
   }
   return true;
 }
@@ -125,4 +126,17 @@ function hasActiveRasterPixel(group: RasterGroup): boolean {
     if (s > 0) return true;
   }
   return false;
+}
+
+function rasterScanShiftRange(group: RasterGroup): {
+  readonly minX: number;
+  readonly maxX: number;
+} {
+  const initialX = finiteOrZero(group.initialXOffsetMm);
+  const bidirectional = Math.abs(finiteOrZero(group.bidirectionalScanOffsetMm));
+  return { minX: initialX - bidirectional, maxX: initialX + bidirectional };
+}
+
+function finiteOrZero(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }

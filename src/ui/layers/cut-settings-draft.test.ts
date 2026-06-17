@@ -165,6 +165,20 @@ describe('cut settings draft helpers', () => {
     expect(dotWidthCorrectionMax(10)).toBe(0.1);
     expect(patch.dotWidthCorrectionMm).toBeCloseTo(linesPerMmToLineIntervalMm(10), 8);
   });
+
+  it('reads image bidirectional scanning only from image-mode forms', () => {
+    const layer = imageLayer({ imageBidirectional: true });
+
+    expect(
+      readCutSettingsPatch(formData({ mode: 'image', imageBidirectional: 'on' }), layer)
+        .imageBidirectional,
+    ).toBe(true);
+    expect(readCutSettingsPatch(formData({ mode: 'image' }), layer).imageBidirectional).toBe(false);
+    expect(
+      readCutSettingsPatch(formData({ mode: 'fill' }), { ...layer, imageBidirectional: true })
+        .imageBidirectional,
+    ).toBe(true);
+  });
 });
 
 function formData(entries: Record<string, string>): FormData {

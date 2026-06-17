@@ -52,4 +52,36 @@ describe('project device profile metadata persistence', () => {
       { id: 'clamp', name: 'Clamp', enabled: true, x: 10, y: 20, width: 30, height: 40 },
     ]);
   });
+
+  it('back-fills and normalizes raster scan calibration on older .lf2 files', () => {
+    const raw = JSON.parse(serializeProject(createProject())) as Record<string, unknown>;
+    const device = raw['device'] as Record<string, unknown>;
+    device['rasterCalibration'] = {
+      enabled: true,
+      initialXOffsetMm: 0.15,
+      bidirectionalOffsetPoints: [
+        { speedMmPerMin: 1200, offsetMm: 0.5 },
+        { speedMmPerMin: 800, offsetMm: 0.25 },
+        { speedMmPerMin: 1200, offsetMm: 0.45 },
+        { speedMmPerMin: 0, offsetMm: 1 },
+      ],
+      source: 'calibration-test',
+      notes: 'measured on scrap',
+    };
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.rasterCalibration).toEqual({
+      enabled: true,
+      initialXOffsetMm: 0.15,
+      bidirectionalOffsetPoints: [
+        { speedMmPerMin: 800, offsetMm: 0.25 },
+        { speedMmPerMin: 1200, offsetMm: 0.45 },
+      ],
+      source: 'calibration-test',
+      notes: 'measured on scrap',
+    });
+  });
 });

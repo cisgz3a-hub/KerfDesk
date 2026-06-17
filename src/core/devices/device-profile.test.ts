@@ -4,6 +4,7 @@ import {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   type DeviceProfile,
 } from './device-profile';
+import { DEFAULT_RASTER_CALIBRATION } from './raster-calibration';
 
 describe('DEFAULT_DEVICE_PROFILE', () => {
   it('matches the WORKFLOW.md F-A1 first-run defaults exactly', () => {
@@ -31,6 +32,10 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
 
   it('defaults air assist command to none so output is unchanged until configured', () => {
     expect(DEFAULT_DEVICE_PROFILE.airAssistCommand).toBe('none');
+  });
+
+  it('defaults raster scan calibration to disabled so existing output is unchanged', () => {
+    expect(DEFAULT_DEVICE_PROFILE.rasterCalibration).toEqual(DEFAULT_RASTER_CALIBRATION);
   });
 
   it('uses a narrow air assist command enum', () => {
@@ -147,5 +152,8 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
       controlledLaserOffTravelFeedMmPerMin: 800,
       laserModeCommand: 'M4',
     });
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.rasterCalibration).toEqual(
+      DEFAULT_RASTER_CALIBRATION,
+    );
   });
 });
