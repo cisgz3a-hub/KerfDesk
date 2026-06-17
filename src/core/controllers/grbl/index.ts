@@ -4,7 +4,7 @@ export { ALARM_CODES, describeAlarm } from './alarm-codes';
 export type { ErrorDescription } from './error-codes';
 export { ALL_ERROR_CODES, describeError } from './error-codes';
 
-export type { GrblState, StatusReport } from './status-parser';
+export type { GrblPins, GrblState, StatusReport } from './status-parser';
 export { parseStatusReport } from './status-parser';
 
 export type { GrblResponse } from './response';
