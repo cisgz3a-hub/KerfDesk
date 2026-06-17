@@ -3,6 +3,7 @@ import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../..
 import {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS,
   materialPresetWarnings,
+  type MaterialRecipeOperation,
   type StarterMaterialPreset,
 } from '../../core/material-library';
 import type { Layer } from '../../core/scene';
@@ -279,15 +280,36 @@ function toMaterialPreset(preset: StarterMaterialPreset): MaterialPreset {
   const warnings = materialPresetWarnings(preset);
   const warningText = warnings.length === 0 ? '' : ` Warnings: ${warnings.join(' ')}`;
   const unsupportedText = preset.unsupported === true ? ' Unsupported on this diode profile.' : '';
+  const profile = NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
   return {
     id: preset.id,
     materialName: preset.materialName,
+    material: preset.materialName,
     ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
     ...(preset.title !== undefined ? { title: preset.title } : {}),
+    operation: starterPresetOperation(preset),
+    ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
+    ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
+    ...(profile.laserSubProfile?.model !== undefined
+      ? { laserModel: profile.laserSubProfile.model }
+      : {}),
+    ...(profile.laserSubProfile?.opticalPowerW !== undefined
+      ? { opticalPowerW: profile.laserSubProfile.opticalPowerW }
+      : {}),
+    confidence: preset.unsupported === true ? 'unsupported' : 'starter',
+    ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
+    calibrationProvenance: preset.revision,
     description: `${preset.description}${unsupportedText}${warningText}`,
     recipe: preset.recipe,
     revision: preset.revision,
   };
+}
+
+function starterPresetOperation(preset: StarterMaterialPreset): MaterialRecipeOperation {
+  const text = `${preset.id} ${preset.description} ${preset.title ?? ''}`.toLowerCase();
+  if (text.includes('cut')) return 'cut';
+  if (preset.recipe.mode === 'image') return 'engrave';
+  return 'engrave';
 }
 
 function activeId(candidate: string, ids: ReadonlyArray<string>): string {
