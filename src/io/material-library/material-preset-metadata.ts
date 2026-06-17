@@ -37,7 +37,10 @@ export function parsePresetMatchMetadata(
   if (enums.kind === 'invalid') return enums;
   const opticalPower = parseOpticalPower(value, index);
   if (opticalPower.kind === 'invalid') return opticalPower;
-  return { kind: 'ok', metadata: { ...strings.metadata, ...enums.metadata, ...opticalPower.metadata } };
+  return {
+    kind: 'ok',
+    metadata: { ...strings.metadata, ...enums.metadata, ...opticalPower.metadata },
+  };
 }
 
 function parseMetadataStrings(

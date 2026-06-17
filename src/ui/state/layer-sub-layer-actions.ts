@@ -36,9 +36,7 @@ type LayerSubLayerActionMutation = {
 type EmptyLayerSubLayerAction = Record<string, never>;
 
 type LayerSubLayerActionSet = (
-  fn: (
-    state: LayerSubLayerActionState,
-  ) => LayerSubLayerActionMutation | EmptyLayerSubLayerAction,
+  fn: (state: LayerSubLayerActionState) => LayerSubLayerActionMutation | EmptyLayerSubLayerAction,
 ) => void;
 
 export function layerSubLayerActions(set: LayerSubLayerActionSet): LayerSubLayerActions {

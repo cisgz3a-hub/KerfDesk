@@ -84,10 +84,7 @@ export function resolveGrblDialect(device: {
   readonly gcodeDialect?: { readonly dialectId?: string };
 }): GrblGcodeDialect {
   const dialectId = device.gcodeDialect?.dialectId ?? DEFAULT_DIALECT_ID;
-  return (
-    GRBL_GCODE_DIALECTS.find((dialect) => dialect.id === dialectId) ??
-    GRBL_DYNAMIC_DIALECT
-  );
+  return GRBL_GCODE_DIALECTS.find((dialect) => dialect.id === dialectId) ?? GRBL_DYNAMIC_DIALECT;
 }
 
 export function normalizeGcodeDialectSelection(value: unknown): GcodeDialectSelection {

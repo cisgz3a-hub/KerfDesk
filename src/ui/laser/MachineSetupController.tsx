@@ -34,7 +34,10 @@ function GrblSetupSlot(): JSX.Element {
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const streamer = useLaserStore((s) => s.streamer);
   const disabled =
-    connection.kind !== 'connected' || autofocusBusy || motionOperation !== null || streamer !== null;
+    connection.kind !== 'connected' ||
+    autofocusBusy ||
+    motionOperation !== null ||
+    streamer !== null;
   return <GrblLaserSetupPanel disabled={disabled} />;
 }
 
@@ -49,8 +52,8 @@ export function FirmwareWritesPanel(): JSX.Element {
       <section style={sectionStyle}>
         <h3 style={sectionHeadingStyle}>Guarded Writes</h3>
         <p style={mutedStyle}>
-          Firmware writes are limited to one setting at a time. Read and export a current
-          controller backup before writing.
+          Firmware writes are limited to one setting at a time. Read and export a current controller
+          backup before writing.
         </p>
       </section>
       {lastSettingsReadAt === null ? (

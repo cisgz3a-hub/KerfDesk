@@ -72,12 +72,7 @@ function postamble(laserAlreadyOff: boolean, dialect: GrblGcodeDialect): string 
   return lines.join(LINE_END) + LINE_END;
 }
 
-function emitSegment(
-  seg: CutSegment,
-  s: number,
-  feed: number,
-  dialect: GrblGcodeDialect,
-): string {
+function emitSegment(seg: CutSegment, s: number, feed: number, dialect: GrblGcodeDialect): string {
   const lines: string[] = [];
   const first = seg.polyline[0];
   if (first === undefined) {

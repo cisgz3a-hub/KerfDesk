@@ -57,7 +57,15 @@ describe('preflight no-go zones', () => {
         device: {
           ...DEFAULT_DEVICE_PROFILE,
           noGoZones: [
-            { id: 'outside', name: 'Outside', enabled: true, x: 500, y: 500, width: 10, height: 10 },
+            {
+              id: 'outside',
+              name: 'Outside',
+              enabled: true,
+              x: 500,
+              y: 500,
+              width: 10,
+              height: 10,
+            },
           ],
         },
       },

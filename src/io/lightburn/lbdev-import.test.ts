@@ -57,7 +57,8 @@ describe('LightBurn .lbdev import', () => {
   it('returns a clear unsupported result for LightBurn bundle exports', () => {
     expect(importLightBurnDeviceProfile('PK...', { fileName: 'devices.lbzip' })).toEqual({
       kind: 'unsupported-bundle',
-      reason: 'LightBurn .lbzip bundles are not imported yet. Export a legacy .lbdev device instead.',
+      reason:
+        'LightBurn .lbzip bundles are not imported yet. Export a legacy .lbdev device instead.',
     });
   });
 

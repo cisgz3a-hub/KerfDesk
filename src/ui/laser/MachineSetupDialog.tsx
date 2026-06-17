@@ -1,20 +1,11 @@
 import { useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
-import {
-  ControllerSettingsPanel,
-  FirmwareWritesPanel,
-} from './MachineSetupController';
+import { ControllerSettingsPanel, FirmwareWritesPanel } from './MachineSetupController';
 import { ImportExportPanel } from './MachineSetupImportExport';
 import { OverviewPanel, ProfileCatalogPanel } from './MachineSetupProfiles';
 import { SafetyZonesPanel } from './MachineSetupSafetyZones';
 
-type SetupTab =
-  | 'overview'
-  | 'catalog'
-  | 'controller'
-  | 'firmware'
-  | 'zones'
-  | 'import-export';
+type SetupTab = 'overview' | 'catalog' | 'controller' | 'firmware' | 'zones' | 'import-export';
 
 const TABS: ReadonlyArray<{ readonly id: SetupTab; readonly label: string }> = [
   { id: 'overview', label: 'Overview' },

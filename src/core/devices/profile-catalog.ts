@@ -45,9 +45,7 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
 ];
 
-export function profileCatalogEntryById(
-  profileId: string,
-): MachineProfileCatalogEntry | undefined {
+export function profileCatalogEntryById(profileId: string): MachineProfileCatalogEntry | undefined {
   return GRBL_MACHINE_PROFILE_CATALOG.find((entry) => entry.profile.profileId === profileId);
 }
 

@@ -108,9 +108,7 @@ describe('computeJobBounds', () => {
       scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.25 }],
     };
 
-    expect(
-      computeJobMotionBounds(rasterJob, device),
-    ).toEqual({
+    expect(computeJobMotionBounds(rasterJob, device)).toEqual({
       minX: 8.75,
       minY: 0,
       maxX: 13,

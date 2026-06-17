@@ -119,7 +119,11 @@ function SettingsTable({ rows }: { readonly rows: ReadonlyArray<GrblSettingRow> 
       {filteredRows.length === 0 ? (
         <p style={emptyStyle}>No settings match.</p>
       ) : (
-        <div style={tableWrapStyle} title={tableHelp.title} data-help-id={tableHelp['data-help-id']}>
+        <div
+          style={tableWrapStyle}
+          title={tableHelp.title}
+          data-help-id={tableHelp['data-help-id']}
+        >
           <table style={tableStyle}>
             <thead>
               <tr>
@@ -162,7 +166,15 @@ function SettingsTable({ rows }: { readonly rows: ReadonlyArray<GrblSettingRow> 
   );
 }
 
-const CATEGORY_ORDER = ['laser', 'motion', 'homing', 'limits', 'reporting', 'system', 'unknown'] as const;
+const CATEGORY_ORDER = [
+  'laser',
+  'motion',
+  'homing',
+  'limits',
+  'reporting',
+  'system',
+  'unknown',
+] as const;
 const CATEGORY_LABELS: Readonly<Record<GrblSettingRow['category'], string>> = {
   laser: 'Laser',
   motion: 'Motion',
@@ -187,9 +199,7 @@ function filterRows(
   );
 }
 
-function groupRows(
-  rows: ReadonlyArray<GrblSettingRow>,
-): ReadonlyArray<{
+function groupRows(rows: ReadonlyArray<GrblSettingRow>): ReadonlyArray<{
   readonly category: GrblSettingRow['category'];
   readonly rows: ReadonlyArray<GrblSettingRow>;
 }> {

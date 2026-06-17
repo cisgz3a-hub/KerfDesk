@@ -51,11 +51,7 @@ function pointInZone(point: MotionPoint, zone: NoGoZone): boolean {
   );
 }
 
-function segmentIntersectsZone(
-  a: MotionPoint,
-  b: MotionPoint,
-  zone: NoGoZone,
-): boolean {
+function segmentIntersectsZone(a: MotionPoint, b: MotionPoint, zone: NoGoZone): boolean {
   if (pointInZone(a, zone) || pointInZone(b, zone)) return true;
   const left = zone.x;
   const right = zone.x + zone.width;
@@ -86,21 +82,13 @@ function segmentsIntersect(
   return o1 !== o2 && o3 !== o4;
 }
 
-function orientation(
-  a: MotionPoint,
-  b: MotionPoint,
-  c: MotionPoint,
-): -1 | 0 | 1 {
+function orientation(a: MotionPoint, b: MotionPoint, c: MotionPoint): -1 | 0 | 1 {
   const value = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
   if (Math.abs(value) < 1e-9) return 0;
   return value > 0 ? 1 : -1;
 }
 
-function onSegment(
-  a: MotionPoint,
-  b: MotionPoint,
-  c: MotionPoint,
-): boolean {
+function onSegment(a: MotionPoint, b: MotionPoint, c: MotionPoint): boolean {
   return (
     b.x <= Math.max(a.x, c.x) &&
     b.x >= Math.min(a.x, c.x) &&

@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import type { MaterialRecipe } from './material-library';
-import {
-  rankMaterialRecipesForProfile,
-  type MaterialRecipeCandidate,
-} from './recipe-matching';
+import { rankMaterialRecipesForProfile, type MaterialRecipeCandidate } from './recipe-matching';
 
 const recipe: MaterialRecipe = {
   mode: 'line',
@@ -51,7 +48,12 @@ describe('material recipe matching', () => {
       ...DEFAULT_DEVICE_PROFILE,
       profileId: 'shop-falcon',
       machineFamily: 'falcon',
-      laserSubProfile: { model: '20W module', opticalPowerW: 20, focusMode: 'manual', airAssist: 'manual' },
+      laserSubProfile: {
+        model: '20W module',
+        opticalPowerW: 20,
+        focusMode: 'manual',
+        airAssist: 'manual',
+      },
     } as const;
     const ranked = rankMaterialRecipesForProfile(device, [
       candidate('generic'),

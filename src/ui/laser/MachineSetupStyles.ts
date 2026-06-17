@@ -1,4 +1,8 @@
-export const stackStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 10 };
+export const stackStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 10,
+};
 export const sectionStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 4,

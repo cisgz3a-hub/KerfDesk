@@ -141,10 +141,7 @@ function pointOnSegment(point: Point, a: Point, b: Point): boolean {
 
 function pointInRect(point: Point, rect: Rect): boolean {
   return (
-    point.x >= rect.minX &&
-    point.x <= rect.maxX &&
-    point.y >= rect.minY &&
-    point.y <= rect.maxY
+    point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY
   );
 }
 

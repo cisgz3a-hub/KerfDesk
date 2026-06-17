@@ -65,18 +65,12 @@ export function optionalNumber(obj: Record<string, unknown>, path: string): stri
   return value === undefined || isFiniteNumber(value) ? null : `missing or invalid \`${path}\``;
 }
 
-export function requirePositiveNumber(
-  obj: Record<string, unknown>,
-  path: string,
-): string | null {
+export function requirePositiveNumber(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return isFiniteNumber(value) && value > 0 ? null : `missing or invalid \`${path}\``;
 }
 
-export function optionalPositiveNumber(
-  obj: Record<string, unknown>,
-  path: string,
-): string | null {
+export function optionalPositiveNumber(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined || (isFiniteNumber(value) && value > 0)
     ? null
@@ -93,20 +87,14 @@ export function optionalNonNegativeNumber(
     : `missing or invalid \`${path}\``;
 }
 
-export function optionalPositiveInteger(
-  obj: Record<string, unknown>,
-  path: string,
-): string | null {
+export function optionalPositiveInteger(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined || (isFiniteNumber(value) && Number.isInteger(value) && value > 0)
     ? null
     : `missing or invalid \`${path}\``;
 }
 
-export function requirePositiveInteger(
-  obj: Record<string, unknown>,
-  path: string,
-): string | null {
+export function requirePositiveInteger(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return isFiniteNumber(value) && Number.isInteger(value) && value > 0
     ? null
