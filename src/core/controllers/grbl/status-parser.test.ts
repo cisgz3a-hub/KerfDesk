@@ -67,6 +67,36 @@ describe('parseStatusReport — happy paths', () => {
   });
 });
 
+describe('parseStatusReport — Pn pins (ADR-053 P3)', () => {
+  it('decodes limit-switch letters from the Pn field', () => {
+    const r = parseStatusReport('<Alarm|MPos:0.000,0.000,0.000|FS:0,0|Pn:XY>');
+    expect(r?.pins).toEqual({
+      limitX: true,
+      limitY: true,
+      limitZ: false,
+      probe: false,
+      door: false,
+    });
+  });
+
+  it('decodes a single Z limit', () => {
+    expect(parseStatusReport('<Alarm|MPos:0.000,0.000,0.000|FS:0,0|Pn:Z>')?.pins?.limitZ).toBe(
+      true,
+    );
+  });
+
+  it('decodes probe and door without flagging limits', () => {
+    const pins = parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Pn:PD>')?.pins;
+    expect(pins?.probe).toBe(true);
+    expect(pins?.door).toBe(true);
+    expect(pins?.limitX).toBe(false);
+  });
+
+  it('returns pins=null when GRBL omits the Pn field (nothing triggered)', () => {
+    expect(parseStatusReport('<Idle|MPos:0.000,0.000,0.000|FS:0,0>')?.pins).toBeNull();
+  });
+});
+
 describe('parseStatusReport — degenerate inputs', () => {
   it('returns null for non-status lines', () => {
     expect(parseStatusReport('ok')).toBeNull();
