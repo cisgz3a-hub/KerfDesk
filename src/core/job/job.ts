@@ -60,6 +60,9 @@ export type RasterGroup = {
   // out of the burn area.
   readonly overscanMm: number;
   readonly dotWidthCorrectionMm: number;
+  readonly initialXOffsetMm?: number;
+  readonly bidirectionalScanOffsetMm?: number;
+  readonly bidirectional?: boolean;
 };
 
 export type Group = CutGroup | FillGroup | RasterGroup;

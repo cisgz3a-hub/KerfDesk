@@ -2,6 +2,9 @@
 // laser-power scale, and coordinate origin. Used by JobCompiler to honor
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
+import type { RasterCalibration } from './raster-calibration';
+import { DEFAULT_RASTER_CALIBRATION } from './raster-calibration';
+
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
 export type ControllerKind = 'grbl-v1.1';
@@ -100,6 +103,7 @@ export type DeviceProfile = {
   readonly laserSubProfile?: LaserSubProfile;
   readonly controller: DeviceControllerCompatibility;
   readonly gcodeDialect: DeviceGcodeDialect;
+  readonly rasterCalibration: RasterCalibration;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
   // treats these as mm. G-code output is `G21` (mm). Reference work
@@ -206,6 +210,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
     airAssistCommand: 'none',
     laserModeCommand: 'mixed',
   },
+  rasterCalibration: DEFAULT_RASTER_CALIBRATION,
   bedWidth: 400,
   bedHeight: 400,
   maxFeed: 6000,

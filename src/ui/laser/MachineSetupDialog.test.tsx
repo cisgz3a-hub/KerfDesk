@@ -94,6 +94,47 @@ describe('MachineSetupDialog', () => {
       await cleanup();
     }
   });
+
+  it('generates a scan-offset test scene from the calibration tab', async () => {
+    const { host, cleanup } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Calibration').click());
+      expect(host.textContent).toContain('Raster calibration');
+
+      await act(async () => button(host, 'Generate scan offset test').click());
+
+      const scene = useStore.getState().project.scene;
+      expect(scene.objects).toHaveLength(3);
+      expect(scene.layers).toHaveLength(3);
+      expect(scene.layers.map((layer) => layer.speed)).toEqual([600, 1200, 1800]);
+      expect(scene.layers.every((layer) => layer.mode === 'fill')).toBe(true);
+      expect(scene.layers.every((layer) => layer.fillBidirectional)).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('stores measured bidirectional scan offset on the active profile', async () => {
+    const { host, cleanup } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Calibration').click());
+
+      input(host, 'Calibration speed').value = '900';
+      input(host, 'Measured line separation').value = '0.6';
+      input(host, 'Initial X offset').value = '0.1';
+
+      await act(async () => button(host, 'Save scan offset').click());
+
+      expect(useStore.getState().project.device.rasterCalibration).toMatchObject({
+        enabled: true,
+        source: 'calibration-test',
+        initialXOffsetMm: 0.1,
+        bidirectionalOffsetPoints: [{ speedMmPerMin: 900, offsetMm: 0.3 }],
+      });
+    } finally {
+      await cleanup();
+    }
+  });
 });
 
 async function renderDialog(): Promise<{
@@ -125,5 +166,11 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
     candidate.textContent?.includes(label),
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
+  return match;
+}
+
+function input(host: HTMLElement, label: string): HTMLInputElement {
+  const match = host.querySelector(`input[aria-label="${label}"]`);
+  if (!(match instanceof HTMLInputElement)) throw new Error(`Input not rendered: ${label}`);
   return match;
 }

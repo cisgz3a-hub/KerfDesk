@@ -134,6 +134,7 @@ describe('CutsLayersPanel cut settings editor', () => {
       await openCutSettings(host, '#ff0000');
       requireInput(host, 'input[name="negativeImage"]').checked = true;
       requireInput(host, 'input[name="passThrough"]').checked = true;
+      requireInput(host, 'input[name="imageBidirectional"]').checked = false;
       requireInput(host, 'input[name="dotWidthCorrectionMm"]').value = '0.08';
 
       await clickButtonWithText(host, 'OK');
@@ -141,6 +142,7 @@ describe('CutsLayersPanel cut settings editor', () => {
       const layer = useStore.getState().project.scene.layers[0];
       expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
       expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
+      expect((layer as { readonly imageBidirectional?: boolean })?.imageBidirectional).toBe(false);
       expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(
         0.08,
       );
@@ -172,11 +174,16 @@ describe('CutsLayersPanel cut settings editor', () => {
     try {
       const negative = requireInput(host, 'input[aria-label="Negative image for #ff0000"]');
       const passThrough = requireInput(host, 'input[aria-label="Pass-through image for #ff0000"]');
+      const bidirectional = requireInput(
+        host,
+        'input[aria-label="Bidirectional image scan for #ff0000"]',
+      );
       const dotWidth = requireInput(host, 'input[aria-label="Dot width correction for #ff0000"]');
 
       await act(async () => {
         negative.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         passThrough.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        bidirectional.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
       await act(async () => {
         dotWidth.value = '0.07';
@@ -189,6 +196,7 @@ describe('CutsLayersPanel cut settings editor', () => {
       const layer = useStore.getState().project.scene.layers[0];
       expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
       expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
+      expect((layer as { readonly imageBidirectional?: boolean })?.imageBidirectional).toBe(false);
       expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(
         0.07,
       );

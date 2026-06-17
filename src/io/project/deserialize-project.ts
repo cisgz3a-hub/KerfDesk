@@ -6,18 +6,19 @@
 // validation in Phase A is "trust the file was ours" — Zod-style schema
 // validation is a Phase B improvement.
 
-import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import {
-  DITHER_ALGORITHMS,
+  DEFAULT_DEVICE_PROFILE,
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  normalizeRasterCalibration,
+} from '../../core/devices';
+import {
   DEFAULT_PROJECT_OPTIMIZATION,
-  LAYER_DEFAULTS,
   PROJECT_SCHEMA_VERSION,
-  captureLayerOperationSettings,
-  type LayerOperationSettings,
   type Project,
 } from '../../core/scene';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
+import { normalizeLayer } from './normalize-layer';
 import { validateProjectShape } from './project-shape-validator';
 
 export type DeserializeResult =
@@ -118,6 +119,7 @@ function normalizeDevice(dev: Record<string, unknown>): Project['device'] {
     airAssistCommand,
     controller: normalizeDeviceController(dev['controller']),
     gcodeDialect: normalizeGcodeDialect(dev['gcodeDialect'], airAssistCommand),
+    rasterCalibration: normalizeRasterCalibration(dev['rasterCalibration']),
   } as unknown as Project['device'];
 }
 
@@ -343,136 +345,19 @@ function normalizeSceneObject(obj: unknown): unknown {
   return { ...obj, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
 }
 
-// Back-fill F.1 hatch fields on Layer. Pre-F.1 .lf2 files have no
 // hatchAngleDeg / hatchSpacingMm — fill with LAYER_DEFAULTS so the
 // compile path doesn't see NaN for mode='line' layers and so a future
 // flip to mode='fill' has sensible starting values.
-function normalizeLayer(layer: unknown): unknown {
-  if (!isObject(layer)) return layer;
-  const out: Record<string, unknown> = { ...layer };
-  normalizeCommonLayerFields(out);
-  normalizeFillLayerFields(out);
-  normalizeImageLayerFields(out);
-  normalizeSubLayers(out);
-  return out;
-}
-
-function normalizeCommonLayerFields(out: Record<string, unknown>): void {
-  if (typeof out['airAssist'] !== 'boolean') {
-    out['airAssist'] = LAYER_DEFAULTS.airAssist;
-  }
-  if (typeof out['kerfOffsetMm'] !== 'number' || !Number.isFinite(out['kerfOffsetMm'])) {
-    out['kerfOffsetMm'] = LAYER_DEFAULTS.kerfOffsetMm;
-  }
-  if (typeof out['tabsEnabled'] !== 'boolean') {
-    out['tabsEnabled'] = LAYER_DEFAULTS.tabsEnabled;
-  }
-  if (!isPositiveNumber(out['tabSizeMm'])) {
-    out['tabSizeMm'] = LAYER_DEFAULTS.tabSizeMm;
-  }
-  if (!isPositiveInteger(out['tabsPerShape'])) {
-    out['tabsPerShape'] = LAYER_DEFAULTS.tabsPerShape;
-  }
-  if (typeof out['tabSkipInnerShapes'] !== 'boolean') {
-    out['tabSkipInnerShapes'] = LAYER_DEFAULTS.tabSkipInnerShapes;
-  }
-}
-
-function normalizeFillLayerFields(out: Record<string, unknown>): void {
-  if (out['fillStyle'] !== 'offset' && out['fillStyle'] !== 'scanline') {
-    out['fillStyle'] = LAYER_DEFAULTS.fillStyle;
-  }
-  if (typeof out['hatchAngleDeg'] !== 'number') {
-    out['hatchAngleDeg'] = LAYER_DEFAULTS.hatchAngleDeg;
-  }
-  if (!isPositiveNumber(out['hatchSpacingMm'])) {
-    out['hatchSpacingMm'] = LAYER_DEFAULTS.hatchSpacingMm;
-  }
-  if (!isNonNegativeNumber(out['fillOverscanMm'])) {
-    out['fillOverscanMm'] = LAYER_DEFAULTS.fillOverscanMm;
-  }
-  // ADR-038: pre-unidirectional .lf2 files have no fillBidirectional — default
-  // to the snake fill they were authored against so reopening is unchanged.
-  if (typeof out['fillBidirectional'] !== 'boolean') {
-    out['fillBidirectional'] = LAYER_DEFAULTS.fillBidirectional;
-  }
-  if (typeof out['fillCrossHatch'] !== 'boolean') {
-    out['fillCrossHatch'] = LAYER_DEFAULTS.fillCrossHatch;
-  }
-}
-
-function normalizeImageLayerFields(out: Record<string, unknown>): void {
-  // F.2.e: back-fill image-mode Layer fields. Same additive-with-
-  // default pattern as the hatch fields above — pre-F.2 .lf2 files
-  // don't have them; treating missing as the default keeps the
-  // schema additive (no schemaVersion bump).
-  if (!DITHER_ALGORITHMS.some((algorithm) => algorithm === out['ditherAlgorithm'])) {
-    out['ditherAlgorithm'] = LAYER_DEFAULTS.ditherAlgorithm;
-  }
-  if (!isPositiveNumber(out['linesPerMm'])) {
-    out['linesPerMm'] = LAYER_DEFAULTS.linesPerMm;
-  }
-  if (!isPercent(out['minPower'])) {
-    out['minPower'] = LAYER_DEFAULTS.minPower;
-  }
-  if (typeof out['negativeImage'] !== 'boolean') {
-    out['negativeImage'] = LAYER_DEFAULTS.negativeImage;
-  }
-  if (typeof out['passThrough'] !== 'boolean') {
-    out['passThrough'] = LAYER_DEFAULTS.passThrough;
-  }
-  if (!isNonNegativeNumber(out['dotWidthCorrectionMm'])) {
-    out['dotWidthCorrectionMm'] = LAYER_DEFAULTS.dotWidthCorrectionMm;
-  }
-}
-
-function normalizeSubLayers(out: Record<string, unknown>): void {
-  if (!Array.isArray(out['subLayers'])) {
-    out['subLayers'] = LAYER_DEFAULTS.subLayers;
-    return;
-  }
-  out['subLayers'] = out['subLayers'].map((value, index) =>
-    normalizeSubLayer(value, `Sub-layer ${index + 1}`),
-  );
-}
-
-function normalizeSubLayer(value: unknown, fallbackLabel: string): unknown {
-  if (!isObject(value)) return value;
-  return {
-    ...value,
-    settings: normalizeLayerOperationSettings(value['settings']),
-    label: typeof value['label'] === 'string' ? value['label'] : fallbackLabel,
-    enabled: typeof value['enabled'] === 'boolean' ? value['enabled'] : true,
-  };
-}
-
-function normalizeLayerOperationSettings(value: unknown): LayerOperationSettings {
-  const settings: Record<string, unknown> = {
-    ...captureLayerOperationSettings(LAYER_DEFAULTS),
-    ...(isObject(value) ? value : {}),
-  };
-  normalizeCommonLayerFields(settings);
-  normalizeFillLayerFields(settings);
-  normalizeImageLayerFields(settings);
-  return settings as unknown as LayerOperationSettings;
-}
-
-function isNonNegativeNumber(value: unknown): value is number {
-  return typeof value === 'number' && value >= 0;
-}
-
+// ADR-038: pre-unidirectional .lf2 files have no fillBidirectional — default
+// to the snake fill they were authored against so reopening is unchanged.
+// F.2.e: back-fill image-mode Layer fields. Same additive-with-
+// default pattern as the hatch fields above — pre-F.2 .lf2 files
+// don't have them; treating missing as the default keeps the
+// schema additive (no schemaVersion bump).
 function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && value > 0;
 }
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0;
-}
-
-function isPercent(value: unknown): value is number {
-  return typeof value === 'number' && value >= 0 && value <= 100;
 }

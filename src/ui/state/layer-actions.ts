@@ -12,10 +12,7 @@ import {
 } from '../../core/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
-import {
-  layerSubLayerActions,
-  type LayerSubLayerPatch,
-} from './layer-sub-layer-actions';
+import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
@@ -278,6 +275,7 @@ const LAYER_SETTING_KEYS = [
   'fillCrossHatch',
   'ditherAlgorithm',
   'linesPerMm',
+  'imageBidirectional',
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
@@ -307,6 +305,7 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     fillCrossHatch: layer.fillCrossHatch,
     ditherAlgorithm: layer.ditherAlgorithm,
     linesPerMm: layer.linesPerMm,
+    imageBidirectional: layer.imageBidirectional,
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,

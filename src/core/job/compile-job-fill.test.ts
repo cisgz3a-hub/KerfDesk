@@ -180,6 +180,28 @@ describe('compileJob fill hatching', () => {
     expect(segments.some(isVerticalSegment)).toBe(true);
   });
 
+  it('applies raster scan calibration to bidirectional scanline fill segments', () => {
+    const layer = { ...fillLayer(), speed: 1000 };
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
+    const calibratedDevice = {
+      ...dev,
+      rasterCalibration: {
+        enabled: true,
+        initialXOffsetMm: 0.1,
+        bidirectionalOffsetPoints: [{ speedMmPerMin: 1000, offsetMm: 0.25 }],
+      },
+    };
+
+    const fill = requireFirstFillGroup(
+      compileJob({ objects: [square], layers: [layer] }, calibratedDevice),
+    );
+
+    expect(segmentPointX(fill, 0, 0)).toBeCloseTo(0.35);
+    expect(segmentPointX(fill, 0, 1)).toBeCloseTo(4.35);
+    expect(segmentPointX(fill, 1, 0)).toBeCloseTo(3.85);
+    expect(segmentPointX(fill, 1, 1)).toBeCloseTo(-0.15);
+  });
+
   it('compiles offset fill as contour-following closed paths', () => {
     const layer = { ...fillLayer(), fillStyle: 'offset' as const, hatchSpacingMm: 2 };
     const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 10 });
@@ -230,4 +252,18 @@ function isVerticalSegment(segment: FillGroup['segments'][number]): boolean {
   const a = segment.polyline[0];
   const b = segment.polyline[1];
   return a !== undefined && b !== undefined && Math.abs(a.x - b.x) < 1e-6;
+}
+
+function requireFirstFillGroup(job: ReturnType<typeof compileJob>): FillGroup {
+  const fill = firstFillGroup(job);
+  if (fill === undefined) throw new Error('Expected fill group');
+  return fill;
+}
+
+function segmentPointX(fill: FillGroup, segmentIndex: number, pointIndex: number): number {
+  const segment = fill.segments[segmentIndex];
+  if (segment === undefined) throw new Error(`Missing fill segment ${segmentIndex}`);
+  const point = segment.polyline[pointIndex];
+  if (point === undefined) throw new Error(`Missing point ${pointIndex}`);
+  return point.x;
 }

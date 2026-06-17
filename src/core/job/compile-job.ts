@@ -1,4 +1,4 @@
-import { type DeviceProfile, toMachineCoords } from '../devices';
+import { resolveRasterScanCalibration, type DeviceProfile, toMachineCoords } from '../devices';
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
@@ -14,6 +14,7 @@ import {
   type Vec2,
 } from '../scene';
 import { memoizedFillHatching } from './fill-hatching-cache';
+import { applyFillScanCalibration } from './fill-scan-calibration';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { type CutSegment, type Group, type Job } from './job';
 import { effectiveObjectPowerPercent, objectPowerScalePercent } from './object-power-scale';
@@ -43,10 +44,9 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
 }
 
 function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {
-  return [
-    layer,
-    ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer)),
-  ].filter((operationLayer) => operationLayer.output);
+  return [layer, ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer))].filter(
+    (operationLayer) => operationLayer.output,
+  );
 }
 
 function appendRasterGroupsForLayer(
@@ -176,10 +176,23 @@ function collectFillSegmentsForLayer(
           spacingMm: layer.hatchSpacingMm,
         })
       : memoizedLayerFillHatching(objects, layer, device);
-  return polylines.map((polyline) => ({
+  const calibrated = applyScanCalibrationToFillPolylines(polylines, layer, device);
+  return calibrated.map((polyline) => ({
     polyline: polyline.points,
     closed: polyline.closed,
   }));
+}
+
+function applyScanCalibrationToFillPolylines(
+  polylines: ReadonlyArray<Polyline>,
+  layer: Layer,
+  device: DeviceProfile,
+): ReadonlyArray<Polyline> {
+  if (layer.fillStyle === 'offset') return polylines;
+  return applyFillScanCalibration(
+    polylines,
+    resolveRasterScanCalibration(device.rasterCalibration, Math.min(layer.speed, device.maxFeed)),
+  );
 }
 
 function memoizedLayerFillHatching(

@@ -318,6 +318,7 @@ describe('deserializeProject', () => {
       // the fill they were authored against.
       expect(layer?.fillBidirectional).toBe(true);
       expect((layer as { readonly fillCrossHatch?: boolean })?.fillCrossHatch).toBe(false);
+      expect((layer as { readonly imageBidirectional?: boolean })?.imageBidirectional).toBe(true);
     }
   });
 

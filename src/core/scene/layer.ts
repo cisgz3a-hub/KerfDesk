@@ -36,6 +36,7 @@ export type LayerOperationSettings = {
   readonly fillCrossHatch: boolean;
   readonly ditherAlgorithm: LayerDitherAlgorithm;
   readonly linesPerMm: number;
+  readonly imageBidirectional: boolean;
   readonly negativeImage: boolean;
   readonly passThrough: boolean;
   readonly dotWidthCorrectionMm: number;
@@ -78,6 +79,7 @@ export const LAYER_DEFAULTS = {
   fillCrossHatch: false,
   ditherAlgorithm: 'floyd-steinberg',
   linesPerMm: 10,
+  imageBidirectional: true,
   negativeImage: false,
   passThrough: false,
   dotWidthCorrectionMm: 0,
@@ -104,6 +106,7 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'fillCrossHatch',
   'ditherAlgorithm',
   'linesPerMm',
+  'imageBidirectional',
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
@@ -121,7 +124,9 @@ export function createLayer(args: { id: string; color: string; mode?: LayerMode 
   };
 }
 
-export function captureLayerOperationSettings(layer: LayerOperationSettings): LayerOperationSettings {
+export function captureLayerOperationSettings(
+  layer: LayerOperationSettings,
+): LayerOperationSettings {
   return {
     mode: layer.mode,
     minPower: layer.minPower,
@@ -142,6 +147,7 @@ export function captureLayerOperationSettings(layer: LayerOperationSettings): La
     fillCrossHatch: layer.fillCrossHatch,
     ditherAlgorithm: layer.ditherAlgorithm,
     linesPerMm: layer.linesPerMm,
+    imageBidirectional: layer.imageBidirectional,
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,

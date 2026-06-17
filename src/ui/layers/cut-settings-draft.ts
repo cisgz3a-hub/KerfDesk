@@ -51,6 +51,8 @@ export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
           )
         : layer.dotWidthCorrectionMm,
     negativeImage: mode === 'image' ? data.has('negativeImage') : layer.negativeImage,
+    imageBidirectional:
+      mode === 'image' ? data.has('imageBidirectional') : layer.imageBidirectional,
     passThrough: mode === 'image' ? data.has('passThrough') : layer.passThrough,
   };
 }

@@ -34,6 +34,7 @@ describe('createLayer', () => {
       airAssist: false,
       ditherAlgorithm: 'floyd-steinberg',
       linesPerMm: 10,
+      imageBidirectional: true,
       negativeImage: false,
       passThrough: false,
       dotWidthCorrectionMm: 0,
@@ -84,6 +85,13 @@ describe('LAYER_DEFAULTS', () => {
   it('defaults sub-layers to an empty operation list', () => {
     expect(LAYER_DEFAULTS.subLayers).toEqual([]);
     expect(createLayer({ id: 'L1', color: '#000000' }).subLayers).toEqual([]);
+  });
+
+  it('defaults image engraving to bidirectional scans for existing output parity', () => {
+    expect(LAYER_DEFAULTS.imageBidirectional).toBe(true);
+    expect(createLayer({ id: 'L1', color: '#000000', mode: 'image' }).imageBidirectional).toBe(
+      true,
+    );
   });
 });
 

@@ -19,6 +19,18 @@ export type {
   ProfileEvidenceStatus,
 } from './device-profile';
 export { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from './device-profile';
+export type {
+  RasterBidirectionalOffsetPoint,
+  RasterCalibration,
+  RasterCalibrationSource,
+  ResolvedRasterScanCalibration,
+} from './raster-calibration';
+export {
+  DEFAULT_RASTER_CALIBRATION,
+  normalizeRasterCalibration,
+  resolveRasterScanCalibration,
+  scanAxisOffsetForDirection,
+} from './raster-calibration';
 export type { MachineProfileCatalogEntry } from './profile-catalog';
 export {
   duplicateProfileAsCustom,
