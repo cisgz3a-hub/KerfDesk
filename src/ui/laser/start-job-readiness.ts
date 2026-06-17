@@ -131,6 +131,9 @@ function findPlacementBoundsIssue(
   };
   const preflight = framePreflight(physicalBounds, project.device);
   if (preflight.kind === 'ok') return null;
+  if (preflight.kind === 'no-go-zone') {
+    return `Selected job origin would place this job through no-go zone "${preflight.zoneName}".`;
+  }
   return `Selected job origin would place this job outside the machine bed. ${describeFramePreflightFailure(preflight)}`;
 }
 

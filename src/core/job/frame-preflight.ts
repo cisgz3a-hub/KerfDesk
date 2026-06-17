@@ -22,6 +22,7 @@ const EPSILON_MM = 0.001;
 
 export type FramePreflight =
   | { readonly kind: 'ok' }
+  | { readonly kind: 'no-go-zone'; readonly zoneName: string }
   | {
       readonly kind: 'out-of-bounds';
       readonly bounds: JobBounds;
@@ -55,7 +56,87 @@ export function framePreflight(bounds: JobBounds, device: DeviceProfile): FrameP
       overhang,
     };
   }
+  const hit = device.noGoZones.find((zone) => zone.enabled && frameIntersectsZone(bounds, zone));
+  if (hit !== undefined) return { kind: 'no-go-zone', zoneName: hit.name };
   return { kind: 'ok' };
+}
+
+function frameIntersectsZone(
+  bounds: JobBounds,
+  zone: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  },
+): boolean {
+  const zoneMaxX = zone.x + zone.width;
+  const zoneMaxY = zone.y + zone.height;
+  const top = horizontalIntersects(
+    bounds.minX,
+    bounds.maxX,
+    bounds.minY,
+    zone.x,
+    zoneMaxX,
+    zone.y,
+    zoneMaxY,
+  );
+  const bottom = horizontalIntersects(
+    bounds.minX,
+    bounds.maxX,
+    bounds.maxY,
+    zone.x,
+    zoneMaxX,
+    zone.y,
+    zoneMaxY,
+  );
+  const left = verticalIntersects(
+    bounds.minY,
+    bounds.maxY,
+    bounds.minX,
+    zone.y,
+    zoneMaxY,
+    zone.x,
+    zoneMaxX,
+  );
+  const right = verticalIntersects(
+    bounds.minY,
+    bounds.maxY,
+    bounds.maxX,
+    zone.y,
+    zoneMaxY,
+    zone.x,
+    zoneMaxX,
+  );
+  return top || bottom || left || right;
+}
+
+function horizontalIntersects(
+  minX: number,
+  maxX: number,
+  y: number,
+  zoneMinX: number,
+  zoneMaxX: number,
+  zoneMinY: number,
+  zoneMaxY: number,
+): boolean {
+  return y >= zoneMinY && y <= zoneMaxY && rangesOverlap(minX, maxX, zoneMinX, zoneMaxX);
+}
+
+function verticalIntersects(
+  minY: number,
+  maxY: number,
+  x: number,
+  zoneMinY: number,
+  zoneMaxY: number,
+  zoneMinX: number,
+  zoneMaxX: number,
+): boolean {
+  return x >= zoneMinX && x <= zoneMaxX && rangesOverlap(minY, maxY, zoneMinY, zoneMaxY);
+}
+
+function rangesOverlap(aMin: number, aMax: number, bMin: number, bMax: number): boolean {
+  return aMin <= bMax && bMin <= aMax;
 }
 
 // Human-readable message for the toast. Names the worst overhang so
