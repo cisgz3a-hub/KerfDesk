@@ -57,6 +57,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
     optionalScanOffsetTable(device, 'device.scanningOffsets'),
+    optionalNoGoZones(device, 'device.noGoZones'),
     optionalPositiveNumber(device, 'device.framingFeedMmPerMin'),
     optionalPositiveNumber(device, 'device.accelMmPerSec2'),
     optionalPositiveNumber(device, 'device.junctionDeviationMm'),
@@ -389,9 +390,34 @@ function optionalNonNegativeNumber(obj: Record<string, unknown>, path: string): 
     : `missing or invalid \`${path}\``;
 }
 
+function requireNonNegativeNumber(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return isFiniteNumber(value) && value >= 0 ? null : `missing or invalid \`${path}\``;
+}
+
 function optionalScanOffsetTable(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined || isScanOffsetTable(value) ? null : `missing or invalid \`${path}\``;
+}
+
+function optionalNoGoZones(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return `missing or invalid \`${path}\``;
+  return validateArray(value, path, validateNoGoZone);
+}
+
+function validateNoGoZone(value: unknown, path: string): string | null {
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  return firstError([
+    requireString(value, `${path}.id`),
+    requireString(value, `${path}.name`),
+    requireBoolean(value, `${path}.enabled`),
+    requireNonNegativeNumber(value, `${path}.x`),
+    requireNonNegativeNumber(value, `${path}.y`),
+    requirePositiveNumber(value, `${path}.width`),
+    requirePositiveNumber(value, `${path}.height`),
+  ]);
 }
 
 function requirePositiveInteger(obj: Record<string, unknown>, path: string): string | null {
