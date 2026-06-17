@@ -24,6 +24,19 @@ export type LightBurnDeviceImportOptions = {
   readonly fileName?: string;
 };
 
+type ParsedLightBurnDevice = {
+  readonly name: string;
+  readonly controller?: string;
+  readonly width: number;
+  readonly height: number;
+  readonly originRaw?: string;
+  readonly origin: Origin | null;
+  readonly maxPowerS: number | null;
+  readonly startScript?: string;
+  readonly endScript?: string;
+  readonly isGrbl: boolean;
+};
+
 export function importLightBurnDeviceProfile(
   text: string,
   options: LightBurnDeviceImportOptions = {},
@@ -36,97 +49,170 @@ export function importLightBurnDeviceProfile(
     };
   }
 
+  const parsed = parseLightBurnDevice(text);
+  if (parsed.kind === 'invalid') return parsed;
+  const review = lightBurnReviewFields(parsed.device);
+
+  return {
+    kind: 'review',
+    canCreateProfile: parsed.device.isGrbl,
+    profile: lightBurnProfile(parsed.device, options),
+    applied: review.applied,
+    needsReview: review.needsReview,
+    ignored: review.ignored,
+  };
+}
+
+function parseLightBurnDevice(
+  text: string,
+):
+  | { readonly kind: 'ok'; readonly device: ParsedLightBurnDevice }
+  | { readonly kind: 'invalid'; readonly reason: string } {
   const name = extractFirst(text, ['Name', 'DeviceName', 'DisplayName']) ?? 'Imported LightBurn device';
   const controller = extractFirst(text, ['Controller', 'ControllerType', 'DeviceType', 'Type']);
   const width = parsePositiveNumber(extractFirst(text, ['Width', 'XSize', 'BedWidth', 'WorkWidth']));
   const height = parsePositiveNumber(extractFirst(text, ['Height', 'YSize', 'BedHeight', 'WorkHeight']));
-  if (width === null || height === null) {
-    return { kind: 'invalid', reason: 'missing bed width or height' };
-  }
-
+  if (width === null || height === null) return { kind: 'invalid', reason: 'missing bed width or height' };
   const originRaw = extractFirst(text, ['Origin', 'HomeOrigin', 'StartFrom']);
-  const origin = mapOrigin(originRaw);
-  const maxPowerS = parsePositiveNumber(extractFirst(text, ['SMax', 'MaxS', 'SpindleMax', 'SValueMax']));
-  const startScript = extractFirst(text, ['StartScript', 'StartGCode', 'StartMacro']);
-  const endScript = extractFirst(text, ['EndScript', 'EndGCode', 'EndMacro']);
-  const isGrbl = controller?.toLowerCase().includes('grbl') === true;
+  return {
+    kind: 'ok',
+    device: {
+      name,
+      ...(controller !== undefined ? { controller } : {}),
+      width,
+      height,
+      ...(originRaw !== undefined ? { originRaw } : {}),
+      origin: mapOrigin(originRaw),
+      maxPowerS: parsePositiveNumber(extractFirst(text, ['SMax', 'MaxS', 'SpindleMax', 'SValueMax'])),
+      ...optionalScript(text, 'startScript', ['StartScript', 'StartGCode', 'StartMacro']),
+      ...optionalScript(text, 'endScript', ['EndScript', 'EndGCode', 'EndMacro']),
+      isGrbl: controller?.toLowerCase().includes('grbl') === true,
+    },
+  };
+}
 
-  const applied: LightBurnImportReviewField[] = [
-    { label: 'Name', value: name },
-    ...(isGrbl
-      ? [{ label: 'Controller', value: controller ?? 'GRBL', note: 'Mapped as GRBL-compatible.' }]
+function lightBurnProfile(
+  device: ParsedLightBurnDevice,
+  options: LightBurnDeviceImportOptions,
+): DeviceProfile {
+  const { catalogVersion, ...baseProfile } = DEFAULT_DEVICE_PROFILE;
+  void catalogVersion;
+  return {
+    ...baseProfile,
+    profileId: `lightburn-${slugify(device.name)}`,
+    profileSource: 'lightburn',
+    name: device.name,
+    bedWidth: device.width,
+    bedHeight: device.height,
+    maxPowerS: device.maxPowerS ?? DEFAULT_DEVICE_PROFILE.maxPowerS,
+    origin: device.origin ?? DEFAULT_DEVICE_PROFILE.origin,
+    scanningOffsets: [],
+    noGoZones: [],
+    evidence: [
+      {
+        label: 'LightBurn .lbdev import',
+        status: 'user-imported',
+        note: `Imported from ${options.fileName ?? 'legacy .lbdev text'}; review before first job.`,
+      },
+    ],
+  };
+}
+
+function lightBurnReviewFields(device: ParsedLightBurnDevice): {
+  readonly applied: ReadonlyArray<LightBurnImportReviewField>;
+  readonly needsReview: ReadonlyArray<LightBurnImportReviewField>;
+  readonly ignored: ReadonlyArray<LightBurnImportReviewField>;
+} {
+  return {
+    applied: appliedLightBurnFields(device),
+    needsReview: reviewLightBurnFields(device),
+    ignored: ignoredLightBurnFields(device),
+  };
+}
+
+function appliedLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  return [
+    { label: 'Name', value: device.name },
+    ...(device.isGrbl
+      ? [
+          {
+            label: 'Controller',
+            value: device.controller ?? 'GRBL',
+            note: 'Mapped as GRBL-compatible.',
+          },
+        ]
       : []),
-    { label: 'Bed width', value: `${width} mm` },
-    { label: 'Bed height', value: `${height} mm` },
+    { label: 'Bed width', value: `${device.width} mm` },
+    { label: 'Bed height', value: `${device.height} mm` },
+    ...(device.originRaw !== undefined && device.origin !== null
+      ? [{ label: 'Origin', value: device.originRaw }]
+      : []),
+    ...(device.maxPowerS !== null ? [{ label: 'Max S', value: String(device.maxPowerS) }] : []),
   ];
-  const needsReview: LightBurnImportReviewField[] = [];
-  const ignored: LightBurnImportReviewField[] = [];
+}
 
-  if (!isGrbl) {
-    needsReview.push({
+function reviewLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  return [
+    ...controllerReview(device),
+    ...originReview(device),
+    ...maxPowerReview(device),
+  ];
+}
+
+function controllerReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  if (device.isGrbl) return [];
+  return [
+    {
       label: 'Controller',
-      value: controller ?? 'Unknown',
+      value: device.controller ?? 'Unknown',
       note: 'Only GRBL-compatible LightBurn devices can become LaserForge profiles.',
-    });
-  }
-  if (originRaw !== undefined && origin !== null) {
-    applied.push({ label: 'Origin', value: originRaw });
-  } else if (originRaw !== undefined) {
-    needsReview.push({ label: 'Origin', value: originRaw, note: 'Could not map safely.' });
-  }
-  if (maxPowerS !== null) {
-    applied.push({ label: 'Max S', value: String(maxPowerS) });
-  } else {
-    needsReview.push({
+    },
+  ];
+}
+
+function originReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  if (device.originRaw === undefined || device.origin !== null) return [];
+  return [{ label: 'Origin', value: device.originRaw, note: 'Could not map safely.' }];
+}
+
+function maxPowerReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  if (device.maxPowerS !== null) return [];
+  return [
+    {
       label: 'Max S',
       value: 'Not detected',
       note: 'LaserForge default $30 range will be used until reviewed.',
-    });
-  }
-  if (startScript !== undefined) {
-    ignored.push({
-      label: 'Start script',
-      value: summarizeMultiline(startScript),
-      note: 'Imported profiles never write firmware or run startup scripts automatically.',
-    });
-  }
-  if (endScript !== undefined) {
-    ignored.push({
-      label: 'End script',
-      value: summarizeMultiline(endScript),
-      note: 'End scripts are review-only in Machine Setup.',
-    });
-  }
-
-  const { catalogVersion, ...baseProfile } = DEFAULT_DEVICE_PROFILE;
-  void catalogVersion;
-
-  return {
-    kind: 'review',
-    canCreateProfile: isGrbl,
-    profile: {
-      ...baseProfile,
-      profileId: `lightburn-${slugify(name)}`,
-      profileSource: 'lightburn',
-      name,
-      bedWidth: width,
-      bedHeight: height,
-      maxPowerS: maxPowerS ?? DEFAULT_DEVICE_PROFILE.maxPowerS,
-      origin: origin ?? DEFAULT_DEVICE_PROFILE.origin,
-      scanningOffsets: [],
-      noGoZones: [],
-      evidence: [
-        {
-          label: 'LightBurn .lbdev import',
-          status: 'user-imported',
-          note: `Imported from ${options.fileName ?? 'legacy .lbdev text'}; review before first job.`,
-        },
-      ],
     },
-    applied,
-    needsReview,
-    ignored,
-  };
+  ];
+}
+
+function ignoredLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
+  return [
+    ...scriptReview(
+      'Start script',
+      device.startScript,
+      'Imported profiles never write firmware or run startup scripts automatically.',
+    ),
+    ...scriptReview('End script', device.endScript, 'End scripts are review-only in Machine Setup.'),
+  ];
+}
+
+function scriptReview(
+  label: string,
+  script: string | undefined,
+  note: string,
+): LightBurnImportReviewField[] {
+  return script === undefined ? [] : [{ label, value: summarizeMultiline(script), note }];
+}
+
+function optionalScript(
+  text: string,
+  key: 'startScript' | 'endScript',
+  tags: ReadonlyArray<string>,
+): Pick<ParsedLightBurnDevice, 'startScript' | 'endScript'> {
+  const script = extractFirst(text, tags);
+  if (script === undefined) return {};
+  return key === 'startScript' ? { startScript: script } : { endScript: script };
 }
 
 function extractFirst(text: string, tags: ReadonlyArray<string>): string | undefined {

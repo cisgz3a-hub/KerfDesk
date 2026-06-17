@@ -280,13 +280,35 @@ function toMaterialPreset(preset: StarterMaterialPreset): MaterialPreset {
   const warnings = materialPresetWarnings(preset);
   const warningText = warnings.length === 0 ? '' : ` Warnings: ${warnings.join(' ')}`;
   const unsupportedText = preset.unsupported === true ? ' Unsupported on this diode profile.' : '';
-  const profile = NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
   return {
     id: preset.id,
     materialName: preset.materialName,
     material: preset.materialName,
     ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
     ...(preset.title !== undefined ? { title: preset.title } : {}),
+    ...starterPresetMetadata(preset, warnings),
+    description: `${preset.description}${unsupportedText}${warningText}`,
+    recipe: preset.recipe,
+    revision: preset.revision,
+  };
+}
+
+function starterPresetMetadata(
+  preset: StarterMaterialPreset,
+  warnings: ReadonlyArray<string>,
+): Pick<
+  MaterialPreset,
+  | 'operation'
+  | 'profileId'
+  | 'machineFamily'
+  | 'laserModel'
+  | 'opticalPowerW'
+  | 'confidence'
+  | 'warning'
+  | 'calibrationProvenance'
+> {
+  const profile = NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
+  return {
     operation: starterPresetOperation(preset),
     ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
     ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
@@ -299,9 +321,6 @@ function toMaterialPreset(preset: StarterMaterialPreset): MaterialPreset {
     confidence: preset.unsupported === true ? 'unsupported' : 'starter',
     ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
     calibrationProvenance: preset.revision,
-    description: `${preset.description}${unsupportedText}${warningText}`,
-    recipe: preset.recipe,
-    revision: preset.revision,
   };
 }
 
