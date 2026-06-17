@@ -4,9 +4,11 @@
 // check on jobs whose AABB already fails.
 
 import { assertNever } from '../scene';
+import type { DeviceProfile } from '../devices';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
 import type { CutGroup, FillGroup, Group, Job, RasterGroup } from './job';
+import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
 
 export type JobBounds = {
   readonly minX: number;
@@ -17,18 +19,22 @@ export type JobBounds = {
 
 type MutableBounds = { minX: number; minY: number; maxX: number; maxY: number };
 
-export function computeJobBounds(job: Job): JobBounds | null {
-  return computeBounds(job, false);
+export function computeJobBounds(job: Job, device?: DeviceProfile): JobBounds | null {
+  return computeBounds(job, false, device);
 }
 
 // Full physical motion envelope, including laser-off acceleration runways.
 // Frame still traces computeJobBounds(), but safety gates use this helper so a
 // burn-area frame cannot approve a Start job whose overscan would leave the bed.
-export function computeJobMotionBounds(job: Job): JobBounds | null {
-  return computeBounds(job, true);
+export function computeJobMotionBounds(job: Job, device?: DeviceProfile): JobBounds | null {
+  return computeBounds(job, true, device);
 }
 
-function computeBounds(job: Job, includeOverscanMotion: boolean): JobBounds | null {
+function computeBounds(
+  job: Job,
+  includeOverscanMotion: boolean,
+  device: DeviceProfile | undefined,
+): JobBounds | null {
   const b: MutableBounds = {
     minX: Number.POSITIVE_INFINITY,
     minY: Number.POSITIVE_INFINITY,
@@ -37,7 +43,7 @@ function computeBounds(job: Job, includeOverscanMotion: boolean): JobBounds | nu
   };
   let any = false;
   for (const group of job.groups) {
-    if (extendBoundsForGroup(b, group, includeOverscanMotion)) any = true;
+    if (extendBoundsForGroup(b, group, includeOverscanMotion, device)) any = true;
   }
   return any ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY } : null;
 }
@@ -47,14 +53,15 @@ function extendBoundsForGroup(
   b: MutableBounds,
   group: Group,
   includeOverscanMotion: boolean,
+  device: DeviceProfile | undefined,
 ): boolean {
   switch (group.kind) {
     case 'cut':
       return extendBoundsForCut(b, group);
     case 'fill':
-      return extendBoundsForFill(b, group, includeOverscanMotion);
+      return extendBoundsForFill(b, group, includeOverscanMotion, device);
     case 'raster':
-      return extendBoundsForRaster(b, group, includeOverscanMotion);
+      return extendBoundsForRaster(b, group, includeOverscanMotion, device);
     default:
       return assertNever(group, 'Group');
   }
@@ -75,12 +82,29 @@ function extendBoundsForFill(
   b: MutableBounds,
   group: FillGroup,
   includeOverscanMotion: boolean,
+  device: DeviceProfile | undefined,
 ): boolean {
-  const any = extendBoundsForCut(b, group);
-  if (!includeOverscanMotion) return any;
-  for (const sweep of groupFillSweeps(group.segments)) {
-    const first = sweep.spans[0];
-    const last = sweep.spans[sweep.spans.length - 1];
+  let any = extendBoundsForCut(b, group);
+  const scanOffsetMm = scanOffsetForGroup(device, group.speed);
+  const sweeps = groupFillSweeps(group.segments);
+  for (const sweep of sweeps) {
+    const spans =
+      sweep.reverse && scanOffsetMm !== 0
+        ? sweep.spans.map((span) => {
+            const shifted = shiftAlongTravel(span.start, span.end, scanOffsetMm);
+            return { start: shifted.from, end: shifted.to };
+          })
+        : sweep.spans;
+    if (sweep.reverse && scanOffsetMm !== 0) {
+      for (const span of spans) {
+        extendBoundsForPoint(b, span.start);
+        extendBoundsForPoint(b, span.end);
+        any = true;
+      }
+    }
+    if (!includeOverscanMotion) continue;
+    const first = spans[0];
+    const last = spans[spans.length - 1];
     if (first === undefined || last === undefined) continue;
     const burnRun = [first.start, last.end] as const;
     const overscan = effectiveOverscanMm(burnRun, group.overscanMm);
@@ -98,14 +122,25 @@ function extendBoundsForRaster(
   b: MutableBounds,
   group: RasterGroup,
   includeOverscanMotion: boolean,
+  device: DeviceProfile | undefined,
 ): boolean {
+  const scanOffsetMm = scanOffsetForGroup(device, group.speed);
+  const reverseShiftX = hasActiveReverseRasterRow(group) ? -scanOffsetMm : 0;
   if (group.bounds.minX < b.minX) b.minX = group.bounds.minX;
   if (group.bounds.maxX > b.maxX) b.maxX = group.bounds.maxX;
   if (group.bounds.minY < b.minY) b.minY = group.bounds.minY;
   if (group.bounds.maxY > b.maxY) b.maxY = group.bounds.maxY;
+  if (reverseShiftX !== 0) {
+    b.minX = Math.min(b.minX, group.bounds.minX + reverseShiftX);
+    b.maxX = Math.max(b.maxX, group.bounds.maxX + reverseShiftX);
+  }
   if (includeOverscanMotion && hasActiveRasterPixel(group)) {
     b.minX = Math.min(b.minX, group.bounds.minX - group.overscanMm);
     b.maxX = Math.max(b.maxX, group.bounds.maxX + group.overscanMm);
+    if (reverseShiftX !== 0) {
+      b.minX = Math.min(b.minX, group.bounds.minX - group.overscanMm + reverseShiftX);
+      b.maxX = Math.max(b.maxX, group.bounds.maxX + group.overscanMm + reverseShiftX);
+    }
   }
   return true;
 }
@@ -125,4 +160,26 @@ function hasActiveRasterPixel(group: RasterGroup): boolean {
     if (s > 0) return true;
   }
   return false;
+}
+
+function hasActiveReverseRasterRow(group: RasterGroup): boolean {
+  let emittedRowCount = 0;
+  for (let y = 0; y < group.pixelHeight; y += 1) {
+    if (!hasActivePixelInRasterRow(group, y)) continue;
+    if (emittedRowCount % 2 === 1) return true;
+    emittedRowCount += 1;
+  }
+  return false;
+}
+
+function hasActivePixelInRasterRow(group: RasterGroup, y: number): boolean {
+  const rowStart = y * group.pixelWidth;
+  for (let x = 0; x < group.pixelWidth; x += 1) {
+    if ((group.sValues[rowStart + x] ?? 0) > 0) return true;
+  }
+  return false;
+}
+
+function scanOffsetForGroup(device: DeviceProfile | undefined, speed: number): number {
+  return device === undefined ? 0 : offsetForSpeed(device.scanningOffsets, speed);
 }

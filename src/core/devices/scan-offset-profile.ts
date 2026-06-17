@@ -4,18 +4,26 @@ export type ScanOffsetPoint = {
 };
 
 export function isScanOffsetTable(value: unknown): value is ReadonlyArray<ScanOffsetPoint> {
-  return Array.isArray(value) && value.every(isScanOffsetPoint);
+  if (!Array.isArray(value)) return false;
+  const seenSpeeds = new Set<number>();
+  for (const point of value) {
+    if (!isScanOffsetPoint(point)) return false;
+    if (seenSpeeds.has(point.speedMmPerMin)) return false;
+    seenSpeeds.add(point.speedMmPerMin);
+  }
+  return true;
 }
 
 export function normalizeScanOffsetTable(value: unknown): ReadonlyArray<ScanOffsetPoint> {
   if (!Array.isArray(value)) return [];
-  return value
-    .filter(isScanOffsetPoint)
-    .map((point) => ({
-      speedMmPerMin: point.speedMmPerMin,
-      offsetMm: point.offsetMm,
-    }))
-    .sort((a, b) => a.speedMmPerMin - b.speedMmPerMin);
+  const bySpeed = new Map<number, ScanOffsetPoint>();
+  for (const point of value.filter(isScanOffsetPoint).map((point) => ({
+    speedMmPerMin: point.speedMmPerMin,
+    offsetMm: point.offsetMm,
+  }))) {
+    bySpeed.set(point.speedMmPerMin, point);
+  }
+  return [...bySpeed.values()].sort((a, b) => a.speedMmPerMin - b.speedMmPerMin);
 }
 
 function isScanOffsetPoint(value: unknown): value is ScanOffsetPoint {

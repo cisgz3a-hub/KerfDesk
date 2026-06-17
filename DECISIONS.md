@@ -2779,7 +2779,7 @@ reload / address-bar defaults in the web build (acceptable on a CAD surface).
 
 ## ADR-052 — Scanning offset compensation: a per-speed table cancels the bidirectional zipper
 
-**Status:** Proposed; pure math module + tests landed, emitter wiring pending. | **Date:** 2026-06-17
+**Status:** Accepted; core model, emitters, bounds, IO, tests, and opt-in UI landed. Calibration workflow pending. | **Date:** 2026-06-17
 
 ### Context
 
@@ -2830,16 +2830,18 @@ only** (not half-to-each): forward rows and all vector cuts stay at exact design
 coordinates, so mixed line+fill registration is preserved, and the calibration
 value is exactly the measured forward-vs-reverse separation.
 
-Delivered in two diffs to keep each reviewable (CLAUDE.md "tight leash"):
+Delivered in reviewable slices (CLAUDE.md "tight leash"):
 
-1. **(this diff)** the pure module + co-located unit/property tests, **no wiring**
-   — nothing imports it, so output is byte-identical and no snapshot moves.
-2. the `DeviceProfile` field + threading into `emit-raster.ts` (shift X of reverse
-   rows, gated on the existing `reverse` flag) and `grbl-strategy.ts`
-   `emitFillSweep` (`shiftAlongTravel` on reverse sweeps), plus a calibration
-   test-pattern generator and the device-settings table UI. That diff *does* move
-   the G-code snapshot for bidirectional fills and will carry the
-   `Snapshot change acknowledged:` line.
+1. the pure module + co-located unit/property tests;
+2. `DeviceProfile.scanningOffsets` + project/material IO normalization;
+3. raster reverse-row X shifts and fill reverse-sweep `shiftAlongTravel` wiring;
+4. scan-offset-aware job/frame bounds so Frame placement and safety checks see
+   compensated output extents;
+5. the device-settings table UI.
+
+The calibration-pattern workflow and machine-specific default tables remain
+future work. The Neotronics 4040 profile still ships with `[]` rather than a
+guessed default.
 
 ### Consequences
 
