@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
+import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import {
   createLayer,
   createProject,
+  DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { prepareOutput } from '../../io/gcode';
 import type { JobPlacementSettings } from '../job-placement';
+import type { FrameVerification } from '../state/frame-verification';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -286,6 +290,76 @@ describe('prepareStartJob job placement', () => {
     if (!result.ok) {
       expect(result.messages.join('\n')).toMatch(/overscan/i);
       expect(result.messages.join('\n')).toMatch(/5 mm/);
+    }
+  });
+});
+
+describe('prepareStartJob Verified Origin gate (ADR-053 P2)', () => {
+  const verifiedOriginFrontLeft: JobPlacementSettings = {
+    startFrom: 'verified-origin',
+    anchor: 'front-left',
+  };
+  const framedWco = { x: 0, y: -90, z: 0 };
+
+  function matchingVerification(project: Project, wco: typeof framedWco): FrameVerification {
+    const prepared = prepareOutput(project, {
+      jobOrigin: { startFrom: 'verified-origin', anchor: 'front-left' },
+      outputScope: DEFAULT_OUTPUT_SCOPE,
+    });
+    if (!prepared.ok) throw new Error('test setup: prepareOutput failed');
+    const bounds = computeJobBounds(prepared.job);
+    if (bounds === null) throw new Error('test setup: no bounds');
+    return { boundsSignature: frameBoundsSignature(bounds), wco, workOriginActive: true };
+  }
+
+  it('blocks Start until a Verified Frame is recorded', () => {
+    const result = prepareStartJob(
+      calibratedProjectWith(centeredTraceObject),
+      readyController,
+      { ...readyMachine, workOriginActive: true, wcoCache: framedWco, frameVerification: null },
+      verifiedOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/verified frame/i);
+    }
+  });
+
+  it('allows Start after a matching Verified Frame', () => {
+    const project = calibratedProjectWith(centeredTraceObject);
+    const result = prepareStartJob(
+      project,
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: framedWco,
+        frameVerification: matchingVerification(project, framedWco),
+      },
+      verifiedOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('re-blocks when the origin moved since the Verified Frame', () => {
+    const project = calibratedProjectWith(centeredTraceObject);
+    const result = prepareStartJob(
+      project,
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        wcoCache: { x: 10, y: -90, z: 0 },
+        frameVerification: matchingVerification(project, framedWco),
+      },
+      verifiedOriginFrontLeft,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages.join('\n')).toMatch(/verified frame/i);
     }
   });
 });
