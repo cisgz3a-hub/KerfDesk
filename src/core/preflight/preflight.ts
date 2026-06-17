@@ -17,6 +17,7 @@ import {
   findOutOfBoundsCoords,
   type MotionBoundsOffset,
 } from '../invariants';
+import type { NoGoZone } from '../devices';
 import { machineBoundsForDevice } from '../devices';
 import { DEFAULT_OVERSCAN_MM } from '../job';
 
@@ -30,6 +31,7 @@ export type PreflightCode =
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
+  | 'no-go-zone-collision'
   | 'raster-too-large'
   | 'selected-output-empty'
   | 'empty-output';
@@ -83,6 +85,8 @@ export function runPreflight(
 
   appendBoundsIssues(project, gcode, issues, options);
 
+  appendNoGoZoneIssues(project, gcode, issues, options);
+
   appendLaserOnTravelIssues(gcode, issues);
 
   appendLongBlankFeedIssues(gcode, issues);
@@ -95,6 +99,31 @@ export function runPreflight(
   }
 
   return { ok: issues.length === 0, issues };
+}
+
+function appendNoGoZoneIssues(
+  project: Project,
+  gcode: string,
+  issues: PreflightIssue[],
+  options: PreflightOptions,
+): void {
+  const zones = project.device.noGoZones.filter((zone) => zone.enabled);
+  if (zones.length === 0) return;
+  if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
+    issues.push({
+      code: 'no-go-zone-collision',
+      message: 'No-go zones require trusted machine position for relative-origin output.',
+    });
+    return;
+  }
+  const offset = options.motionOffset ?? { x: 0, y: 0 };
+  const collisions = findNoGoZoneCollisions(gcode, zones, offset);
+  for (const collision of collisions.slice(0, MAX_BOUNDS_ISSUES)) {
+    issues.push({
+      code: 'no-go-zone-collision',
+      message: `Line ${collision.lineNumber}: motion crosses no-go zone "${collision.zone.name}".`,
+    });
+  }
 }
 
 function appendLayerIssues(layer: Layer, maxFeed: number, issues: PreflightIssue[]): void {
@@ -293,6 +322,106 @@ function collectRelativeMotionEnvelope(gcode: string): {
     }
   }
   return any ? { minX, minY, maxX, maxY } : null;
+}
+
+function findNoGoZoneCollisions(
+  gcode: string,
+  zones: ReadonlyArray<NoGoZone>,
+  offset: MotionBoundsOffset,
+): ReadonlyArray<{ readonly lineNumber: number; readonly zone: NoGoZone }> {
+  const issues: Array<{ readonly lineNumber: number; readonly zone: NoGoZone }> = [];
+  let current: MotionPoint | null = null;
+  const lines = gcode.split('\n');
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i];
+    if (raw === undefined) continue;
+    const stripped = raw.split(';', 1)[0]?.trim() ?? '';
+    if (!/^G[0123]\b/.test(stripped)) continue;
+    const parsedX = parseMotionAxis(stripped, 'X');
+    const parsedY = parseMotionAxis(stripped, 'Y');
+    if (parsedX === null && parsedY === null) continue;
+    const baseX: number = parsedX ?? (current === null ? 0 : current.x);
+    const baseY: number = parsedY ?? (current === null ? 0 : current.y);
+    const next: MotionPoint = { x: baseX + offset.x, y: baseY + offset.y };
+    const hit = zones.find((zone) =>
+      current === null ? pointInZone(next, zone) : segmentIntersectsZone(current, next, zone),
+    );
+    if (hit !== undefined) issues.push({ lineNumber: i + 1, zone: hit });
+    current = next;
+  }
+  return issues;
+}
+
+type MotionPoint = {
+  readonly x: number;
+  readonly y: number;
+};
+
+function pointInZone(point: MotionPoint, zone: NoGoZone): boolean {
+  return (
+    point.x >= zone.x &&
+    point.x <= zone.x + zone.width &&
+    point.y >= zone.y &&
+    point.y <= zone.y + zone.height
+  );
+}
+
+function segmentIntersectsZone(
+  a: MotionPoint,
+  b: MotionPoint,
+  zone: NoGoZone,
+): boolean {
+  if (pointInZone(a, zone) || pointInZone(b, zone)) return true;
+  const left = zone.x;
+  const right = zone.x + zone.width;
+  const top = zone.y;
+  const bottom = zone.y + zone.height;
+  return (
+    segmentsIntersect(a, b, { x: left, y: top }, { x: right, y: top }) ||
+    segmentsIntersect(a, b, { x: right, y: top }, { x: right, y: bottom }) ||
+    segmentsIntersect(a, b, { x: right, y: bottom }, { x: left, y: bottom }) ||
+    segmentsIntersect(a, b, { x: left, y: bottom }, { x: left, y: top })
+  );
+}
+
+function segmentsIntersect(
+  a: MotionPoint,
+  b: MotionPoint,
+  c: MotionPoint,
+  d: MotionPoint,
+): boolean {
+  const o1 = orientation(a, b, c);
+  const o2 = orientation(a, b, d);
+  const o3 = orientation(c, d, a);
+  const o4 = orientation(c, d, b);
+  if (o1 === 0 && onSegment(a, c, b)) return true;
+  if (o2 === 0 && onSegment(a, d, b)) return true;
+  if (o3 === 0 && onSegment(c, a, d)) return true;
+  if (o4 === 0 && onSegment(c, b, d)) return true;
+  return o1 !== o2 && o3 !== o4;
+}
+
+function orientation(
+  a: MotionPoint,
+  b: MotionPoint,
+  c: MotionPoint,
+): -1 | 0 | 1 {
+  const value = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
+  if (Math.abs(value) < 1e-9) return 0;
+  return value > 0 ? 1 : -1;
+}
+
+function onSegment(
+  a: MotionPoint,
+  b: MotionPoint,
+  c: MotionPoint,
+): boolean {
+  return (
+    b.x <= Math.max(a.x, c.x) &&
+    b.x >= Math.min(a.x, c.x) &&
+    b.y <= Math.max(a.y, c.y) &&
+    b.y >= Math.min(a.y, c.y)
+  );
 }
 
 function parseMotionAxis(line: string, axis: 'X' | 'Y'): number | null {

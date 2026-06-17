@@ -350,9 +350,13 @@ function describeFrameMotionPreflightIssue(
   const preflightBounds =
     motionOffset === undefined ? motionBounds : offsetJobBounds(motionBounds, motionOffset);
   const pre = framePreflight(preflightBounds, device);
-  return pre.kind === 'out-of-bounds'
-    ? `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`
-    : null;
+  if (pre.kind === 'out-of-bounds') {
+    return `${describeFramePreflightFailure(pre)} Generated motion includes overscan; move the artwork farther from the bed edge or reduce overscan after a test burn.`;
+  }
+  if (pre.kind === 'no-go-zone') {
+    return `Cannot frame: generated motion crosses no-go zone "${pre.zoneName}".`;
+  }
+  return null;
 }
 
 function describeRelativeMotionTooLarge(
