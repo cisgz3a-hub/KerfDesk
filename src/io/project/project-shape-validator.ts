@@ -1,5 +1,5 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
-import { isScanOffsetTable } from '../../core/devices';
+import { isGcodeDialectSelection, isScanOffsetTable } from '../../core/devices';
 
 // Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
 // deserialize. Distinct from the TARGET burn-grid budget (core/raster
@@ -54,6 +54,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     validateHoming(device['homing']),
     requireString(device, 'device.autofocusCommand'),
     optionalLiteral(device, 'device.airAssistCommand', ['none', 'M7', 'M8']),
+    optionalGcodeDialect(device, 'device.gcodeDialect'),
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
     optionalScanOffsetTable(device, 'device.scanningOffsets'),
@@ -398,6 +399,13 @@ function requireNonNegativeNumber(obj: Record<string, unknown>, path: string): s
 function optionalScanOffsetTable(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined || isScanOffsetTable(value) ? null : `missing or invalid \`${path}\``;
+}
+
+function optionalGcodeDialect(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return value === undefined || isGcodeDialectSelection(value)
+    ? null
+    : `missing or invalid \`${path}\``;
 }
 
 function optionalNoGoZones(obj: Record<string, unknown>, path: string): string | null {

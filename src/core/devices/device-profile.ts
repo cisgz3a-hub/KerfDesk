@@ -3,6 +3,7 @@
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
 import type { ScanOffsetPoint } from './scan-offset-profile';
+import type { GcodeDialectSelection } from './gcode-dialects';
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
@@ -65,6 +66,7 @@ export type DeviceProfile = {
   readonly evidence?: ReadonlyArray<ProfileEvidence>;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
+  readonly gcodeDialect: GcodeDialectSelection;
   readonly laserSubProfile?: LaserSubProfile;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
@@ -161,6 +163,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   minPowerS: 0,
   laserModeEnabled: true,
   airAssistCommand: 'none',
+  gcodeDialect: { dialectId: 'grbl-dynamic' },
   scanningOffsets: [],
   noGoZones: [],
   origin: 'front-left',
@@ -188,6 +191,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   minPowerS: 0,
   laserModeEnabled: true,
   airAssistCommand: 'none',
+  gcodeDialect: { dialectId: 'neotronics-4040-safe' },
   noGoZones: [],
   capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
   evidence: [

@@ -52,6 +52,7 @@ describe('LaserForge machine profile documents', () => {
       schemaVersion: 1,
       profile: {
         profileId: 'neotronics-4040-max-lt4lds-v2-20w',
+        gcodeDialect: { dialectId: 'neotronics-4040-safe' },
         scanningOffsets: [
           { speedMmPerMin: 3000, offsetMm: 0.09 },
           { speedMmPerMin: 6000, offsetMm: 0.18 },
@@ -80,6 +81,7 @@ describe('LaserForge machine profile documents', () => {
       { speedMmPerMin: 3000, offsetMm: 0.09 },
       { speedMmPerMin: 6000, offsetMm: 0.18 },
     ]);
+    expect(result.document.profile.gcodeDialect.dialectId).toBe('neotronics-4040-safe');
     expect(result.document.profile.noGoZones).toHaveLength(1);
   });
 

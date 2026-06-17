@@ -1,4 +1,17 @@
 export type {
+  GcodeDialectSelection,
+  GrblGcodeDialect,
+  GrblGcodeDialectId,
+  GrblPowerMode,
+} from './gcode-dialects';
+export {
+  GRBL_GCODE_DIALECTS,
+  isGcodeDialectSelection,
+  isGrblGcodeDialectId,
+  normalizeGcodeDialectSelection,
+  resolveGrblDialect,
+} from './gcode-dialects';
+export type {
   ControllerKind,
   DeviceProfile,
   HomingConfig,

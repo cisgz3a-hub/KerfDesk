@@ -6,6 +6,7 @@ import {
   type ProfileCapability,
   type ProfileEvidence,
 } from './device-profile';
+import { isGcodeDialectSelection } from './gcode-dialects';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
 
@@ -84,6 +85,9 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
   if (profile.controllerKind !== undefined && profile.controllerKind !== 'grbl-v1.1') {
     errors.push('controllerKind must be grbl-v1.1');
+  }
+  if (!isGcodeDialectSelection(profile.gcodeDialect)) {
+    errors.push('gcodeDialect must reference a known GRBL dialect');
   }
   requirePositive(profile.bedWidth, 'bedWidth', errors);
   requirePositive(profile.bedHeight, 'bedHeight', errors);

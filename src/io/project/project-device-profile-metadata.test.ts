@@ -12,7 +12,19 @@ describe('project device profile metadata persistence', () => {
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.project.device.machineFamily).toBe('neotronics-4040-max');
+    expect(result.project.device.gcodeDialect.dialectId).toBe('neotronics-4040-safe');
     expect(result.project.device.zTravelConfirmed).toBe(false);
     expect(result.project.device.laserSubProfile?.model).toBe('LASER TREE LT-4LDS-V2');
+  });
+
+  it('backfills old projects without a gcode dialect to the default dynamic GRBL dialect', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    delete raw.device.gcodeDialect;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.gcodeDialect).toEqual({ dialectId: 'grbl-dynamic' });
   });
 });
