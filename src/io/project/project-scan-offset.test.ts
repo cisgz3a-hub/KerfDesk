@@ -70,4 +70,25 @@ describe('project scan-offset IO', () => {
       expect(result.reason).toMatch(/device\.scanningOffsets/);
     }
   });
+
+  it('reports invalid for duplicate scan-offset speeds', () => {
+    const project = createProject();
+    const text = JSON.stringify({
+      ...project,
+      device: {
+        ...project.device,
+        scanningOffsets: [
+          { speedMmPerMin: 6000, offsetMm: 0.12 },
+          { speedMmPerMin: 6000, offsetMm: 0.2 },
+        ],
+      },
+    });
+
+    const result = deserializeProject(text);
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/device\.scanningOffsets/);
+    }
+  });
 });

@@ -333,12 +333,12 @@ function useFrameAction(): () => void {
       );
       return;
     }
-    const bounds = computeJobBounds(prepared.job);
+    const bounds = computeJobBounds(prepared.job, project.device);
     if (bounds === null) {
       pushToast('Nothing to frame — enable Output on at least one layer.', 'warning');
       return;
     }
-    const motionBounds = computeJobMotionBounds(prepared.job) ?? bounds;
+    const motionBounds = computeJobMotionBounds(prepared.job, project.device) ?? bounds;
     // Refuse to drive the head off-bed. The Falcon (and most diode
     // lasers) ship with $20=0, so any X/Y past the soft-limits skips
     // steps mechanically — the operator hears grinding and the trace

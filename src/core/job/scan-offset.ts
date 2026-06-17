@@ -17,8 +17,8 @@
 //     correction is correct at any hatch angle, not just axis-aligned rows.
 //
 // Pure-core: no clock, no random, no I/O. Same input -> same output (determinism
-// invariant #5). Nothing imports this yet — ADR-052 step 1 lands the math alone
-// (output byte-identical); the emitter wiring is the separate step-2 diff.
+// invariant #5). The GRBL fill/raster emitters import this, but an empty device
+// table still returns 0 so uncalibrated machines keep byte-identical output.
 
 import type { ScanOffsetPoint } from '../devices';
 import type { Vec2 } from '../scene';
