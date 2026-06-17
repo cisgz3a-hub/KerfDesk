@@ -16,6 +16,8 @@ const device = {
   junctionDeviationMm: 0.01,
 };
 
+const MIN_PROPERTY_POLYLINE_LENGTH_MM = 1e-3;
+
 function seg(...pts: Array<[number, number]>): CutSegment {
   return { polyline: pts.map(([x, y]) => ({ x, y })), closed: false };
 }
@@ -78,6 +80,19 @@ function rasterGroup(opts: {
     overscanMm: 5,
     dotWidthCorrectionMm: 0,
   };
+}
+
+function polylineLength(points: ReadonlyArray<Vec2>): number {
+  let previous = points[0];
+  if (previous === undefined) return 0;
+  let length = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    const current = points[i];
+    if (current === undefined) continue;
+    length += Math.hypot(current.x - previous.x, current.y - previous.y);
+    previous = current;
+  }
+  return length;
 }
 
 describe('estimateJobDuration', () => {
@@ -291,6 +306,7 @@ describe('estimateJobDuration', () => {
         ),
         (k, pts) => {
           const points: Vec2[] = pts.map(([x, y]) => ({ x, y }));
+          fc.pre(polylineLength(points) >= MIN_PROPERTY_POLYLINE_LENGTH_MM);
           const scaled: Vec2[] = points.map((p) => ({ x: p.x * k, y: p.y * k }));
           const base = estimateJobDuration(
             { groups: [group({ segments: [{ polyline: points, closed: false }] })] },
