@@ -1,5 +1,6 @@
 import {
   isScanOffsetTable,
+  normalizeGcodeDialectSelection,
   normalizeScanOffsetTable,
   validateMachineProfile,
   type DeviceProfile,
@@ -147,6 +148,7 @@ function parseProfile(
 
   const profile = canonicalProfile({
     ...(value as unknown as DeviceProfile),
+    gcodeDialect: normalizeGcodeDialectSelection(value['gcodeDialect']),
     scanningOffsets: normalizeScanOffsetTable(value['scanningOffsets']),
     noGoZones: noGoZones.noGoZones,
   });
@@ -228,6 +230,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     name: profile.name,
     ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
     ...(profile.controllerKind !== undefined ? { controllerKind: profile.controllerKind } : {}),
+    gcodeDialect: normalizeGcodeDialectSelection(profile.gcodeDialect),
     ...(profile.laserSubProfile !== undefined
       ? { laserSubProfile: { ...profile.laserSubProfile } }
       : {}),
