@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { GrblState, StatusReport } from '../../core/controllers/grbl';
+import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import {
+  DEFAULT_RASTER_LAYER_COLOR,
   createLayer,
   createProject,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type Project,
+  type RasterImage,
   type SceneObject,
 } from '../../core/scene';
+import { prepareOutput } from '../../io/gcode';
 import { prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
@@ -87,6 +91,42 @@ function calibratedProject(): Project {
   };
 }
 
+function rasterProjectWithScanOffset(): Project {
+  const image: RasterImage = {
+    kind: 'raster-image',
+    id: 'raster-1',
+    source: 'scan-offset.png',
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: 2,
+    pixelHeight: 2,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 5 },
+    transform: IDENTITY_TRANSFORM,
+    color: DEFAULT_RASTER_LAYER_COLOR,
+    dither: 'threshold',
+    linesPerMm: 1,
+    lumaBase64: 'AAAAAA==',
+  };
+  const device = {
+    ...createProject().device,
+    scanningOffsets: [{ speedMmPerMin: 1500, offsetMm: -2 }],
+  };
+  return {
+    ...createProject(device),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [image],
+      layers: [
+        {
+          ...createLayer({ id: 'image', color: DEFAULT_RASTER_LAYER_COLOR, mode: 'image' }),
+          speed: 1500,
+          linesPerMm: 1,
+          ditherAlgorithm: 'threshold',
+        },
+      ],
+    },
+  };
+}
+
 describe('prepareStartJob', () => {
   it('blocks Start when connected controller $30 differs from project max S', () => {
     const result = prepareStartJob(
@@ -158,6 +198,33 @@ describe('prepareStartJob', () => {
         'Trace "logo.png" is vector Line output, not raster image engraving. It will run with M3 constant-power moves and can cut if power/speed are too aggressive.',
       );
     }
+  });
+
+  it('accepts a Verified Frame signature computed from scan-offset-aware bounds', () => {
+    const project = rasterProjectWithScanOffset();
+    const jobOrigin = { startFrom: 'verified-origin' as const, anchor: 'front-left' as const };
+    const prepared = prepareOutput(project, { jobOrigin });
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) return;
+    const bounds = computeJobBounds(prepared.job, project.device);
+    expect(bounds?.maxX).toBe(12);
+
+    const result = prepareStartJob(
+      project,
+      readyController,
+      {
+        ...readyMachine,
+        workOriginActive: true,
+        frameVerification: {
+          boundsSignature: frameBoundsSignature(bounds),
+          wco: null,
+          workOriginActive: true,
+        },
+      },
+      { startFrom: 'verified-origin', anchor: 'front-left' },
+    );
+
+    expect(result.ok).toBe(true);
   });
 
   it('blocks Start until a controller status frame has been received', () => {
