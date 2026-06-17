@@ -2961,6 +2961,52 @@ Verification:
 
 ---
 
+## ADR-056 - Lane 6H: Ordered sub-layer operation stack
+
+**Status:** Accepted. | **Date:** 2026-06-17
+
+LightBurn sub-layers let one color run multiple operations, such as Fill then
+Line, without duplicating artwork. Rayforge's useful lesson is that a layer can
+own an ordered workflow of operation steps, but LaserForge does not need
+Rayforge's plugin workflow graph for this lane.
+
+Decision:
+
+- Add `Layer.subLayers`, defaulting to `[]`, as an additive-with-default
+  project field. Existing projects with no sub-layers compile exactly as before.
+- Keep the existing top-level layer as the primary operation. Enabled sub-layers
+  run after it in stored order and share the parent layer color/object match.
+- Store each sub-layer as `{ id, label, enabled, settings }`, where `settings`
+  is a complete snapshot of the same operation settings used by a normal layer:
+  mode, power, speed, passes, air assist, kerf, tabs, fill, image, and raster
+  tuning fields.
+- Compile sub-layers by materializing them as same-color effective layers with
+  ids like `#ff0000:sub-1`. This lets Preview, Save G-code, Frame, Start,
+  estimates, and output strategies consume the existing Job IR instead of a
+  second code path.
+- Surface a compact Sub-layers section in Cuts/Layers. Add creates a duplicate
+  of the primary operation; quick controls edit enabled, mode, and power; the
+  existing Cut Settings dialog edits the full operation. In that dialog, Output
+  maps to sub-layer enabled.
+
+Consequences:
+
+- Simple "engrave fill, then cut outline" workflows are now possible on one
+  color layer without duplicating geometry.
+- This is not Rayforge's full workflow system. Per-operation source transforms,
+  generated workpieces, plugin operation types, drag-reorder UI, manual tab
+  placement, and multi-laser assignment remain future work.
+- Hardware proof is still required: burn a same-color closed shape with primary
+  Fill and a Line sub-layer, then confirm the emitted order and physical result.
+
+Verification:
+
+- Red-first tests cover layer defaults/helpers, `.lf2` back-fill and nested
+  validation, ordered compile output, store add/update/delete/undo behavior, and
+  the Cuts/Layers sub-layer controls.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

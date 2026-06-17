@@ -193,4 +193,33 @@ describe('CutsLayersPanel layer order controls', () => {
       await unmount();
     }
   });
+
+  it('adds and edits a sub-layer operation from the Cuts / Layers panel', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const { host, unmount } = await renderPanel();
+    try {
+      const addSubLayer = host.querySelector('button[aria-label="Add sub-layer for #ff0000"]');
+      if (!(addSubLayer instanceof HTMLButtonElement)) throw new Error('add sub-layer missing');
+
+      await act(async () => {
+        addSubLayer.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const mode = host.querySelector('select[aria-label="Mode for Sub-layer 1 #ff0000"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('sub-layer mode missing');
+      await act(async () => {
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+
+      expect(useStore.getState().project.scene.layers[0]?.subLayers[0]).toMatchObject({
+        id: 'sub-1',
+        label: 'Sub-layer 1',
+        enabled: true,
+        settings: { mode: 'fill' },
+      });
+    } finally {
+      await unmount();
+    }
+  });
 });

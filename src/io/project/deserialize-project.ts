@@ -12,6 +12,8 @@ import {
   DEFAULT_PROJECT_OPTIMIZATION,
   LAYER_DEFAULTS,
   PROJECT_SCHEMA_VERSION,
+  captureLayerOperationSettings,
+  type LayerOperationSettings,
   type Project,
 } from '../../core/scene';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
@@ -351,6 +353,7 @@ function normalizeLayer(layer: unknown): unknown {
   normalizeCommonLayerFields(out);
   normalizeFillLayerFields(out);
   normalizeImageLayerFields(out);
+  normalizeSubLayers(out);
   return out;
 }
 
@@ -421,6 +424,37 @@ function normalizeImageLayerFields(out: Record<string, unknown>): void {
   if (!isNonNegativeNumber(out['dotWidthCorrectionMm'])) {
     out['dotWidthCorrectionMm'] = LAYER_DEFAULTS.dotWidthCorrectionMm;
   }
+}
+
+function normalizeSubLayers(out: Record<string, unknown>): void {
+  if (!Array.isArray(out['subLayers'])) {
+    out['subLayers'] = LAYER_DEFAULTS.subLayers;
+    return;
+  }
+  out['subLayers'] = out['subLayers'].map((value, index) =>
+    normalizeSubLayer(value, `Sub-layer ${index + 1}`),
+  );
+}
+
+function normalizeSubLayer(value: unknown, fallbackLabel: string): unknown {
+  if (!isObject(value)) return value;
+  return {
+    ...value,
+    settings: normalizeLayerOperationSettings(value['settings']),
+    label: typeof value['label'] === 'string' ? value['label'] : fallbackLabel,
+    enabled: typeof value['enabled'] === 'boolean' ? value['enabled'] : true,
+  };
+}
+
+function normalizeLayerOperationSettings(value: unknown): LayerOperationSettings {
+  const settings: Record<string, unknown> = {
+    ...captureLayerOperationSettings(LAYER_DEFAULTS),
+    ...(isObject(value) ? value : {}),
+  };
+  normalizeCommonLayerFields(settings);
+  normalizeFillLayerFields(settings);
+  normalizeImageLayerFields(settings);
+  return settings as unknown as LayerOperationSettings;
 }
 
 function isNonNegativeNumber(value: unknown): value is number {

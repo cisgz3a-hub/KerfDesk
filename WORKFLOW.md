@@ -797,6 +797,11 @@ or traced image) with at least one closed polyline.
 7. If **Offset Fill** is selected, closed regions emit inward contour-following
    fill paths spaced by the line interval. Offset Fill uses the Fill layer's
    dynamic-power output path but does not use scanline overscan runways.
+8. Use **Sub-layers > Add** to add a second operation for the same color. The
+   primary layer operation emits first, then enabled sub-layers emit in row
+   order using their own mode, power, speed, passes, fill, image, kerf, tab,
+   and air settings. This supports simple LightBurn-style "fill then line"
+   workflows without duplicating artwork.
 
 **Error**:
 - *No closed polylines on this color* — the layer's mode is Fill, but
@@ -807,6 +812,8 @@ or traced image) with at least one closed polyline.
 - *Offset Fill on open contours* - Start / Save G-code preflight blocks with
   a specific Offset Fill message. Close the shapes or switch the layer back to
   Scanline Fill.
+- *Sub-layer disabled* - the sub-layer stays saved on the project but does not
+  compile into Preview, Frame, Save G-code, or Start output.
 
 **Empty**:
 - *No SceneObjects yet* — the Mode dropdown still works, but no

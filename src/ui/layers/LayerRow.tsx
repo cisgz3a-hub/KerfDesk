@@ -13,6 +13,7 @@ import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerRowCutSettings } from './LayerRowCutSettings';
 import { LayerRowSettingsFields } from './LayerRowFields';
+import { LayerSubLayers } from './LayerSubLayers';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
 import { useCutSettingsLauncher } from './use-cut-settings-launcher';
@@ -111,6 +112,7 @@ export function LayerRow(props: {
         <HeaderToggle label="Output" layer={layer} field="output" />
       </header>
       <LayerRowSettingsFields layer={layer} />
+      <LayerSubLayers layer={layer} />
       {settingsOpen ? <LayerRowCutSettings layer={layer} onClose={closeSettings} /> : null}
     </section>
   );

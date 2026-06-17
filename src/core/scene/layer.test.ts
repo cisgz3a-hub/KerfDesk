@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { createLayer, LAYER_DEFAULTS } from './layer';
+import {
+  captureLayerOperationSettings,
+  createLayer,
+  createLayerSubLayer,
+  layerFromSubLayer,
+  LAYER_DEFAULTS,
+} from './layer';
 
 describe('createLayer', () => {
   it('applies WORKFLOW.md F-A7 defaults (power 30, speed 1500, passes 1, visible+output on, mode line) plus F.1 hatch defaults', () => {
@@ -31,6 +37,7 @@ describe('createLayer', () => {
       negativeImage: false,
       passThrough: false,
       dotWidthCorrectionMm: 0,
+      subLayers: [],
     });
   });
 
@@ -72,5 +79,43 @@ describe('LAYER_DEFAULTS', () => {
   it('defaults fill style to scanline so existing fill output is unchanged', () => {
     expect(LAYER_DEFAULTS.fillStyle).toBe('scanline');
     expect(createLayer({ id: 'L1', color: '#000000' }).fillStyle).toBe('scanline');
+  });
+
+  it('defaults sub-layers to an empty operation list', () => {
+    expect(LAYER_DEFAULTS.subLayers).toEqual([]);
+    expect(createLayer({ id: 'L1', color: '#000000' }).subLayers).toEqual([]);
+  });
+});
+
+describe('layer sub-layer operations', () => {
+  it('captures a layer operation and materializes it as a same-color output layer', () => {
+    const layer = { ...createLayer({ id: 'L1', color: '#ff0000' }), mode: 'fill' as const };
+    const subLayer = createLayerSubLayer(layer, {
+      id: 'sub-1',
+      label: 'Cut after fill',
+      settings: {
+        ...captureLayerOperationSettings(layer),
+        mode: 'line',
+        power: 82,
+        speed: 900,
+      },
+    });
+
+    expect(subLayer).toMatchObject({
+      id: 'sub-1',
+      label: 'Cut after fill',
+      enabled: true,
+      settings: { mode: 'line', power: 82, speed: 900 },
+    });
+    expect(layerFromSubLayer(layer, subLayer)).toMatchObject({
+      id: 'L1:sub-1',
+      color: '#ff0000',
+      mode: 'line',
+      power: 82,
+      speed: 900,
+      visible: true,
+      output: true,
+      subLayers: [],
+    });
   });
 });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
+  captureLayerOperationSettings,
   createLayer,
+  createLayerSubLayer,
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type SceneObject,
@@ -189,6 +191,32 @@ describe('compileJob fill hatching', () => {
     expect(segments.length).toBeGreaterThan(1);
     expect(segments.every((segment) => segment.closed)).toBe(true);
     expect(segments.every((segment) => segment.polyline.length > 2)).toBe(true);
+  });
+
+  it('compiles enabled sub-layers as ordered same-color operations after the primary layer', () => {
+    const primary = { ...fillLayer(), power: 35 };
+    const layer = {
+      ...primary,
+      subLayers: [
+        createLayerSubLayer(primary, {
+          id: 'sub-1',
+          label: 'Line cleanup',
+          settings: {
+            ...captureLayerOperationSettings(primary),
+            mode: 'line',
+            power: 80,
+            speed: 900,
+          },
+        }),
+      ],
+    };
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 10 });
+
+    const job = compileJob({ objects: [square], layers: [layer] }, dev);
+
+    expect(job.groups).toHaveLength(2);
+    expect(job.groups[0]).toMatchObject({ kind: 'fill', layerId: '#ff0000', power: 35 });
+    expect(job.groups[1]).toMatchObject({ kind: 'cut', layerId: '#ff0000:sub-1', power: 80 });
   });
 });
 
