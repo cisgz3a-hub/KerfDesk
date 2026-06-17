@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest';
+import {
+  GRBL_MACHINE_PROFILE_CATALOG,
+  duplicateProfileAsCustom,
+  profileCatalogEntryById,
+  profileSupportsCapability,
+  validateMachineProfile,
+} from './profile-catalog';
+
+describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
+  it('ships the required built-in GRBL profiles with valid evidence', () => {
+    expect(GRBL_MACHINE_PROFILE_CATALOG.map((entry) => entry.profile.profileId)).toEqual([
+      'generic-grbl-400x400',
+      'creality-falcon-a1-pro-compatible',
+      'neotronics-4040-max-lt4lds-v2-20w',
+    ]);
+    for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {
+      expect(validateMachineProfile(entry.profile)).toEqual([]);
+      expect(entry.evidence.length).toBeGreaterThan(0);
+      expect(entry.profile.scanningOffsets).toEqual([]);
+    }
+  });
+
+  it('finds catalog entries by id and reports capabilities', () => {
+    const entry = profileCatalogEntryById('neotronics-4040-max-lt4lds-v2-20w');
+    expect(entry?.profile.name).toContain('Neotronics');
+    expect(entry === undefined ? false : profileSupportsCapability(entry.profile, 'grbl')).toBe(
+      true,
+    );
+  });
+
+  it('duplicates a built-in profile as a custom editable profile', () => {
+    const source = profileCatalogEntryById('generic-grbl-400x400')?.profile;
+    if (source === undefined) throw new Error('catalog profile missing');
+
+    const custom = duplicateProfileAsCustom(source, {
+      profileId: 'custom-test-profile',
+      name: 'Custom Test Profile',
+    });
+
+    expect(custom.profileId).toBe('custom-test-profile');
+    expect(custom.name).toBe('Custom Test Profile');
+    expect(custom.profileSource).toBe('custom');
+    expect(custom.catalogVersion).toBeUndefined();
+    expect(custom.scanningOffsets).toEqual([]);
+  });
+});

@@ -114,6 +114,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
           : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
       airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
       scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
+      noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     },
     optimization: normalizeOptimization(raw['optimization']),
     scene: {
