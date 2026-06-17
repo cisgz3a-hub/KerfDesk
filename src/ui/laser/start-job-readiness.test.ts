@@ -207,7 +207,9 @@ describe('prepareStartJob', () => {
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) return;
     const bounds = computeJobBounds(prepared.job, project.device);
-    expect(bounds?.maxX).toBe(12);
+    expect(bounds).not.toBeNull();
+    if (bounds === null) return;
+    expect(bounds.maxX).toBe(12);
 
     const result = prepareStartJob(
       project,
