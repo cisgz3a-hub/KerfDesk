@@ -1,7 +1,4 @@
-import {
-  GRBL_MACHINE_PROFILE_CATALOG,
-  type MachineProfileCatalogEntry,
-} from '../../core/devices';
+import { GRBL_MACHINE_PROFILE_CATALOG, type MachineProfileCatalogEntry } from '../../core/devices';
 import { Button } from '../kit';
 import { useStore } from '../state';
 import { DeviceSettings } from './DeviceSettings';

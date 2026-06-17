@@ -8,7 +8,12 @@ export type MaterialRecipeOperation =
   | 'material-test'
   | 'interval-test';
 export type MaterialRecipeConfidence = 'starter' | 'calibrated' | 'imported' | 'unsupported';
-export type MaterialRecipeMatchScope = 'profile' | 'machine-family' | 'laser-model' | 'optical-power' | 'generic';
+export type MaterialRecipeMatchScope =
+  | 'profile'
+  | 'machine-family'
+  | 'laser-model'
+  | 'optical-power'
+  | 'generic';
 
 export type MaterialRecipeCandidate = {
   readonly id: string;
@@ -44,8 +49,9 @@ export function rankMaterialRecipeCandidates<T extends MaterialRecipeCandidate>(
 ): ReadonlyArray<MaterialRecipeMatch<T>> {
   return candidates
     .map((candidate, index) => ({ match: matchCandidate(device, candidate, query), index }))
-    .filter((item): item is { readonly match: MaterialRecipeMatch<T>; readonly index: number } =>
-      item.match !== null,
+    .filter(
+      (item): item is { readonly match: MaterialRecipeMatch<T>; readonly index: number } =>
+        item.match !== null,
     )
     .sort((a, b) => b.match.score - a.match.score || a.index - b.index)
     .map((item) => item.match);
@@ -74,7 +80,10 @@ function matchCandidate<T extends MaterialRecipeCandidate>(
   };
 }
 
-function matchesQuery(candidate: MaterialRecipeCandidate, query: MaterialRecipeMatchQuery): boolean {
+function matchesQuery(
+  candidate: MaterialRecipeCandidate,
+  query: MaterialRecipeMatchQuery,
+): boolean {
   return (
     stringMatches(candidate.material, query.material) &&
     operationMatches(candidate.operation, query.operation) &&
@@ -126,7 +135,10 @@ function warningsFor(
   return warnings;
 }
 
-function stringMatches(candidateValue: string | undefined, queryValue: string | undefined): boolean {
+function stringMatches(
+  candidateValue: string | undefined,
+  queryValue: string | undefined,
+): boolean {
   if (candidateValue === undefined || queryValue === undefined) return true;
   return normalizeString(candidateValue) === normalizeString(queryValue);
 }
@@ -138,7 +150,10 @@ function operationMatches(
   return candidateValue === undefined || queryValue === undefined || candidateValue === queryValue;
 }
 
-function thicknessMatches(candidateValue: number | undefined, queryValue: number | undefined): boolean {
+function thicknessMatches(
+  candidateValue: number | undefined,
+  queryValue: number | undefined,
+): boolean {
   if (candidateValue === undefined || queryValue === undefined) return true;
   return Math.abs(candidateValue - queryValue) <= 0.001;
 }

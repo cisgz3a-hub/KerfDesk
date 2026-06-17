@@ -152,7 +152,11 @@ describe('laser-store machine settings', () => {
   it('blocks guarded writes without a current settings backup', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
-    useLaserStore.setState({ statusReport: idleStatus(), grblSettingsRows: [], lastSettingsReadAt: null });
+    useLaserStore.setState({
+      statusReport: idleStatus(),
+      grblSettingsRows: [],
+      lastSettingsReadAt: null,
+    });
 
     await expect(useLaserStore.getState().writeGrblSetting(30, '1000')).rejects.toThrow(
       /read and export/i,
@@ -168,9 +172,7 @@ describe('laser-store machine settings', () => {
       lastSettingsReadAt: Date.now(),
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
 
-    await expect(useLaserStore.getState().writeGrblSetting(999, '1')).rejects.toThrow(
-      /unknown/i,
-    );
+    await expect(useLaserStore.getState().writeGrblSetting(999, '1')).rejects.toThrow(/unknown/i);
   });
 });
 

@@ -71,7 +71,11 @@ function ZoneRow(props: {
       <NumberInput label="X" value={zone.x} onChange={(x) => props.onChange({ x })} />
       <NumberInput label="Y" value={zone.y} onChange={(y) => props.onChange({ y })} />
       <NumberInput label="W" value={zone.width} onChange={(width) => props.onChange({ width })} />
-      <NumberInput label="H" value={zone.height} onChange={(height) => props.onChange({ height })} />
+      <NumberInput
+        label="H"
+        value={zone.height}
+        onChange={(height) => props.onChange({ height })}
+      />
       <Button onClick={props.onDelete}>Delete</Button>
     </section>
   );
@@ -105,7 +109,11 @@ function replaceZone(
 }
 
 const stackStyle: React.CSSProperties = { display: 'grid', gap: 8 };
-const copyStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', margin: 0, lineHeight: 1.35 };
+const copyStyle: React.CSSProperties = {
+  color: 'var(--lf-text-muted)',
+  margin: 0,
+  lineHeight: 1.35,
+};
 const rowStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'auto minmax(130px, 1fr) repeat(4, 72px) auto',

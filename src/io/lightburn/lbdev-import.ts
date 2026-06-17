@@ -68,11 +68,17 @@ function parseLightBurnDevice(
 ):
   | { readonly kind: 'ok'; readonly device: ParsedLightBurnDevice }
   | { readonly kind: 'invalid'; readonly reason: string } {
-  const name = extractFirst(text, ['Name', 'DeviceName', 'DisplayName']) ?? 'Imported LightBurn device';
+  const name =
+    extractFirst(text, ['Name', 'DeviceName', 'DisplayName']) ?? 'Imported LightBurn device';
   const controller = extractFirst(text, ['Controller', 'ControllerType', 'DeviceType', 'Type']);
-  const width = parsePositiveNumber(extractFirst(text, ['Width', 'XSize', 'BedWidth', 'WorkWidth']));
-  const height = parsePositiveNumber(extractFirst(text, ['Height', 'YSize', 'BedHeight', 'WorkHeight']));
-  if (width === null || height === null) return { kind: 'invalid', reason: 'missing bed width or height' };
+  const width = parsePositiveNumber(
+    extractFirst(text, ['Width', 'XSize', 'BedWidth', 'WorkWidth']),
+  );
+  const height = parsePositiveNumber(
+    extractFirst(text, ['Height', 'YSize', 'BedHeight', 'WorkHeight']),
+  );
+  if (width === null || height === null)
+    return { kind: 'invalid', reason: 'missing bed width or height' };
   const originRaw = extractFirst(text, ['Origin', 'HomeOrigin', 'StartFrom']);
   return {
     kind: 'ok',
@@ -83,7 +89,9 @@ function parseLightBurnDevice(
       height,
       ...(originRaw !== undefined ? { originRaw } : {}),
       origin: mapOrigin(originRaw),
-      maxPowerS: parsePositiveNumber(extractFirst(text, ['SMax', 'MaxS', 'SpindleMax', 'SValueMax'])),
+      maxPowerS: parsePositiveNumber(
+        extractFirst(text, ['SMax', 'MaxS', 'SpindleMax', 'SValueMax']),
+      ),
       ...optionalScript(text, 'startScript', ['StartScript', 'StartGCode', 'StartMacro']),
       ...optionalScript(text, 'endScript', ['EndScript', 'EndGCode', 'EndMacro']),
       isGrbl: controller?.toLowerCase().includes('grbl') === true,
@@ -152,11 +160,7 @@ function appliedLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportR
 }
 
 function reviewLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
-  return [
-    ...controllerReview(device),
-    ...originReview(device),
-    ...maxPowerReview(device),
-  ];
+  return [...controllerReview(device), ...originReview(device), ...maxPowerReview(device)];
 }
 
 function controllerReview(device: ParsedLightBurnDevice): LightBurnImportReviewField[] {
@@ -193,7 +197,11 @@ function ignoredLightBurnFields(device: ParsedLightBurnDevice): LightBurnImportR
       device.startScript,
       'Imported profiles never write firmware or run startup scripts automatically.',
     ),
-    ...scriptReview('End script', device.endScript, 'End scripts are review-only in Machine Setup.'),
+    ...scriptReview(
+      'End script',
+      device.endScript,
+      'End scripts are review-only in Machine Setup.',
+    ),
   ];
 }
 

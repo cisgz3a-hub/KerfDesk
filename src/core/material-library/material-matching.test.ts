@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  DEFAULT_DEVICE_PROFILE,
-  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
-} from '../devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import {
   rankMaterialRecipeCandidates,
   recipeConfidence,

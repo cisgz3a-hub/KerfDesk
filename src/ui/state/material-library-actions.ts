@@ -204,7 +204,10 @@ function enrichCalibratedInput(
   };
 }
 
-function calibratedProfileId(input: CreateMaterialPresetInput, project: Project): string | undefined {
+function calibratedProfileId(
+  input: CreateMaterialPresetInput,
+  project: Project,
+): string | undefined {
   return input.profileId ?? project.device.profileId;
 }
 
@@ -217,7 +220,12 @@ function calibratedMachineFamily(
 }
 
 function calibratedLaserModel(input: CreateMaterialPresetInput, project: Project): string {
-  return input.laserModel ?? project.device.laserSubProfile?.model ?? project.device.model ?? project.device.name;
+  return (
+    input.laserModel ??
+    project.device.laserSubProfile?.model ??
+    project.device.model ??
+    project.device.name
+  );
 }
 
 function calibratedOpticalPower(

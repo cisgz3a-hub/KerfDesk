@@ -7,10 +7,7 @@ import {
   serializeMachineProfileDocument,
   type MachineProfileDocument,
 } from '../../io/machine-profile';
-import {
-  importLightBurnDeviceProfile,
-  type LightBurnDeviceImportReview,
-} from '../../io/lightburn';
+import { importLightBurnDeviceProfile, type LightBurnDeviceImportReview } from '../../io/lightburn';
 import { usePlatform } from '../app/platform-context';
 import { Button } from '../kit';
 import { useStore } from '../state';
@@ -101,7 +98,12 @@ function ImportReviewCard(props: {
   readonly onApply: (profile: DeviceProfile) => void;
 }): JSX.Element {
   const review = props.review;
-  if (review.kind === 'error') return <p role="alert" style={errorStyle}>{review.message}</p>;
+  if (review.kind === 'error')
+    return (
+      <p role="alert" style={errorStyle}>
+        {review.message}
+      </p>
+    );
   if (review.kind === 'machine') {
     return <MachineProfileReview review={review} onApply={props.onApply} />;
   }

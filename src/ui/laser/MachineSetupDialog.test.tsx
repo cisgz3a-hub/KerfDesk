@@ -5,7 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { settingsMapToRows } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../platform/types';
-import { serializeMachineProfileDocument, MACHINE_PROFILE_FORMAT, MACHINE_PROFILE_SCHEMA_VERSION } from '../../io/machine-profile';
+import {
+  serializeMachineProfileDocument,
+  MACHINE_PROFILE_FORMAT,
+  MACHINE_PROFILE_SCHEMA_VERSION,
+} from '../../io/machine-profile';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -16,7 +20,9 @@ import { MachineSetupDialog } from './MachineSetupDialog';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-function platformWithFiles(files: ReadonlyArray<{ readonly name: string; readonly text: string }>): PlatformAdapter {
+function platformWithFiles(
+  files: ReadonlyArray<{ readonly name: string; readonly text: string }>,
+): PlatformAdapter {
   return {
     id: 'mock',
     pickFilesForOpen: vi.fn(async (_request: FileOpenRequest) =>
@@ -82,7 +88,9 @@ describe('MachineSetupDialog', () => {
       await act(async () => button(host, 'Profile Catalog').click());
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
 
-      expect(useStore.getState().project.device.profileId).toBe('creality-falcon-a1-pro-compatible');
+      expect(useStore.getState().project.device.profileId).toBe(
+        'creality-falcon-a1-pro-compatible',
+      );
       expect(useStore.getState().dirty).toBe(true);
     } finally {
       await unmount();
@@ -97,7 +105,9 @@ describe('MachineSetupDialog', () => {
       source: { kind: 'custom', label: 'Fixture' },
       reviewNotes: ['Fixture import.'],
     });
-    const { host, unmount } = await renderDialog(platformWithFiles([{ name: 'bench.lfmachine.json', text }]));
+    const { host, unmount } = await renderDialog(
+      platformWithFiles([{ name: 'bench.lfmachine.json', text }]),
+    );
     try {
       await act(async () => button(host, 'Import / Export').click());
       await act(async () => button(host, 'Import LaserForge profile').click());
@@ -117,7 +127,9 @@ describe('MachineSetupDialog', () => {
   it('imports LightBurn lbdev files as review-first profiles', async () => {
     const lbdev =
       '<LightBurnDevice><Name>LB 4040</Name><Controller>GRBL</Controller><Width>410</Width><Height>390</Height><SMax>1000</SMax></LightBurnDevice>';
-    const { host, unmount } = await renderDialog(platformWithFiles([{ name: 'lb.lbdev', text: lbdev }]));
+    const { host, unmount } = await renderDialog(
+      platformWithFiles([{ name: 'lb.lbdev', text: lbdev }]),
+    );
     try {
       await act(async () => button(host, 'Import / Export').click());
       await act(async () => button(host, 'Import LightBurn .lbdev').click());

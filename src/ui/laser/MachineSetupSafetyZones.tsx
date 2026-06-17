@@ -15,7 +15,8 @@ export function SafetyZonesPanel(): JSX.Element {
   const device = useStore((s) => s.project.device);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const zones = device.noGoZones;
-  const updateZones = (noGoZones: ReadonlyArray<NoGoZone>): void => updateDeviceProfile({ noGoZones });
+  const updateZones = (noGoZones: ReadonlyArray<NoGoZone>): void =>
+    updateDeviceProfile({ noGoZones });
   return (
     <div style={stackStyle}>
       <div style={buttonRowStyle}>
