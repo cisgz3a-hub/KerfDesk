@@ -1,6 +1,12 @@
 import type { DeviceProfile } from '../devices';
 
-export type MaterialRecipeOperation = 'cut' | 'engrave' | 'score' | 'image';
+export type MaterialRecipeOperation =
+  | 'cut'
+  | 'engrave'
+  | 'score'
+  | 'image'
+  | 'material-test'
+  | 'interval-test';
 export type MaterialRecipeConfidence = 'starter' | 'calibrated' | 'imported' | 'unsupported';
 export type MaterialRecipeMatchScope = 'profile' | 'machine-family' | 'laser-model' | 'optical-power' | 'generic';
 

@@ -8,6 +8,7 @@ import {
   optionalNonNegativeNumber,
   optionalNumber,
   optionalPercent,
+  optionalPositiveInteger,
   optionalPositiveNumber,
   optionalString,
   requireBoolean,
@@ -23,6 +24,7 @@ import {
   validateArray,
   valueAtPath,
 } from './project-shape-primitives';
+import { validateLayerSubLayers } from './project-layer-validator';
 
 // Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
 // deserialize. Distinct from the TARGET burn-grid budget (core/raster
@@ -125,16 +127,24 @@ function validateLayer(layer: unknown, path: string): string | null {
     requireBoolean(layer, `${path}.visible`),
     requireBoolean(layer, `${path}.output`),
     optionalBoolean(layer, `${path}.airAssist`),
+    optionalNumber(layer, `${path}.kerfOffsetMm`),
+    optionalBoolean(layer, `${path}.tabsEnabled`),
+    optionalPositiveNumber(layer, `${path}.tabSizeMm`),
+    optionalPositiveInteger(layer, `${path}.tabsPerShape`),
+    optionalBoolean(layer, `${path}.tabSkipInnerShapes`),
     optionalNumber(layer, `${path}.hatchAngleDeg`),
     optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),
+    optionalLiteral(layer, `${path}.fillStyle`, ['scanline', 'offset']),
     optionalBoolean(layer, `${path}.fillBidirectional`),
     optionalBoolean(layer, `${path}.fillCrossHatch`),
     optionalDither(layer, `${path}.ditherAlgorithm`),
     optionalPositiveNumber(layer, `${path}.linesPerMm`),
+    optionalBoolean(layer, `${path}.imageBidirectional`),
     optionalBoolean(layer, `${path}.negativeImage`),
     optionalBoolean(layer, `${path}.passThrough`),
     optionalNonNegativeNumber(layer, `${path}.dotWidthCorrectionMm`),
+    validateLayerSubLayers(layer['subLayers'], `${path}.subLayers`),
   ]);
 }
 

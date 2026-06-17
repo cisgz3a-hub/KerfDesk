@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { generateIntervalTestGrid, generateMaterialTestGrid } from '../../core/job';
 import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
 import {
   MATERIAL_LIBRARY_FORMAT,
@@ -17,9 +18,15 @@ function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
     speed: 1900,
     passes: 2,
     airAssist: false,
+    kerfOffsetMm: 0,
+    tabsEnabled: false,
+    tabSizeMm: 0.5,
+    tabsPerShape: 4,
+    tabSkipInnerShapes: true,
     hatchAngleDeg: 15,
     hatchSpacingMm: 0.08,
     fillOverscanMm: 3,
+    fillStyle: 'scanline',
     fillBidirectional: false,
     fillCrossHatch: true,
     ditherAlgorithm: 'atkinson',
@@ -160,6 +167,76 @@ describe('material library store actions', () => {
     expect(state.materialLibraryDirty).toBe(true);
     expect(state.dirty).toBe(false);
     expect(state.undoStack).toHaveLength(0);
+  });
+
+  it('creates a calibrated profile-matched recipe from a selected material test swatch', () => {
+    const grid = generateMaterialTestGrid({
+      rows: 1,
+      columns: 2,
+      speedMin: 1000,
+      speedMax: 2000,
+      powerMin: 10,
+      powerMax: 40,
+      cellWidthMm: 5,
+      cellHeightMm: 5,
+    });
+    useStore.getState().replaceSceneWithGeneratedScene(grid.scene);
+    useStore.getState().selectObject('material-test-cell-r0-c0');
+    useStore.getState().setMaterialLibrary(library());
+
+    const created = useStore.getState().createMaterialPresetFromLayer('material-test-row-0', {
+      id: 'birch-3mm-calibrated',
+      materialName: 'Birch plywood',
+      thicknessMm: 3,
+      description: 'Clean fill',
+      revision: 'manual-1',
+    });
+
+    expect(created).toMatchObject({
+      confidence: 'calibrated',
+      material: 'Birch plywood',
+      operation: 'material-test',
+      profileId: 'generic-grbl-400x400',
+      machineFamily: 'generic-grbl-400x400',
+      laserModel: 'GRBL 400x400',
+      description: expect.stringContaining('material-test-cell-r0-c0'),
+      recipe: expect.objectContaining({ mode: 'fill', speed: 2000, power: 10 }),
+    });
+    expect(useStore.getState().materialLibraryDirty).toBe(true);
+  });
+
+  it('creates a calibrated interval recipe from a selected interval test swatch', () => {
+    const grid = generateIntervalTestGrid({
+      steps: 2,
+      speed: 1500,
+      power: 30,
+      intervalMinMm: 0.08,
+      intervalMaxMm: 0.2,
+      swatchSizeMm: 8,
+    });
+    useStore.getState().replaceSceneWithGeneratedScene(grid.scene);
+    useStore.getState().selectObject('interval-test-cell-1');
+    useStore.getState().setMaterialLibrary(library());
+
+    const created = useStore.getState().createMaterialPresetFromLayer('interval-test-step-1', {
+      id: 'birch-interval-calibrated',
+      materialName: 'Birch plywood',
+      thicknessMm: 3,
+      description: 'Clean interval',
+      revision: 'manual-1',
+    });
+
+    expect(created).toMatchObject({
+      confidence: 'calibrated',
+      operation: 'interval-test',
+      description: expect.stringContaining('interval-test-cell-1'),
+      recipe: expect.objectContaining({
+        mode: 'fill',
+        speed: 1500,
+        power: 30,
+        hatchSpacingMm: 0.08,
+      }),
+    });
   });
 
   it('createMaterialPresetFromLayer rejects invalid metadata and missing inputs', () => {

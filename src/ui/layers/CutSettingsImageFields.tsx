@@ -61,24 +61,24 @@ export function CutSettingsImageFields(props: {
         />
         <span className="lf-field-unit">mm</span>
       </Field>
-      <Field label="Negative">
-        <input
-          name="negativeImage"
-          type="checkbox"
-          className="lf-checkbox"
-          defaultChecked={props.layer.negativeImage}
-          title="Invert image brightness before engraving this layer."
-        />
-      </Field>
-      <Field label="Pass-through">
-        <input
-          name="passThrough"
-          type="checkbox"
-          className="lf-checkbox"
-          defaultChecked={props.layer.passThrough}
-          title="Use the image pixels as-is and skip LaserForge image processing."
-        />
-      </Field>
+      <ImageCheckboxField
+        label="Negative"
+        name="negativeImage"
+        checked={props.layer.negativeImage}
+        title="Invert image brightness before engraving this layer."
+      />
+      <ImageCheckboxField
+        label="Bidirectional"
+        name="imageBidirectional"
+        checked={props.layer.imageBidirectional}
+        title="Alternate raster rows in both directions. Turn off for scan-offset diagnosis."
+      />
+      <ImageCheckboxField
+        label="Pass-through"
+        name="passThrough"
+        checked={props.layer.passThrough}
+        title="Use the image pixels as-is and skip LaserForge image processing."
+      />
     </fieldset>
   );
 }
@@ -156,6 +156,25 @@ function NumberInput(props: {
       aria-label={`Cut settings ${props.label ?? props.name}`}
       title={`Set image cut setting ${props.label ?? props.name}.`}
     />
+  );
+}
+
+function ImageCheckboxField(props: {
+  readonly label: string;
+  readonly name: string;
+  readonly checked: boolean;
+  readonly title: string;
+}): JSX.Element {
+  return (
+    <Field label={props.label}>
+      <input
+        name={props.name}
+        type="checkbox"
+        className="lf-checkbox"
+        defaultChecked={props.checked}
+        title={props.title}
+      />
+    </Field>
   );
 }
 

@@ -94,7 +94,7 @@ function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] 
     if (group.kind === 'raster') continue;
     const cutV = groupCutVelocity(group, device);
     cursor =
-      group.kind === 'fill'
+      group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'
         ? appendFillGroupBlocks(out, cursor, group, cutV, travelV)
         : appendCutGroupBlocks(out, cursor, group, cutV, travelV);
   }
@@ -142,7 +142,7 @@ function appendFillGroupBlocks(
 function appendCutGroupBlocks(
   out: Block[],
   initialCursor: Vec2,
-  group: CutGroup,
+  group: CutGroup | FillGroup,
   cutV: number,
   travelV: number,
 ): Vec2 {

@@ -22,6 +22,7 @@ function makeLaserState(): LaserState {
     autofocusBusy: false,
     motionOperation: null,
     streamer: null,
+    homingState: 'unknown',
     log: [],
     transcript: [],
     detectedSettings: null,

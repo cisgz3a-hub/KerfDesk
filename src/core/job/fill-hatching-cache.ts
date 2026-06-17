@@ -1,5 +1,5 @@
 import type { Layer, Polyline } from '../scene';
-import { fillHatchingWithMetadata, type HatchPolyline } from './fill-hatching';
+import { fillHatchingWithMetadata, type HatchFillRule, type HatchPolyline } from './fill-hatching';
 
 const MAX_SETTINGS_PER_POLYLINE_SET = 8;
 
@@ -15,17 +15,19 @@ const hatchCache = new WeakMap<
 export function memoizedFillHatching(
   polylines: ReadonlyArray<Polyline>,
   layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional' | 'fillCrossHatch'>,
+  fillRule: HatchFillRule = 'evenodd',
 ): ReadonlyArray<Polyline> {
-  return memoizedFillHatchingWithMetadata(polylines, layer).map(stripHatchMetadata);
+  return memoizedFillHatchingWithMetadata(polylines, layer, fillRule).map(stripHatchMetadata);
 }
 
 export function memoizedFillHatchingWithMetadata(
   polylines: ReadonlyArray<Polyline>,
   layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional' | 'fillCrossHatch'>,
+  fillRule: HatchFillRule = 'evenodd',
 ): ReadonlyArray<HatchPolyline> {
   // fillBidirectional is part of the key: toggling snake/unidirectional changes
   // the hatch geometry, so a stale cache entry would silently keep the old path.
-  const cacheKey = `${layer.hatchAngleDeg}:${layer.hatchSpacingMm}:${layer.fillBidirectional}:${layer.fillCrossHatch}`;
+  const cacheKey = `${layer.hatchAngleDeg}:${layer.hatchSpacingMm}:${layer.fillBidirectional}:${layer.fillCrossHatch}:${fillRule}`;
   let bySettings = hatchCache.get(polylines);
   if (bySettings === undefined) {
     bySettings = new Map<string, ReadonlyArray<HatchPolyline>>();
@@ -39,6 +41,7 @@ export function memoizedFillHatchingWithMetadata(
     polylines,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
+    fillRule,
     bidirectional: layer.fillBidirectional,
   });
   const crossHatches = layer.fillCrossHatch
@@ -46,6 +49,7 @@ export function memoizedFillHatchingWithMetadata(
         polylines,
         hatchAngleDeg: layer.hatchAngleDeg + 90,
         hatchSpacingMm: layer.hatchSpacingMm,
+        fillRule,
         bidirectional: layer.fillBidirectional,
       })
     : [];

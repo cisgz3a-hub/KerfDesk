@@ -75,6 +75,13 @@ export function optionalPositiveNumber(obj: Record<string, unknown>, path: strin
     : `missing or invalid \`${path}\``;
 }
 
+export function optionalPositiveInteger(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return value === undefined || (isFiniteNumber(value) && Number.isInteger(value) && value > 0)
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
 export function optionalNonNegativeNumber(
   obj: Record<string, unknown>,
   path: string,

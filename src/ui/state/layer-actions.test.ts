@@ -237,6 +237,42 @@ describe('layer store actions', () => {
     expect(useStore.getState().dirty).toBe(false);
   });
 
+  it('adds, updates, deletes, and undoes layer sub-layers', () => {
+    useStore.getState().createManualLayer('#ff0000');
+    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 22, speed: 3333 });
+    useStore.setState({ dirty: false, undoStack: [] });
+
+    useStore.getState().addLayerSubLayer('#ff0000');
+
+    let layer = useStore.getState().project.scene.layers[0];
+    const subLayer = layer?.subLayers[0];
+    expect(subLayer).toMatchObject({
+      id: 'sub-1',
+      label: 'Sub-layer 1',
+      enabled: true,
+      settings: { mode: 'fill', power: 22, speed: 3333 },
+    });
+
+    if (subLayer === undefined) throw new Error('expected sub-layer');
+    useStore.getState().updateLayerSubLayer('#ff0000', subLayer.id, {
+      mode: 'line',
+      power: 80,
+    });
+    layer = useStore.getState().project.scene.layers[0];
+    expect(layer?.subLayers[0]).toMatchObject({
+      settings: { mode: 'line', power: 80, speed: 3333 },
+    });
+
+    useStore.getState().deleteLayerSubLayer('#ff0000', subLayer.id);
+    expect(useStore.getState().project.scene.layers[0]?.subLayers).toEqual([]);
+
+    useStore.getState().undo();
+    expect(useStore.getState().project.scene.layers[0]?.subLayers[0]).toMatchObject({
+      id: 'sub-1',
+      settings: { mode: 'line', power: 80 },
+    });
+  });
+
   it('makeLayerDefault remembers current settings without mutating project history', () => {
     useStore.getState().createManualLayer('#ff0000');
     useStore.getState().setLayerParam('#ff0000', { mode: 'fill', power: 22, speed: 3333 });

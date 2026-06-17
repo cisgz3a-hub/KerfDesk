@@ -41,6 +41,8 @@ export type StreamerStatus =
 
 export type StreamerState = {
   readonly status: StreamerStatus;
+  readonly streamingMode: StreamingMode;
+  readonly pollDuringJob: PollDuringJob;
   // Lines remaining to send, each already terminated with '\n'.
   readonly queued: ReadonlyArray<string>;
   // Lines sent but not yet ack'd, head-first.
@@ -52,6 +54,14 @@ export type StreamerState = {
   // Total line count at start of stream (for progress %).
   readonly total: number;
   readonly rxBufferBytes: number;
+};
+
+export type StreamingMode = 'char-counted' | 'ping-pong';
+export type PollDuringJob = 'off' | '1hz' | '2hz' | '4hz';
+export type CreateStreamerOptions = {
+  readonly rxBufferBytes?: number;
+  readonly streamingMode?: StreamingMode;
+  readonly pollDuringJob?: PollDuringJob;
 };
 
 export type AckKind = 'ok' | 'error' | 'alarm';
@@ -70,13 +80,12 @@ export type AckResult = {
   readonly acked: string | null;
 };
 
-export function createStreamer(
-  gcode: string,
-  opts: { readonly rxBufferBytes?: number } = {},
-): StreamerState {
+export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}): StreamerState {
   const lines = splitLines(gcode);
   return {
     status: lines.length === 0 ? 'done' : 'idle',
+    streamingMode: opts.streamingMode ?? 'char-counted',
+    pollDuringJob: opts.pollDuringJob ?? '4hz',
     queued: lines,
     inFlight: [],
     inFlightBytes: 0,
@@ -134,11 +143,15 @@ export function step(state: StreamerState): StepResult {
   if (state.status === 'paused' || isTerminal(state.status)) {
     return { state, toSend: '' };
   }
+  if (state.streamingMode === 'ping-pong' && state.inFlight.length > 0) {
+    return { state, toSend: '' };
+  }
   let queued = state.queued;
   let inFlight = state.inFlight;
   let inFlightBytes = state.inFlightBytes;
   const sentChunks: string[] = [];
   while (queued.length > 0) {
+    if (state.streamingMode === 'ping-pong' && sentChunks.length > 0) break;
     const next = queued[0];
     if (next === undefined) break;
     const bytes = next.length;

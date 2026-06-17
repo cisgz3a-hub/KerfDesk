@@ -28,6 +28,8 @@ describe('CutSettingsDialog fill density controls', () => {
 
       const mode = host.querySelector('select[aria-label="Cut settings mode"]');
       if (!(mode instanceof HTMLSelectElement)) throw new Error('mode select missing');
+      expect(host.textContent).toContain('Kerf Offset');
+      expect(host.textContent).toContain('Tabs / Bridges');
       expect(host.textContent).not.toContain('Line Interval');
       expect(host.textContent).not.toContain('Dither');
 
@@ -36,6 +38,8 @@ describe('CutSettingsDialog fill density controls', () => {
         Simulate.change(mode);
       });
       expect(host.textContent).toContain('Line Interval');
+      expect(host.textContent).not.toContain('Kerf Offset');
+      expect(host.textContent).not.toContain('Tabs / Bridges');
       expect(host.textContent).not.toContain('Dither');
 
       await act(async () => {
@@ -43,6 +47,8 @@ describe('CutSettingsDialog fill density controls', () => {
         Simulate.change(mode);
       });
       expect(host.textContent).not.toContain('Lines / Inch');
+      expect(host.textContent).not.toContain('Kerf Offset');
+      expect(host.textContent).not.toContain('Tabs / Bridges');
       expect(host.textContent).toContain('Dither');
     } finally {
       if (root !== null) await act(async () => root?.unmount());
@@ -218,6 +224,33 @@ describe('CutSettingsDialog fill density controls', () => {
       expect(
         (requireApplied(applied) as { readonly fillCrossHatch?: boolean }).fillCrossHatch,
       ).toBe(true);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('renders a fill direction preview with a perpendicular cross-hatch pass', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <CutSettingsDialog
+            layer={fillLayer({ fillCrossHatch: true, hatchAngleDeg: 45 })}
+            onCancel={() => undefined}
+            onApply={() => undefined}
+          />,
+        );
+      });
+
+      const preview = host.querySelector('svg[aria-label="Fill scan direction preview"]');
+      if (!(preview instanceof SVGSVGElement)) throw new Error('direction preview missing');
+      expect(preview.querySelectorAll('[data-fill-pass]')).toHaveLength(2);
+      expect(preview.querySelector('[data-fill-pass="primary"]')).not.toBeNull();
+      expect(preview.querySelector('[data-fill-pass="cross-hatch"]')).not.toBeNull();
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

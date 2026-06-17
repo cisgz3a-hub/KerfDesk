@@ -54,13 +54,13 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     }
     try {
       const writeSource = source ?? transcriptSourceForWrite(line, action);
+      await conn.write(line);
       set((s) => ({
         transcript: appendTranscript(
           s.transcript,
           outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, writeSource),
         ),
       }));
-      await conn.write(line);
     } catch (err) {
       const message = serialWriteErrorMessage(err);
       set({

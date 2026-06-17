@@ -3,18 +3,22 @@ import {
   assignObjectToLayer,
   assertNever,
   createLayer,
+  layerOperationSettingsEqual,
   type Layer,
+  type LayerSubLayer,
   type Project,
   type Scene,
   updateLayer,
 } from '../../core/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
+import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 const HEX_LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 export type LayerSettingsClipboard = Omit<Layer, 'id' | 'color'>;
+export type { LayerSubLayerPatch } from './layer-sub-layer-actions';
 
 type LayerActionState = StateSlice & {
   readonly selectedObjectId: string | null;
@@ -56,6 +60,13 @@ export type LayerActions = {
   readonly deleteLayerAndObjects: (layerId: string) => void;
   readonly copyLayerSettings: (layerId: string) => void;
   readonly pasteLayerSettings: (layerId: string) => void;
+  readonly addLayerSubLayer: (layerId: string) => void;
+  readonly updateLayerSubLayer: (
+    layerId: string,
+    subLayerId: string,
+    patch: LayerSubLayerPatch,
+  ) => void;
+  readonly deleteLayerSubLayer: (layerId: string, subLayerId: string) => void;
 };
 
 export function layerActions(set: LayerActionSet): LayerActions {
@@ -120,6 +131,7 @@ export function layerActions(set: LayerActionSet): LayerActions {
         const scene = updateLayer(state.project.scene, layerId, state.copiedLayerSettings);
         return mutation(state, { ...state.project, scene });
       }),
+    ...layerSubLayerActions(set),
   };
 }
 
@@ -248,18 +260,26 @@ const LAYER_SETTING_KEYS = [
   'speed',
   'passes',
   'airAssist',
+  'kerfOffsetMm',
+  'tabsEnabled',
+  'tabSizeMm',
+  'tabsPerShape',
+  'tabSkipInnerShapes',
   'visible',
   'output',
   'hatchAngleDeg',
   'hatchSpacingMm',
   'fillOverscanMm',
+  'fillStyle',
   'fillBidirectional',
   'fillCrossHatch',
   'ditherAlgorithm',
   'linesPerMm',
+  'imageBidirectional',
   'negativeImage',
   'passThrough',
   'dotWidthCorrectionMm',
+  'subLayers',
 ] as const satisfies ReadonlyArray<keyof LayerSettingsClipboard>;
 
 function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
@@ -270,23 +290,54 @@ function layerSettingsFrom(layer: Layer): LayerSettingsClipboard {
     speed: layer.speed,
     passes: layer.passes,
     airAssist: layer.airAssist,
+    kerfOffsetMm: layer.kerfOffsetMm,
+    tabsEnabled: layer.tabsEnabled,
+    tabSizeMm: layer.tabSizeMm,
+    tabsPerShape: layer.tabsPerShape,
+    tabSkipInnerShapes: layer.tabSkipInnerShapes,
     visible: layer.visible,
     output: layer.output,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
     fillOverscanMm: layer.fillOverscanMm,
+    fillStyle: layer.fillStyle,
     fillBidirectional: layer.fillBidirectional,
     fillCrossHatch: layer.fillCrossHatch,
     ditherAlgorithm: layer.ditherAlgorithm,
     linesPerMm: layer.linesPerMm,
+    imageBidirectional: layer.imageBidirectional,
     negativeImage: layer.negativeImage,
     passThrough: layer.passThrough,
     dotWidthCorrectionMm: layer.dotWidthCorrectionMm,
+    subLayers: layer.subLayers,
   };
 }
 
 function layerSettingsEqual(layer: Layer, settings: LayerSettingsClipboard): boolean {
-  return LAYER_SETTING_KEYS.every((key) => layer[key] === settings[key]);
+  return LAYER_SETTING_KEYS.every((key) =>
+    key === 'subLayers'
+      ? subLayersEqual(layer.subLayers, settings.subLayers)
+      : layer[key] === settings[key],
+  );
+}
+
+function subLayersEqual(
+  left: ReadonlyArray<LayerSubLayer>,
+  right: ReadonlyArray<LayerSubLayer>,
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((subLayer, index) => {
+      const other = right[index];
+      return (
+        other !== undefined &&
+        subLayer.id === other.id &&
+        subLayer.label === other.label &&
+        subLayer.enabled === other.enabled &&
+        layerOperationSettingsEqual(subLayer.settings, other.settings)
+      );
+    })
+  );
 }
 
 function usedLayerColors(scene: Scene): ReadonlySet<string> {

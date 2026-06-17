@@ -64,6 +64,7 @@ export default tseslint.config(
       'dist-electron/**',
       'coverage/**',
       'node_modules/**',
+      'references/**',
       '.claude/**',
       'references/**',
       'eslint.config.mjs',

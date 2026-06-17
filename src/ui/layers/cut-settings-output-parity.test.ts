@@ -115,6 +115,34 @@ describe('cut settings editor output parity', () => {
     expect(on.gcode).toMatch(/^M9$/m);
     expect(stripCoolant(on.gcode)).toBe(off.gcode);
   });
+
+  it('routes line kerf offset through prepared output, preview, and G-code', () => {
+    const base = lineProjectWithClosedCut();
+    const patch = readCutSettingsPatch(
+      formData({
+        mode: 'line',
+        power: '30',
+        speed: '1500',
+        passes: '1',
+        kerfOffsetMm: '1',
+        visible: 'on',
+        output: 'on',
+      }),
+      base.scene.layers[0]!,
+    );
+    const project = patchFirstLayer(base, patch);
+    const prepared = prepareOutput(project);
+
+    expect(prepared.ok).toBe(true);
+    if (!prepared.ok) throw new Error('expected prepared kerf output');
+    expect(prepared.job.groups[0]).toMatchObject({ kind: 'cut' });
+    expect(buildPreviewToolpath(project)).toEqual(
+      mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device),
+    );
+    expect(emitGcode(project).gcode).not.toBe(emitGcode(base).gcode);
+    expect(emitGcode(project).gcode).toContain('X-1.000');
+    expect(emitGcode(project).gcode).toContain('X11.000');
+  });
 });
 
 function formData(entries: Record<string, string>): FormData {
@@ -189,6 +217,17 @@ function lineProjectWithAirDevice(): Project {
     scene: {
       layers: [{ ...createLayer({ id: color, color, mode: 'line' }), power: 55, speed: 1400 }],
       objects: [lineObject(color)],
+    },
+  };
+}
+
+function lineProjectWithClosedCut(): Project {
+  const color = '#000000';
+  return {
+    ...createProject(),
+    scene: {
+      layers: [{ ...createLayer({ id: color, color, mode: 'line' }), power: 30, speed: 1500 }],
+      objects: [squareObject(color)],
     },
   };
 }

@@ -45,3 +45,6 @@ Thumbs.db
 
 # Local Claude / planning artifacts that should not ship to the repo
 .claude/
+
+# Local external reference repositories
+references/

@@ -7,9 +7,15 @@ export type MaterialRecipe = {
   readonly speed: number;
   readonly passes: number;
   readonly airAssist?: boolean;
+  readonly kerfOffsetMm?: number;
+  readonly tabsEnabled?: boolean;
+  readonly tabSizeMm?: number;
+  readonly tabsPerShape?: number;
+  readonly tabSkipInnerShapes?: boolean;
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
+  readonly fillStyle?: Layer['fillStyle'];
   readonly fillBidirectional: boolean;
   readonly fillCrossHatch: boolean;
   readonly ditherAlgorithm: DitherAlgorithm;
@@ -26,9 +32,15 @@ export const MATERIAL_RECIPE_FIELDS = [
   'speed',
   'passes',
   'airAssist',
+  'kerfOffsetMm',
+  'tabsEnabled',
+  'tabSizeMm',
+  'tabsPerShape',
+  'tabSkipInnerShapes',
   'hatchAngleDeg',
   'hatchSpacingMm',
   'fillOverscanMm',
+  'fillStyle',
   'fillBidirectional',
   'fillCrossHatch',
   'ditherAlgorithm',
@@ -49,9 +61,15 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     speed: layer.speed,
     passes: layer.passes,
     airAssist: layer.airAssist,
+    kerfOffsetMm: layer.kerfOffsetMm,
+    tabsEnabled: layer.tabsEnabled,
+    tabSizeMm: layer.tabSizeMm,
+    tabsPerShape: layer.tabsPerShape,
+    tabSkipInnerShapes: layer.tabSkipInnerShapes,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
     fillOverscanMm: layer.fillOverscanMm,
+    fillStyle: layer.fillStyle,
     fillBidirectional: layer.fillBidirectional,
     fillCrossHatch: layer.fillCrossHatch,
     ditherAlgorithm: layer.ditherAlgorithm,
@@ -83,9 +101,15 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     speed: Math.max(1, finiteOr(recipe.speed, 1)),
     passes: Math.max(1, Math.floor(finiteOr(recipe.passes, 1))),
     ...(recipe.airAssist !== undefined ? { airAssist: recipe.airAssist } : {}),
+    kerfOffsetMm: finiteOr(recipe.kerfOffsetMm ?? 0, 0),
+    tabsEnabled: recipe.tabsEnabled === true,
+    tabSizeMm: Math.max(0.01, finiteOr(recipe.tabSizeMm ?? 0.5, 0.5)),
+    tabsPerShape: Math.max(1, Math.floor(finiteOr(recipe.tabsPerShape ?? 4, 4))),
+    tabSkipInnerShapes: recipe.tabSkipInnerShapes !== false,
     hatchAngleDeg: finiteOr(recipe.hatchAngleDeg, 0),
     hatchSpacingMm: Math.max(MIN_SPACING, finiteOr(recipe.hatchSpacingMm, MIN_SPACING)),
     fillOverscanMm: Math.max(0, finiteOr(recipe.fillOverscanMm, 0)),
+    fillStyle: recipe.fillStyle === 'offset' ? 'offset' : 'scanline',
     fillBidirectional: recipe.fillBidirectional,
     fillCrossHatch: recipe.fillCrossHatch,
     ditherAlgorithm: recipe.ditherAlgorithm,
@@ -121,7 +145,12 @@ function hasRecipeModes(value: Record<string, unknown>): boolean {
 }
 
 function hasRecipeNumbers(value: Record<string, unknown>): boolean {
-  return hasPowerNumbers(value) && hasMotionNumbers(value) && hasRasterNumbers(value);
+  return (
+    hasPowerNumbers(value) &&
+    hasMotionNumbers(value) &&
+    hasRasterNumbers(value) &&
+    hasRecipeFillStyle(value)
+  );
 }
 
 function hasPowerNumbers(value: Record<string, unknown>): boolean {
@@ -132,9 +161,18 @@ function hasMotionNumbers(value: Record<string, unknown>): boolean {
   return (
     isPositiveFinite(value.speed) &&
     isPositiveInteger(value.passes) &&
+    (value.kerfOffsetMm === undefined || isFiniteNumber(value.kerfOffsetMm)) &&
+    (value.tabSizeMm === undefined || isPositiveFinite(value.tabSizeMm)) &&
+    (value.tabsPerShape === undefined || isPositiveInteger(value.tabsPerShape)) &&
     isFiniteNumber(value.hatchAngleDeg) &&
     isPositiveFinite(value.hatchSpacingMm) &&
     isNonNegativeFinite(value.fillOverscanMm)
+  );
+}
+
+function hasRecipeFillStyle(value: Record<string, unknown>): boolean {
+  return (
+    value.fillStyle === undefined || value.fillStyle === 'scanline' || value.fillStyle === 'offset'
   );
 }
 
@@ -147,6 +185,8 @@ function hasRecipeBooleans(value: Record<string, unknown>): boolean {
     typeof value.fillBidirectional === 'boolean' &&
     typeof value.fillCrossHatch === 'boolean' &&
     (value.airAssist === undefined || typeof value.airAssist === 'boolean') &&
+    (value.tabsEnabled === undefined || typeof value.tabsEnabled === 'boolean') &&
+    (value.tabSkipInnerShapes === undefined || typeof value.tabSkipInnerShapes === 'boolean') &&
     typeof value.negativeImage === 'boolean' &&
     typeof value.passThrough === 'boolean'
   );

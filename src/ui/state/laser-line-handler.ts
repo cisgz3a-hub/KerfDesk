@@ -201,8 +201,9 @@ function handleStatusLine(
   safeWrite: SafeWriteFn,
   report: StatusReport,
 ): void {
-  const operation = get().motionOperation;
-  const streamer = get().streamer;
+  const state = get();
+  const operation = state.motionOperation;
+  const streamer = state.streamer;
   if (report.state === 'Alarm') {
     set({
       statusReport: report,
@@ -210,6 +211,7 @@ function handleStatusLine(
       workOriginActive: false,
       motionOperation: null,
       frameVerification: null,
+      homingState: 'unknown',
     });
     return;
   }
@@ -221,19 +223,34 @@ function handleStatusLine(
   const completedStreamerPatch =
     streamer?.status === 'done' && report.state === 'Idle' ? { streamer: null } : {};
 
-  if (report.wco !== null) {
-    set({
-      statusReport: report,
-      wcoCache: report.wco,
-      workOriginActive: hasCustomOrigin(report.wco),
-      ...operationPatch,
-      ...completedStreamerPatch,
-    });
-  } else {
-    set({ statusReport: report, ...operationPatch, ...completedStreamerPatch });
-  }
+  set({
+    ...statusPositionPatch(report),
+    ...operationPatch,
+    ...completedStreamerPatch,
+    ...homingStatusPatch(state, report),
+  });
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
+}
+
+function homingStatusPatch(
+  state: LaserState,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'homingState'>> {
+  return state.homingState === 'homing' && report.state === 'Idle'
+    ? { homingState: 'confirmed' }
+    : {};
+}
+
+function statusPositionPatch(
+  report: StatusReport,
+): Pick<LaserState, 'statusReport'> & Partial<Pick<LaserState, 'wcoCache' | 'workOriginActive'>> {
+  if (report.wco === null) return { statusReport: report };
+  return {
+    statusReport: report,
+    wcoCache: report.wco,
+    workOriginActive: hasCustomOrigin(report.wco),
+  };
 }
 
 function dispatchQueuedFrameLine(set: SetFn, safeWrite: SafeWriteFn, line: string): void {

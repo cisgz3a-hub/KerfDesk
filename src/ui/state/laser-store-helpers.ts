@@ -144,6 +144,7 @@ export function initialLaserState(): Pick<
   | 'autofocusBusy'
   | 'motionOperation'
   | 'streamer'
+  | 'homingState'
   | 'log'
   | 'transcript'
   | 'detectedSettings'
@@ -164,6 +165,7 @@ export function initialLaserState(): Pick<
     autofocusBusy: false,
     motionOperation: null,
     streamer: null,
+    homingState: 'unknown',
     log: [],
     transcript: [],
     detectedSettings: null,
@@ -198,6 +200,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).
     frameVerification: null,
     motionOperation: null,
+    homingState: 'unknown',
     streamer: stream,
     ...(wasUnsafeActive ? { safetyNotice: disconnectDuringJobNotice() } : {}),
   };
