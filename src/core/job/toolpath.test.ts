@@ -151,6 +151,36 @@ describe('buildToolpath', () => {
     });
     expect(tp.totalLength).toBe(20);
   });
+
+  it('renders offset fill contours as normal contour cuts without overscan', () => {
+    const offsetGroup = {
+      kind: 'fill' as const,
+      fillStyle: 'offset' as const,
+      layerId: 'fill',
+      color: '#000',
+      power: 30,
+      speed: 1000,
+      passes: 1,
+      airAssist: false,
+      overscanMm: 2,
+      segments: [
+        {
+          polyline: [
+            { x: 10, y: 10 },
+            { x: 20, y: 10 },
+            { x: 20, y: 20 },
+            { x: 10, y: 20 },
+            { x: 10, y: 10 },
+          ],
+          closed: true,
+        },
+      ],
+    };
+    const tp = buildToolpath({ groups: [offsetGroup] });
+
+    expect(tp.steps.map((s) => s.kind)).toEqual(['cut']);
+    expect(tp.totalLength).toBe(40);
+  });
 });
 
 describe('summarizeToolpathDistances', () => {

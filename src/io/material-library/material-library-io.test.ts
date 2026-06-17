@@ -27,6 +27,7 @@ const lineRecipe: MaterialRecipe = {
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
+  fillStyle: 'scanline',
   fillBidirectional: true,
   fillCrossHatch: false,
   ditherAlgorithm: 'threshold',
@@ -186,6 +187,21 @@ describe('material library IO', () => {
     }
     if (recipeResult.kind === 'invalid') {
       expect(recipeResult.reason).toMatch(/recipe/);
+    }
+  });
+
+  it('accepts older recipes without fill style and defaults them to scanline', () => {
+    const legacyRecipe = { ...lineRecipe };
+    delete legacyRecipe.fillStyle;
+    const original = library({
+      entries: [preset({ recipe: legacyRecipe })],
+    });
+
+    const result = deserializeMaterialLibrary(JSON.stringify(original));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.library.entries[0]?.recipe.fillStyle).toBe('scanline');
     }
   });
 

@@ -15,6 +15,7 @@ export type MaterialRecipe = {
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
+  readonly fillStyle?: Layer['fillStyle'];
   readonly fillBidirectional: boolean;
   readonly fillCrossHatch: boolean;
   readonly ditherAlgorithm: DitherAlgorithm;
@@ -39,6 +40,7 @@ export const MATERIAL_RECIPE_FIELDS = [
   'hatchAngleDeg',
   'hatchSpacingMm',
   'fillOverscanMm',
+  'fillStyle',
   'fillBidirectional',
   'fillCrossHatch',
   'ditherAlgorithm',
@@ -67,6 +69,7 @@ export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
     fillOverscanMm: layer.fillOverscanMm,
+    fillStyle: layer.fillStyle,
     fillBidirectional: layer.fillBidirectional,
     fillCrossHatch: layer.fillCrossHatch,
     ditherAlgorithm: layer.ditherAlgorithm,
@@ -106,6 +109,7 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     hatchAngleDeg: finiteOr(recipe.hatchAngleDeg, 0),
     hatchSpacingMm: Math.max(MIN_SPACING, finiteOr(recipe.hatchSpacingMm, MIN_SPACING)),
     fillOverscanMm: Math.max(0, finiteOr(recipe.fillOverscanMm, 0)),
+    fillStyle: recipe.fillStyle === 'offset' ? 'offset' : 'scanline',
     fillBidirectional: recipe.fillBidirectional,
     fillCrossHatch: recipe.fillCrossHatch,
     ditherAlgorithm: recipe.ditherAlgorithm,
@@ -141,7 +145,12 @@ function hasRecipeModes(value: Record<string, unknown>): boolean {
 }
 
 function hasRecipeNumbers(value: Record<string, unknown>): boolean {
-  return hasPowerNumbers(value) && hasMotionNumbers(value) && hasRasterNumbers(value);
+  return (
+    hasPowerNumbers(value) &&
+    hasMotionNumbers(value) &&
+    hasRasterNumbers(value) &&
+    hasRecipeFillStyle(value)
+  );
 }
 
 function hasPowerNumbers(value: Record<string, unknown>): boolean {
@@ -158,6 +167,12 @@ function hasMotionNumbers(value: Record<string, unknown>): boolean {
     isFiniteNumber(value.hatchAngleDeg) &&
     isPositiveFinite(value.hatchSpacingMm) &&
     isNonNegativeFinite(value.fillOverscanMm)
+  );
+}
+
+function hasRecipeFillStyle(value: Record<string, unknown>): boolean {
+  return (
+    value.fillStyle === undefined || value.fillStyle === 'scanline' || value.fillStyle === 'offset'
   );
 }
 

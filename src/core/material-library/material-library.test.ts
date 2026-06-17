@@ -37,6 +37,7 @@ describe('material library recipes', () => {
       hatchAngleDeg: 37,
       hatchSpacingMm: 0.08,
       fillOverscanMm: 2.5,
+      fillStyle: 'offset',
       fillBidirectional: false,
       fillCrossHatch: true,
     });
@@ -63,6 +64,7 @@ describe('material library recipes', () => {
       hatchAngleDeg: 37,
       hatchSpacingMm: 0.08,
       fillOverscanMm: 2.5,
+      fillStyle: 'offset',
       fillBidirectional: false,
       fillCrossHatch: true,
     });
@@ -112,6 +114,7 @@ describe('material library recipes', () => {
       hatchAngleDeg: 15,
       hatchSpacingMm: 0.12,
       fillOverscanMm: 1.5,
+      fillStyle: 'offset',
       fillBidirectional: false,
       fillCrossHatch: true,
       ditherAlgorithm: 'jarvis',

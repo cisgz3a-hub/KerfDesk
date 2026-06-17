@@ -39,6 +39,7 @@ import {
 } from '../scene';
 import { memoizedFillHatching } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
+import { offsetFillContours } from './offset-fill';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
 import type { CutSegment, Group, Job, RasterGroup } from './job';
 
@@ -188,7 +189,7 @@ function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
   let bitCount = 0;
   for (const char of base64) {
     if (outIndex >= expectedLength || char === '=') break;
-    if (isBase64Whitespace(char)) continue;
+    if (char === ' ' || char === '\n' || char === '\r' || char === '\t') continue;
     const value = BASE64_ALPHABET.indexOf(char);
     if (value === -1) return whiteLuma(expectedLength);
     buffer = (buffer << 6) | value;
@@ -201,10 +202,6 @@ function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
     }
   }
   return out;
-}
-
-function isBase64Whitespace(char: string): boolean {
-  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
 }
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -260,7 +257,12 @@ function vectorGroupForLayer(
   };
   return [
     layer.mode === 'fill'
-      ? { ...common, kind: 'fill' as const, overscanMm: Math.max(0, layer.fillOverscanMm) }
+      ? {
+          ...common,
+          kind: 'fill' as const,
+          fillStyle: layer.fillStyle,
+          overscanMm: Math.max(0, layer.fillOverscanMm),
+        }
       : { ...common, kind: 'cut' as const },
   ];
 }
@@ -313,7 +315,14 @@ function collectFillSegmentsForLayer(
   layer: Layer,
   device: DeviceProfile,
 ): CutSegment[] {
-  return memoizedLayerFillHatching(objects, layer, device).map((polyline) => ({
+  const polylines =
+    layer.fillStyle === 'offset'
+      ? offsetFillContours({
+          polylines: collectFillContoursForLayer(objects, layer, device),
+          spacingMm: layer.hatchSpacingMm,
+        })
+      : memoizedLayerFillHatching(objects, layer, device);
+  return polylines.map((polyline) => ({
     polyline: polyline.points,
     closed: polyline.closed,
   }));

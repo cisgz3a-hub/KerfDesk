@@ -43,6 +43,7 @@ function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
     hatchAngleDeg: 22,
     hatchSpacingMm: 0.09,
     fillOverscanMm: 2,
+    fillStyle: 'scanline',
     fillBidirectional: false,
     fillCrossHatch: true,
     ditherAlgorithm: 'stucki',

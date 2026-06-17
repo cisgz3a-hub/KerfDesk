@@ -332,7 +332,8 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Narrow
   Line-mode kerf compensation is scoped by ADR-052, automatic Line-mode
   hard-skip tabs are scoped by ADR-053, and simple Cross-Hatch fill is scoped by
-  ADR-054; broader offset/boolean/node editing remains out of scope.
+  ADR-054. Simple Offset Fill output is scoped by ADR-055; broader
+  boolean/node editing and advanced fill-pattern systems remain out of scope.
 - Macros, scripting, command palette, plugins, extensions.
 - Variable text (CSV / counter / date).
 - System fonts.

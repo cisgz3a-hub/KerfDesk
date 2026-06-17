@@ -231,6 +231,25 @@ describe('runPreflight — F-A10 check 6: empty output', () => {
   });
 });
 
+describe('runPreflight offset fill validation', () => {
+  it('blocks offset fill on open vector contours instead of silently producing empty output', () => {
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000', mode: 'fill' }),
+      fillStyle: 'offset' as const,
+    };
+    const project = projectWith(layer);
+
+    const result = runPreflight(project, emit(project));
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: 'offset-fill-open-contour',
+      message:
+        'Layer L1 uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.',
+    });
+  });
+});
+
 describe('runPreflight — F-A10 check 2: bounds', () => {
   it('flags out-of-bed coords (objects translated past bedWidth)', () => {
     const layer = createLayer({ id: 'L1', color: '#ff0000' });

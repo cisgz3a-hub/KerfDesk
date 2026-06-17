@@ -304,9 +304,7 @@ function stringArrayOrDefault(
   value: unknown,
   fallback: ReadonlyArray<string>,
 ): ReadonlyArray<string> {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string')
-    ? value
-    : fallback;
+  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : fallback;
 }
 
 function controlledLaserOffTravelFeedOrDefault(
@@ -378,6 +376,9 @@ function normalizeCommonLayerFields(out: Record<string, unknown>): void {
 }
 
 function normalizeFillLayerFields(out: Record<string, unknown>): void {
+  if (out['fillStyle'] !== 'offset' && out['fillStyle'] !== 'scanline') {
+    out['fillStyle'] = LAYER_DEFAULTS.fillStyle;
+  }
   if (typeof out['hatchAngleDeg'] !== 'number') {
     out['hatchAngleDeg'] = LAYER_DEFAULTS.hatchAngleDeg;
   }

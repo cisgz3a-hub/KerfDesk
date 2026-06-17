@@ -26,6 +26,7 @@ function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
     hatchAngleDeg: 15,
     hatchSpacingMm: 0.08,
     fillOverscanMm: 3,
+    fillStyle: 'scanline',
     fillBidirectional: false,
     fillCrossHatch: true,
     ditherAlgorithm: 'atkinson',
@@ -229,7 +230,12 @@ describe('material library store actions', () => {
       confidence: 'calibrated',
       operation: 'interval-test',
       description: expect.stringContaining('interval-test-cell-1'),
-      recipe: expect.objectContaining({ mode: 'fill', speed: 1500, power: 30, hatchSpacingMm: 0.08 }),
+      recipe: expect.objectContaining({
+        mode: 'fill',
+        speed: 1500,
+        power: 30,
+        hatchSpacingMm: 0.08,
+      }),
     });
   });
 

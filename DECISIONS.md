@@ -2912,6 +2912,55 @@ Verification:
 
 ---
 
+## ADR-055 - Lane 6G: Offset Fill foundation
+
+**Status:** Accepted. | **Date:** 2026-06-17
+
+LightBurn has a distinct Offset Fill mode that fills closed shapes with
+contour-following paths instead of parallel scanlines. Rayforge's useful lesson
+is to keep contour-style operations separate from raster hatching, with explicit
+validation and fallback behavior. LaserForge adopts that split as a narrow Fill
+style, without adding a full geometry kernel or copying Rayforge code.
+
+Decision:
+
+- Add `Layer.fillStyle: 'scanline' | 'offset'`, defaulting to `scanline` so
+  existing projects, recipes, and G-code stay compatible.
+- Keep Offset Fill under `mode: 'fill'` instead of inventing a fourth layer mode
+  in v1. The UI exposes it as a Fill style because it shares power, speed,
+  line interval, material recipes, and dynamic-power Fill output behavior.
+- Generate Offset Fill with inward closed-contour offsets spaced by the layer's
+  hatch spacing. The first contour is offset by half the spacing to avoid
+  overburning the boundary as an outline.
+- Emit Offset Fill paths as closed contour burns, not scanline sweeps. Therefore
+  scanline overscan, grouped fill sweeps, and long-gap blanking do not apply.
+- Block Offset Fill in preflight when matching vector contours are open. This
+  gives the operator a specific repair path instead of a generic empty-output
+  failure.
+- Persist and copy `fillStyle` through `.lf2`, layer defaults/copy-paste, and
+  `.lfml.json`. Older recipes without the field import as `scanline`.
+
+Consequences:
+
+- Offset Fill is now useful for simple closed contours like rectangles, circles,
+  and text outlines converted to closed geometry.
+- This is not a full boolean/offset editor. Node editing, source-geometry
+  offsets, weld/boolean operations, self-intersection repair, and advanced fill
+  patterns remain separate future work.
+- Hardware proof is still required before calling this production-calibrated:
+  burn a simple closed rectangle/circle with Scanline Fill and Offset Fill,
+  then compare boundary darkness and coverage.
+
+Verification:
+
+- Red-first tests cover layer defaults, `.lf2` back-fill and validation,
+  Cut Settings parsing, material library canonicalization and legacy import,
+  offset-fill compile output, GRBL emission without overscan runways, toolpath
+  preview behavior, planner/bounds behavior, and preflight rejection of open
+  offset-fill contours.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

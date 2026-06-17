@@ -77,7 +77,7 @@ function extendBoundsForFill(
   includeOverscanMotion: boolean,
 ): boolean {
   const any = extendBoundsForCut(b, group);
-  if (!includeOverscanMotion) return any;
+  if (!includeOverscanMotion || (group.fillStyle ?? 'scanline') === 'offset') return any;
   for (const sweep of groupFillSweeps(group.segments)) {
     const first = sweep.spans[0];
     const last = sweep.spans[sweep.spans.length - 1];
