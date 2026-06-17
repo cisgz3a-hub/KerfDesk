@@ -2,6 +2,7 @@ import { useState, type ChangeEvent } from 'react';
 import type { IntervalTestGridOptions } from '../../core/job';
 import { CalibrationNumberField } from './CalibrationNumberField';
 import { Button, Dialog, DialogActions } from '../kit';
+import { persistCalibrationDraft, restoreCalibrationDraft } from './calibration-draft-storage';
 import { calibrationGridStyle } from './calibration-dialog-styles';
 
 type IntervalTestDraft = {
@@ -32,6 +33,11 @@ const DEFAULT_DRAFT: IntervalTestDraft = {
   gapMm: '2',
 };
 
+const INTERVAL_TEST_DRAFT_KEY = 'laserforge.calibration.intervalTestDraft.v1';
+const INTERVAL_TEST_DRAFT_FIELDS = Object.keys(DEFAULT_DRAFT) as ReadonlyArray<
+  keyof IntervalTestDraft
+>;
+
 const FIELD_SPECS: ReadonlyArray<IntervalTestField> = [
   { key: 'steps', label: 'Steps', min: 1, max: 20, step: undefined },
   { key: 'speed', label: 'Speed', min: 1, max: undefined, step: undefined },
@@ -46,7 +52,9 @@ export function IntervalTestDialog(props: {
   readonly onCancel: () => void;
   readonly onGenerate: (options: IntervalTestGridOptions) => void;
 }): JSX.Element {
-  const [draft, setDraft] = useState(DEFAULT_DRAFT);
+  const [draft, setDraft] = useState(() =>
+    restoreCalibrationDraft(INTERVAL_TEST_DRAFT_KEY, DEFAULT_DRAFT, INTERVAL_TEST_DRAFT_FIELDS),
+  );
   const setField =
     (field: keyof IntervalTestDraft) =>
     (event: ChangeEvent<HTMLInputElement>): void => {
@@ -62,6 +70,7 @@ export function IntervalTestDialog(props: {
       as="form"
       onSubmit={(event) => {
         event.preventDefault();
+        persistCalibrationDraft(INTERVAL_TEST_DRAFT_KEY, draft);
         props.onGenerate(parseDraft(draft));
       }}
       size="sm"

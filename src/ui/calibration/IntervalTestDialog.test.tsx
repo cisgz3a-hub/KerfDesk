@@ -27,6 +27,7 @@ async function renderDialog(
 }
 
 afterEach(() => {
+  localStorage.clear();
   document.body.innerHTML = '';
 });
 
@@ -60,6 +61,31 @@ describe('IntervalTestDialog', () => {
     }
   });
 
+  it('restores the last generated interval test settings', async () => {
+    const first = await renderDialog();
+    try {
+      const steps = input(first.host, 'Steps');
+      const intervalMax = input(first.host, 'Max interval');
+      await act(async () => {
+        steps.value = '6';
+        Simulate.change(steps);
+        intervalMax.value = '0.24';
+        Simulate.change(intervalMax);
+      });
+      await clickGenerate(first.host);
+    } finally {
+      await act(async () => first.root.unmount());
+    }
+
+    const second = await renderDialog();
+    try {
+      expect(input(second.host, 'Steps').value).toBe('6');
+      expect(input(second.host, 'Max interval').value).toBe('0.24');
+    } finally {
+      await act(async () => second.root.unmount());
+    }
+  });
+
   // Gained via the kit Dialog migration (ADR-047): the calibration dialogs
   // previously lacked the Escape/focus-trap behavior every other modal had.
   it('closes on Escape', async () => {
@@ -75,6 +101,16 @@ describe('IntervalTestDialog', () => {
     }
   });
 });
+
+async function clickGenerate(host: HTMLElement): Promise<void> {
+  const generate = [...host.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('Generate'),
+  );
+  if (!(generate instanceof HTMLButtonElement)) throw new Error('Generate button missing');
+  await act(async () => {
+    generate.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
 
 function input(host: HTMLElement, label: string): HTMLInputElement {
   const element = host.querySelector(`input[aria-label="${label}"]`);
