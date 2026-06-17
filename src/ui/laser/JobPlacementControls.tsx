@@ -7,6 +7,7 @@ const START_FROM_LABELS: Readonly<Record<JobStartMode, string>> = {
   absolute: 'Absolute Coordinates',
   'current-position': 'Current Position',
   'user-origin': 'User Origin',
+  'verified-origin': 'Verified Origin',
 };
 
 const ANCHOR_LABELS: Readonly<Record<JobOriginAnchor, string>> = {
@@ -40,7 +41,7 @@ export function JobPlacementControls(props: {
             aria-label="Start from"
             value={placement.startFrom}
             disabled={busy}
-            title="Choose whether the job uses absolute machine coordinates, current head position, or the saved user origin."
+            title="Choose whether the job uses absolute machine coordinates, current head position, the saved user origin, or a hand-set verified origin (no-homing machines: size-checked, then confirmed by framing)."
             onChange={(e) => setJobPlacement({ startFrom: e.currentTarget.value as JobStartMode })}
           >
             {Object.entries(START_FROM_LABELS).map(([value, label]) => (
