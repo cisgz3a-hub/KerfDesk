@@ -47,6 +47,8 @@ export function resolveJobPlacement(
       return resolveCurrentPosition(settings, machine);
     case 'user-origin':
       return resolveUserOrigin(settings, machine);
+    case 'verified-origin':
+      return resolveVerifiedOrigin(settings, machine);
     default:
       return assertNeverStartMode(settings.startFrom);
   }
@@ -56,6 +58,10 @@ export function trustedMotionOffsetForPreflight(
   device: DeviceProfile,
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
 ): MotionBoundsOffset | undefined {
+  // Verified Origin is set by hand, so GRBL's machine position is fiction even
+  // on a homing-capable machine — never trust an absolute offset for it, which
+  // forces the size-only relative preflight regardless of homing (ADR-053).
+  if (placement.jobOrigin?.startFrom === 'verified-origin') return undefined;
   if (!device.homing.enabled) return undefined;
   return placement.preflightMotionOffset;
 }
@@ -117,6 +123,27 @@ function resolveUserOrigin(
     ok: true,
     jobOrigin: { startFrom: 'user-origin', anchor: settings.anchor },
     preflightMotionOffset: xyOffset(wco),
+  };
+}
+
+function resolveVerifiedOrigin(
+  settings: JobPlacementSettings,
+  machine: MachinePlacementSnapshot,
+): ResolvedJobPlacement {
+  // Only a custom work origin is required — NOT a known WCO. Verified Origin
+  // never uses an absolute offset (see trustedMotionOffsetForPreflight), so the
+  // job is size-checked, not position-checked. Where on the bed the origin sits
+  // is unknowable after a hand-set origin; the mandatory Verified Frame (P2) is
+  // the physical bounds check that replaces it (ADR-053).
+  if (!customOriginIsActive(machine)) {
+    return {
+      ok: false,
+      messages: ['Verified Origin needs a custom work origin. Click "Set origin here" first.'],
+    };
+  }
+  return {
+    ok: true,
+    jobOrigin: { startFrom: 'verified-origin', anchor: settings.anchor },
   };
 }
 

@@ -146,6 +146,7 @@ function targetPoint(placement: JobOriginPlacement): Vec2 | null {
     case 'absolute':
       return null;
     case 'user-origin':
+    case 'verified-origin':
       return { x: 0, y: 0 };
     case 'current-position':
       return placement.currentPosition;
