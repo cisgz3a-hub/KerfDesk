@@ -2777,6 +2777,119 @@ reload / address-bar defaults in the web build (acceptable on a CAD surface).
 
 ---
 
+## ADR-052 — Scanning offset compensation: a per-speed table cancels the bidirectional zipper
+
+**Status:** Proposed; pure math module + tests landed, emitter wiring pending. | **Date:** 2026-06-17
+
+### Context
+
+ADR-038 added a per-layer unidirectional fill toggle to remove the bidirectional
+firing-lag "zipper" (Cause C, docs/research/burn-perfection-small-text.md) by
+*serialising* the rows — every row in one direction, a laser-off return-rapid
+between them. It explicitly deferred "a full scan-offset *compensation* table
+(correcting bidirectional rows rather than serialising them)" as the heavier
+lever.
+
+Field report makes that lever worth building now: the same GRBL output that
+burns clean text on a Creality Falcon A1 Pro doubles / serrates letters on a
+heavier `neotronics-4040-max`-class gantry (the "PRT 4040"). Our output is
+machine-independent except for power scale (`grbl-strategy.ts`), so the variable
+is the machine: a heavier gantry has more firing/motion lag, so the per-direction
+offset that the Falcon hides is large enough on the 4040 to split every vertical
+edge. Unidirectional (ADR-038) fixes it but halves fill throughput. We want the
+zipper gone *and* bidirectional speed kept.
+
+Reference check (recorded in RESEARCH_LOG): `barebaric/raygeo` (Rayforge's Rust
+raster core) structures bidirectional sweeps as `is_reversed = index % 2` plus an
+endpoint swap and applies **no** lag compensation — same blind spot we have, and
+it is unlicensed, so nothing is borrowed. The serpentine-by-parity idea is the
+standard unprotectable technique; the implementation here is written fresh
+against our own `Vec2` / sweep types.
+
+### Decision
+
+Add scan-offset compensation as a **pure geometry transform**, decoupled from the
+GRBL emitter so Fill and Image (raster) share one implementation and a future
+controller (ADR-006) inherits it for free. Two pure functions in
+`src/core/job/scan-offset.ts`:
+
+- **`offsetForSpeed(table, feed)`** — piecewise-linear lookup over a per-device
+  calibration table (`ScanOffsetPoint[]`, sorted by speed). Off-end behaviour is
+  *defined*, not implementation-specific: linear from rest below the first point
+  (lag distance is ~proportional to speed), clamped above the last; empty table
+  or non-positive speed returns 0.
+- **`shiftAlongTravel(from, to, offsetMm)`** — translate a sweep along its own
+  `from -> to` vector. Applied to reverse rows only, this slides the lagging row
+  back into registration. Following the travel vector (not the X axis) makes the
+  correction correct at **any hatch angle** — the differentiator over an
+  X-only/horizontal-only correction.
+
+Storage: a new `DeviceProfile.scanningOffsets: ReadonlyArray<ScanOffsetPoint>`,
+default `[]` (= feature off, output byte-identical). We correct **reverse rows
+only** (not half-to-each): forward rows and all vector cuts stay at exact design
+coordinates, so mixed line+fill registration is preserved, and the calibration
+value is exactly the measured forward-vs-reverse separation.
+
+Delivered in two diffs to keep each reviewable (CLAUDE.md "tight leash"):
+
+1. **(this diff)** the pure module + co-located unit/property tests, **no wiring**
+   — nothing imports it, so output is byte-identical and no snapshot moves.
+2. the `DeviceProfile` field + threading into `emit-raster.ts` (shift X of reverse
+   rows, gated on the existing `reverse` flag) and `grbl-strategy.ts`
+   `emitFillSweep` (`shiftAlongTravel` on reverse sweeps), plus a calibration
+   test-pattern generator and the device-settings table UI. That diff *does* move
+   the G-code snapshot for bidirectional fills and will carry the
+   `Snapshot change acknowledged:` line.
+
+### Consequences
+
+- Keeps bidirectional speed while removing the zipper, once calibrated — the
+  complement to ADR-038's calibration-free unidirectional lever. The two compose:
+  bidirectional ON + a populated table = the fast, registered path.
+- Default `[]` means zero behaviour change until a user calibrates; determinism
+  (#5) holds — both functions are pure inputs to pure functions.
+- One shared transform for fill + raster avoids the duplication raygeo carries
+  (direction handling baked into each `rasterize_*`).
+- Requires a per-machine calibration burn; an uncalibrated or mis-measured table
+  can *worsen* registration, so the UI must ship with the test pattern and the
+  feature stays opt-in. A wrong table is a user-visible regression, not a crash.
+
+### Alternatives rejected
+
+- **Unidirectional-only (ADR-038) as the final answer:** rejected — it halves
+  fill throughput; this ADR is specifically the "keep the speed" path ADR-038
+  deferred.
+- **Borrow/port raygeo's raster sweep:** rejected — it has no compensation to
+  borrow, is unlicensed (fails the ADR-008/018 dependency policy), and is coupled
+  to its own `Ops` type.
+- **Single global offset (not speed-indexed):** rejected — lag is ~constant time,
+  so the distance error scales with feed; one number is wrong at every speed but
+  one.
+- **X-axis-only shift:** rejected — breaks for angled and cross-hatch fill;
+  shifting along the sweep vector is barely more code and generalises.
+- **Split the offset half-to-each-direction:** rejected for v1 — moves forward
+  rows off design coordinates and complicates line+fill registration; reverse-only
+  keeps the design position authoritative. Revisit only if a machine shows
+  asymmetric lag.
+
+### Verification
+
+- `src/core/job/scan-offset.test.ts`: unit cases pin empty-table, non-positive
+  speed, exact calibration points, linear interpolation, from-rest below the
+  first point, clamp above the last, and a single-point table; property tests
+  (100 seeds) assert the lookup stays within `[0, maxOffset]` and is monotonic in
+  speed for an ascending table, and that `shiftAlongTravel` is a rigid translation
+  that moves each endpoint by exactly `|offsetMm|`.
+- Step-1 output is byte-identical (nothing imports the module) — existing
+  snapshots unchanged by construction.
+- `tsc --noEmit` + lint green.
+- **Hardware verification (gates step 2):** burn the calibration pattern on the
+  4040, populate the table, then re-burn the "langebaan" small text bidirectional
+  and confirm the edge serration is gone at full fill speed — green tests prove
+  the math, not the fidelity (CLAUDE.md rule 2).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
