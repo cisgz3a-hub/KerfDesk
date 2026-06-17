@@ -52,6 +52,7 @@ function makeLaserState(): LaserState {
     markFrameVerified: () => undefined,
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
+    writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
     clearTranscript: () => undefined,
   };

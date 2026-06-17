@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { GrblSettingRow } from '../../core/controllers/grbl';
 import {
   GRBL_MACHINE_PROFILE_CATALOG,
   type DeviceProfile,
@@ -178,14 +179,79 @@ function GrblSetupSlot(): JSX.Element {
 }
 
 function FirmwareWritesPanel(): JSX.Element {
+  const rows = useLaserStore((s) => s.grblSettingsRows);
+  const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
+  const writableRows = rows.filter((row) => row.writeRisk === 'common' && COMMON_WRITE_IDS.has(row.id));
   return (
-    <div style={sectionStyle}>
-      <h3 style={sectionHeadingStyle}>Guarded Writes</h3>
-      <p style={mutedStyle}>
-        Firmware writes are limited to one setting at a time and require a current controller
-        backup. Unknown settings stay read-only.
-      </p>
+    <div style={stackStyle}>
+      <section style={sectionStyle}>
+        <h3 style={sectionHeadingStyle}>Guarded Writes</h3>
+        <p style={mutedStyle}>
+          Firmware writes are limited to one setting at a time. Read and export a current
+          controller backup before writing.
+        </p>
+      </section>
+      {lastSettingsReadAt === null ? (
+        <p style={mutedStyle}>Read controller settings before firmware writes are available.</p>
+      ) : null}
+      {writableRows.map((row) => (
+        <FirmwareWriteRow key={row.code} row={row} />
+      ))}
+      {lastSettingsReadAt !== null && writableRows.length === 0 ? (
+        <p style={mutedStyle}>No common writable GRBL settings were found in the latest read.</p>
+      ) : null}
     </div>
+  );
+}
+
+const COMMON_WRITE_IDS = new Set([30, 31, 32]);
+
+function FirmwareWriteRow({ row }: { readonly row: GrblSettingRow }): JSX.Element {
+  const [value, setValue] = useState(row.rawValue);
+  const [confirmed, setConfirmed] = useState(false);
+  const writeGrblSetting = useLaserStore((s) => s.writeGrblSetting);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const canWrite = confirmed && value.trim().length > 0;
+
+  const write = (): void => {
+    void writeGrblSetting(row.id, value)
+      .then(() => pushToast(`${row.code} write sent; re-reading controller settings.`, 'success'))
+      .catch((error: unknown) => pushToast(errorMessage(error), 'error'));
+  };
+
+  return (
+    <article style={cardStyle}>
+      <div style={firmwareGridStyle}>
+        <div>
+          <strong>{row.code}</strong>
+          <p style={mutedStyle}>{row.name}</p>
+        </div>
+        <label>
+          <span>Current</span>
+          <input value={row.rawValue} readOnly aria-label={`Current value for ${row.code}`} />
+        </label>
+        <label>
+          <span>New</span>
+          <input
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            aria-label={`New value for ${row.code}`}
+          />
+        </label>
+        <label style={inlineLabelStyle}>
+          <input
+            type="checkbox"
+            checked={confirmed}
+            onChange={(event) => setConfirmed(event.target.checked)}
+            aria-label={`Confirm write ${row.code}`}
+          />
+          Confirm
+        </label>
+        <Button variant="primary" disabled={!canWrite} onClick={write}>
+          Write {row.code}
+        </Button>
+      </div>
+    </article>
   );
 }
 
@@ -530,6 +596,12 @@ const errorStyle: React.CSSProperties = { color: 'var(--lf-danger-fg)' };
 const zoneGridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(120px, 1fr) repeat(4, 72px) auto auto',
+  gap: 8,
+  alignItems: 'end',
+};
+const firmwareGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(150px, 1fr) 90px 90px auto auto',
   gap: 8,
   alignItems: 'end',
 };
