@@ -14,6 +14,18 @@ export function CutSettingsFillFields(props: {
     <fieldset className="lf-fieldset">
       <legend className="lf-legend">Fill</legend>
       <CutSettingsFillDirectionPreview angleDeg={hatchAngleDeg} crossHatch={fillCrossHatch} />
+      <Field label="Style">
+        <select
+          name="fillStyle"
+          className="lf-select"
+          defaultValue={props.layer.fillStyle}
+          aria-label="Cut settings fill style"
+          title="Choose Scanline for parallel hatch lines or Offset Fill for contour-following closed paths."
+        >
+          <option value="scanline">Scanline</option>
+          <option value="offset">Offset Fill</option>
+        </select>
+      </Field>
       <Field label="Scan angle">
         <NumberInput
           name="hatchAngleDeg"

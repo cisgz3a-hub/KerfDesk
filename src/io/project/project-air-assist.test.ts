@@ -25,6 +25,7 @@ describe('project air assist persistence', () => {
     delete firstLayer.tabSizeMm;
     delete firstLayer.tabsPerShape;
     delete firstLayer.tabSkipInnerShapes;
+    delete firstLayer.fillStyle;
 
     const result = deserializeProject(JSON.stringify(raw));
 
@@ -37,6 +38,22 @@ describe('project air assist persistence', () => {
     expect(result.project.scene.layers[0]?.tabSizeMm).toBe(0.5);
     expect(result.project.scene.layers[0]?.tabsPerShape).toBe(4);
     expect(result.project.scene.layers[0]?.tabSkipInnerShapes).toBe(true);
+    expect(result.project.scene.layers[0]?.fillStyle).toBe('scanline');
+  });
+
+  it('reports invalid when a layer fill style is unknown', () => {
+    const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
+    const scene = raw.scene as { layers: Array<Record<string, unknown>> };
+    const firstLayer = scene.layers[0];
+    if (firstLayer === undefined) throw new Error('expected project fixture layer');
+    firstLayer.fillStyle = 'spiral';
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.layers\[0\]\.fillStyle/);
+    }
   });
 
   it('reports invalid when the device air assist command is unknown', () => {

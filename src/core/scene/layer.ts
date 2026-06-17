@@ -14,6 +14,7 @@ export type LayerMode = 'line' | 'fill' | 'image';
 // type doesn't reach into the SceneObject module. Kept aligned;
 // adding an algorithm here also needs the matching dither.ts arm.
 export type LayerDitherAlgorithm = DitherAlgorithm;
+export type LayerFillStyle = 'scanline' | 'offset';
 
 export type Layer = {
   readonly id: string;
@@ -47,6 +48,9 @@ export type Layer = {
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
   readonly fillOverscanMm: number;
+  // LightBurn-style Fill / Offset Fill split. Scanline is the existing parallel
+  // hatch behavior; offset follows inward contours for closed shapes.
+  readonly fillStyle: LayerFillStyle;
   // Bidirectional (snake) hatch fill: alternate each scanline's direction so
   // the head never returns to start between rows (faster). Set false for
   // UNIDIRECTIONAL fill — every row burns the same direction — which removes
@@ -86,6 +90,7 @@ export const LAYER_DEFAULTS = {
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
+  fillStyle: 'scanline',
   fillBidirectional: true,
   fillCrossHatch: false,
   ditherAlgorithm: 'floyd-steinberg',

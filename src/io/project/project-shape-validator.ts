@@ -108,6 +108,7 @@ function validateLayer(layer: unknown, path: string): string | null {
     optionalNumber(layer, `${path}.hatchAngleDeg`),
     optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),
+    optionalLiteral(layer, `${path}.fillStyle`, ['scanline', 'offset']),
     optionalBoolean(layer, `${path}.fillBidirectional`),
     optionalBoolean(layer, `${path}.fillCrossHatch`),
     optionalDither(layer, `${path}.ditherAlgorithm`),
@@ -468,6 +469,5 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);

@@ -20,6 +20,7 @@ export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
   const power = numberField(data, 'power', layer.power, 0, 100);
   const linesPerMm = mode === 'image' ? readImageLinesPerMm(data, layer) : layer.linesPerMm;
   const lineSettings = readLineSettingsPatch(data, layer, mode);
+  const fillSettings = readFillSettingsPatch(data, layer, mode);
   return {
     mode,
     power,
@@ -36,11 +37,7 @@ export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
     output: data.has('output'),
     airAssist: data.has('airAssist'),
     ...lineSettings,
-    hatchAngleDeg: numberField(data, 'hatchAngleDeg', layer.hatchAngleDeg, 0, 180),
-    hatchSpacingMm: mode === 'fill' ? readFillLineIntervalMm(data, layer) : layer.hatchSpacingMm,
-    fillOverscanMm: numberField(data, 'fillOverscanMm', layer.fillOverscanMm, 0, 25),
-    fillBidirectional: mode === 'fill' ? data.has('fillBidirectional') : layer.fillBidirectional,
-    fillCrossHatch: mode === 'fill' ? data.has('fillCrossHatch') : layer.fillCrossHatch,
+    ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),
     linesPerMm,
     dotWidthCorrectionMm:
@@ -55,6 +52,18 @@ export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
         : layer.dotWidthCorrectionMm,
     negativeImage: mode === 'image' ? data.has('negativeImage') : layer.negativeImage,
     passThrough: mode === 'image' ? data.has('passThrough') : layer.passThrough,
+  };
+}
+
+function readFillSettingsPatch(data: FormData, layer: Layer, mode: LayerMode): LayerPatch {
+  return {
+    hatchAngleDeg: numberField(data, 'hatchAngleDeg', layer.hatchAngleDeg, 0, 180),
+    hatchSpacingMm: mode === 'fill' ? readFillLineIntervalMm(data, layer) : layer.hatchSpacingMm,
+    fillOverscanMm: numberField(data, 'fillOverscanMm', layer.fillOverscanMm, 0, 25),
+    fillStyle:
+      mode === 'fill' ? parseFillStyle(String(data.get('fillStyle') ?? '')) : layer.fillStyle,
+    fillBidirectional: mode === 'fill' ? data.has('fillBidirectional') : layer.fillBidirectional,
+    fillCrossHatch: mode === 'fill' ? data.has('fillCrossHatch') : layer.fillCrossHatch,
   };
 }
 
@@ -148,6 +157,10 @@ function numberField(
 function parseMode(value: string): LayerMode {
   if (value === 'fill' || value === 'image') return value;
   return 'line';
+}
+
+function parseFillStyle(value: string): Layer['fillStyle'] {
+  return value === 'offset' ? 'offset' : 'scanline';
 }
 
 function parseDither(value: string): Layer['ditherAlgorithm'] {

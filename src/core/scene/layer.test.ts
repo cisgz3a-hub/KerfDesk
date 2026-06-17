@@ -22,6 +22,7 @@ describe('createLayer', () => {
       hatchAngleDeg: 0,
       hatchSpacingMm: 0.1,
       fillOverscanMm: 5,
+      fillStyle: 'scanline',
       fillBidirectional: true,
       fillCrossHatch: false,
       airAssist: false,
@@ -66,5 +67,10 @@ describe('LAYER_DEFAULTS', () => {
     expect(LAYER_DEFAULTS.tabsPerShape).toBe(4);
     expect(LAYER_DEFAULTS.tabSkipInnerShapes).toBe(true);
     expect(createLayer({ id: 'L1', color: '#000000' }).tabsEnabled).toBe(false);
+  });
+
+  it('defaults fill style to scanline so existing fill output is unchanged', () => {
+    expect(LAYER_DEFAULTS.fillStyle).toBe('scanline');
+    expect(createLayer({ id: 'L1', color: '#000000' }).fillStyle).toBe('scanline');
   });
 });

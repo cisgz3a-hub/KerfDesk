@@ -121,6 +121,25 @@ describe('cut settings draft helpers', () => {
     ).toBeCloseTo(0.1, 8);
   });
 
+  it('reads fill style from fill-mode forms', () => {
+    const layer = fillLayer();
+
+    expect(
+      (
+        readCutSettingsPatch(formData({ mode: 'fill', fillStyle: 'offset' }), layer) as {
+          readonly fillStyle?: unknown;
+        }
+      ).fillStyle,
+    ).toBe('offset');
+    expect(
+      (
+        readCutSettingsPatch(formData({ mode: 'fill', fillStyle: 'spiral' }), layer) as {
+          readonly fillStyle?: unknown;
+        }
+      ).fillStyle,
+    ).toBe('scanline');
+  });
+
   it('maps image DPI and line interval values to lines per mm', () => {
     const layer = imageLayer({ linesPerMm: 10 });
 

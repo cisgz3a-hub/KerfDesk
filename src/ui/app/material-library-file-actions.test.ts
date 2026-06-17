@@ -33,6 +33,7 @@ const recipe: MaterialRecipe = {
   hatchAngleDeg: 0,
   hatchSpacingMm: 0.1,
   fillOverscanMm: 5,
+  fillStyle: 'scanline',
   fillBidirectional: true,
   fillCrossHatch: false,
   ditherAlgorithm: 'threshold',

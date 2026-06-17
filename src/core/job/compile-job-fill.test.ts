@@ -177,6 +177,19 @@ describe('compileJob fill hatching', () => {
     expect(segments.some(isHorizontalSegment)).toBe(true);
     expect(segments.some(isVerticalSegment)).toBe(true);
   });
+
+  it('compiles offset fill as contour-following closed paths', () => {
+    const layer = { ...fillLayer(), fillStyle: 'offset' as const, hatchSpacingMm: 2 };
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 10 });
+
+    const fill = firstFillGroup(compileJob({ objects: [square], layers: [layer] }, dev));
+    const segments = fill?.segments ?? [];
+
+    expect(fill).toMatchObject({ kind: 'fill', fillStyle: 'offset' });
+    expect(segments.length).toBeGreaterThan(1);
+    expect(segments.every((segment) => segment.closed)).toBe(true);
+    expect(segments.every((segment) => segment.polyline.length > 2)).toBe(true);
+  });
 });
 
 function isHorizontalSegment(segment: FillGroup['segments'][number]): boolean {

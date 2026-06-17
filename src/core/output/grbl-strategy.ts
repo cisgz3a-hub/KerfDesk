@@ -120,6 +120,8 @@ function emitFillGroup(
   device: DeviceProfile,
   dialect: ResolvedGcodeDialect,
 ): string {
+  if ((group.fillStyle ?? 'scanline') === 'offset')
+    return emitOffsetFillGroup(group, device, dialect);
   const s = scaleS(group.power, device.maxPowerS);
   const feed = Math.round(group.speed);
   const chunks: string[] = [];
@@ -139,6 +141,27 @@ function emitFillGroup(
     for (const sweep of sweeps) {
       const text = emitFillSweep(sweep, s, feed, group.overscanMm, dialect);
       if (text.length > 0) chunks.push(text);
+    }
+  }
+  return chunks.join(LINE_END) + LINE_END;
+}
+
+function emitOffsetFillGroup(
+  group: FillGroup,
+  device: DeviceProfile,
+  dialect: ResolvedGcodeDialect,
+): string {
+  const s = scaleS(group.power, device.maxPowerS);
+  const feed = Math.round(group.speed);
+  const chunks: string[] = [];
+  chunks.push(
+    `; offset fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes}`,
+  );
+  for (let p = 0; p < group.passes; p += 1) {
+    chunks.push(`; pass ${p + 1} of ${group.passes}`);
+    for (const seg of group.segments) {
+      const segText = emitSegment(seg, s, feed, dialect);
+      if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));
     }
   }
   return chunks.join(LINE_END) + LINE_END;

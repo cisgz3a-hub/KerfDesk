@@ -2,10 +2,7 @@ import type { DeviceProfile } from '../devices';
 import type { Layer, SceneObject } from '../scene';
 import type { HatchFillRule } from './fill-hatching';
 
-export function fillRuleForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-): HatchFillRule {
+export function fillRuleForLayer(objects: ReadonlyArray<SceneObject>, layer: Layer): HatchFillRule {
   return objects.some((obj) => textObjectMatchesLayer(obj, layer)) ? 'nonzero' : 'evenodd';
 }
 
@@ -24,6 +21,7 @@ export function layerFillCacheKey(
     layer.hatchSpacingMm,
     layer.fillBidirectional,
     layer.fillCrossHatch,
+    layer.fillStyle,
     fillRule,
     device.origin,
     device.bedWidth,

@@ -10,7 +10,14 @@
 //   5. Passes ≥ 1 (integer) for every output layer.
 //   6. Generated G-code is non-empty (at least one G1 line).
 //
-import { assertNever, type Layer, type Project, type Scene, type SceneObject } from '../scene';
+import {
+  assertNever,
+  isClosedEnough,
+  type Layer,
+  type Project,
+  type Scene,
+  type SceneObject,
+} from '../scene';
 import {
   findLaserOnTravelIssues,
   findLongBlankFeedMoves,
@@ -28,6 +35,7 @@ export type PreflightCode =
   | 'speed-out-of-range'
   | 'passes-below-one'
   | 'layer-mode-mismatch'
+  | 'offset-fill-open-contour'
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
@@ -80,6 +88,8 @@ export function runPreflight(
   }
 
   appendModeMismatchIssues(project.scene, outputLayers, issues);
+
+  appendOffsetFillOpenContourIssues(project.scene, outputLayers, issues);
 
   appendUnsupportedRasterTransformIssues(project.scene, outputLayers, issues);
 
@@ -177,6 +187,40 @@ function mismatchMessage(layer: Layer): string {
   return layer.mode === 'image'
     ? `Layer ${layer.id} is in Image mode but has vector objects assigned; they will not be engraved. Set the layer to Line or Fill, or move the objects to another layer.`
     : `Layer ${layer.id} is in ${layer.mode === 'fill' ? 'Fill' : 'Line'} mode but has an image assigned; it will not be engraved. Set the layer to Image mode.`;
+}
+
+function appendOffsetFillOpenContourIssues(
+  scene: Scene,
+  outputLayers: ReadonlyArray<Layer>,
+  issues: PreflightIssue[],
+): void {
+  for (const layer of outputLayers) {
+    if (layer.mode !== 'fill' || layer.fillStyle !== 'offset') continue;
+    if (scene.objects.some((obj) => objectHasOpenContourOnLayer(obj, layer))) {
+      issues.push({
+        code: 'offset-fill-open-contour',
+        message: `Layer ${layer.id} uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.`,
+      });
+    }
+  }
+}
+
+function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {
+  switch (obj.kind) {
+    case 'imported-svg':
+    case 'text':
+    case 'traced-image':
+    case 'shape':
+      return obj.paths.some(
+        (path) =>
+          path.color === layer.color &&
+          path.polylines.some((polyline) => !isClosedEnough(polyline)),
+      );
+    case 'raster-image':
+      return false;
+    default:
+      return assertNever(obj, 'SceneObject');
+  }
 }
 
 function appendUnsupportedRasterTransformIssues(
@@ -335,7 +379,7 @@ function maxOutputOverscanMm(scene: Scene): number {
   const fillOverscan = Math.max(
     0,
     ...scene.layers
-      .filter((l) => l.output && l.mode === 'fill')
+      .filter((l) => l.output && l.mode === 'fill' && l.fillStyle !== 'offset')
       .map((l) => Math.max(0, l.fillOverscanMm)),
   );
   return Math.max(imageOverscan, fillOverscan);

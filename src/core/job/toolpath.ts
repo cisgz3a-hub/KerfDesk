@@ -41,6 +41,10 @@ export function buildToolpath(job: Job): Toolpath {
     // enhancement: synthesize one "raster" step per row.
     if (group.kind === 'raster') continue;
     if (group.kind === 'fill') {
+      if ((group.fillStyle ?? 'scanline') === 'offset') {
+        prevEnd = appendContourGroupSteps(steps, prevEnd, group.segments, group.color);
+        continue;
+      }
       for (const sweep of groupFillSweeps(group.segments)) {
         const end = appendFillSweepSteps(steps, prevEnd, sweep, group.color, group.overscanMm);
         if (end !== null) prevEnd = end;
@@ -63,6 +67,29 @@ export function buildToolpath(job: Job): Toolpath {
   }
   const totalLength = steps.reduce((sum, s) => sum + s.length, 0);
   return { steps, totalLength };
+}
+
+function appendContourGroupSteps(
+  steps: ToolpathStep[],
+  initialPrevEnd: Vec2 | null,
+  segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2> }>,
+  color: string,
+): Vec2 | null {
+  let prevEnd = initialPrevEnd;
+  for (const seg of segments) {
+    const first = seg.polyline[0];
+    if (first === undefined) continue;
+    appendTravelStep(steps, prevEnd, first);
+    steps.push({
+      kind: 'cut',
+      color,
+      polyline: seg.polyline,
+      length: polylineLength(seg.polyline),
+    });
+    const last = seg.polyline[seg.polyline.length - 1];
+    if (last !== undefined) prevEnd = last;
+  }
+  return prevEnd;
 }
 
 export function summarizeToolpathDistances(toolpath: Toolpath): ToolpathDistanceSummary {
