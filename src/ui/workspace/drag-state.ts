@@ -9,6 +9,7 @@ import {
   hitTest,
   type Project,
   type SceneObject,
+  type SelectionAnchor,
   type Transform,
   type Vec2,
 } from '../../core/scene';
@@ -48,6 +49,11 @@ export type DragState =
       readonly kind: 'draw';
       readonly shape: 'rect' | 'ellipse' | 'polygon';
       readonly startScenePoint: Vec2;
+    }
+  | {
+      readonly kind: 'marquee';
+      readonly startScenePoint: Vec2;
+      readonly additive: boolean;
     };
 
 // Decide what kind of drag a mouse-down on `point` initiates, based on the
@@ -111,12 +117,14 @@ export function computeMouseDownDrag(args: {
     if (handleDrag !== null) return handleDrag;
   }
   const hitId = hitTest(project.scene, point);
+  if (hitId === null) {
+    return { kind: 'marquee', startScenePoint: point, additive: e.shiftKey };
+  }
   if (e.shiftKey) {
-    if (hitId !== null) onShiftClick(hitId);
+    onShiftClick(hitId);
     return null;
   }
   onPlainClick(hitId);
-  if (hitId === null) return null;
   const obj = project.scene.objects.find((o) => o.id === hitId);
   if (obj === undefined) return null;
   return {
@@ -154,10 +162,11 @@ export function panOffsetForDrag(args: {
 // drags never reach this function (the caller handles them before
 // computing a scene point).
 export function nextTransformForDrag(
-  drag: Exclude<DragState, { kind: 'pan' | 'draw' }>,
+  drag: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }>,
   obj: SceneObject,
   point: Vec2,
   e: { readonly shiftKey: boolean; readonly ctrlKey: boolean; readonly metaKey: boolean },
+  selectionAnchor?: SelectionAnchor,
 ): Transform {
   if (drag.kind === 'move') {
     return {
@@ -167,13 +176,20 @@ export function nextTransformForDrag(
     };
   }
   if (drag.kind === 'scale') {
+    const useCenterAnchor = e.ctrlKey || e.metaKey;
     return scaleObjectByHandleDrag({
       object: obj,
       handle: drag.handle,
       dragTo: point,
       lockAspect: !e.shiftKey,
-      fromCenter: e.ctrlKey || e.metaKey,
+      fromCenter: useCenterAnchor,
+      ...(useCenterAnchor || selectionAnchor === undefined ? {} : { anchor: selectionAnchor }),
     });
   }
-  return rotateObjectByDrag({ object: obj, dragTo: point, snap: e.shiftKey });
+  return rotateObjectByDrag({
+    object: obj,
+    dragTo: point,
+    snap: e.shiftKey,
+    ...(selectionAnchor === undefined ? {} : { anchor: selectionAnchor }),
+  });
 }

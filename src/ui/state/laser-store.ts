@@ -27,6 +27,7 @@ import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
+import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
 import { jobActions } from './laser-job-actions';
@@ -134,6 +135,7 @@ export type LaserState = {
   readonly home: () => Promise<void>;
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
   readonly unlockAlarm: () => Promise<void>;
+  readonly wakeController: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
   readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
@@ -451,6 +453,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...consoleActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),
+  ...controllerRecoveryActions(set, (line, action) => safeWrite(set, get, line, action)),
   ...originActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),

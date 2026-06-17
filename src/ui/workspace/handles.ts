@@ -9,7 +9,13 @@
 // Handles live on the object's transformed local bounds, not on an
 // axis-aligned bbox. That keeps resize behavior stable after rotation.
 
-import { applyTransform, type SceneObject, type Transform, type Vec2 } from '../../core/scene';
+import {
+  applyTransform,
+  type SceneObject,
+  type SelectionAnchor,
+  type Transform,
+  type Vec2,
+} from '../../core/scene';
 
 export type HandleKind = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 'e' | 's' | 'w';
 
@@ -69,9 +75,42 @@ export function hitHandle(object: SceneObject, point: Vec2, pxToMm: number): Han
 // When `fromCenter` is true (alt-drag) the anchor is the bbox center —
 // scaling pulls both halves outward / inward symmetrically. For edge
 // handles, the anchor mirrors the axis we're not scaling.
-function anchorLocalPoint(object: SceneObject, dragging: HandleKind, fromCenter: boolean): Vec2 {
+function anchorLocalPoint(
+  object: SceneObject,
+  dragging: HandleKind,
+  fromCenter: boolean,
+  anchor?: SelectionAnchor,
+): Vec2 {
   const { minX, minY, maxX, maxY } = object.bounds;
   if (fromCenter) return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  const selected = selectedAnchorLocalPoint(object, dragging, anchor);
+  if (selected !== null) return selected;
+  return oppositeLocalPointForHandle(object, dragging);
+}
+
+function selectedAnchorLocalPoint(
+  object: SceneObject,
+  dragging: HandleKind,
+  anchor?: SelectionAnchor,
+): Vec2 | null {
+  if (anchor === undefined) return null;
+  const selected = localPointForAnchor(object, anchor);
+  const handle = localPointForHandle(object, dragging);
+  return selectedAnchorCanResizeHandle(dragging, selected, handle) ? selected : null;
+}
+
+function selectedAnchorCanResizeHandle(
+  dragging: HandleKind,
+  selected: Vec2,
+  handle: Vec2,
+): boolean {
+  if (dragging === 'e' || dragging === 'w') return selected.x !== handle.x;
+  if (dragging === 'n' || dragging === 's') return selected.y !== handle.y;
+  return selected.x !== handle.x && selected.y !== handle.y;
+}
+
+function oppositeLocalPointForHandle(object: SceneObject, dragging: HandleKind): Vec2 {
+  const { minX, minY, maxX, maxY } = object.bounds;
   switch (dragging) {
     case 'nw':
       return { x: maxX, y: maxY };
@@ -103,10 +142,11 @@ export function scaleObjectByHandleDrag(args: {
   readonly dragTo: Vec2;
   readonly lockAspect: boolean;
   readonly fromCenter?: boolean;
+  readonly anchor?: SelectionAnchor;
 }): Transform {
-  const { object, handle, dragTo, lockAspect, fromCenter = false } = args;
+  const { object, handle, dragTo, lockAspect, fromCenter = false, anchor: selectionAnchor } = args;
   const t = object.transform;
-  const anchorLocal = anchorLocalPoint(object, handle, fromCenter);
+  const anchorLocal = anchorLocalPoint(object, handle, fromCenter, selectionAnchor);
   const handleLocal = localPointForHandle(object, handle);
   const anchor = applyTransform(anchorLocal, t);
   const { factorX, factorY } = computeScaleFactors({
@@ -223,6 +263,15 @@ function localPointForHandle(object: SceneObject, kind: HandleKind): Vec2 {
     case 'w':
       return { x: minX, y: midY };
   }
+}
+
+function localPointForAnchor(object: SceneObject, anchor: SelectionAnchor): Vec2 {
+  const { minX, minY, maxX, maxY } = object.bounds;
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+  const x = anchor.endsWith('w') ? minX : anchor.endsWith('e') ? maxX : midX;
+  const y = anchor.startsWith('n') ? minY : anchor.startsWith('s') ? maxY : midY;
+  return { x, y };
 }
 
 // Inverse of applyTransform's rotation+mirror steps for a vector. Translation

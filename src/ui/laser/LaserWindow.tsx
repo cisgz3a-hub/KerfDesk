@@ -27,6 +27,7 @@ export function LaserWindow(): JSX.Element {
   const disconnect = useLaserStore((s) => s.disconnect);
   const home = useLaserStore((s) => s.home);
   const unlockAlarm = useLaserStore((s) => s.unlockAlarm);
+  const wakeController = useLaserStore((s) => s.wakeController);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const streamer = useLaserStore((s) => s.streamer);
@@ -38,7 +39,8 @@ export function LaserWindow(): JSX.Element {
   // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
   const jobActive = isActiveJob(streamer);
   const controllerIdle = statusReport?.state === 'Idle';
-  const showAlarmBanner = hasAlarmRecovery(alarmCode, statusReport?.state);
+  const controllerSleep = statusReport?.state === 'Sleep';
+  const showAlarmBanner = !controllerSleep && hasAlarmRecovery(alarmCode, statusReport?.state);
   const connected = connection.kind === 'connected';
 
   const supportsSerial = platform.serial.isSupported();
@@ -71,6 +73,9 @@ export function LaserWindow(): JSX.Element {
           onUnlock={() => void unlockAlarm().catch(() => undefined)}
         />
       )}
+      {controllerSleep && (
+        <SleepBanner onWake={() => void wakeController().catch(() => undefined)} />
+      )}
       <StatusDisplay />
       <JogPad
         disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobActive)}
@@ -95,6 +100,21 @@ function isJogPadDisabled(
   jobActive: boolean,
 ): boolean {
   return !connected || !controllerIdle || machineOperationBusy || jobActive;
+}
+
+function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
+  return (
+    <div style={sleepStyle} role="alert">
+      <strong>Controller is asleep</strong>
+      <p style={alarmDetailStyle}>
+        GRBL is ignoring normal jog, frame, and start commands. Wake sends Ctrl-X soft reset,
+        clears the temporary work origin, and waits for the controller to report Idle again.
+      </p>
+      <button type="button" onClick={onWake} title="Send Ctrl-X soft reset to wake GRBL.">
+        Wake (Ctrl-X)
+      </button>
+    </div>
+  );
 }
 
 function AlarmBanner({
@@ -176,6 +196,13 @@ const alarmStyle: React.CSSProperties = {
   border: '1px solid var(--lf-danger)',
   background: 'var(--lf-tint-danger)',
   color: 'var(--lf-danger-fg)',
+  padding: 8,
+  borderRadius: 4,
+};
+const sleepStyle: React.CSSProperties = {
+  border: '1px solid var(--lf-warning)',
+  background: 'var(--lf-tint-warning)',
+  color: 'var(--lf-warning-fg)',
   padding: 8,
   borderRadius: 4,
 };

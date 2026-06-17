@@ -22,6 +22,7 @@ export const canvasTheme = {
   // Selection chrome (draw-scene)
   selection: '#1976d2',
   selectionHandleFill: '#ffffff',
+  selectionMarqueeFill: 'rgba(25, 118, 210, 0.12)',
   rotateHandleStroke: '#fff',
   outOfBounds: '#c62828',
   noGoZoneFill: 'rgba(198, 40, 40, 0.12)',

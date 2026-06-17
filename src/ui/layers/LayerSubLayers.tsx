@@ -29,12 +29,26 @@ const titleStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
 };
 const rowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'auto minmax(72px, 1fr) auto auto auto auto',
+  display: 'flex',
+  flexWrap: 'wrap',
   alignItems: 'center',
   gap: 6,
+  minWidth: 0,
+  overflow: 'hidden',
 };
-const modeSelectStyle: React.CSSProperties = { fontSize: 12, padding: '2px 4px' };
+const rowLabelStyle: React.CSSProperties = {
+  flex: '1 1 76px',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+const modeSelectStyle: React.CSSProperties = {
+  flex: '0 1 64px',
+  minWidth: 58,
+  fontSize: 12,
+  padding: '2px 4px',
+};
 const numericStyle: React.CSSProperties = { width: 58, padding: '2px 4px', fontSize: 12 };
 
 export function LayerSubLayers({ layer }: { readonly layer: Layer }): JSX.Element {
@@ -79,7 +93,9 @@ function LayerSubLayerRow(props: {
         aria-label={`Enable ${subLayer.label} for ${layer.color}`}
         title="Include this sub-layer operation in output."
       />
-      <span title={subLayer.label}>{subLayer.label}</span>
+      <span style={rowLabelStyle} title={subLayer.label}>
+        {subLayer.label}
+      </span>
       <ModeSelect layer={layer} subLayer={subLayer} />
       <PowerInput layer={layer} subLayer={subLayer} />
       <button

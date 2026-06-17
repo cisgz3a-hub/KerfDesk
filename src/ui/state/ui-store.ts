@@ -5,7 +5,7 @@
 // an editable action.
 
 import { create } from 'zustand';
-import type { Bounds, RasterImage, ShapeObject, Vec2 } from '../../core/scene';
+import type { Bounds, RasterImage, SelectionAnchor, ShapeObject, Vec2 } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
 
 export const MIN_ZOOM = 0.1;
@@ -45,6 +45,11 @@ export type PenDraft = {
   readonly cursor: Vec2 | null;
 };
 
+export type SelectionMarquee = {
+  readonly start: Vec2;
+  readonly end: Vec2;
+};
+
 export type UiState = {
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
@@ -52,6 +57,10 @@ export type UiState = {
   readonly setScrubberT: (next: number) => void;
   readonly showPreviewTravel: boolean;
   readonly setShowPreviewTravel: (next: boolean) => void;
+  readonly selectionAnchor: SelectionAnchor;
+  readonly setSelectionAnchor: (next: SelectionAnchor) => void;
+  readonly selectionMarquee: SelectionMarquee | null;
+  readonly setSelectionMarquee: (next: SelectionMarquee | null) => void;
   // Current drawing layer color. LightBurn's color/layer palette sets the
   // target color for subsequently-created vectors; this mirrors that behavior
   // without making layer selection undoable project data.
@@ -120,6 +129,10 @@ export const useUiStore = create<UiState>((set) => ({
   setScrubberT: (next) => set({ scrubberT: clamp01(next) }),
   showPreviewTravel: true,
   setShowPreviewTravel: (next) => set({ showPreviewTravel: next }),
+  selectionAnchor: 'nw',
+  setSelectionAnchor: (next) => set({ selectionAnchor: next }),
+  selectionMarquee: null,
+  setSelectionMarquee: (next) => set({ selectionMarquee: next }),
   activeLayerColor: null,
   setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,

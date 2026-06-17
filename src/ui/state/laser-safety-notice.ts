@@ -27,6 +27,7 @@ export type LaserSafetyAction =
   | 'jog'
   | 'home'
   | 'unlock'
+  | 'wake'
   | 'console';
 
 export type LaserSafetyNotice =
@@ -103,6 +104,12 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
     return (
       'The console command was not written to the controller; the machine may not have ' +
       'responded. Use physical E-stop or power cutoff now if unsafe.'
+    );
+  }
+  if (action === 'wake') {
+    return (
+      'The wake soft-reset was not written to the controller; the machine may stay asleep ' +
+      'or locked. Use physical E-stop or power cutoff now if unsafe.'
     );
   }
   return (

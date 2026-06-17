@@ -37,6 +37,7 @@ function makeLaserState(): LaserState {
     home: async () => undefined,
     autofocus: async () => ({ kind: 'preflight-failed', reason: 'unused' }),
     unlockAlarm: async () => undefined,
+    wakeController: async () => undefined,
     jog: async () => undefined,
     cancelJog: async () => undefined,
     frame: async () => undefined,
@@ -240,6 +241,39 @@ describe('handleLine status-only Alarm recovery state', () => {
     expect(get().motionOperation).toBeNull();
     expect(get().wcoCache).toBeNull();
     expect(get().workOriginActive).toBe(false);
+  });
+});
+
+describe('handleLine Sleep recovery state', () => {
+  it('clears stale alarm, motion, and custom-origin state when GRBL reports Sleep', () => {
+    const { refs, set, get } = makeHarness();
+    set({
+      alarmCode: 9,
+      wcoCache: { x: 25, y: 40, z: 0 },
+      workOriginActive: true,
+      frameVerification: {
+        boundsSignature: '0,0,50,50',
+        wco: { x: 25, y: 40, z: 0 },
+        workOriginActive: true,
+      },
+      motionOperation: {
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    });
+
+    handleLine(set, get, refs, async () => undefined, '<Sleep|MPos:25.000,40.000,0.000|FS:0,0>');
+
+    expect(get().statusReport?.state).toBe('Sleep');
+    expect(get().alarmCode).toBeNull();
+    expect(get().motionOperation).toBeNull();
+    expect(get().wcoCache).toBeNull();
+    expect(get().workOriginActive).toBe(false);
+    expect(get().frameVerification).toBeNull();
+    expect(get().homingState).toBe('unknown');
   });
 });
 

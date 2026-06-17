@@ -7,6 +7,7 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
   beforeEach(() => {
     useUiStore.getState().setToolMode({ kind: 'select' });
     useUiStore.getState().setPenDraft(null);
+    useUiStore.getState().setSelectionMarquee(null);
     useUiStore.getState().setActiveLayerColor(null);
     useUiStore.getState().setShowPreviewTravel(true);
   });
@@ -54,5 +55,13 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().setShowPreviewTravel(false);
 
     expect(useUiStore.getState().showPreviewTravel).toBe(false);
+  });
+
+  it('tracks a live selection marquee outside project history', () => {
+    const marquee = { start: { x: 1, y: 2 }, end: { x: 3, y: 4 } };
+
+    useUiStore.getState().setSelectionMarquee(marquee);
+
+    expect(useUiStore.getState().selectionMarquee).toEqual(marquee);
   });
 });
