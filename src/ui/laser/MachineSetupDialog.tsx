@@ -3,9 +3,17 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { ControllerSettingsPanel, FirmwareWritesPanel } from './MachineSetupController';
 import { ImportExportPanel } from './MachineSetupImportExport';
 import { OverviewPanel, ProfileCatalogPanel } from './MachineSetupProfiles';
+import { RasterDiagnosticsPanel } from './MachineSetupRasterDiagnostics';
 import { SafetyZonesPanel } from './MachineSetupSafetyZones';
 
-type SetupTab = 'overview' | 'catalog' | 'controller' | 'firmware' | 'zones' | 'import-export';
+type SetupTab =
+  | 'overview'
+  | 'catalog'
+  | 'controller'
+  | 'firmware'
+  | 'zones'
+  | 'raster-diagnostics'
+  | 'import-export';
 
 const TABS: ReadonlyArray<{ readonly id: SetupTab; readonly label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -13,6 +21,7 @@ const TABS: ReadonlyArray<{ readonly id: SetupTab; readonly label: string }> = [
   { id: 'controller', label: 'Controller Settings' },
   { id: 'firmware', label: 'Firmware Writes' },
   { id: 'zones', label: 'Safety Zones' },
+  { id: 'raster-diagnostics', label: 'Raster Diagnostics' },
   { id: 'import-export', label: 'Import / Export' },
 ];
 
@@ -54,6 +63,8 @@ function renderTab(tab: SetupTab): JSX.Element {
       return <FirmwareWritesPanel />;
     case 'zones':
       return <SafetyZonesPanel />;
+    case 'raster-diagnostics':
+      return <RasterDiagnosticsPanel />;
     case 'import-export':
       return <ImportExportPanel />;
   }
