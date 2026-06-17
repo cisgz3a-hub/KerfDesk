@@ -239,10 +239,7 @@ function handleStatusLine(
   // forever, so isActiveJob stayed true and every setup/jog/console command —
   // plus the clear-canvas guard — was blocked until a reconnect. The
   // controller-error safetyNotice lives in separate state and survives.
-  const jobOverAtIdle =
-    streamer !== null &&
-    (streamer.status === 'done' || streamer.status === 'errored') &&
-    report.state === 'Idle';
+  const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, report);
   const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
 
   set({
@@ -253,6 +250,17 @@ function handleStatusLine(
   });
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
+}
+
+function shouldReleaseStreamerAtIdle(
+  streamer: StreamerState | null,
+  report: StatusReport,
+): boolean {
+  return (
+    streamer !== null &&
+    (streamer.status === 'done' || streamer.status === 'errored') &&
+    report.state === 'Idle'
+  );
 }
 
 function homingStatusPatch(
