@@ -19,6 +19,7 @@ import {
 } from '../invariants';
 import { machineBoundsForDevice } from '../devices';
 import { DEFAULT_OVERSCAN_MM } from '../job';
+import { findNoGoZoneCollisions } from './no-go-zones';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -30,6 +31,7 @@ export type PreflightCode =
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
+  | 'no-go-zone-collision'
   | 'raster-too-large'
   | 'selected-output-empty'
   | 'empty-output';
@@ -83,9 +85,11 @@ export function runPreflight(
 
   appendBoundsIssues(project, gcode, issues, options);
 
+  appendNoGoZoneIssues(project, gcode, issues, options);
+
   appendLaserOnTravelIssues(gcode, issues);
 
-  appendLongBlankFeedIssues(gcode, issues);
+  appendLongBlankFeedIssues(project, gcode, issues);
 
   if (!/\bG1\b/.test(gcode)) {
     issues.push({
@@ -243,6 +247,25 @@ function appendBoundsIssues(
   }
 }
 
+function appendNoGoZoneIssues(
+  project: Project,
+  gcode: string,
+  issues: PreflightIssue[],
+  options: PreflightOptions,
+): void {
+  const zones = project.device.noGoZones ?? [];
+  if (zones.length === 0) return;
+  const collisions = findNoGoZoneCollisions(gcode, zones, machineBoundsForDevice(project.device), {
+    motionOffset: options.motionOffset,
+  });
+  for (const collision of collisions.slice(0, MAX_BOUNDS_ISSUES)) {
+    issues.push({
+      code: 'no-go-zone-collision',
+      message: `Line ${collision.lineNumber}: motion crosses no-go zone "${collision.zone.name}".`,
+    });
+  }
+}
+
 function findRelativeMotionEnvelopeIssues(
   gcode: string,
   bed: { readonly width: number; readonly height: number },
@@ -332,7 +355,12 @@ function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): voi
 // (G1 ... S0). Distinct from laser-on-travel: this is the marking / stale-export
 // invariant (the "moved to the second part and left a stray line" class). Fresh
 // post-ADR-035 output is clean; a hit means a regression or an old export.
-function appendLongBlankFeedIssues(gcode: string, issues: PreflightIssue[]): void {
+function appendLongBlankFeedIssues(
+  project: Project,
+  gcode: string,
+  issues: PreflightIssue[],
+): void {
+  if (usesControlledLaserOffTravel(project)) return;
   const blankFeed = findLongBlankFeedMoves(gcode, { thresholdMm: LONG_BLANK_FEED_THRESHOLD_MM });
   for (const issue of blankFeed.slice(0, MAX_BOUNDS_ISSUES)) {
     issues.push({
@@ -340,4 +368,9 @@ function appendLongBlankFeedIssues(gcode: string, issues: PreflightIssue[]): voi
       message: `Line ${issue.lineNumber}: blank G1 feed move ${issue.distanceMm.toFixed(3)} mm exceeds ${LONG_BLANK_FEED_THRESHOLD_MM.toFixed(3)} mm. Regenerate output or lower the fill blank-feed threshold after hardware verification.`,
     });
   }
+}
+
+function usesControlledLaserOffTravel(project: Project): boolean {
+  const feed = project.device.gcodeDialect.controlledLaserOffTravelFeedMmPerMin;
+  return typeof feed === 'number' && Number.isFinite(feed) && feed > 0;
 }

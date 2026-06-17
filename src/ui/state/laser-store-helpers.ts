@@ -172,6 +172,7 @@ export function initialLaserState(): Pick<
   | 'controllerSettings'
   | 'grblSettingsRows'
   | 'lastSettingsReadAt'
+  | 'settingsBackupExportedAt'
   | 'wcoCache'
   | 'workOriginActive'
   | 'homingState'
@@ -192,6 +193,7 @@ export function initialLaserState(): Pick<
     controllerSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    settingsBackupExportedAt: null,
     wcoCache: null,
     workOriginActive: false,
     homingState: 'unknown',
@@ -213,6 +215,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     controllerSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    settingsBackupExportedAt: null,
     // GRBL clears G92 on the reset that fires when the port closes; our cache
     // must match or the next connect shows "custom origin" against a zeroed machine.
     wcoCache: null,

@@ -9,6 +9,7 @@ import { createMachineDiagnosticBundle } from '../state/machine-diagnostic-bundl
 import { useToastStore } from '../state/toast-store';
 import { exportGrblSettingsBackup } from './export-grbl-settings-backup';
 import { exportMachineDiagnosticBundle } from './export-machine-diagnostic-bundle';
+import { MachineSettingsTable } from './MachineSettingsTable';
 
 type PushToast = ReturnType<typeof useToastStore.getState>['pushToast'];
 type AsyncAction = () => Promise<void>;
@@ -22,6 +23,9 @@ export function MachineSettingsPanel(): JSX.Element {
   const rows = useLaserStore((s) => s.grblSettingsRows);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
+  const markMachineSettingsBackupExported = useLaserStore(
+    (s) => s.markMachineSettingsBackupExported,
+  );
   const runMachineDiagnostic = useLaserStore((s) => s.runMachineDiagnostic);
   const pushToast = useToastStore((s) => s.pushToast);
   const readDisabledReason = machineSettingsReadDisabledReason({
@@ -48,14 +52,16 @@ export function MachineSettingsPanel(): JSX.Element {
         readDisabledReason={readDisabledReason}
         exportDisabledReason={exportDisabledReason}
         onRead={() => runRead(readMachineSettings, pushToast)}
-        onExport={() => runSettingsExport(platform, rows, pushToast)}
+        onExport={() =>
+          runSettingsExport(platform, rows, pushToast, markMachineSettingsBackupExported)
+        }
         onDiagnostic={() => runDiagnostic(runMachineDiagnostic, pushToast)}
         onExportDiagnostic={() => runDiagnosticExport(platform, pushToast)}
       />
       {lastSettingsReadAt !== null ? (
         <div style={readAtStyle}>Last read: {new Date(lastSettingsReadAt).toLocaleString()}</div>
       ) : null}
-      <SettingsTable rows={rows} />
+      <MachineSettingsTable rows={rows} />
     </details>
   );
 }
@@ -132,9 +138,11 @@ function runSettingsExport(
   platform: PlatformAdapter,
   rows: ReadonlyArray<GrblSettingRow>,
   pushToast: PushToast,
+  markMachineSettingsBackupExported: () => void,
 ): void {
   void exportGrblSettingsBackup({ platform, rows }).then((result) => {
     if (result.ok) {
+      markMachineSettingsBackupExported();
       pushToast(`Exported machine settings backup to ${result.displayName}`, 'success');
       return;
     }
@@ -175,40 +183,6 @@ function MachineSettingsNotice(): JSX.Element {
       Reads live controller settings with <code>$$</code> and read-only diagnostic probes. Export a
       backup before changing firmware.
     </p>
-  );
-}
-
-function SettingsTable({ rows }: { readonly rows: ReadonlyArray<GrblSettingRow> }): JSX.Element {
-  const tableHelp = helpProps('control:laser.machine-settings.table');
-  if (rows.length === 0) {
-    return <p style={emptyStyle}>No settings read yet.</p>;
-  }
-  return (
-    <div style={tableWrapStyle} title={tableHelp.title} data-help-id={tableHelp['data-help-id']}>
-      <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={cellStyle}>Setting</th>
-            <th style={cellStyle}>Value</th>
-            <th style={cellStyle}>Unit</th>
-            <th style={cellStyle}>Meaning</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.code}>
-              <td style={cellStyle}>{row.code}</td>
-              <td style={cellStyle}>{row.rawValue}</td>
-              <td style={cellStyle}>{row.unit ?? '-'}</td>
-              <td style={cellStyle}>
-                <strong>{row.name}</strong>
-                <span style={descriptionStyle}> {row.description}</span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
@@ -258,29 +232,4 @@ const readAtStyle: React.CSSProperties = {
   color: 'var(--lf-text-faint)',
   fontSize: 11,
   marginBottom: 4,
-};
-const emptyStyle: React.CSSProperties = {
-  margin: '6px 0 0',
-  color: 'var(--lf-text-faint)',
-  fontStyle: 'italic',
-};
-const tableWrapStyle: React.CSSProperties = {
-  maxHeight: 180,
-  overflow: 'auto',
-  border: '1px solid var(--lf-border)',
-  background: 'var(--lf-bg)',
-};
-const tableStyle: React.CSSProperties = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: 11,
-};
-const cellStyle: React.CSSProperties = {
-  borderBottom: '1px solid var(--lf-border)',
-  padding: '3px 4px',
-  textAlign: 'left',
-  verticalAlign: 'top',
-};
-const descriptionStyle: React.CSSProperties = {
-  color: 'var(--lf-text-muted)',
 };

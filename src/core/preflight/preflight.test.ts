@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { compileJob } from '../job';
 import { grblStrategy } from '../output';
 import {
@@ -130,6 +130,30 @@ describe('runPreflight long blank-feed invariant', () => {
     ].join('\n');
 
     const result = runPreflight(project, freshGcode);
+
+    expect(result.issues.every((i) => i.code !== 'long-blank-feed')).toBe(true);
+  });
+
+  it('allows long G1 S0 moves for profiles with controlled laser-off travel', () => {
+    const project: Project = {
+      ...createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+      scene: {
+        ...EMPTY_SCENE,
+        objects: [sampleObject],
+        layers: [createLayer({ id: 'L1', color: '#ff0000' })],
+      },
+    };
+    const controlledTravelGcode = [
+      'G21',
+      'G90',
+      'M4 S0',
+      'G1 X1.000 Y1.000 F800 S0',
+      'G1 X21.000 Y1.000 F800 S0',
+      'G1 X25.000 Y1.000 F800 S900',
+      'M5',
+    ].join('\n');
+
+    const result = runPreflight(project, controlledTravelGcode);
 
     expect(result.issues.every((i) => i.code !== 'long-blank-feed')).toBe(true);
   });

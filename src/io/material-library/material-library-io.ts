@@ -27,12 +27,21 @@ type MaterialLibraryDeviceHintInput = Omit<MaterialLibraryDeviceHint, 'airAssist
 export type MaterialPreset = {
   readonly id: string;
   readonly materialName: string;
+  readonly material?: string;
   readonly thicknessMm?: number;
   readonly title?: string;
+  readonly operation?: string;
+  readonly profileId?: string;
+  readonly machineFamily?: string;
+  readonly laserModel?: string;
+  readonly opticalPowerW?: number;
+  readonly confidence?: 'starter' | 'calibrated' | 'imported' | 'unsupported';
   readonly description: string;
   readonly recipe: MaterialRecipe;
   readonly revision: string;
 };
+
+type MaterialPresetConfidence = 'starter' | 'calibrated' | 'imported' | 'unsupported';
 
 export type MaterialLibraryDocument = {
   readonly format: typeof MATERIAL_LIBRARY_FORMAT;
@@ -219,8 +228,15 @@ function parsePreset(
     entry: canonicalPreset({
       id: strings.id,
       materialName: strings.materialName,
+      ...optionalStringField(value, 'material'),
       ...(thickness.thicknessMm !== undefined ? { thicknessMm: thickness.thicknessMm } : {}),
       ...(thickness.title !== undefined ? { title: thickness.title } : {}),
+      ...optionalStringField(value, 'operation'),
+      ...optionalStringField(value, 'profileId'),
+      ...optionalStringField(value, 'machineFamily'),
+      ...optionalStringField(value, 'laserModel'),
+      ...optionalPositiveNumberField(value, 'opticalPowerW'),
+      ...optionalConfidenceField(value),
       description: strings.description,
       recipe: normalizeMaterialRecipe(value['recipe']),
       revision: strings.revision,
@@ -339,8 +355,15 @@ function canonicalPreset(preset: MaterialPreset): MaterialPreset {
   return {
     id: preset.id,
     materialName: preset.materialName,
+    ...(preset.material !== undefined ? { material: preset.material } : {}),
     ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
     ...(preset.title !== undefined ? { title: preset.title } : {}),
+    ...(preset.operation !== undefined ? { operation: preset.operation } : {}),
+    ...(preset.profileId !== undefined ? { profileId: preset.profileId } : {}),
+    ...(preset.machineFamily !== undefined ? { machineFamily: preset.machineFamily } : {}),
+    ...(preset.laserModel !== undefined ? { laserModel: preset.laserModel } : {}),
+    ...(preset.opticalPowerW !== undefined ? { opticalPowerW: preset.opticalPowerW } : {}),
+    ...(preset.confidence !== undefined ? { confidence: preset.confidence } : {}),
     description: preset.description,
     recipe: normalizeMaterialRecipe(preset.recipe),
     revision: preset.revision,
@@ -368,6 +391,37 @@ function invalidField(
   field: string,
 ): { readonly kind: 'invalid'; readonly reason: string } {
   return { kind: 'invalid', reason: `entries[${index}].${field} must be a non-empty string` };
+}
+
+function optionalStringField(
+  value: Record<string, unknown>,
+  field: 'material' | 'operation' | 'profileId' | 'machineFamily' | 'laserModel',
+): Record<string, string> {
+  const raw = value[field];
+  return isNonEmptyString(raw) ? { [field]: raw } : {};
+}
+
+function optionalPositiveNumberField(
+  value: Record<string, unknown>,
+  field: 'opticalPowerW',
+): Record<string, number> {
+  const raw = value[field];
+  return isPositiveFinite(raw) ? { [field]: raw } : {};
+}
+
+function optionalConfidenceField(
+  value: Record<string, unknown>,
+): { readonly confidence?: MaterialPresetConfidence } {
+  const raw = value['confidence'];
+  if (
+    raw === 'starter' ||
+    raw === 'calibrated' ||
+    raw === 'imported' ||
+    raw === 'unsupported'
+  ) {
+    return { confidence: raw };
+  }
+  return {};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

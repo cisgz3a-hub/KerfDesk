@@ -16,6 +16,37 @@ export type HomingConfig = {
   readonly direction: Origin;
 };
 
+export type MachineProfileSource = 'built-in' | 'custom' | 'imported-lightburn' | 'diagnostic';
+
+export type ProfileCapability =
+  | 'grbl'
+  | 'homing'
+  | 'wcs'
+  | 'air-assist'
+  | 'z-axis'
+  | 'no-go-zones'
+  | 'rotary-ready'
+  | 'camera-ready';
+
+export type ProfileEvidenceStatus = 'verified' | 'researched' | 'starter' | 'user-imported';
+
+export type ProfileEvidence = {
+  readonly label: string;
+  readonly status: ProfileEvidenceStatus;
+  readonly note: string;
+  readonly source?: string;
+};
+
+export type NoGoZone = {
+  readonly id: string;
+  readonly name: string;
+  readonly enabled: boolean;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+};
+
 export type LaserSubProfile = {
   readonly model: string;
   readonly opticalPowerW?: number;
@@ -45,6 +76,10 @@ export type DeviceGcodeDialect = {
   readonly dialectId: string;
   readonly returnToOriginOnEnd: boolean;
   readonly emitSOnTravel: boolean;
+  // When set, laser-off positioning moves are emitted as feed-controlled
+  // `G1 ... F... S0` instead of uncontrolled `G0 ... S0`. This is slower, but
+  // protects controllers/gantries that lose steps on aggressive rapid moves.
+  readonly controlledLaserOffTravelFeedMmPerMin?: number | undefined;
   readonly emitSOnEveryBurnMove: boolean;
   readonly modalFeedrate: boolean;
   readonly airAssistCommand: AirAssistCommand;
@@ -52,6 +87,13 @@ export type DeviceGcodeDialect = {
 };
 
 export type DeviceProfile = {
+  readonly profileId?: string;
+  readonly vendor?: string;
+  readonly model?: string;
+  readonly profileSource?: MachineProfileSource;
+  readonly catalogVersion?: string;
+  readonly capabilities?: ReadonlyArray<ProfileCapability>;
+  readonly evidence?: ReadonlyArray<ProfileEvidence>;
   readonly name: string;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
@@ -100,6 +142,7 @@ export type DeviceProfile = {
   readonly junctionDeviationMm: number;
   readonly origin: Origin;
   readonly homing: HomingConfig;
+  readonly noGoZones?: ReadonlyArray<NoGoZone>;
   // Multi-line G-code (or vendor M-code) sequence the "Auto-focus" button
   // sends. Lines are sent in order via the streaming buffer. Default is a
   // standard GRBL probe-and-offset pattern; users on machines with custom
@@ -128,7 +171,22 @@ const DEFAULT_AUTOFOCUS_COMMAND = '';
 
 // First-run default per WORKFLOW.md F-A1.
 export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
+  profileId: 'generic-grbl-400x400',
+  vendor: 'Generic',
+  model: 'GRBL 400x400',
+  profileSource: 'built-in',
+  catalogVersion: '2026-06-17',
+  capabilities: ['grbl', 'wcs', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'LaserForge starter profile',
+      status: 'starter',
+      note: 'Conservative 400x400 mm GRBL defaults for first-run setup and manual confirmation.',
+    },
+  ],
   name: 'Default 400×400',
+  machineFamily: 'generic-grbl-400x400',
+  controllerKind: 'grbl-v1.1',
   controller: {
     baudRate: 115200,
     rxBufferBytes: 120,
@@ -167,9 +225,20 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
 
 export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'neotronics-4040-max-lt4lds-v2-20w',
+  vendor: 'Neotronics',
+  model: '4040 Max / LT-4LDS-V2 20W',
   name: 'Neotronics 4040 Max / LT-4LDS-V2 20W',
   machineFamily: 'neotronics-4040-max',
   controllerKind: 'grbl-v1.1',
+  capabilities: ['grbl', 'homing', 'wcs', 'air-assist', 'z-axis', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'User diagnostic profile',
+      status: 'researched',
+      note: 'Based on local 4040 diagnostic work: GRBL-like controller, LT-4LDS-V2 20W head, conservative streaming, and feed-controlled travel.',
+    },
+  ],
   controller: {
     ...DEFAULT_DEVICE_PROFILE.controller,
     rxBufferBytes: 80,
@@ -185,6 +254,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
     returnToOriginOnEnd: false,
     emitSOnEveryBurnMove: true,
     modalFeedrate: false,
+    controlledLaserOffTravelFeedMmPerMin: 800,
     laserModeCommand: 'M4',
   },
   bedWidth: 400,

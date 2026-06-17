@@ -18,7 +18,7 @@ type Setter = (
 
 export function sceneActions(
   set: Setter,
-): Pick<AppState, 'setLayerParam' | 'moveLayer' | 'updateDeviceProfile'> {
+): Pick<AppState, 'setLayerParam' | 'moveLayer' | 'replaceDeviceProfile' | 'updateDeviceProfile'> {
   return {
     setLayerParam: (layerId, patch) =>
       set((s) => ({
@@ -59,6 +59,17 @@ export function sceneActions(
           dirty: true,
         };
       }),
+    replaceDeviceProfile: (device) =>
+      set((s) => ({
+        project: {
+          ...s.project,
+          device,
+          workspace: { ...s.project.workspace, width: device.bedWidth, height: device.bedHeight },
+        },
+        undoStack: pushUndo(s.project, s.undoStack),
+        redoStack: [],
+        dirty: true,
+      })),
   };
 }
 

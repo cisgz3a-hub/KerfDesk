@@ -11,9 +11,23 @@ export type {
   LaserAirAssistHardware,
   LaserFocusMode,
   LaserSubProfile,
+  MachineProfileSource,
+  NoGoZone,
   Origin,
+  ProfileCapability,
+  ProfileEvidence,
+  ProfileEvidenceStatus,
 } from './device-profile';
 export { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from './device-profile';
+export type { MachineProfileCatalogEntry } from './profile-catalog';
+export {
+  duplicateProfileAsCustom,
+  GRBL_MACHINE_PROFILE_CATALOG,
+  PROFILE_CATALOG_VERSION,
+  profileCatalogEntryById,
+  profileSupportsCapability,
+  validateMachineProfile,
+} from './profile-catalog';
 export type {
   DiagnosticPosition,
   DiagnosticTranscriptEntry,

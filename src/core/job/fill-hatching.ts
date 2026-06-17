@@ -48,12 +48,15 @@ export type HatchInput = {
   readonly polylines: ReadonlyArray<Polyline>;
   readonly hatchAngleDeg: number;
   readonly hatchSpacingMm: number;
+  readonly fillRule?: HatchFillRule;
   // Snake fill (alternate each row's direction) when true/undefined; emit every
   // row in the SAME direction when false (unidirectional). Unidirectional trades
   // a return-rapid per row for removing the bidirectional firing-lag zipper that
   // can serrate small text (ADR-038). Defaults to true.
   readonly bidirectional?: boolean;
 };
+
+export type HatchFillRule = 'evenodd' | 'nonzero';
 
 export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   const spacing = Math.max(MIN_HATCH_SPACING_MM, input.hatchSpacingMm);
@@ -82,6 +85,7 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   // it actually spans, so the cost tracks the geometry, not bed height.
   const edges = buildSortedEdges(rotated);
   const bidirectional = input.bidirectional ?? true;
+  const fillRule = input.fillRule ?? 'evenodd';
   const hatchesRotated: Polyline[] = [];
   // Snap the first scanline to a multiple of `spacing` so two adjacent
   // shapes hatched separately use the same Y grid — avoids visible
@@ -108,8 +112,23 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
     // interval [yLo, yHi), so y >= yHi means it no longer crosses. Since y
     // only increases, a retired edge never returns.
     active = active.filter((e) => y < e.yHi);
-    const intersections = active.map((e) => intersectX(e, y));
-    pushScanlineHatches(intersections, y, scanIndex, bidirectional, hatchesRotated);
+    if (fillRule === 'nonzero') {
+      pushNonZeroScanlineHatches(
+        active.map((e) => ({ x: intersectX(e, y), windingDelta: e.windingDelta })),
+        y,
+        scanIndex,
+        bidirectional,
+        hatchesRotated,
+      );
+    } else {
+      pushEvenOddScanlineHatches(
+        active.map((e) => intersectX(e, y)),
+        y,
+        scanIndex,
+        bidirectional,
+        hatchesRotated,
+      );
+    }
   }
 
   return hatchesRotated.map((pl) => rotatePolyline(pl, angle));
@@ -175,6 +194,7 @@ type ScanEdge = {
   readonly by: number;
   readonly yLo: number;
   readonly yHi: number;
+  readonly windingDelta: 1 | -1;
 };
 
 // Flatten every closed polyline into a flat edge list, dropping horizontal
@@ -200,6 +220,7 @@ function buildSortedEdges(polylines: ReadonlyArray<Polyline>): ScanEdge[] {
         by: b.y,
         yLo: Math.min(a.y, b.y),
         yHi: Math.max(a.y, b.y),
+        windingDelta: b.y > a.y ? 1 : -1,
       });
     }
   }
@@ -220,7 +241,7 @@ function intersectX(e: ScanEdge, y: number): number {
 // (snake fill) so the laser doesn't return-to-start between rows; when not,
 // every row goes forward (unidirectional — the emitter rapids back between
 // rows, but no alternating firing-lag zipper, ADR-038).
-function pushScanlineHatches(
+function pushEvenOddScanlineHatches(
   xs: number[],
   y: number,
   scanIndex: number,
@@ -244,4 +265,92 @@ function pushScanlineHatches(
       closed: false,
     });
   }
+}
+
+type WindingIntersection = {
+  readonly x: number;
+  readonly windingDelta: 1 | -1;
+};
+
+function pushNonZeroScanlineHatches(
+  intersections: WindingIntersection[],
+  y: number,
+  scanIndex: number,
+  bidirectional: boolean,
+  out: Polyline[],
+): void {
+  if (intersections.length < 2) return;
+  intersections.sort((a, b) => a.x - b.x);
+  const spans = collectNonZeroSpans(intersections);
+  const forward = bidirectional ? scanIndex % 2 === 0 : true;
+  for (const [xa, xb] of spans) {
+    const [x0, x1] = forward ? [xa, xb] : [xb, xa];
+    pushHatch(out, x0, x1, y);
+  }
+}
+
+function collectNonZeroSpans(
+  intersections: ReadonlyArray<WindingIntersection>,
+): Array<readonly [number, number]> {
+  const spans: Array<readonly [number, number]> = [];
+  let winding = 0;
+  let runStart: number | null = null;
+  for (let i = 0; i < intersections.length; ) {
+    const group = groupedWindingDelta(intersections, i);
+    if (group === null) break;
+    const transition = nextWindingTransition(winding, winding + group.delta, runStart, group.x);
+    if (transition.span !== null) spans.push(transition.span);
+    winding = transition.winding;
+    runStart = transition.runStart;
+    i = group.nextIndex;
+  }
+  return spans;
+}
+
+function groupedWindingDelta(
+  intersections: ReadonlyArray<WindingIntersection>,
+  startIndex: number,
+): { readonly x: number; readonly delta: number; readonly nextIndex: number } | null {
+  const x = intersections[startIndex]?.x;
+  if (x === undefined) return null;
+  let delta = 0;
+  let i = startIndex;
+  while (i < intersections.length && sameIntersectionX(intersections[i]?.x, x)) {
+    delta += intersections[i]?.windingDelta ?? 0;
+    i += 1;
+  }
+  return { x, delta, nextIndex: i };
+}
+
+function sameIntersectionX(candidate: number | undefined, x: number): boolean {
+  return candidate !== undefined && Math.abs(candidate - x) < SCANLINE_EPS;
+}
+
+function nextWindingTransition(
+  winding: number,
+  nextWinding: number,
+  runStart: number | null,
+  x: number,
+): {
+  readonly winding: number;
+  readonly runStart: number | null;
+  readonly span: readonly [number, number] | null;
+} {
+  if (winding === 0 && nextWinding !== 0) {
+    return { winding: nextWinding, runStart: x, span: null };
+  }
+  if (winding === 0 || nextWinding !== 0 || runStart === null || x - runStart < SCANLINE_EPS) {
+    return { winding: nextWinding, runStart, span: null };
+  }
+  return { winding: nextWinding, runStart: null, span: [runStart, x] };
+}
+
+function pushHatch(out: Polyline[], x0: number, x1: number, y: number): void {
+  out.push({
+    points: [
+      { x: x0, y },
+      { x: x1, y },
+    ],
+    closed: false,
+  });
 }

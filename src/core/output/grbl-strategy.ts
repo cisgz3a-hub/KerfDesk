@@ -1,7 +1,8 @@
 // GrblStrategy — emits deterministic GRBL v1.1+ G-code for a Job.
 //
 // Invariants enforced at emit time (PROJECT.md non-negotiables):
-//   #3 Laser-off on travel: every G0 line carries `S0`.
+//   #3 Laser-off on travel: every G0 line carries `S0`; profiles that avoid
+//      rapid travel emit feed-controlled `G1 ... S0` instead.
 //   #5 Deterministic output: fixed decimal precision, LF line endings,
 //      indexed iteration (no Set/Map iteration order).
 //   #7 Power scale honest: S = round((power/100) * device.maxPowerS).
@@ -35,8 +36,17 @@ function scaleS(powerPercent: number, maxPowerS: number): number {
 }
 
 function travelLine(x: number, y: number, dialect: ResolvedGcodeDialect): string {
+  const controlledFeed = controlledTravelFeed(dialect);
+  if (controlledFeed !== null) {
+    return `G1 X${fmt(x)} Y${fmt(y)} F${controlledFeed} S0`;
+  }
   const base = `G0 X${fmt(x)} Y${fmt(y)}`;
   return dialect.emitSOnTravel ? `${base} S0` : base;
+}
+
+function controlledTravelFeed(dialect: ResolvedGcodeDialect): number | null {
+  const feed = dialect.controlledLaserOffTravelFeedMmPerMin;
+  return typeof feed === 'number' && Number.isFinite(feed) && feed > 0 ? Math.round(feed) : null;
 }
 
 function initialLaserMode(dialect: ResolvedGcodeDialect): 'M3' | 'M4' {
@@ -231,6 +241,7 @@ function emitRasterGroupHere(group: RasterGroup, dialect: ResolvedGcodeDialect):
     laserModeCommand: rasterLaserMode(dialect),
     modalFeedrate: dialect.modalFeedrate,
     emitSOnEveryBurnMove: dialect.emitSOnEveryBurnMove,
+    controlledLaserOffTravelFeedMmPerMin: dialect.controlledLaserOffTravelFeedMmPerMin,
   });
 }
 

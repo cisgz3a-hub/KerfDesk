@@ -27,6 +27,7 @@ function makeLaserState(): LaserState {
     controllerSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    settingsBackupExportedAt: null,
     wcoCache: null,
     workOriginActive: false,
     homingState: 'unknown',
@@ -49,6 +50,8 @@ function makeLaserState(): LaserState {
     resetOrigin: async () => undefined,
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
+    markMachineSettingsBackupExported: () => undefined,
+    writeGrblSetting: async () => undefined,
     runMachineDiagnostic: async () => undefined,
     sendConsoleCommand: async () => undefined,
     clearTranscript: () => undefined,
@@ -56,7 +59,12 @@ function makeLaserState(): LaserState {
 }
 
 function makeHarness(): {
-  readonly refs: { settingsCollector: SettingsCollectorState; onLineArrived: null };
+  readonly refs: {
+    settingsCollector: SettingsCollectorState;
+    settingWriteAck: null;
+    settingsReadComplete: null;
+    onLineArrived: null;
+  };
   readonly set: SetFn;
   readonly get: GetFn;
 } {
@@ -66,7 +74,12 @@ function makeHarness(): {
     state = { ...state, ...patch } as LaserState;
   };
   return {
-    refs: { settingsCollector: startCollecting(), onLineArrived: null },
+    refs: {
+      settingsCollector: startCollecting(),
+      settingWriteAck: null,
+      settingsReadComplete: null,
+      onLineArrived: null,
+    },
     set,
     get: () => state,
   };

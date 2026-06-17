@@ -8,10 +8,7 @@ import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { ConsolePanel } from './ConsolePanel';
-import { DetectedSettingsBanner } from './DetectedSettingsBanner';
-import { DeviceSettings } from './DeviceSettings';
-import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
-import { MachineSettingsPanel } from './MachineSettingsPanel';
+import { MachineSetupEntry } from './MachineSetupEntry';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
@@ -55,17 +52,15 @@ export function LaserWindow(): JSX.Element {
           the Windows desktop app.
         </p>
       )}
-      <DeviceSettings />
+      <MachineSetupEntry
+        setupDisabled={isSetupPanelDisabled(connected, machineOperationBusy, jobActive)}
+      />
       <ConnectionBar
         connection={connection}
         onConnect={() => void connect(platform)}
         onDisconnect={() => void disconnect().catch(() => undefined)}
         disabled={!supportsSerial || machineOperationBusy}
       />
-      <GrblLaserSetupPanel
-        disabled={isSetupPanelDisabled(connected, machineOperationBusy, jobActive)}
-      />
-      <MachineSettingsPanel />
       {showAlarmBanner && (
         <AlarmBanner
           code={alarmCode}
@@ -74,7 +69,6 @@ export function LaserWindow(): JSX.Element {
           onUnlock={() => void unlockAlarm().catch(() => undefined)}
         />
       )}
-      <DetectedSettingsBanner />
       <StatusDisplay />
       <JogPad
         disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobActive)}

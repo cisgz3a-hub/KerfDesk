@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 
@@ -43,6 +44,12 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await Promise.resolve();
 }
 
+async function flushUntil(predicate: () => boolean): Promise<void> {
+  for (let i = 0; i < 10 && !predicate(); i += 1) {
+    await Promise.resolve();
+  }
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -66,8 +73,10 @@ afterEach(async () => {
     controllerSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    settingsBackupExportedAt: null,
     wcoCache: null,
     workOriginActive: false,
+    homingState: 'unknown',
   });
   vi.restoreAllMocks();
 });
@@ -128,5 +137,100 @@ describe('laser-store machine settings', () => {
 
     expect(useLaserStore.getState().grblSettingsRows).toEqual([]);
     expect(useLaserStore.getState().lastSettingsReadAt).toBeNull();
+  });
+
+  it('writes one guarded setting and re-reads $$ when a fresh backup exists', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+      grblSettingsRows: settingsMapToRows(new Map([[32, '0']])),
+      lastSettingsReadAt: 10,
+      settingsBackupExportedAt: 11,
+    });
+    writes.length = 0;
+
+    const pending = useLaserStore
+      .getState()
+      .writeGrblSetting(32, '1', { commonSettingChecked: true });
+    await Promise.resolve();
+
+    expect(writes).toEqual(['$32=1\n']);
+    connection.emitLine('ok');
+    await flushUntil(() => writes.length === 2);
+    for (const line of ['$32=1', 'ok']) connection.emitLine(line);
+    await pending;
+
+    expect(writes).toEqual(['$32=1\n', '$$\n']);
+    expect(useLaserStore.getState().settingsBackupExportedAt).toBeNull();
+  });
+
+  it('rejects guarded writes when the verification read does not confirm the value', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+      grblSettingsRows: settingsMapToRows(new Map([[32, '0']])),
+      lastSettingsReadAt: 10,
+      settingsBackupExportedAt: 11,
+    });
+    writes.length = 0;
+
+    const pending = useLaserStore
+      .getState()
+      .writeGrblSetting(32, '1', { commonSettingChecked: true });
+    await Promise.resolve();
+    connection.emitLine('ok');
+    await flushUntil(() => writes.length === 2);
+    for (const line of ['$32=0', 'ok']) connection.emitLine(line);
+
+    await expect(pending).rejects.toThrow(/did not verify/i);
+    expect(writes).toEqual(['$32=1\n', '$$\n']);
+    expect(useLaserStore.getState().lastWriteError).toMatch(/did not verify/i);
+  });
+
+  it('blocks guarded writes until the current settings backup is exported', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+      grblSettingsRows: settingsMapToRows(new Map([[32, '0']])),
+      lastSettingsReadAt: 10,
+      settingsBackupExportedAt: null,
+    });
+
+    await expect(
+      useLaserStore.getState().writeGrblSetting(32, '1', { commonSettingChecked: true }),
+    ).rejects.toThrow(/backup/i);
   });
 });
