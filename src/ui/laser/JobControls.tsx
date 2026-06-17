@@ -9,6 +9,7 @@ import {
   computeJobBounds,
   computeJobMotionBounds,
   describeFramePreflightFailure,
+  frameBoundsSignature,
   framePreflight,
   type JobBounds,
   offsetJobBounds,
@@ -378,7 +379,22 @@ function dispatchFrameIfSafe(
     return;
   }
   const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
-  void frame(bounds, feed);
+  const isVerifiedOrigin = placement.jobOrigin?.startFrom === 'verified-origin';
+  void frame(bounds, feed)
+    .then(() => {
+      // Record the Verified Frame on a clean dispatch. The frame motion is still
+      // running, but Start is separately gated on Idle + no-alarm, so a frame
+      // that is mid-flight, hit a limit (alarm), or was cancelled can never
+      // authorize a burn from this record (ADR-053 P2).
+      if (!isVerifiedOrigin) return;
+      const laser = useLaserStore.getState();
+      laser.markFrameVerified({
+        boundsSignature: frameBoundsSignature(bounds),
+        wco: laser.wcoCache,
+        workOriginActive: laser.workOriginActive,
+      });
+    })
+    .catch(() => undefined);
 }
 
 function describeFrameMotionPreflightIssue(

@@ -30,6 +30,7 @@ export async function runStartJobFlow(): Promise<void> {
       autofocusBusy: laser.autofocusBusy,
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,
+      frameVerification: laser.frameVerification,
     },
     jobPlacement,
     currentOutputScope(app),
