@@ -52,7 +52,9 @@ function mergeDraft<T extends object>(
   return next;
 }
 
-function isDraftEnvelope(value: unknown): value is CalibrationDraftEnvelope<Record<string, unknown>> {
+function isDraftEnvelope(
+  value: unknown,
+): value is CalibrationDraftEnvelope<Record<string, unknown>> {
   if (!isRecord(value)) return false;
   return value['schemaVersion'] === 1 && isRecord(value['draft']);
 }
