@@ -7,6 +7,12 @@ import {
   type Polyline,
   type Scene,
 } from '../scene';
+import {
+  calibrationLabelWidthMm,
+  createCalibrationLabelLayer,
+  createCalibrationLabelObject,
+  formatCalibrationNumber,
+} from './calibration-labels';
 
 const MIN_COUNT = 1;
 const MAX_COUNT = 20;
@@ -49,6 +55,19 @@ export type MaterialTestGrid = {
   readonly cells: ReadonlyArray<MaterialTestCell>;
 };
 
+type MaterialTestLayout = {
+  readonly origin: { readonly x: number; readonly y: number };
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+  readonly gap: number;
+  readonly labelSize: number;
+  readonly labelGap: number;
+  readonly leftGutter: number;
+  readonly topGutter: number;
+  readonly speedLabels: ReadonlyArray<string>;
+  readonly powerLabels: ReadonlyArray<string>;
+};
+
 export function generateMaterialTestGrid(options: MaterialTestGridOptions): MaterialTestGrid {
   const rows = clampInteger(options.rows, MIN_COUNT, MAX_COUNT);
   const columns = clampInteger(options.columns, MIN_COUNT, MAX_COUNT);
@@ -69,6 +88,7 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
   const origin = options.origin ?? DEFAULT_ORIGIN;
   const speeds = linspace(speedHigh, speedLow, rows);
   const powers = linspace(powerLow, powerHigh, columns);
+  const layout = materialTestLayout({ origin, cellWidth, cellHeight, gap, speeds, powers });
 
   const layers: Layer[] = speeds.map((speed, row) => {
     const color = materialTestLayerColor(row);
@@ -87,8 +107,8 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
     for (let column = 0; column < columns; column += 1) {
       const power = powers[column] ?? powerLow;
       const powerScale = powerHigh > 0 ? (power / powerHigh) * 100 : 100;
-      const x = origin.x + column * (cellWidth + gap);
-      const y = origin.y + row * (cellHeight + gap);
+      const x = cellX(layout, column);
+      const y = cellY(layout, row);
       const objectId = `material-test-cell-r${row}-c${column}`;
       objects.push(
         squareObject({ id: objectId, color: layer.color, cellWidth, cellHeight, x, y, powerScale }),
@@ -106,7 +126,59 @@ export function generateMaterialTestGrid(options: MaterialTestGridOptions): Mate
     }
   }
 
+  objects.push(...materialTestLabelObjects(layout));
+  layers.push(createCalibrationLabelLayer('material-test-labels'));
+
   return { scene: { objects, layers }, cells };
+}
+
+function materialTestLayout(args: {
+  readonly origin: { readonly x: number; readonly y: number };
+  readonly cellWidth: number;
+  readonly cellHeight: number;
+  readonly gap: number;
+  readonly speeds: ReadonlyArray<number>;
+  readonly powers: ReadonlyArray<number>;
+}): MaterialTestLayout {
+  const labelSize = labelSizeForCell(args.cellWidth, args.cellHeight);
+  const labelGap = Math.max(0.5, Math.min(args.gap, 2));
+  const speedLabels = args.speeds.map(formatCalibrationNumber);
+  const powerLabels = args.powers.map(formatCalibrationNumber);
+  return {
+    ...args,
+    labelSize,
+    labelGap,
+    speedLabels,
+    powerLabels,
+    leftGutter:
+      Math.max(...speedLabels.map((label) => calibrationLabelWidthMm(label, labelSize))) + labelGap,
+    topGutter: labelSize + labelGap,
+  };
+}
+
+function materialTestLabelObjects(layout: MaterialTestLayout): ReadonlyArray<ImportedSvg> {
+  return [
+    ...layout.powerLabels.map((label, column) =>
+      createCalibrationLabelObject({
+        id: `material-test-power-c${column}`,
+        text: label,
+        x:
+          cellX(layout, column) +
+          centerOffset(layout.cellWidth, calibrationLabelWidthMm(label, layout.labelSize)),
+        y: layout.origin.y,
+        sizeMm: layout.labelSize,
+      }),
+    ),
+    ...layout.speedLabels.map((label, row) =>
+      createCalibrationLabelObject({
+        id: `material-test-speed-r${row}`,
+        text: label,
+        x: layout.origin.x,
+        y: cellY(layout, row) + centerOffset(layout.cellHeight, layout.labelSize),
+        sizeMm: layout.labelSize,
+      }),
+    ),
+  ];
 }
 
 function squareObject(args: {
@@ -155,6 +227,22 @@ function orderedPair(a: number, b: number): readonly [number, number] {
 
 function materialTestLayerColor(row: number): string {
   return `#${(0x100000 + row).toString(16).padStart(6, '0')}`;
+}
+
+function labelSizeForCell(width: number, height: number): number {
+  return Math.max(1.4, Math.min(2.5, width * 0.42, height * 0.45));
+}
+
+function cellX(layout: MaterialTestLayout, column: number): number {
+  return layout.origin.x + layout.leftGutter + column * (layout.cellWidth + layout.gap);
+}
+
+function cellY(layout: MaterialTestLayout, row: number): number {
+  return layout.origin.y + layout.topGutter + row * (layout.cellHeight + layout.gap);
+}
+
+function centerOffset(span: number, childSpan: number): number {
+  return Math.max(0, (span - childSpan) / 2);
 }
 
 function clampInteger(value: number, min: number, max: number): number {

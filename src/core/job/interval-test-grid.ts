@@ -7,6 +7,12 @@ import {
   type Polyline,
   type Scene,
 } from '../scene';
+import {
+  calibrationLabelWidthMm,
+  createCalibrationLabelLayer,
+  createCalibrationLabelObject,
+  formatCalibrationInterval,
+} from './calibration-labels';
 
 const MIN_STEPS = 1;
 const MAX_STEPS = 20;
@@ -63,6 +69,8 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
   const gap = Math.max(0, clampFinite(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
   const origin = options.origin ?? DEFAULT_ORIGIN;
   const intervals = linspace(intervalHigh, intervalLow, steps);
+  const labelSize = labelSizeForSwatch(swatchSize);
+  const labelGap = Math.max(0.5, Math.min(gap / 2, 2));
   const layers: Layer[] = [];
   const objects: ImportedSvg[] = [];
   const cells: IntervalTestCell[] = [];
@@ -85,6 +93,20 @@ export function generateIntervalTestGrid(options: IntervalTestGridOptions): Inte
       bounds: { minX: x, minY: y, maxX: x + swatchSize, maxY: y + swatchSize },
     });
   }
+
+  objects.push(
+    ...cells.map((cell) => {
+      const label = formatCalibrationInterval(cell.intervalMm);
+      return createCalibrationLabelObject({
+        id: `interval-test-label-${cell.step}`,
+        text: label,
+        x: cell.bounds.minX + centerOffset(swatchSize, calibrationLabelWidthMm(label, labelSize)),
+        y: cell.bounds.maxY + labelGap,
+        sizeMm: labelSize,
+      });
+    }),
+  );
+  layers.push(createCalibrationLabelLayer('interval-test-labels'));
 
   return { scene: { objects, layers }, cells };
 }
@@ -147,6 +169,14 @@ function orderedPair(a: number, b: number): readonly [number, number] {
 
 function intervalLayerColor(step: number): string {
   return `#${(0x200000 + step).toString(16).padStart(6, '0')}`;
+}
+
+function labelSizeForSwatch(size: number): number {
+  return Math.max(1.4, Math.min(2.5, size * 0.3));
+}
+
+function centerOffset(span: number, childSpan: number): number {
+  return Math.max(0, (span - childSpan) / 2);
 }
 
 function clampInteger(value: number, min: number, max: number): number {
