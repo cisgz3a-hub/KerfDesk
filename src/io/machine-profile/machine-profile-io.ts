@@ -220,20 +220,10 @@ function canonicalSource(source: MachineProfileDocumentSource): MachineProfileDo
 
 function canonicalProfile(profile: DeviceProfile): DeviceProfile {
   return {
-    ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
-    ...(profile.vendor !== undefined ? { vendor: profile.vendor } : {}),
-    ...(profile.model !== undefined ? { model: profile.model } : {}),
-    ...(profile.profileSource !== undefined ? { profileSource: profile.profileSource } : {}),
-    ...(profile.catalogVersion !== undefined ? { catalogVersion: profile.catalogVersion } : {}),
-    ...(profile.capabilities !== undefined ? { capabilities: [...profile.capabilities] } : {}),
-    ...(profile.evidence !== undefined ? { evidence: profile.evidence.map((item) => ({ ...item })) } : {}),
+    ...canonicalIdentityMetadata(profile),
     name: profile.name,
-    ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
-    ...(profile.controllerKind !== undefined ? { controllerKind: profile.controllerKind } : {}),
+    ...canonicalMachineMetadata(profile),
     gcodeDialect: normalizeGcodeDialectSelection(profile.gcodeDialect),
-    ...(profile.laserSubProfile !== undefined
-      ? { laserSubProfile: { ...profile.laserSubProfile } }
-      : {}),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,
     maxFeed: profile.maxFeed,
@@ -249,8 +239,40 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     framingFeedMmPerMin: profile.framingFeedMmPerMin,
     accelMmPerSec2: profile.accelMmPerSec2,
     junctionDeviationMm: profile.junctionDeviationMm,
+    ...canonicalZMetadata(profile),
+  };
+}
+
+function canonicalIdentityMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
+  return {
+    ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
+    ...(profile.vendor !== undefined ? { vendor: profile.vendor } : {}),
+    ...(profile.model !== undefined ? { model: profile.model } : {}),
+    ...(profile.profileSource !== undefined ? { profileSource: profile.profileSource } : {}),
+    ...(profile.catalogVersion !== undefined ? { catalogVersion: profile.catalogVersion } : {}),
+    ...(profile.capabilities !== undefined ? { capabilities: [...profile.capabilities] } : {}),
+    ...(profile.evidence !== undefined
+      ? { evidence: profile.evidence.map((item) => ({ ...item })) }
+      : {}),
+  };
+}
+
+function canonicalMachineMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
+  return {
+    ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
+    ...(profile.controllerKind !== undefined ? { controllerKind: profile.controllerKind } : {}),
+    ...(profile.laserSubProfile !== undefined
+      ? { laserSubProfile: { ...profile.laserSubProfile } }
+      : {}),
+  };
+}
+
+function canonicalZMetadata(profile: DeviceProfile): Partial<DeviceProfile> {
+  return {
     ...(profile.zTravelMm !== undefined ? { zTravelMm: profile.zTravelMm } : {}),
-    ...(profile.zTravelConfirmed !== undefined ? { zTravelConfirmed: profile.zTravelConfirmed } : {}),
+    ...(profile.zTravelConfirmed !== undefined
+      ? { zTravelConfirmed: profile.zTravelConfirmed }
+      : {}),
     ...(profile.zProbePresent !== undefined ? { zProbePresent: profile.zProbePresent } : {}),
   };
 }

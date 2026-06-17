@@ -64,6 +64,16 @@ describe('GRBL laser setup panel', () => {
         );
       });
 
+      expect(host.textContent).toContain('Machine Setup');
+      await act(async () => {
+        button(host, 'Machine Setup').click();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        button(host, 'Controller Settings').click();
+        await Promise.resolve();
+      });
+
       expect(host.textContent).toContain('One-time GRBL Setup');
       expect(host.textContent).toContain('Writes only the listed GRBL values');
       await act(async () => {

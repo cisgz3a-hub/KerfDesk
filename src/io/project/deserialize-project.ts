@@ -92,35 +92,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   const layers = Array.isArray(scene['layers']) ? scene['layers'] : [];
   const normalized = {
     ...raw,
-    device: {
-      ...dev,
-      accelMmPerSec2:
-        typeof dev['accelMmPerSec2'] === 'number'
-          ? dev['accelMmPerSec2']
-          : DEFAULT_DEVICE_PROFILE.accelMmPerSec2,
-      junctionDeviationMm:
-        typeof dev['junctionDeviationMm'] === 'number'
-          ? dev['junctionDeviationMm']
-          : DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
-      // Back-fill for pre-framing-feed .lf2 files. Same additive-with-
-      // default pattern as accel / junctionDeviation above.
-      framingFeedMmPerMin:
-        typeof dev['framingFeedMmPerMin'] === 'number' && dev['framingFeedMmPerMin'] > 0
-          ? dev['framingFeedMmPerMin']
-          : DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
-      minPowerS:
-        typeof dev['minPowerS'] === 'number' && dev['minPowerS'] >= 0
-          ? dev['minPowerS']
-          : DEFAULT_DEVICE_PROFILE.minPowerS,
-      laserModeEnabled:
-        typeof dev['laserModeEnabled'] === 'boolean'
-          ? dev['laserModeEnabled']
-          : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
-      airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
-      gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
-      scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
-      noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
-    },
+    device: normalizeDevice(dev),
     optimization: normalizeOptimization(raw['optimization']),
     scene: {
       ...scene,
@@ -137,6 +109,48 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   // the single trusted point. Replacing it with typed builders is tracked as a
   // Phase C improvement (audit CQ-006); the runtime is already validated.
   return normalized as unknown as Project;
+}
+
+function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...dev,
+    accelMmPerSec2: numberOrDefault(dev['accelMmPerSec2'], DEFAULT_DEVICE_PROFILE.accelMmPerSec2),
+    junctionDeviationMm: numberOrDefault(
+      dev['junctionDeviationMm'],
+      DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
+    ),
+    // Back-fill for pre-framing-feed .lf2 files. Same additive-with-
+    // default pattern as accel / junctionDeviation above.
+    framingFeedMmPerMin: positiveNumberOrDefault(
+      dev['framingFeedMmPerMin'],
+      DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
+    ),
+    minPowerS: nonNegativeNumberOrDefault(dev['minPowerS'], DEFAULT_DEVICE_PROFILE.minPowerS),
+    laserModeEnabled: booleanOrDefault(
+      dev['laserModeEnabled'],
+      DEFAULT_DEVICE_PROFILE.laserModeEnabled,
+    ),
+    airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
+    gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
+    scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
+    noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
+  };
+}
+
+function numberOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' ? value : fallback;
+}
+
+function positiveNumberOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && value > 0 ? value : fallback;
+}
+
+function nonNegativeNumberOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && value >= 0 ? value : fallback;
+}
+
+function booleanOrDefault(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
 }
 
 function normalizeOptimization(value: unknown): Project['optimization'] {

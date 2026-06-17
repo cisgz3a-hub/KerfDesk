@@ -12,6 +12,7 @@ import {
   type MaterialRecipeConfidence,
   type MaterialRecipeOperation,
 } from '../../core/material-library';
+import { parsePresetMatchMetadata } from './material-preset-metadata';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
 export const MATERIAL_LIBRARY_SCHEMA_VERSION = 1;
@@ -77,8 +78,6 @@ export type MergeMaterialLibrariesResult = {
 };
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
-const RECIPE_CONFIDENCES = ['starter', 'calibrated', 'imported', 'unsupported'] as const;
-const RECIPE_OPERATIONS = ['cut', 'engrave', 'score', 'image'] as const;
 
 export function createMaterialLibraryDeviceHint(device: DeviceProfile): MaterialLibraryDeviceHint {
   return {
@@ -281,58 +280,6 @@ function parsePresetStrings(
   return { kind: 'ok', id, materialName, description, revision };
 }
 
-function parsePresetMatchMetadata(
-  value: Record<string, unknown>,
-  index: number,
-):
-  | {
-      readonly kind: 'ok';
-      readonly metadata: Pick<
-        MaterialPreset,
-        | 'material'
-        | 'operation'
-        | 'profileId'
-        | 'machineFamily'
-        | 'laserModel'
-        | 'opticalPowerW'
-        | 'confidence'
-        | 'warning'
-        | 'calibrationProvenance'
-      >;
-    }
-  | { readonly kind: 'invalid'; readonly reason: string } {
-  const metadata: Record<string, unknown> = {};
-  const stringFields = [
-    'material',
-    'profileId',
-    'machineFamily',
-    'laserModel',
-    'warning',
-    'calibrationProvenance',
-  ] as const;
-  for (const field of stringFields) {
-    const raw = value[field];
-    if (raw === undefined) continue;
-    if (!isNonEmptyString(raw)) return invalidPresetMetadata(index, field);
-    metadata[field] = raw;
-  }
-  if (value['operation'] !== undefined) {
-    if (!isRecipeOperation(value['operation'])) return invalidPresetMetadata(index, 'operation');
-    metadata['operation'] = value['operation'];
-  }
-  if (value['confidence'] !== undefined) {
-    if (!isRecipeConfidence(value['confidence'])) return invalidPresetMetadata(index, 'confidence');
-    metadata['confidence'] = value['confidence'];
-  }
-  if (value['opticalPowerW'] !== undefined) {
-    if (!isPositiveFinite(value['opticalPowerW'])) {
-      return invalidPresetMetadata(index, 'opticalPowerW');
-    }
-    metadata['opticalPowerW'] = value['opticalPowerW'];
-  }
-  return { kind: 'ok', metadata };
-}
-
 function parseThicknessTitle(
   value: Record<string, unknown>,
   index: number,
@@ -463,13 +410,6 @@ function invalidField(
   return { kind: 'invalid', reason: `entries[${index}].${field} must be a non-empty string` };
 }
 
-function invalidPresetMetadata(
-  index: number,
-  field: string,
-): { readonly kind: 'invalid'; readonly reason: string } {
-  return { kind: 'invalid', reason: `entries[${index}].${field} is invalid` };
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -492,12 +432,4 @@ function isOrigin(value: unknown): value is Origin {
 
 function isAirAssistCommand(value: unknown): value is DeviceProfile['airAssistCommand'] {
   return value === 'none' || value === 'M7' || value === 'M8';
-}
-
-function isRecipeConfidence(value: unknown): value is MaterialRecipeConfidence {
-  return RECIPE_CONFIDENCES.some((confidence) => confidence === value);
-}
-
-function isRecipeOperation(value: unknown): value is MaterialRecipeOperation {
-  return RECIPE_OPERATIONS.some((operation) => operation === value);
 }

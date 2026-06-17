@@ -12,7 +12,7 @@ export function drawNoGoZones(
     if (!zone.enabled) continue;
     const rect = sceneRectForZone(project, zone);
     ctx.save();
-    ctx.fillStyle = 'rgba(198, 40, 40, 0.12)';
+    ctx.fillStyle = canvasTheme.noGoZoneFill;
     ctx.strokeStyle = canvasTheme.outOfBounds;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);

@@ -110,6 +110,7 @@ function SettingsTable({ rows }: { readonly rows: ReadonlyArray<GrblSettingRow> 
       <input
         type="search"
         aria-label="Search controller settings"
+        title="Search controller settings by code, name, unit, category, or value."
         placeholder="Search settings"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
