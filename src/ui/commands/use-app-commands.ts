@@ -21,6 +21,7 @@ export type CommandShellCallbacks = {
   readonly requestAdjustImage: () => void;
   readonly requestMaterialTest: () => void;
   readonly requestIntervalTest: () => void;
+  readonly requestScanOffsetTest: () => void;
   readonly requestOptimizationSettings: () => void;
   readonly showAbout: () => void;
 };
@@ -38,11 +39,6 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const activeStreamer =
     laser.streamer !== null &&
     (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
-  const machine = {
-    statusReport: laser.statusReport,
-    workOriginActive: laser.workOriginActive,
-    wcoCache: laser.wcoCache,
-  };
   return buildAppCommands({
     dirty: app.dirty,
     savedName: app.savedName,
@@ -62,17 +58,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     saveProjectAs: () => saveProject(platform, app, pushToast, true),
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
-    saveGcode: () =>
-      void handleSaveGcode({
-        platform,
-        project: app.project,
-        savedName: app.savedName,
-        jobPlacement: app.jobPlacement,
-        outputScope: currentOutputScope(app),
-        machine,
-        controllerSettings: laser.controllerSettings,
-        pushToast,
-      }),
+    saveGcode: saveGcodeAction(platform, app, laser, pushToast),
     undo: app.undo,
     redo: app.redo,
     selectAll: app.selectAllObjects,
@@ -82,6 +68,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     addText: () => openTextDialog({ mode: 'add' }),
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
+    scanOffsetTest: callbacks.requestScanOffsetTest,
     optimizationSettings: callbacks.requestOptimizationSettings,
     adjustImage: callbacks.requestAdjustImage,
     traceImage: () => {
@@ -104,6 +91,29 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     resetView: useUiStore.getState().resetView,
     showAbout: callbacks.showAbout,
   });
+}
+
+function saveGcodeAction(
+  platform: ReturnType<typeof usePlatform>,
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): () => void {
+  return () =>
+    void handleSaveGcode({
+      platform,
+      project: app.project,
+      savedName: app.savedName,
+      jobPlacement: app.jobPlacement,
+      outputScope: currentOutputScope(app),
+      machine: {
+        statusReport: laser.statusReport,
+        workOriginActive: laser.workOriginActive,
+        wcoCache: laser.wcoCache,
+      },
+      controllerSettings: laser.controllerSettings,
+      pushToast,
+    });
 }
 
 function openProject(

@@ -19,6 +19,7 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'tools.add-text',
   'tools.material-test',
   'tools.interval-test',
+  'tools.scan-offset-test',
   'tools.optimization-settings',
   'tools.adjust-image',
   'tools.trace-image',
