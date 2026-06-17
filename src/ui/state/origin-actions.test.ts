@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { hasCustomOrigin, resetOrigin, setOriginHere } from './origin-actions';
+import { hasCustomOrigin, releaseMotors, resetOrigin, setOriginHere } from './origin-actions';
 
 describe('setOriginHere', () => {
   it('writes exactly G92 X0 Y0 with a trailing newline', async () => {
@@ -45,6 +45,15 @@ describe('resetOrigin', () => {
     await resetOrigin(safeWrite);
     expect(safeWrite).toHaveBeenCalledTimes(1);
     expect(safeWrite).toHaveBeenCalledWith('G92.1\n');
+  });
+});
+
+describe('releaseMotors', () => {
+  it('writes exactly $SLP with a trailing newline', async () => {
+    const safeWrite = vi.fn(async () => undefined);
+    await releaseMotors(safeWrite);
+    expect(safeWrite).toHaveBeenCalledTimes(1);
+    expect(safeWrite).toHaveBeenCalledWith('$SLP\n');
   });
 });
 
