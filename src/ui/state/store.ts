@@ -158,6 +158,7 @@ export type AppState = ObjectPropertiesActions &
     readonly resetLayerToDefault: (layerId: string) => void;
     readonly setLayerDefaults: (layerDefaults: LayerDefaultsState) => void;
     readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
+    readonly replaceDeviceProfile: (device: DeviceProfile) => void;
     readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
     readonly undo: () => void;

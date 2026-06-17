@@ -47,6 +47,39 @@ const singleRasterJob: Job = {
   ],
 };
 
+const twoSweepFillJob: Job = {
+  groups: [
+    {
+      kind: 'fill',
+      layerId: 'fill',
+      color: '#000000',
+      power: 90,
+      speed: 800,
+      passes: 1,
+      airAssist: false,
+      overscanMm: 3,
+      segments: [
+        {
+          polyline: [
+            { x: 10, y: 5 },
+            { x: 20, y: 5 },
+          ],
+          closed: false,
+        },
+        // Gap is wider than the fill rapid threshold, so current output seeks
+        // between these sweeps with G0. The 4040-safe dialect must not.
+        {
+          polyline: [
+            { x: 40, y: 5 },
+            { x: 50, y: 5 },
+          ],
+          closed: false,
+        },
+      ],
+    },
+  ],
+};
+
 describe('grblStrategy machine compatibility dialects', () => {
   it('keeps the default/Falcon-compatible dialect byte-identical for vector output', () => {
     expect(grblStrategy.emit(singleCutJob, DEFAULT_DEVICE_PROFILE)).toBe(
@@ -76,7 +109,7 @@ describe('grblStrategy machine compatibility dialects', () => {
         'M4 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
-        'G0 X10.000 Y20.000 S0',
+        'G1 X10.000 Y20.000 F800 S0',
         'G1 X30.000 Y40.000 F1500 S500',
         'G1 X50.000 Y60.000 F1500 S500',
         'M5',
@@ -104,6 +137,18 @@ describe('grblStrategy machine compatibility dialects', () => {
   it('uses non-modal feed words for Neotronics-safe raster output', () => {
     const out = grblStrategy.emit(singleRasterJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
 
+    expect(out).not.toMatch(/^G0\b/m);
+    expect(out).toContain('G1 X0.000 Y0.500 F800 S0');
     expect(out).toContain('G1 X1.000 F1000 S500\nG1 X1.000 F1000 S0');
+  });
+
+  it('uses feed-controlled laser-off travel for Neotronics-safe fill output', () => {
+    const out = grblStrategy.emit(twoSweepFillJob, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+
+    expect(out).not.toMatch(/^G0\b/m);
+    expect(out).toContain('G1 X7.000 Y5.000 F800 S0');
+    expect(out).toContain('G1 X23.000 Y5.000 F800 S0');
+    expect(out).toContain('G1 X37.000 Y5.000 F800 S0');
+    expect(out).toContain('G1 X53.000 Y5.000 F800 S0');
   });
 });

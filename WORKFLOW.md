@@ -792,6 +792,8 @@ or traced image) with at least one closed polyline.
 5. Compile + emit G-code as usual (Save G-code, or Start job in the
    Laser panel). The FillGroup for that color now contains hatch lines
    with laser-off overscan runway instead of the outline.
+6. If **Cross-Hatch** is enabled, the same fill region emits a second hatch
+   set at `hatchAngleDeg + 90`. The scan-direction preview shows both passes.
 
 **Error**:
 - *No closed polylines on this color* — the layer's mode is Fill, but

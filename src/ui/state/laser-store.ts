@@ -8,7 +8,7 @@ import { create } from 'zustand';
 import {
   CMD_HOME,
   CMD_UNLOCK,
-  type GrblSettingRow,
+  type GrblSettingRow, type GrblSettingWriteConfirmation,
   RT_JOG_CANCEL,
   RT_STATUS,
   buildJogCommand,
@@ -41,11 +41,7 @@ import {
   setOriginHere as setOriginHereAction,
   type WorkCoordinateOffset,
 } from './origin-actions';
-import {
-  type LaserSafetyNotice,
-  streamStalledNotice,
-  writeFailedNotice,
-} from './laser-safety-notice';
+import { type LaserSafetyNotice, streamStalledNotice, writeFailedNotice } from './laser-safety-notice';
 import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
@@ -70,7 +66,6 @@ export type { WorkCoordinateOffset } from './origin-actions';
 
 const DEFAULT_BAUD = 115200;
 const STATUS_POLL_MS = 250;
-
 export type ConnectionState =
   | { readonly kind: 'disconnected' }
   | { readonly kind: 'connecting' }
@@ -102,6 +97,7 @@ export type LaserState = {
   readonly controllerSettings: ControllerSettingsSnapshot | null;
   readonly grblSettingsRows: ReadonlyArray<GrblSettingRow>;
   readonly lastSettingsReadAt: number | null;
+  readonly settingsBackupExportedAt: number | null;
   /**
    * F.3 — last-seen Work Coordinate Offset from the GRBL controller.
    * GRBL only reports WCO on a cadence (~every Nth status frame), so
@@ -122,6 +118,8 @@ export type LaserState = {
   readonly unlockAlarm: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
+  readonly markMachineSettingsBackupExported: () => void;
+  readonly writeGrblSetting: (id: number, value: string, confirmation: GrblSettingWriteConfirmation) => Promise<void>;
   readonly runMachineDiagnostic: () => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   readonly clearTranscript: () => void;
@@ -161,6 +159,7 @@ type LiveRefs = {
   // object handler functions receive carries it across calls.
   onLineArrived: (() => void) | null;
   nextTranscriptId: number;
+  settingWriteAck: null; settingsReadComplete: null;
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
@@ -174,6 +173,7 @@ const refs: LiveRefs = {
   settingsCollector: idleCollector(),
   onLineArrived: null,
   nextTranscriptId: 1,
+  settingWriteAck: null, settingsReadComplete: null,
   stallProbe: null,
 };
 
@@ -188,6 +188,7 @@ function teardown(): void {
   refs.settingsCollector = idleCollector();
   refs.onLineArrived = null;
   refs.nextTranscriptId = 1;
+  refs.settingWriteAck = null; refs.settingsReadComplete = null;
   refs.stallProbe = null;
 }
 
@@ -283,6 +284,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         controllerSettings: null,
         grblSettingsRows: [],
         lastSettingsReadAt: null,
+        settingsBackupExportedAt: null,
         streamer: null,
         wcoCache: null,
         workOriginActive: false,

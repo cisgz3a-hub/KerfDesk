@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
-import { createLayer, IDENTITY_TRANSFORM, type SceneObject, type Transform } from '../scene';
+import {
+  createLayer,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type SceneObject,
+  type Transform,
+} from '../scene';
 import { compileJob } from './compile-job';
 import type { FillGroup, Job } from './job';
 
@@ -18,7 +24,7 @@ function closedSquareObj(args: {
   readonly y?: number;
   readonly size: number;
   readonly transform?: Transform;
-}): SceneObject {
+}): ImportedSvg {
   const x = args.x ?? 0;
   const y = args.y ?? 0;
   const points = [
@@ -34,6 +40,25 @@ function closedSquareObj(args: {
     bounds: { minX: x, minY: y, maxX: x + args.size, maxY: y + args.size },
     transform: args.transform ?? IDENTITY_TRANSFORM,
     paths: [{ color: args.color, polylines: [{ points, closed: true }] }],
+  };
+}
+
+function textWithOverlappingContours(color: string): SceneObject {
+  const left = closedSquareObj({ id: 'left-glyph', color, size: 10 });
+  const right = closedSquareObj({ id: 'right-glyph', color, x: 5, size: 10 });
+  return {
+    kind: 'text',
+    id: 'script-text',
+    content: 'Carina',
+    fontKey: 'dancing-script',
+    sizeMm: 20,
+    alignment: 'left',
+    lineHeight: 1.4,
+    letterSpacing: 0,
+    color,
+    bounds: { minX: 0, minY: 0, maxX: 15, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [...left.paths, ...right.paths],
   };
 }
 
@@ -116,6 +141,17 @@ describe('compileJob fill hatching', () => {
     expect(row).toHaveLength(2);
     expect(totalBurnLength).toBeCloseTo(10);
     expect(row.some((segment) => segment.minX < 10 && segment.maxX > 5)).toBe(false);
+  });
+
+  it('fills overlapping text contours as a union so script glyph joins do not go hollow', () => {
+    const layer = fillLayer();
+    const script = textWithOverlappingContours('#ff0000');
+
+    const fill = firstFillGroup(compileJob({ objects: [script], layers: [layer] }, dev));
+    const row = segmentsAtMachineY(fill, dev.bedHeight - 5);
+
+    expect(row).toHaveLength(1);
+    expect(row[0]?.length).toBeCloseTo(15);
   });
 
   it('keeps different fill layers separate so overlaps can engrave twice', () => {

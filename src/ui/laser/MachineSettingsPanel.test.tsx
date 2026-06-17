@@ -37,6 +37,7 @@ afterEach(() => {
     safetyNotice: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
+    settingsBackupExportedAt: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
 });
 
@@ -163,6 +164,7 @@ describe('MachineSettingsPanel', () => {
       expect(JSON.parse(written).settings).toEqual([
         expect.objectContaining({ code: '$30', rawValue: '1000' }),
       ]);
+      expect(useLaserStore.getState().settingsBackupExportedAt).toEqual(expect.any(Number));
     } finally {
       await cleanup();
     }
@@ -211,14 +213,15 @@ describe('MachineSettingsPanel', () => {
     }
   });
 
-  it('does not render any firmware write controls', async () => {
+  it('renders guarded firmware write controls per setting row', async () => {
     useLaserStore.setState({
       grblSettingsRows: settingsMapToRows(new Map([[30, '1000']])),
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const { host, cleanup } = await renderPanel();
     try {
-      expect(host.textContent).not.toMatch(/\bWrite\b/);
-      expect(host.textContent).not.toMatch(/\bLoad\b/);
+      expect(host.textContent).toContain('Laser');
+      expect(host.textContent).toContain('common');
+      expect(button(host, 'Write')).toBeInstanceOf(HTMLButtonElement);
     } finally {
       await cleanup();
     }

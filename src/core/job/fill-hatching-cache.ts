@@ -1,5 +1,5 @@
 import type { Layer, Polyline } from '../scene';
-import { fillHatching } from './fill-hatching';
+import { fillHatching, type HatchFillRule } from './fill-hatching';
 
 const MAX_SETTINGS_PER_POLYLINE_SET = 8;
 
@@ -12,10 +12,11 @@ const hatchCache = new WeakMap<ReadonlyArray<Polyline>, Map<string, ReadonlyArra
 export function memoizedFillHatching(
   polylines: ReadonlyArray<Polyline>,
   layer: Pick<Layer, 'hatchAngleDeg' | 'hatchSpacingMm' | 'fillBidirectional' | 'fillCrossHatch'>,
+  fillRule: HatchFillRule = 'evenodd',
 ): ReadonlyArray<Polyline> {
   // fillBidirectional is part of the key: toggling snake/unidirectional changes
   // the hatch geometry, so a stale cache entry would silently keep the old path.
-  const cacheKey = `${layer.hatchAngleDeg}:${layer.hatchSpacingMm}:${layer.fillBidirectional}:${layer.fillCrossHatch}`;
+  const cacheKey = `${layer.hatchAngleDeg}:${layer.hatchSpacingMm}:${layer.fillBidirectional}:${layer.fillCrossHatch}:${fillRule}`;
   let bySettings = hatchCache.get(polylines);
   if (bySettings === undefined) {
     bySettings = new Map<string, ReadonlyArray<Polyline>>();
@@ -29,6 +30,7 @@ export function memoizedFillHatching(
     polylines,
     hatchAngleDeg: layer.hatchAngleDeg,
     hatchSpacingMm: layer.hatchSpacingMm,
+    fillRule,
     bidirectional: layer.fillBidirectional,
   });
   const crossHatches = layer.fillCrossHatch
@@ -36,6 +38,7 @@ export function memoizedFillHatching(
         polylines,
         hatchAngleDeg: layer.hatchAngleDeg + 90,
         hatchSpacingMm: layer.hatchSpacingMm,
+        fillRule,
         bidirectional: layer.fillBidirectional,
       })
     : [];

@@ -14,6 +14,7 @@ import {
   transformedBBox,
 } from '../../core/scene';
 import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
+import { drawNoGoZones } from './draw-no-go-zones';
 import { drawPenDraft } from './draw-pen-preview';
 import { type PenDraft } from '../state/ui-store';
 import {
@@ -105,6 +106,7 @@ export function drawScene(
     if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
     if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
   }
+  drawNoGoZones(ctx, project.device, view);
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
@@ -288,7 +290,7 @@ function drawFilledDesignGeometry(
 
   if (closed.length > 0) {
     ctx.fillStyle = color;
-    fillClosedPolylinesBatched(ctx, obj, closed, view);
+    fillClosedPolylinesBatched(ctx, obj, closed, view, obj.kind === 'text' ? 'nonzero' : 'evenodd');
   }
   if (open.length === 0) return;
 

@@ -38,6 +38,7 @@ import {
   type Vec2,
 } from '../scene';
 import { memoizedFillHatching } from './fill-hatching-cache';
+import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
 import type { CutSegment, Group, Job, RasterGroup } from './job';
 
@@ -323,7 +324,8 @@ function memoizedLayerFillHatching(
   layer: Layer,
   device: DeviceProfile,
 ): ReadonlyArray<Polyline> {
-  const cacheKey = layerFillCacheKey(layer, device);
+  const fillRule = fillRuleForLayer(objects, layer);
+  const cacheKey = layerFillCacheKey(layer, device, fillRule);
   let bySettings = layerFillCache.get(objects);
   if (bySettings === undefined) {
     bySettings = new Map<string, ReadonlyArray<Polyline>>();
@@ -333,26 +335,13 @@ function memoizedLayerFillHatching(
   if (cached !== undefined) return cached;
 
   const contours = collectFillContoursForLayer(objects, layer, device);
-  const hatches = memoizedFillHatching(contours, layer);
+  const hatches = memoizedFillHatching(contours, layer, fillRule);
   if (bySettings.size >= MAX_LAYER_FILL_CACHE_ENTRIES) {
     const oldestKey = bySettings.keys().next().value;
     if (oldestKey !== undefined) bySettings.delete(oldestKey);
   }
   bySettings.set(cacheKey, hatches);
   return hatches;
-}
-
-function layerFillCacheKey(layer: Layer, device: DeviceProfile): string {
-  return [
-    layer.color,
-    layer.hatchAngleDeg,
-    layer.hatchSpacingMm,
-    layer.fillBidirectional,
-    layer.fillCrossHatch,
-    device.origin,
-    device.bedWidth,
-    device.bedHeight,
-  ].join(':');
 }
 
 function collectFillContoursForLayer(

@@ -144,6 +144,7 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
       emitSOnTravel: true,
       emitSOnEveryBurnMove: true,
       modalFeedrate: false,
+      controlledLaserOffTravelFeedMmPerMin: 800,
       laserModeCommand: 'M4',
     });
   });

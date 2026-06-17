@@ -119,6 +119,29 @@ describe('material library IO', () => {
     }
   });
 
+  it('roundtrips optional profile matching and confidence metadata', () => {
+    const original = library({
+      entries: [
+        preset({
+          profileId: 'generic-grbl-400x400',
+          machineFamily: 'generic-grbl-400x400',
+          laserModel: '20W diode',
+          opticalPowerW: 20,
+          material: 'birch-ply',
+          operation: 'cut',
+          confidence: 'calibrated',
+        }),
+      ],
+    });
+
+    const result = deserializeMaterialLibrary(serializeMaterialLibrary(original));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.library).toEqual(original);
+    }
+  });
+
   it('reports structured parse and root-shape errors', () => {
     expect(deserializeMaterialLibrary('{not-json').kind).toBe('invalid');
     expect(deserializeMaterialLibrary('42').kind).toBe('invalid');

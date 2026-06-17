@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe('LaserWindow autofocus busy controls', () => {
-  it('renders the Device Profile settings collapsed by default and lets the user open it', async () => {
+  it('moves durable machine setup into a dialog opened from the rail', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -52,16 +52,25 @@ describe('LaserWindow autofocus busy controls', () => {
         );
       });
 
-      const deviceDetails = detailsBySummary(host, 'Device Profile');
-      expect(deviceDetails.open).toBe(false);
+      expect(button(host, 'Machine Setup')).toBeTruthy();
+      expect(detailsBySummary(host, 'Device Profile')).toBeNull();
+      expect(detailsBySummary(host, 'One-time GRBL Setup')).toBeNull();
+      expect(detailsBySummary(host, 'Read / Backup Controller Settings')).toBeNull();
 
-      const summary = deviceDetails.querySelector('summary');
-      if (!(summary instanceof HTMLElement)) throw new Error('Device Profile summary missing');
       await act(async () => {
-        summary.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        button(host, 'Machine Setup').click();
       });
 
-      expect(deviceDetails.open).toBe(true);
+      expect(host.querySelector('[role="dialog"]')?.textContent).toContain('Machine Setup');
+      expect(detailsBySummary(host, 'Device Profile')).toBeTruthy();
+      await act(async () => {
+        button(host, 'Controller').click();
+      });
+      expect(detailsBySummary(host, 'Read / Backup Controller Settings')).toBeTruthy();
+      await act(async () => {
+        button(host, 'Firmware').click();
+      });
+      expect(detailsBySummary(host, 'One-time GRBL Setup')).toBeTruthy();
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -384,10 +393,9 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
   return match;
 }
 
-function detailsBySummary(host: HTMLElement, label: string): HTMLDetailsElement {
+function detailsBySummary(host: HTMLElement, label: string): HTMLDetailsElement | null {
   const match = [...host.querySelectorAll('details')].find(
     (details) => details.querySelector('summary')?.textContent === label,
   );
-  if (!(match instanceof HTMLDetailsElement)) throw new Error(`Details not rendered: ${label}`);
-  return match;
+  return match instanceof HTMLDetailsElement ? match : null;
 }

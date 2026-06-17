@@ -2870,6 +2870,48 @@ Verification:
 
 ---
 
+## ADR-054 - Lane 6F: Fill Cross-Hatch preview and output
+
+**Status:** Accepted. | **Date:** 2026-06-17
+
+Rayforge exposes Cross-Hatch as an engraving setting that adds a second scan
+pass at 90 degrees from the primary scan angle and previews both directions.
+LaserForge adopts that behavior as a narrow Fill-mode setting, without copying
+Rayforge code or expanding into broader fill-pattern support.
+
+Decision:
+
+- Keep `Layer.fillCrossHatch` as an additive-with-default boolean, default
+  `false`, so old projects do not suddenly double burn time.
+- Implement Cross-Hatch by appending a second Fill hatch set at
+  `hatchAngleDeg + 90`. The second pass uses the same spacing, overscan,
+  bidirectional setting, fill rule, power, speed, and passes as the primary
+  Fill pass.
+- Include `fillCrossHatch` in both fill cache keys so preview, estimates, Save
+  G-code, Frame, and Start cannot reuse stale one-pass geometry.
+- Surface the setting in Cut Settings with a compact scan-direction preview that
+  shows the primary pass and, when enabled, the perpendicular cross-hatch pass.
+- Persist/copy recipe and layer-setting values through the existing `.lf2`,
+  layer clipboard, and `.lfml.json` paths.
+
+Consequences:
+
+- Cross-Hatch is a useful coverage control for engraving, but it is not a
+  general fill-pattern system. Offset Fill, texture fills, angle increments,
+  per-pass power, and sub-layers remain separate future work.
+- Heat input can roughly double. Operators should re-test recipes before using
+  Cross-Hatch on production material.
+
+Verification:
+
+- Tests pin layer defaults, old-project back-fill, settings copy/paste,
+  material recipe persistence, fill-cache invalidation, generated perpendicular
+  hatches, and the Cut Settings preview.
+- Hardware proof still requires a small scrap fill swatch with Cross-Hatch off
+  and on, confirming coverage improves without excessive scorching.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

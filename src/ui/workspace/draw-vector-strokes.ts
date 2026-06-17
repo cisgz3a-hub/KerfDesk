@@ -36,6 +36,7 @@ export function fillClosedPolylinesBatched(
   obj: SceneObject,
   polylines: ReadonlyArray<Polyline>,
   view: ViewTransform,
+  fillRule: CanvasFillRule = 'evenodd',
 ): void {
   ctx.beginPath();
   for (const polyline of polylines) {
@@ -43,7 +44,7 @@ export function fillClosedPolylinesBatched(
     appendPolylinePath(ctx, obj, polyline, view);
     ctx.closePath();
   }
-  ctx.fill('evenodd');
+  ctx.fill(fillRule);
 }
 
 export function drawLargeSceneNotice(ctx: CanvasRenderingContext2D): void {

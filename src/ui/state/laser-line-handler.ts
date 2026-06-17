@@ -40,6 +40,11 @@ import {
 import type { LaserState } from './laser-store';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
 import { hasCustomOrigin } from './origin-actions';
+import {
+  resolvePendingSettingWriteAck,
+  resolvePendingSettingsRead,
+  type GrblSettingsActionRefs,
+} from './grbl-settings-actions';
 
 export type HandlerRefs = {
   settingsCollector: SettingsCollectorState;
@@ -49,7 +54,7 @@ export type HandlerRefs = {
   // get().log.length on a 50 ms loop (R-L2 audit finding).
   onLineArrived: (() => void) | null;
   nextTranscriptId?: number;
-};
+} & GrblSettingsActionRefs;
 
 export type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -131,12 +136,14 @@ export function handleLine(
       grblSettingsRows: detected.settingsRows,
       lastSettingsReadAt: Date.now(),
     });
+    resolvePendingSettingsRead(refs, detected.settingsRows);
   }
   if (cls.kind === 'status') {
     handleStatusLine(set, get, safeWrite, cls.report);
     return;
   }
   if (cls.kind === 'alarm') {
+    resolvePendingSettingWriteAck(refs, 'alarm', cls.code);
     set({
       alarmCode: cls.code,
       wcoCache: null,
@@ -148,6 +155,7 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'error') {
+    resolvePendingSettingWriteAck(refs, 'error', cls.code);
     const state = get();
     set({
       lastError: cls.code,
@@ -157,6 +165,7 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'ok') {
+    resolvePendingSettingWriteAck(refs, 'ok');
     advanceStream(set, get, safeWrite, 'ok');
   }
 }

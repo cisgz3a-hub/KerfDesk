@@ -7,6 +7,14 @@ export {
   materialRecipePatch,
   normalizeMaterialRecipe,
 } from './material-library';
+export type {
+  MaterialOperation,
+  MaterialRecipeCandidate,
+  RankedMaterialRecipe,
+  RecipeConfidence,
+  RecipeMatchLevel,
+} from './recipe-matching';
+export { rankMaterialRecipesForProfile } from './recipe-matching';
 export {
   isUnsupportedPreset,
   materialPresetWarnings,

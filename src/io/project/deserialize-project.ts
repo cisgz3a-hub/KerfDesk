@@ -6,7 +6,7 @@
 // validation in Phase A is "trust the file was ours" — Zod-style schema
 // validation is a Phase B improvement.
 
-import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import {
   DITHER_ALGORITHMS,
   DEFAULT_PROJECT_OPTIMIZATION,
@@ -88,37 +88,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   const layers = Array.isArray(scene['layers']) ? scene['layers'] : [];
   const normalized = {
     ...raw,
-    device: {
-      ...dev,
-      accelMmPerSec2:
-        typeof dev['accelMmPerSec2'] === 'number'
-          ? dev['accelMmPerSec2']
-          : DEFAULT_DEVICE_PROFILE.accelMmPerSec2,
-      junctionDeviationMm:
-        typeof dev['junctionDeviationMm'] === 'number'
-          ? dev['junctionDeviationMm']
-          : DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
-      // Back-fill for pre-framing-feed .lf2 files. Same additive-with-
-      // default pattern as accel / junctionDeviation above.
-      framingFeedMmPerMin:
-        typeof dev['framingFeedMmPerMin'] === 'number' && dev['framingFeedMmPerMin'] > 0
-          ? dev['framingFeedMmPerMin']
-          : DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
-      minPowerS:
-        typeof dev['minPowerS'] === 'number' && dev['minPowerS'] >= 0
-          ? dev['minPowerS']
-          : DEFAULT_DEVICE_PROFILE.minPowerS,
-      laserModeEnabled:
-        typeof dev['laserModeEnabled'] === 'boolean'
-          ? dev['laserModeEnabled']
-          : DEFAULT_DEVICE_PROFILE.laserModeEnabled,
-      airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
-      controller: normalizeDeviceController(dev['controller']),
-      gcodeDialect: normalizeGcodeDialect(
-        dev['gcodeDialect'],
-        normalizeAirAssistCommand(dev['airAssistCommand']),
-      ),
-    },
+    device: normalizeDevice(dev),
     optimization: normalizeOptimization(raw['optimization']),
     scene: {
       ...scene,
@@ -135,6 +105,66 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   // the single trusted point. Replacing it with typed builders is tracked as a
   // Phase C improvement (audit CQ-006); the runtime is already validated.
   return normalized as unknown as Project;
+}
+
+function normalizeDevice(dev: Record<string, unknown>): Project['device'] {
+  const airAssistCommand = normalizeAirAssistCommand(dev['airAssistCommand']);
+  return {
+    ...dev,
+    ...normalizeDeviceProfileMetadata(dev),
+    ...normalizeDeviceAdditiveFields(dev),
+    airAssistCommand,
+    controller: normalizeDeviceController(dev['controller']),
+    gcodeDialect: normalizeGcodeDialect(dev['gcodeDialect'], airAssistCommand),
+  } as unknown as Project['device'];
+}
+
+function normalizeDeviceProfileMetadata(dev: Record<string, unknown>): Record<string, unknown> {
+  const noGoZones = normalizeNoGoZones(dev['noGoZones']);
+  return {
+    profileId: stringOrDefault(
+      dev['profileId'],
+      DEFAULT_DEVICE_PROFILE.profileId ?? 'generic-grbl-400x400',
+    ),
+    vendor: stringOrDefault(dev['vendor'], DEFAULT_DEVICE_PROFILE.vendor ?? 'Generic'),
+    model: stringOrDefault(
+      dev['model'],
+      DEFAULT_DEVICE_PROFILE.model ?? DEFAULT_DEVICE_PROFILE.name,
+    ),
+    profileSource: profileSourceOrDefault(dev['profileSource']),
+    catalogVersion: stringOrDefault(
+      dev['catalogVersion'],
+      DEFAULT_DEVICE_PROFILE.catalogVersion ?? '2026-06-17',
+    ),
+    capabilities: stringArrayOrDefault(
+      dev['capabilities'],
+      DEFAULT_DEVICE_PROFILE.capabilities ?? ['grbl'],
+    ),
+    evidence: Array.isArray(dev['evidence']) ? dev['evidence'] : DEFAULT_DEVICE_PROFILE.evidence,
+    ...(noGoZones !== undefined ? { noGoZones } : {}),
+  };
+}
+
+function normalizeDeviceAdditiveFields(dev: Record<string, unknown>): Record<string, unknown> {
+  return {
+    accelMmPerSec2: positiveFiniteOrDefault(
+      dev['accelMmPerSec2'],
+      DEFAULT_DEVICE_PROFILE.accelMmPerSec2,
+    ),
+    junctionDeviationMm: positiveFiniteOrDefault(
+      dev['junctionDeviationMm'],
+      DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
+    ),
+    framingFeedMmPerMin: positiveFiniteOrDefault(
+      dev['framingFeedMmPerMin'],
+      DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
+    ),
+    minPowerS: nonNegativeFiniteOrDefault(dev['minPowerS'], DEFAULT_DEVICE_PROFILE.minPowerS),
+    laserModeEnabled: booleanOrDefault(
+      dev['laserModeEnabled'],
+      DEFAULT_DEVICE_PROFILE.laserModeEnabled,
+    ),
+  };
 }
 
 function normalizeOptimization(value: unknown): Project['optimization'] {
@@ -197,11 +227,16 @@ function normalizeGcodeDialect(
   airAssistCommand: Project['device']['airAssistCommand'],
 ): Project['device']['gcodeDialect'] {
   if (!isObject(value)) return { ...DEFAULT_DEVICE_PROFILE.gcodeDialect, airAssistCommand };
+  const dialectId =
+    typeof value['dialectId'] === 'string' && value['dialectId'].trim() !== ''
+      ? value['dialectId']
+      : DEFAULT_DEVICE_PROFILE.gcodeDialect.dialectId;
+  const controlledLaserOffTravelFeedMmPerMin = controlledLaserOffTravelFeedOrDefault(
+    value['controlledLaserOffTravelFeedMmPerMin'],
+    dialectId,
+  );
   return {
-    dialectId:
-      typeof value['dialectId'] === 'string' && value['dialectId'].trim() !== ''
-        ? value['dialectId']
-        : DEFAULT_DEVICE_PROFILE.gcodeDialect.dialectId,
+    dialectId,
     returnToOriginOnEnd: booleanOrDefault(
       value['returnToOriginOnEnd'],
       DEFAULT_DEVICE_PROFILE.gcodeDialect.returnToOriginOnEnd,
@@ -218,6 +253,9 @@ function normalizeGcodeDialect(
       value['modalFeedrate'],
       DEFAULT_DEVICE_PROFILE.gcodeDialect.modalFeedrate,
     ),
+    ...(controlledLaserOffTravelFeedMmPerMin !== undefined
+      ? { controlledLaserOffTravelFeedMmPerMin }
+      : {}),
     airAssistCommand,
     laserModeCommand:
       value['laserModeCommand'] === 'M3' ||
@@ -228,8 +266,66 @@ function normalizeGcodeDialect(
   };
 }
 
+function normalizeNoGoZones(value: unknown): Project['device']['noGoZones'] {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter(isNoGoZone);
+}
+
+function isNoGoZone(value: unknown): value is NonNullable<Project['device']['noGoZones']>[number] {
+  if (!isObject(value)) return false;
+  return (
+    typeof value['id'] === 'string' &&
+    typeof value['name'] === 'string' &&
+    typeof value['enabled'] === 'boolean' &&
+    isFiniteNumber(value['x']) &&
+    isFiniteNumber(value['y']) &&
+    isPositiveNumber(value['width']) &&
+    isPositiveNumber(value['height'])
+  );
+}
+
+function profileSourceOrDefault(value: unknown): Project['device']['profileSource'] {
+  if (
+    value === 'built-in' ||
+    value === 'custom' ||
+    value === 'imported-lightburn' ||
+    value === 'diagnostic'
+  ) {
+    return value;
+  }
+  return DEFAULT_DEVICE_PROFILE.profileSource ?? 'built-in';
+}
+
+function stringOrDefault(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() !== '' ? value : fallback;
+}
+
+function stringArrayOrDefault(
+  value: unknown,
+  fallback: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+    ? value
+    : fallback;
+}
+
+function controlledLaserOffTravelFeedOrDefault(
+  value: unknown,
+  dialectId: string,
+): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  if (dialectId === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.gcodeDialect.dialectId) {
+    return NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.gcodeDialect.controlledLaserOffTravelFeedMmPerMin;
+  }
+  return DEFAULT_DEVICE_PROFILE.gcodeDialect.controlledLaserOffTravelFeedMmPerMin;
+}
+
 function positiveFiniteOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function nonNegativeFiniteOrDefault(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 function booleanOrDefault(value: unknown, fallback: boolean): boolean {
@@ -332,6 +428,10 @@ function isNonNegativeNumber(value: unknown): value is number {
 
 function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && value > 0;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function isPositiveInteger(value: unknown): value is number {

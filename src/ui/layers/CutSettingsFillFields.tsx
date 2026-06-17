@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { Layer } from '../../core/scene';
+import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
 import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
 
 export function CutSettingsFillFields(props: {
@@ -6,16 +8,20 @@ export function CutSettingsFillFields(props: {
   readonly lineIntervalMm: number;
   readonly onLineIntervalMmChange: (lineIntervalMm: number) => void;
 }): JSX.Element {
+  const [hatchAngleDeg, setHatchAngleDeg] = useState(props.layer.hatchAngleDeg);
+  const [fillCrossHatch, setFillCrossHatch] = useState(props.layer.fillCrossHatch);
   return (
     <fieldset className="lf-fieldset">
       <legend className="lf-legend">Fill</legend>
+      <CutSettingsFillDirectionPreview angleDeg={hatchAngleDeg} crossHatch={fillCrossHatch} />
       <Field label="Scan angle">
         <NumberInput
           name="hatchAngleDeg"
-          value={props.layer.hatchAngleDeg}
+          value={hatchAngleDeg}
           min={0}
           max={180}
           step={5}
+          onChange={setHatchAngleDeg}
         />
         <span className="lf-field-unit">deg</span>
       </Field>
@@ -47,7 +53,8 @@ export function CutSettingsFillFields(props: {
           name="fillCrossHatch"
           type="checkbox"
           className="lf-checkbox"
-          defaultChecked={props.layer.fillCrossHatch}
+          checked={fillCrossHatch}
+          onChange={(event) => setFillCrossHatch(event.currentTarget.checked)}
           aria-label="Cut settings cross-hatch"
           title="Add a second fill pass at 90 degrees for denser engraving."
         />
@@ -63,6 +70,7 @@ function NumberInput(props: {
   readonly max?: number;
   readonly step?: number;
   readonly label?: string;
+  readonly onChange?: (value: number) => void;
 }): JSX.Element {
   return (
     <input
@@ -72,7 +80,12 @@ function NumberInput(props: {
       min={props.min}
       {...(props.max !== undefined ? { max: props.max } : {})}
       step={props.step ?? 1}
-      defaultValue={props.value}
+      {...(props.onChange !== undefined
+        ? {
+            value: props.value,
+            onChange: (event) => props.onChange?.(Number(event.currentTarget.value)),
+          }
+        : { defaultValue: props.value })}
       style={numberStyle}
       aria-label={`Cut settings ${props.label ?? props.name}`}
       title={`Set cut settings ${props.label ?? props.name}.`}

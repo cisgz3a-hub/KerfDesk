@@ -79,6 +79,7 @@ export type EmitRasterInput = {
   readonly laserModeCommand?: 'M3' | 'M4';
   readonly modalFeedrate?: boolean;
   readonly emitSOnEveryBurnMove?: boolean;
+  readonly controlledLaserOffTravelFeedMmPerMin?: number | undefined;
 };
 
 export function emitRasterGroup(input: EmitRasterInput): string {
@@ -200,8 +201,10 @@ function emitSpanSweep(
   const activeEndX = input.bounds.minX + (span.lastX + 1) * pixelWidthMm;
   const startX = reverse ? activeEndX + input.overscanMm : activeStartX - input.overscanMm;
   const endX = reverse ? activeStartX - input.overscanMm : activeEndX + input.overscanMm;
-  // Rapid into the overscan zone, laser off (M4 + S0 → diode dark).
-  lines.push(`G0 X${fmt(startX)} Y${fmt(worldY)} S0`);
+  // Move into the overscan zone with the laser off (M4 + S0 → diode dark).
+  // Most profiles use rapid G0; conservative profiles can force feed-
+  // controlled G1 S0 travel to avoid missed steps on weaker gantries.
+  lines.push(formatLaserOffTravel(startX, worldY, input.controlledLaserOffTravelFeedMmPerMin));
   let prevS = -1;
   let shouldEmitFeed = emitFeed;
   const pushRun = (x: number, s: number): void => {
@@ -410,6 +413,21 @@ function formatLaserOffG1(x: number, feed: number, modalFeedrate: boolean): stri
   if (!modalFeedrate) parts.push(`F${feed}`);
   parts.push('S0');
   return parts.join(' ');
+}
+
+function formatLaserOffTravel(
+  x: number,
+  y: number,
+  controlledFeedMmPerMin: number | undefined,
+): string {
+  const feed =
+    typeof controlledFeedMmPerMin === 'number' &&
+    Number.isFinite(controlledFeedMmPerMin) &&
+    controlledFeedMmPerMin > 0
+      ? Math.round(controlledFeedMmPerMin)
+      : null;
+  if (feed !== null) return `G1 X${fmt(x)} Y${fmt(y)} F${feed} S0`;
+  return `G0 X${fmt(x)} Y${fmt(y)} S0`;
 }
 
 function headerComment(input: EmitRasterInput): string {
