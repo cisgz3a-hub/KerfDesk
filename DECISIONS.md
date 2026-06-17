@@ -2893,7 +2893,7 @@ guessed default.
 
 ## ADR-053 — Verified Origin: hand-set origin + mandatory verified frame for no-homing / hand-positioned machines
 
-**Status:** Proposed; implementation starting (phased, this branch). | **Date:** 2026-06-17
+**Status:** Accepted; P1–P4 code shipped, hardware verification pending. | **Date:** 2026-06-17
 
 > Numbered after ADR-052 (scan-offset compensation), which lands via a separate
 > branch. 052/053 are concurrent feature branches off the same main.
