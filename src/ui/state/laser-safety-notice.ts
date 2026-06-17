@@ -47,6 +47,10 @@ export type LaserSafetyNotice =
   | {
       readonly kind: 'stream-stalled';
       readonly message: string;
+    }
+  | {
+      readonly kind: 'frame-limit';
+      readonly message: string;
     };
 
 // M13 (AUDIT-2026-06-10): the streamer is ack-driven — if GRBL stops
@@ -69,6 +73,23 @@ export const DISCONNECT_DURING_JOB_MESSAGE =
 
 export function disconnectDuringJobNotice(): LaserSafetyNotice {
   return { kind: 'disconnect-during-job', message: DISCONNECT_DURING_JOB_MESSAGE };
+}
+
+// ADR-053 P3: a hard-limit ALARM fired while a Verified Frame was tracing the
+// job box, i.e. the job does not fit the travel from this hand-set origin. The
+// alarm cleared the origin (G92) and the verification, so the operator must
+// unlock, re-home the origin somewhere safer (or shrink the job), and re-frame.
+export function frameHitLimitMessage(axisLabel: string | null): string {
+  const where = axisLabel === null ? 'a limit switch' : `the ${axisLabel} limit switch`;
+  return (
+    `The Verified Frame hit ${where} — the job does not fit the travel from this origin. ` +
+    'Unlock ($X), move the origin away from that edge or shrink the job, set the origin again, ' +
+    'then re-frame before starting.'
+  );
+}
+
+export function frameHitLimitNotice(axisLabel: string | null): LaserSafetyNotice {
+  return { kind: 'frame-limit', message: frameHitLimitMessage(axisLabel) };
 }
 
 export function writeFailedMessage(action: LaserSafetyAction): string {

@@ -18,6 +18,7 @@ import {
   classifyResponse,
   CMD_SETTINGS,
   disconnect as disconnectStreamer,
+  type GrblPins,
   onAck,
   type SettingsCollectorState,
   startCollecting,
@@ -29,6 +30,7 @@ import { consumeSettingsResponse } from './detected-settings-action';
 import {
   controllerErrorNotice,
   disconnectDuringJobNotice,
+  frameHitLimitNotice,
   type ControllerErrorContext,
   type LaserSafetyAction,
 } from './laser-safety-notice';
@@ -137,8 +139,7 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'alarm') {
-    set({ alarmCode: cls.code, wcoCache: null, workOriginActive: false, motionOperation: null });
-    advanceStream(set, get, safeWrite, 'alarm');
+    handleAlarmLine(set, get, safeWrite, cls.code);
     return;
   }
   if (cls.kind === 'error') {
@@ -153,6 +154,39 @@ export function handleLine(
   if (cls.kind === 'ok') {
     advanceStream(set, get, safeWrite, 'ok');
   }
+}
+
+// GRBL ALARM:1 — hard limit triggered (see alarm-codes.ts).
+const HARD_LIMIT_ALARM_CODE = 1;
+
+function handleAlarmLine(set: SetFn, get: GetFn, safeWrite: SafeWriteFn, code: number): void {
+  // A hard-limit alarm that fires while a Verified Frame is tracing means the
+  // job box runs past the travel from this origin — name the limit so the
+  // operator knows which way to move (ADR-053 P3). The alarm also clears the
+  // origin + frame verification.
+  const prev = get();
+  const frameLimitPatch =
+    prev.motionOperation?.kind === 'frame' && code === HARD_LIMIT_ALARM_CODE
+      ? { safetyNotice: frameHitLimitNotice(activeLimitAxisLabel(prev.statusReport?.pins ?? null)) }
+      : {};
+  set({
+    alarmCode: code,
+    wcoCache: null,
+    workOriginActive: false,
+    motionOperation: null,
+    frameVerification: null,
+    ...frameLimitPatch,
+  });
+  advanceStream(set, get, safeWrite, 'alarm');
+}
+
+function activeLimitAxisLabel(pins: GrblPins | null): string | null {
+  if (pins === null) return null;
+  const axes: string[] = [];
+  if (pins.limitX) axes.push('X');
+  if (pins.limitY) axes.push('Y');
+  if (pins.limitZ) axes.push('Z');
+  return axes.length > 0 ? axes.join('/') : null;
 }
 
 function nextTranscriptId(refs: HandlerRefs): number {
@@ -175,6 +209,7 @@ function handleStatusLine(
       wcoCache: null,
       workOriginActive: false,
       motionOperation: null,
+      frameVerification: null,
     });
     return;
   }
