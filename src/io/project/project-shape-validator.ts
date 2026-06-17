@@ -1,4 +1,29 @@
-import { DITHER_ALGORITHMS } from '../../core/scene';
+import { validateLayerSubLayers } from './project-layer-validator';
+import {
+  firstError,
+  isObject,
+  optionalBoolean,
+  optionalDither,
+  optionalLiteral,
+  optionalNonNegativeNumber,
+  optionalNumber,
+  optionalPercent,
+  optionalPositiveInteger,
+  optionalPositiveNumber,
+  optionalString,
+  requireBoolean,
+  requireCoordinate,
+  requireDither,
+  requireLiteral,
+  requireNumber,
+  requireOrigin,
+  requirePercent,
+  requirePositiveInteger,
+  requirePositiveNumber,
+  requireScale,
+  requireString,
+  validateArray,
+} from './project-validator-primitives';
 
 // Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
 // deserialize. Distinct from the TARGET burn-grid budget (core/raster
@@ -8,16 +33,6 @@ import { DITHER_ALGORITHMS } from '../../core/scene';
 // gigabytes here first. 256M px is far above any real import (2048-edge cap) or
 // Convert-to-Bitmap source, but fatal to the integer bomb (security audit 2026-06-14).
 const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
-
-// Ceiling on any stored coordinate magnitude (mm). A coordinate >= 1e21 passes
-// Number.isFinite but renders in exponential notation when emitted (toFixed),
-// which the G-code bounds-check regex can't read — defeating the bounds
-// invariant. Any real bed is < 2 m; 1e6 mm (1 km) is absurdly generous yet far
-// below the exponential threshold (security audit 2026-06-14).
-const MAX_COORDINATE_MAGNITUDE_MM = 1_000_000;
-// Ceiling on a transform scale factor, so scale * coordinate can't blow past the
-// coordinate ceiling either.
-const MAX_TRANSFORM_SCALE = 100_000;
 
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
   const device = raw['device'];
@@ -116,6 +131,7 @@ function validateLayer(layer: unknown, path: string): string | null {
     optionalBoolean(layer, `${path}.negativeImage`),
     optionalBoolean(layer, `${path}.passThrough`),
     optionalNonNegativeNumber(layer, `${path}.dotWidthCorrectionMm`),
+    validateLayerSubLayers(layer['subLayers'], `${path}.subLayers`),
   ]);
 }
 
@@ -311,163 +327,3 @@ function validatePoint(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([requireCoordinate(value, `${path}.x`), requireCoordinate(value, `${path}.y`)]);
 }
-
-function validateArray(
-  value: ReadonlyArray<unknown>,
-  path: string,
-  validate: (item: unknown, path: string) => string | null,
-): string | null {
-  for (let i = 0; i < value.length; i += 1) {
-    const error = validate(value[i], `${path}[${i}]`);
-    if (error !== null) return error;
-  }
-  return null;
-}
-
-function firstError(errors: ReadonlyArray<string | null>): string | null {
-  for (const error of errors) {
-    if (error !== null) return error;
-  }
-  return null;
-}
-
-function requireString(obj: Record<string, unknown>, path: string): string | null {
-  return typeof valueAtPath(obj, path) === 'string' ? null : `missing or invalid \`${path}\``;
-}
-
-function optionalString(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || typeof value === 'string' ? null : `missing or invalid \`${path}\``;
-}
-
-function requireBoolean(obj: Record<string, unknown>, path: string): string | null {
-  return typeof valueAtPath(obj, path) === 'boolean' ? null : `missing or invalid \`${path}\``;
-}
-
-function optionalBoolean(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || typeof value === 'boolean'
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function requireNumber(obj: Record<string, unknown>, path: string): string | null {
-  return isFiniteNumber(valueAtPath(obj, path)) ? null : `missing or invalid \`${path}\``;
-}
-
-function requireCoordinate(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && Math.abs(value) <= MAX_COORDINATE_MAGNITUDE_MM
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function requireScale(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && Math.abs(value) <= MAX_TRANSFORM_SCALE
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function optionalNumber(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || isFiniteNumber(value) ? null : `missing or invalid \`${path}\``;
-}
-
-function requirePositiveNumber(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && value > 0 ? null : `missing or invalid \`${path}\``;
-}
-
-function optionalPositiveNumber(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || (isFiniteNumber(value) && value > 0)
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function optionalNonNegativeNumber(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || (isFiniteNumber(value) && value >= 0)
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function optionalPositiveInteger(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || (isFiniteNumber(value) && Number.isInteger(value) && value > 0)
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function requirePositiveInteger(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && Number.isInteger(value) && value > 0
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function requirePercent(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && value >= 0 && value <= 100
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function optionalPercent(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || (isFiniteNumber(value) && value >= 0 && value <= 100)
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function requireDither(obj: Record<string, unknown>, path: string): string | null {
-  return requireLiteral(obj, path, DITHER_ALGORITHMS);
-}
-
-function optionalDither(obj: Record<string, unknown>, path: string): string | null {
-  return optionalLiteral(obj, path, DITHER_ALGORITHMS);
-}
-
-function requireOrigin(obj: Record<string, unknown>, path: string): string | null {
-  return requireLiteral(obj, path, [
-    'front-left',
-    'front-right',
-    'rear-left',
-    'rear-right',
-    'center',
-  ]);
-}
-
-function requireLiteral(
-  obj: Record<string, unknown>,
-  path: string,
-  allowed: readonly string[],
-): string | null {
-  const value = valueAtPath(obj, path);
-  return typeof value === 'string' && allowed.includes(value)
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function optionalLiteral(
-  obj: Record<string, unknown>,
-  path: string,
-  allowed: readonly string[],
-): string | null {
-  const value = valueAtPath(obj, path);
-  return value === undefined || (typeof value === 'string' && allowed.includes(value))
-    ? null
-    : `missing or invalid \`${path}\``;
-}
-
-function valueAtPath(obj: Record<string, unknown>, path: string): unknown {
-  return obj[path.slice(path.lastIndexOf('.') + 1)];
-}
-
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);

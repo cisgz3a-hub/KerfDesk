@@ -27,7 +27,7 @@ import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
-import { layerActions, type LayerSettingsClipboard } from './layer-actions';
+import { layerActions, type LayerSettingsClipboard, type LayerSubLayerPatch } from './layer-actions';
 import {
   DEFAULT_LAYER_DEFAULTS_STATE,
   layerDefaultActions,
@@ -153,6 +153,13 @@ export type AppState = ObjectPropertiesActions &
     readonly deleteLayerAndObjects: (layerId: string) => void;
     readonly copyLayerSettings: (layerId: string) => void;
     readonly pasteLayerSettings: (layerId: string) => void;
+    readonly addLayerSubLayer: (layerId: string) => void;
+    readonly updateLayerSubLayer: (
+      layerId: string,
+      subLayerId: string,
+      patch: LayerSubLayerPatch,
+    ) => void;
+    readonly deleteLayerSubLayer: (layerId: string, subLayerId: string) => void;
     readonly makeLayerDefault: (layerId: string) => void;
     readonly makeLayerDefaultForAll: (layerId: string) => void;
     readonly resetLayerToDefault: (layerId: string) => void;
