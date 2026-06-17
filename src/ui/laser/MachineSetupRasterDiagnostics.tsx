@@ -13,6 +13,7 @@ import {
   sectionStyle,
   stackStyle,
 } from './MachineSetupStyles';
+import { MeasuredScanOffsetApply } from './MeasuredScanOffsetApply';
 
 export function RasterDiagnosticsPanel(): JSX.Element {
   const project = useStore((s) => s.project);
@@ -66,6 +67,11 @@ export function RasterDiagnosticsPanel(): JSX.Element {
             </article>
           ))}
         </div>
+      </section>
+
+      <section style={sectionStyle}>
+        <h3 style={sectionHeadingStyle}>Measured Offsets</h3>
+        <MeasuredScanOffsetApply />
       </section>
     </div>
   );
