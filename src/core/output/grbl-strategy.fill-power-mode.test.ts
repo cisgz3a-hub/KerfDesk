@@ -34,6 +34,7 @@ const fill = (y: number): FillGroup => ({
         { x: 20, y },
       ],
       closed: false,
+      reverse: false,
     },
   ],
 });

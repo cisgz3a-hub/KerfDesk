@@ -141,6 +141,19 @@ describe('compileJob fill hatching', () => {
     expect(segments.some(isHorizontalSegment)).toBe(true);
     expect(segments.some(isVerticalSegment)).toBe(true);
   });
+
+  it('preserves reverse metadata for bidirectional and cross-hatch fill segments', () => {
+    const layer = { ...fillLayer(), hatchSpacingMm: 1, fillCrossHatch: true };
+    const square = closedSquareObj({ id: 'square', color: '#ff0000', size: 4 });
+
+    const fill = firstFillGroup(compileJob({ objects: [square], layers: [layer] }, dev));
+    const segments = fill?.segments ?? [];
+
+    expect(segments.some((segment) => segment.reverse === false)).toBe(true);
+    expect(segments.some((segment) => segment.reverse === true)).toBe(true);
+    expect(segments.filter(isHorizontalSegment).some((segment) => segment.reverse)).toBe(true);
+    expect(segments.filter(isVerticalSegment).some((segment) => segment.reverse)).toBe(true);
+  });
 });
 
 function isHorizontalSegment(segment: FillGroup['segments'][number]): boolean {

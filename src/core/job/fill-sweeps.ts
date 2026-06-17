@@ -25,9 +25,9 @@ export type FillSpan = { readonly start: Vec2; readonly end: Vec2 };
 // One scanline's worth of ink spans, ordered along the sweep direction. The
 // gap between spans[i].end and spans[i+1].start is interior (a hole) — the
 // emitter crosses it with the laser blanked (S0).
-export type FillSweep = { readonly spans: ReadonlyArray<FillSpan> };
+export type FillSweep = { readonly reverse: boolean; readonly spans: ReadonlyArray<FillSpan> };
 
-type Run = { readonly start: Vec2; readonly end: Vec2 };
+type Run = { readonly start: Vec2; readonly end: Vec2; readonly reverse: boolean };
 
 // Perpendicular distance (mm) below which a point counts as on the group's
 // line. Runs on one scanline are collinear to ~1e-12 mm; the next scanline is
@@ -36,7 +36,7 @@ type Run = { readonly start: Vec2; readonly end: Vec2 };
 const COLLINEAR_EPS_MM = 1e-6;
 
 export function groupFillSweeps(
-  segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2> }>,
+  segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Vec2>; readonly reverse: boolean }>,
 ): FillSweep[] {
   const sweeps: FillSweep[] = [];
   let group: Run[] = [];
@@ -44,8 +44,8 @@ export function groupFillSweeps(
     const a = seg.polyline[0];
     const b = seg.polyline[1];
     if (a === undefined || b === undefined || seg.polyline.length !== 2) continue;
-    const run: Run = { start: a, end: b };
-    if (group.length === 0 || isOnGroupLine(group[0] as Run, run)) {
+    const run: Run = { start: a, end: b, reverse: seg.reverse };
+    if (group.length === 0 || canJoinGroup(group[0] as Run, run)) {
       group.push(run);
     } else {
       sweeps.push(...buildSweeps(group));
@@ -54,6 +54,10 @@ export function groupFillSweeps(
   }
   if (group.length > 0) sweeps.push(...buildSweeps(group));
   return sweeps;
+}
+
+function canJoinGroup(first: Run, run: Run): boolean {
+  return first.reverse === run.reverse && isOnGroupLine(first, run);
 }
 
 // True when both endpoints of `run` lie on the infinite line through the
@@ -112,10 +116,10 @@ function buildSweeps(runs: Run[]): FillSweep[] {
     if (next === undefined) continue;
     const gap = Math.hypot(next.start.x - span.end.x, next.start.y - span.end.y);
     if (gap > GAP_RAPID_THRESHOLD_MM) {
-      sweeps.push({ spans: current });
+      sweeps.push({ reverse: first.reverse, spans: current });
       current = [];
     }
   }
-  if (current.length > 0) sweeps.push({ spans: current });
+  if (current.length > 0) sweeps.push({ reverse: first.reverse, spans: current });
   return sweeps;
 }

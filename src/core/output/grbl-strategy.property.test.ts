@@ -20,7 +20,7 @@ import {
   findLaserOnTravelIssues,
   findOutOfBoundsCoords,
 } from '../invariants';
-import type { CutSegment, Job } from '../job';
+import type { CutSegment, FillSegment, Job } from '../job';
 
 const FUZZ_RUNS = 100;
 const BED_WIDTH = DEFAULT_DEVICE_PROFILE.bedWidth;
@@ -71,7 +71,7 @@ const arbJob: fc.Arbitrary<Job> = fc.record({
 // must be exercised by the determinism + laser-off fuzz, which previously only
 // fed cut groups. Spans are placed on a small set of shared Y values so runs
 // collide into multi-span sweeps with interior gaps — the path that matters.
-const arbFillSpan = fc
+const arbFillSpan: fc.Arbitrary<FillSegment> = fc
   .record({
     y: fc.constantFrom(10, 20, 30),
     x0: fc.double({ min: 0, max: BED_WIDTH, noNaN: true, noDefaultInfinity: true }),
@@ -83,6 +83,7 @@ const arbFillSpan = fc
       { x: x1, y },
     ],
     closed: false,
+    reverse: false,
   }));
 
 const arbFillGroup = fc.record({
@@ -199,6 +200,7 @@ describe('grblStrategy property tests', () => {
                 { x: 20, y: 10 },
               ],
               closed: false,
+              reverse: false,
             },
           ],
         },

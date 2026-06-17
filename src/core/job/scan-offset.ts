@@ -20,20 +20,15 @@
 // invariant #5). Nothing imports this yet — ADR-052 step 1 lands the math alone
 // (output byte-identical); the emitter wiring is the separate step-2 diff.
 
+import type { ScanOffsetPoint } from '../devices';
 import type { Vec2 } from '../scene';
+export type { ScanOffsetPoint } from '../devices';
 
 /**
  * One calibration sample: the measured forward-vs-reverse row separation
  * (`offsetMm`) at a given engrave feed (`speedMmPerMin`). A device holds an
  * array of these sorted ascending by speed; an empty array disables the feature
  * (every lookup returns 0, so output stays byte-identical).
- */
-export type ScanOffsetPoint = {
-  readonly speedMmPerMin: number;
-  readonly offsetMm: number;
-};
-
-/**
  * Interpolate the scan-offset for `speedMmPerMin` from a calibration `table`.
  *
  * Contract: `table` is sorted ascending by `speedMmPerMin`. Behaviour off the

@@ -16,6 +16,7 @@
 import type { DeviceProfile } from '../devices';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
+import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
 import { assertNever } from '../scene';
@@ -105,10 +106,11 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
   // few hundred continuous sweeps. Single-run scanlines emit exactly as before
   // (1a rapid runway + 1b short-run skip preserved).
   const sweeps = groupFillSweeps(group.segments);
+  const scanOffsetMm = offsetForSpeed(device.scanningOffsets, group.speed);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const sweep of sweeps) {
-      const text = emitFillSweep(sweep, s, feed, group.overscanMm);
+      const text = emitFillSweep(sweep, s, feed, group.overscanMm, scanOffsetMm);
       if (text.length > 0) chunks.push(text);
     }
   }
@@ -122,8 +124,14 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile): string {
 // S is modal, so every span re-asserts its value — a missed S0 would fire the
 // beam across a hole, so the per-segment S sequence is asserted exhaustively in
 // the tests.
-function emitFillSweep(sweep: FillSweep, s: number, feed: number, overscanMm: number): string {
-  const spans = sweep.spans;
+function emitFillSweep(
+  sweep: FillSweep,
+  s: number,
+  feed: number,
+  overscanMm: number,
+  scanOffsetMm: number,
+): string {
+  const spans = scanOffsetSpans(sweep, scanOffsetMm);
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return '';
@@ -139,6 +147,14 @@ function emitFillSweep(sweep: FillSweep, s: number, feed: number, overscanMm: nu
     lines.push(`G0 X${fmt(run.leadEnd.x)} Y${fmt(run.leadEnd.y)} S0`);
   }
   return lines.join(LINE_END);
+}
+
+function scanOffsetSpans(sweep: FillSweep, scanOffsetMm: number): ReadonlyArray<FillSpan> {
+  if (!sweep.reverse || scanOffsetMm === 0) return sweep.spans;
+  return sweep.spans.map((span) => {
+    const shifted = shiftAlongTravel(span.start, span.end, scanOffsetMm);
+    return { start: shifted.from, end: shifted.to };
+  });
 }
 
 // The G1 chain for one sweep: burn each ink span (S{s}), blank each interior
@@ -181,7 +197,7 @@ function sweepSpanLines(spans: ReadonlyArray<FillSpan>, s: number, feed: number)
 // (emit-raster.ts), which handles the M4 flip + per-pixel S
 // modulation. The strategy stays one-arm-per-kind so adding new
 // group types lights up the exhaustiveness check.
-function emitRasterGroupHere(group: RasterGroup): string {
+function emitRasterGroupHere(group: RasterGroup, device: DeviceProfile): string {
   return emitRasterGroupGcode({
     sValues: group.sValues,
     width: group.pixelWidth,
@@ -191,6 +207,7 @@ function emitRasterGroupHere(group: RasterGroup): string {
     passes: group.passes,
     overscanMm: group.overscanMm,
     dotWidthCorrectionMm: group.dotWidthCorrectionMm,
+    scanOffsetMm: offsetForSpeed(device.scanningOffsets, group.speed),
     layerId: group.layerId,
     color: group.color,
     powerPercent: group.power,
@@ -204,7 +221,7 @@ function emitAnyGroup(group: Group, device: DeviceProfile): string {
     case 'fill':
       return emitFillGroup(group, device);
     case 'raster':
-      return emitRasterGroupHere(group);
+      return emitRasterGroupHere(group, device);
     default:
       return assertNever(group, 'Group');
   }

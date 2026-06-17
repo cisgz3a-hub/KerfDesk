@@ -1,4 +1,4 @@
-export type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from './job';
+export type { CutGroup, CutSegment, FillGroup, FillSegment, Group, Job, RasterGroup } from './job';
 export { EMPTY_JOB } from './job';
 export { compileJob, DEFAULT_OVERSCAN_MM } from './compile-job';
 export type { JobBounds } from './job-bounds';
@@ -50,3 +50,5 @@ export type {
   IntervalTestGridOptions,
 } from './interval-test-grid';
 export { generateIntervalTestGrid } from './interval-test-grid';
+export type { ScanOffsetPoint } from './scan-offset';
+export { offsetForSpeed, shiftAlongTravel } from './scan-offset';

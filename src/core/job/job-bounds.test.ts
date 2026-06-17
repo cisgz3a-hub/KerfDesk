@@ -68,6 +68,7 @@ describe('computeJobBounds', () => {
                   { x: 100, y: 20 },
                 ],
                 closed: false,
+                reverse: false,
               },
             ],
           },

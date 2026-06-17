@@ -186,6 +186,7 @@ describe('material library IO', () => {
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
       airAssistCommand: DEFAULT_DEVICE_PROFILE.airAssistCommand,
       origin: DEFAULT_DEVICE_PROFILE.origin,
+      scanningOffsets: [],
     });
   });
 
@@ -208,6 +209,44 @@ describe('material library IO', () => {
     }
   });
 
+  it('roundtrips calibrated scan offsets on device hints sorted by speed', () => {
+    const original = library({
+      deviceHint: createMaterialLibraryDeviceHint({
+        ...DEFAULT_DEVICE_PROFILE,
+        scanningOffsets: [
+          { speedMmPerMin: 6000, offsetMm: 0.12 },
+          { speedMmPerMin: 3000, offsetMm: 0.05 },
+        ],
+      }),
+    });
+
+    const result = deserializeMaterialLibrary(serializeMaterialLibrary(original));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.library.deviceHint?.scanningOffsets).toEqual([
+        { speedMmPerMin: 3000, offsetMm: 0.05 },
+        { speedMmPerMin: 6000, offsetMm: 0.12 },
+      ]);
+    }
+  });
+
+  it('accepts older device hints without scan offsets and defaults them to empty', () => {
+    const deviceHint = createMaterialLibraryDeviceHint(DEFAULT_DEVICE_PROFILE);
+    const { scanningOffsets: _scanningOffsets, ...legacyDeviceHint } = deviceHint;
+    const result = deserializeMaterialLibrary(
+      JSON.stringify({
+        ...library(),
+        deviceHint: legacyDeviceHint,
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.library.deviceHint?.scanningOffsets).toEqual([]);
+    }
+  });
+
   it('rejects invalid air assist command hints', () => {
     const result = deserializeMaterialLibrary(
       JSON.stringify({
@@ -215,6 +254,23 @@ describe('material library IO', () => {
         deviceHint: {
           ...createMaterialLibraryDeviceHint(DEFAULT_DEVICE_PROFILE),
           airAssistCommand: 'M106',
+        },
+      }),
+    );
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/deviceHint/);
+    }
+  });
+
+  it('rejects invalid scan-offset hints', () => {
+    const result = deserializeMaterialLibrary(
+      JSON.stringify({
+        ...library(),
+        deviceHint: {
+          ...createMaterialLibraryDeviceHint(DEFAULT_DEVICE_PROFILE),
+          scanningOffsets: [{ speedMmPerMin: -1, offsetMm: 0.12 }],
         },
       }),
     );

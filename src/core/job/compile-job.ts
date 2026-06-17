@@ -35,9 +35,9 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
-import { memoizedFillHatching } from './fill-hatching-cache';
+import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
-import type { CutSegment, Group, Job, RasterGroup } from './job';
+import type { CutSegment, FillSegment, Group, Job, RasterGroup } from './job';
 
 // Default overscan kept here (not on Layer) so it can ride device
 // profiles in the future without a .lf2 schema bump. 5 mm matches
@@ -52,7 +52,7 @@ const WHITE_LUMA_BYTE = 255;
 // map capped at MAX_LAYER_FILL_CACHE_ENTRIES, pinned by compile-job-fill-cache.test.ts.
 const layerFillCache = new WeakMap<
   ReadonlyArray<SceneObject>,
-  Map<string, ReadonlyArray<Polyline>>
+  Map<string, ReadonlyArray<FillSegmentAsPolyline>>
 >();
 
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
@@ -253,12 +253,16 @@ function vectorGroupForLayer(
     speed: Math.min(layer.speed, device.maxFeed),
     passes: Math.max(1, Math.floor(layer.passes)),
     airAssist: layer.airAssist,
-    segments,
   };
   return [
     layer.mode === 'fill'
-      ? { ...common, kind: 'fill' as const, overscanMm: Math.max(0, layer.fillOverscanMm) }
-      : { ...common, kind: 'cut' as const },
+      ? {
+          ...common,
+          kind: 'fill' as const,
+          overscanMm: Math.max(0, layer.fillOverscanMm),
+          segments: segments as ReadonlyArray<FillSegment>,
+        }
+      : { ...common, kind: 'cut' as const, segments },
   ];
 }
 
@@ -305,10 +309,11 @@ function collectFillSegmentsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
-): CutSegment[] {
+): FillSegment[] {
   return memoizedLayerFillHatching(objects, layer, device).map((polyline) => ({
     polyline: polyline.points,
     closed: polyline.closed,
+    reverse: polyline.reverse,
   }));
 }
 
@@ -316,18 +321,18 @@ function memoizedLayerFillHatching(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
-): ReadonlyArray<Polyline> {
+): ReadonlyArray<FillSegmentAsPolyline> {
   const cacheKey = layerFillCacheKey(layer, device);
   let bySettings = layerFillCache.get(objects);
   if (bySettings === undefined) {
-    bySettings = new Map<string, ReadonlyArray<Polyline>>();
+    bySettings = new Map<string, ReadonlyArray<FillSegmentAsPolyline>>();
     layerFillCache.set(objects, bySettings);
   }
   const cached = bySettings.get(cacheKey);
   if (cached !== undefined) return cached;
 
   const contours = collectFillContoursForLayer(objects, layer, device);
-  const hatches = memoizedFillHatching(contours, layer);
+  const hatches = memoizedFillHatchingWithMetadata(contours, layer);
   if (bySettings.size >= MAX_LAYER_FILL_CACHE_ENTRIES) {
     const oldestKey = bySettings.keys().next().value;
     if (oldestKey !== undefined) bySettings.delete(oldestKey);
@@ -335,6 +340,8 @@ function memoizedLayerFillHatching(
   bySettings.set(cacheKey, hatches);
   return hatches;
 }
+
+type FillSegmentAsPolyline = Polyline & { readonly reverse: boolean };
 
 function layerFillCacheKey(layer: Layer, device: DeviceProfile): string {
   return [

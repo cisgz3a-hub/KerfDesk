@@ -23,7 +23,7 @@
 // Pure-core compliant: no clock reads, no Math.random, no I/O.
 
 import type { DeviceProfile } from '../devices';
-import type { CutSegment, FillGroup, Job, RasterGroup } from './job';
+import type { FillGroup, FillSegment, Job, RasterGroup } from './job';
 import { estimateWithPlanner } from './planner';
 
 export type JobDurationEstimate = {
@@ -71,7 +71,7 @@ function rasterActiveSweepSegments(group: RasterGroup): FillGroup['segments'] {
   const pixelHeightMm = (group.bounds.maxY - group.bounds.minY) / group.pixelHeight;
   if (pixelWidthMm <= 0 || pixelHeightMm <= 0) return [];
 
-  const segments: CutSegment[] = [];
+  const segments: FillSegment[] = [];
   let sweepIndex = 0;
   for (let y = 0; y < group.pixelHeight; y += 1) {
     const span = rasterActiveSpan(group, y);
@@ -91,6 +91,7 @@ function rasterActiveSweepSegments(group: RasterGroup): FillGroup['segments'] {
             { x: endX, y: worldY },
           ],
       closed: false,
+      reverse: isReverseSweep,
     });
     sweepIndex += 1;
   }

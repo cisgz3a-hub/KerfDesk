@@ -1,4 +1,10 @@
-import type { DeviceProfile, Origin } from '../../core/devices';
+import {
+  isScanOffsetTable,
+  normalizeScanOffsetTable,
+  type DeviceProfile,
+  type Origin,
+  type ScanOffsetPoint,
+} from '../../core/devices';
 import {
   isMaterialRecipe,
   normalizeMaterialRecipe,
@@ -18,10 +24,15 @@ export type MaterialLibraryDeviceHint = {
   readonly laserModeEnabled: boolean;
   readonly airAssistCommand: DeviceProfile['airAssistCommand'];
   readonly origin: Origin;
+  readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
 };
 
-type MaterialLibraryDeviceHintInput = Omit<MaterialLibraryDeviceHint, 'airAssistCommand'> & {
+type MaterialLibraryDeviceHintInput = Omit<
+  MaterialLibraryDeviceHint,
+  'airAssistCommand' | 'scanningOffsets'
+> & {
   readonly airAssistCommand?: DeviceProfile['airAssistCommand'];
+  readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
 };
 
 export type MaterialPreset = {
@@ -67,6 +78,7 @@ export function createMaterialLibraryDeviceHint(device: DeviceProfile): Material
     laserModeEnabled: device.laserModeEnabled,
     airAssistCommand: device.airAssistCommand,
     origin: device.origin,
+    scanningOffsets: normalizeScanOffsetTable(device.scanningOffsets),
   };
 }
 
@@ -318,7 +330,8 @@ function isDeviceHint(value: Record<string, unknown>): value is MaterialLibraryD
     isNonNegativeFinite(value.minPowerS) &&
     typeof value.laserModeEnabled === 'boolean' &&
     (value.airAssistCommand === undefined || isAirAssistCommand(value.airAssistCommand)) &&
-    isOrigin(value.origin)
+    isOrigin(value.origin) &&
+    (value.scanningOffsets === undefined || isScanOffsetTable(value.scanningOffsets))
   );
 }
 
@@ -360,6 +373,7 @@ function canonicalDeviceHint(
     laserModeEnabled: deviceHint.laserModeEnabled,
     airAssistCommand: deviceHint.airAssistCommand ?? 'none',
     origin: deviceHint.origin,
+    scanningOffsets: normalizeScanOffsetTable(deviceHint.scanningOffsets),
   };
 }
 
