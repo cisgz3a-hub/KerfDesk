@@ -48,6 +48,7 @@ function makeLaserState(): LaserState {
     dismissDetectedSettings: () => undefined,
     setOriginHere: async () => undefined,
     resetOrigin: async () => undefined,
+    releaseMotors: async () => undefined,
     markFrameVerified: () => undefined,
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
