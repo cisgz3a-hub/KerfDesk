@@ -101,19 +101,19 @@ describe('detectJobIntentWarnings', () => {
 
   it('warns when a traced image will run as vector Line output, not raster engraving', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'line'))).toContain(
-      'Trace "logo.png" is vector Line output, not raster image engraving. It will run with M3 constant-power moves and can cut if power/speed are too aggressive.',
+      'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M3 constant-power vector moves and can cut if power/speed are too aggressive.',
     );
   });
 
   it('warns when a traced image will run as vector Fill output, not raster engraving', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'fill'))).toContain(
-      'Trace "logo.png" is vector Fill output, not raster image engraving. It will run with M3 constant-power moves and can cut if power/speed are too aggressive.',
+      'Trace "logo.png" is vector Fill output, not raster image engraving. It will run as M4 dynamic-power fill sweeps from traced vector geometry; tiny traced text can stay wavy if the source outline is poor.',
     );
   });
 
   it('does not emit a vector-trace warning for image-mode layers', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'image'))).not.toContain(
-      'Trace "logo.png" is vector Line output, not raster image engraving. It will run with M3 constant-power moves and can cut if power/speed are too aggressive.',
+      'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M3 constant-power vector moves and can cut if power/speed are too aggressive.',
     );
   });
 
