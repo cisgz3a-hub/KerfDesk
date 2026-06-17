@@ -322,6 +322,51 @@ describe('JobControls running safety copy', () => {
     }
   });
 
+  it('keeps a Stop escape mounted after a job finishes but before GRBL confirms Idle', async () => {
+    installProject();
+    useLaserStore.setState({
+      streamer: {
+        status: 'done',
+        streamingMode: 'char-counted',
+        pollDuringJob: '4hz',
+        queued: [],
+        inFlight: [],
+        inFlightBytes: 0,
+        completed: 5,
+        total: 5,
+        rxBufferBytes: 120,
+      },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+      });
+
+      const buttons = [...host.querySelectorAll('button')].map((button) => button.textContent);
+      expect(buttons).toContain('Stop');
+      expect(buttons).not.toContain('Pause');
+      expect(buttons).not.toContain('Resume');
+      const buttonByText = (text: string): HTMLButtonElement => {
+        const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
+        if (button === undefined) throw new Error(`${text} button not rendered`);
+        return button;
+      };
+      expect(buttonByText('Home').disabled).toBe(true);
+      expect(buttonByText('Set origin here').disabled).toBe(true);
+      expect(buttonByText('Frame').disabled).toBe(true);
+      expect(buttonByText('Start job').disabled).toBe(true);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
   it('shows Cancel frame and disables conflicting controls while Frame is active', async () => {
     installProject();
     setMotionOperation({ kind: 'frame', sawControllerBusy: false });

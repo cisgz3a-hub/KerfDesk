@@ -117,6 +117,25 @@ describe('handleLine streamer writes', () => {
     expect(get().streamer).toBeNull();
   });
 
+  it('releases the job lock once an errored stream settles to Idle, keeping the error notice', () => {
+    const { refs, set, get } = makeHarness();
+    set({ streamer: step(createStreamer('G1 X1\nG1 X2\nG1 X3\n')).state });
+    // GRBL rejects a line mid-job: terminal 'errored' + a controller-error notice.
+    handleLine(set, get, refs, async () => undefined, 'error:7');
+    expect(get().streamer?.status).toBe('errored');
+    expect(get().safetyNotice).not.toBeNull();
+
+    // Still settling — the lock holds until motion stops.
+    handleLine(set, get, refs, async () => undefined, '<Run|MPos:1.000,0.000,0.000|FS:600,0>');
+    expect(get().streamer?.status).toBe('errored');
+
+    // Idle means motion stopped: the dead job lock releases so the controller
+    // is usable again, while the operator still sees the error notice.
+    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
+    expect(get().streamer).toBeNull();
+    expect(get().safetyNotice).not.toBeNull();
+  });
+
   it('marks the streamer disconnected if an ack-triggered follow-up write fails', async () => {
     const { refs, set, get } = makeHarness();
     const firstStep = step(

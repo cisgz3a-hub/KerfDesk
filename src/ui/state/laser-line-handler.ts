@@ -220,8 +220,18 @@ function handleStatusLine(
     operation !== null && observedOperation === null ? takeNextFrameJogLine(operation) : null;
   const nextOperation = queuedFrameDispatch?.operation ?? observedOperation;
   const operationPatch = operation === nextOperation ? {} : { motionOperation: nextOperation };
-  const completedStreamerPatch =
-    streamer?.status === 'done' && report.state === 'Idle' ? { streamer: null } : {};
+  // Release the job lock once GRBL settles to Idle for BOTH a clean finish
+  // ('done') and a rejected line ('errored'). Idle means physical motion has
+  // stopped, so it is as safe to clear here as the 'done' case. Without the
+  // 'errored' arm a GRBL error:N left the streamer terminal-but-non-null
+  // forever, so isActiveJob stayed true and every setup/jog/console command —
+  // plus the clear-canvas guard — was blocked until a reconnect. The
+  // controller-error safetyNotice lives in separate state and survives.
+  const jobOverAtIdle =
+    streamer !== null &&
+    (streamer.status === 'done' || streamer.status === 'errored') &&
+    report.state === 'Idle';
+  const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
 
   set({
     ...statusPositionPatch(report),

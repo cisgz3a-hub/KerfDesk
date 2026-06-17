@@ -43,11 +43,19 @@ type Props = {
 
 export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   const streamer = useLaserStore((s) => s.streamer);
-  const isStreaming = streamer !== null && streamer.status === 'streaming';
-  const isPaused = streamer !== null && streamer.status === 'paused';
-  const isErrored = streamer !== null && streamer.status === 'errored';
+  const status = streamer?.status;
+  const isStreaming = status === 'streaming';
+  const isPaused = status === 'paused';
+  // 'done' and 'errored' both keep the recovery controls (chiefly Stop)
+  // mounted. A finished job stays active (isActiveJob) until a later Idle status
+  // clears the streamer — laser-store-helpers keeps 'done' busy so the user
+  // can't jog into a head still physically finishing motion — and an errored job
+  // needs an explicit Stop. Mounting Stop through the 'done' window means a job
+  // whose Idle report is delayed or never arrives still has an in-app escape
+  // instead of forcing a disconnect/reconnect.
+  const jobNeedsRecovery =
+    isStreaming || isPaused || status === 'errored' || status === 'done';
   const motionOperation = useLaserStore((s) => s.motionOperation);
-  const jobNeedsRecovery = isStreaming || isPaused || isErrored;
   const motionBusy = motionOperation !== null;
   const controlsBusy = jobNeedsRecovery || motionBusy;
   return (
