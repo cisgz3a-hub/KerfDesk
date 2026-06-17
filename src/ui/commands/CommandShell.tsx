@@ -2,14 +2,17 @@ import { useRef, useState } from 'react';
 import {
   generateIntervalTestGrid,
   generateMaterialTestGrid,
+  generateScanOffsetCalibrationPattern,
   type IntervalTestGridOptions,
   type MaterialTestGridOptions,
+  type ScanOffsetCalibrationPatternOptions,
 } from '../../core/job';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
+import { ScanOffsetCalibrationDialog } from '../calibration/ScanOffsetCalibrationDialog';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
@@ -31,6 +34,7 @@ export function CommandShell(): JSX.Element {
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
+  const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
@@ -40,6 +44,7 @@ export function CommandShell(): JSX.Element {
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
+    requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
   });
@@ -76,6 +81,9 @@ export function CommandShell(): JSX.Element {
       ) : null}
       {intervalTestDialogOpen ? (
         <IntervalDialog onClose={() => setIntervalTestDialogOpen(false)} />
+      ) : null}
+      {scanOffsetTestDialogOpen ? (
+        <ScanOffsetDialog onClose={() => setScanOffsetTestDialogOpen(false)} />
       ) : null}
       {optimizationDialogOpen ? (
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
@@ -126,6 +134,19 @@ function MaterialDialog(props: { readonly onClose: () => void }): JSX.Element {
     pushToast(`Generated material test grid (${grid.cells.length} cells).`, 'success');
   };
   return <MaterialTestDialog onCancel={props.onClose} onGenerate={onGenerate} />;
+}
+
+function ScanOffsetDialog(props: { readonly onClose: () => void }): JSX.Element {
+  useRegisterModal();
+  const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const onGenerate = (options: ScanOffsetCalibrationPatternOptions): void => {
+    const pattern = generateScanOffsetCalibrationPattern(options);
+    replaceSceneWithGeneratedScene(pattern.scene);
+    props.onClose();
+    pushToast(`Generated scan offset test (${pattern.cells.length} swatches).`, 'success');
+  };
+  return <ScanOffsetCalibrationDialog onCancel={props.onClose} onGenerate={onGenerate} />;
 }
 
 function ConvertDialog(props: {

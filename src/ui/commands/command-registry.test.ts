@@ -46,6 +46,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     addText: vi.fn(),
     materialTest: vi.fn(),
     intervalTest: vi.fn(),
+    scanOffsetTest: vi.fn(),
     optimizationSettings: vi.fn(),
     adjustImage: vi.fn(),
     traceImage: vi.fn(),
@@ -176,6 +177,17 @@ describe('buildAppCommands', () => {
     expect(confirmDiscard).toHaveBeenCalledWith('create an interval test');
     await flushMicrotasks();
     expect(intervalTest).toHaveBeenCalled();
+  });
+
+  it('runs Scan Offset Test through the shared dirty-project guard', async () => {
+    const confirmDiscard = vi.fn(async () => true);
+    const scanOffsetTest = vi.fn();
+    const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, scanOffsetTest }));
+
+    expect(runCommand(commandById(commands, 'tools.scan-offset-test'))).toBe(true);
+    expect(confirmDiscard).toHaveBeenCalledWith('create a scan offset test');
+    await flushMicrotasks();
+    expect(scanOffsetTest).toHaveBeenCalled();
   });
 
   it('runs Optimization Settings without the destructive dirty-project guard', () => {

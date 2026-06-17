@@ -102,6 +102,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Create an interval grid for tuning raster line spacing.',
   },
+  'tools.scan-offset-test': {
+    family: 'tools',
+    tooltip: 'Create a bidirectional scan-offset calibration pattern.',
+  },
   'tools.optimization-settings': {
     family: 'tools',
     tooltip: 'Adjust path ordering and travel optimization for output.',

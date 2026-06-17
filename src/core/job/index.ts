@@ -51,5 +51,11 @@ export type {
   IntervalTestGridOptions,
 } from './interval-test-grid';
 export { generateIntervalTestGrid } from './interval-test-grid';
+export type {
+  ScanOffsetCalibrationCell,
+  ScanOffsetCalibrationPattern,
+  ScanOffsetCalibrationPatternOptions,
+} from './scan-offset-calibration-pattern';
+export { generateScanOffsetCalibrationPattern } from './scan-offset-calibration-pattern';
 export type { ScanOffsetPoint } from './scan-offset';
 export { offsetForSpeed, shiftAlongTravel } from './scan-offset';

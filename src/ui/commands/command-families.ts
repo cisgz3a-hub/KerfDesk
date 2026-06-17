@@ -97,6 +97,36 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
 export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
     enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
+    ...calibrationToolCommands(ctx),
+    enabled(
+      'tools.optimization-settings',
+      'tools',
+      'Optimization Settings...',
+      'Adjust output path optimization',
+      ctx.optimizationSettings,
+    ),
+    rasterToolCommand(ctx, 'tools.adjust-image', 'Adjust Image...', 'Adjust selected image'),
+    rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image'),
+    ctx.hasConvertibleSelection
+      ? enabled(
+          'tools.convert-to-bitmap',
+          'tools',
+          'Convert to Bitmap...',
+          'Convert selected vector into a bitmap',
+          ctx.convertToBitmap,
+        )
+      : disabled(
+          'tools.convert-to-bitmap',
+          'tools',
+          'Convert to Bitmap...',
+          'Select a vector first.',
+          ctx.convertToBitmap,
+        ),
+  ];
+}
+
+function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
+  return [
     enabled(
       'tools.material-test',
       'tools',
@@ -120,58 +150,29 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       },
     ),
     enabled(
-      'tools.optimization-settings',
+      'tools.scan-offset-test',
       'tools',
-      'Optimization Settings...',
-      'Adjust output path optimization',
-      ctx.optimizationSettings,
+      'Scan Offset Test...',
+      'Create a bidirectional scan-offset calibration pattern',
+      () => {
+        void ctx.confirmDiscard('create a scan offset test').then((ok) => {
+          if (ok) ctx.scanOffsetTest();
+        });
+      },
     ),
-    ctx.hasRasterSelection
-      ? enabled(
-          'tools.adjust-image',
-          'tools',
-          'Adjust Image...',
-          'Adjust selected image',
-          ctx.adjustImage,
-        )
-      : disabled(
-          'tools.adjust-image',
-          'tools',
-          'Adjust Image...',
-          'Select an image first.',
-          ctx.adjustImage,
-        ),
-    ctx.hasRasterSelection
-      ? enabled(
-          'tools.trace-image',
-          'tools',
-          'Trace Image...',
-          'Trace selected image',
-          ctx.traceImage,
-        )
-      : disabled(
-          'tools.trace-image',
-          'tools',
-          'Trace Image...',
-          'Select an image first.',
-          ctx.traceImage,
-        ),
-    ctx.hasConvertibleSelection
-      ? enabled(
-          'tools.convert-to-bitmap',
-          'tools',
-          'Convert to Bitmap...',
-          'Convert selected vector into a bitmap',
-          ctx.convertToBitmap,
-        )
-      : disabled(
-          'tools.convert-to-bitmap',
-          'tools',
-          'Convert to Bitmap...',
-          'Select a vector first.',
-          ctx.convertToBitmap,
-        ),
   ];
+}
+
+function rasterToolCommand(
+  ctx: AppCommandContext,
+  id: 'tools.adjust-image' | 'tools.trace-image',
+  label: string,
+  title: string,
+): AppCommand {
+  const invoke = id === 'tools.adjust-image' ? ctx.adjustImage : ctx.traceImage;
+  return ctx.hasRasterSelection
+    ? enabled(id, 'tools', label, title, invoke)
+    : disabled(id, 'tools', label, 'Select an image first.', invoke);
 }
 
 export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
