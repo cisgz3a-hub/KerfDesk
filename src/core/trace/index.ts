@@ -31,6 +31,8 @@ export {
 export { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
 export { traceImageToCenterlinePaths } from './centerline-trace';
 export { coloredPathsToSvg } from './paths-to-svg';
+export type { BatchTraceDependencies, BatchTraceImageJob, BatchTraceSvgFile } from './batch-trace';
+export { traceImagesToSvgFiles } from './batch-trace';
 export type { TraceBoundary } from './trace-boundary';
 export {
   cropRawImageData,
