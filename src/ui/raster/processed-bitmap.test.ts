@@ -68,6 +68,46 @@ describe('processed raster bitmap', () => {
 
     expect(result).toMatchObject({ kind: 'too-large', width: 2001, height: 2001 });
   });
+
+  it('applies an image mask before dithering the processed bitmap', () => {
+    const layer = imageLayer({ ditherAlgorithm: 'threshold', passThrough: true });
+    const mask = {
+      kind: 'shape' as const,
+      id: 'M1',
+      color: '#000000',
+      spec: { kind: 'rect' as const, widthMm: 2, heightMm: 1, cornerRadiusMm: 0 },
+      bounds: { minX: 0, minY: 0, maxX: 2, maxY: 1 },
+      transform: { ...IDENTITY_TRANSFORM, x: 1, y: 0 },
+      paths: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 2, y: 0 },
+                { x: 2, y: 1 },
+                { x: 0, y: 1 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = buildProcessedRasterBitmap(
+      rasterImage({ pixelWidth: 4, pixelHeight: 1, luma: [0, 0, 0, 0], imageMaskId: 'M1' }),
+      layer,
+      DEFAULT_DEVICE_PROFILE,
+      { maskObject: mask },
+    );
+
+    expect(result.kind).toBe('ok');
+    expect(result.kind === 'ok' ? Array.from(result.rgba) : []).toEqual([
+      255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+    ]);
+  });
 });
 
 function imageLayer(overrides: Partial<Layer> = {}): Layer {

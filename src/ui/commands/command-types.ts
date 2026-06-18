@@ -39,6 +39,8 @@ export type CommandId =
   | 'tools.focus-test'
   | 'tools.optimization-settings'
   | 'tools.adjust-image'
+  | 'tools.apply-image-mask'
+  | 'tools.remove-image-mask'
   | 'tools.save-processed-bitmap'
   | 'tools.trace-image'
   | 'tools.convert-to-bitmap'
@@ -88,6 +90,8 @@ export type AppCommandContext = {
   readonly hasSelection: boolean;
   readonly hasRasterSelection: boolean;
   readonly hasConvertibleSelection: boolean;
+  readonly canApplyImageMask: boolean;
+  readonly hasMaskedRasterSelection: boolean;
   // LU18 dirty-project guard: resolves true when the destructive action
   // may proceed (clean, saved, or explicitly discarded). Async because it
   // can show the Save / Don't Save / Cancel dialog and run a save.
@@ -116,6 +120,8 @@ export type AppCommandContext = {
   readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
+  readonly applyImageMask: () => void;
+  readonly removeImageMask: () => void;
   readonly canTransformSelection: boolean;
   readonly canAlignSelection: boolean;
   readonly alignSelection: (kind: SelectionAlignKind) => void;

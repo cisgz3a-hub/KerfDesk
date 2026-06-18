@@ -118,6 +118,15 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Tune brightness, contrast, gamma, and dithering for the selected image.',
   },
+  'tools.apply-image-mask': {
+    family: 'tools',
+    tooltip:
+      'Use selected closed vector geometry as a non-destructive mask for the selected image.',
+  },
+  'tools.remove-image-mask': {
+    family: 'tools',
+    tooltip: 'Remove the selected image mask without changing the original image pixels.',
+  },
   'tools.save-processed-bitmap': {
     family: 'tools',
     tooltip: 'Save the selected image as the processed bitmap LaserForge will engrave.',

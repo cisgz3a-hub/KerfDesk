@@ -203,6 +203,7 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     optionalNumber(obj, `${path}.brightness`),
     optionalNumber(obj, `${path}.contrast`),
     optionalNumber(obj, `${path}.gamma`),
+    optionalString(obj, `${path}.imageMaskId`),
     optionalString(obj, `${path}.lumaBase64`),
     optionalLiteral(obj, `${path}.role`, ['trace-source']),
   ]);

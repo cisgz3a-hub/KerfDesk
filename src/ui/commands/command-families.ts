@@ -106,6 +106,8 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       ctx.optimizationSettings,
     ),
     rasterToolCommand(ctx, 'tools.adjust-image', 'Adjust Image...', 'Adjust selected image'),
+    imageMaskApplyCommand(ctx),
+    imageMaskRemoveCommand(ctx),
     rasterToolCommand(
       ctx,
       'tools.save-processed-bitmap',
@@ -129,6 +131,42 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           ctx.convertToBitmap,
         ),
   ];
+}
+
+function imageMaskApplyCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.canApplyImageMask
+    ? enabled(
+        'tools.apply-image-mask',
+        'tools',
+        'Apply Mask to Image',
+        'Apply selected closed vector as an image mask',
+        ctx.applyImageMask,
+      )
+    : disabled(
+        'tools.apply-image-mask',
+        'tools',
+        'Apply Mask to Image',
+        'Select one image and one closed vector mask.',
+        ctx.applyImageMask,
+      );
+}
+
+function imageMaskRemoveCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasMaskedRasterSelection
+    ? enabled(
+        'tools.remove-image-mask',
+        'tools',
+        'Remove Image Mask',
+        'Remove the selected image mask',
+        ctx.removeImageMask,
+      )
+    : disabled(
+        'tools.remove-image-mask',
+        'tools',
+        'Remove Image Mask',
+        'Select an image that already has a mask.',
+        ctx.removeImageMask,
+      );
 }
 
 function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {

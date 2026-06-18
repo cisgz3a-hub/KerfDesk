@@ -1,4 +1,4 @@
-import type { Project } from '../../core/scene';
+import type { Project, RasterImage } from '../../core/scene';
 import { profileSupportsCapability } from '../../core/devices';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
@@ -15,6 +15,7 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { isConvertibleVector } from '../raster/vector-to-bitmap';
 import { buildAppCommands, type AppCommand } from './command-registry';
+import { selectedImageMaskPair, type SelectedImageMaskPair } from './image-mask-command-state';
 import { hasPreviewableContent } from './previewable-content';
 
 export type CommandShellCallbacks = {
@@ -38,7 +39,13 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const selected = selectedObject(app.project, app.selectedObjectId);
   const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
+  const imageMaskPair = selectedImageMaskPair(app.project, selectedIds);
   const hasSelection = selectedIds.length > 0;
+  const focusTestAvailable =
+    profileSupportsCapability(app.project.device, 'z-axis') &&
+    app.project.device.zTravelConfirmed === true;
+  const hasMaskedRasterSelection =
+    selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
   const activeStreamer =
     laser.streamer !== null &&
     (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
@@ -54,6 +61,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     hasSelection,
     hasRasterSelection: selected?.kind === 'raster-image',
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
+    canApplyImageMask: imageMaskPair !== null,
+    hasMaskedRasterSelection,
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
@@ -72,23 +81,15 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
     scanOffsetTest: callbacks.requestScanOffsetTest,
-    focusTestAvailable:
-      profileSupportsCapability(app.project.device, 'z-axis') &&
-      app.project.device.zTravelConfirmed === true,
+    focusTestAvailable,
     focusTest: callbacks.requestFocusTest,
     optimizationSettings: callbacks.requestOptimizationSettings,
     adjustImage: callbacks.requestAdjustImage,
-    saveProcessedBitmap: () =>
-      void handleSaveProcessedBitmap({
-        platform,
-        project: app.project,
-        selectedObjectId: app.selectedObjectId,
-        pushToast,
-      }),
-    traceImage: () => {
-      if (selected?.kind === 'raster-image') openImageDialog(selected);
-    },
+    saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
+    traceImage: traceImageAction(selected, openImageDialog),
     convertToBitmap: callbacks.requestConvertToBitmap,
+    applyImageMask: applyImageMaskAction(app, imageMaskPair),
+    removeImageMask: removeImageMaskAction(app, selected),
     canTransformSelection: selected !== null,
     canAlignSelection: selectedIds.length >= 2,
     alignSelection: app.alignSelection,
@@ -128,6 +129,47 @@ function saveGcodeAction(
       controllerSettings: laser.controllerSettings,
       pushToast,
     });
+}
+
+function saveProcessedBitmapAction(
+  platform: ReturnType<typeof usePlatform>,
+  app: ReturnType<typeof useStore.getState>,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): () => void {
+  return () =>
+    void handleSaveProcessedBitmap({
+      platform,
+      project: app.project,
+      selectedObjectId: app.selectedObjectId,
+      pushToast,
+    });
+}
+
+function traceImageAction(
+  selected: Project['scene']['objects'][number] | null,
+  openImageDialog: (source: RasterImage) => void,
+): () => void {
+  return () => {
+    if (selected?.kind === 'raster-image') openImageDialog(selected);
+  };
+}
+
+function applyImageMaskAction(
+  app: ReturnType<typeof useStore.getState>,
+  pair: SelectedImageMaskPair | null,
+): () => void {
+  return () => {
+    if (pair !== null) app.applyImageMask(pair.imageId, pair.maskId);
+  };
+}
+
+function removeImageMaskAction(
+  app: ReturnType<typeof useStore.getState>,
+  selected: Project['scene']['objects'][number] | null,
+): () => void {
+  return () => {
+    if (selected?.kind === 'raster-image') app.removeImageMask(selected.id);
+  };
 }
 
 function openProject(
