@@ -39,6 +39,7 @@ export type CommandId =
   | 'tools.focus-test'
   | 'tools.optimization-settings'
   | 'tools.adjust-image'
+  | 'tools.save-processed-bitmap'
   | 'tools.trace-image'
   | 'tools.convert-to-bitmap'
   | 'arrange.align-left'
@@ -112,6 +113,7 @@ export type AppCommandContext = {
   readonly focusTest: () => void;
   readonly optimizationSettings: () => void;
   readonly adjustImage: () => void;
+  readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
   readonly canTransformSelection: boolean;

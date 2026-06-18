@@ -259,8 +259,9 @@ describe('file actions contextual failure handling', () => {
     const written: string[] = [];
     const target: SaveTarget = {
       displayName: 'out.gcode',
-      write: async (text: string) => {
-        written.push(text);
+      write: async (data) => {
+        if (typeof data !== 'string') throw new Error('expected text G-code');
+        written.push(data);
       },
     };
     const toast = toasts();
@@ -284,8 +285,9 @@ describe('file actions contextual failure handling', () => {
     const written: string[] = [];
     const target: SaveTarget = {
       displayName: 'selected.gcode',
-      write: async (text: string) => {
-        written.push(text);
+      write: async (data) => {
+        if (typeof data !== 'string') throw new Error('expected text G-code');
+        written.push(data);
       },
     };
     const toast = toasts();

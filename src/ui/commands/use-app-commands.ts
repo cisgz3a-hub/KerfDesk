@@ -8,6 +8,7 @@ import {
   handleSaveGcode,
   handleSaveProject,
 } from '../app/file-actions';
+import { handleSaveProcessedBitmap } from '../app/save-processed-bitmap';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -77,6 +78,13 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     focusTest: callbacks.requestFocusTest,
     optimizationSettings: callbacks.requestOptimizationSettings,
     adjustImage: callbacks.requestAdjustImage,
+    saveProcessedBitmap: () =>
+      void handleSaveProcessedBitmap({
+        platform,
+        project: app.project,
+        selectedObjectId: app.selectedObjectId,
+        pushToast,
+      }),
     traceImage: () => {
       if (selected?.kind === 'raster-image') openImageDialog(selected);
     },

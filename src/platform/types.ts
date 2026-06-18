@@ -12,7 +12,7 @@ export type FileHandle = {
 
 export type SaveTarget = {
   readonly displayName: string;
-  readonly write: (text: string) => Promise<void>;
+  readonly write: (data: string | Blob) => Promise<void>;
 };
 
 export type FileOpenRequest = {

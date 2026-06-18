@@ -118,6 +118,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Tune brightness, contrast, gamma, and dithering for the selected image.',
   },
+  'tools.save-processed-bitmap': {
+    family: 'tools',
+    tooltip: 'Save the selected image as the processed bitmap LaserForge will engrave.',
+  },
   'tools.trace-image': {
     family: 'tools',
     tooltip: 'Trace the selected bitmap into editable vector paths.',

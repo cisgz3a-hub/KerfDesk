@@ -51,6 +51,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     focusTest: vi.fn(),
     optimizationSettings: vi.fn(),
     adjustImage: vi.fn(),
+    saveProcessedBitmap: vi.fn(),
     traceImage: vi.fn(),
     convertToBitmap: vi.fn(),
     connectLaser: vi.fn(),
@@ -240,6 +241,24 @@ describe('buildAppCommands', () => {
     expect(commandById(enabledCommands, 'tools.adjust-image').enabled).toBe(true);
     expect(runCommand(commandById(enabledCommands, 'tools.adjust-image'))).toBe(true);
     expect(adjustImage).toHaveBeenCalled();
+  });
+
+  it('enables Save Processed Bitmap only when a raster image is selected', () => {
+    const saveProcessedBitmap = vi.fn();
+    const disabledCommands = buildAppCommands(
+      baseCtx({ hasRasterSelection: false, saveProcessedBitmap }),
+    );
+
+    expect(commandById(disabledCommands, 'tools.save-processed-bitmap').enabled).toBe(false);
+    expect(runCommand(commandById(disabledCommands, 'tools.save-processed-bitmap'))).toBe(false);
+    expect(saveProcessedBitmap).not.toHaveBeenCalled();
+
+    const enabledCommands = buildAppCommands(
+      baseCtx({ hasRasterSelection: true, saveProcessedBitmap }),
+    );
+    expect(commandById(enabledCommands, 'tools.save-processed-bitmap').enabled).toBe(true);
+    expect(runCommand(commandById(enabledCommands, 'tools.save-processed-bitmap'))).toBe(true);
+    expect(saveProcessedBitmap).toHaveBeenCalled();
   });
 
   it('runs Arrange flip commands only when an object can be transformed', () => {
