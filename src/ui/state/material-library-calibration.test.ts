@@ -68,9 +68,7 @@ describe('material library calibration selection', () => {
   it('ignores non-calibration selections', () => {
     const project = createProject();
 
-    expect(
-      materialLibraryCalibrationFromSelection({ project, selectedObjectId: null }),
-    ).toBeNull();
+    expect(materialLibraryCalibrationFromSelection({ project, selectedObjectId: null })).toBeNull();
     expect(
       materialLibraryCalibrationFromSelection({ project, selectedObjectId: 'missing' }),
     ).toBeNull();

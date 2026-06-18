@@ -47,9 +47,7 @@ export function MaterialLibraryRecipeControls(props: {
         onCreated={(id) => {
           props.onPresetCreated(id);
           props.onStatus(
-            props.calibrationContext === null
-              ? 'Preset created.'
-              : 'Calibrated recipe created.',
+            props.calibrationContext === null ? 'Preset created.' : 'Calibrated recipe created.',
           );
         }}
         onFailed={props.onStatus}

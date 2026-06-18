@@ -28,9 +28,7 @@ export function materialLibraryPresetOptions(
   return [...ranked.map(matchedOption), ...unmatched];
 }
 
-function matchedOption(
-  match: MaterialRecipeMatch<MaterialPreset>,
-): MaterialLibraryPresetOption {
+function matchedOption(match: MaterialRecipeMatch<MaterialPreset>): MaterialLibraryPresetOption {
   const statusText = `${match.confidence} / ${scopeLabel(match.scope)}`;
   return {
     preset: match.candidate,

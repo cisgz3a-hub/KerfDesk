@@ -350,19 +350,17 @@ describe('MaterialLibraryPanel', () => {
   it('prefers the best active-machine recipe match in the preset selector', async () => {
     useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore
-      .getState()
-      .setMaterialLibrary(
-        library([
-          preset({ id: 'generic-birch', confidence: 'starter' }),
-          preset({
-            id: 'neotronics-birch',
-            profileId: NEOTRONICS_PROFILE_ID,
-            confidence: 'calibrated',
-            recipe: recipe({ power: 28 }),
-          }),
-        ]),
-      );
+    useStore.getState().setMaterialLibrary(
+      library([
+        preset({ id: 'generic-birch', confidence: 'starter' }),
+        preset({
+          id: 'neotronics-birch',
+          profileId: NEOTRONICS_PROFILE_ID,
+          confidence: 'calibrated',
+          recipe: recipe({ power: 28 }),
+        }),
+      ]),
+    );
     const { host, root } = await renderPanel();
     try {
       const presetSelect = select(host, 'Material library preset');
@@ -379,19 +377,17 @@ describe('MaterialLibraryPanel', () => {
   it('blocks unsupported recipe assignment and surfaces the recipe warning', async () => {
     useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore
-      .getState()
-      .setMaterialLibrary(
-        library([
-          preset({
-            id: 'clear-acrylic',
-            materialName: 'Clear acrylic',
-            profileId: NEOTRONICS_PROFILE_ID,
-            confidence: 'unsupported',
-            warning: 'Clear acrylic is not supported on this diode profile.',
-          }),
-        ]),
-      );
+    useStore.getState().setMaterialLibrary(
+      library([
+        preset({
+          id: 'clear-acrylic',
+          materialName: 'Clear acrylic',
+          profileId: NEOTRONICS_PROFILE_ID,
+          confidence: 'unsupported',
+          warning: 'Clear acrylic is not supported on this diode profile.',
+        }),
+      ]),
+    );
     const { host, root } = await renderPanel();
     try {
       expect(host.textContent).toContain('Unsupported recipe.');
