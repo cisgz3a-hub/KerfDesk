@@ -199,6 +199,7 @@ describe('material library store actions', () => {
       profileId: 'generic-grbl-400x400',
       machineFamily: 'generic-grbl-400x400',
       laserModel: 'GRBL 400x400',
+      calibrationProvenance: 'Material Test swatch material-test-cell-r0-c0',
       description: expect.stringContaining('material-test-cell-r0-c0'),
       recipe: expect.objectContaining({ mode: 'fill', speed: 2000, power: 10 }),
     });
@@ -229,6 +230,7 @@ describe('material library store actions', () => {
     expect(created).toMatchObject({
       confidence: 'calibrated',
       operation: 'interval-test',
+      calibrationProvenance: 'Interval Test swatch interval-test-cell-1',
       description: expect.stringContaining('interval-test-cell-1'),
       recipe: expect.objectContaining({
         mode: 'fill',

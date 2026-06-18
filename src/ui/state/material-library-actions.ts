@@ -4,8 +4,12 @@ import {
   materialRecipePatch,
   type MaterialRecipe,
 } from '../../core/material-library';
-import { updateLayer, type Layer, type Project, type SceneObject } from '../../core/scene';
+import { updateLayer, type Layer, type Project } from '../../core/scene';
 import type { MaterialLibraryDocument, MaterialPreset } from '../../io/material-library';
+import {
+  materialLibraryCalibrationFromSelection,
+  type MaterialLibraryCalibrationContext,
+} from './material-library-calibration';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 export const MATERIAL_LIBRARY_STATE_DEFAULTS = {
@@ -66,7 +70,10 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
       let created: MaterialPreset | null = null;
       set((state) => {
         if (state.materialLibrary === null) return {};
-        const calibrated = calibratedPresetFromSelection(state);
+        const calibrated = materialLibraryCalibrationFromSelection({
+          project: state.project,
+          selectedObjectId: state.selectedObjectId,
+        });
         const target =
           calibrated?.layer ?? state.project.scene.layers.find((layer) => layer.id === layerId);
         if (target === undefined) return {};
@@ -136,57 +143,16 @@ function createPreset(
     ...optionalString(input.laserModel, 'laserModel'),
     ...optionalNumber(input.opticalPowerW, 'opticalPowerW'),
     ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
+    ...optionalString(input.calibrationProvenance, 'calibrationProvenance'),
     description: strings.description,
     recipe: materialRecipePatch(recipe),
     revision: strings.revision,
   };
 }
 
-type CalibratedPreset = {
-  readonly layer: Layer;
-  readonly recipe: MaterialRecipe;
-  readonly operation: NonNullable<MaterialPreset['operation']>;
-  readonly note: string;
-};
-
-function calibratedPresetFromSelection(state: MaterialLibraryActionState): CalibratedPreset | null {
-  const selected = selectedObject(state);
-  if (selected?.kind !== 'imported-svg') return null;
-  if (selected.source !== 'material-test-grid' && selected.source !== 'interval-test-grid') {
-    return null;
-  }
-  const color = selected.paths[0]?.color;
-  if (color === undefined) return null;
-  const layer = state.project.scene.layers.find(
-    (candidate) => candidate.id === color || candidate.color === color,
-  );
-  if (layer === undefined) return null;
-  const base = captureMaterialRecipe(layer);
-  if (selected.source === 'material-test-grid') {
-    const power = clampPower((layer.power * (selected.powerScale ?? 100)) / 100);
-    return {
-      layer,
-      recipe: { ...base, power, minPower: Math.min(base.minPower, power) },
-      operation: 'material-test',
-      note: `Calibrated from Material Test swatch ${selected.id}.`,
-    };
-  }
-  return {
-    layer,
-    recipe: base,
-    operation: 'interval-test',
-    note: `Calibrated from Interval Test swatch ${selected.id}.`,
-  };
-}
-
-function selectedObject(state: MaterialLibraryActionState): SceneObject | null {
-  if (state.selectedObjectId === null) return null;
-  return state.project.scene.objects.find((object) => object.id === state.selectedObjectId) ?? null;
-}
-
 function enrichCalibratedInput(
   input: CreateMaterialPresetInput,
-  calibrated: CalibratedPreset,
+  calibrated: MaterialLibraryCalibrationContext,
   project: Project,
 ): CreateMaterialPresetInput {
   const profileId = calibratedProfileId(input, project);
@@ -200,6 +166,7 @@ function enrichCalibratedInput(
     laserModel: calibratedLaserModel(input, project),
     ...optionalNumber(calibratedOpticalPower(input, project), 'opticalPowerW'),
     confidence: 'calibrated',
+    calibrationProvenance: calibrated.calibrationProvenance,
     description: `${input.description.trim()} ${calibrated.note}`,
   };
 }
@@ -291,8 +258,4 @@ function optionalString(value: string | undefined, field: string): Record<string
 
 function optionalNumber(value: number | undefined, field: string): Record<string, number> {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? { [field]: value } : {};
-}
-
-function clampPower(value: number): number {
-  return Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
 }
