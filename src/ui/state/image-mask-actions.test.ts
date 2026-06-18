@@ -65,4 +65,26 @@ describe('image mask actions', () => {
     const unmasked = useStore.getState().project.scene.objects.find((object) => object.id === 'R1');
     expect(unmasked?.kind === 'raster-image' ? unmasked.imageMaskId : undefined).toBeUndefined();
   });
+
+  it('crops a masked image as a single undoable replacement', () => {
+    useStore.getState().applyImageMask('R1', 'M1');
+    const cropped = raster({
+      dataUrl: 'data:image/png;base64,cropped',
+      pixelWidth: 1,
+      pixelHeight: 1,
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+      lumaBase64: 'AA==',
+    });
+
+    useStore.getState().cropImage('R1', cropped);
+
+    const stored = useStore.getState().project.scene.objects.find((object) => object.id === 'R1');
+    expect(stored).toEqual(cropped);
+    expect(useStore.getState().selectedObjectId).toBe('R1');
+    expect(useStore.getState().dirty).toBe(true);
+
+    useStore.getState().undo();
+    const undone = useStore.getState().project.scene.objects.find((object) => object.id === 'R1');
+    expect(undone?.kind === 'raster-image' ? undone.imageMaskId : undefined).toBe('M1');
+  });
 });

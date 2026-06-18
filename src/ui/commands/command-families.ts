@@ -107,6 +107,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     ),
     rasterToolCommand(ctx, 'tools.adjust-image', 'Adjust Image...', 'Adjust selected image'),
     imageMaskApplyCommand(ctx),
+    imageMaskCropCommand(ctx),
     imageMaskRemoveCommand(ctx),
     rasterToolCommand(
       ctx,
@@ -166,6 +167,24 @@ function imageMaskRemoveCommand(ctx: AppCommandContext): AppCommand {
         'Remove Image Mask',
         'Select an image that already has a mask.',
         ctx.removeImageMask,
+      );
+}
+
+function imageMaskCropCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasMaskedRasterSelection
+    ? enabled(
+        'tools.crop-image',
+        'tools',
+        'Crop Image',
+        'Bake the selected image mask into pixels and crop its bounds',
+        ctx.cropImage,
+      )
+    : disabled(
+        'tools.crop-image',
+        'tools',
+        'Crop Image',
+        'Select an image that already has a mask.',
+        ctx.cropImage,
       );
 }
 

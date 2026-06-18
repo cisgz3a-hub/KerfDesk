@@ -123,6 +123,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     tooltip:
       'Use selected closed vector geometry as a non-destructive mask for the selected image.',
   },
+  'tools.crop-image': {
+    family: 'tools',
+    tooltip: 'Bake the selected image mask into pixels and crop the image bounds.',
+  },
   'tools.remove-image-mask': {
     family: 'tools',
     tooltip: 'Remove the selected image mask without changing the original image pixels.',

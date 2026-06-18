@@ -48,6 +48,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     convertToBitmap: vi.fn(),
     applyImageMask: vi.fn(),
     removeImageMask: vi.fn(),
+    cropImage: vi.fn(),
     connectLaser: vi.fn(),
     disconnectLaser: vi.fn(),
     homeLaser: vi.fn(),
@@ -94,5 +95,20 @@ describe('image mask commands', () => {
     expect(commandById(enabled, 'tools.remove-image-mask').enabled).toBe(true);
     expect(runCommand(commandById(enabled, 'tools.remove-image-mask'))).toBe(true);
     expect(removeImageMask).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables Crop Image only when the selected image has a mask to bake', () => {
+    const cropImage = vi.fn();
+    const disabled = buildAppCommands(baseCtx({ hasRasterSelection: true, cropImage }));
+
+    expect(commandById(disabled, 'tools.crop-image').enabled).toBe(false);
+    expect(runCommand(commandById(disabled, 'tools.crop-image'))).toBe(false);
+
+    const enabled = buildAppCommands(
+      baseCtx({ hasRasterSelection: true, hasMaskedRasterSelection: true, cropImage }),
+    );
+    expect(commandById(enabled, 'tools.crop-image').enabled).toBe(true);
+    expect(runCommand(commandById(enabled, 'tools.crop-image'))).toBe(true);
+    expect(cropImage).toHaveBeenCalledTimes(1);
   });
 });
