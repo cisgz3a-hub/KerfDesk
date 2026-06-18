@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "clipper2-ts": "2.0.1-17",
-    "dompurify": "^3.4.10",
+    "dompurify": "^3.4.11",
     "imagetracerjs": "^1.2.6",
     "opentype.js": "^2.0.0",
     "react": "^18.3.0",

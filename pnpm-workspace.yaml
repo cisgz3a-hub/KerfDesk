@@ -41,10 +41,12 @@ minimumReleaseAgeExclude:
 # These are toolchain-only except `form-data` through jsdom test tooling:
 # wrangler/miniflare pins ws below the GHSA-96hv-2xvq-fx4p patch, jsdom pins
 # form-data below the GHSA-hmw2-7cc7-3qxx patch, and ESLint's config parser
-# pins js-yaml below the GHSA-h67p-54hq-rp68 patch.
+# pins js-yaml below the GHSA-h67p-54hq-rp68 patch. Electron/Wrangler pull
+# Undici 7.x below the GHSA-vmh5-mc38-953g and GHSA-pr7r-676h-xcf6 patches.
 overrides:
   tmp@<0.2.6: ^0.2.6
   esbuild@<0.28.1: ^0.28.1
   ws@<8.21.0: 8.21.0
   form-data@<4.0.6: 4.0.6
   js-yaml@<4.2.0: 4.2.0
+  undici@>=7.0.0 <7.28.0: 7.28.0
