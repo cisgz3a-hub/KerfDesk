@@ -15,6 +15,7 @@ import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
 import {
   applyLumaAdjustments,
+  applyImageMaskToLuma,
   dither,
   maybeInvertLuma,
   pixelExtentForMm,
@@ -76,7 +77,7 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
         for (const obj of scene.objects) {
           if (obj.kind !== 'raster-image' || obj.color !== operationLayer.color) continue;
           if (obj.role === 'trace-source') continue;
-          groups.push(compileRasterGroup(obj, operationLayer, device));
+          groups.push(compileRasterGroup(obj, operationLayer, device, scene.objects));
         }
         continue;
       }
@@ -102,7 +103,12 @@ function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {
 // was created (UI layer; image-loader.ts). We work from `dataUrl`
 // metadata only via pixelWidth/pixelHeight; the actual greyscale
 // luma buffer is stored separately as base64 and decoded locally.
-function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfile): RasterGroup {
+function compileRasterGroup(
+  obj: RasterImage,
+  layer: Layer,
+  device: DeviceProfile,
+  objects: ReadonlyArray<SceneObject>,
+): RasterGroup {
   // Missing/corrupt luma fails safe to white (S0), not black/full-burn.
   const sourceLuma =
     obj.lumaBase64 !== undefined
@@ -129,9 +135,16 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
         pixelWidth,
         pixelHeight,
       );
+  const maskedLuma = applyImageMaskToLuma({
+    image: obj,
+    maskObject: imageMaskObjectFor(obj, objects),
+    luma,
+    width: pixelWidth,
+    height: pixelHeight,
+  });
   // Layer settings win over per-image settings so the operator can
   // re-tune one layer without editing every image on it.
-  const orientedLuma = orientRasterLumaForMachine(luma, pixelWidth, pixelHeight, obj, device);
+  const orientedLuma = orientRasterLumaForMachine(maskedLuma, pixelWidth, pixelHeight, obj, device);
   const sValues = dither(
     { luma: orientedLuma, width: pixelWidth, height: pixelHeight },
     { algorithm: layer.ditherAlgorithm, sMax, sMin },
@@ -152,6 +165,14 @@ function compileRasterGroup(obj: RasterImage, layer: Layer, device: DeviceProfil
     dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
     bidirectional: layer.imageBidirectional,
   };
+}
+
+function imageMaskObjectFor(
+  obj: RasterImage,
+  objects: ReadonlyArray<SceneObject>,
+): SceneObject | null {
+  if (obj.imageMaskId === undefined) return null;
+  return objects.find((candidate) => candidate.id === obj.imageMaskId) ?? null;
 }
 
 function orientRasterLumaForMachine(

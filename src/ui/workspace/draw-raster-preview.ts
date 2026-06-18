@@ -9,7 +9,7 @@
 // preview shows what burns, not what is merely visible.
 
 import type { DeviceProfile } from '../../core/devices';
-import type { Layer, Project, RasterImage } from '../../core/scene';
+import type { Layer, Project, RasterImage, SceneObject } from '../../core/scene';
 import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
 import { drawBitmapAtTransform } from './draw-raster';
 import type { ViewTransform } from './view-transform';
@@ -32,7 +32,7 @@ export function drawRasterPreview(
     for (const obj of project.scene.objects) {
       if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
       if (obj.role === 'trace-source') continue;
-      drawOnePreview(ctx, obj, layer, project.device, view);
+      drawOnePreview(ctx, obj, layer, project.device, view, imageMaskObjectFor(project, obj));
     }
   }
 }
@@ -49,8 +49,9 @@ function drawOnePreview(
   layer: Layer,
   device: DeviceProfile,
   view: ViewTransform,
+  maskObject: SceneObject | null,
 ): void {
-  const canvas = previewCanvasFor(obj, layer, device);
+  const canvas = previewCanvasFor(obj, layer, device, maskObject);
   if (canvas === null) return;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -62,14 +63,15 @@ function previewCanvasFor(
   obj: RasterImage,
   layer: Layer,
   device: DeviceProfile,
+  maskObject: SceneObject | null,
 ): HTMLCanvasElement | null {
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
   const { width, height } = processedRasterDimensions(obj, layer);
-  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}`;
+  const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}|${maskCacheKey(maskObject)}`;
   const cached = previewCanvasCache.get(key);
   if (cached !== undefined) return cached.canvas;
-  const bitmap = buildProcessedRasterBitmap(obj, layer, device);
+  const bitmap = buildProcessedRasterBitmap(obj, layer, device, { maskObject });
   if (bitmap.kind === 'too-large') return null;
   const canvas = document.createElement('canvas');
   canvas.width = bitmap.width;
@@ -79,6 +81,24 @@ function previewCanvasFor(
   octx.putImageData(new ImageData(bitmap.rgba, bitmap.width, bitmap.height), 0, 0);
   previewCanvasCache.set(key, { dataUrl: obj.dataUrl, canvas });
   return canvas;
+}
+
+function imageMaskObjectFor(project: Project, obj: RasterImage): SceneObject | null {
+  if (obj.imageMaskId === undefined) return null;
+  return project.scene.objects.find((candidate) => candidate.id === obj.imageMaskId) ?? null;
+}
+
+function maskCacheKey(maskObject: SceneObject | null): string {
+  if (maskObject === null) return 'mask:none';
+  return JSON.stringify({
+    id: maskObject.id,
+    bounds: maskObject.bounds,
+    transform: maskObject.transform,
+    paths:
+      maskObject.kind === 'raster-image'
+        ? []
+        : maskObject.paths.map((path) => ({ color: path.color, polylines: path.polylines })),
+  });
 }
 
 function adjustmentKey(obj: RasterImage): string {

@@ -1,5 +1,6 @@
 import type { DeviceProfile } from '../../core/devices';
 import {
+  applyImageMaskToLuma,
   applyLumaAdjustments,
   dither,
   maybeInvertLuma,
@@ -9,7 +10,7 @@ import {
   whiteLuma,
 } from '../../core/raster';
 import { evaluateRasterBudget } from '../../core/raster/raster-budget';
-import type { Layer, RasterImage } from '../../core/scene';
+import type { Layer, RasterImage, SceneObject } from '../../core/scene';
 
 const PERCENT_MAX = 100;
 
@@ -27,10 +28,15 @@ export type ProcessedRasterBitmap =
       readonly reason: string;
     };
 
+export type ProcessedRasterBitmapOptions = {
+  readonly maskObject?: SceneObject | null;
+};
+
 export function buildProcessedRasterBitmap(
   image: RasterImage,
   layer: Layer,
   device: DeviceProfile,
+  options: ProcessedRasterBitmapOptions = {},
 ): ProcessedRasterBitmap {
   const { width, height } = processedRasterDimensions(image, layer);
   const budget = evaluateRasterBudget(width, height);
@@ -47,9 +53,19 @@ export function buildProcessedRasterBitmap(
         width,
         height,
       );
+  const maskedLuma = applyImageMaskToLuma({
+    image,
+    maskObject: options.maskObject,
+    luma,
+    width,
+    height,
+  });
   const sMax = powerToSMax(layer.power, device.maxPowerS);
   const sMin = minPowerToSMin(layer.minPower, layer.power, device.maxPowerS);
-  const sValues = dither({ luma, width, height }, { algorithm: layer.ditherAlgorithm, sMax, sMin });
+  const sValues = dither(
+    { luma: maskedLuma, width, height },
+    { algorithm: layer.ditherAlgorithm, sMax, sMin },
+  );
   const rgba = new Uint8ClampedArray(rasterPreviewRgba(sValues, sMax, width, height));
   return { kind: 'ok', width, height, rgba };
 }

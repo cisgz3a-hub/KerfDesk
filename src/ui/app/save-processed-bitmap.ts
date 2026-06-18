@@ -1,5 +1,5 @@
 import type { PlatformAdapter } from '../../platform/types';
-import type { Layer, Project, RasterImage } from '../../core/scene';
+import type { Layer, Project, RasterImage, SceneObject } from '../../core/scene';
 import { buildProcessedRasterBitmap } from '../raster/processed-bitmap';
 import { rgbaToPngBlob } from '../raster/luma-bitmap';
 import type { ToastVariant } from '../state/toast-store';
@@ -43,7 +43,9 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
   }
   if (target === null) return;
   try {
-    const bitmap = buildProcessedRasterBitmap(selected, layer, ctx.project.device);
+    const bitmap = buildProcessedRasterBitmap(selected, layer, ctx.project.device, {
+      maskObject: imageMaskObjectFor(ctx.project, selected),
+    });
     if (bitmap.kind === 'too-large') {
       ctx.pushToast(`Could not save processed bitmap: ${bitmap.reason}`, 'error');
       return;
@@ -64,6 +66,11 @@ function selectedRaster(project: Project, selectedObjectId: string | null): Rast
 
 function layerForRaster(project: Project, image: RasterImage): Layer | null {
   return project.scene.layers.find((layer) => layer.color === image.color) ?? null;
+}
+
+function imageMaskObjectFor(project: Project, image: RasterImage): SceneObject | null {
+  if (image.imageMaskId === undefined) return null;
+  return project.scene.objects.find((object) => object.id === image.imageMaskId) ?? null;
 }
 
 function suggestedProcessedBitmapName(source: string): string {

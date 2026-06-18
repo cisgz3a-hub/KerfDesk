@@ -44,6 +44,7 @@ import {
   type MaterialLibraryActions,
 } from './material-library-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
+import { imageMaskActions, type ImageMaskActions } from './image-mask-actions';
 import { generatedSceneActions } from './generated-scene-actions';
 import {
   projectOptimizationActions,
@@ -79,6 +80,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 };
 
 export type AppState = ObjectPropertiesActions &
+  ImageMaskActions &
   ProjectOptimizationActions &
   SelectionTransformActions &
   ObjectDeleteActions &
@@ -289,6 +291,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),
   ...objectPropertiesActions(set),
+  ...imageMaskActions(set),
   ...generatedSceneActions(set),
   ...projectOptimizationActions(set),
   ...selectionTransformActions(set),

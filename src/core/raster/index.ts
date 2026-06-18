@@ -19,5 +19,8 @@ export { rasterPreviewRgba } from './preview-data';
 export type { LumaRaster } from './luma-resample';
 export { pixelExtentForMm, resampleLumaNearest, whiteLuma } from './luma-resample';
 
+export type { ImageMaskInput } from './image-mask';
+export { applyImageMaskToLuma, hasClosedImageMaskGeometry } from './image-mask';
+
 export type { VectorRaster, VectorRasterInput } from './rasterize-vector';
 export { rasterizeVectorToLuma } from './rasterize-vector';

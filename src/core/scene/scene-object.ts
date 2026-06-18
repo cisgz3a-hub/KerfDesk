@@ -164,6 +164,9 @@ export type RasterImage = ObjectPowerScale & {
   readonly brightness?: number; // -100..100; image engrave adjustment, default 0
   readonly contrast?: number; // -100..100; image engrave adjustment, default 0
   readonly gamma?: number; // 0.1..5; image engrave adjustment, default 1
+  // Non-destructive Apply Mask to Image. The referenced scene object remains
+  // editable; raster processing whites pixels outside its closed geometry.
+  readonly imageMaskId?: string;
   // Pre-extracted greyscale luma buffer (one byte per pixel, ITU-R
   // BT.601: 0.299·R + 0.587·G + 0.114·B), base64-encoded so it can
   // round-trip through .lf2's JSON. Length after decode equals
