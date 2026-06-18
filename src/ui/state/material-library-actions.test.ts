@@ -339,6 +339,54 @@ describe('material library store actions', () => {
     });
   });
 
+  it('assignMaterialPresetToLayer blocks recipes for incompatible device profiles', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const originalRecipe = captureMaterialRecipe(targetLayer());
+    useStore
+      .getState()
+      .setMaterialLibrary(
+        library([
+          preset({
+            profileId: 'other-machine-profile',
+            confidence: 'calibrated',
+            recipe: recipe({ power: 99 }),
+          }),
+        ]),
+      );
+    useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
+
+    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
+      false,
+    );
+    expect(captureMaterialRecipe(targetLayer())).toEqual(originalRecipe);
+    expect(useStore.getState().dirty).toBe(false);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it('assignMaterialPresetToLayer blocks unsupported recipes', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const originalRecipe = captureMaterialRecipe(targetLayer());
+    useStore
+      .getState()
+      .setMaterialLibrary(
+        library([
+          preset({
+            confidence: 'unsupported',
+            warning: 'Clear acrylic is not supported on this diode profile.',
+            recipe: recipe({ power: 99 }),
+          }),
+        ]),
+      );
+    useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
+
+    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
+      false,
+    );
+    expect(captureMaterialRecipe(targetLayer())).toEqual(originalRecipe);
+    expect(useStore.getState().dirty).toBe(false);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('assignMaterialPresetToLayer no-ops for missing or identical recipes', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const matching = preset({ recipe: captureMaterialRecipe(targetLayer()) });
