@@ -97,6 +97,8 @@ function LoadedMaterialLibraryPanel(props: {
   const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
   const markMaterialLibrarySaved = useStore((state) => state.markMaterialLibrarySaved);
   const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
+  const updateMaterialPresetFromLayer = useStore((state) => state.updateMaterialPresetFromLayer);
+  const deleteMaterialPreset = useStore((state) => state.deleteMaterialPreset);
   const pushToast = useToastStore((state) => state.pushToast);
   const [targetLayerId, setTargetLayerId] = useState('');
   const [presetId, setPresetId] = useState('');
@@ -151,6 +153,8 @@ function LoadedMaterialLibraryPanel(props: {
         activePresetOption={activePresetOption}
         calibrationContext={calibrationContext}
         onAssign={() => assignMaterialPresetToLayer(activeLayerId, activePresetId)}
+        onUpdate={() => updateMaterialPresetFromLayer(activeLayerId, activePresetId)}
+        onDelete={() => deleteMaterialPreset(activePresetId)}
         onPresetCreated={(id) => {
           setPresetId(id);
         }}

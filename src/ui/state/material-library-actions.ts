@@ -33,6 +33,8 @@ export type MaterialLibraryActions = {
     input: CreateMaterialPresetInput,
   ) => MaterialPreset | null;
   readonly assignMaterialPresetToLayer: (layerId: string, presetId: string) => boolean;
+  readonly updateMaterialPresetFromLayer: (layerId: string, presetId: string) => boolean;
+  readonly deleteMaterialPreset: (presetId: string) => boolean;
 };
 
 export function currentMaterialLibraryState(state: MaterialLibraryState): MaterialLibraryState {
@@ -121,7 +123,65 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
       });
       return assigned;
     },
+    updateMaterialPresetFromLayer: (layerId, presetId) =>
+      updateMaterialPresetFromLayer(set, layerId, presetId),
+    deleteMaterialPreset: (presetId) => deleteMaterialPreset(set, presetId),
   };
+}
+
+function updateMaterialPresetFromLayer(
+  set: MaterialLibrarySet,
+  layerId: string,
+  presetId: string,
+): boolean {
+  let updated = false;
+  set((state) => {
+    if (state.materialLibrary === null) return {};
+    const target = state.project.scene.layers.find((layer) => layer.id === layerId);
+    if (target === undefined) return {};
+    const presetIndex = state.materialLibrary.entries.findIndex((entry) => entry.id === presetId);
+    if (presetIndex < 0) return {};
+    const preset = state.materialLibrary.entries[presetIndex];
+    if (preset === undefined || recipeMatchesLayer(target, preset.recipe)) return {};
+
+    updated = true;
+    return {
+      materialLibrary: {
+        ...state.materialLibrary,
+        entries: updatePresetRecipe(state.materialLibrary.entries, presetIndex, target),
+      },
+      materialLibraryDirty: true,
+    };
+  });
+  return updated;
+}
+
+function updatePresetRecipe(
+  entries: ReadonlyArray<MaterialPreset>,
+  presetIndex: number,
+  target: Layer,
+): ReadonlyArray<MaterialPreset> {
+  return entries.map((entry, index) =>
+    index === presetIndex
+      ? { ...entry, recipe: materialRecipePatch(captureMaterialRecipe(target)) }
+      : entry,
+  );
+}
+
+function deleteMaterialPreset(set: MaterialLibrarySet, presetId: string): boolean {
+  let deleted = false;
+  set((state) => {
+    if (state.materialLibrary === null) return {};
+    const entries = state.materialLibrary.entries.filter((entry) => entry.id !== presetId);
+    if (entries.length === state.materialLibrary.entries.length) return {};
+
+    deleted = true;
+    return {
+      materialLibrary: { ...state.materialLibrary, entries },
+      materialLibraryDirty: true,
+    };
+  });
+  return deleted;
 }
 
 function canAssignPreset(project: Project, preset: MaterialPreset): boolean {
