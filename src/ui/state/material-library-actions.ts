@@ -2,6 +2,7 @@ import {
   captureMaterialRecipe,
   MATERIAL_RECIPE_FIELDS,
   materialRecipePatch,
+  rankMaterialRecipeCandidates,
   type MaterialRecipe,
 } from '../../core/material-library';
 import { updateLayer, type Layer, type Project } from '../../core/scene';
@@ -102,6 +103,7 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
         if (state.materialLibrary === null) return {};
         const preset = state.materialLibrary.entries.find((entry) => entry.id === presetId);
         if (preset === undefined) return {};
+        if (!canAssignPreset(state.project, preset)) return {};
         const target = state.project.scene.layers.find((layer) => layer.id === layerId);
         if (target === undefined) return {};
         if (recipeMatchesLayer(target, preset.recipe)) return {};
@@ -120,6 +122,11 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
       return assigned;
     },
   };
+}
+
+function canAssignPreset(project: Project, preset: MaterialPreset): boolean {
+  const [match] = rankMaterialRecipeCandidates(project.device, [preset]);
+  return match !== undefined && match.confidence !== 'unsupported';
 }
 
 function createPreset(
