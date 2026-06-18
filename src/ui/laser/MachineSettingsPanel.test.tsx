@@ -154,8 +154,9 @@ describe('MachineSettingsPanel', () => {
     let written = '';
     const target: SaveTarget = {
       displayName: 'settings.lfgrbl-settings.json',
-      write: async (text) => {
-        written = text;
+      write: async (data) => {
+        if (typeof data !== 'string') throw new Error('expected text backup');
+        written = data;
       },
     };
     const platform = makePlatform(async () => target);

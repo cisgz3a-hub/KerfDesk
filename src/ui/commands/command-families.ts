@@ -106,6 +106,12 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       ctx.optimizationSettings,
     ),
     rasterToolCommand(ctx, 'tools.adjust-image', 'Adjust Image...', 'Adjust selected image'),
+    rasterToolCommand(
+      ctx,
+      'tools.save-processed-bitmap',
+      'Save Processed Bitmap...',
+      'Save selected image after layer processing',
+    ),
     rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image'),
     ctx.hasConvertibleSelection
       ? enabled(
@@ -185,145 +191,29 @@ function guardedCalibrationAction(
 
 function rasterToolCommand(
   ctx: AppCommandContext,
-  id: 'tools.adjust-image' | 'tools.trace-image',
+  id: 'tools.adjust-image' | 'tools.save-processed-bitmap' | 'tools.trace-image',
   label: string,
   title: string,
 ): AppCommand {
-  const invoke = id === 'tools.adjust-image' ? ctx.adjustImage : ctx.traceImage;
+  const invoke = rasterToolInvoke(ctx, id);
   return ctx.hasRasterSelection
     ? enabled(id, 'tools', label, title, invoke)
     : disabled(id, 'tools', label, 'Select an image first.', invoke);
 }
 
-export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
-  const align = ALIGN_COMMANDS.map((spec) =>
-    ctx.canAlignSelection
-      ? enabled(spec.id, 'arrange', spec.label, spec.title, () => ctx.alignSelection(spec.kind))
-      : disabled(spec.id, 'arrange', spec.label, 'Select at least two objects to align.', () =>
-          ctx.alignSelection(spec.kind),
-        ),
-  );
-  const distribute = DISTRIBUTE_COMMANDS.map((spec) =>
-    ctx.canDistributeSelection
-      ? enabled(spec.id, 'arrange', spec.label, spec.title, () =>
-          ctx.distributeSelection(spec.kind),
-        )
-      : disabled(
-          spec.id,
-          'arrange',
-          spec.label,
-          'Select at least three objects to distribute.',
-          () => ctx.distributeSelection(spec.kind),
-        ),
-  );
-  const horizontal = ctx.canTransformSelection
-    ? enabled(
-        'arrange.flip-horizontal',
-        'arrange',
-        'Flip Horizontal',
-        'Flip selection horizontally',
-        ctx.flipHorizontal,
-        'H',
-      )
-    : disabled(
-        'arrange.flip-horizontal',
-        'arrange',
-        'Flip Horizontal',
-        'Select an object to flip.',
-        ctx.flipHorizontal,
-        'H',
-      );
-  const vertical = ctx.canTransformSelection
-    ? enabled(
-        'arrange.flip-vertical',
-        'arrange',
-        'Flip Vertical',
-        'Flip selection vertically',
-        ctx.flipVertical,
-        'V',
-      )
-    : disabled(
-        'arrange.flip-vertical',
-        'arrange',
-        'Flip Vertical',
-        'Select an object to flip.',
-        ctx.flipVertical,
-        'V',
-      );
-  return [...align, ...distribute, horizontal, vertical];
+function rasterToolInvoke(
+  ctx: AppCommandContext,
+  id: 'tools.adjust-image' | 'tools.save-processed-bitmap' | 'tools.trace-image',
+): () => void {
+  switch (id) {
+    case 'tools.adjust-image':
+      return ctx.adjustImage;
+    case 'tools.save-processed-bitmap':
+      return ctx.saveProcessedBitmap;
+    case 'tools.trace-image':
+      return ctx.traceImage;
+  }
 }
-
-const ALIGN_COMMANDS = [
-  {
-    id: 'arrange.align-left',
-    kind: 'left',
-    label: 'Align Left',
-    title: 'Align selected objects to the reference left edge',
-  },
-  {
-    id: 'arrange.align-center-x',
-    kind: 'center-x',
-    label: 'Align Center X',
-    title: 'Align selected objects to the reference vertical center',
-  },
-  {
-    id: 'arrange.align-right',
-    kind: 'right',
-    label: 'Align Right',
-    title: 'Align selected objects to the reference right edge',
-  },
-  {
-    id: 'arrange.align-top',
-    kind: 'top',
-    label: 'Align Top',
-    title: 'Align selected objects to the reference top edge',
-  },
-  {
-    id: 'arrange.align-center-y',
-    kind: 'center-y',
-    label: 'Align Center Y',
-    title: 'Align selected objects to the reference horizontal center',
-  },
-  {
-    id: 'arrange.align-bottom',
-    kind: 'bottom',
-    label: 'Align Bottom',
-    title: 'Align selected objects to the reference bottom edge',
-  },
-  {
-    id: 'arrange.align-centers',
-    kind: 'centers',
-    label: 'Align Centers',
-    title: 'Center selected objects over the reference object',
-  },
-] as const;
-
-const DISTRIBUTE_COMMANDS = [
-  {
-    id: 'arrange.distribute-horizontal-centers',
-    kind: 'horizontal-centers',
-    label: 'Distribute H Centers',
-    title: 'Evenly space selected object centers horizontally',
-  },
-  {
-    id: 'arrange.distribute-horizontal-spacing',
-    kind: 'horizontal-spacing',
-    label: 'Distribute H Spacing',
-    title: 'Evenly space selected object edges horizontally',
-  },
-  {
-    id: 'arrange.distribute-vertical-centers',
-    kind: 'vertical-centers',
-    label: 'Distribute V Centers',
-    title: 'Evenly space selected object centers vertically',
-  },
-  {
-    id: 'arrange.distribute-vertical-spacing',
-    kind: 'vertical-spacing',
-    label: 'Distribute V Spacing',
-    title: 'Evenly space selected object edges vertically',
-  },
-] as const;
 
 export function laserCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   const connect =

@@ -201,8 +201,9 @@ describe('material library file actions', () => {
           saveRequests.push(req);
           return {
             displayName: 'shop.lfml.json',
-            write: async (text) => {
-              writes.push(text);
+            write: async (data) => {
+              if (typeof data !== 'string') throw new Error('expected text material library');
+              writes.push(data);
             },
           };
         },

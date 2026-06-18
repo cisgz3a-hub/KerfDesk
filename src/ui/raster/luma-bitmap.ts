@@ -68,11 +68,11 @@ export function lumaToBase64(luma: Uint8Array): string {
   return btoa(bin);
 }
 
-async function rgbaToPngDataUrl(
+export async function rgbaToPngBlob(
   rgba: Uint8ClampedArray,
   width: number,
   height: number,
-): Promise<string> {
+): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -83,7 +83,15 @@ async function rgbaToPngDataUrl(
   const imageData = ctx.createImageData(width, height);
   imageData.data.set(rgba);
   ctx.putImageData(imageData, 0, 0);
-  const blob = await canvasToBlob(canvas);
+  return canvasToBlob(canvas);
+}
+
+async function rgbaToPngDataUrl(
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Promise<string> {
+  const blob = await rgbaToPngBlob(rgba, width, height);
   return blobToDataUrl(blob);
 }
 

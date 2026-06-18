@@ -58,9 +58,9 @@ async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null>
   }
   return {
     displayName: handle.name,
-    write: async (text: string) => {
+    write: async (data) => {
       const writable = await handle.createWritable();
-      await writable.write(text);
+      await writable.write(data);
       await writable.close();
     },
   };
