@@ -17,7 +17,8 @@ export type ProfileCapability =
   | 'air-assist'
   | 'no-go-zones'
   | 'scan-offsets'
-  | 'verified-origin';
+  | 'verified-origin'
+  | 'z-axis';
 export type ProfileEvidenceStatus = 'default' | 'researched' | 'user-imported' | 'unverified';
 
 export type ProfileEvidence = {

@@ -42,10 +42,12 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(DEFAULT_DEVICE_PROFILE.profileId).toBe('generic-grbl-400x400');
     expect(DEFAULT_DEVICE_PROFILE.profileSource).toBe('built-in');
     expect(DEFAULT_DEVICE_PROFILE.capabilities).toContain('grbl');
+    expect(DEFAULT_DEVICE_PROFILE.capabilities).not.toContain('z-axis');
     expect(DEFAULT_DEVICE_PROFILE.noGoZones).toEqual([]);
     expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId).toBe(
       'neotronics-4040-max-lt4lds-v2-20w',
     );
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.capabilities).not.toContain('z-axis');
     expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.noGoZones).toEqual([]);
   });
 

@@ -45,6 +45,10 @@ export function CommandShell(): JSX.Element {
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
+    requestFocusTest: () =>
+      jobAwareAlert(
+        'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.',
+      ),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
   });
