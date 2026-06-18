@@ -25,6 +25,10 @@ import { materialLibraryCalibrationFromSelection } from '../state/material-libra
 import { useToastStore } from '../state/toast-store';
 import { MaterialLibraryRecipeControls } from './MaterialLibraryRecipeControls';
 import {
+  materialLibraryPresetOptions,
+  type MaterialLibraryPresetOption,
+} from './material-library-preset-options';
+import {
   buttonRowStyle,
   fieldStyle,
   headingStyle,
@@ -97,14 +101,17 @@ function LoadedMaterialLibraryPanel(props: {
   const [targetLayerId, setTargetLayerId] = useState('');
   const [presetId, setPresetId] = useState('');
   const [status, setStatus] = useState('');
+  const presetOptions = materialLibraryPresetOptions(project.device, props.library.entries);
   const activeLayerId = activeId(
     targetLayerId,
     layers.map((layer) => layer.id),
   );
   const activePresetId = activeId(
     presetId,
-    props.library.entries.map((entry) => entry.id),
+    presetOptions.map((option) => option.preset.id),
   );
+  const activePresetOption =
+    presetOptions.find((option) => option.preset.id === activePresetId) ?? null;
   const calibrationContext = materialLibraryCalibrationFromSelection({ project, selectedObjectId });
   return (
     <section aria-label="Material Library" style={sectionStyle}>
@@ -131,7 +138,7 @@ function LoadedMaterialLibraryPanel(props: {
       />
       <MaterialLibrarySelectors
         layers={layers}
-        library={props.library}
+        presetOptions={presetOptions}
         activeLayerId={activeLayerId}
         activePresetId={activePresetId}
         onLayerChange={setTargetLayerId}
@@ -141,6 +148,7 @@ function LoadedMaterialLibraryPanel(props: {
         activeLayerId={activeLayerId}
         activePresetId={activePresetId}
         entryCount={props.library.entries.length}
+        activePresetOption={activePresetOption}
         calibrationContext={calibrationContext}
         onAssign={() => assignMaterialPresetToLayer(activeLayerId, activePresetId)}
         onPresetCreated={(id) => {
@@ -195,7 +203,7 @@ function LibraryHeader(props: {
 
 function MaterialLibrarySelectors(props: {
   readonly layers: ReadonlyArray<Layer>;
-  readonly library: MaterialLibraryDocument;
+  readonly presetOptions: ReadonlyArray<MaterialLibraryPresetOption>;
   readonly activeLayerId: string;
   readonly activePresetId: string;
   readonly onLayerChange: (id: string) => void;
@@ -225,14 +233,14 @@ function MaterialLibrarySelectors(props: {
         <select
           aria-label="Material library preset"
           value={props.activePresetId}
-          disabled={props.library.entries.length === 0}
+          disabled={props.presetOptions.length === 0}
           title="Choose the saved material preset to apply."
           onChange={(event) => props.onPresetChange(event.currentTarget.value)}
         >
-          {props.library.entries.length === 0 ? <option value="">No presets</option> : null}
-          {props.library.entries.map((entry) => (
-            <option key={entry.id} value={entry.id}>
-              {presetLabel(entry.materialName, entry.thicknessMm, entry.title)}
+          {props.presetOptions.length === 0 ? <option value="">No presets</option> : null}
+          {props.presetOptions.map((option) => (
+            <option key={option.preset.id} value={option.preset.id}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -325,21 +333,6 @@ function starterPresetOperation(preset: StarterMaterialPreset): MaterialRecipeOp
 function activeId(candidate: string, ids: ReadonlyArray<string>): string {
   if (candidate !== '' && ids.includes(candidate)) return candidate;
   return ids[0] ?? '';
-}
-
-function presetLabel(
-  materialName: string,
-  thicknessMm: number | undefined,
-  title: string | undefined,
-): string {
-  const label = thicknessMm !== undefined ? `${formatThickness(thicknessMm)} mm` : title;
-  return `${materialName} - ${label ?? 'Preset'}`;
-}
-
-function formatThickness(value: number): string {
-  return Number.isInteger(value)
-    ? String(value)
-    : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function slug(value: string): string {

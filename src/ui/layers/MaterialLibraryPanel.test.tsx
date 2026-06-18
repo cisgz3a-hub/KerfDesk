@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
 import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
 import {
@@ -20,6 +21,8 @@ import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
+
+const NEOTRONICS_PROFILE_ID = 'neotronics-4040-max-lt4lds-v2-20w';
 
 afterEach(() => {
   resetStore();
@@ -339,6 +342,61 @@ describe('MaterialLibraryPanel', () => {
       expect(target).toBeDefined();
       if (target === undefined) throw new Error('target layer missing');
       expect(captureMaterialRecipe(target)).toEqual(recipe());
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('prefers the best active-machine recipe match in the preset selector', async () => {
+    useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore
+      .getState()
+      .setMaterialLibrary(
+        library([
+          preset({ id: 'generic-birch', confidence: 'starter' }),
+          preset({
+            id: 'neotronics-birch',
+            profileId: NEOTRONICS_PROFILE_ID,
+            confidence: 'calibrated',
+            recipe: recipe({ power: 28 }),
+          }),
+        ]),
+      );
+    const { host, root } = await renderPanel();
+    try {
+      const presetSelect = select(host, 'Material library preset');
+
+      expect(presetSelect.value).toBe('neotronics-birch');
+      expect(presetSelect.options[0]?.textContent).toContain('calibrated / profile');
+      expect(host.textContent).toContain('Preset Match');
+      expect(host.textContent).toContain('calibrated / profile');
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('blocks unsupported recipe assignment and surfaces the recipe warning', async () => {
+    useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore
+      .getState()
+      .setMaterialLibrary(
+        library([
+          preset({
+            id: 'clear-acrylic',
+            materialName: 'Clear acrylic',
+            profileId: NEOTRONICS_PROFILE_ID,
+            confidence: 'unsupported',
+            warning: 'Clear acrylic is not supported on this diode profile.',
+          }),
+        ]),
+      );
+    const { host, root } = await renderPanel();
+    try {
+      expect(host.textContent).toContain('Unsupported recipe.');
+      expect(host.textContent).toContain('Clear acrylic is not supported');
+      expect(button(host, 'Assign selected material preset').disabled).toBe(true);
     } finally {
       await unmount(root, host);
     }
