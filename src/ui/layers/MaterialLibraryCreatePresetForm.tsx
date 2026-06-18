@@ -16,6 +16,7 @@ const EMPTY_DRAFT: CreateDraft = { materialName: '', thicknessMm: '', title: '',
 export function CreatePresetForm(props: {
   readonly targetLayerId: string;
   readonly entryCount: number;
+  readonly isCalibrated: boolean;
   readonly onCreated: (id: string) => void;
   readonly onFailed: (message: string) => void;
 }): JSX.Element {
@@ -23,6 +24,9 @@ export function CreatePresetForm(props: {
   const [draft, setDraft] = useState<CreateDraft>(EMPTY_DRAFT);
   const createInput = createPresetInput(draft, props.entryCount);
   const createDisabled = props.targetLayerId === '' || createInput === null;
+  const actionLabel = props.isCalibrated
+    ? 'Create calibrated recipe'
+    : 'Create preset from selected layer';
   return (
     <form
       style={formStyle}
@@ -72,11 +76,15 @@ export function CreatePresetForm(props: {
       />
       <Button
         type="submit"
-        aria-label="Create preset from selected layer"
-        title="Create a new material preset from the selected layer settings."
+        aria-label={actionLabel}
+        title={
+          props.isCalibrated
+            ? 'Create a calibrated material recipe from the selected test swatch.'
+            : 'Create a new material preset from the selected layer settings.'
+        }
         disabled={createDisabled}
       >
-        Create from Layer
+        {props.isCalibrated ? 'Create Calibrated Recipe' : 'Create from Layer'}
       </Button>
     </form>
   );

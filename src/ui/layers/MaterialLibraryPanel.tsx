@@ -21,8 +21,9 @@ import {
 import { usePlatform } from '../app/platform-context';
 import { Button } from '../kit';
 import { useStore } from '../state';
+import { materialLibraryCalibrationFromSelection } from '../state/material-library-calibration';
 import { useToastStore } from '../state/toast-store';
-import { CreatePresetForm } from './MaterialLibraryCreatePresetForm';
+import { MaterialLibraryRecipeControls } from './MaterialLibraryRecipeControls';
 import {
   buttonRowStyle,
   fieldStyle,
@@ -86,7 +87,9 @@ function LoadedMaterialLibraryPanel(props: {
   readonly libraryDirty: boolean;
 }): JSX.Element {
   const platform = usePlatform();
+  const project = useStore((state) => state.project);
   const layers = useStore((state) => state.project.scene.layers);
+  const selectedObjectId = useStore((state) => state.selectedObjectId);
   const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
   const markMaterialLibrarySaved = useStore((state) => state.markMaterialLibrarySaved);
   const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
@@ -102,7 +105,7 @@ function LoadedMaterialLibraryPanel(props: {
     presetId,
     props.library.entries.map((entry) => entry.id),
   );
-  const assignDisabled = activeLayerId === '' || activePresetId === '';
+  const calibrationContext = materialLibraryCalibrationFromSelection({ project, selectedObjectId });
   return (
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
@@ -134,28 +137,16 @@ function LoadedMaterialLibraryPanel(props: {
         onLayerChange={setTargetLayerId}
         onPresetChange={setPresetId}
       />
-      <Button
-        aria-label="Assign selected material preset"
-        title="Apply the selected material preset to the selected layer."
-        disabled={assignDisabled}
-        onClick={() => {
-          setStatus(
-            assignMaterialPresetToLayer(activeLayerId, activePresetId)
-              ? `Assigned to ${activeLayerId}.`
-              : 'Preset was not assigned.',
-          );
-        }}
-      >
-        Assign
-      </Button>
-      <CreatePresetForm
-        targetLayerId={activeLayerId}
+      <MaterialLibraryRecipeControls
+        activeLayerId={activeLayerId}
+        activePresetId={activePresetId}
         entryCount={props.library.entries.length}
-        onCreated={(id) => {
+        calibrationContext={calibrationContext}
+        onAssign={() => assignMaterialPresetToLayer(activeLayerId, activePresetId)}
+        onPresetCreated={(id) => {
           setPresetId(id);
-          setStatus('Preset created.');
         }}
-        onFailed={setStatus}
+        onStatus={setStatus}
       />
       {status !== '' ? <p style={statusStyle}>{status}</p> : null}
     </section>

@@ -40,6 +40,26 @@ export const labelStyle: CSSProperties = { color: 'var(--lf-text-muted)', fontSi
 
 export const formStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 6 };
 
+export const calibrationContextStyle: CSSProperties = {
+  border: '1px solid var(--lf-border)',
+  borderRadius: 4,
+  padding: '6px 8px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 3,
+};
+
+export const calibrationHeadingStyle: CSSProperties = {
+  color: 'var(--lf-text)',
+  fontSize: 12,
+};
+
+export const calibrationTextStyle: CSSProperties = {
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+  lineHeight: 1.35,
+};
+
 export const splitRowStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '1fr 1fr',
