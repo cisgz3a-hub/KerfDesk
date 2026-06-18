@@ -14,6 +14,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { isConvertibleVector } from '../raster/vector-to-bitmap';
+import { cropMaskedRasterImage } from '../raster/crop-image';
 import { buildAppCommands, type AppCommand } from './command-registry';
 import { selectedImageMaskPair, type SelectedImageMaskPair } from './image-mask-command-state';
 import { hasPreviewableContent } from './previewable-content';
@@ -89,6 +90,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     traceImage: traceImageAction(selected, openImageDialog),
     convertToBitmap: callbacks.requestConvertToBitmap,
     applyImageMask: applyImageMaskAction(app, imageMaskPair),
+    cropImage: cropImageAction(app, selected, pushToast),
     removeImageMask: removeImageMaskAction(app, selected),
     canTransformSelection: selected !== null,
     canAlignSelection: selectedIds.length >= 2,
@@ -169,6 +171,28 @@ function removeImageMaskAction(
 ): () => void {
   return () => {
     if (selected?.kind === 'raster-image') app.removeImageMask(selected.id);
+  };
+}
+
+function cropImageAction(
+  app: ReturnType<typeof useStore.getState>,
+  selected: Project['scene']['objects'][number] | null,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): () => void {
+  return () => {
+    if (selected?.kind !== 'raster-image' || selected.imageMaskId === undefined) return;
+    const maskObject = app.project.scene.objects.find(
+      (object) => object.id === selected.imageMaskId,
+    );
+    void cropMaskedRasterImage(selected, maskObject)
+      .then((cropped) => {
+        app.cropImage(selected.id, cropped);
+        pushToast(`Cropped image: ${selected.source}`, 'success');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        pushToast(`Could not crop image: ${message}`, 'error');
+      });
   };
 }
 

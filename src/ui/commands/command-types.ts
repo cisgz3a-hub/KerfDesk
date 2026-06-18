@@ -40,6 +40,7 @@ export type CommandId =
   | 'tools.optimization-settings'
   | 'tools.adjust-image'
   | 'tools.apply-image-mask'
+  | 'tools.crop-image'
   | 'tools.remove-image-mask'
   | 'tools.save-processed-bitmap'
   | 'tools.trace-image'
@@ -121,6 +122,7 @@ export type AppCommandContext = {
   readonly traceImage: () => void;
   readonly convertToBitmap: () => void;
   readonly applyImageMask: () => void;
+  readonly cropImage: () => void;
   readonly removeImageMask: () => void;
   readonly canTransformSelection: boolean;
   readonly canAlignSelection: boolean;

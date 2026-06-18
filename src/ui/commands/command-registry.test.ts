@@ -57,6 +57,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     traceImage: vi.fn(),
     convertToBitmap: vi.fn(),
     applyImageMask: vi.fn(),
+    cropImage: vi.fn(),
     removeImageMask: vi.fn(),
     connectLaser: vi.fn(),
     disconnectLaser: vi.fn(),

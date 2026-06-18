@@ -6,6 +6,7 @@ import type { AppState } from './store';
 export type ImageMaskActions = {
   readonly applyImageMask: (imageId: string, maskId: string) => void;
   readonly removeImageMask: (imageId: string) => void;
+  readonly cropImage: (imageId: string, cropped: RasterImage) => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -14,6 +15,7 @@ export function imageMaskActions(set: Setter): ImageMaskActions {
   return {
     applyImageMask: (imageId, maskId) => set((state) => applyMask(state, imageId, maskId)),
     removeImageMask: (imageId) => set((state) => removeMask(state, imageId)),
+    cropImage: (imageId, cropped) => set((state) => cropMask(state, imageId, cropped)),
   };
 }
 
@@ -44,6 +46,28 @@ function removeMask(state: AppState, imageId: string): AppState | Partial<AppSta
       ...state.project,
       scene: replaceObject(state.project.scene, image.id, unmasked),
     },
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function cropMask(
+  state: AppState,
+  imageId: string,
+  cropped: RasterImage,
+): AppState | Partial<AppState> {
+  const image = sceneObjectById(state.project.scene.objects, imageId);
+  if (image?.kind !== 'raster-image' || image.imageMaskId === undefined) return state;
+  const { imageMaskId: _imageMaskId, ...unmasked } =
+    cropped.id === image.id ? cropped : { ...cropped, id: image.id };
+  return {
+    project: {
+      ...state.project,
+      scene: replaceObject(state.project.scene, image.id, unmasked),
+    },
+    selectedObjectId: image.id,
+    additionalSelectedIds: new Set(),
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
