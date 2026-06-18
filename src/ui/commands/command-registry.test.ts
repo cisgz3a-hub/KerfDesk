@@ -47,6 +47,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     materialTest: vi.fn(),
     intervalTest: vi.fn(),
     scanOffsetTest: vi.fn(),
+    focusTestAvailable: false,
+    focusTest: vi.fn(),
     optimizationSettings: vi.fn(),
     adjustImage: vi.fn(),
     traceImage: vi.fn(),
@@ -188,6 +190,30 @@ describe('buildAppCommands', () => {
     expect(confirmDiscard).toHaveBeenCalledWith('create a scan offset test');
     await flushMicrotasks();
     expect(scanOffsetTest).toHaveBeenCalled();
+  });
+
+  it('blocks Focus Test unless the active profile has verified controllable Z support', () => {
+    const focusTest = vi.fn();
+    const commands = buildAppCommands(baseCtx({ focusTest }));
+    const command = commandById(commands, 'tools.focus-test');
+
+    expect(command.enabled).toBe(false);
+    expect(command.disabledReason).toContain('verified controllable Z-axis');
+    expect(runCommand(command)).toBe(false);
+    expect(focusTest).not.toHaveBeenCalled();
+  });
+
+  it('runs Focus Test through the shared dirty-project guard when Z support is verified', async () => {
+    const confirmDiscard = vi.fn(async () => true);
+    const focusTest = vi.fn();
+    const commands = buildAppCommands(
+      baseCtx({ dirty: true, confirmDiscard, focusTestAvailable: true, focusTest }),
+    );
+
+    expect(runCommand(commandById(commands, 'tools.focus-test'))).toBe(true);
+    expect(confirmDiscard).toHaveBeenCalledWith('create a focus test');
+    await flushMicrotasks();
+    expect(focusTest).toHaveBeenCalled();
   });
 
   it('runs Optimization Settings without the destructive dirty-project guard', () => {

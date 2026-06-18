@@ -106,6 +106,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Create a bidirectional scan-offset calibration pattern.',
   },
+  'tools.focus-test': {
+    family: 'tools',
+    tooltip: 'Create a Z-axis focus test pattern for verified controllable-Z profiles.',
+  },
   'tools.optimization-settings': {
     family: 'tools',
     tooltip: 'Adjust path ordering and travel optimization for output.',

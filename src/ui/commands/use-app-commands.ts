@@ -1,4 +1,5 @@
 import type { Project } from '../../core/scene';
+import { profileSupportsCapability } from '../../core/devices';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import {
@@ -22,6 +23,7 @@ export type CommandShellCallbacks = {
   readonly requestMaterialTest: () => void;
   readonly requestIntervalTest: () => void;
   readonly requestScanOffsetTest: () => void;
+  readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
   readonly showAbout: () => void;
 };
@@ -69,6 +71,10 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
     scanOffsetTest: callbacks.requestScanOffsetTest,
+    focusTestAvailable:
+      profileSupportsCapability(app.project.device, 'z-axis') &&
+      app.project.device.zTravelConfirmed === true,
+    focusTest: callbacks.requestFocusTest,
     optimizationSettings: callbacks.requestOptimizationSettings,
     adjustImage: callbacks.requestAdjustImage,
     traceImage: () => {

@@ -132,35 +132,55 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       'tools',
       'Material Test...',
       'Create a material test grid',
-      () => {
-        void ctx.confirmDiscard('create a material test').then((ok) => {
-          if (ok) ctx.materialTest();
-        });
-      },
+      guardedCalibrationAction(ctx, 'create a material test', ctx.materialTest),
     ),
     enabled(
       'tools.interval-test',
       'tools',
       'Interval Test...',
       'Create an interval test grid',
-      () => {
-        void ctx.confirmDiscard('create an interval test').then((ok) => {
-          if (ok) ctx.intervalTest();
-        });
-      },
+      guardedCalibrationAction(ctx, 'create an interval test', ctx.intervalTest),
     ),
     enabled(
       'tools.scan-offset-test',
       'tools',
       'Scan Offset Test...',
       'Create a bidirectional scan-offset calibration pattern',
-      () => {
-        void ctx.confirmDiscard('create a scan offset test').then((ok) => {
-          if (ok) ctx.scanOffsetTest();
-        });
-      },
+      guardedCalibrationAction(ctx, 'create a scan offset test', ctx.scanOffsetTest),
     ),
+    focusTestCommand(ctx),
   ];
+}
+
+function focusTestCommand(ctx: AppCommandContext): AppCommand {
+  const invoke = guardedCalibrationAction(ctx, 'create a focus test', ctx.focusTest);
+  return ctx.focusTestAvailable
+    ? enabled(
+        'tools.focus-test',
+        'tools',
+        'Focus Test...',
+        'Create a Z-axis focus test pattern',
+        invoke,
+      )
+    : disabled(
+        'tools.focus-test',
+        'tools',
+        'Focus Test...',
+        'Active machine profile needs verified controllable Z-axis support before Focus Test can run.',
+        invoke,
+      );
+}
+
+function guardedCalibrationAction(
+  ctx: AppCommandContext,
+  action: string,
+  run: () => void,
+): () => void {
+  return () => {
+    void ctx.confirmDiscard(action).then((ok) => {
+      if (ok) run();
+    });
+  };
 }
 
 function rasterToolCommand(

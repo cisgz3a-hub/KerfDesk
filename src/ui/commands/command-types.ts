@@ -36,6 +36,7 @@ export type CommandId =
   | 'tools.material-test'
   | 'tools.interval-test'
   | 'tools.scan-offset-test'
+  | 'tools.focus-test'
   | 'tools.optimization-settings'
   | 'tools.adjust-image'
   | 'tools.trace-image'
@@ -107,6 +108,8 @@ export type AppCommandContext = {
   readonly materialTest: () => void;
   readonly intervalTest: () => void;
   readonly scanOffsetTest: () => void;
+  readonly focusTestAvailable: boolean;
+  readonly focusTest: () => void;
   readonly optimizationSettings: () => void;
   readonly adjustImage: () => void;
   readonly traceImage: () => void;
