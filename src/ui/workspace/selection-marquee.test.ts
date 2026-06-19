@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, type Scene, type SceneObject, type Vec2 } from '../../core/scene';
 import { selectObjectsInMarquee } from './selection-marquee';
 
-function objectAt(id: string, x: number, y: number): SceneObject {
+function objectAt(id: string, x: number, y: number, locked = false): SceneObject {
   return {
     kind: 'imported-svg',
     id,
     source: `${id}.svg`,
+    ...(locked ? { locked } : {}),
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
     transform: { ...IDENTITY_TRANSFORM, x, y },
     paths: [],
@@ -33,5 +34,15 @@ describe('selectObjectsInMarquee', () => {
     const end: Vec2 = { x: -5, y: -5 };
 
     expect(selectObjectsInMarquee(scene([objectAt('A', 0, 0)]), start, end)).toEqual(['A']);
+  });
+
+  it('skips locked objects inside the marquee', () => {
+    const selected = selectObjectsInMarquee(
+      scene([objectAt('A', 0, 0, true), objectAt('B', 20, 0)]),
+      { x: -5, y: -5 },
+      { x: 35, y: 15 },
+    );
+
+    expect(selected).toEqual(['B']);
   });
 });

@@ -11,11 +11,13 @@ function obj(args: {
   maxY: number;
   tx?: number;
   ty?: number;
+  locked?: boolean;
 }): SceneObject {
   return {
     kind: 'imported-svg',
     id: args.id,
     source: `${args.id}.svg`,
+    ...(args.locked === undefined ? {} : { locked: args.locked }),
     bounds: { minX: args.minX, minY: args.minY, maxX: args.maxX, maxY: args.maxY },
     transform: { ...IDENTITY_TRANSFORM, x: args.tx ?? 0, y: args.ty ?? 0 },
     paths: [],
@@ -62,5 +64,14 @@ describe('hitTest', () => {
     expect(hitTest(scene, { x: 10, y: 10 })).toBe('B');
     // Outside B but inside A → falls through to A.
     expect(hitTest(scene, { x: 18, y: 18 })).toBe('A');
+  });
+
+  it('skips locked objects and hits the next unlocked object underneath', () => {
+    const scene = withObjects(
+      obj({ id: 'A', minX: 0, minY: 0, maxX: 20, maxY: 20 }),
+      obj({ id: 'B', minX: 5, minY: 5, maxX: 15, maxY: 15, locked: true }),
+    );
+
+    expect(hitTest(scene, { x: 10, y: 10 })).toBe('A');
   });
 });

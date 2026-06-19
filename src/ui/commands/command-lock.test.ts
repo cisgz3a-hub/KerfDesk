@@ -1,0 +1,104 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  buildAppCommands,
+  commandById,
+  runCommand,
+  type AppCommandContext,
+} from './command-registry';
+
+function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext {
+  return {
+    dirty: false,
+    savedName: null,
+    serialSupported: true,
+    connected: false,
+    machineBusy: false,
+    homingEnabled: true,
+    canUndo: false,
+    canRedo: false,
+    hasSelection: false,
+    hasRasterSelection: false,
+    hasConvertibleSelection: false,
+    canApplyImageMask: false,
+    hasMaskedRasterSelection: false,
+    canPaste: false,
+    canGroupSelection: false,
+    canUngroupSelection: false,
+    canLockSelection: false,
+    hasLockedObjects: false,
+    confirmDiscard: vi.fn(async () => true),
+    newProject: vi.fn(),
+    openProject: vi.fn(),
+    saveProject: vi.fn(),
+    saveProjectAs: vi.fn(),
+    importSvg: vi.fn(),
+    importImage: vi.fn(),
+    saveGcode: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    selectAll: vi.fn(),
+    copySelection: vi.fn(),
+    cutSelection: vi.fn(),
+    pasteClipboard: vi.fn(),
+    groupSelection: vi.fn(),
+    ungroupSelection: vi.fn(),
+    lockSelection: vi.fn(),
+    unlockAllObjects: vi.fn(),
+    duplicateSelection: vi.fn(),
+    deleteSelection: vi.fn(),
+    clearSelection: vi.fn(),
+    addText: vi.fn(),
+    materialTest: vi.fn(),
+    intervalTest: vi.fn(),
+    scanOffsetTest: vi.fn(),
+    focusTestAvailable: false,
+    focusTest: vi.fn(),
+    optimizationSettings: vi.fn(),
+    adjustImage: vi.fn(),
+    saveProcessedBitmap: vi.fn(),
+    traceImage: vi.fn(),
+    multiFileTrace: vi.fn(),
+    convertToBitmap: vi.fn(),
+    applyImageMask: vi.fn(),
+    cropImage: vi.fn(),
+    removeImageMask: vi.fn(),
+    canTransformSelection: false,
+    canAlignSelection: false,
+    alignSelection: vi.fn(),
+    canDistributeSelection: false,
+    distributeSelection: vi.fn(),
+    flipHorizontal: vi.fn(),
+    flipVertical: vi.fn(),
+    connectLaser: vi.fn(),
+    disconnectLaser: vi.fn(),
+    homeLaser: vi.fn(),
+    togglePreview: vi.fn(),
+    previewActive: false,
+    hasPreviewableContent: true,
+    resetView: vi.fn(),
+    showAbout: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe('lock commands', () => {
+  it('gates Lock Selection and Unlock All from selection and locked object state', () => {
+    const lockSelection = vi.fn();
+    const unlockAllObjects = vi.fn();
+    const disabled = buildAppCommands(
+      baseCtx({ canLockSelection: false, hasLockedObjects: false, lockSelection, unlockAllObjects }),
+    );
+
+    expect(commandById(disabled, 'edit.lock-selection').enabled).toBe(false);
+    expect(commandById(disabled, 'edit.unlock-all').enabled).toBe(false);
+
+    const enabled = buildAppCommands(
+      baseCtx({ canLockSelection: true, hasLockedObjects: true, lockSelection, unlockAllObjects }),
+    );
+
+    expect(runCommand(commandById(enabled, 'edit.lock-selection'))).toBe(true);
+    expect(runCommand(commandById(enabled, 'edit.unlock-all'))).toBe(true);
+    expect(lockSelection).toHaveBeenCalledTimes(1);
+    expect(unlockAllObjects).toHaveBeenCalledTimes(1);
+  });
+});

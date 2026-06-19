@@ -31,4 +31,15 @@ describe('useStore selectObjects', () => {
     expect(s.selectedObjectId).toBe('O1');
     expect([...s.additionalSelectedIds]).toEqual(['O2', 'O3']);
   });
+
+  it('filters locked objects out of direct multi-selection requests', () => {
+    useStore.getState().importSvgObject({ ...svgObj('O1', ['#f00']), locked: true });
+    useStore.getState().importSvgObject(svgObj('O2', ['#0f0']));
+
+    useStore.getState().selectObjects(['O1', 'O2']);
+
+    const s = useStore.getState();
+    expect(s.selectedObjectId).toBe('O2');
+    expect([...s.additionalSelectedIds]).toEqual([]);
+  });
 });

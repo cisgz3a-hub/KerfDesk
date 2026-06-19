@@ -124,6 +124,7 @@ function expandedObjectIdsForGroups(scene: Scene, ids: ReadonlyArray<string>): R
 function orderedLiveIds(scene: Scene, ids: ReadonlySet<string>): ReadonlyArray<string> {
   const out: string[] = [];
   for (const object of scene.objects) {
+    if (object.locked === true) continue;
     if (ids.has(object.id)) out.push(object.id);
   }
   return out;

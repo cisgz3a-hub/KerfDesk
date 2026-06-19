@@ -66,6 +66,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'edit',
     tooltip: 'Remove grouping from the selected artwork.',
   },
+  'edit.lock-selection': {
+    family: 'edit',
+    tooltip: 'Lock selected artwork so normal selection and transform tools skip it.',
+  },
+  'edit.unlock-all': {
+    family: 'edit',
+    tooltip: 'Unlock every locked object in the current project.',
+  },
   'edit.duplicate': {
     family: 'edit',
     tooltip: 'Duplicate the selected artwork in place.',

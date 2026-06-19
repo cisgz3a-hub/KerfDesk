@@ -150,14 +150,11 @@ Identical to F-A3 except:
 2. Both objects are now selected; selection box wraps their combined bounding box.
 3. Resize handles operate on the combined box.
 
-#### Multi — marquee — **NOT YET IMPLEMENTED**
-> This flow is specified but not built: `computeMouseDownDrag` returns null on
-> empty space, so click+drag in empty workspace does nothing today. Tracked for
-> the drawing-tools work (LIGHTBURN-GAP Increment 2). The spec below is the
-> intended behavior, not current behavior.
+#### Multi — marquee
 1. Click+drag in empty workspace area.
 2. Dashed-blue marquee box follows cursor.
 3. On release, every object whose bounding box is fully or partially inside the marquee is selected.
+4. Locked objects inside the marquee are skipped.
 
 #### All — Cmd/Ctrl+A
 1. Selects every object in the scene.
@@ -165,8 +162,10 @@ Identical to F-A3 except:
 #### Deselect — Escape or click in empty space
 1. Selection cleared. Status bar updates: `Nothing selected`.
 
-#### Edge — click on locked layer object
-1. Phase A has no layer locking. (Phase C feature, not designed yet.)
+#### Edge — locked object
+1. Edit menu `Lock Selection` locks selected artwork and clears selection.
+2. Normal click, marquee, Select All, and transform tools skip locked objects.
+3. Edit menu `Unlock All` unlocks every locked object in the project.
 
 ---
 
