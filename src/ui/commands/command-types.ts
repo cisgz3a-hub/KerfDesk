@@ -29,6 +29,9 @@ export type CommandId =
   | 'edit.undo'
   | 'edit.redo'
   | 'edit.select-all'
+  | 'edit.copy'
+  | 'edit.cut'
+  | 'edit.paste'
   | 'edit.duplicate'
   | 'edit.delete'
   | 'edit.clear-selection'
@@ -94,6 +97,7 @@ export type AppCommandContext = {
   readonly hasConvertibleSelection: boolean;
   readonly canApplyImageMask: boolean;
   readonly hasMaskedRasterSelection: boolean;
+  readonly canPaste: boolean;
   // LU18 dirty-project guard: resolves true when the destructive action
   // may proceed (clean, saved, or explicitly discarded). Async because it
   // can show the Save / Don't Save / Cancel dialog and run a save.
@@ -108,6 +112,9 @@ export type AppCommandContext = {
   readonly undo: () => void;
   readonly redo: () => void;
   readonly selectAll: () => void;
+  readonly copySelection: () => void;
+  readonly cutSelection: () => void;
+  readonly pasteClipboard: () => void;
   readonly duplicateSelection: () => void;
   readonly deleteSelection: () => void;
   readonly clearSelection: () => void;

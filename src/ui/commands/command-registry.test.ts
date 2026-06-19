@@ -31,6 +31,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     hasConvertibleSelection: false,
     canApplyImageMask: false,
     hasMaskedRasterSelection: false,
+    canPaste: false,
     confirmDiscard: vi.fn(async () => true),
     newProject: vi.fn(),
     openProject: vi.fn(),
@@ -43,6 +44,9 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     undo: vi.fn(),
     redo: vi.fn(),
     selectAll: vi.fn(),
+    copySelection: vi.fn(),
+    cutSelection: vi.fn(),
+    pasteClipboard: vi.fn(),
     duplicateSelection: vi.fn(),
     deleteSelection: vi.fn(),
     clearSelection: vi.fn(),
@@ -155,6 +159,29 @@ describe('buildAppCommands', () => {
     expect(commandById(commands, 'tools.trace-image').enabled).toBe(false);
     expect(runCommand(commandById(commands, 'tools.trace-image'))).toBe(false);
     expect(traceImage).not.toHaveBeenCalled();
+  });
+
+  it('gates Copy, Cut, and Paste from selection and clipboard state', () => {
+    const copySelection = vi.fn();
+    const cutSelection = vi.fn();
+    const pasteClipboard = vi.fn();
+    const disabled = buildAppCommands(
+      baseCtx({ hasSelection: false, canPaste: false, copySelection, cutSelection, pasteClipboard }),
+    );
+
+    expect(commandById(disabled, 'edit.copy').enabled).toBe(false);
+    expect(commandById(disabled, 'edit.cut').enabled).toBe(false);
+    expect(commandById(disabled, 'edit.paste').enabled).toBe(false);
+
+    const enabled = buildAppCommands(
+      baseCtx({ hasSelection: true, canPaste: true, copySelection, cutSelection, pasteClipboard }),
+    );
+    expect(runCommand(commandById(enabled, 'edit.copy'))).toBe(true);
+    expect(runCommand(commandById(enabled, 'edit.cut'))).toBe(true);
+    expect(runCommand(commandById(enabled, 'edit.paste'))).toBe(true);
+    expect(copySelection).toHaveBeenCalledTimes(1);
+    expect(cutSelection).toHaveBeenCalledTimes(1);
+    expect(pasteClipboard).toHaveBeenCalledTimes(1);
   });
 
   it('enables Trace Image when a raster image is selected', () => {

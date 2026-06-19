@@ -24,6 +24,7 @@ export function resetStore(): void {
     savedName: null,
     lastSaveTarget: null,
     copiedLayerSettings: null,
+    sceneClipboard: null,
     layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
     materialLibrary: null,
     materialLibraryDirty: false,

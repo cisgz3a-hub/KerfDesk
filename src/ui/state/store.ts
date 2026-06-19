@@ -45,6 +45,11 @@ import {
 } from './material-library-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { imageMaskActions, type ImageMaskActions } from './image-mask-actions';
+import {
+  sceneClipboardActions,
+  type SceneClipboard,
+  type SceneClipboardActions,
+} from './scene-clipboard-actions';
 import { generatedSceneActions } from './generated-scene-actions';
 import {
   projectOptimizationActions,
@@ -84,6 +89,7 @@ export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
   SelectionTransformActions &
   ObjectDeleteActions &
+  SceneClipboardActions &
   ReturnType<typeof currentMaterialLibraryState> &
   MaterialLibraryActions & {
     readonly project: Project;
@@ -113,6 +119,7 @@ export type AppState = ObjectPropertiesActions &
     readonly savedName: string | null;
     readonly lastSaveTarget: SaveTarget | null;
     readonly copiedLayerSettings: LayerSettingsClipboard | null;
+    readonly sceneClipboard: SceneClipboard | null;
     readonly layerDefaults: LayerDefaultsState;
 
     readonly setProject: (project: Project) => void;
@@ -222,6 +229,7 @@ function initialState(): Pick<
   | 'savedName'
   | 'lastSaveTarget'
   | 'copiedLayerSettings'
+  | 'sceneClipboard'
   | 'layerDefaults'
 > &
   ReturnType<typeof currentMaterialLibraryState> {
@@ -241,6 +249,7 @@ function initialState(): Pick<
     savedName: null,
     lastSaveTarget: null,
     copiedLayerSettings: null,
+    sceneClipboard: null,
     layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
     ...MATERIAL_LIBRARY_STATE_DEFAULTS,
   };
@@ -292,6 +301,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...materialLibraryActions(set),
   ...objectPropertiesActions(set),
   ...imageMaskActions(set),
+  ...sceneClipboardActions(set),
   ...generatedSceneActions(set),
   ...projectOptimizationActions(set),
   ...selectionTransformActions(set),

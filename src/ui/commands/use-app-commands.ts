@@ -42,15 +42,12 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const selected = selectedObject(app.project, app.selectedObjectId);
   const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
   const imageMaskPair = selectedImageMaskPair(app.project, selectedIds);
-  const hasSelection = selectedIds.length > 0;
-  const focusTestAvailable =
-    profileSupportsCapability(app.project.device, 'z-axis') &&
-    app.project.device.zTravelConfirmed === true;
+  const focusTestAvailable = profileSupportsCapability(app.project.device, 'z-axis')
+    && app.project.device.zTravelConfirmed === true;
   const hasMaskedRasterSelection =
     selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
-  const activeStreamer =
-    laser.streamer !== null &&
-    (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
+  const activeStreamer = laser.streamer !== null
+    && (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
   return buildAppCommands({
     dirty: app.dirty,
     savedName: app.savedName,
@@ -60,11 +57,12 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     homingEnabled: app.project.device.homing.enabled,
     canUndo: app.undoStack.length > 0,
     canRedo: app.redoStack.length > 0,
-    hasSelection,
+    hasSelection: selectedIds.length > 0,
     hasRasterSelection: selected?.kind === 'raster-image',
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
     canApplyImageMask: imageMaskPair !== null,
     hasMaskedRasterSelection,
+    canPaste: app.sceneClipboard !== null && app.sceneClipboard.objects.length > 0,
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
@@ -76,6 +74,9 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     undo: app.undo,
     redo: app.redo,
     selectAll: app.selectAllObjects,
+    copySelection: app.copySelection,
+    cutSelection: app.cutSelection,
+    pasteClipboard: app.pasteClipboard,
     duplicateSelection: app.duplicateSelection,
     deleteSelection: () => deleteSelection(),
     clearSelection: () => app.selectObject(null),

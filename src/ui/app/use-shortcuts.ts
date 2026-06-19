@@ -42,6 +42,9 @@ function useFileEditShortcuts(): void {
   const removeSceneObjects = useStore((s) => s.removeSceneObjects);
   const selectObject = useStore((s) => s.selectObject);
   const selectAllObjects = useStore((s) => s.selectAllObjects);
+  const copySelection = useStore((s) => s.copySelection);
+  const cutSelection = useStore((s) => s.cutSelection);
+  const pasteClipboard = useStore((s) => s.pasteClipboard);
   const duplicateSelection = useStore((s) => s.duplicateSelection);
   const resetToolMode = useUiStore((s) => s.resetToolMode);
   const setToolMode = useUiStore((s) => s.setToolMode);
@@ -67,7 +70,7 @@ function useFileEditShortcuts(): void {
       // prettier-ignore
       const fileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
-      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, removeSceneObjects, selectObject, selectAllObjects, duplicateSelection, resetToolMode };
+      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, removeSceneObjects, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, duplicateSelection, resetToolMode };
       if (handleFileShortcut(e, fileCtx)) return;
       // Tool-arming (Ctrl+R/E/L) runs between File and Edit: File owns the
       // Shift variants (Save-As, export G-code), and no Edit binding uses a
@@ -102,6 +105,9 @@ function useFileEditShortcuts(): void {
     removeSceneObjects,
     selectObject,
     selectAllObjects,
+    copySelection,
+    cutSelection,
+    pasteClipboard,
     duplicateSelection,
     resetToolMode,
     setToolMode,
