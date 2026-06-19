@@ -53,7 +53,10 @@ export async function runMultiFileTrace(
     for (const file of svgFiles) {
       download(file);
     }
-    pushToast(`Traced ${svgFiles.length} ${svgFiles.length === 1 ? 'image' : 'images'} to SVG.`, 'success');
+    pushToast(
+      `Traced ${svgFiles.length} ${svgFiles.length === 1 ? 'image' : 'images'} to SVG.`,
+      'success',
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');

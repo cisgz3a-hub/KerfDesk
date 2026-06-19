@@ -8,10 +8,7 @@ import {
 import type { JobPlacementSettings } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, pushUndo } from './scene-mutations';
-import {
-  selectionFromIds,
-  toggleSelectionFromId,
-} from './scene-group-actions';
+import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState, OutputScopeSettings } from './store';
 
 const HISTORY_DEPTH = 50;

@@ -16,7 +16,16 @@ import { resetStore, svgObj } from './test-helpers';
 
 const BLACK_PATH: ColoredPath = {
   color: '#000000',
-  polylines: [{ closed: true, points: [{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: 3 }] }],
+  polylines: [
+    {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 3, y: 0 },
+        { x: 3, y: 3 },
+      ],
+    },
+  ],
 };
 
 describe('scene clipboard actions', () => {
@@ -59,7 +68,13 @@ describe('scene clipboard actions', () => {
     const state = useStore.getState();
     const pasted = state.project.scene.objects;
     expect(pasted).toHaveLength(5);
-    expect(pasted.map((object) => object.id)).not.toEqual(['svg-1', 'text-1', 'trace-1', 'raster-1', 'shape-1']);
+    expect(pasted.map((object) => object.id)).not.toEqual([
+      'svg-1',
+      'text-1',
+      'trace-1',
+      'raster-1',
+      'shape-1',
+    ]);
     expect(pasted[0]?.transform).toMatchObject({ x: 10, y: 10 });
     expect(state.selectedObjectId).toBe(pasted[0]?.id);
     expect(state.additionalSelectedIds.size).toBe(4);

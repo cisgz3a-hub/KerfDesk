@@ -111,7 +111,10 @@ function selectionStateFromIds(scene: Scene, ids: ReadonlyArray<string>): Select
   };
 }
 
-function expandedObjectIdsForGroups(scene: Scene, ids: ReadonlyArray<string>): ReadonlyArray<string> {
+function expandedObjectIdsForGroups(
+  scene: Scene,
+  ids: ReadonlyArray<string>,
+): ReadonlyArray<string> {
   const selected = new Set(ids);
   for (const group of scene.groups ?? []) {
     if (group.objectIds.some((id) => selected.has(id))) {

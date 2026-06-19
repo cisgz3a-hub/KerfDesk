@@ -174,7 +174,13 @@ describe('buildAppCommands', () => {
     const cutSelection = vi.fn();
     const pasteClipboard = vi.fn();
     const disabled = buildAppCommands(
-      baseCtx({ hasSelection: false, canPaste: false, copySelection, cutSelection, pasteClipboard }),
+      baseCtx({
+        hasSelection: false,
+        canPaste: false,
+        copySelection,
+        cutSelection,
+        pasteClipboard,
+      }),
     );
 
     expect(commandById(disabled, 'edit.copy').enabled).toBe(false);
@@ -232,9 +238,7 @@ describe('buildAppCommands', () => {
 
   it('runs Multi-File Trace without requiring a selected image', () => {
     const multiFileTrace = vi.fn();
-    const commands = buildAppCommands(
-      baseCtx({ hasRasterSelection: false, multiFileTrace }),
-    );
+    const commands = buildAppCommands(baseCtx({ hasRasterSelection: false, multiFileTrace }));
     const command = commandById(commands, 'tools.multi-file-trace');
 
     expect(command.enabled).toBe(true);
