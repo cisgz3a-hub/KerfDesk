@@ -64,9 +64,7 @@ describe('scene lock actions', () => {
     useStore.getState().importSvgObject({ ...svgObj('A', ['#ff0000']), locked: true });
     const before = useStore.getState().project.scene.objects[0]?.transform;
 
-    useStore
-      .getState()
-      .applyObjectTransform('A', { ...IDENTITY_TRANSFORM, x: 50, y: 50 });
+    useStore.getState().applyObjectTransform('A', { ...IDENTITY_TRANSFORM, x: 50, y: 50 });
 
     expect(useStore.getState().project.scene.objects[0]?.transform).toEqual(before);
   });

@@ -48,10 +48,7 @@ function unlockAllObjectsInState(state: AppState): AppState | Partial<AppState> 
   };
 }
 
-function mapObjects(
-  project: Project,
-  map: (object: SceneObject) => SceneObject,
-): Project {
+function mapObjects(project: Project, map: (object: SceneObject) => SceneObject): Project {
   let changed = false;
   const objects = project.scene.objects.map((object) => {
     const next = map(object);

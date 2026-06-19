@@ -16,6 +16,7 @@ import { useUiStore } from '../state/ui-store';
 import { isConvertibleVector } from '../raster/vector-to-bitmap';
 import { cropMaskedRasterImage } from '../raster/crop-image';
 import { buildAppCommands, type AppCommand } from './command-registry';
+import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair, type SelectedImageMaskPair } from './image-mask-command-state';
 import { hasPreviewableContent } from './previewable-content';
 
@@ -32,6 +33,17 @@ export type CommandShellCallbacks = {
   readonly showAbout: () => void;
 };
 
+type CommandDialogs = {
+  readonly openImageDialog: (source: RasterImage) => void;
+  readonly openTextDialog: (options: { readonly mode: 'add' }) => void;
+};
+
+type CommandSelection = {
+  readonly selected: Project['scene']['objects'][number] | null;
+  readonly selectedIds: ReadonlyArray<string>;
+  readonly imageMaskPair: SelectedImageMaskPair | null;
+};
+
 export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<AppCommand> {
   const platform = usePlatform();
   const app = useStore();
@@ -39,20 +51,44 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const pushToast = useToastStore((s) => s.pushToast);
   const openTextDialog = useUiStore((s) => s.openTextDialog);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
+  return buildAppCommands(
+    appCommandContext(callbacks, platform, app, laser, pushToast, {
+      openImageDialog,
+      openTextDialog,
+    }),
+  );
+}
+
+function appCommandContext(
+  callbacks: CommandShellCallbacks,
+  platform: ReturnType<typeof usePlatform>,
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+  dialogs: CommandDialogs,
+): AppCommandContext {
   const selected = selectedObject(app.project, app.selectedObjectId);
   const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
   const imageMaskPair = selectedImageMaskPair(app.project, selectedIds);
-  const hasMaskedRasterSelection = selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
-  const activeStreamer = laser.streamer !== null && (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
-  return buildAppCommands({
+  const selection = { selected, selectedIds, imageMaskPair };
+  const hasMaskedRasterSelection =
+    selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
+  const activeStreamer =
+    laser.streamer !== null &&
+    (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
+  return {
+    ...fileCommandContext(callbacks, platform, app, laser, pushToast),
+    ...editCommandContext(app, dialogs),
+    ...toolCommandContext(callbacks, app, platform, dialogs, pushToast, selection),
+    ...arrangeCommandContext(app),
+    ...laserCommandContext(platform, laser),
+    ...windowHelpCommandContext(callbacks, app),
     dirty: app.dirty,
     savedName: app.savedName,
     serialSupported: platform.serial.isSupported(),
     connected: laser.connection.kind === 'connected',
     machineBusy: laser.autofocusBusy || laser.motionOperation !== null || activeStreamer,
     homingEnabled: app.project.device.homing.enabled,
-    canUndo: app.undoStack.length > 0,
-    canRedo: app.redoStack.length > 0,
     hasSelection: selectedIds.length > 0,
     hasRasterSelection: selected?.kind === 'raster-image',
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
@@ -63,6 +99,35 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     canUngroupSelection: selectionTouchesGroup(app.project, selectedIds),
     canLockSelection: selectionHasUnlockedObject(app.project, selectedIds),
     hasLockedObjects: app.project.scene.objects.some((object) => object.locked === true),
+    canTransformSelection: selected !== null,
+    canAlignSelection: selectedIds.length >= 2,
+    canDistributeSelection: selectedIds.length >= 3,
+    focusTestAvailable:
+      profileSupportsCapability(app.project.device, 'z-axis') &&
+      app.project.device.zTravelConfirmed === true,
+    previewActive: app.previewMode,
+    hasPreviewableContent: hasPreviewableContent(app.project),
+  };
+}
+
+function fileCommandContext(
+  callbacks: CommandShellCallbacks,
+  platform: ReturnType<typeof usePlatform>,
+  app: ReturnType<typeof useStore.getState>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+): Pick<
+  AppCommandContext,
+  | 'confirmDiscard'
+  | 'newProject'
+  | 'openProject'
+  | 'saveProject'
+  | 'saveProjectAs'
+  | 'importSvg'
+  | 'importImage'
+  | 'saveGcode'
+> {
+  return {
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
@@ -71,46 +136,125 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
     saveGcode: saveGcodeAction(platform, app, laser, pushToast),
-    undo: app.undo, redo: app.redo,
+  };
+}
+
+function editCommandContext(
+  app: ReturnType<typeof useStore.getState>,
+  dialogs: CommandDialogs,
+): Pick<
+  AppCommandContext,
+  | 'canUndo'
+  | 'canRedo'
+  | 'undo'
+  | 'redo'
+  | 'selectAll'
+  | 'copySelection'
+  | 'cutSelection'
+  | 'pasteClipboard'
+  | 'groupSelection'
+  | 'ungroupSelection'
+  | 'lockSelection'
+  | 'unlockAllObjects'
+  | 'duplicateSelection'
+  | 'deleteSelection'
+  | 'clearSelection'
+  | 'addText'
+> {
+  return {
+    canUndo: app.undoStack.length > 0,
+    canRedo: app.redoStack.length > 0,
+    undo: app.undo,
+    redo: app.redo,
     selectAll: app.selectAllObjects,
-    copySelection: app.copySelection, cutSelection: app.cutSelection,
+    copySelection: app.copySelection,
+    cutSelection: app.cutSelection,
     pasteClipboard: app.pasteClipboard,
-    groupSelection: app.groupSelection, ungroupSelection: app.ungroupSelection,
-    lockSelection: app.lockSelection, unlockAllObjects: app.unlockAllObjects,
+    groupSelection: app.groupSelection,
+    ungroupSelection: app.ungroupSelection,
+    lockSelection: app.lockSelection,
+    unlockAllObjects: app.unlockAllObjects,
     duplicateSelection: app.duplicateSelection,
     deleteSelection: () => deleteSelection(),
     clearSelection: () => app.selectObject(null),
-    addText: () => openTextDialog({ mode: 'add' }),
+    addText: () => dialogs.openTextDialog({ mode: 'add' }),
+  };
+}
+
+function toolCommandContext(
+  callbacks: CommandShellCallbacks,
+  app: ReturnType<typeof useStore.getState>,
+  platform: ReturnType<typeof usePlatform>,
+  dialogs: CommandDialogs,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+  selection: CommandSelection,
+): Pick<
+  AppCommandContext,
+  | 'materialTest'
+  | 'intervalTest'
+  | 'scanOffsetTest'
+  | 'focusTest'
+  | 'optimizationSettings'
+  | 'adjustImage'
+  | 'saveProcessedBitmap'
+  | 'traceImage'
+  | 'multiFileTrace'
+  | 'convertToBitmap'
+  | 'applyImageMask'
+  | 'cropImage'
+  | 'removeImageMask'
+> {
+  return {
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
     scanOffsetTest: callbacks.requestScanOffsetTest,
-    focusTestAvailable: profileSupportsCapability(app.project.device, 'z-axis') && app.project.device.zTravelConfirmed === true,
     focusTest: callbacks.requestFocusTest,
     optimizationSettings: callbacks.requestOptimizationSettings,
     adjustImage: callbacks.requestAdjustImage,
     saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
-    traceImage: traceImageAction(selected, openImageDialog),
+    traceImage: traceImageAction(selection.selected, dialogs.openImageDialog),
     multiFileTrace: callbacks.requestMultiFileTrace,
     convertToBitmap: callbacks.requestConvertToBitmap,
-    applyImageMask: applyImageMaskAction(app, imageMaskPair),
-    cropImage: cropImageAction(app, selected, pushToast),
-    removeImageMask: removeImageMaskAction(app, selected),
-    canTransformSelection: selected !== null,
-    canAlignSelection: selectedIds.length >= 2,
+    applyImageMask: applyImageMaskAction(app, selection.imageMaskPair),
+    cropImage: cropImageAction(app, selection.selected, pushToast),
+    removeImageMask: removeImageMaskAction(app, selection.selected),
+  };
+}
+
+function arrangeCommandContext(
+  app: ReturnType<typeof useStore.getState>,
+): Pick<
+  AppCommandContext,
+  'alignSelection' | 'distributeSelection' | 'flipHorizontal' | 'flipVertical'
+> {
+  return {
     alignSelection: app.alignSelection,
-    canDistributeSelection: selectedIds.length >= 3,
     distributeSelection: app.distributeSelection,
     flipHorizontal: () => app.flipSelection('horizontal'),
     flipVertical: () => app.flipSelection('vertical'),
+  };
+}
+
+function laserCommandContext(
+  platform: ReturnType<typeof usePlatform>,
+  laser: ReturnType<typeof useLaserStore.getState>,
+): Pick<AppCommandContext, 'connectLaser' | 'disconnectLaser' | 'homeLaser'> {
+  return {
     connectLaser: () => void laser.connect(platform),
     disconnectLaser: () => void laser.disconnect().catch(() => undefined),
     homeLaser: () => void laser.home().catch(() => undefined),
+  };
+}
+
+function windowHelpCommandContext(
+  callbacks: CommandShellCallbacks,
+  app: ReturnType<typeof useStore.getState>,
+): Pick<AppCommandContext, 'togglePreview' | 'resetView' | 'showAbout'> {
+  return {
     togglePreview: app.togglePreview,
-    previewActive: app.previewMode,
-    hasPreviewableContent: hasPreviewableContent(app.project),
     resetView: useUiStore.getState().resetView,
     showAbout: callbacks.showAbout,
-  });
+  };
 }
 
 function saveGcodeAction(
@@ -251,9 +395,7 @@ function selectionTouchesGroup(project: Project, selectedIds: ReadonlyArray<stri
 
 function selectionHasUnlockedObject(project: Project, selectedIds: ReadonlyArray<string>): boolean {
   const selected = new Set(selectedIds);
-  return project.scene.objects.some(
-    (object) => selected.has(object.id) && object.locked !== true,
-  );
+  return project.scene.objects.some((object) => selected.has(object.id) && object.locked !== true);
 }
 
 function deleteSelection(): void {

@@ -39,7 +39,11 @@ describe('project scene groups IO', () => {
 
   it('rejects malformed group metadata', () => {
     const raw = JSON.parse(serializeProject(createProject())) as Record<string, unknown>;
-    raw['scene'] = { objects: [], layers: [], groups: [{ id: 'bad', name: 'Bad', objectIds: [7] }] };
+    raw['scene'] = {
+      objects: [],
+      layers: [],
+      groups: [{ id: 'bad', name: 'Bad', objectIds: [7] }],
+    };
 
     const result = deserializeProject(JSON.stringify(raw));
 

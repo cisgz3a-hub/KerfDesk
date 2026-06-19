@@ -86,7 +86,12 @@ describe('lock commands', () => {
     const lockSelection = vi.fn();
     const unlockAllObjects = vi.fn();
     const disabled = buildAppCommands(
-      baseCtx({ canLockSelection: false, hasLockedObjects: false, lockSelection, unlockAllObjects }),
+      baseCtx({
+        canLockSelection: false,
+        hasLockedObjects: false,
+        lockSelection,
+        unlockAllObjects,
+      }),
     );
 
     expect(commandById(disabled, 'edit.lock-selection').enabled).toBe(false);

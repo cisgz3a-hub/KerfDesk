@@ -91,7 +91,9 @@ function copiedLayersForObjects(
   scene: Scene,
   objects: ReadonlyArray<SceneObject>,
 ): ReadonlyArray<Layer> {
-  const colors = new Set(objects.flatMap((object) => layerSpecsForObject(object).map((s) => s.color)));
+  const colors = new Set(
+    objects.flatMap((object) => layerSpecsForObject(object).map((s) => s.color)),
+  );
   return scene.layers.filter((layer) => colors.has(layer.color)).map(cloneLayer);
 }
 
@@ -149,7 +151,8 @@ function layerSpecsForObject(
   object: SceneObject,
 ): ReadonlyArray<{ readonly color: string; readonly mode: Layer['mode'] }> {
   if (object.kind === 'raster-image') return [{ color: object.color, mode: 'image' }];
-  const mode = object.kind === 'traced-image' && object.traceMode !== 'centerline' ? 'fill' : 'line';
+  const mode =
+    object.kind === 'traced-image' && object.traceMode !== 'centerline' ? 'fill' : 'line';
   return object.paths.map((path) => ({ color: path.color, mode }));
 }
 

@@ -5,8 +5,22 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
     undoCommand(ctx),
     redoCommand(ctx),
     enabled('edit.select-all', 'edit', 'Select All', 'Select all artwork', ctx.selectAll, 'Ctrl+A'),
-    selectionCommand(ctx, 'edit.copy', 'Copy', 'Select an object to copy.', ctx.copySelection, 'Ctrl+C'),
-    selectionCommand(ctx, 'edit.cut', 'Cut', 'Select an object to cut.', ctx.cutSelection, 'Ctrl+X'),
+    selectionCommand(
+      ctx,
+      'edit.copy',
+      'Copy',
+      'Select an object to copy.',
+      ctx.copySelection,
+      'Ctrl+C',
+    ),
+    selectionCommand(
+      ctx,
+      'edit.cut',
+      'Cut',
+      'Select an object to cut.',
+      ctx.cutSelection,
+      'Ctrl+X',
+    ),
     pasteCommand(ctx),
     groupCommand(ctx),
     ungroupCommand(ctx),
@@ -41,7 +55,13 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
 
 function lockSelectionCommand(ctx: AppCommandContext): AppCommand {
   return ctx.canLockSelection
-    ? enabled('edit.lock-selection', 'edit', 'Lock Selection', 'Lock selected artwork', ctx.lockSelection)
+    ? enabled(
+        'edit.lock-selection',
+        'edit',
+        'Lock Selection',
+        'Lock selected artwork',
+        ctx.lockSelection,
+      )
     : disabled(
         'edit.lock-selection',
         'edit',

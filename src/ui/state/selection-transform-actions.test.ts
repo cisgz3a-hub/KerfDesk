@@ -44,9 +44,9 @@ describe('selection transform actions', () => {
     const before = useStore.getState().project.scene.objects[0]?.transform;
     useStore.setState({ undoStack: [], dirty: false });
 
-    useStore.getState().applySelectionTransforms([
-      { id: 'A', transform: { ...IDENTITY_TRANSFORM, x: 10, y: 20 } },
-    ]);
+    useStore
+      .getState()
+      .applySelectionTransforms([{ id: 'A', transform: { ...IDENTITY_TRANSFORM, x: 10, y: 20 } }]);
 
     const state = useStore.getState();
     expect(state.project.scene.objects[0]?.transform).toEqual(before);
