@@ -83,6 +83,9 @@ function editCtx(
     selectObject: vi.fn(),
     selectAllObjects: vi.fn(),
     duplicateSelection: vi.fn(),
+    copySelection: vi.fn(),
+    cutSelection: vi.fn(),
+    pasteClipboard: vi.fn(),
     resetToolMode: vi.fn(),
     ...overrides,
   };
@@ -183,6 +186,51 @@ describe('handleEditShortcut — Cmd+D duplicate', () => {
     );
     expect(handled).toBe(false);
     expect(ctx.duplicateSelection).not.toHaveBeenCalled();
+    input.remove();
+  });
+});
+
+describe('handleEditShortcut — clipboard', () => {
+  it('Cmd+C copies the current selection', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(fakeKeydown({ key: 'c', metaKey: true, target: div }), ctx);
+    expect(handled).toBe(true);
+    expect(ctx.copySelection).toHaveBeenCalled();
+    div.remove();
+  });
+
+  it('Cmd+X cuts the current selection', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(fakeKeydown({ key: 'x', metaKey: true, target: div }), ctx);
+    expect(handled).toBe(true);
+    expect(ctx.cutSelection).toHaveBeenCalled();
+    div.remove();
+  });
+
+  it('Cmd+V pastes the scene clipboard', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(fakeKeydown({ key: 'v', metaKey: true, target: div }), ctx);
+    expect(handled).toBe(true);
+    expect(ctx.pasteClipboard).toHaveBeenCalled();
+    div.remove();
+  });
+
+  it('Cmd+C inside an <input> does NOT copy scene objects', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(
+      fakeKeydown({ key: 'c', metaKey: true, target: input }),
+      ctx,
+    );
+    expect(handled).toBe(false);
+    expect(ctx.copySelection).not.toHaveBeenCalled();
     input.remove();
   });
 });

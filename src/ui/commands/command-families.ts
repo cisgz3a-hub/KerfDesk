@@ -47,6 +47,36 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
 }
 
 export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
+  const copy = ctx.hasSelection
+    ? enabled('edit.copy', 'edit', 'Copy', 'Copy selection', ctx.copySelection, 'Ctrl+C')
+    : disabled(
+        'edit.copy',
+        'edit',
+        'Copy',
+        'Select an object to copy.',
+        ctx.copySelection,
+        'Ctrl+C',
+      );
+  const cut = ctx.hasSelection
+    ? enabled('edit.cut', 'edit', 'Cut', 'Cut selection', ctx.cutSelection, 'Ctrl+X')
+    : disabled(
+        'edit.cut',
+        'edit',
+        'Cut',
+        'Select an object to cut.',
+        ctx.cutSelection,
+        'Ctrl+X',
+      );
+  const paste = ctx.canPaste
+    ? enabled('edit.paste', 'edit', 'Paste', 'Paste copied artwork', ctx.pasteClipboard, 'Ctrl+V')
+    : disabled(
+        'edit.paste',
+        'edit',
+        'Paste',
+        'Copy or cut artwork first.',
+        ctx.pasteClipboard,
+        'Ctrl+V',
+      );
   const duplicate = ctx.hasSelection
     ? enabled(
         'edit.duplicate',
@@ -72,6 +102,9 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ? enabled('edit.redo', 'edit', 'Redo', 'Redo last undone edit', ctx.redo, 'Ctrl+Shift+Z')
       : disabled('edit.redo', 'edit', 'Redo', 'Nothing to redo.', ctx.redo, 'Ctrl+Shift+Z'),
     enabled('edit.select-all', 'edit', 'Select All', 'Select all artwork', ctx.selectAll, 'Ctrl+A'),
+    copy,
+    cut,
+    paste,
     duplicate,
     ctx.hasSelection
       ? enabled('edit.delete', 'edit', 'Delete', 'Delete selection', ctx.deleteSelection, 'Delete')
