@@ -15,6 +15,7 @@ export function hitTest(scene: Scene, point: Vec2): string | null {
   for (let i = scene.objects.length - 1; i >= 0; i -= 1) {
     const obj = scene.objects[i];
     if (obj === undefined) continue;
+    if (obj.locked === true) continue;
     if (pointInObjectBBox(point, obj)) return obj.id;
   }
   return null;

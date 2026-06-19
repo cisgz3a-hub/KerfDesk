@@ -101,6 +101,7 @@ function applySelectionTransformsToState(
       objects: state.project.scene.objects.map((object) => {
         const transform = byId.get(object.id);
         if (transform === undefined) return object;
+        if (object.locked === true) return object;
         changed = true;
         return { ...object, transform };
       }),

@@ -7,6 +7,7 @@ export function selectObjectsInMarquee(
 ): ReadonlyArray<string> {
   const marquee = normalizedAabb(start, end);
   return scene.objects
+    .filter((object) => object.locked !== true)
     .filter((object) => aabbIntersects(marquee, transformedBBox(object)))
     .map((object) => object.id);
 }

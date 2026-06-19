@@ -10,6 +10,8 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
     pasteCommand(ctx),
     groupCommand(ctx),
     ungroupCommand(ctx),
+    lockSelectionCommand(ctx),
+    unlockAllCommand(ctx),
     selectionCommand(
       ctx,
       'edit.duplicate',
@@ -35,6 +37,30 @@ export function editCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'Esc',
     ),
   ];
+}
+
+function lockSelectionCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.canLockSelection
+    ? enabled('edit.lock-selection', 'edit', 'Lock Selection', 'Lock selected artwork', ctx.lockSelection)
+    : disabled(
+        'edit.lock-selection',
+        'edit',
+        'Lock Selection',
+        'Select unlocked artwork to lock.',
+        ctx.lockSelection,
+      );
+}
+
+function unlockAllCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.hasLockedObjects
+    ? enabled('edit.unlock-all', 'edit', 'Unlock All', 'Unlock all artwork', ctx.unlockAllObjects)
+    : disabled(
+        'edit.unlock-all',
+        'edit',
+        'Unlock All',
+        'No locked artwork in the project.',
+        ctx.unlockAllObjects,
+      );
 }
 
 function undoCommand(ctx: AppCommandContext): AppCommand {

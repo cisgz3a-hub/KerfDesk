@@ -61,6 +61,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     canPaste: app.sceneClipboard !== null && app.sceneClipboard.objects.length > 0,
     canGroupSelection: selectedIds.length >= 2,
     canUngroupSelection: selectionTouchesGroup(app.project, selectedIds),
+    canLockSelection: selectionHasUnlockedObject(app.project, selectedIds),
+    hasLockedObjects: app.project.scene.objects.some((object) => object.locked === true),
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
@@ -69,14 +71,12 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
     saveGcode: saveGcodeAction(platform, app, laser, pushToast),
-    undo: app.undo,
-    redo: app.redo,
+    undo: app.undo, redo: app.redo,
     selectAll: app.selectAllObjects,
-    copySelection: app.copySelection,
-    cutSelection: app.cutSelection,
+    copySelection: app.copySelection, cutSelection: app.cutSelection,
     pasteClipboard: app.pasteClipboard,
-    groupSelection: app.groupSelection,
-    ungroupSelection: app.ungroupSelection,
+    groupSelection: app.groupSelection, ungroupSelection: app.ungroupSelection,
+    lockSelection: app.lockSelection, unlockAllObjects: app.unlockAllObjects,
     duplicateSelection: app.duplicateSelection,
     deleteSelection: () => deleteSelection(),
     clearSelection: () => app.selectObject(null),
@@ -246,6 +246,13 @@ function selectionTouchesGroup(project: Project, selectedIds: ReadonlyArray<stri
   const selected = new Set(selectedIds);
   return (project.scene.groups ?? []).some((group) =>
     group.objectIds.some((objectId) => selected.has(objectId)),
+  );
+}
+
+function selectionHasUnlockedObject(project: Project, selectedIds: ReadonlyArray<string>): boolean {
+  const selected = new Set(selectedIds);
+  return project.scene.objects.some(
+    (object) => selected.has(object.id) && object.locked !== true,
   );
 }
 

@@ -47,6 +47,9 @@ export type Bounds = {
 export type ObjectPowerScale = {
   // LightBurn Shape Properties: per-shape scale applied to layer power.
   readonly powerScale?: number;
+  // Object locking V1: locked artwork is skipped by normal selection and
+  // transform tools, but still renders and compiles.
+  readonly locked?: boolean;
 };
 
 export type ImportedSvg = ObjectPowerScale & {

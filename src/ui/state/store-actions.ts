@@ -149,7 +149,9 @@ export function viewActions(
     toggleSelectObject: (id) => set((s) => toggleSelectionFromId(s, id)),
     selectAllObjects: () =>
       set((s) => {
-        const ids = s.project.scene.objects.map((o) => o.id);
+        const ids = s.project.scene.objects
+          .filter((object) => object.locked !== true)
+          .map((o) => o.id);
         const [primary, ...rest] = ids;
         return {
           selectedObjectId: primary ?? null,
@@ -229,7 +231,9 @@ function applyTransformToScene(project: Project, id: string, transform: Transfor
     ...project,
     scene: {
       ...project.scene,
-      objects: project.scene.objects.map((o) => (o.id === id ? { ...o, transform } : o)),
+      objects: project.scene.objects.map((o) =>
+        o.id === id && o.locked !== true ? { ...o, transform } : o,
+      ),
     },
   };
 }

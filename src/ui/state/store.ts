@@ -51,6 +51,7 @@ import {
   type SceneClipboardActions,
 } from './scene-clipboard-actions';
 import { sceneGroupActions, type SceneGroupActions } from './scene-group-actions';
+import { sceneLockActions, type SceneLockActions } from './scene-lock-actions';
 import { generatedSceneActions } from './generated-scene-actions';
 import {
   projectOptimizationActions,
@@ -92,6 +93,7 @@ export type AppState = ObjectPropertiesActions &
   ObjectDeleteActions &
   SceneClipboardActions &
   SceneGroupActions &
+  SceneLockActions &
   ReturnType<typeof currentMaterialLibraryState> &
   MaterialLibraryActions & {
     readonly project: Project;
@@ -305,6 +307,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...imageMaskActions(set),
   ...sceneClipboardActions(set),
   ...sceneGroupActions(set),
+  ...sceneLockActions(set),
   ...generatedSceneActions(set),
   ...projectOptimizationActions(set),
   ...selectionTransformActions(set),
