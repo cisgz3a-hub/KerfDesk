@@ -26,7 +26,7 @@ import {
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
-import { consumeSettingsResponse } from './detected-settings-action';
+import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
   controllerErrorNotice,
   disconnectDuringJobNotice,
@@ -104,6 +104,25 @@ export async function runHandshake(
   await safeWrite(`${CMD_SETTINGS}\n`);
 }
 
+function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
+  if (Object.keys(detected.patch).length > 0) return true;
+  const controller = detected.controllerSettings;
+  if (
+    controller.softLimitsEnabled !== undefined ||
+    controller.hardLimitsEnabled !== undefined ||
+    controller.homingEnabled !== undefined ||
+    controller.homingDirectionMask !== undefined
+  ) {
+    return true;
+  }
+  if (isPositive(controller.zMaxFeed) && isPositive(controller.zTravelMm)) return true;
+  return detected.settingsRows.some((row) => !row.known);
+}
+
+function isPositive(value: number | undefined): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
 export function handleLine(
   set: SetFn,
   get: GetFn,
@@ -128,7 +147,7 @@ export function handleLine(
   const detected = consumeSettingsResponse(refs, cls);
   if (detected !== null) {
     set({
-      detectedSettings: Object.keys(detected.patch).length > 0 ? detected.patch : null,
+      detectedSettings: shouldShowDetectedSettingsReview(detected) ? detected.patch : null,
       controllerSettings: detected.controllerSettings,
       grblSettingsRows: detected.settingsRows,
       lastSettingsReadAt: Date.now(),

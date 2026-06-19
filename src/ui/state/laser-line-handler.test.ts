@@ -99,6 +99,24 @@ describe('handleLine detected controller settings', () => {
     });
     expect(get().grblSettingsRows.map((row) => row.code)).toEqual(['$22', '$30', '$31', '$32']);
   });
+
+  it('keeps review-only controller settings pending for the Machine Setup review banner', () => {
+    const { refs, set, get } = makeHarness();
+
+    for (const line of ['$20=1', '$21=0', '$22=1', '$23=3', 'ok']) {
+      handleLine(set, get, refs, async () => undefined, line);
+    }
+
+    expect(refs.settingsCollector).toEqual(idleCollector());
+    expect(get().detectedSettings).toEqual({});
+    expect(get().controllerSettings).toMatchObject({
+      softLimitsEnabled: true,
+      hardLimitsEnabled: false,
+      homingEnabled: true,
+      homingDirectionMask: 3,
+    });
+    expect(get().grblSettingsRows.map((row) => row.code)).toEqual(['$20', '$21', '$22', '$23']);
+  });
 });
 
 describe('handleLine streamer writes', () => {
