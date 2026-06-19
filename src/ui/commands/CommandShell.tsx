@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import {
   generateIntervalTestGrid,
   generateMaterialTestGrid,
@@ -25,11 +25,13 @@ import { useRegisterModal } from '../common/use-register-modal';
 import { AppMenuBar } from './AppMenuBar';
 import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
+import { runMultiFileTrace, type MultiFileTraceFile } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
 import { useAppCommands } from './use-app-commands';
 
 export function CommandShell(): JSX.Element {
   const imageInput = useRef<HTMLInputElement | null>(null);
+  const multiFileTraceInput = useRef<HTMLInputElement | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
@@ -40,6 +42,7 @@ export function CommandShell(): JSX.Element {
   const selectedRaster = useSelectedRaster();
   const commands = useAppCommands({
     requestImportImage: () => imageInput.current?.click(),
+    requestMultiFileTrace: () => multiFileTraceInput.current?.click(),
     requestConvertToBitmap: () => setConvertDialogOpen(true),
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
@@ -53,24 +56,14 @@ export function CommandShell(): JSX.Element {
     showAbout: () => jobAwareAlert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
+  const onMultiFileTracePick = useMultiFileTracePickHandler();
   return (
     <>
       <AppMenuBar commands={commands} />
       <Toolbar commands={commands} />
       <NumericEditsBar />
-      <input
-        ref={imageInput}
-        type="file"
-        accept="image/png,image/jpeg"
-        aria-label="Import image file picker"
-        title="Choose a PNG or JPG image to import into the workspace."
-        style={{ display: 'none' }}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file !== undefined) onImagePick(file);
-          event.target.value = '';
-        }}
-      />
+      <ImageImportInput inputRef={imageInput} onPick={onImagePick} />
+      <MultiFileTraceInput inputRef={multiFileTraceInput} onPick={onMultiFileTracePick} />
       {convertDialogOpen && selectedConvertible !== null ? (
         <ConvertDialog
           convertible={selectedConvertible}
@@ -93,6 +86,48 @@ export function CommandShell(): JSX.Element {
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
       ) : null}
     </>
+  );
+}
+
+function ImageImportInput(props: {
+  readonly inputRef: RefObject<HTMLInputElement>;
+  readonly onPick: (file: File) => void;
+}): JSX.Element {
+  return (
+    <input
+      ref={props.inputRef}
+      type="file"
+      accept="image/png,image/jpeg"
+      aria-label="Import image file picker"
+      title="Choose a PNG or JPG image to import into the workspace."
+      style={{ display: 'none' }}
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (file !== undefined) props.onPick(file);
+        event.target.value = '';
+      }}
+    />
+  );
+}
+
+function MultiFileTraceInput(props: {
+  readonly inputRef: RefObject<HTMLInputElement>;
+  readonly onPick: (files: ReadonlyArray<MultiFileTraceFile>) => void;
+}): JSX.Element {
+  return (
+    <input
+      ref={props.inputRef}
+      type="file"
+      accept="image/png,image/jpeg"
+      multiple
+      aria-label="Multi-file trace image picker"
+      title="Choose PNG or JPG images to trace into standalone SVG files."
+      style={{ display: 'none' }}
+      onChange={(event) => {
+        props.onPick(Array.from(event.target.files ?? []));
+        event.target.value = '';
+      }}
+    />
   );
 }
 
@@ -206,6 +241,13 @@ function AdjustDialog(props: {
       onApply={onApply}
     />
   );
+}
+
+function useMultiFileTracePickHandler(): (files: ReadonlyArray<MultiFileTraceFile>) => void {
+  const pushToast = useToastStore((s) => s.pushToast);
+  return (files) => {
+    void runMultiFileTrace(files, pushToast);
+  };
 }
 
 function useImagePickHandler(): (file: File) => void {

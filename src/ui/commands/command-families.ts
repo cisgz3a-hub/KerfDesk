@@ -116,6 +116,13 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Save selected image after layer processing',
     ),
     rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image'),
+    enabled(
+      'tools.multi-file-trace',
+      'tools',
+      'Multi-File Trace...',
+      'Trace multiple image files to SVG exports',
+      ctx.multiFileTrace,
+    ),
     ctx.hasConvertibleSelection
       ? enabled(
           'tools.convert-to-bitmap',

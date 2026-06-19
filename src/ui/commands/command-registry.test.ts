@@ -38,6 +38,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     saveProjectAs: vi.fn(),
     importSvg: vi.fn(),
     importImage: vi.fn(),
+    multiFileTrace: vi.fn(),
     saveGcode: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
@@ -163,6 +164,18 @@ describe('buildAppCommands', () => {
     expect(commandById(commands, 'tools.trace-image').enabled).toBe(true);
     expect(runCommand(commandById(commands, 'tools.trace-image'))).toBe(true);
     expect(traceImage).toHaveBeenCalled();
+  });
+
+  it('runs Multi-File Trace without requiring a selected image', () => {
+    const multiFileTrace = vi.fn();
+    const commands = buildAppCommands(
+      baseCtx({ hasRasterSelection: false, multiFileTrace }),
+    );
+    const command = commandById(commands, 'tools.multi-file-trace');
+
+    expect(command.enabled).toBe(true);
+    expect(runCommand(command)).toBe(true);
+    expect(multiFileTrace).toHaveBeenCalledTimes(1);
   });
 
   it('runs Material Test through the shared dirty-project guard', async () => {

@@ -44,6 +44,7 @@ export type CommandId =
   | 'tools.remove-image-mask'
   | 'tools.save-processed-bitmap'
   | 'tools.trace-image'
+  | 'tools.multi-file-trace'
   | 'tools.convert-to-bitmap'
   | 'arrange.align-left'
   | 'arrange.align-center-x'
@@ -120,6 +121,7 @@ export type AppCommandContext = {
   readonly adjustImage: () => void;
   readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;
+  readonly multiFileTrace: () => void;
   readonly convertToBitmap: () => void;
   readonly applyImageMask: () => void;
   readonly cropImage: () => void;

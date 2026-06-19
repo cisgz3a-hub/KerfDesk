@@ -21,6 +21,7 @@ import { hasPreviewableContent } from './previewable-content';
 
 export type CommandShellCallbacks = {
   readonly requestImportImage: () => void;
+  readonly requestMultiFileTrace: () => void;
   readonly requestConvertToBitmap: () => void;
   readonly requestAdjustImage: () => void;
   readonly requestMaterialTest: () => void;
@@ -88,6 +89,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     adjustImage: callbacks.requestAdjustImage,
     saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
     traceImage: traceImageAction(selected, openImageDialog),
+    multiFileTrace: callbacks.requestMultiFileTrace,
     convertToBitmap: callbacks.requestConvertToBitmap,
     applyImageMask: applyImageMaskAction(app, imageMaskPair),
     cropImage: cropImageAction(app, selected, pushToast),

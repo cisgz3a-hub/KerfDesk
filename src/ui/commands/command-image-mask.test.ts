@@ -28,6 +28,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     saveProjectAs: vi.fn(),
     importSvg: vi.fn(),
     importImage: vi.fn(),
+    multiFileTrace: vi.fn(),
     saveGcode: vi.fn(),
     undo: vi.fn(),
     redo: vi.fn(),
