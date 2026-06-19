@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ColoredPath } from '../../core/scene';
-import { DEFAULT_TRACE_OPTIONS, type RawImageData } from '../../core/trace';
+import { TRACE_PRESETS, type RawImageData } from '../../core/trace';
 import {
   buildMultiFileTraceExports,
   runMultiFileTrace,
@@ -50,8 +50,8 @@ describe('buildMultiFileTraceExports', () => {
 
     expect(loadImage).toHaveBeenNthCalledWith(1, namedFile('logo.png'));
     expect(loadImage).toHaveBeenNthCalledWith(2, namedFile('photo.jpg'));
-    expect(trace).toHaveBeenNthCalledWith(1, logo, DEFAULT_TRACE_OPTIONS);
-    expect(trace).toHaveBeenNthCalledWith(2, photo, DEFAULT_TRACE_OPTIONS);
+    expect(trace).toHaveBeenNthCalledWith(1, logo, TRACE_PRESETS['Line Art']);
+    expect(trace).toHaveBeenNthCalledWith(2, photo, TRACE_PRESETS['Line Art']);
     expect(files.map((file) => file.filename)).toEqual(['logo-trace.svg', 'photo-trace.svg']);
     expect(files[0]?.svg).toContain('viewBox="0 0 4 3"');
     expect(files[1]?.svg).toContain('viewBox="0 0 6 5"');
@@ -102,5 +102,22 @@ describe('runMultiFileTrace', () => {
 
     expect(download).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith('Could not trace images: decode failed', 'error');
+  });
+
+  it('does not download transparent SVGs when tracing produces no visible paths', async () => {
+    const pushToast = vi.fn();
+    const download = vi.fn();
+
+    await runMultiFileTrace([namedFile('empty.png')], pushToast, {
+      loadImage: async () => rawImage(2, 2),
+      trace: async () => [],
+      download,
+    });
+
+    expect(download).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not trace images: Trace produced no visible paths for empty-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
+      'error',
+    );
   });
 });
