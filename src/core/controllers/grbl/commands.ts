@@ -73,6 +73,7 @@ export type JogParams = {
   // shouldn't move this jog.
   readonly dx?: number;
   readonly dy?: number;
+  readonly dz?: number;
   // Feed rate in mm/min. GRBL requires F for jog commands.
   readonly feed: number;
   // When true, emits a relative-mode jog ($J=G91...). When false, absolute.
@@ -94,6 +95,9 @@ export function buildJogCommand(params: JogParams): string {
   }
   if (typeof params.dy === 'number' && params.dy !== 0) {
     parts.push(`Y${formatMm(params.dy)}`);
+  }
+  if (typeof params.dz === 'number' && params.dz !== 0) {
+    parts.push(`Z${formatMm(params.dz)}`);
   }
   parts.push(`F${Math.max(1, Math.round(params.feed))}`);
   return `$J=${parts.join(' ')}`;

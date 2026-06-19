@@ -91,6 +91,36 @@ describe('DeviceSettings air assist command', () => {
       await unmount();
     }
   });
+
+  it('lets the operator declare whether the machine has powered Z jog', async () => {
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      details.open = true;
+
+      const poweredZ = host.querySelector('input[aria-label="Powered Z jog enabled"]');
+      if (!(poweredZ instanceof HTMLInputElement)) throw new Error('Powered Z checkbox missing');
+      expect(poweredZ.checked).toBe(false);
+      expect(useStore.getState().project.device.capabilities).not.toContain('z-axis');
+
+      await act(async () => {
+        poweredZ.checked = true;
+        Simulate.change(poweredZ);
+      });
+
+      expect(useStore.getState().project.device.capabilities).toContain('z-axis');
+
+      await act(async () => {
+        poweredZ.checked = false;
+        Simulate.change(poweredZ);
+      });
+
+      expect(useStore.getState().project.device.capabilities).not.toContain('z-axis');
+    } finally {
+      await unmount();
+    }
+  });
 });
 
 describe('DeviceSettings scan offsets', () => {

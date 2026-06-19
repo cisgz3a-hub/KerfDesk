@@ -36,6 +36,11 @@ describe('buildJogCommand', () => {
     expect(buildJogCommand({ dx: 5, dy: -3, feed: 1000 })).toBe('$J=G91 G21 X5.000 Y-3.000 F1000');
   });
 
+  it('includes Z when a powered focus axis is jogged', () => {
+    expect(buildJogCommand({ dz: 1, feed: 300 })).toBe('$J=G91 G21 Z1.000 F300');
+    expect(buildJogCommand({ dz: -0.5, feed: 300 })).toBe('$J=G91 G21 Z-0.500 F300');
+  });
+
   it('emits absolute-mode when relative: false', () => {
     expect(buildJogCommand({ dx: 100, feed: 1500, relative: false })).toBe(
       '$J=G90 G21 X100.000 F1500',

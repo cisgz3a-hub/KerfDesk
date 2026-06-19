@@ -1,6 +1,7 @@
 import type { ColoredPath } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
+  TRACE_PRESETS,
   traceImagesToSvgFiles,
   type BatchTraceSvgFile,
   type RawImageData,
@@ -24,12 +25,15 @@ export type MultiFileTraceDeps = {
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
+const DEFAULT_MULTI_FILE_TRACE_OPTIONS: TraceOptions =
+  TRACE_PRESETS['Line Art'] ?? DEFAULT_TRACE_OPTIONS;
+
 export async function buildMultiFileTraceExports(
   files: ReadonlyArray<MultiFileTraceFile>,
   deps: MultiFileTraceDeps = {},
 ): Promise<ReadonlyArray<BatchTraceSvgFile>> {
   const loadImage = deps.loadImage ?? loadImageAsRawData;
-  const options = deps.options ?? DEFAULT_TRACE_OPTIONS;
+  const options = deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS;
   const jobs = [];
   for (const file of files) {
     jobs.push({
@@ -49,6 +53,7 @@ export async function runMultiFileTrace(
   if (files.length === 0) return;
   try {
     const svgFiles = await buildMultiFileTraceExports(files, deps);
+    assertTraceProducedVisiblePaths(svgFiles);
     const download = deps.download ?? downloadTraceSvgFile;
     for (const file of svgFiles) {
       download(file);
@@ -61,6 +66,15 @@ export async function runMultiFileTrace(
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');
   }
+}
+
+function assertTraceProducedVisiblePaths(files: ReadonlyArray<BatchTraceSvgFile>): void {
+  const emptyFiles = files.filter((file) => file.pathCount === 0);
+  if (emptyFiles.length === 0) return;
+  const filenames = emptyFiles.map((file) => file.filename).join(', ');
+  throw new Error(
+    `Trace produced no visible paths for ${filenames}. Try Trace Image with adjusted threshold or import as Image instead.`,
+  );
 }
 
 export function downloadTraceSvgFile(file: BatchTraceSvgFile): void {

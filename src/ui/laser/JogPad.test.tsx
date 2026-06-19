@@ -1,12 +1,15 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { JogPad } from './JogPad';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
+
+const originalJog = useLaserStore.getState().jog;
 
 // jsdom's selector engine mis-parses '+' inside quoted attribute values, so
 // queries scan getAttribute instead of using querySelector.
@@ -37,6 +40,7 @@ async function renderJogPad(): Promise<{
 }
 
 afterEach(() => {
+  useLaserStore.setState({ jog: originalJog });
   useStore.getState().newProject();
 });
 
@@ -86,6 +90,54 @@ describe('JogPad accessible labels', () => {
       '50',
       '100',
     ]);
+
+    await unmount();
+  });
+
+  it('shows manual focus guidance when the active profile has no powered Z axis', async () => {
+    const { host, unmount } = await renderJogPad();
+
+    expect(host.textContent).toContain('Manual focus: adjust the laser head by hand.');
+    expect(buttonByLabel(host, 'Jog Z+ 1 mm')).toBeNull();
+
+    await unmount();
+  });
+
+  it('blocks Z jog buttons until Z travel has been confirmed', async () => {
+    useStore.getState().updateDeviceProfile({
+      capabilities: ['grbl', 'z-axis'],
+      zTravelMm: 75,
+      zTravelConfirmed: false,
+    });
+    const { host, unmount } = await renderJogPad();
+
+    const zUp = buttonByLabel(host, 'Jog Z+ 1 mm');
+    const zDown = buttonByLabel(host, 'Jog Z- 1 mm');
+    expect(zUp?.disabled).toBe(true);
+    expect(zDown?.disabled).toBe(true);
+    expect(host.textContent).toContain('Confirm Z travel in Machine Setup before using Z jog.');
+
+    await unmount();
+  });
+
+  it('sends relative Z jogs only for confirmed Z-axis profiles', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.getState().updateDeviceProfile({
+      capabilities: ['grbl', 'z-axis'],
+      zTravelMm: 75,
+      zTravelConfirmed: true,
+      maxFeed: 6000,
+    });
+    const { host, unmount } = await renderJogPad();
+
+    const zUp = buttonByLabel(host, 'Jog Z+ 1 mm');
+    if (zUp === null) throw new Error('Z+ jog button missing');
+    await act(async () => {
+      zUp.click();
+    });
+
+    expect(jog).toHaveBeenCalledWith({ dz: 1, feed: 600 });
 
     await unmount();
   });

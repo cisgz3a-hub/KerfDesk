@@ -1,4 +1,9 @@
-import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../../core/devices';
+import {
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  profileSupportsCapability,
+  type DeviceProfile,
+  type ProfileCapability,
+} from '../../core/devices';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 
@@ -38,6 +43,25 @@ export function ZRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
     <>
+      <Row label="Powered Z">
+        <label
+          style={inlineLabelStyle}
+          title="Enable only when the controller can jog a motorized Z/focus axis with GRBL $J Z moves."
+        >
+          <input
+            type="checkbox"
+            checked={profileSupportsCapability(device, 'z-axis')}
+            onChange={(e) =>
+              update({
+                capabilities: setCapability(device.capabilities, 'z-axis', e.target.checked),
+              })
+            }
+            aria-label="Powered Z jog enabled"
+            title="Shows manual Z focus jog buttons after Z travel is confirmed."
+          />
+          <span>Z jog buttons</span>
+        </label>
+      </Row>
       <Row label="Z travel">
         <input
           type="number"
@@ -82,6 +106,18 @@ export function ZRows(props: DeviceRowsProps): JSX.Element {
       </Row>
     </>
   );
+}
+
+function setCapability(
+  capabilities: ReadonlyArray<ProfileCapability> | undefined,
+  capability: ProfileCapability,
+  enabled: boolean,
+): ReadonlyArray<ProfileCapability> {
+  const current = capabilities ?? [];
+  if (enabled) {
+    return current.includes(capability) ? current : [...current, capability];
+  }
+  return current.filter((item) => item !== capability);
 }
 
 function neotronicsProfileConfirmation(): string {
