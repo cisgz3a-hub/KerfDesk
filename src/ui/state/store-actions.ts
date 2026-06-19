@@ -8,6 +8,10 @@ import {
 import type { JobPlacementSettings } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, pushUndo } from './scene-mutations';
+import {
+  selectionFromIds,
+  toggleSelectionFromId,
+} from './scene-group-actions';
 import type { AppState, OutputScopeSettings } from './store';
 
 const HISTORY_DEPTH = 50;
@@ -136,24 +140,13 @@ export function viewActions(
   | 'setCursorMm'
 > {
   return {
-    selectObject: (id) => set({ selectedObjectId: id, additionalSelectedIds: new Set() }),
-    toggleSelectObject: (id) =>
-      set((s) => {
-        if (s.selectedObjectId === id && s.additionalSelectedIds.size === 0) {
-          return { selectedObjectId: null, additionalSelectedIds: new Set() };
-        }
-        if (s.selectedObjectId === id) return promoteAdditionalSelection(s.additionalSelectedIds);
-        const next = new Set(s.additionalSelectedIds);
-        if (next.has(id)) {
-          next.delete(id);
-          return { additionalSelectedIds: next };
-        }
-        if (s.selectedObjectId === null) {
-          return { selectedObjectId: id, additionalSelectedIds: next };
-        }
-        next.add(id);
-        return { additionalSelectedIds: next };
-      }),
+    selectObject: (id) =>
+      set((s) =>
+        id === null
+          ? { selectedObjectId: null, additionalSelectedIds: new Set() }
+          : selectionFromIds(s, [id], false),
+      ),
+    toggleSelectObject: (id) => set((s) => toggleSelectionFromId(s, id)),
     selectAllObjects: () =>
       set((s) => {
         const ids = s.project.scene.objects.map((o) => o.id);
@@ -211,53 +204,6 @@ export function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | '
       set({ dirty: false, savedName: target.displayName, lastSaveTarget: target }),
     markLoaded: (filename) => set({ dirty: false, savedName: filename, lastSaveTarget: null }),
   };
-}
-
-function selectionFromIds(
-  state: AppState,
-  ids: ReadonlyArray<string>,
-  additive: boolean,
-): Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> {
-  const current = additive ? currentSelectionIds(state) : [];
-  const selected = liveUniqueIds(state, [...current, ...ids]);
-  const [primary, ...rest] = selected;
-  return {
-    selectedObjectId: primary ?? null,
-    additionalSelectedIds: new Set(rest),
-  };
-}
-
-function currentSelectionIds(
-  state: Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'>,
-): ReadonlyArray<string> {
-  return [
-    ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
-    ...state.additionalSelectedIds,
-  ];
-}
-
-function liveUniqueIds(
-  state: Pick<AppState, 'project'>,
-  ids: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-  const live = new Set(state.project.scene.objects.map((object) => object.id));
-  const seen = new Set<string>();
-  const selected: string[] = [];
-  for (const id of ids) {
-    if (!live.has(id) || seen.has(id)) continue;
-    seen.add(id);
-    selected.push(id);
-  }
-  return selected;
-}
-
-function promoteAdditionalSelection(
-  additionalSelectedIds: ReadonlySet<string>,
-): Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> {
-  const next = new Set(additionalSelectedIds);
-  const promoted = next.values().next().value as string | undefined;
-  if (promoted !== undefined) next.delete(promoted);
-  return { selectedObjectId: promoted ?? null, additionalSelectedIds: next };
 }
 
 function mergeJobPlacement(

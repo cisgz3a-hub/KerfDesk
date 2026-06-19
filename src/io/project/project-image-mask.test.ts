@@ -40,6 +40,7 @@ describe('project image mask persistence', () => {
     const scene = {
       objects: [raster(), mask],
       layers: [createLayer({ id: 'image', color: '#808080', mode: 'image' })],
+      groups: [],
     };
     const original: Project = { ...base, scene };
 

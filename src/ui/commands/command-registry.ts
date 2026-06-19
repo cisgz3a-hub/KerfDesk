@@ -3,13 +3,13 @@
 // command-families.ts; shared shapes in command-types.ts (ADR-015 split).
 
 import {
-  editCommands,
   fileCommands,
   helpCommand,
   laserCommands,
   toolsCommands,
   windowCommands,
 } from './command-families';
+import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
 import type { AppCommand, AppCommandContext, CommandId } from './command-types';
 

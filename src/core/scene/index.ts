@@ -89,7 +89,7 @@ export type { AABB } from './hit-test';
 export { combinedBBox, hitTest, transformedBBox } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';
 
-export type { Scene } from './scene';
+export type { Scene, SceneGroup } from './scene';
 export type { LayerMoveDirection } from './scene';
 export {
   EMPTY_SCENE,

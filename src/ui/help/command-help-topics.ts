@@ -58,6 +58,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'edit',
     tooltip: 'Paste copied artwork into the workspace.',
   },
+  'edit.group': {
+    family: 'edit',
+    tooltip: 'Treat the selected artwork as one selection group.',
+  },
+  'edit.ungroup': {
+    family: 'edit',
+    tooltip: 'Remove grouping from the selected artwork.',
+  },
   'edit.duplicate': {
     family: 'edit',
     tooltip: 'Duplicate the selected artwork in place.',

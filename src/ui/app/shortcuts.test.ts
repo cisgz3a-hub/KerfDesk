@@ -78,7 +78,6 @@ function editCtx(
     redo: vi.fn(),
     selectedObjectId: 'O1',
     additionalSelectedIds: new Set<string>(),
-    removeSceneObject: vi.fn(),
     removeSceneObjects: vi.fn(),
     selectObject: vi.fn(),
     selectAllObjects: vi.fn(),
@@ -86,6 +85,8 @@ function editCtx(
     copySelection: vi.fn(),
     cutSelection: vi.fn(),
     pasteClipboard: vi.fn(),
+    groupSelection: vi.fn(),
+    ungroupSelection: vi.fn(),
     resetToolMode: vi.fn(),
     ...overrides,
   };
@@ -122,7 +123,7 @@ describe('handleEditShortcut — input-focus guard (regression)', () => {
     document.body.appendChild(input);
     const ctx = editCtx();
     handleEditShortcut(fakeKeydown({ key: 'Backspace', target: input }), ctx);
-    expect(ctx.removeSceneObject).not.toHaveBeenCalled();
+    expect(ctx.removeSceneObjects).not.toHaveBeenCalled();
     input.remove();
   });
 
@@ -132,7 +133,6 @@ describe('handleEditShortcut — input-focus guard (regression)', () => {
     const ctx = editCtx({ additionalSelectedIds: new Set(['O2']) });
     handleEditShortcut(fakeKeydown({ key: 'Backspace', target: div }), ctx);
     expect(ctx.removeSceneObjects).toHaveBeenCalledWith(['O1', 'O2']);
-    expect(ctx.removeSceneObject).not.toHaveBeenCalled();
     div.remove();
   });
 
@@ -160,7 +160,7 @@ describe('handleEditShortcut — input-focus guard (regression)', () => {
     document.body.appendChild(div);
     const ctx = editCtx();
     handleEditShortcut(fakeKeydown({ key: 'Backspace', target: div }), ctx);
-    expect(ctx.removeSceneObject).not.toHaveBeenCalled();
+    expect(ctx.removeSceneObjects).not.toHaveBeenCalled();
     div.remove();
   });
 });
@@ -391,3 +391,28 @@ function shapeObject(transform: Transform): SceneObject {
     paths: [],
   };
 }
+
+describe('handleEditShortcut - grouping', () => {
+  it('Cmd+G groups the current selection', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(fakeKeydown({ key: 'g', metaKey: true, target: div }), ctx);
+    expect(handled).toBe(true);
+    expect(ctx.groupSelection).toHaveBeenCalled();
+    div.remove();
+  });
+
+  it('Cmd+Shift+G ungroups the current selection', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(
+      fakeKeydown({ key: 'g', metaKey: true, shiftKey: true, target: div }),
+      ctx,
+    );
+    expect(handled).toBe(true);
+    expect(ctx.ungroupSelection).toHaveBeenCalled();
+    div.remove();
+  });
+});

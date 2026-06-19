@@ -38,13 +38,14 @@ function useFileEditShortcuts(): void {
   const newProject = useStore((s) => s.newProject);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
-  const removeSceneObject = useStore((s) => s.removeSceneObject);
   const removeSceneObjects = useStore((s) => s.removeSceneObjects);
   const selectObject = useStore((s) => s.selectObject);
   const selectAllObjects = useStore((s) => s.selectAllObjects);
   const copySelection = useStore((s) => s.copySelection);
   const cutSelection = useStore((s) => s.cutSelection);
   const pasteClipboard = useStore((s) => s.pasteClipboard);
+  const groupSelection = useStore((s) => s.groupSelection);
+  const ungroupSelection = useStore((s) => s.ungroupSelection);
   const duplicateSelection = useStore((s) => s.duplicateSelection);
   const resetToolMode = useUiStore((s) => s.resetToolMode);
   const setToolMode = useUiStore((s) => s.setToolMode);
@@ -70,7 +71,7 @@ function useFileEditShortcuts(): void {
       // prettier-ignore
       const fileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
       // prettier-ignore
-      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObject, removeSceneObjects, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, duplicateSelection, resetToolMode };
+      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObjects, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, groupSelection, ungroupSelection, duplicateSelection, resetToolMode };
       if (handleFileShortcut(e, fileCtx)) return;
       // Tool-arming (Ctrl+R/E/L) runs between File and Edit: File owns the
       // Shift variants (Save-As, export G-code), and no Edit binding uses a
@@ -101,13 +102,14 @@ function useFileEditShortcuts(): void {
     redo,
     selectedObjectId,
     additionalSelectedIds,
-    removeSceneObject,
     removeSceneObjects,
     selectObject,
     selectAllObjects,
     copySelection,
     cutSelection,
     pasteClipboard,
+    groupSelection,
+    ungroupSelection,
     duplicateSelection,
     resetToolMode,
     setToolMode,
