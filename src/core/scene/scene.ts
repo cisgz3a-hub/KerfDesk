@@ -9,11 +9,18 @@ const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 export type Scene = {
   readonly objects: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
+  readonly groups?: ReadonlyArray<SceneGroup>;
+};
+
+export type SceneGroup = {
+  readonly id: string;
+  readonly name: string;
+  readonly objectIds: ReadonlyArray<string>;
 };
 
 export type LayerMoveDirection = 'up' | 'down';
 
-export const EMPTY_SCENE: Scene = { objects: [], layers: [] };
+export const EMPTY_SCENE: Scene = { objects: [], layers: [], groups: [] };
 
 export function addObject(scene: Scene, object: SceneObject): Scene {
   return { ...scene, objects: [...scene.objects, object] };

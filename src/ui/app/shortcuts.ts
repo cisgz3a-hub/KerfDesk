@@ -58,13 +58,14 @@ export type EditCtx = {
   readonly redo: () => void;
   readonly selectedObjectId: string | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
-  readonly removeSceneObject: (id: string) => void;
   readonly removeSceneObjects: (ids: ReadonlyArray<string>) => void;
   readonly selectObject: (id: string | null) => void;
   readonly selectAllObjects: () => void;
   readonly copySelection: () => void;
   readonly cutSelection: () => void;
   readonly pasteClipboard: () => void;
+  readonly groupSelection: () => void;
+  readonly ungroupSelection: () => void;
   readonly duplicateSelection: () => void;
   readonly resetToolMode: () => void;
 };
@@ -212,6 +213,14 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
   {
     match: (e) => hasMeta(e) && e.key.toLowerCase() === 'v' && !e.shiftKey,
     invoke: (c) => c.pasteClipboard(),
+  },
+  {
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'g' && !e.shiftKey,
+    invoke: (c) => c.groupSelection(),
+  },
+  {
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'g' && e.shiftKey,
+    invoke: (c) => c.ungroupSelection(),
   },
   {
     // Cmd/Ctrl+D — Duplicate selection. Matches Figma / Inkscape /

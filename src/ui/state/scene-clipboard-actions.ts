@@ -7,6 +7,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
+import { removeObjectIdsFromGroups } from './scene-group-actions';
 import type { AppState } from './store';
 
 const PASTE_OFFSET_MM = 10;
@@ -37,7 +38,9 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
         if (clipboard === null) return state;
         const cutIds = new Set(clipboard.objects.map((object) => object.id));
         const objects = state.project.scene.objects.filter((object) => !cutIds.has(object.id));
-        const scene = pruneOrphanLayers({ ...state.project.scene, objects });
+        const scene = pruneOrphanLayers(
+          removeObjectIdsFromGroups({ ...state.project.scene, objects }, cutIds),
+        );
         return {
           sceneClipboard: clipboard,
           project: { ...state.project, scene },

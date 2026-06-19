@@ -42,12 +42,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const selected = selectedObject(app.project, app.selectedObjectId);
   const selectedIds = selectedObjectIds(app.selectedObjectId, app.additionalSelectedIds);
   const imageMaskPair = selectedImageMaskPair(app.project, selectedIds);
-  const focusTestAvailable = profileSupportsCapability(app.project.device, 'z-axis')
-    && app.project.device.zTravelConfirmed === true;
-  const hasMaskedRasterSelection =
-    selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
-  const activeStreamer = laser.streamer !== null
-    && (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
+  const hasMaskedRasterSelection = selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
+  const activeStreamer = laser.streamer !== null && (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
   return buildAppCommands({
     dirty: app.dirty,
     savedName: app.savedName,
@@ -63,6 +59,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     canApplyImageMask: imageMaskPair !== null,
     hasMaskedRasterSelection,
     canPaste: app.sceneClipboard !== null && app.sceneClipboard.objects.length > 0,
+    canGroupSelection: selectedIds.length >= 2,
+    canUngroupSelection: selectionTouchesGroup(app.project, selectedIds),
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
     newProject: app.newProject,
     openProject: () => openProject(platform, app.setProject, app.markLoaded, pushToast),
@@ -77,6 +75,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     copySelection: app.copySelection,
     cutSelection: app.cutSelection,
     pasteClipboard: app.pasteClipboard,
+    groupSelection: app.groupSelection,
+    ungroupSelection: app.ungroupSelection,
     duplicateSelection: app.duplicateSelection,
     deleteSelection: () => deleteSelection(),
     clearSelection: () => app.selectObject(null),
@@ -84,7 +84,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
     scanOffsetTest: callbacks.requestScanOffsetTest,
-    focusTestAvailable,
+    focusTestAvailable: profileSupportsCapability(app.project.device, 'z-axis') && app.project.device.zTravelConfirmed === true,
     focusTest: callbacks.requestFocusTest,
     optimizationSettings: callbacks.requestOptimizationSettings,
     adjustImage: callbacks.requestAdjustImage,
@@ -240,6 +240,13 @@ function selectedObjectIds(
   additionalSelectedIds: ReadonlySet<string>,
 ): ReadonlyArray<string> {
   return [...(selectedObjectId === null ? [] : [selectedObjectId]), ...additionalSelectedIds];
+}
+
+function selectionTouchesGroup(project: Project, selectedIds: ReadonlyArray<string>): boolean {
+  const selected = new Set(selectedIds);
+  return (project.scene.groups ?? []).some((group) =>
+    group.objectIds.some((objectId) => selected.has(objectId)),
+  );
 }
 
 function deleteSelection(): void {

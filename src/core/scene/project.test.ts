@@ -24,6 +24,7 @@ describe('createProject', () => {
     const p = createProject();
     expect(p.scene.objects).toHaveLength(0);
     expect(p.scene.layers).toHaveLength(0);
+    expect(p.scene.groups).toEqual([]);
   });
 
   it('honors a caller-provided device profile', () => {

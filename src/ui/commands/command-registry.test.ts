@@ -32,6 +32,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     canApplyImageMask: false,
     hasMaskedRasterSelection: false,
     canPaste: false,
+    canGroupSelection: false,
+    canUngroupSelection: false,
     confirmDiscard: vi.fn(async () => true),
     newProject: vi.fn(),
     openProject: vi.fn(),
@@ -47,6 +49,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     copySelection: vi.fn(),
     cutSelection: vi.fn(),
     pasteClipboard: vi.fn(),
+    groupSelection: vi.fn(),
+    ungroupSelection: vi.fn(),
     duplicateSelection: vi.fn(),
     deleteSelection: vi.fn(),
     clearSelection: vi.fn(),
@@ -182,6 +186,35 @@ describe('buildAppCommands', () => {
     expect(copySelection).toHaveBeenCalledTimes(1);
     expect(cutSelection).toHaveBeenCalledTimes(1);
     expect(pasteClipboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('gates Group and Ungroup from selection and group state', () => {
+    const groupSelection = vi.fn();
+    const ungroupSelection = vi.fn();
+    const disabled = buildAppCommands(
+      baseCtx({
+        canGroupSelection: false,
+        canUngroupSelection: false,
+        groupSelection,
+        ungroupSelection,
+      }),
+    );
+
+    expect(commandById(disabled, 'edit.group').enabled).toBe(false);
+    expect(commandById(disabled, 'edit.ungroup').enabled).toBe(false);
+
+    const enabled = buildAppCommands(
+      baseCtx({
+        canGroupSelection: true,
+        canUngroupSelection: true,
+        groupSelection,
+        ungroupSelection,
+      }),
+    );
+    expect(runCommand(commandById(enabled, 'edit.group'))).toBe(true);
+    expect(runCommand(commandById(enabled, 'edit.ungroup'))).toBe(true);
+    expect(groupSelection).toHaveBeenCalledTimes(1);
+    expect(ungroupSelection).toHaveBeenCalledTimes(1);
   });
 
   it('enables Trace Image when a raster image is selected', () => {

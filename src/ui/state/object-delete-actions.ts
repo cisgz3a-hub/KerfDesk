@@ -1,6 +1,7 @@
 import { removeObject } from '../../core/scene';
 import type { AppState } from './store';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
+import { removeObjectIdsFromGroups } from './scene-group-actions';
 
 export type ObjectDeleteActions = {
   readonly removeSceneObject: (id: string) => void;
@@ -19,7 +20,9 @@ export function objectDeleteActions(set: Setter): ObjectDeleteActions {
 function removeSceneObjectFromState(state: AppState, id: string): AppState | Partial<AppState> {
   const nextExtras = new Set(state.additionalSelectedIds);
   nextExtras.delete(id);
-  const scene = pruneOrphanLayers(removeObject(state.project.scene, id));
+  const scene = pruneOrphanLayers(
+    removeObjectIdsFromGroups(removeObject(state.project.scene, id), new Set([id])),
+  );
   return {
     project: { ...state.project, scene },
     selectedObjectId: state.selectedObjectId === id ? null : state.selectedObjectId,
@@ -41,7 +44,12 @@ function removeSceneObjectsFromState(
   const nextExtras = new Set(state.additionalSelectedIds);
   for (const id of uniqueIds) nextExtras.delete(id);
   return {
-    project: { ...state.project, scene: pruneOrphanLayers({ ...state.project.scene, objects }) },
+    project: {
+      ...state.project,
+      scene: pruneOrphanLayers(
+        removeObjectIdsFromGroups({ ...state.project.scene, objects }, uniqueIds),
+      ),
+    },
     selectedObjectId:
       state.selectedObjectId !== null && uniqueIds.has(state.selectedObjectId)
         ? null

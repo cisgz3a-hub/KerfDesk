@@ -75,6 +75,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   const scene = (raw['scene'] ?? {}) as Record<string, unknown>;
   const objects = Array.isArray(scene['objects']) ? scene['objects'] : [];
   const layers = Array.isArray(scene['layers']) ? scene['layers'] : [];
+  const groups = Array.isArray(scene['groups']) ? scene['groups'] : [];
   const normalized = {
     ...raw,
     device: normalizeDevice(dev),
@@ -83,6 +84,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
       ...scene,
       objects: objects.map(normalizeSceneObject),
       layers: layers.map(normalizeLayer),
+      groups,
     },
   };
   return normalized as unknown as Project;

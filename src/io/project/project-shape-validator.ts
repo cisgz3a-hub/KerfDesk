@@ -110,8 +110,36 @@ function validateScene(scene: Record<string, unknown>): string | null {
   if (!Array.isArray(objects) || !Array.isArray(layers)) return null;
   return (
     validateArray(layers, 'scene.layers', validateLayer) ??
-    validateArray(objects, 'scene.objects', validateSceneObject)
+    validateArray(objects, 'scene.objects', validateSceneObject) ??
+    optionalSceneGroups(scene, 'scene.groups')
   );
+}
+
+function optionalSceneGroups(scene: Record<string, unknown>, path: string): string | null {
+  const groups = scene['groups'];
+  if (groups === undefined) return null;
+  if (!Array.isArray(groups)) return `missing or invalid \`${path}\``;
+  return validateArray(groups, path, validateSceneGroup);
+}
+
+function validateSceneGroup(value: unknown, path: string): string | null {
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  const objectIds = value['objectIds'];
+  const fieldError = firstError([
+    requireString(value, `${path}.id`),
+    requireString(value, `${path}.name`),
+    Array.isArray(objectIds)
+      ? validateArray(objectIds, `${path}.objectIds`, validateSceneGroupObjectId)
+      : `missing or invalid \`${path}.objectIds\``,
+  ]);
+  if (fieldError !== null) return fieldError;
+  return Array.isArray(objectIds) && objectIds.length >= 2
+    ? null
+    : `missing or invalid \`${path}.objectIds\``;
+}
+
+function validateSceneGroupObjectId(value: unknown, path: string): string | null {
+  return typeof value === 'string' ? null : `missing or invalid \`${path}\``;
 }
 
 function validateLayer(layer: unknown, path: string): string | null {
