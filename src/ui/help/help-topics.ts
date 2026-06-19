@@ -139,6 +139,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Trace the selected bitmap into editable vector paths.',
   },
+  'tools.multi-file-trace': {
+    family: 'tools',
+    tooltip: 'Trace multiple image files to standalone SVG exports without changing the workspace.',
+  },
   'tools.convert-to-bitmap': {
     family: 'tools',
     tooltip: 'Rasterize selected vector artwork into a bitmap image.',
