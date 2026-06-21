@@ -58,6 +58,14 @@ describe('coloredPathsToSvg', () => {
     expect(svg).toContain('preserveAspectRatio="xMidYMid meet"');
   });
 
+  it('can emit physical millimetre dimensions for standalone trace exports', () => {
+    const svg = coloredPathsToSvg([SQUARE], 1000, 500, { widthMm: 100, heightMm: 50 });
+
+    expect(svg).toContain('viewBox="0 0 1000 500"');
+    expect(svg).toContain('width="100mm"');
+    expect(svg).toContain('height="50mm"');
+  });
+
   it('emits one <path> per ColoredPath with the layer colour', () => {
     const svg = coloredPathsToSvg([SQUARE], 10, 10);
     expect(svg).toContain('<path');

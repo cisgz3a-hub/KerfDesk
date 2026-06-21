@@ -7,14 +7,18 @@ import {
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
+import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
-import { loadImageAsRawData } from '../trace/image-loader';
+import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
 import { traceImageWithFallback } from '../trace/use-trace-worker-client';
 
 export type MultiFileTraceFile = File;
 
 export type MultiFileTraceDeps = {
   readonly loadImage?: (file: MultiFileTraceFile) => Promise<RawImageData>;
+  readonly readNaturalSize?: (
+    file: MultiFileTraceFile,
+  ) => Promise<{ readonly width: number; readonly height: number }>;
   readonly trace?: (
     image: RawImageData,
     options: TraceOptions,
@@ -33,12 +37,27 @@ export async function buildMultiFileTraceExports(
   deps: MultiFileTraceDeps = {},
 ): Promise<ReadonlyArray<BatchTraceSvgFile>> {
   const loadImage = deps.loadImage ?? loadImageAsRawData;
+  const readNatural =
+    deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null);
   const options = deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS;
   const jobs = [];
   for (const file of files) {
+    const image = await loadImage(file);
+    const natural =
+      readNatural === null ? { width: image.width, height: image.height } : await readNatural(file);
+    const geometry = rasterImportGeometry({
+      naturalWidth: natural.width,
+      naturalHeight: natural.height,
+      sampledWidth: image.width,
+      sampledHeight: image.height,
+    });
     jobs.push({
       sourceName: file.name,
-      image: await loadImage(file),
+      image,
+      physicalSizeMm: {
+        widthMm: geometry.bounds.maxX - geometry.bounds.minX,
+        heightMm: geometry.bounds.maxY - geometry.bounds.minY,
+      },
       options,
     });
   }

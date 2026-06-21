@@ -77,6 +77,18 @@ describe('runMultiFileTrace', () => {
     expect(pushToast).toHaveBeenCalledWith('Traced 2 images to SVG.', 'success');
   });
 
+  it('exports physical SVG dimensions from the source image size, not the sampled trace grid', async () => {
+    const files = await buildMultiFileTraceExports([namedFile('logo.png')], {
+      loadImage: async () => rawImage(500, 250),
+      readNaturalSize: async () => ({ width: 1000, height: 500 }),
+      trace: async () => [SQUARE_PATH],
+    });
+
+    expect(files[0]?.svg).toContain('viewBox="0 0 500 250"');
+    expect(files[0]?.svg).toContain('width="100mm"');
+    expect(files[0]?.svg).toContain('height="50mm"');
+  });
+
   it('keeps cancelled file picks silent', async () => {
     const pushToast = vi.fn();
     const download = vi.fn();
@@ -117,6 +129,23 @@ describe('runMultiFileTrace', () => {
     expect(download).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
       'Could not trace images: Trace produced no visible paths for empty-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
+      'error',
+    );
+  });
+
+  it('does not download SVGs when trace returns only non-renderable path groups', async () => {
+    const pushToast = vi.fn();
+    const download = vi.fn();
+
+    await runMultiFileTrace([namedFile('empty-groups.png')], pushToast, {
+      loadImage: async () => rawImage(2, 2),
+      trace: async () => [{ color: '#000000', polylines: [] }],
+      download,
+    });
+
+    expect(download).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not trace images: Trace produced no visible paths for empty-groups-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
       'error',
     );
   });

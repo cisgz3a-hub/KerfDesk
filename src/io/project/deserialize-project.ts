@@ -3,6 +3,7 @@
 
 import {
   DEFAULT_DEVICE_PROFILE,
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   normalizeGcodeDialectSelection,
   normalizeScanOffsetTable,
 } from '../../core/devices';
@@ -98,10 +99,7 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       dev['junctionDeviationMm'],
       DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
     ),
-    framingFeedMmPerMin: positiveNumberOrDefault(
-      dev['framingFeedMmPerMin'],
-      DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
-    ),
+    framingFeedMmPerMin: normalizeFramingFeed(dev),
     minPowerS: nonNegativeNumberOrDefault(dev['minPowerS'], DEFAULT_DEVICE_PROFILE.minPowerS),
     laserModeEnabled: booleanOrDefault(
       dev['laserModeEnabled'],
@@ -130,6 +128,24 @@ function hasCapability(dev: Record<string, unknown>, capability: string): boolea
 
 function numberOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' ? value : fallback;
+}
+
+function normalizeFramingFeed(dev: Record<string, unknown>): number {
+  const raw = positiveNumberOrDefault(
+    dev['framingFeedMmPerMin'],
+    DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
+  );
+  if (isLegacyNeotronicsFrameFeed(dev, raw)) {
+    return NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.framingFeedMmPerMin;
+  }
+  return raw;
+}
+
+function isLegacyNeotronicsFrameFeed(dev: Record<string, unknown>, feed: number): boolean {
+  const isNeotronics =
+    dev['profileId'] === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId ||
+    dev['machineFamily'] === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.machineFamily;
+  return isNeotronics && feed === DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin;
 }
 
 function positiveNumberOrDefault(value: unknown, fallback: number): number {
