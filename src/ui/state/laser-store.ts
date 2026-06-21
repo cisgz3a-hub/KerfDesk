@@ -1,16 +1,6 @@
 // laser-store — Zustand store for the live serial connection to the GRBL
-// controller. Holds the SerialConnection in a closure (out-of-band from the
-// React-observable state) so 60-Hz status updates don't churn the React
-// tree any more than necessary. Components subscribe to `connection`,
-// `statusReport`, `alarmCode`, and `streamer` for live UI updates.
-//
-// Status polling: every 250 ms while connected we write '?' to the port.
-// GRBL replies with <Idle|...> or <Run|...>, which the classifier turns into
-// `kind: 'status'` and the store fans into `statusReport`.
-
 import { create } from 'zustand';
 import {
-  CMD_HOME,
   CMD_UNLOCK,
   type GrblSettingRow,
   RT_JOG_CANCEL,
@@ -27,9 +17,15 @@ import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
+import type { LaserControllerOperation } from './laser-controller-operation';
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
+import { runHomeAction } from './laser-home-action';
+import {
+  cancelControllerLifecycleRefs,
+  type ControllerLifecycleRefs,
+} from './laser-interactive-command';
 import { jobActions } from './laser-job-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
 import {
@@ -69,11 +65,7 @@ export { hasCustomOrigin } from './origin-actions';
 export type { WorkCoordinateOffset } from './origin-actions';
 
 const DEFAULT_BAUD = 115200;
-// Status poll tick. We tick at 250 ms always, but when no job is active
-// we only emit a `?` every 4th tick (effective 1000 ms). MIT-T2 audit
-// finding: CNCjs / LightBurn both ramp polling down when idle to cut
-// serial chatter and CPU. While streaming/paused we keep the fast cadence
-// so the live progress UI stays smooth.
+// 250 ms tick; idle machines only emit `?` every 4th tick.
 const STATUS_POLL_MS = 250;
 const IDLE_POLL_DIVISOR = 4;
 
@@ -97,6 +89,7 @@ export type LaserState = {
   readonly safetyNotice: LaserSafetyNotice | null;
   readonly autofocusBusy: boolean;
   readonly motionOperation: LaserMotionOperation | null;
+  readonly controllerOperation: LaserControllerOperation | null;
   readonly streamer: StreamerState | null;
   readonly homingState: HomingState;
   readonly log: ReadonlyArray<string>;
@@ -173,10 +166,7 @@ export type LaserState = {
   readonly markFrameVerified: (verification: FrameVerification) => void;
 };
 
-// Live state held outside Zustand. The connection / pollHandle references are
-// imperative; only their *effects* (state report, alarm, streamer progress)
-// flow into the React-observable state above.
-type LiveRefs = {
+type LiveRefs = ControllerLifecycleRefs & {
   connection: SerialConnection | null;
   unsubscribeLine: (() => void) | null;
   unsubscribeClose: (() => void) | null;
@@ -186,9 +176,6 @@ type LiveRefs = {
   // line would otherwise re-render Laser components for no reason —
   // only the final `done` patch matters to the UI.
   settingsCollector: SettingsCollectorState;
-  // R-L2: one-shot fired by handleLine the first time runHandshake's
-  // race wants to observe a line. Held here so the shared `refs`
-  // object handler functions receive carries it across calls.
   onLineArrived: (() => void) | null;
   nextTranscriptId: number;
   // M13 ack-watchdog probe: last-seen stream position + when it was first
@@ -205,9 +192,12 @@ const refs: LiveRefs = {
   onLineArrived: null,
   nextTranscriptId: 1,
   stallProbe: null,
+  controllerCommand: null,
+  controllerIdleWait: null,
 };
 
 function teardown(): void {
+  cancelControllerLifecycleRefs(refs);
   refs.unsubscribeLine?.();
   refs.unsubscribeClose?.();
   if (refs.pollHandle !== null) clearInterval(refs.pollHandle);
@@ -219,28 +209,28 @@ function teardown(): void {
   refs.onLineArrived = null;
   refs.nextTranscriptId = 1;
   refs.stallProbe = null;
+  refs.controllerCommand = null;
+  refs.controllerIdleWait = null;
 }
 
-async function safeWrite(
-  set: SetFn,
-  get: GetFn,
-  line: string,
-  action?: Parameters<typeof writeFailedNotice>[0],
-  source?: TranscriptSource,
-): Promise<void> {
+async function safeWrite(set: SetFn, get: GetFn, line: string, action?: Parameters<typeof writeFailedNotice>[0], source?: TranscriptSource): Promise<void> {
   await createSafeWrite(set, get, refs)(line, action, source);
 }
 
-type SetFn = (
-  partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
-) => void;
+type SetFn = (partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState)) => void;
 type GetFn = () => LaserState;
 
 function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' | 'disconnect'> {
   return {
     connect: async (adapter) => {
       refs.nextTranscriptId = 1;
-      set({ connection: { kind: 'connecting' }, log: [], transcript: [], homingState: 'unknown' });
+      set({
+        connection: { kind: 'connecting' },
+        controllerOperation: null,
+        log: [],
+        transcript: [],
+        homingState: 'unknown',
+      });
       const portRef = await adapter.serial.requestPort();
       if (portRef === null) {
         set({ connection: { kind: 'disconnected' } });
@@ -254,33 +244,15 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         );
         refs.unsubscribeClose = conn.onClose(() => {
           teardown();
-          // If a job was streaming/paused when the port dropped, mark the
-          // streamer 'disconnected' AND raise the disconnect-during-job safety
-          // notice (GRBL may still be running buffered commands). Functional set
-          // so we don't clobber a concurrent ack-driven update. See
-          // buildPortClosePatch (laser-store-helpers) for the patch + rationale.
           set(buildPortClosePatch);
         });
-        let pollTick = 0;
-        refs.pollHandle = setInterval(() => {
-          pollTick++;
-          const s = get();
-          // M13 ack watchdog: raise the stalled notice once when nothing
-          // acks for the timeout while lines are in flight.
-          const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
-          refs.stallProbe = stall.probe;
-          if (stall.stalled && s.safetyNotice === null) {
-            set({ safetyNotice: streamStalledNotice() });
-          }
-          const isActive = isActiveJob(s.streamer) || s.motionOperation !== null || s.autofocusBusy;
-          if (!isActive && pollTick % IDLE_POLL_DIVISOR !== 0) return;
-          void safeWrite(set, get, RT_STATUS).catch(() => undefined);
-        }, STATUS_POLL_MS);
+        startStatusPolling(set, get);
         set({
           connection: { kind: 'connected' },
           alarmCode: null,
           lastWriteError: null,
           safetyNotice: null,
+          controllerOperation: null,
           homingState: 'unknown',
         });
         void runHandshake(set, get, refs, (out) => safeWrite(set, get, out)).catch(() => undefined);
@@ -318,11 +290,34 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         workOriginActive: false,
         frameVerification: null,
         motionOperation: null,
+        controllerOperation: null,
         homingState: 'unknown',
         lastWriteError: null,
       });
     },
   };
+}
+
+function startStatusPolling(set: SetFn, get: GetFn): void {
+  let pollTick = 0;
+  refs.pollHandle = setInterval(() => {
+    pollTick++;
+    const s = get();
+    const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
+    refs.stallProbe = stall.probe;
+    if (stall.stalled && s.safetyNotice === null) set({ safetyNotice: streamStalledNotice() });
+    if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
+    void safeWrite(set, get, RT_STATUS).catch(() => undefined);
+  }, STATUS_POLL_MS);
+}
+
+function shouldFastPoll(state: LaserState): boolean {
+  return (
+    isActiveJob(state.streamer) ||
+    state.motionOperation !== null ||
+    state.controllerOperation !== null ||
+    state.autofocusBusy
+  );
 }
 
 function jogActions(
@@ -331,15 +326,9 @@ function jogActions(
 ): Pick<LaserState, 'home' | 'autofocus' | 'unlockAlarm' | 'jog' | 'cancelJog' | 'frame'> {
   return {
     home: async () => {
-      assertAutofocusIdle(get());
-      assertNoMotionOperation(set, get);
-      try {
-        await safeWrite(set, get, `${CMD_HOME}\n`, 'home');
-        set({ homingState: 'homing' });
-      } catch (err) {
-        set({ homingState: 'unknown' });
-        throw err;
-      }
+      await runHomeAction(set, get, refs, (line, action, source) =>
+        safeWrite(set, get, line, action, source),
+      );
     },
     autofocus: async (command) => {
       const activeJobBlock = idleCommandBlockResult(get());
@@ -453,7 +442,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...consoleActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),
-  ...controllerRecoveryActions(set, (line, action) => safeWrite(set, get, line, action)),
+  ...controllerRecoveryActions(set, refs, (line, action) => safeWrite(set, get, line, action)),
   ...originActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),

@@ -162,7 +162,7 @@ describe('laser-store safety notices (P0-B)', () => {
 });
 
 describe('laser-store serial write failures', () => {
-  it('confirms homing only after the Home command is followed by Idle status', async () => {
+  it('confirms homing only after Home ack, settle ack, and fresh Idle status', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -172,12 +172,23 @@ describe('laser-store serial write failures', () => {
 
     expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('unknown');
 
-    await useLaserStore.getState().home();
+    const home = useLaserStore.getState().home();
+    await Promise.resolve();
 
     expect(writes).toContain('$H\n');
     expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('homing');
 
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('homing');
+
+    connection.emitLine('ok');
+    await Promise.resolve();
+    expect(writes).toContain('G4 P0.01\n');
+
+    connection.emitLine('ok');
+    await Promise.resolve();
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await home;
 
     expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('confirmed');
   });

@@ -2,12 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createStreamer,
   idleCollector,
-  onAck,
   startCollecting,
   step,
-  type SettingsCollectorState,
 } from '../../core/controllers/grbl';
-import { handleLine, type GetFn, type SetFn } from './laser-line-handler';
+import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
 import type { FrameVerification } from './frame-verification';
 
@@ -21,6 +19,7 @@ function makeLaserState(): LaserState {
     safetyNotice: null,
     autofocusBusy: false,
     motionOperation: null,
+    controllerOperation: null,
     streamer: null,
     homingState: 'unknown',
     log: [],
@@ -61,7 +60,7 @@ function makeLaserState(): LaserState {
 }
 
 function makeHarness(): {
-  readonly refs: { settingsCollector: SettingsCollectorState; onLineArrived: null };
+  readonly refs: HandlerRefs;
   readonly set: SetFn;
   readonly get: GetFn;
 } {
@@ -71,7 +70,12 @@ function makeHarness(): {
     state = { ...state, ...patch } as LaserState;
   };
   return {
-    refs: { settingsCollector: startCollecting(), onLineArrived: null },
+    refs: {
+      settingsCollector: startCollecting(),
+      onLineArrived: null,
+      controllerCommand: null,
+      controllerIdleWait: null,
+    },
     set,
     get: () => state,
   };
@@ -120,19 +124,29 @@ describe('handleLine detected controller settings', () => {
 });
 
 describe('handleLine streamer writes', () => {
-  it('keeps a fully acked job busy until a later Idle status confirms physical motion is done', () => {
+  it('keeps a fully acked job busy until the post-job settle marker and stable Idle finish', async () => {
     const { refs, set, get } = makeHarness();
-    let streamer = step(createStreamer('G21\nG90\nG1 X10 F600\nM5\n')).state;
-    for (let i = 0; i < 4; i += 1) streamer = onAck(streamer, 'ok').state;
-    set({ streamer });
-    expect(get().streamer?.status).toBe('done');
-
-    handleLine(set, get, refs, async () => undefined, '<Run|MPos:1.000,0.000,0.000|FS:600,0>');
+    const safeWrite = vi.fn(async () => undefined);
+    set({ streamer: step(createStreamer('G21\nG90\nG1 X10 F600\nM5\n')).state });
+    for (let i = 0; i < 4; i += 1) handleLine(set, get, refs, safeWrite, 'ok');
+    await Promise.resolve();
 
     expect(get().streamer?.status).toBe('done');
+    expect(get().controllerOperation).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+    expect(safeWrite).toHaveBeenCalledWith('G4 P0.01\n', 'console', 'system');
 
-    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    handleLine(set, get, refs, safeWrite, '<Run|MPos:1.000,0.000,0.000|FS:600,0>');
+    expect(get().streamer?.status).toBe('done');
 
+    handleLine(set, get, refs, safeWrite, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+
+    expect(get().streamer?.status).toBe('done');
+    handleLine(set, get, refs, safeWrite, 'ok');
+    await Promise.resolve();
+    handleLine(set, get, refs, safeWrite, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    expect(get().streamer?.status).toBe('done');
+    handleLine(set, get, refs, safeWrite, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await Promise.resolve();
     expect(get().streamer).toBeNull();
   });
 
@@ -208,7 +222,22 @@ describe('handleLine controller error (P0-1)', () => {
     expect(get().safetyNotice).toEqual({
       kind: 'controller-error',
       code: 7,
+      rejectedLine: 'G1 X1234567890',
       message: expect.stringContaining('error:7'),
+    });
+  });
+
+  it('includes the rejected in-flight G-code line in the controller-error notice', () => {
+    const { refs, set, get } = makeHarness();
+    set({ streamer: step(createStreamer('G1 X10 F600 S100\nG1 X20\n')).state });
+
+    handleLine(set, get, refs, async () => undefined, 'error:7');
+
+    expect(get().safetyNotice).toEqual({
+      kind: 'controller-error',
+      code: 7,
+      rejectedLine: 'G1 X10 F600 S100',
+      message: expect.stringContaining('Rejected line: G1 X10 F600 S100'),
     });
   });
 
@@ -233,6 +262,23 @@ describe('handleLine controller error (P0-1)', () => {
       message: expect.stringContaining('frame command'),
     });
     expect(get().safetyNotice?.message).not.toContain('during the job');
+  });
+
+  it('stops the stream for unrecognized error responses without treating them as GRBL codes', () => {
+    const { refs, set, get } = makeHarness();
+    set({ streamer: step(createStreamer('G1 X1\nG1 X2\n')).state });
+
+    handleLine(set, get, refs, async () => undefined, 'error:7002009');
+
+    expect(get().streamer?.status).toBe('errored');
+    expect(get().lastError).toBeNull();
+    expect(get().safetyNotice).toEqual({
+      kind: 'controller-error',
+      code: null,
+      raw: 'error:7002009',
+      rejectedLine: 'G1 X1',
+      message: expect.stringContaining('unrecognized controller error response: error:7002009'),
+    });
   });
 });
 

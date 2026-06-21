@@ -194,7 +194,7 @@ describe('laser-store active-job command guard', () => {
       expect(writes.some((line) => line.startsWith(forbiddenPrefix))).toBe(false);
       expect(useLaserStore.getState().streamer?.status).toBe('streaming');
       expect(useLaserStore.getState().log.join('\n')).toMatch(
-        /(Serial write blocked|Motion command blocked)/,
+        /(Serial write blocked|Motion command blocked|Home command blocked)/,
       );
       expect(getMotionOperation()).toBeNull();
     },

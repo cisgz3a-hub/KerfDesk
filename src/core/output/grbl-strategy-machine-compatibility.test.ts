@@ -108,7 +108,7 @@ describe('grblStrategy machine compatibility dialects', () => {
       [
         'G21',
         'G90',
-        'M4 S0',
+        'M3 S0',
         '; layer L1 color #ff0000 power 50% speed 1500 mm/min passes 1',
         '; pass 1 of 1',
         'G1 X10.000 Y20.000 F800 S0',
@@ -119,6 +119,43 @@ describe('grblStrategy machine compatibility dialects', () => {
       ].join('\n'),
     );
     expect(out).not.toMatch(/^G0 X0\.000 Y0\.000/m);
+  });
+
+  it('uses constant-power vector mode for Neotronics two-pass cuts and reasserts pass 2 power', () => {
+    const out = grblStrategy.emit(
+      {
+        groups: [
+          {
+            kind: 'cut',
+            layerId: 'cut4040',
+            color: '#ff0000',
+            power: 60,
+            speed: 1200,
+            passes: 2,
+            airAssist: false,
+            segments: [
+              {
+                polyline: [
+                  { x: 0, y: 0 },
+                  { x: 5, y: 0 },
+                  { x: 5, y: 5 },
+                ],
+                closed: false,
+              },
+            ],
+          },
+        ],
+      },
+      NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+    );
+
+    expect(out).toContain('G21\nG90\nM3 S0\n; layer cut4040');
+    expect(out).not.toMatch(/^M4\b/m);
+    expect(out).toContain(
+      ['; pass 2 of 2', 'M3 S0', 'G1 X0.000 Y0.000 F800 S0', 'G1 X5.000 Y0.000 F1200 S600'].join(
+        '\n',
+      ),
+    );
   });
 
   it('uses the catalog raster laser mode for raster output', () => {

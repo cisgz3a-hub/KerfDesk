@@ -2,6 +2,10 @@ import { Fragment, useMemo, useState } from 'react';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
 import { helpProps } from '../help/help-topics';
+import {
+  controllerOperationCommandBlockMessage,
+  type LaserControllerOperation,
+} from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -12,6 +16,7 @@ export function MachineSettingsPanel(): JSX.Element {
   const connection = useLaserStore((s) => s.connection);
   const streamer = useLaserStore((s) => s.streamer);
   const motionOperation = useLaserStore((s) => s.motionOperation);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const rows = useLaserStore((s) => s.grblSettingsRows);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
@@ -21,6 +26,7 @@ export function MachineSettingsPanel(): JSX.Element {
     connected: connection.kind === 'connected',
     activeJob: isActiveJob(streamer),
     motionOperationActive: motionOperation !== null,
+    controllerOperation,
     autofocusBusy,
   });
   const exportDisabledReason =
@@ -226,6 +232,7 @@ function machineSettingsReadDisabledReason(state: {
   readonly connected: boolean;
   readonly activeJob: boolean;
   readonly motionOperationActive: boolean;
+  readonly controllerOperation: LaserControllerOperation | null;
   readonly autofocusBusy: boolean;
 }): string | null {
   if (!state.connected) return 'Connect to the laser before reading machine settings.';
@@ -233,6 +240,10 @@ function machineSettingsReadDisabledReason(state: {
   if (state.motionOperationActive) {
     return 'A jog or frame operation is active. Wait for it to finish before reading settings.';
   }
+  const controllerOperationMessage = controllerOperationCommandBlockMessage(
+    state.controllerOperation,
+  );
+  if (controllerOperationMessage !== null) return controllerOperationMessage;
   if (state.autofocusBusy) {
     return 'Auto-focus is active. Wait for it to finish before reading settings.';
   }

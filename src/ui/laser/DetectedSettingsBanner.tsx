@@ -3,7 +3,11 @@
 // capability hints stay review-only until the operator confirms the machine.
 
 import type { ControllerSettingsSnapshot, GrblSettingRow } from '../../core/controllers/grbl';
-import { profileSupportsCapability, type DeviceProfile } from '../../core/devices';
+import {
+  profileSupportsCapability,
+  type DeviceProfile,
+  type ProfileCapability,
+} from '../../core/devices';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 
@@ -14,6 +18,7 @@ export function DetectedSettingsBanner(): JSX.Element | null {
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const settingsRows = useLaserStore((s) => s.grblSettingsRows);
   const current = useStore((s) => s.project.device);
+  const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   if (detected === null) return null;
   const rows = describePatch(detected, current);
   const review = describeReviewItems(detected, current, controllerSettings ?? {}, settingsRows);
@@ -28,7 +33,11 @@ export function DetectedSettingsBanner(): JSX.Element | null {
         hardware capabilities stay review-only until you confirm the machine.
       </p>
       {rows.length > 0 ? <PatchRows rows={rows} /> : null}
-      <ReviewSection title="Needs review" items={review.needsReview} />
+      <ReviewSection
+        title="Needs review"
+        items={review.needsReview}
+        onApplyAction={(patch) => updateDeviceProfile(patch)}
+      />
       <ReviewSection title="Ignored" items={review.ignored} />
       <div style={actionsStyle}>
         <button
@@ -62,17 +71,11 @@ function PatchRows({ rows }: { readonly rows: ReadonlyArray<Row> }): JSX.Element
           <li key={r.label} style={rowStyle}>
             <span style={rowLabelStyle}>{r.label}</span>
             <span style={rowValueStyle}>
-              {r.changed ? (
-                <>
-                  <span style={oldStyle}>{r.oldText}</span>
-                  <span aria-hidden style={arrowStyle}>
-                    -&gt;
-                  </span>
-                  <span style={newStyle}>{r.newText}</span>
-                </>
-              ) : (
-                <span style={unchangedStyle}>{r.newText} (no change)</span>
-              )}
+              <span style={oldStyle}>{r.oldText}</span>
+              <span aria-hidden style={arrowStyle}>
+                -&gt;
+              </span>
+              <span style={newStyle}>{r.newText}</span>
             </span>
           </li>
         ))}
@@ -84,18 +87,34 @@ function PatchRows({ rows }: { readonly rows: ReadonlyArray<Row> }): JSX.Element
 function ReviewSection(props: {
   readonly title: string;
   readonly items: ReadonlyArray<ReviewItem>;
+  readonly onApplyAction?: (patch: Partial<DeviceProfile>) => void;
 }): JSX.Element | null {
   if (props.items.length === 0) return null;
   return (
     <section>
       <strong style={sectionTitleStyle}>{props.title}</strong>
       <ul style={listStyle}>
-        {props.items.map((item) => (
-          <li key={item.label} style={reviewRowStyle}>
-            <span style={rowLabelStyle}>{item.label}</span>
-            <span style={reviewDetailStyle}>{item.detail}</span>
-          </li>
-        ))}
+        {props.items.map((item) => {
+          const action = item.action;
+          return (
+            <li key={item.label} style={reviewRowStyle}>
+              <span style={rowLabelStyle}>{item.label}</span>
+              <span style={reviewDetailStyle}>
+                <span>{item.detail}</span>
+                {action === undefined || props.onApplyAction === undefined ? null : (
+                  <button
+                    type="button"
+                    style={reviewActionButtonStyle}
+                    title={action.title}
+                    onClick={() => props.onApplyAction?.(action.patch)}
+                  >
+                    {action.label}
+                  </button>
+                )}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -111,6 +130,13 @@ type Row = {
 type ReviewItem = {
   readonly label: string;
   readonly detail: string;
+  readonly action?: ReviewAction;
+};
+
+type ReviewAction = {
+  readonly label: string;
+  readonly title: string;
+  readonly patch: Partial<DeviceProfile>;
 };
 
 type ReviewSummary = {
@@ -155,15 +181,25 @@ export function describeReviewItems(
 ): ReviewSummary {
   const needsReview: ReviewItem[] = [];
   const ignored: ReviewItem[] = [];
+  const detectedZTravelMm = controller.zTravelMm ?? patch.zTravelMm;
   if (
     isPositive(controller.zMaxFeed) &&
-    isPositive(controller.zTravelMm ?? patch.zTravelMm) &&
+    isPositive(detectedZTravelMm) &&
     !profileSupportsCapability(current, 'z-axis')
   ) {
     needsReview.push({
       label: 'Powered Z jog',
       detail:
         'Controller reports Z travel and Z max rate. Confirm the machine has a motorized Z/focus axis before enabling Z jog buttons.',
+      action: {
+        label: 'Mark profile as powered Z',
+        title: 'Adds powered Z capability but keeps Z jog blocked until travel is confirmed.',
+        patch: {
+          capabilities: addCapability(current.capabilities, 'z-axis'),
+          zTravelMm: detectedZTravelMm,
+          zTravelConfirmed: false,
+        },
+      },
     });
   }
   pushBooleanReview(
@@ -221,11 +257,12 @@ function pushBooleanRow(
   format: (value: boolean) => string,
 ): void {
   if (next === undefined) return;
+  if (next === prev) return;
   rows.push({
     label,
     oldText: format(prev),
     newText: format(next),
-    changed: next !== prev,
+    changed: true,
   });
 }
 
@@ -237,11 +274,12 @@ function pushNumericRow(
   format: (n: number) => string,
 ): void {
   if (next === undefined) return;
+  if (numbersClose(next, prev)) return;
   rows.push({
     label,
     oldText: format(prev),
     newText: format(next),
-    changed: !numbersClose(next, prev),
+    changed: true,
   });
 }
 
@@ -253,11 +291,12 @@ function pushOptionalNumericRow(
   format: (n: number) => string,
 ): void {
   if (next === undefined) return;
+  if (prev !== undefined && numbersClose(next, prev)) return;
   rows.push({
     label,
     oldText: prev === undefined ? 'Not set' : format(prev),
     newText: format(next),
-    changed: prev === undefined || !numbersClose(next, prev),
+    changed: true,
   });
 }
 
@@ -268,8 +307,16 @@ function numbersClose(a: number, b: number): boolean {
   return diff / denom < 0.001;
 }
 
-function isPositive(value: number | undefined): boolean {
+function isPositive(value: number | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function addCapability(
+  capabilities: ReadonlyArray<ProfileCapability> | undefined,
+  capability: ProfileCapability,
+): ReadonlyArray<ProfileCapability> {
+  if (capabilities?.includes(capability) === true) return capabilities;
+  return [...(capabilities ?? []), capability];
 }
 
 function formatMm(n: number): string {
@@ -331,10 +378,17 @@ const oldStyle: React.CSSProperties = {
 };
 const arrowStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
 const newStyle: React.CSSProperties = { color: 'var(--lf-text)', fontWeight: 600 };
-const unchangedStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
 const reviewDetailStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 4,
   color: 'var(--lf-text-muted)',
   lineHeight: 1.3,
+};
+const reviewActionButtonStyle: React.CSSProperties = {
+  padding: '3px 7px',
+  borderRadius: 3,
 };
 const actionsStyle: React.CSSProperties = {
   display: 'flex',

@@ -45,6 +45,8 @@ export type MachineStartSnapshot = {
   readonly statusReport: StatusReport | null;
   readonly alarmCode: number | null;
   readonly hasActiveStreamer: boolean;
+  readonly motionOperationActive?: boolean;
+  readonly controllerOperationActive?: boolean;
   readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
@@ -170,6 +172,12 @@ function findMachineStartIssues(machine: MachineStartSnapshot): ReadonlyArray<st
   const issues: string[] = [];
   if (machine.hasActiveStreamer) {
     issues.push('A job is already active. Stop or finish it before starting another.');
+  }
+  if (machine.motionOperationActive === true) {
+    issues.push('A jog or frame operation is active. Wait for it to finish before starting.');
+  }
+  if (machine.controllerOperationActive === true) {
+    issues.push('A controller operation is active. Wait for it to finish before starting.');
   }
   if (machine.autofocusBusy === true) {
     issues.push('Auto-focus is running. Wait for it to finish before starting a job.');

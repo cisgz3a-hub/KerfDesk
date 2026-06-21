@@ -85,6 +85,7 @@ export function commitDraftShape(drawShape: (shape: ShapeObject) => void): boole
   if (draft === null) return false;
   drawShape({ ...draft, id: crypto.randomUUID() });
   useUiStore.getState().setDraftShape(null);
-  useUiStore.getState().resetToolMode();
+  // Stay armed in the draw tool so shapes can be created back-to-back (LightBurn
+  // parity + ADR-051 J3). Esc, Select, or clicking the active tool returns to Select.
   return true;
 }

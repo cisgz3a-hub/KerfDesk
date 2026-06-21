@@ -118,6 +118,9 @@ function outboundKind(raw: string): TranscriptKind {
 
 function decoded(response: GrblResponse): { readonly decoded: string } | Record<string, never> {
   if (response.kind === 'error') {
+    if (response.code === null) {
+      return { decoded: `Unrecognized controller error: ${response.raw ?? 'error'}` };
+    }
     const desc = describeError(response.code);
     return desc === null
       ? { decoded: `Error ${response.code}` }

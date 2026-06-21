@@ -13,10 +13,11 @@
 //   Grbl 1.1h ['$' for help] Welcome banner.
 
 import { parseStatusReport, type StatusReport } from './status-parser';
+import { describeError } from './error-codes';
 
 export type GrblResponse =
   | { readonly kind: 'ok' }
-  | { readonly kind: 'error'; readonly code: number }
+  | { readonly kind: 'error'; readonly code: number | null; readonly raw?: string }
   | { readonly kind: 'alarm'; readonly code: number }
   | { readonly kind: 'status'; readonly report: StatusReport }
   | { readonly kind: 'setting'; readonly id: number; readonly value: string }
@@ -32,7 +33,7 @@ type Matcher = (line: string) => GrblResponse | null;
 
 const MATCHERS: ReadonlyArray<Matcher> = [
   matchOk,
-  matchCodedKeyword('error:', (code) => ({ kind: 'error', code })),
+  matchError,
   matchCodedKeyword('ALARM:', (code) => ({ kind: 'alarm', code })),
   matchStatus,
   matchSetting,
@@ -51,6 +52,16 @@ export function classifyResponse(line: string): GrblResponse {
 
 function matchOk(line: string): GrblResponse | null {
   return line === 'ok' ? { kind: 'ok' } : null;
+}
+
+function matchError(line: string): GrblResponse | null {
+  if (!line.startsWith('error:')) return null;
+  const codeText = line.slice('error:'.length);
+  if (!/^\d+$/.test(codeText)) return { kind: 'error', code: null, raw: line };
+  const code = Number.parseInt(codeText, 10);
+  return describeError(code) === null
+    ? { kind: 'error', code: null, raw: line }
+    : { kind: 'error', code };
 }
 
 function matchCodedKeyword(prefix: string, build: (code: number) => GrblResponse): Matcher {

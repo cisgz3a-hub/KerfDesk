@@ -149,6 +149,7 @@ export function finishPen(args: {
     createPolyline({ id: crypto.randomUUID(), color, spec: { points, closed: args.closed } }),
   );
   useUiStore.getState().setPenDraft(null);
-  useUiStore.getState().resetToolMode();
+  // Stay armed in the pen tool for back-to-back polylines (LightBurn parity +
+  // ADR-051 J3); Esc or Select exit. setPenDraft(null) already cleared the draft.
   return true;
 }

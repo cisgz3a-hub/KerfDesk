@@ -1,6 +1,49 @@
-import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { describePatch, describeReviewItems } from './DetectedSettingsBanner';
+import { useStore } from '../state';
+import { resetStore } from '../state/test-helpers';
+import { useLaserStore } from '../state/laser-store';
+import {
+  describePatch,
+  describeReviewItems,
+  DetectedSettingsBanner,
+} from './DetectedSettingsBanner';
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+async function renderDetectedSettingsBanner(): Promise<{
+  readonly host: HTMLDivElement;
+  readonly unmount: () => Promise<void>;
+}> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    root.render(createElement(DetectedSettingsBanner));
+  });
+  return {
+    host,
+    unmount: async () => {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    },
+  };
+}
+
+afterEach(() => {
+  resetStore();
+  useLaserStore.setState({
+    detectedSettings: null,
+    controllerSettings: null,
+    grblSettingsRows: [],
+  });
+});
 
 describe('describePatch', () => {
   it('surfaces GRBL $31 and $32 alongside $30 detected settings', () => {
@@ -38,10 +81,19 @@ describe('describePatch', () => {
       }),
     ]);
   });
+
+  it('omits controller values that already match the active profile', () => {
+    const rows = describePatch(
+      { maxPowerS: 1000, minPowerS: 0, laserModeEnabled: true },
+      DEFAULT_DEVICE_PROFILE,
+    );
+
+    expect(rows).toEqual([]);
+  });
 });
 
 describe('describeReviewItems', () => {
-  it('flags powered Z as a review-only suggestion instead of an auto-applied capability', () => {
+  it('offers a guarded powered Z action without confirming Z travel automatically', () => {
     const review = describeReviewItems(
       { zTravelMm: 75 },
       DEFAULT_DEVICE_PROFILE,
@@ -54,6 +106,15 @@ describe('describeReviewItems', () => {
         label: 'Powered Z jog',
         detail:
           'Controller reports Z travel and Z max rate. Confirm the machine has a motorized Z/focus axis before enabling Z jog buttons.',
+        action: {
+          label: 'Mark profile as powered Z',
+          title: 'Adds powered Z capability but keeps Z jog blocked until travel is confirmed.',
+          patch: expect.objectContaining({
+            capabilities: expect.arrayContaining(['z-axis']),
+            zTravelMm: 75,
+            zTravelConfirmed: false,
+          }),
+        },
       }),
     ]);
     expect(review.ignored).toEqual([]);
@@ -102,5 +163,39 @@ describe('describeReviewItems', () => {
         detail: 'Unknown GRBL setting was read but not applied to the LaserForge profile.',
       }),
     ]);
+  });
+});
+
+describe('DetectedSettingsBanner', () => {
+  it('applies the guarded powered Z action to the active profile only after click', async () => {
+    useLaserStore.setState({
+      detectedSettings: { zTravelMm: 75 },
+      controllerSettings: { zTravelMm: 75, zMaxFeed: 300 },
+      grblSettingsRows: [],
+    });
+
+    const { host, unmount } = await renderDetectedSettingsBanner();
+    try {
+      expect(useStore.getState().project.device.capabilities).not.toContain('z-axis');
+
+      const button = [...host.querySelectorAll('button')].find((candidate) =>
+        candidate.textContent?.includes('Mark profile as powered Z'),
+      );
+      if (!(button instanceof HTMLButtonElement)) {
+        throw new Error('Powered Z action button missing');
+      }
+
+      await act(async () => {
+        button.click();
+      });
+
+      expect(useStore.getState().project.device).toMatchObject({
+        zTravelMm: 75,
+        zTravelConfirmed: false,
+      });
+      expect(useStore.getState().project.device.capabilities).toContain('z-axis');
+    } finally {
+      await unmount();
+    }
   });
 });

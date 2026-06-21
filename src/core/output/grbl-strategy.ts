@@ -100,6 +100,7 @@ function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDia
   );
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
+    if (p > 0) chunks.push(`${laserModeWord(dialect.cutPowerMode)} S0`);
     for (const seg of group.segments) {
       const segText = emitSegment(seg, s, feed, dialect);
       if (segText.length > 0) chunks.push(segText.replace(/\n$/, ''));

@@ -90,10 +90,12 @@ function FocusJogControls(props: {
 }): JSX.Element {
   const supportsZAxis = profileSupportsCapability(props.device, 'z-axis');
   const zTravelConfirmed = props.device.zTravelConfirmed === true;
+  const zTravelReady = isPositive(props.device.zTravelMm);
   if (!supportsZAxis) {
     return <p style={focusHintStyle}>Manual focus: adjust the laser head by hand.</p>;
   }
-  const zDisabled = props.disabled || !zTravelConfirmed;
+  const zReady = zTravelConfirmed && zTravelReady;
+  const zDisabled = props.disabled || !zReady;
   return (
     <div style={focusPanelStyle}>
       <div style={headerRowStyle}>
@@ -127,12 +129,16 @@ function FocusJogControls(props: {
         >
           Z-
         </Btn>
-        {!zTravelConfirmed && (
+        {!zReady && (
           <span style={focusHintStyle}>Confirm Z travel in Machine Setup before using Z jog.</span>
         )}
       </div>
     </div>
   );
+}
+
+function isPositive(value: number | undefined): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function Btn({

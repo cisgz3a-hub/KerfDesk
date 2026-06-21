@@ -121,6 +121,91 @@ describe('DeviceSettings air assist command', () => {
       await unmount();
     }
   });
+
+  it('keeps Z travel confirmation disabled until powered Z and travel are present', async () => {
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      details.open = true;
+
+      const confirmed = input(host, 'Z travel confirmed');
+      expect(confirmed.disabled).toBe(true);
+
+      const poweredZ = host.querySelector('input[aria-label="Powered Z jog enabled"]');
+      if (!(poweredZ instanceof HTMLInputElement)) throw new Error('Powered Z checkbox missing');
+      await act(async () => {
+        poweredZ.checked = true;
+        Simulate.change(poweredZ);
+      });
+      expect(confirmed.disabled).toBe(true);
+
+      const travel = input(host, 'Z travel (mm)');
+      await act(async () => {
+        travel.value = '75';
+        Simulate.change(travel);
+      });
+
+      expect(input(host, 'Z travel confirmed').disabled).toBe(false);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('clears Z travel confirmation when powered Z jog is disabled', async () => {
+    useStore.getState().updateDeviceProfile({
+      capabilities: ['grbl', 'z-axis'],
+      zTravelMm: 75,
+      zTravelConfirmed: true,
+    });
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      details.open = true;
+
+      const poweredZ = host.querySelector('input[aria-label="Powered Z jog enabled"]');
+      if (!(poweredZ instanceof HTMLInputElement)) throw new Error('Powered Z checkbox missing');
+      expect(useStore.getState().project.device.zTravelConfirmed).toBe(true);
+
+      await act(async () => {
+        poweredZ.checked = false;
+        Simulate.change(poweredZ);
+      });
+
+      expect(useStore.getState().project.device.capabilities).not.toContain('z-axis');
+      expect(useStore.getState().project.device.zTravelConfirmed).toBe(false);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('does not inherit stale Z travel confirmation when powered Z jog is enabled', async () => {
+    useStore.getState().updateDeviceProfile({
+      capabilities: ['grbl'],
+      zTravelMm: 75,
+      zTravelConfirmed: true,
+    });
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      details.open = true;
+
+      const poweredZ = host.querySelector('input[aria-label="Powered Z jog enabled"]');
+      if (!(poweredZ instanceof HTMLInputElement)) throw new Error('Powered Z checkbox missing');
+
+      await act(async () => {
+        poweredZ.checked = true;
+        Simulate.change(poweredZ);
+      });
+
+      expect(useStore.getState().project.device.capabilities).toContain('z-axis');
+      expect(useStore.getState().project.device.zTravelConfirmed).toBe(false);
+    } finally {
+      await unmount();
+    }
+  });
 });
 
 describe('DeviceSettings scan offsets', () => {

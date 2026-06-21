@@ -17,6 +17,7 @@ import {
 import { prepareOutput } from '../../io/gcode';
 import { resolveJobPlacement, trustedMotionOffsetForPreflight } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
+import { describeControllerOperation } from '../state/laser-controller-operation';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
@@ -55,14 +56,18 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   // instead of forcing a disconnect/reconnect.
   const jobNeedsRecovery = isStreaming || isPaused || status === 'errored' || status === 'done';
   const motionOperation = useLaserStore((s) => s.motionOperation);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const motionBusy = motionOperation !== null;
-  const controlsBusy = jobNeedsRecovery || motionBusy;
+  const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
   return (
     <div style={containerStyle}>
       <JobPlacementControls disabled={disabled} streaming={controlsBusy} />
       <OriginRow disabled={disabled} streaming={controlsBusy} />
       <SetupRow disabled={disabled} streaming={controlsBusy} onStartJob={onStartJob} />
       {motionOperation !== null && <MotionControls operationKind={motionOperation.kind} />}
+      {controllerOperation !== null && (
+        <ControllerOperationControls label={describeControllerOperation(controllerOperation)} />
+      )}
       {jobNeedsRecovery && <RunningControls isStreaming={isStreaming} isPaused={isPaused} />}
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
     </div>
@@ -221,6 +226,14 @@ function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX
         {label}
       </button>
       <span style={runningSafetyStyle}>Uses GRBL jog cancel. Use physical E-stop if unsafe.</span>
+    </div>
+  );
+}
+
+function ControllerOperationControls({ label }: { readonly label: string }): JSX.Element {
+  return (
+    <div style={rowStyle}>
+      <span style={runningSafetyStyle}>{label}</span>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { prepareConsoleCommand } from '../../core/controllers/grbl';
 import { helpProps } from '../help/help-topics';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
+import { controllerOperationCommandBlockMessage } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
@@ -15,6 +16,7 @@ export function ConsolePanel(): JSX.Element {
   const statusReport = useLaserStore((s) => s.statusReport);
   const streamer = useLaserStore((s) => s.streamer);
   const motionOperation = useLaserStore((s) => s.motionOperation);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const sendConsoleCommand = useLaserStore((s) => s.sendConsoleCommand);
   const clearTranscript = useLaserStore((s) => s.clearTranscript);
@@ -30,6 +32,7 @@ export function ConsolePanel(): JSX.Element {
     (isActiveJob(streamer) && 'A job is active. Press Stop before sending console commands.') ||
     (motionOperation !== null &&
       'A jog or frame operation is active. Wait for it to finish before sending console commands.') ||
+    controllerOperationCommandBlockMessage(controllerOperation) ||
     (autofocusBusy &&
       'Auto-focus is active. Wait for it to finish before sending console commands.') ||
     null;

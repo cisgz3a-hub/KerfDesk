@@ -28,6 +28,13 @@ import {
 } from '../../core/controllers/grbl';
 import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
+  cancelControllerLifecycleRefs,
+  consumeControllerCommandResponse,
+  observeControllerIdleWait,
+  type ControllerLifecycleRefs,
+} from './laser-interactive-command';
+import { beginPostJobSettle } from './laser-post-job-settle';
+import {
   controllerErrorNotice,
   disconnectDuringJobNotice,
   frameHitLimitNotice,
@@ -41,9 +48,10 @@ import {
 } from './laser-motion-operation';
 import type { LaserState } from './laser-store';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
+import type { TranscriptSource } from './laser-transcript';
 import { hasCustomOrigin } from './origin-actions';
 
-export type HandlerRefs = {
+export type HandlerRefs = ControllerLifecycleRefs & {
   settingsCollector: SettingsCollectorState;
   // One-shot callback fired by handleLine the next time any line arrives.
   // runHandshake sets it before awaiting; handleLine clears it after
@@ -57,7 +65,11 @@ export type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 export type GetFn = () => LaserState;
-type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+type SafeWriteFn = (
+  line: string,
+  action?: LaserSafetyAction,
+  source?: TranscriptSource,
+) => Promise<void>;
 
 const LOG_MAX = 200;
 
@@ -153,32 +165,45 @@ export function handleLine(
       lastSettingsReadAt: Date.now(),
     });
   }
+  if (consumeControllerCommandResponse(refs, cls, line)) return;
   if (cls.kind === 'status') {
-    handleStatusLine(set, get, safeWrite, cls.report);
+    handleStatusLine(set, get, refs, safeWrite, cls.report);
     return;
   }
   if (cls.kind === 'alarm') {
-    handleAlarmLine(set, get, safeWrite, cls.code);
+    handleAlarmLine(set, get, refs, safeWrite, cls.code);
     return;
   }
   if (cls.kind === 'error') {
     const state = get();
+    const rejectedLine = state.streamer?.inFlight[0]?.line.trim();
     set({
       lastError: cls.code,
-      safetyNotice: controllerErrorNotice(cls.code, controllerErrorContext(state)),
+      safetyNotice: controllerErrorNotice(
+        cls.code,
+        controllerErrorContext(state),
+        cls.raw,
+        rejectedLine,
+      ),
     });
-    advanceStream(set, get, safeWrite, 'error');
+    advanceStream(set, get, refs, safeWrite, 'error');
     return;
   }
   if (cls.kind === 'ok') {
-    advanceStream(set, get, safeWrite, 'ok');
+    advanceStream(set, get, refs, safeWrite, 'ok');
   }
 }
 
 // GRBL ALARM:1 — hard limit triggered (see alarm-codes.ts).
 const HARD_LIMIT_ALARM_CODE = 1;
 
-function handleAlarmLine(set: SetFn, get: GetFn, safeWrite: SafeWriteFn, code: number): void {
+function handleAlarmLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  code: number,
+): void {
   // A hard-limit alarm that fires while a Verified Frame is tracing means the
   // job box runs past the travel from this origin — name the limit so the
   // operator knows which way to move (ADR-053 P3). The alarm also clears the
@@ -193,10 +218,12 @@ function handleAlarmLine(set: SetFn, get: GetFn, safeWrite: SafeWriteFn, code: n
     wcoCache: null,
     workOriginActive: false,
     motionOperation: null,
+    controllerOperation: null,
     frameVerification: null,
     ...frameLimitPatch,
   });
-  advanceStream(set, get, safeWrite, 'alarm');
+  cancelControllerLifecycleRefs(refs, `ALARM:${code}`);
+  advanceStream(set, get, refs, safeWrite, 'alarm');
 }
 
 function activeLimitAxisLabel(pins: GrblPins | null): string | null {
@@ -217,6 +244,7 @@ function nextTranscriptId(refs: HandlerRefs): number {
 function handleStatusLine(
   set: SetFn,
   get: GetFn,
+  refs: HandlerRefs,
   safeWrite: SafeWriteFn,
   report: StatusReport,
 ): void {
@@ -229,9 +257,11 @@ function handleStatusLine(
       wcoCache: null,
       workOriginActive: false,
       motionOperation: null,
+      controllerOperation: null,
       frameVerification: null,
       homingState: 'unknown',
     });
+    cancelControllerLifecycleRefs(refs, 'Controller entered Alarm.');
     return;
   }
   if (report.state === 'Sleep') {
@@ -241,9 +271,11 @@ function handleStatusLine(
       wcoCache: null,
       workOriginActive: false,
       motionOperation: null,
+      controllerOperation: null,
       frameVerification: null,
       homingState: 'unknown',
     });
+    cancelControllerLifecycleRefs(refs, 'Controller entered Sleep.');
     return;
   }
   const observedOperation = observeMotionStatus(operation, report.state);
@@ -265,8 +297,8 @@ function handleStatusLine(
     ...statusPositionPatch(report),
     ...operationPatch,
     ...completedStreamerPatch,
-    ...homingStatusPatch(state, report),
   });
+  observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
 }
@@ -277,18 +309,9 @@ function shouldReleaseStreamerAtIdle(
 ): boolean {
   return (
     streamer !== null &&
-    (streamer.status === 'done' || streamer.status === 'errored') &&
+    streamer.status === 'errored' &&
     report.state === 'Idle'
   );
-}
-
-function homingStatusPatch(
-  state: LaserState,
-  report: StatusReport,
-): Partial<Pick<LaserState, 'homingState'>> {
-  return state.homingState === 'homing' && report.state === 'Idle'
-    ? { homingState: 'confirmed' }
-    : {};
 }
 
 function statusPositionPatch(
@@ -317,6 +340,7 @@ function dispatchQueuedFrameLine(set: SetFn, safeWrite: SafeWriteFn, line: strin
 function advanceStream(
   set: SetFn,
   get: GetFn,
+  refs: HandlerRefs,
   safeWrite: SafeWriteFn,
   ack: 'ok' | 'error' | 'alarm',
 ): void {
@@ -325,6 +349,9 @@ function advanceStream(
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
   set({ streamer: stepped.state });
+  if (s.status !== 'done' && stepped.state.status === 'done') {
+    beginPostJobSettle(set, get, refs, safeWrite);
+  }
   if (stepped.toSend.length > 0) {
     void safeWrite(stepped.toSend).catch(() => {
       set({

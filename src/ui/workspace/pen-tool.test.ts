@@ -127,7 +127,8 @@ describe('finishPen', () => {
     expect(shape?.spec.closed).toBe(false);
     expect(shape?.spec.points).toHaveLength(2);
     expect(useUiStore.getState().penDraft).toBeNull();
-    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
+    // Sticky: stay in the pen tool for the next polyline (LightBurn parity).
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'polyline' });
   });
 
   it('does not commit an open finish with <2 vertices (keeps the draft)', () => {
@@ -160,7 +161,7 @@ describe('finishPen', () => {
     expect(finishPen({ closed: true, project: createProject(), drawShape })).toBe(true);
     expect(drawShape).toHaveBeenCalledTimes(1);
     expect(drawShape.mock.calls[0]?.[0]?.spec.closed).toBe(true);
-    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'polyline' });
   });
 
   it('uses the current drawing layer color for committed pen geometry', () => {

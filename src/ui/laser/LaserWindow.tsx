@@ -30,10 +30,15 @@ export function LaserWindow(): JSX.Element {
   const wakeController = useLaserStore((s) => s.wakeController);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const streamer = useLaserStore((s) => s.streamer);
   const statusReport = useLaserStore((s) => s.statusReport);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
-  const machineOperationBusy = autofocusBusy || motionOperation !== null;
+  const machineOperationBusy = isMachineOperationBusy({
+    autofocusBusy,
+    motionOperation,
+    controllerOperation,
+  });
   // H6: jog mid-job interleaves $J= acks into the character-counted stream —
   // every ack pops the stream head, so the 120-byte RX accounting drifts and
   // GRBL's real buffer can overflow. Gate like Home/Frame/Start.
@@ -100,6 +105,14 @@ function isJogPadDisabled(
   jobActive: boolean,
 ): boolean {
   return !connected || !controllerIdle || machineOperationBusy || jobActive;
+}
+
+function isMachineOperationBusy(state: {
+  readonly autofocusBusy: boolean;
+  readonly motionOperation: unknown;
+  readonly controllerOperation: unknown;
+}): boolean {
+  return state.autofocusBusy || state.motionOperation !== null || state.controllerOperation !== null;
 }
 
 function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {

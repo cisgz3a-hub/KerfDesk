@@ -69,7 +69,7 @@ export const GRBL_GCODE_DIALECTS: ReadonlyArray<GrblGcodeDialect> = [
     id: 'neotronics-4040-safe',
     label: 'Neotronics 4040 Safe',
     description: 'Conservative GRBL dialect for the Neotronics 4040 profile family.',
-    cutPowerMode: 'dynamic',
+    cutPowerMode: 'constant',
     fillPowerMode: 'dynamic',
     rasterPowerMode: 'dynamic',
     requiresS0OnRapid: true,

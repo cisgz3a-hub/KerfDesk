@@ -75,7 +75,7 @@ function appCommandContext(
     selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
   const activeStreamer =
     laser.streamer !== null &&
-    (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused');
+    ['streaming', 'paused', 'done', 'errored'].includes(laser.streamer.status);
   return {
     ...fileCommandContext(callbacks, platform, app, laser, pushToast),
     ...editCommandContext(app, dialogs),
@@ -87,7 +87,11 @@ function appCommandContext(
     savedName: app.savedName,
     serialSupported: platform.serial.isSupported(),
     connected: laser.connection.kind === 'connected',
-    machineBusy: laser.autofocusBusy || laser.motionOperation !== null || activeStreamer,
+    machineBusy:
+      laser.autofocusBusy ||
+      laser.motionOperation !== null ||
+      laser.controllerOperation !== null ||
+      activeStreamer,
     homingEnabled: app.project.device.homing.enabled,
     hasSelection: selectedIds.length > 0,
     hasRasterSelection: selected?.kind === 'raster-image',
