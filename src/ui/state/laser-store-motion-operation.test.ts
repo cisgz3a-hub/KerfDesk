@@ -173,6 +173,31 @@ describe('laser-store motion operation lifecycle', () => {
     expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
   });
 
+  it('stops dispatching Frame legs after the controller rejects a jog command', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    writes.length = 0;
+
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
+    connection.emitLine('error:7002009');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      '$J=G90 G21 X0.000 Y0.000 F1000\n',
+    ]);
+    expect(getMotionOperation()).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toMatchObject({
+      kind: 'controller-error',
+      raw: 'error:7002009',
+    });
+    expect(useLaserStore.getState().safetyNotice?.message).toMatch(/rejected a frame command/i);
+  });
+
   it('clears Frame after stable Idle reports when polling misses the Jog state', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);

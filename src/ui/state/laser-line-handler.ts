@@ -179,6 +179,8 @@ export function handleLine(
   if (cls.kind === 'error') {
     const state = get();
     const rejectedLine = state.streamer?.inFlight[0]?.line.trim();
+    const motionErrorPatch =
+      state.motionOperation !== null ? { motionOperation: null, frameVerification: null } : {};
     set({
       lastError: cls.code,
       safetyNotice: controllerErrorNotice(
@@ -187,6 +189,7 @@ export function handleLine(
         cls.raw,
         rejectedLine,
       ),
+      ...motionErrorPatch,
     });
     requestRealtimeStopAfterStreamError(state.streamer, safeWrite);
     advanceStream(set, get, refs, safeWrite, 'error');
