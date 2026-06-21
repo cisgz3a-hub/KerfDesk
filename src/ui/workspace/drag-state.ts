@@ -159,6 +159,13 @@ export function isStationaryRightPanClick(
   return Math.hypot(dx, dy) <= CONTEXT_CLICK_TOLERANCE_PX;
 }
 
+export function isRightButtonDoubleClick(e: {
+  readonly button: number;
+  readonly detail: number;
+}): boolean {
+  return e.button === RIGHT_BUTTON && e.detail >= 2;
+}
+
 // Convert a pan-drag mousemove into the next (panX, panY) in scene-mm.
 export function panOffsetForDrag(args: {
   readonly drag: Extract<DragState, { kind: 'pan' }>;

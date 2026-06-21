@@ -11,6 +11,7 @@ import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import {
   computeMouseDownDrag,
+  isRightButtonDoubleClick,
   isStationaryRightPanClick,
   type DragState,
   nextTransformForDrag,
@@ -231,6 +232,7 @@ function finishWorkspaceDrag(args: {
   }
   const drag = args.drag;
   if (drag.kind === 'pan') {
+    if (finishDrawToolOnRightDoubleClick(args.e)) return;
     openContextBarForRightClick({
       drag,
       e: args.e,
@@ -246,6 +248,18 @@ function finishWorkspaceDrag(args: {
     return;
   }
   args.endInteraction();
+}
+
+export function finishDrawToolOnRightDoubleClick(e: {
+  readonly button: number;
+  readonly detail: number;
+}): boolean {
+  const ui = useUiStore.getState();
+  if (ui.toolMode.kind !== 'draw') return false;
+  if (!isRightButtonDoubleClick(e)) return false;
+  ui.closeWorkspaceContextBar();
+  ui.resetToolMode();
+  return true;
 }
 
 function openContextBarForRightClick(args: {

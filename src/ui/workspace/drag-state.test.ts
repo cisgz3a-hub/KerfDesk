@@ -5,7 +5,12 @@ import {
   type SceneObject,
   type Transform,
 } from '../../core/scene';
-import { isStationaryRightPanClick, nextTransformForDrag, type DragState } from './drag-state';
+import {
+  isRightButtonDoubleClick,
+  isStationaryRightPanClick,
+  nextTransformForDrag,
+  type DragState,
+} from './drag-state';
 
 const SE_SCALE: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }> = {
   kind: 'scale',
@@ -104,6 +109,17 @@ describe('isStationaryRightPanClick', () => {
     expect(
       isStationaryRightPanClick(panDrag('space-left-button'), { clientX: 100, clientY: 100 }),
     ).toBe(false);
+  });
+});
+
+describe('isRightButtonDoubleClick', () => {
+  it('recognizes the second click of a right-button double-click', () => {
+    expect(isRightButtonDoubleClick({ button: 2, detail: 2 })).toBe(true);
+  });
+
+  it('ignores single right-clicks and non-right double-clicks', () => {
+    expect(isRightButtonDoubleClick({ button: 2, detail: 1 })).toBe(false);
+    expect(isRightButtonDoubleClick({ button: 0, detail: 2 })).toBe(false);
   });
 });
 

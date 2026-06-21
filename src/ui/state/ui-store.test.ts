@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createRectangle } from '../../core/shapes';
 import { useUiStore } from './ui-store';
 
 const ONE_VERTEX = { vertices: [{ x: 1, y: 2 }], cursor: null };
@@ -40,6 +41,22 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().resetToolMode();
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
     expect(useUiStore.getState().penDraft).toBeNull();
+  });
+
+  it('resetToolMode clears a live shape draft', () => {
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'rect' });
+    useUiStore.getState().setDraftShape(
+      createRectangle({
+        id: 'draft',
+        color: '#000000',
+        spec: { widthMm: 10, heightMm: 5, cornerRadiusMm: 0 },
+      }),
+    );
+
+    useUiStore.getState().resetToolMode();
+
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
+    expect(useUiStore.getState().draftShape).toBeNull();
   });
 
   it('tracks the current drawing layer color outside undoable project data', () => {

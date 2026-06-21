@@ -181,7 +181,7 @@ export const useUiStore = create<UiState>((set) => ({
         ? { toolMode: next }
         : { toolMode: next, penDraft: null },
     ),
-  resetToolMode: () => set({ toolMode: { kind: 'select' }, penDraft: null }),
+  resetToolMode: () => set({ toolMode: { kind: 'select' }, draftShape: null, penDraft: null }),
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),
   penDraft: null,
