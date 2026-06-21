@@ -27,6 +27,9 @@ type SetFn = (
 type GetFn = () => LaserState;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 
+const PAUSE_REQUIRES_LASER_MODE_MESSAGE =
+  'Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.';
+
 export function jobActions(
   set: SetFn,
   get: GetFn,
@@ -64,6 +67,7 @@ export function jobActions(
       }
     },
     pauseJob: async () => {
+      assertPauseSafe(set, get);
       await safeWrite(RT_HOLD, 'pause');
       const s = get().streamer;
       if (s !== null) set({ streamer: pauseStreamer(s) });
@@ -122,4 +126,20 @@ export function jobActions(
       }));
     },
   };
+}
+
+function assertPauseSafe(set: SetFn, get: GetFn): void {
+  const blockedMessage = pauseLaserModeBlockMessage(get());
+  if (blockedMessage === null) return;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(get(), `[lf2] Pause blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
+}
+
+function pauseLaserModeBlockMessage(state: LaserState): string | null {
+  return state.controllerSettings?.laserModeEnabled === true
+    ? null
+    : PAUSE_REQUIRES_LASER_MODE_MESSAGE;
 }

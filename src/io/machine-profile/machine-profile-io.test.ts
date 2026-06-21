@@ -30,6 +30,21 @@ function profileWithCalibration(): DeviceProfile {
   };
 }
 
+function deserializeProfilePatch(patch: Record<string, unknown>) {
+  return deserializeMachineProfileDocument(
+    JSON.stringify({
+      format: MACHINE_PROFILE_FORMAT,
+      schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+      profile: {
+        ...profileWithCalibration(),
+        ...patch,
+      },
+      source: { kind: 'custom', label: 'Bad import' },
+      reviewNotes: [],
+    }),
+  );
+}
+
 describe('LaserForge machine profile documents', () => {
   it('serializes deterministic .lfmachine.json with canonical profile safety fields', () => {
     const document: MachineProfileDocument = {
@@ -86,20 +101,26 @@ describe('LaserForge machine profile documents', () => {
   });
 
   it('rejects malformed machine profile documents instead of guessing safety data', () => {
-    const result = deserializeMachineProfileDocument(
-      JSON.stringify({
-        format: MACHINE_PROFILE_FORMAT,
-        schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
-        profile: {
-          ...profileWithCalibration(),
-          scanningOffsets: [{ speedMmPerMin: 0, offsetMm: 'bad' }],
-        },
-        source: { kind: 'custom', label: 'Bad import' },
-        reviewNotes: [],
-      }),
-    );
+    const result = deserializeProfilePatch({
+      scanningOffsets: [{ speedMmPerMin: 0, offsetMm: 'bad' }],
+    });
 
     expect(result).toEqual({ kind: 'invalid', reason: 'profile.scanningOffsets is invalid' });
+  });
+
+  it('rejects malformed nested machine profile fields before canonicalizing', () => {
+    expect(deserializeProfilePatch({ homing: null })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.homing is invalid',
+    });
+    expect(deserializeProfilePatch({ capabilities: ['grbl', 'macro-runner'] })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.capabilities is invalid',
+    });
+    expect(deserializeProfilePatch({ autofocusCommand: 42 })).toEqual({
+      kind: 'invalid',
+      reason: 'profile.autofocusCommand must be a string',
+    });
   });
 
   it('rejects unsupported formats and newer schemas clearly', () => {

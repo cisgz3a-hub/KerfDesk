@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createStreamer, idleCollector, startCollecting, step } from '../../core/controllers/grbl';
+import {
+  CMD_COOLANT_OFF,
+  RT_SOFT_RESET,
+  createStreamer,
+  idleCollector,
+  startCollecting,
+  step,
+} from '../../core/controllers/grbl';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
 import type { FrameVerification } from './frame-verification';
@@ -121,7 +128,9 @@ describe('handleLine detected controller settings', () => {
 describe('handleLine streamer writes', () => {
   it('keeps a fully acked job busy until the post-job settle marker and stable Idle finish', async () => {
     const { refs, set, get } = makeHarness();
-    const safeWrite = vi.fn(async () => undefined);
+    const safeWrite = vi.fn(
+      async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
+    );
     set({ streamer: step(createStreamer('G21\nG90\nG1 X10 F600\nM5\n')).state });
     for (let i = 0; i < 4; i += 1) handleLine(set, get, refs, safeWrite, 'ok');
     await Promise.resolve();
@@ -194,7 +203,7 @@ describe('handleLine streamer writes', () => {
 });
 
 describe('handleLine controller error (P0-1)', () => {
-  it('stops the stream and raises a safety notice when GRBL rejects a line mid-job', () => {
+  it('soft-resets the controller and raises a safety notice when GRBL rejects a line mid-job', async () => {
     const { refs, set, get } = makeHarness();
     // rxBuffer 30 leaves the third line queued, so before the fix the error ack
     // would have written the next queued bytes. Now it must write nothing.
@@ -205,13 +214,20 @@ describe('handleLine controller error (P0-1)', () => {
     );
     set({ streamer: firstStep.state });
     expect(get().streamer?.queued.length).toBeGreaterThan(0);
-    const safeWrite = vi.fn(async () => undefined);
+    const safeWrite = vi.fn(
+      async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
+    );
 
     handleLine(set, get, refs, safeWrite, 'error:7');
+    await Promise.resolve();
+    await Promise.resolve();
 
-    // Terminal: no further bytes go to the controller.
+    // Terminal: no further job bytes go to the controller, but the realtime
+    // soft-reset is still sent to drain any already-buffered laser-on motion.
     expect(get().streamer?.status).toBe('errored');
-    expect(safeWrite).not.toHaveBeenCalled();
+    expect(safeWrite).toHaveBeenNthCalledWith(1, RT_SOFT_RESET, 'stop', 'system');
+    expect(safeWrite).toHaveBeenNthCalledWith(2, `${CMD_COOLANT_OFF}\n`, 'stop', 'system');
+    expect(safeWrite.mock.calls.some(([payload]) => payload.startsWith('G1 '))).toBe(false);
     // The code is recorded and the operator is told to check the machine.
     expect(get().lastError).toBe(7);
     expect(get().safetyNotice).toEqual({

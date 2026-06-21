@@ -16,10 +16,12 @@
 
 import {
   classifyResponse,
+  CMD_COOLANT_OFF,
   CMD_SETTINGS,
   disconnect as disconnectStreamer,
   type GrblPins,
   onAck,
+  RT_SOFT_RESET,
   type SettingsCollectorState,
   startCollecting,
   step,
@@ -186,6 +188,7 @@ export function handleLine(
         rejectedLine,
       ),
     });
+    requestRealtimeStopAfterStreamError(state.streamer, safeWrite);
     advanceStream(set, get, refs, safeWrite, 'error');
     return;
   }
@@ -308,6 +311,18 @@ function shouldReleaseStreamerAtIdle(
   report: StatusReport,
 ): boolean {
   return streamer !== null && streamer.status === 'errored' && report.state === 'Idle';
+}
+
+function requestRealtimeStopAfterStreamError(
+  streamer: StreamerState | null,
+  safeWrite: SafeWriteFn,
+): void {
+  const streamCanStillHaveBufferedMotion =
+    streamer !== null && ['streaming', 'paused', 'done'].includes(streamer.status);
+  if (!streamCanStillHaveBufferedMotion) return;
+  void safeWrite(RT_SOFT_RESET, 'stop', 'system')
+    .then(() => safeWrite(`${CMD_COOLANT_OFF}\n`, 'stop', 'system'))
+    .catch(() => undefined);
 }
 
 function statusPositionPatch(

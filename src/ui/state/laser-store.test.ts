@@ -236,6 +236,7 @@ describe('laser-store serial write failures', () => {
     });
     const connection = makeConnection(write);
     await connectWith(connection);
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
     await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
 
@@ -260,6 +261,7 @@ describe('laser-store serial write failures', () => {
     });
     const connection = makeConnection(write);
     await connectWith(connection);
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
     const gcode = [
       'G21',
       'G90',
