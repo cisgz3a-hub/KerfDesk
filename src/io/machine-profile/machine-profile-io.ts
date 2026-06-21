@@ -8,6 +8,7 @@ import {
   type NoGoZone,
   type Origin,
 } from '../../core/devices';
+import { validateMachineProfileShape } from './machine-profile-shape';
 
 export const MACHINE_PROFILE_FORMAT = 'laserforge-machine-profile';
 export const MACHINE_PROFILE_SCHEMA_VERSION = 1;
@@ -143,11 +144,13 @@ function parseProfile(
   if (value['scanningOffsets'] !== undefined && !isScanOffsetTable(value['scanningOffsets'])) {
     return { kind: 'invalid', reason: 'profile.scanningOffsets is invalid' };
   }
+  const profileShapeError = validateMachineProfileShape(value);
+  if (profileShapeError !== null) return { kind: 'invalid', reason: profileShapeError };
   const noGoZones = parseNoGoZones(value['noGoZones']);
   if (noGoZones.kind === 'invalid') return noGoZones;
 
   const profile = canonicalProfile({
-    ...(value as unknown as DeviceProfile),
+    ...validatedDeviceProfile(value),
     gcodeDialect: normalizeGcodeDialectSelection(value['gcodeDialect']),
     scanningOffsets: normalizeScanOffsetTable(value['scanningOffsets']),
     noGoZones: noGoZones.noGoZones,
@@ -163,6 +166,12 @@ function parseProfile(
     return { kind: 'invalid', reason: 'profile.airAssistCommand is invalid' };
   }
   return { kind: 'ok', profile };
+}
+
+function validatedDeviceProfile(value: Record<string, unknown>): DeviceProfile {
+  // validateProfileShape proves the imported JSON has DeviceProfile's required
+  // fields and nested safety fields; TypeScript cannot infer that from Record.
+  return value as unknown as DeviceProfile;
 }
 
 function parseNoGoZones(

@@ -41,11 +41,11 @@ export function ImportExportPanel(): JSX.Element {
         suggestedName: `${slugify(device.name)}.lfmachine.json`,
         extensions: ['.lfmachine.json'],
       })
-      .then((target) => {
+      .then(async (target) => {
         if (target === null) return;
-        return target.write(serializeMachineProfileDocument(activeProfileDocument(device)));
+        await target.write(serializeMachineProfileDocument(activeProfileDocument(device)));
+        pushToast('Machine profile exported.', 'success');
       })
-      .then(() => pushToast('Machine profile exported.', 'success'))
       .catch((error: unknown) => pushToast(errorMessage(error), 'error'));
   };
 
@@ -86,6 +86,7 @@ export function ImportExportPanel(): JSX.Element {
           onApply={(profile) => {
             replaceDeviceProfile(profile);
             setReview(null);
+            pushToast('Machine profile applied.', 'success');
           }}
         />
       )}
