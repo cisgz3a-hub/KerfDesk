@@ -151,6 +151,19 @@ describe('runAutofocus — wire protocol', () => {
     }
   });
 
+  it('rejects on unrecognized error responses without assigning a GRBL code', async () => {
+    const conn = mockConnection();
+    const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
+    await Promise.resolve();
+    conn.emit('error:7002009');
+    const r = await p;
+    expect(r.kind).toBe('rejected');
+    if (r.kind === 'rejected') {
+      expect(r.errorCode).toBeNull();
+      expect(r.raw).toBe('error:7002009');
+    }
+  });
+
   it('rejects on Alarm status', async () => {
     const conn = mockConnection();
     const p = runAutofocus({ connection: conn, statusReport: idleStatus(), command: '$HZ1' });
@@ -184,6 +197,15 @@ describe('describeAutofocusResult', () => {
   it('maps error:9 to the no-probe-pin hint', () => {
     const t = describeAutofocusResult({ kind: 'rejected', errorCode: 9, raw: 'error:9' });
     expect(t.message).toMatch(/probe pin/i);
+  });
+
+  it('maps unrecognized error responses to the raw controller reply', () => {
+    const t = describeAutofocusResult({
+      kind: 'rejected',
+      errorCode: null,
+      raw: 'error:7002009',
+    });
+    expect(t.message).toContain('error:7002009');
   });
 
   it('maps timeout to a warning', () => {

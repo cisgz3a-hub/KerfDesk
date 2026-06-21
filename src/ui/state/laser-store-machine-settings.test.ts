@@ -44,6 +44,11 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await Promise.resolve();
 }
 
+async function flush(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -60,6 +65,7 @@ afterEach(async () => {
     safetyNotice: null,
     autofocusBusy: false,
     motionOperation: null,
+    controllerOperation: null,
     streamer: null,
     log: [],
     transcript: [],
@@ -82,7 +88,8 @@ describe('laser-store machine settings', () => {
     await connectWith(connection);
     writes.length = 0;
 
-    await useLaserStore.getState().readMachineSettings();
+    const read = useLaserStore.getState().readMachineSettings();
+    await flush();
 
     expect(writes.at(-1)).toBe('$$\n');
     expect(useLaserStore.getState().transcript.at(-1)).toMatchObject({
@@ -90,16 +97,27 @@ describe('laser-store machine settings', () => {
       source: 'console',
       kind: 'settings-query',
     });
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'interactive-command',
+      label: 'Reading controller settings',
+    });
+
+    connection.emitLine('ok');
+    await read;
+
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
   it('populates known and unknown settings rows when the $$ dump completes', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
 
-    await useLaserStore.getState().readMachineSettings();
+    const read = useLaserStore.getState().readMachineSettings();
+    await flush();
     for (const line of ['$30=1000', '$32=1', '$999=custom', 'ok']) {
       connection.emitLine(line);
     }
+    await read;
 
     expect(useLaserStore.getState().grblSettingsRows).toEqual([
       expect.objectContaining({ code: '$30', known: true }),
@@ -144,9 +162,29 @@ describe('laser-store machine settings', () => {
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     writes.length = 0;
 
-    await useLaserStore.getState().writeGrblSetting(30, '1000');
+    const write = useLaserStore.getState().writeGrblSetting(30, '1000');
+    await flush();
+
+    expect(writes).toEqual(['$30=1000\n']);
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'interactive-command',
+      label: 'Writing $30',
+    });
+
+    connection.emitLine('ok');
+    await flush();
 
     expect(writes).toEqual(['$30=1000\n', '$$\n']);
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'interactive-command',
+      label: 'Verifying $30',
+    });
+
+    connection.emitLine('$30=1000');
+    connection.emitLine('ok');
+    await write;
+
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
   it('blocks guarded writes without a current settings backup', async () => {

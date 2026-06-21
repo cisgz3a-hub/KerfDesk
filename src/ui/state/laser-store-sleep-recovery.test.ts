@@ -43,6 +43,11 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await Promise.resolve();
 }
 
+async function flush(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -58,6 +63,8 @@ afterEach(async () => {
     lastWriteError: null,
     safetyNotice: null,
     autofocusBusy: false,
+    motionOperation: null,
+    controllerOperation: null,
     streamer: null,
     log: [],
     detectedSettings: null,
@@ -94,7 +101,8 @@ describe('laser-store Sleep recovery', () => {
       },
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
 
-    await useLaserStore.getState().wakeController();
+    const wake = useLaserStore.getState().wakeController();
+    await flush();
 
     expect(write).toHaveBeenCalledWith('\x18');
     expect(useLaserStore.getState().connection.kind).toBe('connected');
@@ -103,5 +111,14 @@ describe('laser-store Sleep recovery', () => {
     expect(useLaserStore.getState().workOriginActive).toBe(false);
     expect(useLaserStore.getState().wcoCache).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'recovery',
+      phase: 'awaiting-idle',
+    });
+
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await wake;
+
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 });

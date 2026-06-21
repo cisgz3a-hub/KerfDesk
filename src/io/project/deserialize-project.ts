@@ -111,7 +111,21 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
     scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
+    ...normalizeZTravelPatch(dev),
   };
+}
+
+function normalizeZTravelPatch(dev: Record<string, unknown>): Record<string, unknown> {
+  if (dev['zTravelConfirmed'] === undefined) return {};
+  const zTravelMm = dev['zTravelMm'];
+  const zTravelReady = typeof zTravelMm === 'number' && Number.isFinite(zTravelMm) && zTravelMm > 0;
+  const zAxisReady = hasCapability(dev, 'z-axis');
+  return { zTravelConfirmed: dev['zTravelConfirmed'] === true && zTravelReady && zAxisReady };
+}
+
+function hasCapability(dev: Record<string, unknown>, capability: string): boolean {
+  const capabilities = dev['capabilities'];
+  return Array.isArray(capabilities) && capabilities.includes(capability);
 }
 
 function numberOrDefault(value: unknown, fallback: number): number {

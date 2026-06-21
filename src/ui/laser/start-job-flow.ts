@@ -12,6 +12,7 @@
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { isActiveJob } from '../state/laser-store-helpers';
 import { prepareStartJob } from './start-job-readiness';
 
 export async function runStartJobFlow(): Promise<void> {
@@ -24,9 +25,9 @@ export async function runStartJobFlow(): Promise<void> {
     {
       statusReport: laser.statusReport,
       alarmCode: laser.alarmCode,
-      hasActiveStreamer:
-        laser.streamer !== null &&
-        (laser.streamer.status === 'streaming' || laser.streamer.status === 'paused'),
+      hasActiveStreamer: isActiveJob(laser.streamer),
+      motionOperationActive: laser.motionOperation !== null,
+      controllerOperationActive: laser.controllerOperation !== null,
       autofocusBusy: laser.autofocusBusy,
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,

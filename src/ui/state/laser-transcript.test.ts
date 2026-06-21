@@ -21,6 +21,10 @@ describe('laser transcript', () => {
       kind: 'error',
       decoded: 'Not idle: The command needs the controller to be idle.',
     });
+    expect(inboundTranscriptEntry(22, 101, 'error:7002009')).toMatchObject({
+      kind: 'error',
+      decoded: 'Unrecognized controller error: error:7002009',
+    });
     expect(inboundTranscriptEntry(3, 102, 'ALARM:1')).toMatchObject({
       kind: 'alarm',
       decoded: expect.stringContaining('Hard limit'),

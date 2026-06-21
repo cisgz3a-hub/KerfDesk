@@ -120,6 +120,30 @@ describe('JogPad accessible labels', () => {
     await unmount();
   });
 
+  it('blocks Z jog buttons when a stale confirmation has no positive travel value', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.getState().updateDeviceProfile({
+      capabilities: ['grbl', 'z-axis'],
+      zTravelConfirmed: true,
+      maxFeed: 6000,
+    });
+    const { host, unmount } = await renderJogPad();
+
+    const zUp = buttonByLabel(host, 'Jog Z+ 1 mm');
+    if (zUp === null) throw new Error('Z+ jog button missing');
+    expect(zUp.disabled).toBe(true);
+
+    await act(async () => {
+      zUp.click();
+    });
+
+    expect(jog).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Confirm Z travel in Machine Setup before using Z jog.');
+
+    await unmount();
+  });
+
   it('sends relative Z jogs only for confirmed Z-axis profiles', async () => {
     const jog = vi.fn(async () => undefined);
     useLaserStore.setState({ jog });

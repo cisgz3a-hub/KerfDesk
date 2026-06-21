@@ -12,6 +12,7 @@ import {
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
+import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 
@@ -45,7 +46,9 @@ export function activeJobCommandBlockMessage(state: LaserState): string | null {
 }
 
 export function motionOperationCommandBlockMessage(state: LaserState): string | null {
-  return state.motionOperation !== null ? MOTION_OPERATION_ACTIVE_MESSAGE : null;
+  return state.motionOperation !== null
+    ? MOTION_OPERATION_ACTIVE_MESSAGE
+    : controllerOperationCommandBlockMessage(state.controllerOperation);
 }
 
 export function setupCommandBlockMessage(state: LaserState): string | null {
@@ -57,6 +60,8 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   if (activeJobMessage !== null) return activeJobMessage;
   const motionOperationMessage = motionOperationCommandBlockMessage(state);
   if (motionOperationMessage !== null) return motionOperationMessage;
+  const controllerOperationMessage = controllerOperationCommandBlockMessage(state.controllerOperation);
+  if (controllerOperationMessage !== null) return controllerOperationMessage;
   if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
   if (state.statusReport.state !== 'Idle') {
     return `Machine must be Idle before jogging or framing (currently ${state.statusReport.state}).`;
@@ -143,6 +148,7 @@ export function initialLaserState(): Pick<
   | 'safetyNotice'
   | 'autofocusBusy'
   | 'motionOperation'
+  | 'controllerOperation'
   | 'streamer'
   | 'homingState'
   | 'log'
@@ -164,6 +170,7 @@ export function initialLaserState(): Pick<
     safetyNotice: null,
     autofocusBusy: false,
     motionOperation: null,
+    controllerOperation: null,
     streamer: null,
     homingState: 'unknown',
     log: [],
@@ -184,7 +191,8 @@ export function initialLaserState(): Pick<
 // commands already in its 127-byte buffer (P0-B).
 export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
   const wasActiveJob = isActiveJob(state.streamer);
-  const wasUnsafeActive = wasActiveJob || state.motionOperation !== null;
+  const wasUnsafeActive =
+    wasActiveJob || state.motionOperation !== null || state.controllerOperation !== null;
   const stream: StreamerState | null =
     wasActiveJob && state.streamer !== null ? disconnectStreamer(state.streamer) : state.streamer;
   return {
@@ -200,6 +208,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).
     frameVerification: null,
     motionOperation: null,
+    controllerOperation: null,
     homingState: 'unknown',
     streamer: stream,
     ...(wasUnsafeActive ? { safetyNotice: disconnectDuringJobNotice() } : {}),

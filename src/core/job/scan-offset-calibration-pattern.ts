@@ -7,6 +7,12 @@ import {
   type Polyline,
   type Scene,
 } from '../scene';
+import {
+  calibrationLabelWidthMm,
+  createCalibrationLabelLayer,
+  createCalibrationLabelObject,
+  formatCalibrationNumber,
+} from './calibration-labels';
 
 const MIN_STEPS = 1;
 const MAX_STEPS = 10;
@@ -78,6 +84,8 @@ export function generateScanOffsetCalibrationPattern(
   const gapMm = Math.max(0, clampFinite(options.gapMm ?? DEFAULT_GAP_MM, DEFAULT_GAP_MM));
   const origin = options.origin ?? DEFAULT_ORIGIN;
   const speeds = linspace(speedHigh, speedLow, steps);
+  const labelSize = labelSizeForSwatch(Math.min(swatchWidth, swatchHeight));
+  const labelGap = Math.max(0.5, Math.min(gapMm / 2, 2));
   const layers: Layer[] = [];
   const objects: ImportedSvg[] = [];
   const cells: ScanOffsetCalibrationCell[] = [];
@@ -108,6 +116,23 @@ export function generateScanOffsetCalibrationPattern(
       bounds: { minX: x, minY: y, maxX: x + swatchWidth, maxY: y + swatchHeight },
     });
   }
+
+  // Burn a speed label under each swatch. The Measured Scan Offset apply UI asks
+  // the operator to enter the offset for the speed they read off the swatch, so
+  // the speed must be engraved beside it (same as the material/interval grids).
+  objects.push(
+    ...cells.map((cell) => {
+      const label = formatCalibrationNumber(cell.speed);
+      return createCalibrationLabelObject({
+        id: `scan-offset-calibration-label-${cell.step}`,
+        text: label,
+        x: cell.bounds.minX + centerOffset(swatchWidth, calibrationLabelWidthMm(label, labelSize)),
+        y: cell.bounds.maxY + labelGap,
+        sizeMm: labelSize,
+      });
+    }),
+  );
+  layers.push(createCalibrationLabelLayer('scan-offset-calibration-labels'));
 
   return { scene: { objects, layers }, cells };
 }
@@ -177,6 +202,14 @@ function orderedPair(a: number, b: number): readonly [number, number] {
 
 function scanOffsetLayerColor(step: number): string {
   return `#${(0x300000 + step).toString(16).padStart(6, '0')}`;
+}
+
+function labelSizeForSwatch(size: number): number {
+  return Math.max(1.4, Math.min(2.5, size * 0.3));
+}
+
+function centerOffset(span: number, childSpan: number): number {
+  return Math.max(0, (span - childSpan) / 2);
 }
 
 function clampInteger(value: number, min: number, max: number): number {

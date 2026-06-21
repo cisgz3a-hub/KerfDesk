@@ -18,6 +18,7 @@ import { useMaterialLibraryPersistence } from './use-material-library-persistenc
 import { useShortcuts } from './use-shortcuts';
 import { useSpacePan } from './use-space-pan';
 import { useUnloadStop } from './use-unload-stop';
+import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
 import { useWindowTitle } from './use-window-title';
 
 export function App(): JSX.Element {
@@ -35,6 +36,7 @@ export function App(): JSX.Element {
   useShortcuts();
   useSpacePan();
   useUnloadStop();
+  useUnsavedChangesGuard();
   useWindowTitle();
   return (
     <div style={shellStyle}>

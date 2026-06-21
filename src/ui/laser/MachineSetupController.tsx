@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
 import { Button } from '../kit';
 import { useLaserStore } from '../state/laser-store';
+import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { GrblLaserSetupPanel } from './GrblLaserSetupPanel';
@@ -32,11 +33,13 @@ function GrblSetupSlot(): JSX.Element {
   const connection = useLaserStore((s) => s.connection);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const streamer = useLaserStore((s) => s.streamer);
   const disabled =
     connection.kind !== 'connected' ||
     autofocusBusy ||
     motionOperation !== null ||
+    controllerOperation !== null ||
     streamer !== null;
   return <GrblLaserSetupPanel disabled={disabled} />;
 }
@@ -72,9 +75,21 @@ export function FirmwareWritesPanel(): JSX.Element {
 function FirmwareWriteRow({ row }: { readonly row: GrblSettingRow }): JSX.Element {
   const [value, setValue] = useState(row.rawValue);
   const [confirmed, setConfirmed] = useState(false);
+  const connection = useLaserStore((s) => s.connection);
+  const streamer = useLaserStore((s) => s.streamer);
+  const motionOperation = useLaserStore((s) => s.motionOperation);
+  const controllerOperation = useLaserStore((s) => s.controllerOperation);
+  const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const writeGrblSetting = useLaserStore((s) => s.writeGrblSetting);
   const pushToast = useToastStore((s) => s.pushToast);
-  const canWrite = confirmed && value.trim().length > 0;
+  const canWrite =
+    confirmed &&
+    value.trim().length > 0 &&
+    connection.kind === 'connected' &&
+    !isActiveJob(streamer) &&
+    motionOperation === null &&
+    controllerOperation === null &&
+    !autofocusBusy;
 
   const write = (): void => {
     void writeGrblSetting(row.id, value)

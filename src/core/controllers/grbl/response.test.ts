@@ -11,6 +11,19 @@ describe('classifyResponse', () => {
     expect(classifyResponse('error:5')).toEqual({ kind: 'error', code: 5 });
   });
 
+  it('keeps unrecognized error responses safety-visible without inventing a GRBL code', () => {
+    expect(classifyResponse('error:7002009')).toEqual({
+      kind: 'error',
+      code: null,
+      raw: 'error:7002009',
+    });
+    expect(classifyResponse('error:7ok')).toEqual({
+      kind: 'error',
+      code: null,
+      raw: 'error:7ok',
+    });
+  });
+
   it('parses ALARM:N', () => {
     expect(classifyResponse('ALARM:9')).toEqual({ kind: 'alarm', code: 9 });
   });

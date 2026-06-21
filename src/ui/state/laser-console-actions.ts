@@ -3,6 +3,7 @@ import {
   startCollecting,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
+import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
@@ -74,6 +75,10 @@ function consoleCommandBlockReason(
   if (command.requiresNoActiveOperation) {
     if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
     if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
+    const controllerOperationMessage = controllerOperationCommandBlockMessage(
+      state.controllerOperation,
+    );
+    if (controllerOperationMessage !== null) return controllerOperationMessage;
     if (state.autofocusBusy) {
       return 'Auto-focus is running. Wait for it to finish before sending console commands.';
     }

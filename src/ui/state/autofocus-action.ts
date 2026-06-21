@@ -25,7 +25,7 @@ export const AUTOFOCUS_TIMEOUT_MS = 15_000;
 
 export type AutofocusResult =
   | { readonly kind: 'ok' }
-  | { readonly kind: 'rejected'; readonly errorCode: number; readonly raw: string }
+  | { readonly kind: 'rejected'; readonly errorCode: number | null; readonly raw: string }
   | { readonly kind: 'alarm'; readonly alarmCode: number | null }
   | { readonly kind: 'timeout' }
   | { readonly kind: 'preflight-failed'; readonly reason: string };

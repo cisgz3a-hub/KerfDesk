@@ -42,7 +42,9 @@ export type LaserSafetyNotice =
     }
   | {
       readonly kind: 'controller-error';
-      readonly code: number;
+      readonly code: number | null;
+      readonly raw?: string;
+      readonly rejectedLine?: string;
       readonly message: string;
     }
   | {
@@ -129,32 +131,45 @@ export function writeFailedNotice(action: LaserSafetyAction): LaserSafetyNotice 
 export type ControllerErrorContext = 'job' | 'frame' | 'jog' | 'command';
 
 export function controllerErrorMessage(
-  code: number,
+  code: number | null,
   context: ControllerErrorContext = 'job',
+  raw?: string,
+  rejectedLine?: string,
 ): string {
+  const errorText =
+    code === null ? `unrecognized controller error response: ${raw ?? 'error'}` : `error:${code}`;
+  const rejectedText = rejectedLine === undefined ? '' : ` Rejected line: ${rejectedLine.trim()}`;
   if (context === 'job') {
     return (
-      `The controller rejected a command (error:${code}) during the job, so the job was ` +
+      `The controller rejected a command (${errorText}) during the job, so the job was ` +
       'stopped. The head may be mispositioned and the laser may have fired out of place. ' +
-      'Use physical E-stop or power cutoff now if unsafe, then home before re-running.'
+      `Use physical E-stop or power cutoff now if unsafe, then home before re-running.${rejectedText}`
     );
   }
   if (context === 'frame' || context === 'jog') {
     return (
-      `The controller rejected a ${context} command (error:${code}). ` +
+      `The controller rejected a ${context} command (${errorText}). ` +
       'Wait until the controller reports Idle before jogging or framing again. ' +
-      'If the head moved unexpectedly, use physical E-stop or power cutoff now if unsafe.'
+      `If the head moved unexpectedly, use physical E-stop or power cutoff now if unsafe.${rejectedText}`
     );
   }
   return (
-    `The controller rejected a command (error:${code}). ` +
-    'Check the Laser Log, wait for Idle, and home before continuing if position is uncertain.'
+    `The controller rejected a command (${errorText}). ` +
+    `Check the Laser Log, wait for Idle, and home before continuing if position is uncertain.${rejectedText}`
   );
 }
 
 export function controllerErrorNotice(
-  code: number,
+  code: number | null,
   context: ControllerErrorContext = 'job',
+  raw?: string,
+  rejectedLine?: string,
 ): LaserSafetyNotice {
-  return { kind: 'controller-error', code, message: controllerErrorMessage(code, context) };
+  return {
+    kind: 'controller-error',
+    code,
+    ...(raw === undefined ? {} : { raw }),
+    ...(rejectedLine === undefined ? {} : { rejectedLine: rejectedLine.trim() }),
+    message: controllerErrorMessage(code, context, raw, rejectedLine),
+  };
 }

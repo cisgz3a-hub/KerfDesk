@@ -165,6 +165,38 @@ describe('grblStrategy multi-pass repeats the segment block per pass', () => {
     // Same coordinates appear three times (once per pass).
     expect(out.match(/G1 X5\.000 Y0\.000 F1000 S1000/g)).toHaveLength(3);
   });
+
+  it('re-arms constant-power cut mode at zero power before each repeated pass', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'cut',
+          layerId: 'falcon-cut',
+          color: '#ff0000',
+          power: 60,
+          speed: 1200,
+          passes: 2,
+          airAssist: false,
+          segments: [
+            {
+              polyline: [
+                { x: 0, y: 0 },
+                { x: 5, y: 0 },
+                { x: 5, y: 5 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    const out = emit(job);
+
+    expect(out).toContain(
+      ['; pass 2 of 2', 'M3 S0', 'G0 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 F1200 S600'].join('\n'),
+    );
+  });
 });
 
 describe('grblStrategy fill hatch overscan', () => {

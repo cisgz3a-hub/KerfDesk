@@ -27,4 +27,43 @@ describe('project device profile metadata persistence', () => {
     if (result.kind !== 'ok') return;
     expect(result.project.device.gcodeDialect).toEqual({ dialectId: 'grbl-dynamic' });
   });
+
+  it('clears stale Z travel confirmation when loaded profile has no positive Z travel', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    raw.device.capabilities = ['grbl', 'z-axis'];
+    raw.device.zTravelConfirmed = true;
+    delete raw.device.zTravelMm;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.zTravelConfirmed).toBe(false);
+  });
+
+  it('clears stale Z travel confirmation when loaded profile has no powered Z capability', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    raw.device.capabilities = ['grbl'];
+    raw.device.zTravelMm = 75;
+    raw.device.zTravelConfirmed = true;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.zTravelMm).toBe(75);
+    expect(result.project.device.zTravelConfirmed).toBe(false);
+  });
+
+  it('rejects malformed loaded Z travel metadata', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    raw.device.zTravelMm = -5;
+    raw.device.zTravelConfirmed = 'yes';
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.reason).toMatch(/device\.zTravelMm|device\.zTravelConfirmed/);
+  });
 });

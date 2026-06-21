@@ -1,9 +1,12 @@
 import {
   CMD_SETTINGS,
+  idleCollector,
   startCollecting,
   type GrblSettingRow,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
+import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
+import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
   ACTIVE_JOB_COMMAND_MESSAGE,
@@ -20,11 +23,11 @@ type SetFn = (
 type GetFn = () => LaserState;
 type SettingsWriteFn = (
   line: string,
-  action: LaserSafetyAction | undefined,
-  source: TranscriptSource,
+  action?: LaserSafetyAction,
+  source?: TranscriptSource,
 ) => Promise<void>;
 
-export type GrblSettingsActionRefs = {
+export type GrblSettingsActionRefs = ControllerLifecycleRefs & {
   settingsCollector: SettingsCollectorState;
 };
 
@@ -35,33 +38,131 @@ export function grblSettingsActions(
   write: SettingsWriteFn,
 ): Pick<LaserState, 'readMachineSettings' | 'writeGrblSetting'> {
   return {
-    readMachineSettings: async () => {
-      const blocked = machineSettingsReadBlockReason(get(), refs);
-      if (blocked !== null) return blockRead(set, get, blocked);
-      refs.settingsCollector = startCollecting();
-      set({
-        detectedSettings: null,
-        controllerSettings: null,
-        grblSettingsRows: [],
-        lastSettingsReadAt: null,
-      });
-      await write(`${CMD_SETTINGS}\n`, 'console', 'console');
-    },
-    writeGrblSetting: async (id, value) => {
-      const blocked = machineSettingsWriteBlockReason(get(), refs, id, value);
-      if (blocked !== null) return blockWrite(set, get, blocked);
-      const trimmed = value.trim();
-      await write(`$${id}=${trimmed}\n`, 'console', 'console');
-      refs.settingsCollector = startCollecting();
-      set({
-        detectedSettings: null,
-        controllerSettings: null,
-        grblSettingsRows: [],
-        lastSettingsReadAt: null,
-      });
-      await write(`${CMD_SETTINGS}\n`, 'console', 'console');
-    },
+    readMachineSettings: () => readMachineSettingsAction(set, get, refs, write),
+    writeGrblSetting: (id, value) => writeGrblSettingAction(set, get, refs, write, id, value),
   };
+}
+
+async function readMachineSettingsAction(
+  set: SetFn,
+  get: GetFn,
+  refs: GrblSettingsActionRefs,
+  write: SettingsWriteFn,
+): Promise<void> {
+  const blocked = machineSettingsReadBlockReason(get(), refs);
+  if (blocked !== null) return blockRead(set, get, blocked);
+  refs.settingsCollector = startCollecting();
+  set({
+    controllerOperation: {
+      kind: 'interactive-command',
+      phase: 'command',
+      label: 'Reading controller settings',
+    },
+    detectedSettings: null,
+    controllerSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
+  });
+  try {
+    await startControllerCommand(refs, write, {
+      kind: 'interactive-command',
+      label: 'read controller settings',
+      command: `${CMD_SETTINGS}\n`,
+      action: 'console',
+      source: 'console',
+    });
+    clearInteractiveOperation(set);
+  } catch (err) {
+    failSettingsOperation(set, get, refs, 'read', err);
+  }
+}
+
+async function writeGrblSettingAction(
+  set: SetFn,
+  get: GetFn,
+  refs: GrblSettingsActionRefs,
+  write: SettingsWriteFn,
+  id: number,
+  value: string,
+): Promise<void> {
+  const blocked = machineSettingsWriteBlockReason(get(), refs, id, value);
+  if (blocked !== null) return blockWrite(set, get, blocked);
+  const trimmed = value.trim();
+  set({
+    controllerOperation: {
+      kind: 'interactive-command',
+      phase: 'command',
+      label: `Writing $${id}`,
+    },
+  });
+  try {
+    await writeAndVerifySetting(set, get, refs, write, id, trimmed);
+    clearInteractiveOperation(set);
+  } catch (err) {
+    failSettingsOperation(set, get, refs, 'write', err);
+  }
+}
+
+async function writeAndVerifySetting(
+  set: SetFn,
+  get: GetFn,
+  refs: GrblSettingsActionRefs,
+  write: SettingsWriteFn,
+  id: number,
+  trimmed: string,
+): Promise<void> {
+  await startControllerCommand(refs, write, {
+    kind: 'interactive-command',
+    label: `write $${id}`,
+    command: `$${id}=${trimmed}\n`,
+    action: 'console',
+    source: 'console',
+  });
+  refs.settingsCollector = startCollecting();
+  set({
+    controllerOperation: {
+      kind: 'interactive-command',
+      phase: 'command',
+      label: `Verifying $${id}`,
+    },
+    detectedSettings: null,
+    controllerSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
+  });
+  await startControllerCommand(refs, write, {
+    kind: 'interactive-command',
+    label: 'verify controller settings',
+    command: `${CMD_SETTINGS}\n`,
+    action: 'console',
+    source: 'console',
+  });
+  if (!settingWasVerified(get, id, trimmed)) {
+    throw new Error(`Controller did not report $${id}=${trimmed} after re-read.`);
+  }
+}
+
+function settingWasVerified(get: GetFn, id: number, trimmed: string): boolean {
+  return get().grblSettingsRows.some(
+    (row) => row.id === id && Number(row.rawValue) === Number(trimmed),
+  );
+}
+
+function failSettingsOperation(
+  set: SetFn,
+  get: GetFn,
+  refs: GrblSettingsActionRefs,
+  operation: 'read' | 'write',
+  err: unknown,
+): never {
+  refs.settingsCollector = idleCollector();
+  clearInteractiveOperation(set);
+  const message = err instanceof Error ? err.message : String(err);
+  set({
+    lastWriteError: message,
+    log: pushLog(get(), `[lf2] Machine settings ${operation} failed: ${message}`),
+  });
+  throw err instanceof Error ? err : new Error(message);
 }
 
 function machineSettingsReadBlockReason(
@@ -71,6 +172,8 @@ function machineSettingsReadBlockReason(
   if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
   if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
   if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
+  const controllerOperationMessage = controllerOperationCommandBlockMessage(state.controllerOperation);
+  if (controllerOperationMessage !== null) return controllerOperationMessage;
   if (state.autofocusBusy) {
     return 'Auto-focus is running. Wait for it to finish before reading machine settings.';
   }
@@ -128,4 +231,12 @@ function blockWrite(set: SetFn, get: GetFn, reason: string): never {
     log: pushLog(get(), `[lf2] Machine settings write blocked: ${reason}`),
   });
   throw new Error(reason);
+}
+
+function clearInteractiveOperation(set: SetFn): void {
+  set((state) =>
+    state.controllerOperation?.kind === 'interactive-command'
+      ? { controllerOperation: null }
+      : {},
+  );
 }

@@ -41,6 +41,8 @@ export function ProfileRows(props: DeviceRowsProps): JSX.Element {
 
 export function ZRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
+  const supportsZAxis = profileSupportsCapability(device, 'z-axis');
+  const canConfirmZTravel = supportsZAxis && isPositive(device.zTravelMm);
   return (
     <>
       <Row label="Powered Z">
@@ -50,12 +52,14 @@ export function ZRows(props: DeviceRowsProps): JSX.Element {
         >
           <input
             type="checkbox"
-            checked={profileSupportsCapability(device, 'z-axis')}
-            onChange={(e) =>
+            checked={supportsZAxis}
+            onChange={(e) => {
+              const enabled = e.target.checked;
               update({
-                capabilities: setCapability(device.capabilities, 'z-axis', e.target.checked),
-              })
-            }
+                capabilities: setCapability(device.capabilities, 'z-axis', enabled),
+                zTravelConfirmed: false,
+              });
+            }}
             aria-label="Powered Z jog enabled"
             title="Shows manual Z focus jog buttons after Z travel is confirmed."
           />
@@ -85,12 +89,20 @@ export function ZRows(props: DeviceRowsProps): JSX.Element {
           <input
             type="checkbox"
             checked={device.zTravelConfirmed === true}
+            disabled={!canConfirmZTravel}
             onChange={(e) => update({ zTravelConfirmed: e.target.checked })}
             aria-label="Z travel confirmed"
-            title="Confirm only after checking the real Z travel / clearance on this machine."
+            title={
+              canConfirmZTravel
+                ? 'Confirm only after checking the real Z travel / clearance on this machine.'
+                : 'Enable Powered Z and enter the measured Z travel before confirming.'
+            }
           />
           <span>Confirmed</span>
         </label>
+        {!canConfirmZTravel && (
+          <span style={warningTextStyle}>Enable Powered Z and enter measured travel first.</span>
+        )}
       </Row>
       <Row label="Z probe">
         <label style={inlineLabelStyle} title="Records whether this machine has a Z-probe.">
@@ -120,6 +132,10 @@ function setCapability(
   return current.filter((item) => item !== capability);
 }
 
+function isPositive(value: number | undefined): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
 function neotronicsProfileConfirmation(): string {
   return [
     'Apply the Neotronics 4040 Max / LT-4LDS-V2 20W laser profile?',
@@ -135,4 +151,8 @@ const inlineLabelStyle: React.CSSProperties = {
   gap: 4,
   fontSize: 12,
   cursor: 'pointer',
+};
+const warningTextStyle: React.CSSProperties = {
+  color: 'var(--lf-text-muted)',
+  fontSize: 11,
 };
