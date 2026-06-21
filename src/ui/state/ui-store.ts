@@ -50,6 +50,12 @@ export type SelectionMarquee = {
   readonly end: Vec2;
 };
 
+export type WorkspaceContextBarState = {
+  readonly x: number;
+  readonly y: number;
+  readonly context: 'workspace-empty' | 'workspace-selection';
+};
+
 export type UiState = {
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
@@ -61,6 +67,9 @@ export type UiState = {
   readonly setSelectionAnchor: (next: SelectionAnchor) => void;
   readonly selectionMarquee: SelectionMarquee | null;
   readonly setSelectionMarquee: (next: SelectionMarquee | null) => void;
+  readonly workspaceContextBar: WorkspaceContextBarState | null;
+  readonly openWorkspaceContextBar: (next: WorkspaceContextBarState) => void;
+  readonly closeWorkspaceContextBar: () => void;
   // Current drawing layer color. LightBurn's color/layer palette sets the
   // target color for subsequently-created vectors; this mirrors that behavior
   // without making layer selection undoable project data.
@@ -133,6 +142,9 @@ export const useUiStore = create<UiState>((set) => ({
   setSelectionAnchor: (next) => set({ selectionAnchor: next }),
   selectionMarquee: null,
   setSelectionMarquee: (next) => set({ selectionMarquee: next }),
+  workspaceContextBar: null,
+  openWorkspaceContextBar: (next) => set({ workspaceContextBar: next }),
+  closeWorkspaceContextBar: () => set({ workspaceContextBar: null }),
   activeLayerColor: null,
   setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,

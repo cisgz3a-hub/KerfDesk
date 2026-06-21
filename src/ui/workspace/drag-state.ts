@@ -37,6 +37,7 @@ export type DragState =
     }
   | {
       readonly kind: 'pan';
+      readonly trigger: 'middle-button' | 'right-button' | 'space-left-button';
       readonly startClientX: number;
       readonly startClientY: number;
       readonly startPanX: number;
@@ -80,6 +81,7 @@ export function pickHandleDrag(args: {
 // to learn the Space modifier to pan with a regular mouse.
 const MIDDLE_BUTTON = 1;
 const RIGHT_BUTTON = 2;
+const CONTEXT_CLICK_TOLERANCE_PX = 4;
 
 // Resolve a mouse-down event to the drag it should initiate. Pure of
 // React — takes side-effect callbacks (selection updates) so the hook in
@@ -98,10 +100,11 @@ export function computeMouseDownDrag(args: {
   // button (CAD convention), right button (alternative for users
   // without middle button). All three create the same pan DragState
   // and use the same downstream offset math.
-  const isPanButton = e.button === MIDDLE_BUTTON || e.button === RIGHT_BUTTON;
-  if (useUiStore.getState().spaceDown || isPanButton) {
+  const trigger = panTriggerForMouseDown(e.button, useUiStore.getState().spaceDown);
+  if (trigger !== null) {
     return {
       kind: 'pan',
+      trigger,
       startClientX: e.clientX,
       startClientY: e.clientY,
       startPanX: useUiStore.getState().panX,
@@ -134,6 +137,26 @@ export function computeMouseDownDrag(args: {
     startTx: obj.transform.x,
     startTy: obj.transform.y,
   };
+}
+
+function panTriggerForMouseDown(
+  button: number,
+  spaceDown: boolean,
+): Extract<DragState, { kind: 'pan' }>['trigger'] | null {
+  if (spaceDown && button === 0) return 'space-left-button';
+  if (button === MIDDLE_BUTTON) return 'middle-button';
+  if (button === RIGHT_BUTTON) return 'right-button';
+  return null;
+}
+
+export function isStationaryRightPanClick(
+  drag: Extract<DragState, { kind: 'pan' }>,
+  e: { readonly clientX: number; readonly clientY: number },
+): boolean {
+  if (drag.trigger !== 'right-button') return false;
+  const dx = e.clientX - drag.startClientX;
+  const dy = e.clientY - drag.startClientY;
+  return Math.hypot(dx, dy) <= CONTEXT_CLICK_TOLERANCE_PX;
 }
 
 // Convert a pan-drag mousemove into the next (panX, panY) in scene-mm.

@@ -1,9 +1,17 @@
 import { useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
-import type { Project, SelectionAnchor, ShapeObject, Transform, Vec2 } from '../../core/scene';
+import {
+  hitTest,
+  type Project,
+  type SelectionAnchor,
+  type ShapeObject,
+  type Transform,
+  type Vec2,
+} from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import {
   computeMouseDownDrag,
+  isStationaryRightPanClick,
   type DragState,
   nextTransformForDrag,
   panOffsetForDrag,
@@ -59,6 +67,7 @@ export function useDragMove(
   const [drag, setDrag] = useState<DragState | null>(null);
 
   const handleMouseDown = (e: CanvasMouseEvent): void => {
+    useUiStore.getState().closeWorkspaceContextBar();
     if (previewMode) return;
     const next = beginWorkspaceDrag({
       e,
@@ -107,6 +116,7 @@ export function useDragMove(
       viewState,
       drawShape,
       setDraftShape,
+      selectObject,
       selectObjects,
       setSelectionMarquee,
       endInteraction,
@@ -205,6 +215,7 @@ function finishWorkspaceDrag(args: {
   readonly viewState: WorkspaceViewState;
   readonly drawShape: (shape: ShapeObject) => void;
   readonly setDraftShape: (shape: ShapeObject | null) => void;
+  readonly selectObject: (id: string | null) => void;
   readonly selectObjects: (
     ids: ReadonlyArray<string>,
     options?: { readonly additive?: boolean },
@@ -218,11 +229,46 @@ function finishWorkspaceDrag(args: {
     commitDrawDraft({ ...args, drag: args.drag });
     return;
   }
+  const drag = args.drag;
+  if (drag.kind === 'pan') {
+    openContextBarForRightClick({
+      drag,
+      e: args.e,
+      ref: args.ref,
+      project: args.project,
+      viewState: args.viewState,
+      selectObject: args.selectObject,
+    });
+    return;
+  }
   if (args.drag.kind === 'marquee') {
     commitSelectionMarquee({ ...args, drag: args.drag });
     return;
   }
-  if (args.drag !== null && args.drag.kind !== 'pan') args.endInteraction();
+  args.endInteraction();
+}
+
+function openContextBarForRightClick(args: {
+  readonly drag: Extract<DragState, { kind: 'pan' }>;
+  readonly e: CanvasMouseEvent;
+  readonly ref: CanvasRef;
+  readonly project: Project;
+  readonly viewState: WorkspaceViewState;
+  readonly selectObject: (id: string | null) => void;
+}): void {
+  if (args.e.type !== 'mouseup') return;
+  if (!isStationaryRightPanClick(args.drag, args.e)) return;
+  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  const hitId = point === null ? null : hitTest(args.project.scene, point);
+  if (hitId !== null) args.selectObject(hitId);
+  const current = useStore.getState();
+  const hasSelection =
+    hitId !== null || current.selectedObjectId !== null || current.additionalSelectedIds.size > 0;
+  useUiStore.getState().openWorkspaceContextBar({
+    x: args.e.clientX,
+    y: args.e.clientY,
+    context: hasSelection ? 'workspace-selection' : 'workspace-empty',
+  });
 }
 
 function updateDrawDraft(args: {
