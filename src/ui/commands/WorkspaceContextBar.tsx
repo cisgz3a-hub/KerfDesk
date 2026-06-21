@@ -112,10 +112,10 @@ function commandsForIds(
   });
 }
 
-function clampedPosition(state: {
-  readonly x: number;
-  readonly y: number;
-}): { readonly left: number; readonly top: number } {
+function clampedPosition(state: { readonly x: number; readonly y: number }): {
+  readonly left: number;
+  readonly top: number;
+} {
   return {
     left: clamp(state.x, FLOATING_MARGIN_PX, window.innerWidth - BAR_WIDTH_PX),
     top: clamp(state.y, FLOATING_MARGIN_PX, window.innerHeight - BAR_HEIGHT_PX),

@@ -98,11 +98,12 @@ describe('isStationaryRightPanClick', () => {
   });
 
   it('never opens the context bar for middle-button or Space panning', () => {
-    expect(isStationaryRightPanClick(panDrag('middle-button'), { clientX: 100, clientY: 100 })).toBe(
-      false,
-    );
-    expect(isStationaryRightPanClick(panDrag('space-left-button'), { clientX: 100, clientY: 100 }))
-      .toBe(false);
+    expect(
+      isStationaryRightPanClick(panDrag('middle-button'), { clientX: 100, clientY: 100 }),
+    ).toBe(false);
+    expect(
+      isStationaryRightPanClick(panDrag('space-left-button'), { clientX: 100, clientY: 100 }),
+    ).toBe(false);
   });
 });
 
@@ -118,10 +119,9 @@ function centerOf(bbox: {
   };
 }
 
-function panDrag(trigger: 'middle-button' | 'right-button' | 'space-left-button'): Extract<
-  DragState,
-  { kind: 'pan' }
-> {
+function panDrag(
+  trigger: 'middle-button' | 'right-button' | 'space-left-button',
+): Extract<DragState, { kind: 'pan' }> {
   return {
     kind: 'pan',
     trigger,

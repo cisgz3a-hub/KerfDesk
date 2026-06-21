@@ -27,9 +27,7 @@ afterEach(async () => {
 
 describe('WorkspaceContextBar', () => {
   it('shows empty-workspace commands without selection-only actions', async () => {
-    useUiStore
-      .getState()
-      .openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-empty' });
+    useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-empty' });
     const h = await renderBar(commands());
 
     expect(h.textContent).toContain('Paste');
@@ -43,9 +41,7 @@ describe('WorkspaceContextBar', () => {
 
   it('runs enabled quick-bar commands through the command object and closes', async () => {
     const onDuplicate = vi.fn();
-    useUiStore
-      .getState()
-      .openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
+    useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
     const h = await renderBar(commands({ 'edit.duplicate': onDuplicate }));
 
     await clickButton(h, 'Duplicate');
@@ -56,9 +52,7 @@ describe('WorkspaceContextBar', () => {
 
   it('keeps disabled command buttons inert', async () => {
     const onCopy = vi.fn();
-    useUiStore
-      .getState()
-      .openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
+    useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
     const h = await renderBar(commands({ 'edit.copy': onCopy }, new Set(['edit.copy'])));
     const copy = buttonByText(h, 'Copy');
 
@@ -70,9 +64,7 @@ describe('WorkspaceContextBar', () => {
   });
 
   it('shows context More actions but excludes laser machine commands', async () => {
-    useUiStore
-      .getState()
-      .openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
+    useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
     const h = await renderBar(commands());
 
     await clickButton(h, 'More');
@@ -87,9 +79,7 @@ describe('WorkspaceContextBar', () => {
   it('clamps the floating surface inside the viewport', async () => {
     vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(320);
     vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(180);
-    useUiStore
-      .getState()
-      .openWorkspaceContextBar({ x: 999, y: 999, context: 'workspace-empty' });
+    useUiStore.getState().openWorkspaceContextBar({ x: 999, y: 999, context: 'workspace-empty' });
     const h = await renderBar(commands());
     const menu = h.querySelector('[aria-label="Workspace quick actions"]');
     if (!(menu instanceof HTMLElement)) throw new Error('quick bar missing');
