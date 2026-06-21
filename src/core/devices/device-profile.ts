@@ -193,6 +193,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   laserModeEnabled: true,
   airAssistCommand: 'none',
   gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+  framingFeedMmPerMin: 2000,
   noGoZones: [],
   capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
   evidence: [

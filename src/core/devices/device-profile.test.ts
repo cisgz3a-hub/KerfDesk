@@ -122,4 +122,11 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
       },
     });
   });
+
+  it('does not inherit the Falcon-class frame feed for the heavier Neotronics 4040', () => {
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.framingFeedMmPerMin).toBeLessThan(
+      DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
+    );
+    expect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.framingFeedMmPerMin).toBeGreaterThanOrEqual(1000);
+  });
 });
