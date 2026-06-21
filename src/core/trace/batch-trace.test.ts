@@ -75,4 +75,23 @@ describe('traceImagesToSvgFiles', () => {
     expect(trace).toHaveBeenNthCalledWith(1, rawImage(1, 1), customOptions);
     expect(trace).toHaveBeenNthCalledWith(2, rawImage(2, 2), DEFAULT_TRACE_OPTIONS);
   });
+
+  it('writes physical dimensions into standalone SVG exports when provided', async () => {
+    const trace = vi.fn(async () => [SQUARE_PATH]);
+
+    const files = await traceImagesToSvgFiles(
+      [
+        {
+          sourceName: 'wide-logo.png',
+          image: rawImage(1000, 500),
+          physicalSizeMm: { widthMm: 100, heightMm: 50 },
+        },
+      ],
+      { trace },
+    );
+
+    expect(files[0]?.svg).toContain('viewBox="0 0 1000 500"');
+    expect(files[0]?.svg).toContain('width="100mm"');
+    expect(files[0]?.svg).toContain('height="50mm"');
+  });
 });

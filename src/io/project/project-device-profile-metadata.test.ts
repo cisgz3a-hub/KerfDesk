@@ -28,6 +28,19 @@ describe('project device profile metadata persistence', () => {
     expect(result.project.device.gcodeDialect).toEqual({ dialectId: 'grbl-dynamic' });
   });
 
+  it('replaces legacy Neotronics 4040 frame feed with the safer built-in feed', () => {
+    const raw = JSON.parse(serializeProject(createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE)));
+    raw.device.framingFeedMmPerMin = 6000;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.framingFeedMmPerMin).toBe(
+      NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.framingFeedMmPerMin,
+    );
+  });
+
   it('clears stale Z travel confirmation when loaded profile has no positive Z travel', () => {
     const raw = JSON.parse(serializeProject(createProject()));
     raw.device.capabilities = ['grbl', 'z-axis'];

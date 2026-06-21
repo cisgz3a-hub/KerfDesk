@@ -25,21 +25,31 @@ import type { ColoredPath } from '../scene';
 // just inflates the string.
 const ROUND_DP = 2;
 
+export type SvgPhysicalSize = {
+  readonly widthMm: number;
+  readonly heightMm: number;
+};
+
 export function coloredPathsToSvg(
   paths: ReadonlyArray<ColoredPath>,
   width: number,
   height: number,
+  physicalSize?: SvgPhysicalSize,
 ): string {
-  const header = svgOpen(width, height);
+  const header = svgOpen(width, height, physicalSize);
   const body = paths.map(coloredPathToSvgPath).join('');
   return `${header}${body}</svg>`;
 }
 
-function svgOpen(width: number, height: number): string {
+function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize): string {
+  const sizeAttrs =
+    physicalSize === undefined
+      ? ' width="100%" height="100%"'
+      : ` width="${round(physicalSize.widthMm)}mm" height="${round(physicalSize.heightMm)}mm"`;
   return (
     '<svg xmlns="http://www.w3.org/2000/svg"' +
     ` viewBox="0 0 ${width} ${height}"` +
-    ' width="100%" height="100%"' +
+    sizeAttrs +
     ' preserveAspectRatio="xMidYMid meet">'
   );
 }
