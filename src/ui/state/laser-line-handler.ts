@@ -307,11 +307,7 @@ function shouldReleaseStreamerAtIdle(
   streamer: StreamerState | null,
   report: StatusReport,
 ): boolean {
-  return (
-    streamer !== null &&
-    streamer.status === 'errored' &&
-    report.state === 'Idle'
-  );
+  return streamer !== null && streamer.status === 'errored' && report.state === 'Idle';
 }
 
 function statusPositionPatch(

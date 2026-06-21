@@ -86,7 +86,8 @@ export async function runHomeAction(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     set((state) => ({
-      controllerOperation: state.controllerOperation?.kind === 'home' ? null : state.controllerOperation,
+      controllerOperation:
+        state.controllerOperation?.kind === 'home' ? null : state.controllerOperation,
       homingState: 'unknown',
       lastWriteError: message,
       safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
