@@ -61,7 +61,9 @@ export function startControllerCommand(
   options: StartControllerCommandOptions,
 ): Promise<ReadonlyArray<string>> {
   if (refs.controllerCommand !== null) {
-    return Promise.reject(new Error('A controller command is already waiting for acknowledgement.'));
+    return Promise.reject(
+      new Error('A controller command is already waiting for acknowledgement.'),
+    );
   }
   return new Promise((resolve, reject) => {
     const request: ControllerCommandRequest = {

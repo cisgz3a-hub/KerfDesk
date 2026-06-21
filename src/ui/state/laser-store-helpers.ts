@@ -60,7 +60,9 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   if (activeJobMessage !== null) return activeJobMessage;
   const motionOperationMessage = motionOperationCommandBlockMessage(state);
   if (motionOperationMessage !== null) return motionOperationMessage;
-  const controllerOperationMessage = controllerOperationCommandBlockMessage(state.controllerOperation);
+  const controllerOperationMessage = controllerOperationCommandBlockMessage(
+    state.controllerOperation,
+  );
   if (controllerOperationMessage !== null) return controllerOperationMessage;
   if (state.statusReport === null) return UNKNOWN_IDLE_STATUS_MESSAGE;
   if (state.statusReport.state !== 'Idle') {

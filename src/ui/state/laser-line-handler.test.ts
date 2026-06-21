@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  createStreamer,
-  idleCollector,
-  startCollecting,
-  step,
-} from '../../core/controllers/grbl';
+import { createStreamer, idleCollector, startCollecting, step } from '../../core/controllers/grbl';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
 import type { FrameVerification } from './frame-verification';

@@ -46,8 +46,8 @@ import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import {
+  activeJobCommandBlockMessage,
   assertAutofocusIdle,
-  assertNoActiveJob,
   buildPortClosePatch,
   detectStreamStall,
   disconnectStopCommands,
@@ -213,11 +213,19 @@ function teardown(): void {
   refs.controllerIdleWait = null;
 }
 
-async function safeWrite(set: SetFn, get: GetFn, line: string, action?: Parameters<typeof writeFailedNotice>[0], source?: TranscriptSource): Promise<void> {
+async function safeWrite(
+  set: SetFn,
+  get: GetFn,
+  line: string,
+  action?: Parameters<typeof writeFailedNotice>[0],
+  source?: TranscriptSource,
+): Promise<void> {
   await createSafeWrite(set, get, refs)(line, action, source);
 }
 
-type SetFn = (partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState)) => void;
+type SetFn = (
+  partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
+) => void;
 type GetFn = () => LaserState;
 
 function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' | 'disconnect'> {
@@ -331,8 +339,8 @@ function jogActions(
       );
     },
     autofocus: async (command) => {
-      const activeJobBlock = idleCommandBlockResult(get());
-      if (activeJobBlock !== null) return activeJobBlock;
+      const activeJobBlock = activeJobCommandBlockMessage(get());
+      if (activeJobBlock !== null) return { kind: 'preflight-failed', reason: activeJobBlock };
       const motionOperationBlock = motionOperationCommandBlockMessage(get());
       if (motionOperationBlock !== null) {
         return { kind: 'preflight-failed', reason: motionOperationBlock };
@@ -448,13 +456,3 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   clearSafetyNotice: () => set({ safetyNotice: null }),
   markFrameVerified: (verification) => set({ frameVerification: verification }),
 }));
-
-function idleCommandBlockResult(state: LaserState): AutofocusResult | null {
-  try {
-    assertNoActiveJob(state);
-    return null;
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    return { kind: 'preflight-failed', reason };
-  }
-}

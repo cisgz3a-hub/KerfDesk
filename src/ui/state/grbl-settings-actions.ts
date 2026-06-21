@@ -172,7 +172,9 @@ function machineSettingsReadBlockReason(
   if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
   if (isActiveJob(state.streamer)) return ACTIVE_JOB_COMMAND_MESSAGE;
   if (state.motionOperation !== null) return MOTION_OPERATION_ACTIVE_MESSAGE;
-  const controllerOperationMessage = controllerOperationCommandBlockMessage(state.controllerOperation);
+  const controllerOperationMessage = controllerOperationCommandBlockMessage(
+    state.controllerOperation,
+  );
   if (controllerOperationMessage !== null) return controllerOperationMessage;
   if (state.autofocusBusy) {
     return 'Auto-focus is running. Wait for it to finish before reading machine settings.';
@@ -235,8 +237,6 @@ function blockWrite(set: SetFn, get: GetFn, reason: string): never {
 
 function clearInteractiveOperation(set: SetFn): void {
   set((state) =>
-    state.controllerOperation?.kind === 'interactive-command'
-      ? { controllerOperation: null }
-      : {},
+    state.controllerOperation?.kind === 'interactive-command' ? { controllerOperation: null } : {},
   );
 }

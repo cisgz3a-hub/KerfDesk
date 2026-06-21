@@ -112,7 +112,9 @@ function isMachineOperationBusy(state: {
   readonly motionOperation: unknown;
   readonly controllerOperation: unknown;
 }): boolean {
-  return state.autofocusBusy || state.motionOperation !== null || state.controllerOperation !== null;
+  return (
+    state.autofocusBusy || state.motionOperation !== null || state.controllerOperation !== null
+  );
 }
 
 function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
