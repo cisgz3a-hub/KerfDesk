@@ -80,7 +80,10 @@ export function Workspace(): JSX.Element {
         onMouseUp={handlers.onMouseUp}
         onMouseLeave={handlers.onMouseUp}
         onDoubleClick={handleCanvasDoubleClick}
-        onWheel={(e) => handleCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY })}
+        onWheel={(e) => {
+          useUiStore.getState().closeWorkspaceContextBar();
+          handleCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY });
+        }}
         onContextMenu={(e) => {
           // Right-click is rebound to pan; suppress the OS context
           // menu so a right-drag doesn't pop up the menu on release.

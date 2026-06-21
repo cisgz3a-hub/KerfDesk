@@ -28,6 +28,7 @@ import { importImageFile } from './import-image-action';
 import { runMultiFileTrace, type MultiFileTraceFile } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
 import { useAppCommands } from './use-app-commands';
+import { WorkspaceContextBar } from './WorkspaceContextBar';
 
 export function CommandShell(): JSX.Element {
   const imageInput = useRef<HTMLInputElement | null>(null);
@@ -62,6 +63,7 @@ export function CommandShell(): JSX.Element {
       <AppMenuBar commands={commands} />
       <Toolbar commands={commands} />
       <NumericEditsBar />
+      <WorkspaceContextBar commands={commands} />
       <ImageImportInput inputRef={imageInput} onPick={onImagePick} />
       <MultiFileTraceInput inputRef={multiFileTraceInput} onPick={onMultiFileTracePick} />
       {convertDialogOpen && selectedConvertible !== null ? (

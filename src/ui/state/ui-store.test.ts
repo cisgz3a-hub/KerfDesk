@@ -10,6 +10,7 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().setSelectionMarquee(null);
     useUiStore.getState().setActiveLayerColor(null);
     useUiStore.getState().setShowPreviewTravel(true);
+    useUiStore.getState().closeWorkspaceContextBar();
   });
 
   it('setToolMode clears the pen draft when switching to a non-pen draw tool', () => {
@@ -63,5 +64,17 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().setSelectionMarquee(marquee);
 
     expect(useUiStore.getState().selectionMarquee).toEqual(marquee);
+  });
+
+  it('tracks the workspace right-click quick bar outside project history', () => {
+    const quickBar = { x: 200, y: 120, context: 'workspace-selection' as const };
+
+    useUiStore.getState().openWorkspaceContextBar(quickBar);
+
+    expect(useUiStore.getState().workspaceContextBar).toEqual(quickBar);
+
+    useUiStore.getState().closeWorkspaceContextBar();
+
+    expect(useUiStore.getState().workspaceContextBar).toBeNull();
   });
 });

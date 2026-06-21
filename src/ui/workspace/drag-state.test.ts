@@ -5,7 +5,7 @@ import {
   type SceneObject,
   type Transform,
 } from '../../core/scene';
-import { nextTransformForDrag, type DragState } from './drag-state';
+import { isStationaryRightPanClick, nextTransformForDrag, type DragState } from './drag-state';
 
 const SE_SCALE: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }> = {
   kind: 'scale',
@@ -84,6 +84,28 @@ describe('nextTransformForDrag scale modifiers', () => {
   });
 });
 
+describe('isStationaryRightPanClick', () => {
+  it('treats a stationary right-button pan candidate as a context click', () => {
+    const drag = panDrag('right-button');
+
+    expect(isStationaryRightPanClick(drag, { clientX: 104, clientY: 100 })).toBe(true);
+  });
+
+  it('keeps right-button drags as panning after the movement threshold', () => {
+    const drag = panDrag('right-button');
+
+    expect(isStationaryRightPanClick(drag, { clientX: 105, clientY: 100 })).toBe(false);
+  });
+
+  it('never opens the context bar for middle-button or Space panning', () => {
+    expect(isStationaryRightPanClick(panDrag('middle-button'), { clientX: 100, clientY: 100 })).toBe(
+      false,
+    );
+    expect(isStationaryRightPanClick(panDrag('space-left-button'), { clientX: 100, clientY: 100 }))
+      .toBe(false);
+  });
+});
+
 function centerOf(bbox: {
   readonly minX: number;
   readonly minY: number;
@@ -93,5 +115,19 @@ function centerOf(bbox: {
   return {
     x: (bbox.minX + bbox.maxX) / 2,
     y: (bbox.minY + bbox.maxY) / 2,
+  };
+}
+
+function panDrag(trigger: 'middle-button' | 'right-button' | 'space-left-button'): Extract<
+  DragState,
+  { kind: 'pan' }
+> {
+  return {
+    kind: 'pan',
+    trigger,
+    startClientX: 100,
+    startClientY: 100,
+    startPanX: 0,
+    startPanY: 0,
   };
 }
