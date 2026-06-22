@@ -56,6 +56,7 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateDevice(device),
     validateWorkspace(workspace),
     validateOptimization(raw['optimization']),
+    optionalString(raw, 'notes'),
     validateScene(scene),
   ]);
 }

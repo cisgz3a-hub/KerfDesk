@@ -71,6 +71,7 @@ export type CommandId =
   | 'laser.home'
   | 'window.toggle-preview'
   | 'window.fit-view'
+  | 'window.project-notes'
   | 'help.about';
 
 export type AppCommand = {
@@ -159,6 +160,7 @@ export type AppCommandContext = {
   readonly previewActive: boolean;
   readonly hasPreviewableContent: boolean;
   readonly resetView: () => void;
+  readonly projectNotes: () => void;
   readonly showAbout: () => void;
 };
 

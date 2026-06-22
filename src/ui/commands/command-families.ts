@@ -299,6 +299,13 @@ export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       ctx.resetView,
       'F',
     ),
+    enabled(
+      'window.project-notes',
+      'window',
+      'Project Notes...',
+      'Edit project notes',
+      ctx.projectNotes,
+    ),
   ];
 }
 

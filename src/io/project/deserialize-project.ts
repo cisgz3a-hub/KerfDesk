@@ -81,6 +81,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
     ...raw,
     device: normalizeDevice(dev),
     optimization: normalizeOptimization(raw['optimization']),
+    notes: typeof raw['notes'] === 'string' ? raw['notes'] : '',
     scene: {
       ...scene,
       objects: objects.map(normalizeSceneObject),

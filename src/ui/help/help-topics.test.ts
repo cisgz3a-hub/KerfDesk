@@ -54,6 +54,7 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'laser.home',
   'window.toggle-preview',
   'window.fit-view',
+  'window.project-notes',
   'help.about',
 ];
 

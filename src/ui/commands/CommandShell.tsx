@@ -27,6 +27,7 @@ import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion'
 import { importImageFile } from './import-image-action';
 import { runMultiFileTrace, type MultiFileTraceFile } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
+import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 
@@ -39,6 +40,7 @@ export function CommandShell(): JSX.Element {
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
+  const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
   const commands = useAppCommands({
@@ -54,6 +56,7 @@ export function CommandShell(): JSX.Element {
         'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.',
       ),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
+    requestProjectNotes: () => setProjectNotesOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
@@ -87,7 +90,26 @@ export function CommandShell(): JSX.Element {
       {optimizationDialogOpen ? (
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
       ) : null}
+      {projectNotesOpen ? <ProjectNotesPanel onClose={() => setProjectNotesOpen(false)} /> : null}
     </>
+  );
+}
+
+function ProjectNotesPanel(props: { readonly onClose: () => void }): JSX.Element {
+  useRegisterModal();
+  const notes = useStore((s) => s.project.notes);
+  const setProjectNotes = useStore((s) => s.setProjectNotes);
+  const pushToast = useToastStore((s) => s.pushToast);
+  return (
+    <ProjectNotesDialog
+      notes={notes}
+      onCancel={props.onClose}
+      onApply={(next) => {
+        setProjectNotes(next);
+        props.onClose();
+        pushToast('Updated project notes.', 'success');
+      }}
+    />
   );
 }
 

@@ -79,6 +79,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     previewActive: false,
     hasPreviewableContent: true,
     resetView: vi.fn(),
+    projectNotes: vi.fn(),
     showAbout: vi.fn(),
     canTransformSelection: false,
     canAlignSelection: false,
@@ -313,6 +314,19 @@ describe('buildAppCommands', () => {
     expect(runCommand(commandById(commands, 'tools.optimization-settings'))).toBe(true);
     expect(confirmDiscard).not.toHaveBeenCalled();
     expect(optimizationSettings).toHaveBeenCalled();
+  });
+
+  it('runs Project Notes from the Window menu without the destructive dirty-project guard', () => {
+    const confirmDiscard = vi.fn(async () => true);
+    const projectNotes = vi.fn();
+    const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, projectNotes }));
+
+    const command = commandById(commands, 'window.project-notes');
+
+    expect(command.enabled).toBe(true);
+    expect(runCommand(command)).toBe(true);
+    expect(confirmDiscard).not.toHaveBeenCalled();
+    expect(projectNotes).toHaveBeenCalledTimes(1);
   });
 
   it('enables Adjust Image only when a raster image is selected', () => {

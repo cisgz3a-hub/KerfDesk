@@ -30,6 +30,7 @@ export type CommandShellCallbacks = {
   readonly requestScanOffsetTest: () => void;
   readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
+  readonly requestProjectNotes: () => void;
   readonly showAbout: () => void;
 };
 
@@ -253,10 +254,11 @@ function laserCommandContext(
 function windowHelpCommandContext(
   callbacks: CommandShellCallbacks,
   app: ReturnType<typeof useStore.getState>,
-): Pick<AppCommandContext, 'togglePreview' | 'resetView' | 'showAbout'> {
+): Pick<AppCommandContext, 'togglePreview' | 'resetView' | 'projectNotes' | 'showAbout'> {
   return {
     togglePreview: app.togglePreview,
     resetView: useUiStore.getState().resetView,
+    projectNotes: callbacks.requestProjectNotes,
     showAbout: callbacks.showAbout,
   };
 }
