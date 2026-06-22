@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRectangle } from '../../core/shapes';
+import { DEFAULT_SNAP_SETTINGS, type SnapGuide } from '../workspace/snapping';
 import { useUiStore } from './ui-store';
 
 const ONE_VERTEX = { vertices: [{ x: 1, y: 2 }], cursor: null };
@@ -12,6 +13,8 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().setActiveLayerColor(null);
     useUiStore.getState().setShowPreviewTravel(true);
     useUiStore.getState().closeWorkspaceContextBar();
+    useUiStore.getState().setSnapSettings(DEFAULT_SNAP_SETTINGS);
+    useUiStore.getState().setSnapGuides([]);
   });
 
   it('setToolMode clears the pen draft when switching to a non-pen draw tool', () => {
@@ -93,5 +96,18 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().closeWorkspaceContextBar();
 
     expect(useUiStore.getState().workspaceContextBar).toBeNull();
+  });
+
+  it('tracks snapping settings and transient guides outside project history', () => {
+    const guide: SnapGuide = { axis: 'x', positionMm: 20, fromMm: 0, toMm: 10 };
+
+    useUiStore.getState().setSnapSettings({ enabled: false });
+    useUiStore.getState().setSnapGuides([guide]);
+
+    expect(useUiStore.getState().snapSettings).toEqual({
+      ...DEFAULT_SNAP_SETTINGS,
+      enabled: false,
+    });
+    expect(useUiStore.getState().snapGuides).toEqual([guide]);
   });
 });

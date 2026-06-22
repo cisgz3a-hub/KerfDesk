@@ -35,10 +35,22 @@ export function ZoomControls(): JSX.Element {
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const zoomBy = useUiStore((s) => s.zoomBy);
   const resetView = useUiStore((s) => s.resetView);
+  const snapEnabled = useUiStore((s) => s.snapSettings.enabled);
+  const setSnapSettings = useUiStore((s) => s.setSnapSettings);
   const fitToSelection = useStore((s) => s.fitToSelection);
   const percent = Math.round(zoomFactor * 100);
   return (
     <div className="lf-chip" style={zoomControlsStyle} role="group" aria-label="Zoom">
+      <button
+        type="button"
+        onClick={() => setSnapSettings({ enabled: !snapEnabled })}
+        title="Toggle snapping"
+        aria-label="Toggle snapping"
+        aria-pressed={snapEnabled}
+        style={snapEnabled ? activeZoomBtnStyle : zoomBtnStyle}
+      >
+        #
+      </button>
       <button
         type="button"
         onClick={() => zoomBy(1 / ZOOM_STEP)}
@@ -249,6 +261,11 @@ const zoomBtnStyle: React.CSSProperties = {
   fontSize: 16,
   color: 'inherit',
   padding: 0,
+};
+const activeZoomBtnStyle: React.CSSProperties = {
+  ...zoomBtnStyle,
+  background: 'var(--lf-accent)',
+  color: 'var(--lf-on-fill)',
 };
 const zoomReadoutStyle: React.CSSProperties = {
   display: 'inline-flex',

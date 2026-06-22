@@ -18,6 +18,8 @@ import { drawNoGoZones } from './draw-no-go-zones';
 import { drawPenDraft } from './draw-pen-preview';
 import { type PenDraft, type SelectionMarquee } from '../state/ui-store';
 import { drawSelectionMarquee } from './draw-selection-marquee';
+import { drawSnapGuides } from './draw-snap-guides';
+import type { SnapGuide } from './snapping';
 import {
   buildDisplayPolylines,
   type DisplayPolylineCache,
@@ -61,6 +63,7 @@ export type DrawOpts = {
   // rubber-band to the cursor). Null unless the pen is mid-draw.
   readonly penDraft?: PenDraft;
   readonly selectionMarquee?: SelectionMarquee;
+  readonly snapGuides?: ReadonlyArray<SnapGuide>;
 };
 
 export function drawScene(
@@ -110,6 +113,7 @@ export function drawScene(
     if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
     if (opts.selectionMarquee !== undefined) drawSelectionMarquee(ctx, opts.selectionMarquee, view);
   }
+  if (!opts.preview) drawSnapGuides(ctx, opts.snapGuides ?? [], view);
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
