@@ -14,7 +14,6 @@ import {
   isRightButtonDoubleClick,
   isStationaryRightPanClick,
   type DragState,
-  nextTransformForDrag,
   panOffsetForDrag,
 } from './drag-state';
 import {
@@ -25,7 +24,10 @@ import {
 } from './draw-tool';
 import { handlePenMouseDown, updatePenCursor } from './pen-tool';
 import { selectObjectsInMarquee } from './selection-marquee';
+import { transformDragWithSnap } from './drag-snap';
+import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene } from './view-transform';
+import { useWorkspaceDragDeps } from './workspace-drag-deps';
 
 type CanvasMouseEvent = ReactMouseEvent<HTMLCanvasElement>;
 type CanvasRef = RefObject<HTMLCanvasElement | null>;
@@ -52,40 +54,29 @@ export function useDragMove(
   previewMode: boolean,
   viewState: WorkspaceViewState,
 ): DragMoveResult {
-  const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const selectObject = useStore((s) => s.selectObject);
-  const selectObjects = useStore((s) => s.selectObjects);
-  const toggleSelectObject = useStore((s) => s.toggleSelectObject);
-  const setCursorMm = useStore((s) => s.setCursorMm);
-  const beginInteraction = useStore((s) => s.beginInteraction);
-  const setObjectTransform = useStore((s) => s.setObjectTransform);
-  const endInteraction = useStore((s) => s.endInteraction);
-  const toolMode = useUiStore((s) => s.toolMode);
-  const selectionAnchor = useUiStore((s) => s.selectionAnchor);
-  const drawShape = useStore((s) => s.drawShape);
-  const setDraftShape = useUiStore((s) => s.setDraftShape);
-  const setSelectionMarquee = useUiStore((s) => s.setSelectionMarquee);
+  const deps = useWorkspaceDragDeps();
   const [drag, setDrag] = useState<DragState | null>(null);
 
   const handleMouseDown = (e: CanvasMouseEvent): void => {
     useUiStore.getState().closeWorkspaceContextBar();
+    deps.setSnapGuides([]);
     if (previewMode) return;
     const next = beginWorkspaceDrag({
       e,
       ref,
       project,
       viewState,
-      toolMode,
-      selectedObjectId,
-      selectObject,
-      toggleSelectObject,
-      drawShape,
+      toolMode: deps.toolMode,
+      selectedObjectId: deps.selectedObjectId,
+      selectObject: deps.selectObject,
+      toggleSelectObject: deps.toggleSelectObject,
+      drawShape: deps.drawShape,
     });
     if (next === null) return;
     if (next.kind === 'marquee') {
-      setSelectionMarquee({ start: next.startScenePoint, end: next.startScenePoint });
+      deps.setSelectionMarquee({ start: next.startScenePoint, end: next.startScenePoint });
     } else if (next.kind !== 'pan') {
-      beginInteraction();
+      deps.beginInteraction();
     }
     setDrag(next);
   };
@@ -97,17 +88,20 @@ export function useDragMove(
       drag,
       project,
       viewState,
-      toolMode,
-      setCursorMm,
-      setDraftShape,
-      setSelectionMarquee,
-      selectionAnchor,
-      setObjectTransform,
+      toolMode: deps.toolMode,
+      setCursorMm: deps.setCursorMm,
+      setDraftShape: deps.setDraftShape,
+      setSelectionMarquee: deps.setSelectionMarquee,
+      selectionAnchor: deps.selectionAnchor,
+      snapSettings: deps.snapSettings,
+      setObjectTransform: deps.setObjectTransform,
+      setSnapGuides: deps.setSnapGuides,
     });
   };
 
   const handleMouseUp = (e: CanvasMouseEvent): void => {
-    setCursorMm(null);
+    deps.setCursorMm(null);
+    deps.setSnapGuides([]);
     if (drag === null) return;
     finishWorkspaceDrag({
       drag,
@@ -115,12 +109,12 @@ export function useDragMove(
       ref,
       project,
       viewState,
-      drawShape,
-      setDraftShape,
-      selectObject,
-      selectObjects,
-      setSelectionMarquee,
-      endInteraction,
+      drawShape: deps.drawShape,
+      setDraftShape: deps.setDraftShape,
+      selectObject: deps.selectObject,
+      selectObjects: deps.selectObjects,
+      setSelectionMarquee: deps.setSelectionMarquee,
+      endInteraction: deps.endInteraction,
     });
     setDrag(null);
   };
@@ -179,10 +173,13 @@ function updateWorkspaceDrag(args: {
     marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
   ) => void;
   readonly selectionAnchor: SelectionAnchor;
+  readonly snapSettings: SnapSettings;
   readonly setObjectTransform: (id: string, transform: Transform) => void;
+  readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
 }): void {
   const canvas = args.ref.current;
   if (args.drag?.kind === 'pan' && canvas !== null) {
+    args.setSnapGuides([]);
     const next = panOffsetForDrag({ ...args, drag: args.drag, canvas });
     useUiStore.getState().setPan(next.panX, next.panY);
     return;
@@ -350,7 +347,9 @@ function applyTransformDrag(args: {
   readonly e: CanvasMouseEvent;
   readonly project: Project;
   readonly selectionAnchor: SelectionAnchor;
+  readonly snapSettings: SnapSettings;
   readonly setObjectTransform: (id: string, transform: Transform) => void;
+  readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
 }): void {
   const { drag, point } = args;
   if (
@@ -360,14 +359,25 @@ function applyTransformDrag(args: {
     drag.kind === 'marquee' ||
     point === null
   ) {
+    args.setSnapGuides([]);
     return;
   }
   const obj = args.project.scene.objects.find((o) => o.id === drag.objectId);
-  if (obj === undefined) return;
-  args.setObjectTransform(
-    drag.objectId,
-    nextTransformForDrag(drag, obj, point, args.e, args.selectionAnchor),
-  );
+  if (obj === undefined) {
+    args.setSnapGuides([]);
+    return;
+  }
+  const result = transformDragWithSnap({
+    drag,
+    object: obj,
+    point,
+    event: args.e,
+    project: args.project,
+    snapSettings: args.snapSettings,
+    selectionAnchor: args.selectionAnchor,
+  });
+  args.setSnapGuides(result.guides);
+  args.setObjectTransform(drag.objectId, result.transform);
 }
 
 function visibleDragKind(drag: DragState | null): DragMoveResult['dragKind'] {

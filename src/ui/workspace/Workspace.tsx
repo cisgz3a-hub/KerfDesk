@@ -147,6 +147,7 @@ function useWorkspaceDraw(args: {
   // preview. Identity changes each mouse-move, so it belongs in the deps below.
   const draftShape = useUiStore((s) => s.draftShape);
   const selectionMarquee = useUiStore((s) => s.selectionMarquee);
+  const snapGuides = useUiStore((s) => s.snapGuides);
   // Phase G (B6): the pen tool's in-progress polyline (also redraws per click /
   // cursor move).
   const penDraft = useUiStore((s) => s.penDraft);
@@ -177,6 +178,7 @@ function useWorkspaceDraw(args: {
       ...(draftShape === null ? {} : { draft: draftShape }),
       ...(penDraft === null ? {} : { penDraft }),
       ...(selectionMarquee === null ? {} : { selectionMarquee }),
+      ...(snapGuides.length === 0 ? {} : { snapGuides }),
     });
   }, [
     ref,
@@ -195,6 +197,7 @@ function useWorkspaceDraw(args: {
     draftShape,
     penDraft,
     selectionMarquee,
+    snapGuides,
   ]);
 }
 

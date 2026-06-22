@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { Bounds, RasterImage, SelectionAnchor, ShapeObject, Vec2 } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
+import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';
 
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 16;
@@ -70,6 +71,10 @@ export type UiState = {
   readonly workspaceContextBar: WorkspaceContextBarState | null;
   readonly openWorkspaceContextBar: (next: WorkspaceContextBarState) => void;
   readonly closeWorkspaceContextBar: () => void;
+  readonly snapSettings: SnapSettings;
+  readonly setSnapSettings: (next: Partial<SnapSettings>) => void;
+  readonly snapGuides: ReadonlyArray<SnapGuide>;
+  readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
   // Current drawing layer color. LightBurn's color/layer palette sets the
   // target color for subsequently-created vectors; this mirrors that behavior
   // without making layer selection undoable project data.
@@ -145,6 +150,10 @@ export const useUiStore = create<UiState>((set) => ({
   workspaceContextBar: null,
   openWorkspaceContextBar: (next) => set({ workspaceContextBar: next }),
   closeWorkspaceContextBar: () => set({ workspaceContextBar: null }),
+  snapSettings: DEFAULT_SNAP_SETTINGS,
+  setSnapSettings: (next) => set((s) => ({ snapSettings: { ...s.snapSettings, ...next } })),
+  snapGuides: [],
+  setSnapGuides: (next) => set({ snapGuides: next }),
   activeLayerColor: null,
   setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,
