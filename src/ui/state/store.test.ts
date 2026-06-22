@@ -180,7 +180,6 @@ describe('useStore', () => {
     });
     expect(useStore.getState().dirty).toBe(false);
   });
-
 });
 
 describe('useStore — SVG re-import (Phase C #7)', () => {
