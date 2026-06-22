@@ -215,6 +215,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'window',
     tooltip: 'Fit the full machine bed into the workspace view.',
   },
+  'window.project-notes': {
+    family: 'window',
+    tooltip: 'Edit notes saved inside the current LaserForge project file.',
+  },
   'help.about': {
     family: 'help',
     tooltip: 'Show LaserForge build and version information.',

@@ -57,6 +57,7 @@ import {
   projectOptimizationActions,
   type ProjectOptimizationActions,
 } from './project-optimization-actions';
+import { projectNotesActions, type ProjectNotesActions } from './project-notes-actions';
 import {
   selectionTransformActions,
   type SelectionTransformActions,
@@ -89,6 +90,7 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
 export type AppState = ObjectPropertiesActions &
   ImageMaskActions &
   ProjectOptimizationActions &
+  ProjectNotesActions &
   SelectionTransformActions &
   ObjectDeleteActions &
   SceneClipboardActions &
@@ -310,6 +312,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...sceneLockActions(set),
   ...generatedSceneActions(set),
   ...projectOptimizationActions(set),
+  ...projectNotesActions(set),
   ...selectionTransformActions(set),
   ...objectDeleteActions(set),
   ...sceneActions(set),

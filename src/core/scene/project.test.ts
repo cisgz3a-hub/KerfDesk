@@ -27,6 +27,10 @@ describe('createProject', () => {
     expect(p.scene.groups).toEqual([]);
   });
 
+  it('starts with empty project notes for operator job context', () => {
+    expect(createProject().notes).toBe('');
+  });
+
   it('honors a caller-provided device profile', () => {
     const custom = {
       ...DEFAULT_DEVICE_PROFILE,

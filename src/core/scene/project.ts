@@ -25,6 +25,7 @@ export type Project = {
   readonly device: DeviceProfile;
   readonly workspace: Workspace;
   readonly optimization: ProjectOptimizationSettings;
+  readonly notes: string;
   readonly scene: Scene;
 };
 
@@ -34,6 +35,7 @@ export function createProject(device: DeviceProfile = DEFAULT_DEVICE_PROFILE): P
     device,
     workspace: { width: device.bedWidth, height: device.bedHeight, units: 'mm' },
     optimization: DEFAULT_PROJECT_OPTIMIZATION,
+    notes: '',
     scene: EMPTY_SCENE,
   };
 }
