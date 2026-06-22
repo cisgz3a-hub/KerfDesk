@@ -7,11 +7,13 @@ import { ProjectNotesDialog } from './ProjectNotesDialog';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-async function renderDialog(props: {
-  readonly notes?: string;
-  readonly onApply?: (notes: string) => void;
-  readonly onCancel?: () => void;
-} = {}): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
+async function renderDialog(
+  props: {
+    readonly notes?: string;
+    readonly onApply?: (notes: string) => void;
+    readonly onCancel?: () => void;
+  } = {},
+): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
