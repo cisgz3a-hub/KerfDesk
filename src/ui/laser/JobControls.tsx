@@ -243,14 +243,35 @@ function ProgressBar({
 }: {
   readonly streamer: NonNullable<ReturnType<typeof useLaserStore.getState>['streamer']>;
 }): JSX.Element {
+  const display = describeProgressDisplay(streamer);
   return (
-    <div style={progressContainerStyle}>
-      <div style={{ ...progressFillStyle, width: `${Math.round(progress(streamer) * 100)}%` }} />
-      <div style={progressLabelStyle}>
-        {streamer.completed} / {streamer.total} lines
-      </div>
+    <div style={progressContainerStyle} title={display.title}>
+      <div
+        data-testid="job-progress-fill"
+        style={{ ...progressFillStyle, width: `${display.percent}%` }}
+      />
+      <div style={progressLabelStyle}>{display.label}</div>
     </div>
   );
+}
+
+function describeProgressDisplay(
+  streamer: NonNullable<ReturnType<typeof useLaserStore.getState>['streamer']>,
+): { readonly percent: number; readonly label: string; readonly title: string } {
+  const lineText = `${streamer.completed} / ${streamer.total}`;
+  if (streamer.status === 'done') {
+    return {
+      percent: 99,
+      label: `Machine finishing (${lineText} sent)`,
+      title:
+        'GRBL has acknowledged every G-code line, but LaserForge is waiting for Idle before marking the job complete.',
+    };
+  }
+  return {
+    percent: Math.round(progress(streamer) * 100),
+    label: `${lineText} lines`,
+    title: 'G-code lines acknowledged by the controller.',
+  };
 }
 
 function useFrameAction(): () => void {

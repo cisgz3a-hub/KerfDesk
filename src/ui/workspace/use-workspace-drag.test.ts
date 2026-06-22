@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRectangle } from '../../core/shapes';
 import { useUiStore } from '../state/ui-store';
-import { finishDrawToolOnRightDoubleClick } from './use-workspace-drag';
+import { finishDrawToolOnLeftDoubleClick } from './use-workspace-drag';
 
-describe('finishDrawToolOnRightDoubleClick', () => {
+describe('finishDrawToolOnLeftDoubleClick', () => {
   beforeEach(() => {
     useUiStore.getState().setToolMode({ kind: 'select' });
     useUiStore.getState().setDraftShape(null);
     useUiStore.getState().closeWorkspaceContextBar();
   });
 
-  it('cancels draw mode, clears the draft, and returns to Select on a right double-click', () => {
+  it('cancels draw mode, clears the draft, and returns to Select on a left double-click', () => {
     useUiStore.getState().setToolMode({ kind: 'draw', shape: 'rect' });
     useUiStore.getState().setDraftShape(
       createRectangle({
@@ -25,17 +25,17 @@ describe('finishDrawToolOnRightDoubleClick', () => {
       context: 'workspace-empty',
     });
 
-    expect(finishDrawToolOnRightDoubleClick({ button: 2, detail: 2 })).toBe(true);
+    expect(finishDrawToolOnLeftDoubleClick({ button: 0, detail: 2 })).toBe(true);
 
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
     expect(useUiStore.getState().draftShape).toBeNull();
     expect(useUiStore.getState().workspaceContextBar).toBeNull();
   });
 
-  it('leaves draw mode alone on a single right-click', () => {
+  it('leaves draw mode alone on a right double-click', () => {
     useUiStore.getState().setToolMode({ kind: 'draw', shape: 'ellipse' });
 
-    expect(finishDrawToolOnRightDoubleClick({ button: 2, detail: 1 })).toBe(false);
+    expect(finishDrawToolOnLeftDoubleClick({ button: 2, detail: 2 })).toBe(false);
 
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'ellipse' });
   });

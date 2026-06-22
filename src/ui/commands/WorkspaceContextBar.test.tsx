@@ -29,6 +29,7 @@ describe('WorkspaceContextBar', () => {
   it('shows empty-workspace commands without selection-only actions', async () => {
     useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-empty' });
     const h = await renderBar(commands());
+    const menu = h.querySelector('[aria-label="Workspace quick actions"]');
 
     expect(h.textContent).toContain('Paste');
     expect(h.textContent).toContain('Import SVG...');
@@ -37,6 +38,11 @@ describe('WorkspaceContextBar', () => {
     expect(h.textContent).toContain('Preview');
     expect(h.textContent).toContain('Fit View');
     expect(h.textContent).not.toContain('Copy');
+    if (!(menu instanceof HTMLElement)) throw new Error('quick bar missing');
+    const paste = buttonByText(h, 'Paste');
+    expect(menu.style.flexDirection).toBe('row');
+    expect(paste.classList.contains('lf-menu-item')).toBe(true);
+    expect(paste.classList.contains('lf-btn')).toBe(false);
   });
 
   it('runs enabled quick-bar commands through the command object and closes', async () => {
