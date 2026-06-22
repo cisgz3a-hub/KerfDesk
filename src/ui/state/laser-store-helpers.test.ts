@@ -23,12 +23,13 @@ function report(state: StatusReport['state']): StatusReport {
 describe('detectStreamStall (M13)', () => {
   it('flags a stall when no ack arrives within the timeout', () => {
     const streamer = streamingState();
-    const first = detectStreamStall(streamer, report('Run'), null, 1_000);
+    const staleRunStatus = report('Run');
+    const first = detectStreamStall(streamer, staleRunStatus, null, 1_000);
     expect(first.stalled).toBe(false);
 
     const second = detectStreamStall(
       streamer,
-      report('Run'),
+      staleRunStatus,
       first.probe,
       1_000 + STREAM_STALL_TIMEOUT_MS,
     );
@@ -43,6 +44,19 @@ describe('detectStreamStall (M13)', () => {
     const second = detectStreamStall(
       progressed,
       report('Run'),
+      first.probe,
+      1_000 + STREAM_STALL_TIMEOUT_MS,
+    );
+    expect(second.stalled).toBe(false);
+  });
+
+  it('does not flag a stall while fresh Run status reports keep arriving', () => {
+    const streamer = streamingState();
+    const first = detectStreamStall(streamer, report('Run'), null, 1_000);
+    const freshRunStatus = report('Run');
+    const second = detectStreamStall(
+      streamer,
+      freshRunStatus,
       first.probe,
       1_000 + STREAM_STALL_TIMEOUT_MS,
     );

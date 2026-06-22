@@ -8,6 +8,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { useToastStore } from '../state/toast-store';
 import { LaserWindow } from './LaserWindow';
 
 (
@@ -34,10 +35,56 @@ afterEach(() => {
     workOriginActive: false,
     wcoCache: null,
     safetyNotice: null,
+    detectedSettings: null,
+    controllerSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
   } as Partial<ReturnType<typeof useLaserStore.getState>>);
+  useToastStore.setState({ toasts: [] });
 });
 
 describe('LaserWindow autofocus busy controls', () => {
+  it('shows a toast when controller settings auto-detection completes', async () => {
+    vi.useFakeTimers();
+    useToastStore.setState({ toasts: [] });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      await act(async () => {
+        useLaserStore.setState({
+          detectedSettings: { maxPowerS: 255 },
+          controllerSettings: { maxPowerS: 255 },
+          grblSettingsRows: [],
+          lastSettingsReadAt: 123,
+        });
+      });
+
+      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
+        variant: 'info',
+        message: expect.stringMatching(/machine settings detected/i),
+      });
+      expect(useToastStore.getState().toasts.at(-1)?.message).toContain('Machine Setup');
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+      useToastStore.setState({ toasts: [] });
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it('opens Machine Setup from a compact rail entry', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

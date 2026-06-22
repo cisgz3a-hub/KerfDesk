@@ -109,6 +109,7 @@ export type StallProbe = {
   readonly completed: number;
   readonly inFlightBytes: number;
   readonly queuedCount: number;
+  readonly statusReport: StatusReport | null;
   readonly at: number;
 } | null;
 
@@ -118,26 +119,49 @@ export function detectStreamStall(
   prev: StallProbe,
   now: number,
 ): { readonly probe: StallProbe; readonly stalled: boolean } {
-  const active =
-    streamer !== null && streamer.status === 'streaming' && streamer.inFlight.length > 0;
-  if (!active) return { probe: null, stalled: false };
-  const machineState = statusReport?.state;
-  if (machineState === 'Hold' || machineState === 'Door') return { probe: null, stalled: false };
-  const unchanged =
-    prev !== null &&
-    prev.completed === streamer.completed &&
-    prev.inFlightBytes === streamer.inFlightBytes &&
-    prev.queuedCount === streamer.queued.length;
+  if (!isStallWatchActive(streamer)) return { probe: null, stalled: false };
+  if (statusPausesStallWatch(statusReport)) return { probe: null, stalled: false };
+  const unchanged = streamPositionUnchanged(prev, streamer) && !freshRunStatus(prev, statusReport);
   const at = unchanged ? prev.at : now;
   return {
     probe: {
       completed: streamer.completed,
       inFlightBytes: streamer.inFlightBytes,
       queuedCount: streamer.queued.length,
+      statusReport,
       at,
     },
     stalled: now - at >= STREAM_STALL_TIMEOUT_MS,
   };
+}
+
+function isStallWatchActive(streamer: StreamerState | null): streamer is StreamerState {
+  return streamer !== null && streamer.status === 'streaming' && streamer.inFlight.length > 0;
+}
+
+function statusPausesStallWatch(statusReport: StatusReport | null): boolean {
+  return statusReport?.state === 'Hold' || statusReport?.state === 'Door';
+}
+
+function freshRunStatus(prev: StallProbe, statusReport: StatusReport | null): boolean {
+  return (
+    prev !== null &&
+    statusReport !== null &&
+    prev.statusReport !== statusReport &&
+    statusReport.state === 'Run'
+  );
+}
+
+function streamPositionUnchanged(
+  prev: StallProbe,
+  streamer: StreamerState,
+): prev is NonNullable<StallProbe> {
+  return (
+    prev !== null &&
+    prev.completed === streamer.completed &&
+    prev.inFlightBytes === streamer.inFlightBytes &&
+    prev.queuedCount === streamer.queued.length
+  );
 }
 
 export function initialLaserState(): Pick<

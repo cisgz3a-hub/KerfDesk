@@ -53,10 +53,10 @@ export function WorkspaceContextBar(props: {
         <button
           type="button"
           role="menuitem"
-          className="lf-btn"
+          className="lf-menu-item"
           aria-expanded={moreOpen}
           title="Show more workspace commands"
-          style={moreButtonStyle}
+          style={horizontalMenuItemStyle}
           onClick={() => setMoreOpen((open) => !open)}
         >
           More
@@ -82,7 +82,8 @@ function ContextCommandButton(props: {
     <button
       type="button"
       role="menuitem"
-      className="lf-btn"
+      className="lf-menu-item"
+      style={horizontalMenuItemStyle}
       disabled={!props.command.enabled}
       data-help-id={helpId}
       title={commandButtonTitle(props.command, helpId)}
@@ -160,14 +161,16 @@ const BAR_HEIGHT_PX = 44;
 const barStyle: React.CSSProperties = {
   position: 'fixed',
   display: 'flex',
+  flexDirection: 'row',
   alignItems: 'center',
-  gap: 4,
+  gap: 2,
   maxWidth: BAR_WIDTH_PX,
   overflowX: 'auto',
   boxShadow: 'var(--lf-shadow)',
 };
 
-const moreButtonStyle: React.CSSProperties = {
+const horizontalMenuItemStyle: React.CSSProperties = {
+  width: 'auto',
   whiteSpace: 'nowrap',
 };
 

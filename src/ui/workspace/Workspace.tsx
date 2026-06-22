@@ -24,7 +24,7 @@ import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } fr
 import { PreviewStatsPanel, PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewToolpath } from './use-preview-toolpath';
-import { useDragMove } from './use-workspace-drag';
+import { finishDrawToolOnLeftDoubleClick, useDragMove } from './use-workspace-drag';
 import { clientToCanvasPx, zoomAtCursorPx } from './view-transform';
 import { useJobEstimate } from '../laser/use-job-estimate';
 
@@ -231,10 +231,11 @@ function handleCanvasWheel(
   useUiStore.getState().setPan(next.panX, next.panY);
 }
 
-// Phase G (B6) — in pen mode a double-click finishes the in-progress polyline
-// as an OPEN path; otherwise it falls through to the Phase D text-edit. Module-
-// level so the canvas onDoubleClick prop reference stays stable.
-function handleCanvasDoubleClick(): void {
+// Phase G (B6) — double-click exits sticky shape tools; in pen mode it finishes
+// the in-progress polyline as an OPEN path. Otherwise it falls through to the
+// Phase D text-edit. Module-level so the canvas prop reference stays stable.
+function handleCanvasDoubleClick(e: React.MouseEvent<HTMLCanvasElement>): void {
+  if (finishDrawToolOnLeftDoubleClick(e)) return;
   const ui = useUiStore.getState();
   if (ui.toolMode.kind === 'draw' && ui.toolMode.shape === 'polyline') {
     const s = useStore.getState();

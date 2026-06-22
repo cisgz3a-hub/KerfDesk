@@ -10,6 +10,7 @@ import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { ConsolePanel } from './ConsolePanel';
+import { DetectedSettingsToast } from './DetectedSettingsToast';
 import { MachineSetupDialog } from './MachineSetupDialog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
@@ -52,6 +53,7 @@ export function LaserWindow(): JSX.Element {
 
   return (
     <aside aria-label="Laser controls" className="lf-rail" style={panelStyle}>
+      <DetectedSettingsToast />
       <h2 className="lf-heading" style={headingStyle}>
         Laser
       </h2>
