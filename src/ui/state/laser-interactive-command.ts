@@ -26,6 +26,7 @@ type ControllerCommandRequest = {
   readonly resolve: (responses: ReadonlyArray<string>) => void;
   readonly reject: (err: Error) => void;
   readonly timer: ReturnType<typeof setTimeout>;
+  acceptingResponses: boolean;
 };
 
 type ControllerIdleWaitRequest = {
@@ -72,15 +73,20 @@ export function startControllerCommand(
       responses: [],
       resolve,
       reject,
+      acceptingResponses: false,
       timer: setTimeout(() => {
         finishControllerCommand(refs, request, 'reject', `${options.label} timed out.`);
       }, options.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS),
     };
     refs.controllerCommand = request;
-    write(options.command, options.action, options.source).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      finishControllerCommand(refs, request, 'reject', message);
-    });
+    write(options.command, options.action, options.source)
+      .then(() => {
+        if (refs.controllerCommand === request) request.acceptingResponses = true;
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        finishControllerCommand(refs, request, 'reject', message);
+      });
   });
 }
 
@@ -91,6 +97,7 @@ export function consumeControllerCommandResponse(
 ): boolean {
   const request = refs.controllerCommand;
   if (request === null) return false;
+  if (!request.acceptingResponses) return false;
   if (response.kind === 'ok') {
     finishControllerCommand(refs, request, 'resolve');
     return true;

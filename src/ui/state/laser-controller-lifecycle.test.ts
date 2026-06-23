@@ -50,8 +50,7 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 async function flush(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
 }
 
 function controllerOperation(): ControllerOperationSnapshot {
@@ -171,6 +170,59 @@ describe('laser controller lifecycle operations', () => {
     connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
     expect(useLaserStore.getState().streamer?.status).toBe('done');
 
+    connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await flush();
+
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(controllerOperation()).toBeNull();
+  });
+
+  it('ignores a stray ok before the post-job settle marker write is confirmed', async () => {
+    const writes: string[] = [];
+    let settleWriteResolved = false;
+    let resolveSettleWrite = (): void => {
+      throw new Error('Settle marker write was not started.');
+    };
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+      if (data === 'G4 P0.01\n') {
+        await new Promise<void>((resolve) => {
+          resolveSettleWrite = () => {
+            settleWriteResolved = true;
+            resolve();
+          };
+        });
+      }
+    });
+    await connectWith(connection);
+    writes.length = 0;
+
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n');
+    for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
+    await flush();
+
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+    expect(controllerOperation()).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+    expect(writes.at(-1)).toBe('G4 P0.01\n');
+    expect(settleWriteResolved).toBe(false);
+
+    connection.emitLine('ok');
+    await flush();
+
+    expect(controllerOperation()).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+
+    resolveSettleWrite();
+    await flush();
+    connection.emitLine('ok');
+    await flush();
+
+    expect(controllerOperation()).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+    });
+
+    connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
     connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
     await flush();
 

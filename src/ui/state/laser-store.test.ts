@@ -77,6 +77,12 @@ async function connectWith(connection: FakeConnection): Promise<void> {
   await Promise.resolve();
 }
 
+async function flush(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve();
+  }
+}
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
@@ -173,7 +179,7 @@ describe('laser-store serial write failures', () => {
     expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('unknown');
 
     const home = useLaserStore.getState().home();
-    await Promise.resolve();
+    await flush();
 
     expect(writes).toContain('$H\n');
     expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('homing');
@@ -182,11 +188,11 @@ describe('laser-store serial write failures', () => {
     expect((useLaserStore.getState() as { homingState?: unknown }).homingState).toBe('homing');
 
     connection.emitLine('ok');
-    await Promise.resolve();
+    await flush();
     expect(writes).toContain('G4 P0.01\n');
 
     connection.emitLine('ok');
-    await Promise.resolve();
+    await flush();
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await home;
 
