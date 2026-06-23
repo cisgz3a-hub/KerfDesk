@@ -29,6 +29,7 @@ export const canvasTheme = {
   selectionMarqueeFill: 'rgba(25, 118, 210, 0.12)',
   rotateHandleStroke: '#fff',
   snapGuide: '#00a884',
+  measureStroke: '#7b1fa2',
   outOfBounds: '#c62828',
   openFillContour: '#f57c00',
   noGoZoneFill: 'rgba(198, 40, 40, 0.12)',

@@ -14,10 +14,12 @@ import {
   transformedBBox,
 } from '../../core/scene';
 import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
+import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
 import { drawSelectedOpenFillContours } from './draw-open-fill-contours';
 import { drawPenDraft } from './draw-pen-preview';
 import { type PenDraft, type SelectionMarquee } from '../state/ui-store';
+import type { MeasureDraft } from './measure-tool';
 import { drawSelectionMarquee } from './draw-selection-marquee';
 import { drawSnapGuides } from './draw-snap-guides';
 import type { SnapGuide } from './snapping';
@@ -68,6 +70,7 @@ export type DrawOpts = {
   // rubber-band to the cursor). Null unless the pen is mid-draw.
   readonly penDraft?: PenDraft;
   readonly selectionMarquee?: SelectionMarquee;
+  readonly measureDraft?: MeasureDraft;
   readonly snapGuides?: ReadonlyArray<SnapGuide>;
 };
 
@@ -123,14 +126,23 @@ export function drawScene(
       opts.selectedId,
       opts.additionalSelectedIds ?? EMPTY_SELECTION,
     );
-    if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
-    if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
-    if (opts.selectionMarquee !== undefined) drawSelectionMarquee(ctx, opts.selectionMarquee, view);
+    drawLiveWorkspaceOverlays(ctx, opts, view);
   }
   if (!opts.preview) drawSnapGuides(ctx, opts.snapGuides ?? [], view);
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
+}
+
+function drawLiveWorkspaceOverlays(
+  ctx: CanvasRenderingContext2D,
+  opts: DrawOpts,
+  view: ViewTransform,
+): void {
+  if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
+  if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
+  if (opts.selectionMarquee !== undefined) drawSelectionMarquee(ctx, opts.selectionMarquee, view);
+  if (opts.measureDraft !== undefined) drawMeasurement(ctx, opts.measureDraft, view);
 }
 
 // Phase G (B5): render the shape being dragged out as a dashed accent outline.

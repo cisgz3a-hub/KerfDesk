@@ -18,16 +18,20 @@ import {
 import {
   beginDrawDrag,
   commitDraftShape,
-  draftForDrawDrag,
-  drawModifiersFromEvent,
 } from './draw-tool';
-import { handlePenMouseDown, updatePenCursor } from './pen-tool';
-import { beginPathNodeDrag, updatePathNodeDrag } from './path-node-drag';
+import type { MeasureDraft } from './measure-tool';
+import { handlePenMouseDown } from './pen-tool';
+import { beginPathNodeDrag } from './path-node-drag';
 import { selectObjectsInMarquee } from './selection-marquee';
 import { transformDragWithSnap } from './drag-snap';
 import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 import { useWorkspaceDragDeps } from './workspace-drag-deps';
+import {
+  handleNonTransformDragUpdate,
+  updateDrawDraft,
+  updateMeasureDraft,
+} from './workspace-drag-updates';
 
 type CanvasMouseEvent = ReactMouseEvent<HTMLCanvasElement>;
 type CanvasRef = RefObject<HTMLCanvasElement | null>;
@@ -76,6 +80,8 @@ export function useDragMove(
     if (next === null) return;
     if (next.kind === 'marquee') {
       deps.setSelectionMarquee({ start: next.startScenePoint, end: next.startScenePoint });
+    } else if (next.kind === 'measure') {
+      deps.setMeasureDraft({ start: next.startScenePoint, end: next.startScenePoint });
     } else if (next.kind !== 'pan') {
       deps.beginInteraction();
     }
@@ -92,6 +98,7 @@ export function useDragMove(
       toolMode: deps.toolMode,
       setCursorMm: deps.setCursorMm,
       setDraftShape: deps.setDraftShape,
+      setMeasureDraft: deps.setMeasureDraft,
       setSelectionMarquee: deps.setSelectionMarquee,
       setSelectedPathNodePositionDuringInteraction:
         deps.setSelectedPathNodePositionDuringInteraction,
@@ -114,6 +121,7 @@ export function useDragMove(
       viewState,
       drawShape: deps.drawShape,
       setDraftShape: deps.setDraftShape,
+      setMeasureDraft: deps.setMeasureDraft,
       selectObject: deps.selectObject,
       selectObjects: deps.selectObjects,
       setSelectionMarquee: deps.setSelectionMarquee,
@@ -156,6 +164,10 @@ function beginWorkspaceDrag(args: {
     }
     return beginDrawDrag({ ...args, shape: args.toolMode.shape });
   }
+  if (args.toolMode.kind === 'measure' && args.e.button === 0 && !useUiStore.getState().spaceDown) {
+    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    return point === null ? null : { kind: 'measure', startScenePoint: point };
+  }
   return computeMouseDownDrag({
     e: args.e,
     ref: args.ref,
@@ -197,6 +209,7 @@ function updateWorkspaceDrag(args: {
   readonly toolMode: ReturnType<typeof useUiStore.getState>['toolMode'];
   readonly setCursorMm: (point: Vec2 | null) => void;
   readonly setDraftShape: (shape: ShapeObject | null) => void;
+  readonly setMeasureDraft: (draft: MeasureDraft | null) => void;
   readonly setSelectionMarquee: (
     marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
   ) => void;
@@ -215,31 +228,7 @@ function updateWorkspaceDrag(args: {
   }
   const point = canvasMouseToScene(args.e, canvas, args.project, args.viewState);
   args.setCursorMm(point);
-  if (args.drag?.kind === 'marquee') {
-    updateSelectionMarquee({
-      drag: args.drag,
-      point,
-      setSelectionMarquee: args.setSelectionMarquee,
-    });
-    return;
-  }
-  if (args.drag?.kind === 'path-node') {
-    updatePathNodeDrag({
-      drag: args.drag,
-      point,
-      setSelectedPathNodePositionDuringInteraction:
-        args.setSelectedPathNodePositionDuringInteraction,
-    });
-    return;
-  }
-  if (args.toolMode.kind === 'draw' && args.toolMode.shape === 'polyline') {
-    updatePenCursor(point, args.e.shiftKey);
-    return;
-  }
-  if (args.drag?.kind === 'draw') {
-    updateDrawDraft({ ...args, drag: args.drag, point });
-    return;
-  }
+  if (handleNonTransformDragUpdate({ ...args, point })) return;
   applyTransformDrag({ ...args, point });
 }
 
@@ -251,6 +240,7 @@ function finishWorkspaceDrag(args: {
   readonly viewState: WorkspaceViewState;
   readonly drawShape: (shape: ShapeObject) => void;
   readonly setDraftShape: (shape: ShapeObject | null) => void;
+  readonly setMeasureDraft: (draft: MeasureDraft | null) => void;
   readonly selectObject: (id: string | null) => void;
   readonly selectObjects: (
     ids: ReadonlyArray<string>,
@@ -263,6 +253,16 @@ function finishWorkspaceDrag(args: {
 }): void {
   if (args.drag.kind === 'draw') {
     commitDrawDraft({ ...args, drag: args.drag });
+    return;
+  }
+  if (args.drag.kind === 'measure') {
+    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    updateMeasureDraft({
+      drag: args.drag,
+      point,
+      constrained: args.e.shiftKey,
+      setMeasureDraft: args.setMeasureDraft,
+    });
     return;
   }
   const drag = args.drag;
@@ -305,30 +305,6 @@ function openContextBarForRightClick(args: {
     y: args.e.clientY,
     context: hasSelection ? 'workspace-selection' : 'workspace-empty',
   });
-}
-
-function updateDrawDraft(args: {
-  readonly drag: Extract<DragState, { kind: 'draw' }>;
-  readonly point: Vec2 | null;
-  readonly project: Project;
-  readonly e: CanvasMouseEvent;
-  readonly setDraftShape: (shape: ShapeObject | null) => void;
-}): void {
-  if (args.point === null) return;
-  args.setDraftShape(
-    draftForDrawDrag(args.drag, args.point, args.project, drawModifiersFromEvent(args.e)),
-  );
-}
-
-function updateSelectionMarquee(args: {
-  readonly drag: Extract<DragState, { kind: 'marquee' }>;
-  readonly point: Vec2 | null;
-  readonly setSelectionMarquee: (
-    marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
-  ) => void;
-}): void {
-  if (args.point === null) return;
-  args.setSelectionMarquee({ start: args.drag.startScenePoint, end: args.point });
 }
 
 function commitSelectionMarquee(args: {
@@ -382,6 +358,7 @@ function applyTransformDrag(args: {
     drag.kind === 'pan' ||
     drag.kind === 'draw' ||
     drag.kind === 'marquee' ||
+    drag.kind === 'measure' ||
     drag.kind === 'path-node' ||
     point === null
   ) {
@@ -412,6 +389,7 @@ function visibleDragKind(drag: DragState | null): DragMoveResult['dragKind'] {
     drag.kind === 'pan' ||
     drag.kind === 'draw' ||
     drag.kind === 'marquee' ||
+    drag.kind === 'measure' ||
     drag.kind === 'path-node'
   ) {
     return null;

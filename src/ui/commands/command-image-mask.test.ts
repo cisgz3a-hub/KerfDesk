@@ -29,6 +29,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     canUngroupSelection: false,
     canLockSelection: false,
     hasLockedObjects: false,
+    measureTool: vi.fn(),
+    measureActive: false,
     confirmDiscard: vi.fn(async () => true),
     newProject: vi.fn(),
     openProject: vi.fn(),

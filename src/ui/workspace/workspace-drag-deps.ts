@@ -20,6 +20,7 @@ export function useWorkspaceDragDeps() {
   const snapSettings = useUiStore((s) => s.snapSettings);
   const setSnapGuides = useUiStore((s) => s.setSnapGuides);
   const setDraftShape = useUiStore((s) => s.setDraftShape);
+  const setMeasureDraft = useUiStore((s) => s.setMeasureDraft);
   const setSelectionMarquee = useUiStore((s) => s.setSelectionMarquee);
   return {
     selectedObjectId,
@@ -38,6 +39,7 @@ export function useWorkspaceDragDeps() {
     snapSettings,
     setSnapGuides,
     setDraftShape,
+    setMeasureDraft,
     setSelectionMarquee,
   };
 }

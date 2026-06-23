@@ -44,6 +44,9 @@ describe('ToolStrip', () => {
     expect(pen?.getAttribute('title')).toContain('double-click');
     expect(node?.getAttribute('aria-label')).toBe('Edit nodes');
     expect(node?.getAttribute('title')?.toLowerCase()).toContain('nodes');
+    expect(h.querySelector('button[data-help-id="tool:measure"]')?.getAttribute('title')).toContain(
+      'distance',
+    );
   });
 
   it('toggles an already-active draw tool back to Select mode', async () => {
@@ -75,5 +78,17 @@ describe('ToolStrip', () => {
     expect(
       h.querySelector('button[aria-label="Select / transform"]')?.getAttribute('aria-pressed'),
     ).toBe('false');
+  });
+
+  it('arms the Measure tool from the tool strip', async () => {
+    const h = await render(<ToolStrip />);
+    const measure = h.querySelector('button[aria-label="Measure"]');
+
+    await act(async () => {
+      measure?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'measure' });
+    expect(measure?.getAttribute('aria-pressed')).toBe('true');
   });
 });

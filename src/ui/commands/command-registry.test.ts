@@ -163,6 +163,22 @@ describe('buildAppCommands', () => {
     expect(multiFileTrace).toHaveBeenCalledTimes(1);
   });
 
+  it('runs and marks the Measure tool command as active', () => {
+    const measureTool = vi.fn();
+    const inactive = commandById(buildAppCommands(baseCtx({ measureTool })), 'tools.measure');
+
+    expect(inactive.shortcut).toBe('Alt+M');
+    expect(inactive.active).toBe(false);
+    expect(runCommand(inactive)).toBe(true);
+    expect(measureTool).toHaveBeenCalledTimes(1);
+
+    const active = commandById(
+      buildAppCommands(baseCtx({ measureActive: true, measureTool })),
+      'tools.measure',
+    );
+    expect(active.active).toBe(true);
+  });
+
   it('runs Material Test through the shared dirty-project guard', async () => {
     const confirmDiscard = vi.fn(async () => true);
     const materialTest = vi.fn();

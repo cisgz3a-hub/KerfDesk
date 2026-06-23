@@ -57,6 +57,10 @@ export type DragState =
       readonly startScenePoint: Vec2;
       readonly additive: boolean;
     }
+  | {
+      readonly kind: 'measure';
+      readonly startScenePoint: Vec2;
+    }
   | PathNodeDragState;
 
 // Decide what kind of drag a mouse-down on `point` initiates, based on the
@@ -194,7 +198,7 @@ export function panOffsetForDrag(args: {
 // drags never reach this function (the caller handles them before
 // computing a scene point).
 export function nextTransformForDrag(
-  drag: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }>,
+  drag: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' | 'measure' }>,
   obj: SceneObject,
   point: Vec2,
   e: { readonly shiftKey: boolean; readonly ctrlKey: boolean; readonly metaKey: boolean },

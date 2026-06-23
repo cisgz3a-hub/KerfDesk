@@ -49,6 +49,17 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
 
 export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
+    {
+      ...enabled(
+        'tools.measure',
+        'tools',
+        'Measure',
+        'Measure distance and angle on the workspace',
+        ctx.measureTool,
+        'Alt+M',
+      ),
+      active: ctx.measureActive,
+    },
     enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
     ...calibrationToolCommands(ctx),
     enabled(
