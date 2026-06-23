@@ -143,6 +143,7 @@ describe('coloredPathsToSvg', () => {
           points: [
             { x: 1.23456789, y: 2.345678 },
             { x: 9.999999, y: 4.001 },
+            { x: 4.25, y: 8.75 },
           ],
         },
       ],
@@ -160,6 +161,55 @@ describe('coloredPathsToSvg', () => {
   it('skips a ColoredPath whose polylines are empty', () => {
     const empty: ColoredPath = { color: '#000000', polylines: [] };
     const svg = coloredPathsToSvg([empty], 10, 10);
+    expect(svg).not.toContain('<path ');
+  });
+
+  it('skips closed polylines with no filled area', () => {
+    const degenerate: ColoredPath = {
+      color: '#000000',
+      polylines: [
+        {
+          closed: true,
+          points: [
+            { x: 2, y: 2 },
+            { x: 2, y: 2 },
+            { x: 2, y: 2 },
+          ],
+        },
+        {
+          closed: true,
+          points: [
+            { x: 0, y: 0 },
+            { x: 5, y: 5 },
+            { x: 10, y: 10 },
+          ],
+        },
+      ],
+    };
+
+    const svg = coloredPathsToSvg([degenerate, SQUARE], 10, 10);
+
+    expect(svg).not.toContain('M2 2 L2 2 L2 2 Z');
+    expect(svg).not.toContain('M0 0 L5 5 L10 10 Z');
+    expect(svg).toContain('M0 0 L10 0 L10 10 L0 10 Z');
+  });
+
+  it('skips open polylines with no travel length', () => {
+    const zeroLength: ColoredPath = {
+      color: '#ff0000',
+      polylines: [
+        {
+          closed: false,
+          points: [
+            { x: 4, y: 4 },
+            { x: 4, y: 4 },
+          ],
+        },
+      ],
+    };
+
+    const svg = coloredPathsToSvg([zeroLength], 10, 10);
+
     expect(svg).not.toContain('<path ');
   });
 });

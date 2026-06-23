@@ -22,6 +22,20 @@ const SQUARE_PATH: ColoredPath = {
   ],
 };
 
+const ZERO_AREA_PATH: ColoredPath = {
+  color: '#000000',
+  polylines: [
+    {
+      closed: true,
+      points: [
+        { x: 1, y: 1 },
+        { x: 1, y: 1 },
+        { x: 1, y: 1 },
+      ],
+    },
+  ],
+};
+
 function rawImage(width: number, height: number): RawImageData {
   return {
     width,
@@ -146,6 +160,23 @@ describe('runMultiFileTrace', () => {
     expect(download).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
       'Could not trace images: Trace produced no visible paths for empty-groups-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
+      'error',
+    );
+  });
+
+  it('does not download SVGs when trace returns only zero-area geometry', async () => {
+    const pushToast = vi.fn();
+    const download = vi.fn();
+
+    await runMultiFileTrace([namedFile('transparent.png')], pushToast, {
+      loadImage: async () => rawImage(4, 4),
+      trace: async () => [ZERO_AREA_PATH],
+      download,
+    });
+
+    expect(download).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not trace images: Trace produced no visible paths for transparent-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
       'error',
     );
   });
