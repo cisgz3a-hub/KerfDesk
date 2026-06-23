@@ -132,11 +132,15 @@ function isVisibleOpenPolyline(polyline: ColoredPath['polylines'][number]): bool
   return pathLength(points) > VISIBLE_GEOMETRY_EPSILON;
 }
 
-function finitePoints(polyline: ColoredPath['polylines'][number]): ReadonlyArray<ColoredPath['polylines'][number]['points'][number]> {
+function finitePoints(
+  polyline: ColoredPath['polylines'][number],
+): ReadonlyArray<ColoredPath['polylines'][number]['points'][number]> {
   return polyline.points.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
 }
 
-function signedArea(points: ReadonlyArray<ColoredPath['polylines'][number]['points'][number]>): number {
+function signedArea(
+  points: ReadonlyArray<ColoredPath['polylines'][number]['points'][number]>,
+): number {
   let area = 0;
   for (let i = 0; i < points.length; i += 1) {
     const a = points[i];
@@ -147,7 +151,9 @@ function signedArea(points: ReadonlyArray<ColoredPath['polylines'][number]['poin
   return area / 2;
 }
 
-function pathLength(points: ReadonlyArray<ColoredPath['polylines'][number]['points'][number]>): number {
+function pathLength(
+  points: ReadonlyArray<ColoredPath['polylines'][number]['points'][number]>,
+): number {
   let length = 0;
   for (let i = 1; i < points.length; i += 1) {
     const prev = points[i - 1];
