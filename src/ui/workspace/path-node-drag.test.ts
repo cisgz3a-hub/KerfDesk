@@ -27,12 +27,45 @@ describe('beginPathNodeDrag', () => {
       kind: 'path-node',
       startScenePoint: { x: 10.25, y: 0.2 },
     });
-    expect(selectPathNode).toHaveBeenCalledWith({
-      objectId: 'logo',
-      pathIndex: 0,
-      polylineIndex: 0,
-      pointIndex: 1,
+    expect(selectPathNode).toHaveBeenCalledWith(
+      {
+        objectId: 'logo',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 1,
+      },
+      {
+        additive: false,
+      },
+    );
+  });
+
+  it('passes additive selection through for Shift-click node selection', () => {
+    const selectPathNode = vi.fn();
+    const project = {
+      ...createProject(),
+      scene: addObject(EMPTY_SCENE, vectorObject()),
+    };
+
+    beginPathNodeDrag({
+      project,
+      scenePoint: { x: 10.25, y: 0.2 },
+      pxToMm: 0.25,
+      additive: true,
+      selectPathNode,
     });
+
+    expect(selectPathNode).toHaveBeenCalledWith(
+      {
+        objectId: 'logo',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 1,
+      },
+      {
+        additive: true,
+      },
+    );
   });
 
   it('clears node selection and does not start a drag when no node is hit', () => {
@@ -50,7 +83,7 @@ describe('beginPathNodeDrag', () => {
         selectPathNode,
       }),
     ).toBeNull();
-    expect(selectPathNode).toHaveBeenCalledWith(null);
+    expect(selectPathNode).toHaveBeenCalledWith(null, { additive: false });
   });
 
   it('updates the selected node position while a path-node drag is active', () => {

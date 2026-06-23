@@ -151,6 +151,41 @@ describe('path node edit actions', () => {
     expect(object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 10.5, maxY: 10 });
   });
 
+  it('shift-selects multiple nodes on one vector and nudges them together', () => {
+    loadObjects([importedSvg('logo', [pathWithPolyline('#000000', false, squarePoints())])]);
+    useStore.setState({ dirty: false });
+
+    useStore.getState().selectPathNode({
+      objectId: 'logo',
+      pathIndex: 0,
+      polylineIndex: 0,
+      pointIndex: 0,
+    });
+    useStore.getState().selectPathNode(
+      {
+        objectId: 'logo',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 2,
+      },
+      { additive: true },
+    );
+
+    useStore.getState().nudgeSelectedPathNode(2, 3);
+
+    const state = useStore.getState();
+    const object = state.project.scene.objects[0] as ImportedSvg | undefined;
+    expect(state.selectedPathNodes).toEqual([
+      { objectId: 'logo', pathIndex: 0, polylineIndex: 0, pointIndex: 0 },
+      { objectId: 'logo', pathIndex: 0, polylineIndex: 0, pointIndex: 2 },
+    ]);
+    expect(object?.paths[0]?.polylines[0]?.points[0]).toEqual({ x: 2, y: 3 });
+    expect(object?.paths[0]?.polylines[0]?.points[2]).toEqual({ x: 12, y: 13 });
+    expect(object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 12, maxY: 13 });
+    expect(state.undoStack).toHaveLength(1);
+    expect(state.dirty).toBe(true);
+  });
+
   it('does not edit locked, raster, or missing node references', () => {
     loadObjects([
       {
@@ -201,6 +236,7 @@ function loadObjects(
       },
     },
     selectedPathNode: null,
+    selectedPathNodes: [],
   });
 }
 

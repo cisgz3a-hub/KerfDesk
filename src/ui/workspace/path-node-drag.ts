@@ -11,10 +11,14 @@ export function beginPathNodeDrag(args: {
   readonly project: Project;
   readonly scenePoint: Vec2;
   readonly pxToMm: number;
-  readonly selectPathNode: (ref: PathNodeRef | null) => void;
+  readonly additive?: boolean;
+  readonly selectPathNode: (
+    ref: PathNodeRef | null,
+    options?: { readonly additive?: boolean },
+  ) => void;
 }): PathNodeDragState | null {
   const ref = hitPathNode(args.project.scene, args.scenePoint, args.pxToMm);
-  args.selectPathNode(ref);
+  args.selectPathNode(ref, { additive: args.additive === true });
   return ref === null ? null : { kind: 'path-node', startScenePoint: args.scenePoint };
 }
 

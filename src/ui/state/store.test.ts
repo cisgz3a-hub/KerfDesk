@@ -162,10 +162,21 @@ describe('useStore', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setJobPlacement({ startFrom: 'current-position', anchor: 'center' });
     useStore.getState().selectObject('O1');
+    useStore
+      .getState()
+      .selectPathNode({ objectId: 'O1', pathIndex: 0, polylineIndex: 0, pointIndex: 0 });
+    useStore
+      .getState()
+      .selectPathNode(
+        { objectId: 'O1', pathIndex: 0, polylineIndex: 0, pointIndex: 1 },
+        { additive: true },
+      );
     useStore.getState().newProject();
     const s = useStore.getState();
     expect(s.project.scene.objects).toHaveLength(0);
     expect(s.selectedObjectId).toBeNull();
+    expect(s.selectedPathNode).toBeNull();
+    expect(s.selectedPathNodes).toEqual([]);
     expect(s.jobPlacement).toEqual({ startFrom: 'absolute', anchor: 'front-left' });
   });
 
