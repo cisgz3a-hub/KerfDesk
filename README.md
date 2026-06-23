@@ -2,7 +2,7 @@
 
 > A focused CAM application for **GRBL** laser cutters and engravers. Web app and Windows desktop from one codebase. Proprietary source (ADR-018).
 
-**Status:** Phases A–E shipped (the MVP plus the two post-MVP rounds: text + raster trace), plus Phase F.1 (Fill hatching, shipped 2026-05-28), Phase F.2 (raster image engrave — code shipped through F.2.e, hardware burn F.2.f pending), and Phase F.3 (set work origin — code shipped, hardware verification pending). **Trace pipeline hardened 2026-05-29:** transparent-PNG decode fix, a perceptual-fidelity test harness (ADR-025), and LightBurn-style trace-keeps-source overlay (ADR-026). **Known open gap (next frontier):** imagetracerjs is outline-only, so the outline-vs-centerline limitation — the core "faulty vs LightBurn" issue — remains; see ADR-025 'Scope'. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://laserforge.pages.dev> (published manually via `pnpm deploy:web`; CI auto-deploy is dormant until the Cloudflare secrets are set — see below). Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
+**Status:** Phases A–E shipped (the MVP plus the two post-MVP rounds: text + raster trace), plus Phase F.1 (Fill hatching, shipped 2026-05-28), Phase F.2 (raster image engrave — code shipped through F.2.e, hardware burn F.2.f pending), and Phase F.3 (set work origin — code shipped, hardware verification pending). **Trace pipeline hardened 2026-05-29:** transparent-PNG decode fix, a perceptual-fidelity test harness (ADR-025), and LightBurn-style trace-keeps-source overlay (ADR-026). **Known open gap (next frontier):** imagetracerjs is outline-only, so the outline-vs-centerline limitation — the core "faulty vs LightBurn" issue — remains; see ADR-025 'Scope'. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://laserforge-2fj.pages.dev> (published by GitHub Actions after CI succeeds). Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
 
 ---
 
@@ -66,7 +66,7 @@ pnpm deploy:web:preview # Same, but to a per-deploy preview URL
 ### Cloudflare Pages — auto-deploy on push
 
 The `.github/workflows/deploy.yml` workflow publishes the bundle to
-`https://laserforge.pages.dev` after every push to `main`. It needs two
+`https://laserforge-2fj.pages.dev` after every successful CI run on `main`. It needs two
 repository secrets to authenticate:
 
 1. **`CLOUDFLARE_API_TOKEN`** — create at
@@ -80,11 +80,10 @@ Add both at **Settings → Secrets and variables → Actions → New
 repository secret**. Until both are set the workflow will fail at the
 "Publish to Cloudflare Pages" step (CI itself stays green).
 
-**Current status (2026-05-29): the two secrets are not set**, so the
-auto-deploy workflow is dormant. The live site is published manually with
-`pnpm deploy:web` (a local `wrangler login` provides the auth). The latest
-manual deploy serves the current `main`. Add the two secrets above to
-enable push-to-deploy.
+**Current status (2026-06-23): push-to-deploy is active.** The canonical
+Cloudflare Pages project is `laserforge-2fj`; the older
+`https://laserforge.pages.dev` address belongs to a stale Pages project and
+must not be used for release verification.
 
 ## License
 

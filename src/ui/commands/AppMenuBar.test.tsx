@@ -57,6 +57,7 @@ describe('AppMenuBar', () => {
     try {
       expect(host.textContent).toContain('File');
       expect(host.textContent).toContain('Tools');
+      expect(host.querySelector('.lf-menu')).toBeNull();
 
       const file = [...host.querySelectorAll('summary')].find(
         (summary) => summary.textContent === 'File',
@@ -85,6 +86,14 @@ describe('AppMenuBar', () => {
   it('leaves disabled commands disabled with a reason', async () => {
     const { host, root } = await renderMenu(commands());
     try {
+      const tools = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'Tools',
+      );
+      if (!(tools instanceof HTMLElement)) throw new Error('Tools menu missing');
+      await act(async () => {
+        tools.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
       const button = [...host.querySelectorAll('button')].find((item) =>
         item.textContent?.includes('Trace Image'),
       );
@@ -103,9 +112,27 @@ describe('AppMenuBar', () => {
       expect(
         host.querySelector('summary[data-help-id="menu:file"]')?.getAttribute('title'),
       ).toContain('File menu');
+
+      const file = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'File',
+      );
+      if (!(file instanceof HTMLElement)) throw new Error('File menu missing');
+      await act(async () => {
+        file.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
       expect(
         host.querySelector('button[data-help-id="command:file.new"]')?.getAttribute('title'),
       ).toContain('new blank project');
+
+      const tools = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'Tools',
+      );
+      if (!(tools instanceof HTMLElement)) throw new Error('Tools menu missing');
+      await act(async () => {
+        tools.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
       expect(
         host
           .querySelector('button[data-help-id="command:tools.trace-image"]')
@@ -164,6 +191,30 @@ describe('AppMenuBar', () => {
       expect(openFamilyLabels(host)).toEqual([]);
     } finally {
       outside.remove();
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('closes the open top menu when Escape is pressed', async () => {
+    const { host, root } = await renderMenu(commands());
+    try {
+      const file = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'File',
+      );
+      if (!(file instanceof HTMLElement)) throw new Error('File menu missing');
+
+      await act(async () => {
+        file.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(openFamilyLabels(host)).toEqual(['File']);
+
+      await act(async () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+      });
+
+      expect(openFamilyLabels(host)).toEqual([]);
+      expect(host.querySelector('.lf-menu')).toBeNull();
+    } finally {
       await act(async () => root.unmount());
     }
   });
