@@ -2,9 +2,10 @@
 // summary, object / layer counts, device name, bed dimensions. Job estimate
 // is Phase C.
 
-import { transformedBBox } from '../../core/scene';
+import { transformedBBox, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { selectedOpenFillContourCount } from './fill-diagnostics';
 
 export function StatusBar(): JSX.Element {
   const project = useStore((s) => s.project);
@@ -13,8 +14,11 @@ export function StatusBar(): JSX.Element {
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const objectCount = project.scene.objects.length;
+  const groupCount = project.scene.groups?.length ?? 0;
+  const lockedCount = project.scene.objects.filter((object) => object.locked === true).length;
   const layerCount = project.scene.layers.length;
   const outputLayerCount = project.scene.layers.filter((l) => l.output).length;
+  const selectedFillWarning = fillWarning(project, selectedObjectId, additionalSelectedIds);
   return (
     <footer aria-label="Status bar" style={barStyle}>
       <Segment>
@@ -23,7 +27,10 @@ export function StatusBar(): JSX.Element {
           : `Cursor: X ${cursorMm.x.toFixed(1)}, Y ${cursorMm.y.toFixed(1)} mm`}
       </Segment>
       <Segment>{describeSelection(project, selectedObjectId, additionalSelectedIds)}</Segment>
+      {selectedFillWarning !== null && <Segment>{selectedFillWarning}</Segment>}
       <Segment>Objects: {objectCount}</Segment>
+      {groupCount > 0 && <Segment>Groups: {groupCount}</Segment>}
+      {lockedCount > 0 && <Segment>Locked: {lockedCount}</Segment>}
       <Segment>
         Layers: {layerCount} ({outputLayerCount} output)
       </Segment>
@@ -50,6 +57,17 @@ function describeSelection(
   const w = bbox.maxX - bbox.minX;
   const h = bbox.maxY - bbox.minY;
   return `1 selected · ${w.toFixed(1)} × ${h.toFixed(1)} mm · X ${bbox.minX.toFixed(1)}, Y ${bbox.minY.toFixed(1)}`;
+}
+
+function fillWarning(
+  project: Project,
+  selectedId: string | null,
+  additional: ReadonlySet<string>,
+): string | null {
+  const count = selectedOpenFillContourCount(project, selectedId, additional);
+  if (count === 0) return null;
+  const noun = count === 1 ? 'contour' : 'contours';
+  return `Fill warning: ${count} open ${noun} will not fill`;
 }
 
 function Segment({ children }: { readonly children: React.ReactNode }): JSX.Element {

@@ -22,10 +22,15 @@ export const canvasTheme = {
   // Selection chrome (draw-scene)
   selection: '#1976d2',
   selectionHandleFill: '#ffffff',
+  pathNodeHandleFill: '#ffffff',
+  pathNodeHandleStroke: '#00a884',
+  pathNodeHandleActiveFill: '#00a884',
+  pathNodeHandleActiveStroke: '#ffffff',
   selectionMarqueeFill: 'rgba(25, 118, 210, 0.12)',
   rotateHandleStroke: '#fff',
   snapGuide: '#00a884',
   outOfBounds: '#c62828',
+  openFillContour: '#f57c00',
   noGoZoneFill: 'rgba(198, 40, 40, 0.12)',
   // Rulers (draw-rulers)
   rulerBackground: '#f0f0f0',

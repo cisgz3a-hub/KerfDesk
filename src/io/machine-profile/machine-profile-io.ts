@@ -1,6 +1,8 @@
 import {
   isScanOffsetTable,
   normalizeGcodeDialectSelection,
+  normalizeGrblRxBufferBytes,
+  normalizeGrblStreamingMode,
   normalizeScanOffsetTable,
   validateMachineProfile,
   type DeviceProfile,
@@ -152,6 +154,8 @@ function parseProfile(
   const profile = canonicalProfile({
     ...validatedDeviceProfile(value),
     gcodeDialect: normalizeGcodeDialectSelection(value['gcodeDialect']),
+    streamingMode: normalizeGrblStreamingMode(value['streamingMode']),
+    rxBufferBytes: normalizeGrblRxBufferBytes(value['rxBufferBytes']),
     scanningOffsets: normalizeScanOffsetTable(value['scanningOffsets']),
     noGoZones: noGoZones.noGoZones,
   });
@@ -233,6 +237,8 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     name: profile.name,
     ...canonicalMachineMetadata(profile),
     gcodeDialect: normalizeGcodeDialectSelection(profile.gcodeDialect),
+    streamingMode: normalizeGrblStreamingMode(profile.streamingMode),
+    rxBufferBytes: normalizeGrblRxBufferBytes(profile.rxBufferBytes),
     bedWidth: profile.bedWidth,
     bedHeight: profile.bedHeight,
     maxFeed: profile.maxFeed,

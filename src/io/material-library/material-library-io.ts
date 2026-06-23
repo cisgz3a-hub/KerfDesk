@@ -1,42 +1,23 @@
 import {
-  isScanOffsetTable,
-  normalizeScanOffsetTable,
-  type DeviceProfile,
-  type Origin,
-  type ScanOffsetPoint,
-} from '../../core/devices';
-import {
   isMaterialRecipe,
   normalizeMaterialRecipe,
   type MaterialRecipe,
   type MaterialRecipeConfidence,
   type MaterialRecipeOperation,
 } from '../../core/material-library';
+import {
+  canonicalDeviceHint,
+  createMaterialLibraryDeviceHint,
+  parseOptionalDeviceHint,
+  type MaterialLibraryDeviceHint,
+} from './material-library-device-hint';
 import { parsePresetMatchMetadata } from './material-preset-metadata';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
 export const MATERIAL_LIBRARY_SCHEMA_VERSION = 1;
 
-export type MaterialLibraryDeviceHint = {
-  readonly name: string;
-  readonly bedWidth: number;
-  readonly bedHeight: number;
-  readonly maxFeed: number;
-  readonly maxPowerS: number;
-  readonly minPowerS: number;
-  readonly laserModeEnabled: boolean;
-  readonly airAssistCommand: DeviceProfile['airAssistCommand'];
-  readonly origin: Origin;
-  readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
-};
-
-type MaterialLibraryDeviceHintInput = Omit<
-  MaterialLibraryDeviceHint,
-  'airAssistCommand' | 'scanningOffsets'
-> & {
-  readonly airAssistCommand?: DeviceProfile['airAssistCommand'];
-  readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
-};
+export { createMaterialLibraryDeviceHint };
+export type { MaterialLibraryDeviceHint };
 
 export type MaterialPreset = {
   readonly id: string;
@@ -76,23 +57,6 @@ export type MergeMaterialLibrariesResult = {
   readonly library: MaterialLibraryDocument;
   readonly skippedDuplicateIds: ReadonlyArray<string>;
 };
-
-const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
-
-export function createMaterialLibraryDeviceHint(device: DeviceProfile): MaterialLibraryDeviceHint {
-  return {
-    name: device.name,
-    bedWidth: device.bedWidth,
-    bedHeight: device.bedHeight,
-    maxFeed: device.maxFeed,
-    maxPowerS: device.maxPowerS,
-    minPowerS: device.minPowerS,
-    laserModeEnabled: device.laserModeEnabled,
-    airAssistCommand: device.airAssistCommand,
-    origin: device.origin,
-    scanningOffsets: normalizeScanOffsetTable(device.scanningOffsets),
-  };
-}
 
 export function serializeMaterialLibrary(document: MaterialLibraryDocument): string {
   return `${JSON.stringify(canonicalLibrary(document), null, 2)}\n`;
@@ -318,38 +282,6 @@ function parseThickness(
   return { kind: 'invalid', reason: `entries[${index}].thicknessMm must be positive` };
 }
 
-function parseOptionalDeviceHint(
-  value: unknown,
-):
-  | { readonly kind: 'ok'; readonly deviceHint?: MaterialLibraryDeviceHint }
-  | { readonly kind: 'invalid'; readonly reason: string } {
-  if (value === undefined) {
-    return { kind: 'ok' };
-  }
-  if (!isRecord(value)) {
-    return { kind: 'invalid', reason: 'deviceHint must be an object' };
-  }
-  if (!isDeviceHint(value)) {
-    return { kind: 'invalid', reason: 'deviceHint has invalid fields' };
-  }
-  return { kind: 'ok', deviceHint: canonicalDeviceHint(value) };
-}
-
-function isDeviceHint(value: Record<string, unknown>): value is MaterialLibraryDeviceHintInput {
-  return (
-    isNonEmptyString(value.name) &&
-    isPositiveFinite(value.bedWidth) &&
-    isPositiveFinite(value.bedHeight) &&
-    isPositiveFinite(value.maxFeed) &&
-    isPositiveFinite(value.maxPowerS) &&
-    isNonNegativeFinite(value.minPowerS) &&
-    typeof value.laserModeEnabled === 'boolean' &&
-    (value.airAssistCommand === undefined || isAirAssistCommand(value.airAssistCommand)) &&
-    isOrigin(value.origin) &&
-    (value.scanningOffsets === undefined || isScanOffsetTable(value.scanningOffsets))
-  );
-}
-
 function canonicalLibrary(document: MaterialLibraryDocument): MaterialLibraryDocument {
   return {
     format: MATERIAL_LIBRARY_FORMAT,
@@ -386,23 +318,6 @@ function canonicalPreset(preset: MaterialPreset): MaterialPreset {
   };
 }
 
-function canonicalDeviceHint(
-  deviceHint: MaterialLibraryDeviceHintInput,
-): MaterialLibraryDeviceHint {
-  return {
-    name: deviceHint.name,
-    bedWidth: deviceHint.bedWidth,
-    bedHeight: deviceHint.bedHeight,
-    maxFeed: deviceHint.maxFeed,
-    maxPowerS: deviceHint.maxPowerS,
-    minPowerS: deviceHint.minPowerS,
-    laserModeEnabled: deviceHint.laserModeEnabled,
-    airAssistCommand: deviceHint.airAssistCommand ?? 'none',
-    origin: deviceHint.origin,
-    scanningOffsets: normalizeScanOffsetTable(deviceHint.scanningOffsets),
-  };
-}
-
 function invalidField(
   index: number,
   field: string,
@@ -416,20 +331,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isPositiveFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
-function isNonNegativeFinite(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-function isOrigin(value: unknown): value is Origin {
-  return ORIGINS.some((origin) => origin === value);
-}
-
-function isAirAssistCommand(value: unknown): value is DeviceProfile['airAssistCommand'] {
-  return value === 'none' || value === 'M7' || value === 'M8';
 }

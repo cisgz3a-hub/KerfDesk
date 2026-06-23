@@ -143,6 +143,18 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Rasterize selected vector artwork into a bitmap image.',
   },
+  'tools.fill-selection': {
+    family: 'tools',
+    tooltip: 'Move selected vector artwork to its own Fill layer.',
+  },
+  'tools.close-open-fill-contours': {
+    family: 'tools',
+    tooltip: 'Close selected Fill contours when their endpoints are already nearly touching.',
+  },
+  'tools.close-fill-contours-with-tolerance': {
+    family: 'tools',
+    tooltip: 'Review selected open Fill contours before closing a larger endpoint gap.',
+  },
   'arrange.align-left': {
     family: 'arrange',
     tooltip: 'Align selected objects to the reference left edge.',
@@ -186,6 +198,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'arrange.distribute-vertical-spacing': {
     family: 'arrange',
     tooltip: 'Evenly space selected object edges vertically.',
+  },
+  'arrange.break-apart': {
+    family: 'arrange',
+    tooltip: 'Split selected imported SVG paths into separate selectable objects.',
   },
   'arrange.flip-horizontal': {
     family: 'arrange',

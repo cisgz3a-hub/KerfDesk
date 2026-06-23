@@ -53,6 +53,9 @@ export type CommandId =
   | 'tools.trace-image'
   | 'tools.multi-file-trace'
   | 'tools.convert-to-bitmap'
+  | 'tools.fill-selection'
+  | 'tools.close-open-fill-contours'
+  | 'tools.close-fill-contours-with-tolerance'
   | 'arrange.align-left'
   | 'arrange.align-center-x'
   | 'arrange.align-right'
@@ -64,6 +67,7 @@ export type CommandId =
   | 'arrange.distribute-horizontal-spacing'
   | 'arrange.distribute-vertical-centers'
   | 'arrange.distribute-vertical-spacing'
+  | 'arrange.break-apart'
   | 'arrange.flip-horizontal'
   | 'arrange.flip-vertical'
   | 'laser.connect'
@@ -100,6 +104,9 @@ export type AppCommandContext = {
   readonly hasSelection: boolean;
   readonly hasRasterSelection: boolean;
   readonly hasConvertibleSelection: boolean;
+  readonly hasFillableSelection: boolean;
+  readonly canCloseOpenFillContours: boolean;
+  readonly canReviewCloseOpenFillContours: boolean;
   readonly canApplyImageMask: boolean;
   readonly hasMaskedRasterSelection: boolean;
   readonly canPaste: boolean;
@@ -143,6 +150,9 @@ export type AppCommandContext = {
   readonly traceImage: () => void;
   readonly multiFileTrace: () => void;
   readonly convertToBitmap: () => void;
+  readonly fillSelectionSeparately: () => void;
+  readonly closeSelectedOpenFillContours: () => void;
+  readonly reviewCloseOpenFillContours: () => void;
   readonly applyImageMask: () => void;
   readonly cropImage: () => void;
   readonly removeImageMask: () => void;
@@ -151,6 +161,8 @@ export type AppCommandContext = {
   readonly alignSelection: (kind: SelectionAlignKind) => void;
   readonly canDistributeSelection: boolean;
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
+  readonly canBreakApartSelection: boolean;
+  readonly breakApartSelection: () => void;
   readonly flipHorizontal: () => void;
   readonly flipVertical: () => void;
   readonly connectLaser: () => void;

@@ -18,6 +18,12 @@ const SE_SCALE: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }> = {
   handle: 'se',
 };
 
+const E_SCALE: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }> = {
+  kind: 'scale',
+  objectId: 'O1',
+  handle: 'e',
+};
+
 function resizeEvent(args: {
   readonly shiftKey?: boolean;
   readonly ctrlKey?: boolean;
@@ -81,6 +87,29 @@ describe('nextTransformForDrag scale modifiers', () => {
       resizeEvent({ ctrlKey: true }),
     );
     const before = transformedBBox(object);
+    const after = transformedBBox({ ...object, transform: next });
+
+    expect(centerOf(after)).toEqual(centerOf(before));
+    expect(next.scaleX).toBeCloseTo(3);
+    expect(next.scaleY).toBeCloseTo(3);
+  });
+
+  it('stretches only width from an east side handle and keeps the opposite edge pinned', () => {
+    const object = objectWithBounds();
+    const before = transformedBBox(object);
+    const next = nextTransformForDrag(E_SCALE, object, { x: 30, y: 999 }, resizeEvent({}));
+    const after = transformedBBox({ ...object, transform: next });
+
+    expect(after.minX).toBeCloseTo(before.minX);
+    expect(after.minY).toBeCloseTo(before.minY);
+    expect(after.maxY).toBeCloseTo(before.maxY);
+    expect(after.maxX).toBeCloseTo(30);
+  });
+
+  it('uses the selected anchor as the resize pivot when it is valid for the dragged handle', () => {
+    const object = objectWithBounds();
+    const before = transformedBBox(object);
+    const next = nextTransformForDrag(SE_SCALE, object, { x: 20, y: 40 }, resizeEvent({}), 'c');
     const after = transformedBBox({ ...object, transform: next });
 
     expect(centerOf(after)).toEqual(centerOf(before));

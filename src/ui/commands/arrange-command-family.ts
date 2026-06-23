@@ -21,7 +21,31 @@ export function arrangeCommands(ctx: AppCommandContext): ReadonlyArray<AppComman
           () => ctx.distributeSelection(spec.kind),
         ),
   );
-  return [...align, ...distribute, flipHorizontalCommand(ctx), flipVerticalCommand(ctx)];
+  return [
+    ...align,
+    ...distribute,
+    breakApartCommand(ctx),
+    flipHorizontalCommand(ctx),
+    flipVerticalCommand(ctx),
+  ];
+}
+
+function breakApartCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.canBreakApartSelection
+    ? enabled(
+        'arrange.break-apart',
+        'arrange',
+        'Break Apart',
+        'Split selected imported SVG paths into separate objects',
+        ctx.breakApartSelection,
+      )
+    : disabled(
+        'arrange.break-apart',
+        'arrange',
+        'Break Apart',
+        'Select an imported SVG with more than one path.',
+        ctx.breakApartSelection,
+      );
 }
 
 function flipHorizontalCommand(ctx: AppCommandContext): AppCommand {

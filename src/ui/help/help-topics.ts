@@ -5,7 +5,7 @@ export { COMMAND_HELP, type CommandHelpTopic } from './command-help-topics';
 
 export type CommandHelpId = `command:${CommandId}`;
 export type MenuHelpId = `menu:${CommandFamily}`;
-export type ToolHelpKey = 'select' | 'rect' | 'ellipse' | 'polygon' | 'polyline';
+export type ToolHelpKey = 'select' | 'node' | 'rect' | 'ellipse' | 'polygon' | 'polyline';
 export type ToolHelpId = `tool:${ToolHelpKey}`;
 export type ControlHelpKey =
   | 'laser.console'
@@ -39,6 +39,10 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   select: {
     label: 'Select / transform',
     tooltip: 'Select, move, rotate, and resize existing artwork. Press Esc to return here.',
+  },
+  node: {
+    label: 'Edit nodes',
+    tooltip: 'Edit vector path nodes without moving or resizing the whole object.',
   },
   rect: {
     label: 'Draw rectangle',

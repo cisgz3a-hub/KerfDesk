@@ -6,6 +6,7 @@ import {
   type ProfileCapability,
   type ProfileEvidence,
 } from './device-profile';
+import { isGrblRxBufferBytes, isGrblStreamingMode } from '../grbl-streaming';
 import { isGcodeDialectSelection } from './gcode-dialects';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
@@ -86,6 +87,12 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   }
   if (!isGcodeDialectSelection(profile.gcodeDialect)) {
     errors.push('gcodeDialect must reference a known GRBL dialect');
+  }
+  if (!isGrblStreamingMode(profile.streamingMode)) {
+    errors.push('streamingMode must be char-counted or ping-pong');
+  }
+  if (!isGrblRxBufferBytes(profile.rxBufferBytes)) {
+    errors.push('rxBufferBytes must be a positive integer not greater than 4096');
   }
   requirePositive(profile.bedWidth, 'bedWidth', errors);
   requirePositive(profile.bedHeight, 'bedHeight', errors);

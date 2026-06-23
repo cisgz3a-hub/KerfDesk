@@ -11,6 +11,7 @@ import {
   type SettingsCollectorState,
   type StatusReport,
   type StreamerState,
+  type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import type { DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
@@ -145,7 +146,7 @@ export type LaserState = {
     },
     feed: number,
   ) => Promise<void>;
-  readonly startJob: (gcode: string) => Promise<void>;
+  readonly startJob: (gcode: string, options?: CreateStreamerOptions) => Promise<void>;
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
   readonly stopJob: () => Promise<void>;

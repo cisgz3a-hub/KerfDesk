@@ -1,5 +1,7 @@
 import {
   isGcodeDialectSelection,
+  isGrblRxBufferBytes,
+  isGrblStreamingMode,
   type ControllerKind,
   type LaserAirAssistHardware,
   type LaserFocusMode,
@@ -57,7 +59,25 @@ function validateProfileIdentity(value: Record<string, unknown>): string | null 
 }
 
 function validateProfileMachineFields(value: Record<string, unknown>): string | null {
+  return (
+    validateProfileStreamingFields(value) ??
+    validateProfilePositiveMachineFields(value) ??
+    validateProfileScalarMachineFields(value)
+  );
+}
+
+function validateProfileStreamingFields(value: Record<string, unknown>): string | null {
   if (!isGcodeDialectSelection(value['gcodeDialect'])) return 'profile.gcodeDialect is invalid';
+  if (value['streamingMode'] !== undefined && !isGrblStreamingMode(value['streamingMode'])) {
+    return 'profile.streamingMode is invalid';
+  }
+  if (value['rxBufferBytes'] !== undefined && !isGrblRxBufferBytes(value['rxBufferBytes'])) {
+    return 'profile.rxBufferBytes is invalid';
+  }
+  return null;
+}
+
+function validateProfilePositiveMachineFields(value: Record<string, unknown>): string | null {
   for (const field of [
     'bedWidth',
     'bedHeight',
@@ -68,6 +88,10 @@ function validateProfileMachineFields(value: Record<string, unknown>): string | 
   ] as const) {
     if (!isPositiveFinite(value[field])) return `profile.${field} must be positive`;
   }
+  return null;
+}
+
+function validateProfileScalarMachineFields(value: Record<string, unknown>): string | null {
   if (!isNonNegativeFinite(value['minPowerS'])) return 'profile.minPowerS must be non-negative';
   if (!isNonNegativeFinite(value['junctionDeviationMm'])) {
     return 'profile.junctionDeviationMm must be non-negative';

@@ -1,3 +1,10 @@
+import {
+  DEFAULT_GRBL_RX_BUFFER_BYTES,
+  normalizeGrblRxBufferBytes,
+  type GrblPollDuringJob,
+  type GrblStreamingMode,
+} from '../../grbl-streaming';
+
 // GRBL character-counted streaming buffer (pure state machine).
 //
 // GRBL's serial RX buffer is 128 bytes (default; configurable on some forks).
@@ -18,7 +25,7 @@
 // against transient queueing edge cases. We previously used 127 (1-byte
 // margin) and were off-by-one in the conservative direction. MIT-compare
 // audit recommended matching CNCjs. No observed bug at 127 — preventive.
-export const DEFAULT_RX_BUFFER_BYTES = 120;
+export const DEFAULT_RX_BUFFER_BYTES = DEFAULT_GRBL_RX_BUFFER_BYTES;
 
 // 'disconnected' is distinct from 'cancelled' so the UI can show
 // "job aborted — connection lost" vs the user-initiated stop. The
@@ -56,8 +63,8 @@ export type StreamerState = {
   readonly rxBufferBytes: number;
 };
 
-export type StreamingMode = 'char-counted' | 'ping-pong';
-export type PollDuringJob = 'off' | '1hz' | '2hz' | '4hz';
+export type StreamingMode = GrblStreamingMode;
+export type PollDuringJob = GrblPollDuringJob;
 export type CreateStreamerOptions = {
   readonly rxBufferBytes?: number;
   readonly streamingMode?: StreamingMode;
@@ -91,7 +98,7 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
     inFlightBytes: 0,
     completed: 0,
     total: lines.length,
-    rxBufferBytes: opts.rxBufferBytes ?? DEFAULT_RX_BUFFER_BYTES,
+    rxBufferBytes: normalizeGrblRxBufferBytes(opts.rxBufferBytes),
   };
 }
 
@@ -118,10 +125,11 @@ export function findOversizedLine(
   gcode: string,
   rxBufferBytes: number = DEFAULT_RX_BUFFER_BYTES,
 ): OversizedLine | null {
+  const limit = normalizeGrblRxBufferBytes(rxBufferBytes);
   const lines = splitLines(gcode);
   for (let i = 0; i < lines.length; i += 1) {
     const bytes = lines[i]?.length ?? 0;
-    if (bytes > rxBufferBytes) return { lineNumber: i + 1, bytes, limit: rxBufferBytes };
+    if (bytes > limit) return { lineNumber: i + 1, bytes, limit };
   }
   return null;
 }

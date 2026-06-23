@@ -36,6 +36,9 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'tools.trace-image',
   'tools.multi-file-trace',
   'tools.convert-to-bitmap',
+  'tools.fill-selection',
+  'tools.close-open-fill-contours',
+  'tools.close-fill-contours-with-tolerance',
   'arrange.align-left',
   'arrange.align-center-x',
   'arrange.align-right',
@@ -47,6 +50,7 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'arrange.distribute-horizontal-spacing',
   'arrange.distribute-vertical-centers',
   'arrange.distribute-vertical-spacing',
+  'arrange.break-apart',
   'arrange.flip-horizontal',
   'arrange.flip-vertical',
   'laser.connect',
@@ -75,6 +79,7 @@ describe('help topics', () => {
 
   it('defines drawing-tool help separate from icon labels', () => {
     expect(TOOL_HELP.select.tooltip.toLowerCase()).toContain('select');
+    expect(TOOL_HELP.node.tooltip.toLowerCase()).toContain('nodes');
     expect(TOOL_HELP.rect.tooltip).toContain('rectangle');
     expect(TOOL_HELP.polyline.tooltip).toContain('Enter');
   });

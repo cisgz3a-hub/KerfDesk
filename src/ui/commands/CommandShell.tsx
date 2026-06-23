@@ -23,6 +23,7 @@ import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to
 import { Toolbar } from '../common/Toolbar';
 import { useRegisterModal } from '../common/use-register-modal';
 import { AppMenuBar } from './AppMenuBar';
+import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
 import { runMultiFileTrace, type MultiFileTraceFile } from './multi-file-trace-action';
@@ -41,6 +42,7 @@ export function CommandShell(): JSX.Element {
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
+  const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
   const commands = useAppCommands({
@@ -57,6 +59,7 @@ export function CommandShell(): JSX.Element {
       ),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
     requestProjectNotes: () => setProjectNotesOpen(true),
+    requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
   });
   const onImagePick = useImagePickHandler();
@@ -91,7 +94,32 @@ export function CommandShell(): JSX.Element {
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
       ) : null}
       {projectNotesOpen ? <ProjectNotesPanel onClose={() => setProjectNotesOpen(false)} /> : null}
+      {closeToleranceDialogOpen ? (
+        <CloseOpenFillContoursPanel onClose={() => setCloseToleranceDialogOpen(false)} />
+      ) : null}
     </>
+  );
+}
+
+function CloseOpenFillContoursPanel(props: { readonly onClose: () => void }): JSX.Element {
+  useRegisterModal();
+  const project = useStore((s) => s.project);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
+  const closeWithTolerance = useStore((s) => s.closeSelectedOpenFillContoursWithTolerance);
+  const pushToast = useToastStore((s) => s.pushToast);
+  return (
+    <CloseOpenFillContoursDialog
+      project={project}
+      selectedObjectId={selectedObjectId}
+      additionalSelectedIds={additionalSelectedIds}
+      onCancel={props.onClose}
+      onApply={(toleranceMm) => {
+        closeWithTolerance(toleranceMm);
+        props.onClose();
+        pushToast(`Closed Fill contours within ${toleranceMm} mm.`, 'success');
+      }}
+    />
   );
 }
 

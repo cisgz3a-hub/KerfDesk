@@ -12,6 +12,7 @@ export function resetStore(): void {
   useStore.setState({
     project: createProject(),
     selectedObjectId: null,
+    selectedPathNode: null,
     additionalSelectedIds: new Set(),
     previewMode: false,
     undoStack: [],

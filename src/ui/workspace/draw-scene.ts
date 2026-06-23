@@ -15,6 +15,7 @@ import {
 } from '../../core/scene';
 import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawNoGoZones } from './draw-no-go-zones';
+import { drawSelectedOpenFillContours } from './draw-open-fill-contours';
 import { drawPenDraft } from './draw-pen-preview';
 import { type PenDraft, type SelectionMarquee } from '../state/ui-store';
 import { drawSelectionMarquee } from './draw-selection-marquee';
@@ -25,6 +26,8 @@ import {
   type DisplayPolylineCache,
   type DisplayPolylines,
 } from './display-polylines';
+import type { PathNodeRef } from '../state/path-node-edit-actions';
+import { drawPathNodeHandles } from './draw-path-node-handles';
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
@@ -40,6 +43,8 @@ import {
 
 export type DrawOpts = {
   readonly selectedId: string | null;
+  readonly showPathNodeHandles?: boolean;
+  readonly selectedPathNode?: PathNodeRef | null;
   // Extra selection (F-A5 multi-select). Drawn with a thinner secondary
   // outline so the user can still tell which is the primary (handles only
   // render on the primary in Phase A).
@@ -104,11 +109,20 @@ export function drawScene(
       project,
       view,
       opts.selectedId,
+      opts.showPathNodeHandles === true,
+      opts.selectedPathNode ?? null,
       opts.additionalSelectedIds,
       opts.onRasterBitmapReady,
       opts.displayPolylineCache,
     );
     if (simplified) drawLargeSceneNotice(ctx);
+    drawSelectedOpenFillContours(
+      ctx,
+      project,
+      view,
+      opts.selectedId,
+      opts.additionalSelectedIds ?? EMPTY_SELECTION,
+    );
     if (opts.draft !== undefined) drawDraftShape(ctx, opts.draft, view);
     if (opts.penDraft !== undefined) drawPenDraft(ctx, opts.penDraft, view);
     if (opts.selectionMarquee !== undefined) drawSelectionMarquee(ctx, opts.selectionMarquee, view);
@@ -200,6 +214,8 @@ function drawObjects(
   project: Project,
   view: ViewTransform,
   selectedId: string | null,
+  showPathNodeHandles: boolean,
+  selectedPathNode: PathNodeRef | null,
   additionalSelectedIds: ReadonlySet<string> = EMPTY_SELECTION,
   onRasterBitmapReady?: () => void,
   displayPolylineCache?: DisplayPolylineCache,
@@ -228,6 +244,7 @@ function drawObjects(
     }
     if (obj.id === selectedId) {
       drawSelectionBox(ctx, obj, view);
+      if (showPathNodeHandles) drawPathNodeHandles(ctx, obj, view, selectedPathNode);
     } else if (additionalSelectedIds.has(obj.id)) {
       drawSecondarySelectionBox(ctx, obj, view);
     }

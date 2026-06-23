@@ -63,4 +63,27 @@ describe('emitRasterGroup scan-offset compensation', () => {
       'G1 X0.750 S0',
     ]);
   });
+
+  it('does not apply scan offset when bidirectional scanning is disabled', () => {
+    const out = emitRasterGroup(
+      makeInput({
+        width: 4,
+        height: 2,
+        bounds: { minX: 0, minY: 0, maxX: 4, maxY: 2 },
+        scanOffsetMm: 0.25,
+        bidirectional: false,
+        sValues: new Uint16Array([500, 500, 0, 0, 0, 0, 700, 700]),
+      }),
+    );
+
+    const motion = out.split('\n').filter((line) => line.startsWith('G'));
+    expect(motion).toEqual([
+      'G0 X0.000 Y0.500 S0',
+      'G1 X2.000 F6000 S500',
+      'G1 X2.000 S0',
+      'G0 X2.000 Y1.500 S0',
+      'G1 X4.000 S700',
+      'G1 X4.000 S0',
+    ]);
+  });
 });

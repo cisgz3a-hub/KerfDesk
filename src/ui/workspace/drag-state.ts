@@ -15,6 +15,7 @@ import {
 } from '../../core/scene';
 import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
+import type { PathNodeDragState } from './path-node-drag';
 import { hitRotateHandle, rotateObjectByDrag } from './rotate-handle';
 import { canvasMouseToScene, computeView, pxToMmForCanvas } from './view-transform';
 
@@ -55,7 +56,8 @@ export type DragState =
       readonly kind: 'marquee';
       readonly startScenePoint: Vec2;
       readonly additive: boolean;
-    };
+    }
+  | PathNodeDragState;
 
 // Decide what kind of drag a mouse-down on `point` initiates, based on the
 // selected object's handle layout. Returns null if the click missed all

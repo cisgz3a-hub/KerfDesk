@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLayer, createProject, type Project } from '../../core/scene';
 import { useUiStore } from '../state/ui-store';
 import {
+  beginDrawDrag,
   commitDraftShape,
   DEFAULT_SHAPE_COLOR,
   drawModifiersFromEvent,
@@ -51,6 +52,20 @@ describe('draftForDrawDrag', () => {
     });
 
     expect(draft?.spec).toEqual({ kind: 'rect', widthMm: 30, heightMm: 30, cornerRadiusMm: 0 });
+  });
+});
+
+describe('beginDrawDrag', () => {
+  it('ignores the second left click of a double-click so shape-exit does not start a stray draft', () => {
+    const drag = beginDrawDrag({
+      e: mouseEvent({ button: 0, detail: 2, clientX: 80, clientY: 80 }),
+      ref: canvasRef(),
+      project: twoLayerProject(),
+      viewState: { zoomFactor: 1, panX: 0, panY: 0 },
+      shape: 'rect',
+    });
+
+    expect(drag).toBeNull();
   });
 });
 
@@ -119,4 +134,33 @@ function twoLayerProject(): Project {
       ],
     },
   };
+}
+
+function canvasRef(): React.RefObject<HTMLCanvasElement | null> {
+  return {
+    current: {
+      width: 400,
+      height: 400,
+      getBoundingClientRect: () => ({
+        left: 0,
+        top: 0,
+        width: 400,
+        height: 400,
+        right: 400,
+        bottom: 400,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    } as HTMLCanvasElement,
+  };
+}
+
+function mouseEvent(args: {
+  readonly button: number;
+  readonly detail: number;
+  readonly clientX: number;
+  readonly clientY: number;
+}): React.MouseEvent<HTMLCanvasElement> {
+  return args as React.MouseEvent<HTMLCanvasElement>;
 }

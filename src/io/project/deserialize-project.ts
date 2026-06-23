@@ -5,6 +5,8 @@ import {
   DEFAULT_DEVICE_PROFILE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   normalizeGcodeDialectSelection,
+  normalizeGrblRxBufferBytes,
+  normalizeGrblStreamingMode,
   normalizeScanOffsetTable,
 } from '../../core/devices';
 import {
@@ -107,6 +109,8 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
       DEFAULT_DEVICE_PROFILE.laserModeEnabled,
     ),
     airAssistCommand: normalizeAirAssistCommand(dev['airAssistCommand']),
+    streamingMode: normalizeGrblStreamingMode(dev['streamingMode']),
+    rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
     gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
     scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],

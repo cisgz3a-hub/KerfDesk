@@ -99,11 +99,12 @@ function payloadContainsDollarLineCommand(payload: string): boolean {
 
 // M13 (AUDIT-2026-06-10): ack watchdog. The streamer is purely ack-driven —
 // if GRBL stops answering while lines are in flight, the job froze silently
-// forever. The status poll feeds this detector each tick; when nothing
-// (acks, sends, queue) changes for STREAM_STALL_TIMEOUT_MS the store raises
-// the stream-stalled safety notice. Feed hold / door states legitimately
-// silence acks (execution is paused), so they reset the clock.
+// forever. The status poll feeds this detector each tick. Use a longer grace
+// window while the controller is still in Run so slow moves do not look like
+// dead USB. Feed hold / door states legitimately silence acks, so they reset
+// the clock.
 export const STREAM_STALL_TIMEOUT_MS = 10_000;
+export const STREAM_STALL_RUNNING_TIMEOUT_MS = 90_000;
 
 export type StallProbe = {
   readonly completed: number;
@@ -123,6 +124,7 @@ export function detectStreamStall(
   if (statusPausesStallWatch(statusReport)) return { probe: null, stalled: false };
   const unchanged = streamPositionUnchanged(prev, streamer) && !freshRunStatus(prev, statusReport);
   const at = unchanged ? prev.at : now;
+  const timeoutMs = streamStallTimeoutMs(statusReport);
   return {
     probe: {
       completed: streamer.completed,
@@ -131,8 +133,12 @@ export function detectStreamStall(
       statusReport,
       at,
     },
-    stalled: now - at >= STREAM_STALL_TIMEOUT_MS,
+    stalled: now - at >= timeoutMs,
   };
+}
+
+function streamStallTimeoutMs(statusReport: StatusReport | null): number {
+  return statusReport?.state === 'Run' ? STREAM_STALL_RUNNING_TIMEOUT_MS : STREAM_STALL_TIMEOUT_MS;
 }
 
 function isStallWatchActive(streamer: StreamerState | null): streamer is StreamerState {

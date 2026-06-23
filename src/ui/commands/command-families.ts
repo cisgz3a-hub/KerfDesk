@@ -1,6 +1,7 @@
 // command-families — the per-menu-family command builders consumed by
 // buildAppCommands. Pure functions of AppCommandContext.
 
+import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from '../common/fill-diagnostics';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
@@ -75,6 +76,23 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Trace multiple image files to SVG exports',
       ctx.multiFileTrace,
     ),
+    ctx.hasFillableSelection
+      ? enabled(
+          'tools.fill-selection',
+          'tools',
+          'Fill Selection',
+          'Move selected vector artwork to a dedicated Fill layer',
+          ctx.fillSelectionSeparately,
+        )
+      : disabled(
+          'tools.fill-selection',
+          'tools',
+          'Fill Selection',
+          'Select vector artwork first.',
+          ctx.fillSelectionSeparately,
+        ),
+    closeOpenFillContoursCommand(ctx),
+    reviewCloseOpenFillContoursCommand(ctx),
     ctx.hasConvertibleSelection
       ? enabled(
           'tools.convert-to-bitmap',
@@ -91,6 +109,44 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           ctx.convertToBitmap,
         ),
   ];
+}
+
+function closeOpenFillContoursCommand(ctx: AppCommandContext): AppCommand {
+  const label = 'Close Open Fill Contours';
+  return ctx.canCloseOpenFillContours
+    ? enabled(
+        'tools.close-open-fill-contours',
+        'tools',
+        label,
+        'Mark selected near-closed Fill contours as closed',
+        ctx.closeSelectedOpenFillContours,
+      )
+    : disabled(
+        'tools.close-open-fill-contours',
+        'tools',
+        label,
+        `Select open Fill contours with endpoints within ${CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM} mm.`,
+        ctx.closeSelectedOpenFillContours,
+      );
+}
+
+function reviewCloseOpenFillContoursCommand(ctx: AppCommandContext): AppCommand {
+  const label = 'Close Fill Contours With Tolerance...';
+  return ctx.canReviewCloseOpenFillContours
+    ? enabled(
+        'tools.close-fill-contours-with-tolerance',
+        'tools',
+        label,
+        'Review selected open Fill contours before closing a larger endpoint gap',
+        ctx.reviewCloseOpenFillContours,
+      )
+    : disabled(
+        'tools.close-fill-contours-with-tolerance',
+        'tools',
+        label,
+        'Select open Fill contours on an output Fill layer.',
+        ctx.reviewCloseOpenFillContours,
+      );
 }
 
 function imageMaskApplyCommand(ctx: AppCommandContext): AppCommand {

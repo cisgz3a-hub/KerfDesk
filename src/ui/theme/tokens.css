@@ -409,6 +409,21 @@
   cursor: default;
 }
 
+.lf-workspace-context-menu {
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.lf-workspace-context-menu .lf-menu-item {
+  justify-content: flex-start;
+}
+
+.lf-workspace-context-menu__more {
+  flex-direction: column;
+  align-items: stretch;
+}
+
 /* ---------- Workspace overlay chips ---------- */
 
 .lf-chip {

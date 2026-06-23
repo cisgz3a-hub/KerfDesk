@@ -4,6 +4,7 @@
 
 import type { ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
+import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
@@ -67,6 +68,11 @@ export type DeviceProfile = {
   readonly evidence?: ReadonlyArray<ProfileEvidence>;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
+  // GRBL serial streaming behavior. Most controllers work best with
+  // char-counted streaming and a conservative 120-byte RX window; profiles can
+  // opt into one-line ping-pong for controllers that misreport/free buffers.
+  readonly streamingMode: GrblStreamingMode;
+  readonly rxBufferBytes: number;
   readonly gcodeDialect: GcodeDialectSelection;
   readonly laserSubProfile?: LaserSubProfile;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
@@ -164,6 +170,8 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   minPowerS: 0,
   laserModeEnabled: true,
   airAssistCommand: 'none',
+  streamingMode: 'char-counted',
+  rxBufferBytes: DEFAULT_GRBL_RX_BUFFER_BYTES,
   gcodeDialect: { dialectId: 'grbl-dynamic' },
   scanningOffsets: [],
   noGoZones: [],

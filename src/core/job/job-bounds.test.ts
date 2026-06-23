@@ -157,6 +157,46 @@ describe('computeJobMotionBounds', () => {
     });
   });
 
+  it('does not apply raster scan offsets to unidirectional image rows', () => {
+    const rasterJob: Job = {
+      groups: [
+        {
+          kind: 'raster',
+          layerId: 'image',
+          color: '#000000',
+          power: 30,
+          speed: 6000,
+          passes: 1,
+          airAssist: false,
+          sValues: new Uint16Array([100, 100, 100, 100]),
+          pixelWidth: 2,
+          pixelHeight: 2,
+          bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+          overscanMm: 0,
+          dotWidthCorrectionMm: 0,
+          bidirectional: false,
+        },
+      ],
+    };
+    const device = {
+      ...DEFAULT_DEVICE_PROFILE,
+      scanningOffsets: [{ speedMmPerMin: 6000, offsetMm: 0.25 }],
+    };
+
+    expect(computeJobBounds(rasterJob, device)).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 2,
+      maxY: 2,
+    });
+    expect(computeJobMotionBounds(rasterJob, device)).toEqual({
+      minX: 0,
+      minY: 0,
+      maxX: 2,
+      maxY: 2,
+    });
+  });
+
   it('includes reverse fill scan-offset burn and overscan motion in the physical envelope', () => {
     const fillJob: Job = {
       groups: [

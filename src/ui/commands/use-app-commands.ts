@@ -14,11 +14,28 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { isConvertibleVector } from '../raster/vector-to-bitmap';
-import { cropMaskedRasterImage } from '../raster/crop-image';
+import {
+  selectedCloseableOpenFillContourCount,
+  selectedOpenFillContourCount,
+} from '../common/fill-diagnostics';
 import { buildAppCommands, type AppCommand } from './command-registry';
 import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair, type SelectedImageMaskPair } from './image-mask-command-state';
+import {
+  applyImageMaskAction,
+  cropImageAction,
+  removeImageMaskAction,
+  traceImageAction,
+} from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
+import {
+  selectedObject,
+  selectedObjectIds,
+  selectionCanBreakApart,
+  selectionHasUnlockedObject,
+  selectionHasVectorObject,
+  selectionTouchesGroup,
+} from './selection-command-state';
 
 export type CommandShellCallbacks = {
   readonly requestImportImage: () => void;
@@ -31,6 +48,7 @@ export type CommandShellCallbacks = {
   readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
   readonly requestProjectNotes: () => void;
+  readonly requestCloseOpenFillContoursWithTolerance: () => void;
   readonly showAbout: () => void;
 };
 
@@ -97,7 +115,17 @@ function appCommandContext(
     hasSelection: selectedIds.length > 0,
     hasRasterSelection: selected?.kind === 'raster-image',
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
+    hasFillableSelection: selectionHasVectorObject(app.project, selectedIds),
     canApplyImageMask: imageMaskPair !== null,
+    canCloseOpenFillContours:
+      selectedCloseableOpenFillContourCount(
+        app.project,
+        app.selectedObjectId,
+        app.additionalSelectedIds,
+      ) > 0,
+    canReviewCloseOpenFillContours:
+      selectedOpenFillContourCount(app.project, app.selectedObjectId, app.additionalSelectedIds) >
+      0,
     hasMaskedRasterSelection,
     canPaste: app.sceneClipboard !== null && app.sceneClipboard.objects.length > 0,
     canGroupSelection: selectedIds.length >= 2,
@@ -107,6 +135,7 @@ function appCommandContext(
     canTransformSelection: selected !== null,
     canAlignSelection: selectedIds.length >= 2,
     canDistributeSelection: selectedIds.length >= 3,
+    canBreakApartSelection: selectionCanBreakApart(app.project, selectedIds),
     focusTestAvailable:
       profileSupportsCapability(app.project.device, 'z-axis') &&
       app.project.device.zTravelConfirmed === true,
@@ -205,6 +234,9 @@ function toolCommandContext(
   | 'traceImage'
   | 'multiFileTrace'
   | 'convertToBitmap'
+  | 'fillSelectionSeparately'
+  | 'closeSelectedOpenFillContours'
+  | 'reviewCloseOpenFillContours'
   | 'applyImageMask'
   | 'cropImage'
   | 'removeImageMask'
@@ -220,6 +252,9 @@ function toolCommandContext(
     traceImage: traceImageAction(selection.selected, dialogs.openImageDialog),
     multiFileTrace: callbacks.requestMultiFileTrace,
     convertToBitmap: callbacks.requestConvertToBitmap,
+    fillSelectionSeparately: app.fillSelectionSeparately,
+    closeSelectedOpenFillContours: app.closeSelectedOpenFillContours,
+    reviewCloseOpenFillContours: callbacks.requestCloseOpenFillContoursWithTolerance,
     applyImageMask: applyImageMaskAction(app, selection.imageMaskPair),
     cropImage: cropImageAction(app, selection.selected, pushToast),
     removeImageMask: removeImageMaskAction(app, selection.selected),
@@ -230,11 +265,16 @@ function arrangeCommandContext(
   app: ReturnType<typeof useStore.getState>,
 ): Pick<
   AppCommandContext,
-  'alignSelection' | 'distributeSelection' | 'flipHorizontal' | 'flipVertical'
+  | 'alignSelection'
+  | 'distributeSelection'
+  | 'breakApartSelection'
+  | 'flipHorizontal'
+  | 'flipVertical'
 > {
   return {
     alignSelection: app.alignSelection,
     distributeSelection: app.distributeSelection,
+    breakApartSelection: app.breakApartSelection,
     flipHorizontal: () => app.flipSelection('horizontal'),
     flipVertical: () => app.flipSelection('vertical'),
   };
@@ -300,55 +340,6 @@ function saveProcessedBitmapAction(
     });
 }
 
-function traceImageAction(
-  selected: Project['scene']['objects'][number] | null,
-  openImageDialog: (source: RasterImage) => void,
-): () => void {
-  return () => {
-    if (selected?.kind === 'raster-image') openImageDialog(selected);
-  };
-}
-
-function applyImageMaskAction(
-  app: ReturnType<typeof useStore.getState>,
-  pair: SelectedImageMaskPair | null,
-): () => void {
-  return () => {
-    if (pair !== null) app.applyImageMask(pair.imageId, pair.maskId);
-  };
-}
-
-function removeImageMaskAction(
-  app: ReturnType<typeof useStore.getState>,
-  selected: Project['scene']['objects'][number] | null,
-): () => void {
-  return () => {
-    if (selected?.kind === 'raster-image') app.removeImageMask(selected.id);
-  };
-}
-
-function cropImageAction(
-  app: ReturnType<typeof useStore.getState>,
-  selected: Project['scene']['objects'][number] | null,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): () => void {
-  return () => {
-    if (selected?.kind !== 'raster-image' || selected.imageMaskId === undefined) return;
-    const maskObject = app.project.scene.objects.find(
-      (object) => object.id === selected.imageMaskId,
-    );
-    void cropMaskedRasterImage(selected, maskObject)
-      .then((cropped) => {
-        app.cropImage(selected.id, cropped);
-        pushToast(`Cropped image: ${selected.source}`, 'success');
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        pushToast(`Could not crop image: ${message}`, 'error');
-      });
-  };
-}
-
 function openProject(
   platform: ReturnType<typeof usePlatform>,
   setProject: ReturnType<typeof useStore.getState>['setProject'],
@@ -378,30 +369,6 @@ function saveProject(
     },
     forceDialog,
   );
-}
-
-function selectedObject(project: Project, selectedObjectId: string | null) {
-  if (selectedObjectId === null) return null;
-  return project.scene.objects.find((object) => object.id === selectedObjectId) ?? null;
-}
-
-function selectedObjectIds(
-  selectedObjectId: string | null,
-  additionalSelectedIds: ReadonlySet<string>,
-): ReadonlyArray<string> {
-  return [...(selectedObjectId === null ? [] : [selectedObjectId]), ...additionalSelectedIds];
-}
-
-function selectionTouchesGroup(project: Project, selectedIds: ReadonlyArray<string>): boolean {
-  const selected = new Set(selectedIds);
-  return (project.scene.groups ?? []).some((group) =>
-    group.objectIds.some((objectId) => selected.has(objectId)),
-  );
-}
-
-function selectionHasUnlockedObject(project: Project, selectedIds: ReadonlyArray<string>): boolean {
-  const selected = new Set(selectedIds);
-  return project.scene.objects.some((object) => selected.has(object.id) && object.locked !== true);
 }
 
 function deleteSelection(): void {
