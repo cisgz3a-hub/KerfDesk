@@ -39,6 +39,7 @@ export type CommandId =
   | 'edit.duplicate'
   | 'edit.delete'
   | 'edit.clear-selection'
+  | 'tools.measure'
   | 'tools.add-text'
   | 'tools.material-test'
   | 'tools.interval-test'
@@ -138,6 +139,8 @@ export type AppCommandContext = {
   readonly duplicateSelection: () => void;
   readonly deleteSelection: () => void;
   readonly clearSelection: () => void;
+  readonly measureTool: () => void;
+  readonly measureActive: boolean;
   readonly addText: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;

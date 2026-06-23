@@ -20,7 +20,14 @@ import { useUiStore } from '../state/ui-store';
 import { drawScene } from './draw-scene';
 import { createDisplayPolylineCache, type DisplayPolylineCache } from './display-polylines';
 import { finishPen } from './pen-tool';
-import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
+import {
+  DragOverlay,
+  DragReadout,
+  EmptyHint,
+  MeasureReadoutOverlay,
+  PreviewScrubber,
+  ZoomControls,
+} from './overlays';
 import { PreviewStatsPanel, PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewToolpath } from './use-preview-toolpath';
@@ -95,15 +102,13 @@ export function Workspace(): JSX.Element {
       />
       {isEmpty && !dragOverlay && <EmptyHint />}
       {dragOverlay && <DragOverlay />}
-      {dragKind !== null && (
-        <DragReadout
-          canvasRef={ref}
-          project={project}
-          selectedId={selectedObjectId}
-          kind={dragKind}
-          viewState={viewState}
-        />
-      )}
+      <WorkspaceInteractionOverlays
+        canvasRef={ref}
+        project={project}
+        selectedObjectId={selectedObjectId}
+        dragKind={dragKind}
+        viewState={viewState}
+      />
       <WorkspacePreviewOverlays
         previewMode={previewMode}
         project={project}
@@ -137,6 +142,33 @@ function WorkspacePreviewOverlays(props: {
   );
 }
 
+function WorkspaceInteractionOverlays(props: {
+  readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  readonly project: Project;
+  readonly selectedObjectId: string | null;
+  readonly dragKind: ReturnType<typeof useDragMove>['dragKind'];
+  readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
+}): JSX.Element {
+  return (
+    <>
+      {props.dragKind !== null && (
+        <DragReadout
+          canvasRef={props.canvasRef}
+          project={props.project}
+          selectedId={props.selectedObjectId}
+          kind={props.dragKind}
+          viewState={props.viewState}
+        />
+      )}
+      <MeasureReadoutOverlay
+        canvasRef={props.canvasRef}
+        project={props.project}
+        viewState={props.viewState}
+      />
+    </>
+  );
+}
+
 function useWorkspaceDraw(args: {
   readonly ref: React.RefObject<HTMLCanvasElement | null>;
   readonly project: Project;
@@ -158,6 +190,7 @@ function useWorkspaceDraw(args: {
   const draftShape = useUiStore((s) => s.draftShape);
   const selectionMarquee = useUiStore((s) => s.selectionMarquee);
   const snapGuides = useUiStore((s) => s.snapGuides);
+  const measureDraft = useUiStore((s) => s.measureDraft);
   // Phase G (B6): the pen tool's in-progress polyline (also redraws per click /
   // cursor move).
   const penDraft = useUiStore((s) => s.penDraft);
@@ -190,6 +223,7 @@ function useWorkspaceDraw(args: {
       ...(draftShape === null ? {} : { draft: draftShape }),
       ...(penDraft === null ? {} : { penDraft }),
       ...(selectionMarquee === null ? {} : { selectionMarquee }),
+      ...(measureDraft === null ? {} : { measureDraft }),
       ...(snapGuides.length === 0 ? {} : { snapGuides }),
     });
   }, [
@@ -204,6 +238,7 @@ function useWorkspaceDraw(args: {
     args.showPreviewTravel,
     args.viewState,
     args.canvasSize,
+    measureDraft,
     rasterRedrawTick,
     displayPolylineCache,
     args.previewToolpath,

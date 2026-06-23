@@ -312,6 +312,12 @@ const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
 };
 
 export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
+  if (e.altKey && !hasMeta(e) && !e.shiftKey && e.key.toLowerCase() === 'm') {
+    if (isEditableTarget(e)) return false;
+    e.preventDefault();
+    ctx.setToolMode({ kind: 'measure' });
+    return true;
+  }
   if (!hasMeta(e) || e.shiftKey || e.altKey) return false;
   if (isEditableTarget(e)) return false;
   const mode = TOOL_BINDINGS[e.key.toLowerCase()];

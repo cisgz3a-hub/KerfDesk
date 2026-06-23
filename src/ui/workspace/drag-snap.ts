@@ -2,7 +2,7 @@ import type { Project, SceneObject, SelectionAnchor, Transform, Vec2 } from '../
 import { nextTransformForDrag, type DragState } from './drag-state';
 import { snapMoveTransform, type SnapGuide, type SnapSettings } from './snapping';
 
-type TransformDrag = Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' }>;
+type TransformDrag = Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' | 'measure' }>;
 
 type DragEventModifiers = {
   readonly shiftKey: boolean;

@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import type { Bounds, RasterImage, SelectionAnchor, ShapeObject, Vec2 } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
+import type { MeasureDraft } from '../workspace/measure-tool';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide, type SnapSettings } from '../workspace/snapping';
 
 export const MIN_ZOOM = 0.1;
@@ -36,6 +37,7 @@ export type TextDialogState =
 export type ToolMode =
   | { readonly kind: 'select' }
   | { readonly kind: 'node' }
+  | { readonly kind: 'measure' }
   | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'polyline' };
 
 // Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.
@@ -135,6 +137,10 @@ export type UiState = {
   // Pen-tool in-progress polyline (B6). See PenDraft. Cleared by resetToolMode.
   readonly penDraft: PenDraft | null;
   readonly setPenDraft: (next: PenDraft | null) => void;
+  // Temporary Measure tool line. It is UI-only: not saved, not undoable, and
+  // never included in preview or emitted G-code.
+  readonly measureDraft: MeasureDraft | null;
+  readonly setMeasureDraft: (next: MeasureDraft | null) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -188,14 +194,19 @@ export const useUiStore = create<UiState>((set) => ({
   setToolMode: (next) =>
     set(
       next.kind === 'draw' && next.shape === 'polyline'
-        ? { toolMode: next }
-        : { toolMode: next, penDraft: null },
+        ? { toolMode: next, measureDraft: null }
+        : next.kind === 'measure'
+          ? { toolMode: next, penDraft: null }
+          : { toolMode: next, penDraft: null, measureDraft: null },
     ),
-  resetToolMode: () => set({ toolMode: { kind: 'select' }, draftShape: null, penDraft: null }),
+  resetToolMode: () =>
+    set({ toolMode: { kind: 'select' }, draftShape: null, penDraft: null, measureDraft: null }),
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),
   penDraft: null,
   setPenDraft: (next) => set({ penDraft: next }),
+  measureDraft: null,
+  setMeasureDraft: (next) => set({ measureDraft: next }),
 }));
 
 export function isModalOpen(

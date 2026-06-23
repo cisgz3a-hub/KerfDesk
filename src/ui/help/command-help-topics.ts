@@ -86,6 +86,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'edit',
     tooltip: 'Clear the current selection and return to the workspace.',
   },
+  'tools.measure': {
+    family: 'tools',
+    tooltip: 'Measure distance, delta, and angle on the workspace.',
+  },
   'tools.add-text': {
     family: 'tools',
     tooltip: 'Create editable text artwork on the workspace.',

@@ -23,6 +23,7 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'edit.duplicate',
   'edit.delete',
   'edit.clear-selection',
+  'tools.measure',
   'tools.add-text',
   'tools.material-test',
   'tools.interval-test',

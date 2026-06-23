@@ -4,12 +4,14 @@ import { DEFAULT_SNAP_SETTINGS, type SnapGuide } from '../workspace/snapping';
 import { useUiStore } from './ui-store';
 
 const ONE_VERTEX = { vertices: [{ x: 1, y: 2 }], cursor: null };
+const MEASURE_DRAFT = { start: { x: 0, y: 0 }, end: { x: 12, y: 8 } };
 
 describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
   beforeEach(() => {
     useUiStore.getState().setToolMode({ kind: 'select' });
     useUiStore.getState().setPenDraft(null);
     useUiStore.getState().setSelectionMarquee(null);
+    useUiStore.getState().setMeasureDraft(null);
     useUiStore.getState().setActiveLayerColor(null);
     useUiStore.getState().setShowPreviewTravel(true);
     useUiStore.getState().closeWorkspaceContextBar();
@@ -68,6 +70,18 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
 
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
     expect(useUiStore.getState().draftShape).toBeNull();
+  });
+
+  it('tracks and clears temporary measure drafts outside project history', () => {
+    useUiStore.getState().setToolMode({ kind: 'measure' });
+    useUiStore.getState().setMeasureDraft(MEASURE_DRAFT);
+
+    expect(useUiStore.getState().measureDraft).toEqual(MEASURE_DRAFT);
+
+    useUiStore.getState().resetToolMode();
+
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
+    expect(useUiStore.getState().measureDraft).toBeNull();
   });
 
   it('tracks the current drawing layer color outside undoable project data', () => {

@@ -5,7 +5,14 @@ export { COMMAND_HELP, type CommandHelpTopic } from './command-help-topics';
 
 export type CommandHelpId = `command:${CommandId}`;
 export type MenuHelpId = `menu:${CommandFamily}`;
-export type ToolHelpKey = 'select' | 'node' | 'rect' | 'ellipse' | 'polygon' | 'polyline';
+export type ToolHelpKey =
+  | 'select'
+  | 'node'
+  | 'measure'
+  | 'rect'
+  | 'ellipse'
+  | 'polygon'
+  | 'polyline';
 export type ToolHelpId = `tool:${ToolHelpKey}`;
 export type ControlHelpKey =
   | 'laser.console'
@@ -43,6 +50,10 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   node: {
     label: 'Edit nodes',
     tooltip: 'Edit vector path nodes without moving or resizing the whole object.',
+  },
+  measure: {
+    label: 'Measure',
+    tooltip: 'Measure distance, delta, and angle on the workspace. Hold Shift to snap the line.',
   },
   rect: {
     label: 'Draw rectangle',

@@ -55,6 +55,8 @@ export type CommandShellCallbacks = {
 type CommandDialogs = {
   readonly openImageDialog: (source: RasterImage) => void;
   readonly openTextDialog: (options: { readonly mode: 'add' }) => void;
+  readonly measureTool: () => void;
+  readonly measureActive: boolean;
 };
 
 type CommandSelection = {
@@ -70,10 +72,14 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const pushToast = useToastStore((s) => s.pushToast);
   const openTextDialog = useUiStore((s) => s.openTextDialog);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
+  const setToolMode = useUiStore((s) => s.setToolMode);
+  const toolMode = useUiStore((s) => s.toolMode);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
       openTextDialog,
+      measureTool: () => setToolMode({ kind: 'measure' }),
+      measureActive: toolMode.kind === 'measure',
     }),
   );
 }
@@ -193,6 +199,8 @@ function editCommandContext(
   | 'duplicateSelection'
   | 'deleteSelection'
   | 'clearSelection'
+  | 'measureTool'
+  | 'measureActive'
   | 'addText'
 > {
   return {
@@ -211,6 +219,8 @@ function editCommandContext(
     duplicateSelection: app.duplicateSelection,
     deleteSelection: () => deleteSelection(),
     clearSelection: () => app.selectObject(null),
+    measureTool: dialogs.measureTool,
+    measureActive: dialogs.measureActive,
     addText: () => dialogs.openTextDialog({ mode: 'add' }),
   };
 }

@@ -7,6 +7,7 @@ import type { Project } from '../../core/scene';
 import { transformedBBox } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
+import { measureReadout } from './measure-tool';
 import { computeView } from './view-transform';
 
 export function EmptyHint(): JSX.Element {
@@ -164,6 +165,43 @@ export function DragReadout(props: {
   );
 }
 
+export function MeasureReadoutOverlay(props: {
+  readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  readonly project: Project;
+  readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
+}): JSX.Element | null {
+  const draft = useUiStore((s) => s.measureDraft);
+  const canvas = props.canvasRef.current;
+  if (canvas === null || draft === null) return null;
+  const view = computeView(
+    canvas.width,
+    canvas.height,
+    props.project.device.bedWidth,
+    props.project.device.bedHeight,
+    props.viewState,
+  );
+  const rect = canvas.getBoundingClientRect();
+  const cssScaleX = rect.width / canvas.width;
+  const cssScaleY = rect.height / canvas.height;
+  const midX = (draft.start.x + draft.end.x) / 2;
+  const midY = (draft.start.y + draft.end.y) / 2;
+  const cssX = (view.offsetX + midX * view.scale) * cssScaleX;
+  const cssY = (view.offsetY + midY * view.scale) * cssScaleY;
+  return (
+    <div
+      role="status"
+      aria-label="Measure readout"
+      style={{
+        ...measureReadoutStyle,
+        left: clamp(cssX + 10, 8, Math.max(8, rect.width - 320)),
+        top: clamp(cssY - 34, 8, Math.max(8, rect.height - 40)),
+      }}
+    >
+      {measureReadout(draft).label}
+    </div>
+  );
+}
+
 function readoutLabel(
   kind: 'move' | 'scale' | 'rotate',
   obj: { readonly transform: { readonly rotationDeg: number } },
@@ -174,6 +212,10 @@ function readoutLabel(
   if (kind === 'move') return `X ${bbox.minX.toFixed(1)}, Y ${bbox.minY.toFixed(1)} mm`;
   if (kind === 'scale') return `${w.toFixed(1)} × ${h.toFixed(1)} mm`;
   return `${obj.transform.rotationDeg.toFixed(1)}°`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 const emptyHintStyle: React.CSSProperties = {
@@ -222,6 +264,12 @@ const dragReadoutStyle: React.CSSProperties = {
   fontWeight: 600,
   pointerEvents: 'none',
   whiteSpace: 'nowrap',
+};
+const measureReadoutStyle: React.CSSProperties = {
+  ...dragReadoutStyle,
+  background: 'var(--lf-bg-1)',
+  color: 'var(--lf-text)',
+  border: '1px solid var(--lf-accent)',
 };
 const scrubberContainerStyle: React.CSSProperties = {
   position: 'absolute',
