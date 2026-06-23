@@ -19,7 +19,10 @@ export type PathNodeRef = {
 };
 
 export type PathNodeEditActions = {
-  readonly selectPathNode: (ref: PathNodeRef | null) => void;
+  readonly selectPathNode: (
+    ref: PathNodeRef | null,
+    options?: { readonly additive?: boolean },
+  ) => void;
   readonly nudgeSelectedPathNode: (dx: number, dy: number) => void;
   readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
 };
@@ -28,19 +31,46 @@ type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function pathNodeEditActions(set: Setter): PathNodeEditActions {
   return {
-    selectPathNode: (ref) =>
-      set(() =>
-        ref === null
-          ? { selectedPathNode: null }
-          : {
-              selectedPathNode: ref,
-              selectedObjectId: ref.objectId,
-              additionalSelectedIds: new Set(),
-            },
-      ),
+    selectPathNode: (ref, options = {}) =>
+      set((state) => selectPathNode(state, ref, options.additive === true)),
     nudgeSelectedPathNode: (dx, dy) => set((state) => nudgeSelectedPathNode(state, dx, dy)),
     setSelectedPathNodePositionDuringInteraction: (scenePoint) =>
       set((state) => setSelectedPathNodePositionDuringInteraction(state, scenePoint)),
+  };
+}
+
+function selectPathNode(
+  state: AppState,
+  ref: PathNodeRef | null,
+  additive: boolean,
+): AppState | Partial<AppState> {
+  if (ref === null) return { selectedPathNode: null, selectedPathNodes: [] };
+  if (!additive || state.selectedPathNodes.length === 0) {
+    return singlePathNodeSelection(ref);
+  }
+  const sameObject = state.selectedPathNodes.every(
+    (selected) => selected.objectId === ref.objectId,
+  );
+  if (!sameObject) return singlePathNodeSelection(ref);
+
+  const exists = state.selectedPathNodes.some((selected) => pathNodeRefsEqual(selected, ref));
+  const selectedPathNodes = exists
+    ? state.selectedPathNodes.filter((selected) => !pathNodeRefsEqual(selected, ref))
+    : [...state.selectedPathNodes, ref];
+  return {
+    selectedPathNode: selectedPathNodes[selectedPathNodes.length - 1] ?? null,
+    selectedPathNodes,
+    selectedObjectId: ref.objectId,
+    additionalSelectedIds: new Set(),
+  };
+}
+
+function singlePathNodeSelection(ref: PathNodeRef): Partial<AppState> {
+  return {
+    selectedPathNode: ref,
+    selectedPathNodes: [ref],
+    selectedObjectId: ref.objectId,
+    additionalSelectedIds: new Set(),
   };
 }
 
@@ -49,9 +79,10 @@ function nudgeSelectedPathNode(
   dx: number,
   dy: number,
 ): AppState | Partial<AppState> {
-  const ref = state.selectedPathNode;
-  if (ref === null || !Number.isFinite(dx) || !Number.isFinite(dy)) return state;
+  const refs = activePathNodeRefs(state);
+  if (refs.length === 0 || !Number.isFinite(dx) || !Number.isFinite(dy)) return state;
   if (dx === 0 && dy === 0) return state;
+  const refsByObject = groupPathNodeRefsByObject(refs);
 
   let changed = false;
   const nextProject: Project = {
@@ -59,8 +90,9 @@ function nudgeSelectedPathNode(
     scene: {
       ...state.project.scene,
       objects: state.project.scene.objects.map((object) => {
-        if (object.id !== ref.objectId) return object;
-        const edited = editObjectNode(object, ref, dx, dy);
+        const objectRefs = refsByObject.get(object.id);
+        if (objectRefs === undefined) return object;
+        const edited = editObjectNodes(object, objectRefs, dx, dy);
         if (edited === object) return object;
         changed = true;
         return edited;
@@ -104,9 +136,9 @@ function setSelectedPathNodePositionDuringInteraction(
   return changed ? { project: nextProject, dirty: true } : state;
 }
 
-function editObjectNode(
+function editObjectNodes(
   object: SceneObject,
-  ref: PathNodeRef,
+  refs: ReadonlyArray<PathNodeRef>,
   dx: number,
   dy: number,
 ): SceneObject {
@@ -116,11 +148,10 @@ function editObjectNode(
 
   const localDelta = sceneVectorToObjectLocal({ x: dx, y: dy }, object.transform);
   if (localDelta === null) return object;
-  const edit = editPathsNodeByDelta(object.paths, ref, localDelta.x, localDelta.y);
+  const edit = editPathsNodesByDelta(object.paths, refs, localDelta.x, localDelta.y);
   if (edit === null) return object;
   const bounds = boundsForPaths(edit.paths);
-  if (object.kind === 'shape')
-    return editPolylineShape(object, edit.paths, ref, edit.point, bounds);
+  if (object.kind === 'shape') return editPolylineShape(object, edit.paths, bounds);
   return { ...object, paths: edit.paths, bounds };
 }
 
@@ -132,44 +163,51 @@ function editObjectNodeToPoint(object: SceneObject, ref: PathNodeRef, point: Vec
   const edit = editPathsNodeToPoint(object.paths, ref, point);
   if (edit === null) return object;
   const bounds = boundsForPaths(edit.paths);
-  if (object.kind === 'shape')
-    return editPolylineShape(object, edit.paths, ref, edit.point, bounds);
+  if (object.kind === 'shape') return editPolylineShape(object, edit.paths, bounds);
   return { ...object, paths: edit.paths, bounds };
 }
 
 function editPolylineShape(
   object: ShapeObject,
   paths: ReadonlyArray<ColoredPath>,
-  ref: PathNodeRef,
-  point: Vec2,
   bounds: Bounds,
 ): ShapeObject {
   if (object.spec.kind !== 'polyline') return object;
+  const nextPoints = paths[0]?.polylines[0]?.points ?? object.spec.points;
   return {
     ...object,
     paths,
     bounds,
     spec: {
       ...object.spec,
-      points: object.spec.points.map((candidate, index) =>
-        index === ref.pointIndex ? point : candidate,
-      ),
+      points: nextPoints,
     },
   };
 }
 
-function editPathsNodeByDelta(
+function editPathsNodesByDelta(
   paths: ReadonlyArray<ColoredPath>,
-  ref: PathNodeRef,
+  refs: ReadonlyArray<PathNodeRef>,
   dx: number,
   dy: number,
-): { readonly paths: ReadonlyArray<ColoredPath>; readonly point: Vec2 } | null {
-  const path = paths[ref.pathIndex];
-  const polyline = path?.polylines[ref.polylineIndex];
-  const point = polyline?.points[ref.pointIndex];
-  if (path === undefined || polyline === undefined || point === undefined) return null;
-
-  return editPathsNodeToPoint(paths, ref, { x: point.x + dx, y: point.y + dy });
+): { readonly paths: ReadonlyArray<ColoredPath> } | null {
+  let changed = false;
+  const refKeys = new Set(refs.map(pathNodeRefKey));
+  const nextPaths = paths.map((path, pathIndex) => ({
+    ...path,
+    polylines: path.polylines.map((polyline, polylineIndex) => ({
+      ...polyline,
+      points: polyline.points.map((point, pointIndex) => {
+        if (!refKeys.has(pathNodeRefKey({ objectId: '', pathIndex, polylineIndex, pointIndex }))) {
+          return point;
+        }
+        changed = true;
+        const nextPoint = { x: point.x + dx, y: point.y + dy };
+        return nextPoint;
+      }),
+    })),
+  }));
+  return changed ? { paths: nextPaths } : null;
 }
 
 function editPathsNodeToPoint(
@@ -228,6 +266,36 @@ function isInvertibleScale(value: number): boolean {
 
 function pointsEqual(a: Vec2, b: Vec2): boolean {
   return a.x === b.x && a.y === b.y;
+}
+
+function activePathNodeRefs(state: AppState): ReadonlyArray<PathNodeRef> {
+  if (state.selectedPathNodes.length > 0) return state.selectedPathNodes;
+  return state.selectedPathNode === null ? [] : [state.selectedPathNode];
+}
+
+function groupPathNodeRefsByObject(
+  refs: ReadonlyArray<PathNodeRef>,
+): ReadonlyMap<string, ReadonlyArray<PathNodeRef>> {
+  const byObject = new Map<string, PathNodeRef[]>();
+  for (const ref of refs) {
+    const current = byObject.get(ref.objectId) ?? [];
+    current.push(ref);
+    byObject.set(ref.objectId, current);
+  }
+  return byObject;
+}
+
+function pathNodeRefsEqual(a: PathNodeRef, b: PathNodeRef): boolean {
+  return (
+    a.objectId === b.objectId &&
+    a.pathIndex === b.pathIndex &&
+    a.polylineIndex === b.polylineIndex &&
+    a.pointIndex === b.pointIndex
+  );
+}
+
+function pathNodeRefKey(ref: Omit<PathNodeRef, 'objectId'> | PathNodeRef): string {
+  return `${ref.pathIndex}:${ref.polylineIndex}:${ref.pointIndex}`;
 }
 
 function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds {

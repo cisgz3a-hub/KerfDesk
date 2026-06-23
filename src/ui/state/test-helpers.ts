@@ -13,6 +13,7 @@ export function resetStore(): void {
     project: createProject(),
     selectedObjectId: null,
     selectedPathNode: null,
+    selectedPathNodes: [],
     additionalSelectedIds: new Set(),
     previewMode: false,
     undoStack: [],

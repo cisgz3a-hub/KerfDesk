@@ -106,6 +106,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           redoStack: [...s.redoStack, s.project].slice(-HISTORY_DEPTH),
           selectedObjectId: null,
           selectedPathNode: null,
+          selectedPathNodes: [],
           dirty: true,
         };
       }),
@@ -119,6 +120,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           undoStack: [...s.undoStack, s.project].slice(-HISTORY_DEPTH),
           selectedObjectId: null,
           selectedPathNode: null,
+          selectedPathNodes: [],
           dirty: true,
         };
       }),
@@ -142,11 +144,20 @@ export function viewActions(
     selectObject: (id) =>
       set((s) =>
         id === null
-          ? { selectedObjectId: null, selectedPathNode: null, additionalSelectedIds: new Set() }
-          : { ...selectionFromIds(s, [id], false), selectedPathNode: null },
+          ? {
+              selectedObjectId: null,
+              selectedPathNode: null,
+              selectedPathNodes: [],
+              additionalSelectedIds: new Set(),
+            }
+          : { ...selectionFromIds(s, [id], false), selectedPathNode: null, selectedPathNodes: [] },
       ),
     toggleSelectObject: (id) =>
-      set((s) => ({ ...toggleSelectionFromId(s, id), selectedPathNode: null })),
+      set((s) => ({
+        ...toggleSelectionFromId(s, id),
+        selectedPathNode: null,
+        selectedPathNodes: [],
+      })),
     selectAllObjects: () =>
       set((s) => {
         const ids = s.project.scene.objects
@@ -156,6 +167,7 @@ export function viewActions(
         return {
           selectedObjectId: primary ?? null,
           selectedPathNode: null,
+          selectedPathNodes: [],
           additionalSelectedIds: new Set(rest),
         };
       }),
@@ -163,8 +175,14 @@ export function viewActions(
       set((s) => ({
         ...selectionFromIds(s, ids, options.additive === true),
         selectedPathNode: null,
+        selectedPathNodes: [],
       })),
-    togglePreview: () => set((s) => ({ previewMode: !s.previewMode, selectedPathNode: null })),
+    togglePreview: () =>
+      set((s) => ({
+        previewMode: !s.previewMode,
+        selectedPathNode: null,
+        selectedPathNodes: [],
+      })),
     setJobPlacement: (patch) =>
       set((s) => ({ jobPlacement: mergeJobPlacement(s.jobPlacement, patch) })),
     setOutputScopeSettings: (patch) =>

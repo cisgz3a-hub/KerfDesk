@@ -41,6 +41,7 @@ export function Workspace(): JSX.Element {
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const selectedPathNode = useStore((s) => s.selectedPathNode);
+  const selectedPathNodes = useStore((s) => s.selectedPathNodes);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const previewMode = useStore((s) => s.previewMode);
   const scrubberT = useUiStore((s) => s.scrubberT);
@@ -61,6 +62,7 @@ export function Workspace(): JSX.Element {
     project,
     selectedObjectId,
     selectedPathNode,
+    selectedPathNodes,
     showPathNodeHandles: toolMode.kind === 'node',
     additionalSelectedIds,
     previewMode,
@@ -174,6 +176,7 @@ function useWorkspaceDraw(args: {
   readonly project: Project;
   readonly selectedObjectId: string | null;
   readonly selectedPathNode: ReturnType<typeof useStore.getState>['selectedPathNode'];
+  readonly selectedPathNodes: ReturnType<typeof useStore.getState>['selectedPathNodes'];
   readonly showPathNodeHandles: boolean;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
@@ -212,6 +215,7 @@ function useWorkspaceDraw(args: {
       selectedId: args.selectedObjectId,
       showPathNodeHandles: args.showPathNodeHandles,
       selectedPathNode: args.selectedPathNode,
+      selectedPathNodes: args.selectedPathNodes,
       additionalSelectedIds: args.additionalSelectedIds,
       preview: args.previewMode,
       scrubberT: args.scrubberT,
@@ -231,6 +235,7 @@ function useWorkspaceDraw(args: {
     args.project,
     args.selectedObjectId,
     args.selectedPathNode,
+    args.selectedPathNodes,
     args.showPathNodeHandles,
     args.additionalSelectedIds,
     args.previewMode,

@@ -116,6 +116,7 @@ export type AppState = ObjectPropertiesActions &
     readonly project: Project;
     readonly selectedObjectId: string | null;
     readonly selectedPathNode: PathNodeRef | null;
+    readonly selectedPathNodes: ReadonlyArray<PathNodeRef>;
     // Additional objects in the multi-selection set (F-A5). The "primary"
     // selection is selectedObjectId; additionalSelectedIds is everything
     // shift+clicked or marquee-added after that. Combined-bbox scale and
@@ -244,6 +245,7 @@ function initialState(): Pick<
   | 'project'
   | 'selectedObjectId'
   | 'selectedPathNode'
+  | 'selectedPathNodes'
   | 'additionalSelectedIds'
   | 'previewMode'
   | 'undoStack'
@@ -264,6 +266,7 @@ function initialState(): Pick<
     project: createProject(),
     selectedObjectId: null,
     selectedPathNode: null,
+    selectedPathNodes: [],
     additionalSelectedIds: new Set(),
     previewMode: false,
     undoStack: [],

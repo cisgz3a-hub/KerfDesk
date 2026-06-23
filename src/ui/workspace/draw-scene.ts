@@ -47,6 +47,7 @@ export type DrawOpts = {
   readonly selectedId: string | null;
   readonly showPathNodeHandles?: boolean;
   readonly selectedPathNode?: PathNodeRef | null;
+  readonly selectedPathNodes?: ReadonlyArray<PathNodeRef>;
   // Extra selection (F-A5 multi-select). Drawn with a thinner secondary
   // outline so the user can still tell which is the primary (handles only
   // render on the primary in Phase A).
@@ -114,6 +115,10 @@ export function drawScene(
       opts.selectedId,
       opts.showPathNodeHandles === true,
       opts.selectedPathNode ?? null,
+      opts.selectedPathNodes ??
+        (opts.selectedPathNode === undefined || opts.selectedPathNode === null
+          ? []
+          : [opts.selectedPathNode]),
       opts.additionalSelectedIds,
       opts.onRasterBitmapReady,
       opts.displayPolylineCache,
@@ -228,6 +233,7 @@ function drawObjects(
   selectedId: string | null,
   showPathNodeHandles: boolean,
   selectedPathNode: PathNodeRef | null,
+  selectedPathNodes: ReadonlyArray<PathNodeRef>,
   additionalSelectedIds: ReadonlySet<string> = EMPTY_SELECTION,
   onRasterBitmapReady?: () => void,
   displayPolylineCache?: DisplayPolylineCache,
@@ -256,7 +262,9 @@ function drawObjects(
     }
     if (obj.id === selectedId) {
       drawSelectionBox(ctx, obj, view);
-      if (showPathNodeHandles) drawPathNodeHandles(ctx, obj, view, selectedPathNode);
+      if (showPathNodeHandles) {
+        drawPathNodeHandles(ctx, obj, view, selectedPathNode, selectedPathNodes);
+      }
     } else if (additionalSelectedIds.has(obj.id)) {
       drawSecondarySelectionBox(ctx, obj, view);
     }

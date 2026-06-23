@@ -11,6 +11,7 @@ export function drawPathNodeHandles(
   object: SceneObject,
   view: ViewTransform,
   selectedNode: PathNodeRef | null = null,
+  selectedNodes: ReadonlyArray<PathNodeRef> = selectedNode === null ? [] : [selectedNode],
 ): void {
   if (!isNodeEditableVector(object)) return;
   for (let pathIndex = 0; pathIndex < object.paths.length; pathIndex += 1) {
@@ -25,7 +26,7 @@ export function drawPathNodeHandles(
         drawNodeHandle(
           ctx,
           screenPoint(point, object, view),
-          isSelectedNode(selectedNode, object.id, pathIndex, polylineIndex, pointIndex),
+          isSelectedNode(selectedNodes, object.id, pathIndex, polylineIndex, pointIndex),
         );
       }
     }
@@ -60,16 +61,17 @@ function screenPoint(point: Vec2, object: SceneObject, view: ViewTransform): Vec
 }
 
 function isSelectedNode(
-  selectedNode: PathNodeRef | null,
+  selectedNodes: ReadonlyArray<PathNodeRef>,
   objectId: string,
   pathIndex: number,
   polylineIndex: number,
   pointIndex: number,
 ): boolean {
-  return (
-    selectedNode?.objectId === objectId &&
-    selectedNode.pathIndex === pathIndex &&
-    selectedNode.polylineIndex === polylineIndex &&
-    selectedNode.pointIndex === pointIndex
+  return selectedNodes.some(
+    (selectedNode) =>
+      selectedNode.objectId === objectId &&
+      selectedNode.pathIndex === pathIndex &&
+      selectedNode.polylineIndex === polylineIndex &&
+      selectedNode.pointIndex === pointIndex,
   );
 }

@@ -43,6 +43,25 @@ describe('drawScene path node handles', () => {
     expect(fillRectStyles).not.toContain(canvasTheme.pathNodeHandleActiveFill);
     expect(strokeRectStyles).not.toContain(canvasTheme.pathNodeHandleStroke);
   });
+
+  it('marks every selected path node distinctly', () => {
+    const { ctx, fillRectStyles } = recordingContext();
+
+    drawScene(ctx, 800, 600, vectorProject(), {
+      selectedId: 'logo',
+      showPathNodeHandles: true,
+      selectedPathNodes: [
+        { objectId: 'logo', pathIndex: 0, polylineIndex: 0, pointIndex: 1 },
+        { objectId: 'logo', pathIndex: 0, polylineIndex: 0, pointIndex: 3 },
+      ],
+      preview: false,
+      view: { zoomFactor: 1, panX: 0, panY: 0 },
+    });
+
+    expect(
+      fillRectStyles.filter((style) => style === canvasTheme.pathNodeHandleActiveFill),
+    ).toHaveLength(2);
+  });
 });
 
 function recordingContext(): {

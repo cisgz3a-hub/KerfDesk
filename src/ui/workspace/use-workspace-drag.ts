@@ -15,10 +15,7 @@ import {
   type DragState,
   panOffsetForDrag,
 } from './drag-state';
-import {
-  beginDrawDrag,
-  commitDraftShape,
-} from './draw-tool';
+import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
@@ -196,6 +193,7 @@ function beginPathNodeDragForNodeTool(args: {
     project: args.project,
     scenePoint: point,
     pxToMm,
+    additive: args.e.shiftKey,
     selectPathNode: args.selectPathNode,
   });
 }
