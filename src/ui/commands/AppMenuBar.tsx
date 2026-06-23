@@ -18,8 +18,15 @@ export function AppMenuBar(props: { readonly commands: ReadonlyArray<AppCommand>
       if (target instanceof Node && menuBarRef.current?.contains(target)) return;
       setOpenFamily(null);
     };
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setOpenFamily(null);
+    };
     document.addEventListener('pointerdown', closeOnOutsidePointerDown, true);
-    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true);
+    document.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true);
+      document.removeEventListener('keydown', closeOnEscape, true);
+    };
   }, [openFamily]);
 
   return (
@@ -72,31 +79,33 @@ function MenuFamily(props: {
       >
         {familyLabel(props.family)}
       </summary>
-      <div role="menu" className="lf-menu" style={menuStyle}>
-        {commands.map((command) => {
-          const commandHelp = commandHelpId(command.id);
-          return (
-            <button
-              key={command.id}
-              type="button"
-              role="menuitem"
-              className="lf-menu-item"
-              disabled={!command.enabled}
-              title={controlHelp(commandHelp, command.disabledReason)}
-              data-help-id={commandHelp}
-              style={menuItemStyle}
-              onClick={() => {
-                if (runCommand(command)) props.onCommandRun();
-              }}
-            >
-              <span>{command.label}</span>
-              {command.shortcut !== undefined ? (
-                <span style={shortcutStyle}>{command.shortcut}</span>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+      {props.open ? (
+        <div role="menu" className="lf-menu" style={menuStyle}>
+          {commands.map((command) => {
+            const commandHelp = commandHelpId(command.id);
+            return (
+              <button
+                key={command.id}
+                type="button"
+                role="menuitem"
+                className="lf-menu-item"
+                disabled={!command.enabled}
+                title={controlHelp(commandHelp, command.disabledReason)}
+                data-help-id={commandHelp}
+                style={menuItemStyle}
+                onClick={() => {
+                  if (runCommand(command)) props.onCommandRun();
+                }}
+              >
+                <span>{command.label}</span>
+                {command.shortcut !== undefined ? (
+                  <span style={shortcutStyle}>{command.shortcut}</span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </details>
   );
 }
