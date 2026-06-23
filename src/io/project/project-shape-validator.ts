@@ -1,5 +1,9 @@
 import { DITHER_ALGORITHMS } from '../../core/scene';
-import { isGcodeDialectSelection, isScanOffsetTable } from '../../core/devices';
+import {
+  isGcodeDialectSelection,
+  isGrblRxBufferBytes,
+  isScanOffsetTable,
+} from '../../core/devices';
 import {
   firstError,
   isObject,
@@ -78,6 +82,8 @@ function validateDevice(device: Record<string, unknown>): string | null {
     validateHoming(device['homing']),
     requireString(device, 'device.autofocusCommand'),
     optionalLiteral(device, 'device.airAssistCommand', ['none', 'M7', 'M8']),
+    optionalLiteral(device, 'device.streamingMode', ['char-counted', 'ping-pong']),
+    optionalGrblRxBufferBytes(device, 'device.rxBufferBytes'),
     optionalGcodeDialect(device, 'device.gcodeDialect'),
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
@@ -386,6 +392,13 @@ function optionalScanOffsetTable(obj: Record<string, unknown>, path: string): st
 function optionalGcodeDialect(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined || isGcodeDialectSelection(value)
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
+function optionalGrblRxBufferBytes(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return value === undefined || isGrblRxBufferBytes(value)
     ? null
     : `missing or invalid \`${path}\``;
 }

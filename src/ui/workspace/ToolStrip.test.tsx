@@ -37,10 +37,13 @@ describe('ToolStrip', () => {
   it('uses help topics for drawing tool hover explanations', async () => {
     const h = await render(<ToolStrip />);
     const pen = h.querySelector('button[data-help-id="tool:polyline"]');
+    const node = h.querySelector('button[data-help-id="tool:node"]');
 
     expect(pen?.getAttribute('aria-label')).toBe('Draw polyline');
     expect(pen?.getAttribute('title')).toContain('Enter');
     expect(pen?.getAttribute('title')).toContain('double-click');
+    expect(node?.getAttribute('aria-label')).toBe('Edit nodes');
+    expect(node?.getAttribute('title')?.toLowerCase()).toContain('nodes');
   });
 
   it('toggles an already-active draw tool back to Select mode', async () => {
@@ -57,5 +60,20 @@ describe('ToolStrip', () => {
     expect(
       h.querySelector('button[aria-label="Select / transform"]')?.getAttribute('aria-pressed'),
     ).toBe('true');
+  });
+
+  it('arms node edit mode without toggling normal Select transforms', async () => {
+    const h = await render(<ToolStrip />);
+    const node = h.querySelector('button[aria-label="Edit nodes"]');
+
+    await act(async () => {
+      node?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'node' });
+    expect(node?.getAttribute('aria-pressed')).toBe('true');
+    expect(
+      h.querySelector('button[aria-label="Select / transform"]')?.getAttribute('aria-pressed'),
+    ).toBe('false');
   });
 });

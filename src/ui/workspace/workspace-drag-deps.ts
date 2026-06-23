@@ -5,6 +5,10 @@ export function useWorkspaceDragDeps() {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const selectObject = useStore((s) => s.selectObject);
   const selectObjects = useStore((s) => s.selectObjects);
+  const selectPathNode = useStore((s) => s.selectPathNode);
+  const setSelectedPathNodePositionDuringInteraction = useStore(
+    (s) => s.setSelectedPathNodePositionDuringInteraction,
+  );
   const toggleSelectObject = useStore((s) => s.toggleSelectObject);
   const setCursorMm = useStore((s) => s.setCursorMm);
   const beginInteraction = useStore((s) => s.beginInteraction);
@@ -21,6 +25,8 @@ export function useWorkspaceDragDeps() {
     selectedObjectId,
     selectObject,
     selectObjects,
+    selectPathNode,
+    setSelectedPathNodePositionDuringInteraction,
     toggleSelectObject,
     setCursorMm,
     beginInteraction,

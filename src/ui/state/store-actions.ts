@@ -105,6 +105,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           undoStack: s.undoStack.slice(0, -1),
           redoStack: [...s.redoStack, s.project].slice(-HISTORY_DEPTH),
           selectedObjectId: null,
+          selectedPathNode: null,
           dirty: true,
         };
       }),
@@ -117,6 +118,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           redoStack: s.redoStack.slice(0, -1),
           undoStack: [...s.undoStack, s.project].slice(-HISTORY_DEPTH),
           selectedObjectId: null,
+          selectedPathNode: null,
           dirty: true,
         };
       }),
@@ -140,10 +142,11 @@ export function viewActions(
     selectObject: (id) =>
       set((s) =>
         id === null
-          ? { selectedObjectId: null, additionalSelectedIds: new Set() }
-          : selectionFromIds(s, [id], false),
+          ? { selectedObjectId: null, selectedPathNode: null, additionalSelectedIds: new Set() }
+          : { ...selectionFromIds(s, [id], false), selectedPathNode: null },
       ),
-    toggleSelectObject: (id) => set((s) => toggleSelectionFromId(s, id)),
+    toggleSelectObject: (id) =>
+      set((s) => ({ ...toggleSelectionFromId(s, id), selectedPathNode: null })),
     selectAllObjects: () =>
       set((s) => {
         const ids = s.project.scene.objects
@@ -152,12 +155,16 @@ export function viewActions(
         const [primary, ...rest] = ids;
         return {
           selectedObjectId: primary ?? null,
+          selectedPathNode: null,
           additionalSelectedIds: new Set(rest),
         };
       }),
     selectObjects: (ids, options = {}) =>
-      set((s) => selectionFromIds(s, ids, options.additive === true)),
-    togglePreview: () => set((s) => ({ previewMode: !s.previewMode })),
+      set((s) => ({
+        ...selectionFromIds(s, ids, options.additive === true),
+        selectedPathNode: null,
+      })),
+    togglePreview: () => set((s) => ({ previewMode: !s.previewMode, selectedPathNode: null })),
     setJobPlacement: (patch) =>
       set((s) => ({ jobPlacement: mergeJobPlacement(s.jobPlacement, patch) })),
     setOutputScopeSettings: (patch) =>

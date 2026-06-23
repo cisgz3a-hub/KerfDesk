@@ -35,6 +35,7 @@ export type TextDialogState =
 // canvas drag. Ephemeral like zoom — never persisted; Esc returns to select.
 export type ToolMode =
   | { readonly kind: 'select' }
+  | { readonly kind: 'node' }
   | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'polyline' };
 
 // Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.

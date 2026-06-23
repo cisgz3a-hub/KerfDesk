@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createStreamer, step, type StatusReport } from '../../core/controllers/grbl';
-import { detectStreamStall, STREAM_STALL_TIMEOUT_MS, type StallProbe } from './laser-store-helpers';
+import {
+  detectStreamStall,
+  STREAM_STALL_RUNNING_TIMEOUT_MS,
+  STREAM_STALL_TIMEOUT_MS,
+  type StallProbe,
+} from './laser-store-helpers';
 
 function streamingState() {
   return step(createStreamer('G1 X1 S100\nG1 X2\nG1 X3')).state;
@@ -21,7 +26,16 @@ function report(state: StatusReport['state']): StatusReport {
 // M13 (AUDIT-2026-06-10): if GRBL stops acking mid-job there was no watchdog
 // anywhere — 'streaming' at a frozen percentage indefinitely, silently.
 describe('detectStreamStall (M13)', () => {
-  it('flags a stall when no ack arrives within the timeout', () => {
+  it('flags a stall when no ack arrives and the controller has no Run status', () => {
+    const streamer = streamingState();
+    const first = detectStreamStall(streamer, null, null, 1_000);
+    expect(first.stalled).toBe(false);
+
+    const second = detectStreamStall(streamer, null, first.probe, 1_000 + STREAM_STALL_TIMEOUT_MS);
+    expect(second.stalled).toBe(true);
+  });
+
+  it('allows a longer watchdog window while the controller is still running', () => {
     const streamer = streamingState();
     const staleRunStatus = report('Run');
     const first = detectStreamStall(streamer, staleRunStatus, null, 1_000);
@@ -33,7 +47,15 @@ describe('detectStreamStall (M13)', () => {
       first.probe,
       1_000 + STREAM_STALL_TIMEOUT_MS,
     );
-    expect(second.stalled).toBe(true);
+    expect(second.stalled).toBe(false);
+
+    const third = detectStreamStall(
+      streamer,
+      staleRunStatus,
+      second.probe,
+      1_000 + STREAM_STALL_RUNNING_TIMEOUT_MS,
+    );
+    expect(third.stalled).toBe(true);
   });
 
   it('resets the clock when the stream makes progress', () => {

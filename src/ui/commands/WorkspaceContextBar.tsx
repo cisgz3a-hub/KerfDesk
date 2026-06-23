@@ -42,8 +42,9 @@ export function WorkspaceContextBar(props: {
     <div
       ref={barRef}
       role="menu"
+      aria-orientation="vertical"
       aria-label="Workspace quick actions"
-      className="lf-menu"
+      className="lf-menu lf-workspace-context-menu"
       style={{ ...barStyle, left: position.left, top: position.top }}
     >
       {primary.map((command) => (
@@ -56,14 +57,20 @@ export function WorkspaceContextBar(props: {
           className="lf-menu-item"
           aria-expanded={moreOpen}
           title="Show more workspace commands"
-          style={horizontalMenuItemStyle}
+          style={menuItemStyle}
           onClick={() => setMoreOpen((open) => !open)}
         >
           More
         </button>
       ) : null}
       {moreOpen ? (
-        <div role="menu" className="lf-menu" style={moreMenuStyle}>
+        <div
+          role="menu"
+          aria-orientation="vertical"
+          aria-label="More workspace quick actions"
+          className="lf-workspace-context-menu__more"
+          style={moreMenuStyle}
+        >
           {more.map((command) => (
             <ContextCommandButton key={command.id} command={command} onCommandRun={close} />
           ))}
@@ -83,7 +90,7 @@ function ContextCommandButton(props: {
       type="button"
       role="menuitem"
       className="lf-menu-item"
-      style={horizontalMenuItemStyle}
+      style={menuItemStyle}
       disabled={!props.command.enabled}
       data-help-id={helpId}
       title={commandButtonTitle(props.command, helpId)}
@@ -118,8 +125,8 @@ function clampedPosition(state: { readonly x: number; readonly y: number }): {
   readonly top: number;
 } {
   return {
-    left: clamp(state.x, FLOATING_MARGIN_PX, window.innerWidth - BAR_WIDTH_PX),
-    top: clamp(state.y, FLOATING_MARGIN_PX, window.innerHeight - BAR_HEIGHT_PX),
+    left: clamp(state.x, FLOATING_MARGIN_PX, window.innerWidth - MENU_WIDTH_PX),
+    top: clamp(state.y, FLOATING_MARGIN_PX, window.innerHeight - MENU_HEIGHT_PX),
   };
 }
 
@@ -155,31 +162,37 @@ function closeOnEscape(close: () => void): () => void {
 }
 
 const FLOATING_MARGIN_PX = 8;
-const BAR_WIDTH_PX = 420;
-const BAR_HEIGHT_PX = 44;
+const MENU_WIDTH_PX = 240;
+const MENU_HEIGHT_PX = 260;
 
 const barStyle: React.CSSProperties = {
   position: 'fixed',
   display: 'flex',
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 2,
-  maxWidth: BAR_WIDTH_PX,
-  overflowX: 'auto',
+  flexDirection: 'column',
+  alignItems: 'stretch',
+  gap: 1,
+  width: MENU_WIDTH_PX,
+  maxWidth: 'calc(100vw - 16px)',
+  maxHeight: 'calc(100vh - 16px)',
+  overflowX: 'hidden',
+  overflowY: 'auto',
   boxShadow: 'var(--lf-shadow)',
 };
 
-const horizontalMenuItemStyle: React.CSSProperties = {
-  width: 'auto',
+const menuItemStyle: React.CSSProperties = {
+  width: '100%',
+  minWidth: 0,
   whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 };
 
 const moreMenuStyle: React.CSSProperties = {
-  position: 'absolute',
-  left: 0,
-  top: 'calc(100% + 4px)',
-  minWidth: 230,
+  position: 'static',
   display: 'flex',
   flexDirection: 'column',
   gap: 1,
+  marginTop: 2,
+  paddingTop: 2,
+  borderTop: '1px solid var(--lf-border)',
 };

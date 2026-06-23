@@ -31,6 +31,14 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     expect(useUiStore.getState().penDraft).toBeNull();
   });
 
+  it('setToolMode clears the pen draft when switching to node edit', () => {
+    useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
+    useUiStore.getState().setPenDraft(ONE_VERTEX);
+    useUiStore.getState().setToolMode({ kind: 'node' });
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'node' });
+    expect(useUiStore.getState().penDraft).toBeNull();
+  });
+
   it('setToolMode keeps the pen draft when the pen is re-selected', () => {
     useUiStore.getState().setToolMode({ kind: 'draw', shape: 'polyline' });
     useUiStore.getState().setPenDraft(ONE_VERTEX);

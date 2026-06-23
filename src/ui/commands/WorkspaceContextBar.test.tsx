@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 describe('WorkspaceContextBar', () => {
-  it('shows empty-workspace commands without selection-only actions', async () => {
+  it('shows empty-workspace commands in a vertical dropdown without selection-only actions', async () => {
     useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-empty' });
     const h = await renderBar(commands());
     const menu = h.querySelector('[aria-label="Workspace quick actions"]');
@@ -40,9 +40,13 @@ describe('WorkspaceContextBar', () => {
     expect(h.textContent).not.toContain('Copy');
     if (!(menu instanceof HTMLElement)) throw new Error('quick bar missing');
     const paste = buttonByText(h, 'Paste');
-    expect(menu.style.flexDirection).toBe('row');
+    expect(menu.getAttribute('aria-orientation')).toBe('vertical');
+    expect(menu.classList.contains('lf-workspace-context-menu')).toBe(true);
+    expect(menu.style.flexDirection).toBe('column');
+    expect(menu.style.overflowX).toBe('hidden');
     expect(paste.classList.contains('lf-menu-item')).toBe(true);
     expect(paste.classList.contains('lf-btn')).toBe(false);
+    expect(paste.style.width).toBe('100%');
   });
 
   it('runs enabled quick-bar commands through the command object and closes', async () => {
@@ -54,6 +58,15 @@ describe('WorkspaceContextBar', () => {
 
     expect(onDuplicate).toHaveBeenCalledTimes(1);
     expect(useUiStore.getState().workspaceContextBar).toBeNull();
+  });
+
+  it('shows Fill Selection in the selected-object dropdown', async () => {
+    useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
+    const h = await renderBar(commands());
+
+    expect(h.textContent).toContain('Copy');
+    expect(h.textContent).toContain('Fill Selection');
+    expect(h.textContent).not.toContain('Paste');
   });
 
   it('keeps disabled command buttons inert', async () => {
@@ -69,13 +82,20 @@ describe('WorkspaceContextBar', () => {
     expect(useUiStore.getState().workspaceContextBar).not.toBeNull();
   });
 
-  it('shows context More actions but excludes laser machine commands', async () => {
+  it('expands context More actions inside the vertical dropdown and excludes laser machine commands', async () => {
     useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
     const h = await renderBar(commands());
 
     await clickButton(h, 'More');
+    const menus = h.querySelectorAll('[role="menu"]');
 
+    expect(menus).toHaveLength(2);
+    expect((menus[1] as HTMLElement).style.position).toBe('static');
+    expect((menus[1] as HTMLElement).style.flexDirection).toBe('column');
     expect(h.textContent).toContain('Align Left');
+    expect(h.textContent).toContain('Break Apart');
+    expect(h.textContent).toContain('Close Open Fill Contours');
+    expect(h.textContent).toContain('Close Fill Contours With Tolerance...');
     expect(h.textContent).toContain('Flip Horizontal');
     expect(h.textContent).toContain('Convert to Bitmap...');
     expect(h.textContent).not.toContain('Home');
@@ -164,7 +184,11 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'tools.adjust-image',
   'tools.trace-image',
   'tools.convert-to-bitmap',
+  'tools.fill-selection',
+  'tools.close-open-fill-contours',
+  'tools.close-fill-contours-with-tolerance',
   'arrange.align-left',
+  'arrange.break-apart',
   'arrange.flip-horizontal',
   'laser.connect',
   'laser.home',
@@ -188,7 +212,11 @@ const COMMAND_LABELS: Partial<Record<CommandId, string>> = {
   'tools.adjust-image': 'Adjust Image...',
   'tools.trace-image': 'Trace Image...',
   'tools.convert-to-bitmap': 'Convert to Bitmap...',
+  'tools.fill-selection': 'Fill Selection',
+  'tools.close-open-fill-contours': 'Close Open Fill Contours',
+  'tools.close-fill-contours-with-tolerance': 'Close Fill Contours With Tolerance...',
   'arrange.align-left': 'Align Left',
+  'arrange.break-apart': 'Break Apart',
   'arrange.flip-horizontal': 'Flip Horizontal',
   'laser.connect': 'Connect',
   'laser.home': 'Home',

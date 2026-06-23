@@ -41,3 +41,11 @@ export { machineBoundsForDevice } from './machine-bounds';
 export { toMachineCoords, toSceneCoords } from './origin-transform';
 export type { ScanOffsetPoint } from './scan-offset-profile';
 export { isScanOffsetTable, normalizeScanOffsetTable } from './scan-offset-profile';
+export type { GrblStreamingMode } from '../grbl-streaming';
+export {
+  DEFAULT_GRBL_RX_BUFFER_BYTES,
+  isGrblRxBufferBytes,
+  isGrblStreamingMode,
+  normalizeGrblRxBufferBytes,
+  normalizeGrblStreamingMode,
+} from '../grbl-streaming';

@@ -349,6 +349,30 @@ describe('handleToolShortcut — LightBurn tool arming (ADR-051 B7)', () => {
 });
 
 describe('handleTransformShortcut — flip keeps object position', () => {
+  it('nudges the selected path node instead of the whole object', () => {
+    const nudgeSelectedPathNode = vi.fn();
+    const nudgeSelection = vi.fn();
+
+    const handled = handleTransformShortcut(fakeKeydown({ key: 'ArrowRight' }), {
+      project: createProject(),
+      selectedObjectId: 'shape-1',
+      selectedPathNode: {
+        objectId: 'shape-1',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 1,
+      },
+      applyObjectTransform: vi.fn(),
+      nudgeSelection,
+      nudgeSelectedPathNode,
+      flipSelection: vi.fn(),
+    });
+
+    expect(handled).toBe(true);
+    expect(nudgeSelectedPathNode).toHaveBeenCalledWith(1, 0);
+    expect(nudgeSelection).not.toHaveBeenCalled();
+  });
+
   it('H flips the selected object horizontally around its center', () => {
     const object = shapeObject({
       x: 40,
@@ -365,8 +389,10 @@ describe('handleTransformShortcut — flip keeps object position', () => {
     const handled = handleTransformShortcut(fakeKeydown({ key: 'h' }), {
       project,
       selectedObjectId: object.id,
+      selectedPathNode: null,
       applyObjectTransform: vi.fn(),
       nudgeSelection: vi.fn(),
+      nudgeSelectedPathNode: vi.fn(),
       flipSelection,
     });
 

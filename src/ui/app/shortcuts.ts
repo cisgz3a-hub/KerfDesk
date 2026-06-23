@@ -17,6 +17,7 @@ import type {
 } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import type { JobPlacementSettings, MachinePlacementSnapshot } from '../job-placement';
+import type { PathNodeRef } from '../state/path-node-edit-actions';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
@@ -73,8 +74,10 @@ export type EditCtx = {
 export type TransformCtx = {
   readonly project: Project;
   readonly selectedObjectId: string | null;
+  readonly selectedPathNode: PathNodeRef | null;
   readonly applyObjectTransform: (id: string, transform: Transform) => void;
   readonly nudgeSelection: (dx: number, dy: number) => void;
+  readonly nudgeSelectedPathNode: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
 };
 
@@ -330,7 +333,8 @@ function tryNudge(e: KeyboardEvent, ctx: TransformCtx): boolean {
   if (arrow === undefined) return false;
   e.preventDefault();
   const step = e.shiftKey ? NUDGE_BIG_MM : NUDGE_MM;
-  ctx.nudgeSelection(arrow.dx * step, arrow.dy * step);
+  if (ctx.selectedPathNode !== null) ctx.nudgeSelectedPathNode(arrow.dx * step, arrow.dy * step);
+  else ctx.nudgeSelection(arrow.dx * step, arrow.dy * step);
   return true;
 }
 

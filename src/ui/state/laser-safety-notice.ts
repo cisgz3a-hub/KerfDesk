@@ -62,9 +62,9 @@ export type LaserSafetyNotice =
 // nothing acks and fresh Run status stops arriving for STREAM_STALL_TIMEOUT_MS
 // while lines are in flight.
 export const STREAM_STALLED_MESSAGE =
-  'The controller has not acknowledged a command or reported fresh Run status for 10 seconds ' +
-  'while a job is active. The stream may be stalled. Press Stop (or physical E-stop if unsafe), ' +
-  'then check the USB link before re-running.';
+  'The controller has not acknowledged a command or reported fresh movement status for longer ' +
+  'than the watchdog window while a job is active. The stream may be stalled. Press Stop ' +
+  '(or physical E-stop if unsafe), then check the USB link before re-running.';
 
 export function streamStalledNotice(): LaserSafetyNotice {
   return { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE };

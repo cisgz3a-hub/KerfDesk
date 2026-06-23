@@ -24,7 +24,8 @@ import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } fr
 import { PreviewStatsPanel, PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewToolpath } from './use-preview-toolpath';
-import { finishDrawToolOnLeftDoubleClick, useDragMove } from './use-workspace-drag';
+import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
+import { useDragMove } from './use-workspace-drag';
 import { clientToCanvasPx, zoomAtCursorPx } from './view-transform';
 import { useJobEstimate } from '../laser/use-job-estimate';
 
@@ -32,10 +33,12 @@ export function Workspace(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const selectedPathNode = useStore((s) => s.selectedPathNode);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const previewMode = useStore((s) => s.previewMode);
   const scrubberT = useUiStore((s) => s.scrubberT);
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
+  const toolMode = useUiStore((s) => s.toolMode);
   // Three primitive selectors — Zustand only re-runs the effect when one
   // of them actually changes. A bundled `{...}` selector would create a
   // fresh object every store update and force unnecessary redraws.
@@ -50,6 +53,8 @@ export function Workspace(): JSX.Element {
     ref,
     project,
     selectedObjectId,
+    selectedPathNode,
+    showPathNodeHandles: toolMode.kind === 'node',
     additionalSelectedIds,
     previewMode,
     previewToolpath,
@@ -84,11 +89,7 @@ export function Workspace(): JSX.Element {
           useUiStore.getState().closeWorkspaceContextBar();
           handleCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY });
         }}
-        onContextMenu={(e) => {
-          // Right-click is rebound to pan; suppress the OS context
-          // menu so a right-drag doesn't pop up the menu on release.
-          e.preventDefault();
-        }}
+        onContextMenu={suppressCanvasContextMenu}
         style={canvasStyle}
         aria-label="LaserForge workspace"
       />
@@ -103,12 +104,12 @@ export function Workspace(): JSX.Element {
           viewState={viewState}
         />
       )}
-      {previewMode && previewToolpath !== null && (
-        <>
-          <PreviewStatusOverlays project={project} toolpath={previewToolpath} />
-          <PreviewStatsPanel toolpath={previewToolpath} estimate={jobEstimate} />
-        </>
-      )}
+      <WorkspacePreviewOverlays
+        previewMode={previewMode}
+        project={project}
+        toolpath={previewToolpath}
+        estimate={jobEstimate}
+      />
       {previewMode && <PreviewScrubber />}
       {/* Bottom-right zoom controls — hidden during preview so the
           scrubber gets the whole bottom strip. */}
@@ -117,10 +118,31 @@ export function Workspace(): JSX.Element {
   );
 }
 
+function suppressCanvasContextMenu(e: React.MouseEvent<HTMLCanvasElement>): void {
+  e.preventDefault();
+}
+
+function WorkspacePreviewOverlays(props: {
+  readonly previewMode: boolean;
+  readonly project: Project;
+  readonly toolpath: Toolpath | null;
+  readonly estimate: ReturnType<typeof useJobEstimate>;
+}): JSX.Element | null {
+  if (!props.previewMode || props.toolpath === null) return null;
+  return (
+    <>
+      <PreviewStatusOverlays project={props.project} toolpath={props.toolpath} />
+      <PreviewStatsPanel toolpath={props.toolpath} estimate={props.estimate} />
+    </>
+  );
+}
+
 function useWorkspaceDraw(args: {
   readonly ref: React.RefObject<HTMLCanvasElement | null>;
   readonly project: Project;
   readonly selectedObjectId: string | null;
+  readonly selectedPathNode: ReturnType<typeof useStore.getState>['selectedPathNode'];
+  readonly showPathNodeHandles: boolean;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
   readonly previewToolpath: Toolpath | null;
@@ -131,18 +153,6 @@ function useWorkspaceDraw(args: {
   // bitmap resize clears the canvas, so the effect must re-run on it.
   readonly canvasSize: CanvasBitmapSize;
 }): void {
-  const {
-    ref,
-    project,
-    selectedObjectId,
-    additionalSelectedIds,
-    previewMode,
-    previewToolpath,
-    scrubberT,
-    showPreviewTravel,
-    viewState,
-    canvasSize,
-  } = args;
   // Phase G (B5): the live shape being dragged out, rendered as a dashed
   // preview. Identity changes each mouse-move, so it belongs in the deps below.
   const draftShape = useUiStore((s) => s.draftShape);
@@ -161,38 +171,42 @@ function useWorkspaceDraw(args: {
     setRasterRedrawTick((tick) => tick + 1);
   }, []);
   useEffect(() => {
-    const canvas = ref.current;
+    const canvas = args.ref.current;
     if (canvas === null) return;
     const ctx = canvas.getContext('2d');
     if (ctx === null) return;
-    drawScene(ctx, canvas.width, canvas.height, project, {
-      selectedId: selectedObjectId,
-      additionalSelectedIds,
-      preview: previewMode,
-      scrubberT,
-      previewShowTravel: showPreviewTravel,
-      view: viewState,
+    drawScene(ctx, canvas.width, canvas.height, args.project, {
+      selectedId: args.selectedObjectId,
+      showPathNodeHandles: args.showPathNodeHandles,
+      selectedPathNode: args.selectedPathNode,
+      additionalSelectedIds: args.additionalSelectedIds,
+      preview: args.previewMode,
+      scrubberT: args.scrubberT,
+      previewShowTravel: args.showPreviewTravel,
+      view: args.viewState,
       onRasterBitmapReady: requestRasterRedraw,
       displayPolylineCache,
-      ...(previewToolpath === null ? {} : { previewToolpath }),
+      ...(args.previewToolpath === null ? {} : { previewToolpath: args.previewToolpath }),
       ...(draftShape === null ? {} : { draft: draftShape }),
       ...(penDraft === null ? {} : { penDraft }),
       ...(selectionMarquee === null ? {} : { selectionMarquee }),
       ...(snapGuides.length === 0 ? {} : { snapGuides }),
     });
   }, [
-    ref,
-    project,
-    selectedObjectId,
-    additionalSelectedIds,
-    previewMode,
-    scrubberT,
-    showPreviewTravel,
-    viewState,
-    canvasSize,
+    args.ref,
+    args.project,
+    args.selectedObjectId,
+    args.selectedPathNode,
+    args.showPathNodeHandles,
+    args.additionalSelectedIds,
+    args.previewMode,
+    args.scrubberT,
+    args.showPreviewTravel,
+    args.viewState,
+    args.canvasSize,
     rasterRedrawTick,
     displayPolylineCache,
-    previewToolpath,
+    args.previewToolpath,
     requestRasterRedraw,
     draftShape,
     penDraft,

@@ -163,6 +163,7 @@ function hasActiveRasterPixel(group: RasterGroup): boolean {
 }
 
 function hasActiveReverseRasterRow(group: RasterGroup): boolean {
+  if (group.bidirectional === false) return false;
   let emittedRowCount = 0;
   for (let y = 0; y < group.pixelHeight; y += 1) {
     if (!hasActivePixelInRasterRow(group, y)) continue;

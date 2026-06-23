@@ -37,9 +37,14 @@ export function beginDrawDrag(args: {
   readonly viewState: ViewArg;
   readonly shape: DrawShapeKind;
 }): DragState | null {
+  if (isLeftDoubleClick(args.e)) return null;
   const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
   if (point === null) return null;
   return { kind: 'draw', shape: args.shape, startScenePoint: point };
+}
+
+function isLeftDoubleClick(e: { readonly button: number; readonly detail: number }): boolean {
+  return e.button === 0 && e.detail >= 2;
 }
 
 // Compute the live draft for a draw-drag mouse-move, or null while the drag is

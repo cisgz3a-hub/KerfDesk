@@ -119,8 +119,10 @@ function useFileEditShortcuts(): void {
 function useTransformViewShortcuts(): void {
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const selectedPathNode = useStore((s) => s.selectedPathNode);
   const applyObjectTransform = useStore((s) => s.applyObjectTransform);
   const nudgeSelection = useStore((s) => s.nudgeSelection);
+  const nudgeSelectedPathNode = useStore((s) => s.nudgeSelectedPathNode);
   const flipSelection = useStore((s) => s.flipSelection);
   const togglePreview = useStore((s) => s.togglePreview);
   const fitToSelection = useStore((s) => s.fitToSelection);
@@ -133,8 +135,10 @@ function useTransformViewShortcuts(): void {
         handleTransformShortcut(e, {
           project,
           selectedObjectId,
+          selectedPathNode,
           applyObjectTransform,
           nudgeSelection,
+          nudgeSelectedPathNode,
           flipSelection,
         })
       )
@@ -146,8 +150,10 @@ function useTransformViewShortcuts(): void {
   }, [
     project,
     selectedObjectId,
+    selectedPathNode,
     applyObjectTransform,
     nudgeSelection,
+    nudgeSelectedPathNode,
     flipSelection,
     togglePreview,
     resetView,

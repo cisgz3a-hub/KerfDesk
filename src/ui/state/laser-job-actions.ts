@@ -16,7 +16,9 @@ import {
   pause as pauseStreamer,
   resume as resumeStreamer,
   step,
+  type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
+import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -36,7 +38,7 @@ export function jobActions(
   safeWrite: SafeWriteFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
   return {
-    startJob: async (gcode) => {
+    startJob: async (gcode, options = {}) => {
       assertAutofocusIdle(get());
       const blockedMessage = setupCommandBlockMessage(get());
       if (blockedMessage !== null) {
@@ -48,14 +50,15 @@ export function jobActions(
       }
       // M13: a line longer than the RX buffer can never send — step() would
       // break silently, leaving a phantom idle job and a frozen progress bar.
-      const oversized = findOversizedLine(gcode);
+      const streamOptions = normalizeStartJobOptions(options);
+      const oversized = findOversizedLine(gcode, streamOptions.rxBufferBytes);
       if (oversized !== null) {
         throw new Error(
           `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
             `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
         );
       }
-      const initial = createStreamer(gcode);
+      const initial = createStreamer(gcode, streamOptions);
       const stepped = step(initial);
       set({ streamer: stepped.state });
       if (stepped.toSend.length === 0) return;
@@ -125,6 +128,13 @@ export function jobActions(
         streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
       }));
     },
+  };
+}
+
+function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {
+  return {
+    ...options,
+    rxBufferBytes: normalizeGrblRxBufferBytes(options.rxBufferBytes),
   };
 }
 

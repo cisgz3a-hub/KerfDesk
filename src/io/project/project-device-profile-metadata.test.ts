@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { createProject } from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
@@ -26,6 +26,46 @@ describe('project device profile metadata persistence', () => {
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.project.device.gcodeDialect).toEqual({ dialectId: 'grbl-dynamic' });
+  });
+
+  it('roundtrips profile streaming settings used by the GRBL streamer', () => {
+    const project = createProject({
+      ...DEFAULT_DEVICE_PROFILE,
+      streamingMode: 'ping-pong',
+      rxBufferBytes: 96,
+    });
+
+    const result = deserializeProject(serializeProject(project));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.streamingMode).toBe('ping-pong');
+    expect(result.project.device.rxBufferBytes).toBe(96);
+  });
+
+  it('backfills old projects without profile streaming settings to safe defaults', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    delete raw.device.streamingMode;
+    delete raw.device.rxBufferBytes;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.project.device.streamingMode).toBe(DEFAULT_DEVICE_PROFILE.streamingMode);
+    expect(result.project.device.rxBufferBytes).toBe(DEFAULT_DEVICE_PROFILE.rxBufferBytes);
+  });
+
+  it('rejects malformed loaded profile streaming settings', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    raw.device.streamingMode = 'blast';
+    raw.device.rxBufferBytes = 0;
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.reason).toMatch(/device\.streamingMode|device\.rxBufferBytes/);
   });
 
   it('replaces legacy Neotronics 4040 frame feed with the safer built-in feed', () => {

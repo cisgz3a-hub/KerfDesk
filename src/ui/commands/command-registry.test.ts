@@ -4,93 +4,9 @@ import {
   COMMAND_FAMILY_ORDER,
   commandById,
   runCommand,
-  type AppCommandContext,
 } from './command-registry';
 import { COMMAND_HELP } from '../help/help-topics';
-
-// The dirty-project guard resolves through a promise chain
-// (confirmDiscard(...).then(...)); two hops cover mock-promise unwrap +
-// the .then callback.
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
-}
-
-function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext {
-  return {
-    dirty: false,
-    savedName: null,
-    serialSupported: true,
-    connected: false,
-    machineBusy: false,
-    homingEnabled: true,
-    canUndo: false,
-    canRedo: false,
-    hasSelection: false,
-    hasRasterSelection: false,
-    hasConvertibleSelection: false,
-    canApplyImageMask: false,
-    hasMaskedRasterSelection: false,
-    canPaste: false,
-    canGroupSelection: false,
-    canUngroupSelection: false,
-    canLockSelection: false,
-    hasLockedObjects: false,
-    confirmDiscard: vi.fn(async () => true),
-    newProject: vi.fn(),
-    openProject: vi.fn(),
-    saveProject: vi.fn(),
-    saveProjectAs: vi.fn(),
-    importSvg: vi.fn(),
-    importImage: vi.fn(),
-    multiFileTrace: vi.fn(),
-    saveGcode: vi.fn(),
-    undo: vi.fn(),
-    redo: vi.fn(),
-    selectAll: vi.fn(),
-    copySelection: vi.fn(),
-    cutSelection: vi.fn(),
-    pasteClipboard: vi.fn(),
-    groupSelection: vi.fn(),
-    ungroupSelection: vi.fn(),
-    lockSelection: vi.fn(),
-    unlockAllObjects: vi.fn(),
-    duplicateSelection: vi.fn(),
-    deleteSelection: vi.fn(),
-    clearSelection: vi.fn(),
-    addText: vi.fn(),
-    materialTest: vi.fn(),
-    intervalTest: vi.fn(),
-    scanOffsetTest: vi.fn(),
-    focusTestAvailable: false,
-    focusTest: vi.fn(),
-    optimizationSettings: vi.fn(),
-    adjustImage: vi.fn(),
-    saveProcessedBitmap: vi.fn(),
-    traceImage: vi.fn(),
-    convertToBitmap: vi.fn(),
-    applyImageMask: vi.fn(),
-    cropImage: vi.fn(),
-    removeImageMask: vi.fn(),
-    connectLaser: vi.fn(),
-    disconnectLaser: vi.fn(),
-    homeLaser: vi.fn(),
-    togglePreview: vi.fn(),
-    previewActive: false,
-    hasPreviewableContent: true,
-    resetView: vi.fn(),
-    projectNotes: vi.fn(),
-    showAbout: vi.fn(),
-    canTransformSelection: false,
-    canAlignSelection: false,
-    alignSelection: vi.fn(),
-    canDistributeSelection: false,
-    distributeSelection: vi.fn(),
-    flipHorizontal: vi.fn(),
-    flipVertical: vi.fn(),
-    ...overrides,
-  };
-}
+import { baseCtx, flushMicrotasks } from './command-registry-test-helpers';
 
 describe('buildAppCommands', () => {
   it('defines LightBurn-style command families with unique command ids', () => {

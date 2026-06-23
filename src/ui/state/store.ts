@@ -23,6 +23,7 @@ import {
 import type { SaveTarget } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import { imageImportActions } from './import-actions';
+import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
@@ -32,6 +33,11 @@ import {
   type LayerSettingsClipboard,
   type LayerSubLayerPatch,
 } from './layer-actions';
+import { fillSelectionActions, type FillSelectionActions } from './fill-selection-actions';
+import {
+  closeOpenFillContoursActions,
+  type CloseOpenFillContoursActions,
+} from './close-open-fill-contours-actions';
 import {
   DEFAULT_LAYER_DEFAULTS_STATE,
   layerDefaultActions,
@@ -62,6 +68,11 @@ import {
   selectionTransformActions,
   type SelectionTransformActions,
 } from './selection-transform-actions';
+import {
+  pathNodeEditActions,
+  type PathNodeEditActions,
+  type PathNodeRef,
+} from './path-node-edit-actions';
 import { type ImportOutcome, type TraceExistingImageOptions } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
 import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
@@ -92,6 +103,10 @@ export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
   ProjectNotesActions &
   SelectionTransformActions &
+  PathNodeEditActions &
+  BreakApartActions &
+  FillSelectionActions &
+  CloseOpenFillContoursActions &
   ObjectDeleteActions &
   SceneClipboardActions &
   SceneGroupActions &
@@ -100,6 +115,7 @@ export type AppState = ObjectPropertiesActions &
   MaterialLibraryActions & {
     readonly project: Project;
     readonly selectedObjectId: string | null;
+    readonly selectedPathNode: PathNodeRef | null;
     // Additional objects in the multi-selection set (F-A5). The "primary"
     // selection is selectedObjectId; additionalSelectedIds is everything
     // shift+clicked or marquee-added after that. Combined-bbox scale and
@@ -169,6 +185,10 @@ export type AppState = ObjectPropertiesActions &
     readonly moveLayer: (layerId: string, direction: LayerMoveDirection) => void;
     readonly createManualLayer: (color: string) => void;
     readonly assignSelectionToLayer: (layerId: string) => void;
+    readonly breakApartSelection: () => void;
+    readonly fillSelectionSeparately: () => void;
+    readonly closeSelectedOpenFillContours: () => void;
+    readonly closeSelectedOpenFillContoursWithTolerance: (toleranceMm: number) => void;
     readonly deleteLayerAndObjects: (layerId: string) => void;
     readonly copyLayerSettings: (layerId: string) => void;
     readonly pasteLayerSettings: (layerId: string) => void;
@@ -223,6 +243,7 @@ function initialState(): Pick<
   AppState,
   | 'project'
   | 'selectedObjectId'
+  | 'selectedPathNode'
   | 'additionalSelectedIds'
   | 'previewMode'
   | 'undoStack'
@@ -242,6 +263,7 @@ function initialState(): Pick<
   return {
     project: createProject(),
     selectedObjectId: null,
+    selectedPathNode: null,
     additionalSelectedIds: new Set(),
     previewMode: false,
     undoStack: [],
@@ -301,8 +323,11 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectActions(set),
   ...objectInsertActions(set, get),
   ...imageImportActions(set, get),
+  ...breakApartActions(set),
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
+  ...fillSelectionActions(set),
+  ...closeOpenFillContoursActions(set),
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),
   ...objectPropertiesActions(set),
@@ -314,6 +339,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectOptimizationActions(set),
   ...projectNotesActions(set),
   ...selectionTransformActions(set),
+  ...pathNodeEditActions(set),
   ...objectDeleteActions(set),
   ...sceneActions(set),
   ...duplicateAction(set),

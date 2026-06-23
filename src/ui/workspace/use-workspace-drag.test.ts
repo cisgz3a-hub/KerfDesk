@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createRectangle } from '../../core/shapes';
 import { useUiStore } from '../state/ui-store';
-import { finishDrawToolOnLeftDoubleClick } from './use-workspace-drag';
+import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 
 describe('finishDrawToolOnLeftDoubleClick', () => {
   beforeEach(() => {

@@ -22,10 +22,11 @@ import {
   drawModifiersFromEvent,
 } from './draw-tool';
 import { handlePenMouseDown, updatePenCursor } from './pen-tool';
+import { beginPathNodeDrag, updatePathNodeDrag } from './path-node-drag';
 import { selectObjectsInMarquee } from './selection-marquee';
 import { transformDragWithSnap } from './drag-snap';
 import type { SnapGuide, SnapSettings } from './snapping';
-import { canvasMouseToScene } from './view-transform';
+import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 import { useWorkspaceDragDeps } from './workspace-drag-deps';
 
 type CanvasMouseEvent = ReactMouseEvent<HTMLCanvasElement>;
@@ -68,6 +69,7 @@ export function useDragMove(
       toolMode: deps.toolMode,
       selectedObjectId: deps.selectedObjectId,
       selectObject: deps.selectObject,
+      selectPathNode: deps.selectPathNode,
       toggleSelectObject: deps.toggleSelectObject,
       drawShape: deps.drawShape,
     });
@@ -91,6 +93,8 @@ export function useDragMove(
       setCursorMm: deps.setCursorMm,
       setDraftShape: deps.setDraftShape,
       setSelectionMarquee: deps.setSelectionMarquee,
+      setSelectedPathNodePositionDuringInteraction:
+        deps.setSelectedPathNodePositionDuringInteraction,
       selectionAnchor: deps.selectionAnchor,
       snapSettings: deps.snapSettings,
       setObjectTransform: deps.setObjectTransform,
@@ -138,9 +142,13 @@ function beginWorkspaceDrag(args: {
   readonly toolMode: ReturnType<typeof useUiStore.getState>['toolMode'];
   readonly selectedObjectId: string | null;
   readonly selectObject: (id: string | null) => void;
+  readonly selectPathNode: ReturnType<typeof useStore.getState>['selectPathNode'];
   readonly toggleSelectObject: (id: string) => void;
   readonly drawShape: (shape: ShapeObject) => void;
 }): DragState | null {
+  if (args.toolMode.kind === 'node' && args.e.button === 0 && !useUiStore.getState().spaceDown) {
+    return beginPathNodeDragForNodeTool(args);
+  }
   if (args.toolMode.kind === 'draw' && args.e.button === 0 && !useUiStore.getState().spaceDown) {
     if (args.toolMode.shape === 'polyline') {
       handlePenMouseDown(args);
@@ -159,6 +167,27 @@ function beginWorkspaceDrag(args: {
   });
 }
 
+function beginPathNodeDragForNodeTool(args: {
+  readonly e: CanvasMouseEvent;
+  readonly ref: CanvasRef;
+  readonly project: Project;
+  readonly viewState: WorkspaceViewState;
+  readonly selectPathNode: ReturnType<typeof useStore.getState>['selectPathNode'];
+}): DragState | null {
+  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  if (point === null) {
+    args.selectPathNode(null);
+    return null;
+  }
+  const pxToMm = pxToMmForCanvas(args.ref.current, args.project, args.viewState);
+  return beginPathNodeDrag({
+    project: args.project,
+    scenePoint: point,
+    pxToMm,
+    selectPathNode: args.selectPathNode,
+  });
+}
+
 function updateWorkspaceDrag(args: {
   readonly e: CanvasMouseEvent;
   readonly ref: CanvasRef;
@@ -171,6 +200,7 @@ function updateWorkspaceDrag(args: {
   readonly setSelectionMarquee: (
     marquee: { readonly start: Vec2; readonly end: Vec2 } | null,
   ) => void;
+  readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
   readonly selectionAnchor: SelectionAnchor;
   readonly snapSettings: SnapSettings;
   readonly setObjectTransform: (id: string, transform: Transform) => void;
@@ -190,6 +220,15 @@ function updateWorkspaceDrag(args: {
       drag: args.drag,
       point,
       setSelectionMarquee: args.setSelectionMarquee,
+    });
+    return;
+  }
+  if (args.drag?.kind === 'path-node') {
+    updatePathNodeDrag({
+      drag: args.drag,
+      point,
+      setSelectedPathNodePositionDuringInteraction:
+        args.setSelectedPathNodePositionDuringInteraction,
     });
     return;
   }
@@ -243,23 +282,6 @@ function finishWorkspaceDrag(args: {
     return;
   }
   args.endInteraction();
-}
-
-export function finishDrawToolOnLeftDoubleClick(e: {
-  readonly button: number;
-  readonly detail: number;
-}): boolean {
-  const ui = useUiStore.getState();
-  if (ui.toolMode.kind !== 'draw') return false;
-  if (ui.toolMode.shape === 'polyline') return false;
-  if (!isLeftButtonDoubleClick(e)) return false;
-  ui.closeWorkspaceContextBar();
-  ui.resetToolMode();
-  return true;
-}
-
-function isLeftButtonDoubleClick(e: { readonly button: number; readonly detail: number }): boolean {
-  return e.button === 0 && e.detail >= 2;
 }
 
 function openContextBarForRightClick(args: {
@@ -360,6 +382,7 @@ function applyTransformDrag(args: {
     drag.kind === 'pan' ||
     drag.kind === 'draw' ||
     drag.kind === 'marquee' ||
+    drag.kind === 'path-node' ||
     point === null
   ) {
     args.setSnapGuides([]);
@@ -384,7 +407,13 @@ function applyTransformDrag(args: {
 }
 
 function visibleDragKind(drag: DragState | null): DragMoveResult['dragKind'] {
-  if (drag === null || drag.kind === 'pan' || drag.kind === 'draw' || drag.kind === 'marquee') {
+  if (
+    drag === null ||
+    drag.kind === 'pan' ||
+    drag.kind === 'draw' ||
+    drag.kind === 'marquee' ||
+    drag.kind === 'path-node'
+  ) {
     return null;
   }
   return drag.kind;

@@ -46,7 +46,10 @@ export async function runStartJobFlow(): Promise<void> {
     if (!jobAwareConfirm(`Controller warning:\n\n${lines}\n\nStart anyway?`)) return;
   }
   try {
-    await laser.startJob(prepared.gcode);
+    await laser.startJob(prepared.gcode, {
+      streamingMode: project.device.streamingMode,
+      rxBufferBytes: project.device.rxBufferBytes,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     jobAwareAlert(`Could not start job:\n\n${message}`);

@@ -244,6 +244,8 @@ describe('material library IO', () => {
       minPowerS: DEFAULT_DEVICE_PROFILE.minPowerS,
       laserModeEnabled: DEFAULT_DEVICE_PROFILE.laserModeEnabled,
       airAssistCommand: DEFAULT_DEVICE_PROFILE.airAssistCommand,
+      streamingMode: DEFAULT_DEVICE_PROFILE.streamingMode,
+      rxBufferBytes: DEFAULT_DEVICE_PROFILE.rxBufferBytes,
       origin: DEFAULT_DEVICE_PROFILE.origin,
       scanningOffsets: [],
     });
@@ -265,6 +267,48 @@ describe('material library IO', () => {
         ...deviceHint,
         airAssistCommand: 'none',
       });
+    }
+  });
+
+  it('accepts older device hints without streaming settings and defaults them safely', () => {
+    const deviceHint = createMaterialLibraryDeviceHint(DEFAULT_DEVICE_PROFILE);
+    const {
+      streamingMode: _streamingMode,
+      rxBufferBytes: _rxBufferBytes,
+      ...legacyDeviceHint
+    } = deviceHint;
+    const result = deserializeMaterialLibrary(
+      JSON.stringify({
+        ...library(),
+        deviceHint: legacyDeviceHint,
+      }),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.library.deviceHint).toEqual({
+        ...deviceHint,
+        streamingMode: 'char-counted',
+        rxBufferBytes: 120,
+      });
+    }
+  });
+
+  it('rejects invalid streaming settings on device hints', () => {
+    const result = deserializeMaterialLibrary(
+      JSON.stringify({
+        ...library(),
+        deviceHint: {
+          ...createMaterialLibraryDeviceHint(DEFAULT_DEVICE_PROFILE),
+          streamingMode: 'burst',
+          rxBufferBytes: 0,
+        },
+      }),
+    );
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/deviceHint/);
     }
   });
 
