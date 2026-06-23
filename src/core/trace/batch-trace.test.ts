@@ -18,6 +18,20 @@ const SQUARE_PATH: ColoredPath = {
   ],
 };
 
+const ZERO_AREA_PATH: ColoredPath = {
+  color: '#000000',
+  polylines: [
+    {
+      closed: true,
+      points: [
+        { x: 1, y: 1 },
+        { x: 1, y: 1 },
+        { x: 1, y: 1 },
+      ],
+    },
+  ],
+};
+
 function rawImage(width: number, height: number): RawImageData {
   return {
     width,
@@ -93,5 +107,17 @@ describe('traceImagesToSvgFiles', () => {
     expect(files[0]?.svg).toContain('viewBox="0 0 1000 500"');
     expect(files[0]?.svg).toContain('width="100mm"');
     expect(files[0]?.svg).toContain('height="50mm"');
+  });
+
+  it('does not count degenerate geometry as visible trace output', async () => {
+    const trace = vi.fn(async () => [ZERO_AREA_PATH]);
+
+    const files = await traceImagesToSvgFiles(
+      [{ sourceName: 'transparent.png', image: rawImage(4, 4) }],
+      { trace },
+    );
+
+    expect(files[0]?.pathCount).toBe(0);
+    expect(files[0]?.svg).not.toContain('<path ');
   });
 });

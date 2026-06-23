@@ -1,5 +1,5 @@
 import type { ColoredPath } from '../scene';
-import { coloredPathsToSvg } from './paths-to-svg';
+import { coloredPathsToSvg, countVisibleColoredPaths } from './paths-to-svg';
 import { traceImageToColoredPaths } from './trace-to-paths';
 import { DEFAULT_TRACE_OPTIONS, type RawImageData, type TraceOptions } from './trace-image';
 
@@ -44,15 +44,10 @@ export async function traceImagesToSvgFiles(
     files.push({
       filename: `${stem}-trace.svg`,
       svg: coloredPathsToSvg(paths, job.image.width, job.image.height, job.physicalSizeMm),
-      pathCount: countRenderablePaths(paths),
+      pathCount: countVisibleColoredPaths(paths),
     });
   }
   return files;
-}
-
-function countRenderablePaths(paths: ReadonlyArray<ColoredPath>): number {
-  return paths.filter((path) => path.polylines.some((polyline) => polyline.points.length >= 2))
-    .length;
 }
 
 function uniqueStem(stem: string, seen: Map<string, number>): string {
