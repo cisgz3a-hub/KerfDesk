@@ -25,6 +25,7 @@ export {
   findRegistrationBoxBounds,
   findRegistrationBoxes,
   findRegistrationLayer,
+  hasRegistrationArtwork,
   isRegistrationBox,
   isRegistrationLayer,
   registrationOutputConflict,

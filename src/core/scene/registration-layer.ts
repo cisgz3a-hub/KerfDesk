@@ -67,6 +67,41 @@ export function findRegistrationBoxBounds(scene: Scene): AABB | null {
   return combinedBBox(findRegistrationBoxes(scene));
 }
 
+export function hasRegistrationArtwork(scene: Scene): boolean {
+  const artworkColors = artworkLayerColors(scene, false);
+  if (artworkColors.size === 0) return false;
+  return scene.objects.some(
+    (object) =>
+      !isRegistrationBox(object) &&
+      objectLayerColors(object).some((color) => artworkColors.has(color)),
+  );
+}
+
+function hasOutputRegistrationArtwork(scene: Scene): boolean {
+  const outputArtworkColors = artworkLayerColors(scene, true);
+  if (outputArtworkColors.size === 0) return false;
+  return scene.objects.some(
+    (object) =>
+      !isRegistrationBox(object) &&
+      objectLayerColors(object).some((color) => outputArtworkColors.has(color)),
+  );
+}
+
+function artworkLayerColors(scene: Scene, outputOnly: boolean): ReadonlySet<string> {
+  return new Set(
+    scene.layers
+      .filter(
+        (layer) => layer.id !== REGISTRATION_LAYER_ID && (!outputOnly || layer.output === true),
+      )
+      .map((layer) => layer.color),
+  );
+}
+
+function objectLayerColors(object: SceneObject): ReadonlyArray<string> {
+  if (object.kind === 'raster-image') return [object.color];
+  return object.paths.flatMap((path) => (path.polylines.length === 0 ? [] : [path.color]));
+}
+
 // Which run the next Start will burn, derived from the registration layer's output
 // vs the other layers'. Drives the jig panel's "Next burn" banner and the
 // Box/Artwork segmented toggle (ADR-057). 'mixed' = not cleanly one run, i.e. both
@@ -76,11 +111,9 @@ export type RegistrationRunState = 'none' | 'box' | 'artwork' | 'mixed';
 export function registrationRunState(scene: Scene): RegistrationRunState {
   const layer = findRegistrationLayer(scene);
   if (layer === null || findRegistrationBoxes(scene).length === 0) return 'none';
-  const othersOutput = scene.layers.some(
-    (other) => other.id !== REGISTRATION_LAYER_ID && other.output,
-  );
-  if (layer.output && !othersOutput) return 'box';
-  if (!layer.output && othersOutput) return 'artwork';
+  const artworkOutput = hasOutputRegistrationArtwork(scene);
+  if (layer.output && !artworkOutput) return 'box';
+  if (!layer.output && artworkOutput) return 'artwork';
   return 'mixed';
 }
 
@@ -92,5 +125,5 @@ export function registrationRunState(scene: Scene): RegistrationRunState {
 export function registrationOutputConflict(scene: Scene): boolean {
   const layer = findRegistrationLayer(scene);
   if (layer === null || !layer.output || findRegistrationBoxes(scene).length === 0) return false;
-  return scene.layers.some((other) => other.id !== REGISTRATION_LAYER_ID && other.output);
+  return hasOutputRegistrationArtwork(scene);
 }

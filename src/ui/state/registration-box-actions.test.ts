@@ -5,6 +5,7 @@ import {
   findRegistrationLayer,
   IDENTITY_TRANSFORM,
   REGISTRATION_LAYER_ID,
+  registrationRunState,
   type Project,
 } from '../../core/scene';
 import { createRectangle, createRegistrationBox } from '../../core/shapes';
@@ -87,6 +88,24 @@ describe('addRegistrationBox store action', () => {
     expect(replaced?.transform.x).toBe(moved?.transform.x);
     expect(replaced?.transform.y).toBe(moved?.transform.y);
     expect(replaced?.spec).toMatchObject({ kind: 'rect', widthMm: 100, heightMm: 60 });
+  });
+
+  it('switches to artwork output when a box is placed around existing artwork', () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'art',
+        color: '#0000ff',
+        spec: { widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
+      }),
+    );
+
+    useStore.getState().addRegistrationBox(80, 40);
+
+    const scene = useStore.getState().project.scene;
+    expect(registrationRunState(scene)).toBe('artwork');
+    expect(scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.output).toBe(false);
+    expect(scene.layers.find((layer) => layer.id === '#0000ff')?.output).toBe(true);
   });
 });
 

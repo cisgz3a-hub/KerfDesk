@@ -47,6 +47,8 @@ export function CommandShell(): JSX.Element {
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
+  const onImagePick = useImagePickHandler();
+  const onMultiFileTracePick = useMultiFileTracePickHandler();
   const commands = useAppCommands({
     requestImportImage: () => imageInput.current?.click(),
     requestMultiFileTrace: () => multiFileTraceInput.current?.click(),
@@ -65,8 +67,6 @@ export function CommandShell(): JSX.Element {
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
   });
-  const onImagePick = useImagePickHandler();
-  const onMultiFileTracePick = useMultiFileTracePickHandler();
   return (
     <>
       <AppMenuBar commands={commands} />

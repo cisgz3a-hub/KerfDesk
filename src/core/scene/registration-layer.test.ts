@@ -8,6 +8,7 @@ import {
   findRegistrationBoxBounds,
   findRegistrationBoxes,
   findRegistrationLayer,
+  hasRegistrationArtwork,
   isRegistrationBox,
   isRegistrationLayer,
   registrationOutputConflict,
@@ -69,10 +70,31 @@ describe('registration layer', () => {
     expect(findRegistrationBoxBounds(makeScene([], []))).toBeNull();
   });
 
+  it('hasRegistrationArtwork ignores empty output layers and finds real non-jig objects', () => {
+    const box = createRegistrationBox({ widthMm: 80, heightMm: 40 });
+    const reg = createRegistrationLayer();
+    const art = createLayer({ id: '#000000', color: '#000000' });
+    const artObject = createRectangle({
+      id: 'art',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
+
+    expect(hasRegistrationArtwork(makeScene([box], [reg, { ...art, output: true }]))).toBe(false);
+    expect(
+      hasRegistrationArtwork(makeScene([box, artObject], [reg, { ...art, output: false }])),
+    ).toBe(true);
+  });
+
   it('registrationRunState reports the active burn run from layer output', () => {
     const box = createRegistrationBox({ widthMm: 80, heightMm: 40 });
     const reg = createRegistrationLayer();
     const art = createLayer({ id: '#000000', color: '#000000' });
+    const artObject = createRectangle({
+      id: 'art',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
     expect(registrationRunState(makeScene([], []))).toBe('none');
     expect(
       registrationRunState(
@@ -88,7 +110,7 @@ describe('registration layer', () => {
     expect(
       registrationRunState(
         makeScene(
-          [box],
+          [box, artObject],
           [
             { ...reg, output: false },
             { ...art, output: true },
@@ -99,7 +121,7 @@ describe('registration layer', () => {
     expect(
       registrationRunState(
         makeScene(
-          [box],
+          [box, artObject],
           [
             { ...reg, output: true },
             { ...art, output: true },
@@ -113,11 +135,16 @@ describe('registration layer', () => {
     const box = createRegistrationBox({ widthMm: 80, heightMm: 40 });
     const reg = createRegistrationLayer();
     const art = createLayer({ id: '#000000', color: '#000000' });
+    const artObject = createRectangle({
+      id: 'art',
+      color: '#000000',
+      spec: { widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    });
     expect(registrationOutputConflict(makeScene([], []))).toBe(false);
     expect(
       registrationOutputConflict(
         makeScene(
-          [box],
+          [box, artObject],
           [
             { ...reg, output: true },
             { ...art, output: true },
@@ -139,7 +166,7 @@ describe('registration layer', () => {
     expect(
       registrationOutputConflict(
         makeScene(
-          [box],
+          [box, artObject],
           [
             { ...reg, output: false },
             { ...art, output: true },
