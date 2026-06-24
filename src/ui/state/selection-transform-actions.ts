@@ -3,6 +3,7 @@ import {
   buildSelectionDistributeEdit,
   buildSelectionFlipEdit,
   buildSelectionNudgeEdit,
+  findRegistrationBoxes,
   type Project,
   type SceneObject,
   type SelectionAlignKind,
@@ -24,6 +25,9 @@ export type SelectionTransformActions = {
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
   readonly nudgeSelection: (dx: number, dy: number) => void;
   readonly flipSelection: (axis: SelectionFlipAxis) => void;
+  // ADR-057: center the selected artwork on the registration jig box. The box is
+  // the alignment reference and never moves (it is locked).
+  readonly centerSelectionInRegistrationBox: () => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -36,7 +40,24 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
     distributeSelection: (kind) => set((state) => applySelectionDistributeToState(state, kind)),
     nudgeSelection: (dx, dy) => set((state) => applySelectionNudgeToState(state, dx, dy)),
     flipSelection: (axis) => set((state) => applySelectionFlipToState(state, axis)),
+    centerSelectionInRegistrationBox: () =>
+      set((state) => applyCenterInRegistrationBoxToState(state)),
   };
+}
+
+// Center the selected artwork on the registration jig box (ADR-057). The box is
+// the alignment reference (so it stays put) and is also locked, so even if it is
+// part of the selection applySelectionTransformsToState skips it. No-op when no
+// jig exists or only the box is selected.
+function applyCenterInRegistrationBoxToState(state: AppState): AppState | Partial<AppState> {
+  const box = findRegistrationBoxes(state.project.scene)[0];
+  if (box === undefined) return state;
+  const artIds = selectedObjectIds(state).filter((id) => id !== box.id);
+  if (artIds.length === 0) return state;
+  const objects = [...selectedObjects(state.project.scene.objects, artIds), box];
+  const result = buildSelectionAlignEdit(objects, { kind: 'centers', referenceId: box.id });
+  if (result.kind === 'error') return state;
+  return applySelectionTransformsToState(state, result.transforms);
 }
 
 function applySelectionAlignToState(

@@ -69,6 +69,10 @@ import {
   type SelectionTransformActions,
 } from './selection-transform-actions';
 import {
+  registrationOutputActions,
+  type RegistrationOutputActions,
+} from './registration-output-actions';
+import {
   pathNodeEditActions,
   type PathNodeEditActions,
   type PathNodeRef,
@@ -103,6 +107,7 @@ export type AppState = ObjectPropertiesActions &
   ProjectOptimizationActions &
   ProjectNotesActions &
   SelectionTransformActions &
+  RegistrationOutputActions &
   PathNodeEditActions &
   BreakApartActions &
   FillSelectionActions &
@@ -175,6 +180,12 @@ export type AppState = ObjectPropertiesActions &
     readonly upsertTextObject: (text: TextObject) => void;
     // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
     readonly drawShape: (shape: ShapeObject) => void;
+    // ADR-057: add (or replace) the registration jig box on the reserved
+    // registration layer. Width/height in mm; placed at the bed center.
+    readonly addRegistrationBox: (widthMm: number, heightMm: number) => void;
+    // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
+    // when no jig is present.
+    readonly removeRegistrationBox: () => void;
     // Clone every currently-selected SceneObject with a fresh id and a
     // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
     // new selection. No-op when nothing is selected.
@@ -342,6 +353,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectOptimizationActions(set),
   ...projectNotesActions(set),
   ...selectionTransformActions(set),
+  ...registrationOutputActions(set),
   ...pathNodeEditActions(set),
   ...objectDeleteActions(set),
   ...sceneActions(set),

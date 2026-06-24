@@ -141,6 +141,13 @@ export type UiState = {
   // never included in preview or emitted G-code.
   readonly measureDraft: MeasureDraft | null;
   readonly setMeasureDraft: (next: MeasureDraft | null) => void;
+  // ADR-057 registration jig panel — a persistent, NON-modal floating panel
+  // (top-right of the canvas). Deliberately NOT part of isModalOpen so canvas
+  // mouse handling and keyboard shortcuts keep working while it is open.
+  readonly registrationPanelOpen: boolean;
+  readonly toggleRegistrationPanel: () => void;
+  readonly openRegistrationPanel: () => void;
+  readonly closeRegistrationPanel: () => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -207,6 +214,10 @@ export const useUiStore = create<UiState>((set) => ({
   setPenDraft: (next) => set({ penDraft: next }),
   measureDraft: null,
   setMeasureDraft: (next) => set({ measureDraft: next }),
+  registrationPanelOpen: false,
+  toggleRegistrationPanel: () => set((s) => ({ registrationPanelOpen: !s.registrationPanelOpen })),
+  openRegistrationPanel: () => set({ registrationPanelOpen: true }),
+  closeRegistrationPanel: () => set({ registrationPanelOpen: false }),
 }));
 
 export function isModalOpen(

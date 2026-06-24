@@ -3,6 +3,7 @@
 
 import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from '../common/fill-diagnostics';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
+import { registrationJigCommand } from './registration-command-family';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -61,6 +62,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       active: ctx.measureActive,
     },
     enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
+    registrationJigCommand(ctx),
     ...calibrationToolCommands(ctx),
     enabled(
       'tools.optimization-settings',

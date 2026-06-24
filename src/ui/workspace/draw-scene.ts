@@ -7,6 +7,7 @@
 import { canvasTheme } from '../theme/canvas-theme';
 import type { Toolpath } from '../../core/job';
 import {
+  isRegistrationBox,
   type Layer,
   type Polyline,
   type Project,
@@ -241,11 +242,14 @@ function drawObjects(
   const layerByColor = new Map(project.scene.layers.map((l) => [l.color, l]));
   let simplified = false;
   for (const obj of project.scene.objects) {
-    // ImportedSvg and TextObject share the same polyline shape after
-    // text renders to paths in the UI layer — single drawing path.
+    // ImportedSvg and TextObject share the same polyline shape after text renders
+    // to paths — single drawing path. ADR-057: dash the jig box so it reads as a
+    // placement fixture, not artwork; reset after, before the overlays below.
+    ctx.setLineDash(isRegistrationBox(obj) ? [8, 5] : []);
     if (drawObjectPolylines(ctx, obj, layerByColor, view, displayPolylineCache)) {
       simplified = true;
     }
+    ctx.setLineDash([]);
     // F.2.c: raster images render via Canvas2D drawImage rather than
     // polyline strokes. The bitmap displays at its mm-bounds; the
     // dither preview overlay is a separate render layer we can add

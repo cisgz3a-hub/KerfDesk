@@ -3034,6 +3034,127 @@ stepper-disable (`$MD` / `M18`) without a reset, prefer it.
   any origin nudge.
 ---
 
+## ADR-057 — Registration Box: camera-free placement jig
+
+**Status:** Accepted; core + IO shipped, UI in progress, hardware verification pending. | **Date:** 2026-06-24
+
+### Context
+
+On a no-homing, no-camera machine (the tester's PTR 4040), centering a burn on a
+physical object (a keychain blank, a coaster) is trial-and-error: the operator
+pencils a square on a board to mark where the object sits, jogs the head to it,
+test-burns, finds it off-center, jogs again. It wastes time and scrap. LightBurn
+users solve this with a physical jig + Set Origin; we already had Set Origin
+(ADR-021) and Frame, but no first-class jig workflow.
+
+### Decision
+
+A **registration box** is a real, locked rectangle `ShapeObject` on a **reserved
+registration layer**, burned once as a physical placement reference. The operator
+then places the workpiece inside the burned outline and positions artwork relative
+to the box on the canvas; both burn from the same origin so the art lands where it
+sits relative to the box. Three parts:
+
+1. **Box + reserved layer (no schema change).** `createRegistrationBox`
+   (`core/shapes/registration-box.ts`) builds a locked rectangle via
+   `createRectangle` with the reserved color `REGISTRATION_LAYER_COLOR`.
+   `createRegistrationLayer` (`core/scene/registration-layer.ts`) is a line-mode
+   layer with the reserved id `'registration'` — identified by id, NOT color, the
+   same pattern as the calibration-label layers (`material-test-labels`,
+   `scan-offset-calibration-labels`). The object->layer join stays by color
+   (`compile-job.ts`). Box + layer persist in `.lf2` for free (`locked` already
+   round-trips; confirmed by `project-registration-jig.test.ts`), so there is no
+   `SceneObject` / schema / `schemaVersion` change.
+
+2. **Two runs via the per-layer `output` toggle.** Run 1 outputs only the
+   registration layer (burns the box); the operator places the object; run 2
+   outputs only the artwork. This reuses the existing `if (!layer.output) continue;`
+   mechanism (`compile-job.ts`) — no new run/sequencing concept.
+
+3. **Box-anchored placement — the correctness crux.** `jobOriginOffset` normally
+   anchors to the *output-enabled* bounds, so run 1 (box) and run 2 (art) would
+   re-anchor to *different* bboxes and the art would land at the bed corner. When a
+   jig is present, `prepareOutput` (`resolveJobOriginOffset`) instead anchors EVERY
+   run to the box via `computeRegistrationBoxBounds`
+   (`core/job/registration-placement.ts`) plus the existing
+   `jobOriginOffsetFromBounds` / `applyJobOriginOffset`. Both runs receive an
+   identical box-anchored offset, so the art keeps its position relative to the
+   box. This lives in the single shared prepared-output pipeline (ADR-040), so
+   preview = save = start = estimate all agree.
+
+Pairs with Set Origin (ADR-021) / Verified Origin (ADR-053) for the physical
+anchor on no-homing machines.
+
+### Amendment (registration jig UI + movable box)
+
+Two follow-ups refined the above after the maintainer tested it:
+
+- **UI consolidated into one panel.** The four flat Tools-menu commands
+  (Registration Box / Center in box / Burn Box Only / Burn Artwork Only) read as a
+  confusing button soup, not one stateful two-run workflow. They are replaced by a
+  single `tools.registration-jig` toolbar toggle that opens a persistent,
+  **non-modal** `RegistrationJigPanel` pinned top-right of the canvas: a live
+  "next burn" banner (`registrationRunState`), inline box create/replace/remove,
+  center-in-box, the Box/Artwork output toggle, and built-in how-to. It stays open
+  while the operator works on the canvas (it never calls `useRegisterModal`).
+
+- **The box is movable, not locked.** Identifying the jig box now keys on the
+  reserved color alone (`findRegistrationBoxes` / `isRegistrationBox`), NOT on the
+  `locked` flag, so `createRegistrationBox` no longer locks it. The operator can
+  drag it onto the material — essential on a homing machine, where the box's
+  on-canvas position *is* its absolute bed position — and delete it via the panel's
+  **Remove box** button (`removeRegistrationBox`, which drops the box and the
+  reserved layer). Note the box-anchored offset (#3 above) only applies in an Origin
+  start mode; in **Absolute** mode both runs emit at their true on-canvas positions,
+  so a homed machine aligns the two runs with no Set-Origin step.
+
+### Consequences
+
+- The jig is a composition of existing machinery — reserved-id layer (ADR-005
+  color-keyed, calibration-layer precedent), `createRectangle` (ADR-051), per-layer
+  output, and the ADR-040 placement pipeline — so the new surface is small (two
+  pure-core files plus a one-branch change in `resolveJobOriginOffset`).
+- Box-anchored placement is **safety/correctness-critical** (origin honesty,
+  non-negotiable #2): a wrong offset burns the art in the wrong place. It is
+  property-tested for alignment invariance across both runs
+  (`registration-placement.property.test.ts`).
+- No-op for every non-jig project: `computeRegistrationBoxBounds` returns null when
+  no registration layer is present, falling through to existing placement.
+- The reserved color is a documented sentinel; identification keys on the reserved
+  id, so a color collision is cosmetic, not a mis-placement.
+
+### Alternatives rejected
+
+- **A non-object canvas overlay region (Measure-tool style):** rejected — the box
+  would not flow through compile/preview/emit, the art would not sit in real scene
+  space relative to it, and the two-run burn would need bespoke sequencing instead
+  of the existing output toggle.
+- **A new `SceneObject` kind or a persisted `registrationJig` field:** rejected for
+  v1 — both add union/schema surface (and a `schemaVersion` bump) for no gain over
+  a reserved-id layer that already persists.
+- **Re-anchor each run to its own output bbox (do nothing):** rejected — this is
+  exactly the bug; the art would burn at the corner, not in the box.
+- **Burn box + art in one pass:** rejected — removes the physical placement step
+  that is the entire point of the jig.
+
+### Verification
+
+- **Core/IO tests:** generator + reserved-layer predicates
+  (`registration-box.test.ts`, `registration-layer.test.ts`);
+  `computeRegistrationBoxBounds` measures only the box and is stable across the
+  output toggle (`registration-placement.test.ts`); `.lf2` round-trip
+  (`project-registration-jig.test.ts`).
+- **Property test (alignment invariance):** box-run and art-run receive an
+  identical box-anchored offset; the box anchors to work-zero; the art lands at its
+  offset relative to the box, not at the corner
+  (`registration-placement.property.test.ts`).
+- Full suite + `tsc --noEmit` + lint green; no existing G-code snapshot moves
+  (non-jig placement unchanged).
+- **Hardware (gates "done"):** on the 4040, Set Origin, burn the box, place the
+  object, center the art, burn the art, and confirm it lands centered in the box.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current

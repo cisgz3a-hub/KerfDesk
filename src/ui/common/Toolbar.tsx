@@ -89,6 +89,7 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   [
     'file.import-svg',
     'tools.add-text',
+    'tools.registration-jig',
     'file.import-image',
     'tools.trace-image',
     'tools.convert-to-bitmap',

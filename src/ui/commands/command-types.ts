@@ -41,6 +41,7 @@ export type CommandId =
   | 'edit.clear-selection'
   | 'tools.measure'
   | 'tools.add-text'
+  | 'tools.registration-jig'
   | 'tools.material-test'
   | 'tools.interval-test'
   | 'tools.scan-offset-test'
@@ -142,6 +143,8 @@ export type AppCommandContext = {
   readonly measureTool: () => void;
   readonly measureActive: boolean;
   readonly addText: () => void;
+  readonly registrationPanelOpen: boolean;
+  readonly toggleRegistrationPanel: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;
   readonly scanOffsetTest: () => void;

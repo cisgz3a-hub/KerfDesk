@@ -18,6 +18,18 @@ export {
   layerOperationSettingsEqual,
   nextLayerSubLayerId,
 } from './layer';
+export {
+  REGISTRATION_LAYER_COLOR,
+  REGISTRATION_LAYER_ID,
+  createRegistrationLayer,
+  findRegistrationBoxBounds,
+  findRegistrationBoxes,
+  findRegistrationLayer,
+  isRegistrationBox,
+  isRegistrationLayer,
+  registrationRunState,
+} from './registration-layer';
+export type { RegistrationRunState } from './registration-layer';
 
 export type {
   Bounds,

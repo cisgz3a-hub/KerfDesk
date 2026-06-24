@@ -53,6 +53,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     deleteSelection: vi.fn(),
     clearSelection: vi.fn(),
     addText: vi.fn(),
+    registrationPanelOpen: false,
+    toggleRegistrationPanel: vi.fn(),
     materialTest: vi.fn(),
     intervalTest: vi.fn(),
     scanOffsetTest: vi.fn(),
