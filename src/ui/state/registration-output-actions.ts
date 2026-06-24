@@ -3,7 +3,7 @@
 // on scrap) or ONLY the artwork (run 2: burn the design, not the box). The box
 // and the artwork must never burn in the same pass.
 
-import { REGISTRATION_LAYER_ID, updateLayer } from '../../core/scene';
+import { REGISTRATION_LAYER_ID, updateLayer, type Scene } from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 
@@ -25,23 +25,27 @@ function applyRegistrationOutput(
   state: AppState,
   scope: RegistrationOutputScope,
 ): AppState | Partial<AppState> {
-  const { layers } = state.project.scene;
-  if (!layers.some((layer) => layer.id === REGISTRATION_LAYER_ID)) return state;
-  let scene = state.project.scene;
-  let changed = false;
-  for (const layer of layers) {
-    const isRegistration = layer.id === REGISTRATION_LAYER_ID;
-    const output = scope === 'box' ? isRegistration : !isRegistration;
-    if (layer.output !== output) {
-      scene = updateLayer(scene, layer.id, { output });
-      changed = true;
-    }
-  }
-  if (!changed) return state;
+  const scene = applyRegistrationOutputToScene(state.project.scene, scope);
+  if (scene === state.project.scene) return state;
   return {
     project: { ...state.project, scene },
     undoStack: pushUndo(state.project, state.undoStack),
     redoStack: [],
     dirty: true,
   };
+}
+
+export function applyRegistrationOutputToScene(
+  initialScene: Scene,
+  scope: RegistrationOutputScope,
+): Scene {
+  const { layers } = initialScene;
+  if (!layers.some((layer) => layer.id === REGISTRATION_LAYER_ID)) return initialScene;
+  let scene = initialScene;
+  for (const layer of layers) {
+    const isRegistration = layer.id === REGISTRATION_LAYER_ID;
+    const output = scope === 'box' ? isRegistration : !isRegistration;
+    if (layer.output !== output) scene = updateLayer(scene, layer.id, { output });
+  }
+  return scene;
 }

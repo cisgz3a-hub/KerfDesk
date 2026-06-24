@@ -11,6 +11,7 @@ import {
   createRegistrationLayer,
   findRegistrationBoxes,
   findRegistrationLayer,
+  hasRegistrationArtwork,
   type Project,
   REGISTRATION_LAYER_ID,
   removeObject,
@@ -18,6 +19,7 @@ import {
   type ShapeObject,
 } from '../../core/scene';
 import { type MutationResult, pushUndo, type StateSlice } from './scene-mutations';
+import { applyRegistrationOutputToScene } from './registration-output-actions';
 
 type RemoveRegistrationBoxResult = {
   readonly project: Project;
@@ -57,6 +59,7 @@ export function applyAddRegistrationBox(
   if (findRegistrationLayer(scene) === null) {
     scene = addLayer(scene, createRegistrationLayer());
   }
+  if (hasRegistrationArtwork(scene)) scene = applyRegistrationOutputToScene(scene, 'artwork');
   return {
     project: { ...s.project, scene },
     selectedObjectId: box.id,

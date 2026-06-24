@@ -5,18 +5,27 @@
 // mouse handling and keyboard shortcuts keep working while it is open; it stays
 // open until the operator closes it (toolbar toggle or the × here).
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   findRegistrationBoxes,
+  hasRegistrationArtwork,
   registrationRunState,
   type RegistrationRunState,
 } from '../../core/scene';
 import { Button, NumberInput } from '../kit';
 import { useStore } from '../state';
-import { useUiStore } from '../state/ui-store';
+import { useUiStore, type FloatingPanelPosition } from '../state/ui-store';
 
 const DEFAULT_WIDTH_MM = 80;
 const DEFAULT_HEIGHT_MM = 40;
+const PANEL_MARGIN_PX = 12;
+
+type DragState = {
+  readonly startClientX: number;
+  readonly startClientY: number;
+  readonly startX: number;
+  readonly startY: number;
+};
 
 export function RegistrationJigPanel(): JSX.Element | null {
   const open = useUiStore((s) => s.registrationPanelOpen);
@@ -26,9 +35,11 @@ export function RegistrationJigPanel(): JSX.Element | null {
   const centerInBox = useStore((s) => s.centerSelectionInRegistrationBox);
   const setOutput = useStore((s) => s.setRegistrationOutput);
   const close = useUiStore((s) => s.closeRegistrationPanel);
+  const drag = useRegistrationPanelDrag();
 
   const boxes = findRegistrationBoxes(scene);
   const hasBox = boxes.length > 0;
+  const hasArtwork = hasRegistrationArtwork(scene);
   const runState = registrationRunState(scene);
   const boxIds = new Set(boxes.map((b) => b.id));
   const canCenter =
@@ -37,9 +48,23 @@ export function RegistrationJigPanel(): JSX.Element | null {
 
   if (!open) return null;
   return (
-    <section aria-label="Registration jig" className="lf-chip" style={panelStyle}>
+    <section
+      aria-label="Registration jig"
+      className="lf-chip"
+      ref={drag.panelRef}
+      style={drag.placementStyle}
+    >
       <header style={headerStyle}>
-        <strong>Registration Jig</strong>
+        <strong
+          aria-label="Move registration jig panel"
+          role="button"
+          tabIndex={0}
+          title="Drag to move this panel"
+          style={dragHandleStyle}
+          onPointerDown={drag.startDrag}
+        >
+          Registration Jig
+        </strong>
         <Button variant="ghost" aria-label="Close registration jig panel" onClick={close}>
           ×
         </Button>
@@ -61,11 +86,117 @@ export function RegistrationJigPanel(): JSX.Element | null {
         Center artwork in box
       </Button>
 
-      <BurnRunToggle state={runState} disabled={!hasBox} onPick={setOutput} />
+      <BurnRunToggle
+        state={runState}
+        disabled={!hasBox}
+        artworkDisabled={!hasArtwork}
+        onPick={setOutput}
+      />
 
       <RegistrationJigHelp />
     </section>
   );
+}
+
+type PanelDragControls = {
+  readonly panelRef: RefObject<HTMLElement>;
+  readonly placementStyle: React.CSSProperties;
+  readonly startDrag: (event: React.PointerEvent<HTMLElement>) => void;
+};
+
+function useRegistrationPanelDrag(): PanelDragControls {
+  const position = useUiStore((s) => s.registrationPanelPosition);
+  const setPosition = useUiStore((s) => s.setRegistrationPanelPosition);
+  const panelRef = useRef<HTMLElement>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const placementStyle = useMemo<React.CSSProperties>(
+    () =>
+      position === null
+        ? panelStyle
+        : {
+            ...panelStyle,
+            left: position.x,
+            top: position.y,
+            right: 'auto',
+          },
+    [position],
+  );
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onPointerMove = (event: PointerEvent): void => {
+      const drag = dragRef.current;
+      const panel = panelRef.current;
+      const parent = panel === null ? null : panel.parentElement;
+      if (drag === null || panel === null || parent === null) return;
+      const nextX = drag.startX + event.clientX - drag.startClientX;
+      const nextY = drag.startY + event.clientY - drag.startClientY;
+      setPosition(
+        clampPanelPosition(nextX, nextY, parent.getBoundingClientRect(), panel.getBoundingClientRect()),
+      );
+    };
+    const onPointerEnd = (): void => {
+      dragRef.current = null;
+      setDragging(false);
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerEnd, { once: true });
+    window.addEventListener('pointercancel', onPointerEnd, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerEnd);
+      window.removeEventListener('pointercancel', onPointerEnd);
+    };
+  }, [dragging, setPosition]);
+
+  const startDrag = (event: React.PointerEvent<HTMLElement>): void => {
+    if (event.button !== 0) return;
+    const panel = panelRef.current;
+    const parent = panel === null ? null : panel.parentElement;
+    if (panel === null || parent === null) return;
+    const panelRect = panel.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    const currentPosition =
+      position ??
+      clampPanelPosition(
+        panelRect.left - parentRect.left,
+        panelRect.top - parentRect.top,
+        parentRect,
+        panelRect,
+      );
+    dragRef.current = {
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: currentPosition.x,
+      startY: currentPosition.y,
+    };
+    setPosition(currentPosition);
+    setDragging(true);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  return { panelRef, placementStyle, startDrag };
+}
+
+function clampPanelPosition(
+  x: number,
+  y: number,
+  parentRect: DOMRect,
+  panelRect: DOMRect,
+): FloatingPanelPosition {
+  const maxX = Math.max(PANEL_MARGIN_PX, parentRect.width - panelRect.width - PANEL_MARGIN_PX);
+  const maxY = Math.max(PANEL_MARGIN_PX, parentRect.height - panelRect.height - PANEL_MARGIN_PX);
+  return {
+    x: clamp(x, PANEL_MARGIN_PX, maxX),
+    y: clamp(y, PANEL_MARGIN_PX, maxY),
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, value));
 }
 
 // Box size + create/replace/remove + lock. Self-contained (owns the size inputs)
@@ -172,6 +303,7 @@ function bannerFor(state: RegistrationRunState): {
 function BurnRunToggle(props: {
   readonly state: RegistrationRunState;
   readonly disabled: boolean;
+  readonly artworkDisabled: boolean;
   readonly onPick: (scope: 'box' | 'artwork') => void;
 }): JSX.Element {
   return (
@@ -186,7 +318,8 @@ function BurnRunToggle(props: {
       </Button>
       <Button
         pressed={props.state === 'artwork'}
-        disabled={props.disabled}
+        disabled={props.disabled || props.artworkDisabled}
+        title={props.artworkDisabled ? 'Add artwork before run 2.' : 'Burn artwork only'}
         onClick={() => props.onPick('artwork')}
       >
         Artwork only
@@ -245,6 +378,11 @@ const headerStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
+};
+const dragHandleStyle: React.CSSProperties = {
+  cursor: 'grab',
+  touchAction: 'none',
+  userSelect: 'none',
 };
 const sizeRowStyle: React.CSSProperties = {
   display: 'flex',

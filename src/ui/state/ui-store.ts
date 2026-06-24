@@ -60,6 +60,11 @@ export type WorkspaceContextBarState = {
   readonly context: 'workspace-empty' | 'workspace-selection';
 };
 
+export type FloatingPanelPosition = {
+  readonly x: number;
+  readonly y: number;
+};
+
 export type UiState = {
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
@@ -145,9 +150,11 @@ export type UiState = {
   // (top-right of the canvas). Deliberately NOT part of isModalOpen so canvas
   // mouse handling and keyboard shortcuts keep working while it is open.
   readonly registrationPanelOpen: boolean;
+  readonly registrationPanelPosition: FloatingPanelPosition | null;
   readonly toggleRegistrationPanel: () => void;
   readonly openRegistrationPanel: () => void;
   readonly closeRegistrationPanel: () => void;
+  readonly setRegistrationPanelPosition: (next: FloatingPanelPosition | null) => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -215,9 +222,11 @@ export const useUiStore = create<UiState>((set) => ({
   measureDraft: null,
   setMeasureDraft: (next) => set({ measureDraft: next }),
   registrationPanelOpen: false,
+  registrationPanelPosition: null,
   toggleRegistrationPanel: () => set((s) => ({ registrationPanelOpen: !s.registrationPanelOpen })),
   openRegistrationPanel: () => set({ registrationPanelOpen: true }),
   closeRegistrationPanel: () => set({ registrationPanelOpen: false }),
+  setRegistrationPanelPosition: (next) => set({ registrationPanelPosition: next }),
 }));
 
 export function isModalOpen(
