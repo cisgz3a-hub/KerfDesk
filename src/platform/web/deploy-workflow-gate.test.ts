@@ -16,6 +16,22 @@ function commandIndex(source: string, command: string): number {
 }
 
 describe('Cloudflare production deploy gate', () => {
+  it('targets the canonical Cloudflare Pages project', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      scripts: Record<string, string>;
+    };
+    const canonicalProject = '--project-name=laserforge-2fj';
+    const staleProject = '--project-name=laserforge --';
+
+    expect(workflow).toContain(canonicalProject);
+    expect(workflow).not.toContain(staleProject);
+    expect(packageJson.scripts['deploy:web']).toContain(canonicalProject);
+    expect(packageJson.scripts['deploy:web:preview']).toContain(canonicalProject);
+    expect(packageJson.scripts['deploy:web']).not.toContain(staleProject);
+    expect(packageJson.scripts['deploy:web:preview']).not.toContain(staleProject);
+  });
+
   it('only permits manual production deploys from the main branch', () => {
     const workflow = repoFile('.github/workflows/deploy.yml');
 
