@@ -27,6 +27,7 @@ export {
   findRegistrationLayer,
   isRegistrationBox,
   isRegistrationLayer,
+  registrationOutputConflict,
   registrationRunState,
 } from './registration-layer';
 export type { RegistrationRunState } from './registration-layer';

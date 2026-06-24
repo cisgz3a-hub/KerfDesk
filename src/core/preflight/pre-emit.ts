@@ -14,10 +14,18 @@ import { pixelExtentForMm } from '../raster';
 import { evaluateRasterBudget } from '../raster/raster-budget';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
+import { registrationOutputConflict } from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
   const issues: PreflightIssue[] = [];
+  if (registrationOutputConflict(project.scene)) {
+    issues.push({
+      code: 'registration-both-output',
+      message:
+        'Registration jig: the box and your artwork are both set to burn. In the Registration Jig panel pick "Burn Box Only" or "Burn Artwork Only" so they do not burn in the same pass.',
+    });
+  }
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
     const layer = project.scene.layers.find(

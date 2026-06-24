@@ -41,6 +41,7 @@ export type PreflightCode =
   | 'long-blank-feed'
   | 'no-go-zone-collision'
   | 'raster-too-large'
+  | 'registration-both-output'
   | 'selected-output-empty'
   | 'empty-output';
 

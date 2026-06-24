@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, REGISTRATION_LAYER_ID } from '../../core/scene';
+import { findRegistrationBoxes, IDENTITY_TRANSFORM, REGISTRATION_LAYER_ID } from '../../core/scene';
 import { createRectangle } from '../../core/shapes';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -73,5 +73,17 @@ describe('RegistrationJigPanel', () => {
     click('Artwork only');
     expect(container.textContent).toContain('your ARTWORK');
     expect(regLayer()?.output).toBe(false);
+  });
+
+  it('locks the box via the Lock box checkbox', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    render();
+    const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (checkbox === null) throw new Error('lock checkbox not found');
+    expect(checkbox.checked).toBe(false);
+    act(() => {
+      checkbox.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(findRegistrationBoxes(useStore.getState().project.scene)[0]?.locked).toBe(true);
   });
 });

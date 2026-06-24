@@ -1,5 +1,5 @@
-// registration-box-actions — insert (or replace) the locked registration jig box
-// on the reserved registration layer (ADR-057). Distinct from applyDrawShape for
+// registration-box-actions — insert, replace, lock, or remove the registration jig
+// box on the reserved registration layer (ADR-057). Distinct from applyDrawShape for
 // two reasons: the box must land on the reserved id='registration' layer
 // (createRegistrationLayer), NOT the color-keyed layer ensureLayersForColors would
 // create; and only ONE jig may exist, because two boxes would make the
@@ -14,6 +14,7 @@ import {
   type Project,
   REGISTRATION_LAYER_ID,
   removeObject,
+  replaceObject,
   type ShapeObject,
 } from '../../core/scene';
 import { type MutationResult, pushUndo, type StateSlice } from './scene-mutations';
@@ -87,6 +88,35 @@ export function applyRemoveRegistrationBox(
     selectedObjectId:
       s.selectedObjectId !== null && boxIds.has(s.selectedObjectId) ? null : s.selectedObjectId,
     additionalSelectedIds: new Set([...s.additionalSelectedIds].filter((id) => !boxIds.has(id))),
+    undoStack: pushUndo(s.project, s.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+type LockResult = {
+  readonly project: Project;
+  readonly undoStack: ReadonlyArray<Project>;
+  readonly redoStack: ReadonlyArray<Project>;
+  readonly dirty: true;
+};
+
+// Lock or unlock the jig box: the operator positions the movable box, then locks it
+// so it can't drift between the two burns (hit-test and selection transforms skip
+// locked objects). Identification is color-based, so locking does not change which
+// object is the jig. No-op when there is no jig or the state already matches.
+export function applySetRegistrationBoxLocked(s: StateSlice, locked: boolean): LockResult | null {
+  let scene = s.project.scene;
+  let changed = false;
+  for (const box of findRegistrationBoxes(scene)) {
+    if ((box.locked === true) !== locked) {
+      scene = replaceObject(scene, box.id, { ...box, locked });
+      changed = true;
+    }
+  }
+  if (!changed) return null;
+  return {
+    project: { ...s.project, scene },
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,

@@ -5,6 +5,7 @@
 // same "add an object + auto-create layers + select + push undo" shape.
 
 import {
+  findRegistrationBoxes,
   type Layer,
   type Project,
   type SceneObject,
@@ -27,6 +28,7 @@ import { applyDrawShape } from './draw-shape-mutation';
 import {
   applyAddRegistrationBox,
   applyRemoveRegistrationBox,
+  applySetRegistrationBoxLocked,
   registrationBoxDefaultPosition,
 } from './registration-box-actions';
 
@@ -43,6 +45,7 @@ export function objectInsertActions(
   | 'drawShape'
   | 'addRegistrationBox'
   | 'removeRegistrationBox'
+  | 'setRegistrationBoxLocked'
 > {
   return {
     importSvgObject: (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
@@ -72,14 +75,25 @@ export function objectInsertActions(
     },
     addRegistrationBox: (widthMm: number, heightMm: number) => {
       set((s) => {
+        // Replace-in-place: keep an existing box's position and lock state so
+        // resizing doesn't re-center it (the operator may have dragged it onto the
+        // material) or silently unlock it. A fresh box centers on the bed.
+        const existing = findRegistrationBoxes(s.project.scene)[0];
         const { bedWidth, bedHeight } = s.project.device;
-        const position = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
+        const position =
+          existing === undefined
+            ? registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm)
+            : { x: existing.transform.x, y: existing.transform.y };
         const box = createRegistrationBox({ widthMm, heightMm, x: position.x, y: position.y });
-        return applyAddRegistrationBox(s, box);
+        const next = existing?.locked === true ? { ...box, locked: true } : box;
+        return applyAddRegistrationBox(s, next);
       });
     },
     removeRegistrationBox: () => {
       set((s) => applyRemoveRegistrationBox(s) ?? s);
+    },
+    setRegistrationBoxLocked: (locked: boolean) => {
+      set((s) => applySetRegistrationBoxLocked(s, locked) ?? s);
     },
   };
 }
