@@ -1,10 +1,10 @@
-// Step 3 of the Device Setup wizard: confirm the machine's core settings.
-// Reuses the shared BasicRows editor (name, bed, origin, feed, power, air
-// assist) bound to the wizard draft, so the wizard and the inline Device
-// Profile panel render identical controls.
+// Step 3 of the Device Setup wizard: confirm the controller-reported settings.
+// Renders the shared bed, feed, and laser-power rows bound to the wizard draft;
+// operator-supplied fields (name, origin, air assist) live on the safety step.
 
 import type { DeviceProfile } from '../../../core/devices';
-import { BasicRows } from '../DeviceProfileFields';
+import { BedRows, FeedRows } from '../DeviceProfileFields';
+import { LaserPowerRows } from '../DeviceProfilePowerFields';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
@@ -12,10 +12,12 @@ export function DeviceSetupConfirmStep({ state, dispatch }: DeviceSetupStepProps
   return (
     <section style={sectionStyle}>
       <p style={hintStyle}>
-        These values drive the G-code LaserForge generates. Confirm what your controller reported
-        and fix anything that doesn&apos;t match your laser.
+        These are the values your controller reported via $$. Confirm the work area, feed, and power
+        scale, and fix anything that doesn&apos;t match your laser.
       </p>
-      <BasicRows device={state.draft} update={update} />
+      <BedRows device={state.draft} update={update} />
+      <FeedRows device={state.draft} update={update} />
+      <LaserPowerRows device={state.draft} update={update} />
     </section>
   );
 }

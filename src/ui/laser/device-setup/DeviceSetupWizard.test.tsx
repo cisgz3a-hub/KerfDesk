@@ -84,6 +84,28 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
+  it('exposes help metadata on the wizard navigation buttons', async () => {
+    const { host, unmount } = await renderWizard();
+    try {
+      const nav: ReadonlyArray<readonly [string, string]> = [
+        ['Cancel', 'control:laser.device-setup.cancel'],
+        ['Back', 'control:laser.device-setup.back'],
+        ['Next', 'control:laser.device-setup.next'],
+      ];
+      for (const [label, helpId] of nav) {
+        const target = button(host, label);
+        expect(target.dataset.helpId).toBe(helpId);
+        expect(target.title.length).toBeGreaterThan(30);
+      }
+      await advanceUntil(host, 'Finish setup');
+      const finish = button(host, 'Finish setup');
+      expect(finish.dataset.helpId).toBe('control:laser.device-setup.finish');
+      expect(finish.title.length).toBeGreaterThan(30);
+    } finally {
+      await unmount();
+    }
+  });
+
   it('applies a preset to the draft and commits only on Finish', async () => {
     const { host, unmount } = await renderWizard();
     try {
@@ -134,16 +156,36 @@ describe('DeviceSetupWizard', () => {
       await act(async () => button(host, 'Next').click()); // connect -> identify
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
       await act(async () => button(host, 'Next').click()); // identify -> confirm
-      const name = host.querySelector('input[aria-label="Device name"]');
-      if (!(name instanceof HTMLInputElement)) throw new Error('name input missing');
+      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
+      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
       await act(async () => {
-        name.value = 'My Custom Laser';
+        bed.value = '555';
+        Simulate.change(bed);
+      });
+      await advanceUntil(host, 'Finish setup');
+      await act(async () => button(host, 'Finish setup').click());
+      expect(useStore.getState().project.device.bedWidth).toBe(555);
+      expect(useStore.getState().project.device.profileId).toBe(FALCON_ID);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('commits Safety-step edits (machine name) through the wizard draft', async () => {
+    const { host, unmount } = await renderWizard();
+    try {
+      await act(async () => button(host, 'Next').click()); // connect -> identify
+      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
+      await advanceUntil(host, 'Homing'); // reach the safety step
+      const name = host.querySelector('input[aria-label="Device name"]');
+      if (!(name instanceof HTMLInputElement)) throw new Error('name input missing on safety step');
+      await act(async () => {
+        name.value = 'Shopfloor Falcon';
         Simulate.change(name);
       });
       await advanceUntil(host, 'Finish setup');
       await act(async () => button(host, 'Finish setup').click());
-      expect(useStore.getState().project.device.name).toBe('My Custom Laser');
-      expect(useStore.getState().project.device.profileId).toBe(FALCON_ID);
+      expect(useStore.getState().project.device.name).toBe('Shopfloor Falcon');
     } finally {
       await unmount();
     }

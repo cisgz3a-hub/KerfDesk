@@ -6,8 +6,10 @@
 // shell + footer navigation.
 
 import { useReducer } from 'react';
+import type { DeviceProfile } from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
 import { useRegisterModal } from '../../common/use-register-modal';
+import { helpProps } from '../../help/help-topics';
 import { Button, Dialog, DialogActions } from '../../kit';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
@@ -39,7 +41,10 @@ const STEP_TITLES: Record<DeviceSetupStep, string> = {
   review: 'Review & finish',
 };
 
-export function DeviceSetupWizard(props: { readonly onClose: () => void }): JSX.Element {
+export function DeviceSetupWizard(props: {
+  readonly onClose: () => void;
+  readonly onConfigured?: (profile: DeviceProfile) => void;
+}): JSX.Element {
   useRegisterModal();
   const device = useStore((s) => s.project.device);
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
@@ -53,6 +58,7 @@ export function DeviceSetupWizard(props: { readonly onClose: () => void }): JSX.
   const stepNumber = DEVICE_SETUP_STEP_ORDER.indexOf(state.step) + 1;
   const onFinish = (): void => {
     replaceDeviceProfile(state.draft);
+    props.onConfigured?.(state.draft);
     props.onClose();
   };
   return (
@@ -62,13 +68,13 @@ export function DeviceSetupWizard(props: { readonly onClose: () => void }): JSX.
       </p>
       <div style={bodyStyle}>{renderStep(state, dispatch)}</div>
       <DialogActions>
-        <Button onClick={props.onClose} title="Discard this setup and close.">
+        <Button onClick={props.onClose} {...helpProps('control:laser.device-setup.cancel')}>
           Cancel
         </Button>
         <Button
           onClick={() => dispatch({ kind: 'back' })}
           disabled={isFirstDeviceSetupStep(state.step)}
-          title="Go to the previous step."
+          {...helpProps('control:laser.device-setup.back')}
         >
           Back
         </Button>
@@ -77,7 +83,10 @@ export function DeviceSetupWizard(props: { readonly onClose: () => void }): JSX.
             variant="primary"
             onClick={onFinish}
             disabled={!ready}
-            title={ready ? 'Save this profile.' : 'Resolve the flagged items before finishing.'}
+            {...helpProps(
+              'control:laser.device-setup.finish',
+              ready ? undefined : 'Resolve the flagged items before finishing.',
+            )}
           >
             Finish setup
           </Button>
@@ -86,7 +95,7 @@ export function DeviceSetupWizard(props: { readonly onClose: () => void }): JSX.
             variant="primary"
             onClick={() => dispatch({ kind: 'next' })}
             disabled={!canAdvanceDeviceSetup(state)}
-            title="Go to the next step."
+            {...helpProps('control:laser.device-setup.next')}
           >
             Next
           </Button>

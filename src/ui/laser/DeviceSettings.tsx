@@ -9,11 +9,12 @@
 // a modal would add modality without adding clarity (CLAUDE.md
 // "simplicity first").
 //
-// The per-field editors (BasicRows/PowerRows/FeedRows/OriginSelect/
-// HomingEditor) live in DeviceProfileFields.tsx, and AutofocusEditor +
-// PlannerAdvanced in sibling files, so this file stays a thin composition
-// under the 400-line hard cap and the same controls can be reused by the
-// connect-time Device Setup wizard.
+// The per-field editors (BasicRows/FeedRows/OriginSelect/HomingEditor) live in
+// DeviceProfileFields.tsx, the power/air-assist rows in
+// DeviceProfilePowerFields.tsx, and AutofocusEditor + PlannerAdvanced in
+// sibling files, so this file stays a thin composition under the 400-line hard
+// cap and the same controls can be reused by the connect-time Device Setup
+// wizard.
 
 import { useStore } from '../state';
 import { AutofocusEditor } from './AutofocusEditor';
