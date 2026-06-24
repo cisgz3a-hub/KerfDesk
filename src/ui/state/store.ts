@@ -181,11 +181,15 @@ export type AppState = ObjectPropertiesActions &
     // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
     readonly drawShape: (shape: ShapeObject) => void;
     // ADR-057: add (or replace) the registration jig box on the reserved
-    // registration layer. Width/height in mm; placed at the bed center.
+    // registration layer. Width/height in mm; a new box centers on the bed, a
+    // replace keeps the existing box's position and lock state.
     readonly addRegistrationBox: (widthMm: number, heightMm: number) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.
     readonly removeRegistrationBox: () => void;
+    // ADR-057: lock/unlock the jig box so it can't drift between the two burns
+    // once the operator has positioned it.
+    readonly setRegistrationBoxLocked: (locked: boolean) => void;
     // Clone every currently-selected SceneObject with a fresh id and a
     // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
     // new selection. No-op when nothing is selected.

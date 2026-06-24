@@ -23,28 +23,16 @@ export function RegistrationJigPanel(): JSX.Element | null {
   const scene = useStore((s) => s.project.scene);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
-  const addRegistrationBox = useStore((s) => s.addRegistrationBox);
   const centerInBox = useStore((s) => s.centerSelectionInRegistrationBox);
   const setOutput = useStore((s) => s.setRegistrationOutput);
-  const removeBox = useStore((s) => s.removeRegistrationBox);
   const close = useUiStore((s) => s.closeRegistrationPanel);
 
   const boxes = findRegistrationBoxes(scene);
-  const box = boxes[0];
-  const hasBox = box !== undefined;
-  const rectSpec = box !== undefined && box.spec.kind === 'rect' ? box.spec : null;
+  const hasBox = boxes.length > 0;
   const runState = registrationRunState(scene);
   const boxIds = new Set(boxes.map((b) => b.id));
   const canCenter =
     hasBox && [selectedObjectId, ...additionalSelectedIds].some((id) => id !== null && !boxIds.has(id));
-
-  const [widthMm, setWidthMm] = useState(String(rectSpec?.widthMm ?? DEFAULT_WIDTH_MM));
-  const [heightMm, setHeightMm] = useState(String(rectSpec?.heightMm ?? DEFAULT_HEIGHT_MM));
-  const onCreate = (): void => {
-    const w = Number(widthMm);
-    const h = Number(heightMm);
-    if (Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1) addRegistrationBox(w, h);
-  };
 
   if (!open) return null;
   return (
@@ -58,6 +46,49 @@ export function RegistrationJigPanel(): JSX.Element | null {
 
       <NextBurnBanner state={runState} />
 
+      <JigBoxControls />
+
+      <Button
+        onClick={centerInBox}
+        disabled={!canCenter}
+        title={
+          canCenter
+            ? 'Center the selected artwork in the box'
+            : 'Select your artwork first, then center it in the box'
+        }
+      >
+        Center artwork in box
+      </Button>
+
+      <BurnRunToggle state={runState} disabled={!hasBox} onPick={setOutput} />
+
+      <RegistrationJigHelp />
+    </section>
+  );
+}
+
+// Box size + create/replace/remove + lock. Self-contained (owns the size inputs)
+// so the panel root stays under the function-size cap.
+function JigBoxControls(): JSX.Element {
+  const scene = useStore((s) => s.project.scene);
+  const addRegistrationBox = useStore((s) => s.addRegistrationBox);
+  const removeBox = useStore((s) => s.removeRegistrationBox);
+  const setBoxLocked = useStore((s) => s.setRegistrationBoxLocked);
+
+  const box = findRegistrationBoxes(scene)[0];
+  const hasBox = box !== undefined;
+  const boxLocked = box?.locked === true;
+  const rectSpec = box !== undefined && box.spec.kind === 'rect' ? box.spec : null;
+  const [widthMm, setWidthMm] = useState(String(rectSpec?.widthMm ?? DEFAULT_WIDTH_MM));
+  const [heightMm, setHeightMm] = useState(String(rectSpec?.heightMm ?? DEFAULT_HEIGHT_MM));
+  const onCreate = (): void => {
+    const w = Number(widthMm);
+    const h = Number(heightMm);
+    if (Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1) addRegistrationBox(w, h);
+  };
+
+  return (
+    <>
       <div style={sizeRowStyle}>
         <span>W</span>
         <NumberInput
@@ -87,23 +118,19 @@ export function RegistrationJigPanel(): JSX.Element | null {
           </Button>
         ) : null}
       </div>
-
-      <Button
-        onClick={centerInBox}
-        disabled={!canCenter}
-        title={
-          canCenter
-            ? 'Center the selected artwork in the box'
-            : 'Select your artwork first, then center it in the box'
-        }
-      >
-        Center artwork in box
-      </Button>
-
-      <BurnRunToggle state={runState} disabled={!hasBox} onPick={setOutput} />
-
-      <RegistrationJigHelp />
-    </section>
+      {hasBox ? (
+        <label style={lockRowStyle}>
+          <input
+            type="checkbox"
+            checked={boxLocked}
+            aria-label="Lock registration box"
+            title="Lock the box so it can't move between the two burns"
+            onChange={(e) => setBoxLocked(e.target.checked)}
+          />
+          Lock box (prevent moving between burns)
+        </label>
+      ) : null}
+    </>
   );
 }
 
@@ -210,6 +237,12 @@ const sizeRowStyle: React.CSSProperties = {
 };
 const sizeInputStyle: React.CSSProperties = { width: 56 };
 const unitStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
+const lockRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
+};
 const toggleRowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
 const helpStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };
 const helpListStyle: React.CSSProperties = {

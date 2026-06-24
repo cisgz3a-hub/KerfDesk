@@ -4,11 +4,27 @@ import {
   addObject,
   createLayer,
   createProject,
+  createRegistrationLayer,
   IDENTITY_TRANSFORM,
   type Project,
   type RasterImage,
 } from '../scene';
+import { createRectangle, createRegistrationBox } from '../shapes';
 import { runPreEmitPreflight } from './pre-emit';
+
+function projectWithJig(opts: { readonly regOutput: boolean; readonly artOutput: boolean }): Project {
+  const base = createProject();
+  const box = createRegistrationBox({ widthMm: 80, heightMm: 40 });
+  const art = createRectangle({
+    id: 'art',
+    color: '#0000ff',
+    spec: { widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
+  });
+  let scene = addObject(addObject(base.scene, box), art);
+  scene = addLayer(scene, { ...createRegistrationLayer(), output: opts.regOutput });
+  scene = addLayer(scene, { ...createLayer({ id: '#0000ff', color: '#0000ff' }), output: opts.artOutput });
+  return { ...base, scene };
+}
 
 const COLOR = '#808080';
 
@@ -79,5 +95,16 @@ describe('runPreEmitPreflight', () => {
     );
 
     expect(result.ok).toBe(true);
+  });
+
+  it('blocks a registration jig with the box and artwork both set to output', () => {
+    const result = runPreEmitPreflight(projectWithJig({ regOutput: true, artOutput: true }));
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((i) => i.code === 'registration-both-output')).toBe(true);
+  });
+
+  it('allows a registration jig burning only one run', () => {
+    expect(runPreEmitPreflight(projectWithJig({ regOutput: true, artOutput: false })).ok).toBe(true);
+    expect(runPreEmitPreflight(projectWithJig({ regOutput: false, artOutput: true })).ok).toBe(true);
   });
 });

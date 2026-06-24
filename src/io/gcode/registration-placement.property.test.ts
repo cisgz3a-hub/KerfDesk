@@ -145,4 +145,31 @@ describe('registration jig placement — alignment invariance', () => {
     // And the art is NOT anchored to the corner (proves it isn't self-anchored).
     expect(Math.abs(artPlaced.minX) + Math.abs(artPlaced.minY)).toBeGreaterThan(0);
   });
+
+  it('emits the artwork toolpath INSIDE the box outline when the art sits inside the box', () => {
+    // Direct, perceptual check (not just the offset): box 80x40 at (50,60) ->
+    // (50,60)-(130,100); a 20x10 art at (80,75) -> (80,75)-(100,85) sits inside it.
+    // The two runs are emitted separately, so this proves the burned art toolpath
+    // falls within the burned box outline in real machine space.
+    const g: Geom = { bx: 50, by: 60, bw: 80, bh: 40, ax: 80, ay: 75, aw: 20, ah: 10 };
+    const boxRun = prepareOutput(jigProject(g, { boxOutput: true, artOutput: false }), {
+      jobOrigin: USER_ORIGIN_JOB_PLACEMENT,
+    });
+    const artRun = prepareOutput(jigProject(g, { boxOutput: false, artOutput: true }), {
+      jobOrigin: USER_ORIGIN_JOB_PLACEMENT,
+    });
+    expect(boxRun.ok && artRun.ok).toBe(true);
+    if (!boxRun.ok || !artRun.ok) return;
+    const boxOut = computeJobBounds(boxRun.job);
+    const artOut = computeJobBounds(artRun.job);
+    if (boxOut === null || artOut === null) throw new Error('expected non-null bounds');
+
+    const EPS = 1e-6;
+    expect(artOut.minX).toBeGreaterThanOrEqual(boxOut.minX - EPS);
+    expect(artOut.minY).toBeGreaterThanOrEqual(boxOut.minY - EPS);
+    expect(artOut.maxX).toBeLessThanOrEqual(boxOut.maxX + EPS);
+    expect(artOut.maxY).toBeLessThanOrEqual(boxOut.maxY + EPS);
+    // ...and strictly inside (not coincident with the outline on every edge).
+    expect(artOut.maxX - artOut.minX).toBeLessThan(boxOut.maxX - boxOut.minX);
+  });
 });

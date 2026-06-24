@@ -59,7 +59,7 @@ describe('addRegistrationBox store action', () => {
     resetStore();
   });
 
-  it('creates the sized box at the front-left, selects it, and dirties the project', () => {
+  it('creates the sized box centered, selects it, and dirties the project', () => {
     useStore.getState().addRegistrationBox(80, 40);
     const state = useStore.getState();
     const boxes = findRegistrationBoxes(state.project.scene);
@@ -69,6 +69,21 @@ describe('addRegistrationBox store action', () => {
     expect(state.dirty).toBe(true);
     expect(boxes[0]?.transform.x).toBe((state.project.device.bedWidth - 80) / 2);
     expect(boxes[0]?.transform.y).toBe((state.project.device.bedHeight - 40) / 2);
+  });
+
+  it('replace keeps the existing box position instead of re-centering', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    const created = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    // Drag the (selected) box away from center.
+    useStore.getState().nudgeSelection(50, 30);
+    const moved = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(moved?.transform.x).toBe((created?.transform.x ?? 0) + 50);
+    // Replace with a new size — position must be preserved.
+    useStore.getState().addRegistrationBox(100, 60);
+    const replaced = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(replaced?.transform.x).toBe(moved?.transform.x);
+    expect(replaced?.transform.y).toBe(moved?.transform.y);
+    expect(replaced?.spec).toMatchObject({ kind: 'rect', widthMm: 100, heightMm: 60 });
   });
 });
 
@@ -127,6 +142,31 @@ describe('removeRegistrationBox store action', () => {
   it('is a no-op when there is no jig', () => {
     const before = useStore.getState().project;
     useStore.getState().removeRegistrationBox();
+    expect(useStore.getState().project).toBe(before);
+  });
+});
+
+describe('setRegistrationBoxLocked store action', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  function boxLocked(): boolean | undefined {
+    return findRegistrationBoxes(useStore.getState().project.scene)[0]?.locked;
+  }
+
+  it('locks and unlocks the box', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    expect(boxLocked()).toBeUndefined();
+    useStore.getState().setRegistrationBoxLocked(true);
+    expect(boxLocked()).toBe(true);
+    useStore.getState().setRegistrationBoxLocked(false);
+    expect(boxLocked()).toBe(false);
+  });
+
+  it('is a no-op when there is no jig', () => {
+    const before = useStore.getState().project;
+    useStore.getState().setRegistrationBoxLocked(true);
     expect(useStore.getState().project).toBe(before);
   });
 });

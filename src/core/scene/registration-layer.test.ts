@@ -10,6 +10,7 @@ import {
   findRegistrationLayer,
   isRegistrationBox,
   isRegistrationLayer,
+  registrationOutputConflict,
   registrationRunState,
 } from './registration-layer';
 import { EMPTY_SCENE, type Scene } from './scene';
@@ -82,6 +83,28 @@ describe('registration layer', () => {
     expect(
       registrationRunState(makeScene([box], [{ ...reg, output: true }, { ...art, output: true }])),
     ).toBe('mixed');
+  });
+
+  it('registrationOutputConflict flags box + artwork both set to output', () => {
+    const box = createRegistrationBox({ widthMm: 80, heightMm: 40 });
+    const reg = createRegistrationLayer();
+    const art = createLayer({ id: '#000000', color: '#000000' });
+    expect(registrationOutputConflict(makeScene([], []))).toBe(false);
+    expect(
+      registrationOutputConflict(
+        makeScene([box], [{ ...reg, output: true }, { ...art, output: true }]),
+      ),
+    ).toBe(true);
+    expect(
+      registrationOutputConflict(
+        makeScene([box], [{ ...reg, output: true }, { ...art, output: false }]),
+      ),
+    ).toBe(false);
+    expect(
+      registrationOutputConflict(
+        makeScene([box], [{ ...reg, output: false }, { ...art, output: true }]),
+      ),
+    ).toBe(false);
   });
 
   it('isRegistrationBox matches the reserved-color shape, not other colors', () => {
