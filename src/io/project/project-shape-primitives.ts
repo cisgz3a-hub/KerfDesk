@@ -121,9 +121,7 @@ export function requireIntegerInRange(
 
 export function requireUnitRatio(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
-  return isFiniteNumber(value) && value > 0 && value < 1
-    ? null
-    : `missing or invalid \`${path}\``;
+  return isFiniteNumber(value) && value > 0 && value < 1 ? null : `missing or invalid \`${path}\``;
 }
 
 export function requirePercent(obj: Record<string, unknown>, path: string): string | null {

@@ -18,7 +18,9 @@ describe('starToPolylines', () => {
     expect(points.at(-1)).toEqual(points[0]);
 
     const center = { x: 10, y: 10 };
-    const radii = points.slice(0, -1).map((point) => Math.hypot(point.x - center.x, point.y - center.y));
+    const radii = points
+      .slice(0, -1)
+      .map((point) => Math.hypot(point.x - center.x, point.y - center.y));
     expect(radii[0]).toBeCloseTo(10, 5);
     expect(radii[1]).toBeCloseTo(5, 5);
     expect(radii[2]).toBeCloseTo(10, 5);
