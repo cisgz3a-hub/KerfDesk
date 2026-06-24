@@ -82,6 +82,7 @@ describe('help topics', () => {
     expect(TOOL_HELP.select.tooltip.toLowerCase()).toContain('select');
     expect(TOOL_HELP.node.tooltip.toLowerCase()).toContain('nodes');
     expect(TOOL_HELP.rect.tooltip).toContain('rectangle');
+    expect(TOOL_HELP.star.tooltip).toContain('star');
     expect(TOOL_HELP.polyline.tooltip).toContain('Enter');
   });
 

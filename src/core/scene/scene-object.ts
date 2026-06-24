@@ -220,6 +220,13 @@ export type PolygonShape = {
   readonly radiusMm: number; // circumradius
 };
 
+export type StarShape = {
+  readonly kind: 'star';
+  readonly points: number; // alternating outer/inner vertices, 3..64 points
+  readonly outerRadiusMm: number;
+  readonly innerRadiusRatio: number; // innerRadiusMm / outerRadiusMm, 0..1
+};
+
 // An open or closed run of points — the pen tool's freeform primitive (B6).
 // The points are absolute (the factory places them at IDENTITY_TRANSFORM).
 export type PolylineShape = {
@@ -229,7 +236,7 @@ export type PolylineShape = {
 };
 
 // The parametric block.
-export type ShapeSpec = RectangleShape | EllipseShape | PolygonShape | PolylineShape;
+export type ShapeSpec = RectangleShape | EllipseShape | PolygonShape | StarShape | PolylineShape;
 
 export type ShapeObject = ObjectPowerScale & {
   readonly kind: 'shape';
