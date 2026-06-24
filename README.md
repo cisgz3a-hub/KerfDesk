@@ -80,10 +80,11 @@ Add both at **Settings → Secrets and variables → Actions → New
 repository secret**. Until both are set the workflow will fail at the
 "Publish to Cloudflare Pages" step (CI itself stays green).
 
-**Current status (2026-06-23): push-to-deploy is active.** The canonical
-Cloudflare Pages project is `laserforge-2fj`; the older
-`https://laserforge.pages.dev` address belongs to a stale Pages project and
-must not be used for release verification.
+**Current status (2026-06-24): push-to-deploy is active.** The Cloudflare Pages
+API project name used by Wrangler is `laserforge`, but its canonical production
+release URL is `https://laserforge-2fj.pages.dev`. The older
+`https://laserforge.pages.dev` address belongs to a stale Pages URL and must not
+be used for release verification.
 
 ## License
 

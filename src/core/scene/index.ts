@@ -47,6 +47,7 @@ export type {
   SceneObject,
   ShapeObject,
   ShapeSpec,
+  StarShape,
   TextAlignment,
   TextObject,
   TracedImage,

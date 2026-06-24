@@ -12,6 +12,7 @@ export type ToolHelpKey =
   | 'rect'
   | 'ellipse'
   | 'polygon'
+  | 'star'
   | 'polyline';
 export type ToolHelpId = `tool:${ToolHelpKey}`;
 export type ControlHelpKey =
@@ -32,6 +33,13 @@ export type ControlHelpKey =
   | 'laser.machine-settings.export'
   | 'laser.machine-settings.export-diagnostic'
   | 'laser.machine-settings.table'
+  | 'laser.machine-setup.tab.overview'
+  | 'laser.machine-setup.tab.catalog'
+  | 'laser.machine-setup.tab.controller'
+  | 'laser.machine-setup.tab.firmware'
+  | 'laser.machine-setup.tab.zones'
+  | 'laser.machine-setup.tab.raster-diagnostics'
+  | 'laser.machine-setup.tab.import-export'
   | 'laser.output-scope.cut-selected'
   | 'laser.output-scope.selection-origin';
 export type ControlHelpId = `control:${string}`;
@@ -66,6 +74,10 @@ export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
   polygon: {
     label: 'Draw polygon',
     tooltip: 'Draw a polygon by dragging to set its size on the workspace.',
+  },
+  star: {
+    label: 'Draw star',
+    tooltip: 'Draw a star by dragging to set its size on the workspace.',
   },
   polyline: {
     label: 'Draw polyline',
@@ -175,6 +187,40 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-settings.table': {
     label: 'Machine settings table',
     tooltip: 'Review each reported GRBL setting value, unit, and meaning without editing firmware.',
+  },
+  'laser.machine-setup.tab.overview': {
+    label: 'Machine overview',
+    tooltip:
+      'Review the active machine profile, work area, capabilities, and current setup summary.',
+  },
+  'laser.machine-setup.tab.catalog': {
+    label: 'Profile catalog',
+    tooltip:
+      'Choose a built-in GRBL machine profile or duplicate one before tuning machine-specific values.',
+  },
+  'laser.machine-setup.tab.controller': {
+    label: 'Controller settings',
+    tooltip: 'Read and search live GRBL controller settings without changing firmware values.',
+  },
+  'laser.machine-setup.tab.firmware': {
+    label: 'Firmware writes',
+    tooltip:
+      'Write one guarded GRBL setting at a time only after review, confirmation, and a fresh backup.',
+  },
+  'laser.machine-setup.tab.zones': {
+    label: 'Safety zones',
+    tooltip:
+      'Define machine-coordinate no-go zones that preflight checks before frame, start, or export.',
+  },
+  'laser.machine-setup.tab.raster-diagnostics': {
+    label: 'Raster diagnostics',
+    tooltip:
+      'Check bidirectional raster and fill risks such as missing scan offsets, overscan, and laser mode.',
+  },
+  'laser.machine-setup.tab.import-export': {
+    label: 'Import and export',
+    tooltip:
+      'Import, review, and export LaserForge machine profiles or supported LightBurn device files.',
   },
   'laser.output-scope.cut-selected': {
     label: 'Cut Selected Graphics',

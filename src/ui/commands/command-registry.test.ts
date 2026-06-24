@@ -261,6 +261,19 @@ describe('buildAppCommands', () => {
     expect(projectNotes).toHaveBeenCalledTimes(1);
   });
 
+  it('runs Undo History from the Window menu without the destructive dirty-project guard', () => {
+    const confirmDiscard = vi.fn(async () => true);
+    const undoHistory = vi.fn();
+    const commands = buildAppCommands(baseCtx({ dirty: true, confirmDiscard, undoHistory }));
+
+    const command = commandById(commands, 'window.undo-history');
+
+    expect(command.enabled).toBe(true);
+    expect(runCommand(command)).toBe(true);
+    expect(confirmDiscard).not.toHaveBeenCalled();
+    expect(undoHistory).toHaveBeenCalledTimes(1);
+  });
+
   it('enables Adjust Image only when a raster image is selected', () => {
     const adjustImage = vi.fn();
     const disabledCommands = buildAppCommands(baseCtx({ hasRasterSelection: false, adjustImage }));

@@ -1,74 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { COMMAND_HELP, CONTROL_HELP, TOOL_HELP, controlHelp, helpProps } from './help-topics';
-import { COMMAND_FAMILY_ORDER, type CommandId } from '../commands/command-registry';
-
-const COMMAND_IDS: ReadonlyArray<CommandId> = [
-  'file.new',
-  'file.open',
-  'file.save',
-  'file.save-as',
-  'file.import-svg',
-  'file.import-image',
-  'file.save-gcode',
-  'edit.undo',
-  'edit.redo',
-  'edit.select-all',
-  'edit.copy',
-  'edit.cut',
-  'edit.paste',
-  'edit.group',
-  'edit.ungroup',
-  'edit.lock-selection',
-  'edit.unlock-all',
-  'edit.duplicate',
-  'edit.delete',
-  'edit.clear-selection',
-  'tools.measure',
-  'tools.add-text',
-  'tools.material-test',
-  'tools.interval-test',
-  'tools.scan-offset-test',
-  'tools.optimization-settings',
-  'tools.adjust-image',
-  'tools.apply-image-mask',
-  'tools.crop-image',
-  'tools.remove-image-mask',
-  'tools.save-processed-bitmap',
-  'tools.trace-image',
-  'tools.multi-file-trace',
-  'tools.convert-to-bitmap',
-  'tools.fill-selection',
-  'tools.close-open-fill-contours',
-  'tools.close-fill-contours-with-tolerance',
-  'arrange.align-left',
-  'arrange.align-center-x',
-  'arrange.align-right',
-  'arrange.align-top',
-  'arrange.align-center-y',
-  'arrange.align-bottom',
-  'arrange.align-centers',
-  'arrange.distribute-horizontal-centers',
-  'arrange.distribute-horizontal-spacing',
-  'arrange.distribute-vertical-centers',
-  'arrange.distribute-vertical-spacing',
-  'arrange.break-apart',
-  'arrange.flip-horizontal',
-  'arrange.flip-vertical',
-  'laser.connect',
-  'laser.disconnect',
-  'laser.home',
-  'window.toggle-preview',
-  'window.fit-view',
-  'window.project-notes',
-  'help.about',
-];
+import {
+  buildAppCommands,
+  COMMAND_FAMILY_ORDER,
+  type CommandId,
+} from '../commands/command-registry';
+import { baseCtx } from '../commands/command-registry-test-helpers';
 
 describe('help topics', () => {
-  it('defines meaningful help for every command id', () => {
-    const missing = COMMAND_IDS.filter((id) => COMMAND_HELP[id] === undefined);
-    const weak = COMMAND_IDS.filter((id) => !isMeaningful(COMMAND_HELP[id]?.tooltip ?? ''));
+  it('keeps command help coverage aligned with the real command registry', () => {
+    const registryIds = commandIds();
+    const registryIdSet = new Set(registryIds);
+    const missing = registryIds.filter((id) => COMMAND_HELP[id] === undefined);
+    const stale = Object.keys(COMMAND_HELP).filter((id) => !registryIdSet.has(id as CommandId));
 
     expect(missing).toEqual([]);
+    expect(stale).toEqual([]);
+  });
+
+  it('defines meaningful help for every command id', () => {
+    const weak = commandIds().filter((id) => !isMeaningful(COMMAND_HELP[id]?.tooltip ?? ''));
+
     expect(weak).toEqual([]);
   });
 
@@ -82,6 +34,7 @@ describe('help topics', () => {
     expect(TOOL_HELP.select.tooltip.toLowerCase()).toContain('select');
     expect(TOOL_HELP.node.tooltip.toLowerCase()).toContain('nodes');
     expect(TOOL_HELP.rect.tooltip).toContain('rectangle');
+    expect(TOOL_HELP.star.tooltip).toContain('star');
     expect(TOOL_HELP.polyline.tooltip).toContain('Enter');
   });
 
@@ -109,6 +62,13 @@ describe('help topics', () => {
       'laser.machine-settings.read',
       'laser.machine-settings.export',
       'laser.machine-settings.table',
+      'laser.machine-setup.tab.overview',
+      'laser.machine-setup.tab.catalog',
+      'laser.machine-setup.tab.controller',
+      'laser.machine-setup.tab.firmware',
+      'laser.machine-setup.tab.zones',
+      'laser.machine-setup.tab.raster-diagnostics',
+      'laser.machine-setup.tab.import-export',
       'laser.output-scope.cut-selected',
       'laser.output-scope.selection-origin',
     ] as const;
@@ -136,4 +96,8 @@ describe('help topics', () => {
 
 function isMeaningful(value: string): boolean {
   return value.length >= 18 && /\s/.test(value) && /[.!?]$/.test(value);
+}
+
+function commandIds(): ReadonlyArray<CommandId> {
+  return buildAppCommands(baseCtx()).map((command) => command.id);
 }

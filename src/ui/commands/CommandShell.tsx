@@ -29,6 +29,7 @@ import { importImageFile } from './import-image-action';
 import { runMultiFileTrace, type MultiFileTraceFile } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
+import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 
@@ -42,6 +43,7 @@ export function CommandShell(): JSX.Element {
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
+  const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
   const selectedConvertible = useSelectedConvertible();
   const selectedRaster = useSelectedRaster();
@@ -59,6 +61,7 @@ export function CommandShell(): JSX.Element {
       ),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
     requestProjectNotes: () => setProjectNotesOpen(true),
+    requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
   });
@@ -94,6 +97,7 @@ export function CommandShell(): JSX.Element {
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
       ) : null}
       {projectNotesOpen ? <ProjectNotesPanel onClose={() => setProjectNotesOpen(false)} /> : null}
+      {undoHistoryOpen ? <UndoHistoryPanel onClose={() => setUndoHistoryOpen(false)} /> : null}
       {closeToleranceDialogOpen ? (
         <CloseOpenFillContoursPanel onClose={() => setCloseToleranceDialogOpen(false)} />
       ) : null}
@@ -119,6 +123,25 @@ function CloseOpenFillContoursPanel(props: { readonly onClose: () => void }): JS
         props.onClose();
         pushToast(`Closed Fill contours within ${toleranceMm} mm.`, 'success');
       }}
+    />
+  );
+}
+
+function UndoHistoryPanel(props: { readonly onClose: () => void }): JSX.Element {
+  useRegisterModal();
+  const current = useStore((s) => s.project);
+  const undoStack = useStore((s) => s.undoStack);
+  const redoStack = useStore((s) => s.redoStack);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  return (
+    <UndoHistoryDialog
+      current={current}
+      undoStack={undoStack}
+      redoStack={redoStack}
+      onUndo={undo}
+      onRedo={redo}
+      onClose={props.onClose}
     />
   );
 }

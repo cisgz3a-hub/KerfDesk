@@ -38,7 +38,7 @@ export type ToolMode =
   | { readonly kind: 'select' }
   | { readonly kind: 'node' }
   | { readonly kind: 'measure' }
-  | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'polyline' };
+  | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'star' | 'polyline' };
 
 // Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.
 // `vertices` are committed clicks (scene mm); `cursor` is the live rubber-band
