@@ -3,6 +3,7 @@
 // can copy it into the working draft.
 
 import { usePlatform } from '../../app/platform-context';
+import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import { assertNever } from '../../../core/scene';
 import { useLaserStore, type ConnectionState } from '../../state/laser-store';
@@ -24,7 +25,7 @@ export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps
         <div style={actionsStyle}>
           <Button
             onClick={() => void readMachineSettings().catch(() => undefined)}
-            title="Re-read the controller's settings ($$)."
+            {...helpProps('control:laser.device-setup.reread')}
           >
             Re-read ($$)
           </Button>
@@ -32,7 +33,7 @@ export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps
             <Button
               variant="primary"
               onClick={() => dispatch({ kind: 'accept-detected', patch: detected })}
-              title="Copy the controller's reported settings into this setup."
+              {...helpProps('control:laser.device-setup.apply-detected')}
             >
               Apply detected
             </Button>
@@ -43,7 +44,7 @@ export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps
           variant="primary"
           onClick={() => void connect(platform).catch(() => undefined)}
           disabled={connection.kind === 'connecting'}
-          title="Open the WebSerial port picker and connect."
+          {...helpProps('control:laser.device-setup.connect')}
         >
           Connect…
         </Button>

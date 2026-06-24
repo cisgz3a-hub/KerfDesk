@@ -44,6 +44,14 @@ export type ControlHelpKey =
   | 'laser.machine-setup.tab.zones'
   | 'laser.machine-setup.tab.raster-diagnostics'
   | 'laser.machine-setup.tab.import-export'
+  | 'laser.device-setup.launch'
+  | 'laser.device-setup.next'
+  | 'laser.device-setup.back'
+  | 'laser.device-setup.finish'
+  | 'laser.device-setup.cancel'
+  | 'laser.device-setup.connect'
+  | 'laser.device-setup.reread'
+  | 'laser.device-setup.apply-detected'
   | 'laser.output-scope.cut-selected'
   | 'laser.output-scope.selection-origin';
 export type ControlHelpId = `control:${string}`;
@@ -244,6 +252,39 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     label: 'Import and export',
     tooltip:
       'Import, review, and export LaserForge machine profiles or supported LightBurn device files.',
+  },
+  'laser.device-setup.launch': {
+    label: 'Set up device',
+    tooltip:
+      'Open the guided Device Setup wizard to configure this machine from what the controller reports.',
+  },
+  'laser.device-setup.next': {
+    label: 'Next step',
+    tooltip: 'Continue to the next step of the Device Setup wizard.',
+  },
+  'laser.device-setup.back': {
+    label: 'Previous step',
+    tooltip: 'Return to the previous step of the Device Setup wizard.',
+  },
+  'laser.device-setup.finish': {
+    label: 'Finish setup',
+    tooltip: 'Save the confirmed machine profile and close the Device Setup wizard.',
+  },
+  'laser.device-setup.cancel': {
+    label: 'Cancel setup',
+    tooltip: 'Discard the Device Setup draft without changing the active machine profile.',
+  },
+  'laser.device-setup.connect': {
+    label: 'Connect controller',
+    tooltip: 'Open the WebSerial port picker and connect to the laser controller.',
+  },
+  'laser.device-setup.reread': {
+    label: 'Re-read settings',
+    tooltip: 'Re-read the controller GRBL settings with $$ to refresh the detected values.',
+  },
+  'laser.device-setup.apply-detected': {
+    label: 'Apply detected settings',
+    tooltip: 'Copy the controller-reported settings into the Device Setup draft.',
   },
   'laser.output-scope.cut-selected': {
     label: 'Cut Selected Graphics',

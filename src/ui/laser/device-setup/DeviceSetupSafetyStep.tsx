@@ -5,7 +5,8 @@
 import type { DeviceProfile } from '../../../core/devices';
 import { AutofocusEditor } from '../AutofocusEditor';
 import { Row } from '../device-settings-shared';
-import { HomingEditor } from '../DeviceProfileFields';
+import { HomingEditor, NameRow, OriginCornerRow } from '../DeviceProfileFields';
+import { AirAssistRow } from '../DeviceProfilePowerFields';
 import { ZRows } from '../DeviceProfileRows';
 import { PlannerAdvanced } from '../PlannerAdvanced';
 import { ScanOffsetEditor } from '../ScanOffsetEditor';
@@ -17,9 +18,12 @@ export function DeviceSetupSafetyStep({ state, dispatch }: DeviceSetupStepProps)
   return (
     <section style={sectionStyle}>
       <p style={hintStyle}>
-        Enable $H homing only if your controller has working homing switches. Everything below is
-        optional.
+        Name this machine and set what $$ cannot report — origin corner, air assist, and homing.
+        Enable $H only if your controller has working homing switches.
       </p>
+      <NameRow device={draft} update={update} />
+      <OriginCornerRow device={draft} update={update} />
+      <AirAssistRow device={draft} update={update} />
       <Row label="Homing">
         <HomingEditor
           enabled={draft.homing.enabled}

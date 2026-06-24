@@ -1,12 +1,15 @@
-// DeviceProfileFields — the reusable per-field editors for a DeviceProfile
-// (name, bed, origin, feed, power/air-assist, homing). Extracted verbatim
-// from DeviceSettings.tsx so both the inline Device Profile panel and the
-// upcoming connect-time Device Setup wizard render identical controls rather
-// than duplicating them. Pure presentational components: each takes a
-// `device` plus an `update` callback and owns no store wiring.
+// DeviceProfileFields — reusable per-field editors for a DeviceProfile's
+// identity and geometry (name, bed, origin, feed) plus homing. Granular so the
+// Device Setup wizard can place machine-reported geometry on its "confirm"
+// step and operator-supplied placement on its "safety" step; BasicRows
+// recomposes them in the original order for the inline Device Profile panel, so
+// that panel renders identical controls. Pure presentational components: each
+// takes a `device` plus an `update` callback and owns no store wiring.
+// Power/air-assist fields live in DeviceProfilePowerFields.tsx.
 
 import type { DeviceProfile, Origin } from '../../core/devices';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
+import { AirAssistRow, LaserPowerRows } from './DeviceProfilePowerFields';
 
 const ORIGIN_OPTIONS: ReadonlyArray<{ readonly value: Origin; readonly label: string }> = [
   { value: 'front-left', label: 'Front left' },
@@ -83,125 +86,63 @@ export function HomingEditor(props: {
   );
 }
 
-// The five always-visible numeric fields: Name, Bed (W×H), Origin,
-// Max feed, $30 max power. Sub-component so DeviceSettings itself
-// stays under the 80-line function cap and reads as a list.
-export function BasicRows(props: DeviceRowsProps): JSX.Element {
+export function NameRow(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
-    <>
-      <Row label="Name">
-        <input
-          type="text"
-          value={device.name}
-          onChange={(e) => update({ name: e.target.value })}
-          style={textInputStyle}
-          aria-label="Device name"
-          title="Name for this machine profile."
-        />
-      </Row>
-      <Row label="Bed">
-        <input
-          type="number"
-          min={10}
-          step={1}
-          value={device.bedWidth}
-          onChange={(e) => update({ bedWidth: Math.max(10, Number(e.target.value) || 0) })}
-          style={numInputStyle}
-          aria-label="Bed width (mm)"
-          title="Usable machine bed width in millimeters. Match GRBL $130."
-        />
-        <span style={timesStyle}>×</span>
-        <input
-          type="number"
-          min={10}
-          step={1}
-          value={device.bedHeight}
-          onChange={(e) => update({ bedHeight: Math.max(10, Number(e.target.value) || 0) })}
-          style={numInputStyle}
-          aria-label="Bed height (mm)"
-          title="Usable machine bed height in millimeters. Match GRBL $131."
-        />
-        <span style={unitStyle}>mm</span>
-      </Row>
-      <Row label="Origin">
-        <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
-      </Row>
-      <FeedRows device={device} update={update} />
-      <PowerRows device={device} update={update} />
-    </>
+    <Row label="Name">
+      <input
+        type="text"
+        value={device.name}
+        onChange={(e) => update({ name: e.target.value })}
+        style={textInputStyle}
+        aria-label="Device name"
+        title="Name for this machine profile."
+      />
+    </Row>
   );
 }
 
-export function PowerRows(props: DeviceRowsProps): JSX.Element {
+export function BedRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
-    <>
-      <Row label="$30 (max S)">
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={device.maxPowerS}
-          onChange={(e) =>
-            update({ maxPowerS: Math.max(1, Math.floor(Number(e.target.value) || 0)) })
-          }
-          style={numInputStyle}
-          aria-label="GRBL $30 max power S"
-          title="Maximum GRBL spindle/laser S value. Match your controller's $30 setting."
-        />
-      </Row>
-      <Row label="$31 (min S)">
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={device.minPowerS}
-          onChange={(e) =>
-            update({ minPowerS: Math.max(0, Math.floor(Number(e.target.value) || 0)) })
-          }
-          style={numInputStyle}
-          aria-label="GRBL $31 min power S"
-          title="Minimum nonzero spindle/laser S value. Diode lasers usually use 0."
-        />
-      </Row>
-      <Row label="$32 laser mode">
-        <label
-          style={inlineLabelStyle}
-          title="GRBL laser mode. Keep this enabled for M4 dynamic-power image engraving."
-        >
-          <input
-            type="checkbox"
-            checked={device.laserModeEnabled}
-            onChange={(e) => update({ laserModeEnabled: e.target.checked })}
-            aria-label="GRBL $32 laser mode enabled"
-            title="Enable GRBL laser mode ($32=1) for laser jobs."
-          />
-          <span>Enabled</span>
-        </label>
-      </Row>
-      <Row label="Air assist">
-        <select
-          value={device.airAssistCommand}
-          onChange={(e) =>
-            update({ airAssistCommand: e.target.value as DeviceProfile['airAssistCommand'] })
-          }
-          aria-label="Air assist command"
-          title="Choose the GRBL coolant command wired to your air assist. Leave Disabled unless you have tested the output."
-        >
-          <option value="none">Disabled</option>
-          <option value="M8">M8 flood coolant</option>
-          <option value="M7">M7 mist coolant</option>
-        </select>
-      </Row>
-    </>
+    <Row label="Bed">
+      <input
+        type="number"
+        min={10}
+        step={1}
+        value={device.bedWidth}
+        onChange={(e) => update({ bedWidth: Math.max(10, Number(e.target.value) || 0) })}
+        style={numInputStyle}
+        aria-label="Bed width (mm)"
+        title="Usable machine bed width in millimeters. Match GRBL $130."
+      />
+      <span style={timesStyle}>×</span>
+      <input
+        type="number"
+        min={10}
+        step={1}
+        value={device.bedHeight}
+        onChange={(e) => update({ bedHeight: Math.max(10, Number(e.target.value) || 0) })}
+        style={numInputStyle}
+        aria-label="Bed height (mm)"
+        title="Usable machine bed height in millimeters. Match GRBL $131."
+      />
+      <span style={unitStyle}>mm</span>
+    </Row>
   );
 }
 
-// Two related feed knobs: machine hardware ceiling + dedicated frame
-// speed. Sit next to each other so the relationship (one caps the
-// other) is immediately legible. Extracted from BasicRows so each
-// component stays under the 80-line per-function lint cap.
+export function OriginCornerRow(props: DeviceRowsProps): JSX.Element {
+  const { device, update } = props;
+  return (
+    <Row label="Origin">
+      <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
+    </Row>
+  );
+}
+
+// Two related feed knobs: machine hardware ceiling + dedicated frame speed. Sit
+// next to each other so the relationship (one caps the other) is legible.
 export function FeedRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
@@ -234,6 +175,23 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
         />
         <span style={unitStyle}>mm/min</span>
       </Row>
+    </>
+  );
+}
+
+// The inline Device Profile panel's core fields in one block. Composed from the
+// granular rows (plus the power/air-assist rows) so the wizard can reuse them
+// piecemeal while this keeps rendering the same controls in the same order.
+export function BasicRows(props: DeviceRowsProps): JSX.Element {
+  const { device, update } = props;
+  return (
+    <>
+      <NameRow device={device} update={update} />
+      <BedRows device={device} update={update} />
+      <OriginCornerRow device={device} update={update} />
+      <FeedRows device={device} update={update} />
+      <LaserPowerRows device={device} update={update} />
+      <AirAssistRow device={device} update={update} />
     </>
   );
 }
