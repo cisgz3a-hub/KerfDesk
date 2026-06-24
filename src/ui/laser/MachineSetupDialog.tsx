@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { helpProps, type HelpTopicId } from '../help/help-topics';
 import { Button, Dialog, DialogActions } from '../kit';
 import { ControllerSettingsPanel, FirmwareWritesPanel } from './MachineSetupController';
 import { ImportExportPanel } from './MachineSetupImportExport';
@@ -15,14 +16,34 @@ type SetupTab =
   | 'raster-diagnostics'
   | 'import-export';
 
-const TABS: ReadonlyArray<{ readonly id: SetupTab; readonly label: string }> = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'catalog', label: 'Profile Catalog' },
-  { id: 'controller', label: 'Controller Settings' },
-  { id: 'firmware', label: 'Firmware Writes' },
-  { id: 'zones', label: 'Safety Zones' },
-  { id: 'raster-diagnostics', label: 'Raster Diagnostics' },
-  { id: 'import-export', label: 'Import / Export' },
+const TABS: ReadonlyArray<{
+  readonly id: SetupTab;
+  readonly label: string;
+  readonly helpId: HelpTopicId;
+}> = [
+  { id: 'overview', label: 'Overview', helpId: 'control:laser.machine-setup.tab.overview' },
+  { id: 'catalog', label: 'Profile Catalog', helpId: 'control:laser.machine-setup.tab.catalog' },
+  {
+    id: 'controller',
+    label: 'Controller Settings',
+    helpId: 'control:laser.machine-setup.tab.controller',
+  },
+  {
+    id: 'firmware',
+    label: 'Firmware Writes',
+    helpId: 'control:laser.machine-setup.tab.firmware',
+  },
+  { id: 'zones', label: 'Safety Zones', helpId: 'control:laser.machine-setup.tab.zones' },
+  {
+    id: 'raster-diagnostics',
+    label: 'Raster Diagnostics',
+    helpId: 'control:laser.machine-setup.tab.raster-diagnostics',
+  },
+  {
+    id: 'import-export',
+    label: 'Import / Export',
+    helpId: 'control:laser.machine-setup.tab.import-export',
+  },
 ];
 
 export function MachineSetupDialog(props: { readonly onClose: () => void }): JSX.Element {
@@ -34,6 +55,7 @@ export function MachineSetupDialog(props: { readonly onClose: () => void }): JSX
           {TABS.map((item) => (
             <Button
               key={item.id}
+              {...helpProps(item.helpId)}
               pressed={tab === item.id}
               onClick={() => setTab(item.id)}
               aria-label={item.label}

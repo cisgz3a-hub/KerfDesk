@@ -62,6 +62,13 @@ describe('help topics', () => {
       'laser.machine-settings.read',
       'laser.machine-settings.export',
       'laser.machine-settings.table',
+      'laser.machine-setup.tab.overview',
+      'laser.machine-setup.tab.catalog',
+      'laser.machine-setup.tab.controller',
+      'laser.machine-setup.tab.firmware',
+      'laser.machine-setup.tab.zones',
+      'laser.machine-setup.tab.raster-diagnostics',
+      'laser.machine-setup.tab.import-export',
       'laser.output-scope.cut-selected',
       'laser.output-scope.selection-origin',
     ] as const;
