@@ -1,9 +1,4 @@
-import {
-  IDENTITY_TRANSFORM,
-  type ColoredPath,
-  type ShapeObject,
-  type Transform,
-} from '../scene';
+import { IDENTITY_TRANSFORM, type ColoredPath, type ShapeObject, type Transform } from '../scene';
 import { boundsOfPolylines } from './polyline-bounds';
 import { starToPolylines, type StarSpec } from './star';
 
