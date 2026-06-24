@@ -1,7 +1,6 @@
 import {
   type Bounds,
   type ColoredPath,
-  type Polyline,
   type Project,
   type SceneObject,
   type ShapeObject,
@@ -10,6 +9,13 @@ import {
 } from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import {
+  boundsForPaths,
+  deletePathsNodes,
+  editPathsNodeToPoint,
+  editPathsNodesByDelta,
+  materializedPolylineToSpecPoints,
+} from './path-node-edit-geometry';
 
 export type PathNodeRef = {
   readonly objectId: string;
@@ -24,6 +30,7 @@ export type PathNodeEditActions = {
     options?: { readonly additive?: boolean },
   ) => void;
   readonly nudgeSelectedPathNode: (dx: number, dy: number) => void;
+  readonly deleteSelectedPathNodes: () => void;
   readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
 };
 
@@ -34,6 +41,7 @@ export function pathNodeEditActions(set: Setter): PathNodeEditActions {
     selectPathNode: (ref, options = {}) =>
       set((state) => selectPathNode(state, ref, options.additive === true)),
     nudgeSelectedPathNode: (dx, dy) => set((state) => nudgeSelectedPathNode(state, dx, dy)),
+    deleteSelectedPathNodes: () => set((state) => deleteSelectedPathNodes(state)),
     setSelectedPathNodePositionDuringInteraction: (scenePoint) =>
       set((state) => setSelectedPathNodePositionDuringInteraction(state, scenePoint)),
   };
@@ -108,6 +116,37 @@ function nudgeSelectedPathNode(
   };
 }
 
+function deleteSelectedPathNodes(state: AppState): AppState | Partial<AppState> {
+  const refs = activePathNodeRefs(state);
+  if (refs.length === 0) return state;
+  const refsByObject = groupPathNodeRefsByObject(refs);
+
+  let changed = false;
+  const nextProject: Project = {
+    ...state.project,
+    scene: {
+      ...state.project.scene,
+      objects: state.project.scene.objects.map((object) => {
+        const objectRefs = refsByObject.get(object.id);
+        if (objectRefs === undefined) return object;
+        const edited = deleteObjectNodes(object, objectRefs);
+        if (edited === object) return object;
+        changed = true;
+        return edited;
+      }),
+    },
+  };
+  if (!changed) return state;
+  return {
+    project: nextProject,
+    selectedPathNode: null,
+    selectedPathNodes: [],
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
 function setSelectedPathNodePositionDuringInteraction(
   state: AppState,
   scenePoint: Vec2,
@@ -155,6 +194,18 @@ function editObjectNodes(
   return { ...object, paths: edit.paths, bounds };
 }
 
+function deleteObjectNodes(object: SceneObject, refs: ReadonlyArray<PathNodeRef>): SceneObject {
+  if (object.locked === true) return object;
+  if (object.kind === 'raster-image' || object.kind === 'text') return object;
+  if (object.kind === 'shape' && object.spec.kind !== 'polyline') return object;
+
+  const edit = deletePathsNodes(object.paths, refs);
+  if (edit === null) return object;
+  const bounds = boundsForPaths(edit.paths);
+  if (object.kind === 'shape') return editPolylineShape(object, edit.paths, bounds);
+  return { ...object, paths: edit.paths, bounds };
+}
+
 function editObjectNodeToPoint(object: SceneObject, ref: PathNodeRef, point: Vec2): SceneObject {
   if (object.locked === true) return object;
   if (object.kind === 'raster-image' || object.kind === 'text') return object;
@@ -180,64 +231,8 @@ function editPolylineShape(
     bounds,
     spec: {
       ...object.spec,
-      points: nextPoints,
+      points: materializedPolylineToSpecPoints(nextPoints, object.spec.closed),
     },
-  };
-}
-
-function editPathsNodesByDelta(
-  paths: ReadonlyArray<ColoredPath>,
-  refs: ReadonlyArray<PathNodeRef>,
-  dx: number,
-  dy: number,
-): { readonly paths: ReadonlyArray<ColoredPath> } | null {
-  let changed = false;
-  const refKeys = new Set(refs.map(pathNodeRefKey));
-  const nextPaths = paths.map((path, pathIndex) => ({
-    ...path,
-    polylines: path.polylines.map((polyline, polylineIndex) => ({
-      ...polyline,
-      points: polyline.points.map((point, pointIndex) => {
-        if (!refKeys.has(pathNodeRefKey({ objectId: '', pathIndex, polylineIndex, pointIndex }))) {
-          return point;
-        }
-        changed = true;
-        const nextPoint = { x: point.x + dx, y: point.y + dy };
-        return nextPoint;
-      }),
-    })),
-  }));
-  return changed ? { paths: nextPaths } : null;
-}
-
-function editPathsNodeToPoint(
-  paths: ReadonlyArray<ColoredPath>,
-  ref: PathNodeRef,
-  nextPoint: Vec2,
-): { readonly paths: ReadonlyArray<ColoredPath>; readonly point: Vec2 } | null {
-  const path = paths[ref.pathIndex];
-  const polyline = path?.polylines[ref.polylineIndex];
-  const point = polyline?.points[ref.pointIndex];
-  if (path === undefined || polyline === undefined || point === undefined) return null;
-  if (pointsEqual(point, nextPoint)) return null;
-
-  return {
-    point: nextPoint,
-    paths: paths.map((candidatePath, pathIndex) => {
-      if (pathIndex !== ref.pathIndex) return candidatePath;
-      return {
-        ...candidatePath,
-        polylines: candidatePath.polylines.map((candidatePolyline, polylineIndex) => {
-          if (polylineIndex !== ref.polylineIndex) return candidatePolyline;
-          return {
-            ...candidatePolyline,
-            points: candidatePolyline.points.map((candidatePoint, pointIndex) =>
-              pointIndex === ref.pointIndex ? nextPoint : candidatePoint,
-            ),
-          };
-        }),
-      };
-    }),
   };
 }
 
@@ -264,10 +259,6 @@ function isInvertibleScale(value: number): boolean {
   return Number.isFinite(value) && value !== 0;
 }
 
-function pointsEqual(a: Vec2, b: Vec2): boolean {
-  return a.x === b.x && a.y === b.y;
-}
-
 function activePathNodeRefs(state: AppState): ReadonlyArray<PathNodeRef> {
   if (state.selectedPathNodes.length > 0) return state.selectedPathNodes;
   return state.selectedPathNode === null ? [] : [state.selectedPathNode];
@@ -292,21 +283,4 @@ function pathNodeRefsEqual(a: PathNodeRef, b: PathNodeRef): boolean {
     a.polylineIndex === b.polylineIndex &&
     a.pointIndex === b.pointIndex
   );
-}
-
-function pathNodeRefKey(ref: Omit<PathNodeRef, 'objectId'> | PathNodeRef): string {
-  return `${ref.pathIndex}:${ref.polylineIndex}:${ref.pointIndex}`;
-}
-
-function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds {
-  const points = paths.flatMap((path) =>
-    path.polylines.flatMap((polyline: Polyline) => polyline.points),
-  );
-  if (points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
-  };
 }

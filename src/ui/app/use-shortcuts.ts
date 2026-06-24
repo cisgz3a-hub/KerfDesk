@@ -8,7 +8,7 @@
 // window keydown listener; order doesn't matter because the matchers
 // guard themselves (modifier checks, isEditableTarget, kind-of-event).
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -16,12 +16,21 @@ import { isModalOpen, useUiStore } from '../state/ui-store';
 import { confirmDiscardAsync } from './confirm-discard';
 import { usePlatform } from './platform-context';
 import {
+  type EditCtx,
+  type FileCtx,
   handleEditShortcut,
   handleFileShortcut,
   handleToolShortcut,
   handleTransformShortcut,
   handleViewShortcut,
+  type ToolCtx,
 } from './shortcuts';
+
+type FileEditShortcutBindings = {
+  readonly fileCtx: FileCtx;
+  readonly editCtx: EditCtx;
+  readonly toolCtx: ToolCtx;
+};
 
 export function useShortcuts(): void {
   useFileEditShortcuts();
@@ -37,8 +46,10 @@ function useFileEditShortcuts(): void {
   const setProject = useStore((s) => s.setProject);
   const newProject = useStore((s) => s.newProject);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const selectedPathNode = useStore((s) => s.selectedPathNode);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const removeSceneObjects = useStore((s) => s.removeSceneObjects);
+  const deleteSelectedPathNodes = useStore((s) => s.deleteSelectedPathNodes);
   const selectObject = useStore((s) => s.selectObject);
   const selectAllObjects = useStore((s) => s.selectAllObjects);
   const copySelection = useStore((s) => s.copySelection);
@@ -60,60 +71,31 @@ function useFileEditShortcuts(): void {
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const controllerSettings = useLaserStore((s) => s.controllerSettings);
   const pushToast = useToastStore((s) => s.pushToast);
+  const machine = { statusReport, workOriginActive, wcoCache };
+  const confirmDiscard = (action: string): Promise<boolean> =>
+    confirmDiscardAsync(platform, action);
+  // prettier-ignore
+  const fileCtx: FileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
+  // prettier-ignore
+  const editCtx: EditCtx = { undo, redo, selectedObjectId, selectedPathNode, additionalSelectedIds, removeSceneObjects, deleteSelectedPathNodes, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, groupSelection, ungroupSelection, duplicateSelection, resetToolMode };
+  useFileEditShortcutEffect(fileCtx, editCtx, { setToolMode });
+}
+
+function useFileEditShortcutEffect(fileCtx: FileCtx, editCtx: EditCtx, toolCtx: ToolCtx): void {
+  const bindingsRef = useRef<FileEditShortcutBindings>({ fileCtx, editCtx, toolCtx });
+  bindingsRef.current = { fileCtx, editCtx, toolCtx };
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (isModalOpen(useUiStore.getState())) return;
-      const machine = { statusReport, workOriginActive, wcoCache };
-      // F-A13 dirty check (LU18 three-way dialog). Queries the store
-      // imperatively when the key fires, so no stale captures.
-      const confirmDiscard = (action: string): Promise<boolean> =>
-        confirmDiscardAsync(platform, action);
-      // prettier-ignore
-      const fileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
-      // prettier-ignore
-      const editCtx = { undo, redo, selectedObjectId, additionalSelectedIds, removeSceneObjects, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, groupSelection, ungroupSelection, duplicateSelection, resetToolMode };
+      const { fileCtx, editCtx, toolCtx } = bindingsRef.current;
       if (handleFileShortcut(e, fileCtx)) return;
-      // Tool-arming (Ctrl+R/E/L) runs between File and Edit: File owns the
-      // Shift variants (Save-As, export G-code), and no Edit binding uses a
-      // bare Ctrl+R/E/L, so order is unambiguous.
-      if (handleToolShortcut(e, { setToolMode })) return;
+      if (handleToolShortcut(e, toolCtx)) return;
       handleEditShortcut(e, editCtx);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [
-    platform,
-    project,
-    jobPlacement,
-    outputScope,
-    importSvgObject,
-    setProject,
-    newProject,
-    savedName,
-    lastSaveTarget,
-    markSaved,
-    markLoaded,
-    statusReport,
-    workOriginActive,
-    wcoCache,
-    controllerSettings,
-    pushToast,
-    undo,
-    redo,
-    selectedObjectId,
-    additionalSelectedIds,
-    removeSceneObjects,
-    selectObject,
-    selectAllObjects,
-    copySelection,
-    cutSelection,
-    pasteClipboard,
-    groupSelection,
-    ungroupSelection,
-    duplicateSelection,
-    resetToolMode,
-    setToolMode,
-  ]);
+  }, []);
 }
 
 function useTransformViewShortcuts(): void {

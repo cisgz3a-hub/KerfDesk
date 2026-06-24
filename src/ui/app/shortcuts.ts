@@ -58,8 +58,10 @@ export type EditCtx = {
   readonly undo: () => void;
   readonly redo: () => void;
   readonly selectedObjectId: string | null;
+  readonly selectedPathNode: PathNodeRef | null;
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly removeSceneObjects: (ids: ReadonlyArray<string>) => void;
+  readonly deleteSelectedPathNodes: () => void;
   readonly selectObject: (id: string | null) => void;
   readonly selectAllObjects: () => void;
   readonly copySelection: () => void;
@@ -237,6 +239,10 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
   {
     match: (e) => !hasMeta(e) && (e.key === 'Delete' || e.key === 'Backspace'),
     invoke: (c) => {
+      if (c.selectedPathNode !== null) {
+        c.deleteSelectedPathNodes();
+        return;
+      }
       const all = [
         ...(c.selectedObjectId !== null ? [c.selectedObjectId] : []),
         ...c.additionalSelectedIds,
