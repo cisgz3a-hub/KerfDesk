@@ -18,9 +18,9 @@ export type GcodeMetadata = {
 };
 
 // Bump when the emitter's G-code-shaping behavior changes. Currently covers the
-// continuous-sweep fill (ADR-034), the >5 mm gap-rapid split (ADR-035), and M4
-// dynamic power for fill (ADR-036).
-export const EMITTER_REVISION = 'adr-036-m4-fill-v1';
+// continuous-sweep fill (ADR-034), the >5 mm fill gap-rapid split (ADR-035), M4
+// dynamic power for fill (ADR-036), and raster gap-rapid splitting (ADR-039).
+export const EMITTER_REVISION = 'adr-039-raster-gap-rapid-v1';
 
 // Leading `;` comment lines; GRBL ignores them. Ends with a trailing newline so
 // the motion body starts cleanly on its own line when concatenated.

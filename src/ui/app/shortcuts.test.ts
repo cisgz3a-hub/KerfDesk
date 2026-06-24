@@ -76,8 +76,10 @@ function editCtx(
     undo: vi.fn(),
     redo: vi.fn(),
     selectedObjectId: 'O1',
+    selectedPathNode: null,
     additionalSelectedIds: new Set<string>(),
     removeSceneObjects: vi.fn(),
+    deleteSelectedPathNodes: vi.fn(),
     selectObject: vi.fn(),
     selectAllObjects: vi.fn(),
     duplicateSelection: vi.fn(),
@@ -132,6 +134,23 @@ describe('handleEditShortcut — input-focus guard (regression)', () => {
     const ctx = editCtx({ additionalSelectedIds: new Set(['O2']) });
     handleEditShortcut(fakeKeydown({ key: 'Backspace', target: div }), ctx);
     expect(ctx.removeSceneObjects).toHaveBeenCalledWith(['O1', 'O2']);
+    div.remove();
+  });
+
+  it('Backspace with a selected path node deletes nodes, not the whole object', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx({
+      selectedPathNode: {
+        objectId: 'O1',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 1,
+      },
+    });
+    handleEditShortcut(fakeKeydown({ key: 'Backspace', target: div }), ctx);
+    expect(ctx.deleteSelectedPathNodes).toHaveBeenCalled();
+    expect(ctx.removeSceneObjects).not.toHaveBeenCalled();
     div.remove();
   });
 

@@ -10,6 +10,10 @@ const META: GcodeMetadata = {
 };
 
 describe('gcodeMetadataHeader', () => {
+  it('tracks the ADR-039 raster gap-rapid emitter revision', () => {
+    expect(EMITTER_REVISION).toBe('adr-039-raster-gap-rapid-v1');
+  });
+
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
     const header = gcodeMetadataHeader(META, { maxPowerS: 1000 });
     expect(header).toContain('; LaserForge 2.0');

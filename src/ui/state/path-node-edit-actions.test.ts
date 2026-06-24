@@ -186,6 +186,118 @@ describe('path node edit actions', () => {
     expect(state.dirty).toBe(true);
   });
 
+  it('deletes selected open polyline nodes without deleting the object', () => {
+    loadObjects([importedSvg('logo', [pathWithPolyline('#000000', false, squarePoints())])]);
+    useStore.setState({ dirty: false });
+    useStore.getState().selectPathNode({
+      objectId: 'logo',
+      pathIndex: 0,
+      polylineIndex: 0,
+      pointIndex: 0,
+    });
+    useStore.getState().selectPathNode(
+      {
+        objectId: 'logo',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 2,
+      },
+      { additive: true },
+    );
+
+    useStore.getState().deleteSelectedPathNodes();
+
+    const state = useStore.getState();
+    const object = state.project.scene.objects[0] as ImportedSvg | undefined;
+    expect(state.project.scene.objects).toHaveLength(1);
+    expect(object?.paths[0]?.polylines[0]?.points).toEqual([
+      { x: 10, y: 0 },
+      { x: 0, y: 10 },
+    ]);
+    expect(object?.bounds).toEqual({ minX: 0, minY: 0, maxX: 10, maxY: 10 });
+    expect(state.selectedObjectId).toBe('logo');
+    expect(state.selectedPathNode).toBeNull();
+    expect(state.selectedPathNodes).toEqual([]);
+    expect(state.undoStack).toHaveLength(1);
+    expect(state.dirty).toBe(true);
+
+    useStore.getState().undo();
+    const restored = useStore.getState().project.scene.objects[0] as ImportedSvg | undefined;
+    expect(restored?.paths[0]?.polylines[0]?.points).toEqual(squarePoints());
+  });
+
+  it('keeps polyline shape specs in sync when deleting selected nodes', () => {
+    const shape = createPolyline({
+      id: 'pen',
+      color: '#000000',
+      spec: {
+        closed: false,
+        points: [
+          { x: 2, y: 3 },
+          { x: 8, y: 3 },
+          { x: 8, y: 7 },
+        ],
+      },
+    });
+    loadObjects([shape]);
+    useStore.getState().selectPathNode({
+      objectId: 'pen',
+      pathIndex: 0,
+      polylineIndex: 0,
+      pointIndex: 1,
+    });
+
+    useStore.getState().deleteSelectedPathNodes();
+
+    const object = useStore.getState().project.scene.objects[0];
+    if (object?.kind !== 'shape' || object.spec.kind !== 'polyline') {
+      throw new Error('expected edited polyline shape');
+    }
+    expect(object.paths[0]?.polylines[0]?.points).toEqual([
+      { x: 2, y: 3 },
+      { x: 8, y: 7 },
+    ]);
+    expect(object.spec.points).toEqual([
+      { x: 2, y: 3 },
+      { x: 8, y: 7 },
+    ]);
+    expect(object.bounds).toEqual({ minX: 2, minY: 3, maxX: 8, maxY: 7 });
+  });
+
+  it('does not delete nodes when the remaining contour would be invalid', () => {
+    loadObjects([importedSvg('logo', [pathWithPolyline('#000000', false, squarePoints())])]);
+    useStore.getState().selectPathNode({
+      objectId: 'logo',
+      pathIndex: 0,
+      polylineIndex: 0,
+      pointIndex: 0,
+    });
+    useStore.getState().selectPathNode(
+      {
+        objectId: 'logo',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 1,
+      },
+      { additive: true },
+    );
+    useStore.getState().selectPathNode(
+      {
+        objectId: 'logo',
+        pathIndex: 0,
+        polylineIndex: 0,
+        pointIndex: 2,
+      },
+      { additive: true },
+    );
+    const before = useStore.getState().project;
+
+    useStore.getState().deleteSelectedPathNodes();
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('does not edit locked, raster, or missing node references', () => {
     loadObjects([
       {
@@ -217,6 +329,7 @@ describe('path node edit actions', () => {
       pointIndex: 0,
     });
     useStore.getState().nudgeSelectedPathNode(1, 1);
+    useStore.getState().deleteSelectedPathNodes();
 
     expect(useStore.getState().project).toBe(before);
     expect(useStore.getState().undoStack).toHaveLength(0);
