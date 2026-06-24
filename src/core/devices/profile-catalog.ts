@@ -34,6 +34,71 @@ const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
   ],
 };
 
+// Brand starter profiles. Bed dimensions are commonly-published figures, NOT
+// hardware-verified here, so each carries 'unverified' evidence. The Device
+// Setup wizard reads the true travel/power from the controller's $$ dump on
+// connect (core/controllers/grbl/parse-settings.ts), so these are named
+// starting points and an offline fallback; the operator confirms first.
+const XTOOL_D1_PRO_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'xtool-d1-pro',
+  vendor: 'xTool',
+  model: 'D1 Pro',
+  name: 'xTool D1 Pro',
+  machineFamily: 'xtool-d1-pro',
+  controllerKind: 'grbl-v1.1',
+  bedWidth: 430,
+  bedHeight: 390,
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'xTool D1 Pro public specs',
+      status: 'unverified',
+      note: 'Work area ~430×390 mm from published specs (xTool lists up to 432×406). Confirm bed size, S range, and homing — LaserForge reads the real values from $$ on connect.',
+    },
+  ],
+};
+
+const SCULPFUN_S30_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'sculpfun-s30',
+  vendor: 'Sculpfun',
+  model: 'S30',
+  name: 'Sculpfun S30',
+  machineFamily: 'sculpfun-s30',
+  controllerKind: 'grbl-v1.1',
+  bedWidth: 410,
+  bedHeight: 400,
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'Sculpfun S30 public specs',
+      status: 'unverified',
+      note: 'Work area ~410×400 mm from published specs (Pro/Max variants differ). Confirm bed size and S range before the first job; LaserForge reads the real values from $$ on connect.',
+    },
+  ],
+};
+
+const ORTUR_LASER_MASTER_3_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'ortur-laser-master-3',
+  vendor: 'Ortur',
+  model: 'Laser Master 3',
+  name: 'Ortur Laser Master 3',
+  machineFamily: 'ortur-laser-master-3',
+  controllerKind: 'grbl-v1.1',
+  bedWidth: 400,
+  bedHeight: 400,
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'Ortur Laser Master 3 public specs',
+      status: 'unverified',
+      note: 'Work area ~400×400 mm from published specs. Confirm bed size, homing, and S range before the first job; LaserForge reads the real values from $$ on connect.',
+    },
+  ],
+};
+
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
   entry(DEFAULT_DEVICE_PROFILE, [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
@@ -43,6 +108,15 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, [
     'No default 4040 scan-offset table is shipped; calibrate before enabling compensation.',
+  ]),
+  entry(XTOOL_D1_PRO_PROFILE, [
+    'Work area from public specs; LaserForge confirms the real bed size from $$ on connect.',
+  ]),
+  entry(SCULPFUN_S30_PROFILE, [
+    'Work area from public specs; confirm bed size and S range before the first job.',
+  ]),
+  entry(ORTUR_LASER_MASTER_3_PROFILE, [
+    'Work area from public specs; confirm bed size, homing, and S range before the first job.',
   ]),
 ];
 

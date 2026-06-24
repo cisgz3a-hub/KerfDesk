@@ -11,6 +11,7 @@ import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { ConsolePanel } from './ConsolePanel';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
+import { DeviceSetupWizard } from './device-setup';
 import { MachineSetupDialog } from './MachineSetupDialog';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
@@ -21,6 +22,7 @@ import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
   const [machineSetupOpen, setMachineSetupOpen] = useState(false);
+  const [deviceSetupOpen, setDeviceSetupOpen] = useState(false);
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -64,7 +66,11 @@ export function LaserWindow(): JSX.Element {
           the Windows desktop app.
         </p>
       )}
+      <Button variant="primary" onClick={() => setDeviceSetupOpen(true)}>
+        Set up device
+      </Button>
       <Button onClick={() => setMachineSetupOpen(true)}>Machine Setup</Button>
+      {deviceSetupOpen && <DeviceSetupWizard onClose={() => setDeviceSetupOpen(false)} />}
       {machineSetupOpen && <MachineSetupDialog onClose={() => setMachineSetupOpen(false)} />}
       <ConnectionBar
         connection={connection}
