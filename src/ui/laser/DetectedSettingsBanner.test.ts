@@ -106,7 +106,8 @@ describe('describeReviewItems', () => {
         label: 'Powered Z jog',
         detail:
           'Controller reports Z travel and Z max rate. Confirm the machine has a motorized Z/focus axis before enabling Z jog buttons.',
-        action: {
+        action: expect.objectContaining({
+          helpId: 'control:laser.detected-settings.powered-z',
           label: 'Mark profile as powered Z',
           title: 'Adds powered Z capability but keeps Z jog blocked until travel is confirmed.',
           patch: expect.objectContaining({
@@ -114,7 +115,7 @@ describe('describeReviewItems', () => {
             zTravelMm: 75,
             zTravelConfirmed: false,
           }),
-        },
+        }),
       }),
     ]);
     expect(review.ignored).toEqual([]);
@@ -167,6 +168,37 @@ describe('describeReviewItems', () => {
 });
 
 describe('DetectedSettingsBanner', () => {
+  it('exposes explicit help metadata on the detected-settings review controls', async () => {
+    useLaserStore.setState({
+      detectedSettings: { maxPowerS: 255, zTravelMm: 75 },
+      controllerSettings: { maxPowerS: 255, zTravelMm: 75, zMaxFeed: 300 },
+      grblSettingsRows: [],
+    });
+
+    const { host, unmount } = await renderDetectedSettingsBanner();
+    try {
+      const region = host.querySelector('[aria-label="Detected machine settings"]');
+      if (!(region instanceof HTMLElement)) {
+        throw new Error('Detected settings region missing');
+      }
+
+      expect(region.dataset.helpId).toBe('control:laser.detected-settings.review');
+      expect(region.title.length).toBeGreaterThan(30);
+
+      expect(button(host, 'Dismiss').dataset.helpId).toBe(
+        'control:laser.detected-settings.dismiss',
+      );
+      expect(button(host, 'Apply safe settings').dataset.helpId).toBe(
+        'control:laser.detected-settings.apply-safe',
+      );
+      expect(button(host, 'Mark profile as powered Z').dataset.helpId).toBe(
+        'control:laser.detected-settings.powered-z',
+      );
+    } finally {
+      await unmount();
+    }
+  });
+
   it('applies the guarded powered Z action to the active profile only after click', async () => {
     useLaserStore.setState({
       detectedSettings: { zTravelMm: 75 },
@@ -199,3 +231,11 @@ describe('DetectedSettingsBanner', () => {
     }
   });
 });
+
+function button(host: HTMLElement, label: string): HTMLButtonElement {
+  const match = [...host.querySelectorAll('button')].find((candidate) =>
+    candidate.textContent?.includes(label),
+  );
+  if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
+  return match;
+}
