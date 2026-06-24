@@ -8,6 +8,7 @@ import {
   type DeviceProfile,
   type ProfileCapability,
 } from '../../core/devices';
+import { controlHelp, helpProps, type HelpTopicId } from '../help/help-topics';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 
@@ -26,7 +27,12 @@ export function DetectedSettingsBanner(): JSX.Element | null {
     return null;
   }
   return (
-    <div style={panelStyle} role="region" aria-label="Detected machine settings">
+    <div
+      style={panelStyle}
+      role="region"
+      aria-label="Detected machine settings"
+      {...helpProps('control:laser.detected-settings.review')}
+    >
       <strong style={titleStyle}>Detected machine settings review</strong>
       <p style={hintStyle}>
         Your laser reported these values via <code>$$</code>. Safe profile values can be applied;
@@ -43,7 +49,8 @@ export function DetectedSettingsBanner(): JSX.Element | null {
         <button
           type="button"
           onClick={dismiss}
-          title="Ignore these detected firmware settings for now."
+          title={controlHelp('control:laser.detected-settings.dismiss')}
+          data-help-id="control:laser.detected-settings.dismiss"
         >
           Dismiss
         </button>
@@ -52,7 +59,8 @@ export function DetectedSettingsBanner(): JSX.Element | null {
             type="button"
             onClick={apply}
             style={primaryButtonStyle}
-            title="Apply only the safe detected firmware settings to this device profile."
+            title={controlHelp('control:laser.detected-settings.apply-safe')}
+            data-help-id="control:laser.detected-settings.apply-safe"
           >
             Apply safe settings
           </button>
@@ -106,6 +114,7 @@ function ReviewSection(props: {
                     type="button"
                     style={reviewActionButtonStyle}
                     title={action.title}
+                    data-help-id={action.helpId}
                     onClick={() => props.onApplyAction?.(action.patch)}
                   >
                     {action.label}
@@ -137,6 +146,7 @@ type ReviewAction = {
   readonly label: string;
   readonly title: string;
   readonly patch: Partial<DeviceProfile>;
+  readonly helpId: HelpTopicId;
 };
 
 type ReviewSummary = {
@@ -194,6 +204,7 @@ export function describeReviewItems(
       action: {
         label: 'Mark profile as powered Z',
         title: 'Adds powered Z capability but keeps Z jog blocked until travel is confirmed.',
+        helpId: 'control:laser.detected-settings.powered-z',
         patch: {
           capabilities: addCapability(current.capabilities, 'z-axis'),
           zTravelMm: detectedZTravelMm,

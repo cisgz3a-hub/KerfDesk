@@ -27,6 +27,10 @@ export type ControlHelpKey =
   | 'laser.console.quick.$I'
   | 'laser.console.quick.$G'
   | 'laser.console.quick.?'
+  | 'laser.detected-settings.review'
+  | 'laser.detected-settings.dismiss'
+  | 'laser.detected-settings.apply-safe'
+  | 'laser.detected-settings.powered-z'
   | 'laser.machine-settings'
   | 'laser.machine-settings.read'
   | 'laser.machine-settings.diagnostic'
@@ -160,6 +164,25 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.console.quick.?': {
     label: 'Status query',
     tooltip: 'Send realtime ? to request one immediate GRBL status report.',
+  },
+  'laser.detected-settings.review': {
+    label: 'Detected settings review',
+    tooltip:
+      'Review controller-reported GRBL settings before applying safe profile updates or capability hints.',
+  },
+  'laser.detected-settings.dismiss': {
+    label: 'Dismiss detected settings',
+    tooltip: 'Hide this detected-settings review without changing the active machine profile.',
+  },
+  'laser.detected-settings.apply-safe': {
+    label: 'Apply safe detected settings',
+    tooltip:
+      'Apply only safe numeric GRBL profile values; firmware and machine capabilities are not changed.',
+  },
+  'laser.detected-settings.powered-z': {
+    label: 'Mark powered Z',
+    tooltip:
+      'Mark the profile as having powered Z while keeping Z jog blocked until travel is confirmed.',
   },
   'laser.machine-settings': {
     label: 'Read / Backup Controller Settings',
