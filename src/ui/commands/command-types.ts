@@ -78,6 +78,7 @@ export type CommandId =
   | 'window.toggle-preview'
   | 'window.fit-view'
   | 'window.project-notes'
+  | 'window.undo-history'
   | 'help.about';
 
 export type AppCommand = {
@@ -179,6 +180,7 @@ export type AppCommandContext = {
   readonly hasPreviewableContent: boolean;
   readonly resetView: () => void;
   readonly projectNotes: () => void;
+  readonly undoHistory: () => void;
   readonly showAbout: () => void;
 };
 

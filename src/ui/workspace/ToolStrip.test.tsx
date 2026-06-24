@@ -91,4 +91,16 @@ describe('ToolStrip', () => {
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'measure' });
     expect(measure?.getAttribute('aria-pressed')).toBe('true');
   });
+
+  it('arms the Star tool from the tool strip', async () => {
+    const h = await render(<ToolStrip />);
+    const star = h.querySelector('button[aria-label="Draw star"]');
+
+    await act(async () => {
+      star?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'star' });
+    expect(star?.getAttribute('aria-pressed')).toBe('true');
+  });
 });

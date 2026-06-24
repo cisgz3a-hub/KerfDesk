@@ -101,6 +101,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     togglePreview: vi.fn(),
     resetView: vi.fn(),
     projectNotes: vi.fn(),
+    undoHistory: vi.fn(),
     showAbout: vi.fn(),
   };
 }

@@ -49,7 +49,7 @@ export type DragState =
   // nextTransformForDrag, since there's no object to transform until commit.
   | {
       readonly kind: 'draw';
-      readonly shape: 'rect' | 'ellipse' | 'polygon';
+      readonly shape: 'rect' | 'ellipse' | 'polygon' | 'star';
       readonly startScenePoint: Vec2;
     }
   | {

@@ -21,6 +21,7 @@ const TOOLS: ReadonlyArray<Tool> = [
   { mode: { kind: 'draw', shape: 'rect' }, helpKey: 'rect', icon: 'square' },
   { mode: { kind: 'draw', shape: 'ellipse' }, helpKey: 'ellipse', icon: 'circle' },
   { mode: { kind: 'draw', shape: 'polygon' }, helpKey: 'polygon', icon: 'pentagon' },
+  { mode: { kind: 'draw', shape: 'star' }, helpKey: 'star', icon: 'star' },
   { mode: { kind: 'draw', shape: 'polyline' }, helpKey: 'polyline', icon: 'pen' },
 ];
 

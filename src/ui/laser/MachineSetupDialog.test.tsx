@@ -105,6 +105,29 @@ describe('MachineSetupDialog', () => {
     }
   });
 
+  it('exposes explicit help metadata on every Machine Setup tab', async () => {
+    const expected = [
+      ['Overview', 'control:laser.machine-setup.tab.overview'],
+      ['Profile Catalog', 'control:laser.machine-setup.tab.catalog'],
+      ['Controller Settings', 'control:laser.machine-setup.tab.controller'],
+      ['Firmware Writes', 'control:laser.machine-setup.tab.firmware'],
+      ['Safety Zones', 'control:laser.machine-setup.tab.zones'],
+      ['Raster Diagnostics', 'control:laser.machine-setup.tab.raster-diagnostics'],
+      ['Import / Export', 'control:laser.machine-setup.tab.import-export'],
+    ] as const;
+    const { host, unmount } = await renderDialog();
+    try {
+      for (const [label, helpId] of expected) {
+        const tab = button(host, label);
+
+        expect(tab.dataset.helpId).toBe(helpId);
+        expect(tab.title.length).toBeGreaterThan(30);
+      }
+    } finally {
+      await unmount();
+    }
+  });
+
   it('summarizes raster calibration risks for bidirectional output', async () => {
     useStore.getState().setProject(
       projectWithLayers([

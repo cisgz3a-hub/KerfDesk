@@ -89,6 +89,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     hasPreviewableContent: true,
     resetView: vi.fn(),
     projectNotes: vi.fn(),
+    undoHistory: vi.fn(),
     showAbout: vi.fn(),
     ...overrides,
   };
