@@ -107,6 +107,25 @@ export function requirePositiveInteger(obj: Record<string, unknown>, path: strin
     : `missing or invalid \`${path}\``;
 }
 
+export function requireIntegerInRange(
+  obj: Record<string, unknown>,
+  path: string,
+  min: number,
+  max: number,
+): string | null {
+  const value = valueAtPath(obj, path);
+  return isFiniteNumber(value) && Number.isInteger(value) && value >= min && value <= max
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
+export function requireUnitRatio(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  return isFiniteNumber(value) && value > 0 && value < 1
+    ? null
+    : `missing or invalid \`${path}\``;
+}
+
 export function requirePercent(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return isFiniteNumber(value) && value >= 0 && value <= 100

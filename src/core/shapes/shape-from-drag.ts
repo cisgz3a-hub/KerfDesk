@@ -7,8 +7,9 @@ import { IDENTITY_TRANSFORM, type ShapeObject, type Transform, type Vec2 } from 
 import { createEllipse } from './create-ellipse';
 import { createPolygon } from './create-polygon';
 import { createRectangle } from './create-rectangle';
+import { createStar } from './create-star';
 
-export type DrawShapeKind = 'rect' | 'ellipse' | 'polygon';
+export type DrawShapeKind = 'rect' | 'ellipse' | 'polygon' | 'star';
 export type DrawShapeModifiers = {
   readonly regular?: boolean;
   readonly fromCenter?: boolean;
@@ -17,6 +18,8 @@ export type DrawShapeModifiers = {
 // LightBurn's polygon tool defaults to 6 sides; LaserForge follows that until a
 // per-shape sides control lands.
 const DEFAULT_POLYGON_SIDES = 6;
+const DEFAULT_STAR_POINTS = 5;
+const DEFAULT_STAR_INNER_RADIUS_RATIO = 0.5;
 
 // A click or sub-millimetre twitch should not spawn a degenerate primitive.
 // Closed shapes need real width and height, except Shift/regular mode where one
@@ -49,7 +52,10 @@ export function shapeFromDrag(args: {
       transform: { ...IDENTITY_TRANSFORM, x: box.minX, y: box.minY },
     });
   }
-  return polygonInBox({ id, color, box, regular: args.modifiers?.regular === true });
+  if (args.kind === 'polygon') {
+    return polygonInBox({ id, color, box, regular: args.modifiers?.regular === true });
+  }
+  return starInBox({ id, color, box, regular: args.modifiers?.regular === true });
 }
 
 export function isDrawDragSignificant(
@@ -109,12 +115,37 @@ function polygonInBox(args: {
   const scaleX = args.box.widthMm / naturalWidth;
   const scaleY = args.box.heightMm / naturalHeight;
   const transform = args.regular
-    ? regularPolygonTransform(unit, args.box, Math.min(scaleX, scaleY))
-    : polygonBoxTransform(unit, args.box, scaleX, scaleY);
+    ? regularShapeTransform(unit, args.box, Math.min(scaleX, scaleY))
+    : shapeBoxTransform(unit, args.box, scaleX, scaleY);
   return { ...unit, transform };
 }
 
-function polygonBoxTransform(
+function starInBox(args: {
+  readonly id: string;
+  readonly color: string;
+  readonly box: DrawBox;
+  readonly regular: boolean;
+}): ShapeObject {
+  const unit = createStar({
+    id: args.id,
+    color: args.color,
+    spec: {
+      points: DEFAULT_STAR_POINTS,
+      outerRadiusMm: 1,
+      innerRadiusRatio: DEFAULT_STAR_INNER_RADIUS_RATIO,
+    },
+  });
+  const naturalWidth = unit.bounds.maxX - unit.bounds.minX;
+  const naturalHeight = unit.bounds.maxY - unit.bounds.minY;
+  const scaleX = args.box.widthMm / naturalWidth;
+  const scaleY = args.box.heightMm / naturalHeight;
+  const transform = args.regular
+    ? regularShapeTransform(unit, args.box, Math.min(scaleX, scaleY))
+    : shapeBoxTransform(unit, args.box, scaleX, scaleY);
+  return { ...unit, transform };
+}
+
+function shapeBoxTransform(
   shape: ShapeObject,
   box: DrawBox,
   scaleX: number,
@@ -129,7 +160,7 @@ function polygonBoxTransform(
   };
 }
 
-function regularPolygonTransform(shape: ShapeObject, box: DrawBox, scale: number): Transform {
+function regularShapeTransform(shape: ShapeObject, box: DrawBox, scale: number): Transform {
   const naturalWidth = shape.bounds.maxX - shape.bounds.minX;
   const naturalHeight = shape.bounds.maxY - shape.bounds.minY;
   const actualWidth = naturalWidth * scale;

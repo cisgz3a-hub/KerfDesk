@@ -60,6 +60,22 @@ describe('shapeFromDrag', () => {
     expectShapeBox(shape, { minX: 0, minY: 0, maxX: 40, maxY: 20 });
   });
 
+  it('fills the visual drag box for a star', () => {
+    const shape = shapeFromDrag({
+      kind: 'star',
+      start: { x: 0, y: 0 },
+      end: { x: 40, y: 40 },
+      id: 'S1',
+      color: '#ffff00',
+    });
+
+    expect(shape.spec.kind).toBe('star');
+    if (shape.spec.kind !== 'star') throw new Error('expected star shape');
+    expect(shape.spec.points).toBe(5);
+    expect(shape.spec.innerRadiusRatio).toBeCloseTo(0.5, 5);
+    expectShapeBox(shape, { minX: 0, minY: 0, maxX: 40, maxY: 40 });
+  });
+
   it('uses Ctrl/Cmd-style center-out drawing when requested', () => {
     const shape = shapeFromDrag({
       kind: 'ellipse',

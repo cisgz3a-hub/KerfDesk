@@ -1,7 +1,3 @@
-// create-polygon — bridge from polygon geometry to a kind:'shape' SceneObject
-// (ADR-051, Phase G, B3). Unlike rect/ellipse, a regular polygon's bounding box
-// depends on side count + orientation, so bounds are derived from the vertices.
-
 import {
   IDENTITY_TRANSFORM,
   type ColoredPath,
@@ -9,20 +5,20 @@ import {
   type Transform,
 } from '../scene';
 import { boundsOfPolylines } from './polyline-bounds';
-import { polygonToPolylines, type PolygonSpec } from './polygon';
+import { starToPolylines, type StarSpec } from './star';
 
-export function createPolygon(args: {
+export function createStar(args: {
   readonly id: string;
   readonly color: string;
-  readonly spec: PolygonSpec;
+  readonly spec: StarSpec;
   readonly transform?: Transform;
 }): ShapeObject {
-  const polylines = polygonToPolylines(args.spec);
+  const polylines = starToPolylines(args.spec);
   const paths: ReadonlyArray<ColoredPath> = [{ color: args.color, polylines }];
   return {
     kind: 'shape',
     id: args.id,
-    spec: { kind: 'polygon', ...args.spec },
+    spec: { kind: 'star', ...args.spec },
     color: args.color,
     bounds: boundsOfPolylines(polylines),
     transform: args.transform ?? IDENTITY_TRANSFORM,

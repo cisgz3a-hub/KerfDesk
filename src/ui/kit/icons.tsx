@@ -28,6 +28,7 @@ export type IconName =
   | 'square'
   | 'circle'
   | 'pentagon'
+  | 'star'
   | 'ruler'
   | 'pen';
 
@@ -76,6 +77,7 @@ const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
   square: <rect x="3" y="3" width="10" height="10" rx="1" />,
   circle: <circle cx="8" cy="8" r="5.5" />,
   pentagon: <path d="M8 2.5l5.2 3.8-2 6.2H4.8l-2-6.2L8 2.5Z" />,
+  star: <path d="M8 2.3l1.6 3.5 3.8.4-2.8 2.6.8 3.8L8 10.7l-3.4 1.9.8-3.8-2.8-2.6 3.8-.4L8 2.3Z" />,
   ruler: (
     <>
       <path d="M2.5 11.5l9-9 2 2-9 9-2-2Z" />

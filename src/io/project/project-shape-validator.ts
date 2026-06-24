@@ -17,6 +17,7 @@ import {
   optionalString,
   requireBoolean,
   requireCoordinate,
+  requireIntegerInRange,
   requireLiteral,
   requireNonNegativeNumber,
   requireNumber,
@@ -25,6 +26,7 @@ import {
   requirePositiveNumber,
   requireScale,
   requireString,
+  requireUnitRatio,
   validateArray,
   valueAtPath,
 } from './project-shape-primitives';
@@ -299,6 +301,13 @@ function validateShapeSpec(value: unknown, path: string): string | null {
     return firstError([
       requirePositiveInteger(value, `${path}.sides`),
       requirePositiveNumber(value, `${path}.radiusMm`),
+    ]);
+  }
+  if (kind === 'star') {
+    return firstError([
+      requireIntegerInRange(value, `${path}.points`, 3, 64),
+      requirePositiveNumber(value, `${path}.outerRadiusMm`),
+      requireUnitRatio(value, `${path}.innerRadiusRatio`),
     ]);
   }
   if (kind === 'polyline') {
