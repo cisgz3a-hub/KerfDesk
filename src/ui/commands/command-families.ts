@@ -373,6 +373,13 @@ export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
       'Edit project notes',
       ctx.projectNotes,
     ),
+    enabled(
+      'window.undo-history',
+      'window',
+      'Undo History...',
+      'Review undo and redo history',
+      ctx.undoHistory,
+    ),
   ];
 }
 

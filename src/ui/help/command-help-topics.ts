@@ -239,6 +239,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'window',
     tooltip: 'Edit notes saved inside the current LaserForge project file.',
   },
+  'window.undo-history': {
+    family: 'window',
+    tooltip: 'Review undo and redo history for the current project.',
+  },
   'help.about': {
     family: 'help',
     tooltip: 'Show LaserForge build and version information.',

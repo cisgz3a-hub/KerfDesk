@@ -48,6 +48,7 @@ export type CommandShellCallbacks = {
   readonly requestFocusTest: () => void;
   readonly requestOptimizationSettings: () => void;
   readonly requestProjectNotes: () => void;
+  readonly requestUndoHistory: () => void;
   readonly requestCloseOpenFillContoursWithTolerance: () => void;
   readonly showAbout: () => void;
 };
@@ -304,11 +305,15 @@ function laserCommandContext(
 function windowHelpCommandContext(
   callbacks: CommandShellCallbacks,
   app: ReturnType<typeof useStore.getState>,
-): Pick<AppCommandContext, 'togglePreview' | 'resetView' | 'projectNotes' | 'showAbout'> {
+): Pick<
+  AppCommandContext,
+  'togglePreview' | 'resetView' | 'projectNotes' | 'undoHistory' | 'showAbout'
+> {
   return {
     togglePreview: app.togglePreview,
     resetView: useUiStore.getState().resetView,
     projectNotes: callbacks.requestProjectNotes,
+    undoHistory: callbacks.requestUndoHistory,
     showAbout: callbacks.showAbout,
   };
 }
