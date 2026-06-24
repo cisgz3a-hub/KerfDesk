@@ -12,7 +12,10 @@ import {
 import { createRectangle, createRegistrationBox } from '../shapes';
 import { runPreEmitPreflight } from './pre-emit';
 
-function projectWithJig(opts: { readonly regOutput: boolean; readonly artOutput: boolean }): Project {
+function projectWithJig(opts: {
+  readonly regOutput: boolean;
+  readonly artOutput: boolean;
+}): Project {
   const base = createProject();
   const box = createRegistrationBox({ widthMm: 80, heightMm: 40 });
   const art = createRectangle({
@@ -22,7 +25,10 @@ function projectWithJig(opts: { readonly regOutput: boolean; readonly artOutput:
   });
   let scene = addObject(addObject(base.scene, box), art);
   scene = addLayer(scene, { ...createRegistrationLayer(), output: opts.regOutput });
-  scene = addLayer(scene, { ...createLayer({ id: '#0000ff', color: '#0000ff' }), output: opts.artOutput });
+  scene = addLayer(scene, {
+    ...createLayer({ id: '#0000ff', color: '#0000ff' }),
+    output: opts.artOutput,
+  });
   return { ...base, scene };
 }
 
@@ -104,7 +110,11 @@ describe('runPreEmitPreflight', () => {
   });
 
   it('allows a registration jig burning only one run', () => {
-    expect(runPreEmitPreflight(projectWithJig({ regOutput: true, artOutput: false })).ok).toBe(true);
-    expect(runPreEmitPreflight(projectWithJig({ regOutput: false, artOutput: true })).ok).toBe(true);
+    expect(runPreEmitPreflight(projectWithJig({ regOutput: true, artOutput: false })).ok).toBe(
+      true,
+    );
+    expect(runPreEmitPreflight(projectWithJig({ regOutput: false, artOutput: true })).ok).toBe(
+      true,
+    );
   });
 });

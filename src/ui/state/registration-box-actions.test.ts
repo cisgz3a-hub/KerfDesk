@@ -8,7 +8,10 @@ import {
   type Project,
 } from '../../core/scene';
 import { createRectangle, createRegistrationBox } from '../../core/shapes';
-import { applyAddRegistrationBox, registrationBoxDefaultPosition } from './registration-box-actions';
+import {
+  applyAddRegistrationBox,
+  registrationBoxDefaultPosition,
+} from './registration-box-actions';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 

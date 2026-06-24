@@ -32,7 +32,8 @@ export function RegistrationJigPanel(): JSX.Element | null {
   const runState = registrationRunState(scene);
   const boxIds = new Set(boxes.map((b) => b.id));
   const canCenter =
-    hasBox && [selectedObjectId, ...additionalSelectedIds].some((id) => id !== null && !boxIds.has(id));
+    hasBox &&
+    [selectedObjectId, ...additionalSelectedIds].some((id) => id !== null && !boxIds.has(id));
 
   if (!open) return null;
   return (
@@ -143,16 +144,28 @@ function NextBurnBanner(props: { readonly state: RegistrationRunState }): JSX.El
   );
 }
 
-function bannerFor(state: RegistrationRunState): { readonly className: string; readonly text: string } {
+function bannerFor(state: RegistrationRunState): {
+  readonly className: string;
+  readonly text: string;
+} {
   switch (state) {
     case 'none':
       return { className: 'lf-banner', text: 'Create a box below to begin.' };
     case 'box':
-      return { className: 'lf-banner lf-banner--info', text: '▶ Next Start burns: BOX outline (run 1)' };
+      return {
+        className: 'lf-banner lf-banner--info',
+        text: '▶ Next Start burns: BOX outline (run 1)',
+      };
     case 'artwork':
-      return { className: 'lf-banner lf-banner--info', text: '▶ Next Start burns: your ARTWORK (run 2)' };
+      return {
+        className: 'lf-banner lf-banner--info',
+        text: '▶ Next Start burns: your ARTWORK (run 2)',
+      };
     case 'mixed':
-      return { className: 'lf-banner lf-banner--warning', text: 'Pick a run below — Box only or Artwork only.' };
+      return {
+        className: 'lf-banner lf-banner--warning',
+        text: 'Pick a run below — Box only or Artwork only.',
+      };
   }
 }
 
@@ -164,7 +177,11 @@ function BurnRunToggle(props: {
   return (
     <div role="group" aria-label="Burn run" style={toggleRowStyle}>
       <span>Burn run:</span>
-      <Button pressed={props.state === 'box'} disabled={props.disabled} onClick={() => props.onPick('box')}>
+      <Button
+        pressed={props.state === 'box'}
+        disabled={props.disabled}
+        onClick={() => props.onPick('box')}
+      >
         Box only
       </Button>
       <Button
@@ -188,8 +205,8 @@ function RegistrationJigHelp(): JSX.Element {
       {open && (
         <ol style={helpListStyle}>
           <li>
-            Set the size and <strong>Create box</strong>. Pick <strong>Box only</strong>, then Start to
-            burn the box on scrap.
+            Set the size and <strong>Create box</strong>. Pick <strong>Box only</strong>, then Start
+            to burn the box on scrap.
           </li>
           <li>Put your object inside the burned outline.</li>
           <li>
@@ -252,4 +269,8 @@ const helpListStyle: React.CSSProperties = {
   gap: 4,
   fontSize: 12,
 };
-const helpNoteStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', listStyle: 'none', marginLeft: -18 };
+const helpNoteStyle: React.CSSProperties = {
+  color: 'var(--lf-text-faint)',
+  listStyle: 'none',
+  marginLeft: -18,
+};
