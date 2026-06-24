@@ -133,7 +133,12 @@ function useRegistrationPanelDrag(): PanelDragControls {
       const nextX = drag.startX + event.clientX - drag.startClientX;
       const nextY = drag.startY + event.clientY - drag.startClientY;
       setPosition(
-        clampPanelPosition(nextX, nextY, parent.getBoundingClientRect(), panel.getBoundingClientRect()),
+        clampPanelPosition(
+          nextX,
+          nextY,
+          parent.getBoundingClientRect(),
+          panel.getBoundingClientRect(),
+        ),
       );
     };
     const onPointerEnd = (): void => {

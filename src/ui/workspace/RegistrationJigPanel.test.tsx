@@ -110,7 +110,9 @@ describe('RegistrationJigPanel', () => {
   it('moves when the header is dragged', () => {
     render();
     const panel = container.querySelector<HTMLElement>('[aria-label="Registration jig"]');
-    const handle = container.querySelector<HTMLElement>('[aria-label="Move registration jig panel"]');
+    const handle = container.querySelector<HTMLElement>(
+      '[aria-label="Move registration jig panel"]',
+    );
     if (panel === null || handle === null) throw new Error('registration panel handle not found');
 
     panel.getBoundingClientRect = () =>
