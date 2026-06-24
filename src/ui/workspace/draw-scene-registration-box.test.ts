@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createLayer, createProject, createRegistrationLayer, type Project } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  createRegistrationLayer,
+  type Project,
+} from '../../core/scene';
 import { createRectangle, createRegistrationBox } from '../../core/shapes';
 import { drawScene } from './draw-scene';
 
@@ -29,7 +34,11 @@ function recordingContext(): {
 const DRAW_OPTS = { selectedId: null, preview: false, view: { zoomFactor: 1, panX: 0, panY: 0 } };
 const JIG_DASH = [8, 5];
 
-function sceneProject(project: Project, layers: Project['scene']['layers'], objects: Project['scene']['objects']): Project {
+function sceneProject(
+  project: Project,
+  layers: Project['scene']['layers'],
+  objects: Project['scene']['objects'],
+): Project {
   return { ...project, scene: { layers, objects, groups: [] } };
 }
 

@@ -75,13 +75,37 @@ describe('registration layer', () => {
     const art = createLayer({ id: '#000000', color: '#000000' });
     expect(registrationRunState(makeScene([], []))).toBe('none');
     expect(
-      registrationRunState(makeScene([box], [{ ...reg, output: true }, { ...art, output: false }])),
+      registrationRunState(
+        makeScene(
+          [box],
+          [
+            { ...reg, output: true },
+            { ...art, output: false },
+          ],
+        ),
+      ),
     ).toBe('box');
     expect(
-      registrationRunState(makeScene([box], [{ ...reg, output: false }, { ...art, output: true }])),
+      registrationRunState(
+        makeScene(
+          [box],
+          [
+            { ...reg, output: false },
+            { ...art, output: true },
+          ],
+        ),
+      ),
     ).toBe('artwork');
     expect(
-      registrationRunState(makeScene([box], [{ ...reg, output: true }, { ...art, output: true }])),
+      registrationRunState(
+        makeScene(
+          [box],
+          [
+            { ...reg, output: true },
+            { ...art, output: true },
+          ],
+        ),
+      ),
     ).toBe('mixed');
   });
 
@@ -92,17 +116,35 @@ describe('registration layer', () => {
     expect(registrationOutputConflict(makeScene([], []))).toBe(false);
     expect(
       registrationOutputConflict(
-        makeScene([box], [{ ...reg, output: true }, { ...art, output: true }]),
+        makeScene(
+          [box],
+          [
+            { ...reg, output: true },
+            { ...art, output: true },
+          ],
+        ),
       ),
     ).toBe(true);
     expect(
       registrationOutputConflict(
-        makeScene([box], [{ ...reg, output: true }, { ...art, output: false }]),
+        makeScene(
+          [box],
+          [
+            { ...reg, output: true },
+            { ...art, output: false },
+          ],
+        ),
       ),
     ).toBe(false);
     expect(
       registrationOutputConflict(
-        makeScene([box], [{ ...reg, output: false }, { ...art, output: true }]),
+        makeScene(
+          [box],
+          [
+            { ...reg, output: false },
+            { ...art, output: true },
+          ],
+        ),
       ),
     ).toBe(false);
   });
