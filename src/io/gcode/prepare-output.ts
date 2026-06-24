@@ -10,6 +10,7 @@
 import {
   applyJobOriginOffset,
   compileJob,
+  computeRegistrationBoxBounds,
   computeSceneOutputBounds,
   jobOriginOffset,
   jobOriginOffsetFromBounds,
@@ -91,6 +92,13 @@ function resolveJobOriginOffset(
   jobOrigin: JobOriginPlacement,
   outputScope: OutputScope,
 ): Vec2 {
+  // Registration jig (ADR-057): both burn runs (box outline, then artwork) anchor
+  // to the BOX, not to whichever layer is output for that run, so the artwork
+  // lands inside the burned box instead of at the bed corner. No-op when no jig
+  // is present (returns null -> existing placement logic below).
+  const boxBounds = computeRegistrationBoxBounds(project.scene, project.device);
+  if (boxBounds !== null) return jobOriginOffsetFromBounds(boxBounds, jobOrigin);
+
   if (outputScope.cutSelectedGraphics && !outputScope.useSelectionOrigin) {
     const fullBounds = computeSceneOutputBounds(project.scene, project.device);
     return fullBounds === null ? ZERO_OFFSET : jobOriginOffsetFromBounds(fullBounds, jobOrigin);

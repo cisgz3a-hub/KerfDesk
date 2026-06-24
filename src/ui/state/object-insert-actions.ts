@@ -11,6 +11,7 @@ import {
   type ShapeObject,
   type TextObject,
 } from '../../core/scene';
+import { createRegistrationBox } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
@@ -23,6 +24,11 @@ import {
   type ImportOutcome,
 } from './scene-mutations';
 import { applyDrawShape } from './draw-shape-mutation';
+import {
+  applyAddRegistrationBox,
+  applyRemoveRegistrationBox,
+  registrationBoxDefaultPosition,
+} from './registration-box-actions';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 type Getter = () => AppState;
@@ -30,7 +36,14 @@ type Getter = () => AppState;
 export function objectInsertActions(
   set: Setter,
   get: Getter,
-): Pick<AppState, 'importSvgObject' | 'upsertTextObject' | 'drawShape'> {
+): Pick<
+  AppState,
+  | 'importSvgObject'
+  | 'upsertTextObject'
+  | 'drawShape'
+  | 'addRegistrationBox'
+  | 'removeRegistrationBox'
+> {
   return {
     importSvgObject: (object: SceneObject, batchOffsetIdx = 0): ImportOutcome => {
       const existing = findReimportTarget(get().project.scene, object);
@@ -56,6 +69,17 @@ export function objectInsertActions(
     },
     drawShape: (shape: ShapeObject) => {
       set((s) => applyDrawShape(s, shape));
+    },
+    addRegistrationBox: (widthMm: number, heightMm: number) => {
+      set((s) => {
+        const { bedWidth, bedHeight } = s.project.device;
+        const position = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
+        const box = createRegistrationBox({ widthMm, heightMm, x: position.x, y: position.y });
+        return applyAddRegistrationBox(s, box);
+      });
+    },
+    removeRegistrationBox: () => {
+      set((s) => applyRemoveRegistrationBox(s) ?? s);
     },
   };
 }

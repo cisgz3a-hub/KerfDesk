@@ -78,6 +78,8 @@ function baseCtxActions(): Partial<AppCommandContext> {
     clearSelection: vi.fn(),
     measureTool: vi.fn(),
     addText: vi.fn(),
+    registrationPanelOpen: false,
+    toggleRegistrationPanel: vi.fn(),
     materialTest: vi.fn(),
     intervalTest: vi.fn(),
     scanOffsetTest: vi.fn(),

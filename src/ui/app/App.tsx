@@ -9,7 +9,7 @@ import { CommandShell } from '../commands';
 import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
-import { ToolStrip, Workspace } from '../workspace';
+import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
@@ -45,6 +45,7 @@ export function App(): JSX.Element {
         <ToolStrip />
         <div style={canvasAreaStyle}>
           <Workspace />
+          <RegistrationJigPanel />
         </div>
         <CutsLayersPanel />
         <LaserWindow />

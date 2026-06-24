@@ -34,6 +34,7 @@ export {
   offsetJobBounds,
 } from './job-origin';
 export { computeSceneOutputBounds } from './scene-output-bounds';
+export { computeRegistrationBoxBounds } from './registration-placement';
 export type { JobDurationEstimate } from './estimate-duration';
 export { estimateJobDuration, formatDuration } from './estimate-duration';
 export { optimizePaths } from './optimize-paths';

@@ -94,6 +94,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Create editable text artwork on the workspace.',
   },
+  'tools.registration-jig': {
+    family: 'tools',
+    tooltip: 'Open the registration jig panel: create a burn-alignment box, center artwork, and pick the burn run.',
+  },
   'tools.material-test': {
     family: 'tools',
     tooltip: 'Create a power and speed grid for finding material settings.',

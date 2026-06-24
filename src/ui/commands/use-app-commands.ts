@@ -57,6 +57,8 @@ type CommandDialogs = {
   readonly openTextDialog: (options: { readonly mode: 'add' }) => void;
   readonly measureTool: () => void;
   readonly measureActive: boolean;
+  readonly registrationPanelOpen: boolean;
+  readonly toggleRegistrationPanel: () => void;
 };
 
 type CommandSelection = {
@@ -74,12 +76,16 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const setToolMode = useUiStore((s) => s.setToolMode);
   const toolMode = useUiStore((s) => s.toolMode);
+  const registrationPanelOpen = useUiStore((s) => s.registrationPanelOpen);
+  const toggleRegistrationPanel = useUiStore((s) => s.toggleRegistrationPanel);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
       openTextDialog,
       measureTool: () => setToolMode({ kind: 'measure' }),
       measureActive: toolMode.kind === 'measure',
+      registrationPanelOpen,
+      toggleRegistrationPanel,
     }),
   );
 }
@@ -119,6 +125,8 @@ function appCommandContext(
       activeStreamer,
     homingEnabled: app.project.device.homing.enabled,
     hasSelection: selectedIds.length > 0,
+    registrationPanelOpen: dialogs.registrationPanelOpen,
+    toggleRegistrationPanel: dialogs.toggleRegistrationPanel,
     hasRasterSelection: selected?.kind === 'raster-image',
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
     hasFillableSelection: selectionHasVectorObject(app.project, selectedIds),
