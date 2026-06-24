@@ -6,6 +6,7 @@
 
 import type { DeviceProfile } from '../../../core/devices';
 import type { GrblSettingRow } from '../../../core/controllers/grbl';
+import { numbersClose } from '../../../core/util';
 
 export type FirmwareDiff = {
   readonly id: number;
@@ -38,8 +39,6 @@ const DIFFED_SETTINGS: ReadonlyArray<DiffedSetting> = [
   { id: 131, label: 'Bed height', desired: (d) => d.bedHeight },
 ];
 
-const COMPARE_EPSILON = 0.001;
-
 export function computeFirmwareDiffs(
   draft: DeviceProfile,
   rows: ReadonlyArray<GrblSettingRow>,
@@ -63,11 +62,4 @@ export function computeFirmwareDiffs(
       },
     ];
   });
-}
-
-function numbersClose(a: number, b: number): boolean {
-  const diff = Math.abs(a - b);
-  if (diff < COMPARE_EPSILON) return true;
-  const denom = Math.max(Math.abs(a), Math.abs(b), 1);
-  return diff / denom < COMPARE_EPSILON;
 }
