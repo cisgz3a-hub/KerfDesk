@@ -33,8 +33,8 @@
     "dev:desktop": "pnpm build:electron-main && vite build && electron .",
     "build:desktop": "pnpm build:electron-main && vite build && electron-builder --win --x64",
     "electron:start": "electron .",
-    "deploy:web": "pnpm guard:repo && pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge --branch=master",
-    "deploy:web:preview": "pnpm guard:repo && pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
+    "deploy:web": "pnpm guard:repo && pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge-2fj --branch=master",
+    "deploy:web:preview": "pnpm guard:repo && pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge-2fj --branch=preview"
   },
   "dependencies": {
     "clipper2-ts": "2.0.1-17",

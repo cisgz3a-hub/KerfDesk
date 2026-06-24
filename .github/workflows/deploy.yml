@@ -111,4 +111,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist/web --project-name=laserforge --branch=master
+          command: pages deploy dist/web --project-name=laserforge-2fj --branch=master
