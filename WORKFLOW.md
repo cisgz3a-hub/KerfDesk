@@ -751,6 +751,30 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 - F-C4. Re-import changed SVG with diff
 - F-C5. Copy / paste / duplicate
 - F-C6. Crash reporter
+- F-C7. Device Setup wizard (connect-time, guided) — specified below; the first Phase-C flow being built (ADR-092)
+
+### F-C7. Device Setup wizard (connect-time)
+
+The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092). Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
+
+#### Success — connected machine answers `$$`
+1. Operator clicks **Set up device** while connected.
+2. Step 1 confirms the connection is live and reads `$$` (or reuses the connect-time read).
+3. Steps 2–4 open with the draft prefilled from the controller's reported settings; the operator picks/confirms the machine, confirms bed/power/feed, and sets the origin corner, homing, and air-assist wiring that `$$` cannot report.
+4. (Optional) Step 5 lists settings where the draft differs from the controller and offers a guarded per-setting write (confirm → write → auto re-read + verify).
+5. Step 6 shows a "ready to cut" checklist; **Finish** commits the draft to the device profile via `replaceDeviceProfile`. Cancel at any point discards the draft.
+
+#### Error — `$$` times out (silent or non-GRBL controller)
+1. Step 1 reports no settings were read; the wizard continues in manual-entry mode (nothing is blocked) so the operator can still set the profile by hand.
+
+#### Empty — default profile, nothing detected
+1. The draft is the generic 400×400 default; the readiness checklist flags every safety item (bed, origin, power scale, homing, identity) as needing attention until the operator confirms it.
+
+#### Edge — opened while disconnected
+1. The wizard runs as a plain profile editor; the Connect and Sync-to-controller steps are gated with a "connect to use this" note. Finish still commits the profile.
+
+#### Edge — firmware write blocked
+1. If the controller is not Idle, or no `$$` read has happened yet, the Sync step's write is disabled with the reason shown (same guard as F-B14 / Machine Setup → Firmware Writes).
 
 ---
 
