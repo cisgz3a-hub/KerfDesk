@@ -3266,6 +3266,14 @@ diff) lives in its own unit-tested modules under `src/ui/laser/device-setup/`.
 
 ## Future ADRs (anticipated, not yet written)
 
+**Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
+The active build plan (`.claude/plans/plan-a-full-build-sparkling-kazoo.md`) reserves
+ADR-054..091 for its tickets — note its allocation table lists 057 as "Offset fill,"
+which collides with the already-written Registration Box, so that table needs
+reconciling before those tickets land. Independent (non-build-plan) ADRs should take
+the next free number **above** the reserved range (ADR-092 and up); ADR-092 (Device
+Setup wizard) is the first.
+
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
   config grows further).
