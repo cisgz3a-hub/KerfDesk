@@ -3241,9 +3241,10 @@ corner (a thinning limit, slice 2c — not the extraction).
 ## ADR-059 — Edge Detection trace mode: clean-room Canny → single-stroke vectors
 
 **Date:** 2026-06-25
-**Status:** Accepted. Clean-room Canny engine landed on `feat/edge-detection`;
-pipeline wiring (edge map → centerline extraction → paths), the preset, and the
-UI control are the following slices.
+**Status:** Accepted. Landed end-to-end on `feat/edge-detection`: clean-room
+Canny engine, the `traceMode: 'edge'` pipeline, and the "Edge Detection" preset
+(auto-listed in the Import dialog). An edge-sensitivity UI control mapping to the
+Canny thresholds is a follow-up.
 
 **Context.** Our trace presets (Line Art / Smooth / Sharp, `traceMode:
 'filled-contours'`) all reduce the image to a brightness **silhouette** (Otsu
@@ -3271,9 +3272,9 @@ the *algorithm*, is not copyrightable.
    to the **reworked centerline extraction** (ADR-058 divide-and-conquer) so each
    edge becomes ONE polyline, not a doubled potrace loop. Single-stroke output is
    the correct laser semantics (each line engraved once, no double-cut) and is
-   why this mode depends on the ADR-058 extraction. **[PENDING]**
+   why this mode depends on the ADR-058 extraction. **[LANDED]**
 3. **Expose it as an "Edge Detection" preset** alongside the others. The Smooth
-   preset and all `filled-contours` behaviour are untouched. **[PENDING]**
+   preset and all `filled-contours` behaviour are untouched. **[LANDED]**
 
 **Consequences.** Full-colour art traces into clean line-art usable for engraving,
 closing the gap with the reference tool's edge mode — with no GPL exposure, so a
