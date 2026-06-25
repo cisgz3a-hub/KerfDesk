@@ -19,10 +19,6 @@ export type Chunk = {
   readonly h: number;
 };
 
-// A 2-exit chunk whose ink strays more than this off the straight chord is a
-// corner, not a gentle curve — route through the bend so the corner survives.
-const CORNER_MIN_PX = 1;
-
 function isInk(mask: Uint8Array, width: number, x: number, y: number): boolean {
   return (mask[y * width + x] ?? 0) === 1;
 }
@@ -85,22 +81,21 @@ export function inkCentroid(mask: Uint8Array, width: number, c: Chunk): Vec2 | n
 
 export function chunkSegments(mask: Uint8Array, width: number, c: Chunk): Vec2[][] {
   const exits = chunkExits(mask, width, c);
-  const ink = chunkInkPixels(mask, width, c);
   const e0 = exits[0];
   const e1 = exits[1];
+  // A stroke passing through: walk the DENSE skeleton path between the two
+  // crossings (not a straight chord), so the fitter downstream has the real
+  // curve to smooth — chords threw the curvature away and the result looked
+  // faceted (potrace-style smoothing needs a dense path + optimal polygon).
   if (exits.length === 2 && e0 !== undefined && e1 !== undefined) {
-    const bend = furthestFromLine(ink, e0, e1);
-    if (bend !== null && distToLineSq(bend, e0, e1) > CORNER_MIN_PX * CORNER_MIN_PX) {
-      return [[e0, bend, e1]]; // corner: route through the bend
-    }
-    return [[e0, e1]];
+    return [walkChunkPath(mask, width, c, e0, e1)];
   }
+  const ink = chunkInkPixels(mask, width, c);
   if (exits.length === 1 && e0 !== undefined) {
-    // A stroke ending inside the chunk: draw to the actual tip (furthest ink
-    // pixel from the entry), not the centroid — otherwise we stop short of the
-    // true endpoint and leave a coverage gap.
+    // A stroke ending inside: walk to the actual tip (furthest ink from entry),
+    // so we reach the true endpoint and leave no coverage gap.
     const tip = furthestFrom(ink, e0);
-    return tip === null ? [] : [[e0, tip]];
+    return tip === null ? [] : [walkChunkPath(mask, width, c, e0, tip)];
   }
   if (exits.length === 0) {
     const span = inkDiameter(ink); // isolated stroke fully inside: span its extent
@@ -110,26 +105,51 @@ export function chunkSegments(mask: Uint8Array, width: number, c: Chunk): Vec2[]
   return center === null ? [] : exits.map((exit) => [center, exit]); // crossroad
 }
 
-function furthestFromLine(ink: ReadonlyArray<Vec2>, a: Vec2, b: Vec2): Vec2 | null {
+// Greedy 8-connected walk of the skeleton inside the chunk from `from` toward
+// `to`, picking the nearest-to-target neighbour each step. Confined to the
+// chunk and bounded, so it captures the dense path without the graph-walk's
+// spurious-junction fragility — connectivity is already decided by the exits.
+function walkChunkPath(mask: Uint8Array, width: number, c: Chunk, from: Vec2, to: Vec2): Vec2[] {
+  const path: Vec2[] = [from];
+  const visited = new Set<number>([from.y * width + from.x]);
+  let curr = from;
+  const maxSteps = c.w * c.h;
+  for (let step = 0; step < maxSteps && (curr.x !== to.x || curr.y !== to.y); step += 1) {
+    const next = nearestSkeletonNeighbor(mask, width, c, curr, to, visited);
+    if (next === null) break;
+    visited.add(next.y * width + next.x);
+    path.push(next);
+    curr = next;
+  }
+  if (curr.x !== to.x || curr.y !== to.y) path.push(to);
+  return path;
+}
+
+function nearestSkeletonNeighbor(
+  mask: Uint8Array,
+  width: number,
+  c: Chunk,
+  from: Vec2,
+  to: Vec2,
+  visited: Set<number>,
+): Vec2 | null {
   let best: Vec2 | null = null;
-  let bestD = -1;
-  for (const p of ink) {
-    const d = distToLineSq(p, a, b);
-    if (d > bestD) {
-      bestD = d;
-      best = p;
+  let bestD = Number.POSITIVE_INFINITY;
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      if (dx === 0 && dy === 0) continue;
+      const x = from.x + dx;
+      const y = from.y + dy;
+      if (x < c.x || y < c.y || x >= c.x + c.w || y >= c.y + c.h) continue;
+      if (!isInk(mask, width, x, y) || visited.has(y * width + x)) continue;
+      const d = (x - to.x) ** 2 + (y - to.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = { x, y };
+      }
     }
   }
   return best;
-}
-
-function distToLineSq(p: Vec2, a: Vec2, b: Vec2): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const len2 = dx * dx + dy * dy;
-  if (len2 === 0) return (p.x - a.x) ** 2 + (p.y - a.y) ** 2;
-  const cross = (p.x - a.x) * dy - (p.y - a.y) * dx;
-  return (cross * cross) / len2;
 }
 
 function chunkInkPixels(mask: Uint8Array, width: number, c: Chunk): Vec2[] {
