@@ -31,7 +31,8 @@ export function decodePng(bytes: Uint8Array): RawImageData {
     if (bytes[i] !== SIGNATURE[i]) throw new Error('Not a PNG (bad signature)');
   }
   const header = readChunks(bytes);
-  if (header.bitDepth !== 8) throw new Error(`PNG bit depth ${header.bitDepth} unsupported (need 8)`);
+  if (header.bitDepth !== 8)
+    throw new Error(`PNG bit depth ${header.bitDepth} unsupported (need 8)`);
   if (header.interlace !== 0) throw new Error('Interlaced PNG unsupported');
   const channels =
     header.colorType === 6 ? RGBA_CHANNELS : header.colorType === 2 ? RGB_CHANNELS : 0;
