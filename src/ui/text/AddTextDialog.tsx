@@ -11,7 +11,7 @@
 // scripts opentype's getPath handles word-spacing and Unicode glyph
 // lookup; we just split on '\n' for line breaks.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   DEFAULT_FONT_KEY,
   FONT_REGISTRY,
@@ -130,7 +130,8 @@ async function commitText(
     readonly setSubmitting: (v: boolean) => void;
   },
 ): Promise<void> {
-  if (v.content.trim() === '') {
+  const normalizedContent = normalizeTextContent(v.content);
+  if (normalizedContent.trim() === '') {
     ctx.pushToast('Type some text first.', 'warning');
     return;
   }
@@ -141,7 +142,7 @@ async function commitText(
     const buffer = await loadFont(knownFontKey);
     const rendered = await textToPolylines({
       fontBuffer: buffer,
-      content: v.content,
+      content: normalizedContent,
       sizeMm: v.sizeMm,
       alignment: v.alignment,
       lineHeight: v.lineHeight,
@@ -151,7 +152,7 @@ async function commitText(
     const obj: TextObject = {
       kind: 'text',
       id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
-      content: v.content,
+      content: normalizedContent,
       fontKey: knownFontKey,
       sizeMm: v.sizeMm,
       alignment: v.alignment,
@@ -192,18 +193,7 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
   } = props.fields;
   return (
     <>
-      <Field label="Content">
-        <textarea
-          value={values.content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={3}
-          className="lf-input"
-          style={textareaStyle}
-          aria-label="Text content"
-          title="Text content to render as editable vector paths."
-          autoFocus
-        />
-      </Field>
+      <ContentField value={values.content} onChange={setContent} />
       <Field label="Font">
         <FontPicker value={values.fontKey} onChange={setFontKey} />
       </Field>
@@ -258,6 +248,59 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
   );
 }
 
+function ContentField(props: {
+  readonly value: string;
+  readonly onChange: (v: string) => void;
+}): JSX.Element {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const insertDiacritic = (char: string): void => {
+    const textarea = textareaRef.current;
+    if (textarea === null) {
+      props.onChange(`${props.value}${char}`);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const next = `${props.value.slice(0, start)}${char}${props.value.slice(end)}`;
+    props.onChange(next);
+    window.requestAnimationFrame(() => {
+      textarea.focus();
+      const caret = start + char.length;
+      textarea.setSelectionRange(caret, caret);
+    });
+  };
+  return (
+    <Field label="Content">
+      <textarea
+        ref={textareaRef}
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        rows={3}
+        className="lf-input"
+        style={textareaStyle}
+        aria-label="Text content"
+        title="Text content to render as editable vector paths."
+        autoFocus
+      />
+      <span style={diacriticsStyle}>
+        {DIACRITIC_INSERTS.map((char) => (
+          <button
+            key={char}
+            type="button"
+            className="lf-btn"
+            style={diacriticButtonStyle}
+            title={`Insert ${char}`}
+            aria-label={`Insert ${char}`}
+            onClick={() => insertDiacritic(char)}
+          >
+            {char}
+          </button>
+        ))}
+      </span>
+    </Field>
+  );
+}
+
 function FormActions(props: {
   readonly mode: 'add' | 'edit';
   readonly canSubmit: boolean;
@@ -287,6 +330,10 @@ function asKnownFontKey(key: string): KnownFontKey {
 
 function fontDisplayName(key: KnownFontKey): string {
   return FONT_REGISTRY.find((f) => f.key === key)?.displayName ?? key;
+}
+
+function normalizeTextContent(text: string): string {
+  return text.normalize('NFC');
 }
 
 function Field(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
@@ -347,4 +394,33 @@ const alignmentLabelStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 4,
   textTransform: 'capitalize',
+};
+const DIACRITIC_INSERTS = [
+  'é',
+  'è',
+  'ê',
+  'ë',
+  'á',
+  'à',
+  'â',
+  'ä',
+  'í',
+  'ó',
+  'ú',
+  'ñ',
+  'ç',
+  'ü',
+  '´',
+] as const;
+const diacriticsStyle: React.CSSProperties = {
+  flexBasis: '100%',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 4,
+};
+const diacriticButtonStyle: React.CSSProperties = {
+  minWidth: 28,
+  height: 26,
+  padding: '0 6px',
+  justifyContent: 'center',
 };

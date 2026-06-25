@@ -5,16 +5,19 @@ import { textToPolylines } from './text-to-polylines';
 
 // Load Roboto once for the whole suite. Same font the app ships;
 // gives us a real renderer to assert against without mocking.
-const robotoPath = resolve(__dirname, '../../ui/text/fonts/Roboto-Regular.ttf');
-const robotoBuffer = readFileSync(robotoPath).buffer.slice(0) as ArrayBuffer;
+const robotoBuffer = readFontBuffer('Roboto-Regular.ttf');
 
 // Variable-font smoke check — Dancing Script ships as a variable
 // `[wght]` TTF. opentype.js 2.0 supports VF for default-instance
 // rendering, but a corrupted download (e.g., GitHub error HTML
 // disguised as .ttf) makes opentype throw "unsupported OpenType
 // signature". This test catches that regression.
-const dancingPath = resolve(__dirname, '../../ui/text/fonts/DancingScript-Regular.ttf');
-const dancingBuffer = readFileSync(dancingPath).buffer.slice(0) as ArrayBuffer;
+const dancingBuffer = readFontBuffer('DancingScript-Regular.ttf');
+
+function readFontBuffer(fileName: string): ArrayBuffer {
+  const bytes = readFileSync(resolve(__dirname, '../../ui/text/fonts', fileName));
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
 
 function render(
   content: string,
@@ -163,6 +166,19 @@ describe('textToPolylines', () => {
     const r = await textToPolylines({
       fontBuffer: dancingBuffer,
       content: 'Aa',
+      sizeMm: 20,
+      alignment: 'left',
+      lineHeight: 1.4,
+      color: '#000000',
+    });
+    expect(r.paths[0]?.polylines.length).toBeGreaterThan(0);
+    expect(r.bounds.maxX - r.bounds.minX).toBeGreaterThan(0);
+  });
+
+  it('renders Latin diacritics with Dancing Script', async () => {
+    const r = await textToPolylines({
+      fontBuffer: dancingBuffer,
+      content: 'Cr\u00e8me br\u00fbl\u00e9e',
       sizeMm: 20,
       alignment: 'left',
       lineHeight: 1.4,
