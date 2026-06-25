@@ -15,6 +15,12 @@ coverage/
 # Perceptual test harness — opt-in render dumps (PERCEPTUAL_ARTIFACTS=1)
 perceptual-artifacts/
 
+# Trace fixtures — local user assets (logos/photos), not committed
+fixtures/*.png
+fixtures/*.jpg
+fixtures/*.jpeg
+fixtures/*.webp
+
 # Electron / electron-builder
 release/
 dist-electron/

@@ -3155,6 +3155,68 @@ Two follow-ups refined the above after the maintainer tested it:
 
 ---
 
+## ADR-058 — Centerline trace rework: a measured pixel-centering bar + junction chaining
+
+**Date:** 2026-06-25
+**Status:** Accepted. Measurement harness + junction chaining landed on
+`feat/centerline-rework`; EDT-driven thinning, iterative spur pruning, and a
+preset-driven threshold are pending slices.
+
+**Context.** Centerline trace (`traceMode: 'centerline'`) produced fragmented,
+broken glyphs and was reported to lag/time out on big images. Causes — confirmed
+by a code audit + algorithm research and reproduced on the maintainer's real
+Arch House logo (1024px → **229** disconnected polylines from 745 points):
+
+- `extractCenterlinePolylines` walked the skeleton pixel-by-pixel and **stopped
+  at every junction**, emitting one fragment per edge; a collinear-only
+  `mergeCollinearOpenPolylines` (O(n³)) glued straight pieces back but left every
+  curve/bend split — the broken letters.
+- Zhang-Suen `thinMask` is O(iterations × W×H) and allocates a neighbour array
+  per ink pixel per pass (the big-image cost); it also leaves **multi-pixel
+  junction clusters** (a crossing's edges end at different adjacent pixels) plus
+  gaps and spurs.
+- The ink threshold was a hard global `128`, independent of the preset.
+
+Green structural tests (path counts) never measured centering, so the defect was
+invisible to CI — the standing "looks faulty vs the source" gap (see ADR-025).
+
+**Decision.**
+
+1. **Measure the bar.** A test-only harness under `src/__fixtures__/perceptual/`
+   (ADR-025 family): ground-truth stroke fixtures with analytically-known
+   centerlines + a deviation metric (max/mean centering deviation, coverage gaps,
+   fragment & spur counts), a self-contained `node:zlib` PNG decoder, and a
+   real-logo baseline that renders `[source | centerline | diff]`. Bar: synthetic
+   strokes centered ≤1px, connected through junctions, spur-free; the real logo's
+   text clean + connected (re-rendered each iteration); big images fast.
+2. **Replace the algorithm** (graph-based, full-resolution to preserve
+   pixel-perfect centering — downscale only as an extreme-tail safety valve):
+   - **a. Junction chaining** (`centerline-chain.ts`) — treat the skeleton as a
+     graph; cluster branch ends within a small radius into one node (absorbs the
+     Zhang-Suen clusters); pair the straightest-through edges by least turning
+     angle so a stroke stays one polyline through junctions. Replaces the
+     collinear-only O(n³) merge. **[LANDED]**
+   - **b. Allocation-free thinning.** Zhang-Suen rewritten with inline neighbour
+     reads (no per-pixel array) + a compacting active-ink list — O(ink) per pass,
+     not O(W·H). Skeleton byte-identical, ~2.4× faster at 16MP. **[LANDED]** A
+     frontier queue and/or an EDT-driven thinner (cleaner skeleton: fewer
+     gaps/spurs, better corners) is the pending quality+perf follow-up.
+   - **c. Iterative spur pruning** by branch length AND EDT radius (drop the
+     all-branches re-admit fallback). **[PENDING]**
+   - **d. Preset-driven ink threshold**, dropping the hard global 128. **[PENDING]**
+3. Salvage the exact O(N) distance transform, RDP simplify, and curve fit — fed
+   graph-extracted strokes.
+
+**Consequences.** Chaining alone dropped the real logo from 229 → **155**
+polylines (longer, connected strokes), removed the O(n³) merge, and reconnects
+crossings (synthetic cross 4 → 2). Remaining gaps — arc fragmentation across a
+skeleton break, corner centering ~1.5px, thin-text breaks, and the big-image
+timeout — are thinning-quality and are the pending slices (2b–2d). The harness
+gates every step. References ADR-025 (perceptual harness), ADR-026/027 (trace
+overlay / divergence).
+
+---
+
 ## ADR-092 — Connect-time Device Setup wizard (manual, draft-commit, guarded firmware sync)
 
 **Status:** Accepted; field-editor extraction (PR-1, `DeviceProfileFields.tsx`) shipped; wizard implementation pending. | **Date:** 2026-06-24
