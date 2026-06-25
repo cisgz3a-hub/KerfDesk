@@ -3215,6 +3215,27 @@ timeout — are thinning-quality and are the pending slices (2b–2d). The harne
 gates every step. References ADR-025 (perceptual harness), ADR-026/027 (trace
 overlay / divergence).
 
+### Amendment — divide-and-conquer extraction replaces the graph-walk (2026-06-25)
+
+Slice 2's "fix the graph-walk node classification" was abandoned: classifying
+skeleton pixels by 8-neighbour degree over-reports junctions on curves, and
+every patch (crossing number; `degree>=2 && crossingNumber<=2`) traded one
+regression for another (spurs vs. shifted junction fits). After studying the
+open-source tracers, we switched paradigms to the **divide-and-conquer** method
+(the LingDong/skeleton-tracing technique): recursively split the skeleton at the
+lowest-crossing line of its longer dimension, and per small chunk read only
+where strokes CROSS the chunk border (0→none, 1→stub to the tip, 2→a chord or a
+through-the-bend route for corners, ≥3→crossroad to the centroid). Reading
+border crossings is immune to the 8-connectivity imperfections that shattered
+the graph walk. **Clean-room: our own implementation of the (non-copyrightable)
+algorithm — no port, no third-party code/license.** Modules: `centerline-chunk.ts`
+(base case) + `centerline-divide.ts` (recursion); `extractCenterlinePolylines`
+is now a thin pipeline (segments → `chainBranches` → fit). Result on the harness:
+the arc fixture (4 fragments + 3.3px gap, never passed) is now 1 connected stroke
+within the bar; the real logo drops 229→137 polylines with the small text
+("LANGEBAAN") readable. The remaining l-corner ~1.5px is Zhang-Suen rounding the
+corner (a thinning limit, slice 2c — not the extraction).
+
 ---
 
 ## Future ADRs (anticipated, not yet written)

@@ -19,6 +19,10 @@ export type Chunk = {
   readonly h: number;
 };
 
+// A 2-exit chunk whose ink strays more than this off the straight chord is a
+// corner, not a gentle curve — route through the bend so the corner survives.
+const CORNER_MIN_PX = 1;
+
 function isInk(mask: Uint8Array, width: number, x: number, y: number): boolean {
   return (mask[y * width + x] ?? 0) === 1;
 }
@@ -81,11 +85,80 @@ export function inkCentroid(mask: Uint8Array, width: number, c: Chunk): Vec2 | n
 
 export function chunkSegments(mask: Uint8Array, width: number, c: Chunk): Vec2[][] {
   const exits = chunkExits(mask, width, c);
+  const ink = chunkInkPixels(mask, width, c);
   const e0 = exits[0];
   const e1 = exits[1];
-  if (exits.length === 2 && e0 !== undefined && e1 !== undefined) return [[e0, e1]];
+  if (exits.length === 2 && e0 !== undefined && e1 !== undefined) {
+    const bend = furthestFromLine(ink, e0, e1);
+    if (bend !== null && distToLineSq(bend, e0, e1) > CORNER_MIN_PX * CORNER_MIN_PX) {
+      return [[e0, bend, e1]]; // corner: route through the bend
+    }
+    return [[e0, e1]];
+  }
+  if (exits.length === 1 && e0 !== undefined) {
+    // A stroke ending inside the chunk: draw to the actual tip (furthest ink
+    // pixel from the entry), not the centroid — otherwise we stop short of the
+    // true endpoint and leave a coverage gap.
+    const tip = furthestFrom(ink, e0);
+    return tip === null ? [] : [[e0, tip]];
+  }
+  if (exits.length === 0) {
+    const span = inkDiameter(ink); // isolated stroke fully inside: span its extent
+    return span === null ? [] : [span];
+  }
   const center = inkCentroid(mask, width, c);
-  if (center === null || e0 === undefined) return [];
-  if (exits.length === 1) return [[e0, center]];
-  return exits.map((exit) => [center, exit]); // crossroad
+  return center === null ? [] : exits.map((exit) => [center, exit]); // crossroad
+}
+
+function furthestFromLine(ink: ReadonlyArray<Vec2>, a: Vec2, b: Vec2): Vec2 | null {
+  let best: Vec2 | null = null;
+  let bestD = -1;
+  for (const p of ink) {
+    const d = distToLineSq(p, a, b);
+    if (d > bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+function distToLineSq(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return (p.x - a.x) ** 2 + (p.y - a.y) ** 2;
+  const cross = (p.x - a.x) * dy - (p.y - a.y) * dx;
+  return (cross * cross) / len2;
+}
+
+function chunkInkPixels(mask: Uint8Array, width: number, c: Chunk): Vec2[] {
+  const out: Vec2[] = [];
+  for (let y = c.y; y < c.y + c.h; y += 1) {
+    for (let x = c.x; x < c.x + c.w; x += 1) {
+      if (isInk(mask, width, x, y)) out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+function furthestFrom(ink: ReadonlyArray<Vec2>, from: Vec2): Vec2 | null {
+  let best: Vec2 | null = null;
+  let bestD = -1;
+  for (const p of ink) {
+    const d = (p.x - from.x) ** 2 + (p.y - from.y) ** 2;
+    if (d > bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+function inkDiameter(ink: ReadonlyArray<Vec2>): Vec2[] | null {
+  const seed = ink[0];
+  if (seed === undefined) return null;
+  const a = furthestFrom(ink, seed);
+  const b = a === null ? null : furthestFrom(ink, a);
+  return a === null || b === null ? null : [a, b];
 }
