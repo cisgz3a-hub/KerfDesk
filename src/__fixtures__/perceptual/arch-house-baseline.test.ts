@@ -49,7 +49,11 @@ describe('arch-house real logo centerline baseline', () => {
       );
 
       const predicted = rasterizeColoredPaths(paths, image.width, image.height);
-      const artifact = writePerceptualArtifact('arch-house-centerline', predicted, sourceInkMask(image));
+      const artifact = writePerceptualArtifact(
+        'arch-house-centerline',
+        predicted,
+        sourceInkMask(image),
+      );
       if (artifact !== null) console.log(`[arch-house] artifact: ${artifact}`);
 
       expect(image.width).toBe(1024);

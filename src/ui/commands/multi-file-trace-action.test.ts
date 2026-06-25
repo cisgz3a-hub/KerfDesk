@@ -36,6 +36,21 @@ const ZERO_AREA_PATH: ColoredPath = {
   ],
 };
 
+const BACKGROUND_PATH: ColoredPath = {
+  color: '#ffffff',
+  polylines: [
+    {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+        { x: 0, y: 4 },
+      ],
+    },
+  ],
+};
+
 function rawImage(width: number, height: number): RawImageData {
   return {
     width,
@@ -177,6 +192,23 @@ describe('runMultiFileTrace', () => {
     expect(download).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
       'Could not trace images: Trace produced no visible paths for transparent-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
+      'error',
+    );
+  });
+
+  it('does not download blank-looking SVGs when trace returns only white background geometry', async () => {
+    const pushToast = vi.fn();
+    const download = vi.fn();
+
+    await runMultiFileTrace([namedFile('blank.png')], pushToast, {
+      loadImage: async () => rawImage(4, 4),
+      trace: async () => [BACKGROUND_PATH],
+      download,
+    });
+
+    expect(download).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(
+      'Could not trace images: Trace produced no visible paths for blank-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
       'error',
     );
   });

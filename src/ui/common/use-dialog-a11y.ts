@@ -39,6 +39,14 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
   // hand focus back on close. Captured once (the ref guards against
   // re-render clobbering) and read in the cleanup.
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  // Hold the latest onClose in a ref so Escape always calls the current handler
+  // WITHOUT making the focus-setup effect depend on onClose's identity. Callers
+  // routinely pass a fresh arrow each render (onClose={() => setOpen(false)}); a
+  // parent that re-renders — e.g. LaserWindow on its 250 ms status poll — would
+  // otherwise re-run this effect every poll, yanking focus back to the first
+  // field and collapsing any open <select> the operator just clicked.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     previouslyFocused.current =
@@ -55,7 +63,7 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -87,5 +95,8 @@ export function useDialogA11y(ref: RefObject<HTMLElement>, onClose: () => void):
         target.focus();
       }
     };
-  }, [ref, onClose]);
+    // Mount-only: focus setup, listener, and previously-focused capture must run
+    // once for the dialog's lifetime. onClose is read via onCloseRef so its
+    // changing identity never re-triggers this (see the ref above).
+  }, [ref]);
 }

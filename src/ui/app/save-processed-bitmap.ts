@@ -1,6 +1,7 @@
 import type { PlatformAdapter } from '../../platform/types';
 import type { Layer, Project, RasterImage, SceneObject } from '../../core/scene';
-import { buildProcessedRasterBitmap } from '../raster/processed-bitmap';
+import { evaluateRasterBudget } from '../../core/raster/raster-budget';
+import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
 import { rgbaToPngBlob } from '../raster/luma-bitmap';
 import type { ToastVariant } from '../state/toast-store';
 
@@ -29,6 +30,12 @@ export async function handleSaveProcessedBitmap(ctx: SaveProcessedBitmapCtx): Pr
   const layer = layerForRaster(ctx.project, selected);
   if (layer === null || layer.mode !== 'image' || !layer.output) {
     ctx.pushToast('The selected image needs an enabled Image layer before export.', 'error');
+    return;
+  }
+  const { width, height } = processedRasterDimensions(selected, layer);
+  const budget = evaluateRasterBudget(width, height);
+  if (budget.kind === 'too-large') {
+    ctx.pushToast(`Could not save processed bitmap: ${budget.reason}`, 'error');
     return;
   }
   let target;

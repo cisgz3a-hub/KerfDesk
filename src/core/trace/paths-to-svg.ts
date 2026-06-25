@@ -117,7 +117,10 @@ function isVisibleColoredPath(path: ColoredPath): boolean {
 
 function isVisibleColor(color: string): boolean {
   const normalized = color.trim().toLowerCase();
-  return normalized !== '' && normalized !== 'none' && normalized !== 'transparent';
+  if (normalized === '' || normalized === 'none' || normalized === 'transparent') return false;
+  // Trace palettes use white as background, not burnable ink. Treating it as
+  // visible lets batch trace export SVGs that look blank in normal viewers.
+  return normalized !== '#fff' && normalized !== '#ffffff';
 }
 
 function isVisibleClosedPolyline(polyline: ColoredPath['polylines'][number]): boolean {
