@@ -3196,9 +3196,11 @@ invisible to CI — the standing "looks faulty vs the source" gap (see ADR-025).
      Zhang-Suen clusters); pair the straightest-through edges by least turning
      angle so a stroke stays one polyline through junctions. Replaces the
      collinear-only O(n³) merge. **[LANDED]**
-   - **b. Allocation-free, EDT-driven thinning** replacing Zhang-Suen (frontier
-     queue, flat typed arrays, iteration budget; Felzenszwalb–Huttenlocher EDT for
-     ordering + spur radius). **[PENDING]**
+   - **b. Allocation-free thinning.** Zhang-Suen rewritten with inline neighbour
+     reads (no per-pixel array) + a compacting active-ink list — O(ink) per pass,
+     not O(W·H). Skeleton byte-identical, ~2.4× faster at 16MP. **[LANDED]** A
+     frontier queue and/or an EDT-driven thinner (cleaner skeleton: fewer
+     gaps/spurs, better corners) is the pending quality+perf follow-up.
    - **c. Iterative spur pruning** by branch length AND EDT radius (drop the
      all-branches re-admit fallback). **[PENDING]**
    - **d. Preset-driven ink threshold**, dropping the hard global 128. **[PENDING]**
