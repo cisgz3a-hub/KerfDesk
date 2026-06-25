@@ -67,6 +67,101 @@ afterEach(() => {
 });
 
 describe('AddTextDialog unknown font safety', () => {
+  it('inserts a diacritic into the content box when the accent button is clicked', async () => {
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<AddTextDialog />);
+      });
+
+      const insert = host.querySelector('button[title="Insert é"]');
+      if (!(insert instanceof HTMLButtonElement)) throw new Error('Insert é button not rendered');
+      await act(async () => {
+        insert.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
+
+      const textarea = host.querySelector('textarea');
+      if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Text area not rendered');
+      expect(textarea.value).toBe('é');
+
+      const form = host.querySelector('form');
+      if (!(form instanceof HTMLFormElement)) throw new Error('Text form not rendered');
+      await act(async () => {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const saved = useStore.getState().project.scene.objects.find((obj) => obj.kind === 'text');
+      expect(saved?.kind).toBe('text');
+      if (saved?.kind !== 'text') return;
+      expect(saved.content).toBe('é');
+      const renderInput = textMocks.textToPolylines.mock.calls[0]?.[0] as
+        | { readonly content?: string }
+        | undefined;
+      expect(renderInput?.content).toBe('é');
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('stores and renders Unicode text in normalized NFC form', async () => {
+    useUiStore.setState({
+      textDialog: {
+        mode: 'edit',
+        id: 'text-1',
+        content: 'Cafe\u0301',
+        fontKey: 'dancing-script-regular',
+        sizeMm: 12,
+        alignment: 'left',
+        lineHeight: 1.2,
+        letterSpacing: 0,
+        color: '#000000',
+      },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<AddTextDialog />);
+      });
+
+      const form = host.querySelector('form');
+      if (!(form instanceof HTMLFormElement)) throw new Error('Text form not rendered');
+      await act(async () => {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const saved = useStore
+        .getState()
+        .project.scene.objects.find((obj) => obj.kind === 'text' && obj.id === 'text-1');
+      expect(saved?.kind).toBe('text');
+      if (saved?.kind !== 'text') return;
+      expect(saved.content).toBe('Caf\u00e9');
+      const renderInput = textMocks.textToPolylines.mock.calls[0]?.[0] as
+        | { readonly content?: string }
+        | undefined;
+      expect(renderInput?.content).toBe('Caf\u00e9');
+      expect(saved.fontKey).toBe('dancing-script-regular');
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
   it('normalizes an unknown edit font key when regenerating fallback geometry', async () => {
     useUiStore.setState({
       textDialog: {
