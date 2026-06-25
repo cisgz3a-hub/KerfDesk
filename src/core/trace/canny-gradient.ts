@@ -86,10 +86,20 @@ function sobelGradient(src: Float32Array, width: number, height: number): Gradie
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
       const i = y * width + x;
-      const gx = at(src, i - width + 1) + 2 * at(src, i + 1) + at(src, i + width + 1) -
-        at(src, i - width - 1) - 2 * at(src, i - 1) - at(src, i + width - 1);
-      const gy = at(src, i + width - 1) + 2 * at(src, i + width) + at(src, i + width + 1) -
-        at(src, i - width - 1) - 2 * at(src, i - width) - at(src, i - width + 1);
+      const gx =
+        at(src, i - width + 1) +
+        2 * at(src, i + 1) +
+        at(src, i + width + 1) -
+        at(src, i - width - 1) -
+        2 * at(src, i - 1) -
+        at(src, i + width - 1);
+      const gy =
+        at(src, i + width - 1) +
+        2 * at(src, i + width) +
+        at(src, i + width + 1) -
+        at(src, i - width - 1) -
+        2 * at(src, i - width) -
+        at(src, i - width + 1);
       mag[i] = Math.hypot(gx, gy);
       dir[i] = quantizeAngle(gx, gy);
     }
