@@ -1,6 +1,6 @@
 import type { Polyline, Vec2 } from '../scene';
+import { chainBranches } from './centerline-chain';
 import { fitCenterlinePoints } from './centerline-fit';
-import { mergeCollinearOpenPolylines } from './centerline-merge';
 
 const MIN_CENTERLINE_LENGTH_PX = 3;
 const SPUR_BRANCH_MAX_PX = 4;
@@ -40,10 +40,12 @@ export function extractCenterlinePolylines(
   const keptBranches = usableBranches.filter(shouldKeepBranch);
   const selectedBranches = keptBranches.length === 0 ? usableBranches : keptBranches;
   const simplifyTolerancePx = options.simplifyTolerancePx ?? DEFAULT_SIMPLIFY_TOLERANCE_PX;
-  const polylines = selectedBranches
-    .map((branch) => branchToPolyline(branch, simplifyTolerancePx))
+  // Stitch edges through junctions into connected strokes BEFORE fitting, so a
+  // glyph stays one polyline instead of one fragment per edge (ADR-058). This
+  // supersedes the old collinear-only merge, which left curves/corners split.
+  return chainBranches(selectedBranches.map((branch) => branch.pixels))
+    .map((pixels) => pixelsToPolyline(pixels, simplifyTolerancePx))
     .filter(shouldKeepPolyline);
-  return mergeCollinearOpenPolylines(polylines, simplifyTolerancePx).filter(shouldKeepPolyline);
 }
 
 function traceFromGraphNodes(
@@ -130,11 +132,11 @@ function isEndpointToJunction(branch: SkeletonBranch): boolean {
   return hasEndpoint && hasJunction;
 }
 
-function branchToPolyline(
-  branch: SkeletonBranch,
+function pixelsToPolyline(
+  pixels: ReadonlyArray<Pixel>,
   simplifyTolerancePx = DEFAULT_SIMPLIFY_TOLERANCE_PX,
 ): Polyline {
-  const points = branch.pixels.map(pixelCenter);
+  const points = pixels.map(pixelCenter);
   return {
     closed: false,
     points: fitCenterlinePoints(points, {
