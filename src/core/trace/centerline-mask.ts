@@ -17,67 +17,122 @@ export function centerlineMaskFromImage(image: RawImageData): Uint8Array {
   return mask;
 }
 
+// Zhang-Suen thinning, allocation-free: inline 8-neighbour reads (no per-pixel
+// array) and one reused removal buffer instead of a fresh array each pass. The
+// removal logic is byte-for-byte the same, so the skeleton is identical to the
+// previous implementation — this is purely the GC-thrash fix behind the
+// big-image lag (ADR-058 2b). A full-image scan per pass remains; a frontier
+// queue is the follow-up if that becomes the bottleneck.
 export function thinMask(input: Uint8Array, width: number, height: number): Uint8Array {
   const mask = new Uint8Array(input);
   if (width < 3 || height < 3) return mask;
+  // Iterate only the ink pixels (a compacting active list), not the whole grid —
+  // each pass touches O(ink) not O(W·H), and the list shrinks as the stroke
+  // thins. Removals are still computed from the start-of-pass state and applied
+  // after, so the skeleton is byte-identical to a full-grid Zhang-Suen scan.
+  let ink = collectInteriorInk(mask, width, height);
+  const removeBuf = new Int32Array(ink.length);
   let changed = true;
-  while (changed) {
-    changed = thinStep(mask, width, height, 0);
-    changed = thinStep(mask, width, height, 1) || changed;
+  while (changed && ink.length > 0) {
+    const removed0 = thinPass(mask, width, ink, removeBuf, 0);
+    const removed1 = thinPass(mask, width, ink, removeBuf, 1);
+    changed = removed0 || removed1;
+    if (changed) ink = compactInk(mask, ink);
   }
   return mask;
 }
 
-function thinStep(mask: Uint8Array, width: number, height: number, phase: 0 | 1): boolean {
-  const remove: number[] = [];
+function thinPass(
+  mask: Uint8Array,
+  width: number,
+  ink: Int32Array,
+  removeBuf: Int32Array,
+  phase: 0 | 1,
+): boolean {
+  let count = 0;
+  for (const idx of ink) {
+    if (mask[idx] !== 1) continue;
+    if (shouldRemove(mask, width, idx, phase)) {
+      removeBuf[count] = idx;
+      count += 1;
+    }
+  }
+  for (let k = 0; k < count; k += 1) {
+    const idx = removeBuf[k];
+    if (idx !== undefined) mask[idx] = 0;
+  }
+  return count > 0;
+}
+
+function collectInteriorInk(mask: Uint8Array, width: number, height: number): Int32Array {
+  let count = 0;
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) if (mask[indexOf(x, y, width)] === 1) count += 1;
+  }
+  const out = new Int32Array(count);
+  let k = 0;
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
       const idx = indexOf(x, y, width);
-      if (mask[idx] !== 1) continue;
-      if (shouldRemove(mask, width, x, y, phase)) remove.push(idx);
+      if (mask[idx] === 1) {
+        out[k] = idx;
+        k += 1;
+      }
     }
   }
-  for (const idx of remove) mask[idx] = 0;
-  return remove.length > 0;
+  return out;
 }
 
-function shouldRemove(
-  mask: Uint8Array,
-  width: number,
-  x: number,
-  y: number,
-  phase: 0 | 1,
-): boolean {
-  const n = orderedNeighbors(mask, width, x, y);
-  const count = n.reduce((sum, v) => sum + v, 0);
+function compactInk(mask: Uint8Array, ink: Int32Array): Int32Array {
+  let count = 0;
+  for (const idx of ink) {
+    if (mask[idx] === 1) count += 1;
+  }
+  const out = new Int32Array(count);
+  let k = 0;
+  for (const idx of ink) {
+    if (mask[idx] === 1) {
+      out[k] = idx;
+      k += 1;
+    }
+  }
+  return out;
+}
+
+// Zhang-Suen removal test, inline neighbour reads in p2..p9 order
+// (N, NE, E, SE, S, SW, W, NW). `idx` is the pixel's flat index; callers pass
+// only interior pixels (1..height-2, 1..width-2) so neighbours stay in-bounds.
+function shouldRemove(mask: Uint8Array, width: number, idx: number, phase: 0 | 1): boolean {
+  const p2 = at(mask, idx - width);
+  const p3 = at(mask, idx - width + 1);
+  const p4 = at(mask, idx + 1);
+  const p5 = at(mask, idx + width + 1);
+  const p6 = at(mask, idx + width);
+  const p7 = at(mask, idx + width - 1);
+  const p8 = at(mask, idx - 1);
+  const p9 = at(mask, idx - width - 1);
+  const count = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
   if (count < 2 || count > 6) return false;
-  if (transitionCount(n) !== 1) return false;
-  const [p2 = 0, , p4 = 0, , p6 = 0, , p8 = 0] = n;
+  const transitions =
+    trans(p2, p3) +
+    trans(p3, p4) +
+    trans(p4, p5) +
+    trans(p5, p6) +
+    trans(p6, p7) +
+    trans(p7, p8) +
+    trans(p8, p9) +
+    trans(p9, p2);
+  if (transitions !== 1) return false;
   if (phase === 0) return p2 * p4 * p6 === 0 && p4 * p6 * p8 === 0;
   return p2 * p4 * p8 === 0 && p2 * p6 * p8 === 0;
 }
 
-function orderedNeighbors(mask: Uint8Array, width: number, x: number, y: number): number[] {
-  return [
-    mask[indexOf(x, y - 1, width)] ?? 0,
-    mask[indexOf(x + 1, y - 1, width)] ?? 0,
-    mask[indexOf(x + 1, y, width)] ?? 0,
-    mask[indexOf(x + 1, y + 1, width)] ?? 0,
-    mask[indexOf(x, y + 1, width)] ?? 0,
-    mask[indexOf(x - 1, y + 1, width)] ?? 0,
-    mask[indexOf(x - 1, y, width)] ?? 0,
-    mask[indexOf(x - 1, y - 1, width)] ?? 0,
-  ];
+function at(mask: Uint8Array, i: number): number {
+  return mask[i] ?? 0;
 }
 
-function transitionCount(neighbors: ReadonlyArray<number>): number {
-  let count = 0;
-  for (let i = 0; i < neighbors.length; i += 1) {
-    const a = neighbors[i] ?? 0;
-    const b = neighbors[(i + 1) % neighbors.length] ?? 0;
-    if (a === 0 && b === 1) count += 1;
-  }
-  return count;
+function trans(a: number, b: number): number {
+  return a === 0 && b === 1 ? 1 : 0;
 }
 
 function indexOf(x: number, y: number, width: number): number {
