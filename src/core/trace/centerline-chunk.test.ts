@@ -23,13 +23,17 @@ const SIZE = 7;
 const FULL: Chunk = { x: 0, y: 0, w: SIZE, h: SIZE };
 
 describe('chunkSegments', () => {
-  it('a straight stroke crossing the chunk -> one segment joining the two crossings', () => {
+  it('a straight stroke crossing the chunk -> one dense segment joining the two crossings', () => {
     const m = mask(SIZE, SIZE, hline(3, 0, 6));
     expect(chunkExits(m, SIZE, FULL)).toHaveLength(2);
     const segs = chunkSegments(m, SIZE, FULL);
     expect(segs).toHaveLength(1);
-    const xs = segs[0]!.map((p) => p.x).sort((a, b) => a - b);
-    expect(xs).toEqual([0, 6]);
+    const seg = segs[0]!;
+    // a DENSE path along the row, ending at the two border crossings
+    expect(seg.length).toBeGreaterThan(2);
+    expect(seg.every((p) => p.y === 3)).toBe(true);
+    const ends = [seg[0]!.x, seg[seg.length - 1]!.x].sort((a, b) => a - b);
+    expect(ends).toEqual([0, 6]);
   });
 
   it('a stroke ending inside -> one stub from the crossing to the centroid', () => {
