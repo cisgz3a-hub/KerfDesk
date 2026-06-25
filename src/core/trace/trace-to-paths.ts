@@ -23,6 +23,7 @@ import {
   preprocessForTrace,
 } from './trace-image';
 import { traceImageToCenterlinePaths } from './centerline-trace';
+import { traceImageToEdgePaths } from './edge-trace';
 import { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
 
 // Number of intermediate points to sample per quadratic Bezier
@@ -131,6 +132,7 @@ export async function traceImageToColoredPaths(
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline') return traceImageToCenterlinePaths(image, options);
+  if (options.traceMode === 'edge') return traceImageToEdgePaths(image, options);
   if (shouldUsePotraceTraceBackend(options)) return traceImageToPotraceColoredPaths(image, options);
   const tracer = await loadTracer();
   const prepared = preprocessForTrace(image, options);

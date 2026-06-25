@@ -60,8 +60,9 @@ export type RawImageData = {
 export type TraceOptions = {
   // Filled contours preserve source silhouettes for fill engraving.
   // Centerline traces skeletonize dark strokes into open line paths
-  // for single-pass vector engraving.
-  readonly traceMode?: 'filled-contours' | 'centerline';
+  // for single-pass vector engraving. Edge detection (Canny) traces the
+  // edges of full-colour art as single-stroke line drawings.
+  readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
   // Number of color quantization buckets. 2 = black-and-white,
   // suitable for most laser engraving. Higher values produce more
   // layers and (usually) more visual fidelity. Range 2-16.
@@ -201,6 +202,23 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // middle instead of filled outline contours. Uses the same
     // binarisation as Line Art, then skeletonizes the ink mask.
     traceMode: 'centerline',
+    numberOfColors: 2,
+    pathOmit: 0,
+    lineTolerance: 1,
+    quadraticTolerance: 1,
+    blurRadius: 0,
+    blurDelta: 0,
+    lineFilter: true,
+    fixedPalette: ['#ffffff', '#000000'],
+    useOtsuThreshold: true,
+    despeckleMinPixels: 12,
+  },
+  'Edge Detection': {
+    // Canny edge detection -> single-stroke vectors of every brightness
+    // transition. For full-colour art / logos that should engrave as a line
+    // drawing of their edges, not a flat silhouette. The threshold / palette /
+    // blur knobs are ignored here -- Canny works on the raw image.
+    traceMode: 'edge',
     numberOfColors: 2,
     pathOmit: 0,
     lineTolerance: 1,
