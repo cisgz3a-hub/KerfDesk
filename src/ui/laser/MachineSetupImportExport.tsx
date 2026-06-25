@@ -137,7 +137,7 @@ function LightBurnReview(props: {
 }): JSX.Element {
   return (
     <article style={cardStyle}>
-      <h3 style={sectionHeadingStyle}>LightBurn review</h3>
+      <h3 style={sectionHeadingStyle}>Imported device review</h3>
       <p style={mutedStyle}>{props.review.profile.name}</p>
       <ReviewList title="Applied" items={props.review.applied} />
       <ReviewList title="Needs Review" items={props.review.needsReview} />
@@ -147,7 +147,7 @@ function LightBurnReview(props: {
         disabled={!props.review.canCreateProfile}
         onClick={() => props.onApply(props.review.profile)}
       >
-        Apply LightBurn profile
+        Apply imported profile
       </Button>
     </article>
   );

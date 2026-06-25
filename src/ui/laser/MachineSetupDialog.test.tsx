@@ -210,10 +210,10 @@ describe('MachineSetupDialog', () => {
       await act(async () => button(host, 'Import / Export').click());
       await act(async () => button(host, 'Import LightBurn .lbdev').click());
 
-      expect(host.textContent).toContain('LightBurn review');
+      expect(host.textContent).toContain('Imported device review');
       expect(host.textContent).toContain('LB 4040');
 
-      await act(async () => button(host, 'Apply LightBurn profile').click());
+      await act(async () => button(host, 'Apply imported profile').click());
 
       expect(useStore.getState().project.device.profileSource).toBe('lightburn');
       expect(useStore.getState().project.device.bedWidth).toBe(410);
