@@ -8,6 +8,7 @@ import {
   type DeviceProfile,
   type ProfileCapability,
 } from '../../core/devices';
+import { numbersClose } from '../../core/util';
 import { controlHelp, helpProps, type HelpTopicId } from '../help/help-topics';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -309,13 +310,6 @@ function pushOptionalNumericRow(
     newText: format(next),
     changed: true,
   });
-}
-
-function numbersClose(a: number, b: number): boolean {
-  const diff = Math.abs(a - b);
-  if (diff < 0.001) return true;
-  const denom = Math.max(Math.abs(a), Math.abs(b), 1);
-  return diff / denom < 0.001;
 }
 
 function isPositive(value: number | undefined): value is number {
