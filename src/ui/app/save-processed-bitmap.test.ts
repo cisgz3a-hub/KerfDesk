@@ -66,6 +66,26 @@ describe('handleSaveProcessedBitmap', () => {
       },
     ]);
   });
+
+  it('rejects over-budget processed bitmaps before opening the save picker', async () => {
+    const toast = toasts();
+    const platform = mockPlatform(vi.fn(async () => null));
+
+    await handleSaveProcessedBitmap({
+      platform,
+      project: overBudgetRasterProject(),
+      selectedObjectId: 'R1',
+      pushToast: toast.pushToast,
+    });
+
+    expect(platform.pickFileForSave).not.toHaveBeenCalled();
+    expect(toast.messages).toEqual([
+      {
+        message: 'Could not save processed bitmap: 4004001 px exceeds the 4000000 px limit',
+        variant: 'error',
+      },
+    ]);
+  });
 });
 
 function rasterProject(): Project {
@@ -93,6 +113,31 @@ function rasterProject(): Project {
           dither: 'threshold',
           linesPerMm: 10,
           lumaBase64: Buffer.from([0, 255]).toString('base64'),
+        },
+      ],
+    },
+  };
+}
+
+function overBudgetRasterProject(): Project {
+  const project = rasterProject();
+  const raster = project.scene.objects.find((object) => object.id === 'R1');
+  if (raster?.kind !== 'raster-image') throw new Error('missing raster fixture');
+  return {
+    ...project,
+    scene: {
+      layers: [
+        {
+          ...createLayer({ id: 'image', color: '#808080', mode: 'image' }),
+          passThrough: false,
+          ditherAlgorithm: 'threshold',
+          linesPerMm: 10,
+        },
+      ],
+      objects: [
+        {
+          ...raster,
+          bounds: { minX: 0, minY: 0, maxX: 200.1, maxY: 200.1 },
         },
       ],
     },
