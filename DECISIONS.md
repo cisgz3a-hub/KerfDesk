@@ -3238,6 +3238,54 @@ corner (a thinning limit, slice 2c — not the extraction).
 
 ---
 
+## ADR-059 — Edge Detection trace mode: clean-room Canny → single-stroke vectors
+
+**Date:** 2026-06-25
+**Status:** Accepted. Clean-room Canny engine landed on `feat/edge-detection`;
+pipeline wiring (edge map → centerline extraction → paths), the preset, and the
+UI control are the following slices.
+
+**Context.** Our trace presets (Line Art / Smooth / Sharp, `traceMode:
+'filled-contours'`) all reduce the image to a brightness **silhouette** (Otsu
+threshold → outline) — the equivalent of the reference tool's "Brightness
+Cutoff". On a full-colour logo (the maintainer's Arch House) that flattens the
+internal detail away. The reference's "Edge Detection" mode instead finds every
+brightness transition and traces those, producing a clean line drawing of the
+whole image (house, arch, windows, sunset, waves, text). We had no equivalent.
+
+The engine behind that mode is the **Canny edge detector** (J. Canny, 1986) — a
+universal, textbook computer-vision algorithm, not the reference tool's
+invention. The reference tool itself, and potrace, are **GPL**; copying either
+would force LaserForge to GPL (viral copyleft) and break its salability. Canny,
+the *algorithm*, is not copyrightable.
+
+**Decision.**
+
+1. **Add an "Edge Detection" trace mode** (`traceMode: 'edge'`) on a **clean-room**
+   Canny detector built from the standard algorithm — grayscale → Gaussian blur →
+   Sobel gradient → non-maximum suppression → double-threshold hysteresis — pure
+   core, deterministic, no GPL/third-party code. Modules: `canny-gradient.ts`
+   (gradient) + `canny-edges.ts` (NMS + hysteresis) → a 1px binary edge map.
+   **[LANDED]**
+2. **Trace the edge map as single strokes, not outlines.** Feed the 1px edge map
+   to the **reworked centerline extraction** (ADR-058 divide-and-conquer) so each
+   edge becomes ONE polyline, not a doubled potrace loop. Single-stroke output is
+   the correct laser semantics (each line engraved once, no double-cut) and is
+   why this mode depends on the ADR-058 extraction. **[PENDING]**
+3. **Expose it as an "Edge Detection" preset** alongside the others. The Smooth
+   preset and all `filled-contours` behaviour are untouched. **[PENDING]**
+
+**Consequences.** Full-colour art traces into clean line-art usable for engraving,
+closing the gap with the reference tool's edge mode — with no GPL exposure, so a
+license scan stays clean and salability is preserved. The mode reuses both the
+new Canny and the ADR-058 extraction (hence it branches off
+`feat/centerline-rework`). Verified at the engine level on the real logo: the
+rendered edge map matches the reference edge-detection preview. References
+ADR-058 (centerline extraction), ADR-025 (perceptual harness), ADR-026/027
+(trace overlay / divergence).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
