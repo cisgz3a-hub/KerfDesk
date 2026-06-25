@@ -32,6 +32,21 @@ const ZERO_AREA_PATH: ColoredPath = {
   ],
 };
 
+const BACKGROUND_PATH: ColoredPath = {
+  color: '#ffffff',
+  polylines: [
+    {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+        { x: 0, y: 4 },
+      ],
+    },
+  ],
+};
+
 function rawImage(width: number, height: number): RawImageData {
   return {
     width,
@@ -114,6 +129,18 @@ describe('traceImagesToSvgFiles', () => {
 
     const files = await traceImagesToSvgFiles(
       [{ sourceName: 'transparent.png', image: rawImage(4, 4) }],
+      { trace },
+    );
+
+    expect(files[0]?.pathCount).toBe(0);
+    expect(files[0]?.svg).not.toContain('<path ');
+  });
+
+  it('does not count white background paths as visible trace output', async () => {
+    const trace = vi.fn(async () => [BACKGROUND_PATH]);
+
+    const files = await traceImagesToSvgFiles(
+      [{ sourceName: 'blank.png', image: rawImage(4, 4) }],
       { trace },
     );
 

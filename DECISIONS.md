@@ -3287,7 +3287,124 @@ ADR-058 (centerline extraction), ADR-025 (perceptual harness), ADR-026/027
 
 ---
 
+## ADR-092 — Connect-time Device Setup wizard (manual, draft-commit, guarded firmware sync)
+
+**Status:** Accepted; field-editor extraction (PR-1, `DeviceProfileFields.tsx`) shipped; wizard implementation pending. | **Date:** 2026-06-24
+
+> Numbering note: the body's previous highest is ADR-057. The active build plan
+> (`.claude/plans/plan-a-full-build-sparkling-kazoo.md`) reserves ADR-054..091 for its
+> tickets, so this independent, maintainer-requested feature takes the next free number
+> above that range (ADR-092) to avoid colliding with a build-plan ticket. (The build
+> plan's table also lists 057 = Offset fill, but 057 was already written here as the
+> Registration Box — a pre-existing build-plan numbering drift, not introduced by this ADR.)
+
+### Context
+
+Getting a freshly connected GRBL machine ready to cut means setting bed size, origin corner,
+power scale ($30), laser mode ($32), homing, and air-assist wiring correctly. Today those
+fields are scattered across the inline Device Profile panel (`DeviceSettings.tsx`) and the
+seven-tab Machine Setup dialog (`MachineSetupDialog.tsx`); a new operator has to know which
+tab each field lives in. LightBurn solves first-run with its "Find My Laser" wizard.
+
+The key realization: we already have most of the data such a wizard asks for. On connect the
+handshake queries `$$` and `core/controllers/grbl/parse-settings.ts` parses bed ($130/$131),
+power ($30/$31), laser mode ($32), feed ($110/$111), accel ($120/$121), junction ($11), and Z
+($132) into a `Partial<DeviceProfile>`, plus a `ControllerSettingsSnapshot` of homing/limit
+hints. The audit (`AUDIT-2026-06-10.md`, P1 item #11) frames the opportunity: "your laser
+told us its settings" beats every competitor's brand-locked detection. The gap is
+presentation and guidance, not detection.
+
+### Decision
+
+Add a **Device Setup wizard**: a multi-step `Dialog` launched from a manual "Set up device"
+button in the Laser rail. It reads what `$$` already reported, asks the operator only for what
+`$$` cannot report (origin corner, air-assist wiring, Z presence, autofocus, machine name),
+optionally writes corrected values back to the controller, and ends with a "ready to cut"
+checklist. Three maintainer-chosen decisions fix its shape:
+
+1. **Manual trigger, not auto-open.** The wizard never opens on its own; the operator clicks a
+   button. This sidesteps WORKFLOW.md F-A1 ("no welcome/onboarding modal on first run")
+   entirely — F-A1 governs app launch over an empty workspace, and a manually-invoked,
+   connect-time editor is neither a launch event nor automatic. It realizes the F-A1 promise
+   that "the user can override [the default profile] in Settings → Device Profile (Phase C)".
+
+2. **Multi-step wizard with Back/Next** (Connect & read → Identify machine → Confirm detected
+   settings → Placement & safety → Sync to controller → Review & finish), modeled on
+   LightBurn's Find My Laser.
+
+3. **Draft-and-commit for the profile; guarded in-step writes for firmware.** The operator
+   edits a draft `DeviceProfile` seeded from `project.device` + `detectedSettings`; the profile
+   commits only on Finish (via `replaceDeviceProfile`), so Cancel is clean and the project undo
+   stack isn't spammed per keystroke. Firmware writes are the exception — an EEPROM write can't
+   be drafted — so the Sync step writes through the existing guarded `writeGrblSetting` action
+   (which already requires connected + Idle + a prior `$$` read, validates the value, writes
+   `$id=value`, then re-reads `$$` and verifies the echo). It inherits that action's
+   `COMMON_WRITE_IDS` allowlist ($30/$31/$32); bed-size writes, if wanted, go through the
+   existing batch `configureGrblLaserSetup` path.
+
+The wizard is **composition, not new plumbing**: it reuses the `$$` detection pipeline
+(`detectedSettings`/`controllerSettings`, `describePatch`/`describeReviewItems`), the profile
+catalog (`core/devices/profile-catalog.ts`), the guarded write path, and the field editors
+extracted to `DeviceProfileFields.tsx`. Pure logic (step reducer, readiness checklist, firmware
+diff) lives in its own unit-tested modules under `src/ui/laser/device-setup/`.
+
+### Consequences
+
+- First-connect setup becomes near-zero-input on machines that answer `$$`: the operator
+  confirms a prefilled draft rather than typing values. This is the audit's beats-LightBurn
+  angle, made real with code we already had.
+- Two profile-editing surfaces now coexist: the inline `DeviceSettings` panel (live-write) and
+  the wizard (draft-commit). Acceptable for now; folding the panel into the wizard is a later
+  roadmap question, not this work.
+- The wizard can change the operator's machine (firmware writes). That power is fenced by the
+  existing guard + an explicit per-setting confirm; the default path only updates the local
+  profile.
+- Delivered as a sequence of small PRs (tidy-first field extraction → this ADR + WORKFLOW →
+  pure logic → profile-only wizard → firmware step → brand presets) so each diff is reviewable
+  and the side-effecting firmware step ships isolated.
+
+### Alternatives rejected
+
+- **Auto-open on connect:** rejected by the maintainer — even gated on "unconfirmed," an
+  automatic modal risks the nag that F-A1 exists to prevent. Manual keeps the operator in
+  control.
+- **Single consolidated scroll page (no steps):** rejected — the maintainer chose a guided
+  wizard; steps hand-hold a first-run operator through safety-critical fields one decision at a
+  time.
+- **Local-profile-only (no firmware writes):** rejected — the maintainer wants the wizard to be
+  able to correct the controller, not just tell the app about it; the existing guarded write
+  path makes this safe to include.
+- **A LightBurn-style fully-manual work-area wizard:** rejected — it ignores the `$$` data we
+  already have; prefilling from the controller is the differentiator.
+- **New store slice for wizard state:** rejected for v1 — open/close is a `useState` in
+  LaserWindow (mirrors `machineSetupOpen`); step/draft is a local `useReducer` over a pure
+  reducer, so no global state and the transition logic stays unit-testable.
+
+### Verification
+
+- **Pure unit tests** for the step reducer (next/back/edit-merge/apply-preset/can-advance/
+  `assertNever` exhaustiveness), the readiness checklist, and the firmware diff (writable vs
+  info-only).
+- **Component tests** (following `MachineSetupDialog.test.tsx` / `DetectedSettingsBanner.test.ts`):
+  steps render; seeding `useLaserStore.detectedSettings` shows confirm rows; a preset edits the
+  draft, not the live store, until Finish; Finish commits via `replaceDeviceProfile`; the
+  firmware step calls `writeGrblSetting` only when the guard passes.
+- **NOT covered by tests (must be hardware-verified before "done"):** that the wizard reads
+  `$$` correctly on a real GRBL connect (2 s handshake), that writing $30/$32 to a real
+  controller verifies, and that the chosen origin corner flips Y correctly in emitted G-code.
+  Per CLAUDE.md these stay explicitly unverified until a maintainer hardware pass.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
+
+**Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
+The active build plan (`.claude/plans/plan-a-full-build-sparkling-kazoo.md`) reserves
+ADR-054..091 for its tickets — note its allocation table lists 057 as "Offset fill,"
+which collides with the already-written Registration Box, so that table needs
+reconciling before those tickets land. Independent (non-build-plan) ADRs should take
+the next free number **above** the reserved range (ADR-092 and up); ADR-092 (Device
+Setup wizard) is the first.
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy

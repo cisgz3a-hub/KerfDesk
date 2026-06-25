@@ -1,17 +1,15 @@
 // LaserWindow — Phase B controller panel. Connection, status, jog, job
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
-import { useState } from 'react';
 import { describeAlarm } from '../../core/controllers/grbl';
 import { usePlatform } from '../app/platform-context';
-import { Button } from '../kit';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { ConnectionBar } from './ConnectionBar';
 import { ConsolePanel } from './ConsolePanel';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
-import { MachineSetupDialog } from './MachineSetupDialog';
+import { DeviceSetupControls } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
@@ -20,7 +18,6 @@ import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
 export function LaserWindow(): JSX.Element {
-  const [machineSetupOpen, setMachineSetupOpen] = useState(false);
   const platform = usePlatform();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -64,8 +61,7 @@ export function LaserWindow(): JSX.Element {
           the Windows desktop app.
         </p>
       )}
-      <Button onClick={() => setMachineSetupOpen(true)}>Machine Setup</Button>
-      {machineSetupOpen && <MachineSetupDialog onClose={() => setMachineSetupOpen(false)} />}
+      <DeviceSetupControls />
       <ConnectionBar
         connection={connection}
         onConnect={() => void connect(platform)}
