@@ -125,6 +125,58 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
+  it('overlays a preset with detection that arrives after the wizard opened', async () => {
+    const { host, unmount } = await renderWizard();
+    try {
+      // Opened with no detection; the controller reports a 363×273 bed afterwards.
+      await act(async () => {
+        useLaserStore.setState({
+          connection: { kind: 'connected' },
+          detectedSettings: { bedWidth: 363, bedHeight: 273 },
+          lastSettingsReadAt: 1,
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+      await act(async () => button(host, 'Next').click()); // connect -> identify
+      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click()); // a 400×400 preset
+      await act(async () => button(host, 'Next').click()); // identify -> confirm
+      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
+      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
+      // Detected 363 must win over the preset's nominal 400.
+      expect(bed.value).toBe('363');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps the last detected values through a re-read null window', async () => {
+    const { host, unmount } = await renderWizard();
+    try {
+      await act(async () => {
+        useLaserStore.setState({
+          connection: { kind: 'connected' },
+          detectedSettings: { bedWidth: 363, bedHeight: 273 },
+          lastSettingsReadAt: 1,
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+      // A re-read clears detectedSettings to null before the $$ reply repopulates it.
+      await act(async () => {
+        useLaserStore.setState({
+          detectedSettings: null,
+          lastSettingsReadAt: null,
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+      // Picking a preset during that window must still overlay the last detected bed.
+      await act(async () => button(host, 'Next').click()); // connect -> identify
+      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
+      await act(async () => button(host, 'Next').click()); // identify -> confirm
+      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
+      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
+      expect(bed.value).toBe('363');
+    } finally {
+      await unmount();
+    }
+  });
+
   it('keeps Finish disabled on the untouched generic default', async () => {
     const { host, unmount } = await renderWizard();
     try {

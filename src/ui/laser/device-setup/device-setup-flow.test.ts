@@ -129,3 +129,36 @@ describe('canAdvanceDeviceSetup', () => {
     );
   });
 });
+
+describe('deviceSetupReducer detected-updated', () => {
+  it('refreshes the live detected snapshot', () => {
+    const state = deviceSetupReducer(open(), {
+      kind: 'detected-updated',
+      detected: { bedWidth: 363, bedHeight: 273 },
+    });
+    expect(state.detected).toEqual({ bedWidth: 363, bedHeight: 273 });
+  });
+
+  it('keeps the detected bed when a preset is picked after detection arrives', () => {
+    // Wizard opened before $$ completed → empty snapshot (the reported repro).
+    let state = initDeviceSetup(PROFILE, null);
+    expect(state.detected).toEqual({});
+    state = deviceSetupReducer(state, {
+      kind: 'detected-updated',
+      detected: { bedWidth: 363, bedHeight: 273 },
+    });
+    // A 400×400 catalog preset must not clobber the detected bed.
+    const preset = nonDefaultPreset();
+    state = deviceSetupReducer(state, { kind: 'apply-preset', profile: preset });
+    expect(state.draft.profileId).toBe(preset.profileId);
+    expect(state.draft.bedWidth).toBe(363);
+    expect(state.draft.bedHeight).toBe(273);
+  });
+
+  it('is a no-op when the detected reference is unchanged', () => {
+    const state = open({ bedWidth: 363 });
+    expect(deviceSetupReducer(state, { kind: 'detected-updated', detected: state.detected })).toBe(
+      state,
+    );
+  });
+});

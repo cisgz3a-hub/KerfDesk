@@ -5,7 +5,7 @@
 // The step logic is the pure reducer in device-setup-flow.ts; this file is the
 // shell + footer navigation.
 
-import { useReducer } from 'react';
+import { useEffect, useReducer } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
 import { useRegisterModal } from '../../common/use-register-modal';
@@ -49,11 +49,20 @@ export function DeviceSetupWizard(props: {
   const device = useStore((s) => s.project.device);
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const detected = useLaserStore((s) => s.detectedSettings);
+  const lastReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const [state, dispatch] = useReducer(deviceSetupReducer, device, (seed) =>
     initDeviceSetup(seed, detected),
   );
-  // Readiness scores against state.detected (the snapshot seeded into the draft),
-  // not the live store, so the footer's Finish gate matches the committed draft.
+  // Keep the reducer's detected value in sync with the live controller read, so
+  // apply-preset and the readiness gate use current $$ values even when the
+  // operator connects or re-reads after the wizard opened (audit fix B). Skip the
+  // transient null a re-read sets before its reply lands, so the last-known
+  // detection survives the window instead of briefly emptying.
+  useEffect(() => {
+    if (detected !== null) dispatch({ kind: 'detected-updated', detected });
+  }, [detected, lastReadAt]);
+  // Readiness scores against state.detected (kept in sync by the effect above),
+  // so the footer's Finish gate matches the committed draft.
   const ready = computeSetupReadiness(state.draft, state.detected).ready;
   const stepNumber = DEVICE_SETUP_STEP_ORDER.indexOf(state.step) + 1;
   const onFinish = (): void => {

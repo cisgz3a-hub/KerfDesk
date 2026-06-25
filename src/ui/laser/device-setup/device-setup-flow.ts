@@ -27,8 +27,9 @@ export type DeviceSetupState = {
   // The profile as the wizard opened: lets Finish diff against it and lets
   // Cancel mean "discard" (the draft is never written until Finish).
   readonly baseline: DeviceProfile;
-  // The $$ patch captured when the wizard opened. Re-overlaid onto a chosen
-  // preset so controller-reported truth wins over the preset's generic values.
+  // The latest $$ patch — seeded at open and refreshed via `detected-updated`
+  // whenever the controller is (re-)read, so apply-preset and readiness overlay
+  // current controller truth instead of a stale open-time snapshot.
   readonly detected: Partial<DeviceProfile>;
   // The working copy every editor mutates; committed on Finish.
   readonly draft: DeviceProfile;
@@ -42,7 +43,8 @@ export type DeviceSetupAction =
   | { readonly kind: 'go'; readonly step: DeviceSetupStep }
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
   | { readonly kind: 'apply-preset'; readonly profile: DeviceProfile }
-  | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> };
+  | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> }
+  | { readonly kind: 'detected-updated'; readonly detected: Partial<DeviceProfile> };
 
 // Shared props for the wizard step components: the current flow state plus the
 // reducer dispatch. ReviewStep takes only `state` (it makes no edits).
@@ -85,6 +87,10 @@ export function deviceSetupReducer(
         draft: { ...action.profile, ...state.detected },
         presetApplied: true,
       };
+    case 'detected-updated':
+      // The wizard re-dispatches the live $$ patch on every read; a ref-equal
+      // dispatch (the mount re-sync) is a no-op so it does not force a render.
+      return action.detected === state.detected ? state : { ...state, detected: action.detected };
     default:
       return assertNever(action);
   }
