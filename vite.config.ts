@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // Vite config for the web build (ADR-003, ADR-009).
 // The Electron build reuses this config via electron-builder's renderer entry
@@ -49,7 +50,35 @@ function appVersion(): string {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
+    // ADR-060: an auto-reload could interrupt a live burn). injectRegister
+    // 'script' emits an external registerSW.js because the strict CSP
+    // (script-src 'self', no unsafe-inline) blocks the default inline form.
+    VitePWA({
+      registerType: 'prompt',
+      injectRegister: 'script',
+      includeAssets: ['favicon.svg'],
+      manifest: {
+        name: 'LaserForge 2.0',
+        short_name: 'LaserForge',
+        description:
+          'GRBL CAM for laser cutters and engravers — design, trace, and burn, fully offline.',
+        theme_color: '#2563eb',
+        background_color: '#f8fafc',
+        display: 'standalone',
+        start_url: '.',
+        icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,ico,png,json,woff,woff2}'],
+        // Some bundled chunks (tracer / font libraries) exceed Workbox's 2 MB
+        // default; raise the ceiling so the whole app precaches for offline use.
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+      },
+    }),
+  ],
   // Relative asset paths so the same bundle loads via http(s):// (web deploy)
   // and file:// (Electron renderer) without rewriting URLs.
   base: './',
