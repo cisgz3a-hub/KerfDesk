@@ -6,6 +6,7 @@
 import { createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
 import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import { DEFAULT_LAYER_DEFAULTS_STATE } from './layer-default-actions';
+import { EMPTY_MATERIAL_LIBRARY_COLLECTION } from './material-library-collection';
 import { DEFAULT_OUTPUT_SCOPE_SETTINGS, useStore } from './store';
 
 export function resetStore(): void {
@@ -30,6 +31,7 @@ export function resetStore(): void {
     layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
     materialLibrary: null,
     materialLibraryDirty: false,
+    savedLibraries: EMPTY_MATERIAL_LIBRARY_COLLECTION,
   });
 }
 

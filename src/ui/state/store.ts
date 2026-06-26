@@ -49,6 +49,13 @@ import {
   materialLibraryActions,
   type MaterialLibraryActions,
 } from './material-library-actions';
+import {
+  SAVED_LIBRARIES_STATE_DEFAULTS,
+  currentSavedLibrariesState,
+  savedLibrariesActions,
+  type SavedLibrariesActions,
+} from './saved-libraries-actions';
+import { materialPresetActions, type MaterialPresetActions } from './material-preset-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { imageMaskActions, type ImageMaskActions } from './image-mask-actions';
 import {
@@ -117,7 +124,10 @@ export type AppState = ObjectPropertiesActions &
   SceneGroupActions &
   SceneLockActions &
   ReturnType<typeof currentMaterialLibraryState> &
-  MaterialLibraryActions & {
+  MaterialLibraryActions &
+  ReturnType<typeof currentSavedLibrariesState> &
+  SavedLibrariesActions &
+  MaterialPresetActions & {
     readonly project: Project;
     readonly selectedObjectId: string | null;
     readonly selectedPathNode: PathNodeRef | null;
@@ -276,7 +286,8 @@ function initialState(): Pick<
   | 'sceneClipboard'
   | 'layerDefaults'
 > &
-  ReturnType<typeof currentMaterialLibraryState> {
+  ReturnType<typeof currentMaterialLibraryState> &
+  ReturnType<typeof currentSavedLibrariesState> {
   return {
     project: createProject(),
     selectedObjectId: null,
@@ -298,6 +309,7 @@ function initialState(): Pick<
     sceneClipboard: null,
     layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
     ...MATERIAL_LIBRARY_STATE_DEFAULTS,
+    ...SAVED_LIBRARIES_STATE_DEFAULTS,
   };
 }
 
@@ -314,12 +326,14 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
         ...initialState(),
         project,
         ...currentMaterialLibraryState(s),
+        ...currentSavedLibrariesState(s),
         ...currentLayerDefaultsState(s),
       })),
     newProject: () =>
       set((s) => ({
         ...initialState(),
         ...currentMaterialLibraryState(s),
+        ...currentSavedLibrariesState(s),
         ...currentLayerDefaultsState(s),
       })),
   };
@@ -348,6 +362,8 @@ export const useStore = create<AppState>((set, get) => ({
   ...closeOpenFillContoursActions(set),
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),
+  ...savedLibrariesActions(set, get),
+  ...materialPresetActions(set),
   ...objectPropertiesActions(set),
   ...imageMaskActions(set),
   ...sceneClipboardActions(set),

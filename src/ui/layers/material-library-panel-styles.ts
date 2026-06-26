@@ -12,11 +12,11 @@ export const sectionStyle: CSSProperties = {
 
 export const headingStyle: CSSProperties = { fontSize: 14, margin: 0 };
 
-export const libraryHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
+export const hintStyle: CSSProperties = {
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+  fontStyle: 'italic',
+  margin: 0,
 };
 
 export const libraryNameStyle: CSSProperties = {

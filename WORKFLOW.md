@@ -1109,6 +1109,13 @@ a LightBurn session).
 
 ### F-ML1. Material library — save, load, and session persistence
 
+**Superseded (ADR-093, 2026-06-26).** The manual Save... / Load... /
+Unload rail controls and the single-library `localStorage` slot
+described below have been **removed**, replaced by in-app multi-library
+auto-save (F-ML3) and the create/edit wizard (F-ML2). The file Save/Load
+paths now live in the Saved Libraries page as Export... / Import...
+This section is retained as the V1 history.
+
 **Code:** `src/ui/layers/MaterialLibraryPanel.tsx`,
 `src/ui/app/material-library-file-actions.ts`,
 `src/ui/state/material-library-persistence.ts`. The library is
@@ -1140,3 +1147,78 @@ share them as files.
 4. **Persistence failure (edge).** If the localStorage write fails
    (quota), a single warning toast points the operator at **Save...**;
    editing continues unaffected.
+
+### F-ML2. Create / edit a material preset (guided wizard) [Planned — ADR-093]
+
+**Operator intent.** Make a reusable material preset by typing its
+details directly — name, thickness, then cut settings — without first
+editing a layer.
+
+**Entry.** Material Library rail → **New material...** (or **Edit** on a
+preset row) opens a multi-step `Dialog` wizard. The draft commits only
+on the final Save, so Cancel/Escape at any step discards it.
+
+**Steps.**
+
+1. **Identity.** Material name (required); a **Thickness** vs **Surface
+   (no thickness)** choice that reveals either a thickness-mm field or a
+   title field; description (required); optional operation (Cut /
+   Engrave).
+2. **Cut settings.** Mode (Line / Fill / Image), power, min power,
+   speed, passes, air assist.
+3. **Mode details.** Only the chosen mode's fields — Line (kerf,
+   tabs/bridges), Fill (interval/LPI, angle, overscan, cross-hatch,
+   direction, style), or Image (dither, DPI/interval, dot width,
+   negative, pass-through).
+4. **Review & Save.** A summary, the device-hint compatibility note,
+   and a plain "test on scrap; these are starting points" reminder.
+   Save adds (or replaces, when editing) the preset and the library
+   auto-saves (F-ML3).
+
+**Flows.**
+
+- **Success.** Save returns to the rail with the new/updated preset
+  selected; a toast confirms "Saved <material>".
+- **Error (invalid input).** Next/Save stays disabled until the current
+  step validates (missing name or description, non-positive thickness,
+  min power > power); the reason shows inline and nothing is committed.
+- **Empty (no library yet).** New material... first prompts to create
+  or open a library (F-ML3); the wizard then targets that library.
+- **Edge (prefill from layer).** An optional **New from current
+  layer** entry pre-fills steps 2–3 from the selected layer's recipe
+  (the old "Create from Layer" shortcut), still fully editable before
+  Save.
+
+### F-ML3. Saved Libraries — in-app, auto-saved, browsable [Planned — ADR-093]
+
+**Operator intent.** Keep several material libraries, switch between
+them, and never lose presets — without managing files by hand.
+
+**Storage.** Libraries live in `localStorage`
+(`laserforge.material-libraries.v1`) as a keyed collection; each
+payload is the byte-identical `.lfml.json` serialization. Any mutation
+of the active library auto-saves. The legacy single-library slot
+(`laserforge.material-library.v1`, F-ML1) is migrated in once, then
+removed.
+
+**Entry.** Material Library rail → **Saved Libraries...** opens a
+`Dialog` listing every saved library: name, device hint, preset count,
+last updated.
+
+**Flows.**
+
+- **Success.** **Open** sets a library active and closes the page;
+  **New library**, **Rename**, and **Duplicate** update the list in
+  place and auto-save.
+- **Delete.** A job-aware confirm guards removal; deleting the active
+  library leaves no active library (the rail shows the empty state).
+- **Export / Import.** **Export...** writes the selected library to a
+  `.lfml.json` file (the F-ML1 save path); **Import...** reads one and
+  adds it to the list. A file from a newer schema raises the
+  schema-too-new alert; any other invalid file toasts the reason and
+  the list is unchanged.
+- **Empty.** With no libraries, the page offers **New library** and
+  **Import...** only.
+- **Edge (quota / corrupt slot).** A failed auto-save warns once and
+  points at Export...; a corrupt collection slot is discarded silently
+  rather than failing every boot.
