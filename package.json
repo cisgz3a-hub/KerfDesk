@@ -1,6 +1,6 @@
 {
   "name": "laserforge",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Focused GRBL CAM application for laser cutters and engravers. Web + Windows desktop from one codebase. Proprietary — All Rights Reserved (see LICENSE).",
   "license": "SEE LICENSE IN LICENSE",
