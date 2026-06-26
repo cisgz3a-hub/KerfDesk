@@ -19,14 +19,16 @@ describe('trace benchmark loop', () => {
       'edge-square-canny-quality',
       'edge-noisy-photo-controls',
       'edge-segmented-curve-linking',
+      'arch-house-edge-curve-cleanup',
       'centerline-landed-regression',
       'arch-house-line-art-baseline',
     ]);
   });
 
-  it('keeps curve linking, Centerline, and real Arch House Line Art in the benchmark loop', async () => {
+  it('keeps curve linking, real Edge Detection, Centerline, and Line Art in the benchmark loop', async () => {
     const results = await runCurrentTraceBenchmarks();
     const curveLinking = requiredResult(results, 'edge-segmented-curve-linking');
+    const archHouseEdge = requiredResult(results, 'arch-house-edge-curve-cleanup');
     const centerline = requiredResult(results, 'centerline-landed-regression');
     const archHouse = requiredResult(results, 'arch-house-line-art-baseline');
 
@@ -34,6 +36,11 @@ describe('trace benchmark loop', () => {
     expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(4);
     expect(curveLinking.metrics.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
     expect(curveLinking.metrics.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
+
+    expect(archHouseEdge.findings).toEqual([]);
+    expect(archHouseEdge.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);
+    expect(archHouseEdge.metrics.shortArchPolylineCount).toBeLessThanOrEqual(2);
+    expect(archHouseEdge.metrics.aggregateArchCoverageRatio).toBeGreaterThanOrEqual(0.95);
 
     expect(centerline.findings).toEqual([]);
     expect(centerline.metrics.maxDeviationPx).toBeLessThanOrEqual(1.6);

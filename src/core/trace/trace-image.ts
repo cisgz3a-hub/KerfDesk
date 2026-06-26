@@ -247,7 +247,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeBlurSigma: 1.2,
     edgeLowThresholdRatio: 0.08,
     edgeHighThresholdRatio: 0.2,
-    edgeMinLengthPx: 3,
+    edgeMinLengthPx: 8,
     edgeJoinGapPx: 3,
     edgeMedianFilter: true,
   },

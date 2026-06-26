@@ -339,9 +339,51 @@ Rating: `10/10` for the synthetic curved-stroke Edge Detection linker slice.
 
 Next likely slice:
 
-1. Add real-logo Edge Detection artifact metrics for curved arch/corner continuity if the existing Arch House fixture can produce stable region-specific thresholds.
+1. Continue real-logo Edge Detection artifact metrics for other curve/corner regions if stable thresholds can be defined.
 2. Add browser smoke for Edge Detection controls if a file-picker-capable harness is available.
 3. Start Centerline v2 distance-aware pruning/gap-repair only after the edge benchmark remains green.
+
+### Step G - Real Logo Edge Detection Cleanup
+
+Goal: make the Arch House Edge Detection proof measure the actual top-arch dotted-curve failure, not just synthetic circles or total point counts.
+
+Completed on 2026-06-27:
+
+- Added a real-logo top-arch continuity metric over the Arch House fixture.
+- Proved the failure first:
+  - Before cleanup, Edge Detection emitted `23` arch-region polylines, `7` short arch fragments, and `12` tiny closed polylines.
+  - The aggregate arch coverage was already complete, which showed the issue was dotted debris/over-fragmentation, not missing source edge data.
+- Raised the Edge Detection preset minimum edge length from `3 px` to `8 px`.
+- After cleanup, Arch House Edge Detection emitted `16` arch-region polylines, `2` short arch fragments, `0` tiny closed polylines, and full aggregate arch coverage.
+- Added `arch-house-edge-curve-cleanup` to the trace benchmark loop beside square Canny, noisy-photo controls, segmented curve linking, Centerline, and Line Art.
+
+Verification:
+
+```powershell
+pnpm test --run src/__fixtures__/perceptual/trace-benchmark-loop.test.ts src/__fixtures__/perceptual/arch-house-edge-quality.test.ts src/__fixtures__/perceptual/edge-curve-quality.test.ts src/__fixtures__/perceptual/trace-artifacts.test.ts src/core/trace/edge-trace.test.ts src/ui/trace/ImportImageDialog.test.ts
+pnpm test --run src/__fixtures__/perceptual src/core/trace/edge-trace.test.ts src/core/trace/canny-edges.test.ts src/ui/trace/ImportImageDialog.test.ts
+pnpm run typecheck
+pnpm run format:check
+pnpm lint
+pnpm test
+```
+
+Result:
+
+- Focused edge/benchmark bundle passed: `6` files, `45` tests.
+- Broad perceptual trace bundle passed: `14` files, `94` tests.
+- Typecheck passed.
+- Format check passed.
+- Lint passed with the existing `boundaries/dependencies` legacy selector migration warning only.
+- Full suite passed: `386` test files, `2370` tests.
+
+Rating: `10/10` for the real-logo Edge Detection top-arch cleanup slice.
+
+Next likely slice:
+
+1. Add browser smoke for Edge Detection controls if a file-picker-capable harness is available.
+2. Add real-logo region metrics for the roof/window corners only if stable, non-false-positive thresholds can be defined.
+3. Start Centerline v2 distance-aware pruning/gap-repair benchmarks before changing Centerline again.
 
 ## Do Not Forget
 

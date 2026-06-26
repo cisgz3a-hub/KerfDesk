@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS } from '../../core/trace';
 import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
+import { measureTopArchContinuity } from './arch-house-edge-truth';
 import { buildTraceArtifact, requiredArchHouseFixtureStatus } from './trace-artifact-runner';
 import { decodePngFile } from './png-decode';
 
@@ -30,8 +31,32 @@ describe('arch-house real logo Edge Detection quality', () => {
 
       expect(artifact.metrics.openPolylineCount).toBe(0);
       expect(artifact.metrics.closedPolylineCount).toBeGreaterThan(10);
-      expect(artifact.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(20);
+      expect(artifact.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);
       expect(artifact.metrics.pointCount).toBeLessThan(120_000);
+    },
+  );
+
+  it(
+    'keeps the main top arch connected enough to avoid dotted curve fragments',
+    { timeout: 120_000 },
+    () => {
+      const fixture = requiredArchHouseFixtureStatus();
+      if (fixture.path === null) throw new Error(`Missing fixture: ${fixture.expectedPathGlob}`);
+      const image = decodePngFile(fixture.path);
+      const paths = traceImageToEdgePaths(image, EDGE_OPTIONS);
+      const archQuality = measureTopArchContinuity(paths.flatMap((path) => path.polylines));
+
+      console.log(
+        `[arch-house-edge-arch] ${archQuality.archPolylineCount} arch polylines, ` +
+          `${archQuality.shortArchPolylineCount} short, ` +
+          `aggregate=${archQuality.aggregateArchCoverageRatio}, ` +
+          `coverage=${archQuality.longestArchCoverageRatio}, ` +
+          `maxGapDeg=${archQuality.maxLongestArchGapDeg}`,
+      );
+
+      expect(archQuality.archPolylineCount).toBeLessThanOrEqual(18);
+      expect(archQuality.shortArchPolylineCount).toBeLessThanOrEqual(2);
+      expect(archQuality.aggregateArchCoverageRatio).toBeGreaterThanOrEqual(0.95);
     },
   );
 });

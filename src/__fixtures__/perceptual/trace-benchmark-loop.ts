@@ -12,6 +12,7 @@ import {
   measureSquarePathEdgeQuality,
 } from './edge-truth';
 import {
+  archHouseEdgeCurveCleanupBenchmark,
   archHouseLineArtBaselineBenchmark,
   centerlineLandedRegressionBenchmark,
 } from './trace-benchmark-regression-cases';
@@ -79,6 +80,7 @@ export async function runCurrentTraceBenchmarks(): Promise<TraceBenchmarkResult[
     edgeSquareCannyBenchmark(),
     edgeNoisyPhotoControlsBenchmark(),
     edgeSegmentedCurveLinkingBenchmark(),
+    archHouseEdgeCurveCleanupBenchmark(),
     centerlineLandedRegressionBenchmark(),
     await archHouseLineArtBaselineBenchmark(),
   ];
