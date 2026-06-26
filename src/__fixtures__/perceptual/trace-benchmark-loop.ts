@@ -2,6 +2,10 @@ import { TRACE_PRESETS } from '../../core/trace';
 import { cannyEdges } from '../../core/trace/canny-edges';
 import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
 import {
+  measureSegmentedStrokeContinuity,
+  SEGMENTED_STROKE_CIRCLE_FIXTURE,
+} from './edge-curve-truth';
+import {
   EDGE_SQUARE_FIXTURE,
   NOISY_PHOTO_EDGE_FIXTURE,
   measureSquareEdgeQuality,
@@ -74,6 +78,7 @@ export async function runCurrentTraceBenchmarks(): Promise<TraceBenchmarkResult[
   return [
     edgeSquareCannyBenchmark(),
     edgeNoisyPhotoControlsBenchmark(),
+    edgeSegmentedCurveLinkingBenchmark(),
     centerlineLandedRegressionBenchmark(),
     await archHouseLineArtBaselineBenchmark(),
   ];
@@ -193,6 +198,61 @@ function edgeNoisyPhotoControlsBenchmark(): TraceBenchmarkResult {
   const detailed = measureSquarePathEdgeQuality(detailedPaths, NOISY_PHOTO_EDGE_FIXTURE);
   const restrained = measureSquarePathEdgeQuality(restrainedPaths, NOISY_PHOTO_EDGE_FIXTURE);
   return buildNoisyPhotoControlsBenchmark(detailed, restrained);
+}
+
+function edgeSegmentedCurveLinkingBenchmark(): TraceBenchmarkResult {
+  const paths = traceImageToEdgePaths(SEGMENTED_STROKE_CIRCLE_FIXTURE.image, {
+    ...EDGE_OPTIONS,
+    edgeBlurSigma: 0.9,
+    edgeLowThresholdRatio: 0.04,
+    edgeHighThresholdRatio: 0.12,
+    edgeMinLengthPx: 10,
+    edgeJoinGapPx: 3,
+  });
+  const polylines = paths.flatMap((path) => path.polylines);
+  const quality = measureSegmentedStrokeContinuity(polylines, SEGMENTED_STROKE_CIRCLE_FIXTURE);
+  const findings: TraceBenchmarkFinding[] = [];
+  pushFindingIf(quality.strokePolylineCount > 4, findings, {
+    severity: 'high',
+    metric: 'strokePolylineCount',
+    actual: quality.strokePolylineCount,
+    target: '<= 4',
+    message: 'Edge Detection leaves small broken curve gaps as separate stroke fragments.',
+    fixHint:
+      'Improve bounded curve-gap linking before contour smoothing without broadening independent edges.',
+  });
+  pushFindingIf(quality.longestStrokeAngularCoverageRatio < 0.9, findings, {
+    severity: 'high',
+    metric: 'longestStrokeAngularCoverageRatio',
+    actual: quality.longestStrokeAngularCoverageRatio,
+    target: '>= 0.9',
+    message: 'The longest curved stroke contour does not cover enough of the intended arc.',
+    fixHint: 'Preserve small curved stroke continuity through the Canny-to-contour bridge.',
+  });
+  pushFindingIf(quality.maxLongestStrokeAngularGapDeg > 30, findings, {
+    severity: 'medium',
+    metric: 'maxLongestStrokeAngularGapDeg',
+    actual: quality.maxLongestStrokeAngularGapDeg,
+    target: '<= 30',
+    message: 'The linked curved stroke still has an overly large angular gap.',
+    fixHint: 'Tune small-gap linking or post-link cleanup for curved strokes.',
+  });
+  return {
+    id: 'edge-segmented-curve-linking',
+    name: 'Segmented curved-stroke Edge Detection linking',
+    rating: ratingFromFindings(findings),
+    metrics: {
+      strokePolylineCount: quality.strokePolylineCount,
+      longestStrokeAngularCoverageRatio: quality.longestStrokeAngularCoverageRatio,
+      maxLongestStrokeAngularGapDeg: quality.maxLongestStrokeAngularGapDeg,
+    },
+    benchmark: {
+      strokePolylineCount: '<= 4',
+      longestStrokeAngularCoverageRatio: '>= 0.9',
+      maxLongestStrokeAngularGapDeg: '<= 30',
+    },
+    findings,
+  };
 }
 
 export function buildNoisyPhotoControlsBenchmark(

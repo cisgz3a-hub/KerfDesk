@@ -18,15 +18,22 @@ describe('trace benchmark loop', () => {
     expect(audit.results.map((result) => result.id)).toEqual([
       'edge-square-canny-quality',
       'edge-noisy-photo-controls',
+      'edge-segmented-curve-linking',
       'centerline-landed-regression',
       'arch-house-line-art-baseline',
     ]);
   });
 
-  it('keeps Centerline and real Arch House Line Art in the benchmark loop', async () => {
+  it('keeps curve linking, Centerline, and real Arch House Line Art in the benchmark loop', async () => {
     const results = await runCurrentTraceBenchmarks();
+    const curveLinking = requiredResult(results, 'edge-segmented-curve-linking');
     const centerline = requiredResult(results, 'centerline-landed-regression');
     const archHouse = requiredResult(results, 'arch-house-line-art-baseline');
+
+    expect(curveLinking.findings).toEqual([]);
+    expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(4);
+    expect(curveLinking.metrics.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
+    expect(curveLinking.metrics.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
 
     expect(centerline.findings).toEqual([]);
     expect(centerline.metrics.maxDeviationPx).toBeLessThanOrEqual(1.6);
