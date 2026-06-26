@@ -1,0 +1,105 @@
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Controllable test doubles, hoisted so the vi.mock factories below can close
+// over them without a temporal-dead-zone error.
+const h = vi.hoisted(() => ({
+  swState: { offlineReady: false, needRefresh: false },
+  setOfflineReady: vi.fn(),
+  setNeedRefresh: vi.fn(),
+  updateServiceWorker: vi.fn(),
+  streamer: { status: null as string | null },
+  pushToast: vi.fn(),
+}));
+
+vi.mock('virtual:pwa-register/react', () => ({
+  useRegisterSW: () => ({
+    offlineReady: [h.swState.offlineReady, h.setOfflineReady],
+    needRefresh: [h.swState.needRefresh, h.setNeedRefresh],
+    updateServiceWorker: h.updateServiceWorker,
+  }),
+}));
+vi.mock('../state/laser-store', () => ({
+  useLaserStore: (sel: (s: { streamer: { status: string } | null }) => unknown) =>
+    sel({ streamer: h.streamer.status === null ? null : { status: h.streamer.status } }),
+}));
+vi.mock('../state/toast-store', () => ({
+  useToastStore: (sel: (s: { pushToast: typeof h.pushToast }) => unknown) =>
+    sel({ pushToast: h.pushToast }),
+}));
+
+import { PwaUpdatePrompt } from './PwaUpdatePrompt';
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+const BANNER = '[aria-label="App update available"]';
+
+async function render(): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    root.render(<PwaUpdatePrompt />);
+  });
+  if (root === null) throw new Error('root missing');
+  return { host, root };
+}
+
+beforeEach(() => {
+  h.swState.offlineReady = false;
+  h.swState.needRefresh = false;
+  h.streamer.status = null;
+  vi.clearAllMocks();
+});
+
+afterEach(() => {
+  document.body.innerHTML = '';
+});
+
+describe('PwaUpdatePrompt', () => {
+  it('shows a Reload banner when an update is waiting and the laser is idle', async () => {
+    h.swState.needRefresh = true;
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).not.toBeNull();
+    expect(host.querySelector('button')?.textContent).toBe('Reload');
+  });
+
+  it('suppresses the banner while the laser is streaming', async () => {
+    h.swState.needRefresh = true;
+    h.streamer.status = 'streaming';
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+
+  it('suppresses the banner while a job is paused', async () => {
+    h.swState.needRefresh = true;
+    h.streamer.status = 'paused';
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+
+  it('reloads with the new service worker when Reload is clicked', async () => {
+    h.swState.needRefresh = true;
+    const { host } = await render();
+    await act(async () => {
+      host.querySelector('button')?.click();
+    });
+    expect(h.updateServiceWorker).toHaveBeenCalledWith(true);
+  });
+
+  it('fires a one-time offline-ready toast', async () => {
+    h.swState.offlineReady = true;
+    await render();
+    expect(h.pushToast).toHaveBeenCalledWith('Ready to work offline.', 'success');
+    expect(h.setOfflineReady).toHaveBeenCalledWith(false);
+  });
+
+  it('renders nothing when there is no update', async () => {
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+});
