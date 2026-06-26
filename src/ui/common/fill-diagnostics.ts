@@ -1,9 +1,11 @@
 import {
+  applyTransform,
   isClosedEnough,
   type ColoredPath,
   type Polyline,
   type Project,
   type SceneObject,
+  type Transform,
 } from '../../core/scene';
 
 type VectorSceneObject = Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }>;
@@ -60,8 +62,9 @@ export function selectedCloseableOpenFillContourCount(
     if (group.object.locked === true) return sum;
     return (
       sum +
-      group.polylines.filter((polyline) => isCloseableOpenFillPolyline(polyline, toleranceMm))
-        .length
+      group.polylines.filter((polyline) =>
+        isCloseableOpenFillPolyline(polyline, group.object.transform, toleranceMm),
+      ).length
     );
   }, 0);
 }
@@ -89,16 +92,20 @@ export function selectedOpenFillContourRepairSummary(
 
 export function isCloseableOpenFillPolyline(
   polyline: Polyline,
+  transform: Transform,
   toleranceMm = CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM,
 ): boolean {
   if (isClosedEnough(polyline) || polyline.points.length < 3) return false;
   const first = polyline.points[0];
   const last = polyline.points[polyline.points.length - 1];
   if (first === undefined || last === undefined) return false;
-  const dx = first.x - last.x;
-  const dy = first.y - last.y;
-  const distance = Math.hypot(dx, dy);
-  return Number.isFinite(distance) && distance <= toleranceMm;
+  // Measure the endpoint gap in scene millimetres, not the object's local point
+  // units (px for traces, viewBox units for SVGs), so the tolerance means the
+  // same physical distance regardless of the object's scale.
+  const firstMm = applyTransform(first, transform);
+  const lastMm = applyTransform(last, transform);
+  const distanceMm = Math.hypot(firstMm.x - lastMm.x, firstMm.y - lastMm.y);
+  return Number.isFinite(distanceMm) && distanceMm <= toleranceMm;
 }
 
 function outputFillLayerColors(project: Project): ReadonlySet<string> {
