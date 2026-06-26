@@ -48,11 +48,11 @@ jobs:
           # triggering run's head SHA; manual dispatches deploy the selected
           # ref (gated to main above) and re-prove everything below anyway.
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
-          # Fetch full history so the version-badge `git rev-parse
-          # --short HEAD` step finds a real commit (the default shallow
-          # clone has depth 1 and works, but a deeper clone helps
-          # debugging in the Actions log).
-          fetch-depth: 1
+          # Fetch full history so the version badge's `git rev-list --count
+          # HEAD` (the auto build number, see vite.config.ts appVersion) is the
+          # real total, not the shallow-clone 1. `git rev-parse --short HEAD`
+          # for the SHA works at any depth.
+          fetch-depth: 0
 
       - name: Set up pnpm
         # See ci.yml for why no `with.version` — package.json's
