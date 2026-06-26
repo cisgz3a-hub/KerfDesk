@@ -25,6 +25,7 @@
 
 import { despeckle, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
+import { shouldUseSketchTrace } from './auto-sketch-trace';
 
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
@@ -104,6 +105,7 @@ export type TraceOptions = {
   readonly thresholdLuma?: number;
   readonly traceTransparency?: boolean;
   readonly sketchTrace?: boolean;
+  readonly autoSketchTrace?: boolean;
   // Phase E.2 quality polish — three pure-core preprocessing
   // stages (see preprocess.ts). Compose in this order:
   //   medianFilter → (otsuThreshold OR thresholdLuma) → despeckle → tracer
@@ -128,6 +130,14 @@ export type TraceOptions = {
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
+  // Edge Detection-only Canny controls. UI exposes these as three simple
+  // operator knobs: Sensitivity, Detail, and Minimum line.
+  readonly edgeBlurSigma?: number;
+  readonly edgeLowThresholdRatio?: number;
+  readonly edgeHighThresholdRatio?: number;
+  readonly edgeMinLengthPx?: number;
+  readonly edgeJoinGapPx?: number;
+  readonly edgeMedianFilter?: boolean;
   // Phase E.3 — image-level adjustments matching LF1's
   // ImageProcessing.ts math (see raster-prep.ts). All four run BEFORE the
   // existing median → threshold → despeckle chain, so the cleanup
@@ -171,8 +181,11 @@ export const DEFAULT_TRACE_OPTIONS: TraceOptions = {
 // (vector-like logos, line drawings, monochrome signs).
 export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   'Line Art': {
-    // For clean black-on-white logos / line drawings. Phase E.2
-    // upgrade stack:
+    // For logo / line-art imports. Clean binary images stay on the
+    // fixed LightBurn-like brightness band, while colour-rich logos can
+    // auto-promote to local-contrast sketch preprocessing so pale ink
+    // such as gold subtitle text is not dropped as background.
+    // Phase E.2 upgrade stack:
     //   * cutoffLuma / thresholdLuma — LightBurn's default trace
     //     brightness band, inclusive 0..128.
     //   * fixedPalette [white, black] — guarantees a 2-layer output
@@ -192,6 +205,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     cutoffLuma: 0,
     thresholdLuma: 128,
+    autoSketchTrace: true,
     ignoreLessThanPixels: 2,
     smoothness: 1,
     optimize: 0.2,
@@ -214,10 +228,11 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     despeckleMinPixels: 12,
   },
   'Edge Detection': {
-    // Canny edge detection -> single-stroke vectors of every brightness
-    // transition. For full-colour art / logos that should engrave as a line
-    // drawing of their edges, not a flat silhouette. The threshold / palette /
-    // blur knobs are ignored here -- Canny works on the raw image.
+    // Canny edge detection -> closed contour vectors around brightness
+    // transitions. For full-colour art / logos that should engrave as a line
+    // drawing of their edges, not a flat silhouette. Brightness threshold /
+    // palette knobs are ignored here; Edge controls and median denoise feed
+    // Canny directly.
     traceMode: 'edge',
     numberOfColors: 2,
     pathOmit: 0,
@@ -229,6 +244,12 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     useOtsuThreshold: true,
     despeckleMinPixels: 12,
+    edgeBlurSigma: 1.2,
+    edgeLowThresholdRatio: 0.08,
+    edgeHighThresholdRatio: 0.2,
+    edgeMinLengthPx: 3,
+    edgeJoinGapPx: 3,
+    edgeMedianFilter: true,
   },
   Smooth: {
     // For slightly noisy / hand-drawn line art. Median filter kills
@@ -291,7 +312,7 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
     }
     return prepared;
   }
-  if (options.sketchTrace === true) {
+  if (shouldUseSketchTrace(image, options)) {
     let prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
     if (shouldDespeckle(options)) {
       prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);

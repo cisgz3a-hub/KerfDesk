@@ -167,7 +167,7 @@ describe('CutsLayersPanel cut settings editor', () => {
     }
   });
 
-  it('applies image toggles from the visible image layer row', async () => {
+  it('applies image toggles from the visible image row to the selected object only', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
     const { host, unmount } = await renderPanel();
@@ -193,19 +193,23 @@ describe('CutsLayersPanel cut settings editor', () => {
         Simulate.blur(dotWidth);
       });
 
-      const layer = useStore.getState().project.scene.layers[0];
-      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(true);
-      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(true);
-      expect((layer as { readonly imageBidirectional?: boolean })?.imageBidirectional).toBe(false);
-      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(
-        0.07,
-      );
+      const state = useStore.getState();
+      const layer = state.project.scene.layers[0];
+      const override = state.project.scene.objects[0]?.operationOverride;
+      expect((layer as { readonly negativeImage?: boolean })?.negativeImage).toBe(false);
+      expect((layer as { readonly passThrough?: boolean })?.passThrough).toBe(false);
+      expect((layer as { readonly imageBidirectional?: boolean })?.imageBidirectional).toBe(true);
+      expect((layer as { readonly dotWidthCorrectionMm?: number })?.dotWidthCorrectionMm).toBe(0);
+      expect(override?.negativeImage).toBe(true);
+      expect(override?.passThrough).toBe(true);
+      expect(override?.imageBidirectional).toBe(false);
+      expect(override?.dotWidthCorrectionMm).toBe(0.07);
     } finally {
       await unmount();
     }
   });
 
-  it('maps visible image line interval and DPI edits into lines per mm', async () => {
+  it('maps visible image row line interval and DPI edits onto the selected object only', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
     const { host, unmount } = await renderPanel();
@@ -218,7 +222,9 @@ describe('CutsLayersPanel cut settings editor', () => {
       await act(async () => {
         Simulate.blur(interval);
       });
-      expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(5);
+      let state = useStore.getState();
+      expect(state.project.scene.layers[0]?.linesPerMm).toBe(10);
+      expect(state.project.scene.objects[0]?.operationOverride?.linesPerMm).toBe(5);
 
       const dpi = requireInput(host, 'input[aria-label="DPI for #ff0000"]');
       await act(async () => {
@@ -228,7 +234,9 @@ describe('CutsLayersPanel cut settings editor', () => {
       await act(async () => {
         Simulate.blur(dpi);
       });
-      expect(useStore.getState().project.scene.layers[0]?.linesPerMm).toBe(10);
+      state = useStore.getState();
+      expect(state.project.scene.layers[0]?.linesPerMm).toBe(10);
+      expect(state.project.scene.objects[0]?.operationOverride?.linesPerMm).toBe(10);
     } finally {
       await unmount();
     }

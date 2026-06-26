@@ -17,7 +17,14 @@ export type LightBurnTraceSettingOverrides = {
   readonly optimize?: number;
   readonly traceTransparency?: boolean;
   readonly sketchTrace?: boolean;
+  readonly edgeSensitivity?: number;
+  readonly edgeDetail?: number;
+  readonly edgeMinimumLinePx?: number;
 };
+
+export const DEFAULT_EDGE_SENSITIVITY = 50;
+export const DEFAULT_EDGE_DETAIL = 68;
+export const DEFAULT_EDGE_MINIMUM_LINE_PX = 3;
 
 export function mergeLightBurnTraceSettings(
   preset: TraceOptions,
@@ -43,7 +50,79 @@ export function mergeLightBurnTraceSettings(
   if (settings.sketchTrace !== undefined) {
     out['sketchTrace'] = settings.sketchTrace;
   }
+  if (preset.traceMode === 'edge') {
+    applyEdgeTraceSettings(out, preset, settings);
+  }
   return out as TraceOptions;
+}
+
+export function edgeSensitivityFromOptions(options: TraceOptions): number {
+  const high = options.edgeHighThresholdRatio ?? 0.2;
+  return clamp(Math.round(((0.32 - high) / (0.32 - 0.05)) * 100), 0, 100);
+}
+
+export function edgeDetailFromOptions(options: TraceOptions): number {
+  const blur = options.edgeBlurSigma ?? 1.2;
+  return clamp(Math.round(((2.5 - blur) / (2.5 - 0.6)) * 100), 0, 100);
+}
+
+function applyEdgeTraceSettings(
+  out: Record<string, unknown>,
+  preset: TraceOptions,
+  settings: LightBurnTraceSettingOverrides,
+): void {
+  if (
+    settings.edgeSensitivity !== undefined &&
+    settings.edgeSensitivity !== edgeSensitivityFromOptions(preset)
+  ) {
+    const thresholds = edgeSensitivityToThresholds(settings.edgeSensitivity);
+    out['edgeLowThresholdRatio'] = thresholds.low;
+    out['edgeHighThresholdRatio'] = thresholds.high;
+  } else {
+    copyIfDefined(out, 'edgeLowThresholdRatio', preset.edgeLowThresholdRatio);
+    copyIfDefined(out, 'edgeHighThresholdRatio', preset.edgeHighThresholdRatio);
+  }
+  if (settings.edgeDetail !== undefined && settings.edgeDetail !== edgeDetailFromOptions(preset)) {
+    const detail = edgeDetailToCanny(settings.edgeDetail);
+    out['edgeBlurSigma'] = detail.blurSigma;
+    out['edgeJoinGapPx'] = detail.joinGapPx;
+  } else {
+    copyIfDefined(out, 'edgeBlurSigma', preset.edgeBlurSigma);
+    copyIfDefined(out, 'edgeJoinGapPx', preset.edgeJoinGapPx);
+  }
+  if (settings.edgeMinimumLinePx !== undefined) {
+    out['edgeMinLengthPx'] = Math.max(0, settings.edgeMinimumLinePx);
+  } else {
+    out['edgeMinLengthPx'] = preset.edgeMinLengthPx ?? DEFAULT_EDGE_MINIMUM_LINE_PX;
+  }
+}
+
+function edgeSensitivityToThresholds(sensitivity: number): {
+  readonly low: number;
+  readonly high: number;
+} {
+  const t = clamp(sensitivity, 0, 100) / 100;
+  const high = roundRatio(0.32 + (0.05 - 0.32) * t);
+  return { low: roundRatio(high * 0.4), high };
+}
+
+function edgeDetailToCanny(detail: number): {
+  readonly blurSigma: number;
+  readonly joinGapPx: number;
+} {
+  const t = clamp(detail, 0, 100) / 100;
+  return {
+    blurSigma: roundRatio(2.5 + (0.6 - 2.5) * t),
+    joinGapPx: roundRatio(2 + (0.5 - 2) * t),
+  };
+}
+
+function copyIfDefined<T extends keyof TraceOptions>(
+  out: Record<string, unknown>,
+  key: T,
+  value: TraceOptions[T],
+): void {
+  if (value !== undefined) out[key] = value;
 }
 
 // True when the options stack any of the three preset features that
@@ -83,4 +162,13 @@ function clampByte(value: number): number {
 function clampMin(value: number, min: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, value);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.min(max, value));
+}
+
+function roundRatio(value: number): number {
+  return Number(value.toFixed(4));
 }

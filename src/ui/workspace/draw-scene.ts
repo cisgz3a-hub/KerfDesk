@@ -12,7 +12,6 @@ import {
   type Polyline,
   type Project,
   type SceneObject,
-  transformedBBox,
 } from '../../core/scene';
 import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawMeasurement } from './draw-measurement';
@@ -34,8 +33,8 @@ import { drawPathNodeHandles } from './draw-path-node-handles';
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
+import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
-import { isObjectOutOfBed } from './out-of-bounds';
 import { rotateHandlePosition } from './rotate-handle';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import {
@@ -299,14 +298,15 @@ function drawObjectPolylines(
   for (const path of obj.paths) {
     const layer = layerByColor.get(path.color);
     if (layer === undefined || !layer.visible) continue;
-    if (layer.mode === 'fill') {
-      drawFilledDesignGeometry(ctx, obj, path.polylines, layer, view, path.color);
+    const effectiveLayer =
+      obj.operationOverride === undefined ? layer : { ...layer, ...obj.operationOverride };
+    if (effectiveLayer.mode === 'fill') {
+      drawFilledDesignGeometry(ctx, obj, path.polylines, effectiveLayer, view, path.color);
       continue;
     }
     ctx.strokeStyle = path.color;
-    ctx.lineWidth = layer.output ? 1.5 : 0.75;
-    // Single beginPath/stroke per color, regardless of how many
-    // polylines that color has. Per-polyline stroke() was the cause
+    ctx.lineWidth = effectiveLayer.output ? 1.5 : 0.75;
+    // Single beginPath/stroke per color. Per-polyline stroke() was the cause
     // of the post-import freeze: each stroke is a GPU sync, so a
     // 5000-polyline traced image emitted 5000 syncs per redraw at
     // 60 Hz → canvas chokes. Batching to one stroke per color drops
@@ -445,26 +445,3 @@ function drawRotateHandle(
 // F-A3/A6/A8 — overlay any object whose transformed bbox extends past the
 // bed in scene coordinates with a red dashed rectangle. Preflight (F-A10)
 // blocks at G-code generation time; this is the live UX hint.
-function drawOutOfBoundsOutlines(
-  ctx: CanvasRenderingContext2D,
-  project: Project,
-  view: ViewTransform,
-): void {
-  const bedW = project.device.bedWidth;
-  const bedH = project.device.bedHeight;
-  for (const obj of project.scene.objects) {
-    if (!isObjectOutOfBed(obj, bedW, bedH)) continue;
-    const bbox = transformedBBox(obj);
-    ctx.save();
-    ctx.strokeStyle = canvasTheme.outOfBounds;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 4]);
-    ctx.strokeRect(
-      view.offsetX + bbox.minX * view.scale,
-      view.offsetY + bbox.minY * view.scale,
-      (bbox.maxX - bbox.minX) * view.scale,
-      (bbox.maxY - bbox.minY) * view.scale,
-    );
-    ctx.restore();
-  }
-}

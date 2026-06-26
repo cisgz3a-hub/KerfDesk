@@ -55,6 +55,87 @@ afterEach(() => {
 });
 
 describe('CutsLayersPanel layer order controls', () => {
+  it('edits only selected artwork from a same-color layer row', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.setState({ selectedObjectId: 'O2', additionalSelectedIds: new Set() });
+    const { host, unmount } = await renderPanel();
+    try {
+      const mode = host.querySelector('select[aria-label="Mode for #000000"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('layer mode missing');
+
+      await act(async () => {
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+
+      const state = useStore.getState();
+      const layer = state.project.scene.layers.find((candidate) => candidate.id === '#000000');
+      const first = state.project.scene.objects.find((object) => object.id === 'O1');
+      const second = state.project.scene.objects.find((object) => object.id === 'O2');
+      expect(layer?.mode).toBe('line');
+      expect(first?.operationOverride).toBeUndefined();
+      expect(second?.operationOverride).toMatchObject({ mode: 'fill' });
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('edits only selected artwork power from a same-color layer row', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.setState({ selectedObjectId: 'O2', additionalSelectedIds: new Set() });
+    const { host, unmount } = await renderPanel();
+    try {
+      const power = host.querySelector('input[aria-label="Power for #000000"]');
+      if (!(power instanceof HTMLInputElement)) throw new Error('layer power missing');
+
+      act(() => {
+        power.value = '55';
+        Simulate.change(power);
+      });
+      act(() => {
+        Simulate.blur(power);
+      });
+
+      const state = useStore.getState();
+      const layer = state.project.scene.layers.find((candidate) => candidate.id === '#000000');
+      const first = state.project.scene.objects.find((object) => object.id === 'O1');
+      const second = state.project.scene.objects.find((object) => object.id === 'O2');
+      expect(layer?.power).toBe(30);
+      expect(first?.operationOverride).toBeUndefined();
+      expect(second?.operationOverride).toMatchObject({ power: 55 });
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('edits all selected same-color artwork from a layer row', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
+    const { host, unmount } = await renderPanel();
+    try {
+      const mode = host.querySelector('select[aria-label="Mode for #000000"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('layer mode missing');
+
+      await act(async () => {
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+
+      const state = useStore.getState();
+      const layer = state.project.scene.layers.find((candidate) => candidate.id === '#000000');
+      expect(layer?.mode).toBe('line');
+      expect(state.project.scene.objects.map((object) => object.operationOverride)).toEqual([
+        { mode: 'fill' },
+        { mode: 'fill' },
+      ]);
+    } finally {
+      await unmount();
+    }
+  });
+
   it('moves a layer up through the Cuts / Layers panel', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff', '#00ff00']));
     const { host, unmount } = await renderPanel();

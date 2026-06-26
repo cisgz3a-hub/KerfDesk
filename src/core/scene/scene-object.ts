@@ -44,9 +44,38 @@ export type Bounds = {
   readonly maxY: number;
 };
 
+export type ObjectOperationOverride = {
+  readonly mode?: 'line' | 'fill' | 'image';
+  readonly minPower?: number;
+  readonly power?: number;
+  readonly speed?: number;
+  readonly passes?: number;
+  readonly airAssist?: boolean;
+  readonly kerfOffsetMm?: number;
+  readonly tabsEnabled?: boolean;
+  readonly tabSizeMm?: number;
+  readonly tabsPerShape?: number;
+  readonly tabSkipInnerShapes?: boolean;
+  readonly hatchAngleDeg?: number;
+  readonly hatchSpacingMm?: number;
+  readonly fillOverscanMm?: number;
+  readonly fillStyle?: 'scanline' | 'offset';
+  readonly fillBidirectional?: boolean;
+  readonly fillCrossHatch?: boolean;
+  readonly ditherAlgorithm?: DitherAlgorithm;
+  readonly linesPerMm?: number;
+  readonly imageBidirectional?: boolean;
+  readonly negativeImage?: boolean;
+  readonly passThrough?: boolean;
+  readonly dotWidthCorrectionMm?: number;
+};
+
 export type ObjectPowerScale = {
   // LightBurn Shape Properties: per-shape scale applied to layer power.
   readonly powerScale?: number;
+  // Optional per-object operation settings. Missing fields inherit the object's
+  // assigned layer settings, so layers remain the batch/default control.
+  readonly operationOverride?: ObjectOperationOverride;
   // Object locking V1: locked artwork is skipped by normal selection and
   // transform tools, but still renders and compiles.
   readonly locked?: boolean;
@@ -107,7 +136,7 @@ export type TracedImage = ObjectPowerScale & {
   readonly id: string;
   readonly source: string;
   // Missing means legacy filled-contour trace.
-  readonly traceMode?: 'filled-contours' | 'centerline';
+  readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
   readonly bounds: Bounds;
   readonly transform: Transform;
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -251,6 +280,34 @@ export type ShapeObject = ObjectPowerScale & {
 // Full union expanded through Phase G (ADR-014, ADR-020, ADR-051). Future
 // variants require an ADR + a PROJECT.md scope revision.
 export type SceneObject = ImportedSvg | TextObject | TracedImage | RasterImage | ShapeObject;
+
+export function sceneObjectPrimaryLayerColor(object: SceneObject): string | null {
+  switch (object.kind) {
+    case 'raster-image':
+    case 'shape':
+    case 'text':
+      return object.color;
+    case 'imported-svg':
+    case 'traced-image':
+      return object.paths[0]?.color ?? null;
+    default:
+      return assertNever(object);
+  }
+}
+
+export function sceneObjectUsesLayerColor(object: SceneObject, color: string): boolean {
+  switch (object.kind) {
+    case 'raster-image':
+    case 'shape':
+    case 'text':
+      return object.color === color;
+    case 'imported-svg':
+    case 'traced-image':
+      return object.paths.some((path) => path.color === color);
+    default:
+      return assertNever(object);
+  }
+}
 
 // Exhaustiveness helper. Place in the default arm of every `switch` over a
 // discriminated union so adding a variant produces exactly one TS error (the

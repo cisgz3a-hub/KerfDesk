@@ -4,6 +4,8 @@ import {
   isGrblRxBufferBytes,
   isScanOffsetTable,
 } from '../../core/devices';
+import { validateProjectLayer } from './project-layer-shape-validator';
+import { validateObjectOperationOverride } from './project-operation-override-validator';
 import {
   firstError,
   isObject,
@@ -12,7 +14,6 @@ import {
   optionalNonNegativeNumber,
   optionalNumber,
   optionalPercent,
-  optionalPositiveInteger,
   optionalPositiveNumber,
   optionalString,
   requireBoolean,
@@ -21,7 +22,6 @@ import {
   requireLiteral,
   requireNonNegativeNumber,
   requireNumber,
-  requirePercent,
   requirePositiveInteger,
   requirePositiveNumber,
   requireScale,
@@ -30,7 +30,6 @@ import {
   validateArray,
   valueAtPath,
 } from './project-shape-primitives';
-import { validateLayerSubLayers } from './project-layer-validator';
 
 // Hard ceiling on a stored raster's own (source) pixel grid, checked at .lf2
 // deserialize. Distinct from the TARGET burn-grid budget (core/raster
@@ -41,14 +40,7 @@ import { validateLayerSubLayers } from './project-layer-validator';
 // Convert-to-Bitmap source, but fatal to the integer bomb (security audit 2026-06-14).
 const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
 
-// Ceiling on any stored coordinate magnitude (mm). A coordinate >= 1e21 passes
-// Number.isFinite but renders in exponential notation when emitted (toFixed),
 // which the G-code bounds-check regex can't read — defeating the bounds
-// invariant. Any real bed is < 2 m; 1e6 mm (1 km) is absurdly generous yet far
-// below the exponential threshold (security audit 2026-06-14).
-// Ceiling on a transform scale factor, so scale * coordinate can't blow past the
-// coordinate ceiling either.
-
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
   const device = raw['device'];
   if (!isObject(device)) return 'missing or invalid `device`';
@@ -121,7 +113,7 @@ function validateScene(scene: Record<string, unknown>): string | null {
   const objects = scene['objects'];
   if (!Array.isArray(objects) || !Array.isArray(layers)) return null;
   return (
-    validateArray(layers, 'scene.layers', validateLayer) ??
+    validateArray(layers, 'scene.layers', validateProjectLayer) ??
     validateArray(objects, 'scene.objects', validateSceneObject) ??
     optionalSceneGroups(scene, 'scene.groups')
   );
@@ -154,46 +146,12 @@ function validateSceneGroupObjectId(value: unknown, path: string): string | null
   return typeof value === 'string' ? null : `missing or invalid \`${path}\``;
 }
 
-function validateLayer(layer: unknown, path: string): string | null {
-  if (!isObject(layer)) return `missing or invalid \`${path}\``;
-  return firstError([
-    requireString(layer, `${path}.id`),
-    requireString(layer, `${path}.color`),
-    requireLiteral(layer, `${path}.mode`, ['line', 'fill', 'image']),
-    optionalPercent(layer, `${path}.minPower`),
-    requirePercent(layer, `${path}.power`),
-    requirePositiveNumber(layer, `${path}.speed`),
-    requirePositiveInteger(layer, `${path}.passes`),
-    requireBoolean(layer, `${path}.visible`),
-    requireBoolean(layer, `${path}.output`),
-    optionalBoolean(layer, `${path}.airAssist`),
-    optionalNumber(layer, `${path}.kerfOffsetMm`),
-    optionalBoolean(layer, `${path}.tabsEnabled`),
-    optionalPositiveNumber(layer, `${path}.tabSizeMm`),
-    optionalPositiveInteger(layer, `${path}.tabsPerShape`),
-    optionalBoolean(layer, `${path}.tabSkipInnerShapes`),
-    optionalNumber(layer, `${path}.hatchAngleDeg`),
-    optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
-    optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),
-    optionalLiteral(layer, `${path}.fillStyle`, ['scanline', 'offset']),
-    optionalBoolean(layer, `${path}.fillBidirectional`),
-    optionalBoolean(layer, `${path}.fillCrossHatch`),
-    optionalDither(layer, `${path}.ditherAlgorithm`),
-    optionalPositiveNumber(layer, `${path}.linesPerMm`),
-    optionalBoolean(layer, `${path}.imageBidirectional`),
-    optionalBoolean(layer, `${path}.negativeImage`),
-    optionalBoolean(layer, `${path}.passThrough`),
-    optionalNonNegativeNumber(layer, `${path}.dotWidthCorrectionMm`),
-    validateLayerSubLayers(layer['subLayers'], `${path}.subLayers`),
-  ]);
-}
-
 function validateSceneObject(obj: unknown, path: string): string | null {
   if (!isObject(obj)) return `missing or invalid \`${path}\``;
   const kind = obj['kind'];
   if (kind === 'imported-svg') return validateVectorObject(obj, path);
   if (kind === 'text') return validateTextObject(obj, path);
-  if (kind === 'traced-image') return validateVectorObject(obj, path);
+  if (kind === 'traced-image') return validateTracedImageObject(obj, path);
   if (kind === 'raster-image') return validateRasterObject(obj, path);
   if (kind === 'shape') return validateShapeObject(obj, path);
   return `missing or invalid \`${path}.kind\``;
@@ -204,10 +162,18 @@ function validateVectorObject(obj: Record<string, unknown>, path: string): strin
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
     optionalPercent(obj, `${path}.powerScale`),
+    validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
     validateColoredPaths(obj['paths'], `${path}.paths`),
+  ]);
+}
+
+function validateTracedImageObject(obj: Record<string, unknown>, path: string): string | null {
+  return firstError([
+    validateVectorObject(obj, path),
+    optionalLiteral(obj, `${path}.traceMode`, ['filled-contours', 'centerline', 'edge']),
   ]);
 }
 
@@ -220,6 +186,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     requireLiteral(obj, `${path}.alignment`, ['left', 'center', 'right']),
     requirePositiveNumber(obj, `${path}.lineHeight`),
     optionalPercent(obj, `${path}.powerScale`),
+    validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     optionalNumber(obj, `${path}.letterSpacing`),
     requireString(obj, `${path}.color`),
@@ -237,6 +204,7 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
     requirePositiveInteger(obj, `${path}.pixelWidth`),
     requirePositiveInteger(obj, `${path}.pixelHeight`),
     optionalPercent(obj, `${path}.powerScale`),
+    validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
@@ -272,6 +240,7 @@ function validateShapeObject(obj: Record<string, unknown>, path: string): string
     validateShapeSpec(obj['spec'], `${path}.spec`),
     requireString(obj, `${path}.color`),
     optionalPercent(obj, `${path}.powerScale`),
+    validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
     optionalBoolean(obj, `${path}.locked`),
     validateBounds(obj['bounds'], `${path}.bounds`),
     validateTransform(obj['transform'], `${path}.transform`),
@@ -434,10 +403,6 @@ function validateNoGoZone(value: unknown, path: string): string | null {
 
 function requireDither(obj: Record<string, unknown>, path: string): string | null {
   return requireLiteral(obj, path, DITHER_ALGORITHMS);
-}
-
-function optionalDither(obj: Record<string, unknown>, path: string): string | null {
-  return optionalLiteral(obj, path, DITHER_ALGORITHMS);
 }
 
 function requireOrigin(obj: Record<string, unknown>, path: string): string | null {

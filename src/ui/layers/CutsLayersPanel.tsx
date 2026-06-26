@@ -25,6 +25,7 @@ export function CutsLayersPanel(): JSX.Element {
         Cuts / Layers
       </h2>
       <AddLayerControls />
+      <SelectedObjectProperties />
       <MaterialLibraryPanel />
       {layers.length === 0 ? (
         <p style={hintStyle}>Import a design to populate layers.</p>
@@ -40,7 +41,6 @@ export function CutsLayersPanel(): JSX.Element {
           ))}
         </div>
       )}
-      <SelectedObjectProperties />
       <SelectedImageAdjustments />
     </aside>
   );

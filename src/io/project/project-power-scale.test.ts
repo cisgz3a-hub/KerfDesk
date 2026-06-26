@@ -45,12 +45,16 @@ function rawProject(objects: readonly Record<string, unknown>[]): string {
   });
 }
 
-function vectorObject(powerScale: unknown): Record<string, unknown> {
+function vectorObject(
+  powerScale: unknown,
+  operationOverride?: Record<string, unknown>,
+): Record<string, unknown> {
   return {
     kind: 'imported-svg',
     id: 'O1',
     source: 'a.svg',
     powerScale,
+    ...(operationOverride === undefined ? {} : { operationOverride }),
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
     transform: {
       x: 0,
@@ -103,6 +107,33 @@ describe('project object power scale validation', () => {
     expect(result.kind).toBe('invalid');
     if (result.kind === 'invalid') {
       expect(result.reason).toMatch(/scene\.objects\[0\]\.powerScale/);
+    }
+  });
+
+  it('accepts valid object operation overrides', () => {
+    const result = deserializeProject(
+      rawProject([vectorObject(100, { mode: 'fill', power: 44, speed: 2222, passes: 2 })]),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project.scene.objects[0]?.operationOverride).toEqual({
+        mode: 'fill',
+        power: 44,
+        speed: 2222,
+        passes: 2,
+      });
+    }
+  });
+
+  it('rejects malformed object operation overrides before a project loads', () => {
+    const result = deserializeProject(
+      rawProject([vectorObject(100, { mode: 'fill', power: 140 })]),
+    );
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.objects\[0\]\.operationOverride\.power/);
     }
   });
 });

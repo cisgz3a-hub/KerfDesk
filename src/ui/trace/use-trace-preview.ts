@@ -32,13 +32,14 @@ import { traceImageRegion } from './trace-region';
 export type TracePreviewState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'decoding' }
-  | { readonly kind: 'tracing' }
+  | { readonly kind: 'tracing'; readonly sourceHasTransparency?: boolean | undefined }
   | {
       readonly kind: 'ready';
       readonly svg: string;
       readonly width: number;
       readonly height: number;
       readonly paths: ReadonlyArray<ColoredPath>;
+      readonly sourceHasTransparency?: boolean | undefined;
     }
   | { readonly kind: 'error'; readonly message: string };
 
@@ -82,8 +83,9 @@ export function useTracePreview(
     loadImageAsRawData(file, PREVIEW_MAX_EDGE_PX)
       .then((img) => {
         if (tokenRef.current !== myToken) return;
+        const sourceHasTransparency = rawImageHasTransparency(img);
         decodedRef.current = img;
-        setState({ kind: 'tracing' });
+        setState({ kind: 'tracing', sourceHasTransparency });
         // Read options through the ref so the latest preset wins even
         // if the user changed it between picking the file and decode
         // completing (R-H1 fix).
@@ -91,6 +93,7 @@ export function useTracePreview(
           img,
           options: optionsRef.current,
           boundary: boundaryRef.current,
+          sourceHasTransparency,
           isCurrent: () => tokenRef.current === myToken,
           setState,
         });
@@ -116,13 +119,15 @@ export function useTracePreview(
     if (img === null) return undefined;
     tokenRef.current += 1;
     const myToken = tokenRef.current;
-    setState({ kind: 'tracing' });
+    const sourceHasTransparency = rawImageHasTransparency(img);
+    setState({ kind: 'tracing', sourceHasTransparency });
     const timer = window.setTimeout(() => {
       if (tokenRef.current !== myToken) return;
       void runTrace({
         img,
         options,
         boundary: boundary ?? null,
+        sourceHasTransparency,
         isCurrent: () => tokenRef.current === myToken,
         setState,
       });
@@ -139,6 +144,7 @@ export function runTrace(args: {
   readonly img: RawImageData;
   readonly options: TraceOptions;
   readonly boundary?: TraceBoundary | null;
+  readonly sourceHasTransparency?: boolean | undefined;
   readonly isCurrent: () => boolean;
   readonly setState: (next: TracePreviewState) => void;
 }): Promise<void> {
@@ -157,6 +163,7 @@ export function runTrace(args: {
         width: args.img.width,
         height: args.img.height,
         paths,
+        sourceHasTransparency: args.sourceHasTransparency,
       });
     } catch (err) {
       if (!args.isCurrent()) return;
@@ -166,4 +173,11 @@ export function runTrace(args: {
       });
     }
   })();
+}
+
+function rawImageHasTransparency(image: RawImageData): boolean {
+  for (let i = 3; i < image.data.length; i += 4) {
+    if ((image.data[i] ?? 255) < 255) return true;
+  }
+  return false;
 }

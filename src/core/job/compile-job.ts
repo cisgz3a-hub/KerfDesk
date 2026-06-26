@@ -32,6 +32,7 @@ import {
   assertNever,
   type ColoredPath,
   type Layer,
+  layerOperationSettingsEqual,
   layerFromSubLayer,
   type Polyline,
   type RasterImage,
@@ -77,11 +78,14 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
         for (const obj of scene.objects) {
           if (obj.kind !== 'raster-image' || obj.color !== operationLayer.color) continue;
           if (obj.role === 'trace-source') continue;
-          groups.push(compileRasterGroup(obj, operationLayer, device, scene.objects));
+          const effectiveLayer = layerWithObjectOverride(operationLayer, obj);
+          if (effectiveLayer.mode !== 'image') continue;
+          groups.push(compileRasterGroup(obj, effectiveLayer, device, scene.objects));
         }
         continue;
       }
       groups.push(...compileVectorGroupsForLayer(scene.objects, operationLayer, device));
+      groups.push(...compileRasterGroupsForLayer(scene.objects, operationLayer, device));
     }
   }
   return { groups };
@@ -91,6 +95,22 @@ function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {
   return [layer, ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer))].filter(
     (operationLayer) => operationLayer.output,
   );
+}
+
+function compileRasterGroupsForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+): RasterGroup[] {
+  const groups: RasterGroup[] = [];
+  for (const obj of objects) {
+    if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
+    if (obj.role === 'trace-source') continue;
+    const effectiveLayer = layerWithObjectOverride(layer, obj);
+    if (effectiveLayer.mode !== 'image') continue;
+    groups.push(compileRasterGroup(obj, effectiveLayer, device, objects));
+  }
+  return groups;
 }
 
 // Builds a RasterGroup from one RasterImage + its Layer settings.
@@ -259,13 +279,34 @@ function compileVectorGroupsForLayer(
   device: DeviceProfile,
 ): Group[] {
   const matchingObjects = objects.filter((obj) => vectorObjectMatchesLayer(obj, layer));
-  const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
-  if (sharedScale !== undefined) {
-    return vectorGroupForLayer(layer, device, collectSegmentsForLayer(objects, layer, device), {
-      powerScale: sharedScale,
-    });
+  if (matchingObjects.every((obj) => obj.operationOverride === undefined)) {
+    return vectorGroupsForObjects(objects, matchingObjects, layer, device);
   }
 
+  const groups: Group[] = [];
+  for (const bucket of vectorObjectBucketsForLayer(objects, layer)) {
+    groups.push(...vectorGroupsForObjects(bucket.objects, bucket.objects, bucket.layer, device));
+  }
+  return groups;
+}
+
+function vectorGroupsForObjects(
+  sourceObjects: ReadonlyArray<SceneObject>,
+  matchingObjects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+): Group[] {
+  const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
+  if (sharedScale !== undefined) {
+    return vectorGroupForLayer(
+      layer,
+      device,
+      collectSegmentsForLayer(sourceObjects, layer, device),
+      {
+        powerScale: sharedScale,
+      },
+    );
+  }
   const groups: Group[] = [];
   for (const obj of matchingObjects) {
     groups.push(
@@ -273,6 +314,32 @@ function compileVectorGroupsForLayer(
     );
   }
   return groups;
+}
+
+function vectorObjectBucketsForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+): ReadonlyArray<{ readonly layer: Layer; readonly objects: ReadonlyArray<SceneObject> }> {
+  const buckets: Array<{ layer: Layer; objects: SceneObject[] }> = [];
+  for (const obj of objects) {
+    if (!vectorObjectMatchesLayer(obj, layer)) continue;
+    const effectiveLayer = layerWithObjectOverride(layer, obj);
+    if (effectiveLayer.mode === 'image') continue;
+    const bucket = buckets.find((candidate) =>
+      layerOperationSettingsEqual(candidate.layer, effectiveLayer),
+    );
+    if (bucket === undefined) {
+      buckets.push({ layer: effectiveLayer, objects: [obj] });
+    } else {
+      bucket.objects.push(obj);
+    }
+  }
+  return buckets;
+}
+
+function layerWithObjectOverride(layer: Layer, obj: SceneObject): Layer {
+  if (obj.operationOverride === undefined) return layer;
+  return { ...layer, ...obj.operationOverride };
 }
 
 function vectorGroupForLayer(

@@ -29,10 +29,16 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
     const layer = project.scene.layers.find(
-      (l) => l.output && l.mode === 'image' && l.color === obj.color,
+      (l) =>
+        l.output && l.color === obj.color && (obj.operationOverride?.mode ?? l.mode) === 'image',
     );
     if (layer === undefined) continue;
-    const { pixelWidth: pw, pixelHeight: ph, remedy } = rasterBudgetDimensions(obj, layer, project);
+    const effectiveLayer = { ...layer, ...(obj.operationOverride ?? {}) };
+    const {
+      pixelWidth: pw,
+      pixelHeight: ph,
+      remedy,
+    } = rasterBudgetDimensions(obj, effectiveLayer, project);
     const verdict = evaluateRasterBudget(pw, ph);
     if (verdict.kind === 'too-large') {
       issues.push({

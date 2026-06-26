@@ -2,8 +2,25 @@ import type { RawImageData } from './trace-image';
 
 const INK_THRESHOLD = 128;
 
-export function centerlineMaskFromImage(image: RawImageData): Uint8Array {
+export type CenterlineMaskOptions = {
+  readonly cutoffLuma?: number;
+  readonly thresholdLuma?: number;
+};
+
+export function centerlineMaskFromImage(
+  image: RawImageData,
+  options: CenterlineMaskOptions = {},
+): Uint8Array {
   const mask = new Uint8Array(image.width * image.height);
+  const threshold = clampLuma(options.thresholdLuma ?? INK_THRESHOLD);
+  const cutoff = options.cutoffLuma;
+  const band =
+    cutoff === undefined
+      ? null
+      : {
+          lo: clampLuma(Math.min(cutoff, threshold)),
+          hi: clampLuma(Math.max(cutoff, threshold)),
+        };
   for (let i = 0; i < mask.length; i += 1) {
     const offset = i * 4;
     const alpha = image.data[offset + 3] ?? 255;
@@ -12,9 +29,22 @@ export function centerlineMaskFromImage(image: RawImageData): Uint8Array {
     const g = image.data[offset + 1] ?? 255;
     const b = image.data[offset + 2] ?? 255;
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-    mask[i] = luma < INK_THRESHOLD ? 1 : 0;
+    mask[i] = isInkLuma(luma, threshold, band) ? 1 : 0;
   }
   return mask;
+}
+
+function isInkLuma(
+  luma: number,
+  threshold: number,
+  band: { readonly lo: number; readonly hi: number } | null,
+): boolean {
+  if (band !== null) return luma >= band.lo && luma <= band.hi;
+  return luma < threshold;
+}
+
+function clampLuma(value: number): number {
+  return Math.max(0, Math.min(255, value));
 }
 
 // Zhang-Suen thinning, allocation-free: inline 8-neighbour reads (no per-pixel

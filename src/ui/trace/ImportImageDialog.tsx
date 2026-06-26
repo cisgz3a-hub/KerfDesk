@@ -52,6 +52,7 @@ import {
   DeleteImageAfterTraceToggle,
   PresetHint,
   PresetPicker,
+  PresetWarning,
   SourceLabel,
 } from './dialog-parts';
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
@@ -122,9 +123,11 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       <h2 className="lf-dialog-title">Trace Image</h2>
       <SourceLabel name={seed.source} />
       <PresetPicker value={preset} onChange={setPreset} />
+      <PresetWarning preset={preset} onPresetChange={setPreset} />
       <TraceSettingsControls
         preset={presetOptions}
         overrides={traceSettings}
+        sourceHasTransparency={traceSourceHasTransparency(preview)}
         onChange={setTraceSettings}
       />
       <TracePreviewPanel
@@ -141,6 +144,14 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
     </Dialog>
   );
+}
+
+function traceSourceHasTransparency(
+  preview: ReturnType<typeof useTracePreview>,
+): boolean | undefined {
+  return preview.kind === 'tracing' || preview.kind === 'ready'
+    ? preview.sourceHasTransparency
+    : undefined;
 }
 
 function useTraceSourceFile(
@@ -227,7 +238,12 @@ export async function commit(
       kind: 'traced-image',
       id: crypto.randomUUID(),
       source: args.seed.source,
-      traceMode: args.options.traceMode === 'centerline' ? 'centerline' : 'filled-contours',
+      traceMode:
+        args.options.traceMode === 'centerline'
+          ? 'centerline'
+          : args.options.traceMode === 'edge'
+            ? 'edge'
+            : 'filled-contours',
       bounds,
       transform: IDENTITY_TRANSFORM,
       paths,

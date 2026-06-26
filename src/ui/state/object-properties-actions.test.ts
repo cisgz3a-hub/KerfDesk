@@ -39,4 +39,28 @@ describe('object property actions', () => {
     expect(useStore.getState().project.scene.objects[0]?.powerScale).toBe(100);
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
+
+  it('sets operation overrides only on selected objects', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O3', ['#000000']));
+    useStore.setState({ selectedObjectId: 'O2', additionalSelectedIds: new Set(['O3']) });
+
+    const actions = useStore.getState() as typeof useStore extends { getState: () => infer State }
+      ? State & {
+          readonly setSelectedObjectsOperationOverride: (
+            patch: Readonly<{ mode: 'fill'; power: number; speed: number }>,
+          ) => void;
+        }
+      : never;
+    actions.setSelectedObjectsOperationOverride({ mode: 'fill', power: 42, speed: 2222 });
+
+    expect(
+      useStore.getState().project.scene.objects.map((object) => object.operationOverride),
+    ).toEqual([
+      undefined,
+      { mode: 'fill', power: 42, speed: 2222 },
+      { mode: 'fill', power: 42, speed: 2222 },
+    ]);
+  });
 });

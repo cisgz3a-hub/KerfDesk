@@ -39,6 +39,7 @@ export type {
   DitherAlgorithm,
   FontKey,
   ImportedSvg,
+  ObjectOperationOverride,
   ObjectPowerScale,
   EllipseShape,
   Polyline,
@@ -60,6 +61,8 @@ export {
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
   assertNever,
+  sceneObjectPrimaryLayerColor,
+  sceneObjectUsesLayerColor,
 } from './scene-object';
 
 export { applyTransform, flipTransformAboutCenter } from './transform';

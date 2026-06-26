@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "name": "arch-house-langebaan-line-art",
+  "mode": "filled-contours",
+  "source": {
+    "width": 1024,
+    "height": 1024
+  },
+  "metrics": {
+    "pathCount": 1,
+    "polylineCount": 83,
+    "pointCount": 13889,
+    "openPolylineCount": 0,
+    "closedPolylineCount": 83,
+    "holeCandidateCount": 51,
+    "smallClosedPolylineCount": 9,
+    "bounds": {
+      "minX": 116.881,
+      "minY": 205.399,
+      "maxX": 911.55,
+      "maxY": 711.139
+    }
+  }
+}

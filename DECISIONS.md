@@ -3158,9 +3158,9 @@ Two follow-ups refined the above after the maintainer tested it:
 ## ADR-058 — Centerline trace rework: a measured pixel-centering bar + junction chaining
 
 **Date:** 2026-06-25
-**Status:** Accepted. Measurement harness + junction chaining landed on
-`feat/centerline-rework`; EDT-driven thinning, iterative spur pruning, and a
-preset-driven threshold are pending slices.
+**Status:** Accepted. Measurement harness, junction chaining, allocation-free
+thinning, and preset-aware mask thresholding have landed; EDT-driven thinning
+quality and iterative spur pruning are pending slices.
 
 **Context.** Centerline trace (`traceMode: 'centerline'`) produced fragmented,
 broken glyphs and was reported to lag/time out on big images. Causes — confirmed
@@ -3203,15 +3203,19 @@ invisible to CI — the standing "looks faulty vs the source" gap (see ADR-025).
      gaps/spurs, better corners) is the pending quality+perf follow-up.
    - **c. Iterative spur pruning** by branch length AND EDT radius (drop the
      all-branches re-admit fallback). **[PENDING]**
-   - **d. Preset-driven ink threshold**, dropping the hard global 128. **[PENDING]**
+   - **d. Preset-driven ink threshold.** `centerlineMaskFromImage` now accepts
+     caller threshold/cutoff settings instead of baking every mask at 128.
+     `traceImageToCenterlinePaths` still lets `preprocessForTrace` own manual
+     threshold bands, Otsu, alpha masks, and despeckle before mask extraction so
+     cutoff bands are not applied twice. **[LANDED]**
 3. Salvage the exact O(N) distance transform, RDP simplify, and curve fit — fed
    graph-extracted strokes.
 
 **Consequences.** Chaining alone dropped the real logo from 229 → **155**
 polylines (longer, connected strokes), removed the O(n³) merge, and reconnects
 crossings (synthetic cross 4 → 2). Remaining gaps — arc fragmentation across a
-skeleton break, corner centering ~1.5px, thin-text breaks, and the big-image
-timeout — are thinning-quality and are the pending slices (2b–2d). The harness
+skeleton break, corner centering ~1.5px, and thin-text breaks are
+thinning-quality and are the pending slices (2b/2c). The harness
 gates every step. References ADR-025 (perceptual harness), ADR-026/027 (trace
 overlay / divergence).
 
