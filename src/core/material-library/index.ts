@@ -22,3 +22,7 @@ export {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS,
   type StarterMaterialPreset,
 } from './neotronics-4040-presets';
+export {
+  starterLibraryEntryForProfileId,
+  type StarterLibraryCatalogEntry,
+} from './starter-catalog';

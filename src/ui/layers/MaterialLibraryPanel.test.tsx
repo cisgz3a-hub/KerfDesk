@@ -1,22 +1,29 @@
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
-import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
-import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/types';
+import { captureMaterialRecipe } from '../../core/material-library';
 import {
   MATERIAL_LIBRARY_FORMAT,
   MATERIAL_LIBRARY_SCHEMA_VERSION,
   serializeMaterialLibrary,
-  type MaterialLibraryDocument,
-  type MaterialPreset,
 } from '../../io/material-library';
-import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
-import { MaterialLibraryPanel } from './MaterialLibraryPanel';
+import {
+  button,
+  file,
+  input,
+  library,
+  mockPlatform,
+  preset,
+  recipe,
+  renderPanel,
+  select,
+  setInputValue,
+  setSelectValue,
+  unmount,
+} from './material-library-panel-test-helpers';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -29,132 +36,6 @@ afterEach(() => {
   useToastStore.setState({ toasts: [] });
   vi.restoreAllMocks();
 });
-
-function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
-  return {
-    mode: 'fill',
-    minPower: 5,
-    power: 55,
-    speed: 2200,
-    passes: 2,
-    airAssist: false,
-    kerfOffsetMm: 0,
-    tabsEnabled: false,
-    tabSizeMm: 0.5,
-    tabsPerShape: 4,
-    tabSkipInnerShapes: true,
-    hatchAngleDeg: 22,
-    hatchSpacingMm: 0.09,
-    fillOverscanMm: 2,
-    fillStyle: 'scanline',
-    fillBidirectional: false,
-    fillCrossHatch: true,
-    ditherAlgorithm: 'stucki',
-    linesPerMm: 11,
-    negativeImage: true,
-    passThrough: false,
-    dotWidthCorrectionMm: 0.04,
-    ...overrides,
-  };
-}
-
-function preset(overrides: Partial<MaterialPreset> = {}): MaterialPreset {
-  return {
-    id: 'birch-3mm-cut',
-    materialName: 'Birch plywood',
-    thicknessMm: 3,
-    description: 'Clean cut',
-    recipe: recipe(),
-    revision: 'rev-1',
-    ...overrides,
-  };
-}
-
-function library(entries: ReadonlyArray<MaterialPreset> = []): MaterialLibraryDocument {
-  return {
-    format: MATERIAL_LIBRARY_FORMAT,
-    librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
-    libraryId: 'shop-library',
-    name: 'Shop Library',
-    entries,
-  };
-}
-
-function file(name: string, text: string): FileHandle {
-  return { name, text: async () => text };
-}
-
-function mockPlatform(
-  args: {
-    readonly open?: () => Promise<ReadonlyArray<FileHandle>>;
-    readonly save?: () => Promise<SaveTarget | null>;
-  } = {},
-): PlatformAdapter {
-  return {
-    id: 'mock',
-    pickFilesForOpen: args.open ?? (async () => []),
-    pickFileForSave: args.save ?? (async () => null),
-    serial: {
-      isSupported: () => false,
-      requestPort: async () => null,
-    },
-  };
-}
-
-async function renderPanel(
-  platform: PlatformAdapter = mockPlatform(),
-): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  let root: Root | null = null;
-  await act(async () => {
-    root = createRoot(host);
-    root.render(
-      <PlatformProvider adapter={platform}>
-        <MaterialLibraryPanel />
-      </PlatformProvider>,
-    );
-  });
-  if (root === null) throw new Error('root missing');
-  return { host, root };
-}
-
-async function unmount(root: Root, host: HTMLElement): Promise<void> {
-  await act(async () => root.unmount());
-  host.remove();
-}
-
-function button(host: HTMLElement, label: string): HTMLButtonElement {
-  const element = host.querySelector(`button[aria-label="${label}"]`);
-  if (!(element instanceof HTMLButtonElement)) throw new Error(`missing button: ${label}`);
-  return element;
-}
-
-function input(host: HTMLElement, label: string): HTMLInputElement {
-  const element = host.querySelector(`input[aria-label="${label}"]`);
-  if (!(element instanceof HTMLInputElement)) throw new Error(`missing input: ${label}`);
-  return element;
-}
-
-function select(host: HTMLElement, label: string): HTMLSelectElement {
-  const element = host.querySelector(`select[aria-label="${label}"]`);
-  if (!(element instanceof HTMLSelectElement)) throw new Error(`missing select: ${label}`);
-  return element;
-}
-
-async function setInputValue(element: HTMLInputElement, value: string): Promise<void> {
-  await act(async () => {
-    element.value = value;
-    Simulate.change(element);
-  });
-}
-
-async function setSelectValue(element: HTMLSelectElement, value: string): Promise<void> {
-  await act(async () => {
-    element.value = value;
-    Simulate.change(element);
-  });
-}
 
 describe('MaterialLibraryPanel', () => {
   it('shows new and load actions when no material library is loaded', async () => {
@@ -187,11 +68,28 @@ describe('MaterialLibraryPanel', () => {
     }
   });
 
-  it('creates a Neotronics starter material library from the researched 20W diode pack', async () => {
+  it('hides the starter button when the device has no catalogued starter presets', async () => {
+    // Default device is not in the starter catalog, so the device-driven button
+    // is absent -- only New Library + Load remain.
+    const { host, root } = await renderPanel();
+    try {
+      expect(
+        host.querySelector(
+          'button[aria-label="Create starter material library for the selected device"]',
+        ),
+      ).toBeNull();
+      expect(button(host, 'Create new material library')).toBeDefined();
+    } finally {
+      await unmount(root, host);
+    }
+  });
+
+  it('creates a starter library for the selected machine from its researched pack', async () => {
+    useStore.getState().replaceDeviceProfile(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE);
     const { host, root } = await renderPanel();
     try {
       await act(async () => {
-        button(host, 'Create Neotronics starter material library').click();
+        button(host, 'Create starter material library for the selected device').click();
       });
 
       const state = useStore.getState();
