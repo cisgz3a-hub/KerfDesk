@@ -99,7 +99,7 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 - **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
 - **F.4 — Convert to Bitmap** [A1–A2 shipped (Fill All); A3 Outlines / A4 Use Cut Settings / A5 polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
 
-- **F.5 - Material calibration workflow** [Approved; staged]. Minimal LightBurn-style Material Test and Interval Test generators are now in scope so operators can calibrate speed, power, passes, and image line interval on scrap before burning final work. Start with pure Scene generators that flow through the existing preview/save/start pipeline; UI and hardware verification follow. The native Material Library recipe foundation and deterministic `.lfml.json` IO are now scoped as support infrastructure for those calibrated settings; full Material Library UI, hidden persistence, LightBurn `.clb` compatibility, manufacturer profiles, and linked presets remain deferred. ADR-044, ADR-045.
+- **F.5 - Material calibration workflow** [Approved; staged]. Minimal LightBurn-style Material Test and Interval Test generators are now in scope so operators can calibrate speed, power, passes, and image line interval on scrap before burning final work. Start with pure Scene generators that flow through the existing preview/save/start pipeline; UI and hardware verification follow. The native Material Library recipe foundation and deterministic `.lfml.json` IO are now scoped as support infrastructure for those calibrated settings; the in-app multi-library UI — create/edit wizard, Saved Libraries browser, and auto-save persistence — is scoped by ADR-093, while LightBurn `.clb` compatibility, manufacturer profiles, and linked presets ("Link") remain deferred. ADR-044, ADR-045, ADR-093.
 
 ### Phase G — v0.7 "Drawing tools" [In progress]
 
@@ -321,11 +321,12 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Camera alignment, overhead camera.
 - Rotary attachment.
 - Auto-focus, Z-axis control beyond initial homing.
-- Full Material Library UI, hidden app-data persistence, manufacturer setting
-  profiles, LightBurn `.clb` compatibility, and linked material presets.
-  Minimal Material Test / Interval Test generators are scoped by Phase F.5 and
-  ADR-044; native Material Library recipe + `.lfml.json` IO foundation is scoped
-  by ADR-045.
+- Manufacturer setting profiles, LightBurn `.clb` compatibility, and linked
+  material presets ("Link"). Minimal Material Test / Interval Test generators
+  are scoped by Phase F.5 and ADR-044; the native Material Library recipe +
+  `.lfml.json` IO foundation by ADR-045; and the in-app multi-library UI
+  (create/edit wizard, Saved Libraries browser, auto-save persistence) by
+  ADR-093.
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync.
 - DXF, AI, PDF import.

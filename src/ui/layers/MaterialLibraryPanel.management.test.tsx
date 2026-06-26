@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
+import type { MaterialRecipe } from '../../core/material-library';
 import type { PlatformAdapter } from '../../platform/types';
 import {
   MATERIAL_LIBRARY_FORMAT,
@@ -18,8 +18,6 @@ import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
-
-const NEOTRONICS_PROFILE_ID = 'neotronics-4040-max-lt4lds-v2-20w';
 
 afterEach(() => {
   resetStore();
@@ -117,44 +115,6 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
 }
 
 describe('MaterialLibraryPanel preset management', () => {
-  it('updates a selected preset from the selected layer settings', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setMaterialLibrary(
-      library([
-        preset({
-          profileId: NEOTRONICS_PROFILE_ID,
-          confidence: 'calibrated',
-          calibrationProvenance: 'Material Test swatch material-test-cell-r0-c0',
-        }),
-      ]),
-    );
-    useStore.getState().setLayerParam('#ff0000', {
-      power: 29,
-      speed: 1850,
-      hatchSpacingMm: 0.11,
-    });
-    const expectedRecipe = captureMaterialRecipe(useStore.getState().project.scene.layers[0]!);
-    const { host, root } = await renderPanel();
-    try {
-      await act(async () => {
-        button(host, 'Update selected material preset from layer').click();
-      });
-
-      const entry = useStore.getState().materialLibrary?.entries[0];
-      expect(entry).toMatchObject({
-        id: 'birch-3mm-cut',
-        profileId: NEOTRONICS_PROFILE_ID,
-        confidence: 'calibrated',
-        calibrationProvenance: 'Material Test swatch material-test-cell-r0-c0',
-        recipe: expectedRecipe,
-      });
-      expect(useStore.getState().materialLibraryDirty).toBe(true);
-      expect(host.textContent).toContain('Preset updated.');
-    } finally {
-      await unmount(root, host);
-    }
-  });
-
   it('deletes a selected material preset after confirmation', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore

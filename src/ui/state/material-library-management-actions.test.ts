@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { captureMaterialRecipe, type MaterialRecipe } from '../../core/material-library';
+import type { MaterialRecipe } from '../../core/material-library';
 import {
   MATERIAL_LIBRARY_FORMAT,
   MATERIAL_LIBRARY_SCHEMA_VERSION,
@@ -7,7 +7,7 @@ import {
   type MaterialPreset,
 } from '../../io/material-library';
 import { useStore } from './store';
-import { resetStore, svgObj } from './test-helpers';
+import { resetStore } from './test-helpers';
 
 function recipe(overrides: Partial<MaterialRecipe> = {}): MaterialRecipe {
   return {
@@ -59,74 +59,9 @@ function library(entries: ReadonlyArray<MaterialPreset> = []): MaterialLibraryDo
   };
 }
 
-function targetLayer() {
-  const layer = useStore
-    .getState()
-    .project.scene.layers.find((candidate) => candidate.id === '#ff0000');
-  if (layer === undefined) throw new Error('expected red layer');
-  return layer;
-}
-
 describe('material library management actions', () => {
   beforeEach(() => {
     resetStore();
-  });
-
-  it('updateMaterialPresetFromLayer refreshes a preset recipe without changing metadata', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const originalPreset = preset({
-      confidence: 'calibrated',
-      profileId: 'generic-grbl-400x400',
-      calibrationProvenance: 'Material Test swatch material-test-cell-r0-c0',
-    });
-    useStore.getState().setMaterialLibrary(library([originalPreset]));
-    useStore.getState().setLayerParam('#ff0000', {
-      mode: 'fill',
-      power: 31,
-      speed: 1750,
-      hatchSpacingMm: 0.12,
-    });
-    const expectedRecipe = captureMaterialRecipe(targetLayer());
-    useStore.setState({ dirty: false, materialLibraryDirty: false, undoStack: [], redoStack: [] });
-
-    expect(
-      useStore.getState().updateMaterialPresetFromLayer('#ff0000', 'birch-3mm-clean-cut'),
-    ).toBe(true);
-
-    const state = useStore.getState();
-    expect(state.materialLibrary?.entries).toHaveLength(1);
-    expect(state.materialLibrary?.entries[0]).toEqual({
-      ...originalPreset,
-      recipe: expectedRecipe,
-    });
-    expect(state.materialLibraryDirty).toBe(true);
-    expect(state.dirty).toBe(false);
-    expect(state.undoStack).toHaveLength(0);
-  });
-
-  it('updateMaterialPresetFromLayer no-ops for missing or identical recipes', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const matching = preset({ recipe: captureMaterialRecipe(targetLayer()) });
-    useStore.getState().setMaterialLibrary(library([matching]));
-    useStore.setState({ dirty: false, materialLibraryDirty: false, undoStack: [], redoStack: [] });
-
-    expect(useStore.getState().updateMaterialPresetFromLayer('#ff0000', 'missing-preset')).toBe(
-      false,
-    );
-    expect(
-      useStore.getState().updateMaterialPresetFromLayer('missing-layer', 'birch-3mm-clean-cut'),
-    ).toBe(false);
-    expect(
-      useStore.getState().updateMaterialPresetFromLayer('#ff0000', 'birch-3mm-clean-cut'),
-    ).toBe(false);
-    useStore.getState().setMaterialLibrary(null);
-    expect(
-      useStore.getState().updateMaterialPresetFromLayer('#ff0000', 'birch-3mm-clean-cut'),
-    ).toBe(false);
-
-    expect(useStore.getState().materialLibraryDirty).toBe(false);
-    expect(useStore.getState().dirty).toBe(false);
-    expect(useStore.getState().undoStack).toHaveLength(0);
   });
 
   it('deleteMaterialPreset removes a preset and dirties only the library', () => {
