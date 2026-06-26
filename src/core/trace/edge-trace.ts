@@ -152,11 +152,92 @@ function edgeMaskToTraceBitmap(
       base[y * width + x] = 1;
     }
   }
+  const bridged =
+    requestedJoinGapPx === 0
+      ? base
+      : bridgeDirectionalGaps(
+          base,
+          width,
+          height,
+          Math.min(8, Math.max(2, requestedJoinGapPx + 2)),
+        );
   const data =
     erodeRadius === 0
-      ? base
-      : erodeMask(dilateMask(base, width, height, closeRadius), width, height, erodeRadius);
+      ? bridged
+      : erodeMask(dilateMask(bridged, width, height, closeRadius), width, height, erodeRadius);
   return { width, height, data };
+}
+
+function paintLine(
+  data: Uint8Array,
+  width: number,
+  height: number,
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+): void {
+  const steps = Math.max(Math.abs(toX - fromX), Math.abs(toY - fromY));
+  for (let step = 0; step <= steps; step += 1) {
+    const t = steps === 0 ? 0 : step / steps;
+    const x = Math.round(fromX + (toX - fromX) * t);
+    const y = Math.round(fromY + (toY - fromY) * t);
+    if (x < 0 || y < 0 || x >= width || y >= height) continue;
+    data[y * width + x] = 1;
+  }
+}
+
+function bridgeDirectionalGaps(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  maxDistance: number,
+): Uint8Array {
+  const out = new Uint8Array(mask);
+  const directions = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+    { x: 1, y: -1 },
+    { x: 2, y: 1 },
+    { x: 1, y: 2 },
+    { x: 2, y: -1 },
+    { x: 1, y: -2 },
+  ];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (mask[y * width + x] !== 1) continue;
+      for (const direction of directions) {
+        bridgeInDirection(out, mask, width, height, x, y, direction.x, direction.y, maxDistance);
+      }
+    }
+  }
+  return out;
+}
+
+function bridgeInDirection(
+  out: Uint8Array,
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  stepX: number,
+  stepY: number,
+  maxDistance: number,
+): void {
+  let sawGap = false;
+  for (let step = 1; ; step += 1) {
+    const nx = x + stepX * step;
+    const ny = y + stepY * step;
+    const distance = Math.hypot(nx - x, ny - y);
+    if (distance > maxDistance || nx < 0 || ny < 0 || nx >= width || ny >= height) return;
+    if (mask[ny * width + nx] === 1) {
+      if (sawGap) paintLine(out, width, height, x, y, nx, ny);
+      return;
+    }
+    sawGap = true;
+  }
 }
 
 function dilateMask(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {

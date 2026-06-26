@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Polyline, Vec2 } from '../../core/scene';
 import { cannyEdges } from '../../core/trace/canny-edges';
 import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
-import { TRACE_PRESETS, type RawImageData } from '../../core/trace';
+import { TRACE_PRESETS } from '../../core/trace';
+import {
+  measureSegmentedStrokeContinuity,
+  SEGMENTED_STROKE_CIRCLE_FIXTURE,
+  type CircleFixture,
+} from './edge-curve-truth';
 
 const EDGE_OPTIONS = TRACE_PRESETS['Edge Detection']!;
 
@@ -59,13 +64,25 @@ describe('Edge Detection curved-corner quality', () => {
     expect(noisyQuality.polylineCount).toBeLessThanOrEqual(cleanQuality.polylineCount + 2);
     expect(noisyQuality.totalLengthPx).toBeLessThanOrEqual(cleanQuality.totalLengthPx * 1.25);
   });
-});
 
-type CircleFixture = {
-  readonly image: RawImageData;
-  readonly center: Vec2;
-  readonly radius: number;
-};
+  it('links small breaks in curved stroke artwork into continuous smooth contours', () => {
+    const fixture = SEGMENTED_STROKE_CIRCLE_FIXTURE;
+    const paths = traceImageToEdgePaths(fixture.image, {
+      ...EDGE_OPTIONS,
+      edgeBlurSigma: 0.9,
+      edgeLowThresholdRatio: 0.04,
+      edgeHighThresholdRatio: 0.12,
+      edgeMinLengthPx: 10,
+      edgeJoinGapPx: 3,
+    });
+    const polylines = paths.flatMap((path) => path.polylines);
+    const quality = measureSegmentedStrokeContinuity(polylines, fixture);
+
+    expect(quality.strokePolylineCount).toBeLessThanOrEqual(4);
+    expect(quality.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
+    expect(quality.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
+  });
+});
 
 type CircleBoundaryQuality = {
   readonly polylineCount: number;
