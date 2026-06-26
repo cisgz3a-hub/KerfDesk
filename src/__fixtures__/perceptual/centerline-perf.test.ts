@@ -38,18 +38,14 @@ const CENTERLINE_OPTIONS = TRACE_PRESETS['Centerline']!;
 const BUDGET_MS = 30_000; // the worker ceiling; the rework target is < ~3s
 
 describe('centerline trace performance on a big image', () => {
-  it(
-    'traces a ~1.9MP thick-stroke grid within the worker budget',
-    () => {
-      const image = gridImage(1600, 1200, 24, 140);
-      const start = performance.now();
-      const paths = traceImageToCenterlinePaths(image, CENTERLINE_OPTIONS);
-      const elapsedMs = performance.now() - start;
-      console.log(
-        `[centerline-perf] 1600x1200 stroke24: ${elapsedMs.toFixed(0)}ms, paths=${paths.length}`,
-      );
-      expect(elapsedMs).toBeLessThan(BUDGET_MS);
-    },
-    { timeout: 90_000 },
-  );
+  it('traces a ~1.9MP thick-stroke grid within the worker budget', { timeout: 90_000 }, () => {
+    const image = gridImage(1600, 1200, 24, 140);
+    const start = performance.now();
+    const paths = traceImageToCenterlinePaths(image, CENTERLINE_OPTIONS);
+    const elapsedMs = performance.now() - start;
+    console.log(
+      `[centerline-perf] 1600x1200 stroke24: ${elapsedMs.toFixed(0)}ms, paths=${paths.length}`,
+    );
+    expect(elapsedMs).toBeLessThan(BUDGET_MS);
+  });
 });

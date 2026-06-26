@@ -1,4 +1,4 @@
-import type { Layer } from '../../core/scene';
+import type { Layer, LayerOperationSettings } from '../../core/scene';
 import { useStore } from '../state';
 import { LayerImageFields } from './LayerImageFields';
 import { useDebouncedCommit } from './use-debounced-commit';
@@ -24,22 +24,35 @@ const inputStyle: React.CSSProperties = { width: 70, padding: '2px 6px' };
 const wideInputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 
-export function LayerRowSettingsFields({ layer }: { readonly layer: Layer }): JSX.Element {
+export type LayerOperationControlTarget = {
+  readonly settings: LayerOperationSettings;
+  readonly selectedObjectCount: number;
+  readonly commit: (patch: Partial<LayerOperationSettings>) => void;
+};
+
+export function LayerRowSettingsFields(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
+  const { settings } = operationTarget;
   return (
     <>
       <FieldRow label="Power">
-        <PowerInput layer={layer} />
+        <PowerInput layer={layer} operationTarget={operationTarget} />
         <span style={unitStyle}>%</span>
       </FieldRow>
       <FieldRow label="Speed">
-        <SpeedInput layer={layer} />
+        <SpeedInput layer={layer} operationTarget={operationTarget} />
         <span style={unitStyle}>mm/min</span>
       </FieldRow>
       <FieldRow label="Passes">
-        <PassesInput layer={layer} />
+        <PassesInput layer={layer} operationTarget={operationTarget} />
       </FieldRow>
-      {layer.mode === 'fill' && <FillFields layer={layer} />}
-      {layer.mode === 'image' && <LayerImageFields layer={layer} />}
+      {settings.mode === 'fill' && <FillFields layer={layer} operationTarget={operationTarget} />}
+      {settings.mode === 'image' && (
+        <LayerImageFields layer={layer} settings={settings} commit={operationTarget.commit} />
+      )}
     </>
   );
 }
@@ -56,47 +69,57 @@ function FieldRow(props: {
   );
 }
 
-function FillFields({ layer }: { readonly layer: Layer }): JSX.Element {
+function FillFields(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   return (
     <>
       <FieldRow label="Hatch angle">
-        <HatchAngleInput layer={layer} />
+        <HatchAngleInput layer={layer} operationTarget={operationTarget} />
         <span style={unitStyle}>deg</span>
       </FieldRow>
       <FieldRow label="Hatch spacing">
-        <HatchSpacingInput layer={layer} />
+        <HatchSpacingInput layer={layer} operationTarget={operationTarget} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
       <FieldRow label="Overscan">
-        <FillOverscanInput layer={layer} />
+        <FillOverscanInput layer={layer} operationTarget={operationTarget} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
       <FieldRow label="Bidirectional">
-        <BidirectionalInput layer={layer} />
+        <BidirectionalInput layer={layer} operationTarget={operationTarget} />
       </FieldRow>
     </>
   );
 }
 
-function BidirectionalInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function BidirectionalInput(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   return (
     <input
       type="checkbox"
-      checked={layer.fillBidirectional}
-      onChange={(e) => setLayerParam(layer.id, { fillBidirectional: e.target.checked })}
+      checked={operationTarget.settings.fillBidirectional}
+      onChange={(e) => operationTarget.commit({ fillBidirectional: e.target.checked })}
       aria-label={`Bidirectional fill for ${layer.color}`}
       title="Scan alternating fill lines in both directions to reduce travel time."
     />
   );
 }
 
-function HatchAngleInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function HatchAngleInput(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   const debounced = useDebouncedCommit<number>({
-    value: layer.hatchAngleDeg,
-    commit: (hatchAngleDeg) => setLayerParam(layer.id, { hatchAngleDeg }),
-    parse: (s) => clamp(numericValue(s, layer.hatchAngleDeg), 0, 180),
+    value: operationTarget.settings.hatchAngleDeg,
+    commit: (hatchAngleDeg) => operationTarget.commit({ hatchAngleDeg }),
+    parse: (s) => clamp(numericValue(s, operationTarget.settings.hatchAngleDeg), 0, 180),
   });
   return (
     <input
@@ -114,12 +137,15 @@ function HatchAngleInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function HatchSpacingInput(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   const debounced = useDebouncedCommit<number>({
-    value: layer.hatchSpacingMm,
-    commit: (hatchSpacingMm) => setLayerParam(layer.id, { hatchSpacingMm }),
-    parse: (s) => clamp(numericValue(s, layer.hatchSpacingMm), 0.05, 10),
+    value: operationTarget.settings.hatchSpacingMm,
+    commit: (hatchSpacingMm) => operationTarget.commit({ hatchSpacingMm }),
+    parse: (s) => clamp(numericValue(s, operationTarget.settings.hatchSpacingMm), 0.05, 10),
   });
   return (
     <input
@@ -137,12 +163,15 @@ function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function FillOverscanInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function FillOverscanInput(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   const debounced = useDebouncedCommit<number>({
-    value: layer.fillOverscanMm,
-    commit: (fillOverscanMm) => setLayerParam(layer.id, { fillOverscanMm }),
-    parse: (s) => clamp(numericValue(s, layer.fillOverscanMm), 0, 25),
+    value: operationTarget.settings.fillOverscanMm,
+    commit: (fillOverscanMm) => operationTarget.commit({ fillOverscanMm }),
+    parse: (s) => clamp(numericValue(s, operationTarget.settings.fillOverscanMm), 0, 25),
   });
   return (
     <input
@@ -160,13 +189,19 @@ function FillOverscanInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function PowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function PowerInput(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   const debounced = useDebouncedCommit<number>({
-    value: layer.power,
+    value: operationTarget.settings.power,
     commit: (power) =>
-      setLayerParam(layer.id, { power, minPower: Math.min(layer.minPower, power) }),
-    parse: (s) => clamp(numericValue(s, layer.power), 0, 100),
+      operationTarget.commit({
+        power,
+        minPower: Math.min(operationTarget.settings.minPower, power),
+      }),
+    parse: (s) => clamp(numericValue(s, operationTarget.settings.power), 0, 100),
   });
   return (
     <input
@@ -183,13 +218,16 @@ function PowerInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function SpeedInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function SpeedInput(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const debounced = useDebouncedCommit<number>({
-    value: layer.speed,
-    commit: (speed) => setLayerParam(layer.id, { speed }),
-    parse: (s) => clamp(numericValue(s, layer.speed), 1, maxFeed),
+    value: operationTarget.settings.speed,
+    commit: (speed) => operationTarget.commit({ speed }),
+    parse: (s) => clamp(numericValue(s, operationTarget.settings.speed), 1, maxFeed),
   });
   return (
     <input
@@ -206,12 +244,15 @@ function SpeedInput({ layer }: { readonly layer: Layer }): JSX.Element {
   );
 }
 
-function PassesInput({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function PassesInput(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   const debounced = useDebouncedCommit<number>({
-    value: layer.passes,
-    commit: (passes) => setLayerParam(layer.id, { passes }),
-    parse: (s) => Math.max(1, Math.floor(numericValue(s, layer.passes))),
+    value: operationTarget.settings.passes,
+    commit: (passes) => operationTarget.commit({ passes }),
+    parse: (s) => Math.max(1, Math.floor(numericValue(s, operationTarget.settings.passes))),
   });
   return (
     <input

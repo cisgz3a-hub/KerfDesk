@@ -1,14 +1,82 @@
 import { DEFAULT_LIGHTBURN_TRACE_SETTINGS, type TraceOptions } from '../../core/trace';
-import type { LightBurnTraceSettingOverrides } from './trace-options';
+import {
+  DEFAULT_EDGE_DETAIL,
+  DEFAULT_EDGE_MINIMUM_LINE_PX,
+  DEFAULT_EDGE_SENSITIVITY,
+  edgeDetailFromOptions,
+  edgeSensitivityFromOptions,
+  type LightBurnTraceSettingOverrides,
+} from './trace-options';
 
-export function TraceSettingsControls(props: {
+type TraceSettingsControlsProps = {
   readonly preset: TraceOptions;
   readonly overrides: LightBurnTraceSettingOverrides;
+  readonly sourceHasTransparency?: boolean | undefined;
   readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
-}): JSX.Element {
+};
+
+export function TraceSettingsControls(props: TraceSettingsControlsProps): JSX.Element {
+  return props.preset.traceMode === 'edge' ? (
+    <EdgeTraceSettingsControls {...props} />
+  ) : (
+    <FilledTraceSettingsControls {...props} />
+  );
+}
+
+function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Element {
   const set = (patch: LightBurnTraceSettingOverrides): void => {
     props.onChange({ ...props.overrides, ...patch });
   };
+  return (
+    <fieldset style={fieldsetStyle}>
+      <legend style={legendStyle}>Trace settings</legend>
+      <NumberRow
+        label="Sensitivity"
+        min={0}
+        max={100}
+        step={1}
+        value={
+          props.overrides.edgeSensitivity ??
+          edgeSensitivityFromOptions(props.preset) ??
+          DEFAULT_EDGE_SENSITIVITY
+        }
+        onChange={(edgeSensitivity) => set({ edgeSensitivity })}
+      />
+      <NumberRow
+        label="Detail"
+        min={0}
+        max={100}
+        step={1}
+        value={
+          props.overrides.edgeDetail ?? edgeDetailFromOptions(props.preset) ?? DEFAULT_EDGE_DETAIL
+        }
+        onChange={(edgeDetail) => set({ edgeDetail })}
+      />
+      <NumberRow
+        label="Minimum line"
+        min={0}
+        max={1000}
+        step={1}
+        value={
+          props.overrides.edgeMinimumLinePx ??
+          props.preset.edgeMinLengthPx ??
+          DEFAULT_EDGE_MINIMUM_LINE_PX
+        }
+        onChange={(edgeMinimumLinePx) => set({ edgeMinimumLinePx })}
+      />
+      <EdgeTraceModeNote />
+      <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
+    </fieldset>
+  );
+}
+
+function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Element {
+  const set = (patch: LightBurnTraceSettingOverrides): void => {
+    props.onChange({ ...props.overrides, ...patch });
+  };
+  const alphaMaskChecking = props.sourceHasTransparency === undefined;
+  const alphaMaskUnavailable = props.sourceHasTransparency === false;
+  const alphaMaskDisabled = alphaMaskChecking || alphaMaskUnavailable;
   return (
     <fieldset style={fieldsetStyle}>
       <legend style={legendStyle}>Trace settings</legend>
@@ -53,33 +121,34 @@ export function TraceSettingsControls(props: {
         onChange={(optimize) => set({ optimize })}
       />
       <CheckboxRow
-        label="Trace Transparency"
-        checked={traceBooleanValue(props.preset, props.overrides, 'traceTransparency')}
+        label="Trace alpha mask"
+        checked={
+          alphaMaskDisabled
+            ? false
+            : traceBooleanValue(props.preset, props.overrides, 'traceTransparency')
+        }
+        disabled={alphaMaskDisabled}
         onChange={(traceTransparency) => set({ traceTransparency })}
       />
-      <CheckboxRow
-        label="Sketch Trace"
-        checked={traceBooleanValue(props.preset, props.overrides, 'sketchTrace')}
-        onChange={(sketchTrace) => set({ sketchTrace })}
-      />
-      <div style={resetRowStyle}>
-        <button
-          type="button"
-          onClick={() => props.onChange({})}
-          disabled={Object.keys(props.overrides).length === 0}
-          style={resetButtonStyle}
-          title="Reset all trace controls to the selected tracing preset."
-        >
-          Reset trace settings
-        </button>
-      </div>
+      {alphaMaskChecking ? <AlphaMaskCheckingNote /> : null}
+      {alphaMaskUnavailable ? <AlphaMaskUnavailableNote /> : null}
+      {props.preset.autoSketchTrace === true ? (
+        <AutoSketchTraceNote />
+      ) : (
+        <CheckboxRow
+          label="Force Sketch Trace"
+          checked={traceBooleanValue(props.preset, props.overrides, 'sketchTrace')}
+          onChange={(sketchTrace) => set({ sketchTrace })}
+        />
+      )}
+      <ResetTraceSettingsButton overrides={props.overrides} onChange={props.onChange} />
     </fieldset>
   );
 }
 
-type NumericTraceSettingKey = Exclude<
+type NumericTraceSettingKey = Extract<
   keyof LightBurnTraceSettingOverrides,
-  'traceTransparency' | 'sketchTrace'
+  'cutoffLuma' | 'thresholdLuma' | 'ignoreLessThanPixels' | 'smoothness' | 'optimize'
 >;
 type BooleanTraceSettingKey = Extract<
   keyof LightBurnTraceSettingOverrides,
@@ -114,6 +183,53 @@ function traceBooleanValue(
   return preset[key] ?? DEFAULT_LIGHTBURN_TRACE_SETTINGS[key];
 }
 
+function ResetTraceSettingsButton(props: {
+  readonly overrides: LightBurnTraceSettingOverrides;
+  readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
+}): JSX.Element {
+  return (
+    <div style={resetRowStyle}>
+      <button
+        type="button"
+        onClick={() => props.onChange({})}
+        disabled={Object.keys(props.overrides).length === 0}
+        style={resetButtonStyle}
+        title="Reset all trace controls to the selected tracing preset."
+      >
+        Reset trace settings
+      </button>
+    </div>
+  );
+}
+
+function AutoSketchTraceNote(): JSX.Element {
+  return (
+    <p style={autoSketchNoteStyle}>
+      Line Art automatically preserves pale logo details. Use Centerline for one-stroke drawings.
+    </p>
+  );
+}
+
+function EdgeTraceModeNote(): JSX.Element {
+  return (
+    <p style={edgeTraceNoteStyle}>
+      Creates outline contours from brightness changes. Use Centerline for one-stroke Line mode.
+    </p>
+  );
+}
+
+function AlphaMaskUnavailableNote(): JSX.Element {
+  return (
+    <p style={alphaMaskNoteStyle}>
+      No transparent pixels detected; alpha mask will not change this image.
+    </p>
+  );
+}
+
+function AlphaMaskCheckingNote(): JSX.Element {
+  return <p style={alphaMaskNoteStyle}>Checking image transparency...</p>;
+}
+
 function NumberRow(props: {
   readonly label: string;
   readonly min: number;
@@ -143,6 +259,7 @@ function NumberRow(props: {
 function CheckboxRow(props: {
   readonly label: string;
   readonly checked: boolean;
+  readonly disabled?: boolean;
   readonly onChange: (next: boolean) => void;
 }): JSX.Element {
   return (
@@ -150,6 +267,7 @@ function CheckboxRow(props: {
       <input
         type="checkbox"
         checked={props.checked}
+        disabled={props.disabled === true}
         title={traceCheckboxTitle(props.label)}
         onChange={(e) => props.onChange(e.target.checked)}
       />
@@ -175,6 +293,12 @@ function traceNumberTitle(label: string): string {
       return 'Smooth traced edges to reduce jagged vector paths.';
     case 'Optimize':
       return 'Simplify traced paths while preserving shape.';
+    case 'Sensitivity':
+      return 'Higher values keep weaker edges in Edge Detection.';
+    case 'Detail':
+      return 'Higher values preserve more fine edge detail; lower values smooth noise.';
+    case 'Minimum line':
+      return 'Discard edge paths shorter than this many source-image pixels.';
     default:
       return `Trace ${label.toLowerCase()} setting.`;
   }
@@ -182,10 +306,10 @@ function traceNumberTitle(label: string): string {
 
 function traceCheckboxTitle(label: string): string {
   switch (label) {
-    case 'Trace Transparency':
-      return 'Use transparent pixels as background while tracing.';
-    case 'Sketch Trace':
-      return 'Trace sketch-like strokes instead of filled silhouettes.';
+    case 'Trace alpha mask':
+      return 'Only changes images with transparent pixels; opaque images trace the same.';
+    case 'Force Sketch Trace':
+      return 'Force local-contrast tracing. Line Art can also auto-use this for pale logo details.';
     default:
       return `Toggle ${label.toLowerCase()} for tracing.`;
   }
@@ -228,6 +352,24 @@ const checkboxRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 6,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
+const autoSketchNoteStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
+const edgeTraceNoteStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  margin: 0,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
+const alphaMaskNoteStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  margin: '-2px 0 0 22px',
   fontSize: 12,
   color: 'var(--lf-text-muted)',
 };

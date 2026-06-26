@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { shouldUseSketchTrace } from './auto-sketch-trace';
 import { DEFAULT_TRACE_OPTIONS, preprocessForTrace } from './trace-image';
 
 describe('Sketch Trace preprocessing', () => {
@@ -41,4 +42,47 @@ describe('Sketch Trace preprocessing', () => {
       255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     ]);
   });
+
+  it('auto-promotes colour-rich logos but leaves binary art on the fixed threshold path', () => {
+    expect(
+      shouldUseSketchTrace(makeSolidImage(40, 1, [182, 128, 24, 255]), {
+        autoSketchTrace: true,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldUseSketchTrace(makeSolidImage(40, 1, [0, 0, 0, 255]), {
+        autoSketchTrace: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldUseSketchTrace(makeSolidImage(40, 1, [182, 128, 24, 255]), {
+        autoSketchTrace: true,
+        sketchTrace: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldUseSketchTrace(makeSolidImage(40, 1, [182, 128, 24, 255]), {
+        autoSketchTrace: false,
+        sketchTrace: false,
+      }),
+    ).toBe(false);
+  });
 });
+
+function makeSolidImage(
+  width: number,
+  height: number,
+  pixel: readonly [number, number, number, number],
+) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let offset = 0; offset < data.length; offset += 4) {
+    data[offset] = pixel[0];
+    data[offset + 1] = pixel[1];
+    data[offset + 2] = pixel[2];
+    data[offset + 3] = pixel[3];
+  }
+  return { width, height, data };
+}

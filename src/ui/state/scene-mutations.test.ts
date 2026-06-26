@@ -252,6 +252,27 @@ function centerlineVector(): TracedImage {
   };
 }
 
+function edgeVector(): TracedImage {
+  return {
+    ...tracedVector(),
+    traceMode: 'edge',
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          {
+            closed: false,
+            points: [
+              { x: 0, y: 0 },
+              { x: 10, y: 0 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
 // A project whose scene already contains the source bitmap — the state
 // the Trace tool runs against.
 function projectWithSource(): Project {
@@ -325,6 +346,12 @@ describe('applyTraceToExisting (ADR-026)', () => {
   it('ensures a line layer for centerline traces', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', centerlineVector());
+    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
+  });
+
+  it('ensures a line layer for edge detection traces', () => {
+    const project = projectWithSource();
+    const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', edgeVector());
     expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
   });
 

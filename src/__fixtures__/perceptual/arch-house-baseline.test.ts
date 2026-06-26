@@ -1,63 +1,126 @@
-// Real-image baseline: the user's actual Arch House logo (fixtures/arch-house.png).
-// Synthetic strokes did not reproduce the reported timeout or letter-shatter, so
-// this runs the REAL pixels through the current centerline tracer, times it, and
-// renders the result for eyeballing (PERCEPTUAL_ARTIFACTS=1 dumps a
-// [source ink | traced centerline | diff] PNG). This is the faithful bar the
-// rework is measured against. Skips if the fixture is absent (CI without it).
+// Real-image baseline: the user's actual Arch House / Langebaan source logo.
+// This is the non-skippable acceptance fixture for the first trace-quality loop:
+// logo-like imports must use Line Art filled contours, not Edge Detection or
+// Centerline, so text does not become the broken double-outline artwork the user
+// reported from screenshots.
 
-import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { RawImageData } from '../../core/trace';
-import { TRACE_PRESETS, traceImageToCenterlinePaths } from '../../core/trace';
+import { TRACE_PRESETS, traceImageToColoredPaths } from '../../core/trace';
 import { decodePngFile } from './png-decode';
-import { writePerceptualArtifact } from './png';
-import { createMask, rasterizeColoredPaths, type Mask } from './rasterize';
+import {
+  buildTraceArtifact,
+  requiredArchHouseFixtureStatus,
+  writeTraceArtifactEvidence,
+} from './trace-artifact-runner';
+import { rasterizeColoredPaths, type Mask } from './rasterize';
 
-const FIXTURE = 'fixtures/arch-house.png';
-const CENTERLINE_OPTIONS = TRACE_PRESETS['Centerline']!;
-const INK_LUMA = 128;
+const LINE_ART_OPTIONS = TRACE_PRESETS['Line Art']!;
+const EVIDENCE_DIR = join(process.cwd(), 'audit', 'evidence', 'trace-artifacts');
+const LANGEBAAN_BAND = { x0: 300, y0: 660, x1: 735, y1: 725 };
 
-function sourceInkMask(image: RawImageData): Mask {
-  const mask = createMask(image.width, image.height);
-  for (let i = 0; i < image.width * image.height; i += 1) {
-    const o = i * 4;
-    const r = image.data[o] ?? 255;
-    const g = image.data[o + 1] ?? 255;
-    const b = image.data[o + 2] ?? 255;
-    if (0.299 * r + 0.587 * g + 0.114 * b < INK_LUMA) mask.data[i] = 1;
-  }
-  return mask;
-}
+describe('arch-house real logo Line Art acceptance', () => {
+  it(
+    'traces the required source fixture as filled logo contours, not edge outlines',
+    { timeout: 120_000 },
+    async () => {
+      const fixture = requiredArchHouseFixtureStatus();
+      expect(fixture.present, fixture.expectedPathGlob).toBe(true);
+      expect(fixture.path, fixture.expectedPathGlob).not.toBeNull();
+      if (fixture.path === null) throw new Error(`Missing fixture: ${fixture.expectedPathGlob}`);
 
-describe('arch-house real logo centerline baseline', () => {
-  (existsSync(FIXTURE) ? it : it.skip)(
-    'traces the real logo (timed + rendered for inspection)',
-    () => {
-      const image = decodePngFile(FIXTURE);
+      const image = decodePngFile(fixture.path);
       const start = performance.now();
-      const paths = traceImageToCenterlinePaths(image, CENTERLINE_OPTIONS);
+      const paths = await traceImageToColoredPaths(image, LINE_ART_OPTIONS);
       const elapsedMs = performance.now() - start;
-
-      const polylines = paths.reduce((n, p) => n + p.polylines.length, 0);
-      const points = paths.reduce(
-        (n, p) => n + p.polylines.reduce((m, pl) => m + pl.points.length, 0),
-        0,
-      );
+      const artifact = buildTraceArtifact({
+        name: 'arch-house-langebaan-line-art',
+        mode: 'filled-contours',
+        source: { width: image.width, height: image.height },
+        paths,
+      });
       console.log(
-        `[arch-house] ${image.width}x${image.height} centerline: ${elapsedMs.toFixed(0)}ms, ` +
-          `${polylines} polylines, ${points} points`,
+        `[arch-house] ${image.width}x${image.height} Line Art: ${elapsedMs.toFixed(0)}ms, ` +
+          `${artifact.metrics.closedPolylineCount} closed polylines, ` +
+          `${artifact.metrics.openPolylineCount} open polylines, ` +
+          `${artifact.metrics.holeCandidateCount} hole candidates, ` +
+          `${artifact.metrics.pointCount} points`,
       );
 
-      const predicted = rasterizeColoredPaths(paths, image.width, image.height);
-      const artifact = writePerceptualArtifact(
-        'arch-house-centerline',
-        predicted,
-        sourceInkMask(image),
-      );
-      if (artifact !== null) console.log(`[arch-house] artifact: ${artifact}`);
+      if (process.env.PERCEPTUAL_ARTIFACTS === '1') {
+        const written = writeTraceArtifactEvidence(artifact, EVIDENCE_DIR);
+        console.log(`[arch-house] evidence: ${written.metricsJsonPath}, ${written.overlaySvgPath}`);
+      }
 
       expect(image.width).toBe(1024);
+      expect(image.height).toBe(1024);
+      expect(artifact.metrics.pathCount).toBeGreaterThan(0);
+      expect(artifact.metrics.openPolylineCount).toBe(0);
+      expect(artifact.metrics.closedPolylineCount).toBeGreaterThanOrEqual(10);
+      expect(artifact.metrics.holeCandidateCount).toBeGreaterThanOrEqual(5);
+      expect(artifact.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(250);
+      expect(artifact.metrics.pointCount).toBeGreaterThan(500);
+      expect(artifact.metrics.pointCount).toBeLessThan(80_000);
+      expect(artifact.metrics.bounds).toEqual({
+        minX: expect.any(Number),
+        minY: expect.any(Number),
+        maxX: expect.any(Number),
+        maxY: expect.any(Number),
+      });
+      expect(artifact.overlaySvg).toContain('data-trace-mode="filled-contours"');
+      expect(artifact.overlaySvg).toContain('fill-rule="evenodd"');
+      expect(artifact.overlaySvg).toContain('stroke="none"');
+      expect(artifact.overlaySvg).not.toContain('vector-effect="non-scaling-stroke"');
     },
+  );
+
+  it(
+    'keeps enough traced ink in the bottom LANGEBAAN word band',
     { timeout: 120_000 },
+    async () => {
+      const fixture = requiredArchHouseFixtureStatus();
+      if (fixture.path === null) throw new Error(`Missing fixture: ${fixture.expectedPathGlob}`);
+      const image = decodePngFile(fixture.path);
+      const paths = await traceImageToColoredPaths(image, LINE_ART_OPTIONS);
+      const mask = rasterizeColoredPaths(paths, image.width, image.height);
+      const bottomWordInk = countInk(mask, LANGEBAAN_BAND);
+
+      console.log(`[arch-house] LANGEBAAN band ink pixels: ${bottomWordInk}`);
+
+      expect(bottomWordInk).toBeGreaterThanOrEqual(3000);
+    },
+  );
+
+  it(
+    'keeps LANGEBAAN when Line Art receives an explicit Sketch Trace off override',
+    { timeout: 120_000 },
+    async () => {
+      const fixture = requiredArchHouseFixtureStatus();
+      if (fixture.path === null) throw new Error(`Missing fixture: ${fixture.expectedPathGlob}`);
+      const image = decodePngFile(fixture.path);
+      const paths = await traceImageToColoredPaths(image, {
+        ...LINE_ART_OPTIONS,
+        sketchTrace: false,
+      });
+      const mask = rasterizeColoredPaths(paths, image.width, image.height);
+      const bottomWordInk = countInk(mask, LANGEBAAN_BAND);
+
+      console.log(`[arch-house] LANGEBAAN band ink pixels with sketch off: ${bottomWordInk}`);
+
+      expect(bottomWordInk).toBeGreaterThanOrEqual(3000);
+    },
   );
 });
+
+function countInk(
+  mask: Mask,
+  rect: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number },
+): number {
+  let count = 0;
+  for (let y = rect.y0; y < rect.y1; y += 1) {
+    for (let x = rect.x0; x < rect.x1; x += 1) {
+      count += mask.data[y * mask.width + x] ?? 0;
+    }
+  }
+  return count;
+}

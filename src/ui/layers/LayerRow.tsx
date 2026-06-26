@@ -5,14 +5,21 @@
 // dialog wiring live in smaller components so this file stays within the
 // project size rules.
 
-import type { Layer, LayerMode } from '../../core/scene';
+import {
+  captureLayerOperationSettings,
+  sceneObjectUsesLayerColor,
+  type Layer,
+  type LayerMode,
+  type LayerOperationSettings,
+  type SceneObject,
+} from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { AssignSelectionButton } from './AssignSelectionButton';
 import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerRowCutSettings } from './LayerRowCutSettings';
-import { LayerRowSettingsFields } from './LayerRowFields';
+import { LayerRowSettingsFields, type LayerOperationControlTarget } from './LayerRowFields';
 import { LayerSubLayers } from './LayerSubLayers';
 import { LayerSettingsClipboardButtons } from './LayerSettingsClipboardButtons';
 import { SelectLayerObjectsButton } from './SelectLayerObjectsButton';
@@ -57,6 +64,14 @@ const headerToggleStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
 };
 const modeSelectStyle: React.CSSProperties = { fontSize: 13, padding: '2px 4px' };
+const selectedBadgeStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-accent)',
+  background: 'var(--lf-bg)',
+  border: '1px solid var(--lf-accent)',
+  borderRadius: 4,
+  padding: '2px 5px',
+};
 
 export function LayerRow(props: {
   readonly layer: Layer;
@@ -69,6 +84,7 @@ export function LayerRow(props: {
   const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
     useCutSettingsLauncher();
   const isActive = activeLayerColor === layer.color;
+  const operationTarget = useLayerOperationTarget(layer);
 
   return (
     <section
@@ -89,7 +105,12 @@ export function LayerRow(props: {
           canMoveUp={props.canMoveUp}
           canMoveDown={props.canMoveDown}
         />
-        <ModeSelect layer={layer} />
+        <ModeSelect layer={layer} operationTarget={operationTarget} />
+        {operationTarget.selectedObjectCount > 0 ? (
+          <span style={selectedBadgeStyle}>
+            Editing selected ({operationTarget.selectedObjectCount})
+          </span>
+        ) : null}
         <span style={headerFillerStyle} />
         <SelectLayerObjectsButton layer={layer} />
         <AssignSelectionButton layer={layer} />
@@ -111,7 +132,7 @@ export function LayerRow(props: {
         <HeaderToggle label="Show" layer={layer} field="visible" />
         <HeaderToggle label="Output" layer={layer} field="output" />
       </header>
-      <LayerRowSettingsFields layer={layer} />
+      <LayerRowSettingsFields layer={layer} operationTarget={operationTarget} />
       <LayerSubLayers layer={layer} />
       {settingsOpen ? <LayerRowCutSettings layer={layer} onClose={closeSettings} /> : null}
     </section>
@@ -141,13 +162,16 @@ function ColorSwatch(props: { readonly color: string; readonly visible: boolean 
   );
 }
 
-function ModeSelect({ layer }: { readonly layer: Layer }): JSX.Element {
-  const setLayerParam = useStore((s) => s.setLayerParam);
+function ModeSelect(props: {
+  readonly layer: Layer;
+  readonly operationTarget: LayerOperationControlTarget;
+}): JSX.Element {
+  const { layer, operationTarget } = props;
   return (
     <select
-      value={layer.mode}
-      onChange={(e) => setLayerParam(layer.id, { mode: e.target.value as LayerMode })}
-      title="Line: cut along the outline. Fill: hatch a closed shape. Image: raster-engrave a bitmap."
+      value={operationTarget.settings.mode}
+      onChange={(e) => operationTarget.commit({ mode: e.target.value as LayerMode })}
+      title={modeSelectTitle(operationTarget)}
       aria-label={`Mode for ${layer.color}`}
       style={modeSelectStyle}
     >
@@ -156,6 +180,67 @@ function ModeSelect({ layer }: { readonly layer: Layer }): JSX.Element {
       <option value="image">Image</option>
     </select>
   );
+}
+
+function useLayerOperationTarget(layer: Layer): LayerOperationControlTarget {
+  const objects = useStore((s) => s.project.scene.objects);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const setSelectedObjectsOperationOverrideForLayer = useStore(
+    (s) => s.setSelectedObjectsOperationOverrideForLayer,
+  );
+  const selectedObjects = selectedObjectsOnLayer(
+    objects,
+    selectedObjectId,
+    additionalSelectedIds,
+    layer.color,
+  );
+  if (selectedObjects.length === 0) {
+    return {
+      settings: captureLayerOperationSettings(layer),
+      selectedObjectCount: 0,
+      commit: (patch) => setLayerParam(layer.id, patch),
+    };
+  }
+  return {
+    settings: selectedEffectiveOperationSettings(layer, selectedObjects),
+    selectedObjectCount: selectedObjects.length,
+    commit: (patch) => setSelectedObjectsOperationOverrideForLayer(layer.color, patch),
+  };
+}
+
+function selectedObjectsOnLayer(
+  objects: ReadonlyArray<SceneObject>,
+  selectedObjectId: string | null,
+  additionalSelectedIds: ReadonlySet<string>,
+  layerColor: string,
+): ReadonlyArray<SceneObject> {
+  const selectedIds = new Set([
+    ...(selectedObjectId === null ? [] : [selectedObjectId]),
+    ...additionalSelectedIds,
+  ]);
+  return objects.filter(
+    (object) => selectedIds.has(object.id) && sceneObjectUsesLayerColor(object, layerColor),
+  );
+}
+
+function selectedEffectiveOperationSettings(
+  layer: Layer,
+  objects: ReadonlyArray<SceneObject>,
+): LayerOperationSettings {
+  return {
+    ...captureLayerOperationSettings(layer),
+    ...(objects[0]?.operationOverride ?? {}),
+  };
+}
+
+function modeSelectTitle(operationTarget: LayerOperationControlTarget): string {
+  const prefix =
+    operationTarget.selectedObjectCount > 0
+      ? 'Editing selected artwork only. '
+      : 'Editing layer defaults. ';
+  return `${prefix}Line: cut along the outline. Fill: hatch a closed shape. Image: raster-engrave a bitmap.`;
 }
 
 function HeaderToggle(props: {

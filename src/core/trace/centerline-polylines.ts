@@ -19,6 +19,7 @@ export type CenterlinePolylineOptions = {
   // distance transform (it prunes nothing by stroke radius).
   readonly distanceSq?: Float64Array;
   readonly simplifyTolerancePx?: number;
+  readonly minLengthPx?: number;
 };
 
 export function extractCenterlinePolylines(
@@ -28,10 +29,11 @@ export function extractCenterlinePolylines(
   options: CenterlinePolylineOptions = {},
 ): Polyline[] {
   const simplifyTolerancePx = options.simplifyTolerancePx ?? DEFAULT_SIMPLIFY_TOLERANCE_PX;
+  const minLengthPx = options.minLengthPx ?? MIN_CENTERLINE_LENGTH_PX;
   const segments = traceSkeletonToSegments(mask, width, height);
   return chainBranches(segments)
     .map((pixels) => pixelsToPolyline(pixels, simplifyTolerancePx))
-    .filter(shouldKeepPolyline);
+    .filter((polyline) => shouldKeepPolyline(polyline, minLengthPx));
 }
 
 function pixelsToPolyline(pixels: ReadonlyArray<Vec2>, simplifyTolerancePx: number): Polyline {
@@ -46,9 +48,9 @@ function pixelsToPolyline(pixels: ReadonlyArray<Vec2>, simplifyTolerancePx: numb
   };
 }
 
-function shouldKeepPolyline(polyline: Polyline): boolean {
+function shouldKeepPolyline(polyline: Polyline, minLengthPx: number): boolean {
   if (polyline.points.length < 2) return false;
-  return polylineLength(polyline.points) >= MIN_CENTERLINE_LENGTH_PX;
+  return polylineLength(polyline.points) >= Math.max(0, minLengthPx);
 }
 
 function polylineLength(points: ReadonlyArray<Vec2>): number {

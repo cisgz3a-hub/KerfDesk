@@ -358,7 +358,7 @@ export function applyTraceToExisting(
   const positionedTrace: TracedImage = { ...traced, transform };
   scene = addObject(scene, positionedTrace);
   scene =
-    positionedTrace.traceMode === 'centerline'
+    positionedTrace.traceMode === 'centerline' || positionedTrace.traceMode === 'edge'
       ? ensureLineLayersForColors(scene, positionedTrace.paths)
       : ensureFillLayersForColors(scene, positionedTrace.paths);
   if (existing !== undefined && options.deleteSourceAfterTrace === true) {

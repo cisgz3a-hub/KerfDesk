@@ -11,6 +11,9 @@ export function traceImageToCenterlinePaths(
   options: TraceOptions,
 ): ColoredPath[] {
   const prepared = preprocessForTrace(image, options);
+  // preprocessForTrace already applies manual threshold bands, Otsu, alpha
+  // masks, and despeckle. The mask sees that prepared binary image here; passing
+  // the same band again would reject black pixels when cutoffLuma > 0.
   const sourceMask = centerlineMaskFromImage(prepared);
   const skeletonMask = thinMask(sourceMask, prepared.width, prepared.height);
   const distanceSq = squaredDistanceToBackground(sourceMask, prepared.width, prepared.height);

@@ -152,7 +152,11 @@ function layerSpecsForObject(
 ): ReadonlyArray<{ readonly color: string; readonly mode: Layer['mode'] }> {
   if (object.kind === 'raster-image') return [{ color: object.color, mode: 'image' }];
   const mode =
-    object.kind === 'traced-image' && object.traceMode !== 'centerline' ? 'fill' : 'line';
+    object.kind === 'traced-image' &&
+    object.traceMode !== 'centerline' &&
+    object.traceMode !== 'edge'
+      ? 'fill'
+      : 'line';
   return object.paths.map((path) => ({ color: path.color, mode }));
 }
 

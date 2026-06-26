@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { useStore } from '../state';
+import { SelectedObjectOperationSettings } from './SelectedObjectOperationSettings';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 const DEFAULT_POWER_SCALE_PERCENT = 100;
@@ -20,6 +21,7 @@ export function SelectedObjectProperties(): JSX.Element | null {
     <section aria-label="Selected object properties" style={sectionStyle}>
       <h3 style={headingStyle}>Shape Properties</h3>
       <PowerScaleInput objects={selectedObjects} />
+      <SelectedObjectOperationSettings objects={selectedObjects} />
     </section>
   );
 }

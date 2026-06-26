@@ -70,4 +70,31 @@ describe('SelectedObjectProperties', () => {
       host.remove();
     }
   });
+
+  it('edits operation settings only on the selected object', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.getState().selectObject('O2');
+    const { host, root } = await render();
+    try {
+      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('selected mode control missing');
+      await act(async () => {
+        mode.value = 'fill';
+        Simulate.change(mode);
+      });
+
+      const state = useStore.getState();
+      expect(state.project.scene.layers.find((layer) => layer.color === '#000000')?.mode).toBe(
+        'line',
+      );
+      expect(state.project.scene.objects.map((object) => object.operationOverride)).toEqual([
+        undefined,
+        { mode: 'fill' },
+      ]);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });

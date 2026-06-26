@@ -75,6 +75,27 @@ function paintThickLine(
   return { ...image, data };
 }
 
+function paintLumaRect(
+  image: RawImageData,
+  x0: number,
+  y0: number,
+  width: number,
+  height: number,
+  luma: number,
+): RawImageData {
+  const data = new Uint8ClampedArray(image.data);
+  for (let y = y0; y < y0 + height; y += 1) {
+    for (let x = x0; x < x0 + width; x += 1) {
+      const i = (y * image.width + x) * 4;
+      data[i] = luma;
+      data[i + 1] = luma;
+      data[i + 2] = luma;
+      data[i + 3] = 255;
+    }
+  }
+  return { ...image, data };
+}
+
 function longestPolyline(paths: ReturnType<typeof traceImageToCenterlinePaths>) {
   return [...(paths[0]?.polylines ?? [])].sort(
     (a, b) => polylineLength(b.points) - polylineLength(a.points),
@@ -124,6 +145,18 @@ describe('traceImageToCenterlinePaths', () => {
 
   it('returns no paths for an all-white image', () => {
     expect(traceImageToCenterlinePaths(whiteImage(8, 8), CENTERLINE_OPTIONS)).toEqual([]);
+  });
+
+  it('keeps ink selected by a manual cutoff band after preprocessing', () => {
+    const image = paintLumaRect(whiteImage(16, 8), 2, 2, 12, 3, 80);
+
+    const paths = traceImageToCenterlinePaths(image, {
+      ...CENTERLINE_OPTIONS,
+      cutoffLuma: 50,
+      thresholdLuma: 100,
+    });
+
+    expect(paths[0]?.polylines.length ?? 0).toBeGreaterThan(0);
   });
 
   it('drops tiny skeleton spurs while keeping the main stroke', () => {
