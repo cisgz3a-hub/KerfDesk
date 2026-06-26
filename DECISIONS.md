@@ -3396,6 +3396,124 @@ diff) lives in its own unit-tested modules under `src/ui/laser/device-setup/`.
 
 ---
 
+## ADR-093 — In-app multi-library Material Library UI: create/edit wizard, Saved Libraries browser, auto-save
+
+**Status:** Accepted; staged in small PRs. | **Date:** 2026-06-26
+
+> Numbering note: ADR-092 is the previous highest. The active build plan reserves
+> ADR-054..091 for its tickets, so this independent, maintainer-requested feature takes the
+> next free number above that range (ADR-093).
+
+### Context
+
+ADR-044/045 landed the calibration generators, the pure `MaterialRecipe` model, and the native
+`.lfml.json` IO, then deliberately stopped short of a full Material Library UI. A minimal UI was
+since wired into the Cuts/Layers rail (`MaterialLibraryPanel.tsx`, WORKFLOW F-ML1), but the
+maintainer reports it is confusing, and the code confirms three concrete problems:
+
+1. **Creation is inverted.** The only authoring path is "Create from Layer"
+   (`createMaterialPresetFromLayer`): the operator must import a design, pick a layer, edit that
+   layer's cut settings elsewhere, then snapshot it into a preset. The natural mental model is the
+   reverse — create a material, name it, then type its power/speed/passes directly.
+2. **File-system wording.** `Load... / Save... / Unload` and `Assign` are jargon; the layer-target
+   dropdown shows a raw hex color; preset labels are verbose.
+3. **No library browser.** Exactly one library exists in memory at a time, persisted to a single
+   `localStorage` slot (`laserforge.material-library.v1`) plus a manual `.lfml.json` picker. There
+   is no way to keep or switch between several libraries.
+
+The 2026-06-05 research (`audit/reports/lightburn-material-library-research-2026-06-05.md`)
+established LightBurn semantics (group by Material → Thickness/No-Thickness → Description; Assign
+copies a recipe onto the active layer) and recommended native deterministic storage. This ADR
+keeps those semantics and the existing recipe/IO/apply pipeline; it redesigns only the UX shell,
+the authoring flow, and the storage breadth.
+
+### Decision
+
+Build the Material Library UI as **composition over the existing core/IO**, in two maintainer-
+chosen shapes:
+
+1. **In-app, auto-saved multi-library storage.** Replace the single-library slot with a keyed
+   collection in `localStorage` (`laserforge.material-libraries.v1`): `activeLibraryId` plus a map
+   of `libraryId → { payload, updatedAt }`, where `payload` is the byte-identical
+   `serializeMaterialLibrary` output (stored == exported == validated on read). The legacy slot is
+   migrated in once and removed. Mutating the active library auto-saves; there is no manual Save
+   button. File Save/Load survive only as **Export... / Import...** for sharing.
+
+2. **Guided multi-step create/edit wizard.** Replace the snapshot form with a `Dialog`-based
+   wizard (Identity → Cut settings → Mode details → Review & Save) whose draft commits only on the
+   final Save, modeled on the ADR-092 Device Setup wizard's draft-commit pattern. Settings are
+   typed directly into the preset. The wizard reuses the layer cut-settings field components
+   (`CutSettingsFillFields`, `CutSettingsImageFields`, `readCutSettingsPatch`) over a synthetic
+   `Layer`, plus a new `PresetCommonFields` that omits the layer-session fields `visible`/`output`
+   (the research doc's rule: never store session fields in a reusable preset). "New from current
+   layer" remains an optional prefill, not the primary path.
+
+3. **Saved Libraries browser.** A `Dialog` page lists every library (name, device hint, preset
+   count, last updated) with Open / New / Rename / Duplicate / Delete (job-aware confirm) /
+   Export / Import.
+
+4. **Reworded rail.** `Assign` → **Apply to layer**; the layer dropdown shows the layer name +
+   color swatch, not hex; `Load.../Save.../Unload` give way to **Saved Libraries...** + auto-save.
+
+The apply pipeline is unchanged: `assignMaterialPresetToLayer` still copies the recipe onto the
+layer via the scene mutation path, so Preview / Save / Frame / Start stay identical. Wizard step
+state is a discriminated union with an `assertNever` default arm (CLAUDE.md state rule); pure
+helpers and the persistence collection are unit-tested independently of React.
+
+Staged as small, independently-verified PRs (CLAUDE.md collaboration rule #1): this ADR +
+PROJECT/WORKFLOW docs (no code) → persistence collection + management actions → create/edit
+wizard → Saved Libraries page → rail rewording → dead-code cleanup. Each diff keeps the app
+working.
+
+### Consequences
+
+- Operators author materials the obvious way (type the numbers) and can keep per-machine or
+  per-material-family libraries that survive reloads without touching files.
+- This advances past ADR-045's "Full Material Library UI ... out of scope" line and the matching
+  PROJECT.md scope entry; both are updated. LightBurn `.clb` compatibility, manufacturer profiles,
+  and linked presets ("Link", ADR-045's deferral) remain out of scope.
+- The new wizard fields and the layer Cut Settings dialog now share field components; a change to a
+  field control affects both surfaces. Acceptable and intended (single source of truth for recipe
+  inputs).
+- Storage breadth grows (N libraries vs 1). Quota failure keeps the existing single-warning,
+  edit-continues posture; a corrupt collection slot is discarded silently.
+- The legacy "Create from Layer" form, the "Update from layer" button, and the
+  calibration-from-test-swatch create path are removed (maintainer decision, Phase 5): the
+  wizard is the sole authoring path. The Material/Interval Test generators and the
+  recipe/IO model are unchanged; turning a selected test swatch into a calibrated preset can
+  be reintroduced later through the wizard if wanted.
+
+### Alternatives rejected
+
+- **File-based libraries (each a `.lfml.json` the operator manages):** rejected by the maintainer
+  in favor of in-app auto-save; files remain available as Export/Import for sharing.
+- **Single guided form instead of a wizard:** rejected — the maintainer chose step-by-step; the
+  wizard hand-holds identity → settings → details → review.
+- **Keep "Create from Layer" as the primary authoring path:** rejected — it is the reported
+  confusion; demoted to an optional prefill.
+- **Hidden auto-applied per-user library (no browser):** rejected — the operator explicitly wants
+  to see and switch libraries.
+- **New Zustand slice for wizard state:** not needed — open/close is local `useState`, step/draft
+  is a local `useReducer` over a pure reducer (mirrors ADR-092), so transition logic stays
+  unit-testable with no global state.
+
+### Verification
+
+- **Pure/unit tests:** the persistence collection (round-trip, migration from the legacy slot,
+  corrupt-slot discard, quota failure returns false), the management actions (list/open/create/
+  rename/duplicate/delete), the wizard step reducer (next/back/edit-merge/can-advance/
+  `assertNever`), and `upsertMaterialPreset` (add vs replace; recipe normalization).
+- **Component tests:** wizard validation gating and draft-commit-on-Save; Saved Libraries Open
+  sets active; Apply-to-layer copies the recipe; Export/Import reuse the IO error paths.
+- **Output parity (perceptual, CLAUDE.md #2):** applying a preset must change emitted feed/power
+  (Line), hatch spacing (Fill), and lines-per-mm (Image) through the existing prepared-output
+  pipeline — checked in Preview / Save G-code, not just by green structural tests.
+- **NOT covered (must be hardware-verified before "done"):** that the chosen settings actually
+  burn correctly on real material. Per CLAUDE.md this stays explicitly unverified until a
+  maintainer hardware pass.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).

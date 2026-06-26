@@ -7,8 +7,16 @@ import {
   type MaterialLibraryDocument,
 } from '../../io/material-library';
 import {
+  EMPTY_MATERIAL_LIBRARY_COLLECTION,
+  reconcileActiveDocument,
+} from './material-library-collection';
+import {
+  MATERIAL_LIBRARIES_STORAGE_KEY,
   MATERIAL_LIBRARY_STORAGE_KEY,
+  migrateLegacyLibrary,
+  persistCollection,
   persistMaterialLibrary,
+  restoreCollection,
   restoreMaterialLibrary,
 } from './material-library-persistence';
 
@@ -91,5 +99,57 @@ describe('material library persistence', () => {
       },
     };
     expect(persistMaterialLibrary(storage, libraryFixture(), false)).toBe(false);
+  });
+});
+
+describe('material library collection persistence (ADR-093)', () => {
+  it('round-trips a collection', () => {
+    const storage = memoryStorage();
+    const collection = reconcileActiveDocument(
+      EMPTY_MATERIAL_LIBRARY_COLLECTION,
+      libraryFixture(),
+      42,
+    );
+    expect(persistCollection(storage, collection)).toBe(true);
+    expect(restoreCollection(storage)).toEqual(collection);
+  });
+
+  it('returns null when nothing is stored', () => {
+    expect(restoreCollection(memoryStorage())).toBeNull();
+  });
+
+  it('clears the collection slot and returns null on a corrupt envelope', () => {
+    const storage = memoryStorage();
+    storage.setItem(MATERIAL_LIBRARIES_STORAGE_KEY, '{not json');
+    expect(restoreCollection(storage)).toBeNull();
+    expect(storage.map.has(MATERIAL_LIBRARIES_STORAGE_KEY)).toBe(false);
+  });
+
+  it('reports failure instead of throwing when the collection write fails (quota)', () => {
+    const storage: StorageLike = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+      removeItem: () => {
+        /* not reached */
+      },
+    };
+    expect(persistCollection(storage, EMPTY_MATERIAL_LIBRARY_COLLECTION)).toBe(false);
+  });
+
+  it('migrates the legacy single-library slot into the collection and removes it', () => {
+    const storage = memoryStorage();
+    persistMaterialLibrary(storage, libraryFixture(), false);
+
+    const migrated = migrateLegacyLibrary(storage, 7);
+
+    expect(migrated?.activeLibraryId).toBe(libraryFixture().libraryId);
+    expect(storage.map.has(MATERIAL_LIBRARY_STORAGE_KEY)).toBe(false);
+    expect(restoreCollection(storage)).toEqual(migrated);
+  });
+
+  it('migrates nothing when there is no legacy slot', () => {
+    expect(migrateLegacyLibrary(memoryStorage(), 7)).toBeNull();
   });
 });

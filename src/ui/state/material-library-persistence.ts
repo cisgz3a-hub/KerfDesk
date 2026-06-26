@@ -13,8 +13,19 @@ import {
   serializeMaterialLibrary,
   type MaterialLibraryDocument,
 } from '../../io/material-library';
+import {
+  EMPTY_MATERIAL_LIBRARY_COLLECTION,
+  parseCollection,
+  reconcileActiveDocument,
+  serializeCollection,
+  type MaterialLibraryCollection,
+} from './material-library-collection';
 
 export const MATERIAL_LIBRARY_STORAGE_KEY = 'laserforge.material-library.v1';
+
+// ADR-093: the in-app multi-library collection slot. Supersedes the single
+// MATERIAL_LIBRARY_STORAGE_KEY slot, which is migrated in once then removed.
+export const MATERIAL_LIBRARIES_STORAGE_KEY = 'laserforge.material-libraries.v1';
 
 export type PersistedMaterialLibrary = {
   readonly library: MaterialLibraryDocument;
@@ -90,6 +101,72 @@ function parseEnvelope(raw: string): Envelope | null {
 function clearSlot(storage: StorageLike): void {
   try {
     storage.removeItem(MATERIAL_LIBRARY_STORAGE_KEY);
+  } catch {
+    // Removal is best-effort; restore already returned null.
+  }
+}
+
+// Returns false instead of throwing so a quota failure surfaces one warning
+// toast without breaking the edit that triggered the write (mirrors
+// persistMaterialLibrary, M16).
+export function persistCollection(
+  storage: StorageLike,
+  collection: MaterialLibraryCollection,
+): boolean {
+  try {
+    storage.setItem(MATERIAL_LIBRARIES_STORAGE_KEY, serializeCollection(collection));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// A corrupt collection slot is discarded so one bad write cannot re-fail every
+// boot (same posture as restoreMaterialLibrary).
+export function restoreCollection(storage: StorageLike): MaterialLibraryCollection | null {
+  let raw: string | null;
+  try {
+    raw = storage.getItem(MATERIAL_LIBRARIES_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+  if (raw === null) return null;
+
+  const collection = parseCollection(raw);
+  if (collection === null) {
+    clearCollectionSlot(storage);
+    return null;
+  }
+  return collection;
+}
+
+// One-time migration of the legacy single-library slot into the collection.
+// Returns the seeded collection, or null when there was nothing to migrate.
+export function migrateLegacyLibrary(
+  storage: StorageLike,
+  now: number,
+): MaterialLibraryCollection | null {
+  const legacy = restoreMaterialLibrary(storage);
+  if (legacy === null) return null;
+
+  const collection = reconcileActiveDocument(
+    EMPTY_MATERIAL_LIBRARY_COLLECTION,
+    legacy.library,
+    now,
+  );
+  persistCollection(storage, collection);
+  try {
+    storage.removeItem(MATERIAL_LIBRARY_STORAGE_KEY);
+  } catch {
+    // Best-effort: the collection is already written; a stale legacy slot is
+    // harmless because restoreCollection is preferred on the next boot.
+  }
+  return collection;
+}
+
+function clearCollectionSlot(storage: StorageLike): void {
+  try {
+    storage.removeItem(MATERIAL_LIBRARIES_STORAGE_KEY);
   } catch {
     // Removal is best-effort; restore already returned null.
   }

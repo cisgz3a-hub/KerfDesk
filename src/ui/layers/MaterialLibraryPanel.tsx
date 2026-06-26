@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../../core/devices';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS,
   materialPresetWarnings,
@@ -14,15 +14,10 @@ import {
   type MaterialLibraryDocument,
   type MaterialPreset,
 } from '../../io/material-library';
-import {
-  handleOpenMaterialLibrary,
-  handleSaveMaterialLibrary,
-} from '../app/material-library-file-actions';
-import { usePlatform } from '../app/platform-context';
 import { Button } from '../kit';
 import { useStore } from '../state';
-import { materialLibraryCalibrationFromSelection } from '../state/material-library-calibration';
-import { useToastStore } from '../state/toast-store';
+import { SavedLibrariesButton } from '../material-library/SavedLibrariesButton';
+import { MaterialPresetWizardLauncher } from '../material-library/wizard';
 import { MaterialLibraryRecipeControls } from './MaterialLibraryRecipeControls';
 import {
   materialLibraryPresetOptions,
@@ -32,8 +27,8 @@ import {
   buttonRowStyle,
   fieldStyle,
   headingStyle,
+  hintStyle,
   labelStyle,
-  libraryHeaderStyle,
   libraryNameStyle,
   sectionStyle,
   statusStyle,
@@ -41,29 +36,30 @@ import {
 
 export function MaterialLibraryPanel(): JSX.Element {
   const library = useStore((state) => state.materialLibrary);
-  const libraryDirty = useStore((state) => state.materialLibraryDirty);
   return library === null ? (
     <EmptyMaterialLibraryPanel />
   ) : (
-    <LoadedMaterialLibraryPanel library={library} libraryDirty={libraryDirty} />
+    <LoadedMaterialLibraryPanel library={library} />
   );
 }
 
 function EmptyMaterialLibraryPanel(): JSX.Element {
-  const platform = usePlatform();
   const device = useStore((state) => state.project.device);
+  const createLibrary = useStore((state) => state.createLibrary);
   const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
-  const pushToast = useToastStore((state) => state.pushToast);
   return (
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
+      <p style={hintStyle}>
+        No material library yet. Create one, or open one from Saved Libraries.
+      </p>
       <div style={buttonRowStyle}>
         <Button
           aria-label="Create new material library"
-          title="Create a new material library for the current device profile."
-          onClick={() => setMaterialLibrary(createBlankLibrary(device))}
+          title="Create a new, empty material library for the current device profile."
+          onClick={() => createLibrary(`${device.name} Library`)}
         >
-          New Library
+          New library
         </Button>
         <Button
           aria-label="Create Neotronics starter material library"
@@ -72,15 +68,6 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
         >
           Neotronics Starters
         </Button>
-        <Button
-          aria-label="Load material library"
-          title="Load a saved LaserForge material library file."
-          onClick={() => {
-            void handleOpenMaterialLibrary({ platform, setMaterialLibrary, pushToast });
-          }}
-        >
-          Load...
-        </Button>
       </div>
     </section>
   );
@@ -88,18 +75,11 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
 
 function LoadedMaterialLibraryPanel(props: {
   readonly library: MaterialLibraryDocument;
-  readonly libraryDirty: boolean;
 }): JSX.Element {
-  const platform = usePlatform();
   const project = useStore((state) => state.project);
   const layers = useStore((state) => state.project.scene.layers);
-  const selectedObjectId = useStore((state) => state.selectedObjectId);
-  const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
-  const markMaterialLibrarySaved = useStore((state) => state.markMaterialLibrarySaved);
   const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
-  const updateMaterialPresetFromLayer = useStore((state) => state.updateMaterialPresetFromLayer);
   const deleteMaterialPreset = useStore((state) => state.deleteMaterialPreset);
-  const pushToast = useToastStore((state) => state.pushToast);
   const [targetLayerId, setTargetLayerId] = useState('');
   const [presetId, setPresetId] = useState('');
   const [status, setStatus] = useState('');
@@ -114,30 +94,10 @@ function LoadedMaterialLibraryPanel(props: {
   );
   const activePresetOption =
     presetOptions.find((option) => option.preset.id === activePresetId) ?? null;
-  const calibrationContext = materialLibraryCalibrationFromSelection({ project, selectedObjectId });
   return (
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
-      <LibraryHeader
-        library={props.library}
-        libraryDirty={props.libraryDirty}
-        onUnload={() => {
-          setMaterialLibrary(null);
-          setStatus('');
-        }}
-        onLoad={() => {
-          setStatus('');
-          void handleOpenMaterialLibrary({ platform, setMaterialLibrary, pushToast });
-        }}
-        onSave={() => {
-          void handleSaveMaterialLibrary({
-            platform,
-            library: props.library,
-            markMaterialLibrarySaved,
-            pushToast,
-          });
-        }}
-      />
+      <p style={libraryNameStyle}>{props.library.name}</p>
       <MaterialLibrarySelectors
         layers={layers}
         presetOptions={presetOptions}
@@ -146,62 +106,20 @@ function LoadedMaterialLibraryPanel(props: {
         onLayerChange={setTargetLayerId}
         onPresetChange={setPresetId}
       />
+      <MaterialPresetWizardLauncher
+        selectedPreset={activePresetOption?.preset ?? null}
+        onSaved={(id) => setPresetId(id)}
+      />
       <MaterialLibraryRecipeControls
         activeLayerId={activeLayerId}
         activePresetId={activePresetId}
-        entryCount={props.library.entries.length}
         activePresetOption={activePresetOption}
-        calibrationContext={calibrationContext}
         onAssign={() => assignMaterialPresetToLayer(activeLayerId, activePresetId)}
-        onUpdate={() => updateMaterialPresetFromLayer(activeLayerId, activePresetId)}
         onDelete={() => deleteMaterialPreset(activePresetId)}
-        onPresetCreated={(id) => {
-          setPresetId(id);
-        }}
         onStatus={setStatus}
       />
       {status !== '' ? <p style={statusStyle}>{status}</p> : null}
     </section>
-  );
-}
-
-function LibraryHeader(props: {
-  readonly library: MaterialLibraryDocument;
-  readonly libraryDirty: boolean;
-  readonly onUnload: () => void;
-  readonly onLoad: () => void;
-  readonly onSave: () => void;
-}): JSX.Element {
-  return (
-    <div style={libraryHeaderStyle}>
-      <span style={libraryNameStyle}>
-        {props.library.name}
-        {props.libraryDirty ? ' *' : ''}
-      </span>
-      <div style={buttonRowStyle}>
-        <Button
-          aria-label="Load material library"
-          title="Load a different material library file."
-          onClick={props.onLoad}
-        >
-          Load...
-        </Button>
-        <Button
-          aria-label="Save material library"
-          title="Save the current material library to disk."
-          onClick={props.onSave}
-        >
-          Save...
-        </Button>
-        <Button
-          aria-label="Unload material library"
-          title="Close the loaded material library without deleting the file."
-          onClick={props.onUnload}
-        >
-          Unload
-        </Button>
-      </div>
-    </div>
   );
 }
 
@@ -213,24 +131,31 @@ function MaterialLibrarySelectors(props: {
   readonly onLayerChange: (id: string) => void;
   readonly onPresetChange: (id: string) => void;
 }): JSX.Element {
+  const activeLayer = props.layers.find((layer) => layer.id === props.activeLayerId) ?? null;
   return (
     <>
       <label style={fieldStyle}>
         <span style={labelStyle}>Layer</span>
-        <select
-          aria-label="Material library target layer"
-          value={props.activeLayerId}
-          disabled={props.layers.length === 0}
-          title="Choose which cut layer receives the selected material preset."
-          onChange={(event) => props.onLayerChange(event.currentTarget.value)}
-        >
-          {props.layers.length === 0 ? <option value="">No layers</option> : null}
-          {props.layers.map((layer) => (
-            <option key={layer.id} value={layer.id}>
-              {layer.color}
-            </option>
-          ))}
-        </select>
+        <span style={layerControlStyle}>
+          {/* Swatch background is scene data (the layer color), inline per ADR-047. */}
+          {activeLayer === null ? null : (
+            <span style={{ ...swatchStyle, background: activeLayer.color }} />
+          )}
+          <select
+            aria-label="Material library target layer"
+            value={props.activeLayerId}
+            disabled={props.layers.length === 0}
+            title="Choose which cut layer receives the selected material preset."
+            onChange={(event) => props.onLayerChange(event.currentTarget.value)}
+          >
+            {props.layers.length === 0 ? <option value="">No layers</option> : null}
+            {props.layers.map((layer, index) => (
+              <option key={layer.id} value={layer.id}>
+                {`Layer ${index + 1} (${layer.color})`}
+              </option>
+            ))}
+          </select>
+        </span>
       </label>
       <label style={fieldStyle}>
         <span style={labelStyle}>Preset</span>
@@ -254,18 +179,12 @@ function MaterialLibrarySelectors(props: {
 }
 
 function Header(): JSX.Element {
-  return <h2 style={headingStyle}>Material Library</h2>;
-}
-
-function createBlankLibrary(device: DeviceProfile): MaterialLibraryDocument {
-  return {
-    format: MATERIAL_LIBRARY_FORMAT,
-    librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
-    libraryId: `laserforge-${slug(device.name)}`,
-    name: `${device.name} Library`,
-    deviceHint: createMaterialLibraryDeviceHint(device),
-    entries: [],
-  };
+  return (
+    <div style={headerRowStyle}>
+      <h2 style={headingStyle}>Material Library</h2>
+      <SavedLibrariesButton />
+    </div>
+  );
 }
 
 function createNeotronicsStarterLibrary(): MaterialLibraryDocument {
@@ -339,13 +258,22 @@ function activeId(candidate: string, ids: ReadonlyArray<string>): string {
   return ids[0] ?? '';
 }
 
-function slug(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 48) || 'library'
-  );
-}
+const headerRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+};
+const layerControlStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  flex: 1,
+};
+const swatchStyle: React.CSSProperties = {
+  width: 14,
+  height: 14,
+  borderRadius: 3,
+  border: '1px solid var(--lf-border-strong)',
+  flexShrink: 0,
+};
