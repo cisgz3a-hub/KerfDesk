@@ -54,11 +54,13 @@ export default defineConfig({
     react(),
     // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
     // ADR-060: an auto-reload could interrupt a live burn). injectRegister
-    // 'script' emits an external registerSW.js because the strict CSP
-    // (script-src 'self', no unsafe-inline) blocks the default inline form.
+    // false: PwaUpdatePrompt registers the SW via the virtual:pwa-register/react
+    // hook (which also drives the offline-ready toast + the update banner), and
+    // a bundled hook satisfies the strict CSP (script-src 'self') where the
+    // inline registration form would be blocked.
     VitePWA({
       registerType: 'prompt',
-      injectRegister: 'script',
+      injectRegister: false,
       includeAssets: ['favicon.svg'],
       manifest: {
         name: 'LaserForge 2.0',
