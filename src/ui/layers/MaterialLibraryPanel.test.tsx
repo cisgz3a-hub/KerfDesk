@@ -8,7 +8,6 @@ import type { FileHandle, PlatformAdapter, SaveTarget } from '../../platform/typ
 import {
   MATERIAL_LIBRARY_FORMAT,
   MATERIAL_LIBRARY_SCHEMA_VERSION,
-  serializeMaterialLibrary,
   type MaterialLibraryDocument,
   type MaterialPreset,
 } from '../../io/material-library';
@@ -80,10 +79,6 @@ function library(entries: ReadonlyArray<MaterialPreset> = []): MaterialLibraryDo
   };
 }
 
-function file(name: string, text: string): FileHandle {
-  return { name, text: async () => text };
-}
-
 function mockPlatform(
   args: {
     readonly open?: () => Promise<ReadonlyArray<FileHandle>>;
@@ -130,23 +125,10 @@ function button(host: HTMLElement, label: string): HTMLButtonElement {
   return element;
 }
 
-function input(host: HTMLElement, label: string): HTMLInputElement {
-  const element = host.querySelector(`input[aria-label="${label}"]`);
-  if (!(element instanceof HTMLInputElement)) throw new Error(`missing input: ${label}`);
-  return element;
-}
-
 function select(host: HTMLElement, label: string): HTMLSelectElement {
   const element = host.querySelector(`select[aria-label="${label}"]`);
   if (!(element instanceof HTMLSelectElement)) throw new Error(`missing select: ${label}`);
   return element;
-}
-
-async function setInputValue(element: HTMLInputElement, value: string): Promise<void> {
-  await act(async () => {
-    element.value = value;
-    Simulate.change(element);
-  });
 }
 
 async function setSelectValue(element: HTMLSelectElement, value: string): Promise<void> {
@@ -157,11 +139,12 @@ async function setSelectValue(element: HTMLSelectElement, value: string): Promis
 }
 
 describe('MaterialLibraryPanel', () => {
-  it('shows new and load actions when no material library is loaded', async () => {
+  it('shows create actions when no material library is loaded', async () => {
     const { host, root } = await renderPanel();
     try {
       expect(button(host, 'Create new material library')).toBeDefined();
-      expect(button(host, 'Load material library')).toBeDefined();
+      expect(button(host, 'Create Neotronics starter material library')).toBeDefined();
+      expect(button(host, 'Open saved libraries')).toBeDefined();
     } finally {
       await unmount(root, host);
     }
@@ -224,107 +207,6 @@ describe('MaterialLibraryPanel', () => {
     }
   });
 
-  it('loads a material library through the panel file picker', async () => {
-    const doc = library([preset()]);
-    const { host, root } = await renderPanel(
-      mockPlatform({
-        open: async () => [file('shop.lfml.json', serializeMaterialLibrary(doc))],
-      }),
-    );
-    try {
-      await act(async () => {
-        button(host, 'Load material library').click();
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      expect(useStore.getState().materialLibrary).toEqual(doc);
-      expect(useStore.getState().materialLibraryDirty).toBe(false);
-    } finally {
-      await unmount(root, host);
-    }
-  });
-
-  it('shows loaded material library file actions', async () => {
-    useStore.getState().setMaterialLibrary(library([preset()]));
-    const { host, root } = await renderPanel();
-    try {
-      expect(button(host, 'Load material library')).toBeDefined();
-      expect(button(host, 'Save material library')).toBeDefined();
-      expect(button(host, 'Unload material library')).toBeDefined();
-    } finally {
-      await unmount(root, host);
-    }
-  });
-
-  it('saves a material library through the panel and clears dirty state', async () => {
-    const doc = library([preset()]);
-    const writes: string[] = [];
-    useStore.getState().setMaterialLibrary(doc);
-    useStore.setState({ materialLibraryDirty: true });
-    const { host, root } = await renderPanel(
-      mockPlatform({
-        save: async () => ({
-          displayName: 'shop.lfml.json',
-          write: async (data) => {
-            if (typeof data !== 'string') throw new Error('expected text material library');
-            writes.push(data);
-          },
-        }),
-      }),
-    );
-    try {
-      await act(async () => {
-        button(host, 'Save material library').click();
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      expect(writes).toEqual([serializeMaterialLibrary(doc)]);
-      expect(useStore.getState().materialLibraryDirty).toBe(false);
-    } finally {
-      await unmount(root, host);
-    }
-  });
-
-  it('captures a preset from the selected layer form fields', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().setLayerParam('#ff0000', {
-      mode: 'fill',
-      minPower: 7,
-      power: 64,
-      speed: 2400,
-      passes: 3,
-      fillBidirectional: false,
-      fillCrossHatch: true,
-    });
-    const expectedRecipe = captureMaterialRecipe(useStore.getState().project.scene.layers[0]!);
-    const { host, root } = await renderPanel();
-    try {
-      await act(async () => {
-        button(host, 'Create new material library').click();
-      });
-      await setInputValue(input(host, 'Material name'), 'Birch plywood');
-      await setInputValue(input(host, 'Material thickness millimeters'), '3');
-      await setInputValue(input(host, 'Preset description'), 'Text engraving');
-
-      await act(async () => {
-        button(host, 'Create preset from selected layer').click();
-      });
-
-      const entry = useStore.getState().materialLibrary?.entries[0];
-      expect(entry).toMatchObject({
-        materialName: 'Birch plywood',
-        thicknessMm: 3,
-        description: 'Text engraving',
-        recipe: expectedRecipe,
-      });
-      expect(useStore.getState().materialLibraryDirty).toBe(true);
-    } finally {
-      await unmount(root, host);
-    }
-  });
-
   it('assigns a selected preset to the selected target layer', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
     useStore.getState().setMaterialLibrary(library([preset()]));
@@ -334,7 +216,7 @@ describe('MaterialLibraryPanel', () => {
       await setSelectValue(select(host, 'Material library preset'), 'birch-3mm-cut');
 
       await act(async () => {
-        button(host, 'Assign selected material preset').click();
+        button(host, 'Apply selected material preset to layer').click();
       });
 
       const target = useStore
@@ -393,7 +275,7 @@ describe('MaterialLibraryPanel', () => {
     try {
       expect(host.textContent).toContain('Unsupported recipe.');
       expect(host.textContent).toContain('Clear acrylic is not supported');
-      expect(button(host, 'Assign selected material preset').disabled).toBe(true);
+      expect(button(host, 'Apply selected material preset to layer').disabled).toBe(true);
     } finally {
       await unmount(root, host);
     }
@@ -405,7 +287,7 @@ describe('MaterialLibraryPanel', () => {
     const { host, root } = await renderPanel();
     try {
       await act(async () => {
-        button(host, 'Assign selected material preset').click();
+        button(host, 'Apply selected material preset to layer').click();
       });
 
       await act(async () => {
@@ -418,15 +300,14 @@ describe('MaterialLibraryPanel', () => {
     }
   });
 
-  it('disables create and assign controls when required inputs are missing', async () => {
+  it('disables apply when no layer or preset is available', async () => {
     const { host, root } = await renderPanel();
     try {
       await act(async () => {
         button(host, 'Create new material library').click();
       });
 
-      expect(button(host, 'Create preset from selected layer').disabled).toBe(true);
-      expect(button(host, 'Assign selected material preset').disabled).toBe(true);
+      expect(button(host, 'Apply selected material preset to layer').disabled).toBe(true);
     } finally {
       await unmount(root, host);
     }

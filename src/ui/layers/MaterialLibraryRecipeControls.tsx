@@ -1,8 +1,5 @@
-import type { MaterialLibraryCalibrationContext as CalibrationContext } from '../state/material-library-calibration';
 import { Button } from '../kit';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { MaterialLibraryCalibrationContext } from './MaterialLibraryCalibrationContext';
-import { CreatePresetForm } from './MaterialLibraryCreatePresetForm';
 import type { MaterialLibraryPresetOption } from './material-library-preset-options';
 import {
   buttonRowStyle,
@@ -14,46 +11,28 @@ import {
 export function MaterialLibraryRecipeControls(props: {
   readonly activeLayerId: string;
   readonly activePresetId: string;
-  readonly entryCount: number;
   readonly activePresetOption: MaterialLibraryPresetOption | null;
-  readonly calibrationContext: CalibrationContext | null;
   readonly onAssign: () => boolean;
-  readonly onUpdate: () => boolean;
   readonly onDelete: () => boolean;
-  readonly onPresetCreated: (id: string) => void;
   readonly onStatus: (message: string) => void;
 }): JSX.Element {
-  const assignDisabled =
+  const applyDisabled =
     props.activeLayerId === '' ||
     props.activePresetId === '' ||
     props.activePresetOption?.isAssignable === false;
-  const updateDisabled = props.activeLayerId === '' || props.activePresetId === '';
   const deleteDisabled = props.activePresetOption === null;
-  const createLayerId = props.calibrationContext?.layer.id ?? props.activeLayerId;
   return (
     <>
       <div style={buttonRowStyle}>
         <Button
-          aria-label="Assign selected material preset"
+          aria-label="Apply selected material preset to layer"
           title="Apply the selected material preset to the selected layer."
-          disabled={assignDisabled}
+          disabled={applyDisabled}
           onClick={() => {
-            props.onStatus(
-              props.onAssign() ? `Assigned to ${props.activeLayerId}.` : 'Preset was not assigned.',
-            );
+            props.onStatus(props.onAssign() ? 'Applied to layer.' : 'Preset was not applied.');
           }}
         >
-          Assign
-        </Button>
-        <Button
-          aria-label="Update selected material preset from layer"
-          title="Replace the selected preset recipe with the selected layer's current settings."
-          disabled={updateDisabled}
-          onClick={() => {
-            props.onStatus(props.onUpdate() ? 'Preset updated.' : 'Preset was not updated.');
-          }}
-        >
-          Update
+          Apply to layer
         </Button>
         <Button
           aria-label="Delete selected material preset"
@@ -74,19 +53,6 @@ export function MaterialLibraryRecipeControls(props: {
         </Button>
       </div>
       <PresetMatchSummary option={props.activePresetOption} />
-      <MaterialLibraryCalibrationContext context={props.calibrationContext} />
-      <CreatePresetForm
-        targetLayerId={createLayerId}
-        entryCount={props.entryCount}
-        isCalibrated={props.calibrationContext !== null}
-        onCreated={(id) => {
-          props.onPresetCreated(id);
-          props.onStatus(
-            props.calibrationContext === null ? 'Preset created.' : 'Calibrated recipe created.',
-          );
-        }}
-        onFailed={props.onStatus}
-      />
     </>
   );
 }
