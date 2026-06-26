@@ -4,6 +4,7 @@ import {
   type Project,
   type SceneObject,
   type ShapeObject,
+  type Transform,
 } from '../../core/scene';
 import {
   CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM,
@@ -84,7 +85,7 @@ function closeObjectFillContours(
     case 'imported-svg':
     case 'text':
     case 'traced-image': {
-      const paths = closeFillPaths(object.paths, fillLayerColors, toleranceMm);
+      const paths = closeFillPaths(object.paths, fillLayerColors, object.transform, toleranceMm);
       return paths === object.paths ? object : { ...object, paths };
     }
     case 'shape':
@@ -101,7 +102,7 @@ function closeShapeFillContours(
   fillLayerColors: ReadonlySet<string>,
   toleranceMm: number,
 ): ShapeObject {
-  const paths = closeFillPaths(object.paths, fillLayerColors, toleranceMm);
+  const paths = closeFillPaths(object.paths, fillLayerColors, object.transform, toleranceMm);
   if (paths === object.paths) return object;
   return {
     ...object,
@@ -113,6 +114,7 @@ function closeShapeFillContours(
 function closeFillPaths(
   paths: ReadonlyArray<ColoredPath>,
   fillLayerColors: ReadonlySet<string>,
+  transform: Transform,
   toleranceMm: number,
 ): ReadonlyArray<ColoredPath> {
   let changed = false;
@@ -120,7 +122,7 @@ function closeFillPaths(
     if (!fillLayerColors.has(path.color)) return path;
     let pathChanged = false;
     const polylines = path.polylines.map((polyline) => {
-      if (!isCloseableOpenFillPolyline(polyline, toleranceMm)) return polyline;
+      if (!isCloseableOpenFillPolyline(polyline, transform, toleranceMm)) return polyline;
       changed = true;
       pathChanged = true;
       return { ...polyline, closed: true };

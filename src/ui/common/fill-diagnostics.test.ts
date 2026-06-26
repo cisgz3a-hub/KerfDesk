@@ -5,6 +5,7 @@ import {
   IDENTITY_TRANSFORM,
   type ImportedSvg,
   type Project,
+  type Transform,
 } from '../../core/scene';
 import {
   selectedOpenFillContourRepairSummary,
@@ -79,6 +80,37 @@ describe('fill diagnostics', () => {
       remainingCount: 2,
     });
   });
+
+  it('closes a scaled-down object by its real mm gap, not its local-unit gap', () => {
+    // Traced / imported art stores points in local units (px, viewBox), scaled to
+    // mm by the object transform. At 0.1 mm per local unit, endpoints 3 local
+    // units apart are 0.3 mm in the real world — well within the 0.5 mm tolerance.
+    // The bug compared 3 against 0.5 and refused to close.
+    const scaledDown: Transform = { ...IDENTITY_TRANSFORM, scaleX: 0.1, scaleY: 0.1 };
+    const project = projectWithObjects([
+      vectorObject(
+        'scaled-open',
+        '#000000',
+        false,
+        false,
+        { x: 3, y: 0 },
+        { transform: scaledDown },
+      ),
+    ]);
+
+    expect(selectedCloseableOpenFillContourCount(project, 'scaled-open', new Set())).toBe(1);
+  });
+
+  it('does not close a scaled-up object whose real mm gap exceeds the tolerance', () => {
+    // At 5 mm per local unit, a 0.3 local-unit gap is 1.5 mm in the real world,
+    // beyond the 0.5 mm tolerance. The bug compared 0.3 against 0.5 and closed it.
+    const scaledUp: Transform = { ...IDENTITY_TRANSFORM, scaleX: 5, scaleY: 5 };
+    const project = projectWithObjects([
+      vectorObject('big-open', '#000000', false, false, { x: 0.3, y: 0 }, { transform: scaledUp }),
+    ]);
+
+    expect(selectedCloseableOpenFillContourCount(project, 'big-open', new Set())).toBe(0);
+  });
 });
 
 function projectWithObjects(objects: ReadonlyArray<ImportedSvg>): Project {
@@ -101,14 +133,14 @@ function vectorObject(
   closed: boolean,
   returnToStart = false,
   lastPoint: { readonly x: number; readonly y: number } = { x: 10, y: 10 },
-  options: { readonly locked?: boolean } = {},
+  options: { readonly locked?: boolean; readonly transform?: Transform } = {},
 ): ImportedSvg {
   return {
     kind: 'imported-svg',
     id,
     source: `${id}.svg`,
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
-    transform: IDENTITY_TRANSFORM,
+    transform: options.transform ?? IDENTITY_TRANSFORM,
     ...(options.locked === undefined ? {} : { locked: options.locked }),
     paths: [
       {
