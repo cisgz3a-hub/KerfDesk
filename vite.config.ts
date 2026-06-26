@@ -16,8 +16,11 @@ import react from '@vitejs/plugin-react';
 // `__GIT_SHA__` — short SHA of HEAD at build time. Falls back to
 //   "dev" when git isn't available or the working dir is clean of the
 //   repo (e.g. a CI scratch checkout without history).
-// `__APP_VERSION__` — version field from package.json. Read at config
-//   time so we don't ship the whole package.json into the bundle.
+// `__APP_VERSION__` — auto build version: package.json's MAJOR.MINOR (the
+//   release line) plus the git commit count as an always-incrementing patch, so
+//   the badge changes on every commit/deploy without a manual bump. Falls back
+//   to the raw package.json version when git history isn't available. The deploy
+//   build uses fetch-depth: 0 so the count is the real total, not a shallow 1.
 function gitShortSha(): string {
   try {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
@@ -25,10 +28,24 @@ function gitShortSha(): string {
     return 'dev';
   }
 }
+function gitCommitCount(): string | null {
+  try {
+    return execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
 function pkgVersion(): string {
   const pkgUrl = new URL('./package.json', import.meta.url);
   const pkg = JSON.parse(readFileSync(fileURLToPath(pkgUrl), 'utf8')) as { version?: string };
   return pkg.version ?? '0.0.0';
+}
+function appVersion(): string {
+  const base = pkgVersion();
+  const count = gitCommitCount();
+  if (count === null || count === '') return base;
+  const [major = '0', minor = '0'] = base.split('.');
+  return `${major}.${minor}.${count}`;
 }
 
 export default defineConfig({
@@ -39,7 +56,7 @@ export default defineConfig({
   define: {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     __GIT_SHA__: JSON.stringify(gitShortSha()),
-    __APP_VERSION__: JSON.stringify(pkgVersion()),
+    __APP_VERSION__: JSON.stringify(appVersion()),
   },
   build: {
     outDir: 'dist/web',
