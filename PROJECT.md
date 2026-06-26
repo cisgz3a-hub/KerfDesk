@@ -32,7 +32,7 @@ User profile:
 
 ## Delivery targets
 
-- **Web app:** Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial for machine connection. File System Access API for projects. PWA-installable.
+- **Web app:** Chromium browsers (Chrome, Edge, Brave, Arc) on any OS. WebSerial for machine connection. File System Access API for projects. PWA-installable, fully offline (ADR-060).
   - *Brave note:* WebSerial is shipped but Brave may gate it behind a Shields/flags toggle in some versions (upstream issue brave-browser#24404, status last re-verified 2026-05-28 — still open). Surface a one-line "Enable WebSerial in Brave settings" hint in the F-B1 connect error path.
 - **Windows desktop app:** Electron. Same UI, same core, native menus and file system, robust offline.
 - **macOS / Linux desktop:** out of scope for MVP. Those users get the web app.

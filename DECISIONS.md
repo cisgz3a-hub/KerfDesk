@@ -3396,6 +3396,62 @@ diff) lives in its own unit-tested modules under `src/ui/laser/device-setup/`.
 
 ---
 
+## ADR-060 — Offline-first PWA: installable service worker + safe update model
+
+**Date:** 2026-06-26
+**Status:** Accepted. Slices 1–3 landed on `feat/offline-pwa` (app-shell precache,
+safe update prompt, connection badge + Install button). Hardware verification
+(Web Serial driving the laser with the network down) is the standing gap.
+
+**Context.** PROJECT.md already mandates this — the web app is "PWA-installable"
+(line 35) and "The app must work fully offline. No analytics, no error reporting
+service, no cloud sync" (line 211). It was simply unbuilt. The app was already
+~90% offline: machine control is local USB via `navigator.serial`
+(`platform/web/web-serial.ts`) — zero internet, a dropped Wi-Fi mid-burn is a
+non-event; compute is pure client-side (`core/` is network-free by rule) on a
+static deploy; and work persists via `autosave.ts` (localStorage). The only gap
+was a service worker to cache the app shell so a fresh load works offline.
+
+Researched distinctiveness: Kiri:Moto is an offline CAM PWA but has no machine
+control; CNCjs / LaserWeb need a Node server; Easel is cloud-only; LightBurn is
+desktop. A single installable, offline, no-server browser app doing full CAM +
+direct Web Serial control is a genuine gap.
+
+**Decision.**
+
+1. **vite-plugin-pwa + Workbox `generateSW`** precaches the app shell (incl. the
+   trace worker and all chunks; `maximumFileSizeToCacheInBytes` raised) so the app
+   loads and runs offline after the first online load. Web-only — Electron is
+   already offline natively and a SW is a no-op over `file://`.
+2. **`registerType: 'prompt'` — never auto-update.** An auto-reload could abort a
+   live burn. A new SW enters `waiting` (no `skipWaiting`); `PwaUpdatePrompt` shows
+   a Reload banner that is **suppressed while the laser is streaming** (mirrors the
+   autosave streaming guard). The update applies on the user's Reload, or
+   automatically once all tabs close. (Edge case: an already-`waiting` SW is not
+   re-surfaced on a manual reload — standard workbox-window behavior; it activates
+   on full close.)
+3. **`injectRegister: false`; register via the `virtual:pwa-register/react`
+   hook.** A bundled hook is same-origin, satisfying the strict CSP
+   (`script-src 'self'`, `public/_headers`) where the inline registration form is
+   blocked. `workbox-window` is a dev dep so the hook resolves in the Rollup build.
+4. **Relative `base: './'` verified to register the SW at root scope** on the web
+   deploy (no `base: '/'` fallback needed). Web Serial is available offline
+   (top-level docs default to `serial=self`; `_headers` sets it explicitly) —
+   verified live.
+5. **Installable + legible:** a manifest (icon from `favicon.svg`), a
+   `ConnectionBadge` (shows "Offline" only when disconnected), and an explicit
+   `InstallButton` (captures `beforeinstallprompt`).
+
+**Consequences.** Closes the PROJECT.md offline + PWA-installable mandate and
+realizes the differentiator. License stays clean (Workbox / vite-plugin-pwa are
+MIT — ADR-008). The headline claim — Web Serial driving the machine with no
+internet — is software-confirmed (the API is local) but **not yet
+hardware-verified** (the standing gap). References PROJECT.md offline mandate,
+ADR-003 (web + desktop from one codebase), ADR-008 (MIT / license discipline),
+ADR-009 (Vite stack), ADR-047 (design tokens).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
