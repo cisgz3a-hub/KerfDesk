@@ -1,19 +1,7 @@
 import { useState } from 'react';
-import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, type DeviceProfile } from '../../core/devices';
-import {
-  NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS,
-  materialPresetWarnings,
-  type MaterialRecipeOperation,
-  type StarterMaterialPreset,
-} from '../../core/material-library';
+import { starterLibraryEntryForProfileId } from '../../core/material-library';
 import type { Layer } from '../../core/scene';
-import {
-  createMaterialLibraryDeviceHint,
-  MATERIAL_LIBRARY_FORMAT,
-  MATERIAL_LIBRARY_SCHEMA_VERSION,
-  type MaterialLibraryDocument,
-  type MaterialPreset,
-} from '../../io/material-library';
+import type { MaterialLibraryDocument } from '../../io/material-library';
 import {
   handleOpenMaterialLibrary,
   handleSaveMaterialLibrary,
@@ -23,6 +11,7 @@ import { Button } from '../kit';
 import { useStore } from '../state';
 import { materialLibraryCalibrationFromSelection } from '../state/material-library-calibration';
 import { useToastStore } from '../state/toast-store';
+import { buildBlankLibrary, buildStarterLibrary } from './material-library-builders';
 import { MaterialLibraryRecipeControls } from './MaterialLibraryRecipeControls';
 import {
   materialLibraryPresetOptions,
@@ -54,6 +43,7 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
   const device = useStore((state) => state.project.device);
   const setMaterialLibrary = useStore((state) => state.setMaterialLibrary);
   const pushToast = useToastStore((state) => state.pushToast);
+  const starterEntry = starterLibraryEntryForProfileId(device.profileId);
   return (
     <section aria-label="Material Library" style={sectionStyle}>
       <Header />
@@ -61,17 +51,21 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
         <Button
           aria-label="Create new material library"
           title="Create a new material library for the current device profile."
-          onClick={() => setMaterialLibrary(createBlankLibrary(device))}
+          onClick={() => setMaterialLibrary(buildBlankLibrary(device))}
         >
           New Library
         </Button>
-        <Button
-          aria-label="Create Neotronics starter material library"
-          title="Create a starter library for the Neotronics 4040 Max / LT-4LDS-V2 20W diode profile. These are researched starting points, not guaranteed burn settings."
-          onClick={() => setMaterialLibrary(createNeotronicsStarterLibrary())}
-        >
-          Neotronics Starters
-        </Button>
+        {starterEntry !== null ? (
+          <Button
+            aria-label="Create starter material library for the selected device"
+            title={`Create a starter library for ${starterEntry.profile.name}. Researched starting points, not guaranteed burn settings.`}
+            onClick={() =>
+              setMaterialLibrary(buildStarterLibrary(starterEntry.profile, starterEntry.presets))
+            }
+          >
+            Starter Presets
+          </Button>
+        ) : null}
         <Button
           aria-label="Load material library"
           title="Load a saved LaserForge material library file."
@@ -257,95 +251,7 @@ function Header(): JSX.Element {
   return <h2 style={headingStyle}>Material Library</h2>;
 }
 
-function createBlankLibrary(device: DeviceProfile): MaterialLibraryDocument {
-  return {
-    format: MATERIAL_LIBRARY_FORMAT,
-    librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
-    libraryId: `laserforge-${slug(device.name)}`,
-    name: `${device.name} Library`,
-    deviceHint: createMaterialLibraryDeviceHint(device),
-    entries: [],
-  };
-}
-
-function createNeotronicsStarterLibrary(): MaterialLibraryDocument {
-  return {
-    format: MATERIAL_LIBRARY_FORMAT,
-    librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
-    libraryId: 'laserforge-neotronics-4040-max-lt4lds-v2',
-    name: 'Neotronics 4040 Max Starter Library',
-    deviceHint: createMaterialLibraryDeviceHint(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
-    entries: NEOTRONICS_4040_MAX_LT4LDS_V2_PRESETS.map(toMaterialPreset),
-  };
-}
-
-function toMaterialPreset(preset: StarterMaterialPreset): MaterialPreset {
-  const warnings = materialPresetWarnings(preset);
-  const warningText = warnings.length === 0 ? '' : ` Warnings: ${warnings.join(' ')}`;
-  const unsupportedText = preset.unsupported === true ? ' Unsupported on this diode profile.' : '';
-  return {
-    id: preset.id,
-    materialName: preset.materialName,
-    material: preset.materialName,
-    ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
-    ...(preset.title !== undefined ? { title: preset.title } : {}),
-    ...starterPresetMetadata(preset, warnings),
-    description: `${preset.description}${unsupportedText}${warningText}`,
-    recipe: preset.recipe,
-    revision: preset.revision,
-  };
-}
-
-function starterPresetMetadata(
-  preset: StarterMaterialPreset,
-  warnings: ReadonlyArray<string>,
-): Pick<
-  MaterialPreset,
-  | 'operation'
-  | 'profileId'
-  | 'machineFamily'
-  | 'laserModel'
-  | 'opticalPowerW'
-  | 'confidence'
-  | 'warning'
-  | 'calibrationProvenance'
-> {
-  const profile = NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
-  return {
-    operation: starterPresetOperation(preset),
-    ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
-    ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
-    ...(profile.laserSubProfile?.model !== undefined
-      ? { laserModel: profile.laserSubProfile.model }
-      : {}),
-    ...(profile.laserSubProfile?.opticalPowerW !== undefined
-      ? { opticalPowerW: profile.laserSubProfile.opticalPowerW }
-      : {}),
-    confidence: preset.unsupported === true ? 'unsupported' : 'starter',
-    ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
-    calibrationProvenance: preset.revision,
-  };
-}
-
-function starterPresetOperation(preset: StarterMaterialPreset): MaterialRecipeOperation {
-  const text = `${preset.id} ${preset.description} ${preset.title ?? ''}`.toLowerCase();
-  if (text.includes('cut')) return 'cut';
-  if (preset.recipe.mode === 'image') return 'engrave';
-  return 'engrave';
-}
-
 function activeId(candidate: string, ids: ReadonlyArray<string>): string {
   if (candidate !== '' && ids.includes(candidate)) return candidate;
   return ids[0] ?? '';
-}
-
-function slug(value: string): string {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 48) || 'library'
-  );
 }
