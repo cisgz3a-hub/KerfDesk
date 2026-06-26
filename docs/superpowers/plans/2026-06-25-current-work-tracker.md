@@ -299,9 +299,49 @@ Rating: `10/10` for the trace benchmark-loop harness slice.
 
 Next likely slice:
 
-1. Start edge-specific linker work under this loop.
+1. Continue edge-specific linker work under this loop with real-logo/browser evidence where available.
 2. Add Centerline v2 distance-aware pruning/gap-repair benchmarks before changing the centerline algorithm.
 3. Keep Line Art and Arch House acceptance gates in the focused bundle whenever trace modes change.
+
+### Step F - Edge Detection Curve Linking
+
+Goal: repair the broken/dotted curved-stroke failure mode in Edge Detection without making Line Art, Centerline, or noisy-photo edge controls regress.
+
+Completed on 2026-06-27:
+
+- Added a segmented curved-stroke fixture that reproduces the small-gap curve/linker failure as a measurable artifact.
+- Proved the failure first: Edge Detection emitted `6` stroke fragments where the target was `<= 4`.
+- Added a bounded directional gap bridge before the contour pass in `src/core/trace/edge-trace.ts`.
+- Added `edge-segmented-curve-linking` to the trace benchmark loop, so the curve-linking case cannot silently drop out of future 10/10 trace audits.
+- Self-audit fix: removed an initial endpoint-pairing attempt because it was O(n^2) in endpoint count and unnecessary after the directional bridge passed the proof.
+
+Verification:
+
+```powershell
+pnpm test --run src/__fixtures__/perceptual/edge-curve-quality.test.ts src/core/trace/edge-trace.test.ts src/__fixtures__/perceptual/trace-benchmark-loop.test.ts
+pnpm test --run src/__fixtures__/perceptual src/core/trace/edge-trace.test.ts src/core/trace/canny-edges.test.ts
+pnpm run typecheck
+pnpm run format:check
+pnpm lint
+pnpm test
+```
+
+Result:
+
+- Focused curve/benchmark bundle passed: `3` files, `16` tests.
+- Broad perceptual trace bundle passed: `13` files, `76` tests.
+- Typecheck passed.
+- Format check passed.
+- Lint passed with the existing `boundaries/dependencies` legacy selector migration warning only.
+- Full suite passed: `386` test files, `2369` tests.
+
+Rating: `10/10` for the synthetic curved-stroke Edge Detection linker slice.
+
+Next likely slice:
+
+1. Add real-logo Edge Detection artifact metrics for curved arch/corner continuity if the existing Arch House fixture can produce stable region-specific thresholds.
+2. Add browser smoke for Edge Detection controls if a file-picker-capable harness is available.
+3. Start Centerline v2 distance-aware pruning/gap-repair only after the edge benchmark remains green.
 
 ## Do Not Forget
 
