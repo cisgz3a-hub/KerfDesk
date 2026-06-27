@@ -192,4 +192,29 @@ describe('traceImageToCenterlinePaths', () => {
     expect(polylines.length).toBeGreaterThanOrEqual(1);
     expect(longestPolyline(paths)?.points.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('prunes a narrow noisy spur from a thick stroke using local stroke radius', () => {
+    let image = paintRect(whiteImage(44, 24), 5, 10, 34, 5);
+    image = paintRect(image, 22, 5, 1, 5);
+
+    const paths = traceImageToCenterlinePaths(image, CENTERLINE_OPTIONS);
+    const polylines = paths[0]?.polylines ?? [];
+    const longest = longestPolyline(paths);
+    const ys = longest?.points.map((p) => p.y) ?? [];
+
+    expect(polylines).toHaveLength(1);
+    expect(polylineLength(longest?.points ?? [])).toBeGreaterThanOrEqual(26);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(11);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(13.5);
+  });
+
+  it('keeps an isolated short mark because it is not attached to a longer stroke', () => {
+    const image = paintRect(whiteImage(24, 16), 8, 7, 8, 3);
+
+    const paths = traceImageToCenterlinePaths(image, CENTERLINE_OPTIONS);
+    const polylines = paths[0]?.polylines ?? [];
+
+    expect(polylines).toHaveLength(1);
+    expect(polylineLength(polylines[0]?.points ?? [])).toBeGreaterThanOrEqual(4);
+  });
 });

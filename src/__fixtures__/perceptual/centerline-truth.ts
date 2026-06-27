@@ -32,6 +32,8 @@ const OPAQUE = 255;
 const SIZE = 128;
 const STROKE_WIDTH_PX = 9;
 
+type SourceInkDecorator = (data: Uint8ClampedArray, width: number, height: number) => void;
+
 function line(...points: ReadonlyArray<Vec2>): Polyline {
   return { points: [...points], closed: false };
 }
@@ -51,6 +53,7 @@ function renderStroke(
   name: string,
   centerlines: ReadonlyArray<Polyline>,
   expectedStrokeCount: number,
+  decorateSource?: SourceInkDecorator,
 ): CenterlineTruthFixture {
   const half = STROKE_WIDTH_PX / 2;
   const data = new Uint8ClampedArray(SIZE * SIZE * RGBA_CHANNELS);
@@ -65,6 +68,7 @@ function renderStroke(
       data[base + 3] = OPAQUE;
     }
   }
+  decorateSource?.(data, SIZE, SIZE);
   return {
     name,
     width: SIZE,
@@ -76,8 +80,30 @@ function renderStroke(
   };
 }
 
+function paintInkRect(
+  data: Uint8ClampedArray,
+  width: number,
+  x0: number,
+  y0: number,
+  w: number,
+  h: number,
+): void {
+  for (let y = y0; y < y0 + h; y += 1) {
+    for (let x = x0; x < x0 + w; x += 1) {
+      const base = (y * width + x) * RGBA_CHANNELS;
+      data[base] = INK;
+      data[base + 1] = INK;
+      data[base + 2] = INK;
+      data[base + 3] = OPAQUE;
+    }
+  }
+}
+
 export const CENTERLINE_TRUTH_FIXTURES: ReadonlyArray<CenterlineTruthFixture> = [
   renderStroke('h-stroke', [line({ x: 24, y: 64 }, { x: 104, y: 64 })], 1),
+  renderStroke('h-stroke-noisy-spur', [line({ x: 24, y: 64 }, { x: 104, y: 64 })], 1, (data) => {
+    paintInkRect(data, SIZE, 64, 54, 1, 5);
+  }),
   renderStroke('diagonal-stroke', [line({ x: 24, y: 24 }, { x: 104, y: 104 })], 1),
   renderStroke('l-corner', [line({ x: 32, y: 28 }, { x: 32, y: 96 }, { x: 100, y: 96 })], 1),
   renderStroke(

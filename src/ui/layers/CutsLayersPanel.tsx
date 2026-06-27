@@ -74,7 +74,9 @@ function CollapsedPanel(props: {
 }): JSX.Element {
   return (
     <details aria-label={props.ariaLabel} style={collapsedPanelStyle}>
-      <summary style={summaryStyle}>{props.label}</summary>
+      <summary style={summaryStyle} title={`Show ${props.label}`}>
+        {props.label}
+      </summary>
       <div style={collapsedContentStyle}>{props.children}</div>
     </details>
   );
