@@ -35,7 +35,7 @@ export function CutSettingsFillDensityFields(props: {
           type="number"
           min={lineIntervalMmToLinesPerInch(10)}
           max={lineIntervalMmToLinesPerInch(0.05)}
-          step={1}
+          step={0.01}
           className="lf-input"
           value={displayNumber(lineIntervalMmToLinesPerInch(props.lineIntervalMm), 2)}
           onChange={(event) =>

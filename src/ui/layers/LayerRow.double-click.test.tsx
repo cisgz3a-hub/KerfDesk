@@ -94,6 +94,7 @@ describe('LayerRow double-click cut settings', () => {
 
   it('does not open cut settings when double-clicking an interactive layer control', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;

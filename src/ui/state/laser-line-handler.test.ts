@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CMD_COOLANT_OFF,
   RT_SOFT_RESET,
@@ -10,6 +10,10 @@ import {
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
 import type { FrameVerification } from './frame-verification';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function makeLaserState(): LaserState {
   return {
@@ -151,6 +155,38 @@ describe('handleLine streamer writes', () => {
     expect(get().streamer?.status).toBe('done');
     handleLine(set, get, refs, safeWrite, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
     await Promise.resolve();
+    expect(get().streamer).toBeNull();
+  });
+
+  it('keeps post-job settle alive while fresh Run status proves buffered motion is still finishing', async () => {
+    vi.useFakeTimers();
+    const { refs, set, get } = makeHarness();
+    const safeWrite = vi.fn(
+      async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
+    );
+    set({ streamer: step(createStreamer('G21\nG90\nG1 X10 F600\nM5\n')).state });
+    for (let i = 0; i < 4; i += 1) handleLine(set, get, refs, safeWrite, 'ok');
+    await Promise.resolve();
+
+    expect(get().streamer?.status).toBe('done');
+    expect(get().controllerOperation).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+
+    await vi.advanceTimersByTimeAsync(4_000);
+    handleLine(set, get, refs, safeWrite, '<Run|MPos:5.000,0.000,0.000|FS:600,0>');
+    await vi.advanceTimersByTimeAsync(5_000);
+    await Promise.resolve();
+
+    expect(get().controllerOperation).toMatchObject({ kind: 'post-job-settle', phase: 'dwell' });
+    expect(get().lastWriteError).toBeNull();
+    expect(get().streamer?.status).toBe('done');
+
+    handleLine(set, get, refs, safeWrite, 'ok');
+    await Promise.resolve();
+    handleLine(set, get, refs, safeWrite, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    handleLine(set, get, refs, safeWrite, '<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
+    await Promise.resolve();
+
+    expect(get().controllerOperation).toBeNull();
     expect(get().streamer).toBeNull();
   });
 

@@ -37,39 +37,52 @@ export function LayerImageFields(props: {
   readonly layer: Layer;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
+  readonly labelContext?: string;
+  readonly minPowerMax?: number;
 }): JSX.Element {
   const { layer, settings, commit } = props;
+  const labelContext = props.labelContext ?? layer.color;
+  const minPowerMax = props.minPowerMax ?? layer.power;
   return (
     <>
       <FieldRow label="Dither">
-        <DitherSelect layer={layer} settings={settings} commit={commit} />
+        <DitherSelect labelContext={labelContext} settings={settings} commit={commit} />
       </FieldRow>
       {settings.ditherAlgorithm === 'grayscale' ? (
         <FieldRow label="Min Power">
-          <MinPowerInput layer={layer} settings={settings} commit={commit} />
+          <MinPowerInput
+            labelContext={labelContext}
+            maxPower={minPowerMax}
+            settings={settings}
+            commit={commit}
+          />
           <span style={unitStyle}>%</span>
         </FieldRow>
       ) : null}
       <FieldRow label="Line Interval">
-        <LineIntervalInput layer={layer} settings={settings} commit={commit} />
+        <LineIntervalInput labelContext={labelContext} settings={settings} commit={commit} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
       <FieldRow label="DPI">
-        <DpiInput layer={layer} settings={settings} commit={commit} />
+        <DpiInput labelContext={labelContext} settings={settings} commit={commit} />
         <span style={unitStyle}>dpi</span>
       </FieldRow>
       <FieldRow label="Dot Width">
-        <DotWidthCorrectionInput layer={layer} settings={settings} commit={commit} />
+        <DotWidthCorrectionInput labelContext={labelContext} settings={settings} commit={commit} />
         <span style={unitStyle}>mm</span>
       </FieldRow>
       <FieldRow label="Negative">
-        <NegativeImageCheckbox layer={layer} settings={settings} commit={commit} />
+        <NegativeImageCheckbox labelContext={labelContext} settings={settings} commit={commit} />
       </FieldRow>
       <FieldRow label="Bidirectional">
-        <BidirectionalImageCheckbox layer={layer} settings={settings} commit={commit} />
+        <BidirectionalImageCheckbox
+          labelContext={labelContext}
+          settings={settings}
+          commit={commit}
+        />
       </FieldRow>
       <FieldRow label="Pass-through">
-        <PassThroughCheckbox layer={layer} settings={settings} commit={commit} />
+        <PassThroughCheckbox labelContext={labelContext} settings={settings} commit={commit} />
       </FieldRow>
     </>
   );
@@ -88,11 +101,11 @@ function FieldRow(props: {
 }
 
 function DitherSelect(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, settings, commit } = props;
   return (
     <select
       value={settings.ditherAlgorithm}
@@ -102,7 +115,7 @@ function DitherSelect(props: {
         })
       }
       title="Binary modes emit off/max dots. Grayscale maps luma between Min Power and Power."
-      aria-label={`Dither for ${layer.color}`}
+      aria-label={`Dither for ${labelContext}`}
       style={ditherSelectStyle}
     >
       {DITHER_ALGORITHMS.map((algorithm) => (
@@ -129,11 +142,11 @@ const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
 };
 
 function LineIntervalInput(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, settings, commit } = props;
   const debounced = useDebouncedCommit<number>({
     value: displayNumber(linesPerMmToLineIntervalMm(settings.linesPerMm), 4),
     commit: (lineIntervalMm) => commit({ linesPerMm: lineIntervalMmToLinesPerMm(lineIntervalMm) }),
@@ -154,18 +167,18 @@ function LineIntervalInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Line interval for ${layer.color}`}
+      aria-label={`Line interval for ${labelContext}`}
       title="Distance between raster scan lines for this image layer."
     />
   );
 }
 
 function DpiInput(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, settings, commit } = props;
   const debounced = useDebouncedCommit<number>({
     value: displayNumber(linesPerMmToDpi(settings.linesPerMm), 2),
     commit: (dpi) => commit({ linesPerMm: dpiToLinesPerMm(dpi) }),
@@ -181,49 +194,50 @@ function DpiInput(props: {
       type="number"
       min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
       max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
-      step={1}
+      step={0.01}
       value={debounced.displayValue}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`DPI for ${layer.color}`}
+      aria-label={`DPI for ${labelContext}`}
       title="Raster engraving resolution for this image layer."
     />
   );
 }
 
 function MinPowerInput(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
+  readonly maxPower: number;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, maxPower, settings, commit } = props;
   const debounced = useDebouncedCommit<number>({
     value: settings.minPower,
     commit: (minPower) => commit({ minPower }),
-    parse: (s) => clamp(numericValue(s, settings.minPower), 0, settings.power),
+    parse: (s) => clamp(numericValue(s, settings.minPower), 0, maxPower),
   });
   return (
     <input
       type="number"
       min={0}
-      max={layer.power}
+      max={maxPower}
       value={debounced.displayValue}
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Minimum power for ${layer.color}`}
+      aria-label={`Minimum power for ${labelContext}`}
       title="Lowest laser power used by grayscale image engraving on this layer."
     />
   );
 }
 
 function DotWidthCorrectionInput(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, settings, commit } = props;
   const max = dotWidthCorrectionMax(settings);
   const debounced = useDebouncedCommit<number>({
     value: settings.dotWidthCorrectionMm,
@@ -240,58 +254,58 @@ function DotWidthCorrectionInput(props: {
       onChange={debounced.onChange}
       onBlur={debounced.onBlur}
       style={inputStyle}
-      aria-label={`Dot width correction for ${layer.color}`}
+      aria-label={`Dot width correction for ${labelContext}`}
       title="Compensate for physical laser dot width when raster engraving this layer."
     />
   );
 }
 
 function NegativeImageCheckbox(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, settings, commit } = props;
   return (
     <input
       type="checkbox"
       checked={settings.negativeImage}
       onChange={(event) => commit({ negativeImage: event.target.checked })}
-      aria-label={`Negative image for ${layer.color}`}
+      aria-label={`Negative image for ${labelContext}`}
       title="Invert image brightness before engraving this layer."
     />
   );
 }
 
 function BidirectionalImageCheckbox(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, settings, commit } = props;
   return (
     <input
       type="checkbox"
       checked={settings.imageBidirectional}
       onChange={(event) => commit({ imageBidirectional: event.target.checked })}
-      aria-label={`Bidirectional image scan for ${layer.color}`}
+      aria-label={`Bidirectional image scan for ${labelContext}`}
       title="Alternate raster rows in both directions. Turn off while diagnosing scan-offset drift."
     />
   );
 }
 
 function PassThroughCheckbox(props: {
-  readonly layer: Layer;
+  readonly labelContext: string;
   readonly settings: LayerOperationSettings;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
-  const { layer, settings, commit } = props;
+  const { labelContext, settings, commit } = props;
   return (
     <input
       type="checkbox"
       checked={settings.passThrough}
       onChange={(event) => commit({ passThrough: event.target.checked })}
-      aria-label={`Pass-through image for ${layer.color}`}
+      aria-label={`Pass-through image for ${labelContext}`}
       title="Use image pixels as-is and skip LaserForge image adjustment for this layer."
     />
   );
