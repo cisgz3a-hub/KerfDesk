@@ -98,6 +98,20 @@ function ensureFillLayersForColors(
   return ensureLayersForMode(scene, paths, 'fill');
 }
 
+function ensureNewFillLayersForColors(
+  scene: Scene,
+  paths: ReadonlyArray<{ readonly color: string }>,
+): Scene {
+  let out = scene;
+  for (const path of paths) {
+    const exists = out.layers.some((l) => l.color === path.color);
+    if (!exists) {
+      out = addLayer(out, createLayer({ id: path.color, color: path.color, mode: 'fill' }));
+    }
+  }
+  return out;
+}
+
 function ensureLineLayersForColors(
   scene: Scene,
   paths: ReadonlyArray<{ readonly color: string }>,
@@ -357,10 +371,13 @@ export function applyTraceToExisting(
   }
   const positionedTrace: TracedImage = { ...traced, transform };
   scene = addObject(scene, positionedTrace);
-  scene =
-    positionedTrace.traceMode === 'centerline' || positionedTrace.traceMode === 'edge'
-      ? ensureLineLayersForColors(scene, positionedTrace.paths)
-      : ensureFillLayersForColors(scene, positionedTrace.paths);
+  if (positionedTrace.traceMode === 'centerline' || positionedTrace.traceMode === 'edge') {
+    scene = ensureLineLayersForColors(scene, positionedTrace.paths);
+  } else if (isFollowShapeTrace(positionedTrace)) {
+    scene = ensureNewFillLayersForColors(scene, positionedTrace.paths);
+  } else {
+    scene = ensureFillLayersForColors(scene, positionedTrace.paths);
+  }
   if (existing !== undefined && options.deleteSourceAfterTrace === true) {
     scene = pruneOrphanLayers(scene);
   }
@@ -371,6 +388,10 @@ export function applyTraceToExisting(
     redoStack: [],
     dirty: true,
   };
+}
+
+function isFollowShapeTrace(trace: TracedImage): boolean {
+  return trace.operationOverride?.mode === 'fill' && trace.operationOverride.fillStyle === 'offset';
 }
 
 export function applyReimport(

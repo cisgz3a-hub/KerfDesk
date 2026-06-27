@@ -54,6 +54,8 @@ import {
   PresetPicker,
   PresetWarning,
   SourceLabel,
+  TraceFillStylePicker,
+  type TraceFillStyle,
 } from './dialog-parts';
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
@@ -75,6 +77,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
   const file = useTraceSourceFile(seed, pushToast);
   const [preset, setPreset] = useState<string>('Line Art');
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
+  const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
   const [boundary, setBoundary] = useState<TraceBoundary | null>(null);
   const [busy, setBusy] = useState(false);
@@ -96,6 +99,7 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
     () => mergeLightBurnTraceSettings(presetOptions, traceSettings),
     [presetOptions, traceSettings],
   );
+  const supportsTraceFillStyle = isFilledContourTraceOptions(options);
   const preview = useTracePreview(file, options, boundary);
 
   const onSubmit = (e: React.FormEvent): void => {
@@ -105,7 +109,14 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       return;
     }
     void commit(
-      { file, options, seed, deleteSourceAfterTrace, boundary },
+      {
+        file,
+        options,
+        seed,
+        traceFillStyle: supportsTraceFillStyle ? traceFillStyle : 'scanline',
+        deleteSourceAfterTrace,
+        boundary,
+      },
       {
         traceExistingImage,
         pushToast,
@@ -124,6 +135,9 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       <SourceLabel name={seed.source} />
       <PresetPicker value={preset} onChange={setPreset} />
       <PresetWarning preset={preset} onPresetChange={setPreset} />
+      {supportsTraceFillStyle ? (
+        <TraceFillStylePicker value={traceFillStyle} onChange={setTraceFillStyle} />
+      ) : null}
       <TraceSettingsControls
         preset={presetOptions}
         overrides={traceSettings}
@@ -144,6 +158,10 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
     </Dialog>
   );
+}
+
+function isFilledContourTraceOptions(options: TraceOptions): boolean {
+  return options.traceMode !== 'centerline' && options.traceMode !== 'edge';
 }
 
 function traceSourceHasTransparency(
@@ -199,6 +217,7 @@ export async function commit(
     readonly file: File;
     readonly options: TraceOptions;
     readonly seed: RasterImage;
+    readonly traceFillStyle?: TraceFillStyle;
     readonly deleteSourceAfterTrace?: boolean;
     readonly boundary?: TraceBoundary | null;
   },
@@ -234,19 +253,25 @@ export async function commit(
     // transform is a placeholder: applyTraceToExisting overwrites it
     // with the source bitmap's own transform so the vectors register
     // pixel-for-pixel over the features they came from (ADR-026).
+    const traceMode: TracedImage['traceMode'] =
+      args.options.traceMode === 'centerline'
+        ? 'centerline'
+        : args.options.traceMode === 'edge'
+          ? 'edge'
+          : 'filled-contours';
+    const operationOverride =
+      traceMode === 'filled-contours' && args.traceFillStyle === 'offset'
+        ? ({ mode: 'fill', fillStyle: 'offset' } as const)
+        : undefined;
     const traced: TracedImage = {
       kind: 'traced-image',
       id: crypto.randomUUID(),
       source: args.seed.source,
-      traceMode:
-        args.options.traceMode === 'centerline'
-          ? 'centerline'
-          : args.options.traceMode === 'edge'
-            ? 'edge'
-            : 'filled-contours',
+      traceMode,
       bounds,
       transform: IDENTITY_TRANSFORM,
       paths,
+      ...(operationOverride === undefined ? {} : { operationOverride }),
     };
     // P2-A: refuse to commit if the live source changed (content/grid) or was
     // removed while the modal was open — overlaying then would misregister the

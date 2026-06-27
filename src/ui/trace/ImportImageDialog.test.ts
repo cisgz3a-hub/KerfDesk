@@ -117,6 +117,29 @@ describe('commit source revalidation (P2-A)', () => {
     expect(ctx.pushToast).toHaveBeenCalledWith(expect.stringContaining('source kept'), 'success');
   });
 
+  it('keeps Scanline traces on layer defaults without an object override', async () => {
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    await commit(args(seed), ctx);
+    const traced = ctx.traceExistingImage.mock.calls[0]?.[1];
+    expect(traced).toEqual(expect.not.objectContaining({ operationOverride: expect.anything() }));
+  });
+
+  it('applies Follow Shape as an object-level offset fill override', async () => {
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    await commit({ ...args(seed), traceFillStyle: 'offset' }, ctx);
+    expect(ctx.traceExistingImage).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({
+        kind: 'traced-image',
+        traceMode: 'filled-contours',
+        operationOverride: { mode: 'fill', fillStyle: 'offset' },
+      }),
+      { deleteSourceAfterTrace: false },
+    );
+  });
+
   it('passes Delete Image After trace through commit and reports source deleted', async () => {
     const seed = seedRaster();
     const ctx = ctxWith(() => seedRaster());
@@ -210,6 +233,46 @@ describe('Trace Image workflow controls', () => {
         (option) => option.value === 'Edge Detection',
       );
       expect(edgeOption?.textContent).toBe('Edge Detection (edge contours)');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      useUiStore.setState({ imageDialog: null });
+    }
+  });
+
+  it('shows Fill Style only for filled-contour presets', async () => {
+    const { host, root } = await renderTraceDialog(seedRaster());
+    try {
+      const presetSelect = host.querySelector('select[aria-label="Trace preset"]');
+      expect(presetSelect).toBeInstanceOf(HTMLSelectElement);
+
+      const fillStyleSelect = (): HTMLSelectElement | null =>
+        host.querySelector('select[aria-label="Trace fill style"]');
+
+      expect(fillStyleSelect()).toBeInstanceOf(HTMLSelectElement);
+      expect(fillStyleSelect()?.value).toBe('scanline');
+      expect(
+        Array.from(fillStyleSelect()?.options ?? []).map((option) => option.textContent),
+      ).toEqual(['Scanline', 'Follow Shape']);
+      expect(host.textContent ?? '').toContain(
+        'Follow Shape is best for closed logos, wreaths, and hollow designs.',
+      );
+
+      for (const preset of ['Smooth', 'Sharp']) {
+        await act(async () => {
+          (presetSelect as HTMLSelectElement).value = preset;
+          presetSelect?.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        expect(fillStyleSelect()).toBeInstanceOf(HTMLSelectElement);
+      }
+
+      for (const preset of ['Centerline', 'Edge Detection']) {
+        await act(async () => {
+          (presetSelect as HTMLSelectElement).value = preset;
+          presetSelect?.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        expect(fillStyleSelect()).toBeNull();
+      }
     } finally {
       await act(async () => root.unmount());
       host.remove();

@@ -11,6 +11,7 @@ import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
+import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
@@ -35,6 +36,7 @@ export function App(): JSX.Element {
   useJobShortcuts();
   useShortcuts();
   useSpacePan();
+  useActiveJobWakeLock();
   useUnloadStop();
   useUnsavedChangesGuard();
   useWindowTitle();
