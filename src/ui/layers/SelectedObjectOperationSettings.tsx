@@ -137,6 +137,20 @@ function SelectedFillFields(props: {
   const { settings, commit } = props;
   return (
     <>
+      <FieldRow label="Style">
+        <select
+          value={settings.fillStyle}
+          onChange={(event) =>
+            commit({ fillStyle: event.target.value === 'offset' ? 'offset' : 'scanline' })
+          }
+          aria-label="Fill style for selected objects"
+          title="Override fill style for the selected artwork only."
+          style={selectStyle}
+        >
+          <option value="scanline">Scanline</option>
+          <option value="offset">Follow Shape</option>
+        </select>
+      </FieldRow>
       <NumberField
         label="Hatch angle"
         value={settings.hatchAngleDeg}

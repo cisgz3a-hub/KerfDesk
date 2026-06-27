@@ -15,6 +15,8 @@ function tracePresetLabel(key: string): string {
   return key === 'Edge Detection' ? 'Edge Detection (edge contours)' : key;
 }
 
+export type TraceFillStyle = 'scanline' | 'offset';
+
 export function PresetPicker(props: {
   readonly value: string;
   readonly onChange: (next: string) => void;
@@ -35,6 +37,30 @@ export function PresetPicker(props: {
           </option>
         ))}
       </select>
+    </Field>
+  );
+}
+
+export function TraceFillStylePicker(props: {
+  readonly value: TraceFillStyle;
+  readonly onChange: (next: TraceFillStyle) => void;
+}): JSX.Element {
+  return (
+    <Field label="Fill style">
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value === 'offset' ? 'offset' : 'scanline')}
+        className="lf-select"
+        style={selectStyle}
+        aria-label="Trace fill style"
+        title="Choose how filled-contour traces should be engraved."
+      >
+        <option value="scanline">Scanline</option>
+        <option value="offset">Follow Shape</option>
+      </select>
+      <span style={fillStyleHintStyle}>
+        Follow Shape is best for closed logos, wreaths, and hollow designs.
+      </span>
     </Field>
   );
 }
@@ -166,6 +192,11 @@ const fileNameStyle: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 const selectStyle: React.CSSProperties = { flex: 1, fontSize: 13 };
+const fillStyleHintStyle: React.CSSProperties = {
+  flexBasis: '100%',
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+};
 const checkboxRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',

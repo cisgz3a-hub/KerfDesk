@@ -255,6 +255,33 @@ describe('CutsLayersPanel cut settings editor', () => {
       await unmount();
     }
   });
+
+  it('applies selected artwork Fill Style to the object override and reset removes it', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { mode: 'fill', fillStyle: 'scanline' });
+    const { host, unmount } = await renderPanel();
+    try {
+      const fillStyle = requireSelect(host, 'select[aria-label="Fill style for selected objects"]');
+      expect(fillStyle.value).toBe('scanline');
+
+      await act(async () => {
+        fillStyle.value = 'offset';
+        Simulate.change(fillStyle);
+      });
+
+      let state = useStore.getState();
+      expect(state.project.scene.layers[0]?.fillStyle).toBe('scanline');
+      expect(state.project.scene.objects[0]?.operationOverride?.fillStyle).toBe('offset');
+
+      await clickButtonWithText(host, 'Reset to layer defaults');
+
+      state = useStore.getState();
+      expect(state.project.scene.layers[0]?.fillStyle).toBe('scanline');
+      expect(state.project.scene.objects[0]?.operationOverride).toBeUndefined();
+    } finally {
+      await unmount();
+    }
+  });
 });
 
 async function openCutSettings(host: HTMLElement, color: string): Promise<void> {
@@ -279,4 +306,10 @@ function requireInput(host: HTMLElement, selector: string): HTMLInputElement {
   const input = host.querySelector(selector);
   if (!(input instanceof HTMLInputElement)) throw new Error(`${selector} missing`);
   return input;
+}
+
+function requireSelect(host: HTMLElement, selector: string): HTMLSelectElement {
+  const select = host.querySelector(selector);
+  if (!(select instanceof HTMLSelectElement)) throw new Error(`${selector} missing`);
+  return select;
 }

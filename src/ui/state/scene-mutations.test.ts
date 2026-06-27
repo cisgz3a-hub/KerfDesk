@@ -343,6 +343,44 @@ describe('applyTraceToExisting (ADR-026)', () => {
     expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('fill');
   });
 
+  it('keeps existing same-color layers unchanged for Follow Shape object overrides', () => {
+    const project = projectWithSource();
+    const withLineLayer: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers: [createLayer({ id: '#000000', color: '#000000', mode: 'line' })],
+      },
+    };
+    const result = applyTraceToExisting(
+      { project: withLineLayer, undoStack: [] },
+      'src1',
+      {
+        ...tracedVector(),
+        operationOverride: { mode: 'fill', fillStyle: 'offset' },
+      },
+    );
+
+    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
+    expect(
+      result.project.scene.objects.find((o) => o.id === 'trace1')?.operationOverride,
+    ).toEqual({ mode: 'fill', fillStyle: 'offset' });
+  });
+
+  it('still creates a fill-capable layer when Follow Shape uses a new trace color', () => {
+    const project = projectWithSource();
+    const result = applyTraceToExisting(
+      { project, undoStack: [] },
+      'src1',
+      {
+        ...tracedVector(),
+        operationOverride: { mode: 'fill', fillStyle: 'offset' },
+      },
+    );
+
+    expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('fill');
+  });
+
   it('ensures a line layer for centerline traces', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', centerlineVector());
