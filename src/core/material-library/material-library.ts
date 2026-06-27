@@ -51,6 +51,9 @@ export const MATERIAL_RECIPE_FIELDS = [
 ] as const satisfies ReadonlyArray<keyof MaterialRecipe>;
 
 const LAYER_MODES = ['line', 'fill', 'image'] as const satisfies ReadonlyArray<LayerMode>;
+const FILL_STYLES = ['scanline', 'offset'] as const satisfies ReadonlyArray<
+  NonNullable<Layer['fillStyle']>
+>;
 const MIN_SPACING = 0.001;
 
 export function captureMaterialRecipe(layer: Layer): MaterialRecipe {
@@ -109,7 +112,7 @@ export function normalizeMaterialRecipe(recipe: MaterialRecipe): MaterialRecipe 
     hatchAngleDeg: finiteOr(recipe.hatchAngleDeg, 0),
     hatchSpacingMm: Math.max(MIN_SPACING, finiteOr(recipe.hatchSpacingMm, MIN_SPACING)),
     fillOverscanMm: Math.max(0, finiteOr(recipe.fillOverscanMm, 0)),
-    fillStyle: recipe.fillStyle === 'offset' ? 'offset' : 'scanline',
+    fillStyle: isFillStyle(recipe.fillStyle) ? recipe.fillStyle : 'scanline',
     fillBidirectional: recipe.fillBidirectional,
     fillCrossHatch: recipe.fillCrossHatch,
     ditherAlgorithm: recipe.ditherAlgorithm,
@@ -171,9 +174,11 @@ function hasMotionNumbers(value: Record<string, unknown>): boolean {
 }
 
 function hasRecipeFillStyle(value: Record<string, unknown>): boolean {
-  return (
-    value.fillStyle === undefined || value.fillStyle === 'scanline' || value.fillStyle === 'offset'
-  );
+  return value.fillStyle === undefined || isFillStyle(value.fillStyle);
+}
+
+function isFillStyle(value: unknown): value is NonNullable<Layer['fillStyle']> {
+  return FILL_STYLES.some((fillStyle) => fillStyle === value);
 }
 
 function hasRasterNumbers(value: Record<string, unknown>): boolean {

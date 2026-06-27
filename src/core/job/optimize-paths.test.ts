@@ -63,6 +63,31 @@ describe('optimizePaths', () => {
     expect(firstSeg?.polyline[0]).toEqual({ x: 0, y: 0 });
   });
 
+  it('leaves fill groups in source order', () => {
+    const farFirst = { ...seg([100, 100], [101, 100]), reverse: false };
+    const nearSecond = { ...seg([0, 0], [1, 0]), reverse: false };
+    const j: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'L1',
+          color: '#000',
+          power: 50,
+          speed: 1000,
+          passes: 1,
+          airAssist: false,
+          fillStyle: 'offset',
+          overscanMm: 0,
+          segments: [farFirst, nearSecond],
+        },
+      ],
+    };
+
+    const result = optimizePaths(j);
+
+    expect(result.groups[0]).toBe(j.groups[0]);
+  });
+
   it('leaves very large groups in source order instead of running the O(n^2) pass', () => {
     const farFirst = seg([100, 100], [101, 100]);
     const nearSecond = seg([0, 0], [1, 0]);

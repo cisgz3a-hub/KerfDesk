@@ -58,6 +58,21 @@ describe('project air assist persistence', () => {
     }
   });
 
+  it('rejects Auto Fastest as a persisted layer fill style', () => {
+    const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
+    const scene = raw.scene as { layers: Array<Record<string, unknown>> };
+    const firstLayer = scene.layers[0];
+    if (firstLayer === undefined) throw new Error('expected project fixture layer');
+    firstLayer.fillStyle = 'auto';
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.layers\[0\]\.fillStyle/);
+    }
+  });
+
   it('reports invalid when a sub-layer operation mode is unknown', () => {
     const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
     const scene = raw.scene as { layers: Array<Record<string, unknown>> };

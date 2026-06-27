@@ -20,10 +20,10 @@ export function CutSettingsFillFields(props: {
           className="lf-select"
           defaultValue={props.layer.fillStyle}
           aria-label="Cut settings fill style"
-          title="Choose Scanline for parallel hatch lines or Offset Fill for contour-following closed paths."
+          title="Choose Scanline or Follow Shape for filled paths."
         >
           <option value="scanline">Scanline</option>
-          <option value="offset">Offset Fill</option>
+          <option value="offset">Follow Shape</option>
         </select>
       </Field>
       <Field label="Scan angle">

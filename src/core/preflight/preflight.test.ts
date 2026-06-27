@@ -298,6 +298,32 @@ describe('runPreflight offset fill validation', () => {
       code: 'offset-fill-open-contour',
       message:
         'Layer L1 uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.',
+      });
+  });
+
+  it('blocks Follow Shape object overrides on open vector contours', () => {
+    const layer = createLayer({ id: 'L1', color: '#ff0000' });
+    const project: Project = {
+      ...projectWith(layer),
+      scene: {
+        ...EMPTY_SCENE,
+        objects: [
+          {
+            ...sampleObject,
+            operationOverride: { mode: 'fill', fillStyle: 'offset' },
+          },
+        ],
+        layers: [layer],
+      },
+    };
+
+    const result = runPreflight(project, emit(project));
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: 'offset-fill-open-contour',
+      message:
+        'Layer L1 uses Follow Shape but has open vector contours assigned. Close the shapes or use Scanline Fill.',
     });
   });
 });

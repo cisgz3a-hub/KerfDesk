@@ -2,6 +2,7 @@ import {
   captureLayerOperationSettings,
   sceneObjectPrimaryLayerColor,
   type Layer,
+  type LayerFillStyle,
   type LayerMode,
   type LayerOperationSettings,
   type SceneObject,
@@ -140,9 +141,7 @@ function SelectedFillFields(props: {
       <FieldRow label="Style">
         <select
           value={settings.fillStyle}
-          onChange={(event) =>
-            commit({ fillStyle: event.target.value === 'offset' ? 'offset' : 'scanline' })
-          }
+          onChange={(event) => commit({ fillStyle: parseFillStyle(event.target.value) })}
           aria-label="Fill style for selected objects"
           title="Override fill style for the selected artwork only."
           style={selectStyle}
@@ -274,6 +273,11 @@ function effectiveOperationSettings(
 function numericValue(value: string, fallback: number): number {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseFillStyle(value: string): LayerFillStyle {
+  if (value === 'offset') return value;
+  return 'scanline';
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -186,7 +186,9 @@ describe('material library recipes', () => {
     const valid = captureMaterialRecipe(makeLayer({ mode: 'fill', minPower: 10, power: 35 }));
 
     expect(isMaterialRecipe(valid)).toBe(true);
+    expect(isMaterialRecipe({ ...valid, fillStyle: 'auto' })).toBe(false);
     expect(isMaterialRecipe({ ...valid, mode: 'offset-fill' })).toBe(false);
+    expect(isMaterialRecipe({ ...valid, fillStyle: 'spiral' })).toBe(false);
     expect(isMaterialRecipe({ ...valid, ditherAlgorithm: 'magic' })).toBe(false);
     expect(isMaterialRecipe({ ...valid, speed: 0 })).toBe(false);
     expect(isMaterialRecipe({ ...valid, power: 101 })).toBe(false);

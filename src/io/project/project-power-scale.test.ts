@@ -126,6 +126,17 @@ describe('project object power scale validation', () => {
     }
   });
 
+  it('rejects Auto Fastest in object operation overrides', () => {
+    const result = deserializeProject(
+      rawProject([vectorObject(100, { mode: 'fill', fillStyle: 'auto' })]),
+    );
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind === 'invalid') {
+      expect(result.reason).toMatch(/scene\.objects\[0\]\.operationOverride\.fillStyle/);
+    }
+  });
+
   it('rejects malformed object operation overrides before a project loads', () => {
     const result = deserializeProject(
       rawProject([vectorObject(100, { mode: 'fill', power: 140 })]),
