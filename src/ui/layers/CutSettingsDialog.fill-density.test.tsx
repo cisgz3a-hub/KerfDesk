@@ -141,6 +141,8 @@ describe('CutSettingsDialog fill density controls', () => {
         lpi.value = '254';
         Simulate.change(lpi);
       });
+      expect(lpi.validity.stepMismatch).toBe(false);
+      expect(lpi.checkValidity()).toBe(true);
       await submitDialog(host);
 
       expect(requireApplied(applied).hatchSpacingMm).toBeCloseTo(0.1, 8);

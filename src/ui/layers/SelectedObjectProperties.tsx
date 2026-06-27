@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { useStore } from '../state';
+import { SelectedImageAdjustments } from './SelectedImageAdjustments';
 import { SelectedObjectOperationSettings } from './SelectedObjectOperationSettings';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -22,6 +23,7 @@ export function SelectedObjectProperties(): JSX.Element | null {
       <h3 style={headingStyle}>Shape Properties</h3>
       <PowerScaleInput objects={selectedObjects} />
       <SelectedObjectOperationSettings objects={selectedObjects} />
+      <SelectedImageAdjustments />
     </section>
   );
 }

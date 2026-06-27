@@ -20,6 +20,7 @@ type SafeWriteFn = (
 
 const SETTLE_DWELL_COMMAND = 'G4 P0.01\n';
 const STABLE_IDLE_REPORTS = 2;
+const SETTLE_MARKER_ACTIVITY_TIMEOUT_MS = 30_000;
 
 export function beginPostJobSettle(
   set: SetFn,
@@ -50,6 +51,8 @@ async function runPostJobSettle(
       command: SETTLE_DWELL_COMMAND,
       action: 'console',
       source: 'system',
+      timeoutMs: SETTLE_MARKER_ACTIVITY_TIMEOUT_MS,
+      timeoutMode: 'non-idle-status-activity',
     });
     set((state) =>
       state.controllerOperation?.kind === 'post-job-settle'

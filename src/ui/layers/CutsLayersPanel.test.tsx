@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
@@ -55,13 +56,13 @@ afterEach(() => {
 });
 
 describe('CutsLayersPanel layer order controls', () => {
-  it('edits only selected artwork from a same-color layer row', async () => {
+  it('edits only selected artwork from the selected artwork settings', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
     useStore.setState({ selectedObjectId: 'O2', additionalSelectedIds: new Set() });
     const { host, unmount } = await renderPanel();
     try {
-      const mode = host.querySelector('select[aria-label="Mode for #000000"]');
+      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
       if (!(mode instanceof HTMLSelectElement)) throw new Error('layer mode missing');
 
       await act(async () => {
@@ -81,13 +82,13 @@ describe('CutsLayersPanel layer order controls', () => {
     }
   });
 
-  it('edits only selected artwork power from a same-color layer row', async () => {
+  it('edits only selected artwork power from the selected artwork settings', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
     useStore.setState({ selectedObjectId: 'O2', additionalSelectedIds: new Set() });
     const { host, unmount } = await renderPanel();
     try {
-      const power = host.querySelector('input[aria-label="Power for #000000"]');
+      const power = host.querySelector('input[aria-label="Power for selected objects"]');
       if (!(power instanceof HTMLInputElement)) throw new Error('layer power missing');
 
       act(() => {
@@ -110,13 +111,13 @@ describe('CutsLayersPanel layer order controls', () => {
     }
   });
 
-  it('edits all selected same-color artwork from a layer row', async () => {
+  it('edits all selected same-color artwork from the selected artwork settings', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
     useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
     const { host, unmount } = await renderPanel();
     try {
-      const mode = host.querySelector('select[aria-label="Mode for #000000"]');
+      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
       if (!(mode instanceof HTMLSelectElement)) throw new Error('layer mode missing');
 
       await act(async () => {
@@ -131,6 +132,68 @@ describe('CutsLayersPanel layer order controls', () => {
         { mode: 'fill' },
         { mode: 'fill' },
       ]);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps selected-object layer cards compact to avoid duplicate settings panels', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().selectObject('O1');
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.textContent).toContain('Selected Artwork Settings');
+      expect(host.textContent).toContain('Editing selected (1)');
+      expect(host.querySelector('select[aria-label="Mode for selected objects"]')).not.toBeNull();
+      expect(host.querySelector('select[aria-label="Mode for #000000"]')).toBeNull();
+      expect(host.querySelector('input[aria-label="Power for #000000"]')).toBeNull();
+      expect(host.textContent).toContain('Use Selected Artwork Settings above for this selection.');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('collapses material and layer management while selected artwork is being edited', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().selectObject('O1');
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.querySelector('[aria-label="Selected object properties"]')).not.toBeNull();
+
+      const materialSection = host.querySelector('details[aria-label="Material Library section"]');
+      const layerSection = host.querySelector('details[aria-label="Layer management section"]');
+      if (!(materialSection instanceof HTMLDetailsElement)) {
+        throw new Error('material disclosure missing');
+      }
+      if (!(layerSection instanceof HTMLDetailsElement))
+        throw new Error('layer disclosure missing');
+
+      expect(materialSection.open).toBe(false);
+      expect(layerSection.open).toBe(false);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps raster image adjustment controls inside the selected artwork inspector', async () => {
+    useStore.getState().importRasterImage(rasterObj('R1'));
+    const { host, unmount } = await renderPanel();
+    try {
+      const selectedPanel = host.querySelector('[aria-label="Selected object properties"]');
+      if (!(selectedPanel instanceof HTMLElement)) throw new Error('selected panel missing');
+
+      expect(
+        selectedPanel.querySelector('[aria-label="Selected image adjustments"]'),
+      ).not.toBeNull();
+      expect(host.querySelectorAll('[aria-label="Selected image adjustments"]')).toHaveLength(1);
+
+      const selectedPanelBottom = selectedPanel.getBoundingClientRect().bottom;
+      const imageAdjustTop = (
+        selectedPanel.querySelector('[aria-label="Selected image adjustments"]') as HTMLElement
+      ).getBoundingClientRect().top;
+      expect(imageAdjustTop).toBeGreaterThanOrEqual(
+        selectedPanelBottom - selectedPanel.offsetHeight,
+      );
     } finally {
       await unmount();
     }
@@ -331,3 +394,19 @@ describe('CutsLayersPanel layer order controls', () => {
     }
   });
 });
+
+function rasterObj(id: string): RasterImage {
+  return {
+    kind: 'raster-image',
+    id,
+    source: `${id}.png`,
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: 20,
+    pixelHeight: 20,
+    bounds: { minX: 0, minY: 0, maxX: 20, maxY: 20 },
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'floyd-steinberg',
+    linesPerMm: 10,
+  };
+}

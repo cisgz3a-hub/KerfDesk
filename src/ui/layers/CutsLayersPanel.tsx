@@ -14,11 +14,13 @@ import { useStore } from '../state';
 import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
-import { SelectedImageAdjustments } from './SelectedImageAdjustments';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
 
 export function CutsLayersPanel(): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
+  const hasSelection = selectedObjectId !== null || additionalSelectedIds.size > 0;
   return (
     <aside aria-label="Cuts / Layers panel" className="lf-rail" style={panelStyle}>
       <h2 className="lf-heading" style={headingStyle}>
@@ -26,23 +28,55 @@ export function CutsLayersPanel(): JSX.Element {
       </h2>
       <AddLayerControls />
       <SelectedObjectProperties />
-      <MaterialLibraryPanel />
-      {layers.length === 0 ? (
-        <p style={hintStyle}>Import a design to populate layers.</p>
+      {hasSelection ? (
+        <>
+          <CollapsedPanel label="Material Library" ariaLabel="Material Library section">
+            <MaterialLibraryPanel />
+          </CollapsedPanel>
+          <CollapsedPanel label="Layers" ariaLabel="Layer management section">
+            <LayerList layers={layers} />
+          </CollapsedPanel>
+        </>
       ) : (
-        <div style={listStyle}>
-          {layers.map((layer, index) => (
-            <LayerRow
-              key={layer.id}
-              layer={layer}
-              canMoveUp={index > 0}
-              canMoveDown={index < layers.length - 1}
-            />
-          ))}
-        </div>
+        <>
+          <MaterialLibraryPanel />
+          <LayerList layers={layers} />
+        </>
       )}
-      <SelectedImageAdjustments />
     </aside>
+  );
+}
+
+function LayerList(props: {
+  readonly layers: ReturnType<typeof useStore.getState>['project']['scene']['layers'];
+}): JSX.Element {
+  const { layers } = props;
+  return layers.length === 0 ? (
+    <p style={hintStyle}>Import a design to populate layers.</p>
+  ) : (
+    <div style={listStyle}>
+      {layers.map((layer, index) => (
+        <LayerRow
+          key={layer.id}
+          layer={layer}
+          canMoveUp={index > 0}
+          canMoveDown={index < layers.length - 1}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CollapsedPanel(props: {
+  readonly label: string;
+  readonly ariaLabel: string;
+  readonly children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <details aria-label={props.ariaLabel} style={collapsedPanelStyle}>
+      <summary style={summaryStyle}>{props.label}</summary>
+      <div style={collapsedContentStyle}>{props.children}</div>
+    </details>
   );
 }
 
@@ -59,3 +93,16 @@ const panelStyle: React.CSSProperties = {
 const headingStyle: React.CSSProperties = { margin: '0 0 10px 0' };
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontStyle: 'italic' };
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };
+const collapsedPanelStyle: React.CSSProperties = {
+  borderTop: '1px solid var(--lf-border)',
+  marginTop: 12,
+  paddingTop: 8,
+};
+const summaryStyle: React.CSSProperties = {
+  cursor: 'pointer',
+  fontWeight: 700,
+  color: 'var(--lf-text)',
+};
+const collapsedContentStyle: React.CSSProperties = {
+  marginTop: 8,
+};

@@ -157,7 +157,10 @@ describe('CutsLayersPanel cut settings editor', () => {
     const { host, unmount } = await renderPanel();
     try {
       await openCutSettings(host, '#ff0000');
-      requireInput(host, 'input[name="imageDpi"]').value = '508';
+      const dpiInput = requireInput(host, 'input[name="imageDpi"]');
+      dpiInput.value = '508';
+      expect(dpiInput.validity.stepMismatch).toBe(false);
+      expect(dpiInput.checkValidity()).toBe(true);
 
       await clickButtonWithText(host, 'OK');
 
@@ -167,18 +170,27 @@ describe('CutsLayersPanel cut settings editor', () => {
     }
   });
 
-  it('applies image toggles from the visible image row to the selected object only', async () => {
+  it('applies image toggles from the selected artwork settings to the selected object only', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
     const { host, unmount } = await renderPanel();
     try {
-      const negative = requireInput(host, 'input[aria-label="Negative image for #ff0000"]');
-      const passThrough = requireInput(host, 'input[aria-label="Pass-through image for #ff0000"]');
+      const negative = requireInput(
+        host,
+        'input[aria-label="Negative image for selected objects"]',
+      );
+      const passThrough = requireInput(
+        host,
+        'input[aria-label="Pass-through image for selected objects"]',
+      );
       const bidirectional = requireInput(
         host,
-        'input[aria-label="Bidirectional image scan for #ff0000"]',
+        'input[aria-label="Bidirectional image scan for selected objects"]',
       );
-      const dotWidth = requireInput(host, 'input[aria-label="Dot width correction for #ff0000"]');
+      const dotWidth = requireInput(
+        host,
+        'input[aria-label="Dot width correction for selected objects"]',
+      );
 
       await act(async () => {
         negative.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -209,12 +221,12 @@ describe('CutsLayersPanel cut settings editor', () => {
     }
   });
 
-  it('maps visible image row line interval and DPI edits onto the selected object only', async () => {
+  it('maps selected artwork line interval and DPI edits onto the selected object only', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { mode: 'image' });
     const { host, unmount } = await renderPanel();
     try {
-      const interval = requireInput(host, 'input[aria-label="Line interval for #ff0000"]');
+      const interval = requireInput(host, 'input[aria-label="Line interval for selected objects"]');
       await act(async () => {
         interval.value = '0.2';
         Simulate.change(interval);
@@ -226,11 +238,13 @@ describe('CutsLayersPanel cut settings editor', () => {
       expect(state.project.scene.layers[0]?.linesPerMm).toBe(10);
       expect(state.project.scene.objects[0]?.operationOverride?.linesPerMm).toBe(5);
 
-      const dpi = requireInput(host, 'input[aria-label="DPI for #ff0000"]');
+      const dpi = requireInput(host, 'input[aria-label="DPI for selected objects"]');
       await act(async () => {
         dpi.value = '254';
         Simulate.change(dpi);
       });
+      expect(dpi.validity.stepMismatch).toBe(false);
+      expect(dpi.checkValidity()).toBe(true);
       await act(async () => {
         Simulate.blur(dpi);
       });

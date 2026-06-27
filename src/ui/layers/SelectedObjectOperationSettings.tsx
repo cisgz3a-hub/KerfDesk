@@ -7,6 +7,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { LayerImageFields } from './LayerImageFields';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 export function SelectedObjectOperationSettings(props: {
@@ -20,14 +21,15 @@ export function SelectedObjectOperationSettings(props: {
     (state) => state.clearSelectedObjectsOperationOverride,
   );
   const maxFeed = useStore((state) => state.project.device.maxFeed);
-  const settings = commonEffectiveOperationSettings(props.objects, layers);
-  if (settings === null) return null;
+  const context = commonEffectiveOperationSettings(props.objects, layers);
+  if (context === null) return null;
   const hasOverride = props.objects.some((object) => object.operationOverride !== undefined);
   const commit = setSelectedObjectsOperationOverride;
   const reset = clearSelectedObjectsOperationOverride;
   return (
     <SelectedOperationControls
-      settings={settings}
+      settings={context.settings}
+      layer={context.layer}
       maxFeed={maxFeed}
       hasOverride={hasOverride}
       commit={commit}
@@ -38,6 +40,7 @@ export function SelectedObjectOperationSettings(props: {
 
 function SelectedOperationControls(props: {
   readonly settings: LayerOperationSettings;
+  readonly layer: Layer;
   readonly maxFeed: number;
   readonly hasOverride: boolean;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
@@ -97,15 +100,33 @@ function SelectedOperationControls(props: {
         parse={(value) => Math.max(1, Math.floor(numericValue(value, settings.passes)))}
       />
       {settings.mode === 'fill' ? <SelectedFillFields settings={settings} commit={commit} /> : null}
-      <button
-        type="button"
-        onClick={props.reset}
-        disabled={!props.hasOverride}
-        title="Remove selected-artwork overrides so the layer settings apply again."
-      >
-        Reset to layer defaults
-      </button>
+      {settings.mode === 'image' ? (
+        <LayerImageFields
+          layer={props.layer}
+          settings={settings}
+          commit={commit}
+          labelContext="selected objects"
+          minPowerMax={settings.power}
+        />
+      ) : null}
+      <ResetSelectedOperationButton hasOverride={props.hasOverride} reset={props.reset} />
     </>
+  );
+}
+
+function ResetSelectedOperationButton(props: {
+  readonly hasOverride: boolean;
+  readonly reset: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={props.reset}
+      disabled={!props.hasOverride}
+      title="Remove selected-artwork overrides so the layer settings apply again."
+    >
+      Reset to layer defaults
+    </button>
   );
 }
 
@@ -137,6 +158,17 @@ function SelectedFillFields(props: {
         ariaLabel="Hatch spacing for selected objects"
         commit={(hatchSpacingMm) => commit({ hatchSpacingMm })}
         parse={(value) => clamp(numericValue(value, settings.hatchSpacingMm), 0.05, 10)}
+      />
+      <NumberField
+        label="Overscan"
+        value={settings.fillOverscanMm}
+        min={0}
+        max={25}
+        step={0.5}
+        unit="mm"
+        ariaLabel="Fill overscan for selected objects"
+        commit={(fillOverscanMm) => commit({ fillOverscanMm })}
+        parse={(value) => clamp(numericValue(value, settings.fillOverscanMm), 0, 25)}
       />
       <FieldRow label="Bidirectional">
         <input
@@ -198,10 +230,15 @@ function FieldRow(props: {
   );
 }
 
+type SelectedOperationContext = {
+  readonly layer: Layer;
+  readonly settings: LayerOperationSettings;
+};
+
 function commonEffectiveOperationSettings(
   objects: ReadonlyArray<SceneObject>,
   layers: ReadonlyArray<Layer>,
-): LayerOperationSettings | null {
+): SelectedOperationContext | null {
   const first = objects[0] === undefined ? null : effectiveOperationSettings(objects[0], layers);
   if (first === null) return null;
   return first;
@@ -210,11 +247,14 @@ function commonEffectiveOperationSettings(
 function effectiveOperationSettings(
   object: SceneObject,
   layers: ReadonlyArray<Layer>,
-): LayerOperationSettings | null {
+): SelectedOperationContext | null {
   const color = sceneObjectPrimaryLayerColor(object);
   const layer = color === null ? undefined : layers.find((candidate) => candidate.color === color);
   if (layer === undefined) return null;
-  return { ...captureLayerOperationSettings(layer), ...(object.operationOverride ?? {}) };
+  return {
+    layer,
+    settings: { ...captureLayerOperationSettings(layer), ...(object.operationOverride ?? {}) },
+  };
 }
 
 function numericValue(value: string, fallback: number): number {

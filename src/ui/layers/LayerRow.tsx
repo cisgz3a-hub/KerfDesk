@@ -72,6 +72,11 @@ const selectedBadgeStyle: React.CSSProperties = {
   borderRadius: 4,
   padding: '2px 5px',
 };
+const compactSelectedHintStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+};
 
 export function LayerRow(props: {
   readonly layer: Layer;
@@ -85,6 +90,7 @@ export function LayerRow(props: {
     useCutSettingsLauncher();
   const isActive = activeLayerColor === layer.color;
   const operationTarget = useLayerOperationTarget(layer);
+  const editingSelectedObjects = operationTarget.selectedObjectCount > 0;
 
   return (
     <section
@@ -105,8 +111,10 @@ export function LayerRow(props: {
           canMoveUp={props.canMoveUp}
           canMoveDown={props.canMoveDown}
         />
-        <ModeSelect layer={layer} operationTarget={operationTarget} />
-        {operationTarget.selectedObjectCount > 0 ? (
+        {editingSelectedObjects ? null : (
+          <ModeSelect layer={layer} operationTarget={operationTarget} />
+        )}
+        {editingSelectedObjects ? (
           <span style={selectedBadgeStyle}>
             Editing selected ({operationTarget.selectedObjectCount})
           </span>
@@ -132,7 +140,13 @@ export function LayerRow(props: {
         <HeaderToggle label="Show" layer={layer} field="visible" />
         <HeaderToggle label="Output" layer={layer} field="output" />
       </header>
-      <LayerRowSettingsFields layer={layer} operationTarget={operationTarget} />
+      {editingSelectedObjects ? (
+        <p style={compactSelectedHintStyle}>
+          Use Selected Artwork Settings above for this selection.
+        </p>
+      ) : (
+        <LayerRowSettingsFields layer={layer} operationTarget={operationTarget} />
+      )}
       <LayerSubLayers layer={layer} />
       {settingsOpen ? <LayerRowCutSettings layer={layer} onClose={closeSettings} /> : null}
     </section>

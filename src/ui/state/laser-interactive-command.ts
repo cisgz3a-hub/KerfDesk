@@ -22,10 +22,12 @@ export type ControllerLifecycleRefs = {
 type ControllerCommandRequest = {
   readonly kind: ControllerCommandKind;
   readonly label: string;
+  readonly timeoutMs: number;
+  readonly timeoutMode: ControllerCommandTimeoutMode;
   readonly responses: string[];
   readonly resolve: (responses: ReadonlyArray<string>) => void;
   readonly reject: (err: Error) => void;
-  readonly timer: ReturnType<typeof setTimeout>;
+  timer: ReturnType<typeof setTimeout>;
   acceptingResponses: boolean;
 };
 
@@ -45,6 +47,7 @@ export type StartControllerCommandOptions = {
   readonly action?: LaserSafetyAction;
   readonly source?: TranscriptSource;
   readonly timeoutMs?: number;
+  readonly timeoutMode?: ControllerCommandTimeoutMode;
 };
 
 export type FreshIdleWaitOptions = {
@@ -55,6 +58,8 @@ export type FreshIdleWaitOptions = {
 
 const DEFAULT_COMMAND_TIMEOUT_MS = 8_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 8_000;
+
+type ControllerCommandTimeoutMode = 'fixed' | 'non-idle-status-activity';
 
 export function startControllerCommand(
   refs: ControllerLifecycleRefs,
@@ -67,16 +72,19 @@ export function startControllerCommand(
     );
   }
   return new Promise((resolve, reject) => {
+    const timeoutMs = options.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS;
     const request: ControllerCommandRequest = {
       kind: options.kind,
       label: options.label,
+      timeoutMs,
+      timeoutMode: options.timeoutMode ?? 'fixed',
       responses: [],
       resolve,
       reject,
       acceptingResponses: false,
       timer: setTimeout(() => {
         finishControllerCommand(refs, request, 'reject', `${options.label} timed out.`);
-      }, options.timeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS),
+      }, timeoutMs),
     };
     refs.controllerCommand = request;
     write(options.command, options.action, options.source)
@@ -115,8 +123,12 @@ export function consumeControllerCommandResponse(
     finishControllerCommand(refs, request, 'reject', `ALARM:${response.code}`);
     return true;
   }
-  if (response.kind !== 'status') request.responses.push(rawLine.trim());
-  return response.kind !== 'status';
+  if (response.kind === 'status') {
+    keepCommandAliveFromStatus(refs, request, response.report);
+    return false;
+  }
+  request.responses.push(rawLine.trim());
+  return true;
 }
 
 export function waitForFreshIdle(
@@ -180,6 +192,19 @@ function finishControllerCommand(
   clearTimeout(request.timer);
   if (mode === 'resolve') request.resolve([...request.responses]);
   else request.reject(new Error(message ?? `${request.label} failed.`));
+}
+
+function keepCommandAliveFromStatus(
+  refs: ControllerLifecycleRefs,
+  request: ControllerCommandRequest,
+  report: StatusReport,
+): void {
+  if (request.timeoutMode !== 'non-idle-status-activity') return;
+  if (report.state === 'Idle' || report.state === 'Alarm' || report.state === 'Sleep') return;
+  clearTimeout(request.timer);
+  request.timer = setTimeout(() => {
+    finishControllerCommand(refs, request, 'reject', `${request.label} timed out.`);
+  }, request.timeoutMs);
 }
 
 function finishIdleWait(

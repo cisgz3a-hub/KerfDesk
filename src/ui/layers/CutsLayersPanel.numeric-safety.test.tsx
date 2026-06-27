@@ -57,6 +57,7 @@ afterEach(() => {
 describe('CutsLayersPanel numeric safety', () => {
   it('does not commit slow-burn minimums when visible numeric fields are blanked', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
     useStore.getState().setLayerParam('#ff0000', {
       mode: 'fill',
       speed: 1500,
@@ -76,6 +77,7 @@ describe('CutsLayersPanel numeric safety', () => {
 
   it('does not commit maximum raster density when visible image density fields are blanked', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.setState({ selectedObjectId: null, additionalSelectedIds: new Set() });
     useStore.getState().setLayerParam('#ff0000', { mode: 'image', linesPerMm: 10 });
     const { host, unmount } = await renderPanel();
     try {

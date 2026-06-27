@@ -117,7 +117,7 @@ function ImageDensityFields(props: {
           type="number"
           min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
           max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
-          step={1}
+          step={0.01}
           className="lf-input"
           value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
           onChange={(event) =>
