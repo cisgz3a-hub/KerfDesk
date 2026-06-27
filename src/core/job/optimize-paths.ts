@@ -49,8 +49,9 @@ export function optimizePaths(job: Job): Job {
   return { groups: job.groups.map(optimizeGroupAny) };
 }
 
-// F.2.d: raster groups don't have polylines to reorder; pass through
-// untouched. Only cut groups go through the nearest-neighbour pass.
+// F.2.d: raster and fill groups pass through untouched. Fill source order is
+// semantically meaningful: scanline rows depend on sweep ordering, and
+// Follow Shape/offset contours should finish a shape before crossing the bed.
 function optimizeGroupAny(group: Group): Group {
   if (group.kind !== 'cut') return group;
   return optimizeGroup(group);
@@ -154,7 +155,7 @@ function segmentEntries(
 }
 
 function reverseSegment(seg: CutSegment): CutSegment {
-  return { polyline: [...seg.polyline].reverse(), closed: seg.closed };
+  return { ...seg, polyline: [...seg.polyline].reverse(), closed: seg.closed };
 }
 
 // Squared distance only — we compare distances, never need the sqrt.

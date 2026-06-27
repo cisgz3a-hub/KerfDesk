@@ -373,7 +373,7 @@ export function applyTraceToExisting(
   scene = addObject(scene, positionedTrace);
   if (positionedTrace.traceMode === 'centerline' || positionedTrace.traceMode === 'edge') {
     scene = ensureLineLayersForColors(scene, positionedTrace.paths);
-  } else if (isFollowShapeTrace(positionedTrace)) {
+  } else if (usesObjectFillOverride(positionedTrace)) {
     scene = ensureNewFillLayersForColors(scene, positionedTrace.paths);
   } else {
     scene = ensureFillLayersForColors(scene, positionedTrace.paths);
@@ -390,8 +390,8 @@ export function applyTraceToExisting(
   };
 }
 
-function isFollowShapeTrace(trace: TracedImage): boolean {
-  return trace.operationOverride?.mode === 'fill' && trace.operationOverride.fillStyle === 'offset';
+function usesObjectFillOverride(trace: TracedImage): boolean {
+  return trace.operationOverride?.mode === 'fill';
 }
 
 export function applyReimport(

@@ -221,14 +221,43 @@ function appendOffsetFillOpenContourIssues(
   issues: PreflightIssue[],
 ): void {
   for (const layer of outputLayers) {
-    if (layer.mode !== 'fill' || layer.fillStyle !== 'offset') continue;
-    if (scene.objects.some((obj) => objectHasOpenContourOnLayer(obj, layer))) {
-      issues.push({
-        code: 'offset-fill-open-contour',
-        message: `Layer ${layer.id} uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.`,
-      });
+    if (layer.mode === 'fill' && layer.fillStyle === 'offset') {
+      appendOpenContourIssueForLayer(scene.objects, layer, 'Offset Fill', issues);
+      continue;
+    }
+    if (scene.objects.some((obj) => objectHasFollowShapeOpenContourOverride(obj, layer))) {
+      appendOffsetFillOpenContourIssue(layer, 'Follow Shape', issues);
     }
   }
+}
+
+function appendOpenContourIssueForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  label: string,
+  issues: PreflightIssue[],
+): void {
+  if (!objects.some((obj) => objectHasOpenContourOnLayer(obj, layer))) return;
+  appendOffsetFillOpenContourIssue(layer, label, issues);
+}
+
+function appendOffsetFillOpenContourIssue(
+  layer: Layer,
+  label: string,
+  issues: PreflightIssue[],
+): void {
+  issues.push({
+    code: 'offset-fill-open-contour',
+    message: `Layer ${layer.id} uses ${label} but has open vector contours assigned. Close the shapes or use Scanline Fill.`,
+  });
+}
+
+function objectHasFollowShapeOpenContourOverride(obj: SceneObject, layer: Layer): boolean {
+  const override = obj.operationOverride;
+  if (override === undefined) return false;
+  const effectiveLayer: Layer = { ...layer, ...override };
+  if (effectiveLayer.mode !== 'fill' || effectiveLayer.fillStyle !== 'offset') return false;
+  return objectHasOpenContourOnLayer(obj, effectiveLayer);
 }
 
 function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {

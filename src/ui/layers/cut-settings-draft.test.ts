@@ -133,6 +133,13 @@ describe('cut settings draft helpers', () => {
     ).toBe('offset');
     expect(
       (
+        readCutSettingsPatch(formData({ mode: 'fill', fillStyle: 'auto' }), layer) as {
+          readonly fillStyle?: unknown;
+        }
+      ).fillStyle,
+    ).toBe('scanline');
+    expect(
+      (
         readCutSettingsPatch(formData({ mode: 'fill', fillStyle: 'spiral' }), layer) as {
           readonly fillStyle?: unknown;
         }

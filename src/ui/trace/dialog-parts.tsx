@@ -49,7 +49,7 @@ export function TraceFillStylePicker(props: {
     <Field label="Fill style">
       <select
         value={props.value}
-        onChange={(e) => props.onChange(e.target.value === 'offset' ? 'offset' : 'scanline')}
+        onChange={(e) => props.onChange(parseTraceFillStyle(e.target.value))}
         className="lf-select"
         style={selectStyle}
         aria-label="Trace fill style"
@@ -63,6 +63,11 @@ export function TraceFillStylePicker(props: {
       </span>
     </Field>
   );
+}
+
+function parseTraceFillStyle(value: string): TraceFillStyle {
+  if (value === 'offset') return value;
+  return 'scanline';
 }
 
 export function PresetWarning(props: {
