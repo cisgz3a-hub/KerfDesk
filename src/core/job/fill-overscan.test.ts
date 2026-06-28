@@ -113,4 +113,9 @@ describe('effectiveFillOverscanMm', () => {
     expect(effectiveFillOverscanMm(hatch(10), 5, 'island')).toBe(5);
     expect(effectiveFillOverscanMm(hatch(20), 5, 'island')).toBe(5);
   });
+
+  it('keeps the full configured runway for sensitive Island Fill sweeps', () => {
+    expect(effectiveFillOverscanMm(hatch(3), 5, 'island', 'sensitive')).toBe(5);
+    expect(effectiveFillOverscanMm(hatch(9.5), 5, 'island', 'sensitive')).toBe(5);
+  });
 });

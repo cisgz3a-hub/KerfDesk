@@ -245,7 +245,8 @@ function isCompatibleIslandFillGroup(first: FillGroup, candidate: Group): candid
     candidate.speed === first.speed &&
     candidate.passes === first.passes &&
     candidate.airAssist === first.airAssist &&
-    candidate.overscanMm === first.overscanMm
+    candidate.overscanMm === first.overscanMm &&
+    candidate.islandMotionPolicy === first.islandMotionPolicy
   );
 }
 
@@ -261,6 +262,7 @@ function islandGroupEndpoints(group: FillGroup): RouteEndpoints | null {
       [first.start, last.end],
       group.overscanMm,
       group.fillStyle,
+      group.islandMotionPolicy,
     );
     const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
     if (run === null) continue;

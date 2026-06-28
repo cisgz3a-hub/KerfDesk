@@ -1,4 +1,4 @@
-import { analyzeFillHeatRisk, compileJob } from '../job';
+import { compileJob, isSensitiveIslandFillPolicy } from '../job';
 import type { Project } from '../scene';
 
 export const MACHINE_ISLAND_FILL_RISK_CODE = 'machine-island-fill-risk';
@@ -9,20 +9,21 @@ export type MachineProfilePreflightIssue = {
 };
 
 const NEOTRONICS_4040_ISLAND_FILL_RISK_MESSAGE =
-  'Neotronics 4040 Island Fill has short acceleration-sensitive sweeps. Use Scanline Fill for this burn; Island Fill on this profile needs dedicated material/motion calibration before it should be trusted.';
-
-const NEOTRONICS_4040_MIN_SAFE_ISLAND_SWEEP_MM = 10;
+  'Neotronics 4040-safe Island Fill needs fill overscan greater than 0 mm so the head has laser-off acceleration runway. Set Fill overscan to 5 mm or use Scanline Fill.';
 
 export function findMachineProfilePreflightIssues(
   project: Project,
 ): ReadonlyArray<MachineProfilePreflightIssue> {
   if (!isNeotronics4040(project)) return [];
-  const heat = analyzeFillHeatRisk(compileJob(project.scene, project.device));
-  const riskyIslandSweeps = heat.islandNoRunwayShortSweepCount + heat.islandPartialRunwaySweepCount;
-  const hasShortIslandSweep =
-    heat.minIslandSweepMm !== null &&
-    heat.minIslandSweepMm < NEOTRONICS_4040_MIN_SAFE_ISLAND_SWEEP_MM;
-  if (riskyIslandSweeps === 0 && !hasShortIslandSweep) return [];
+  const job = compileJob(project.scene, project.device);
+  const hasSensitiveIslandFillWithoutOverscan = job.groups.some(
+    (group) =>
+      group.kind === 'fill' &&
+      group.fillStyle === 'island' &&
+      isSensitiveIslandFillPolicy(group.islandMotionPolicy) &&
+      group.overscanMm <= 0,
+  );
+  if (!hasSensitiveIslandFillWithoutOverscan) return [];
   return [
     {
       code: MACHINE_ISLAND_FILL_RISK_CODE,

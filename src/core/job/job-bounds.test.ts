@@ -240,4 +240,46 @@ describe('computeJobMotionBounds', () => {
       maxY: 20,
     });
   });
+
+  it('uses the full configured island runway for sensitive motion-policy bounds', () => {
+    const fillJob: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          layerId: 'fill',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          fillStyle: 'island',
+          islandMotionPolicy: 'sensitive',
+          overscanMm: 5,
+          segments: [
+            {
+              polyline: [
+                { x: 10, y: 20 },
+                { x: 13, y: 20 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(computeJobBounds(fillJob, DEFAULT_DEVICE_PROFILE)).toEqual({
+      minX: 10,
+      minY: 20,
+      maxX: 13,
+      maxY: 20,
+    });
+    expect(computeJobMotionBounds(fillJob, DEFAULT_DEVICE_PROFILE)).toEqual({
+      minX: 5,
+      minY: 20,
+      maxX: 18,
+      maxY: 20,
+    });
+  });
 });

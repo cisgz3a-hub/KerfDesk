@@ -74,25 +74,24 @@ function fineDetailFillProject(
 }
 
 describe('machine-profile preflight', () => {
-  it('blocks 4040 Island Fill jobs with short acceleration-sensitive sweeps', () => {
+  it('allows 4040 Island Fill jobs with short sweeps when overscan is enabled', () => {
     const project = neotronicsFineDetailFillProject('island');
 
     const result = runPreflight(project, emit(project));
 
-    expect(result.ok).toBe(false);
-    expect(result.issues).toContainEqual({
-      code: 'machine-island-fill-risk',
-      message:
-        'Neotronics 4040 Island Fill has short acceleration-sensitive sweeps. Use Scanline Fill for this burn; Island Fill on this profile needs dedicated material/motion calibration before it should be trusted.',
-    });
+    expect(result.issues.map((issue) => issue.code)).not.toContain('machine-island-fill-risk');
   });
 
-  it('blocks 4040 Island Fill short sweeps even when overscan is disabled', () => {
+  it('blocks 4040 Island Fill when overscan is disabled', () => {
     const project = neotronicsFineDetailFillProject('island', 0);
 
     const result = runPreflight(project, emit(project));
 
-    expect(result.issues.map((issue) => issue.code)).toContain('machine-island-fill-risk');
+    expect(result.issues).toContainEqual({
+      code: 'machine-island-fill-risk',
+      message:
+        'Neotronics 4040-safe Island Fill needs fill overscan greater than 0 mm so the head has laser-off acceleration runway. Set Fill overscan to 5 mm or use Scanline Fill.',
+    });
   });
 
   it('allows the same 4040 fine-detail geometry with Scanline Fill', () => {

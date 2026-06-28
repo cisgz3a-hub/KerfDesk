@@ -59,7 +59,12 @@ function accumulateShortSweepRisk(
 ): void {
   if (group.overscanMm <= 0 || length >= group.overscanMm * 2) return;
   summary.islandShortSweepCount += 1;
-  const effective = effectiveFillOverscanMm([start, end], group.overscanMm, 'island');
+  const effective = effectiveFillOverscanMm(
+    [start, end],
+    group.overscanMm,
+    'island',
+    group.islandMotionPolicy,
+  );
   if (effective > 0 && effective < group.overscanMm) {
     summary.islandPartialRunwaySweepCount += 1;
   } else if (effective === 0) {

@@ -175,6 +175,30 @@ describe('estimateJobDuration', () => {
     expect(overscan.totalSeconds).toBeGreaterThan(zero.totalSeconds);
   });
 
+  it('estimates the longer full runway for sensitive Island Fill sweeps', () => {
+    const base: FillGroup = {
+      kind: 'fill',
+      layerId: 'fill',
+      color: '#000',
+      power: 50,
+      speed: 1000,
+      passes: 1,
+      airAssist: false,
+      fillStyle: 'island',
+      overscanMm: 5,
+      segments: [fillSeg([10, 0], [13, 0])],
+    };
+    const adaptive = estimateJobDuration({ groups: [base] }, device);
+    const sensitive = estimateJobDuration(
+      { groups: [{ ...base, islandMotionPolicy: 'sensitive' }] },
+      device,
+    );
+
+    expect(sensitive.breakdown.cutSeconds).toBeCloseTo(adaptive.breakdown.cutSeconds, 6);
+    expect(sensitive.breakdown.travelSeconds).toBeGreaterThan(adaptive.breakdown.travelSeconds);
+    expect(sensitive.totalSeconds).toBeGreaterThan(adaptive.totalSeconds);
+  });
+
   it('prices a multi-span sweep as one continuous cut block over the envelope (ADR-034)', () => {
     // Three ink spans on one scanline (two holes). The continuous sweep moves at
     // feed across the whole row (ink + S0-blanked gaps), so its cut time equals a

@@ -1,5 +1,10 @@
 import { resolveGrblDialect, type GrblPowerMode } from '../../core/devices';
-import { analyzeFillHeatRisk, compileJob, rasterBoundsInMachineCoords } from '../../core/job';
+import {
+  analyzeFillHeatRisk,
+  compileJob,
+  isSensitiveIslandFillPolicy,
+  rasterBoundsInMachineCoords,
+} from '../../core/job';
 import { pixelExtentForMm } from '../../core/raster';
 import {
   LAYER_DEFAULTS,
@@ -42,7 +47,13 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
 }
 
 function appendFillHeatWarnings(project: Project, warnings: string[]): void {
-  const heat = analyzeFillHeatRisk(compileJob(project.scene, project.device));
+  const job = compileJob(project.scene, project.device);
+  if (job.groups.some(isSensitiveIslandFillGroupWithOverscan)) {
+    warnings.push(
+      '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
+    );
+  }
+  const heat = analyzeFillHeatRisk(job);
   if (heat.islandNoRunwayShortSweepCount > 0) {
     warnings.push(
       `Island Fill has ${heat.islandNoRunwayShortSweepCount} short sweep(s) with no acceleration runway. Increase fill overscan or use Scanline Fill if those small islands look darker than the rest.`,
@@ -54,6 +65,17 @@ function appendFillHeatWarnings(project: Project, warnings: string[]): void {
       `Island Fill has ${heat.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. KerfDesk will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`,
     );
   }
+}
+
+function isSensitiveIslandFillGroupWithOverscan(
+  group: ReturnType<typeof compileJob>['groups'][number],
+): boolean {
+  return (
+    group.kind === 'fill' &&
+    group.fillStyle === 'island' &&
+    isSensitiveIslandFillPolicy(group.islandMotionPolicy) &&
+    group.overscanMm > 0
+  );
 }
 
 // H12 (AUDIT-2026-06-10): the engrave luma comes from the import-time

@@ -158,6 +158,18 @@ describe('optimizePaths', () => {
     expect(result.groups).toEqual([farLayer, nearLayer]);
   });
 
+  it('does not reorder island fill groups across different motion policies', () => {
+    const farAdaptive = fillGroup('island', [fillSeg([100, 100], [101, 100])]);
+    const nearSensitive = fillGroup('island', [fillSeg([0, 0], [1, 0])], {
+      islandMotionPolicy: 'sensitive',
+    });
+    const j: Job = { groups: [farAdaptive, nearSensitive] };
+
+    const result = optimizePaths(j);
+
+    expect(result.groups).toEqual([farAdaptive, nearSensitive]);
+  });
+
   it('leaves very large groups in source order instead of running the O(n^2) pass', () => {
     const farFirst = seg([100, 100], [101, 100]);
     const nearSecond = seg([0, 0], [1, 0]);
