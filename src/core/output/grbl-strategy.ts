@@ -137,6 +137,7 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
         feed,
         group.overscanMm,
         group.fillStyle,
+        group.islandMotionPolicy,
         scanOffsetMm,
         dialect,
       );
@@ -180,6 +181,7 @@ function emitFillSweep(
   feed: number,
   overscanMm: number,
   fillStyle: FillGroup['fillStyle'],
+  islandMotionPolicy: FillGroup['islandMotionPolicy'],
   scanOffsetMm: number,
   dialect: GrblGcodeDialect,
 ): string {
@@ -187,7 +189,12 @@ function emitFillSweep(
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return '';
-  const overscan = effectiveFillOverscanMm([first.start, last.end], overscanMm, fillStyle);
+  const overscan = effectiveFillOverscanMm(
+    [first.start, last.end],
+    overscanMm,
+    fillStyle,
+    islandMotionPolicy,
+  );
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return '';
   const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, dialect)];

@@ -1,4 +1,5 @@
 import type { LayerFillStyle, Vec2 } from '../scene';
+import { isSensitiveIslandFillPolicy, type IslandFillMotionPolicy } from './island-fill-motion';
 
 export type FillOverscanRun = {
   readonly leadStart: Vec2;
@@ -58,6 +59,7 @@ export function effectiveFillOverscanMm(
   polyline: ReadonlyArray<Vec2>,
   overscanMm: number,
   fillStyle: LayerFillStyle | undefined,
+  islandMotionPolicy?: IslandFillMotionPolicy | undefined,
 ): number {
   if (fillStyle !== 'island') return effectiveOverscanMm(polyline, overscanMm);
   if (overscanMm <= 0) return 0;
@@ -66,6 +68,7 @@ export function effectiveFillOverscanMm(
   if (a === undefined || b === undefined || polyline.length !== 2) return 0;
   const length = Math.hypot(b.x - a.x, b.y - a.y);
   if (length <= 0) return 0;
+  if (isSensitiveIslandFillPolicy(islandMotionPolicy)) return overscanMm;
   // Island Fill intentionally keeps a capped runway even for short island
   // sweeps. That avoids starting the burn from rest while still preventing the
   // old full-overscan runtime blowup on thousands of tiny traced features.

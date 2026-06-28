@@ -63,3 +63,5 @@ export type { ScanOffsetPoint } from './scan-offset';
 export { offsetForSpeed, shiftAlongTravel } from './scan-offset';
 export type { FillHeatRiskSummary } from './fill-heat-risk';
 export { analyzeFillHeatRisk } from './fill-heat-risk';
+export type { IslandFillMotionPolicy } from './island-fill-motion';
+export { islandFillMotionPolicyForDevice, isSensitiveIslandFillPolicy } from './island-fill-motion';

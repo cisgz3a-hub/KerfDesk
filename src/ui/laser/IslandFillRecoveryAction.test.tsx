@@ -17,8 +17,8 @@ afterEach(() => {
 });
 
 describe('IslandFillRecoveryAction', () => {
-  it('offers one-click Scanline recovery for risky Neotronics 4040 Island Fill jobs', async () => {
-    installNeotronicsIslandFillProject();
+  it('offers one-click overscan recovery for 4040 Island Fill without runway', async () => {
+    installNeotronicsIslandFillProject({ fillOverscanMm: 0 });
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -28,7 +28,7 @@ describe('IslandFillRecoveryAction', () => {
         root.render(<IslandFillRecoveryAction streaming={false} />);
       });
       const recoveryButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Switch Island Fill layers to Scanline Fill',
+        (button) => button.textContent === 'Set Island Fill overscan to 5 mm',
       );
       expect(recoveryButton).not.toBeUndefined();
 
@@ -36,10 +36,11 @@ describe('IslandFillRecoveryAction', () => {
         recoveryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(useStore.getState().project.scene.layers[0]?.fillStyle).toBe('scanline');
-      expect(host.textContent).not.toContain('Switch Island Fill layers to Scanline Fill');
+      expect(useStore.getState().project.scene.layers[0]?.fillStyle).toBe('island');
+      expect(useStore.getState().project.scene.layers[0]?.fillOverscanMm).toBe(5);
+      expect(host.textContent).not.toContain('Set Island Fill overscan to 5 mm');
       expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
-        message: 'Switched Island Fill layers to Scanline Fill.',
+        message: 'Set Island Fill overscan to 5 mm.',
         variant: 'success',
       });
     } finally {
@@ -102,7 +103,7 @@ describe('IslandFillRecoveryAction', () => {
         root.render(<IslandFillRecoveryAction streaming={false} />);
       });
 
-      expect(host.textContent).not.toContain('Switch Island Fill layers to Scanline Fill');
+      expect(host.textContent).not.toContain('Set Island Fill overscan to 5 mm');
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -112,7 +113,9 @@ describe('IslandFillRecoveryAction', () => {
   });
 });
 
-function installNeotronicsIslandFillProject(): void {
+function installNeotronicsIslandFillProject(
+  options: { readonly fillOverscanMm?: number } = {},
+): void {
   useStore.setState({
     project: {
       ...createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
@@ -122,7 +125,7 @@ function installNeotronicsIslandFillProject(): void {
           {
             ...createLayer({ id: 'L-fill', color: '#ff0000', mode: 'fill' }),
             fillStyle: 'island',
-            fillOverscanMm: 5,
+            fillOverscanMm: options.fillOverscanMm ?? 5,
             hatchSpacingMm: 1,
             power: 10,
           },

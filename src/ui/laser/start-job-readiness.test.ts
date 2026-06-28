@@ -243,17 +243,17 @@ describe('prepareStartJob', () => {
     }
   });
 
-  it('blocks risky Island Fill short sweeps on the Neotronics 4040 profile', () => {
+  it('allows 4040-safe Island Fill short sweeps with a warning on the Neotronics 4040 profile', () => {
     const result = prepareStartJob(
       neotronicsFineDetailFillProject('island'),
       readyController,
       readyMachine,
     );
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.messages).toContain(
-        'Neotronics 4040 Island Fill has short acceleration-sensitive sweeps. Use Scanline Fill for this burn; Island Fill on this profile needs dedicated material/motion calibration before it should be trusted.',
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.warnings).toContain(
+        '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
       );
     }
   });

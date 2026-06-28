@@ -130,6 +130,7 @@ function appendFillGroupBlocks(
         [first.start, last.end],
         group.overscanMm,
         group.fillStyle,
+        group.islandMotionPolicy,
       );
       const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
       if (run === null) continue;

@@ -16,7 +16,7 @@ export function IslandFillRecoveryAction({
   const outputScopeSettings = useStore((s) => s.outputScopeSettings);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
-  const switchIslandFillLayersToScanline = useStore((s) => s.switchIslandFillLayersToScanline);
+  const setLayerParam = useStore((s) => s.setLayerParam);
   const pushToast = useToastStore((s) => s.pushToast);
   const outputScope = useMemo<OutputScope>(
     () => ({
@@ -41,20 +41,24 @@ export function IslandFillRecoveryAction({
   if (!hasRisk) return null;
   return (
     <div style={islandFillRecoveryStyle} role="alert">
-      <strong>4040 Island Fill risk</strong>
+      <strong>4040 Island Fill runway</strong>
       <p style={islandFillRecoveryTextStyle}>
-        Scanline Fill is the safe path for this Neotronics 4040 job.
+        Island Fill can run on this profile, but it needs laser-off overscan runway.
       </p>
       <button
         type="button"
         onClick={() => {
-          switchIslandFillLayersToScanline();
-          pushToast('Switched Island Fill layers to Scanline Fill.', 'success');
+          for (const layer of project.scene.layers) {
+            if (layer.output && layer.mode === 'fill' && layer.fillStyle === 'island') {
+              setLayerParam(layer.id, { fillOverscanMm: Math.max(layer.fillOverscanMm, 5) });
+            }
+          }
+          pushToast('Set Island Fill overscan to 5 mm.', 'success');
         }}
         disabled={streaming}
-        title="Change every Island Fill layer in this project to Scanline Fill."
+        title="Set every output Island Fill layer to at least 5 mm fill overscan."
       >
-        Switch Island Fill layers to Scanline Fill
+        Set Island Fill overscan to 5 mm
       </button>
     </div>
   );

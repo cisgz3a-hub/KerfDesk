@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import {
   createLayer,
   createProject,
@@ -151,6 +152,26 @@ describe('detectJobIntentWarnings', () => {
 
     expect(detectJobIntentWarnings(islandProject)).toContain(
       'Island Fill has 3 short sweep(s) that need partial acceleration runway. KerfDesk will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.',
+    );
+  });
+
+  it('warns when the 4040-safe Island Fill motion policy is active', () => {
+    const project = projectWith(tinyIsland, 'fill');
+    const layer = project.scene.layers[0];
+    const islandProject: Project = {
+      ...project,
+      device: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      scene: {
+        ...project.scene,
+        layers:
+          layer === undefined
+            ? project.scene.layers
+            : [{ ...layer, fillStyle: 'island', fillOverscanMm: 5, hatchSpacingMm: 1 }],
+      },
+    };
+
+    expect(detectJobIntentWarnings(islandProject)).toContain(
+      '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
     );
   });
 

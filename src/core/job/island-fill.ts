@@ -3,6 +3,9 @@ import type { Polyline, Vec2 } from '../scene';
 const ISLAND_MERGE_TOLERANCE_MM = 0.25;
 const CENTER_ISLAND_RATIO = 0.1;
 const FULL_TURN = Math.PI * 2;
+const MICRO_ISLAND_MAX_DIMENSION_MM = 8;
+const MICRO_ISLAND_CLUSTER_GAP_MM = 3;
+const MICRO_ISLAND_CLUSTER_MAX_DIMENSION_MM = 40;
 
 type Bounds = {
   readonly minX: number;
@@ -16,6 +19,10 @@ type Island = {
   readonly bounds: Bounds;
 };
 
+type IslandCluster = Island & {
+  readonly microCluster: boolean;
+};
+
 type IndexedContour = {
   readonly index: number;
   readonly polyline: Polyline;
@@ -24,12 +31,16 @@ type IndexedContour = {
 
 export function groupFillContoursIntoIslands(
   polylines: ReadonlyArray<Polyline>,
+  options: { readonly clusterMicroIslands?: boolean } = {},
 ): ReadonlyArray<ReadonlyArray<Polyline>> {
   const contours = indexedContours(polylines);
   if (contours.length === 0) return [];
   const parent = contours.map((_, i) => i);
   unionConnectedContours(contours, parent);
-  return sortIslands(componentIslands(contours, parent)).map((island) => island.polylines);
+  const islands = componentIslands(contours, parent);
+  const grouped =
+    options.clusterMicroIslands === true ? clusterMicroIslands(islands) : islands;
+  return sortIslands(grouped).map((island) => island.polylines);
 }
 
 function indexedContours(polylines: ReadonlyArray<Polyline>): IndexedContour[] {
@@ -70,6 +81,43 @@ function componentIslands(contours: ReadonlyArray<IndexedContour>, parent: numbe
   }));
 }
 
+function clusterMicroIslands(islands: ReadonlyArray<Island>): Island[] {
+  const clusters: IslandCluster[] = [];
+  for (const island of islands) {
+    if (!isMicroIsland(island)) {
+      clusters.push({ ...island, microCluster: false });
+      continue;
+    }
+    const index = clusters.findIndex((cluster) => canJoinMicroCluster(cluster, island));
+    if (index === -1) {
+      clusters.push({ ...island, microCluster: true });
+      continue;
+    }
+    const cluster = clusters[index];
+    if (cluster !== undefined) clusters[index] = mergeMicroCluster(cluster, island);
+  }
+  return clusters.map(({ microCluster: _microCluster, ...island }) => island);
+}
+
+function canJoinMicroCluster(cluster: IslandCluster, island: Island): boolean {
+  if (!cluster.microCluster) return false;
+  if (boundsGap(cluster.bounds, island.bounds) > MICRO_ISLAND_CLUSTER_GAP_MM) return false;
+  const merged = unionBounds([cluster.bounds, island.bounds]);
+  return maxDimension(merged) <= MICRO_ISLAND_CLUSTER_MAX_DIMENSION_MM;
+}
+
+function mergeMicroCluster(cluster: IslandCluster, island: Island): IslandCluster {
+  return {
+    microCluster: true,
+    polylines: [...cluster.polylines, ...island.polylines],
+    bounds: unionBounds([cluster.bounds, island.bounds]),
+  };
+}
+
+function isMicroIsland(island: Island): boolean {
+  return maxDimension(island.bounds) <= MICRO_ISLAND_MAX_DIMENSION_MM;
+}
+
 function sortIslands(islands: Island[]): Island[] {
   if (islands.length <= 1) return islands;
   const allBounds = unionBounds(islands.map((island) => island.bounds));
@@ -104,6 +152,16 @@ function boundsTouchOrOverlap(a: Bounds, b: Bounds): boolean {
     a.minY - ISLAND_MERGE_TOLERANCE_MM <= b.maxY &&
     a.maxY + ISLAND_MERGE_TOLERANCE_MM >= b.minY
   );
+}
+
+function boundsGap(a: Bounds, b: Bounds): number {
+  const dx = Math.max(0, Math.max(a.minX - b.maxX, b.minX - a.maxX));
+  const dy = Math.max(0, Math.max(a.minY - b.maxY, b.minY - a.maxY));
+  return Math.hypot(dx, dy);
+}
+
+function maxDimension(bounds: Bounds): number {
+  return Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
 }
 
 function polylineBounds(polyline: Polyline): Bounds | null {

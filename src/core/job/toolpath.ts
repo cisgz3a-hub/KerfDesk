@@ -88,6 +88,7 @@ function appendFillGroupSteps(
       group.color,
       group.overscanMm,
       group.fillStyle,
+      group.islandMotionPolicy,
       scanOffsetMm,
     );
     if (end !== null) prevEnd = end;
@@ -246,13 +247,19 @@ function appendFillSweepSteps(
   color: string,
   overscanMm: number,
   fillStyle: FillGroup['fillStyle'],
+  islandMotionPolicy: FillGroup['islandMotionPolicy'],
   scanOffsetMm: number,
 ): Vec2 | null {
   const spans = scanOffsetSpans(sweep, scanOffsetMm);
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return null;
-  const overscan = effectiveFillOverscanMm([first.start, last.end], overscanMm, fillStyle);
+  const overscan = effectiveFillOverscanMm(
+    [first.start, last.end],
+    overscanMm,
+    fillStyle,
+    islandMotionPolicy,
+  );
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return null;
   appendTravelStep(steps, prevEnd, run.leadStart);

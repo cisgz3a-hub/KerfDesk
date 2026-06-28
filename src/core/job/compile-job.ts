@@ -30,6 +30,7 @@ import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { groupFillContoursIntoIslands } from './island-fill';
+import { islandFillMotionPolicyForDevice } from './island-fill-motion';
 import { offsetFillContours } from './offset-fill';
 import type { CutGroup, CutSegment, FillSegment, Group, Job } from './job';
 
@@ -161,18 +162,26 @@ function islandFillGroupsForLayer(
   const common = commonGroupFields(layer, device, powerSource);
   const fillRule = fillRuleForLayer(objects, layer);
   const contours = collectFillContoursForLayer(objects, layer, device);
-  return groupFillContoursIntoIslands(contours).flatMap((island): Group[] => {
-    const segments = memoizedFillHatchingWithMetadata(island, layer, fillRule).map((polyline) => ({
-      polyline: polyline.points,
-      closed: polyline.closed,
-      reverse: polyline.reverse,
-    }));
+  const islandMotionPolicy = islandFillMotionPolicyForDevice(device);
+  const sensitiveIslandFill = islandMotionPolicy === 'sensitive';
+  const hatchingLayer = sensitiveIslandFill ? { ...layer, fillBidirectional: false } : layer;
+  return groupFillContoursIntoIslands(contours, {
+    clusterMicroIslands: sensitiveIslandFill,
+  }).flatMap((island): Group[] => {
+    const segments = memoizedFillHatchingWithMetadata(island, hatchingLayer, fillRule).map(
+      (polyline) => ({
+        polyline: polyline.points,
+        closed: polyline.closed,
+        reverse: polyline.reverse,
+      }),
+    );
     if (segments.length === 0) return [];
     return [
       {
         ...common,
         kind: 'fill',
         fillStyle: 'island',
+        ...(sensitiveIslandFill ? { islandMotionPolicy } : {}),
         overscanMm: Math.max(0, layer.fillOverscanMm),
         segments,
       },

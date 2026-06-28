@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import { createLayer, IDENTITY_TRANSFORM, type SceneObject, type Transform } from '../scene';
 import { compileJob } from './compile-job';
 import type { FillGroup, Job } from './job';
@@ -180,6 +180,44 @@ describe('compileJob fill hatching', () => {
     expect(
       fills.every((fill) => fill.segments.every((segment) => segment.polyline.length === 2)),
     ).toBe(true);
+  });
+
+  it('keeps nearby tiny Island Fill letters separate on generic GRBL profiles', () => {
+    const layer = { ...fillLayer(), fillStyle: 'island' as never };
+    const a = closedSquareObj({ id: 'letter-a', color: '#ff0000', size: 3 });
+    const b = closedSquareObj({ id: 'letter-b', color: '#ff0000', x: 4.5, size: 3 });
+
+    const fills = fillGroups(compileJob({ objects: [a, b], layers: [layer] }, dev));
+
+    expect(fills).toHaveLength(2);
+    expect(fills.every((fill) => fill.islandMotionPolicy === undefined)).toBe(true);
+  });
+
+  it('clusters nearby tiny Island Fill letters and forces unidirectional sweeps on the 4040-safe profile', () => {
+    const layer = { ...fillLayer(), fillStyle: 'island' as never, fillBidirectional: true };
+    const a = closedSquareObj({ id: 'letter-a', color: '#ff0000', size: 3 });
+    const b = closedSquareObj({ id: 'letter-b', color: '#ff0000', x: 4.5, size: 3 });
+
+    const fills = fillGroups(
+      compileJob({ objects: [a, b], layers: [layer] }, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+    );
+
+    expect(fills).toHaveLength(1);
+    expect(fills[0]?.islandMotionPolicy).toBe('sensitive');
+    expect(fills[0]?.segments.every((segment) => !segment.reverse)).toBe(true);
+    expect(segmentsAtMachineY(fills[0], dev.bedHeight - 1)).toHaveLength(2);
+  });
+
+  it('does not cluster distant tiny Island Fill artwork on the 4040-safe profile', () => {
+    const layer = { ...fillLayer(), fillStyle: 'island' as never };
+    const left = closedSquareObj({ id: 'left', color: '#ff0000', size: 3 });
+    const right = closedSquareObj({ id: 'right', color: '#ff0000', x: 50, size: 3 });
+
+    const fills = fillGroups(
+      compileJob({ objects: [left, right], layers: [layer] }, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+    );
+
+    expect(fills).toHaveLength(2);
   });
 
   it('keeps Island Fill holes with their containing outer contour', () => {

@@ -107,7 +107,12 @@ function extendBoundsForFill(
     const last = spans[spans.length - 1];
     if (first === undefined || last === undefined) continue;
     const burnRun = [first.start, last.end] as const;
-    const overscan = effectiveFillOverscanMm(burnRun, group.overscanMm, group.fillStyle);
+    const overscan = effectiveFillOverscanMm(
+      burnRun,
+      group.overscanMm,
+      group.fillStyle,
+      group.islandMotionPolicy,
+    );
     const run = expandFillHatchWithOverscan(burnRun, overscan);
     if (run === null) continue;
     extendBoundsForPoint(b, run.leadStart);
