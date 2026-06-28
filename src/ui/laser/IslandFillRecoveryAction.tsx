@@ -3,6 +3,7 @@ import {
   findMachineProfilePreflightIssues,
   MACHINE_ISLAND_FILL_RISK_CODE,
 } from '../../core/preflight';
+import { islandFillMotionPolicyForDevice } from '../../core/job';
 import { validateOutputScope, type OutputScope, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -65,7 +66,7 @@ export function IslandFillRecoveryAction({
 }
 
 function hasMachineIslandFillRisk(project: Project, outputScope: OutputScope): boolean {
-  if (!hasPotential4040IslandFillRisk(project)) return false;
+  if (!hasPotentialSensitiveIslandFillRisk(project)) return false;
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return false;
   const scopedProject =
@@ -75,12 +76,9 @@ function hasMachineIslandFillRisk(project: Project, outputScope: OutputScope): b
   );
 }
 
-function hasPotential4040IslandFillRisk(project: Project): boolean {
-  const isNeotronics4040 =
-    project.device.machineFamily === 'neotronics-4040-max' ||
-    project.device.profileId === 'neotronics-4040-max-lt4lds-v2-20w';
+function hasPotentialSensitiveIslandFillRisk(project: Project): boolean {
   return (
-    isNeotronics4040 &&
+    islandFillMotionPolicyForDevice(project.device) === 'sensitive' &&
     project.scene.layers.some(
       (layer) => layer.output && layer.mode === 'fill' && layer.fillStyle === 'island',
     )
