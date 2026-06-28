@@ -7,9 +7,10 @@
 // the controller's job).
 
 import type { Vec2 } from '../scene';
-import type { Job, RasterGroup } from './job';
+import type { FillGroup, Group, Job, RasterGroup } from './job';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
-import { groupFillSweeps, type FillSweep } from './fill-sweeps';
+import { groupFillSweeps, type FillSpan, type FillSweep } from './fill-sweeps';
+import { offsetForSpeed, shiftAlongTravel, type ScanOffsetPoint } from './scan-offset';
 
 const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
 
@@ -27,47 +28,70 @@ export type Toolpath = {
   readonly totalLength: number;
 };
 
+export type BuildToolpathOptions = {
+  readonly startPoint?: Vec2;
+  readonly parkPoint?: Vec2;
+  readonly scanningOffsets?: ReadonlyArray<ScanOffsetPoint>;
+};
+
 export type ToolpathDistanceSummary = {
   readonly cutMm: number;
   readonly travelMm: number;
   readonly totalMm: number;
 };
 
-export function buildToolpath(job: Job): Toolpath {
+export function buildToolpath(job: Job, options: BuildToolpathOptions = {}): Toolpath {
   const steps: ToolpathStep[] = [];
-  let prevEnd: Vec2 | null = null;
+  let prevEnd: Vec2 | null = options.startPoint ?? null;
   for (const group of job.groups) {
-    if (group.kind === 'raster') {
-      prevEnd = appendRasterGroupSteps(steps, prevEnd, group);
-      continue;
-    }
-    if (group.kind === 'fill') {
-      if ((group.fillStyle ?? 'scanline') === 'offset') {
-        prevEnd = appendContourGroupSteps(steps, prevEnd, group.segments, group.color);
-        continue;
-      }
-      for (const sweep of groupFillSweeps(group.segments)) {
-        const end = appendFillSweepSteps(steps, prevEnd, sweep, group.color, group.overscanMm);
-        if (end !== null) prevEnd = end;
-      }
-      continue;
-    }
-    for (const seg of group.segments) {
-      const first = seg.polyline[0];
-      if (first === undefined) continue;
-      appendTravelStep(steps, prevEnd, first);
-      steps.push({
-        kind: 'cut',
-        color: group.color,
-        polyline: seg.polyline,
-        length: polylineLength(seg.polyline),
-      });
-      const last = seg.polyline[seg.polyline.length - 1];
-      if (last !== undefined) prevEnd = last;
-    }
+    prevEnd = appendGroupSteps(steps, prevEnd, group, options);
+  }
+  if (options.parkPoint !== undefined && prevEnd !== null) {
+    appendTravelStep(steps, prevEnd, options.parkPoint);
   }
   const totalLength = steps.reduce((sum, s) => sum + s.length, 0);
   return { steps, totalLength };
+}
+
+function appendGroupSteps(
+  steps: ToolpathStep[],
+  prevEnd: Vec2 | null,
+  group: Group,
+  options: BuildToolpathOptions,
+): Vec2 | null {
+  switch (group.kind) {
+    case 'raster':
+      return appendRasterGroupSteps(steps, prevEnd, group);
+    case 'fill':
+      return appendFillGroupSteps(steps, prevEnd, group, options);
+    case 'cut':
+      return appendContourGroupSteps(steps, prevEnd, group.segments, group.color);
+  }
+}
+
+function appendFillGroupSteps(
+  steps: ToolpathStep[],
+  initialPrevEnd: Vec2 | null,
+  group: FillGroup,
+  options: BuildToolpathOptions,
+): Vec2 | null {
+  if ((group.fillStyle ?? 'scanline') === 'offset') {
+    return appendContourGroupSteps(steps, initialPrevEnd, group.segments, group.color);
+  }
+  const scanOffsetMm = offsetForSpeed(options.scanningOffsets ?? [], group.speed);
+  let prevEnd = initialPrevEnd;
+  for (const sweep of groupFillSweeps(group.segments)) {
+    const end = appendFillSweepSteps(
+      steps,
+      prevEnd,
+      sweep,
+      group.color,
+      group.overscanMm,
+      scanOffsetMm,
+    );
+    if (end !== null) prevEnd = end;
+  }
+  return prevEnd;
 }
 
 function appendContourGroupSteps(
@@ -220,17 +244,19 @@ function appendFillSweepSteps(
   sweep: FillSweep,
   color: string,
   overscanMm: number,
+  scanOffsetMm: number,
 ): Vec2 | null {
-  const first = sweep.spans[0];
-  const last = sweep.spans[sweep.spans.length - 1];
+  const spans = scanOffsetSpans(sweep, scanOffsetMm);
+  const first = spans[0];
+  const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return null;
   const overscan = effectiveOverscanMm([first.start, last.end], overscanMm);
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return null;
   appendTravelStep(steps, prevEnd, run.leadStart);
   appendTravelStep(steps, run.leadStart, run.burnStart);
-  for (let i = 0; i < sweep.spans.length; i += 1) {
-    const span = sweep.spans[i];
+  for (let i = 0; i < spans.length; i += 1) {
+    const span = spans[i];
     if (span === undefined) continue;
     steps.push({
       kind: 'cut',
@@ -238,11 +264,19 @@ function appendFillSweepSteps(
       polyline: [span.start, span.end],
       length: dist(span.start, span.end),
     });
-    const next = sweep.spans[i + 1];
+    const next = spans[i + 1];
     if (next !== undefined) appendTravelStep(steps, span.end, next.start);
   }
   appendTravelStep(steps, run.burnEnd, run.leadEnd);
   return run.leadEnd;
+}
+
+function scanOffsetSpans(sweep: FillSweep, scanOffsetMm: number): ReadonlyArray<FillSpan> {
+  if (!sweep.reverse || scanOffsetMm === 0) return sweep.spans;
+  return sweep.spans.map((span) => {
+    const shifted = shiftAlongTravel(span.start, span.end, scanOffsetMm);
+    return { start: shifted.from, end: shifted.to };
+  });
 }
 
 function appendTravelStep(steps: ToolpathStep[], from: Vec2 | null, to: Vec2): void {

@@ -67,6 +67,49 @@ describe('buildToolpath', () => {
     expect(buildToolpath({ groups: [] })).toEqual({ steps: [], totalLength: 0 });
   });
 
+  it('can include the machine origin travel into the first cut and final park', () => {
+    const tp = buildToolpath(
+      {
+        groups: [
+          {
+            kind: 'cut',
+            layerId: 'L1',
+            color: '#000',
+            power: 30,
+            speed: 1000,
+            passes: 1,
+            airAssist: false,
+            segments: [
+              {
+                polyline: [
+                  { x: 10, y: 0 },
+                  { x: 20, y: 0 },
+                ],
+                closed: false,
+              },
+            ],
+          },
+        ],
+      },
+      { startPoint: { x: 0, y: 0 }, parkPoint: { x: 0, y: 0 } },
+    );
+
+    expect(tp.steps.map((s) => s.kind)).toEqual(['travel', 'cut', 'travel']);
+    expect(tp.steps[0]).toMatchObject({
+      kind: 'travel',
+      from: { x: 0, y: 0 },
+      to: { x: 10, y: 0 },
+      length: 10,
+    });
+    expect(tp.steps[2]).toMatchObject({
+      kind: 'travel',
+      from: { x: 20, y: 0 },
+      to: { x: 0, y: 0 },
+      length: 20,
+    });
+    expect(tp.totalLength).toBe(40);
+  });
+
   it('renders fill overscan as laser-off runway around the burn span', () => {
     const tp = buildToolpath({
       groups: [
@@ -175,6 +218,48 @@ describe('buildToolpath', () => {
       length: 3,
     });
     expect(tp.totalLength).toBe(20);
+  });
+
+  it('applies device scan offset to reverse fill sweeps in the preview route', () => {
+    const tp = buildToolpath(
+      {
+        groups: [
+          {
+            kind: 'fill',
+            layerId: 'fill',
+            color: '#000',
+            power: 30,
+            speed: 1000,
+            passes: 1,
+            airAssist: false,
+            overscanMm: 0,
+            segments: [
+              {
+                polyline: [
+                  { x: 20, y: 5 },
+                  { x: 10, y: 5 },
+                ],
+                closed: false,
+                reverse: true,
+              },
+            ],
+          },
+        ],
+      },
+      { scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 2 }] },
+    );
+
+    expect(tp.steps).toEqual([
+      {
+        kind: 'cut',
+        color: '#000',
+        polyline: [
+          { x: 18, y: 5 },
+          { x: 8, y: 5 },
+        ],
+        length: 10,
+      },
+    ]);
   });
 
   it('renders offset fill contours as normal contour cuts without overscan', () => {

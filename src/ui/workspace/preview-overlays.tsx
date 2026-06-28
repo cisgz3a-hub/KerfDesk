@@ -123,6 +123,8 @@ export function PreviewRouteControls(props: { readonly disabled?: boolean } = {}
         style={compactButtonStyle}
         disabled={disabled}
         aria-label={previewPlaying ? 'Pause route preview' : 'Play route preview'}
+        title={previewPlaying ? 'Pause route preview playback.' : 'Play route preview playback.'}
+        data-help-id="preview.routePlayback"
         onClick={() => {
           if (disabled) return;
           if (!previewPlaying && scrubberT >= 1) setScrubberT(0);
@@ -137,6 +139,8 @@ export function PreviewRouteControls(props: { readonly disabled?: boolean } = {}
         style={compactButtonStyle}
         disabled={disabled}
         aria-label="Restart route preview"
+        title="Restart route preview playback from the beginning."
+        data-help-id="preview.routeRestart"
         onClick={() => {
           if (disabled) return;
           setScrubberT(0);
@@ -151,6 +155,8 @@ export function PreviewRouteControls(props: { readonly disabled?: boolean } = {}
           value={previewPlaybackSpeed}
           aria-label="Route preview speed"
           disabled={disabled}
+          title="Choose how quickly the compressed route preview plays."
+          data-help-id="preview.routeSpeed"
           onChange={(e) => setPreviewPlaybackSpeed(e.currentTarget.value as PreviewPlaybackSpeed)}
         >
           <option value="slow">Slow</option>

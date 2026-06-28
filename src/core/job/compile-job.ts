@@ -9,24 +9,10 @@
 // Determinism: iteration order matches scene.layers and scene.objects (both
 // arrays, indexed loops) → repeatable across runs.
 
-/* eslint-disable max-lines -- Merge keeps raster/vector/lane compilation together; split next. */
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
 import { applyAutomaticTabsToPolylines } from '../geometry/tabs-bridges';
-import {
-  applyLumaAdjustments,
-  applyImageMaskToLuma,
-  dither,
-  maybeInvertLuma,
-  pixelExtentForMm,
-  resampleLumaNearest,
-  whiteLuma,
-} from '../raster';
-import {
-  effectiveObjectMinPowerPercent,
-  effectiveObjectPowerPercent,
-  objectPowerScalePercent,
-} from './object-power-scale';
+import { effectiveObjectPowerPercent, objectPowerScalePercent } from './object-power-scale';
 import {
   applyTransform,
   assertNever,
@@ -35,26 +21,19 @@ import {
   layerOperationSettingsEqual,
   layerFromSubLayer,
   type Polyline,
-  type RasterImage,
   type Scene,
   type SceneObject,
   type Transform,
   type Vec2,
 } from '../scene';
+import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
 import { groupFillContoursIntoIslands } from './island-fill';
 import { offsetFillContours } from './offset-fill';
-import { rasterBoundsInMachineCoords } from './raster-bounds';
-import type { CutGroup, CutSegment, FillSegment, Group, Job, RasterGroup } from './job';
+import type { CutGroup, CutSegment, FillSegment, Group, Job } from './job';
 
-// Default overscan kept here (not on Layer) so it can ride device
-// profiles in the future without a .lf2 schema bump. 5 mm matches
-// the ADR-020 baseline for diode lasers.
-export const DEFAULT_OVERSCAN_MM = 5;
-const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 const MAX_LAYER_FILL_CACHE_ENTRIES = 8;
-const WHITE_LUMA_BYTE = 255;
 
 // Allowed module-level cache (narrow exception to "no module-level mutable") —
 // see ADR-050. Identity-keyed via WeakMap (GC-bounded), output-invariant, inner
@@ -69,23 +48,9 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
   for (const layer of scene.layers) {
     if (!layer.output) continue;
     for (const operationLayer of outputOperationLayers(layer)) {
-      if (operationLayer.mode === 'image') {
-        // F.2.d: image-mode layer dispatches to raster compile. The
-        // layer's color binds to RasterImage objects via obj.color;
-        // every matching raster becomes its own RasterGroup. Open
-        // question for future: multi-image-on-one-layer behaviour
-        // (today we emit one group per image — operators can split
-        // by layer if they want different power/dither per image).
-        for (const obj of scene.objects) {
-          if (obj.kind !== 'raster-image' || obj.color !== operationLayer.color) continue;
-          if (obj.role === 'trace-source') continue;
-          const effectiveLayer = layerWithObjectOverride(operationLayer, obj);
-          if (effectiveLayer.mode !== 'image') continue;
-          groups.push(compileRasterGroup(obj, effectiveLayer, device, scene.objects));
-        }
-        continue;
+      if (operationLayer.mode !== 'image') {
+        groups.push(...compileVectorGroupsForLayer(scene.objects, operationLayer, device));
       }
-      groups.push(...compileVectorGroupsForLayer(scene.objects, operationLayer, device));
       groups.push(...compileRasterGroupsForLayer(scene.objects, operationLayer, device));
     }
   }
@@ -96,173 +61,6 @@ function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {
   return [layer, ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer))].filter(
     (operationLayer) => operationLayer.output,
   );
-}
-
-function compileRasterGroupsForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-): RasterGroup[] {
-  const groups: RasterGroup[] = [];
-  for (const obj of objects) {
-    if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
-    if (obj.role === 'trace-source') continue;
-    const effectiveLayer = layerWithObjectOverride(layer, obj);
-    if (effectiveLayer.mode !== 'image') continue;
-    groups.push(compileRasterGroup(obj, effectiveLayer, device, objects));
-  }
-  return groups;
-}
-
-// Builds a RasterGroup from one RasterImage + its Layer settings.
-// dither() turns the source pixels into a per-pixel S-value array
-// already scaled by layer.power; emit-raster only has to lay the
-// pixels onto the bed.
-//
-// Pure: depends on layer config and the image's data — the actual
-// PNG decoding has already happened upstream when the RasterImage
-// was created (UI layer; image-loader.ts). We work from `dataUrl`
-// metadata only via pixelWidth/pixelHeight; the actual greyscale
-// luma buffer is stored separately as base64 and decoded locally.
-function compileRasterGroup(
-  obj: RasterImage,
-  layer: Layer,
-  device: DeviceProfile,
-  objects: ReadonlyArray<SceneObject>,
-): RasterGroup {
-  // Missing/corrupt luma fails safe to white (S0), not black/full-burn.
-  const sourceLuma =
-    obj.lumaBase64 !== undefined
-      ? decodeBase64Luma(obj.lumaBase64, obj.pixelWidth * obj.pixelHeight)
-      : whiteLuma(obj.pixelWidth * obj.pixelHeight);
-  const adjustedLuma = applyLumaAdjustments(sourceLuma, obj);
-  const preparedLuma = maybeInvertLuma(adjustedLuma, layer.negativeImage);
-  const powerPercent = effectiveObjectPowerPercent(layer, obj);
-  const minPowerPercent = effectiveObjectMinPowerPercent(layer, obj);
-  const sMax = Math.round((powerPercent / 100) * device.maxPowerS);
-  const sMin = Math.round((minPowerPercent / 100) * device.maxPowerS);
-  const bounds = rasterBoundsInMachineCoords(obj, device);
-  const pixelWidth = layer.passThrough
-    ? obj.pixelWidth
-    : pixelExtentForMm(bounds.maxX - bounds.minX, layer.linesPerMm);
-  const pixelHeight = layer.passThrough
-    ? obj.pixelHeight
-    : pixelExtentForMm(bounds.maxY - bounds.minY, layer.linesPerMm);
-  const lineIntervalMm = (bounds.maxY - bounds.minY) / pixelHeight;
-  const luma = layer.passThrough
-    ? preparedLuma
-    : resampleLumaNearest(
-        { luma: preparedLuma, width: obj.pixelWidth, height: obj.pixelHeight },
-        pixelWidth,
-        pixelHeight,
-      );
-  const maskedLuma = applyImageMaskToLuma({
-    image: obj,
-    maskObject: imageMaskObjectFor(obj, objects),
-    luma,
-    width: pixelWidth,
-    height: pixelHeight,
-  });
-  // Layer settings win over per-image settings so the operator can
-  // re-tune one layer without editing every image on it.
-  const orientedLuma = orientRasterLumaForMachine(maskedLuma, pixelWidth, pixelHeight, obj, device);
-  const sValues = dither(
-    { luma: orientedLuma, width: pixelWidth, height: pixelHeight },
-    { algorithm: layer.ditherAlgorithm, sMax, sMin },
-  );
-  return {
-    kind: 'raster',
-    layerId: layer.id,
-    color: layer.color,
-    power: powerPercent,
-    speed: Math.min(layer.speed, device.maxFeed),
-    passes: Math.max(1, Math.floor(layer.passes)),
-    airAssist: layer.airAssist,
-    sValues,
-    pixelWidth,
-    pixelHeight,
-    bounds,
-    overscanMm: DEFAULT_OVERSCAN_MM,
-    dotWidthCorrectionMm: clamp(layer.dotWidthCorrectionMm, 0, lineIntervalMm),
-    bidirectional: layer.imageBidirectional,
-  };
-}
-
-function imageMaskObjectFor(
-  obj: RasterImage,
-  objects: ReadonlyArray<SceneObject>,
-): SceneObject | null {
-  if (obj.imageMaskId === undefined) return null;
-  return objects.find((candidate) => candidate.id === obj.imageMaskId) ?? null;
-}
-
-function orientRasterLumaForMachine(
-  luma: Uint8Array,
-  width: number,
-  height: number,
-  obj: RasterImage,
-  device: DeviceProfile,
-): Uint8Array {
-  // Negative scale (a handle dragged across the anchor) is a mirror: the
-  // canvas and dither preview render it flipped, so the burn must flip too
-  // (M3). XOR with the explicit mirror flags — a double flip is upright.
-  const objFlipX = obj.transform.mirrorX !== obj.transform.scaleX < 0;
-  const objFlipY = obj.transform.mirrorY !== obj.transform.scaleY < 0;
-  const flipX = originFlipsRasterX(device) !== objFlipX;
-  const flipY = originFlipsRasterY(device) !== objFlipY;
-  if (!flipX && !flipY) return luma;
-  const out = new Uint8Array(luma.length);
-  for (let y = 0; y < height; y += 1) {
-    const srcY = flipY ? height - 1 - y : y;
-    for (let x = 0; x < width; x += 1) {
-      const srcX = flipX ? width - 1 - x : x;
-      out[y * width + x] = luma[srcY * width + srcX] ?? WHITE_LUMA_BYTE;
-    }
-  }
-  return out;
-}
-
-function originFlipsRasterX(device: DeviceProfile): boolean {
-  return device.origin === 'front-right' || device.origin === 'rear-right';
-}
-
-function originFlipsRasterY(device: DeviceProfile): boolean {
-  return (
-    device.origin === 'front-left' || device.origin === 'front-right' || device.origin === 'center'
-  );
-}
-
-// Decode a base64-encoded luma buffer. Truncates / pads to the expected
-// length so a corrupt or partial buffer does not blow up the dither.
-// Missing/corrupt bytes are white so the laser stays off.
-function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
-  const out = whiteLuma(expectedLength);
-  let outIndex = 0;
-  let buffer = 0;
-  let bitCount = 0;
-  for (const char of base64) {
-    if (outIndex >= expectedLength || char === '=') break;
-    if (isBase64Whitespace(char)) continue;
-    const value = BASE64_ALPHABET.indexOf(char);
-    if (value === -1) return whiteLuma(expectedLength);
-    buffer = (buffer << 6) | value;
-    bitCount += 6;
-    if (bitCount >= 8) {
-      bitCount -= 8;
-      out[outIndex] = (buffer >> bitCount) & 0xff;
-      outIndex += 1;
-      buffer &= (1 << bitCount) - 1;
-    }
-  }
-  return out;
-}
-
-function isBase64Whitespace(char: string): boolean {
-  return char === ' ' || char === '\n' || char === '\r' || char === '\t';
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
 }
 
 function compileVectorGroupsForLayer(

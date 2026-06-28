@@ -82,7 +82,8 @@ describe('installActiveJobWakeLock', () => {
 
     const uninstall = installActiveJobWakeLock({ document, navigator: fakeNavigator(request) });
     await flush();
-    const first = request.mock.results[0]?.value === undefined ? null : await request.mock.results[0].value;
+    const first =
+      request.mock.results[0]?.value === undefined ? null : await request.mock.results[0].value;
     first?.dispatchEvent(new Event('release'));
     await flush();
 

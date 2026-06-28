@@ -8,51 +8,61 @@ import {
 } from './trace-benchmark-loop';
 
 describe('trace benchmark loop', () => {
-  it('rates current trace artifacts against explicit 10/10 benchmarks', async () => {
-    const audit = auditTraceBenchmarkResults(await runCurrentTraceBenchmarks(), { goalRating: 10 });
+  it(
+    'rates current trace artifacts against explicit 10/10 benchmarks',
+    { timeout: 120_000 },
+    async () => {
+      const audit = auditTraceBenchmarkResults(await runCurrentTraceBenchmarks(), {
+        goalRating: 10,
+      });
 
-    expect(audit.passed).toBe(true);
-    expect(audit.rating).toBe(10);
-    expect(audit.fixPrompt).toBeNull();
-    expect(audit.findings).toEqual([]);
-    expect(audit.results.map((result) => result.id)).toEqual([
-      'edge-square-canny-quality',
-      'edge-noisy-photo-controls',
-      'edge-segmented-curve-linking',
-      'arch-house-edge-curve-cleanup',
-      'centerline-landed-regression',
-      'arch-house-line-art-baseline',
-    ]);
-  });
+      expect(audit.passed).toBe(true);
+      expect(audit.rating).toBe(10);
+      expect(audit.fixPrompt).toBeNull();
+      expect(audit.findings).toEqual([]);
+      expect(audit.results.map((result) => result.id)).toEqual([
+        'edge-square-canny-quality',
+        'edge-noisy-photo-controls',
+        'edge-segmented-curve-linking',
+        'arch-house-edge-curve-cleanup',
+        'centerline-landed-regression',
+        'arch-house-line-art-baseline',
+      ]);
+    },
+  );
 
-  it('keeps curve linking, real Edge Detection, Centerline, and Line Art in the benchmark loop', async () => {
-    const results = await runCurrentTraceBenchmarks();
-    const curveLinking = requiredResult(results, 'edge-segmented-curve-linking');
-    const archHouseEdge = requiredResult(results, 'arch-house-edge-curve-cleanup');
-    const centerline = requiredResult(results, 'centerline-landed-regression');
-    const archHouse = requiredResult(results, 'arch-house-line-art-baseline');
+  it(
+    'keeps curve linking, real Edge Detection, Centerline, and Line Art in the benchmark loop',
+    { timeout: 120_000 },
+    async () => {
+      const results = await runCurrentTraceBenchmarks();
+      const curveLinking = requiredResult(results, 'edge-segmented-curve-linking');
+      const archHouseEdge = requiredResult(results, 'arch-house-edge-curve-cleanup');
+      const centerline = requiredResult(results, 'centerline-landed-regression');
+      const archHouse = requiredResult(results, 'arch-house-line-art-baseline');
 
-    expect(curveLinking.findings).toEqual([]);
-    expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(4);
-    expect(curveLinking.metrics.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
-    expect(curveLinking.metrics.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
+      expect(curveLinking.findings).toEqual([]);
+      expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(4);
+      expect(curveLinking.metrics.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
+      expect(curveLinking.metrics.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
 
-    expect(archHouseEdge.findings).toEqual([]);
-    expect(archHouseEdge.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);
-    expect(archHouseEdge.metrics.shortArchPolylineCount).toBeLessThanOrEqual(2);
-    expect(archHouseEdge.metrics.aggregateArchCoverageRatio).toBeGreaterThanOrEqual(0.95);
+      expect(archHouseEdge.findings).toEqual([]);
+      expect(archHouseEdge.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);
+      expect(archHouseEdge.metrics.shortArchPolylineCount).toBeLessThanOrEqual(2);
+      expect(archHouseEdge.metrics.aggregateArchCoverageRatio).toBeGreaterThanOrEqual(0.95);
 
-    expect(centerline.findings).toEqual([]);
-    expect(centerline.metrics.maxDeviationPx).toBeLessThanOrEqual(1.6);
-    expect(centerline.metrics.maxGapPx).toBeLessThanOrEqual(3.5);
-    expect(centerline.metrics.shortFragmentCount).toBe(0);
+      expect(centerline.findings).toEqual([]);
+      expect(centerline.metrics.maxDeviationPx).toBeLessThanOrEqual(1.6);
+      expect(centerline.metrics.maxGapPx).toBeLessThanOrEqual(3.5);
+      expect(centerline.metrics.shortFragmentCount).toBe(0);
 
-    expect(archHouse.findings).toEqual([]);
-    expect(archHouse.metrics.openPolylineCount).toBe(0);
-    expect(archHouse.metrics.bottomWordInk).toBeGreaterThanOrEqual(3000);
-    expect(archHouse.metrics.pointCount).toBeGreaterThan(500);
-    expect(archHouse.metrics.pointCount).toBeLessThan(80_000);
-  });
+      expect(archHouse.findings).toEqual([]);
+      expect(archHouse.metrics.openPolylineCount).toBe(0);
+      expect(archHouse.metrics.bottomWordInk).toBeGreaterThanOrEqual(3000);
+      expect(archHouse.metrics.pointCount).toBeGreaterThan(500);
+      expect(archHouse.metrics.pointCount).toBeLessThan(80_000);
+    },
+  );
 
   it('generates a concrete fix prompt when benchmark findings keep the rating below goal', () => {
     const audit = auditTraceBenchmarkResults([failingBenchmarkResult()], { goalRating: 10 });

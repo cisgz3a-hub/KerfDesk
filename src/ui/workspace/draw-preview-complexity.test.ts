@@ -57,7 +57,15 @@ describe('buildPreviewToolpath complexity guard', () => {
             speed: 1000,
             passes: 1,
             airAssist: false,
-            segments: [{ closed: false, polyline: [{ x: 0, y: 0 }, { x: 10, y: 0 }] }],
+            segments: [
+              {
+                closed: false,
+                polyline: [
+                  { x: 0, y: 0 },
+                  { x: 10, y: 0 },
+                ],
+              },
+            ],
           },
         ],
       },
@@ -74,9 +82,7 @@ describe('buildPreviewToolpath complexity guard', () => {
     gcodeMocks.prepareOutput.mockImplementationOnce(() => {
       throw new Error('prepareOutput should not run for a preview-skipped huge trace');
     });
-    const toolpath = buildPreviewToolpath(
-      traceProject(PREPARATION_RAW_VECTOR_SEGMENT_BUDGET + 1),
-    );
+    const toolpath = buildPreviewToolpath(traceProject(PREPARATION_RAW_VECTOR_SEGMENT_BUDGET + 1));
 
     expect(gcodeMocks.prepareOutput).not.toHaveBeenCalled();
     expect(toolpath.totalLength).toBe(0);

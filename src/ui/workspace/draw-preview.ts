@@ -135,7 +135,15 @@ export function buildPreviewToolpath(
   // The prepared job is in machine/work coordinates; the canvas (ghost +
   // raster sim) draws in scene space. Map back so the overlay registers with
   // the design instead of mirroring about the bed midline (H3).
-  return mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device);
+  return mapToolpathToScene(
+    buildToolpath(prepared.job, {
+      startPoint: { x: 0, y: 0 },
+      parkPoint: { x: 0, y: 0 },
+      scanningOffsets: project.device.scanningOffsets,
+    }),
+    prepared.jobOriginOffset,
+    project.device,
+  );
 }
 
 function emptyPreviewToolpath(previewIssue: PreviewIssue): PreviewToolpath {
@@ -192,7 +200,14 @@ function drawEndpoints(
   const start = firstRoutePoint(steps);
   const end = lastRoutePoint(steps);
   if (start !== null) {
-    drawRouteMarker(ctx, start, view, 3.5, canvasTheme.previewHeadStroke, canvasTheme.previewTravel);
+    drawRouteMarker(
+      ctx,
+      start,
+      view,
+      3.5,
+      canvasTheme.previewHeadStroke,
+      canvasTheme.previewTravel,
+    );
   }
   if (end !== null) {
     drawRouteMarker(ctx, end, view, 3.5, canvasTheme.previewTravel, canvasTheme.previewHeadStroke);

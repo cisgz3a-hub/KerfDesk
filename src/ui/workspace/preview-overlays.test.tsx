@@ -99,7 +99,9 @@ describe('PreviewRouteControls', () => {
     expect(useUiStore.getState().previewPlaying).toBe(true);
 
     await act(async () => {
-      const speed = host.querySelector<HTMLSelectElement>('select[aria-label="Route preview speed"]');
+      const speed = host.querySelector<HTMLSelectElement>(
+        'select[aria-label="Route preview speed"]',
+      );
       if (speed === null) throw new Error('speed selector missing');
       speed.value = 'fast';
       speed.dispatchEvent(new Event('change', { bubbles: true }));
@@ -135,7 +137,9 @@ async function renderPanel(
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(<PreviewStatsPanel toolpath={toolpath} estimate={estimate} routeLabel={routeLabel} />);
+    root.render(
+      <PreviewStatsPanel toolpath={toolpath} estimate={estimate} routeLabel={routeLabel} />,
+    );
   });
   cleanup = async () => {
     if (root !== null) await act(async () => root?.unmount());
@@ -181,7 +185,9 @@ async function renderCombinedPanel(): Promise<HTMLDivElement> {
   return host;
 }
 
-async function renderControls(options: { readonly disabled?: boolean } = {}): Promise<HTMLDivElement> {
+async function renderControls(
+  options: { readonly disabled?: boolean } = {},
+): Promise<HTMLDivElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;

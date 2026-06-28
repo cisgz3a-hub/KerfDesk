@@ -63,9 +63,7 @@ describe('preview / output parity (P1-C)', () => {
       // order would diverge from this prepared job and the deep-equal fails.
       // The preview is the prepared job mapped into the scene frame (H3) —
       // same steps, same order, same lengths, scene coordinates.
-      expect(buildPreviewToolpath(project)).toEqual(
-        mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device),
-      );
+      expect(buildPreviewToolpath(project)).toEqual(expectedPreviewToolpath(project, prepared));
     }
   });
 
@@ -76,11 +74,26 @@ describe('preview / output parity (P1-C)', () => {
     expect(prepared.ok).toBe(true);
     if (prepared.ok) {
       expect(buildPreviewToolpath(project, { outputScope })).toEqual(
-        mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device),
+        expectedPreviewToolpath(project, prepared),
       );
     }
   });
 });
+
+function expectedPreviewToolpath(
+  project: Project,
+  prepared: Extract<ReturnType<typeof prepareOutput>, { readonly ok: true }>,
+) {
+  return mapToolpathToScene(
+    buildToolpath(prepared.job, {
+      startPoint: { x: 0, y: 0 },
+      parkPoint: { x: 0, y: 0 },
+      scanningOffsets: project.device.scanningOffsets,
+    }),
+    prepared.jobOriginOffset,
+    project.device,
+  );
+}
 
 function twoObjectProject(): Project {
   const base = createProject();
