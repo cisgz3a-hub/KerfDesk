@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GrblState, StatusReport } from '../../core/controllers/grbl';
+import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
@@ -127,6 +128,48 @@ function rasterProjectWithScanOffset(): Project {
   };
 }
 
+function neotronicsFineDetailFillProject(fillStyle: 'scanline' | 'island'): Project {
+  const object: SceneObject = {
+    kind: 'imported-svg',
+    id: 'tiny-island',
+    source: 'tiny-island.svg',
+    bounds: { minX: 20, minY: 20, maxX: 23, maxY: 23 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            points: [
+              { x: 20, y: 20 },
+              { x: 23, y: 20 },
+              { x: 23, y: 23 },
+              { x: 20, y: 23 },
+            ],
+            closed: true,
+          },
+        ],
+      },
+    ],
+  };
+  return {
+    ...createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [object],
+      layers: [
+        {
+          ...createLayer({ id: 'L1', color: '#ff0000', mode: 'fill' }),
+          fillStyle,
+          fillOverscanMm: 5,
+          hatchSpacingMm: 1,
+          power: 10,
+        },
+      ],
+    },
+  };
+}
+
 describe('prepareStartJob', () => {
   it('blocks Start when connected controller $30 differs from project max S', () => {
     const result = prepareStartJob(
@@ -198,6 +241,31 @@ describe('prepareStartJob', () => {
         'Trace "logo.png" is vector Line output, not raster image engraving. It will run as M3 constant-power vector moves and can cut if power/speed are too aggressive.',
       );
     }
+  });
+
+  it('blocks risky Island Fill short sweeps on the Neotronics 4040 profile', () => {
+    const result = prepareStartJob(
+      neotronicsFineDetailFillProject('island'),
+      readyController,
+      readyMachine,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages).toContain(
+        'Neotronics 4040 Island Fill has short acceleration-sensitive sweeps. Use Scanline Fill for this burn; Island Fill on this profile needs dedicated material/motion calibration before it should be trusted.',
+      );
+    }
+  });
+
+  it('allows the same Neotronics 4040 fine-detail job with Scanline Fill', () => {
+    const result = prepareStartJob(
+      neotronicsFineDetailFillProject('scanline'),
+      readyController,
+      readyMachine,
+    );
+
+    expect(result.ok).toBe(true);
   });
 
   it('accepts a Verified Frame signature computed from scan-offset-aware bounds', () => {

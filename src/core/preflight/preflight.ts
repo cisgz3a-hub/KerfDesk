@@ -26,6 +26,7 @@ import {
 } from '../invariants';
 import { machineBoundsForDevice, resolveGrblDialect } from '../devices';
 import { DEFAULT_OVERSCAN_MM } from '../job';
+import { findMachineProfilePreflightIssues } from './machine-profile-preflight';
 import { findNoGoZoneCollisions } from './no-go-zone-preflight';
 
 export type PreflightCode =
@@ -36,6 +37,7 @@ export type PreflightCode =
   | 'passes-below-one'
   | 'layer-mode-mismatch'
   | 'offset-fill-open-contour'
+  | 'machine-island-fill-risk'
   | 'unsupported-raster-transform'
   | 'laser-on-travel'
   | 'long-blank-feed'
@@ -93,6 +95,8 @@ export function runPreflight(
   appendOffsetFillOpenContourIssues(project.scene, outputLayers, issues);
 
   appendUnsupportedRasterTransformIssues(project.scene, outputLayers, issues);
+
+  issues.push(...findMachineProfilePreflightIssues(project));
 
   appendBoundsIssues(project, gcode, issues, options);
 
