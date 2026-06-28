@@ -343,7 +343,10 @@ describe('applyTraceToExisting (ADR-026)', () => {
     expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('fill');
   });
 
-  it('keeps existing same-color layers unchanged for Follow Shape object overrides', () => {
+  it.each([
+    ['Follow Shape', 'offset' as const],
+    ['Island Fill', 'island' as const],
+  ])('keeps existing same-color layers unchanged for %s object overrides', (_label, fillStyle) => {
     const project = projectWithSource();
     const withLineLayer: Project = {
       ...project,
@@ -357,24 +360,27 @@ describe('applyTraceToExisting (ADR-026)', () => {
       'src1',
       {
         ...tracedVector(),
-        operationOverride: { mode: 'fill', fillStyle: 'offset' },
+        operationOverride: { mode: 'fill', fillStyle },
       },
     );
 
     expect(result.project.scene.layers.find((l) => l.color === '#000000')?.mode).toBe('line');
     expect(
       result.project.scene.objects.find((o) => o.id === 'trace1')?.operationOverride,
-    ).toEqual({ mode: 'fill', fillStyle: 'offset' });
+    ).toEqual({ mode: 'fill', fillStyle });
   });
 
-  it('still creates a fill-capable layer when Follow Shape uses a new trace color', () => {
+  it.each([
+    ['Follow Shape', 'offset' as const],
+    ['Island Fill', 'island' as const],
+  ])('still creates a fill-capable layer when %s uses a new trace color', (_label, fillStyle) => {
     const project = projectWithSource();
     const result = applyTraceToExisting(
       { project, undoStack: [] },
       'src1',
       {
         ...tracedVector(),
-        operationOverride: { mode: 'fill', fillStyle: 'offset' },
+        operationOverride: { mode: 'fill', fillStyle },
       },
     );
 

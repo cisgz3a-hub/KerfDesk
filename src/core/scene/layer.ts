@@ -14,7 +14,7 @@ export type LayerMode = 'line' | 'fill' | 'image';
 // type does not reach into the SceneObject module. Kept aligned;
 // adding an algorithm here also needs the matching dither.ts arm.
 export type LayerDitherAlgorithm = DitherAlgorithm;
-export type LayerFillStyle = 'scanline' | 'offset';
+export type LayerFillStyle = 'scanline' | 'offset' | 'island';
 
 export type LayerOperationSettings = {
   readonly mode: LayerMode;

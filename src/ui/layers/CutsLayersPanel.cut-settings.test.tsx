@@ -273,6 +273,15 @@ describe('CutsLayersPanel cut settings editor', () => {
       expect(state.project.scene.layers[0]?.fillStyle).toBe('scanline');
       expect(state.project.scene.objects[0]?.operationOverride?.fillStyle).toBe('offset');
 
+      await act(async () => {
+        fillStyle.value = 'island';
+        Simulate.change(fillStyle);
+      });
+
+      state = useStore.getState();
+      expect(state.project.scene.layers[0]?.fillStyle).toBe('scanline');
+      expect(state.project.scene.objects[0]?.operationOverride?.fillStyle).toBe('island');
+
       await clickButtonWithText(host, 'Reset to layer defaults');
 
       state = useStore.getState();

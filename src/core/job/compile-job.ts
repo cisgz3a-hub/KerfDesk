@@ -43,9 +43,10 @@ import {
 } from '../scene';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
 import { fillRuleForLayer, layerFillCacheKey } from './fill-rule';
+import { groupFillContoursIntoIslands } from './island-fill';
 import { offsetFillContours } from './offset-fill';
 import { rasterBoundsInMachineCoords } from './raster-bounds';
-import type { CutSegment, FillSegment, Group, Job, RasterGroup } from './job';
+import type { CutGroup, CutSegment, FillSegment, Group, Job, RasterGroup } from './job';
 
 // Default overscan kept here (not on Layer) so it can ride device
 // profiles in the future without a .lf2 schema bump. 5 mm matches
@@ -264,15 +265,6 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
 }
 
-function collectSegmentsForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  device: DeviceProfile,
-): CutSegment[] {
-  if (layer.mode === 'fill') return collectFillSegmentsForLayer(objects, layer, device);
-  return collectLineSegmentsForLayer(objects, layer, device);
-}
-
 function compileVectorGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
@@ -298,20 +290,11 @@ function vectorGroupsForObjects(
 ): Group[] {
   const sharedScale = sharedObjectPowerScalePercent(matchingObjects);
   if (sharedScale !== undefined) {
-    return vectorGroupForLayer(
-      layer,
-      device,
-      collectSegmentsForLayer(sourceObjects, layer, device),
-      {
-        powerScale: sharedScale,
-      },
-    );
+    return vectorGroupsForLayer(sourceObjects, layer, device, { powerScale: sharedScale });
   }
   const groups: Group[] = [];
   for (const obj of matchingObjects) {
-    groups.push(
-      ...vectorGroupForLayer(layer, device, collectSegmentsForLayer([obj], layer, device), obj),
-    );
+    groups.push(...vectorGroupsForLayer([obj], layer, device, obj));
   }
   return groups;
 }
@@ -342,14 +325,69 @@ function layerWithObjectOverride(layer: Layer, obj: SceneObject): Layer {
   return { ...layer, ...obj.operationOverride };
 }
 
-function vectorGroupForLayer(
+function vectorGroupsForLayer(
+  objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
-  segments: ReadonlyArray<CutSegment>,
   powerSource: SceneObject | { readonly powerScale: number },
 ): Group[] {
+  if (layer.mode === 'fill') {
+    if (layer.fillStyle === 'island') {
+      return islandFillGroupsForLayer(objects, layer, device, powerSource);
+    }
+    const segments = collectFillSegmentsForLayer(objects, layer, device);
+    if (segments.length === 0) return [];
+    const common = commonGroupFields(layer, device, powerSource);
+    return [
+      {
+        ...common,
+        kind: 'fill' as const,
+        fillStyle: layer.fillStyle,
+        overscanMm: Math.max(0, layer.fillOverscanMm),
+        segments,
+      },
+    ];
+  }
+  const segments = collectLineSegmentsForLayer(objects, layer, device);
   if (segments.length === 0) return [];
-  const common = {
+  const common = commonGroupFields(layer, device, powerSource);
+  return [{ ...common, kind: 'cut' as const, segments }];
+}
+
+function islandFillGroupsForLayer(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+  device: DeviceProfile,
+  powerSource: SceneObject | { readonly powerScale: number },
+): Group[] {
+  const common = commonGroupFields(layer, device, powerSource);
+  const fillRule = fillRuleForLayer(objects, layer);
+  const contours = collectFillContoursForLayer(objects, layer, device);
+  return groupFillContoursIntoIslands(contours).flatMap((island): Group[] => {
+    const segments = memoizedFillHatchingWithMetadata(island, layer, fillRule).map((polyline) => ({
+      polyline: polyline.points,
+      closed: polyline.closed,
+      reverse: polyline.reverse,
+    }));
+    if (segments.length === 0) return [];
+    return [
+      {
+        ...common,
+        kind: 'fill',
+        fillStyle: 'island',
+        overscanMm: Math.max(0, layer.fillOverscanMm),
+        segments,
+      },
+    ];
+  });
+}
+
+function commonGroupFields(
+  layer: Layer,
+  device: DeviceProfile,
+  powerSource: SceneObject | { readonly powerScale: number },
+): Omit<CutGroup, 'kind' | 'segments'> {
+  return {
     layerId: layer.id,
     color: layer.color,
     power: effectiveObjectPowerPercent(layer, powerSource),
@@ -357,17 +395,6 @@ function vectorGroupForLayer(
     passes: Math.max(1, Math.floor(layer.passes)),
     airAssist: layer.airAssist,
   };
-  return [
-    layer.mode === 'fill'
-      ? {
-          ...common,
-          kind: 'fill' as const,
-          fillStyle: layer.fillStyle,
-          overscanMm: Math.max(0, layer.fillOverscanMm),
-          segments: segments as ReadonlyArray<FillSegment>,
-        }
-      : { ...common, kind: 'cut' as const, segments },
-  ];
 }
 
 function sharedObjectPowerScalePercent(objects: ReadonlyArray<SceneObject>): number | undefined {

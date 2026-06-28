@@ -39,7 +39,7 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
     optionalNumber(layer, `${path}.hatchAngleDeg`),
     optionalPositiveNumber(layer, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(layer, `${path}.fillOverscanMm`),
-    optionalLiteral(layer, `${path}.fillStyle`, ['scanline', 'offset']),
+    optionalLiteral(layer, `${path}.fillStyle`, ['scanline', 'offset', 'island']),
     optionalBoolean(layer, `${path}.fillBidirectional`),
     optionalBoolean(layer, `${path}.fillCrossHatch`),
     optionalLiteral(layer, `${path}.ditherAlgorithm`, DITHER_ALGORITHMS),

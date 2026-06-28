@@ -26,6 +26,7 @@ import { prepareOutput } from '../../io/gcode';
 import { buildDisplayPolylines } from './display-polylines';
 import { strideForSegmentBudget } from './draw-complexity';
 import { strokePolylinesBatched } from './draw-vector-strokes';
+import type { PreviewIssue, PreviewToolpath } from './preview-status';
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { ViewTransform } from './view-transform';
 
@@ -85,20 +86,36 @@ export function drawPreview(
   toolpath: Toolpath,
   view: ViewTransform,
   scrubberT: number,
-  options: { readonly showTravel?: boolean } = {},
+  options: {
+    readonly showTravel?: boolean;
+    readonly showFuture?: boolean;
+    readonly showEndpoints?: boolean;
+  } = {},
 ): void {
   if (toolpath.totalLength === 0) return;
   const showTravel = options.showTravel !== false;
+  const showFuture = options.showFuture !== false;
+  const showEndpoints = options.showEndpoints !== false;
+  if (showFuture && scrubberT < 1) {
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    drawWholeSteps(ctx, toolpath.steps, view, showTravel);
+    ctx.restore();
+  }
   const sliced = sliceToolpath(toolpath, scrubberT * toolpath.totalLength);
+  ctx.save();
+  ctx.globalAlpha = 0.72;
   drawWholeSteps(ctx, sliced.whole, view, showTravel);
   if (sliced.partial !== null) drawStep(ctx, sliced.partial, view, showTravel);
+  ctx.restore();
+  if (showEndpoints) drawEndpoints(ctx, toolpath.steps, view);
   if (sliced.head !== null && scrubberT < 1) drawHead(ctx, sliced.head, view);
 }
 
 export function buildPreviewToolpath(
   project: Project,
   options: { readonly jobOrigin?: JobOriginPlacement; readonly outputScope?: OutputScope } = {},
-): Toolpath {
+): PreviewToolpath {
   // Use the SAME prepared job (compile + optimize) as Save/Start so the preview
   // shows the exact path ORDER the machine runs (roadmap P1-C). Cheap scoped
   // complexity gates run first so huge traces/fills never reach synchronous
@@ -109,7 +126,7 @@ export function buildPreviewToolpath(
       : validateOutputScope(project.scene, options.outputScope);
   if (scoped !== null && !scoped.ok) return buildToolpath(EMPTY_JOB);
   const complexityScene = scoped === null ? project.scene : scoped.scene;
-  if (scenePreparationTooComplex(complexityScene)) return buildToolpath(EMPTY_JOB);
+  if (scenePreparationTooComplex(complexityScene)) return emptyPreviewToolpath('too-complex');
   const prepared = prepareOutput(project, {
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
@@ -119,6 +136,10 @@ export function buildPreviewToolpath(
   // raster sim) draws in scene space. Map back so the overlay registers with
   // the design instead of mirroring about the bed midline (H3).
   return mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device);
+}
+
+function emptyPreviewToolpath(previewIssue: PreviewIssue): PreviewToolpath {
+  return { ...buildToolpath(EMPTY_JOB), previewIssue };
 }
 
 function drawStep(
@@ -160,14 +181,40 @@ function drawWholeSteps(
 }
 
 function drawHead(ctx: CanvasRenderingContext2D, head: Vec2, view: ViewTransform): void {
+  drawRouteMarker(ctx, head, view, 5, canvasTheme.previewHeadFill, canvasTheme.previewHeadStroke);
+}
+
+function drawEndpoints(
+  ctx: CanvasRenderingContext2D,
+  steps: ReadonlyArray<ToolpathStep>,
+  view: ViewTransform,
+): void {
+  const start = firstRoutePoint(steps);
+  const end = lastRoutePoint(steps);
+  if (start !== null) {
+    drawRouteMarker(ctx, start, view, 3.5, canvasTheme.previewHeadStroke, canvasTheme.previewTravel);
+  }
+  if (end !== null) {
+    drawRouteMarker(ctx, end, view, 3.5, canvasTheme.previewTravel, canvasTheme.previewHeadStroke);
+  }
+}
+
+function drawRouteMarker(
+  ctx: CanvasRenderingContext2D,
+  head: Vec2,
+  view: ViewTransform,
+  radiusPx: number,
+  fillStyle: string,
+  strokeStyle: string,
+): void {
   const cx = view.offsetX + head.x * view.scale;
   const cy = view.offsetY + head.y * view.scale;
   ctx.save();
-  ctx.fillStyle = canvasTheme.previewHeadFill;
-  ctx.strokeStyle = canvasTheme.previewHeadStroke;
+  ctx.fillStyle = fillStyle;
+  ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
@@ -192,11 +239,11 @@ function drawTravel(
 function drawCut(
   ctx: CanvasRenderingContext2D,
   polyline: ReadonlyArray<Vec2>,
-  color: string,
+  _color: string,
   view: ViewTransform,
 ): void {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = canvasTheme.previewCut;
+  ctx.lineWidth = 1;
   ctx.beginPath();
   const stride = strideForSegmentBudget(Math.max(0, polyline.length - 1));
   if (stride > 1) {
@@ -218,4 +265,21 @@ function drawCut(
     }
   }
   ctx.stroke();
+}
+
+function firstRoutePoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
+  const first = steps[0];
+  if (first === undefined) return null;
+  return first.kind === 'travel' ? first.from : (first.polyline[0] ?? null);
+}
+
+function lastRoutePoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    const step = steps[i];
+    if (step === undefined) continue;
+    if (step.kind === 'travel') return step.to;
+    const end = step.polyline[step.polyline.length - 1];
+    if (end !== undefined) return end;
+  }
+  return null;
 }

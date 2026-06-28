@@ -11,6 +11,10 @@ function firstFillGroup(job: Job): FillGroup | undefined {
   return group?.kind === 'fill' ? group : undefined;
 }
 
+function fillGroups(job: Job): FillGroup[] {
+  return job.groups.filter((group): group is FillGroup => group.kind === 'fill');
+}
+
 function closedSquareObj(args: {
   readonly id: string;
   readonly color: string;
@@ -57,6 +61,15 @@ function segmentsAtMachineY(
       const maxX = Math.max(a.x, b.x);
       return { minX, maxX, length: maxX - minX };
     });
+}
+
+function groupCenter(fill: FillGroup): { readonly x: number; readonly y: number } {
+  const points = fill.segments.flatMap((segment) => segment.polyline);
+  if (points.length === 0) return { x: 0, y: 0 };
+  return {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+  };
 }
 
 function fillLayer(color = '#ff0000'): ReturnType<typeof createLayer> {
@@ -153,6 +166,48 @@ describe('compileJob fill hatching', () => {
     expect(segments.some((segment) => segment.reverse === true)).toBe(true);
     expect(segments.filter(isHorizontalSegment).some((segment) => segment.reverse)).toBe(true);
     expect(segments.filter(isVerticalSegment).some((segment) => segment.reverse)).toBe(true);
+  });
+
+  it('compiles Island Fill as one scanline fill group per separate island', () => {
+    const layer = { ...fillLayer(), fillStyle: 'island' as never };
+    const left = closedSquareObj({ id: 'left', color: '#ff0000', size: 6 });
+    const right = closedSquareObj({ id: 'right', color: '#ff0000', x: 30, size: 6 });
+
+    const fills = fillGroups(compileJob({ objects: [left, right], layers: [layer] }, dev));
+
+    expect(fills).toHaveLength(2);
+    expect(fills.every((fill) => fill.fillStyle === 'island')).toBe(true);
+    expect(fills.every((fill) => fill.segments.every((segment) => segment.polyline.length === 2)))
+      .toBe(true);
+  });
+
+  it('keeps Island Fill holes with their containing outer contour', () => {
+    const layer = { ...fillLayer(), fillStyle: 'island' as never };
+    const outer = closedSquareObj({ id: 'outer', color: '#ff0000', size: 12 });
+    const inner = closedSquareObj({ id: 'inner', color: '#ff0000', x: 4, y: 4, size: 4 });
+
+    const fills = fillGroups(compileJob({ objects: [outer, inner], layers: [layer] }, dev));
+
+    expect(fills).toHaveLength(1);
+    expect(segmentsAtMachineY(fills[0], dev.bedHeight - 6)).toHaveLength(2);
+  });
+
+  it('orders Island Fill outer islands clockwise before center islands', () => {
+    const layer = { ...fillLayer(), fillStyle: 'island' as never };
+    const top = closedSquareObj({ id: 'top', color: '#ff0000', x: 20, y: 60, size: 4 });
+    const right = closedSquareObj({ id: 'right', color: '#ff0000', x: 60, y: 20, size: 4 });
+    const bottom = closedSquareObj({ id: 'bottom', color: '#ff0000', x: 20, y: -20, size: 4 });
+    const left = closedSquareObj({ id: 'left', color: '#ff0000', x: -20, y: 20, size: 4 });
+    const center = closedSquareObj({ id: 'center', color: '#ff0000', x: 20, y: 20, size: 4 });
+
+    const fills = fillGroups(
+      compileJob({ objects: [center, left, bottom, right, top], layers: [layer] }, dev),
+    );
+    const centers = fills.map(groupCenter);
+
+    expect(fills).toHaveLength(5);
+    expect(centers.map((centerPoint) => Math.round(centerPoint.x))).toEqual([22, 62, 22, -18, 22]);
+    expect(Math.round(centers[4]?.y ?? 0)).toBe(dev.bedHeight - 22);
   });
 });
 

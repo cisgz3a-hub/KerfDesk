@@ -4,14 +4,15 @@
 // overlays (M27) can read emptiness without preparing the job a second time.
 
 import { useMemo } from 'react';
-import { buildToolpath, EMPTY_JOB, type Toolpath } from '../../core/job';
+import { buildToolpath, EMPTY_JOB } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { resolveJobPlacement } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath } from './draw-preview';
+import type { PreviewToolpath } from './preview-status';
 
-export function usePreviewToolpath(project: Project, previewMode: boolean): Toolpath | null {
+export function usePreviewToolpath(project: Project, previewMode: boolean): PreviewToolpath | null {
   const jobPlacement = useStore((s) => s.jobPlacement);
   const outputScope = useStore((s) => currentOutputScope(s));
   const statusReport = useLaserStore((s) => s.statusReport);

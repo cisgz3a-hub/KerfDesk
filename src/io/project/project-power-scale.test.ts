@@ -126,6 +126,20 @@ describe('project object power scale validation', () => {
     }
   });
 
+  it('accepts Island Fill in object operation overrides', () => {
+    const result = deserializeProject(
+      rawProject([vectorObject(100, { mode: 'fill', fillStyle: 'island' })]),
+    );
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project.scene.objects[0]?.operationOverride).toEqual({
+        mode: 'fill',
+        fillStyle: 'island',
+      });
+    }
+  });
+
   it('rejects Auto Fastest in object operation overrides', () => {
     const result = deserializeProject(
       rawProject([vectorObject(100, { mode: 'fill', fillStyle: 'auto' })]),

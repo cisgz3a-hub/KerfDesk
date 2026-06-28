@@ -142,7 +142,11 @@ function sanitizeOperationOverridePatch(patch: ObjectOperationOverride): ObjectO
   setFiniteNumber(out, 'hatchAngleDeg', patch.hatchAngleDeg);
   setPositiveNumber(out, 'hatchSpacingMm', patch.hatchSpacingMm);
   setNonNegativeNumber(out, 'fillOverscanMm', patch.fillOverscanMm);
-  if (patch.fillStyle === 'scanline' || patch.fillStyle === 'offset')
+  if (
+    patch.fillStyle === 'scanline' ||
+    patch.fillStyle === 'offset' ||
+    patch.fillStyle === 'island'
+  )
     out.fillStyle = patch.fillStyle;
   setBoolean(out, 'fillBidirectional', patch.fillBidirectional);
   setBoolean(out, 'fillCrossHatch', patch.fillCrossHatch);

@@ -40,21 +40,49 @@
 // Pure-core compliant: no clock, no random, no I/O.
 
 import type { Vec2 } from '../scene';
-import type { CutGroup, CutSegment, Group, Job } from './job';
+import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import { groupFillSweeps } from './fill-sweeps';
+import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
 
 const ORIGIN: Vec2 = { x: 0, y: 0 };
 export const MAX_NEAREST_NEIGHBOR_SEGMENTS = 2_000;
 
 export function optimizePaths(job: Job): Job {
-  return { groups: job.groups.map(optimizeGroupAny) };
+  return { groups: optimizeGroups(job.groups) };
 }
 
-// F.2.d: raster and fill groups pass through untouched. Fill source order is
-// semantically meaningful: scanline rows depend on sweep ordering, and
-// Follow Shape/offset contours should finish a shape before crossing the bed.
+function optimizeGroups(groups: ReadonlyArray<Group>): Group[] {
+  const out: Group[] = [];
+  let i = 0;
+  while (i < groups.length) {
+    const group = optimizeGroupAny(groups[i] as Group);
+    if (!isIslandFillGroup(group)) {
+      out.push(group);
+      i += 1;
+      continue;
+    }
+
+    const run: FillGroup[] = [group];
+    i += 1;
+    while (i < groups.length) {
+      const next = optimizeGroupAny(groups[i] as Group);
+      if (!isCompatibleIslandFillGroup(run[0] as FillGroup, next)) break;
+      run.push(next);
+      i += 1;
+    }
+    out.push(...optimizeIslandFillGroups(run));
+  }
+  return out;
+}
+
+// Raster and scanline groups pass through untouched. Scanline source order is
+// semantically meaningful: row order, bidirectional scan offset, and overscan
+// all depend on sweep ordering. Island Fill is optimized only as whole groups;
+// Offset/Follow Shape is optimized as contour segments.
 function optimizeGroupAny(group: Group): Group {
-  if (group.kind !== 'cut') return group;
-  return optimizeGroup(group);
+  if (group.kind === 'cut') return optimizeGroup(group);
+  if (isOffsetFillGroup(group)) return optimizeOffsetFillGroup(group);
+  return group;
 }
 
 function optimizeGroup(group: CutGroup): CutGroup {
@@ -70,10 +98,38 @@ function optimizeGroup(group: CutGroup): CutGroup {
   return { ...group, segments: ordered };
 }
 
-function insideFirstNearestNeighborOrder(segments: ReadonlyArray<CutSegment>): CutSegment[] {
+function optimizeOffsetFillGroup(group: FillGroup): FillGroup {
+  if (group.segments.length === 0) return group;
+  if (group.segments.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return group;
+  return { ...group, segments: insideFirstNearestNeighborOrder(group.segments) };
+}
+
+function optimizeIslandFillGroups(groups: ReadonlyArray<FillGroup>): FillGroup[] {
+  if (groups.length <= 1 || groups.length > MAX_NEAREST_NEIGHBOR_SEGMENTS) return [...groups];
+  const endpoints = groups.map(islandGroupEndpoints);
+  if (endpoints.some((entry) => entry === null)) return [...groups];
+
+  const remaining = new Set<number>();
+  for (let i = 0; i < groups.length; i += 1) remaining.add(i);
+  const out: FillGroup[] = [];
+  let cursor = ORIGIN;
+  while (remaining.size > 0) {
+    const pick = pickBestIslandGroup(endpoints, remaining, cursor);
+    if (pick === null) break;
+    remaining.delete(pick);
+    const group = groups[pick];
+    const endpoint = endpoints[pick];
+    if (group === undefined || endpoint === undefined || endpoint === null) continue;
+    out.push(group);
+    cursor = endpoint.exit;
+  }
+  return out.length === groups.length ? out : [...groups];
+}
+
+function insideFirstNearestNeighborOrder<T extends CutSegment>(segments: ReadonlyArray<T>): T[] {
   const depths = containmentDepths(segments);
   const maxDepth = depths.reduce((m, d) => Math.max(m, d), 0);
-  const out: CutSegment[] = [];
+  const out: T[] = [];
   let cursor = ORIGIN;
   for (let depth = maxDepth; depth >= 0; depth -= 1) {
     const bucket = segments.filter((_, i) => depths[i] === depth);
@@ -89,13 +145,13 @@ function insideFirstNearestNeighborOrder(segments: ReadonlyArray<CutSegment>): C
 // Cursor starts at machine origin — matches the preamble's M3 S0 +
 // homed position. After picking, advance cursor to the segment's
 // far endpoint. Repeat until every segment is placed.
-function nearestNeighborOrderFrom(
-  segments: ReadonlyArray<CutSegment>,
+function nearestNeighborOrderFrom<T extends CutSegment>(
+  segments: ReadonlyArray<T>,
   startCursor: Vec2,
-): { readonly segments: CutSegment[]; readonly cursor: Vec2 } {
+): { readonly segments: T[]; readonly cursor: Vec2 } {
   const remaining = new Set<number>();
   for (let i = 0; i < segments.length; i += 1) remaining.add(i);
-  const out: CutSegment[] = [];
+  const out: T[] = [];
   let cursor: Vec2 = startCursor;
   while (remaining.size > 0) {
     const pick = pickBestNext(segments, remaining, cursor);
@@ -109,18 +165,22 @@ function nearestNeighborOrderFrom(
   return { segments: out, cursor };
 }
 
-type Pick = { readonly index: number; readonly reverse: boolean; readonly segment: CutSegment };
+type Pick<T extends CutSegment> = {
+  readonly index: number;
+  readonly reverse: boolean;
+  readonly segment: T;
+};
 
 // Scan every remaining segment, return the (index, reverse-flag) pair
 // whose entry endpoint is closest to the cursor. Extracted from
 // nearestNeighborOrder to keep both functions under the cyclomatic
 // complexity cap (CLAUDE.md size limits — complexity max 12).
-function pickBestNext(
-  segments: ReadonlyArray<CutSegment>,
+function pickBestNext<T extends CutSegment>(
+  segments: ReadonlyArray<T>,
   remaining: ReadonlySet<number>,
   cursor: Vec2,
-): Pick | null {
-  let best: Pick | null = null;
+): Pick<T> | null {
+  let best: Pick<T> | null = null;
   let bestDistSq = Number.POSITIVE_INFINITY;
   for (const i of remaining) {
     const seg = segments[i];
@@ -154,7 +214,7 @@ function segmentEntries(
   ];
 }
 
-function reverseSegment(seg: CutSegment): CutSegment {
+function reverseSegment<T extends CutSegment>(seg: T): T {
   return { ...seg, polyline: [...seg.polyline].reverse(), closed: seg.closed };
 }
 
@@ -164,6 +224,65 @@ function distanceSquared(a: Vec2, b: Vec2): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   return dx * dx + dy * dy;
+}
+
+type RouteEndpoints = { readonly entry: Vec2; readonly exit: Vec2 };
+
+function isOffsetFillGroup(group: Group): group is FillGroup {
+  return group.kind === 'fill' && (group.fillStyle ?? 'scanline') === 'offset';
+}
+
+function isIslandFillGroup(group: Group): group is FillGroup {
+  return group.kind === 'fill' && group.fillStyle === 'island';
+}
+
+function isCompatibleIslandFillGroup(first: FillGroup, candidate: Group): candidate is FillGroup {
+  return (
+    isIslandFillGroup(candidate) &&
+    candidate.layerId === first.layerId &&
+    candidate.color === first.color &&
+    candidate.power === first.power &&
+    candidate.speed === first.speed &&
+    candidate.passes === first.passes &&
+    candidate.airAssist === first.airAssist &&
+    candidate.overscanMm === first.overscanMm
+  );
+}
+
+function islandGroupEndpoints(group: FillGroup): RouteEndpoints | null {
+  const sweeps = groupFillSweeps(group.segments);
+  let entry: Vec2 | null = null;
+  let exit: Vec2 | null = null;
+  for (const sweep of sweeps) {
+    const first = sweep.spans[0];
+    const last = sweep.spans[sweep.spans.length - 1];
+    if (first === undefined || last === undefined) continue;
+    const overscan = effectiveOverscanMm([first.start, last.end], group.overscanMm);
+    const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
+    if (run === null) continue;
+    if (entry === null) entry = run.leadStart;
+    exit = run.leadEnd;
+  }
+  return entry === null || exit === null ? null : { entry, exit };
+}
+
+function pickBestIslandGroup(
+  endpoints: ReadonlyArray<RouteEndpoints | null>,
+  remaining: ReadonlySet<number>,
+  cursor: Vec2,
+): number | null {
+  let best: number | null = null;
+  let bestDistSq = Number.POSITIVE_INFINITY;
+  for (const i of remaining) {
+    const endpoint = endpoints[i];
+    if (endpoint === undefined || endpoint === null) continue;
+    const d = distanceSquared(cursor, endpoint.entry);
+    if (d < bestDistSq) {
+      best = i;
+      bestDistSq = d;
+    }
+  }
+  return best;
 }
 
 type SegmentBounds = {

@@ -112,7 +112,8 @@ function buildRasterDiagnostics(
   const fillLayers = activeLayers.filter((layer) => layer.mode === 'fill');
   const bidirectionalImageLayers = imageLayers.filter((layer) => layer.imageBidirectional);
   const bidirectionalFillLayers = fillLayers.filter(
-    (layer) => layer.fillStyle === 'scanline' && layer.fillBidirectional,
+    (layer) =>
+      (layer.fillStyle === 'scanline' || layer.fillStyle === 'island') && layer.fillBidirectional,
   );
   const bidirectionalLayers = [...bidirectionalImageLayers, ...bidirectionalFillLayers];
   const lowOverscanLayers = bidirectionalLayers.filter((layer) => layer.fillOverscanMm < 2);

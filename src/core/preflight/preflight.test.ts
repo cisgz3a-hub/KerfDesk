@@ -326,6 +326,32 @@ describe('runPreflight offset fill validation', () => {
         'Layer L1 uses Follow Shape but has open vector contours assigned. Close the shapes or use Scanline Fill.',
     });
   });
+
+  it('blocks Island Fill object overrides on open vector contours', () => {
+    const layer = createLayer({ id: 'L1', color: '#ff0000' });
+    const project: Project = {
+      ...projectWith(layer),
+      scene: {
+        ...EMPTY_SCENE,
+        objects: [
+          {
+            ...sampleObject,
+            operationOverride: { mode: 'fill', fillStyle: 'island' as never },
+          },
+        ],
+        layers: [layer],
+      },
+    };
+
+    const result = runPreflight(project, emit(project));
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toContainEqual({
+      code: 'offset-fill-open-contour',
+      message:
+        'Layer L1 uses Island Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.',
+    });
+  });
 });
 
 describe('runPreflight — F-A10 check 2: bounds', () => {

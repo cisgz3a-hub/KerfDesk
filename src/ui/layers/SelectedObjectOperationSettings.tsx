@@ -148,6 +148,7 @@ function SelectedFillFields(props: {
         >
           <option value="scanline">Scanline</option>
           <option value="offset">Follow Shape</option>
+          <option value="island">Island Fill</option>
         </select>
       </FieldRow>
       <NumberField
@@ -276,6 +277,7 @@ function numericValue(value: string, fallback: number): number {
 }
 
 function parseFillStyle(value: string): LayerFillStyle {
+  if (value === 'island') return value;
   if (value === 'offset') return value;
   return 'scanline';
 }

@@ -33,7 +33,7 @@ function validateLayerOperationSettings(value: unknown, path: string): string | 
     optionalNumber(value, `${path}.hatchAngleDeg`),
     optionalPositiveNumber(value, `${path}.hatchSpacingMm`),
     optionalNonNegativeNumber(value, `${path}.fillOverscanMm`),
-    optionalLiteral(value, `${path}.fillStyle`, ['scanline', 'offset']),
+    optionalLiteral(value, `${path}.fillStyle`, ['scanline', 'offset', 'island']),
     optionalBoolean(value, `${path}.fillBidirectional`),
     optionalBoolean(value, `${path}.fillCrossHatch`),
     optionalDither(value, `${path}.ditherAlgorithm`),

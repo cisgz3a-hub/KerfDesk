@@ -15,7 +15,7 @@ function tracePresetLabel(key: string): string {
   return key === 'Edge Detection' ? 'Edge Detection (edge contours)' : key;
 }
 
-export type TraceFillStyle = 'scanline' | 'offset';
+export type TraceFillStyle = 'scanline' | 'offset' | 'island';
 
 export function PresetPicker(props: {
   readonly value: string;
@@ -57,15 +57,18 @@ export function TraceFillStylePicker(props: {
       >
         <option value="scanline">Scanline</option>
         <option value="offset">Follow Shape</option>
+        <option value="island">Island Fill</option>
       </select>
       <span style={fillStyleHintStyle}>
-        Follow Shape is best for closed logos, wreaths, and hollow designs.
+        Follow Shape is best for closed logos, wreaths, and hollow designs. Island Fill burns
+        connected regions with short straight scanlines.
       </span>
     </Field>
   );
 }
 
 function parseTraceFillStyle(value: string): TraceFillStyle {
+  if (value === 'island') return value;
   if (value === 'offset') return value;
   return 'scanline';
 }

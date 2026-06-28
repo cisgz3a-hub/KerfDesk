@@ -51,7 +51,7 @@ export const MATERIAL_RECIPE_FIELDS = [
 ] as const satisfies ReadonlyArray<keyof MaterialRecipe>;
 
 const LAYER_MODES = ['line', 'fill', 'image'] as const satisfies ReadonlyArray<LayerMode>;
-const FILL_STYLES = ['scanline', 'offset'] as const satisfies ReadonlyArray<
+const FILL_STYLES = ['scanline', 'offset', 'island'] as const satisfies ReadonlyArray<
   NonNullable<Layer['fillStyle']>
 >;
 const MIN_SPACING = 0.001;

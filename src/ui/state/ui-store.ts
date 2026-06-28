@@ -65,6 +65,8 @@ export type FloatingPanelPosition = {
   readonly y: number;
 };
 
+export type PreviewPlaybackSpeed = 'slow' | 'normal' | 'fast';
+
 export type UiState = {
   readonly dragOverlay: boolean;
   readonly setDragOverlay: (next: boolean) => void;
@@ -72,6 +74,10 @@ export type UiState = {
   readonly setScrubberT: (next: number) => void;
   readonly showPreviewTravel: boolean;
   readonly setShowPreviewTravel: (next: boolean) => void;
+  readonly previewPlaying: boolean;
+  readonly setPreviewPlaying: (next: boolean) => void;
+  readonly previewPlaybackSpeed: PreviewPlaybackSpeed;
+  readonly setPreviewPlaybackSpeed: (next: PreviewPlaybackSpeed) => void;
   readonly selectionAnchor: SelectionAnchor;
   readonly setSelectionAnchor: (next: SelectionAnchor) => void;
   readonly selectionMarquee: SelectionMarquee | null;
@@ -164,6 +170,10 @@ export const useUiStore = create<UiState>((set) => ({
   setScrubberT: (next) => set({ scrubberT: clamp01(next) }),
   showPreviewTravel: true,
   setShowPreviewTravel: (next) => set({ showPreviewTravel: next }),
+  previewPlaying: false,
+  setPreviewPlaying: (next) => set({ previewPlaying: next }),
+  previewPlaybackSpeed: 'normal',
+  setPreviewPlaybackSpeed: (next) => set({ previewPlaybackSpeed: next }),
   selectionAnchor: 'nw',
   setSelectionAnchor: (next) => set({ selectionAnchor: next }),
   selectionMarquee: null,

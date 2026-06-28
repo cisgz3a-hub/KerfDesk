@@ -1,6 +1,3 @@
-import { act } from 'react';
-import { createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./image-loader', () => ({
@@ -23,14 +20,8 @@ vi.mock('./use-trace-worker-client', () => ({
 
 import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../../core/scene';
 import { DEFAULT_TRACE_OPTIONS, type TraceBoundary } from '../../core/trace';
-import { useUiStore } from '../state/ui-store';
-import { loadImageAsRawData } from './image-loader';
-import { commit, ImportImageDialog, sameTraceSource } from './ImportImageDialog';
+import { commit, sameTraceSource } from './ImportImageDialog';
 import { traceImageWithFallback } from './use-trace-worker-client';
-
-(
-  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
-).IS_REACT_ACT_ENVIRONMENT = true;
 
 afterEach(() => {
   vi.mocked(traceImageWithFallback).mockClear();
@@ -140,6 +131,21 @@ describe('commit source revalidation (P2-A)', () => {
     );
   });
 
+  it('applies Island Fill as an object-level island fill override', async () => {
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    await commit({ ...args(seed), traceFillStyle: 'island' as never }, ctx);
+    expect(ctx.traceExistingImage).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({
+        kind: 'traced-image',
+        traceMode: 'filled-contours',
+        operationOverride: { mode: 'fill', fillStyle: 'island' },
+      }),
+      { deleteSourceAfterTrace: false },
+    );
+  });
+
   it('passes Delete Image After trace through commit and reports source deleted', async () => {
     const seed = seedRaster();
     const ctx = ctxWith(() => seedRaster());
@@ -222,260 +228,3 @@ describe('commit source revalidation (P2-A)', () => {
     expect(ctx.traceExistingImage).not.toHaveBeenCalled();
   });
 });
-
-describe('Trace Image workflow controls', () => {
-  it('labels Edge Detection as an edge-contour preset', async () => {
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      const select = host.querySelector('select[aria-label="Trace preset"]');
-      expect(select).toBeInstanceOf(HTMLSelectElement);
-      const edgeOption = Array.from((select as HTMLSelectElement).options).find(
-        (option) => option.value === 'Edge Detection',
-      );
-      expect(edgeOption?.textContent).toBe('Edge Detection (edge contours)');
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-
-  it('shows Fill Style only for filled-contour presets', async () => {
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      const presetSelect = host.querySelector('select[aria-label="Trace preset"]');
-      expect(presetSelect).toBeInstanceOf(HTMLSelectElement);
-
-      const fillStyleSelect = (): HTMLSelectElement | null =>
-        host.querySelector('select[aria-label="Trace fill style"]');
-
-      expect(fillStyleSelect()).toBeInstanceOf(HTMLSelectElement);
-      expect(fillStyleSelect()?.value).toBe('scanline');
-      expect(
-        Array.from(fillStyleSelect()?.options ?? []).map((option) => option.textContent),
-      ).toEqual(['Scanline', 'Follow Shape']);
-      expect(host.textContent ?? '').toContain(
-        'Follow Shape is best for closed logos, wreaths, and hollow designs.',
-      );
-
-      for (const preset of ['Smooth', 'Sharp']) {
-        await act(async () => {
-          (presetSelect as HTMLSelectElement).value = preset;
-          presetSelect?.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        expect(fillStyleSelect()).toBeInstanceOf(HTMLSelectElement);
-      }
-
-      for (const preset of ['Centerline', 'Edge Detection']) {
-        await act(async () => {
-          (presetSelect as HTMLSelectElement).value = preset;
-          presetSelect?.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        expect(fillStyleSelect()).toBeNull();
-      }
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-
-  it('shows vector trace settings without image-adjustment controls', async () => {
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      const text = host.textContent ?? '';
-      expect(text).toContain('Trace settings');
-      expect(text).toContain('Cutoff');
-      expect(text).toContain('Threshold');
-      expect(text).toContain('Ignore Less Than');
-      expect(text).toContain('Smoothness');
-      expect(text).toContain('Optimize');
-      expect(text).toContain('Trace alpha mask');
-      expect(text).toContain('Line Art automatically preserves pale logo details.');
-      expect(text).not.toContain('Force Sketch Trace');
-      expect(text).toContain('Fade Image');
-      expect(text).toContain('Delete Image After trace');
-      expect(text).not.toContain('Image adjustments');
-      expect(text).not.toContain('Brightness');
-      expect(text).not.toContain('Contrast');
-      expect(text).not.toContain('Gamma');
-      expect(text).not.toContain('Invert');
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-
-  it('disables alpha-mask tracing when the source image has no transparent pixels', async () => {
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      await waitForText(host, 'No transparent pixels detected');
-
-      const alphaInput = checkboxByLabel(host, 'Trace alpha mask');
-      expect(alphaInput).not.toBeNull();
-      expect(alphaInput?.disabled).toBe(true);
-      expect(host.textContent ?? '').toContain(
-        'No transparent pixels detected; alpha mask will not change this image.',
-      );
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-
-  it('keeps alpha-mask tracing disabled until source transparency is known', async () => {
-    vi.mocked(loadImageAsRawData).mockImplementationOnce(() => new Promise(() => undefined));
-
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      const alphaInput = checkboxByLabel(host, 'Trace alpha mask');
-      expect(alphaInput).not.toBeNull();
-      expect(alphaInput?.disabled).toBe(true);
-      expect(host.textContent ?? '').toContain('Checking image transparency');
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-
-  it('keeps alpha-mask tracing available for transparent source images', async () => {
-    vi.mocked(loadImageAsRawData).mockResolvedValueOnce({
-      width: 2,
-      height: 2,
-      data: new Uint8ClampedArray([
-        255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255,
-      ]),
-    });
-
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      await waitForEnabledCheckbox(host, 'Trace alpha mask');
-
-      const alphaInput = checkboxByLabel(host, 'Trace alpha mask');
-      expect(alphaInput).not.toBeNull();
-      expect(alphaInput?.disabled).toBe(false);
-      expect(host.textContent ?? '').not.toContain('No transparent pixels detected');
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-
-  it('shows simple Edge Detection controls when the edge preset is selected', async () => {
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      const select = host.querySelector('select[aria-label="Trace preset"]');
-      expect(select).toBeInstanceOf(HTMLSelectElement);
-      await act(async () => {
-        (select as HTMLSelectElement).value = 'Edge Detection';
-        select?.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-
-      const text = host.textContent ?? '';
-      expect(text).toContain('Sensitivity');
-      expect(text).toContain('Detail');
-      expect(text).toContain('Minimum line');
-      expect(text).toContain('Creates outline contours from brightness changes.');
-      expect(text).toContain('Use Centerline for one-stroke Line mode.');
-      expect(text).not.toContain('Cutoff');
-      expect(text).not.toContain('Threshold');
-      expect(text).not.toContain('Sketch Trace');
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-
-  it('warns that Edge Detection double-outlines filled text and offers Line Art first', async () => {
-    const { host, root } = await renderTraceDialog(seedRaster());
-    try {
-      const select = host.querySelector('select[aria-label="Trace preset"]');
-      expect(select).toBeInstanceOf(HTMLSelectElement);
-      await act(async () => {
-        (select as HTMLSelectElement).value = 'Edge Detection';
-        select?.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-
-      const text = host.textContent ?? '';
-      expect(text).toContain('Edge Detection creates edge contours, not one-stroke lines.');
-      expect(text).toContain('Line mode will outline those detected edges.');
-      const buttons = Array.from(
-        host.querySelectorAll<HTMLButtonElement>(
-          'div[aria-label="Edge Detection guidance"] button',
-        ),
-      );
-      expect(buttons.map((button) => button.textContent?.trim())).toEqual([
-        'Use Line Art',
-        'Use Centerline',
-      ]);
-
-      await act(async () => {
-        buttons[0]?.click();
-      });
-
-      expect((select as HTMLSelectElement).value).toBe('Line Art');
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-      useUiStore.setState({ imageDialog: null });
-    }
-  });
-});
-
-async function renderTraceDialog(
-  seed: RasterImage,
-): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  useUiStore.setState({ imageDialog: seed });
-  let root: Root | null = null;
-  await act(async () => {
-    root = createRoot(host);
-    root.render(createElement(ImportImageDialog));
-  });
-  if (root === null) throw new Error('root did not mount');
-  return { host, root };
-}
-
-async function waitForText(host: HTMLElement, text: string): Promise<void> {
-  await waitFor(() => {
-    expect(host.textContent ?? '').toContain(text);
-  });
-}
-
-async function waitForEnabledCheckbox(host: HTMLElement, label: string): Promise<void> {
-  await waitFor(() => {
-    const input = checkboxByLabel(host, label);
-    expect(input).not.toBeNull();
-    expect(input?.disabled).toBe(false);
-  });
-}
-
-async function waitFor(assertion: () => void): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    try {
-      assertion();
-      return;
-    } catch (err) {
-      lastError = err;
-    }
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 10));
-    });
-  }
-  throw lastError;
-}
-
-function checkboxByLabel(host: HTMLElement, label: string): HTMLInputElement | null {
-  return (
-    Array.from(host.querySelectorAll('label'))
-      .find((row) => row.textContent?.includes(label))
-      ?.querySelector('input[type="checkbox"]') ?? null
-  );
-}

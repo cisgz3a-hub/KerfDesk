@@ -7,9 +7,11 @@
 // the controller's job).
 
 import type { Vec2 } from '../scene';
-import type { Job } from './job';
+import type { Job, RasterGroup } from './job';
 import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps, type FillSweep } from './fill-sweeps';
+
+const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
 
 export type ToolpathStep =
   | { readonly kind: 'travel'; readonly from: Vec2; readonly to: Vec2; readonly length: number }
@@ -35,11 +37,10 @@ export function buildToolpath(job: Job): Toolpath {
   const steps: ToolpathStep[] = [];
   let prevEnd: Vec2 | null = null;
   for (const group of job.groups) {
-    // F.2.d: the preview scrubber walks vector cuts/travels. Raster
-    // groups don't have a meaningful "edge" model for the scrubber
-    // (they're a continuous sweep); skip them for now. Future
-    // enhancement: synthesize one "raster" step per row.
-    if (group.kind === 'raster') continue;
+    if (group.kind === 'raster') {
+      prevEnd = appendRasterGroupSteps(steps, prevEnd, group);
+      continue;
+    }
     if (group.kind === 'fill') {
       if ((group.fillStyle ?? 'scanline') === 'offset') {
         prevEnd = appendContourGroupSteps(steps, prevEnd, group.segments, group.color);
@@ -90,6 +91,113 @@ function appendContourGroupSteps(
     if (last !== undefined) prevEnd = last;
   }
   return prevEnd;
+}
+
+type RasterSpan = { readonly firstX: number; readonly lastX: number };
+
+function appendRasterGroupSteps(
+  steps: ToolpathStep[],
+  initialPrevEnd: Vec2 | null,
+  group: RasterGroup,
+): Vec2 | null {
+  if (!hasUsableRasterGeometry(group)) return initialPrevEnd;
+  const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
+  const pixelHeightMm = (group.bounds.maxY - group.bounds.minY) / group.pixelHeight;
+  const passes = Math.max(1, Math.floor(group.passes));
+  let prevEnd = initialPrevEnd;
+  for (let pass = 0; pass < passes; pass += 1) {
+    let emittedRowCount = 0;
+    for (let y = 0; y < group.pixelHeight; y += 1) {
+      const spans = rasterActiveSpans(group, y, pixelWidthMm);
+      if (spans.length === 0) continue;
+      const worldY = group.bounds.minY + (y + 0.5) * pixelHeightMm;
+      const reverse = (group.bidirectional ?? true) && emittedRowCount % 2 === 1;
+      const ordered = reverse ? [...spans].reverse() : spans;
+      for (const span of ordered) {
+        prevEnd = appendRasterSpanSweepSteps(steps, prevEnd, group, span, worldY, reverse);
+      }
+      emittedRowCount += 1;
+    }
+  }
+  return prevEnd;
+}
+
+function hasUsableRasterGeometry(group: RasterGroup): boolean {
+  return (
+    group.pixelWidth > 0 &&
+    group.pixelHeight > 0 &&
+    group.sValues.length >= group.pixelWidth * group.pixelHeight &&
+    group.bounds.maxX > group.bounds.minX &&
+    group.bounds.maxY > group.bounds.minY
+  );
+}
+
+function rasterActiveSpans(
+  group: RasterGroup,
+  y: number,
+  pixelWidthMm: number,
+): ReadonlyArray<RasterSpan> {
+  const rowStart = y * group.pixelWidth;
+  const spans: RasterSpan[] = [];
+  let firstX = -1;
+  let lastInk = -1;
+  for (let x = 0; x < group.pixelWidth; x += 1) {
+    if ((group.sValues[rowStart + x] ?? 0) <= 0) continue;
+    if (firstX === -1) {
+      firstX = x;
+      lastInk = x;
+      continue;
+    }
+    const gapMm = (x - lastInk - 1) * pixelWidthMm;
+    if (gapMm > RASTER_GAP_RAPID_THRESHOLD_MM) {
+      spans.push({ firstX, lastX: lastInk });
+      firstX = x;
+    }
+    lastInk = x;
+  }
+  if (firstX !== -1) spans.push({ firstX, lastX: lastInk });
+  return spans;
+}
+
+function appendRasterSpanSweepSteps(
+  steps: ToolpathStep[],
+  prevEnd: Vec2 | null,
+  group: RasterGroup,
+  span: RasterSpan,
+  worldY: number,
+  reverse: boolean,
+): Vec2 {
+  const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
+  const activeStartX = group.bounds.minX + span.firstX * pixelWidthMm;
+  const activeEndX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
+  const overscanMm = Math.max(0, group.overscanMm);
+  const rowShiftX = reverse ? -(group.bidirectionalScanOffsetMm ?? 0) : 0;
+  const leadStart = {
+    x: (reverse ? activeEndX + overscanMm : activeStartX - overscanMm) + rowShiftX,
+    y: worldY,
+  };
+  const burnStart = {
+    x: (reverse ? activeEndX : activeStartX) + rowShiftX,
+    y: worldY,
+  };
+  const burnEnd = {
+    x: (reverse ? activeStartX : activeEndX) + rowShiftX,
+    y: worldY,
+  };
+  const leadEnd = {
+    x: (reverse ? activeStartX - overscanMm : activeEndX + overscanMm) + rowShiftX,
+    y: worldY,
+  };
+  appendTravelStep(steps, prevEnd, leadStart);
+  appendTravelStep(steps, leadStart, burnStart);
+  steps.push({
+    kind: 'cut',
+    color: group.color,
+    polyline: [burnStart, burnEnd],
+    length: dist(burnStart, burnEnd),
+  });
+  appendTravelStep(steps, burnEnd, leadEnd);
+  return leadEnd;
 }
 
 export function summarizeToolpathDistances(toolpath: Toolpath): ToolpathDistanceSummary {
