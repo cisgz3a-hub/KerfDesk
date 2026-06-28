@@ -1,5 +1,5 @@
 /*
- * tokens.css — the LaserForge design tokens + shared chrome classes
+ * tokens.css — the KerfDesk design tokens + shared chrome classes
  * (ADR-047). Imported exactly once, in src/ui/app/main.tsx.
  *
  * Why a stylesheet exists at all in an inline-style codebase: pseudo-states.

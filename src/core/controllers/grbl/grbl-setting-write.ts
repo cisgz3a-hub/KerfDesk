@@ -31,7 +31,7 @@ export function buildGrblSettingWrite(
     return blocked('Export a fresh controller settings backup before writing firmware settings.');
   }
   if (!row.known || row.writeRisk === 'unknown' || row.writeRisk === 'read-only') {
-    return blocked(`${row.code} is read-only or unknown in LaserForge metadata.`);
+    return blocked(`${row.code} is read-only or unknown in KerfDesk metadata.`);
   }
   if (!isValidGrblSettingValue(row.id, normalizedValue)) {
     return blocked(`${row.code} value is not valid for a guarded GRBL write.`);

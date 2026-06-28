@@ -7,6 +7,7 @@ import {
   type MaterialTestGridOptions,
   type ScanOffsetCalibrationPatternOptions,
 } from '../../core/job';
+import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
@@ -350,7 +351,9 @@ function useSelectedConvertible(): ConvertibleVector | null {
 }
 
 function aboutText(): string {
-  return [`LaserForge ${__APP_VERSION__}`, `Commit ${__GIT_SHA__}`, `Built ${__BUILD_TIME__}`].join(
-    '\n',
-  );
+  return [
+    `${APP_DISPLAY_NAME} ${__APP_VERSION__}`,
+    `Commit ${__GIT_SHA__}`,
+    `Built ${__BUILD_TIME__}`,
+  ].join('\n');
 }

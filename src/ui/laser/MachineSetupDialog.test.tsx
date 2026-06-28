@@ -202,7 +202,7 @@ describe('MachineSetupDialog', () => {
     }
   });
 
-  it('imports a LaserForge machine profile through a review step', async () => {
+  it('imports a KerfDesk machine profile through a review step', async () => {
     const text = serializeMachineProfileDocument({
       format: MACHINE_PROFILE_FORMAT,
       schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
@@ -215,7 +215,7 @@ describe('MachineSetupDialog', () => {
     );
     try {
       await act(async () => button(host, 'Import / Export').click());
-      await act(async () => button(host, 'Import LaserForge profile').click());
+      await act(async () => button(host, 'Import KerfDesk profile').click());
 
       expect(host.textContent).toContain('Imported bench profile');
       expect(host.textContent).toContain('Fixture import.');

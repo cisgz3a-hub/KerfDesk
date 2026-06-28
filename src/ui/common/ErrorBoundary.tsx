@@ -90,7 +90,7 @@ function CrashScreen(props: {
         <button
           type="button"
           onClick={props.onRetry}
-          title="Try to reload the LaserForge interface without closing the app."
+          title="Try to reload the KerfDesk interface without closing the app."
         >
           Try again
         </button>

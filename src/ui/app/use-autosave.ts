@@ -103,7 +103,7 @@ export function runAutosaveRecovery(
   const ageMin = Math.max(0, Math.round((Date.now() - record.savedAt) / 60_000));
   const ageLabel = ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute(s) ago`;
   const ok = confirmRestore(
-    `LaserForge found an auto-saved project from ${ageLabel}. Restore it?\n\n` +
+    `KerfDesk found an auto-saved project from ${ageLabel}. Restore it?\n\n` +
       '(Click Cancel to discard the auto-save and start fresh.)',
   );
   if (ok) {

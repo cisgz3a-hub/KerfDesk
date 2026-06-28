@@ -169,7 +169,7 @@ function controllerReview(device: ParsedLightBurnDevice): LightBurnImportReviewF
     {
       label: 'Controller',
       value: device.controller ?? 'Unknown',
-      note: 'Only GRBL-compatible LightBurn devices can become LaserForge profiles.',
+      note: 'Only GRBL-compatible LightBurn devices can become KerfDesk profiles.',
     },
   ];
 }
@@ -185,7 +185,7 @@ function maxPowerReview(device: ParsedLightBurnDevice): LightBurnImportReviewFie
     {
       label: 'Max S',
       value: 'Not detected',
-      note: 'LaserForge default $30 range will be used until reviewed.',
+      note: 'KerfDesk default $30 range will be used until reviewed.',
     },
   ];
 }

@@ -49,7 +49,7 @@ export function ImportExportPanel(): JSX.Element {
       .catch((error: unknown) => pushToast(errorMessage(error), 'error'));
   };
 
-  const importLaserForge = (): void => {
+  const importKerfDesk = (): void => {
     void platform
       .pickFilesForOpen({ accept: ['.lfmachine.json'], multiple: false })
       .then(async ([file]) => {
@@ -77,7 +77,7 @@ export function ImportExportPanel(): JSX.Element {
     <div style={stackStyle}>
       <div style={buttonRowStyle}>
         <Button onClick={exportActive}>Export active profile</Button>
-        <Button onClick={importLaserForge}>Import LaserForge profile</Button>
+        <Button onClick={importKerfDesk}>Import KerfDesk profile</Button>
         <Button onClick={importLightBurn}>Import LightBurn .lbdev</Button>
       </div>
       {review === null ? null : (
@@ -117,7 +117,7 @@ function MachineProfileReview(props: {
 }): JSX.Element {
   return (
     <article style={cardStyle}>
-      <h3 style={sectionHeadingStyle}>LaserForge profile review</h3>
+      <h3 style={sectionHeadingStyle}>KerfDesk profile review</h3>
       <p style={mutedStyle}>{props.review.document.profile.name}</p>
       <ul style={notesStyle}>
         {props.review.document.reviewNotes.map((note) => (

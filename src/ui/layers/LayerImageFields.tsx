@@ -306,7 +306,7 @@ function PassThroughCheckbox(props: {
       checked={settings.passThrough}
       onChange={(event) => commit({ passThrough: event.target.checked })}
       aria-label={`Pass-through image for ${labelContext}`}
-      title="Use image pixels as-is and skip LaserForge image adjustment for this layer."
+      title="Use image pixels as-is and skip KerfDesk image adjustment for this layer."
     />
   );
 }

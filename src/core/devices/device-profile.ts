@@ -157,7 +157,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
   evidence: [
     {
-      label: 'LaserForge default',
+      label: 'KerfDesk default',
       status: 'default',
       note: 'Starter GRBL profile. Confirm bed size, homing, and S range before first job.',
     },

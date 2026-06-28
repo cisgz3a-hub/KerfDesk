@@ -54,7 +54,7 @@ export async function exportGrblSettingsBackup(
 
 function suggestedBackupName(createdAt: string): string {
   const date = createdAt.slice(0, 10);
-  return `laserforge-grbl-settings-${date}.lfgrbl-settings.json`;
+  return `kerfdesk-grbl-settings-${date}.lfgrbl-settings.json`;
 }
 
 function errMsg(err: unknown): string {

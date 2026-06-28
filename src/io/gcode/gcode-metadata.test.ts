@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EMITTER_REVISION, gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
 
 const META: GcodeMetadata = {
-  appName: 'LaserForge 2.0',
+  appName: 'KerfDesk',
   appVersion: '0.0.0',
   gitSha: 'abc1234',
   buildTimeUtc: '2026-06-03T12:00:00.000Z',
@@ -16,7 +16,7 @@ describe('gcodeMetadataHeader', () => {
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
     const header = gcodeMetadataHeader(META, { maxPowerS: 1000 });
-    expect(header).toContain('; LaserForge 2.0');
+    expect(header).toContain('; KerfDesk');
     expect(header).toContain('; version: 0.0.0');
     expect(header).toContain('; commit: abc1234');
     expect(header).toContain('; built: 2026-06-03T12:00:00.000Z');

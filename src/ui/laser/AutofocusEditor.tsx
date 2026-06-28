@@ -46,7 +46,7 @@ export function AutofocusEditor(props: {
         rows={5}
         spellCheck={false}
         placeholder="Pick a preset below, or paste your machine's autofocus command"
-        title="G-code or firmware command LaserForge sends when auto-focus is requested. Leave blank to disable auto-focus."
+        title="G-code or firmware command KerfDesk sends when auto-focus is requested. Leave blank to disable auto-focus."
         style={textareaStyle}
       />
       <div style={presetsRowStyle}>

@@ -124,7 +124,7 @@ export const MENU_HELP: Readonly<Record<CommandFamily, HelpTopic>> = {
   },
   help: {
     label: 'Help menu',
-    tooltip: 'Help menu for LaserForge information and support actions.',
+    tooltip: 'Help menu for KerfDesk information and support actions.',
   },
 };
 
@@ -208,7 +208,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   },
   'laser.machine-settings.export': {
     label: 'Export machine settings backup',
-    tooltip: 'Save the last read GRBL settings as a LaserForge backup JSON file.',
+    tooltip: 'Save the last read GRBL settings as a KerfDesk backup JSON file.',
   },
   'laser.machine-settings.export-diagnostic': {
     label: 'Export machine diagnostic',
@@ -251,7 +251,7 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-setup.tab.import-export': {
     label: 'Import and export',
     tooltip:
-      'Import, review, and export LaserForge machine profiles or supported LightBurn device files.',
+      'Import, review, and export KerfDesk machine profiles or supported LightBurn device files.',
   },
   'laser.device-setup.launch': {
     label: 'Set up device',

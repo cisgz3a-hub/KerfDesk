@@ -259,7 +259,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   }
   if (result.kind === 'schema-too-new') {
     jobAwareAlert(
-      `This project was saved with a newer LaserForge (schemaVersion ${result.sawVersion}). Update the app to open it.`,
+      `This project was saved with a newer KerfDesk (schemaVersion ${result.sawVersion}). Update the app to open it.`,
     );
     return;
   }

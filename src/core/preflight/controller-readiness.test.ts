@@ -52,7 +52,7 @@ describe('runControllerReadiness', () => {
     expect(result.errors).toContainEqual({
       code: 'max-power-unknown',
       message:
-        'Controller did not report GRBL $30 max S. LaserForge cannot prove that power percentages map safely.',
+        'Controller did not report GRBL $30 max S. KerfDesk cannot prove that power percentages map safely.',
     });
   });
 
@@ -66,7 +66,7 @@ describe('runControllerReadiness', () => {
     expect(result.errors).toContainEqual({
       code: 'laser-mode-disabled',
       message:
-        'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from LaserForge.',
+        'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.',
     });
   });
 

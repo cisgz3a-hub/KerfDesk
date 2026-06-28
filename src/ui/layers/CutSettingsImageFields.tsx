@@ -77,7 +77,7 @@ export function CutSettingsImageFields(props: {
         label="Pass-through"
         name="passThrough"
         checked={props.layer.passThrough}
-        title="Use the image pixels as-is and skip LaserForge image processing."
+        title="Use the image pixels as-is and skip KerfDesk image processing."
       />
     </fieldset>
   );

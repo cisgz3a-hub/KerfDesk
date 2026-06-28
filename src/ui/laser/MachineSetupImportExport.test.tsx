@@ -67,7 +67,7 @@ afterEach(() => {
 });
 
 describe('Machine Setup import/export panel', () => {
-  it('exports the active LaserForge machine profile as deterministic JSON', async () => {
+  it('exports the active KerfDesk machine profile as deterministic JSON', async () => {
     let written = '';
     const save = vi.fn(
       async (_request: FileSaveRequest): Promise<SaveTarget> => ({
@@ -111,7 +111,7 @@ describe('Machine Setup import/export panel', () => {
     }
   });
 
-  it('shows a success toast after applying a LaserForge profile import', async () => {
+  it('shows a success toast after applying a KerfDesk profile import', async () => {
     const text = serializeMachineProfileDocument({
       format: MACHINE_PROFILE_FORMAT,
       schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
@@ -124,7 +124,7 @@ describe('Machine Setup import/export panel', () => {
     ]);
     const { host, unmount } = await renderPanel(platformAdapter({ open }));
     try {
-      await act(async () => button(host, 'Import LaserForge profile').click());
+      await act(async () => button(host, 'Import KerfDesk profile').click());
       await act(async () => button(host, 'Apply imported profile').click());
 
       expect(useStore.getState().project.device.name).toBe('Imported bench profile');

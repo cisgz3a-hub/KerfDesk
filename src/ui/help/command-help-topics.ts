@@ -12,7 +12,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'file.open': {
     family: 'file',
-    tooltip: 'Open a saved LaserForge project file.',
+    tooltip: 'Open a saved KerfDesk project file.',
   },
   'file.save': {
     family: 'file',
@@ -48,11 +48,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'edit.copy': {
     family: 'edit',
-    tooltip: 'Copy the selected artwork to LaserForge clipboard.',
+    tooltip: 'Copy the selected artwork to KerfDesk clipboard.',
   },
   'edit.cut': {
     family: 'edit',
-    tooltip: 'Cut the selected artwork to LaserForge clipboard.',
+    tooltip: 'Cut the selected artwork to KerfDesk clipboard.',
   },
   'edit.paste': {
     family: 'edit',
@@ -138,7 +138,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'tools.save-processed-bitmap': {
     family: 'tools',
-    tooltip: 'Save the selected image as the processed bitmap LaserForge will engrave.',
+    tooltip: 'Save the selected image as the processed bitmap KerfDesk will engrave.',
   },
   'tools.trace-image': {
     family: 'tools',
@@ -242,7 +242,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'window.project-notes': {
     family: 'window',
-    tooltip: 'Edit notes saved inside the current LaserForge project file.',
+    tooltip: 'Edit notes saved inside the current KerfDesk project file.',
   },
   'window.undo-history': {
     family: 'window',
@@ -250,6 +250,6 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   },
   'help.about': {
     family: 'help',
-    tooltip: 'Show LaserForge build and version information.',
+    tooltip: 'Show KerfDesk build and version information.',
   },
 };

@@ -34,8 +34,8 @@ if (normalizeGitRemoteUrl(origin) !== expectedRemote) {
 }
 
 const indexHtml = readFileSync(resolve(repoRoot, 'index.html'), 'utf8');
-if (!indexHtml.includes('<title>LaserForge 2.0</title>') || !indexHtml.includes('id="app-root"')) {
-  fail('index.html does not look like the LaserForge 2.0 app shell');
+if (!indexHtml.includes('<title>KerfDesk</title>') || !indexHtml.includes('id="app-root"')) {
+  fail('index.html does not look like the KerfDesk app shell');
 }
 
 console.log(`Repository guard passed: ${repoRoot}`);

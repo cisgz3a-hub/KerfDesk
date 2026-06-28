@@ -10,7 +10,7 @@
 // emitter's behavior, not the build environment.
 
 export type GcodeMetadata = {
-  readonly appName: 'LaserForge 2.0';
+  readonly appName: string;
   readonly appVersion: string;
   readonly gitSha: string;
   readonly buildTimeUtc: string;

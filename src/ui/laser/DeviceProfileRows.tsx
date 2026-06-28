@@ -140,7 +140,7 @@ function neotronicsProfileConfirmation(): string {
   return [
     'Apply the Neotronics 4040 Max / LT-4LDS-V2 20W laser profile?',
     '',
-    'This updates the local LaserForge profile only. After connecting, read $$, export a backup, and confirm Z travel, homing, and air-assist wiring before changing GRBL settings.',
+    'This updates the local KerfDesk profile only. After connecting, read $$, export a backup, and confirm Z travel, homing, and air-assist wiring before changing GRBL settings.',
   ].join('\n');
 }
 

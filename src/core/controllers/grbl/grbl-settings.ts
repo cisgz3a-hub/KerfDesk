@@ -346,7 +346,7 @@ export function settingsMapToRows(map: ReadonlyMap<number, string>): ReadonlyArr
           name: 'Unknown GRBL setting',
           unit: null,
           description:
-            'This setting is reported by the controller but is not in LaserForge metadata.',
+            'This setting is reported by the controller but is not in KerfDesk metadata.',
           category: 'unknown',
           known: false,
           writeRisk: 'unknown',

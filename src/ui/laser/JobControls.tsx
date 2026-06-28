@@ -264,7 +264,7 @@ function describeProgressDisplay(
       percent: 99,
       label: `Machine finishing (${lineText} sent)`,
       title:
-        'GRBL has acknowledged every G-code line, but LaserForge is waiting for Idle before marking the job complete.',
+        'GRBL has acknowledged every G-code line, but KerfDesk is waiting for Idle before marking the job complete.',
     };
   }
   return {
