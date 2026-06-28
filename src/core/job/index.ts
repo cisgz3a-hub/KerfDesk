@@ -1,6 +1,7 @@
 export type { CutGroup, CutSegment, FillGroup, FillSegment, Group, Job, RasterGroup } from './job';
 export { EMPTY_JOB } from './job';
-export { compileJob, DEFAULT_OVERSCAN_MM } from './compile-job';
+export { compileJob } from './compile-job';
+export { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 export type { JobBounds } from './job-bounds';
 export { computeJobBounds, computeJobMotionBounds } from './job-bounds';
 export type { ComputeFrameBoundsOptions } from './frame-bounds';

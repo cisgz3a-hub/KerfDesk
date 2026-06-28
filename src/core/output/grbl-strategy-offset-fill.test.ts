@@ -91,9 +91,13 @@ describe('grblStrategy offset fill', () => {
     const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
 
     expect(out).toContain('; fill layer island-a color #000000');
-    expect(out).toContain('G0 X9.000 Y10.000 S0\nG0 X10.000 Y10.000 S0\nG1 X20.000 Y10.000 F1500 S300\nG0 X21.000 Y10.000 S0');
+    expect(out).toContain(
+      'G0 X9.000 Y10.000 S0\nG0 X10.000 Y10.000 S0\nG1 X20.000 Y10.000 F1500 S300\nG0 X21.000 Y10.000 S0',
+    );
     expect(out).toContain('; fill layer island-b color #000000');
-    expect(out).toContain('G0 X39.000 Y10.000 S0\nG0 X40.000 Y10.000 S0\nG1 X45.000 Y10.000 F1500 S300\nG0 X46.000 Y10.000 S0');
+    expect(out).toContain(
+      'G0 X39.000 Y10.000 S0\nG0 X40.000 Y10.000 S0\nG1 X45.000 Y10.000 F1500 S300\nG0 X46.000 Y10.000 S0',
+    );
     expect(out).not.toMatch(/\bG[23]\b/);
   });
 });

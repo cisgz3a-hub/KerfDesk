@@ -44,9 +44,7 @@ describe('cut settings editor output parity', () => {
       speed: 1234,
       overscanMm: 1,
     });
-    expect(buildPreviewToolpath(project)).toEqual(
-      mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device),
-    );
+    expect(buildPreviewToolpath(project)).toEqual(expectedPreviewToolpath(project, prepared));
     expect(emitGcode(project).gcode).not.toBe(emitGcode(base).gcode);
     expect(estimateLiveJob(project).kind).toBe('estimated');
   });
@@ -136,9 +134,7 @@ describe('cut settings editor output parity', () => {
     expect(prepared.ok).toBe(true);
     if (!prepared.ok) throw new Error('expected prepared kerf output');
     expect(prepared.job.groups[0]).toMatchObject({ kind: 'cut' });
-    expect(buildPreviewToolpath(project)).toEqual(
-      mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device),
-    );
+    expect(buildPreviewToolpath(project)).toEqual(expectedPreviewToolpath(project, prepared));
     expect(emitGcode(project).gcode).not.toBe(emitGcode(base).gcode);
     expect(emitGcode(project).gcode).toContain('X-1.000');
     expect(emitGcode(project).gcode).toContain('X11.000');
@@ -158,6 +154,21 @@ function patchFirstLayer(project: Project, patch: Partial<Layer>): Project {
     ...project,
     scene: { ...project.scene, layers: [{ ...first, ...patch }, ...rest] },
   };
+}
+
+function expectedPreviewToolpath(
+  project: Project,
+  prepared: Extract<ReturnType<typeof prepareOutput>, { readonly ok: true }>,
+) {
+  return mapToolpathToScene(
+    buildToolpath(prepared.job, {
+      startPoint: { x: 0, y: 0 },
+      parkPoint: { x: 0, y: 0 },
+      scanningOffsets: project.device.scanningOffsets,
+    }),
+    prepared.jobOriginOffset,
+    project.device,
+  );
 }
 
 function fillProject(): Project {

@@ -20,23 +20,22 @@
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Total source LOC | 20 721 | ✅ still compact for scope |
-| Total test LOC | 11 030 (~53% of source) | ✅ unusually high — most projects ≤ 30% |
-| Tests passing | **796 / 796** | ✅ |
-| Test files | 101 | ✅ |
-| Production deps | 6 (dompurify, imagetracerjs, opentype.js, react, react-dom, zustand) | ✅ tight |
-| **Production vulns** | **0** (`pnpm audit --prod`) | ✅ |
-| **Dev vulns** | **0** (`pnpm audit`) | ✅ down from 34 pre-F-2 |
-| Files over hard cap (400 LOC) | **0** | ✅ (store.ts at exactly 400) |
-| Files over soft cap (250 LOC) | 21 source + 9 test | ⚠️ documented, monitor |
+| Total source LOC | 67 153 across 520 TS/TSX source files | ✅ compact enough for current scope |
+| Total test LOC | 54 343 across 389 test files (~81% of source) | ✅ unusually high coverage density |
+| Tests passing | **2420 / 2420** (`pnpm release:check`, 2026-06-28) | ✅ |
+| Test files | 389 | ✅ |
+| Production deps | 7 (clipper2-ts, dompurify, imagetracerjs, opentype.js, react, react-dom, zustand) | ✅ tight |
+| **Dependency vulns** | **0** (`pnpm audit:deps`) | ✅ |
+| Files over hard cap (400 counted LOC) | **0** | ✅ |
+| Raw file-size backstop | **0 over 600 physical lines** | ✅ |
 | ESLint errors | 0 | ✅ |
 | ESLint warnings | 1 (boundaries plugin v6 legacy-selector — non-fatal) | ⚠️ |
 | TypeScript strict | clean (no `any`, no `!`, no `eval`, no `innerHTML=`) | ✅ |
 | `@ts-expect-error` in src | 1 (`trace-image.ts`, imagetracerjs untyped lib) | ✅ justified |
-| Bundle (JS, raw / gzip) | 659 KB / 205 KB | ⚠️ over 500 KB warning; under 1 MB project target |
+| Bundle (main JS, raw / gzip) | 972.93 KB / 291.01 KB | ⚠️ over Vite's 500 KB raw warning; under 1 MB compressed target |
 | Bundle (fonts, lazy) | 1.08 MB across 4 .ttf files | ✅ loaded on demand |
-| Web prod deploy | `https://laserforge.pages.dev`, CSP+HSTS+SRI headers ✓ | ✅ |
-| CI status | every `ci.yml` step green; deploy.yml awaits secrets | ✅ |
+| Web prod deploy | `https://laserforge-2fj.pages.dev` serves commit `2777513` with CSP+HSTS headers | ✅ live checked 2026-06-28 |
+| Local release gate | `pnpm release:check` passes end-to-end | ✅ |
 
 ---
 
@@ -195,32 +194,29 @@ future work if a class of bug surfaces those rules want.
 
 ---
 
-### A6 — Bundle main chunk 573 KB (over the 500 KB warning)
+### A6 — Bundle main chunk 972.93 KB raw (over the 500 KB warning)
 
-**Severity:** Low. Under the 1 MB project target; pre-existing across
-multiple audits (Phases C, D, E, F.1). Mentioned for completeness.
+**Severity:** Low. The gzip size is still well under the project's 1 MB
+compressed target, but Vite's raw 500 KB chunk warning is active again.
 
-**Evidence:** `pnpm build:web` emits `assets/index-*.js` at 573 KB raw
-/ ~173 KB gzipped. Vite's chunk-size warning fires at 500 KB.
+**Evidence:** `pnpm release:check` on 2026-06-28 emits the main
+`assets/index-*.js` chunk at **972.93 KB raw / 291.01 KB gzip**. Vite's
+chunk-size warning fires at 500 KB raw.
 
-**Source of weight (in order):** React 18 + react-dom (~145 KB),
-opentype.js (~110 KB), imagetracerjs (~80 KB), DOMPurify (~65 KB),
-Zustand + our own code.
+**Current split:** opentype.js and imagetracerjs remain lazy chunks, but the
+main app chunk has grown with route preview, machine setup, material library,
+and workspace UI code.
 
-**Mitigation paths (none ship today):**
-- Dynamic-import opentype.js — only loaded when the Text dialog opens.
-- Dynamic-import imagetracerjs — only loaded when Trace Image dialog opens.
-- Manual chunk splitting via `build.rollupOptions.output.manualChunks`.
+**Mitigation paths:**
+- Split heavy route-preview / material-library / machine-setup surfaces with
+  dynamic imports where they are not needed for first paint.
+- Add Rollup `manualChunks` for stable vendor and feature chunks.
+- Re-check after route-preview UI stabilizes; do not trade correctness for a
+  smaller initial chunk while this feature is still moving.
 
-**Status:** **RESOLVED** — `text-to-polylines.ts` and `trace-image.ts`
-now lazy-load their heavy libs via `await import(...)` with a cached
-promise. After the change, `pnpm build:web` emits:
-- `assets/index-*.js` — **312.67 KB** (down from 573 KB; -46%)
-- `assets/opentype-*.js` — 243.41 KB (only fetched when Add Text opens)
-- `assets/imagetracer_*.js` — 20.07 KB (only fetched when Trace Image opens)
-Initial first-paint bundle is now well under Vite's 500 KB warn. UI
-call sites (`AddTextDialog`, `ImportImageDialog`, `useTracePreview`)
-await the now-async functions; test suite (432 tests) green.
+**Status:** **REOPENED / NON-BLOCKING**. The release gate passes, sourcemaps
+remain disabled, and gzip size is below the project target. Keep this visible
+for the next performance pass.
 
 ---
 
@@ -642,11 +638,13 @@ returns to ship-ready.
 ## How this audit was produced
 
 Verified locally:
-- `pnpm audit` → 0/0/0/0
-- `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test --run && pnpm build:web` → all green
+- `pnpm release:check` → guard, typecheck, lint, electron lint, format check,
+  license check, dependency audit, 2420 tests, web build, electron build, and
+  file-size backstop all green
 - `grep`-counted: `any`, `!`, `eval`, `innerHTML=`, `ipcMain`, `Math.random` / `Date.now` / `fetch(` / `window.` in `src/core/`
 - `wc -l` against every source file vs the 250/400 caps
-- `pnpm exec wrangler pages deployment list` → confirmed production deploy serves commit `a709747` over HTTPS+HSTS
+- `pnpm exec wrangler pages deployment list` → confirmed production deploy serves commit `2777513`
+  over HTTPS+HSTS/CSP headers at `https://laserforge-2fj.pages.dev`
 
 Cross-checked via WebFetch / WebSearch against:
 - `electronjs.org/docs/latest/tutorial/security` (security tutorial #1–18, fuses tutorial)

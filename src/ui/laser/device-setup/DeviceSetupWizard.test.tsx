@@ -148,6 +148,30 @@ describe('DeviceSetupWizard', () => {
     }
   });
 
+  it('applies detected values visibly by jumping to the confirm step', async () => {
+    const { host, unmount } = await renderWizard();
+    try {
+      await act(async () => {
+        useLaserStore.setState({
+          connection: { kind: 'connected' },
+          detectedSettings: { bedWidth: 363, bedHeight: 273, zTravelMm: 33 },
+          lastSettingsReadAt: 1,
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+
+      await act(async () => button(host, 'Apply detected').click());
+
+      expect(host.textContent).toContain('Step 3 of 6');
+      expect(host.textContent).toContain('Confirm settings');
+      const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
+      if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
+      expect(bed.value).toBe('363');
+      expect(useStore.getState().project.device.bedWidth).toBe(DEFAULT_DEVICE_PROFILE.bedWidth);
+    } finally {
+      await unmount();
+    }
+  });
+
   it('keeps the last detected values through a re-read null window', async () => {
     const { host, unmount } = await renderWizard();
     try {

@@ -155,9 +155,22 @@ describe('buildPreviewToolpath frame registration (H3)', () => {
     const prepared = prepareOutput(project);
     expect(prepared.ok).toBe(true);
     if (prepared.ok) {
-      expect(buildPreviewToolpath(project)).toEqual(
-        mapToolpathToScene(buildToolpath(prepared.job), prepared.jobOriginOffset, project.device),
-      );
+      expect(buildPreviewToolpath(project)).toEqual(expectedPreviewToolpath(project, prepared));
     }
   });
 });
+
+function expectedPreviewToolpath(
+  project: Project,
+  prepared: Extract<ReturnType<typeof prepareOutput>, { readonly ok: true }>,
+) {
+  return mapToolpathToScene(
+    buildToolpath(prepared.job, {
+      startPoint: { x: 0, y: 0 },
+      parkPoint: { x: 0, y: 0 },
+      scanningOffsets: project.device.scanningOffsets,
+    }),
+    prepared.jobOriginOffset,
+    project.device,
+  );
+}

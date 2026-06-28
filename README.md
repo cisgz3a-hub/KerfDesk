@@ -44,7 +44,7 @@ Read in this order:
 
 ## Build status
 
-Phases A–E shipped, plus Phase F.1 / F.2 / F.3 (see **Status** above). 796 tests across 101 files pass; `pnpm audit` is 0/0/0/0. See `AUDIT.md` for current findings.
+Phases A–E shipped, plus Phase F.1 / F.2 / F.3 (see **Status** above). As of the 2026-06-28 local release gate, `pnpm release:check` passes with 2420 tests across 389 files, a clean dependency audit, and a clean license gate. See `AUDIT.md` for current findings, including the non-blocking web bundle chunk warning.
 
 ```bash
 pnpm install
@@ -80,7 +80,8 @@ Add both at **Settings → Secrets and variables → Actions → New
 repository secret**. Until both are set the workflow will fail at the
 "Publish to Cloudflare Pages" step (CI itself stays green).
 
-**Current status (2026-06-24): push-to-deploy is active.** The Cloudflare Pages
+**Current status (2026-06-28): push-to-deploy is active.** The manual deploy
+scripts run `pnpm release:check` before Wrangler publishes. The Cloudflare Pages
 API project name used by Wrangler is `laserforge`, but its canonical production
 release URL is `https://laserforge-2fj.pages.dev`. The older
 `https://laserforge.pages.dev` address belongs to a stale Pages URL and must not

@@ -24,6 +24,7 @@
     "license-check": "node scripts/check-licenses.mjs",
     "audit:deps": "pnpm audit --audit-level=low",
     "check:file-size": "node scripts/check-file-size-policy.mjs",
+    "release:check": "pnpm guard:repo && pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm format:check && pnpm license-check && pnpm audit:deps && pnpm test && pnpm build:web && pnpm build:electron-main && pnpm check:file-size",
     "guard:repo": "node scripts/assert-correct-repo.mjs",
     "dev:web": "vite",
     "build": "pnpm build:web",
@@ -33,8 +34,8 @@
     "dev:desktop": "pnpm build:electron-main && vite build && electron .",
     "build:desktop": "pnpm build:electron-main && vite build && electron-builder --win --x64",
     "electron:start": "electron .",
-    "deploy:web": "pnpm guard:repo && pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge --branch=master",
-    "deploy:web:preview": "pnpm guard:repo && pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
+    "deploy:web": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=master",
+    "deploy:web:preview": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
   },
   "dependencies": {
     "clipper2-ts": "2.0.1-17",

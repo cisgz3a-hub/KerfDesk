@@ -88,7 +88,10 @@ describe('usePreviewPlayback', () => {
   });
 });
 
-async function renderHarness(previewMode: boolean, previewToolpath: Toolpath | null): Promise<void> {
+async function renderHarness(
+  previewMode: boolean,
+  previewToolpath: Toolpath | null,
+): Promise<void> {
   if (host === null) {
     host = document.createElement('div');
     document.body.appendChild(host);

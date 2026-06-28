@@ -298,7 +298,7 @@ describe('runPreflight offset fill validation', () => {
       code: 'offset-fill-open-contour',
       message:
         'Layer L1 uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.',
-      });
+    });
   });
 
   it('blocks Follow Shape object overrides on open vector contours', () => {

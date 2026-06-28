@@ -63,12 +63,5 @@ export function usePreviewPlayback(previewMode: boolean, toolpath: Toolpath | nu
       cancelled = true;
       cancelAnimationFrame(frameId);
     };
-  }, [
-    playbackSpeed,
-    hasPlayableRoute,
-    playing,
-    previewMode,
-    setPreviewPlaying,
-    setScrubberT,
-  ]);
+  }, [playbackSpeed, hasPlayableRoute, playing, previewMode, setPreviewPlaying, setScrubberT]);
 }

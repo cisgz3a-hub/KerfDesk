@@ -177,8 +177,9 @@ describe('compileJob fill hatching', () => {
 
     expect(fills).toHaveLength(2);
     expect(fills.every((fill) => fill.fillStyle === 'island')).toBe(true);
-    expect(fills.every((fill) => fill.segments.every((segment) => segment.polyline.length === 2)))
-      .toBe(true);
+    expect(
+      fills.every((fill) => fill.segments.every((segment) => segment.polyline.length === 2)),
+    ).toBe(true);
   });
 
   it('keeps Island Fill holes with their containing outer contour', () => {

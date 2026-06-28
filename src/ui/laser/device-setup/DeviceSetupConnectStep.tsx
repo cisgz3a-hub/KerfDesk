@@ -32,7 +32,10 @@ export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps
           {detected !== null && rows.length > 0 ? (
             <Button
               variant="primary"
-              onClick={() => dispatch({ kind: 'accept-detected', patch: detected })}
+              onClick={() => {
+                dispatch({ kind: 'accept-detected', patch: detected });
+                dispatch({ kind: 'go', step: 'confirm' });
+              }}
               {...helpProps('control:laser.device-setup.apply-detected')}
             >
               Apply detected
