@@ -1,4 +1,4 @@
-# WORKFLOW.md — LaserForge 2.0 user flows
+# WORKFLOW.md — KerfDesk user flows
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
@@ -29,7 +29,7 @@
 3. User opens via `File → Open Recent` (Phase C) or `File → Open` (Phase A).
 
 #### Empty — no display capability (web only)
-1. If `<canvas>` is unsupported, show full-page error: "LaserForge requires a modern browser. Try Chrome, Edge, or Brave."
+1. If `<canvas>` is unsupported, show full-page error: "KerfDesk requires a modern browser. Try Chrome, Edge, or Brave."
 
 #### Error — WebSerial not supported (web only, blocking only for Phase B+)
 1. In Phase A, no error. Phase A doesn't use WebSerial.
@@ -377,7 +377,7 @@ If all checks pass, save proceeds.
 2. OS Save dialog opens.
 3. Default name: `untitled.lf2`, default location: Documents.
 4. On confirm, project serialized to JSON, written to disk.
-5. Window title updates: `LaserForge — <project-name>`.
+5. Window title updates: `KerfDesk — <project-name>`.
 6. Dirty indicator (`*`) cleared from title.
 
 #### Success — subsequent save
@@ -415,10 +415,10 @@ If all checks pass, save proceeds.
 > **Phase A note:** only `schemaVersion: 1` exists; this branch is forward-looking infrastructure (registered migrator function + dispatch table) and cannot trigger in Phase A. Test by feeding a `schemaVersion: 0` synthetic fixture through the migrator unit test.
 
 #### Error — schema newer than supported
-- Modal: `This project was saved with a newer version of LaserForge. Update the app to open it.` No load.
+- Modal: `This project was saved with a newer version of KerfDesk. Update the app to open it.` No load.
 
 #### Error — file is not a valid .lf2
-- Modal: `Could not open <filename>: not a valid LaserForge project.` No load.
+- Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
 - Project loads with the embedded device profile.
@@ -688,7 +688,7 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 2. User opens the panel and clicks **Read ($$)**.
 3. App sends `$$\n` through the guarded serial write path; it does not use a separate serial shortcut.
 4. The existing settings collector parses the response into visible rows.
-5. Known settings show their code, value, unit, and LaserForge-authored meaning.
+5. Known settings show their code, value, unit, and KerfDesk-authored meaning.
 6. Unknown settings remain visible as unknown rows instead of being dropped.
 
 #### Success — export backup
@@ -1068,8 +1068,8 @@ ships **Fill All** only, so the conversion is immediate (hence no
 Settings) and a DPI control arrive with A3/A4.
 
 **What it does.** Rasterizes the selected vector's closed contours
-into a `RasterImage` at the LaserForge default 254 DPI (= 10
-lines/mm; a LaserForge choice — LightBurn documents no default),
+into a `RasterImage` at the KerfDesk default 254 DPI (= 10
+lines/mm; a KerfDesk choice — LightBurn documents no default),
 every inked pixel at 50% gray on white, carrying the source's own
 bounds + transform so the bitmap lands exactly where the vector was.
 **The source vector is deleted** (LightBurn discards the original);
@@ -1134,7 +1134,7 @@ share them as files.
 2. **Load.** **Load...** (shown in both the empty and loaded panel)
    opens a picker filtered to `.lfml.json`. A valid file replaces the
    current library and toasts "Loaded material library: <name>". A
-   file from a newer LaserForge raises the schema-too-new alert; any
+   file from a newer KerfDesk raises the schema-too-new alert; any
    other invalid file toasts the validation reason and keeps the
    current library.
 3. **Session persistence (automatic).** Whenever the library or its

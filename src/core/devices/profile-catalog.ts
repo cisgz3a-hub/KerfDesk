@@ -27,9 +27,9 @@ const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
   capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
   evidence: [
     {
-      label: 'LaserForge Falcon baseline',
+      label: 'KerfDesk Falcon baseline',
       status: 'researched',
-      note: 'Uses the existing LaserForge/Falcon-compatible output behavior verified by tests.',
+      note: 'Uses the existing KerfDesk/Falcon-compatible output behavior verified by tests.',
     },
   ],
 };
@@ -54,7 +54,7 @@ const XTOOL_D1_PRO_PROFILE: DeviceProfile = {
     {
       label: 'xTool D1 Pro public specs',
       status: 'unverified',
-      note: 'Work area ~430×390 mm from published specs (xTool lists up to 432×406). Confirm bed size, S range, and homing — LaserForge reads the real values from $$ on connect.',
+      note: 'Work area ~430×390 mm from published specs (xTool lists up to 432×406). Confirm bed size, S range, and homing — KerfDesk reads the real values from $$ on connect.',
     },
   ],
 };
@@ -74,7 +74,7 @@ const SCULPFUN_S30_PROFILE: DeviceProfile = {
     {
       label: 'Sculpfun S30 public specs',
       status: 'unverified',
-      note: 'Work area ~410×400 mm from published specs (Pro/Max variants differ). Confirm bed size and S range before the first job; LaserForge reads the real values from $$ on connect.',
+      note: 'Work area ~410×400 mm from published specs (Pro/Max variants differ). Confirm bed size and S range before the first job; KerfDesk reads the real values from $$ on connect.',
     },
   ],
 };
@@ -94,7 +94,7 @@ const ORTUR_LASER_MASTER_3_PROFILE: DeviceProfile = {
     {
       label: 'Ortur Laser Master 3 public specs',
       status: 'unverified',
-      note: 'Work area ~400×400 mm from published specs. Confirm bed size, homing, and S range before the first job; LaserForge reads the real values from $$ on connect.',
+      note: 'Work area ~400×400 mm from published specs. Confirm bed size, homing, and S range before the first job; KerfDesk reads the real values from $$ on connect.',
     },
   ],
 };
@@ -104,13 +104,13 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
   ]),
   entry(FALCON_COMPATIBLE_PROFILE, [
-    'Falcon-compatible output stays byte-stable against existing LaserForge tests.',
+    'Falcon-compatible output stays byte-stable against existing KerfDesk tests.',
   ]),
   entry(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, [
     'No default 4040 scan-offset table is shipped; calibrate before enabling compensation.',
   ]),
   entry(XTOOL_D1_PRO_PROFILE, [
-    'Work area from public specs; LaserForge confirms the real bed size from $$ on connect.',
+    'Work area from public specs; KerfDesk confirms the real bed size from $$ on connect.',
   ]),
   entry(SCULPFUN_S30_PROFILE, [
     'Work area from public specs; confirm bed size and S range before the first job.',

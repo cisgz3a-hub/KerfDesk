@@ -163,6 +163,24 @@ describe('Toolbar Convert to Bitmap', () => {
 });
 
 describe('Toolbar shortcut hint (audit M27/A.5)', () => {
+  it('renders the KerfDesk product name in the app chrome', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={[]} />);
+      });
+
+      expect(host.textContent).toContain('KerfDesk');
+      expect(host.textContent).not.toContain('LaserForge');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('lists every shipped shortcut family, including the late arrivals', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

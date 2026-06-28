@@ -29,7 +29,7 @@ const DEFAULT_DIALECT_ID: GrblGcodeDialectId = 'grbl-dynamic';
 const GRBL_DYNAMIC_DIALECT: GrblGcodeDialect = {
   id: 'grbl-dynamic',
   label: 'GRBL Dynamic',
-  description: 'LaserForge default: constant-power cuts, dynamic fill and raster sweeps.',
+  description: 'KerfDesk default: constant-power cuts, dynamic fill and raster sweeps.',
   cutPowerMode: 'constant',
   fillPowerMode: 'dynamic',
   rasterPowerMode: 'dynamic',

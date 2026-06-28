@@ -150,7 +150,7 @@ describe('detectJobIntentWarnings', () => {
     };
 
     expect(detectJobIntentWarnings(islandProject)).toContain(
-      'Island Fill has 3 short sweep(s) that need partial acceleration runway. LaserForge will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.',
+      'Island Fill has 3 short sweep(s) that need partial acceleration runway. KerfDesk will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.',
     );
   });
 

@@ -4,7 +4,7 @@ import { useLaserStore } from '../state/laser-store';
 const SETUP_CONFIRMATION =
   'Send persistent Neotronics / GRBL diode setup commands?\n\n' +
   '$32=1\n$30=1000\n$130=400\n$131=400\n$$\n\n' +
-  'LaserForge does not change $22 homing here. Read $$ and export a backup first, then confirm Z travel, homing, and air assist wiring on the machine.';
+  'KerfDesk does not change $22 homing here. Read $$ and export a backup first, then confirm Z travel, homing, and air assist wiring on the machine.';
 
 export function GrblLaserSetupPanel({ disabled }: { readonly disabled: boolean }): JSX.Element {
   const configure = useLaserStore((s) => s.configureGrblLaserSetup);

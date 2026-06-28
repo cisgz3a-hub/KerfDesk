@@ -51,7 +51,7 @@ function appendFillHeatWarnings(project: Project, warnings: string[]): void {
   }
   if (heat.islandPartialRunwaySweepCount > 0) {
     warnings.push(
-      `Island Fill has ${heat.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. LaserForge will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`,
+      `Island Fill has ${heat.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. KerfDesk will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`,
     );
   }
 }

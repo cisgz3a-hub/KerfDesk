@@ -14,6 +14,7 @@
 import { canvasTheme } from '../theme/canvas-theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Toolpath } from '../../core/job';
+import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
@@ -96,7 +97,7 @@ export function Workspace(): JSX.Element {
         }}
         onContextMenu={suppressCanvasContextMenu}
         style={canvasStyle}
-        aria-label="LaserForge workspace"
+        aria-label={`${APP_DISPLAY_NAME} workspace`}
       />
       {project.scene.objects.length === 0 && !dragOverlay && <EmptyHint />}
       {dragOverlay && <DragOverlay />}

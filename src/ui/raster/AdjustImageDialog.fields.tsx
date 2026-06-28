@@ -279,7 +279,7 @@ function checkboxFieldTitle(name: string, label: string): string {
     case 'negativeImage':
       return 'Invert image brightness before engraving.';
     case 'passThrough':
-      return 'Use image pixels as-is and skip LaserForge image processing.';
+      return 'Use image pixels as-is and skip KerfDesk image processing.';
     case 'invertDisplay':
       return 'Invert only the dialog preview display for inspection.';
     default:

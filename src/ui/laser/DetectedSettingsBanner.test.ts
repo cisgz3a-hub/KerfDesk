@@ -161,7 +161,7 @@ describe('describeReviewItems', () => {
     expect(review.ignored).toEqual([
       expect.objectContaining({
         label: '$999',
-        detail: 'Unknown GRBL setting was read but not applied to the LaserForge profile.',
+        detail: 'Unknown GRBL setting was read but not applied to the KerfDesk profile.',
       }),
     ]);
   });

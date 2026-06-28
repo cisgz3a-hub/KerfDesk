@@ -208,7 +208,7 @@ function fillHeatRiskWarning(fillHeatRisk: FillHeatRiskSummary): string | null {
     return `Island Fill has ${fillHeatRisk.islandNoRunwayShortSweepCount} short sweep(s) with no acceleration runway. Increase fill overscan or use Scanline Fill if those small islands look darker than the rest.`;
   }
   if (fillHeatRisk.islandPartialRunwaySweepCount > 0) {
-    return `Island Fill has ${fillHeatRisk.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. LaserForge will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`;
+    return `Island Fill has ${fillHeatRisk.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. KerfDesk will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`;
   }
   return null;
 }

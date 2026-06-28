@@ -235,14 +235,14 @@ export function describeReviewItems(
   if (controller.homingDirectionMask !== undefined) {
     needsReview.push({
       label: 'Homing direction mask ($23)',
-      detail: `Controller reports mask ${controller.homingDirectionMask}. Review the machine documentation before mapping this to a LaserForge home corner.`,
+      detail: `Controller reports mask ${controller.homingDirectionMask}. Review the machine documentation before mapping this to a KerfDesk home corner.`,
     });
   }
   for (const row of settingsRows) {
     if (row.known) continue;
     ignored.push({
       label: row.code,
-      detail: 'Unknown GRBL setting was read but not applied to the LaserForge profile.',
+      detail: 'Unknown GRBL setting was read but not applied to the KerfDesk profile.',
     });
   }
   return { needsReview, ignored };

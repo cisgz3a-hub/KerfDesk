@@ -1,14 +1,14 @@
-# LaserForge 2.0
+# KerfDesk
 
 > A focused CAM application for **GRBL** laser cutters and engravers. Web app and Windows desktop from one codebase. Proprietary source (ADR-018).
 
-**Status:** Phases A–E shipped (the MVP plus the two post-MVP rounds: text + raster trace), plus Phase F.1 (Fill hatching, shipped 2026-05-28), Phase F.2 (raster image engrave — code shipped through F.2.e, hardware burn F.2.f pending), and Phase F.3 (set work origin — code shipped, hardware verification pending). **Trace pipeline hardened 2026-05-29:** transparent-PNG decode fix, a perceptual-fidelity test harness (ADR-025), and a trace-keeps-source overlay (ADR-026). **Known open gap (next frontier):** imagetracerjs is outline-only, so the outline-vs-centerline limitation remains; see ADR-025 'Scope'. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://laserforge-2fj.pages.dev> (published by GitHub Actions after CI succeeds). Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
+**Status:** Phases A–E shipped (the MVP plus the two post-MVP rounds: text + raster trace), plus Phase F.1 (Fill hatching, shipped 2026-05-28), Phase F.2 (raster image engrave — code shipped through F.2.e, hardware burn F.2.f pending), and Phase F.3 (set work origin — code shipped, hardware verification pending). **Trace pipeline hardened 2026-05-29:** transparent-PNG decode fix, a perceptual-fidelity test harness (ADR-025), and a trace-keeps-source overlay (ADR-026). **Known open gap (next frontier):** imagetracerjs is outline-only, so the outline-vs-centerline limitation remains; see ADR-025 'Scope'. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://kerfdesk.com> (published by GitHub Actions after CI succeeds). Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
 
 ---
 
 ## What it is
 
-LaserForge 2.0 takes a 2D vector design (SVG), assigns cut/engrave operations per color layer, previews the toolpath, generates correct G-code, and streams it to your machine. The UX follows the laser-CAM conventions users already know — color-as-layer, a Cuts/Layers window, a Laser window. The scope is deliberately narrow: GRBL only in MVP, Line mode only in MVP, no raster engrave or camera or rotary or text in MVP.
+KerfDesk takes a 2D vector design (SVG), assigns cut/engrave operations per color layer, previews the toolpath, generates correct G-code, and streams it to your machine. The UX follows the laser-CAM conventions users already know — color-as-layer, a Cuts/Layers window, a Laser window. The scope is deliberately narrow: GRBL only in MVP, Line mode only in MVP, no raster engrave or camera or rotary or text in MVP.
 
 It will be delivered as:
 
@@ -65,8 +65,9 @@ pnpm deploy:web:preview # Same, but to a per-deploy preview URL
 
 ### Cloudflare Pages — auto-deploy on push
 
-The `.github/workflows/deploy.yml` workflow publishes the bundle to
-`https://laserforge-2fj.pages.dev` after every successful CI run on `main`. It needs two
+The `.github/workflows/deploy.yml` workflow publishes the bundle to the
+Cloudflare Pages project that serves `https://kerfdesk.com` and
+`https://www.kerfdesk.com` after every successful CI run on `main`. It needs two
 repository secrets to authenticate:
 
 1. **`CLOUDFLARE_API_TOKEN`** — create at
@@ -82,10 +83,10 @@ repository secret**. Until both are set the workflow will fail at the
 
 **Current status (2026-06-28): push-to-deploy is active.** The manual deploy
 scripts run `pnpm release:check` before Wrangler publishes. The Cloudflare Pages
-API project name used by Wrangler is `laserforge`, but its canonical production
-release URL is `https://laserforge-2fj.pages.dev`. The older
-`https://laserforge.pages.dev` address belongs to a stale Pages URL and must not
-be used for release verification.
+API project name used by Wrangler is still `laserforge`, but its canonical
+production release URL is `https://kerfdesk.com`; `https://laserforge-2fj.pages.dev`
+is the Pages fallback hostname. The older `https://laserforge.pages.dev` address
+belongs to a stale Pages URL and must not be used for release verification.
 
 ## License
 
@@ -103,4 +104,4 @@ Architectural changes are gated by the ADR process — see [`DECISIONS.md`](./DE
 
 - **CNCjs** — for being the canonical open-source GRBL implementation. Used as a Phase B protocol reference, not as a dependency.
 - **GRBL active forks** — grblHAL, FluidNC, µCNC keep the 1.1h wire protocol alive after `gnea/grbl` was archived (Aug 2019).
-- **DOMPurify** (MPL-2.0 / Apache-2.0), **opentype.js** (MIT), **imagetracerjs** (Unlicense) — the MIT-compatible libraries that let LaserForge 2.0 stand on proven security and parsing work rather than reinventing it.
+- **DOMPurify** (MPL-2.0 / Apache-2.0), **opentype.js** (MIT), **imagetracerjs** (Unlicense) — the MIT-compatible libraries that let KerfDesk stand on proven security and parsing work rather than reinventing it.

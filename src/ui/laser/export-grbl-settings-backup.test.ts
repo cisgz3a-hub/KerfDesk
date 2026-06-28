@@ -26,7 +26,7 @@ describe('exportGrblSettingsBackup', () => {
       },
     };
     const platform = makePlatform(async (req) => {
-      expect(req.suggestedName).toBe('laserforge-grbl-settings-2026-06-15.lfgrbl-settings.json');
+      expect(req.suggestedName).toBe('kerfdesk-grbl-settings-2026-06-15.lfgrbl-settings.json');
       expect(req.extensions).toEqual(['.lfgrbl-settings.json']);
       return target;
     });

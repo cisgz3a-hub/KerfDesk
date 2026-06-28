@@ -22,12 +22,14 @@ describe('Cloudflare production deploy gate', () => {
       scripts: Record<string, string>;
     };
     const pagesApiProject = '--project-name=laserforge';
-    const liveReleaseUrl = 'laserforge-2fj.pages.dev';
+    const liveReleaseUrl = 'kerfdesk.com';
+    const pagesFallbackUrl = 'laserforge-2fj.pages.dev';
 
     expect(workflow).toContain(pagesApiProject);
     expect(packageJson.scripts['deploy:web']).toContain(pagesApiProject);
     expect(packageJson.scripts['deploy:web:preview']).toContain(pagesApiProject);
     expect(repoFile('README.md')).toContain(liveReleaseUrl);
+    expect(repoFile('README.md')).toContain(pagesFallbackUrl);
   });
 
   it('only permits manual production deploys from the main branch', () => {
@@ -77,10 +79,7 @@ describe('Cloudflare production deploy gate', () => {
     const root = mkdtempSync(join(tmpdir(), 'laserforge-repo-guard-'));
     const fakeRepo = join(root, 'LaserForge-2.0');
     mkdirSync(fakeRepo);
-    writeFileSync(
-      join(fakeRepo, 'index.html'),
-      '<title>LaserForge 2.0</title><div id="app-root"></div>',
-    );
+    writeFileSync(join(fakeRepo, 'index.html'), '<title>KerfDesk</title><div id="app-root"></div>');
     execFileSync('git', ['init'], { cwd: fakeRepo, stdio: 'ignore' });
     execFileSync(
       'git',

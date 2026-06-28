@@ -59,7 +59,7 @@ describe('emitGcode', () => {
     };
     const withMeta = emitGcode(project, {
       metadata: {
-        appName: 'LaserForge 2.0',
+        appName: 'KerfDesk',
         appVersion: '9.9.9',
         gitSha: 'deadbee',
         buildTimeUtc: '2026-06-03T00:00:00.000Z',
@@ -68,7 +68,7 @@ describe('emitGcode', () => {
     });
     const withoutMeta = emitGcode(project);
     // Header present and first; the motion body is unchanged after it.
-    expect(withMeta.gcode.startsWith('; LaserForge 2.0')).toBe(true);
+    expect(withMeta.gcode.startsWith('; KerfDesk')).toBe(true);
     expect(withMeta.gcode).toContain('; commit: deadbee');
     expect(withMeta.gcode.endsWith(withoutMeta.gcode)).toBe(true);
     // No metadata => no header => deterministic body only.

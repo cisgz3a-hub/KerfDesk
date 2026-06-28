@@ -2,6 +2,7 @@
 // buildAppCommands. Pure functions of AppCommandContext.
 
 import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from '../common/fill-diagnostics';
+import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { registrationJigCommand } from './registration-command-family';
 
@@ -386,7 +387,13 @@ export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand
 }
 
 export function helpCommand(ctx: AppCommandContext): AppCommand {
-  return enabled('help.about', 'help', 'About LaserForge', 'Show build information', ctx.showAbout);
+  return enabled(
+    'help.about',
+    'help',
+    `About ${APP_DISPLAY_NAME}`,
+    'Show build information',
+    ctx.showAbout,
+  );
 }
 
 function connectDisabledReason(ctx: AppCommandContext): string {

@@ -52,7 +52,7 @@ export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Pr
 
   if (result.kind === 'schema-too-new') {
     jobAwareAlert(
-      `This material library was saved with a newer LaserForge (schemaVersion ${result.sawVersion}). Update the app to open it.`,
+      `This material library was saved with a newer KerfDesk (schemaVersion ${result.sawVersion}). Update the app to open it.`,
     );
     return;
   }

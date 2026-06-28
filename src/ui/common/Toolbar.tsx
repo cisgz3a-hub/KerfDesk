@@ -3,11 +3,12 @@
 
 import { runCommand, type AppCommand, type CommandId } from '../commands/command-registry';
 import { commandHelpId, controlHelp } from '../help/help-topics';
+import { APP_DISPLAY_NAME } from '../../core/app-branding';
 
 export function Toolbar(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
   return (
     <header aria-label="Toolbar" style={barStyle}>
-      <span style={titleStyle}>LaserForge 2.0</span>
+      <span style={titleStyle}>{APP_DISPLAY_NAME}</span>
       <BuildBadge />
       <span style={separatorStyle} />
       <ToolbarButtons commands={props.commands} />

@@ -43,7 +43,7 @@ export function runControllerReadiness(
     errors.push({
       code: 'max-power-unknown',
       message:
-        'Controller did not report GRBL $30 max S. LaserForge cannot prove that power percentages map safely.',
+        'Controller did not report GRBL $30 max S. KerfDesk cannot prove that power percentages map safely.',
     });
   } else if (controller.maxPowerS !== project.device.maxPowerS) {
     errors.push({
@@ -56,13 +56,13 @@ export function runControllerReadiness(
     errors.push({
       code: 'laser-mode-unknown',
       message:
-        'Controller did not report GRBL $32 laser mode. LaserForge cannot prove safe laser-mode behavior.',
+        'Controller did not report GRBL $32 laser mode. KerfDesk cannot prove safe laser-mode behavior.',
     });
   } else if (!controller.laserModeEnabled) {
     errors.push({
       code: 'laser-mode-disabled',
       message:
-        'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from LaserForge.',
+        'Controller reports $32=0. Enable GRBL laser mode ($32=1) before starting from KerfDesk.',
     });
   }
 
