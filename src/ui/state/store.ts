@@ -210,6 +210,7 @@ export type AppState = ObjectPropertiesActions &
     readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
     readonly moveLayer: (layerId: string, direction: LayerMoveDirection) => void;
     readonly createManualLayer: (color: string) => void;
+    readonly switchIslandFillLayersToScanline: () => void;
     readonly assignSelectionToLayer: (layerId: string) => void;
     readonly breakApartSelection: () => void;
     readonly fillSelectionSeparately: () => void;

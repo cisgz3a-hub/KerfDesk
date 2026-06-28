@@ -1,8 +1,10 @@
 import { analyzeFillHeatRisk, compileJob } from '../job';
 import type { Project } from '../scene';
 
+export const MACHINE_ISLAND_FILL_RISK_CODE = 'machine-island-fill-risk';
+
 export type MachineProfilePreflightIssue = {
-  readonly code: 'machine-island-fill-risk';
+  readonly code: typeof MACHINE_ISLAND_FILL_RISK_CODE;
   readonly message: string;
 };
 
@@ -23,7 +25,7 @@ export function findMachineProfilePreflightIssues(
   if (riskyIslandSweeps === 0 && !hasShortIslandSweep) return [];
   return [
     {
-      code: 'machine-island-fill-risk',
+      code: MACHINE_ISLAND_FILL_RISK_CODE,
       message: NEOTRONICS_4040_ISLAND_FILL_RISK_MESSAGE,
     },
   ];
