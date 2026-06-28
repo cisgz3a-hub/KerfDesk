@@ -38,8 +38,7 @@ export function groupFillContoursIntoIslands(
   const parent = contours.map((_, i) => i);
   unionConnectedContours(contours, parent);
   const islands = componentIslands(contours, parent);
-  const grouped =
-    options.clusterMicroIslands === true ? clusterMicroIslands(islands) : islands;
+  const grouped = options.clusterMicroIslands === true ? clusterMicroIslands(islands) : islands;
   return sortIslands(grouped).map((island) => island.polylines);
 }
 

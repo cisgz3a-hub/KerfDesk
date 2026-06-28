@@ -6,8 +6,6 @@ export function islandFillMotionPolicyForDevice(device: DeviceProfile): IslandFi
   return resolveGrblDialect(device).id === 'neotronics-4040-safe' ? 'sensitive' : 'adaptive';
 }
 
-export function isSensitiveIslandFillPolicy(
-  policy: IslandFillMotionPolicy | undefined,
-): boolean {
+export function isSensitiveIslandFillPolicy(policy: IslandFillMotionPolicy | undefined): boolean {
   return policy === 'sensitive';
 }

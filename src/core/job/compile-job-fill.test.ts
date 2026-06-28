@@ -214,7 +214,10 @@ describe('compileJob fill hatching', () => {
     const right = closedSquareObj({ id: 'right', color: '#ff0000', x: 50, size: 3 });
 
     const fills = fillGroups(
-      compileJob({ objects: [left, right], layers: [layer] }, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+      compileJob(
+        { objects: [left, right], layers: [layer] },
+        NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      ),
     );
 
     expect(fills).toHaveLength(2);
