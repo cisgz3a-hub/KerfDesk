@@ -1,4 +1,4 @@
-import type { Vec2 } from '../scene';
+import type { LayerFillStyle, Vec2 } from '../scene';
 
 export type FillOverscanRun = {
   readonly leadStart: Vec2;
@@ -40,10 +40,10 @@ export function expandFillHatchWithOverscan(
 // speed/quality tradeoff (DECISIONS.md ADR-033).
 const OVERSCAN_MIN_BURN_RATIO = 2;
 
-// The overscan to actually apply to a hatch run: the configured value when the
-// burn is long enough to be worth a runway, otherwise 0 (skip). Single source
-// of truth so the emitter, the planner ETA, and the preview scrubber agree on
-// which runs get a runway.
+// The legacy scanline overscan to actually apply to a hatch run: the configured
+// value when the burn is long enough to be worth a runway, otherwise 0 (skip).
+// Kept byte-stable for normal scanline fill; effectiveFillOverscanMm adds the
+// Island Fill policy without changing that older behavior.
 export function effectiveOverscanMm(polyline: ReadonlyArray<Vec2>, overscanMm: number): number {
   if (overscanMm <= 0) return 0;
   const a = polyline[0];
@@ -52,4 +52,22 @@ export function effectiveOverscanMm(polyline: ReadonlyArray<Vec2>, overscanMm: n
   const length = Math.hypot(b.x - a.x, b.y - a.y);
   if (length <= 0) return 0;
   return length < OVERSCAN_MIN_BURN_RATIO * overscanMm ? 0 : overscanMm;
+}
+
+export function effectiveFillOverscanMm(
+  polyline: ReadonlyArray<Vec2>,
+  overscanMm: number,
+  fillStyle: LayerFillStyle | undefined,
+): number {
+  if (fillStyle !== 'island') return effectiveOverscanMm(polyline, overscanMm);
+  if (overscanMm <= 0) return 0;
+  const a = polyline[0];
+  const b = polyline[1];
+  if (a === undefined || b === undefined || polyline.length !== 2) return 0;
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  if (length <= 0) return 0;
+  // Island Fill intentionally keeps a capped runway even for short island
+  // sweeps. That avoids starting the burn from rest while still preventing the
+  // old full-overscan runtime blowup on thousands of tiny traced features.
+  return Math.min(overscanMm, length / OVERSCAN_MIN_BURN_RATIO);
 }

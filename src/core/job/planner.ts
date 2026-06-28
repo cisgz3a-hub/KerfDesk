@@ -35,7 +35,7 @@
 
 import type { DeviceProfile } from '../devices';
 import type { Vec2 } from '../scene';
-import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
 import type { CutGroup, FillGroup, Job } from './job';
 
@@ -124,9 +124,13 @@ function appendFillGroupBlocks(
       // so the burn is a SINGLE cut block from the first span's start to the
       // last span's end — no per-run full stop (ADR-034). The gaps move at feed
       // too, so pricing the whole span as one cut block is accurate for total
-      // time. The overscan runway is laser-off rapid travel; short sweeps skip
-      // it (effectiveOverscanMm → 0, zero-length travels drop out).
-      const overscan = effectiveOverscanMm([first.start, last.end], group.overscanMm);
+      // time. The overscan runway is laser-off rapid travel; normal short
+      // scanlines may skip it, while Island Fill keeps a capped partial runway.
+      const overscan = effectiveFillOverscanMm(
+        [first.start, last.end],
+        group.overscanMm,
+        group.fillStyle,
+      );
       const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
       if (run === null) continue;
       appendTravel(out, cursor, run.leadStart, travelV);

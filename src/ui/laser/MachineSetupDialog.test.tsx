@@ -7,10 +7,12 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import type { FileOpenRequest, FileSaveRequest, PlatformAdapter } from '../../platform/types';
 import {
   EMPTY_SCENE,
+  IDENTITY_TRANSFORM,
   createLayer,
   createProject,
   type Layer,
   type Project,
+  type SceneObject,
 } from '../../core/scene';
 import {
   serializeMachineProfileDocument,
@@ -173,6 +175,33 @@ describe('MachineSetupDialog', () => {
     }
   });
 
+  it('surfaces Island Fill short-sweep heat risk in raster diagnostics', async () => {
+    const islandLayer = {
+      ...createLayer({ id: 'island-layer', color: '#ff0000', mode: 'fill' }),
+      fillStyle: 'island' as const,
+      fillOverscanMm: 5,
+      hatchSpacingMm: 1,
+    };
+    useStore.getState().setProject({
+      ...projectWithLayers([islandLayer]),
+      scene: {
+        ...EMPTY_SCENE,
+        layers: [islandLayer],
+        objects: [tinyIslandObject()],
+      },
+    });
+
+    const { host, unmount } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Raster Diagnostics').click());
+
+      expect(host.textContent).toContain('Island Fill has 3 short sweep(s)');
+      expect(host.textContent).toContain('partial acceleration runway');
+    } finally {
+      await unmount();
+    }
+  });
+
   it('imports a LaserForge machine profile through a review step', async () => {
     const text = serializeMachineProfileDocument({
       format: MACHINE_PROFILE_FORMAT,
@@ -303,5 +332,31 @@ function projectWithLayers(layers: ReadonlyArray<Layer>): Project {
       scanningOffsets: [],
     }),
     scene: { ...EMPTY_SCENE, layers },
+  };
+}
+
+function tinyIslandObject(): SceneObject {
+  return {
+    kind: 'imported-svg',
+    id: 'tiny-island',
+    source: 'tiny-island.svg',
+    bounds: { minX: 0, minY: 0, maxX: 3, maxY: 3 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            points: [
+              { x: 0, y: 0 },
+              { x: 3, y: 0 },
+              { x: 3, y: 3 },
+              { x: 0, y: 3 },
+            ],
+            closed: true,
+          },
+        ],
+      },
+    ],
   };
 }

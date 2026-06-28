@@ -59,6 +59,30 @@ const smallRaster: SceneObject = {
   linesPerMm: 10,
 };
 
+const tinyIsland: SceneObject = {
+  kind: 'imported-svg',
+  id: 'tiny-island',
+  source: 'tiny-island.svg',
+  bounds: { minX: 0, minY: 0, maxX: 3, maxY: 3 },
+  transform: IDENTITY_TRANSFORM,
+  paths: [
+    {
+      color: '#ff0000',
+      polylines: [
+        {
+          points: [
+            { x: 0, y: 0 },
+            { x: 3, y: 0 },
+            { x: 3, y: 3 },
+            { x: 0, y: 3 },
+          ],
+          closed: true,
+        },
+      ],
+    },
+  ],
+};
+
 describe('detectJobIntentWarnings', () => {
   // H12 (AUDIT-2026-06-10): the engrave luma is extracted from the
   // 2048-px-capped decode (ADR-037, a TRACE runtime cap), and compile
@@ -108,6 +132,25 @@ describe('detectJobIntentWarnings', () => {
   it('warns when a traced image will run as vector Fill output, not raster engraving', () => {
     expect(detectJobIntentWarnings(projectWith(traced, 'fill'))).toContain(
       'Trace "logo.png" is vector Fill output, not raster image engraving. It will run as M4 dynamic-power fill sweeps from traced vector geometry; tiny traced text can stay wavy if the source outline is poor.',
+    );
+  });
+
+  it('warns when Island Fill has short sweeps that need partial acceleration runway', () => {
+    const project = projectWith(tinyIsland, 'fill');
+    const layer = project.scene.layers[0];
+    const islandProject: Project = {
+      ...project,
+      scene: {
+        ...project.scene,
+        layers:
+          layer === undefined
+            ? project.scene.layers
+            : [{ ...layer, fillStyle: 'island', fillOverscanMm: 5, hatchSpacingMm: 1 }],
+      },
+    };
+
+    expect(detectJobIntentWarnings(islandProject)).toContain(
+      'Island Fill has 3 short sweep(s) that need partial acceleration runway. LaserForge will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.',
     );
   });
 

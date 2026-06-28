@@ -61,3 +61,5 @@ export type {
 export { generateScanOffsetCalibrationPattern } from './scan-offset-calibration-pattern';
 export type { ScanOffsetPoint } from './scan-offset';
 export { offsetForSpeed, shiftAlongTravel } from './scan-offset';
+export type { FillHeatRiskSummary } from './fill-heat-risk';
+export { analyzeFillHeatRisk } from './fill-heat-risk';

@@ -5,7 +5,7 @@
 
 import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
-import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
 import type { CutGroup, FillGroup, Group, Job, RasterGroup } from './job';
 import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
@@ -107,7 +107,7 @@ function extendBoundsForFill(
     const last = spans[spans.length - 1];
     if (first === undefined || last === undefined) continue;
     const burnRun = [first.start, last.end] as const;
-    const overscan = effectiveOverscanMm(burnRun, group.overscanMm);
+    const overscan = effectiveFillOverscanMm(burnRun, group.overscanMm, group.fillStyle);
     const run = expandFillHatchWithOverscan(burnRun, overscan);
     if (run === null) continue;
     extendBoundsForPoint(b, run.leadStart);

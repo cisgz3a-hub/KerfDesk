@@ -8,7 +8,7 @@
 
 import type { Vec2 } from '../scene';
 import type { FillGroup, Group, Job, RasterGroup } from './job';
-import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from './fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel, type ScanOffsetPoint } from './scan-offset';
 
@@ -87,6 +87,7 @@ function appendFillGroupSteps(
       sweep,
       group.color,
       group.overscanMm,
+      group.fillStyle,
       scanOffsetMm,
     );
     if (end !== null) prevEnd = end;
@@ -244,13 +245,14 @@ function appendFillSweepSteps(
   sweep: FillSweep,
   color: string,
   overscanMm: number,
+  fillStyle: FillGroup['fillStyle'],
   scanOffsetMm: number,
 ): Vec2 | null {
   const spans = scanOffsetSpans(sweep, scanOffsetMm);
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return null;
-  const overscan = effectiveOverscanMm([first.start, last.end], overscanMm);
+  const overscan = effectiveFillOverscanMm([first.start, last.end], overscanMm, fillStyle);
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return null;
   appendTravelStep(steps, prevEnd, run.leadStart);
