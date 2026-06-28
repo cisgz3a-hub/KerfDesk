@@ -1,6 +1,7 @@
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
 // structured error describing why it cannot be loaded.
 
+import { normalizeCameraCalibration } from '../../core/camera';
 import {
   DEFAULT_DEVICE_PROFILE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
@@ -113,6 +114,9 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     rxBufferBytes: normalizeGrblRxBufferBytes(dev['rxBufferBytes']),
     gcodeDialect: normalizeGcodeDialectSelection(dev['gcodeDialect']),
     scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
+    // Override (not merge) the raw value so a malformed persisted calibration is
+    // dropped to undefined rather than trusted; JSON.stringify omits the undefined.
+    cameraCalibration: normalizeCameraCalibration(dev['cameraCalibration']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     ...normalizeZTravelPatch(dev),
   };

@@ -3536,3 +3536,242 @@ Setup wizard) is the first.
 - (Earlier reservations for ADR-019..023 were stale — Phase B / E
   shipped without formal ADRs at those slots. ADR-019 / ADR-020 /
   ADR-021 are the first three slots since reused.)
+
+---
+
+## ADR-094 — Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4)
+
+**Status:** Accepted; staged in small PRs. | **Date:** 2026-06-27
+
+> Numbering note: ADR-093 is the previous highest. The active build plan reserves
+> ADR-054..091 for its tickets, so this maintainer-requested feature takes the next
+> free number above that range (ADR-094). v2–v4 take ADR-095 / 096 / 097.
+
+### Context
+
+`PROJECT.md` listed "Camera alignment, overhead camera" under Out of scope; the maintainer
+requested it. LightBurn's camera (capture → lens calibration → 4-marker alignment → live
+overlay → print-and-cut → capture-to-trace) is the behavioral reference. Competitor source
+was read directly: MeerK40t `camera.py` (`cv2.getPerspectiveTransform` from four manually
+dragged corners, no RANSAC), Rayforge (capture-to-trace, `findHomography` with an image
+y-down → bed y-up flip), OpenPnP (fiducial detection + intrinsic calibration). An adversarial
+second audit verified the math against that code and found no errors.
+
+The decisive constraint is the < 1 MB compressed web-bundle target (ADR-017): OpenCV.js
+(~8–10 MB WASM) is ~10× the budget. The CV math actually required is small — a 4-point
+homography is an 8×8 linear solve; Brown–Conrady undistort and inverse-homography rectify are
+each a few dozen lines — and hand-rolls to ~150–250 LOC of pure TypeScript.
+
+### Decision
+
+1. **Hand-rolled pure-TS CV in a new `src/core/camera/` module — no OpenCV.js.** Rejected on
+   bundle size, not licence (OpenCV.js is Apache-2.0, which is permitted). RANSAC (v3) injects
+   its RNG per the pure-core no-random rule.
+2. **Capture via a new `CameraAdapter` on `PlatformAdapter`** (`getUserMedia` / enumerate /
+   stream), mirroring the existing `SerialAdapter` contract (`isSupported` / request,
+   AbortError → null). Electron is Chromium, so one web code path serves web and desktop.
+3. **v1 live overlay via CSS `matrix3d`** (the GPU performs the perspective divide; Canvas2D is
+   affine-only and physically cannot warp). `matrix3d` covers the homography only — distortion
+   correction (v2) cannot ride it and its live-undistort tech (WebGL shader / CPU remap /
+   still-path-only) is resolved at v2.
+4. **v1 alignment = manual 4-point homography** (matches LightBurn and MeerK40t: exact 8-DOF,
+   no RANSAC). **Alignment targets are laser-engraved** at known machine coordinates, reusing
+   the registration-jig engrave machinery (ADR-057). Fiducial auto-detection is deferred to v3;
+   `js-aruco` / `js-aruco2` are rejected because their bundles include LGPL-v3 code.
+5. **Calibration persists as a `readonly` optional field on `DeviceProfile`** (sibling of
+   `scanningOffsets`; additive normalize in `deserialize-project.ts`; no `schemaVersion` bump).
+   In-progress calibration drafts use the existing `localStorage` calibration-draft pattern.
+6. **Staging:** v1 overlay + manual 4-point (this ADR) → v2 Brown–Conrady lens calibration
+   (ADR-095) → v3 fiducial auto-align + 2-point print-and-cut (ADR-096) → v4 capture-to-trace
+   reusing the existing trace pipeline (ADR-097). Each phase ships as its own small PR set.
+
+### Consequences
+
+- New pure-core module `src/core/camera/`; new `src/platform/web/web-camera.ts`; new
+  `src/ui/camera/` (overlay + alignment panel) and a camera Zustand slice; one `readonly`
+  field on `DeviceProfile`. No new runtime dependency; v1 bundle impact ~< 10 KB.
+- The camera frame is a UI/IO concern only — core never generates it. The existing
+  `drawBitmapAtTransform` / `view-transform` machinery and the registration-jig drag panel are
+  reused rather than reinvented.
+
+### Verification
+
+Pure-core property and unit tests prove the math (four-correspondence round-trip, degeneracy
+rejection, y-flip consistency) and run in CI. **They do not prove the overlay lands on the
+real bed** — per CLAUDE.md rule 2 (green math ≠ fidelity), accuracy is verified on a physical
+USB camera over a real machine (available to the maintainer): engrave the four targets, align,
+and confirm a placed object burns where the overlay showed it. The y-flip *direction* can only
+be confirmed against a real capture (a self-consistent pure test shares the flip and cannot
+catch a mirror). A golden-image regression fixture (the ADR-025 perceptual harness) built from
+a one-time real capture guards the math thereafter. The zero-install web target requires an
+https / secure context or `getUserMedia` silently fails.
+
+### Out of scope for v1
+
+Lens distortion correction (v2), fiducial auto-detection (v3), capture-to-trace (v4), and
+non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-095 / 096 / 097.
+
+---
+
+## ADR-095 — Camera Mode v2: fisheye lens calibration + de-fisheye render
+
+**Status:** Accepted; staged in small PRs. | **Date:** 2026-06-28
+
+### Context
+
+The Falcon A1 Pro (like most laser bed cameras) uses a wide-angle lens, so the live feed
+is visibly barrel-bowed. The ADR-094 4-point homography corrects perspective only — it
+pins the four corners but cannot remove lens curvature, so straight bed edges stay curved.
+A camera-implementation study (MeerK40t, OpenPnP, LightBurn, Rayforge, LaserWeb4, OpenCV)
+confirmed the universal fix: a lens-distortion model applied to the frame **before** the
+homography.
+
+Licensing (ADR-017/018): GPL/AGPL apps (OpenPnP, LaserWeb4) may be **studied** but not
+vendored; only MIT/BSD/Apache code may be copied. OpenCV.js (the build) is excluded on
+bundle size (ADR-094), not licence — and the distortion math is not copyrightable, so the
+equations are clean-roomed in TypeScript from the published Kannala-Brandt model.
+
+### Decision (maintainer-chosen, 2026-06-28)
+
+1. **Model: Kannala-Brandt fisheye** (θ-polynomial, k1..k4), not Brown-Conrady. It stays
+   well-behaved at the wide field angles where Brown-Conrady's r⁶ term diverges; MeerK40t
+   uses exactly this (`cv2.fisheye`) for the same hardware class. Pure-TS forward
+   (`θ_d = θ(1 + k1θ² + k2θ⁴ + k3θ⁶ + k4θ⁸)`) plus a Newton inverse.
+2. **Calibration: guided board.** Print a checkerboard, capture ~5 poses (4 corners +
+   centre) with a per-capture reprojection-error score (LightBurn) and per-quadrant
+   coverage feedback (Rayforge); fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
+   Levenberg-Marquardt minimiser over reprojection error. ChArUco is rejected — its ArUco
+   decode needs an LGPL bundle barred by ADR-094; a plain checkerboard detects clean-room.
+3. **Render: WebGL fragment shader.** The inverse-distortion sampling runs per-pixel on the
+   GPU (LaserWeb4 proves `regl` does this < 1 MB, no OpenCV); output→input sampling so a
+   rectified output pixel reads the distorted source. Supports live UVC video, not only the
+   polled still.
+4. **Order:** capture → de-fisheye → 4-point homography (ADR-094) → overlay. The homography
+   now runs on rectified pixels. K + D persist on the readonly `DeviceProfile` field ADR-094
+   reserved.
+
+### Staging
+
+v2.a fisheye math (pure core) · v2.b checkerboard detection (pure, `ImageData` in) ·
+v2.c LM intrinsic solver (pure — the highest-risk port) · v2.d WebGL undistort shader ·
+v2.e calibration wizard UI (capture poses, coverage + error score, and an OpenPnP-style
+A/B "Apply Calibration?" toggle). Each is its own small PR.
+
+### Consequences
+
+- New pure-core `src/core/camera/{fisheye,checkerboard-detect,calibrate}.ts`; a new WebGL
+  renderer and calibration wizard in `ui/camera/`. No new runtime dependency; the math is
+  clean-roomed from the published Kannala-Brandt model and OpenCV/glfx equations (referenced,
+  never copied).
+- Once distortion is on, the overlay moves off pure CSS `matrix3d` (which cannot carry lens
+  curvature) to a composited undistort→homography frame.
+
+### Verification
+
+Pure tests prove the math (distort/undistort round-trip; the LM solver recovers a known
+K/D from synthetic board poses). Per CLAUDE.md rule 2, green math is **not** a straight real
+image: an A/B "Apply Calibration?" toggle (OpenPnP) lets the operator **see** the bed edges
+straighten on the real Falcon, and a golden frame guards regressions (ADR-025). Physical
+straightness is hardware-verified, not asserted by a green suite.
+
+### v2.c as-built (2026-06-28)
+
+The LM intrinsic solver shipped as pure-core modules in `src/core/camera/` — all internal
+except the single public entry point `calibrate(views, options?)`: `levmar` + `levmar-kernel`
+(generic central-difference Levenberg-Marquardt with Marquardt damping), `rodrigues`
+(axis-angle ↔ matrix, incl. the near-π log-map branch), `lm-params` (flat parameter packing),
+`calibrate-residuals` (reprojection residuals; behind-camera corners masked inactive, not
+penalised), `init-guess`, `calibrate` + `calibrate-metrics`, and the `calibrate-fixtures`
+synthetic oracle (its own independent Rodrigues so a transposition bug cannot self-cancel).
+
+Decisions made during the build (deviating from / refining the draft design):
+
+- **Init = robust fisheye seed, NOT Zhang's pinhole closed-form.** `B = K⁻ᵀK⁻¹` factorises a
+  negative/imaginary focal under Falcon-class barrel distortion, so K is seeded from the
+  device-nominal focal (`0.7·imageWidth` default, or a measured `options.initialGuess`), D=0,
+  and only the per-view R/t are taken from a homography decomposition (forced `t.z>0`,
+  Gram-Schmidt orthonormalised). The wrong-K basin test confirms LM crosses to truth.
+- **`behind-camera` failure reason dropped.** The `t.z>0`-forcing seed makes a whole-board
+  behind-camera result unreachable; shipping the reason would be dead code. Reachable failures:
+  `too-few-views | too-few-points | rank-deficient | no-convergence`.
+- **Karpathy finding — noise overfits the high-order terms.** Zero-noise synthetic recovery is
+  machine-precision for K and D from both a good and a wrong-K init. But under 0.2px detection
+  noise the reprojection RMS stays low (~0.15px) while the weakly-observed `k3,k4` overfit to
+  absurd values (e.g. k3 ≈ 200). **v2.e must add a coefficient-sanity bound + an RMS gate and
+  prefer more poses/points; a low RMS alone does not mean a usable calibration.**
+
+### v2.d as-built (2026-06-28) — render path refines decision #3
+
+Shipped pure-core, all verified: `rectify-map.ts` (per-pixel output->input sample point, the
+math the renderer mirrors), `cpu-rectify.ts` (bilinear-sampled de-fisheye over an RGBA buffer),
+`camera-calibration.ts` (the persisted `CameraCalibration` type + an untrusted-JSON normaliser),
+and a new optional `cameraCalibration?: CameraCalibration` on `DeviceProfile` (the ADR-094 #5 /
+ADR-095 #4 "reserved" field — it did NOT exist in code; this closes that doc-vs-code drift),
+normalised in `deserialize-project.ts` (override, not merge, so a malformed value is dropped).
+
+**Render refinement (flag for the maintainer).** Decision #3 chose a WebGL fragment shader,
+justified by "supports live UVC video." But the Falcon A1 Pro is a **polled network still**
+(`getCapturePhoto`, ~1.5 s cadence), not 60fps video — so the tested CPU rectify (one pass per
+polled frame) is adequate AND is the no-WebGL fallback the ADR already required. Building an
+unverifiable GPU shader now would violate CLAUDE.md rule 2 (no "works" without perceptual proof).
+**As-built: ship the CPU rectify as the v2 render path; defer the WebGL shader to a live-video
+optimisation if/when a UVC camera is supported.** The maintainer can override this back to
+WebGL-first; recorded here rather than silently swapped.
+
+**Karpathy proof (no hardware needed).** `cpu-rectify.test.ts` distorts a known smooth scene
+through the forward KB model, rectifies it back, and confirms reconstruction to <6 grey levels
+over the interior — proving the de-fisheye *pipeline* straightens curvature. What remains
+hardware-gated is only whether the **real Falcon lens matches the calibrated model**, surfaced by
+the v2.e A/B "Apply Calibration?" toggle on a real captured frame.
+
+**FOV tradeoff.** The rectify uses `outputK === sourceK` (the `outputK` parameter is separate so a
+future widened "new camera matrix" can be slotted in). This trades ~7–8% of peripheral field for a
+border-free overlay — the same default MeerK40t/LightBurn use. The v2.e wizard copy should mention it.
+
+### v2.e as-built (2026-06-28) — trust gates + capture session (pure core); UI handed off
+
+Shipped pure-core, all verified: `calibration-trust.ts` (`assessCalibrationTrust` flags implausible
+KB coefficients `|k|>1`, RMS `>1.5px`, or a near-empty image quadrant — the gate that catches the
+v2.c k3/k4-overfit a low RMS would otherwise hide), `pose-diversity.ts` (`checkPoseDiversity` —
+geodesic rotation spread; rejects the 5-near-identical-shots focal/depth-ambiguity trap),
+`resolution-match.ts` (`frameMatchesCalibration` + `scaleIntrinsicsToFrame` for apply-time frame
+rescaling), and `calibration-session.ts` (the wizard's pure reducer: collect → solve → assess).
+
+**Reduced distortion model.** `CalibrationOptions.distortionModel: 'k1k2' | 'k1k2k3k4'` (default
+full; a string union, not a boolean per CLAUDE.md). `'k1k2'` freezes `k3=k4=0` via a new generic
+`LevMarOptions.fixedIndices` (the param's Jacobian column is zeroed, so the damped step never moves
+it). The wizard should default to `'k1k2'` for low-angular-coverage Falcon captures.
+
+**Two solver behaviour changes (decisions, recorded):**
+- **LM terminates on a damping explosion.** A sustained reject streak drives λ past `LAMBDA_MAX`
+  → the step is negligible → we are at a minimum → `converged: true`. The absolute gradient stop is
+  too tight to catch a nonzero-cost (reduced-model) minimum at pixel scale.
+- **`calibrate()` returns a best-effort fit on non-convergence, not a hard failure** — OpenCV/
+  MeerK40t behaviour, resolving the v2.c audit's concern that `converged:false → 'no-convergence'`
+  wrongly rejects usable fits. `'no-convergence'` now means only a genuinely blown-up (non-finite)
+  LM run. The wizard's trust check, not the solver, judges usability.
+
+**Conditioning finding (honest).** For a narrow-FOV planar board (θ ≈ 0.12 rad here) even `k1,k2`
+are weakly observable and trade off under noise (e.g. k2 → 1.0 while RMS stays ~0.15px) — the same
+Karpathy lesson one order down. This is inherent to narrow-FOV planar calibration, not a solver bug;
+`assessCalibrationTrust` is the backstop. Wider angular coverage (more board tilt/closer board) is
+the real remedy, which the pose-diversity + coverage gates nudge the operator toward.
+
+**Handed off (hardware-gated, NOT built).** The wizard's React UI + live camera/canvas wiring —
+polling Falcon frames, detecting the checkerboard and feeding `BoardObservation`s, rendering
+coverage/RMS/trust, and the A/B "Apply Calibration?" overlay (`rectifyImage`) — needs the
+maintainer's real Falcon to build and verify (CLAUDE.md rule 2 perceptual proof, rule 4 side-effect-
+free). The session/solve/assess/persist (`toCameraCalibration`) and de-fisheye (`rectifyImage`)
+dependencies are all shipped and exported. **One pure piece is deliberately NOT shipped: a
+checkerboard GRID DETECTOR.** `refineCornerSubpixel` only *refines* an already-located corner; finding
+the grid in a real frame (the hardest pure-CV step) is part of the handed-off work, best built and
+tuned against real Falcon captures.
+
+**v2.e audit fixes (post-audit, all gated).** The trust gate now also inspects the intrinsics it
+gates (`intrinsics-implausible`: non-positive/non-finite focal, or a principal point thrown far
+outside the frame) — a degenerate-but-finite K with a low RMS no longer reads "trusted".
+`CalibrationResult.ok` now carries `converged: boolean` + a typed `exit` (`tolerance` |
+`iteration-cap` | `damping-stall`) so the wizard can warn before applying a best-effort fit; the
+LM damping-stall stop is now `converged:false` (a stall is not a tolerance stop). Non-finite
+distortion coefficients are flagged explicitly, `scaleIntrinsicsToFrame` guards non-positive frame
+sizes, and the pose-diversity floor is documented as provisional + overridable.

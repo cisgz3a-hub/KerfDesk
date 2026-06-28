@@ -9,6 +9,7 @@ import { CommandShell } from '../commands';
 import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
+import { CameraPanel } from '../camera';
 import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
@@ -48,6 +49,7 @@ export function App(): JSX.Element {
         <div style={canvasAreaStyle}>
           <Workspace />
           <RegistrationJigPanel />
+          <CameraPanel />
         </div>
         <CutsLayersPanel />
         <LaserWindow />

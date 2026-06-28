@@ -12,6 +12,7 @@ import type {
   PlatformAdapter,
   SaveTarget,
 } from '../types';
+import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
 
 type FilePickerAcceptType = {
@@ -71,4 +72,5 @@ export const webAdapter: PlatformAdapter = {
   pickFilesForOpen,
   pickFileForSave,
   serial: webSerial,
+  camera: webCamera,
 };
