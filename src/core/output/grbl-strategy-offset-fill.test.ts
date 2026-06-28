@@ -100,4 +100,37 @@ describe('grblStrategy offset fill', () => {
     );
     expect(out).not.toMatch(/\bG[23]\b/);
   });
+
+  it('keeps a partial laser-off runway around short Island Fill sweeps', () => {
+    const job: Job = {
+      groups: [
+        {
+          kind: 'fill',
+          fillStyle: 'island',
+          layerId: 'island-short',
+          color: '#000000',
+          power: 30,
+          speed: 1500,
+          passes: 1,
+          airAssist: false,
+          overscanMm: 5,
+          segments: [
+            {
+              polyline: [
+                { x: 10, y: 10 },
+                { x: 13, y: 10 },
+              ],
+              closed: false,
+              reverse: false,
+            },
+          ],
+        },
+      ],
+    };
+    const out = grblStrategy.emit(job, DEFAULT_DEVICE_PROFILE);
+
+    expect(out).toContain(
+      'G0 X8.500 Y10.000 S0\nG0 X10.000 Y10.000 S0\nG1 X13.000 Y10.000 F1500 S300\nG0 X14.500 Y10.000 S0',
+    );
+  });
 });

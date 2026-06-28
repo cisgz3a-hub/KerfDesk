@@ -40,7 +40,7 @@
 // Pure-core compliant: no clock, no random, no I/O.
 
 import type { Vec2 } from '../scene';
-import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
 import type { CutGroup, CutSegment, FillGroup, Group, Job } from './job';
 
@@ -257,7 +257,11 @@ function islandGroupEndpoints(group: FillGroup): RouteEndpoints | null {
     const first = sweep.spans[0];
     const last = sweep.spans[sweep.spans.length - 1];
     if (first === undefined || last === undefined) continue;
-    const overscan = effectiveOverscanMm([first.start, last.end], group.overscanMm);
+    const overscan = effectiveFillOverscanMm(
+      [first.start, last.end],
+      group.overscanMm,
+      group.fillStyle,
+    );
     const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
     if (run === null) continue;
     if (entry === null) entry = run.leadStart;

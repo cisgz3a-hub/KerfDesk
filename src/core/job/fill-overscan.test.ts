@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
+import {
+  effectiveFillOverscanMm,
+  effectiveOverscanMm,
+  expandFillHatchWithOverscan,
+} from './fill-overscan';
 
 describe('expandFillHatchWithOverscan', () => {
   it('adds horizontal lead-in and lead-out', () => {
@@ -86,5 +90,27 @@ describe('effectiveOverscanMm', () => {
     expect(effectiveOverscanMm(hatch(20), 0)).toBe(0);
     expect(effectiveOverscanMm([{ x: 1, y: 1 }], 5)).toBe(0);
     expect(effectiveOverscanMm(hatch(0), 5)).toBe(0);
+  });
+});
+
+describe('effectiveFillOverscanMm', () => {
+  const hatch = (len: number) => [
+    { x: 0, y: 0 },
+    { x: len, y: 0 },
+  ];
+
+  it('keeps scanline short-run behavior byte-stable', () => {
+    expect(effectiveFillOverscanMm(hatch(3), 5, 'scanline')).toBe(0);
+    expect(effectiveFillOverscanMm(hatch(3), 5, undefined)).toBe(0);
+  });
+
+  it('uses a capped partial runway for short Island Fill sweeps', () => {
+    expect(effectiveFillOverscanMm(hatch(3), 5, 'island')).toBe(1.5);
+    expect(effectiveFillOverscanMm(hatch(9.5), 5, 'island')).toBe(4.75);
+  });
+
+  it('keeps the configured runway for long Island Fill sweeps', () => {
+    expect(effectiveFillOverscanMm(hatch(10), 5, 'island')).toBe(5);
+    expect(effectiveFillOverscanMm(hatch(20), 5, 'island')).toBe(5);
   });
 });

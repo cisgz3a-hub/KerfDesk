@@ -1,4 +1,5 @@
 import type { GrblSettingRow } from '../../core/controllers/grbl';
+import { analyzeFillHeatRisk, compileJob, type FillHeatRiskSummary } from '../../core/job';
 import { LAYER_DEFAULTS, type Layer, type Project } from '../../core/scene';
 import { layerFromSubLayer } from '../../core/scene';
 import { useStore } from '../state';
@@ -121,12 +122,14 @@ function buildRasterDiagnostics(
   const defaultLineIntervalLayers = [...imageLayers, ...fillLayers].filter(usesStarterLineInterval);
   const sMax = settingSummary(rows, 30, lastSettingsReadAt);
   const laserMode = settingSummary(rows, 32, lastSettingsReadAt);
+  const fillHeatRisk = analyzeFillHeatRisk(compileJob(project.scene, project.device));
   const warnings = rasterWarnings({
     project,
     bidirectionalLayers,
     lowOverscanLayers,
     defaultRecipeLayers,
     defaultLineIntervalLayers,
+    fillHeatRisk,
     laserMode,
     sMax,
   });
@@ -150,6 +153,7 @@ function buildRasterDiagnostics(
       lowOverscanLayers,
       defaultRecipeLayers,
       defaultLineIntervalLayers,
+      fillHeatRisk,
       laserMode,
       sMax,
     }),
@@ -162,6 +166,7 @@ function rasterWarnings(args: {
   readonly lowOverscanLayers: ReadonlyArray<Layer>;
   readonly defaultRecipeLayers: ReadonlyArray<Layer>;
   readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
+  readonly fillHeatRisk: FillHeatRiskSummary;
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<string> {
@@ -174,6 +179,8 @@ function rasterWarnings(args: {
   if (args.lowOverscanLayers.length > 0) {
     warnings.push('Low overscan layers may leave the head accelerating during burn moves.');
   }
+  const fillHeatWarning = fillHeatRiskWarning(args.fillHeatRisk);
+  if (fillHeatWarning !== null) warnings.push(fillHeatWarning);
   if (args.defaultRecipeLayers.length > 0) {
     warnings.push('Run Material Test on scrap before production.');
   }
@@ -196,18 +203,30 @@ function rasterWarnings(args: {
   return warnings;
 }
 
+function fillHeatRiskWarning(fillHeatRisk: FillHeatRiskSummary): string | null {
+  if (fillHeatRisk.islandNoRunwayShortSweepCount > 0) {
+    return `Island Fill has ${fillHeatRisk.islandNoRunwayShortSweepCount} short sweep(s) with no acceleration runway. Increase fill overscan or use Scanline Fill if those small islands look darker than the rest.`;
+  }
+  if (fillHeatRisk.islandPartialRunwaySweepCount > 0) {
+    return `Island Fill has ${fillHeatRisk.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. LaserForge will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`;
+  }
+  return null;
+}
+
 function diagnosticChecks(args: {
   readonly project: Project;
   readonly bidirectionalLayers: ReadonlyArray<Layer>;
   readonly lowOverscanLayers: ReadonlyArray<Layer>;
   readonly defaultRecipeLayers: ReadonlyArray<Layer>;
   readonly defaultLineIntervalLayers: ReadonlyArray<Layer>;
+  readonly fillHeatRisk: FillHeatRiskSummary;
   readonly laserMode: SettingDiagnostic;
   readonly sMax: SettingDiagnostic;
 }): ReadonlyArray<DiagnosticCheck> {
   return [
     bidirectionalCheck(args),
     controllerLaserModeCheck(args.laserMode),
+    islandFillHeatCheck(args.fillHeatRisk),
     accelerationMarginCheck(args.lowOverscanLayers),
     materialRecipeCheck(args.defaultRecipeLayers),
     lineIntervalCheck(args.defaultLineIntervalLayers),
@@ -239,6 +258,20 @@ function controllerLaserModeCheck(laserMode: SettingDiagnostic): DiagnosticCheck
       laserMode.kind === 'missing'
         ? 'Read controller settings before trusting raster diagnostics.'
         : `Current controller readback is ${laserMode.display}.`,
+  };
+}
+
+function islandFillHeatCheck(fillHeatRisk: FillHeatRiskSummary): DiagnosticCheck {
+  const riskyCount =
+    fillHeatRisk.islandNoRunwayShortSweepCount + fillHeatRisk.islandPartialRunwaySweepCount;
+  return {
+    label: 'Island Fill heat margin',
+    status:
+      fillHeatRisk.islandNoRunwayShortSweepCount > 0 ? 'warn' : riskyCount > 0 ? 'check' : 'ok',
+    detail:
+      riskyCount > 0
+        ? 'Tiny island sweeps are sensitive to acceleration. Use partial overscan, test on scrap, or use Scanline Fill if spots look too dark.'
+        : 'No short Island Fill sweeps were found in the active output.',
   };
 }
 

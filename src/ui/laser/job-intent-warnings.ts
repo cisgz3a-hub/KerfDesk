@@ -1,5 +1,5 @@
 import { resolveGrblDialect, type GrblPowerMode } from '../../core/devices';
-import { rasterBoundsInMachineCoords } from '../../core/job';
+import { analyzeFillHeatRisk, compileJob, rasterBoundsInMachineCoords } from '../../core/job';
 import { pixelExtentForMm } from '../../core/raster';
 import {
   LAYER_DEFAULTS,
@@ -14,6 +14,7 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   for (const layer of project.scene.layers) {
     if (usesUncalibratedDefaults(layer)) warnings.push(uncalibratedLayerWarning(layer.id));
   }
+  appendFillHeatWarnings(project, warnings);
 
   const outputLayersByColor = new Map(
     project.scene.layers.filter((layer) => layer.output).map((layer) => [layer.color, layer]),
@@ -38,6 +39,21 @@ export function detectJobIntentWarnings(project: Project): ReadonlyArray<string>
   }
 
   return warnings;
+}
+
+function appendFillHeatWarnings(project: Project, warnings: string[]): void {
+  const heat = analyzeFillHeatRisk(compileJob(project.scene, project.device));
+  if (heat.islandNoRunwayShortSweepCount > 0) {
+    warnings.push(
+      `Island Fill has ${heat.islandNoRunwayShortSweepCount} short sweep(s) with no acceleration runway. Increase fill overscan or use Scanline Fill if those small islands look darker than the rest.`,
+    );
+    return;
+  }
+  if (heat.islandPartialRunwaySweepCount > 0) {
+    warnings.push(
+      `Island Fill has ${heat.islandPartialRunwaySweepCount} short sweep(s) that need partial acceleration runway. LaserForge will add capped laser-off runway, but test on scrap if those small islands look darker than the rest.`,
+    );
+  }
 }
 
 // H12 (AUDIT-2026-06-10): the engrave luma comes from the import-time

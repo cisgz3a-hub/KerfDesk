@@ -19,7 +19,7 @@ import {
   type GrblGcodeDialect,
   type GrblPowerMode,
 } from '../devices';
-import { effectiveOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
+import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
@@ -123,14 +123,23 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   // of lifting to a rapid and stopping at every run. This is the structural
   // fill-speed fix (ADR-034) — it matches how emit-raster.ts sweeps a row and
   // how LightBurn fills, collapsing thousands of short stop-start runs into a
-  // few hundred continuous sweeps. Single-run scanlines emit exactly as before
-  // (1a rapid runway + 1b short-run skip preserved).
+  // few hundred continuous sweeps. Normal scanline short-run skip is preserved;
+  // Island Fill gets a capped partial runway so tiny islands do not start
+  // burning from rest.
   const sweeps = groupFillSweeps(group.segments);
   const scanOffsetMm = offsetForSpeed(device.scanningOffsets, group.speed);
   for (let p = 0; p < group.passes; p += 1) {
     chunks.push(`; pass ${p + 1} of ${group.passes}`);
     for (const sweep of sweeps) {
-      const text = emitFillSweep(sweep, s, feed, group.overscanMm, scanOffsetMm, dialect);
+      const text = emitFillSweep(
+        sweep,
+        s,
+        feed,
+        group.overscanMm,
+        group.fillStyle,
+        scanOffsetMm,
+        dialect,
+      );
       if (text.length > 0) chunks.push(text);
     }
   }
@@ -170,6 +179,7 @@ function emitFillSweep(
   s: number,
   feed: number,
   overscanMm: number,
+  fillStyle: FillGroup['fillStyle'],
   scanOffsetMm: number,
   dialect: GrblGcodeDialect,
 ): string {
@@ -177,7 +187,7 @@ function emitFillSweep(
   const first = spans[0];
   const last = spans[spans.length - 1];
   if (first === undefined || last === undefined) return '';
-  const overscan = effectiveOverscanMm([first.start, last.end], overscanMm);
+  const overscan = effectiveFillOverscanMm([first.start, last.end], overscanMm, fillStyle);
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return '';
   const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, dialect)];
