@@ -55,6 +55,7 @@ type LayerActionSet = (
 
 export type LayerActions = {
   readonly createManualLayer: (color: string) => void;
+  readonly switchIslandFillLayersToScanline: () => void;
   readonly assignSelectionToLayer: (layerId: string) => void;
   readonly selectObjectsOnLayer: (layerId: string) => void;
   readonly deleteLayerAndObjects: (layerId: string) => void;
@@ -82,6 +83,20 @@ export function layerActions(set: LayerActionSet): LayerActions {
           applyLayerDefaultSettings(createLayer({ id: normalized, color: normalized }), defaults),
         );
         return mutation(state, { ...state.project, scene });
+      }),
+    switchIslandFillLayersToScanline: () =>
+      set((state) => {
+        let changed = false;
+        const layers = state.project.scene.layers.map((layer) => {
+          if (layer.mode !== 'fill' || layer.fillStyle !== 'island') return layer;
+          changed = true;
+          return { ...layer, fillStyle: 'scanline' as const };
+        });
+        if (!changed) return {};
+        return mutation(state, {
+          ...state.project,
+          scene: { ...state.project.scene, layers },
+        });
       }),
     assignSelectionToLayer: (layerId) =>
       set((state) => {
