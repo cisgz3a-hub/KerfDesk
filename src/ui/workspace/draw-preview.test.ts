@@ -9,18 +9,56 @@ import {
 } from '../../core/scene';
 import { createRectangle } from '../../core/shapes';
 import type { Toolpath } from '../../core/job';
+import { canvasTheme } from '../theme/canvas-theme';
 import { drawObjectsFaint, drawPreview } from './draw-preview';
 import type { ViewTransform } from './view-transform';
 
 function countingContext(): {
   readonly ctx: CanvasRenderingContext2D;
-  readonly calls: { lineTo: number; moveTo: number; setLineDash: number };
+  readonly calls: {
+    arc: number;
+    fill: number;
+    lineTo: number;
+    moveTo: number;
+    setLineDash: number;
+    globalAlphaValues: number[];
+    lineWidthValues: number[];
+    strokeStyleValues: string[];
+  };
 } {
-  const calls = { lineTo: 0, moveTo: 0, setLineDash: 0 };
+  const calls: {
+    arc: number;
+    fill: number;
+    lineTo: number;
+    moveTo: number;
+    setLineDash: number;
+    globalAlphaValues: number[];
+    lineWidthValues: number[];
+    strokeStyleValues: string[];
+  } = {
+    arc: 0,
+    fill: 0,
+    lineTo: 0,
+    moveTo: 0,
+    setLineDash: 0,
+    globalAlphaValues: [],
+    lineWidthValues: [],
+    strokeStyleValues: [],
+  };
   const ctx = new Proxy(
     {},
     {
       get(_target, prop) {
+        if (prop === 'arc') {
+          return () => {
+            calls.arc += 1;
+          };
+        }
+        if (prop === 'fill') {
+          return () => {
+            calls.fill += 1;
+          };
+        }
         if (prop === 'lineTo') {
           return () => {
             calls.lineTo += 1;
@@ -38,7 +76,16 @@ function countingContext(): {
         }
         return () => undefined;
       },
-      set() {
+      set(_target, prop, value) {
+        if (prop === 'globalAlpha' && typeof value === 'number') {
+          calls.globalAlphaValues.push(value);
+        }
+        if (prop === 'lineWidth' && typeof value === 'number') {
+          calls.lineWidthValues.push(value);
+        }
+        if (prop === 'strokeStyle' && typeof value === 'string') {
+          calls.strokeStyleValues.push(value);
+        }
         return true;
       },
     },
@@ -92,6 +139,43 @@ describe('drawPreview', () => {
     expect(calls.setLineDash).toBe(0);
     expect(calls.moveTo).toBe(1);
     expect(calls.lineTo).toBe(1);
+  });
+
+  it('draws dim future route context plus start, end, and head markers while scrubbing', () => {
+    const toolpath = travelThenCutToolpath();
+    const { ctx, calls } = countingContext();
+
+    drawPreview(ctx, toolpath, view, 0.25, { showFuture: true, showEndpoints: true });
+
+    expect(calls.globalAlphaValues.some((value) => value > 0 && value < 1)).toBe(true);
+    expect(calls.arc).toBeGreaterThanOrEqual(3);
+    expect(calls.fill).toBeGreaterThanOrEqual(3);
+    expect(calls.lineTo).toBeGreaterThan(1);
+  });
+
+  it('draws completed cuts as a translucent route overlay instead of opaque artwork ink', () => {
+    const toolpath: Toolpath = {
+      totalLength: 10,
+      steps: [
+        {
+          kind: 'cut',
+          color: '#000000',
+          length: 10,
+          polyline: [
+            { x: 0, y: 0 },
+            { x: 10, y: 0 },
+          ],
+        },
+      ],
+    };
+    const { ctx, calls } = countingContext();
+
+    drawPreview(ctx, toolpath, view, 1);
+
+    expect(calls.strokeStyleValues).toContain(canvasTheme.previewCut);
+    expect(calls.strokeStyleValues).not.toContain('#000000');
+    expect(calls.globalAlphaValues.some((value) => value > 0 && value < 1)).toBe(true);
+    expect(calls.lineWidthValues).toContain(1);
   });
 
   it('samples oversized preview cuts without visiting every point on each redraw', () => {

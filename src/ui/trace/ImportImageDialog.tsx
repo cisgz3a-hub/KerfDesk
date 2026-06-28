@@ -259,10 +259,7 @@ export async function commit(
         : args.options.traceMode === 'edge'
           ? 'edge'
           : 'filled-contours';
-    const operationOverride =
-      traceMode === 'filled-contours' && args.traceFillStyle === 'offset'
-        ? ({ mode: 'fill', fillStyle: 'offset' } as const)
-        : undefined;
+    const operationOverride = operationOverrideForTrace(traceMode, args.traceFillStyle);
     const traced: TracedImage = {
       kind: 'traced-image',
       id: crypto.randomUUID(),
@@ -315,4 +312,13 @@ export function sameTraceSource(live: SceneObject | undefined, seed: RasterImage
     live.pixelWidth === seed.pixelWidth &&
     live.pixelHeight === seed.pixelHeight
   );
+}
+
+function operationOverrideForTrace(
+  traceMode: TracedImage['traceMode'],
+  fillStyle: TraceFillStyle | undefined,
+): TracedImage['operationOverride'] {
+  if (traceMode !== 'filled-contours') return undefined;
+  if (fillStyle !== 'offset' && fillStyle !== 'island') return undefined;
+  return { mode: 'fill', fillStyle };
 }

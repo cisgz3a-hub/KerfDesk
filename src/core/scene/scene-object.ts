@@ -59,7 +59,7 @@ export type ObjectOperationOverride = {
   readonly hatchAngleDeg?: number;
   readonly hatchSpacingMm?: number;
   readonly fillOverscanMm?: number;
-  readonly fillStyle?: 'scanline' | 'offset';
+  readonly fillStyle?: 'scanline' | 'offset' | 'island';
   readonly fillBidirectional?: boolean;
   readonly fillCrossHatch?: boolean;
   readonly ditherAlgorithm?: DitherAlgorithm;

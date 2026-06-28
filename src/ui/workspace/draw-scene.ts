@@ -105,7 +105,7 @@ export function drawScene(
       opts.previewToolpath ?? buildPreviewToolpath(project),
       view,
       opts.scrubberT ?? 1,
-      { showTravel: opts.previewShowTravel !== false },
+      { showTravel: opts.previewShowTravel !== false, showFuture: true, showEndpoints: true },
     );
   } else {
     const simplified = drawObjects(

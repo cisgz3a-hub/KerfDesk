@@ -20,10 +20,11 @@ export function CutSettingsFillFields(props: {
           className="lf-select"
           defaultValue={props.layer.fillStyle}
           aria-label="Cut settings fill style"
-          title="Choose Scanline or Follow Shape for filled paths."
+          title="Choose Scanline, Follow Shape, or Island Fill for filled paths."
         >
           <option value="scanline">Scanline</option>
           <option value="offset">Follow Shape</option>
+          <option value="island">Island Fill</option>
         </select>
       </Field>
       <Field label="Scan angle">

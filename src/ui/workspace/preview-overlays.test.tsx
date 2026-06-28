@@ -3,7 +3,14 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Toolpath } from '../../core/job';
-import { PreviewStatsPanel } from './preview-overlays';
+import { createProject } from '../../core/scene';
+import { useUiStore } from '../state/ui-store';
+import {
+  PreviewControlsPanel,
+  PreviewRouteControls,
+  PreviewStatsPanel,
+  PreviewStatusOverlays,
+} from './preview-overlays';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -37,6 +44,9 @@ afterEach(async () => {
     await cleanup();
     cleanup = null;
   }
+  useUiStore.getState().setPreviewPlaying(false);
+  useUiStore.getState().setPreviewPlaybackSpeed('normal');
+  useUiStore.getState().setScrubberT(1);
 });
 
 describe('PreviewStatsPanel', () => {
@@ -51,19 +61,134 @@ describe('PreviewStatsPanel', () => {
     const host = await renderPanel({ kind: 'too-large' });
 
     expect(host.textContent).toContain('Time');
-    expect(host.textContent).toContain('large job');
+    expect(host.textContent).toContain('ETA skipped');
+  });
+
+  it('labels whether route preview is for the whole project or selected output', async () => {
+    const host = await renderPanel({ kind: 'estimated', label: '47s' }, 'Selected output');
+
+    expect(host.textContent).toContain('Route');
+    expect(host.textContent).toContain('Selected output');
+  });
+});
+
+describe('PreviewStatusOverlays', () => {
+  it('shows route-too-large status instead of the empty-project hint', async () => {
+    const host = await renderStatus({
+      steps: [],
+      totalLength: 0,
+      previewIssue: 'too-complex',
+    } as Toolpath & { readonly previewIssue: 'too-complex' });
+
+    expect(host.textContent).toContain('Route preview is too large');
+    expect(host.textContent).not.toContain('Nothing to preview');
+  });
+});
+
+describe('PreviewRouteControls', () => {
+  it('renders playback controls and writes route preview state', async () => {
+    const host = await renderControls();
+
+    expect(host.textContent).toContain('Play');
+    expect(host.textContent).toContain('Restart');
+    expect(host.textContent).toContain('Speed');
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button[aria-label="Play route preview"]')?.click();
+    });
+    expect(useUiStore.getState().previewPlaying).toBe(true);
+
+    await act(async () => {
+      const speed = host.querySelector<HTMLSelectElement>('select[aria-label="Route preview speed"]');
+      if (speed === null) throw new Error('speed selector missing');
+      speed.value = 'fast';
+      speed.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(useUiStore.getState().previewPlaybackSpeed).toBe('fast');
+  });
+
+  it('disables playback controls when no route can be played', async () => {
+    const host = await renderControls({ disabled: true });
+
+    const play = host.querySelector<HTMLButtonElement>('button[aria-label="Play route preview"]');
+    expect(play?.disabled).toBe(true);
+  });
+});
+
+describe('PreviewControlsPanel', () => {
+  it('combines playback controls and stats in one bottom panel', async () => {
+    const host = await renderCombinedPanel();
+
+    expect(host.querySelectorAll('.lf-chip')).toHaveLength(1);
+    expect(host.textContent).toContain('Play');
+    expect(host.textContent).toContain('Route');
+    expect(host.textContent).toContain('Cut');
   });
 });
 
 async function renderPanel(
   estimate: React.ComponentProps<typeof PreviewStatsPanel>['estimate'],
+  routeLabel = 'Whole project',
 ): Promise<HTMLDivElement> {
   const host = document.createElement('div');
   document.body.appendChild(host);
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(<PreviewStatsPanel toolpath={toolpath} estimate={estimate} />);
+    root.render(<PreviewStatsPanel toolpath={toolpath} estimate={estimate} routeLabel={routeLabel} />);
+  });
+  cleanup = async () => {
+    if (root !== null) await act(async () => root?.unmount());
+    host.remove();
+  };
+  return host;
+}
+
+async function renderStatus(toolpathValue: Toolpath): Promise<HTMLDivElement> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    root.render(<PreviewStatusOverlays project={createProject()} toolpath={toolpathValue} />);
+  });
+  cleanup = async () => {
+    if (root !== null) await act(async () => root?.unmount());
+    host.remove();
+  };
+  return host;
+}
+
+async function renderCombinedPanel(): Promise<HTMLDivElement> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    root.render(
+      <PreviewControlsPanel
+        toolpath={toolpath}
+        estimate={{ kind: 'estimated', label: '47s' }}
+        routeLabel="Whole project"
+        disabled={false}
+      />,
+    );
+  });
+  cleanup = async () => {
+    if (root !== null) await act(async () => root?.unmount());
+    host.remove();
+  };
+  return host;
+}
+
+async function renderControls(options: { readonly disabled?: boolean } = {}): Promise<HTMLDivElement> {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  let root: Root | null = null;
+  await act(async () => {
+    root = createRoot(host);
+    const Controls = PreviewRouteControls as React.ComponentType<{ readonly disabled?: boolean }>;
+    root.render(<Controls disabled={options.disabled === true} />);
   });
   cleanup = async () => {
     if (root !== null) await act(async () => root?.unmount());

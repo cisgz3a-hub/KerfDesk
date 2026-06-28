@@ -14,6 +14,8 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().setMeasureDraft(null);
     useUiStore.getState().setActiveLayerColor(null);
     useUiStore.getState().setShowPreviewTravel(true);
+    useUiStore.getState().setPreviewPlaying(false);
+    useUiStore.getState().setPreviewPlaybackSpeed('normal');
     useUiStore.getState().closeWorkspaceContextBar();
     useUiStore.getState().setSnapSettings(DEFAULT_SNAP_SETTINGS);
     useUiStore.getState().setSnapGuides([]);
@@ -98,6 +100,17 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().setShowPreviewTravel(false);
 
     expect(useUiStore.getState().showPreviewTravel).toBe(false);
+  });
+
+  it('tracks route preview playback as ephemeral UI state', () => {
+    expect(useUiStore.getState().previewPlaying).toBe(false);
+    expect(useUiStore.getState().previewPlaybackSpeed).toBe('normal');
+
+    useUiStore.getState().setPreviewPlaying(true);
+    useUiStore.getState().setPreviewPlaybackSpeed('fast');
+
+    expect(useUiStore.getState().previewPlaying).toBe(true);
+    expect(useUiStore.getState().previewPlaybackSpeed).toBe('fast');
   });
 
   it('tracks a live selection marquee outside project history', () => {

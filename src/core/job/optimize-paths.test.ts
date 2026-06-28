@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import { estimateJobDuration } from './estimate-duration';
-import type { CutGroup, CutSegment, Job } from './job';
+import type { CutGroup, CutSegment, FillGroup, FillSegment, Job } from './job';
 import { MAX_NEAREST_NEIGHBOR_SEGMENTS, optimizePaths } from './optimize-paths';
 
 // All fixtures in this file produce CutGroups; narrow on the union
@@ -15,6 +15,10 @@ function asCut(j: Job, i = 0): CutGroup | undefined {
 
 function seg(...pts: Array<[number, number]>): CutSegment {
   return { polyline: pts.map(([x, y]) => ({ x, y })), closed: false };
+}
+
+function fillSeg(...pts: Array<[number, number]>): FillSegment {
+  return { ...seg(...pts), reverse: false };
 }
 
 function closedSeg(...pts: Array<[number, number]>): CutSegment {
@@ -35,6 +39,32 @@ function group(segments: ReadonlyArray<CutSegment>): CutGroup {
     airAssist: false,
     segments,
   };
+}
+
+function fillGroup(
+  fillStyle: NonNullable<FillGroup['fillStyle']>,
+  segments: ReadonlyArray<FillSegment>,
+  overrides: Partial<Omit<FillGroup, 'kind' | 'fillStyle' | 'segments'>> = {},
+): FillGroup {
+  return {
+    kind: 'fill',
+    layerId: 'L1',
+    color: '#000',
+    power: 50,
+    speed: 1000,
+    passes: 1,
+    airAssist: false,
+    fillStyle,
+    overscanMm: 0,
+    segments,
+    ...overrides,
+  };
+}
+
+function asFill(j: Job, i = 0): FillGroup | undefined {
+  const g = j.groups[i];
+  if (g === undefined || g.kind !== 'fill') return undefined;
+  return g;
 }
 
 describe('optimizePaths', () => {
@@ -63,7 +93,7 @@ describe('optimizePaths', () => {
     expect(firstSeg?.polyline[0]).toEqual({ x: 0, y: 0 });
   });
 
-  it('leaves fill groups in source order', () => {
+  it('leaves scanline fill groups in source order', () => {
     const farFirst = { ...seg([100, 100], [101, 100]), reverse: false };
     const nearSecond = { ...seg([0, 0], [1, 0]), reverse: false };
     const j: Job = {
@@ -76,7 +106,7 @@ describe('optimizePaths', () => {
           speed: 1000,
           passes: 1,
           airAssist: false,
-          fillStyle: 'offset',
+          fillStyle: 'scanline',
           overscanMm: 0,
           segments: [farFirst, nearSecond],
         },
@@ -86,6 +116,46 @@ describe('optimizePaths', () => {
     const result = optimizePaths(j);
 
     expect(result.groups[0]).toBe(j.groups[0]);
+  });
+
+  it('reorders offset fill contours to enter the closest contour first', () => {
+    const farFirst = fillSeg([100, 100], [101, 100]);
+    const nearSecond = fillSeg([0, 0], [1, 0]);
+    const j: Job = {
+      groups: [fillGroup('offset', [farFirst, nearSecond])],
+    };
+
+    const result = optimizePaths(j);
+
+    expect(asFill(result)?.segments[0]).toBe(nearSecond);
+    expect(asFill(result)?.segments[1]).toBe(farFirst);
+  });
+
+  it('reorders compatible island fill groups to reduce travel', () => {
+    const farIsland = fillGroup('island', [fillSeg([100, 100], [101, 100])]);
+    const nearIsland = fillGroup('island', [fillSeg([0, 0], [1, 0])]);
+    const j: Job = { groups: [farIsland, nearIsland] };
+
+    const before = estimateJobDuration(j, DEFAULT_DEVICE_PROFILE);
+    const result = optimizePaths(j);
+    const after = estimateJobDuration(result, DEFAULT_DEVICE_PROFILE);
+
+    expect(result.groups).toEqual([nearIsland, farIsland]);
+    expect(after.breakdown.travelSeconds).toBeLessThan(before.breakdown.travelSeconds);
+  });
+
+  it('does not reorder island fill groups across incompatible layer settings', () => {
+    const farLayer = fillGroup('island', [fillSeg([100, 100], [101, 100])], {
+      layerId: 'L2',
+    });
+    const nearLayer = fillGroup('island', [fillSeg([0, 0], [1, 0])], {
+      layerId: 'L1',
+    });
+    const j: Job = { groups: [farLayer, nearLayer] };
+
+    const result = optimizePaths(j);
+
+    expect(result.groups).toEqual([farLayer, nearLayer]);
   });
 
   it('leaves very large groups in source order instead of running the O(n^2) pass', () => {

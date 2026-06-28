@@ -37,7 +37,11 @@ function normalizeCommonLayerFields(out: Record<string, unknown>): void {
 }
 
 function normalizeFillLayerFields(out: Record<string, unknown>): void {
-  if (out['fillStyle'] !== 'offset' && out['fillStyle'] !== 'scanline') {
+  if (
+    out['fillStyle'] !== 'offset' &&
+    out['fillStyle'] !== 'island' &&
+    out['fillStyle'] !== 'scanline'
+  ) {
     out['fillStyle'] = LAYER_DEFAULTS.fillStyle;
   }
   if (typeof out['hatchAngleDeg'] !== 'number') {

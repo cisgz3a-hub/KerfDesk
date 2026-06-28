@@ -7,6 +7,16 @@
 import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 
+export type PreviewIssue = 'too-complex';
+
+export type PreviewToolpath = Toolpath & {
+  readonly previewIssue?: PreviewIssue;
+};
+
+export function previewIssueFor(toolpath: Toolpath): PreviewIssue | null {
+  return (toolpath as PreviewToolpath).previewIssue ?? null;
+}
+
 export function previewHasBurnableContent(project: Project, toolpath: Toolpath): boolean {
   if (toolpath.totalLength > 0) return true;
   return sceneHasOutputRaster(project);

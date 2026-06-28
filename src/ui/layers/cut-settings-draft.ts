@@ -162,6 +162,7 @@ function parseMode(value: string): LayerMode {
 }
 
 function parseFillStyle(value: string): Layer['fillStyle'] {
+  if (value === 'island') return 'island';
   return value === 'offset' ? 'offset' : 'scanline';
 }
 

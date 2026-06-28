@@ -221,14 +221,23 @@ function appendOffsetFillOpenContourIssues(
   issues: PreflightIssue[],
 ): void {
   for (const layer of outputLayers) {
-    if (layer.mode === 'fill' && layer.fillStyle === 'offset') {
-      appendOpenContourIssueForLayer(scene.objects, layer, 'Offset Fill', issues);
+    const layerFillLabel = openContourFillLabel(layer);
+    if (layerFillLabel !== null) {
+      appendOpenContourIssueForLayer(scene.objects, layer, layerFillLabel, issues);
       continue;
     }
-    if (scene.objects.some((obj) => objectHasFollowShapeOpenContourOverride(obj, layer))) {
-      appendOffsetFillOpenContourIssue(layer, 'Follow Shape', issues);
+    const overrideFillLabel = openContourOverrideFillLabel(scene.objects, layer);
+    if (overrideFillLabel !== null) {
+      appendOffsetFillOpenContourIssue(layer, overrideFillLabel, issues);
     }
   }
+}
+
+function openContourFillLabel(layer: Layer): string | null {
+  if (layer.mode !== 'fill') return null;
+  if (layer.fillStyle === 'offset') return 'Offset Fill';
+  if (layer.fillStyle === 'island') return 'Island Fill';
+  return null;
 }
 
 function appendOpenContourIssueForLayer(
@@ -252,12 +261,20 @@ function appendOffsetFillOpenContourIssue(
   });
 }
 
-function objectHasFollowShapeOpenContourOverride(obj: SceneObject, layer: Layer): boolean {
-  const override = obj.operationOverride;
-  if (override === undefined) return false;
-  const effectiveLayer: Layer = { ...layer, ...override };
-  if (effectiveLayer.mode !== 'fill' || effectiveLayer.fillStyle !== 'offset') return false;
-  return objectHasOpenContourOnLayer(obj, effectiveLayer);
+function openContourOverrideFillLabel(
+  objects: ReadonlyArray<SceneObject>,
+  layer: Layer,
+): string | null {
+  for (const obj of objects) {
+    const override = obj.operationOverride;
+    if (override === undefined) continue;
+    const effectiveLayer: Layer = { ...layer, ...override };
+    if (effectiveLayer.mode !== 'fill') continue;
+    if (!objectHasOpenContourOnLayer(obj, effectiveLayer)) continue;
+    if (effectiveLayer.fillStyle === 'offset') return 'Follow Shape';
+    if (effectiveLayer.fillStyle === 'island') return 'Island Fill';
+  }
+  return null;
 }
 
 function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {

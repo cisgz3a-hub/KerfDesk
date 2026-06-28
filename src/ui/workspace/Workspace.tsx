@@ -28,8 +28,9 @@ import {
   PreviewScrubber,
   ZoomControls,
 } from './overlays';
-import { PreviewStatsPanel, PreviewStatusOverlays } from './preview-overlays';
+import { PreviewControlsPanel, PreviewStatusOverlays } from './preview-overlays';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
+import { usePreviewPlayback } from './use-preview-playback';
 import { usePreviewToolpath } from './use-preview-toolpath';
 import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 import { useDragMove } from './use-workspace-drag';
@@ -44,6 +45,7 @@ export function Workspace(): JSX.Element {
   const selectedPathNodes = useStore((s) => s.selectedPathNodes);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const previewMode = useStore((s) => s.previewMode);
+  const routePreviewLabel = useStore(selectRoutePreviewLabel);
   const scrubberT = useUiStore((s) => s.scrubberT);
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   const toolMode = useUiStore((s) => s.toolMode);
@@ -55,6 +57,7 @@ export function Workspace(): JSX.Element {
   const panY = useUiStore((s) => s.panY);
   const viewState = useMemo(() => ({ zoomFactor, panX, panY }), [zoomFactor, panX, panY]);
   const previewToolpath = usePreviewToolpath(project, previewMode);
+  usePreviewPlayback(previewMode, previewToolpath);
   const jobEstimate = useJobEstimate();
   const canvasSize = useCanvasBitmapSize(ref);
   useWorkspaceDraw({
@@ -74,14 +77,7 @@ export function Workspace(): JSX.Element {
   });
 
   const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
-  // Phase G (B6) — drop a half-drawn pen polyline when the project is replaced
-  // wholesale (New / Open / undo / redo); otherwise it renders as a ghost over an
-  // unrelated scene. Guarded so the per-frame project churn of a transform drag
-  // (penDraft already null) doesn't touch the store.
-  useEffect(() => {
-    if (useUiStore.getState().penDraft !== null) useUiStore.getState().setPenDraft(null);
-  }, [project]);
-  const isEmpty = project.scene.objects.length === 0;
+  useDropPenDraftOnProjectReplace(project);
   const dragOverlay = useUiStore((s) => s.dragOverlay);
   return (
     <>
@@ -102,7 +98,7 @@ export function Workspace(): JSX.Element {
         style={canvasStyle}
         aria-label="LaserForge workspace"
       />
-      {isEmpty && !dragOverlay && <EmptyHint />}
+      {project.scene.objects.length === 0 && !dragOverlay && <EmptyHint />}
       {dragOverlay && <DragOverlay />}
       <WorkspaceInteractionOverlays
         canvasRef={ref}
@@ -116,6 +112,7 @@ export function Workspace(): JSX.Element {
         project={project}
         toolpath={previewToolpath}
         estimate={jobEstimate}
+        routeLabel={routePreviewLabel}
       />
       {previewMode && <PreviewScrubber />}
       {/* Bottom-right zoom controls — hidden during preview so the
@@ -123,6 +120,16 @@ export function Workspace(): JSX.Element {
       {!previewMode && <ZoomControls />}
     </>
   );
+}
+
+function selectRoutePreviewLabel(state: ReturnType<typeof useStore.getState>): string {
+  return state.outputScopeSettings.cutSelectedGraphics ? 'Selected output' : 'Whole project';
+}
+
+function useDropPenDraftOnProjectReplace(project: Project): void {
+  useEffect(() => {
+    if (useUiStore.getState().penDraft !== null) useUiStore.getState().setPenDraft(null);
+  }, [project]);
 }
 
 function suppressCanvasContextMenu(e: React.MouseEvent<HTMLCanvasElement>): void {
@@ -134,12 +141,18 @@ function WorkspacePreviewOverlays(props: {
   readonly project: Project;
   readonly toolpath: Toolpath | null;
   readonly estimate: ReturnType<typeof useJobEstimate>;
+  readonly routeLabel: string;
 }): JSX.Element | null {
   if (!props.previewMode || props.toolpath === null) return null;
   return (
     <>
       <PreviewStatusOverlays project={props.project} toolpath={props.toolpath} />
-      <PreviewStatsPanel toolpath={props.toolpath} estimate={props.estimate} />
+      <PreviewControlsPanel
+        toolpath={props.toolpath}
+        estimate={props.estimate}
+        routeLabel={props.routeLabel}
+        disabled={props.toolpath.totalLength <= 0}
+      />
     </>
   );
 }

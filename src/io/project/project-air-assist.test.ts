@@ -58,6 +58,21 @@ describe('project air assist persistence', () => {
     }
   });
 
+  it('accepts Island Fill as a persisted layer fill style', () => {
+    const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
+    const scene = raw.scene as { layers: Array<Record<string, unknown>> };
+    const firstLayer = scene.layers[0];
+    if (firstLayer === undefined) throw new Error('expected project fixture layer');
+    firstLayer.fillStyle = 'island';
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.project.scene.layers[0]?.fillStyle).toBe('island');
+    }
+  });
+
   it('rejects Auto Fastest as a persisted layer fill style', () => {
     const raw = JSON.parse(serializeProject(projectWithLayer())) as Record<string, unknown>;
     const scene = raw.scene as { layers: Array<Record<string, unknown>> };
