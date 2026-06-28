@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
-import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { createLayer, createProject, EMPTY_SCENE, IDENTITY_TRANSFORM } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -111,14 +111,46 @@ describe('IslandFillRecoveryAction', () => {
       host.remove();
     }
   });
+
+  it('offers overscan recovery for custom profiles using the 4040-safe dialect', async () => {
+    installNeotronicsIslandFillProject({
+      device: {
+        ...DEFAULT_DEVICE_PROFILE,
+        profileId: 'custom-safe-dialect',
+        machineFamily: 'custom-grbl',
+        gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+      },
+      fillOverscanMm: 0,
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<IslandFillRecoveryAction streaming={false} />);
+      });
+
+      expect(host.textContent).toContain('Set Island Fill overscan to 5 mm');
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
 });
 
 function installNeotronicsIslandFillProject(
-  options: { readonly fillOverscanMm?: number } = {},
+  options: {
+    readonly device?: typeof NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
+    readonly fillOverscanMm?: number;
+  } = {},
 ): void {
+  const device = options.device ?? NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE;
   useStore.setState({
     project: {
-      ...createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE),
+      ...createProject(device),
       scene: {
         ...EMPTY_SCENE,
         layers: [

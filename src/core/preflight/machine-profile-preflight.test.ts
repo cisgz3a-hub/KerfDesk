@@ -27,6 +27,22 @@ function genericFineDetailFillProject(fillStyle: 'scanline' | 'island'): Project
   return fineDetailFillProject(fillStyle, DEFAULT_DEVICE_PROFILE, 5);
 }
 
+function customSafeDialectFineDetailFillProject(
+  fillStyle: 'scanline' | 'island',
+  fillOverscanMm = 5,
+): Project {
+  return fineDetailFillProject(
+    fillStyle,
+    {
+      ...DEFAULT_DEVICE_PROFILE,
+      profileId: 'custom-safe-dialect',
+      machineFamily: 'custom-grbl',
+      gcodeDialect: { dialectId: 'neotronics-4040-safe' },
+    },
+    fillOverscanMm,
+  );
+}
+
 function fineDetailFillProject(
   fillStyle: 'scanline' | 'island',
   device: Project['device'],
@@ -84,6 +100,18 @@ describe('machine-profile preflight', () => {
 
   it('blocks 4040 Island Fill when overscan is disabled', () => {
     const project = neotronicsFineDetailFillProject('island', 0);
+
+    const result = runPreflight(project, emit(project));
+
+    expect(result.issues).toContainEqual({
+      code: 'machine-island-fill-risk',
+      message:
+        'Neotronics 4040-safe Island Fill needs fill overscan greater than 0 mm so the head has laser-off acceleration runway. Set Fill overscan to 5 mm or use Scanline Fill.',
+    });
+  });
+
+  it('blocks safe-dialect custom profiles when Island Fill overscan is disabled', () => {
+    const project = customSafeDialectFineDetailFillProject('island', 0);
 
     const result = runPreflight(project, emit(project));
 

@@ -1,4 +1,4 @@
-import { compileJob, isSensitiveIslandFillPolicy } from '../job';
+import { compileJob, islandFillMotionPolicyForDevice, isSensitiveIslandFillPolicy } from '../job';
 import type { Project } from '../scene';
 
 export const MACHINE_ISLAND_FILL_RISK_CODE = 'machine-island-fill-risk';
@@ -14,7 +14,7 @@ const NEOTRONICS_4040_ISLAND_FILL_RISK_MESSAGE =
 export function findMachineProfilePreflightIssues(
   project: Project,
 ): ReadonlyArray<MachineProfilePreflightIssue> {
-  if (!isNeotronics4040(project)) return [];
+  if (islandFillMotionPolicyForDevice(project.device) !== 'sensitive') return [];
   const job = compileJob(project.scene, project.device);
   const hasSensitiveIslandFillWithoutOverscan = job.groups.some(
     (group) =>
@@ -30,11 +30,4 @@ export function findMachineProfilePreflightIssues(
       message: NEOTRONICS_4040_ISLAND_FILL_RISK_MESSAGE,
     },
   ];
-}
-
-function isNeotronics4040(project: Project): boolean {
-  return (
-    project.device.machineFamily === 'neotronics-4040-max' ||
-    project.device.profileId === 'neotronics-4040-max-lt4lds-v2-20w'
-  );
 }
