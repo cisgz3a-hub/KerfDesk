@@ -10,6 +10,7 @@
 // the modal gate (starting a burn from inside a dialog is never intended).
 
 import { useEffect } from 'react';
+import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { isModalOpen, useUiStore } from '../state/ui-store';
@@ -27,6 +28,7 @@ export function installJobShortcuts(target: Window): () => void {
     }
     if (e.key === 'Enter') {
       if (isModalOpen(useUiStore.getState())) return;
+      if (isEditableShortcutTarget(e.target)) return;
       const laser = useLaserStore.getState();
       if (laser.connection.kind !== 'connected' || isActiveJob(laser.streamer)) return;
       e.preventDefault();

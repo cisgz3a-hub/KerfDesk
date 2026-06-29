@@ -29,6 +29,7 @@ import {
 import { useStore } from '../state';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { finishPen } from '../workspace/pen-tool';
+import { isEditableShortcutTarget } from '../common/keyboard-targets';
 
 const NUDGE_MM = 1;
 const NUDGE_BIG_MM = 10;
@@ -99,20 +100,7 @@ function hasMeta(e: KeyboardEvent): boolean {
 }
 
 function isEditableTarget(e: KeyboardEvent): boolean {
-  const target = e.target as HTMLElement | null;
-  if (target === null) return false;
-  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return true;
-  // Defensive: contenteditable + ARIA textbox surfaces. We don't ship any
-  // today, but a future rich-text or jog-readout that opts into editing
-  // would otherwise eat user keystrokes via the global handlers.
-  // (Check both the property and the attribute — jsdom computes the
-  // property differently from real browsers, and tests need the
-  // attribute path to work.)
-  if (target.isContentEditable) return true;
-  const editableAttr = target.getAttribute('contenteditable');
-  if (editableAttr !== null && editableAttr !== 'false') return true;
-  if (target.getAttribute('role') === 'textbox') return true;
-  return false;
+  return isEditableShortcutTarget(e.target);
 }
 
 // Ctrl+E moved to the Ellipse tool (LightBurn parity, ADR-051 B7); export

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   addLayer,
   addObject,
+  captureLayerOperationSettings,
   createLayer,
+  createLayerSubLayer,
   createProject,
   createRegistrationLayer,
   IDENTITY_TRANSFORM,
@@ -63,6 +65,35 @@ function projectWithRaster(opts: {
   return { ...base, scene: addLayer(addObject(base.scene, raster), layer) };
 }
 
+function projectWithRasterSubLayer(opts: { boundsMax: number; linesPerMm: number }): Project {
+  const base = createProject();
+  const raster: RasterImage = {
+    kind: 'raster-image',
+    id: 'R1',
+    color: COLOR,
+    source: 'x.png',
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: 4,
+    pixelHeight: 4,
+    dither: 'floyd-steinberg',
+    linesPerMm: 10,
+    bounds: { minX: 0, minY: 0, maxX: opts.boundsMax, maxY: opts.boundsMax },
+    transform: IDENTITY_TRANSFORM,
+  };
+  const lineLayer = createLayer({ id: COLOR, color: COLOR, mode: 'line' });
+  const subLayer = createLayerSubLayer(lineLayer, {
+    id: 'image-pass',
+    label: 'Image',
+    settings: {
+      ...captureLayerOperationSettings(lineLayer),
+      mode: 'image',
+      linesPerMm: opts.linesPerMm,
+    },
+  });
+  const layer = { ...lineLayer, subLayers: [subLayer] };
+  return { ...base, scene: addLayer(addObject(base.scene, raster), layer) };
+}
+
 describe('runPreEmitPreflight', () => {
   it('passes a modest raster (10x10mm @ 10 lines/mm = 100x100 px)', () => {
     expect(runPreEmitPreflight(projectWithRaster({ boundsMax: 10, linesPerMm: 10 })).ok).toBe(true);
@@ -70,6 +101,14 @@ describe('runPreEmitPreflight', () => {
 
   it('rejects an oversized raster before compile (300x300mm @ 25 lines/mm = 7500x7500 px)', () => {
     const result = runPreEmitPreflight(projectWithRaster({ boundsMax: 300, linesPerMm: 25 }));
+    expect(result.ok).toBe(false);
+    expect(result.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
+  });
+
+  it('rejects an oversized raster on an image sub-layer before compile', () => {
+    const result = runPreEmitPreflight(
+      projectWithRasterSubLayer({ boundsMax: 300, linesPerMm: 25 }),
+    );
     expect(result.ok).toBe(false);
     expect(result.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
   });

@@ -8,7 +8,6 @@
 import { useEffect, useReducer } from 'react';
 import type { DeviceProfile } from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
-import { useRegisterModal } from '../../common/use-register-modal';
 import { helpProps } from '../../help/help-topics';
 import { Button, Dialog, DialogActions } from '../../kit';
 import { useStore } from '../../state';
@@ -45,7 +44,6 @@ export function DeviceSetupWizard(props: {
   readonly onClose: () => void;
   readonly onConfigured?: (profile: DeviceProfile) => void;
 }): JSX.Element {
-  useRegisterModal();
   const device = useStore((s) => s.project.device);
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const detected = useLaserStore((s) => s.detectedSettings);

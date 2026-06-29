@@ -9,17 +9,14 @@
 // the store in sync with the OS.
 
 import { useEffect } from 'react';
+import { isKeyboardActivationTarget } from '../common/keyboard-targets';
 import { useUiStore } from '../state/ui-store';
 
 export function useSpacePan(): void {
   const setSpaceDown = useUiStore((s) => s.setSpaceDown);
   useEffect(() => {
-    const isEditable = (t: EventTarget | null): boolean =>
-      t instanceof HTMLElement &&
-      (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.code === 'Space' && !isEditable(e.target)) {
+      if (e.code === 'Space' && !isKeyboardActivationTarget(e.target)) {
         // Don't preventDefault unconditionally — scrolling pages use
         // Space too; just preventing space from scrolling when no
         // editable target is focused is harmless inside the app.

@@ -7,6 +7,7 @@ import {
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
+import { confirmOversizeImport as defaultConfirmOversizeImport } from '../app/import-size-guard';
 import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
 import { loadImageAsRawData, readImageNaturalSize } from '../trace/image-loader';
@@ -25,6 +26,7 @@ export type MultiFileTraceDeps = {
   ) => Promise<ReadonlyArray<ColoredPath>>;
   readonly download?: (file: BatchTraceSvgFile) => void;
   readonly options?: TraceOptions;
+  readonly confirmOversizeImport?: (name: string, sizeBytes: number) => boolean;
 };
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
@@ -40,8 +42,12 @@ export async function buildMultiFileTraceExports(
   const readNatural =
     deps.readNaturalSize ?? (deps.loadImage === undefined ? readImageNaturalSize : null);
   const options = deps.options ?? DEFAULT_MULTI_FILE_TRACE_OPTIONS;
+  const confirmOversizeImport = deps.confirmOversizeImport ?? defaultConfirmOversizeImport;
   const jobs = [];
   for (const file of files) {
+    if (!confirmOversizeImport(file.name, file.size)) {
+      continue;
+    }
     const image = await loadImage(file);
     const natural =
       readNatural === null ? { width: image.width, height: image.height } : await readNatural(file);
@@ -72,6 +78,7 @@ export async function runMultiFileTrace(
   if (files.length === 0) return;
   try {
     const svgFiles = await buildMultiFileTraceExports(files, deps);
+    if (svgFiles.length === 0) return;
     assertTraceProducedVisiblePaths(svgFiles);
     const download = deps.download ?? downloadTraceSvgFile;
     for (const file of svgFiles) {

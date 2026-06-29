@@ -48,7 +48,7 @@ import {
   type ElectronSerialPortSummary,
 } from './serial-port-choice.js';
 import {
-  makeTrustedRendererOrigins,
+  resolveRendererRuntime,
   shouldAllowNavigation,
   shouldAllowWindowOpen,
   shouldGrantDevicePermission,
@@ -59,8 +59,11 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DEV_URL = process.env['LASERFORGE_DEV_URL'];
-const TRUSTED_RENDERER_ORIGINS = makeTrustedRendererOrigins(DEV_URL);
+const RENDERER_RUNTIME = resolveRendererRuntime({
+  devUrl: process.env['LASERFORGE_DEV_URL'],
+  isPackaged: app.isPackaged,
+});
+const TRUSTED_RENDERER_ORIGINS = RENDERER_RUNTIME.trustedOrigins;
 const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
@@ -269,11 +272,7 @@ function installNavigationPolicy(window: BrowserWindow): void {
 }
 
 async function loadRenderer(window: BrowserWindow): Promise<void> {
-  if (DEV_URL !== undefined && DEV_URL.length > 0) {
-    await window.loadURL(DEV_URL);
-  } else {
-    await window.loadURL('app://app/index.html');
-  }
+  await window.loadURL(RENDERER_RUNTIME.rendererUrl);
 }
 
 function installDevTools(window: BrowserWindow): void {

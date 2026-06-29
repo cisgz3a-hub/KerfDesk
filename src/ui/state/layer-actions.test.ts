@@ -110,6 +110,22 @@ describe('layer store actions', () => {
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);
   });
 
+  it('hiding a layer prunes hidden objects from the current selection', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
+    useStore.setState({
+      selectedObjectId: 'O1',
+      additionalSelectedIds: new Set(['O2']),
+      dirty: false,
+    });
+
+    useStore.getState().setLayerParam('#ff0000', { visible: false });
+
+    const state = useStore.getState();
+    expect(state.selectedObjectId).toBe('O2');
+    expect(state.additionalSelectedIds.size).toBe(0);
+  });
+
   it('deleteLayerAndObjects removes matching vector paths and preserves unrelated paths', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#ff0000', '#0000ff']));

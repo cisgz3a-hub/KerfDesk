@@ -9,7 +9,13 @@
 // preview shows what burns, not what is merely visible.
 
 import type { DeviceProfile } from '../../core/devices';
-import type { Layer, Project, RasterImage, SceneObject } from '../../core/scene';
+import {
+  outputOperationLayers,
+  type Layer,
+  type Project,
+  type RasterImage,
+  type SceneObject,
+} from '../../core/scene';
 import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
 import { drawBitmapAtTransform } from './draw-raster';
 import type { ViewTransform } from './view-transform';
@@ -28,11 +34,20 @@ export function drawRasterPreview(
 ): void {
   pruneRasterPreviewCache(liveRasterPreviewDataUrls(project));
   for (const layer of project.scene.layers) {
-    if (!layer.output || layer.mode !== 'image') continue;
-    for (const obj of project.scene.objects) {
-      if (obj.kind !== 'raster-image' || obj.color !== layer.color) continue;
-      if (obj.role === 'trace-source') continue;
-      drawOnePreview(ctx, obj, layer, project.device, view, imageMaskObjectFor(project, obj));
+    for (const operationLayer of outputOperationLayers(layer)) {
+      if (operationLayer.mode !== 'image') continue;
+      for (const obj of project.scene.objects) {
+        if (obj.kind !== 'raster-image' || obj.color !== operationLayer.color) continue;
+        if (obj.role === 'trace-source') continue;
+        drawOnePreview(
+          ctx,
+          obj,
+          operationLayer,
+          project.device,
+          view,
+          imageMaskObjectFor(project, obj),
+        );
+      }
     }
   }
 }
@@ -108,7 +123,8 @@ function adjustmentKey(obj: RasterImage): string {
 function liveRasterPreviewDataUrls(project: Project): Set<string> {
   const imageLayerColors = new Set(
     project.scene.layers
-      .filter((layer) => layer.output && layer.mode === 'image')
+      .flatMap((layer) => outputOperationLayers(layer))
+      .filter((layer) => layer.mode === 'image')
       .map((layer) => layer.color),
   );
   const live = new Set<string>();

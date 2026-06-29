@@ -14,7 +14,7 @@ import { pixelExtentForMm } from '../raster';
 import { evaluateRasterBudget } from '../raster/raster-budget';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
-import { registrationOutputConflict } from '../scene';
+import { outputOperationLayers, registrationOutputConflict } from '../scene';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export function runPreEmitPreflight(project: Project): PreflightResult {
@@ -28,10 +28,13 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
   }
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
-    const layer = project.scene.layers.find(
-      (l) =>
-        l.output && l.color === obj.color && (obj.operationOverride?.mode ?? l.mode) === 'image',
-    );
+    const layer = project.scene.layers
+      .flatMap((l) => outputOperationLayers(l))
+      .find(
+        (operationLayer) =>
+          operationLayer.color === obj.color &&
+          (obj.operationOverride?.mode ?? operationLayer.mode) === 'image',
+      );
     if (layer === undefined) continue;
     const effectiveLayer = { ...layer, ...(obj.operationOverride ?? {}) };
     const {

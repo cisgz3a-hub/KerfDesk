@@ -8,6 +8,10 @@ import {
   useCanvasBitmapSize,
 } from './use-canvas-bitmap-size';
 
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
 function Probe(): JSX.Element {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const size = useCanvasBitmapSize(ref);
@@ -22,6 +26,7 @@ describe('useCanvasBitmapSize', () => {
   let roCallbacks: RoCallback[];
   let disconnects: number;
   let measured: { width: number; height: number };
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -30,6 +35,9 @@ describe('useCanvasBitmapSize', () => {
     roCallbacks = [];
     disconnects = 0;
     measured = { width: 1000, height: 700 };
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
+      void args;
+    });
     // jsdom has neither layout nor ResizeObserver — stub both.
     vi.stubGlobal(
       'ResizeObserver',
@@ -62,10 +70,14 @@ describe('useCanvasBitmapSize', () => {
   });
 
   afterEach(() => {
-    act(() => root.unmount());
-    container.remove();
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+    try {
+      act(() => root.unmount());
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+    } finally {
+      container.remove();
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('adopts the measured CSS size as the bitmap size on mount', () => {

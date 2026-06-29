@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, type Scene, type SceneObject, type Vec2 } from '../../core/scene';
+import {
+  createLayer,
+  IDENTITY_TRANSFORM,
+  type Scene,
+  type SceneObject,
+  type Vec2,
+} from '../../core/scene';
 import { selectObjectsInMarquee } from './selection-marquee';
 
-function objectAt(id: string, x: number, y: number, locked = false): SceneObject {
+function objectAt(
+  id: string,
+  x: number,
+  y: number,
+  locked = false,
+  color = '#ff0000',
+): SceneObject {
   return {
     kind: 'imported-svg',
     id,
@@ -10,12 +22,17 @@ function objectAt(id: string, x: number, y: number, locked = false): SceneObject
     ...(locked ? { locked } : {}),
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
     transform: { ...IDENTITY_TRANSFORM, x, y },
-    paths: [],
+    paths: [{ color, polylines: [] }],
   };
 }
 
 function scene(objects: ReadonlyArray<SceneObject>): Scene {
-  return { objects, layers: [] };
+  const colors = new Set(
+    objects.flatMap((object) =>
+      object.kind === 'raster-image' ? [object.color] : object.paths.map((path) => path.color),
+    ),
+  );
+  return { objects, layers: [...colors].map((color) => createLayer({ id: color, color })) };
 }
 
 describe('selectObjectsInMarquee', () => {
@@ -39,6 +56,25 @@ describe('selectObjectsInMarquee', () => {
   it('skips locked objects inside the marquee', () => {
     const selected = selectObjectsInMarquee(
       scene([objectAt('A', 0, 0, true), objectAt('B', 20, 0)]),
+      { x: -5, y: -5 },
+      { x: 35, y: 15 },
+    );
+
+    expect(selected).toEqual(['B']);
+  });
+
+  it('skips objects whose assigned layer is hidden', () => {
+    const base = scene([
+      objectAt('A', 0, 0, false, '#ff0000'),
+      objectAt('B', 20, 0, false, '#0000ff'),
+    ]);
+    const selected = selectObjectsInMarquee(
+      {
+        ...base,
+        layers: base.layers.map((layer) =>
+          layer.id === '#ff0000' ? { ...layer, visible: false } : layer,
+        ),
+      },
       { x: -5, y: -5 },
       { x: 35, y: 15 },
     );

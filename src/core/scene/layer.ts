@@ -182,6 +182,12 @@ export function layerFromSubLayer(layer: Layer, subLayer: LayerSubLayer): Layer 
   };
 }
 
+export function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {
+  return [layer, ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer))].filter(
+    (operationLayer) => operationLayer.output,
+  );
+}
+
 export function nextLayerSubLayerId(layer: Layer): string {
   let index = layer.subLayers.length + 1;
   const used = new Set(layer.subLayers.map((subLayer) => subLayer.id));

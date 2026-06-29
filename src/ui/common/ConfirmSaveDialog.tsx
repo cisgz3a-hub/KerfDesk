@@ -10,7 +10,6 @@
 
 import { Button, Dialog, DialogActions } from '../kit';
 import { useConfirmSaveStore, type ConfirmSaveRequest } from '../state/confirm-save-store';
-import { useRegisterModal } from './use-register-modal';
 
 export function ConfirmSaveDialog(): JSX.Element | null {
   const request = useConfirmSaveStore((s) => s.request);
@@ -19,7 +18,6 @@ export function ConfirmSaveDialog(): JSX.Element | null {
 }
 
 function ConfirmSavePanel(props: { readonly request: ConfirmSaveRequest }): JSX.Element {
-  useRegisterModal();
   const choose = useConfirmSaveStore((s) => s.choose);
   return (
     <Dialog size="sm" title="Save changes?" onClose={() => choose('cancel')}>

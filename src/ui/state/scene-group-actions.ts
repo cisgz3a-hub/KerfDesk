@@ -1,4 +1,4 @@
-import type { Scene, SceneGroup } from '../../core/scene';
+import { sceneObjectHasVisibleLayer, type Scene, type SceneGroup } from '../../core/scene';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
@@ -128,6 +128,7 @@ function orderedLiveIds(scene: Scene, ids: ReadonlySet<string>): ReadonlyArray<s
   const out: string[] = [];
   for (const object of scene.objects) {
     if (object.locked === true) continue;
+    if (!sceneObjectHasVisibleLayer(scene, object)) continue;
     if (ids.has(object.id)) out.push(object.id);
   }
   return out;

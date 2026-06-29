@@ -4,7 +4,9 @@ import {
   buildSelectionFlipEdit,
   buildSelectionNudgeEdit,
   findRegistrationBoxes,
+  sceneObjectHasVisibleLayer,
   type Project,
+  type Scene,
   type SceneObject,
   type SelectionAlignKind,
   type SelectionDistributeKind,
@@ -54,7 +56,7 @@ function applyCenterInRegistrationBoxToState(state: AppState): AppState | Partia
   if (box === undefined) return state;
   const artIds = selectedObjectIds(state).filter((id) => id !== box.id);
   if (artIds.length === 0) return state;
-  const objects = [...selectedObjects(state.project.scene.objects, artIds), box];
+  const objects = [...selectedObjects(state.project.scene, artIds), box];
   const result = buildSelectionAlignEdit(objects, { kind: 'centers', referenceId: box.id });
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
@@ -67,7 +69,7 @@ function applySelectionAlignToState(
   const ids = selectedObjectIds(state);
   const referenceId = ids[ids.length - 1];
   if (referenceId === undefined) return state;
-  const result = buildSelectionAlignEdit(selectedObjects(state.project.scene.objects, ids), {
+  const result = buildSelectionAlignEdit(selectedObjects(state.project.scene, ids), {
     kind,
     referenceId,
   });
@@ -80,7 +82,7 @@ function applySelectionDistributeToState(
   kind: SelectionDistributeKind,
 ): AppState | Partial<AppState> {
   const ids = selectedObjectIds(state);
-  const result = buildSelectionDistributeEdit(selectedObjects(state.project.scene.objects, ids), {
+  const result = buildSelectionDistributeEdit(selectedObjects(state.project.scene, ids), {
     kind,
   });
   if (result.kind === 'error') return state;
@@ -93,7 +95,7 @@ function applySelectionNudgeToState(
   dy: number,
 ): AppState | Partial<AppState> {
   const ids = selectedObjectIds(state);
-  const result = buildSelectionNudgeEdit(selectedObjects(state.project.scene.objects, ids), dx, dy);
+  const result = buildSelectionNudgeEdit(selectedObjects(state.project.scene, ids), dx, dy);
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }
@@ -103,7 +105,7 @@ function applySelectionFlipToState(
   axis: SelectionFlipAxis,
 ): AppState | Partial<AppState> {
   const ids = selectedObjectIds(state);
-  const result = buildSelectionFlipEdit(selectedObjects(state.project.scene.objects, ids), axis);
+  const result = buildSelectionFlipEdit(selectedObjects(state.project.scene, ids), axis);
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }
@@ -123,6 +125,7 @@ function applySelectionTransformsToState(
         const transform = byId.get(object.id);
         if (transform === undefined) return object;
         if (object.locked === true) return object;
+        if (!sceneObjectHasVisibleLayer(state.project.scene, object)) return object;
         changed = true;
         return { ...object, transform };
       }),
@@ -144,11 +147,11 @@ function selectedObjectIds(state: AppState): ReadonlyArray<string> {
   ];
 }
 
-function selectedObjects(
-  objects: ReadonlyArray<SceneObject>,
-  ids: ReadonlyArray<string>,
-): ReadonlyArray<SceneObject> {
+function selectedObjects(scene: Scene, ids: ReadonlyArray<string>): ReadonlyArray<SceneObject> {
   return ids
-    .map((id) => objects.find((object) => object.id === id))
-    .filter((object): object is SceneObject => object !== undefined);
+    .map((id) => scene.objects.find((object) => object.id === id))
+    .filter(
+      (object): object is SceneObject =>
+        object !== undefined && object.locked !== true && sceneObjectHasVisibleLayer(scene, object),
+    );
 }

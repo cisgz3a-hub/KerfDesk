@@ -60,7 +60,7 @@ function rawImage(width: number, height: number): RawImageData {
 }
 
 function namedFile(name: string): MultiFileTraceFile {
-  return { name } as MultiFileTraceFile;
+  return { name, size: 1 } as MultiFileTraceFile;
 }
 
 describe('buildMultiFileTraceExports', () => {
@@ -84,6 +84,26 @@ describe('buildMultiFileTraceExports', () => {
     expect(files.map((file) => file.filename)).toEqual(['logo-trace.svg', 'photo-trace.svg']);
     expect(files[0]?.svg).toContain('viewBox="0 0 4 3"');
     expect(files[1]?.svg).toContain('viewBox="0 0 6 5"');
+  });
+
+  it('asks before decoding oversized files and skips declined ones', async () => {
+    const oversized = new File(['x'], 'oversized.png');
+    Object.defineProperty(oversized, 'size', { value: 30 * 1024 * 1024 });
+    const small = new File(['x'], 'small.png');
+    const loadImage = vi.fn(async () => rawImage(4, 3));
+    const confirmOversizeImport = vi.fn((name: string) => name !== 'oversized.png');
+    const trace = vi.fn(async () => [SQUARE_PATH]);
+
+    const files = await buildMultiFileTraceExports([oversized, small], {
+      loadImage,
+      confirmOversizeImport,
+      trace,
+    });
+
+    expect(confirmOversizeImport).toHaveBeenCalledWith('oversized.png', oversized.size);
+    expect(loadImage).toHaveBeenCalledTimes(1);
+    expect(loadImage).toHaveBeenCalledWith(small);
+    expect(files.map((file) => file.filename)).toEqual(['small-trace.svg']);
   });
 });
 

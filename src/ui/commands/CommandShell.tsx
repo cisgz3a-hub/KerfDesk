@@ -22,7 +22,6 @@ import {
 } from '../raster/ConvertToBitmapDialog';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 import { Toolbar } from '../common/Toolbar';
-import { useRegisterModal } from '../common/use-register-modal';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
@@ -107,7 +106,6 @@ export function CommandShell(): JSX.Element {
 }
 
 function CloseOpenFillContoursPanel(props: { readonly onClose: () => void }): JSX.Element {
-  useRegisterModal();
   const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
@@ -129,7 +127,6 @@ function CloseOpenFillContoursPanel(props: { readonly onClose: () => void }): JS
 }
 
 function UndoHistoryPanel(props: { readonly onClose: () => void }): JSX.Element {
-  useRegisterModal();
   const current = useStore((s) => s.project);
   const undoStack = useStore((s) => s.undoStack);
   const redoStack = useStore((s) => s.redoStack);
@@ -148,7 +145,6 @@ function UndoHistoryPanel(props: { readonly onClose: () => void }): JSX.Element 
 }
 
 function ProjectNotesPanel(props: { readonly onClose: () => void }): JSX.Element {
-  useRegisterModal();
   const notes = useStore((s) => s.project.notes);
   const setProjectNotes = useStore((s) => s.setProjectNotes);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -208,7 +204,6 @@ function MultiFileTraceInput(props: {
 }
 
 function OptimizationDialog(props: { readonly onClose: () => void }): JSX.Element {
-  useRegisterModal();
   const settings = useStore((s) => s.project.optimization);
   const setProjectOptimization = useStore((s) => s.setProjectOptimization);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -226,7 +221,6 @@ function OptimizationDialog(props: { readonly onClose: () => void }): JSX.Elemen
 }
 
 function IntervalDialog(props: { readonly onClose: () => void }): JSX.Element {
-  useRegisterModal();
   const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
   const pushToast = useToastStore((s) => s.pushToast);
   const onGenerate = (options: IntervalTestGridOptions): void => {
@@ -239,7 +233,6 @@ function IntervalDialog(props: { readonly onClose: () => void }): JSX.Element {
 }
 
 function MaterialDialog(props: { readonly onClose: () => void }): JSX.Element {
-  useRegisterModal();
   const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
   const pushToast = useToastStore((s) => s.pushToast);
   const onGenerate = (options: MaterialTestGridOptions): void => {
@@ -252,7 +245,6 @@ function MaterialDialog(props: { readonly onClose: () => void }): JSX.Element {
 }
 
 function ScanOffsetDialog(props: { readonly onClose: () => void }): JSX.Element {
-  useRegisterModal();
   const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
   const pushToast = useToastStore((s) => s.pushToast);
   const onGenerate = (options: ScanOffsetCalibrationPatternOptions): void => {
@@ -268,7 +260,6 @@ function ConvertDialog(props: {
   readonly convertible: ConvertibleVector;
   readonly onClose: () => void;
 }): JSX.Element {
-  useRegisterModal();
   const layers = useStore((s) => s.project.scene.layers);
   const convertToBitmap = useStore((s) => s.convertToBitmap);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -297,7 +288,6 @@ function AdjustDialog(props: {
   readonly image: NonNullable<ReturnType<typeof useSelectedRaster>>;
   readonly onClose: () => void;
 }): JSX.Element | null {
-  useRegisterModal();
   const layer = useStore((s) =>
     s.project.scene.layers.find((candidate) => candidate.id === props.image.color),
   );

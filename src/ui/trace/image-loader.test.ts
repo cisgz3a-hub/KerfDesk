@@ -3,12 +3,15 @@ import {
   PREVIEW_MAX_EDGE_PX,
   compositeRgbOverWhitePreservingAlpha,
   dataUrlToFile,
+  loadImageAsRawData,
+  readImageNaturalSize,
   readFileAsDataUrl,
   scaleToCap,
 } from './image-loader';
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function readFileText(file: File): Promise<string> {
@@ -18,6 +21,62 @@ function readFileText(file: File): Promise<string> {
     reader.onerror = (): void => reject(new Error('FileReader failed.'));
     reader.readAsText(file);
   });
+}
+
+function pngFileWithSize(width: number, height: number): File {
+  const bytes = new Uint8Array([
+    0x89,
+    0x50,
+    0x4e,
+    0x47,
+    0x0d,
+    0x0a,
+    0x1a,
+    0x0a, // signature
+    0x00,
+    0x00,
+    0x00,
+    0x0d, // IHDR length
+    0x49,
+    0x48,
+    0x44,
+    0x52, // IHDR
+    (width >>> 24) & 0xff,
+    (width >>> 16) & 0xff,
+    (width >>> 8) & 0xff,
+    width & 0xff,
+    (height >>> 24) & 0xff,
+    (height >>> 16) & 0xff,
+    (height >>> 8) & 0xff,
+    height & 0xff,
+    0x08, // bit depth
+    0x06, // color type
+    0x00, // compression
+    0x00, // filter
+    0x00, // interlace
+    0x00,
+    0x00,
+    0x00,
+    0x00, // ignored CRC
+  ]);
+  return new File([bytes], 'source.png', { type: 'image/png' });
+}
+
+function stubObjectUrlDecode(width: number, height: number): () => void {
+  const createObjectURL = vi.fn(() => 'blob:test');
+  Object.defineProperty(URL, 'createObjectURL', { value: createObjectURL, configurable: true });
+  Object.defineProperty(URL, 'revokeObjectURL', { value: vi.fn(), configurable: true });
+  class FakeImage {
+    public onload: (() => void) | null = null;
+    public onerror: (() => void) | null = null;
+    public width = width;
+    public height = height;
+    set src(_value: string) {
+      queueMicrotask(() => this.onload?.());
+    }
+  }
+  vi.stubGlobal('Image', FakeImage);
+  return () => expect(createObjectURL).not.toHaveBeenCalled();
 }
 
 describe('image-loader trace preview sizing', () => {
@@ -76,6 +135,27 @@ describe('image-loader scaleToCap (ADR-037 decode resolution)', () => {
     // Bilinear-upscaling deliberate pixel art (Sharp preset) would blur the
     // notches the user wants kept, so sub-cap images pass through untouched.
     expect(scaleToCap(300, 200, 2048)).toEqual({ width: 300, height: 200 });
+  });
+});
+
+describe('image-loader header guards', () => {
+  it('reads PNG natural dimensions from the header without browser decode', async () => {
+    const expectNoObjectUrlDecode = stubObjectUrlDecode(1, 1);
+
+    await expect(readImageNaturalSize(pngFileWithSize(640, 480))).resolves.toEqual({
+      width: 640,
+      height: 480,
+    });
+    expectNoObjectUrlDecode();
+  });
+
+  it('rejects unsafe PNG source dimensions before creating an object URL', async () => {
+    const expectNoObjectUrlDecode = stubObjectUrlDecode(1, 1);
+
+    await expect(loadImageAsRawData(pngFileWithSize(100_000, 100_000))).rejects.toThrow(
+      /too large to decode safely/i,
+    );
+    expectNoObjectUrlDecode();
   });
 });
 

@@ -21,6 +21,16 @@ function press(key: string, init: KeyboardEventInit = {}): void {
   );
 }
 
+function pressFromTarget(target: HTMLElement, init: KeyboardEventInit): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
+  target.dispatchEvent(event);
+  return event;
+}
+
 afterEach(() => {
   patchLaserStore({
     streamer: null,
@@ -28,6 +38,7 @@ afterEach(() => {
     connection: { kind: 'disconnected' },
   });
   useUiStore.setState({ textDialog: null });
+  useUiStore.setState({ imageDialog: null, modalDepth: 0 });
   vi.restoreAllMocks();
 });
 
@@ -117,5 +128,39 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(alert).toHaveBeenCalled();
     uninstall();
+  });
+
+  it.each([
+    ['input', () => document.createElement('input')],
+    ['textarea', () => document.createElement('textarea')],
+    [
+      'contenteditable',
+      () => {
+        const element = document.createElement('div');
+        element.setAttribute('contenteditable', 'true');
+        return element;
+      },
+    ],
+    [
+      'role textbox',
+      () => {
+        const element = document.createElement('div');
+        element.setAttribute('role', 'textbox');
+        return element;
+      },
+    ],
+  ])('Ctrl+Enter does not start from %s targets', (_label, createTarget) => {
+    const alert = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    patchLaserStore({ streamer: null, connection: { kind: 'connected' } });
+    const target = createTarget();
+    document.body.appendChild(target);
+    const uninstall = installJobShortcuts(window);
+
+    const event = pressFromTarget(target, { key: 'Enter', ctrlKey: true });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(alert).not.toHaveBeenCalled();
+    uninstall();
+    target.remove();
   });
 });

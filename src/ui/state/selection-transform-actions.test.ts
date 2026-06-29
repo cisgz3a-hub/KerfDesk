@@ -54,6 +54,22 @@ describe('selection transform actions', () => {
     expect(state.dirty).toBe(false);
   });
 
+  it('does not apply stale selection transform edits to hidden-layer objects', () => {
+    useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { visible: false });
+    const before = useStore.getState().project.scene.objects[0]?.transform;
+    useStore.setState({ undoStack: [], dirty: false });
+
+    useStore
+      .getState()
+      .applySelectionTransforms([{ id: 'A', transform: { ...IDENTITY_TRANSFORM, x: 10, y: 20 } }]);
+
+    const state = useStore.getState();
+    expect(state.project.scene.objects[0]?.transform).toEqual(before);
+    expect(state.undoStack).toHaveLength(0);
+    expect(state.dirty).toBe(false);
+  });
+
   it('aligns a multi-selection to the last selected reference as one undoable edit', () => {
     useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('B', ['#00ff00']));
