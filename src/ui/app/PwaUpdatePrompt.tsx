@@ -23,7 +23,14 @@ export function PwaUpdatePrompt(): JSX.Element | null {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    onRegisterError(error) {
+      // A failed registration means offline mode won't work; surface it rather
+      // than fail silently (ADR-060 audit). console is the UI-layer logger here,
+      // matching platform/web/web-serial.ts.
+      console.error('Service worker registration failed; offline mode unavailable.', error);
+    },
+  });
 
   useEffect(() => {
     if (!offlineReady) return;
