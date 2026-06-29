@@ -17,6 +17,15 @@ const RELEASE_MOTORS_CONFIRM =
   'the work origin. Move the head first, then Wake, wait for Idle, and Set origin again. ' +
   'Do not release motors during a job.';
 
+const SET_PERSISTENT_ORIGIN_CONFIRM =
+  'Set persistent G54 origin?\n\n' +
+  'This sends G10 L20 P1 X0 Y0 and writes the current head position into the controller. ' +
+  'It survives reset and power-cycle until you clear the persistent G54 origin.';
+
+const CLEAR_PERSISTENT_ORIGIN_CONFIRM =
+  'Clear persistent G54 origin?\n\n' +
+  'This sends G92.1, then G10 L2 P1 X0 Y0 to clear both transient and stored G54 origin offsets.';
+
 // F.3 — Set / Reset the work-coordinate origin to the current head
 // position. See ADR-021. Buttons:
 //   - "Set origin here" sends G92 X0 Y0. Always enabled (subject to
@@ -34,10 +43,13 @@ export function OriginRow(props: {
   const releaseMotors = useLaserStore((s) => s.releaseMotors);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const workOriginSource = useLaserStore((s) => s.workOriginSource);
   const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const busy = props.disabled || props.streaming;
   const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
+  const persistentOrUnknown =
+    workOriginSource === 'g54-persistent' || workOriginSource === 'unknown';
   // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
   // intermittently (every Nth status per `$10`), so the StatusDisplay
   // readout may take 1-30 frames (~0.25-7.5s) to update after a G92.
@@ -75,15 +87,18 @@ export function OriginRow(props: {
       <button
         type="button"
         onClick={onReset}
-        disabled={busy || !hasCustom}
+        disabled={busy || !hasCustom || persistentOrUnknown}
         title={
-          hasCustom
-            ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
-            : 'No custom origin active. Set one with "Set origin here" first.'
+          persistentOrUnknown
+            ? 'This origin may be stored in G54. Use Clear persistent origin.'
+            : hasCustom
+              ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
+              : 'No custom origin active. Set one with "Set origin here" first.'
         }
       >
         Reset origin
       </button>
+      <AdvancedOriginControls busy={busy} hasCustom={hasCustom} />
       <button
         type="button"
         onClick={onRelease}
@@ -93,5 +108,54 @@ export function OriginRow(props: {
         Release motors
       </button>
     </div>
+  );
+}
+
+function AdvancedOriginControls(props: {
+  readonly busy: boolean;
+  readonly hasCustom: boolean;
+}): JSX.Element {
+  const setPersistentOrigin = useLaserStore((s) => s.setPersistentOriginHere);
+  const clearPersistentOrigin = useLaserStore((s) => s.clearPersistentOrigin);
+  const setJobPlacement = useStore((s) => s.setJobPlacement);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const onSetPersistent = (): void => {
+    if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
+    void setPersistentOrigin().then(() => {
+      setJobPlacement({ startFrom: 'user-origin' });
+      pushToast('Persistent G54 origin set to current head position.', 'success');
+    });
+  };
+  const onClearPersistent = (): void => {
+    if (!jobAwareConfirm(CLEAR_PERSISTENT_ORIGIN_CONFIRM)) return;
+    void clearPersistentOrigin().then(() => pushToast('Persistent G54 origin cleared.', 'success'));
+  };
+  return (
+    <details style={{ display: 'inline-block' }}>
+      <summary
+        style={{ cursor: props.busy ? 'default' : 'pointer' }}
+        title="Show persistent G54 origin controls."
+      >
+        Advanced origin
+      </summary>
+      <div style={{ ...rowStyle, marginTop: 6 }}>
+        <button
+          type="button"
+          onClick={onSetPersistent}
+          disabled={props.busy}
+          title="Write the current head position as the persistent G54 origin (G10 L20 P1)."
+        >
+          Set persistent origin
+        </button>
+        <button
+          type="button"
+          onClick={onClearPersistent}
+          disabled={props.busy || !props.hasCustom}
+          title="Clear transient G92 and stored G54 origin offsets."
+        >
+          Clear persistent origin
+        </button>
+      </div>
+    </details>
   );
 }

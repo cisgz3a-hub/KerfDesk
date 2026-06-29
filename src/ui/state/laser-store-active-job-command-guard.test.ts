@@ -141,6 +141,8 @@ describe('laser-store active-job command guard', () => {
     ['Unlock', () => useLaserStore.getState().unlockAlarm()],
     ['Set Origin', () => useLaserStore.getState().setOriginHere()],
     ['Reset Origin', () => useLaserStore.getState().resetOrigin()],
+    ['Set Persistent Origin', () => useLaserStore.getState().setPersistentOriginHere()],
+    ['Clear Persistent Origin', () => useLaserStore.getState().clearPersistentOrigin()],
     ['Start job', () => useLaserStore.getState().startJob('G21\nG90\nG1 X1 F1000\nM5\n')],
   ] as const)('blocks %s while a jog/frame operation is active', async (_label, runCommand) => {
     const writes: string[] = [];
@@ -229,6 +231,12 @@ describe('laser-store active-job command guard', () => {
 
     await expect(useLaserStore.getState().setOriginHere()).rejects.toThrow(/job is active/i);
     await expect(useLaserStore.getState().resetOrigin()).rejects.toThrow(/job is active/i);
+    await expect(useLaserStore.getState().setPersistentOriginHere()).rejects.toThrow(
+      /job is active/i,
+    );
+    await expect(useLaserStore.getState().clearPersistentOrigin()).rejects.toThrow(
+      /job is active/i,
+    );
 
     expect(writes).toEqual([]);
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');

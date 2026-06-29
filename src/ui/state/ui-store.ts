@@ -31,6 +31,11 @@ export type TextDialogState =
       readonly color: string;
     };
 
+export type TraceImageDialogState = {
+  readonly source: RasterImage;
+  readonly replaceTraceId?: string;
+};
+
 // Phase G (ADR-051) drawing tool-mode. 'select' is the default (select +
 // transform); a draw mode arms the Workspace to create that shape on the next
 // canvas drag. Ephemeral like zoom — never persisted; Esc returns to select.
@@ -133,8 +138,11 @@ export type UiState = {
   // image — so the dialog is always seeded with the RasterImage the
   // operator picked (via the toolbar Trace button), never a blank file
   // picker. Importing an image as a bitmap is a separate, dialog-less path.
-  readonly imageDialog: RasterImage | null;
-  readonly openImageDialog: (source: RasterImage) => void;
+  readonly imageDialog: TraceImageDialogState | null;
+  readonly openImageDialog: (
+    source: RasterImage,
+    options?: { readonly replaceTraceId?: string },
+  ) => void;
   readonly closeImageDialog: () => void;
   // Phase G drawing tool-mode (ADR-051).
   readonly toolMode: ToolMode;
@@ -209,7 +217,13 @@ export const useUiStore = create<UiState>((set) => ({
   openTextDialog: (next) => set({ textDialog: next }),
   closeTextDialog: () => set({ textDialog: null }),
   imageDialog: null,
-  openImageDialog: (source) => set({ imageDialog: source }),
+  openImageDialog: (source, options) =>
+    set({
+      imageDialog:
+        options?.replaceTraceId === undefined
+          ? { source }
+          : { source, replaceTraceId: options.replaceTraceId },
+    }),
   closeImageDialog: () => set({ imageDialog: null }),
   toolMode: { kind: 'select' },
   // Switching to any non-pen tool discards a half-drawn pen polyline so it can't

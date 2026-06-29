@@ -218,7 +218,7 @@ async function renderTraceDialog(): Promise<{
 }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
-  useUiStore.setState({ imageDialog: seedRaster() });
+  useUiStore.setState({ imageDialog: { source: seedRaster() } });
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);

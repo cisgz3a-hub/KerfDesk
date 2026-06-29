@@ -222,7 +222,7 @@ function handleAlarmLine(
   set({
     alarmCode: code,
     wcoCache: null,
-    workOriginActive: false,
+    ...originUnknownAfterControllerReset(prev),
     motionOperation: null,
     controllerOperation: null,
     frameVerification: null,
@@ -261,7 +261,7 @@ function handleStatusLine(
     set({
       statusReport: report,
       wcoCache: null,
-      workOriginActive: false,
+      ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
       frameVerification: null,
@@ -275,7 +275,7 @@ function handleStatusLine(
       statusReport: report,
       alarmCode: null,
       wcoCache: null,
-      workOriginActive: false,
+      ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
       frameVerification: null,
@@ -300,7 +300,7 @@ function handleStatusLine(
   const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
 
   set({
-    ...statusPositionPatch(report),
+    ...statusPositionPatch(report, state.workOriginSource),
     ...operationPatch,
     ...completedStreamerPatch,
   });
@@ -330,13 +330,32 @@ function requestRealtimeStopAfterStreamError(
 
 function statusPositionPatch(
   report: StatusReport,
-): Pick<LaserState, 'statusReport'> & Partial<Pick<LaserState, 'wcoCache' | 'workOriginActive'>> {
+  originSource: LaserState['workOriginSource'],
+): Pick<LaserState, 'statusReport'> &
+  Partial<Pick<LaserState, 'wcoCache' | 'workOriginActive' | 'workOriginSource'>> {
   if (report.wco === null) return { statusReport: report };
+  const active = hasCustomOrigin(report.wco);
   return {
     statusReport: report,
     wcoCache: report.wco,
-    workOriginActive: hasCustomOrigin(report.wco),
+    workOriginActive: active,
+    workOriginSource: active ? knownOrUnknownOriginSource(originSource) : 'none',
   };
+}
+
+function knownOrUnknownOriginSource(
+  source: LaserState['workOriginSource'],
+): LaserState['workOriginSource'] {
+  return source === 'none' ? 'unknown' : source;
+}
+
+function originUnknownAfterControllerReset(
+  state: LaserState,
+): Pick<LaserState, 'workOriginActive' | 'workOriginSource'> {
+  if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
+    return { workOriginActive: true, workOriginSource: 'unknown' };
+  }
+  return { workOriginActive: false, workOriginSource: 'none' };
 }
 
 function dispatchQueuedFrameLine(set: SetFn, safeWrite: SafeWriteFn, line: string): void {

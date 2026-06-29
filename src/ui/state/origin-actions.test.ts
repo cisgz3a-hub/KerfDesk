@@ -5,7 +5,14 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { hasCustomOrigin, releaseMotors, resetOrigin, setOriginHere } from './origin-actions';
+import {
+  clearPersistentOrigin,
+  hasCustomOrigin,
+  releaseMotors,
+  resetOrigin,
+  setOriginHere,
+  setPersistentOriginHere,
+} from './origin-actions';
 
 describe('setOriginHere', () => {
   it('writes exactly G92 X0 Y0 with a trailing newline', async () => {
@@ -45,6 +52,26 @@ describe('resetOrigin', () => {
     await resetOrigin(safeWrite);
     expect(safeWrite).toHaveBeenCalledTimes(1);
     expect(safeWrite).toHaveBeenCalledWith('G92.1\n');
+  });
+});
+
+describe('setPersistentOriginHere', () => {
+  it('clears transient G92 before setting the persistent G54 origin', async () => {
+    const safeWrite = vi.fn(async () => undefined);
+    await setPersistentOriginHere(safeWrite);
+    expect(safeWrite).toHaveBeenCalledTimes(2);
+    expect(safeWrite).toHaveBeenNthCalledWith(1, 'G92.1\n');
+    expect(safeWrite).toHaveBeenNthCalledWith(2, 'G10 L20 P1 X0 Y0\n');
+  });
+});
+
+describe('clearPersistentOrigin', () => {
+  it('clears transient G92 before clearing the persistent G54 origin', async () => {
+    const safeWrite = vi.fn(async () => undefined);
+    await clearPersistentOrigin(safeWrite);
+    expect(safeWrite).toHaveBeenCalledTimes(2);
+    expect(safeWrite).toHaveBeenNthCalledWith(1, 'G92.1\n');
+    expect(safeWrite).toHaveBeenNthCalledWith(2, 'G10 L2 P1 X0 Y0\n');
   });
 });
 

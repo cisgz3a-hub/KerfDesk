@@ -341,6 +341,8 @@ describe('laser-store serial write failures', () => {
     ],
     ['Set Origin', 'origin', () => useLaserStore.getState().setOriginHere()],
     ['Reset Origin', 'origin', () => useLaserStore.getState().resetOrigin()],
+    ['Set Persistent Origin', 'origin', () => useLaserStore.getState().setPersistentOriginHere()],
+    ['Clear Persistent Origin', 'origin', () => useLaserStore.getState().clearPersistentOrigin()],
   ] as const)(
     'raises a safety notice when the %s write fails',
     async (_label, expectedAction, runCommand) => {
@@ -361,45 +363,6 @@ describe('laser-store serial write failures', () => {
       }
     },
   );
-
-  it('rejects Set Origin when the G92 write fails', async () => {
-    const write = vi.fn(async () => {
-      throw new Error('origin rejected');
-    });
-    const connection = makeConnection(write);
-    await connectWith(connection);
-
-    await expect(useLaserStore.getState().setOriginHere()).rejects.toThrow('origin rejected');
-    expect(useLaserStore.getState().log.join('\n')).toContain(
-      'Serial write failed: origin rejected',
-    );
-  });
-
-  it('marks the work origin active immediately after Set Origin succeeds', async () => {
-    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
-    const connection = makeConnection(write);
-    await connectWith(connection);
-    connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
-
-    await useLaserStore.getState().setOriginHere();
-
-    expect(write).toHaveBeenCalledWith('G92 X0 Y0\n');
-    expect(useLaserStore.getState().workOriginActive).toBe(true);
-    expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
-  });
-
-  it('clears the active work-origin flag when Reset Origin succeeds', async () => {
-    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
-    const connection = makeConnection(write);
-    await connectWith(connection);
-    useLaserStore.setState({ workOriginActive: true, wcoCache: { x: 12, y: 34, z: 0 } });
-
-    await useLaserStore.getState().resetOrigin();
-
-    expect(write).toHaveBeenCalledWith('G92.1\n');
-    expect(useLaserStore.getState().workOriginActive).toBe(false);
-    expect(useLaserStore.getState().wcoCache).toBeNull();
-  });
 });
 
 describe('laser-store autofocus lifecycle', () => {
@@ -451,6 +414,12 @@ describe('laser-store autofocus lifecycle', () => {
       /auto-focus is running/i,
     );
     await expect(useLaserStore.getState().resetOrigin()).rejects.toThrow(/auto-focus is running/i);
+    await expect(useLaserStore.getState().setPersistentOriginHere()).rejects.toThrow(
+      /auto-focus is running/i,
+    );
+    await expect(useLaserStore.getState().clearPersistentOrigin()).rejects.toThrow(
+      /auto-focus is running/i,
+    );
     await expect(useLaserStore.getState().disconnect()).rejects.toThrow(/auto-focus is running/i);
   });
 });

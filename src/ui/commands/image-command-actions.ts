@@ -3,6 +3,7 @@ import { cropMaskedRasterImage } from '../raster/crop-image';
 import type { SelectedImageMaskPair } from './image-mask-command-state';
 
 type SceneObject = Project['scene']['objects'][number];
+type PushToast = (message: string, kind: 'success' | 'error') => void;
 
 type ImageCommandApp = {
   readonly project: Project;
@@ -17,6 +18,35 @@ export function traceImageAction(
 ): () => void {
   return () => {
     if (selected?.kind === 'raster-image') openImageDialog(selected);
+  };
+}
+
+export function traceSourceForTracedImage(
+  project: Project,
+  selected: SceneObject | null,
+): RasterImage | null {
+  if (selected?.kind !== 'traced-image' || selected.traceSourceId === undefined) return null;
+  const source = project.scene.objects.find((object) => object.id === selected.traceSourceId);
+  return source?.kind === 'raster-image' ? source : null;
+}
+
+export function retraceOriginalAction(
+  project: Project,
+  selected: SceneObject | null,
+  openImageDialog: (source: RasterImage, options?: { readonly replaceTraceId?: string }) => void,
+  pushToast: PushToast,
+): () => void {
+  return () => {
+    if (selected?.kind !== 'traced-image') return;
+    const source = traceSourceForTracedImage(project, selected);
+    if (source === null) {
+      pushToast(
+        `Original raster for ${selected.source} is missing. Re-trace needs the kept source image.`,
+        'error',
+      );
+      return;
+    }
+    openImageDialog(source, { replaceTraceId: selected.id });
   };
 }
 
