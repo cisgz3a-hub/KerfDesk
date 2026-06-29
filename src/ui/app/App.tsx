@@ -10,6 +10,7 @@ import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
+import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
@@ -54,6 +55,7 @@ export function App(): JSX.Element {
       </main>
       <StatusBar />
       <Toasts />
+      <PwaUpdatePrompt />
       <AddTextDialog />
       <ImportImageDialog />
       <ConfirmSaveDialog />

@@ -12,6 +12,9 @@ out/
 .vite/
 coverage/
 
+# Cloudflare wrangler (pages dev) — cache + temp worker shims
+.wrangler/
+
 # Perceptual test harness — opt-in render dumps (PERCEPTUAL_ARTIFACTS=1)
 perceptual-artifacts/
 

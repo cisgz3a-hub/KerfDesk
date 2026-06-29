@@ -4,18 +4,22 @@
 import { runCommand, type AppCommand, type CommandId } from '../commands/command-registry';
 import { commandHelpId, controlHelp } from '../help/help-topics';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
+import { ConnectionBadge } from './ConnectionBadge';
+import { InstallButton } from './InstallButton';
 
 export function Toolbar(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
   return (
     <header aria-label="Toolbar" style={barStyle}>
       <span style={titleStyle}>{APP_DISPLAY_NAME}</span>
       <BuildBadge />
+      <ConnectionBadge />
       <span style={separatorStyle} />
       <ToolbarButtons commands={props.commands} />
       <span style={separatorStyle} />
       <span style={hintStyle} title={SHORTCUT_HINT}>
         shortcuts
       </span>
+      <InstallButton />
     </header>
   );
 }
