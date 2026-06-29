@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  captureLayerOperationSettings,
   createLayer,
+  createLayerSubLayer,
   createProject,
   IDENTITY_TRANSFORM,
   type Project,
@@ -138,6 +140,38 @@ describe('drawRasterPreview', () => {
     expect(Array.from(capturedImageData?.data ?? [])).toEqual([
       0, 0, 0, 255, 85, 85, 85, 255, 255, 255, 255, 255,
     ]);
+  });
+
+  it('renders raster previews for image sub-layers', () => {
+    const createdCanvases: unknown[] = [];
+    vi.stubGlobal('ImageData', FakeImageData);
+    vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+      if (tag !== 'canvas') throw new Error(`unexpected element ${tag}`);
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => ({ putImageData: vi.fn() }),
+      };
+      createdCanvases.push(canvas);
+      return canvas as unknown as HTMLCanvasElement;
+    });
+    const layer = createLayer({ id: 'image', color: '#808080', mode: 'line' });
+    const subLayer = createLayerSubLayer(layer, {
+      id: 'image-pass',
+      label: 'Image',
+      settings: { ...captureLayerOperationSettings(layer), mode: 'image' },
+    });
+    const project: Project = {
+      ...createProject(),
+      scene: {
+        objects: [burnRaster('data:image/png;base64,image-sub-layer')],
+        layers: [{ ...layer, subLayers: [subLayer] }],
+      },
+    };
+
+    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+
+    expect(createdCanvases).toHaveLength(1);
   });
 
   it('inverts image-mode luma before rendering raster preview when negative image is enabled', () => {

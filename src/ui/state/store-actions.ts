@@ -1,6 +1,7 @@
 import type { DeviceProfile } from '../../core/devices';
 import {
   moveLayer as moveSceneLayer,
+  sceneObjectHasVisibleLayer,
   type Project,
   type Transform,
   updateLayer,
@@ -22,15 +23,19 @@ export function sceneActions(
 ): Pick<AppState, 'setLayerParam' | 'moveLayer' | 'updateDeviceProfile' | 'replaceDeviceProfile'> {
   return {
     setLayerParam: (layerId, patch) =>
-      set((s) => ({
-        project: {
+      set((s) => {
+        const project = {
           ...s.project,
           scene: updateLayer(s.project.scene, layerId, patch),
-        },
-        undoStack: pushUndo(s.project, s.undoStack),
-        redoStack: [],
-        dirty: true,
-      })),
+        };
+        return {
+          project,
+          undoStack: pushUndo(s.project, s.undoStack),
+          redoStack: [],
+          dirty: true,
+          ...(patch.visible === false ? visibleSelectionState(s, project) : {}),
+        };
+      }),
     moveLayer: (layerId, direction) =>
       set((s) => {
         const scene = moveSceneLayer(s.project.scene, layerId, direction);
@@ -105,6 +110,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           undoStack: s.undoStack.slice(0, -1),
           redoStack: [...s.redoStack, s.project].slice(-HISTORY_DEPTH),
           selectedObjectId: null,
+          additionalSelectedIds: new Set(),
           selectedPathNode: null,
           selectedPathNodes: [],
           dirty: true,
@@ -119,6 +125,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           redoStack: s.redoStack.slice(0, -1),
           undoStack: [...s.undoStack, s.project].slice(-HISTORY_DEPTH),
           selectedObjectId: null,
+          additionalSelectedIds: new Set(),
           selectedPathNode: null,
           selectedPathNodes: [],
           dirty: true,
@@ -162,6 +169,7 @@ export function viewActions(
       set((s) => {
         const ids = s.project.scene.objects
           .filter((object) => object.locked !== true)
+          .filter((object) => sceneObjectHasVisibleLayer(s.project.scene, object))
           .map((o) => o.id);
         const [primary, ...rest] = ids;
         return {
@@ -245,6 +253,28 @@ function mergeOutputScope(
   return {
     ...next,
     useSelectionOrigin: next.cutSelectedGraphics ? next.useSelectionOrigin : false,
+  };
+}
+
+function visibleSelectionState(
+  state: AppState,
+  project: Project,
+): Pick<AppState, 'selectedObjectId' | 'additionalSelectedIds'> {
+  const selectedIds = [
+    ...(state.selectedObjectId === null ? [] : [state.selectedObjectId]),
+    ...state.additionalSelectedIds,
+  ].filter((id) => {
+    const object = project.scene.objects.find((candidate) => candidate.id === id);
+    return (
+      object !== undefined &&
+      object.locked !== true &&
+      sceneObjectHasVisibleLayer(project.scene, object)
+    );
+  });
+  const [primary, ...rest] = selectedIds;
+  return {
+    selectedObjectId: primary ?? null,
+    additionalSelectedIds: new Set(rest),
   };
 }
 

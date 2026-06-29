@@ -9,6 +9,7 @@
 import { applyTransform } from './transform';
 import type { Scene } from './scene';
 import type { SceneObject, Transform, Vec2 } from './scene-object';
+import { sceneObjectHasVisibleLayer } from './visibility';
 
 export function hitTest(scene: Scene, point: Vec2): string | null {
   // Topmost first — later-added objects render on top so they take the click.
@@ -16,6 +17,7 @@ export function hitTest(scene: Scene, point: Vec2): string | null {
     const obj = scene.objects[i];
     if (obj === undefined) continue;
     if (obj.locked === true) continue;
+    if (!sceneObjectHasVisibleLayer(scene, obj)) continue;
     if (pointInObjectBBox(point, obj)) return obj.id;
   }
   return null;

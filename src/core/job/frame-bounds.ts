@@ -9,6 +9,7 @@ import { toMachineCoords, type DeviceProfile } from '../devices';
 import {
   applyTransform,
   assertNever,
+  outputOperationLayers,
   type ColoredPath,
   type Layer,
   type Scene,
@@ -58,13 +59,14 @@ function outputLayerModesByColor(
 ): ReadonlyMap<string, ReadonlySet<Layer['mode']>> {
   const modesByColor = new Map<string, Set<Layer['mode']>>();
   for (const layer of layers) {
-    if (!layer.output) continue;
-    let modes = modesByColor.get(layer.color);
-    if (modes === undefined) {
-      modes = new Set<Layer['mode']>();
-      modesByColor.set(layer.color, modes);
+    for (const operationLayer of outputOperationLayers(layer)) {
+      let modes = modesByColor.get(operationLayer.color);
+      if (modes === undefined) {
+        modes = new Set<Layer['mode']>();
+        modesByColor.set(operationLayer.color, modes);
+      }
+      modes.add(operationLayer.mode);
     }
-    modes.add(layer.mode);
   }
   return modesByColor;
 }

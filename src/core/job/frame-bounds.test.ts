@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import {
+  captureLayerOperationSettings,
   createLayer,
+  createLayerSubLayer,
   createProject,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
@@ -97,6 +99,24 @@ describe('computeFrameBounds', () => {
     const scene = {
       ...EMPTY_SCENE,
       layers: [createLayer({ id: 'image', color: '#808080', mode: 'image' })],
+      objects: [rasterObject()],
+    };
+
+    expect(computeFrameBounds(scene, DEFAULT_DEVICE_PROFILE)).toEqual(
+      computeJobBounds(compileJob(scene, DEFAULT_DEVICE_PROFILE)),
+    );
+  });
+
+  it('matches compiled bounds for image sub-layers without reading raster pixels', () => {
+    const lineLayer = createLayer({ id: 'image', color: '#808080', mode: 'line' });
+    const subLayer = createLayerSubLayer(lineLayer, {
+      id: 'image-pass',
+      label: 'Image',
+      settings: { ...captureLayerOperationSettings(lineLayer), mode: 'image' },
+    });
+    const scene = {
+      ...EMPTY_SCENE,
+      layers: [{ ...lineLayer, subLayers: [subLayer] }],
       objects: [rasterObject()],
     };
 

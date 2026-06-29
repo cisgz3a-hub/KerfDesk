@@ -7,6 +7,7 @@
 
 import { useId, useRef } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { useRegisterModal } from '../common/use-register-modal';
 
 type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
@@ -25,6 +26,7 @@ export function Dialog(props: {
   const backdropRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useDialogA11y(backdropRef, props.onClose);
+  useRegisterModal();
   const panelClass = `lf-dialog lf-dialog--${props.size ?? 'md'}`;
   const heading =
     props.title === undefined ? null : (

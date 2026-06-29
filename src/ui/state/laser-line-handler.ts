@@ -347,7 +347,7 @@ function dispatchQueuedFrameLine(set: SetFn, safeWrite: SafeWriteFn, line: strin
       }));
     })
     .catch(() => {
-      set({ motionOperation: null });
+      set({ motionOperation: null, frameVerification: null });
     });
 }
 

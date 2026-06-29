@@ -9,6 +9,7 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { PlatformProvider } from './platform-context';
 import { useShortcuts } from './use-shortcuts';
+import { Dialog } from '../kit';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -168,6 +169,26 @@ describe('useShortcuts modal gate', () => {
       await pressKey({ key: 'Backspace' });
 
       expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('ignores edit shortcuts while a shared Dialog is open', async () => {
+    installVectorProject();
+    const { unmount } = await renderHarness(
+      <>
+        <ShortcutHarness />
+        <Dialog onClose={() => undefined} ariaLabel="Shared dialog">
+          <button>Inside</button>
+        </Dialog>
+      </>,
+    );
+    try {
+      await pressKey({ key: 'Backspace' });
+
+      expect(useStore.getState().project.scene.objects).toHaveLength(1);
+      expect(useStore.getState().selectedObjectId).toBe('vec-1');
     } finally {
       await unmount();
     }

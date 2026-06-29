@@ -8,6 +8,7 @@ import { canvasTheme } from '../theme/canvas-theme';
 import type { Toolpath } from '../../core/job';
 import {
   isRegistrationBox,
+  sceneObjectHasVisibleLayerFromMap,
   type Layer,
   type Polyline,
   type Project,
@@ -29,13 +30,11 @@ import {
   type DisplayPolylines,
 } from './display-polylines';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
-import { drawPathNodeHandles } from './draw-path-node-handles';
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
 import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
-import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
-import { rotateHandlePosition } from './rotate-handle';
+import { drawObjectSelectionOverlay } from './draw-selection-overlay';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import {
   drawLargeSceneNotice,
@@ -241,6 +240,7 @@ function drawObjects(
   const layerByColor = new Map(project.scene.layers.map((l) => [l.color, l]));
   let simplified = false;
   for (const obj of project.scene.objects) {
+    const isVisible = sceneObjectHasVisibleLayerFromMap(obj, layerByColor);
     // ImportedSvg and TextObject share the same polyline shape after text renders
     // to paths — single drawing path. ADR-057: dash the jig box so it reads as a
     // placement fixture, not artwork; reset after, before the overlays below.
@@ -263,14 +263,14 @@ function drawObjects(
         onRasterBitmapReady === undefined ? undefined : { onBitmapReady: onRasterBitmapReady },
       );
     }
-    if (obj.id === selectedId) {
-      drawSelectionBox(ctx, obj, view);
-      if (showPathNodeHandles) {
-        drawPathNodeHandles(ctx, obj, view, selectedPathNode, selectedPathNodes);
-      }
-    } else if (additionalSelectedIds.has(obj.id)) {
-      drawSecondarySelectionBox(ctx, obj, view);
-    }
+    drawObjectSelectionOverlay(ctx, obj, view, {
+      isVisible,
+      selectedId,
+      showPathNodeHandles,
+      selectedPathNode,
+      selectedPathNodes,
+      additionalSelectedIds,
+    });
   }
   return simplified;
 }
@@ -347,101 +347,4 @@ function drawFilledDesignGeometry(
   strokePolylinesBatched(ctx, obj, open, view);
 }
 
-function drawSelectionBox(
-  ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
-  view: ViewTransform,
-): void {
-  ctx.strokeStyle = canvasTheme.selection;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 3]);
-  strokeSelectionFrame(ctx, selectionFrameFor(obj), view);
-  ctx.setLineDash([]);
-  drawHandles(ctx, obj, view);
-}
-
-// Thinner, no-handles outline for objects in the multi-selection set.
-// Handles only appear on the primary so the user knows which object the
-// next scale/rotate drag will affect.
-function drawSecondarySelectionBox(
-  ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
-  view: ViewTransform,
-): void {
-  ctx.save();
-  ctx.strokeStyle = canvasTheme.selection;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.globalAlpha = 0.7;
-  strokeSelectionFrame(ctx, selectionFrameFor(obj), view);
-  ctx.restore();
-}
-
-function strokeSelectionFrame(
-  ctx: CanvasRenderingContext2D,
-  frame: ReadonlyArray<{ readonly x: number; readonly y: number }>,
-  view: ViewTransform,
-): void {
-  const [first, ...rest] = frame;
-  if (first === undefined) return;
-  ctx.beginPath();
-  ctx.moveTo(view.offsetX + first.x * view.scale, view.offsetY + first.y * view.scale);
-  for (const point of rest) {
-    ctx.lineTo(view.offsetX + point.x * view.scale, view.offsetY + point.y * view.scale);
-  }
-  ctx.closePath();
-  ctx.stroke();
-}
-
-function drawHandles(ctx: CanvasRenderingContext2D, obj: SceneObject, view: ViewTransform): void {
-  ctx.fillStyle = canvasTheme.selectionHandleFill;
-  ctx.strokeStyle = canvasTheme.selection;
-  ctx.lineWidth = 1.5;
-  const half = HANDLE_SCREEN_PX / 2;
-  for (const h of handlesFor(obj)) drawSingleHandle(ctx, h, view, half);
-  drawRotateHandle(ctx, obj, view);
-}
-
-function drawSingleHandle(
-  ctx: CanvasRenderingContext2D,
-  h: Handle,
-  view: ViewTransform,
-  half: number,
-): void {
-  const cx = view.offsetX + h.position.x * view.scale;
-  const cy = view.offsetY + h.position.y * view.scale;
-  ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
-  ctx.strokeRect(cx - half, cy - half, half * 2, half * 2);
-}
-
-function drawRotateHandle(
-  ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
-  view: ViewTransform,
-): void {
-  const pos = rotateHandlePosition(obj);
-  const cx = view.offsetX + pos.x * view.scale;
-  const cy = view.offsetY + pos.y * view.scale;
-  const bboxTopMidScreenY = cy + 24 * view.scale;
-  ctx.save();
-  ctx.strokeStyle = canvasTheme.selection;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([2, 2]);
-  ctx.beginPath();
-  ctx.moveTo(cx, bboxTopMidScreenY);
-  ctx.lineTo(cx, cy);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = canvasTheme.selection;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = canvasTheme.rotateHandleStroke;
-  ctx.stroke();
-  ctx.restore();
-}
-
 // F-A3/A6/A8 — overlay any object whose transformed bbox extends past the
-// bed in scene coordinates with a red dashed rectangle. Preflight (F-A10)
-// blocks at G-code generation time; this is the live UX hint.

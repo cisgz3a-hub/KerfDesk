@@ -1,4 +1,10 @@
-import { transformedBBox, type AABB, type Scene, type Vec2 } from '../../core/scene';
+import {
+  sceneObjectHasVisibleLayer,
+  transformedBBox,
+  type AABB,
+  type Scene,
+  type Vec2,
+} from '../../core/scene';
 
 export function selectObjectsInMarquee(
   scene: Scene,
@@ -8,6 +14,7 @@ export function selectObjectsInMarquee(
   const marquee = normalizedAabb(start, end);
   return scene.objects
     .filter((object) => object.locked !== true)
+    .filter((object) => sceneObjectHasVisibleLayer(scene, object))
     .filter((object) => aabbIntersects(marquee, transformedBBox(object)))
     .map((object) => object.id);
 }

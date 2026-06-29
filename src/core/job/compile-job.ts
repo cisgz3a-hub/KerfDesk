@@ -19,7 +19,7 @@ import {
   type ColoredPath,
   type Layer,
   layerOperationSettingsEqual,
-  layerFromSubLayer,
+  outputOperationLayers,
   type Polyline,
   type Scene,
   type SceneObject,
@@ -56,12 +56,6 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
     }
   }
   return { groups };
-}
-
-function outputOperationLayers(layer: Layer): ReadonlyArray<Layer> {
-  return [layer, ...layer.subLayers.map((subLayer) => layerFromSubLayer(layer, subLayer))].filter(
-    (operationLayer) => operationLayer.output,
-  );
 }
 
 function compileVectorGroupsForLayer(

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PACKAGED_RENDERER_ORIGIN,
   makeTrustedRendererOrigins,
+  resolveRendererRuntime,
   shouldAllowNavigation,
   shouldAllowWindowOpen,
   shouldGrantDevicePermission,
@@ -25,6 +26,32 @@ describe('Electron trusted renderer policy', () => {
     expect(shouldAllowNavigation('http://localhost:5173/workspace', trustedOrigins)).toBe(true);
     expect(shouldAllowNavigation('http://localhost:5174/workspace', trustedOrigins)).toBe(false);
     expect(shouldAllowNavigation('https://laserforge.pages.dev/', trustedOrigins)).toBe(false);
+  });
+
+  it('ignores configured dev URLs when packaged', () => {
+    const runtime = resolveRendererRuntime({
+      devUrl: 'https://evil.example/app',
+      isPackaged: true,
+    });
+
+    expect(runtime.rendererUrl).toBe('app://app/index.html');
+    expect([...runtime.trustedOrigins]).toEqual([PACKAGED_RENDERER_ORIGIN]);
+  });
+
+  it('trusts only loopback dev-server origins when unpackaged', () => {
+    const runtime = resolveRendererRuntime({
+      devUrl: 'https://evil.example/app',
+      isPackaged: false,
+    });
+    const local = resolveRendererRuntime({
+      devUrl: 'http://127.0.0.1:5173/workspace',
+      isPackaged: false,
+    });
+
+    expect(runtime.rendererUrl).toBe('app://app/index.html');
+    expect([...runtime.trustedOrigins]).toEqual([PACKAGED_RENDERER_ORIGIN]);
+    expect(local.rendererUrl).toBe('http://127.0.0.1:5173/workspace');
+    expect([...local.trustedOrigins]).toEqual([PACKAGED_RENDERER_ORIGIN, 'http://127.0.0.1:5173']);
   });
 
   it('grants only app permissions requested by the trusted main renderer', () => {
@@ -181,6 +208,8 @@ describe('Electron main-process security wiring', () => {
     const main = readMainProcessSource();
 
     expect(main).toContain('TRUSTED_RENDERER_ORIGINS');
+    expect(main).toContain('resolveRendererRuntime');
+    expect(main).toContain('app.isPackaged');
     expect(main).toContain('shouldGrantPermissionCheck');
     expect(main).toContain('requestingOrigin');
     expect(main).toContain('details.requestingUrl');

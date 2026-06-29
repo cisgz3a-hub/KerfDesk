@@ -1,4 +1,15 @@
 export const PACKAGED_RENDERER_ORIGIN = 'app://app';
+export const PACKAGED_RENDERER_URL = 'app://app/index.html';
+
+export interface RendererRuntimeInput {
+  readonly devUrl?: string | undefined;
+  readonly isPackaged: boolean;
+}
+
+export interface RendererRuntime {
+  readonly rendererUrl: string;
+  readonly trustedOrigins: ReadonlySet<string>;
+}
 
 export interface PermissionCheckPolicyInput {
   readonly permission: string;
@@ -22,10 +33,20 @@ export interface DevicePermissionPolicyInput {
 export function makeTrustedRendererOrigins(devUrl?: string): ReadonlySet<string> {
   const origins = new Set<string>([PACKAGED_RENDERER_ORIGIN]);
   if (devUrl !== undefined && devUrl.length > 0) {
-    const devOrigin = rendererOriginFromUrl(devUrl);
+    const devOrigin = loopbackDevOriginFromUrl(devUrl);
     if (devOrigin !== null) origins.add(devOrigin);
   }
   return origins;
+}
+
+export function resolveRendererRuntime(input: RendererRuntimeInput): RendererRuntime {
+  if (input.isPackaged) return packagedRendererRuntime();
+  const devUrl = loopbackDevUrl(input.devUrl);
+  if (devUrl === null) return packagedRendererRuntime();
+  return {
+    rendererUrl: devUrl.href,
+    trustedOrigins: makeTrustedRendererOrigins(devUrl.href),
+  };
 }
 
 export function shouldAllowNavigation(url: string, trustedOrigins: ReadonlySet<string>): boolean {
@@ -92,4 +113,32 @@ function rendererOriginFromUrl(value: string): string | null {
   } catch {
     return null;
   }
+}
+
+function packagedRendererRuntime(): RendererRuntime {
+  return {
+    rendererUrl: PACKAGED_RENDERER_URL,
+    trustedOrigins: new Set([PACKAGED_RENDERER_ORIGIN]),
+  };
+}
+
+function loopbackDevUrl(value: string | undefined): URL | null {
+  if (value === undefined || value.length === 0) return null;
+  try {
+    const url = new URL(value);
+    if ((url.protocol === 'http:' || url.protocol === 'https:') && isLoopbackHost(url.hostname)) {
+      return url;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function loopbackDevOriginFromUrl(value: string): string | null {
+  return loopbackDevUrl(value)?.origin ?? null;
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }

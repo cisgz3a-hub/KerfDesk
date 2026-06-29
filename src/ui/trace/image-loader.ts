@@ -30,11 +30,20 @@ const MAX_EDGE_PX = 2048;
 export const PREVIEW_MAX_EDGE_PX = MAX_EDGE_PX;
 
 const PAPER_WHITE = 255;
+const IMAGE_HEADER_PROBE_BYTES = 64 * 1024;
+const MAX_SAFE_DECODE_EDGE_PX = 32_768;
+const MAX_SAFE_DECODE_PIXELS = 100_000_000;
+
+type ImageDimensions = { readonly width: number; readonly height: number };
 
 export async function loadImageAsRawData(
   file: File,
   maxEdge: number = MAX_EDGE_PX,
 ): Promise<RawImageData> {
+  const headerDimensions = await readHeaderImageDimensions(file);
+  if (headerDimensions !== null) {
+    assertSafeDecodeDimensions(headerDimensions);
+  }
   // The try/finally pairing around createObjectURL + revokeObjectURL is
   // load-bearing: each createObjectURL allocation pins the underlying
   // Blob in memory until revokeObjectURL is called or the document is
@@ -85,6 +94,11 @@ function compositeChannel(value: number | undefined, opacity: number): number {
 export async function readImageNaturalSize(
   file: File,
 ): Promise<{ readonly width: number; readonly height: number }> {
+  const headerDimensions = await readHeaderImageDimensions(file);
+  if (headerDimensions !== null) {
+    assertSafeDecodeDimensions(headerDimensions);
+    return headerDimensions;
+  }
   const url = URL.createObjectURL(file);
   try {
     const img = await decodeImage(url);
@@ -101,6 +115,164 @@ function decodeImage(url: string): Promise<HTMLImageElement> {
     img.onerror = (): void => reject(new Error('Failed to decode image — unsupported format?'));
     img.src = url;
   });
+}
+
+async function readHeaderImageDimensions(file: File): Promise<ImageDimensions | null> {
+  const header = new Uint8Array(
+    await readBlobAsArrayBuffer(file.slice(0, IMAGE_HEADER_PROBE_BYTES)),
+  );
+  return parsePngDimensions(header) ?? parseJpegDimensions(header);
+}
+
+function readBlobAsArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+  const readWithArrayBuffer = (blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> })
+    .arrayBuffer;
+  if (typeof readWithArrayBuffer === 'function') {
+    return readWithArrayBuffer.call(blob);
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (): void => {
+      if (reader.result instanceof ArrayBuffer) {
+        resolve(reader.result);
+      } else {
+        reject(new Error('FileReader returned a non-buffer result for the image header.'));
+      }
+    };
+    reader.onerror = (): void => reject(new Error('FileReader failed to read the image header.'));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+function assertSafeDecodeDimensions(dimensions: ImageDimensions): void {
+  const pixels = dimensions.width * dimensions.height;
+  if (
+    dimensions.width > MAX_SAFE_DECODE_EDGE_PX ||
+    dimensions.height > MAX_SAFE_DECODE_EDGE_PX ||
+    pixels > MAX_SAFE_DECODE_PIXELS
+  ) {
+    throw new Error(
+      `Image source dimensions ${dimensions.width}x${dimensions.height} px are too large to decode safely. Resize the image before importing.`,
+    );
+  }
+}
+
+function parsePngDimensions(header: Uint8Array): ImageDimensions | null {
+  if (header.byteLength < 24 || !hasPngSignature(header)) return null;
+  const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
+  const ihdrLength = view.getUint32(8);
+  const ihdrType =
+    String.fromCharCode(header[12] ?? 0) +
+    String.fromCharCode(header[13] ?? 0) +
+    String.fromCharCode(header[14] ?? 0) +
+    String.fromCharCode(header[15] ?? 0);
+  if (ihdrLength !== 13 || ihdrType !== 'IHDR') return null;
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+function hasPngSignature(header: Uint8Array): boolean {
+  return (
+    header[0] === 0x89 &&
+    header[1] === 0x50 &&
+    header[2] === 0x4e &&
+    header[3] === 0x47 &&
+    header[4] === 0x0d &&
+    header[5] === 0x0a &&
+    header[6] === 0x1a &&
+    header[7] === 0x0a
+  );
+}
+
+function parseJpegDimensions(header: Uint8Array): ImageDimensions | null {
+  if (!hasJpegSignature(header)) return null;
+  for (const segment of readJpegSegments(header)) {
+    if (!isJpegStartOfFrameMarker(segment.marker)) continue;
+    return readJpegStartOfFrameDimensions(header, segment.payloadOffset);
+  }
+  return null;
+}
+
+type JpegSegment = {
+  readonly marker: number;
+  readonly payloadOffset: number;
+  readonly nextOffset: number;
+};
+
+function hasJpegSignature(header: Uint8Array): boolean {
+  return header.byteLength >= 4 && header[0] === 0xff && header[1] === 0xd8;
+}
+
+function readJpegSegments(header: Uint8Array): ReadonlyArray<JpegSegment> {
+  const segments: JpegSegment[] = [];
+  let offset = 2;
+  while (offset + 3 < header.byteLength) {
+    const next = readNextJpegSegment(header, offset);
+    if (next === null) break;
+    offset = next.nextOffset;
+    if (next.marker === null) continue;
+    segments.push(next);
+  }
+  return segments;
+}
+
+function readNextJpegSegment(
+  header: Uint8Array,
+  offset: number,
+):
+  | (JpegSegment & { readonly marker: number })
+  | { readonly marker: null; readonly nextOffset: number }
+  | null {
+  if (header[offset] !== 0xff) return { marker: null, nextOffset: offset + 1 };
+  const markerOffset = skipJpegMarkerFillBytes(header, offset);
+  const marker = header[markerOffset] ?? 0;
+  const lengthOffset = markerOffset + 1;
+  if (marker === 0xd9 || marker === 0xda) return null;
+  if (isStandaloneJpegMarker(marker)) return { marker: null, nextOffset: lengthOffset };
+  if (lengthOffset + 1 >= header.byteLength) return null;
+
+  const segmentLength = ((header[lengthOffset] ?? 0) << 8) | (header[lengthOffset + 1] ?? 0);
+  if (segmentLength < 2) return null;
+  return {
+    marker,
+    payloadOffset: lengthOffset + 2,
+    nextOffset: lengthOffset + segmentLength,
+  };
+}
+
+function skipJpegMarkerFillBytes(header: Uint8Array, offset: number): number {
+  let markerOffset = offset;
+  while (markerOffset < header.byteLength && header[markerOffset] === 0xff) {
+    markerOffset += 1;
+  }
+  return markerOffset;
+}
+
+function readJpegStartOfFrameDimensions(
+  header: Uint8Array,
+  payloadOffset: number,
+): ImageDimensions | null {
+  if (payloadOffset + 4 >= header.byteLength) return null;
+  const height = ((header[payloadOffset + 1] ?? 0) << 8) | (header[payloadOffset + 2] ?? 0);
+  const width = ((header[payloadOffset + 3] ?? 0) << 8) | (header[payloadOffset + 4] ?? 0);
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+function isStandaloneJpegMarker(marker: number): boolean {
+  return marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7);
+}
+
+function isJpegStartOfFrameMarker(marker: number): boolean {
+  return (
+    (marker >= 0xc0 && marker <= 0xc3) ||
+    (marker >= 0xc5 && marker <= 0xc7) ||
+    (marker >= 0xc9 && marker <= 0xcb) ||
+    (marker >= 0xcd && marker <= 0xcf)
+  );
 }
 
 // Exported for unit testing the cap math directly (decodeImage needs a real

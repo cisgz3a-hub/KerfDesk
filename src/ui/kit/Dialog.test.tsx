@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useUiStore } from '../state/ui-store';
 import { Button } from './Button';
 import { Dialog, DialogActions } from './Dialog';
 
@@ -26,6 +27,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  useUiStore.setState({ modalDepth: 0 });
 });
 
 describe('kit Dialog', () => {
@@ -87,5 +89,19 @@ describe('kit Dialog', () => {
       form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
     expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers modal depth while mounted and unregisters on unmount', async () => {
+    expect(useUiStore.getState().modalDepth).toBe(0);
+
+    await render(
+      <Dialog onClose={() => undefined} ariaLabel="Registered dialog">
+        <Button onClick={() => undefined}>Inside</Button>
+      </Dialog>,
+    );
+
+    expect(useUiStore.getState().modalDepth).toBe(1);
+    if (root !== null) await act(async () => root?.unmount());
+    expect(useUiStore.getState().modalDepth).toBe(0);
   });
 });

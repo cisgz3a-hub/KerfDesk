@@ -43,17 +43,17 @@ const moduleBoundaries = {
 
 const boundaryRules = [
   // core may only import core
-  { from: 'core', allow: ['core'] },
+  { from: { type: 'core' }, allow: { to: { type: 'core' } } },
   // io may import core + io
-  { from: 'io', allow: ['core', 'io'] },
+  { from: { type: 'io' }, allow: { to: { type: ['core', 'io'] } } },
   // platform/types may import core (interface uses core domain types)
-  { from: 'platform-types', allow: ['core'] },
+  { from: { type: 'platform-types' }, allow: { to: { type: 'core' } } },
   // platform implementations import core + the platform-types interface
-  { from: 'platform-web', allow: ['core', 'platform-types'] },
-  { from: 'platform-electron', allow: ['core', 'platform-types'] },
+  { from: { type: 'platform-web' }, allow: { to: { type: ['core', 'platform-types'] } } },
+  { from: { type: 'platform-electron' }, allow: { to: { type: ['core', 'platform-types'] } } },
   // ui may import core, io, and the platform-types interface — but NOT
   // platform/web or platform/electron directly (those go via DI at React root)
-  { from: 'ui', allow: ['core', 'io', 'platform-types'] },
+  { from: { type: 'ui' }, allow: { to: { type: ['core', 'io', 'platform-types'] } } },
 ];
 
 export default tseslint.config(

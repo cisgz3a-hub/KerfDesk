@@ -7,9 +7,9 @@ import {
   startCollecting,
   step,
 } from '../../core/controllers/grbl';
+import type { FrameVerification } from './frame-verification';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
-import type { FrameVerification } from './frame-verification';
 
 afterEach(() => {
   vi.useRealTimers();

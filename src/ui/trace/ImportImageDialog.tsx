@@ -319,6 +319,6 @@ function operationOverrideForTrace(
   fillStyle: TraceFillStyle | undefined,
 ): TracedImage['operationOverride'] {
   if (traceMode !== 'filled-contours') return undefined;
-  if (fillStyle !== 'offset' && fillStyle !== 'island') return undefined;
+  if (fillStyle === undefined) return undefined;
   return { mode: 'fill', fillStyle };
 }

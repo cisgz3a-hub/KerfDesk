@@ -348,12 +348,37 @@ describe('useStore — undo / redo (F-A14)', () => {
     expect(useStore.getState().project.scene.objects[0]?.id).toBe('O1');
   });
 
+  it('undo clears stale multi-selection ids along with the primary selection', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
+    useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
+
+    useStore.getState().undo();
+
+    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().additionalSelectedIds.size).toBe(0);
+  });
+
   it('redo replays an undone action', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().undo();
     expect(useStore.getState().project.scene.objects).toHaveLength(0);
     useStore.getState().redo();
     expect(useStore.getState().project.scene.objects).toHaveLength(1);
+  });
+
+  it('redo clears stale multi-selection ids along with the primary selection', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().undo();
+    useStore.setState({
+      selectedObjectId: 'ghost',
+      additionalSelectedIds: new Set(['also-ghost']),
+    });
+
+    useStore.getState().redo();
+
+    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().additionalSelectedIds.size).toBe(0);
   });
 
   it('a new mutation after undo clears the redo stack', () => {

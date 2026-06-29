@@ -74,9 +74,9 @@ export default defineConfig({
         icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,ico,png,json,woff,woff2}'],
-        // Some bundled chunks (tracer / font libraries) exceed Workbox's 2 MB
-        // default; raise the ceiling so the whole app precaches for offline use.
+        globPatterns: ['**/*.{js,css,html,svg,ico,png,json,ttf,woff,woff2}'],
+        // Some bundled chunks and font assets exceed Workbox's 2 MB default;
+        // raise the ceiling so the whole app precaches for offline use.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
     }),
@@ -99,9 +99,30 @@ export default defineConfig({
     // Sentry-class error tracker lands, switch to `'hidden'` and
     // upload the maps server-side.
     sourcemap: false,
-    // Web bundle target per PROJECT.md "Accessibility / performance": < 1 MB
-    // compressed. Warn if a chunk pushes past 500 KB compressed.
+    // Keep individual raw chunks below Vite's 500 KB warning threshold while
+    // the service worker still precaches every emitted asset for offline use.
     chunkSizeWarningLimit: 500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          const normalized = id.replace(/\\/g, '/');
+          if (normalized.includes('/node_modules/react')) return 'vendor-react';
+          if (normalized.includes('/node_modules/zustand')) return 'vendor-state';
+          if (
+            normalized.includes('/node_modules/clipper2-ts') ||
+            normalized.includes('/node_modules/dompurify')
+          ) {
+            return 'vendor-cam';
+          }
+          if (normalized.includes('/src/core/')) return 'core';
+          if (normalized.includes('/src/io/')) return 'io';
+          if (normalized.includes('/src/ui/laser/') || normalized.includes('/src/ui/workspace/')) {
+            return 'ui-workbench';
+          }
+          return undefined;
+        },
+      },
+    },
   },
   optimizeDeps: {
     esbuildOptions: {

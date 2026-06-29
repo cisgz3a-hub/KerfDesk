@@ -63,6 +63,19 @@ describe('writeAutosave / readAutosave round-trip', () => {
     );
     expect(readAutosave()).toBeNull();
   });
+
+  it('keeps independent window sessions from overwriting each other', () => {
+    const first = { ...createProject(), notes: 'first window' };
+    const second = { ...createProject(), notes: 'second window' };
+
+    expect(writeAutosave(first, 100, { sessionId: 'window-a' }).kind).toBe('ok');
+    expect(writeAutosave(second, 200, { sessionId: 'window-b' }).kind).toBe('ok');
+    expect(readAutosave()?.project.notes).toBe('second window');
+
+    clearAutosave({ sessionId: 'window-b' });
+
+    expect(readAutosave()?.project.notes).toBe('first window');
+  });
 });
 
 describe('clearAutosave', () => {

@@ -4,6 +4,7 @@ import {
   assertNever,
   createLayer,
   layerOperationSettingsEqual,
+  sceneObjectHasVisibleLayer,
   type Layer,
   type LayerSubLayer,
   type Project,
@@ -115,11 +116,7 @@ export function layerActions(set: LayerActionSet): LayerActions {
       set((state) => {
         const color = layerColorForSelection(state.project.scene, layerId);
         if (color === null) return clearSelection();
-        return selectObjectIds(
-          state.project.scene.objects
-            .filter((object) => objectUsesLayerColor(object, color))
-            .map((object) => object.id),
-        );
+        return selectObjectIds(selectableObjectIdsOnLayer(state.project.scene, color));
       }),
     deleteLayerAndObjects: (layerId) =>
       set((state) => {
@@ -185,6 +182,14 @@ function selectObjectIds(ids: ReadonlyArray<string>): LayerSelectionMutation {
 
 function clearSelection(): LayerSelectionMutation {
   return { selectedObjectId: null, additionalSelectedIds: new Set() };
+}
+
+function selectableObjectIdsOnLayer(scene: Scene, color: string): ReadonlyArray<string> {
+  return scene.objects
+    .filter((object) => objectUsesLayerColor(object, color))
+    .filter((object) => object.locked !== true)
+    .filter((object) => sceneObjectHasVisibleLayer(scene, object))
+    .map((object) => object.id);
 }
 
 function objectUsesLayerColor(object: Scene['objects'][number], color: string): boolean {

@@ -344,6 +344,7 @@ describe('applyTraceToExisting (ADR-026)', () => {
   });
 
   it.each([
+    ['Scanline', 'scanline' as const],
     ['Follow Shape', 'offset' as const],
     ['Island Fill', 'island' as const],
   ])('keeps existing same-color layers unchanged for %s object overrides', (_label, fillStyle) => {
@@ -368,6 +369,7 @@ describe('applyTraceToExisting (ADR-026)', () => {
   });
 
   it.each([
+    ['Scanline', 'scanline' as const],
     ['Follow Shape', 'offset' as const],
     ['Island Fill', 'island' as const],
   ])('still creates a fill-capable layer when %s uses a new trace color', (_label, fillStyle) => {

@@ -116,7 +116,7 @@ export function runAutosaveRecovery(
     return;
   }
   // Declining is an explicit discard — clearing stops the re-prompt loop.
-  clearAutosave();
+  clearAutosave(record);
 }
 
 export function useAutosaveRecovery(): void {

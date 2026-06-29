@@ -64,6 +64,7 @@ const args = (
   file: new File([''], 'logo.png'),
   options: DEFAULT_TRACE_OPTIONS,
   seed,
+  traceFillStyle: 'scanline' as const,
   ...overrides,
 });
 
@@ -108,12 +109,19 @@ describe('commit source revalidation (P2-A)', () => {
     expect(ctx.pushToast).toHaveBeenCalledWith(expect.stringContaining('source kept'), 'success');
   });
 
-  it('keeps Scanline traces on layer defaults without an object override', async () => {
+  it('applies Scanline as an object-level fill override', async () => {
     const seed = seedRaster();
     const ctx = ctxWith(() => seedRaster());
     await commit(args(seed), ctx);
-    const traced = ctx.traceExistingImage.mock.calls[0]?.[1];
-    expect(traced).toEqual(expect.not.objectContaining({ operationOverride: expect.anything() }));
+    expect(ctx.traceExistingImage).toHaveBeenCalledWith(
+      'src-1',
+      expect.objectContaining({
+        kind: 'traced-image',
+        traceMode: 'filled-contours',
+        operationOverride: { mode: 'fill', fillStyle: 'scanline' },
+      }),
+      { deleteSourceAfterTrace: false },
+    );
   });
 
   it('applies Follow Shape as an object-level offset fill override', async () => {
