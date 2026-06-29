@@ -28,3 +28,10 @@
 # safe to cache aggressively.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# The service worker must NOT be long-cached (ADR-060): the browser revalidates
+# sw.js to detect a new deploy's SW, and an HTTP-cached copy delays updates up to
+# the 24 h SW spec cap. The precache it points at is content-hashed, so this is
+# one tiny conditional request per load.
+/sw.js
+  Cache-Control: no-cache
