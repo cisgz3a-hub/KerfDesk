@@ -19,8 +19,13 @@ describe('computeSetupReadiness', () => {
     const readiness = computeSetupReadiness(DEFAULT_DEVICE_PROFILE, null);
     expect(readiness.ready).toBe(false);
     const blocking = readiness.items.filter((item) => item.blocking);
-    expect(blocking.length).toBeGreaterThan(0);
+    expect(blocking.map((item) => item.id)).toEqual(['bed', 'power-scale']);
     expect(blocking.every((item) => item.status === 'needs-attention')).toBe(true);
+    expect(readiness.items.find((item) => item.id === 'identity')).toMatchObject({
+      blocking: false,
+      status: 'confirmed',
+      detail: DEFAULT_DEVICE_PROFILE.name,
+    });
     expect(readiness.items.some((item) => item.id === 'origin' && !item.blocking)).toBe(true);
   });
 
@@ -32,9 +37,8 @@ describe('computeSetupReadiness', () => {
     });
     expect(readiness.items.find((item) => item.id === 'bed')?.status).toBe('confirmed');
     expect(readiness.items.find((item) => item.id === 'power-scale')?.status).toBe('confirmed');
-    // Identity is still the default name, so the machine is not fully ready yet.
-    expect(readiness.items.find((item) => item.id === 'identity')?.status).toBe('needs-attention');
-    expect(readiness.ready).toBe(false);
+    expect(readiness.items.find((item) => item.id === 'identity')?.status).toBe('confirmed');
+    expect(readiness.ready).toBe(true);
   });
 
   it('is ready once a real catalog profile is chosen, even with default-matching numbers', () => {
@@ -48,8 +52,12 @@ describe('computeSetupReadiness', () => {
   it('confirms identity when the operator renames the generic profile', () => {
     const renamed: DeviceProfile = { ...DEFAULT_DEVICE_PROFILE, name: 'Shopfloor 4040' };
     expect(
-      computeSetupReadiness(renamed, null).items.find((item) => item.id === 'identity')?.status,
-    ).toBe('confirmed');
+      computeSetupReadiness(renamed, null).items.find((item) => item.id === 'identity'),
+    ).toMatchObject({
+      blocking: false,
+      detail: 'Shopfloor 4040',
+      status: 'confirmed',
+    });
   });
 
   it('surfaces origin and homing as non-blocking review rows with readable detail', () => {

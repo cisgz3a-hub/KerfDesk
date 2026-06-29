@@ -3,17 +3,18 @@ import { applyTransform, IDENTITY_TRANSFORM, type SceneObject } from '../../core
 import {
   hitRotateHandle,
   ROTATE_HANDLE_OFFSET_MM,
+  rotateSelectionByDrag,
   rotateObjectByDrag,
   rotateHandlePosition,
 } from './rotate-handle';
 
-function obj(): SceneObject {
+function obj(id = 'O1', x = 0, y = 0): SceneObject {
   return {
     kind: 'imported-svg',
-    id: 'O1',
+    id,
     source: 'a.svg',
     bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
-    transform: IDENTITY_TRANSFORM,
+    transform: { ...IDENTITY_TRANSFORM, x, y },
     paths: [],
   };
 }
@@ -65,5 +66,28 @@ describe('rotate-handle', () => {
     expect(t.rotationDeg).toBeCloseTo(90);
     expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 6);
     expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 6);
+  });
+
+  it('rotates every selected start transform around the shared selection center', () => {
+    const updates = rotateSelectionByDrag({
+      startTransforms: [
+        { id: 'A', transform: obj('A', 0, 0).transform },
+        { id: 'B', transform: obj('B', 30, 0).transform },
+      ],
+      anchor: { x: 20, y: 5 },
+      startPointerAngleDeg: -90,
+      dragTo: { x: 70, y: 5 },
+      snap: false,
+    });
+
+    expect(updates).toHaveLength(2);
+    expect(updates[0]?.id).toBe('A');
+    expect(updates[0]?.transform.x).toBeCloseTo(25, 6);
+    expect(updates[0]?.transform.y).toBeCloseTo(-15, 6);
+    expect(updates[0]?.transform.rotationDeg).toBeCloseTo(90, 6);
+    expect(updates[1]?.id).toBe('B');
+    expect(updates[1]?.transform.x).toBeCloseTo(25, 6);
+    expect(updates[1]?.transform.y).toBeCloseTo(15, 6);
+    expect(updates[1]?.transform.rotationDeg).toBeCloseTo(90, 6);
   });
 });

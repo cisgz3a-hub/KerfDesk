@@ -16,8 +16,19 @@ import {
 import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
 import type { PathNodeDragState } from './path-node-drag';
-import { hitRotateHandle, rotateObjectByDrag } from './rotate-handle';
+import {
+  hitRotateHandle,
+  hitSelectionRotateHandle,
+  pointerAngleDeg,
+  rotateObjectByDrag,
+  selectionRotateAnchor,
+} from './rotate-handle';
 import { canvasMouseToScene, computeView, pxToMmForCanvas } from './view-transform';
+
+export type MoveStartTransform = {
+  readonly id: string;
+  readonly transform: Transform;
+};
 
 export type DragState =
   | {
@@ -26,6 +37,7 @@ export type DragState =
       readonly startScenePoint: Vec2;
       readonly startTx: number;
       readonly startTy: number;
+      readonly selectionStartTransforms?: ReadonlyArray<MoveStartTransform>;
     }
   | {
       readonly kind: 'scale';
@@ -35,6 +47,9 @@ export type DragState =
   | {
       readonly kind: 'rotate';
       readonly objectId: string;
+      readonly selectionStartTransforms?: ReadonlyArray<MoveStartTransform>;
+      readonly rotateAnchor?: Vec2;
+      readonly startPointerAngleDeg?: number;
     }
   | {
       readonly kind: 'pan';
@@ -97,11 +112,21 @@ export function computeMouseDownDrag(args: {
   readonly ref: React.RefObject<HTMLCanvasElement | null>;
   readonly project: Project;
   readonly selectedObjectId: string | null;
+  readonly additionalSelectedIds: ReadonlySet<string>;
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
   readonly onShiftClick: (id: string) => void;
   readonly onPlainClick: (id: string | null) => void;
 }): DragState | null {
-  const { e, ref, project, selectedObjectId, viewState, onShiftClick, onPlainClick } = args;
+  const {
+    e,
+    ref,
+    project,
+    selectedObjectId,
+    additionalSelectedIds,
+    viewState,
+    onShiftClick,
+    onPlainClick,
+  } = args;
   // Three pan triggers: Space-held + left button (existing), middle
   // button (CAD convention), right button (alternative for users
   // without middle button). All three create the same pan DragState
@@ -119,9 +144,18 @@ export function computeMouseDownDrag(args: {
   }
   const point = canvasMouseToScene(e, ref.current, project, viewState);
   if (point === null) return null;
+  const selectedIds = selectedObjectIds(selectedObjectId, additionalSelectedIds);
+  const selectedObjects = selectedObjectsForIds(project.scene.objects, selectedIds);
   const selectedObj = project.scene.objects.find((o) => o.id === selectedObjectId);
-  if (selectedObj !== undefined) {
-    const pxToMm = pxToMmForCanvas(ref.current, project, viewState);
+  const pxToMm = pxToMmForCanvas(ref.current, project, viewState);
+  const selectionRotateDrag = pickSelectionRotateDrag({
+    selectedObjects,
+    selectedObjectId,
+    point,
+    pxToMm,
+  });
+  if (selectionRotateDrag !== null) return selectionRotateDrag;
+  if (selectedObj !== undefined && selectedObjects.length <= 1) {
     const handleDrag = pickHandleDrag({ selectedObj, point, pxToMm });
     if (handleDrag !== null) return handleDrag;
   }
@@ -133,16 +167,94 @@ export function computeMouseDownDrag(args: {
     onShiftClick(hitId);
     return null;
   }
-  onPlainClick(hitId);
   const obj = project.scene.objects.find((o) => o.id === hitId);
   if (obj === undefined) return null;
+  const dragExistingSelection = selectedIds.includes(hitId);
+  const moveIds = dragExistingSelection ? selectedIds : [hitId];
+  if (!dragExistingSelection) onPlainClick(hitId);
   return {
     kind: 'move',
     objectId: hitId,
     startScenePoint: point,
     startTx: obj.transform.x,
     startTy: obj.transform.y,
+    selectionStartTransforms: moveStartTransforms(project.scene.objects, moveIds),
   };
+}
+
+function selectedObjectIds(
+  selectedObjectId: string | null,
+  additionalSelectedIds: ReadonlySet<string>,
+): ReadonlyArray<string> {
+  const ids = selectedObjectId === null ? [] : [selectedObjectId];
+  return [...ids, ...additionalSelectedIds].filter(uniqueId);
+}
+
+function selectedObjectsForIds(
+  objects: ReadonlyArray<SceneObject>,
+  ids: ReadonlyArray<string>,
+): ReadonlyArray<SceneObject> {
+  return ids
+    .map((id) => objects.find((object) => object.id === id))
+    .filter((object): object is SceneObject => object !== undefined);
+}
+
+function pickSelectionRotateDrag(args: {
+  readonly selectedObjects: ReadonlyArray<SceneObject>;
+  readonly selectedObjectId: string | null;
+  readonly point: Vec2;
+  readonly pxToMm: number;
+}): Extract<DragState, { kind: 'rotate' }> | null {
+  if (args.selectedObjects.length <= 1) return null;
+  if (!hitSelectionRotateHandle(args.selectedObjects, args.point, args.pxToMm)) return null;
+  const anchor = selectionRotateAnchor(args.selectedObjects);
+  const objectId = args.selectedObjectId ?? args.selectedObjects[0]?.id;
+  if (anchor === null || objectId === undefined) return null;
+  return {
+    kind: 'rotate',
+    objectId,
+    selectionStartTransforms: args.selectedObjects.map((object) => ({
+      id: object.id,
+      transform: { ...object.transform },
+    })),
+    rotateAnchor: anchor,
+    startPointerAngleDeg: pointerAngleDeg(anchor, args.point),
+  };
+}
+
+function uniqueId(id: string, index: number, ids: ReadonlyArray<string>): boolean {
+  return ids.indexOf(id) === index;
+}
+
+function moveStartTransforms(
+  objects: ReadonlyArray<SceneObject>,
+  ids: ReadonlyArray<string>,
+): ReadonlyArray<MoveStartTransform> {
+  return ids
+    .map((id) => objects.find((object) => object.id === id))
+    .filter((object): object is SceneObject => object !== undefined)
+    .map((object) => ({ id: object.id, transform: { ...object.transform } }));
+}
+
+export function transformUpdatesForMoveDrag(
+  drag: Extract<DragState, { kind: 'move' }>,
+  draggedTransform: Transform,
+): ReadonlyArray<MoveStartTransform> {
+  const starts = drag.selectionStartTransforms;
+  if (starts === undefined || starts.length <= 1) {
+    return [{ id: drag.objectId, transform: draggedTransform }];
+  }
+  const draggedStart = starts.find((entry) => entry.id === drag.objectId);
+  if (draggedStart === undefined) return [{ id: drag.objectId, transform: draggedTransform }];
+  const dx = draggedTransform.x - draggedStart.transform.x;
+  const dy = draggedTransform.y - draggedStart.transform.y;
+  return starts.map((entry) => ({
+    id: entry.id,
+    transform:
+      entry.id === drag.objectId
+        ? draggedTransform
+        : { ...entry.transform, x: entry.transform.x + dx, y: entry.transform.y + dy },
+  }));
 }
 
 function panTriggerForMouseDown(

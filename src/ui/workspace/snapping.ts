@@ -42,6 +42,7 @@ type SnapCandidate = {
 export function snapMoveTransform(args: {
   readonly project: Project;
   readonly movingObjectId: string;
+  readonly ignoredObjectIds?: ReadonlySet<string>;
   readonly proposedTransform: Transform;
   readonly settings: SnapSettings;
 }): SnapMoveResult {
@@ -53,6 +54,7 @@ export function snapMoveTransform(args: {
   const snapArgs = {
     project: args.project,
     movingObjectId: moving.id,
+    ignoredObjectIds: args.ignoredObjectIds ?? NO_IGNORED_OBJECT_IDS,
     movedBox,
     settings: args.settings,
   };
@@ -76,10 +78,13 @@ function noSnap(transform: Transform): SnapMoveResult {
   return { transform, guides: [] };
 }
 
+const NO_IGNORED_OBJECT_IDS: ReadonlySet<string> = new Set<string>();
+
 function bestSnapForAxis(args: {
   readonly axis: SnapAxis;
   readonly project: Project;
   readonly movingObjectId: string;
+  readonly ignoredObjectIds: ReadonlySet<string>;
   readonly movedBox: Aabb;
   readonly settings: SnapSettings;
 }): SnapCandidate | null {
@@ -95,6 +100,7 @@ function snapCandidates(args: {
   readonly axis: SnapAxis;
   readonly project: Project;
   readonly movingObjectId: string;
+  readonly ignoredObjectIds: ReadonlySet<string>;
   readonly movedBox: Aabb;
   readonly settings: SnapSettings;
 }): ReadonlyArray<SnapCandidate> {
@@ -108,11 +114,12 @@ function objectSnapCandidates(args: {
   readonly axis: SnapAxis;
   readonly project: Project;
   readonly movingObjectId: string;
+  readonly ignoredObjectIds: ReadonlySet<string>;
   readonly movedBox: Aabb;
 }): ReadonlyArray<SnapCandidate> {
   const candidates: SnapCandidate[] = [];
   for (const object of args.project.scene.objects) {
-    if (!canUseObjectTarget(object, args.movingObjectId)) continue;
+    if (!canUseObjectTarget(object, args.movingObjectId, args.ignoredObjectIds)) continue;
     const targetBox = transformedBBox(object);
     addObjectCandidates(candidates, args.axis, args.movedBox, targetBox);
   }
@@ -150,8 +157,12 @@ function gridSnapCandidates(args: {
   });
 }
 
-function canUseObjectTarget(object: SceneObject, movingObjectId: string): boolean {
-  return object.id !== movingObjectId && object.locked !== true;
+function canUseObjectTarget(
+  object: SceneObject,
+  movingObjectId: string,
+  ignoredObjectIds: ReadonlySet<string>,
+): boolean {
+  return object.id !== movingObjectId && !ignoredObjectIds.has(object.id) && object.locked !== true;
 }
 
 function snapPositions(box: Aabb, axis: SnapAxis): ReadonlyArray<number> {

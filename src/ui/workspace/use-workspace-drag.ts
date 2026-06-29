@@ -15,12 +15,12 @@ import {
   type DragState,
   panOffsetForDrag,
 } from './drag-state';
+import { applyTransformDrag } from './apply-transform-drag';
 import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
 import { selectObjectsInMarquee } from './selection-marquee';
-import { transformDragWithSnap } from './drag-snap';
 import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 import { useWorkspaceDragDeps } from './workspace-drag-deps';
@@ -69,6 +69,7 @@ export function useDragMove(
       viewState,
       toolMode: deps.toolMode,
       selectedObjectId: deps.selectedObjectId,
+      additionalSelectedIds: deps.additionalSelectedIds,
       selectObject: deps.selectObject,
       selectPathNode: deps.selectPathNode,
       toggleSelectObject: deps.toggleSelectObject,
@@ -146,6 +147,7 @@ function beginWorkspaceDrag(args: {
   readonly viewState: WorkspaceViewState;
   readonly toolMode: ReturnType<typeof useUiStore.getState>['toolMode'];
   readonly selectedObjectId: string | null;
+  readonly additionalSelectedIds: ReadonlySet<string>;
   readonly selectObject: (id: string | null) => void;
   readonly selectPathNode: ReturnType<typeof useStore.getState>['selectPathNode'];
   readonly toggleSelectObject: (id: string) => void;
@@ -170,6 +172,7 @@ function beginWorkspaceDrag(args: {
     ref: args.ref,
     project: args.project,
     selectedObjectId: args.selectedObjectId,
+    additionalSelectedIds: args.additionalSelectedIds,
     viewState: args.viewState,
     onShiftClick: args.toggleSelectObject,
     onPlainClick: args.selectObject,
@@ -338,47 +341,6 @@ function commitDrawDraft(args: {
   const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
   updateDrawDraft({ ...args, point });
   commitDraftShape(args.drawShape);
-}
-
-function applyTransformDrag(args: {
-  readonly drag: DragState | null;
-  readonly point: Vec2 | null;
-  readonly e: CanvasMouseEvent;
-  readonly project: Project;
-  readonly selectionAnchor: SelectionAnchor;
-  readonly snapSettings: SnapSettings;
-  readonly setObjectTransform: (id: string, transform: Transform) => void;
-  readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
-}): void {
-  const { drag, point } = args;
-  if (
-    drag === null ||
-    drag.kind === 'pan' ||
-    drag.kind === 'draw' ||
-    drag.kind === 'marquee' ||
-    drag.kind === 'measure' ||
-    drag.kind === 'path-node' ||
-    point === null
-  ) {
-    args.setSnapGuides([]);
-    return;
-  }
-  const obj = args.project.scene.objects.find((o) => o.id === drag.objectId);
-  if (obj === undefined) {
-    args.setSnapGuides([]);
-    return;
-  }
-  const result = transformDragWithSnap({
-    drag,
-    object: obj,
-    point,
-    event: args.e,
-    project: args.project,
-    snapSettings: args.snapSettings,
-    selectionAnchor: args.selectionAnchor,
-  });
-  args.setSnapGuides(result.guides);
-  args.setObjectTransform(drag.objectId, result.transform);
 }
 
 function visibleDragKind(drag: DragState | null): DragMoveResult['dragKind'] {
