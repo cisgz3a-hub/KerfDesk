@@ -33,7 +33,12 @@ export function controllerRecoveryActions(
           alarmCode: null,
           lastError: null,
           wcoCache: null,
-          workOriginActive: false,
+          workOriginActive:
+            state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown',
+          workOriginSource:
+            state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown'
+              ? 'unknown'
+              : 'none',
           frameVerification: null,
           motionOperation: null,
           controllerOperation: { kind: 'recovery', phase: 'awaiting-idle', idleReports: 0 },

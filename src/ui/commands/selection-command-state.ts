@@ -41,6 +41,24 @@ export function selectionHasVectorObject(
   );
 }
 
+export function selectionHasUnlockedVectorObject(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+): boolean {
+  const selected = new Set(selectedIds);
+  return project.scene.objects.some(
+    (object) => selected.has(object.id) && object.locked !== true && isConvertibleVector(object),
+  );
+}
+
+export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<string>): boolean {
+  const selected = new Set(selectedIds);
+  const objects = project.scene.objects.filter(
+    (object) => selected.has(object.id) && object.locked !== true && isConvertibleVector(object),
+  );
+  return objects.length > 0 && objects.every(objectHasOnlyClosedContours);
+}
+
 export function selectionCanBreakApart(
   project: Project,
   selectedIds: ReadonlyArray<string>,
@@ -52,5 +70,17 @@ export function selectionCanBreakApart(
       object.kind === 'imported-svg' &&
       object.paths.reduce((count, path) => count + path.polylines.length, 0) > 1 &&
       object.locked !== true,
+  );
+}
+
+function objectHasOnlyClosedContours(object: Project['scene']['objects'][number]): boolean {
+  if (!isConvertibleVector(object)) return false;
+  return (
+    object.paths.length > 0 &&
+    object.paths.every(
+      (path) =>
+        path.polylines.length > 0 &&
+        path.polylines.every((polyline) => polyline.closed && polyline.points.length >= 3),
+    )
   );
 }

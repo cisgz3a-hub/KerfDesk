@@ -34,6 +34,7 @@ import {
   type LayerSubLayerPatch,
 } from './layer-actions';
 import { fillSelectionActions, type FillSelectionActions } from './fill-selection-actions';
+import { vectorPathActions, type VectorPathActions } from './vector-path-actions';
 import {
   closeOpenFillContoursActions,
   type CloseOpenFillContoursActions,
@@ -118,6 +119,7 @@ export type AppState = ObjectPropertiesActions &
   PathNodeEditActions &
   BreakApartActions &
   FillSelectionActions &
+  VectorPathActions &
   CloseOpenFillContoursActions &
   ObjectDeleteActions &
   SceneClipboardActions &
@@ -214,6 +216,8 @@ export type AppState = ObjectPropertiesActions &
     readonly assignSelectionToLayer: (layerId: string) => void;
     readonly breakApartSelection: () => void;
     readonly fillSelectionSeparately: () => void;
+    readonly convertSelectionToPath: () => void;
+    readonly weldSelection: () => void;
     readonly closeSelectedOpenFillContours: () => void;
     readonly closeSelectedOpenFillContoursWithTolerance: (toleranceMm: number) => void;
     readonly deleteLayerAndObjects: (layerId: string) => void;
@@ -360,6 +364,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
   ...fillSelectionActions(set),
+  ...vectorPathActions(set),
   ...closeOpenFillContoursActions(set),
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),

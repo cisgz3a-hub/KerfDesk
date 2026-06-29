@@ -323,7 +323,7 @@ Identical to F-A3 except:
 - **Live updates:** changing the layer's power or dither algorithm re-renders the simulation within the same 100 ms budget.
 - **Empty:** an image-mode layer with Output off shows no simulation — same rule as any non-output layer (preview shows what *burns*, not what's merely visible on the design canvas).
 - **Edge — missing luma:** a legacy `.lf2` raster with no embedded luma buffer renders white / laser-off, not full-burn. If that leaves the job with no G1 burn moves, preflight reports empty output.
-- **Edge — scrubber:** the scrubber animates vector toolpaths only; the raster simulation always renders complete regardless of scrubber position. Row-by-row raster scrubbing is deferred to a later increment.
+- **Edge — scrubber:** the route scrubber follows raster output row-by-row through the same toolpath as emitted G-code. The burn simulation may still render as the full image backdrop, but the animated route/head reveal raster rows, passes, and bidirectional travel in order.
 
 ---
 

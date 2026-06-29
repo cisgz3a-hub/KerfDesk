@@ -1058,11 +1058,12 @@ diverge from LightBurn output. Strict order within the tier; group the raster-em
 
 ## TIER 4 (P3) - Out of scope by current governance (record, do not build)
 
-### P3-1: Vector tooling (shape primitives, node editing, boolean ops, weld, offset)
+### P3-1: Vector tooling (shape primitives, node editing, boolean ops, offset)
 - **Problem (as reported):** There is no creation toolbar (rectangle/ellipse/line/polygon), no
-  Edit Nodes tool, and no Boolean Union/Subtract/Intersect, Weld, or Offset Shapes. Paths are
-  stored as flattened polylines, never editable as anchor nodes, so users round-trip through
-  external tools for basic editing LightBurn provides inline.
+  Edit Nodes tool, and no Boolean Union/Subtract/Intersect or Offset Shapes. Weld now exists
+  for selected closed vector contours; the remaining gap is the broader node/boolean toolset.
+  Paths are stored as flattened polylines, never editable as anchor nodes, so users still
+  round-trip through external tools for richer editing LightBurn provides inline.
 - **Evidence + verdict:** `LIGHTBURN-PARITY-AUDIT-2026-06-03`;
   `lightburn-parity-codex-verification` (LF-CV-010); LIGHTBURN-STUDY 8.6. Live code confirms
   total absence (no shape-creation buttons in `Toolbar.tsx`; `SceneObject` has only 4 variants

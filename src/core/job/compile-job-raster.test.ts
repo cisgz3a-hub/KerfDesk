@@ -54,6 +54,16 @@ describe('compileJob raster image groups', () => {
     expect(firstRasterGroup(job)).toMatchObject({ passes: 3 });
   });
 
+  it('carries source image identity for row-by-row raster preview scrubbing', () => {
+    const layer = imageLayer();
+    const job = compileJob({ objects: [rasterObject('AP//AA==')], layers: [layer] }, dev);
+
+    expect(firstRasterGroup(job)).toMatchObject({
+      sourceObjectId: 'R1',
+      source: 'photo.png',
+    });
+  });
+
   it('maps grayscale image layers between minPower and power while keeping white off', () => {
     const layer = imageLayer({ ditherAlgorithm: 'grayscale', minPower: 10, power: 30 });
     const image: SceneObject = {

@@ -5,9 +5,10 @@
 // decide whether the Reset button is enabled.
 //
 // Design (per ADR-021):
-//   - G92 only. Transient, session-scoped. GRBL auto-clears on alarm /
+//   - G92 is the default. Transient, session-scoped. GRBL auto-clears on alarm /
 //     soft-reset / power-cycle. Matches LightBurn / LaserGRBL UX.
-//   - No persistent (G10 L20 P1) mode. Deferred until requested.
+//   - Advanced persistent origin uses G10 L20/L2 P1 against G54 and requires
+//     Idle before writing controller coordinate storage.
 //   - The compile pipeline doesn't change — GRBL applies the offset to
 //     our absolute-G90 G-code at run time.
 //
@@ -15,7 +16,13 @@
 // module receives it as a parameter so the actions stay pure functions
 // of their inputs and trivially testable with a mock.
 
-import { CMD_CLEAR_ORIGIN, CMD_SET_ORIGIN_HERE, CMD_SLEEP } from '../../core/controllers/grbl';
+import {
+  CMD_CLEAR_ORIGIN,
+  CMD_CLEAR_PERSISTENT_ORIGIN,
+  CMD_SET_ORIGIN_HERE,
+  CMD_SET_PERSISTENT_ORIGIN_HERE,
+  CMD_SLEEP,
+} from '../../core/controllers/grbl';
 
 /**
  * Threshold for `hasCustomOrigin`. WCO values arrive as decimals from
@@ -49,6 +56,28 @@ export async function setOriginHere(safeWrite: (line: string) => Promise<void>):
  */
 export async function resetOrigin(safeWrite: (line: string) => Promise<void>): Promise<void> {
   await safeWrite(`${CMD_CLEAR_ORIGIN}\n`);
+}
+
+/**
+ * Advanced persistent-origin flow. Clear any transient G92 offset first so the
+ * G54 write records the current physical head position directly.
+ */
+export async function setPersistentOriginHere(
+  safeWrite: (line: string) => Promise<void>,
+): Promise<void> {
+  await safeWrite(`${CMD_CLEAR_ORIGIN}\n`);
+  await safeWrite(`${CMD_SET_PERSISTENT_ORIGIN_HERE}\n`);
+}
+
+/**
+ * Clear both transient G92 and stored G54 origin state. The G10 L2 form writes
+ * the G54 offset explicitly back to machine zero.
+ */
+export async function clearPersistentOrigin(
+  safeWrite: (line: string) => Promise<void>,
+): Promise<void> {
+  await safeWrite(`${CMD_CLEAR_ORIGIN}\n`);
+  await safeWrite(`${CMD_CLEAR_PERSISTENT_ORIGIN}\n`);
 }
 
 /**

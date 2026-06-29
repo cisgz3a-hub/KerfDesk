@@ -40,7 +40,12 @@ export async function runHomeAction(
     controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
     homingState: 'homing',
     wcoCache: null,
-    workOriginActive: false,
+    workOriginActive:
+      state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown',
+    workOriginSource:
+      state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown'
+        ? 'unknown'
+        : 'none',
     frameVerification: null,
     log: pushLog(state, '[lf2] Homing started. Cleared origin and frame verification.'),
   }));
