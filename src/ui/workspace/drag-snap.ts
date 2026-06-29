@@ -23,6 +23,7 @@ export function transformDragWithSnap(args: {
   readonly project: Project;
   readonly snapSettings: SnapSettings;
   readonly selectionAnchor?: SelectionAnchor;
+  readonly ignoredSnapObjectIds?: ReadonlySet<string>;
 }): TransformDragWithSnapResult {
   const transform = nextTransformForDrag(
     args.drag,
@@ -35,6 +36,9 @@ export function transformDragWithSnap(args: {
   return snapMoveTransform({
     project: args.project,
     movingObjectId: args.drag.objectId,
+    ...(args.ignoredSnapObjectIds === undefined
+      ? {}
+      : { ignoredObjectIds: args.ignoredSnapObjectIds }),
     proposedTransform: transform,
     settings: args.snapSettings,
   });

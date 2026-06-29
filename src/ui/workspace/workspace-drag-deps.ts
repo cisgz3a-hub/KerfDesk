@@ -3,6 +3,7 @@ import { useUiStore } from '../state/ui-store';
 
 export function useWorkspaceDragDeps() {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
+  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const selectObject = useStore((s) => s.selectObject);
   const selectObjects = useStore((s) => s.selectObjects);
   const selectPathNode = useStore((s) => s.selectPathNode);
@@ -24,6 +25,7 @@ export function useWorkspaceDragDeps() {
   const setSelectionMarquee = useUiStore((s) => s.setSelectionMarquee);
   return {
     selectedObjectId,
+    additionalSelectedIds,
     selectObject,
     selectObjects,
     selectPathNode,

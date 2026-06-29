@@ -5,7 +5,6 @@ import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { rowStyle } from './JobControls.styles';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
@@ -44,6 +43,7 @@ export function OriginRow(props: {
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const workOriginSource = useLaserStore((s) => s.workOriginSource);
+  const persistentOriginReady = useLaserStore((s) => s.statusReport?.state === 'Idle');
   const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const busy = props.disabled || props.streaming;
@@ -75,7 +75,7 @@ export function OriginRow(props: {
     );
   };
   return (
-    <div style={rowStyle}>
+    <div style={originRowStyle}>
       <button
         type="button"
         onClick={onSet}
@@ -98,7 +98,11 @@ export function OriginRow(props: {
       >
         Reset origin
       </button>
-      <AdvancedOriginControls busy={busy} hasCustom={hasCustom} />
+      <AdvancedOriginControls
+        busy={busy}
+        hasCustom={hasCustom}
+        persistentOriginReady={persistentOriginReady}
+      />
       <button
         type="button"
         onClick={onRelease}
@@ -114,6 +118,7 @@ export function OriginRow(props: {
 function AdvancedOriginControls(props: {
   readonly busy: boolean;
   readonly hasCustom: boolean;
+  readonly persistentOriginReady: boolean;
 }): JSX.Element {
   const setPersistentOrigin = useLaserStore((s) => s.setPersistentOriginHere);
   const clearPersistentOrigin = useLaserStore((s) => s.clearPersistentOrigin);
@@ -130,28 +135,35 @@ function AdvancedOriginControls(props: {
     if (!jobAwareConfirm(CLEAR_PERSISTENT_ORIGIN_CONFIRM)) return;
     void clearPersistentOrigin().then(() => pushToast('Persistent G54 origin cleared.', 'success'));
   };
+  const persistentDisabled = props.busy || !props.persistentOriginReady;
+  const setTitle = props.persistentOriginReady
+    ? 'Write the current head position as the persistent G54 origin (G10 L20 P1).'
+    : 'Machine must be Idle before setting the persistent G54 origin.';
+  const clearTitle = props.persistentOriginReady
+    ? 'Clear transient G92 and stored G54 origin offsets.'
+    : 'Machine must be Idle before clearing the persistent G54 origin.';
   return (
-    <details style={{ display: 'inline-block' }}>
+    <details style={advancedDetailsStyle}>
       <summary
         style={{ cursor: props.busy ? 'default' : 'pointer' }}
         title="Show persistent G54 origin controls."
       >
         Advanced origin
       </summary>
-      <div style={{ ...rowStyle, marginTop: 6 }}>
+      <div style={advancedButtonRowStyle}>
         <button
           type="button"
           onClick={onSetPersistent}
-          disabled={props.busy}
-          title="Write the current head position as the persistent G54 origin (G10 L20 P1)."
+          disabled={persistentDisabled}
+          title={setTitle}
         >
           Set persistent origin
         </button>
         <button
           type="button"
           onClick={onClearPersistent}
-          disabled={props.busy || !props.hasCustom}
-          title="Clear transient G92 and stored G54 origin offsets."
+          disabled={persistentDisabled || !props.hasCustom}
+          title={clearTitle}
         >
           Clear persistent origin
         </button>
@@ -159,3 +171,25 @@ function AdvancedOriginControls(props: {
     </details>
   );
 }
+
+const originRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+  minWidth: 0,
+};
+
+const advancedDetailsStyle: React.CSSProperties = {
+  display: 'block',
+  flexBasis: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+};
+
+const advancedButtonRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+  marginTop: 6,
+  minWidth: 0,
+};

@@ -16,6 +16,12 @@ const originalActions = {
   releaseMotors: useLaserStore.getState().releaseMotors,
 };
 
+type LaserStatusReport = NonNullable<ReturnType<typeof useLaserStore.getState>['statusReport']>;
+
+function statusReport(state: LaserStatusReport['state']): LaserStatusReport {
+  return { state } as LaserStatusReport;
+}
+
 function buttonByText(host: HTMLElement, text: string): HTMLButtonElement {
   const button = [...host.querySelectorAll('button')].find((b) => b.textContent === text);
   if (button === undefined) throw new Error(`${text} button not rendered`);
@@ -54,6 +60,7 @@ afterEach(() => {
 describe('OriginRow persistent origin controls', () => {
   it('shows advanced persistent controls and disables transient reset for known G54 origin', async () => {
     useLaserStore.setState({
+      statusReport: statusReport('Idle'),
       workOriginActive: true,
       workOriginSource: 'g54-persistent',
       wcoCache: { x: 12, y: 34, z: 0 },
@@ -76,6 +83,7 @@ describe('OriginRow persistent origin controls', () => {
   it('confirms before setting persistent G54 origin', async () => {
     const setPersistentOriginHere = vi.fn(async () => undefined);
     useLaserStore.setState({
+      statusReport: statusReport('Idle'),
       setPersistentOriginHere,
       workOriginActive: false,
       workOriginSource: 'none',
@@ -97,6 +105,27 @@ describe('OriginRow persistent origin controls', () => {
 
       expect(confirm).toHaveBeenCalledWith(expect.stringContaining('G54'));
       expect(setPersistentOriginHere).toHaveBeenCalledTimes(1);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('disables persistent origin controls until the machine is Idle', async () => {
+    useLaserStore.setState({
+      statusReport: statusReport('Run'),
+      workOriginActive: true,
+      workOriginSource: 'g54-persistent',
+      wcoCache: { x: 12, y: 34, z: 0 },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      root = await renderOriginRow(host);
+
+      expect(buttonByText(host, 'Set persistent origin').disabled).toBe(true);
+      expect(buttonByText(host, 'Clear persistent origin').disabled).toBe(true);
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

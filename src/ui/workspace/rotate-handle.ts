@@ -9,6 +9,7 @@
 // pivots in place, just like LightBurn / xTool.
 
 import {
+  combinedBBox,
   type SceneObject,
   type SelectionAnchor,
   type Transform,
@@ -22,8 +23,26 @@ import {
 export const ROTATE_HANDLE_OFFSET_MM = 24;
 export const ROTATE_SNAP_DEG = 15;
 
+export type RotateStartTransform = {
+  readonly id: string;
+  readonly transform: Transform;
+};
+
 export function rotateHandlePosition(object: SceneObject): Vec2 {
   const bbox = transformedBBox(object);
+  const midX = (bbox.minX + bbox.maxX) / 2;
+  return { x: midX, y: bbox.minY - ROTATE_HANDLE_OFFSET_MM };
+}
+
+export function selectionRotateAnchor(objects: ReadonlyArray<SceneObject>): Vec2 | null {
+  const bbox = combinedBBox(objects);
+  if (bbox === null) return null;
+  return { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 };
+}
+
+export function selectionRotateHandlePosition(objects: ReadonlyArray<SceneObject>): Vec2 | null {
+  const bbox = combinedBBox(objects);
+  if (bbox === null) return null;
   const midX = (bbox.minX + bbox.maxX) / 2;
   return { x: midX, y: bbox.minY - ROTATE_HANDLE_OFFSET_MM };
 }
@@ -32,6 +51,17 @@ export function hitRotateHandle(object: SceneObject, point: Vec2, pxToMm: number
   const pos = rotateHandlePosition(object);
   // Slightly larger pick radius than the square scale handles since the
   // rotate handle is round and visually smaller.
+  const halfMm = 6 * pxToMm;
+  return Math.abs(point.x - pos.x) <= halfMm && Math.abs(point.y - pos.y) <= halfMm;
+}
+
+export function hitSelectionRotateHandle(
+  objects: ReadonlyArray<SceneObject>,
+  point: Vec2,
+  pxToMm: number,
+): boolean {
+  const pos = selectionRotateHandlePosition(objects);
+  if (pos === null) return false;
   const halfMm = 6 * pxToMm;
   return Math.abs(point.x - pos.x) <= halfMm && Math.abs(point.y - pos.y) <= halfMm;
 }
@@ -63,6 +93,37 @@ export function rotateObjectByDrag(args: {
     y: origin.y,
     rotationDeg: targetDeg,
   };
+}
+
+export function rotateSelectionByDrag(args: {
+  readonly startTransforms: ReadonlyArray<RotateStartTransform>;
+  readonly anchor: Vec2;
+  readonly startPointerAngleDeg: number;
+  readonly dragTo: Vec2;
+  readonly snap: boolean;
+}): ReadonlyArray<RotateStartTransform> {
+  let deltaDeg = pointerAngleDeg(args.anchor, args.dragTo) - args.startPointerAngleDeg;
+  if (args.snap) deltaDeg = Math.round(deltaDeg / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG;
+  return args.startTransforms.map((entry) => {
+    const origin = rotatePoint(
+      { x: entry.transform.x, y: entry.transform.y },
+      args.anchor,
+      deltaDeg,
+    );
+    return {
+      id: entry.id,
+      transform: {
+        ...entry.transform,
+        x: origin.x,
+        y: origin.y,
+        rotationDeg: entry.transform.rotationDeg + deltaDeg,
+      },
+    };
+  });
+}
+
+export function pointerAngleDeg(anchor: Vec2, point: Vec2): number {
+  return (Math.atan2(point.y - anchor.y, point.x - anchor.x) * 180) / Math.PI;
 }
 
 function bboxCenter(object: SceneObject): Vec2 {
