@@ -1,5 +1,6 @@
 import type { ColoredPath } from '../scene';
 import { squaredDistanceToBackground } from './centerline-distance';
+import { joinNearbyOpenPolylines } from './centerline-gap-join';
 import { centerlineMaskFromImage, thinMask } from './centerline-mask';
 import { extractCenterlinePolylines } from './centerline-polylines';
 import { preprocessForTrace, type RawImageData, type TraceOptions } from './trace-image';
@@ -21,5 +22,6 @@ export function traceImageToCenterlinePaths(
     distanceSq,
     simplifyTolerancePx: options.lineTolerance,
   });
-  return polylines.length === 0 ? [] : [{ color: INK_COLOR, polylines }];
+  const joined = joinNearbyOpenPolylines(polylines, options.centerlineJoinGapPx ?? 0);
+  return joined.length === 0 ? [] : [{ color: INK_COLOR, polylines: joined }];
 }

@@ -20,4 +20,8 @@ export type { PolylineSpec } from './polyline';
 export { createPolyline } from './create-polyline';
 export { shapeFromDrag, isDrawDragSignificant, MIN_DRAW_SIZE_MM } from './shape-from-drag';
 export type { DrawShapeKind, DrawShapeModifiers } from './shape-from-drag';
-export { createRegistrationBox, REGISTRATION_BOX_OBJECT_ID } from './registration-box';
+export {
+  createRegistrationBox,
+  createRegistrationCircle,
+  REGISTRATION_BOX_OBJECT_ID,
+} from './registration-box';

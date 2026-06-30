@@ -51,7 +51,6 @@ import {
   DeleteImageAfterTraceToggle,
   PresetHint,
   PresetPicker,
-  PresetWarning,
   SourceLabel,
   TraceFillStylePicker,
   type TraceFillStyle,
@@ -139,7 +138,6 @@ function DialogBody(props: {
       <h2 className="lf-dialog-title">Trace Image</h2>
       <SourceLabel name={seed.source} />
       <PresetPicker value={preset} onChange={setPreset} />
-      <PresetWarning preset={preset} onPresetChange={setPreset} />
       {supportsTraceFillStyle ? (
         <TraceFillStylePicker value={traceFillStyle} onChange={setTraceFillStyle} />
       ) : null}

@@ -11,9 +11,7 @@
 import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
 
-function tracePresetLabel(key: string): string {
-  return key === 'Edge Detection' ? 'Edge Detection (edge contours)' : key;
-}
+export const VISIBLE_TRACE_PRESET_NAMES = ['Line Art', 'Smooth', 'Sharp', 'Centerline'] as const;
 
 export type TraceFillStyle = 'scanline' | 'offset' | 'island';
 
@@ -31,9 +29,9 @@ export function PresetPicker(props: {
         aria-label="Trace preset"
         title="Choose a trace preset tuned for line art, smooth logos, centerlines, or sharp detail."
       >
-        {Object.keys(TRACE_PRESETS).map((key) => (
+        {VISIBLE_TRACE_PRESET_NAMES.filter((key) => TRACE_PRESETS[key] !== undefined).map((key) => (
           <option key={key} value={key}>
-            {tracePresetLabel(key)}
+            {key}
           </option>
         ))}
       </select>
@@ -71,44 +69,6 @@ function parseTraceFillStyle(value: string): TraceFillStyle {
   if (value === 'island') return value;
   if (value === 'offset') return value;
   return 'scanline';
-}
-
-export function PresetWarning(props: {
-  readonly preset: string;
-  readonly onPresetChange: (next: string) => void;
-}): JSX.Element | null {
-  if (props.preset !== 'Edge Detection') return null;
-  return (
-    <div style={warningStyle} role="note" aria-label="Edge Detection guidance">
-      <strong>Edge Detection creates edge contours, not one-stroke lines.</strong>{' '}
-      <span>
-        Line mode will outline those detected edges. Use Line Art for filled logo shapes, or
-        Centerline for one path down strokes.
-      </span>
-      <span style={warningActionsStyle}>
-        <button
-          type="button"
-          className="lf-btn"
-          aria-label="Switch trace preset to Line Art"
-          title="Use filled contour tracing for black-on-white logo artwork."
-          style={warningButtonStyle}
-          onClick={() => props.onPresetChange('Line Art')}
-        >
-          Use Line Art
-        </button>
-        <button
-          type="button"
-          className="lf-btn"
-          aria-label="Switch trace preset to Centerline"
-          title="Use one vector path down black strokes instead of two edge outlines."
-          style={warningButtonStyle}
-          onClick={() => props.onPresetChange('Centerline')}
-        >
-          Use Centerline
-        </button>
-      </span>
-    </div>
-  );
 }
 
 // Trace runs on an already-imported bitmap (LightBurn's model, ADR-027),
@@ -210,26 +170,6 @@ const checkboxRowStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 6,
   fontSize: 12,
-};
-const warningStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 6,
-  padding: '8px 10px',
-  border: '1px solid var(--lf-warning)',
-  borderRadius: 4,
-  background: 'var(--lf-tint-warning)',
-  color: 'var(--lf-warning-fg)',
-  fontSize: 12,
-  lineHeight: 1.35,
-};
-const warningActionsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 6,
-  flexWrap: 'wrap',
-};
-const warningButtonStyle: React.CSSProperties = {
-  fontSize: 11,
-  padding: '3px 8px',
 };
 const hintStyle: React.CSSProperties = {
   fontSize: 11,

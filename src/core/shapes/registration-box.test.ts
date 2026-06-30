@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { REGISTRATION_LAYER_COLOR } from '../scene';
-import { createRegistrationBox, REGISTRATION_BOX_OBJECT_ID } from './registration-box';
+import {
+  createRegistrationBox,
+  createRegistrationCircle,
+  REGISTRATION_BOX_OBJECT_ID,
+} from './registration-box';
 
 describe('createRegistrationBox', () => {
   it('creates a movable rectangle shape bound to the reserved registration color', () => {
@@ -41,6 +45,35 @@ describe('createRegistrationBox', () => {
       widthMm: 1,
     });
     expect(createRegistrationBox({ widthMm: -5, heightMm: 0 }).spec).toMatchObject({
+      widthMm: 1,
+      heightMm: 1,
+    });
+  });
+});
+
+describe('createRegistrationCircle', () => {
+  it('creates a movable circle outline bound to the reserved registration color', () => {
+    const circle = createRegistrationCircle({ diameterMm: 60 });
+    expect(circle.kind).toBe('shape');
+    expect(circle.spec).toEqual({ kind: 'ellipse', widthMm: 60, heightMm: 60 });
+    expect(circle.color).toBe(REGISTRATION_LAYER_COLOR);
+    expect(circle.locked).toBeUndefined();
+    expect(circle.id).toBe(REGISTRATION_BOX_OBJECT_ID);
+    expect(circle.bounds).toEqual({ minX: 0, minY: 0, maxX: 60, maxY: 60 });
+  });
+
+  it('places the circle at the requested origin', () => {
+    const circle = createRegistrationCircle({ diameterMm: 50, x: 12, y: 18 });
+    expect(circle.transform.x).toBe(12);
+    expect(circle.transform.y).toBe(18);
+  });
+
+  it('clamps non-finite or non-positive diameters to a minimum', () => {
+    expect(createRegistrationCircle({ diameterMm: Number.NaN }).spec).toMatchObject({
+      widthMm: 1,
+      heightMm: 1,
+    });
+    expect(createRegistrationCircle({ diameterMm: 0 }).spec).toMatchObject({
       widthMm: 1,
       heightMm: 1,
     });

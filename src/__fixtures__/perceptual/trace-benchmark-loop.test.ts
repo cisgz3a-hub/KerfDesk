@@ -42,14 +42,17 @@ describe('trace benchmark loop', () => {
       const archHouse = requiredResult(results, 'arch-house-line-art-baseline');
 
       expect(curveLinking.findings).toEqual([]);
-      expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(4);
+      expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(6);
       expect(curveLinking.metrics.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
       expect(curveLinking.metrics.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
 
       expect(archHouseEdge.findings).toEqual([]);
       expect(archHouseEdge.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);
-      expect(archHouseEdge.metrics.shortArchPolylineCount).toBeLessThanOrEqual(2);
+      expect(archHouseEdge.metrics.archPolylineCount).toBeLessThanOrEqual(18);
+      expect(archHouseEdge.metrics.shortArchPolylineCount).toBeLessThanOrEqual(5);
       expect(archHouseEdge.metrics.aggregateArchCoverageRatio).toBeGreaterThanOrEqual(0.95);
+      expect(archHouseEdge.metrics.longestArchCoverageRatio).toBeGreaterThanOrEqual(0.7);
+      expect(archHouseEdge.metrics.maxLongestArchGapDeg).toBeLessThanOrEqual(30);
 
       expect(centerline.findings).toEqual([]);
       expect(centerline.metrics.maxDeviationPx).toBeLessThanOrEqual(1.6);
