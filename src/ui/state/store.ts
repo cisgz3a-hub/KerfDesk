@@ -34,6 +34,7 @@ import {
   type LayerSubLayerPatch,
 } from './layer-actions';
 import { fillSelectionActions, type FillSelectionActions } from './fill-selection-actions';
+import { vectorPathActions, type VectorPathActions } from './vector-path-actions';
 import {
   closeOpenFillContoursActions,
   type CloseOpenFillContoursActions,
@@ -118,6 +119,7 @@ export type AppState = ObjectPropertiesActions &
   PathNodeEditActions &
   BreakApartActions &
   FillSelectionActions &
+  VectorPathActions &
   CloseOpenFillContoursActions &
   ObjectDeleteActions &
   SceneClipboardActions &
@@ -194,6 +196,9 @@ export type AppState = ObjectPropertiesActions &
     // registration layer. Width/height in mm; a new box centers on the bed, a
     // replace keeps the existing box's position and lock state.
     readonly addRegistrationBox: (widthMm: number, heightMm: number) => void;
+    // ADR-057: add (or replace) a circular registration jig outline for round
+    // blanks. Diameter in mm; replacement keeps position and lock state.
+    readonly addRegistrationCircle: (diameterMm: number) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.
     readonly removeRegistrationBox: () => void;
@@ -214,6 +219,8 @@ export type AppState = ObjectPropertiesActions &
     readonly assignSelectionToLayer: (layerId: string) => void;
     readonly breakApartSelection: () => void;
     readonly fillSelectionSeparately: () => void;
+    readonly convertSelectionToPath: () => void;
+    readonly weldSelection: () => void;
     readonly closeSelectedOpenFillContours: () => void;
     readonly closeSelectedOpenFillContoursWithTolerance: (toleranceMm: number) => void;
     readonly deleteLayerAndObjects: (layerId: string) => void;
@@ -360,6 +367,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
   ...fillSelectionActions(set),
+  ...vectorPathActions(set),
   ...closeOpenFillContoursActions(set),
   ...layerDefaultActions(set),
   ...materialLibraryActions(set),

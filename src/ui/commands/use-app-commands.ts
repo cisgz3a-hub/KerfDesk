@@ -1,4 +1,3 @@
-import type { Project, RasterImage } from '../../core/scene';
 import { profileSupportsCapability } from '../../core/devices';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
@@ -18,13 +17,20 @@ import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
 } from '../common/fill-diagnostics';
+import type {
+  CommandDialogs,
+  CommandSelection,
+  CommandShellCallbacks,
+} from './app-command-context-types';
 import { buildAppCommands, type AppCommand } from './command-registry';
 import type { AppCommandContext } from './command-types';
-import { selectedImageMaskPair, type SelectedImageMaskPair } from './image-mask-command-state';
+import { selectedImageMaskPair } from './image-mask-command-state';
 import {
   applyImageMaskAction,
   cropImageAction,
   removeImageMaskAction,
+  retraceOriginalAction,
+  traceSourceForTracedImage,
   traceImageAction,
 } from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
@@ -32,41 +38,14 @@ import {
   selectedObject,
   selectedObjectIds,
   selectionCanBreakApart,
+  selectionCanWeld,
   selectionHasUnlockedObject,
+  selectionHasUnlockedVectorObject,
   selectionHasVectorObject,
   selectionTouchesGroup,
 } from './selection-command-state';
 
-export type CommandShellCallbacks = {
-  readonly requestImportImage: () => void;
-  readonly requestMultiFileTrace: () => void;
-  readonly requestConvertToBitmap: () => void;
-  readonly requestAdjustImage: () => void;
-  readonly requestMaterialTest: () => void;
-  readonly requestIntervalTest: () => void;
-  readonly requestScanOffsetTest: () => void;
-  readonly requestFocusTest: () => void;
-  readonly requestOptimizationSettings: () => void;
-  readonly requestProjectNotes: () => void;
-  readonly requestUndoHistory: () => void;
-  readonly requestCloseOpenFillContoursWithTolerance: () => void;
-  readonly showAbout: () => void;
-};
-
-type CommandDialogs = {
-  readonly openImageDialog: (source: RasterImage) => void;
-  readonly openTextDialog: (options: { readonly mode: 'add' }) => void;
-  readonly measureTool: () => void;
-  readonly measureActive: boolean;
-  readonly registrationPanelOpen: boolean;
-  readonly toggleRegistrationPanel: () => void;
-};
-
-type CommandSelection = {
-  readonly selected: Project['scene']['objects'][number] | null;
-  readonly selectedIds: ReadonlyArray<string>;
-  readonly imageMaskPair: SelectedImageMaskPair | null;
-};
+export type { CommandShellCallbacks } from './app-command-context-types';
 
 export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<AppCommand> {
   const platform = usePlatform();
@@ -129,7 +108,10 @@ function appCommandContext(
     registrationPanelOpen: dialogs.registrationPanelOpen,
     toggleRegistrationPanel: dialogs.toggleRegistrationPanel,
     hasRasterSelection: selected?.kind === 'raster-image',
+    canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
+    canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
+    canWeldSelection: selectionCanWeld(app.project, selectedIds),
     hasFillableSelection: selectionHasVectorObject(app.project, selectedIds),
     canApplyImageMask: imageMaskPair !== null,
     canCloseOpenFillContours:
@@ -251,7 +233,10 @@ function toolCommandContext(
   | 'adjustImage'
   | 'saveProcessedBitmap'
   | 'traceImage'
+  | 'retraceOriginal'
   | 'multiFileTrace'
+  | 'convertSelectionToPath'
+  | 'weldSelection'
   | 'convertToBitmap'
   | 'fillSelectionSeparately'
   | 'closeSelectedOpenFillContours'
@@ -269,7 +254,15 @@ function toolCommandContext(
     adjustImage: callbacks.requestAdjustImage,
     saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
     traceImage: traceImageAction(selection.selected, dialogs.openImageDialog),
+    retraceOriginal: retraceOriginalAction(
+      app.project,
+      selection.selected,
+      dialogs.openImageDialog,
+      pushToast,
+    ),
     multiFileTrace: callbacks.requestMultiFileTrace,
+    convertSelectionToPath: app.convertSelectionToPath,
+    weldSelection: app.weldSelection,
     convertToBitmap: callbacks.requestConvertToBitmap,
     fillSelectionSeparately: app.fillSelectionSeparately,
     closeSelectedOpenFillContours: app.closeSelectedOpenFillContours,

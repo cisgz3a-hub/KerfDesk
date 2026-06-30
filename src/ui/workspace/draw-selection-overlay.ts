@@ -1,9 +1,9 @@
-import type { SceneObject } from '../../core/scene';
+import { combinedBBox, type AABB, type SceneObject } from '../../core/scene';
 import { canvasTheme } from '../theme/canvas-theme';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawPathNodeHandles } from './draw-path-node-handles';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
-import { rotateHandlePosition } from './rotate-handle';
+import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
 import type { ViewTransform } from './view-transform';
 
 export function drawObjectSelectionOverlay(
@@ -21,6 +21,10 @@ export function drawObjectSelectionOverlay(
 ): void {
   if (!args.isVisible) return;
   if (obj.id === args.selectedId) {
+    if (args.additionalSelectedIds.size > 0) {
+      drawSecondarySelectionBox(ctx, obj, view);
+      return;
+    }
     drawSelectionBox(ctx, obj, view);
     if (args.showPathNodeHandles) {
       drawPathNodeHandles(ctx, obj, view, args.selectedPathNode, args.selectedPathNodes);
@@ -30,6 +34,21 @@ export function drawObjectSelectionOverlay(
   if (args.additionalSelectedIds.has(obj.id)) {
     drawSecondarySelectionBox(ctx, obj, view);
   }
+}
+
+export function drawSelectionSetOverlay(
+  ctx: CanvasRenderingContext2D,
+  objects: ReadonlyArray<SceneObject>,
+  view: ViewTransform,
+): void {
+  const bbox = combinedBBox(objects);
+  if (bbox === null) return;
+  ctx.strokeStyle = canvasTheme.selection;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  strokeSelectionFrame(ctx, selectionFrameForAabb(bbox), view);
+  ctx.setLineDash([]);
+  drawRotateHandleAt(ctx, rotateHandlePositionForAabb(bbox), bbox.minY, view);
 }
 
 function drawSelectionBox(
@@ -52,9 +71,8 @@ function drawSecondarySelectionBox(
 ): void {
   ctx.save();
   ctx.strokeStyle = canvasTheme.selection;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
   strokeSelectionFrame(ctx, selectionFrameFor(obj), view);
   ctx.restore();
 }
@@ -102,9 +120,18 @@ function drawRotateHandle(
   view: ViewTransform,
 ): void {
   const pos = rotateHandlePosition(obj);
+  drawRotateHandleAt(ctx, pos, pos.y + ROTATE_HANDLE_OFFSET_MM, view);
+}
+
+function drawRotateHandleAt(
+  ctx: CanvasRenderingContext2D,
+  pos: { readonly x: number; readonly y: number },
+  bboxTopY: number,
+  view: ViewTransform,
+): void {
   const cx = view.offsetX + pos.x * view.scale;
   const cy = view.offsetY + pos.y * view.scale;
-  const bboxTopMidScreenY = cy + 24 * view.scale;
+  const bboxTopMidScreenY = view.offsetY + bboxTopY * view.scale;
   ctx.save();
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1;
@@ -122,4 +149,22 @@ function drawRotateHandle(
   ctx.strokeStyle = canvasTheme.rotateHandleStroke;
   ctx.stroke();
   ctx.restore();
+}
+
+function selectionFrameForAabb(
+  bbox: AABB,
+): ReadonlyArray<{ readonly x: number; readonly y: number }> {
+  return [
+    { x: bbox.minX, y: bbox.minY },
+    { x: bbox.maxX, y: bbox.minY },
+    { x: bbox.maxX, y: bbox.maxY },
+    { x: bbox.minX, y: bbox.maxY },
+  ];
+}
+
+function rotateHandlePositionForAabb(bbox: AABB): { readonly x: number; readonly y: number } {
+  return {
+    x: (bbox.minX + bbox.maxX) / 2,
+    y: bbox.minY - ROTATE_HANDLE_OFFSET_MM,
+  };
 }

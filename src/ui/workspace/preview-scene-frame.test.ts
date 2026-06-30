@@ -67,6 +67,16 @@ describe('mapToolpathToScene', () => {
         {
           kind: 'cut',
           color: '#000000',
+          source: {
+            kind: 'raster',
+            objectId: 'photo-1',
+            source: 'photo.png',
+            passIndex: 0,
+            rowIndex: 3,
+            spanIndex: 0,
+            pixelStartX: 2,
+            pixelEndX: 9,
+          },
           polyline: [
             { x: 10, y: dev.bedHeight - 10 },
             { x: 50, y: dev.bedHeight - 10 },
@@ -88,6 +98,16 @@ describe('mapToolpathToScene', () => {
     expect(scene.steps[1]).toEqual({
       kind: 'cut',
       color: '#000000',
+      source: {
+        kind: 'raster',
+        objectId: 'photo-1',
+        source: 'photo.png',
+        passIndex: 0,
+        rowIndex: 3,
+        spanIndex: 0,
+        pixelStartX: 2,
+        pixelEndX: 9,
+      },
       polyline: [
         { x: 10, y: 10 },
         { x: 50, y: 10 },

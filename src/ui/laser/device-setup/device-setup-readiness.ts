@@ -12,9 +12,9 @@ export type SetupChecklistItem = {
   readonly id: SetupChecklistItemId;
   readonly label: string;
   readonly status: 'confirmed' | 'needs-attention';
-  // Blocking items must be confirmed before the machine reports ready. Origin
-  // and homing are informational rows (valid defaults exist), shown so the
-  // operator can review them without gating Finish.
+  // Blocking items must be confirmed before the machine reports ready.
+  // Identity, origin, and homing are informational rows: useful review context,
+  // but not reasons to block a deliberate generic/custom profile.
   readonly blocking: boolean;
   readonly detail: string;
 };
@@ -42,7 +42,7 @@ export function computeSetupReadiness(
   // when its numbers happen to match the default (e.g. another 400×400).
   const pickedRealProfile = draft.profileId !== DEFAULT_DEVICE_PROFILE.profileId;
   const items: ReadonlyArray<SetupChecklistItem> = [
-    identityItem(draft, pickedRealProfile),
+    identityItem(draft),
     bedItem(draft, patch, pickedRealProfile),
     powerScaleItem(draft, patch, pickedRealProfile),
     originItem(draft),
@@ -52,14 +52,13 @@ export function computeSetupReadiness(
   return { items, ready };
 }
 
-function identityItem(draft: DeviceProfile, pickedRealProfile: boolean): SetupChecklistItem {
-  const confirmed = pickedRealProfile || draft.name !== DEFAULT_DEVICE_PROFILE.name;
+function identityItem(draft: DeviceProfile): SetupChecklistItem {
   return {
     id: 'identity',
     label: 'Machine identity',
-    status: confirmed ? 'confirmed' : 'needs-attention',
-    blocking: true,
-    detail: confirmed ? draft.name : 'Still the generic starter — pick or name your machine.',
+    status: 'confirmed',
+    blocking: false,
+    detail: draft.name,
   };
 }
 

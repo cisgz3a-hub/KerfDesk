@@ -5,7 +5,6 @@ import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { rowStyle } from './JobControls.styles';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset that clears G92), so confirm and spell out the correct order:
@@ -16,6 +15,15 @@ const RELEASE_MOTORS_CONFIRM =
   'The controller will ignore normal commands until you Wake it with Ctrl-X, which clears ' +
   'the work origin. Move the head first, then Wake, wait for Idle, and Set origin again. ' +
   'Do not release motors during a job.';
+
+const SET_PERSISTENT_ORIGIN_CONFIRM =
+  'Set persistent G54 origin?\n\n' +
+  'This sends G10 L20 P1 X0 Y0 and writes the current head position into the controller. ' +
+  'It survives reset and power-cycle until you clear the persistent G54 origin.';
+
+const CLEAR_PERSISTENT_ORIGIN_CONFIRM =
+  'Clear persistent G54 origin?\n\n' +
+  'This sends G92.1, then G10 L2 P1 X0 Y0 to clear both transient and stored G54 origin offsets.';
 
 // F.3 — Set / Reset the work-coordinate origin to the current head
 // position. See ADR-021. Buttons:
@@ -34,10 +42,14 @@ export function OriginRow(props: {
   const releaseMotors = useLaserStore((s) => s.releaseMotors);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const workOriginSource = useLaserStore((s) => s.workOriginSource);
+  const persistentOriginReady = useLaserStore((s) => s.statusReport?.state === 'Idle');
   const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const busy = props.disabled || props.streaming;
   const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
+  const persistentOrUnknown =
+    workOriginSource === 'g54-persistent' || workOriginSource === 'unknown';
   // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
   // intermittently (every Nth status per `$10`), so the StatusDisplay
   // readout may take 1-30 frames (~0.25-7.5s) to update after a G92.
@@ -63,7 +75,7 @@ export function OriginRow(props: {
     );
   };
   return (
-    <div style={rowStyle}>
+    <div style={originRowStyle}>
       <button
         type="button"
         onClick={onSet}
@@ -75,15 +87,22 @@ export function OriginRow(props: {
       <button
         type="button"
         onClick={onReset}
-        disabled={busy || !hasCustom}
+        disabled={busy || !hasCustom || persistentOrUnknown}
         title={
-          hasCustom
-            ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
-            : 'No custom origin active. Set one with "Set origin here" first.'
+          persistentOrUnknown
+            ? 'This origin may be stored in G54. Use Clear persistent origin.'
+            : hasCustom
+              ? 'Clear the custom work origin (G92.1) — coordinates return to machine zero.'
+              : 'No custom origin active. Set one with "Set origin here" first.'
         }
       >
         Reset origin
       </button>
+      <AdvancedOriginControls
+        busy={busy}
+        hasCustom={hasCustom}
+        persistentOriginReady={persistentOriginReady}
+      />
       <button
         type="button"
         onClick={onRelease}
@@ -95,3 +114,82 @@ export function OriginRow(props: {
     </div>
   );
 }
+
+function AdvancedOriginControls(props: {
+  readonly busy: boolean;
+  readonly hasCustom: boolean;
+  readonly persistentOriginReady: boolean;
+}): JSX.Element {
+  const setPersistentOrigin = useLaserStore((s) => s.setPersistentOriginHere);
+  const clearPersistentOrigin = useLaserStore((s) => s.clearPersistentOrigin);
+  const setJobPlacement = useStore((s) => s.setJobPlacement);
+  const pushToast = useToastStore((s) => s.pushToast);
+  const onSetPersistent = (): void => {
+    if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
+    void setPersistentOrigin().then(() => {
+      setJobPlacement({ startFrom: 'user-origin' });
+      pushToast('Persistent G54 origin set to current head position.', 'success');
+    });
+  };
+  const onClearPersistent = (): void => {
+    if (!jobAwareConfirm(CLEAR_PERSISTENT_ORIGIN_CONFIRM)) return;
+    void clearPersistentOrigin().then(() => pushToast('Persistent G54 origin cleared.', 'success'));
+  };
+  const persistentDisabled = props.busy || !props.persistentOriginReady;
+  const setTitle = props.persistentOriginReady
+    ? 'Write the current head position as the persistent G54 origin (G10 L20 P1).'
+    : 'Machine must be Idle before setting the persistent G54 origin.';
+  const clearTitle = props.persistentOriginReady
+    ? 'Clear transient G92 and stored G54 origin offsets.'
+    : 'Machine must be Idle before clearing the persistent G54 origin.';
+  return (
+    <details style={advancedDetailsStyle}>
+      <summary
+        style={{ cursor: props.busy ? 'default' : 'pointer' }}
+        title="Show persistent G54 origin controls."
+      >
+        Advanced origin
+      </summary>
+      <div style={advancedButtonRowStyle}>
+        <button
+          type="button"
+          onClick={onSetPersistent}
+          disabled={persistentDisabled}
+          title={setTitle}
+        >
+          Set persistent origin
+        </button>
+        <button
+          type="button"
+          onClick={onClearPersistent}
+          disabled={persistentDisabled || !props.hasCustom}
+          title={clearTitle}
+        >
+          Clear persistent origin
+        </button>
+      </div>
+    </details>
+  );
+}
+
+const originRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+  minWidth: 0,
+};
+
+const advancedDetailsStyle: React.CSSProperties = {
+  display: 'block',
+  flexBasis: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+};
+
+const advancedButtonRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+  marginTop: 6,
+  minWidth: 0,
+};

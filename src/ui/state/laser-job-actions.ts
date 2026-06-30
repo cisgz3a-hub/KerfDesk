@@ -124,11 +124,20 @@ export function jobActions(
       // resumeJob — use functional set.
       set((s) => ({
         wcoCache: null,
-        workOriginActive: false,
+        ...originPatchAfterSoftReset(s),
         streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
       }));
     },
   };
+}
+
+function originPatchAfterSoftReset(
+  state: LaserState,
+): Pick<LaserState, 'workOriginActive' | 'workOriginSource'> {
+  if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
+    return { workOriginActive: true, workOriginSource: 'unknown' };
+  }
+  return { workOriginActive: false, workOriginSource: 'none' };
 }
 
 function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {

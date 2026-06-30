@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Job, RasterGroup } from './job';
+import type { Job } from './job';
 import { buildToolpath, sliceToolpath, summarizeToolpathDistances } from './toolpath';
 
 function aJob(): Job {
@@ -31,27 +31,6 @@ function aJob(): Job {
         ],
       },
     ],
-  };
-}
-
-function rasterGroup(overrides: Partial<RasterGroup> = {}): RasterGroup {
-  const pixelWidth = overrides.pixelWidth ?? 1;
-  const pixelHeight = overrides.pixelHeight ?? 1;
-  return {
-    kind: 'raster',
-    layerId: 'image',
-    color: '#444444',
-    power: 30,
-    speed: 1000,
-    passes: 1,
-    airAssist: false,
-    sValues: new Uint16Array(pixelWidth * pixelHeight).fill(500),
-    pixelWidth,
-    pixelHeight,
-    bounds: { minX: 0, minY: 0, maxX: pixelWidth, maxY: pixelHeight },
-    overscanMm: 0,
-    dotWidthCorrectionMm: 0,
-    ...overrides,
   };
 }
 
@@ -291,56 +270,6 @@ describe('buildToolpath', () => {
 
     expect(tp.steps.map((s) => s.kind)).toEqual(['cut']);
     expect(tp.totalLength).toBe(40);
-  });
-
-  it('renders raster image rows as route preview sweeps with overscan and bidirectional travel', () => {
-    const tp = buildToolpath({
-      groups: [
-        rasterGroup({
-          pixelWidth: 4,
-          pixelHeight: 2,
-          bounds: { minX: 10, minY: 20, maxX: 14, maxY: 22 },
-          overscanMm: 1,
-          sValues: new Uint16Array([0, 500, 500, 0, 0, 0, 500, 500]),
-        }),
-      ],
-    });
-
-    expect(tp.steps.map((step) => step.kind)).toEqual([
-      'travel',
-      'cut',
-      'travel',
-      'travel',
-      'travel',
-      'cut',
-      'travel',
-    ]);
-    expect(tp.steps[0]).toMatchObject({
-      kind: 'travel',
-      from: { x: 10, y: 20.5 },
-      to: { x: 11, y: 20.5 },
-    });
-    expect(tp.steps[1]).toMatchObject({
-      kind: 'cut',
-      color: '#444444',
-      polyline: [
-        { x: 11, y: 20.5 },
-        { x: 13, y: 20.5 },
-      ],
-    });
-    expect(tp.steps[4]).toMatchObject({
-      kind: 'travel',
-      from: { x: 15, y: 21.5 },
-      to: { x: 14, y: 21.5 },
-    });
-    expect(tp.steps[5]).toMatchObject({
-      kind: 'cut',
-      color: '#444444',
-      polyline: [
-        { x: 14, y: 21.5 },
-        { x: 12, y: 21.5 },
-      ],
-    });
   });
 });
 

@@ -48,6 +48,8 @@ export type FillGroup = Omit<CutGroup, 'kind' | 'segments'> & {
 export type RasterGroup = {
   readonly kind: 'raster';
   readonly layerId: string;
+  readonly sourceObjectId?: string;
+  readonly source?: string;
   readonly color: string;
   readonly power: number; // 0..100 (percent)
   readonly speed: number; // mm/min; already capped to device.maxFeed

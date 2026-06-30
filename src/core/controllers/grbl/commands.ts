@@ -49,10 +49,9 @@ export const CMD_COOLANT_OFF = 'M9';
 // --- Work coordinate offset (Phase F.3 set-work-origin) ---
 // GRBL applies a machine-to-work offset on top of the active WCS (G54 by
 // default). G92 modifies that offset transiently — it's cleared on alarm,
-// soft reset, and `$RST=#`. Persistent equivalent would be G10 L20 P1 X0 Y0
-// (sets the G54 offset itself). Per ADR-021 we ship G92 only — matches
-// LightBurn / LaserGRBL "Set Job Origin" semantics where the operator
-// expects each session to start with a fresh origin.
+// soft reset, and `$RST=#`. Advanced persistent-origin controls use
+// G10 L20/L2 against G54 when the operator explicitly wants the origin
+// to survive reconnects.
 
 /** Set work origin to the current head position (transient, cleared on
  *  alarm/soft-reset). Maps to G92 X0 Y0 — declares the current MPos as the
@@ -65,6 +64,13 @@ export const CMD_SET_ORIGIN_HERE = 'G92 X0 Y0';
  *  offset, G92.2 disables without clearing, G92.3 re-enables; we use .1 so
  *  the operator's next "Set origin here" starts from a clean state. */
 export const CMD_CLEAR_ORIGIN = 'G92.1';
+
+/** Set the G54 work coordinate origin to the current head position. Persistent:
+ *  this writes controller coordinate storage and survives reset/power-cycle. */
+export const CMD_SET_PERSISTENT_ORIGIN_HERE = 'G10 L20 P1 X0 Y0';
+
+/** Clear the stored G54 offset back to machine zero. */
+export const CMD_CLEAR_PERSISTENT_ORIGIN = 'G10 L2 P1 X0 Y0';
 
 // --- Jog command builder ---
 

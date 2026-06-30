@@ -79,6 +79,8 @@ function compileRasterGroup(
   return {
     kind: 'raster',
     layerId: layer.id,
+    sourceObjectId: obj.id,
+    source: obj.source,
     color: layer.color,
     power: powerPercent,
     speed: Math.min(layer.speed, device.maxFeed),

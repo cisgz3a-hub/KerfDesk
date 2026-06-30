@@ -53,7 +53,10 @@ export type CommandId =
   | 'tools.remove-image-mask'
   | 'tools.save-processed-bitmap'
   | 'tools.trace-image'
+  | 'tools.retrace-original'
   | 'tools.multi-file-trace'
+  | 'tools.convert-to-path'
+  | 'tools.weld'
   | 'tools.convert-to-bitmap'
   | 'tools.fill-selection'
   | 'tools.close-open-fill-contours'
@@ -106,7 +109,10 @@ export type AppCommandContext = {
   readonly canRedo: boolean;
   readonly hasSelection: boolean;
   readonly hasRasterSelection: boolean;
+  readonly canRetraceOriginal: boolean;
   readonly hasConvertibleSelection: boolean;
+  readonly canConvertSelectionToPath: boolean;
+  readonly canWeldSelection: boolean;
   readonly hasFillableSelection: boolean;
   readonly canCloseOpenFillContours: boolean;
   readonly canReviewCloseOpenFillContours: boolean;
@@ -155,7 +161,10 @@ export type AppCommandContext = {
   readonly adjustImage: () => void;
   readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;
+  readonly retraceOriginal: () => void;
   readonly multiFileTrace: () => void;
+  readonly convertSelectionToPath: () => void;
+  readonly weldSelection: () => void;
   readonly convertToBitmap: () => void;
   readonly fillSelectionSeparately: () => void;
   readonly closeSelectedOpenFillContours: () => void;

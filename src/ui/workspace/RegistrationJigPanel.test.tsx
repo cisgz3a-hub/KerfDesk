@@ -50,6 +50,21 @@ function buttonByLabel(label: string): HTMLButtonElement {
   return button;
 }
 
+function selectByLabel(label: string): HTMLSelectElement {
+  const select = container.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
+  if (select === null) throw new Error(`select not found: ${label}`);
+  return select;
+}
+
+function setInputValue(input: HTMLInputElement, value: string): void {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  if (setter === undefined) throw new Error('native value setter not found');
+  act(() => {
+    setter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
 function addArt(): void {
   act(() => {
     useStore.getState().drawShape(
@@ -64,9 +79,9 @@ function addArt(): void {
 }
 
 describe('RegistrationJigPanel', () => {
-  it('prompts to create a box when no jig exists', () => {
+  it('prompts to create an outline when no jig exists', () => {
     render();
-    expect(container.textContent).toContain('Create a box below to begin');
+    expect(container.textContent).toContain('Create a jig outline below to begin');
   });
 
   it('flips the Next-burn banner and layer output as the Box/Artwork toggle is clicked', () => {
@@ -74,8 +89,8 @@ describe('RegistrationJigPanel', () => {
     addArt();
     render();
 
-    click('Box only');
-    expect(container.textContent).toContain('BOX outline');
+    click('Outline only');
+    expect(container.textContent).toContain('JIG outline');
     const regLayer = () =>
       useStore.getState().project.scene.layers.find((l) => l.id === REGISTRATION_LAYER_ID);
     expect(regLayer()?.output).toBe(true);
@@ -105,6 +120,29 @@ describe('RegistrationJigPanel', () => {
 
     expect(container.textContent).toContain('your ARTWORK');
     expect(buttonByLabel('Artwork only').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('offers a circle outline for round blanks', () => {
+    render();
+
+    const shape = selectByLabel('Registration jig shape');
+    expect([...shape.options].map((option) => option.textContent)).toEqual(['Rectangle', 'Circle']);
+
+    act(() => {
+      shape.value = 'circle';
+      shape.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    const diameter = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Registration circle diameter"]',
+    );
+    expect(diameter).not.toBeNull();
+    if (diameter === null) throw new Error('diameter input not found');
+    setInputValue(diameter, '64');
+    click('Create circle');
+
+    const [circle] = findRegistrationBoxes(useStore.getState().project.scene);
+    expect(circle?.spec).toEqual({ kind: 'ellipse', widthMm: 64, heightMm: 64 });
   });
 
   it('moves when the header is dragged', () => {

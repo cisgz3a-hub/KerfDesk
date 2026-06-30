@@ -1,10 +1,8 @@
-// command-families — the per-menu-family command builders consumed by
-// buildAppCommands. Pure functions of AppCommandContext.
-
 import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from '../common/fill-diagnostics';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { registrationJigCommand } from './registration-command-family';
+import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -72,17 +70,11 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Adjust output path optimization',
       ctx.optimizationSettings,
     ),
-    rasterToolCommand(ctx, 'tools.adjust-image', 'Adjust Image...', 'Adjust selected image'),
+    adjustImageCommand(ctx),
     imageMaskApplyCommand(ctx),
     imageMaskCropCommand(ctx),
     imageMaskRemoveCommand(ctx),
-    rasterToolCommand(
-      ctx,
-      'tools.save-processed-bitmap',
-      'Save Processed Bitmap...',
-      'Save selected image after layer processing',
-    ),
-    rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image'),
+    ...processedRasterToolCommands(ctx),
     enabled(
       'tools.multi-file-trace',
       'tools',
@@ -90,6 +82,8 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Trace multiple image files to SVG exports',
       ctx.multiFileTrace,
     ),
+    convertToPathCommand(ctx),
+    weldCommand(ctx),
     ctx.hasFillableSelection
       ? enabled(
           'tools.fill-selection',
@@ -123,6 +117,42 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           ctx.convertToBitmap,
         ),
   ];
+}
+
+function convertToPathCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.canConvertSelectionToPath
+    ? enabled(
+        'tools.convert-to-path',
+        'tools',
+        'Convert to Path',
+        'Bake selected vector artwork into editable path geometry',
+        ctx.convertSelectionToPath,
+      )
+    : disabled(
+        'tools.convert-to-path',
+        'tools',
+        'Convert to Path',
+        'Select unlocked vector artwork first.',
+        ctx.convertSelectionToPath,
+      );
+}
+
+function weldCommand(ctx: AppCommandContext): AppCommand {
+  return ctx.canWeldSelection
+    ? enabled(
+        'tools.weld',
+        'tools',
+        'Weld',
+        'Union selected closed vector contours into one path object',
+        ctx.weldSelection,
+      )
+    : disabled(
+        'tools.weld',
+        'tools',
+        'Weld',
+        'Select unlocked closed vector contours first.',
+        ctx.weldSelection,
+      );
 }
 
 function closeOpenFillContoursCommand(ctx: AppCommandContext): AppCommand {
@@ -273,32 +303,6 @@ function guardedCalibrationAction(
       if (ok) run();
     });
   };
-}
-
-function rasterToolCommand(
-  ctx: AppCommandContext,
-  id: 'tools.adjust-image' | 'tools.save-processed-bitmap' | 'tools.trace-image',
-  label: string,
-  title: string,
-): AppCommand {
-  const invoke = rasterToolInvoke(ctx, id);
-  return ctx.hasRasterSelection
-    ? enabled(id, 'tools', label, title, invoke)
-    : disabled(id, 'tools', label, 'Select an image first.', invoke);
-}
-
-function rasterToolInvoke(
-  ctx: AppCommandContext,
-  id: 'tools.adjust-image' | 'tools.save-processed-bitmap' | 'tools.trace-image',
-): () => void {
-  switch (id) {
-    case 'tools.adjust-image':
-      return ctx.adjustImage;
-    case 'tools.save-processed-bitmap':
-      return ctx.saveProcessedBitmap;
-    case 'tools.trace-image':
-      return ctx.traceImage;
-  }
 }
 
 export function laserCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
