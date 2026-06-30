@@ -113,6 +113,7 @@ function ShapeSelect(props: {
   return (
     <select
       aria-label="Registration jig shape"
+      title="Choose the physical outline to burn for aligning rectangular or round blanks."
       value={props.value}
       style={shapeSelectStyle}
       onChange={(event) => props.onChange(parseJigShape(event.target.value))}
