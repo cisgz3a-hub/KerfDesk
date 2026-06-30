@@ -196,6 +196,9 @@ export type AppState = ObjectPropertiesActions &
     // registration layer. Width/height in mm; a new box centers on the bed, a
     // replace keeps the existing box's position and lock state.
     readonly addRegistrationBox: (widthMm: number, heightMm: number) => void;
+    // ADR-057: add (or replace) a circular registration jig outline for round
+    // blanks. Diameter in mm; replacement keeps position and lock state.
+    readonly addRegistrationCircle: (diameterMm: number) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.
     readonly removeRegistrationBox: () => void;

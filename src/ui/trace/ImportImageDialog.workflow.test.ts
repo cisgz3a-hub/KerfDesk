@@ -46,13 +46,15 @@ function seedRaster(): RasterImage {
 }
 
 describe('Trace Image workflow controls', () => {
-  it('labels Edge Detection as an edge-contour preset', async () => {
+  it('does not offer Edge Detection as a user-facing trace preset', async () => {
     await withTraceDialog(async (host) => {
       const select = presetSelect(host);
-      const edgeOption = Array.from(select.options).find(
-        (option) => option.value === 'Edge Detection',
-      );
-      expect(edgeOption?.textContent).toBe('Edge Detection (edge contours)');
+      const values = Array.from(select.options).map((option) => option.value);
+      expect(values).toContain('Line Art');
+      expect(values).toContain('Smooth');
+      expect(values).toContain('Sharp');
+      expect(values).toContain('Centerline');
+      expect(values).not.toContain('Edge Detection');
     });
   });
 
@@ -74,7 +76,7 @@ describe('Trace Image workflow controls', () => {
         await changePreset(select, preset);
         expect(fillStyleSelect(host)).toBeInstanceOf(HTMLSelectElement);
       }
-      for (const preset of ['Centerline', 'Edge Detection']) {
+      for (const preset of ['Centerline']) {
         await changePreset(select, preset);
         expect(fillStyleSelect(host)).toBeNull();
       }
@@ -154,49 +156,11 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
-  it('shows simple Edge Detection controls when the edge preset is selected', async () => {
+  it('does not show Edge Detection guidance in the user-facing workflow', async () => {
     await withTraceDialog(async (host) => {
-      await changePreset(presetSelect(host), 'Edge Detection');
-
       const text = host.textContent ?? '';
-      for (const label of [
-        'Sensitivity',
-        'Detail',
-        'Minimum line',
-        'Creates outline contours from brightness changes.',
-        'Use Centerline for one-stroke Line mode.',
-      ]) {
-        expect(text).toContain(label);
-      }
-      expect(text).not.toContain('Cutoff');
-      expect(text).not.toContain('Threshold');
-      expect(text).not.toContain('Sketch Trace');
-    });
-  });
-
-  it('warns that Edge Detection double-outlines filled text and offers Line Art first', async () => {
-    await withTraceDialog(async (host) => {
-      const select = presetSelect(host);
-      await changePreset(select, 'Edge Detection');
-
-      const text = host.textContent ?? '';
-      expect(text).toContain('Edge Detection creates edge contours, not one-stroke lines.');
-      expect(text).toContain('Line mode will outline those detected edges.');
-      const buttons = Array.from(
-        host.querySelectorAll<HTMLButtonElement>(
-          'div[aria-label="Edge Detection guidance"] button',
-        ),
-      );
-      expect(buttons.map((button) => button.textContent?.trim())).toEqual([
-        'Use Line Art',
-        'Use Centerline',
-      ]);
-
-      await act(async () => {
-        buttons[0]?.click();
-      });
-
-      expect(select.value).toBe('Line Art');
+      expect(text).not.toContain('Edge Detection');
+      expect(host.querySelector('div[aria-label="Edge Detection guidance"]')).toBeNull();
     });
   });
 });

@@ -109,6 +109,39 @@ describe('addRegistrationBox store action', () => {
   });
 });
 
+describe('addRegistrationCircle store action', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it('creates the diameter-sized circle centered, selects it, and dirties the project', () => {
+    useStore.getState().addRegistrationCircle(60);
+    const state = useStore.getState();
+    const boxes = findRegistrationBoxes(state.project.scene);
+    expect(boxes).toHaveLength(1);
+    expect(boxes[0]?.spec).toEqual({ kind: 'ellipse', widthMm: 60, heightMm: 60 });
+    expect(state.selectedObjectId).toBe(boxes[0]?.id);
+    expect(state.dirty).toBe(true);
+    expect(boxes[0]?.transform.x).toBe((state.project.device.bedWidth - 60) / 2);
+    expect(boxes[0]?.transform.y).toBe((state.project.device.bedHeight - 60) / 2);
+  });
+
+  it('replacing a box with a circle keeps the existing jig position and lock state', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    useStore.getState().setRegistrationBoxLocked(true);
+    useStore.getState().nudgeSelection(15, 25);
+    const moved = findRegistrationBoxes(useStore.getState().project.scene)[0];
+
+    useStore.getState().addRegistrationCircle(70);
+
+    const replaced = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(replaced?.spec).toEqual({ kind: 'ellipse', widthMm: 70, heightMm: 70 });
+    expect(replaced?.transform.x).toBe(moved?.transform.x);
+    expect(replaced?.transform.y).toBe(moved?.transform.y);
+    expect(replaced?.locked).toBe(true);
+  });
+});
+
 describe('centerSelectionInRegistrationBox store action', () => {
   beforeEach(() => {
     resetStore();

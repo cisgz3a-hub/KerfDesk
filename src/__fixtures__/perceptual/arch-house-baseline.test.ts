@@ -7,7 +7,9 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS, traceImageToColoredPaths } from '../../core/trace';
+import { preprocessForTrace } from '../../core/trace/trace-image';
 import { decodePngFile } from './png-decode';
+import { compareMasks } from './compare';
 import {
   buildTraceArtifact,
   requiredArchHouseFixtureStatus,
@@ -92,6 +94,29 @@ describe('arch-house real logo Line Art acceptance', () => {
   );
 
   it(
+    'matches the preprocessed logo mask closely enough to catch visible flooding',
+    { timeout: 120_000 },
+    async () => {
+      const fixture = requiredArchHouseFixtureStatus();
+      if (fixture.path === null) throw new Error(`Missing fixture: ${fixture.expectedPathGlob}`);
+      const image = decodePngFile(fixture.path);
+      const paths = await traceImageToColoredPaths(image, LINE_ART_OPTIONS);
+      const tracedMask = rasterizeColoredPaths(paths, image.width, image.height);
+      const truthMask = maskFromMonochrome(preprocessForTrace(image, LINE_ART_OPTIONS));
+      const metrics = compareMasks(tracedMask, truthMask);
+
+      console.log(
+        `[arch-house] Line Art mask IoU=${metrics.iou.toFixed(3)}, ` +
+          `precision=${metrics.precision.toFixed(3)}, recall=${metrics.recall.toFixed(3)}`,
+      );
+
+      expect(metrics.iou).toBeGreaterThanOrEqual(0.9);
+      expect(metrics.precision).toBeGreaterThanOrEqual(0.9);
+      expect(metrics.recall).toBeGreaterThanOrEqual(0.9);
+    },
+  );
+
+  it(
     'keeps LANGEBAAN when Line Art receives an explicit Sketch Trace off override',
     { timeout: 120_000 },
     async () => {
@@ -123,4 +148,16 @@ function countInk(
     }
   }
   return count;
+}
+
+function maskFromMonochrome(image: {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+}): Mask {
+  const data = new Uint8Array(image.width * image.height);
+  for (let pixel = 0; pixel < data.length; pixel += 1) {
+    data[pixel] = (image.data[pixel * 4] ?? 255) < 128 ? 1 : 0;
+  }
+  return { width: image.width, height: image.height, data };
 }

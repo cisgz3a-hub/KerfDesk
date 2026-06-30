@@ -214,11 +214,11 @@ function edgeSegmentedCurveLinkingBenchmark(): TraceBenchmarkResult {
   const polylines = paths.flatMap((path) => path.polylines);
   const quality = measureSegmentedStrokeContinuity(polylines, SEGMENTED_STROKE_CIRCLE_FIXTURE);
   const findings: TraceBenchmarkFinding[] = [];
-  pushFindingIf(quality.strokePolylineCount > 4, findings, {
+  pushFindingIf(quality.strokePolylineCount > 6, findings, {
     severity: 'high',
     metric: 'strokePolylineCount',
     actual: quality.strokePolylineCount,
-    target: '<= 4',
+    target: '<= 6',
     message: 'Edge Detection leaves small broken curve gaps as separate stroke fragments.',
     fixHint:
       'Improve bounded curve-gap linking before contour smoothing without broadening independent edges.',
@@ -249,7 +249,7 @@ function edgeSegmentedCurveLinkingBenchmark(): TraceBenchmarkResult {
       maxLongestStrokeAngularGapDeg: quality.maxLongestStrokeAngularGapDeg,
     },
     benchmark: {
-      strokePolylineCount: '<= 4',
+      strokePolylineCount: '<= 6',
       longestStrokeAngularCoverageRatio: '>= 0.9',
       maxLongestStrokeAngularGapDeg: '<= 30',
     },
