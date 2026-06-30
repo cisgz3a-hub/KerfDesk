@@ -19,9 +19,21 @@ export type ToolpathStep =
   | {
       readonly kind: 'cut';
       readonly color: string;
+      readonly source?: RasterToolpathSource;
       readonly polyline: ReadonlyArray<Vec2>;
       readonly length: number;
     };
+
+export type RasterToolpathSource = {
+  readonly kind: 'raster';
+  readonly objectId?: string;
+  readonly source?: string;
+  readonly passIndex: number;
+  readonly rowIndex: number;
+  readonly spanIndex: number;
+  readonly pixelStartX: number;
+  readonly pixelEndX: number;
+};
 
 export type Toolpath = {
   readonly steps: ReadonlyArray<ToolpathStep>;
@@ -139,8 +151,14 @@ function appendRasterGroupSteps(
       const worldY = group.bounds.minY + (y + 0.5) * pixelHeightMm;
       const reverse = (group.bidirectional ?? true) && emittedRowCount % 2 === 1;
       const ordered = reverse ? [...spans].reverse() : spans;
-      for (const span of ordered) {
-        prevEnd = appendRasterSpanSweepSteps(steps, prevEnd, group, span, worldY, reverse);
+      for (let spanIndex = 0; spanIndex < ordered.length; spanIndex += 1) {
+        const span = ordered[spanIndex];
+        if (span === undefined) continue;
+        prevEnd = appendRasterSpanSweepSteps(steps, prevEnd, group, span, worldY, reverse, {
+          passIndex: pass,
+          rowIndex: y,
+          spanIndex,
+        });
       }
       emittedRowCount += 1;
     }
@@ -192,6 +210,11 @@ function appendRasterSpanSweepSteps(
   span: RasterSpan,
   worldY: number,
   reverse: boolean,
+  sourcePosition: {
+    readonly passIndex: number;
+    readonly rowIndex: number;
+    readonly spanIndex: number;
+  },
 ): Vec2 {
   const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
   const activeStartX = group.bounds.minX + span.firstX * pixelWidthMm;
@@ -219,6 +242,16 @@ function appendRasterSpanSweepSteps(
   steps.push({
     kind: 'cut',
     color: group.color,
+    source: {
+      kind: 'raster',
+      ...(group.sourceObjectId === undefined ? {} : { objectId: group.sourceObjectId }),
+      ...(group.source === undefined ? {} : { source: group.source }),
+      passIndex: sourcePosition.passIndex,
+      rowIndex: sourcePosition.rowIndex,
+      spanIndex: sourcePosition.spanIndex,
+      pixelStartX: span.firstX,
+      pixelEndX: span.lastX,
+    },
     polyline: [burnStart, burnEnd],
     length: dist(burnStart, burnEnd),
   });
@@ -336,6 +369,7 @@ function truncateStep(step: ToolpathStep, length: number): ToolpathStep {
   }
   const partial = truncatePolyline(step.polyline, length);
   return {
+    ...step,
     kind: 'cut',
     color: step.color,
     polyline: partial,

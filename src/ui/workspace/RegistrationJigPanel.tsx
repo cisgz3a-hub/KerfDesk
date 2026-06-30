@@ -12,12 +12,11 @@ import {
   registrationRunState,
   type RegistrationRunState,
 } from '../../core/scene';
-import { Button, NumberInput } from '../kit';
+import { Button } from '../kit';
 import { useStore } from '../state';
 import { useUiStore, type FloatingPanelPosition } from '../state/ui-store';
+import { RegistrationJigOutlineControls } from './RegistrationJigOutlineControls';
 
-const DEFAULT_WIDTH_MM = 80;
-const DEFAULT_HEIGHT_MM = 40;
 const PANEL_MARGIN_PX = 12;
 
 type DragState = {
@@ -72,18 +71,18 @@ export function RegistrationJigPanel(): JSX.Element | null {
 
       <NextBurnBanner state={runState} />
 
-      <JigBoxControls />
+      <RegistrationJigOutlineControls />
 
       <Button
         onClick={centerInBox}
         disabled={!canCenter}
         title={
           canCenter
-            ? 'Center the selected artwork in the box'
-            : 'Select your artwork first, then center it in the box'
+            ? 'Center the selected artwork in the jig outline'
+            : 'Select your artwork first, then center it in the jig outline'
         }
       >
-        Center artwork in box
+        Center artwork in outline
       </Button>
 
       <BurnRunToggle
@@ -204,73 +203,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-// Box size + create/replace/remove + lock. Self-contained (owns the size inputs)
-// so the panel root stays under the function-size cap.
-function JigBoxControls(): JSX.Element {
-  const scene = useStore((s) => s.project.scene);
-  const addRegistrationBox = useStore((s) => s.addRegistrationBox);
-  const removeBox = useStore((s) => s.removeRegistrationBox);
-  const setBoxLocked = useStore((s) => s.setRegistrationBoxLocked);
-
-  const box = findRegistrationBoxes(scene)[0];
-  const hasBox = box !== undefined;
-  const boxLocked = box?.locked === true;
-  const rectSpec = box !== undefined && box.spec.kind === 'rect' ? box.spec : null;
-  const [widthMm, setWidthMm] = useState(String(rectSpec?.widthMm ?? DEFAULT_WIDTH_MM));
-  const [heightMm, setHeightMm] = useState(String(rectSpec?.heightMm ?? DEFAULT_HEIGHT_MM));
-  const onCreate = (): void => {
-    const w = Number(widthMm);
-    const h = Number(heightMm);
-    if (Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1) addRegistrationBox(w, h);
-  };
-
-  return (
-    <>
-      <div style={sizeRowStyle}>
-        <span>W</span>
-        <NumberInput
-          value={widthMm}
-          min={1}
-          step={1}
-          aria-label="Registration box width"
-          style={sizeInputStyle}
-          onChange={(e) => setWidthMm(e.target.value)}
-        />
-        <span>H</span>
-        <NumberInput
-          value={heightMm}
-          min={1}
-          step={1}
-          aria-label="Registration box height"
-          style={sizeInputStyle}
-          onChange={(e) => setHeightMm(e.target.value)}
-        />
-        <span style={unitStyle}>mm</span>
-        <Button variant="primary" onClick={onCreate}>
-          {hasBox ? 'Replace box' : 'Create box'}
-        </Button>
-        {hasBox ? (
-          <Button variant="danger" onClick={removeBox}>
-            Remove box
-          </Button>
-        ) : null}
-      </div>
-      {hasBox ? (
-        <label style={lockRowStyle}>
-          <input
-            type="checkbox"
-            checked={boxLocked}
-            aria-label="Lock registration box"
-            title="Lock the box so it can't move between the two burns"
-            onChange={(e) => setBoxLocked(e.target.checked)}
-          />
-          Lock box (prevent moving between burns)
-        </label>
-      ) : null}
-    </>
-  );
-}
-
 function NextBurnBanner(props: { readonly state: RegistrationRunState }): JSX.Element {
   const banner = bannerFor(props.state);
   return (
@@ -286,11 +218,11 @@ function bannerFor(state: RegistrationRunState): {
 } {
   switch (state) {
     case 'none':
-      return { className: 'lf-banner', text: 'Create a box below to begin.' };
+      return { className: 'lf-banner', text: 'Create a jig outline below to begin.' };
     case 'box':
       return {
         className: 'lf-banner lf-banner--info',
-        text: '▶ Next Start burns: BOX outline (run 1)',
+        text: '▶ Next Start burns: JIG outline (run 1)',
       };
     case 'artwork':
       return {
@@ -300,7 +232,7 @@ function bannerFor(state: RegistrationRunState): {
     case 'mixed':
       return {
         className: 'lf-banner lf-banner--warning',
-        text: 'Pick a run below — Box only or Artwork only.',
+        text: 'Pick a run below — Outline only or Artwork only.',
       };
   }
 }
@@ -319,7 +251,7 @@ function BurnRunToggle(props: {
         disabled={props.disabled}
         onClick={() => props.onPick('box')}
       >
-        Box only
+        Outline only
       </Button>
       <Button
         pressed={props.state === 'artwork'}
@@ -343,20 +275,20 @@ function RegistrationJigHelp(): JSX.Element {
       {open && (
         <ol style={helpListStyle}>
           <li>
-            Set the size and <strong>Create box</strong>. Pick <strong>Box only</strong>, then Start
-            to burn the box on scrap.
+            Pick Rectangle or Circle, set the size, and create the outline. Pick{' '}
+            <strong>Outline only</strong>, then Start to burn the outline on scrap.
           </li>
           <li>Put your object inside the burned outline.</li>
           <li>
-            Add your artwork, select it, then <strong>Center artwork in box</strong>.
+            Add your artwork, select it, then <strong>Center artwork in outline</strong>.
           </li>
           <li>
             Pick <strong>Artwork only</strong>, then Start to burn the art.
           </li>
           <li style={helpNoteStyle}>
-            Drag the box onto your material to move it; Remove box deletes it. On a no-homing
-            machine, Set Origin + Frame (Laser panel) first; a homing machine can burn straight from
-            the box's position.
+            Drag the outline onto your material to move it; Remove outline deletes it. On a
+            no-homing machine, Set Origin + Frame (Laser panel) first; a homing machine can burn
+            straight from the outline's position.
           </li>
         </ol>
       )}
@@ -388,20 +320,6 @@ const dragHandleStyle: React.CSSProperties = {
   cursor: 'grab',
   touchAction: 'none',
   userSelect: 'none',
-};
-const sizeRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  flexWrap: 'wrap',
-};
-const sizeInputStyle: React.CSSProperties = { width: 56 };
-const unitStyle: React.CSSProperties = { color: 'var(--lf-text-faint)' };
-const lockRowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 12,
 };
 const toggleRowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
 const helpStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4 };

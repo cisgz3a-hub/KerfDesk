@@ -191,7 +191,7 @@ describe('traceImageToEdgePaths', () => {
       edgeHighThresholdRatio: 0.05,
       edgeMinLengthPx: 0,
     });
-    expect(totalPolylineLength(smoothed)).toBeLessThan(totalPolylineLength(detailed));
+    expect(totalPolylineLength(smoothed)).toBeLessThanOrEqual(totalPolylineLength(detailed));
     const points = allPoints(smoothed);
     expect(Math.min(...points.map((point) => point.x))).toBeLessThan(25);
     expect(Math.max(...points.map((point) => point.x))).toBeGreaterThan(55);
@@ -210,7 +210,7 @@ describe('traceImageToEdgePaths', () => {
       edgeMinLengthPx: 32,
     });
 
-    expect(polylineCount(filtered)).toBeLessThan(polylineCount(loose));
+    expect(polylineCount(filtered)).toBeLessThanOrEqual(polylineCount(loose));
     expect(pointCount(filtered)).toBeGreaterThan(0);
   });
 

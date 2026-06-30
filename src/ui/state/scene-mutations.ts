@@ -55,6 +55,14 @@ export type MutationResult = {
 
 export type TraceExistingImageOptions = {
   readonly deleteSourceAfterTrace?: boolean;
+  readonly replaceTraceId?: string;
+};
+
+type PreparedTraceSource = {
+  readonly scene: Scene;
+  readonly transform: Transform;
+  readonly traceSourceId?: string;
+  readonly shouldPruneLayers: boolean;
 };
 
 // Push the previous project onto undoStack with a depth cap. Co-located
@@ -358,27 +366,15 @@ export function applyTraceToExisting(
   options: TraceExistingImageOptions = {},
 ): MutationResult {
   const existing = s.project.scene.objects.find((o) => o.id === sourceId);
-  let scene = s.project.scene;
-  let transform = traced.transform;
-  if (existing !== undefined && existing.kind === 'raster-image') {
-    transform = overlayTransformForRaster(existing);
-    if (options.deleteSourceAfterTrace === true) {
-      scene = removeObject(scene, existing.id);
-    } else {
-      const taggedSource: RasterImage = { ...existing, role: 'trace-source' };
-      scene = replaceObject(scene, existing.id, taggedSource);
-    }
+  const prepared = prepareTraceSource(s.project.scene, existing, traced, options);
+  let scene = prepared.scene;
+  const positionedTrace = positionTrace(traced, prepared.transform, prepared.traceSourceId);
+  if (options.replaceTraceId !== undefined) {
+    scene = removeObject(scene, options.replaceTraceId);
   }
-  const positionedTrace: TracedImage = { ...traced, transform };
   scene = addObject(scene, positionedTrace);
-  if (positionedTrace.traceMode === 'centerline' || positionedTrace.traceMode === 'edge') {
-    scene = ensureLineLayersForColors(scene, positionedTrace.paths);
-  } else if (usesObjectFillOverride(positionedTrace)) {
-    scene = ensureNewFillLayersForColors(scene, positionedTrace.paths);
-  } else {
-    scene = ensureFillLayersForColors(scene, positionedTrace.paths);
-  }
-  if (existing !== undefined && options.deleteSourceAfterTrace === true) {
+  scene = ensureLayersForTrace(scene, positionedTrace);
+  if (prepared.shouldPruneLayers) {
     scene = pruneOrphanLayers(scene);
   }
   return {
@@ -388,6 +384,62 @@ export function applyTraceToExisting(
     redoStack: [],
     dirty: true,
   };
+}
+
+function prepareTraceSource(
+  scene: Scene,
+  existing: SceneObject | undefined,
+  traced: TracedImage,
+  options: TraceExistingImageOptions,
+): PreparedTraceSource {
+  if (existing === undefined || existing.kind !== 'raster-image') {
+    return traced.traceSourceId === undefined
+      ? { scene, transform: traced.transform, shouldPruneLayers: false }
+      : {
+          scene,
+          transform: traced.transform,
+          traceSourceId: traced.traceSourceId,
+          shouldPruneLayers: false,
+        };
+  }
+  const transform = overlayTransformForRaster(existing);
+  if (options.deleteSourceAfterTrace === true) {
+    return {
+      scene: removeObject(scene, existing.id),
+      transform,
+      traceSourceId: existing.id,
+      shouldPruneLayers: true,
+    };
+  }
+  const taggedSource: RasterImage = { ...existing, role: 'trace-source' };
+  return {
+    scene: replaceObject(scene, existing.id, taggedSource),
+    transform,
+    traceSourceId: existing.id,
+    shouldPruneLayers: false,
+  };
+}
+
+function positionTrace(
+  traced: TracedImage,
+  transform: Transform,
+  traceSourceId: string | undefined,
+): TracedImage {
+  return {
+    ...traced,
+    ...(traceSourceId === undefined ? {} : { traceSourceId }),
+    transform,
+  };
+}
+
+function ensureLayersForTrace(scene: Scene, trace: TracedImage): Scene {
+  if (trace.traceMode === 'centerline' || trace.traceMode === 'edge') {
+    return ensureLineLayersForColors(scene, trace.paths);
+  }
+  if (usesObjectFillOverride(trace)) {
+    return ensureNewFillLayersForColors(scene, trace.paths);
+  }
+  return ensureFillLayersForColors(scene, trace.paths);
 }
 
 function usesObjectFillOverride(trace: TracedImage): boolean {

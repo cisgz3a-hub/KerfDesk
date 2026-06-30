@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildJogCommand,
+  CMD_CLEAR_PERSISTENT_ORIGIN,
   CMD_HOME,
+  CMD_SET_PERSISTENT_ORIGIN_HERE,
   CMD_UNLOCK,
   RT_HOLD,
   RT_JOG_CANCEL,
@@ -24,6 +26,11 @@ describe('GRBL line commands', () => {
   it('uses the documented $-prefixed forms', () => {
     expect(CMD_HOME).toBe('$H');
     expect(CMD_UNLOCK).toBe('$X');
+  });
+
+  it('uses explicit G10 commands for advanced persistent G54 origin', () => {
+    expect(CMD_SET_PERSISTENT_ORIGIN_HERE).toBe('G10 L20 P1 X0 Y0');
+    expect(CMD_CLEAR_PERSISTENT_ORIGIN).toBe('G10 L2 P1 X0 Y0');
   });
 });
 

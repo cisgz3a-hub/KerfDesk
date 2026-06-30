@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createLayer } from './layer';
 import { EMPTY_SCENE, addObject, type Scene } from './scene';
-import { IDENTITY_TRANSFORM, type SceneObject } from './scene-object';
+import { IDENTITY_TRANSFORM, type Polyline, type SceneObject } from './scene-object';
 import { hitTest, transformedBBox } from './hit-test';
 
 function obj(args: {
@@ -27,13 +27,56 @@ function obj(args: {
   };
 }
 
+function outlinedRect(args: {
+  id: string;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  color?: string;
+}): SceneObject {
+  const color = args.color ?? '#ff0000';
+  return {
+    kind: 'imported-svg',
+    id: args.id,
+    source: `${args.id}.svg`,
+    bounds: { minX: args.minX, minY: args.minY, maxX: args.maxX, maxY: args.maxY },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color, polylines: [rectPolyline(args)] }],
+  };
+}
+
+function rectPolyline(args: { minX: number; minY: number; maxX: number; maxY: number }): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: args.minX, y: args.minY },
+      { x: args.maxX, y: args.minY },
+      { x: args.maxX, y: args.maxY },
+      { x: args.minX, y: args.maxY },
+    ],
+  };
+}
+
 function withObjects(...objs: SceneObject[]): Scene {
+  return withObjectsAndLayerModes(new Map(), ...objs);
+}
+
+function withObjectsAndLayerModes(
+  modes: ReadonlyMap<string, 'line' | 'fill' | 'image'>,
+  ...objs: SceneObject[]
+): Scene {
   const colors = new Set(
     objs.flatMap((o) => (o.kind === 'raster-image' ? [o.color] : o.paths.map((p) => p.color))),
   );
   const scene = {
     ...EMPTY_SCENE,
-    layers: [...colors].map((color) => createLayer({ id: color, color })),
+    layers: [...colors].map((color) => {
+      const mode = modes.get(color);
+      return mode === undefined
+        ? createLayer({ id: color, color })
+        : createLayer({ id: color, color, mode });
+    }),
   };
   return objs.reduce<Scene>((acc, o) => addObject(acc, o), scene);
 }
@@ -65,6 +108,25 @@ describe('hitTest', () => {
     expect(hitTest(scene, { x: 50, y: 50 })).toBeNull();
   });
 
+  it('rejects vector objects outside their expanded bounds before walking path geometry', () => {
+    const throwingPolyline = {
+      closed: true,
+      get points(): ReadonlyArray<{ readonly x: number; readonly y: number }> {
+        throw new Error('walked polyline geometry');
+      },
+    };
+    const scene = withObjects({
+      kind: 'imported-svg',
+      id: 'A',
+      source: 'A.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [{ color: '#ff0000', polylines: [throwingPolyline] }],
+    });
+
+    expect(hitTest(scene, { x: 50, y: 50 })).toBeNull();
+  });
+
   it('prefers the topmost object when bboxes overlap', () => {
     // 'B' added second → rendered on top → hit first.
     const scene = withObjects(
@@ -74,6 +136,37 @@ describe('hitTest', () => {
     expect(hitTest(scene, { x: 10, y: 10 })).toBe('B');
     // Outside B but inside A → falls through to A.
     expect(hitTest(scene, { x: 18, y: 18 })).toBe('A');
+  });
+
+  it('prefers the smaller closed outline under the pointer over a larger outline above it', () => {
+    const inner = outlinedRect({ id: 'inner', minX: 30, minY: 30, maxX: 45, maxY: 45 });
+    const outer = outlinedRect({ id: 'outer', minX: 0, minY: 0, maxX: 100, maxY: 100 });
+    const scene = withObjects(inner, outer);
+
+    expect(hitTest(scene, { x: 35, y: 35 })).toBe('inner');
+    expect(hitTest(scene, { x: 1, y: 50 })).toBe('outer');
+  });
+
+  it('keeps filled top objects selectable through their interior', () => {
+    const inner = outlinedRect({
+      id: 'inner',
+      minX: 30,
+      minY: 30,
+      maxX: 45,
+      maxY: 45,
+      color: '#00ff00',
+    });
+    const outer = outlinedRect({
+      id: 'outer',
+      minX: 0,
+      minY: 0,
+      maxX: 100,
+      maxY: 100,
+      color: '#0000ff',
+    });
+    const scene = withObjectsAndLayerModes(new Map([['#0000ff', 'fill']]), inner, outer);
+
+    expect(hitTest(scene, { x: 35, y: 35 })).toBe('outer');
   });
 
   it('skips locked objects and hits the next unlocked object underneath', () => {

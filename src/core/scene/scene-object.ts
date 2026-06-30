@@ -135,6 +135,7 @@ export type TracedImage = ObjectPowerScale & {
   readonly kind: 'traced-image';
   readonly id: string;
   readonly source: string;
+  readonly traceSourceId?: string;
   // Missing means legacy filled-contour trace.
   readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
   readonly bounds: Bounds;

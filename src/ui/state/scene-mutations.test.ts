@@ -429,6 +429,13 @@ describe('applyTraceToExisting (ADR-026)', () => {
     }
   });
 
+  it('records the source raster id on the trace for Re-trace Original', () => {
+    const project = projectWithSource();
+    const result = applyTraceToExisting({ project, undoStack: [] }, 'src1', tracedVector());
+    const trace = result.project.scene.objects.find((o) => o.kind === 'traced-image');
+    expect(trace?.traceSourceId).toBe('src1');
+  });
+
   it('degrades gracefully: missing source → trace added at its own transform, nothing tagged', () => {
     const project = projectWithSource();
     const result = applyTraceToExisting({ project, undoStack: [] }, 'no-such-id', tracedVector());

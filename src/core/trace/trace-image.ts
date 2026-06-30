@@ -130,7 +130,7 @@ export type TraceOptions = {
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
-  // Edge Detection-only Canny controls. UI exposes these as three simple
+  // Edge Detection-only controls. UI exposes these as three simple
   // operator knobs: Sensitivity, Detail, and Minimum line.
   readonly edgeBlurSigma?: number;
   readonly edgeLowThresholdRatio?: number;
@@ -138,6 +138,7 @@ export type TraceOptions = {
   readonly edgeMinLengthPx?: number;
   readonly edgeJoinGapPx?: number;
   readonly edgeMedianFilter?: boolean;
+  readonly centerlineJoinGapPx?: number;
   // Phase E.3 — image-level adjustments matching LF1's
   // ImageProcessing.ts math (see raster-prep.ts). All four run BEFORE the
   // existing median → threshold → despeckle chain, so the cleanup
@@ -226,13 +227,12 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     useOtsuThreshold: true,
     despeckleMinPixels: 12,
+    centerlineJoinGapPx: 3,
   },
   'Edge Detection': {
-    // Canny edge detection -> closed contour vectors around brightness
+    // Contrast edge vectorization -> stroked contour vectors around brightness
     // transitions. For full-colour art / logos that should engrave as a line
-    // drawing of their edges, not a flat silhouette. Brightness threshold /
-    // palette knobs are ignored here; Edge controls and median denoise feed
-    // Canny directly.
+    // drawing of their edges, not a flat filled silhouette.
     traceMode: 'edge',
     numberOfColors: 2,
     pathOmit: 0,
@@ -247,8 +247,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeBlurSigma: 1.2,
     edgeLowThresholdRatio: 0.08,
     edgeHighThresholdRatio: 0.2,
-    edgeMinLengthPx: 8,
-    edgeJoinGapPx: 3,
+    edgeMinLengthPx: 24,
+    edgeJoinGapPx: 5,
     edgeMedianFilter: true,
   },
   Smooth: {

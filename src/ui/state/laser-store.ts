@@ -60,10 +60,8 @@ import {
   type StallProbe,
 } from './laser-store-helpers';
 
-export type { AutofocusResult } from './autofocus-action';
-export { describeAutofocusResult } from './autofocus-action';
-export { hasCustomOrigin } from './origin-actions';
-export type { WorkCoordinateOffset } from './origin-actions';
+export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
+export { hasCustomOrigin, type WorkCoordinateOffset } from './origin-actions';
 
 const DEFAULT_BAUD = 115200;
 // 250 ms tick; idle machines only emit `?` every 4th tick.
@@ -76,6 +74,7 @@ export type ConnectionState =
   | { readonly kind: 'connected' }
   | { readonly kind: 'failed'; readonly error: string };
 export type HomingState = 'unknown' | 'homing' | 'confirmed';
+export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 
 export type LaserState = {
   readonly connection: ConnectionState;
@@ -114,6 +113,7 @@ export type LaserState = {
    */
   readonly wcoCache: WorkCoordinateOffset | null;
   readonly workOriginActive: boolean;
+  readonly workOriginSource: WorkOriginSource;
   /**
    * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
    * the current origin. Set when a frame is dispatched in 'verified-origin'
@@ -153,12 +153,11 @@ export type LaserState = {
   readonly clearSafetyNotice: () => void;
   readonly applyDetectedSettings: () => void;
   readonly dismissDetectedSettings: () => void;
-  // F.3 origin actions. setOriginHere sends G92 X0 Y0 (transient,
-  // session-scoped); resetOrigin sends G92.1 to clear it. Cache
-  // updates flow back through line-handler when GRBL's next
-  // WCO-bearing status arrives.
+  // G92 is the default session-scoped origin; advanced controls use G10/G54.
   readonly setOriginHere: () => Promise<void>;
   readonly resetOrigin: () => Promise<void>;
+  readonly setPersistentOriginHere: () => Promise<void>;
+  readonly clearPersistentOrigin: () => Promise<void>;
   // ADR-053 P4 — $SLP to release the steppers for hand-positioning. Drops the
   // origin + Verified Frame, since the head is about to move and waking needs a
   // soft-reset that clears G92.
@@ -297,6 +296,7 @@ function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' |
         streamer: null,
         wcoCache: null,
         workOriginActive: false,
+        workOriginSource: 'none',
         frameVerification: null,
         motionOperation: null,
         controllerOperation: null,

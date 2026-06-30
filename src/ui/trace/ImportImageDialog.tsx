@@ -20,9 +20,8 @@
 //      and the source is re-tagged 'trace-source' as the deletable
 //      backing.
 //
-// Result is tagged with `kind: 'traced-image'` so the source
-// filename + future "re-trace from original raster" workflow can
-// find it.
+// Result is tagged with `kind: 'traced-image'` plus the source raster id so
+// "Re-trace Original" can reopen this dialog from the kept backing image.
 //
 // Presentational pieces (SourceLabel, PresetPicker, DialogActions,
 // styles) live in dialog-parts.tsx; the pure-data option transforms
@@ -52,7 +51,6 @@ import {
   DeleteImageAfterTraceToggle,
   PresetHint,
   PresetPicker,
-  PresetWarning,
   SourceLabel,
   TraceFillStylePicker,
   type TraceFillStyle,
@@ -65,12 +63,20 @@ import { TracePreview } from './TracePreview';
 import { useTracePreview } from './use-trace-preview';
 
 export function ImportImageDialog(): JSX.Element | null {
-  const seed = useUiStore((s) => s.imageDialog);
-  if (seed === null) return null;
-  return <DialogBody seed={seed} />;
+  const dialog = useUiStore((s) => s.imageDialog);
+  if (dialog === null) return null;
+  return dialog.replaceTraceId === undefined ? (
+    <DialogBody seed={dialog.source} />
+  ) : (
+    <DialogBody seed={dialog.source} replaceTraceId={dialog.replaceTraceId} />
+  );
 }
 
-function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
+function DialogBody(props: {
+  readonly seed: RasterImage;
+  readonly replaceTraceId?: string;
+}): JSX.Element {
+  const { seed } = props;
   const close = useUiStore((s) => s.closeImageDialog);
   const traceExistingImage = useStore((s) => s.traceExistingImage);
   const pushToast = useToastStore((s) => s.pushToast);
@@ -108,24 +114,22 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       pushToast('Image still loading — try again in a moment.', 'warning');
       return;
     }
-    void commit(
-      {
-        file,
-        options,
-        seed,
-        traceFillStyle: supportsTraceFillStyle ? traceFillStyle : 'scanline',
-        deleteSourceAfterTrace,
-        boundary,
-      },
-      {
-        traceExistingImage,
-        pushToast,
-        close,
-        setBusy,
-        getCurrentObject: (id) =>
-          useStore.getState().project.scene.objects.find((o) => o.id === id),
-      },
-    );
+    const traceArgs = {
+      file,
+      options,
+      seed,
+      traceFillStyle: supportsTraceFillStyle ? traceFillStyle : 'scanline',
+      deleteSourceAfterTrace,
+      boundary,
+      ...(props.replaceTraceId === undefined ? {} : { replaceTraceId: props.replaceTraceId }),
+    };
+    void commit(traceArgs, {
+      traceExistingImage,
+      pushToast,
+      close,
+      setBusy,
+      getCurrentObject: (id) => useStore.getState().project.scene.objects.find((o) => o.id === id),
+    });
   };
 
   // kit Dialog owns the a11y wiring (Escape, focus trap, focus return).
@@ -134,7 +138,6 @@ function DialogBody({ seed }: { readonly seed: RasterImage }): JSX.Element {
       <h2 className="lf-dialog-title">Trace Image</h2>
       <SourceLabel name={seed.source} />
       <PresetPicker value={preset} onChange={setPreset} />
-      <PresetWarning preset={preset} onPresetChange={setPreset} />
       {supportsTraceFillStyle ? (
         <TraceFillStylePicker value={traceFillStyle} onChange={setTraceFillStyle} />
       ) : null}
@@ -219,6 +222,7 @@ export async function commit(
     readonly seed: RasterImage;
     readonly traceFillStyle?: TraceFillStyle;
     readonly deleteSourceAfterTrace?: boolean;
+    readonly replaceTraceId?: string;
     readonly boundary?: TraceBoundary | null;
   },
   ctx: {
@@ -253,17 +257,13 @@ export async function commit(
     // transform is a placeholder: applyTraceToExisting overwrites it
     // with the source bitmap's own transform so the vectors register
     // pixel-for-pixel over the features they came from (ADR-026).
-    const traceMode: TracedImage['traceMode'] =
-      args.options.traceMode === 'centerline'
-        ? 'centerline'
-        : args.options.traceMode === 'edge'
-          ? 'edge'
-          : 'filled-contours';
+    const traceMode = traceModeForOptions(args.options);
     const operationOverride = operationOverrideForTrace(traceMode, args.traceFillStyle);
     const traced: TracedImage = {
       kind: 'traced-image',
-      id: crypto.randomUUID(),
+      id: args.replaceTraceId ?? crypto.randomUUID(),
       source: args.seed.source,
+      traceSourceId: args.seed.id,
       traceMode,
       bounds,
       transform: IDENTITY_TRANSFORM,
@@ -282,7 +282,11 @@ export async function commit(
       return;
     }
     const deleteSourceAfterTrace = args.deleteSourceAfterTrace === true;
-    ctx.traceExistingImage(args.seed.id, traced, { deleteSourceAfterTrace });
+    const traceOptions = {
+      deleteSourceAfterTrace,
+      ...(args.replaceTraceId === undefined ? {} : { replaceTraceId: args.replaceTraceId }),
+    };
+    ctx.traceExistingImage(args.seed.id, traced, traceOptions);
     const colorCount = traced.paths.length;
     const sourceStatus = deleteSourceAfterTrace ? 'source deleted' : 'source kept';
     ctx.pushToast(
@@ -321,4 +325,10 @@ function operationOverrideForTrace(
   if (traceMode !== 'filled-contours') return undefined;
   if (fillStyle === undefined) return undefined;
   return { mode: 'fill', fillStyle };
+}
+
+function traceModeForOptions(options: TraceOptions): NonNullable<TracedImage['traceMode']> {
+  if (options.traceMode === 'centerline') return 'centerline';
+  if (options.traceMode === 'edge') return 'edge';
+  return 'filled-contours';
 }

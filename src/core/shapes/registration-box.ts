@@ -7,6 +7,7 @@
 // and delete it when done. Pure — no scene mutation, no I/O.
 
 import { IDENTITY_TRANSFORM, REGISTRATION_LAYER_COLOR, type ShapeObject } from '../scene';
+import { createEllipse } from './create-ellipse';
 import { createRectangle } from './create-rectangle';
 
 export const REGISTRATION_BOX_OBJECT_ID = 'registration-box';
@@ -33,6 +34,24 @@ export function createRegistrationBox(args: {
     transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
   });
   return box;
+}
+
+export function createRegistrationCircle(args: {
+  readonly diameterMm: number;
+  readonly x?: number;
+  readonly y?: number;
+  readonly id?: string;
+}): ShapeObject {
+  const diameterMm = sanitizeSize(args.diameterMm);
+  return createEllipse({
+    id: args.id ?? REGISTRATION_BOX_OBJECT_ID,
+    color: REGISTRATION_LAYER_COLOR,
+    spec: {
+      widthMm: diameterMm,
+      heightMm: diameterMm,
+    },
+    transform: { ...IDENTITY_TRANSFORM, x: args.x ?? 0, y: args.y ?? 0 },
+  });
 }
 
 function sanitizeSize(value: number): number {

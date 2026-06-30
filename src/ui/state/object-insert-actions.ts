@@ -12,7 +12,7 @@ import {
   type ShapeObject,
   type TextObject,
 } from '../../core/scene';
-import { createRegistrationBox } from '../../core/shapes';
+import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
@@ -44,6 +44,7 @@ export function objectInsertActions(
   | 'upsertTextObject'
   | 'drawShape'
   | 'addRegistrationBox'
+  | 'addRegistrationCircle'
   | 'removeRegistrationBox'
   | 'setRegistrationBoxLocked'
 > {
@@ -86,6 +87,23 @@ export function objectInsertActions(
             : { x: existing.transform.x, y: existing.transform.y };
         const box = createRegistrationBox({ widthMm, heightMm, x: position.x, y: position.y });
         const next = existing?.locked === true ? { ...box, locked: true } : box;
+        return applyAddRegistrationBox(s, next);
+      });
+    },
+    addRegistrationCircle: (diameterMm: number) => {
+      set((s) => {
+        const existing = findRegistrationBoxes(s.project.scene)[0];
+        const { bedWidth, bedHeight } = s.project.device;
+        const position =
+          existing === undefined
+            ? registrationBoxDefaultPosition(bedWidth, bedHeight, diameterMm, diameterMm)
+            : { x: existing.transform.x, y: existing.transform.y };
+        const circle = createRegistrationCircle({
+          diameterMm,
+          x: position.x,
+          y: position.y,
+        });
+        const next = existing?.locked === true ? { ...circle, locked: true } : circle;
         return applyAddRegistrationBox(s, next);
       });
     },

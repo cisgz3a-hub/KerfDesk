@@ -144,9 +144,21 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Trace the selected bitmap into editable vector paths.',
   },
+  'tools.retrace-original': {
+    family: 'tools',
+    tooltip: 'Re-open Trace Image from the original raster kept behind the selected trace.',
+  },
   'tools.multi-file-trace': {
     family: 'tools',
     tooltip: 'Trace multiple image files to standalone SVG exports without changing the workspace.',
+  },
+  'tools.convert-to-path': {
+    family: 'tools',
+    tooltip: 'Bake selected vector artwork into plain path geometry for node editing and welding.',
+  },
+  'tools.weld': {
+    family: 'tools',
+    tooltip: 'Union selected closed vector contours into one baked path object by layer color.',
   },
   'tools.convert-to-bitmap': {
     family: 'tools',

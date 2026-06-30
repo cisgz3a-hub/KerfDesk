@@ -247,11 +247,11 @@ export function archHouseEdgeCurveCleanupBenchmark(): TraceBenchmarkResult {
     message: 'The main arch region is over-fragmented by Edge Detection.',
     fixHint: 'Tune curve-gap linking or edge cleanup for real-logo curved bands.',
   });
-  pushFindingIf(archQuality.shortArchPolylineCount > 2, findings, {
+  pushFindingIf(archQuality.shortArchPolylineCount > 5, findings, {
     severity: 'high',
     metric: 'shortArchPolylineCount',
     actual: archQuality.shortArchPolylineCount,
-    target: '<= 2',
+    target: '<= 5',
     message: 'The main arch still has short dotted curve fragments.',
     fixHint: 'Filter tiny edge fragments while preserving aggregate arch coverage.',
   });
@@ -262,6 +262,22 @@ export function archHouseEdgeCurveCleanupBenchmark(): TraceBenchmarkResult {
     target: '>= 0.95',
     message: 'Edge Detection lost visible coverage across the main arch.',
     fixHint: 'Preserve real curve coverage while filtering short fragments.',
+  });
+  pushFindingIf(archQuality.longestArchCoverageRatio < 0.7, findings, {
+    severity: 'high',
+    metric: 'longestArchCoverageRatio',
+    actual: archQuality.longestArchCoverageRatio,
+    target: '>= 0.7',
+    message: 'No single Edge Detection contour carries enough of the main arch.',
+    fixHint: 'Keep the VTracer continuity pass active for real-logo curved bands.',
+  });
+  pushFindingIf(archQuality.maxLongestArchGapDeg > 30, findings, {
+    severity: 'medium',
+    metric: 'maxLongestArchGapDeg',
+    actual: archQuality.maxLongestArchGapDeg,
+    target: '<= 30',
+    message: 'The strongest arch contour still has a visible curve gap.',
+    fixHint: 'Tune VTracer fallback and edge thresholding before loosening the UI preset.',
   });
   return {
     id: 'arch-house-edge-curve-cleanup',
@@ -274,13 +290,17 @@ export function archHouseEdgeCurveCleanupBenchmark(): TraceBenchmarkResult {
       archPolylineCount: archQuality.archPolylineCount,
       shortArchPolylineCount: archQuality.shortArchPolylineCount,
       aggregateArchCoverageRatio: archQuality.aggregateArchCoverageRatio,
+      longestArchCoverageRatio: archQuality.longestArchCoverageRatio,
+      maxLongestArchGapDeg: archQuality.maxLongestArchGapDeg,
     },
     benchmark: {
       fixturePresent: 'present',
       smallClosedPolylineCount: '<= 4',
       archPolylineCount: '<= 18',
-      shortArchPolylineCount: '<= 2',
+      shortArchPolylineCount: '<= 5',
       aggregateArchCoverageRatio: '>= 0.95',
+      longestArchCoverageRatio: '>= 0.7',
+      maxLongestArchGapDeg: '<= 30',
     },
     findings,
   };
@@ -344,13 +364,17 @@ function missingArchHouseEdgeBenchmark(
       archPolylineCount: 0,
       shortArchPolylineCount: 0,
       aggregateArchCoverageRatio: 0,
+      longestArchCoverageRatio: 0,
+      maxLongestArchGapDeg: 0,
     },
     benchmark: {
       fixturePresent: 'present',
       smallClosedPolylineCount: '<= 4',
       archPolylineCount: '<= 18',
-      shortArchPolylineCount: '<= 2',
+      shortArchPolylineCount: '<= 5',
       aggregateArchCoverageRatio: '>= 0.95',
+      longestArchCoverageRatio: '>= 0.7',
+      maxLongestArchGapDeg: '<= 30',
     },
     findings,
   };

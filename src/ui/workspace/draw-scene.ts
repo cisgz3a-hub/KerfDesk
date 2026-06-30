@@ -34,7 +34,7 @@ import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawRulers } from './draw-rulers';
 import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
-import { drawObjectSelectionOverlay } from './draw-selection-overlay';
+import { drawObjectSelectionOverlay, drawSelectionSetOverlay } from './draw-selection-overlay';
 import { computeView, type ViewState, type ViewTransform } from './view-transform';
 import {
   drawLargeSceneNotice,
@@ -272,7 +272,28 @@ function drawObjects(
       additionalSelectedIds,
     });
   }
+  const selectionObjects = selectedObjectsForOverlay(
+    project.scene.objects,
+    selectedId,
+    additionalSelectedIds,
+    layerByColor,
+  );
+  if (selectionObjects.length > 1) drawSelectionSetOverlay(ctx, selectionObjects, view);
   return simplified;
+}
+
+function selectedObjectsForOverlay(
+  objects: ReadonlyArray<SceneObject>,
+  selectedId: string | null,
+  additionalSelectedIds: ReadonlySet<string>,
+  layerByColor: Map<string, Layer>,
+): ReadonlyArray<SceneObject> {
+  if (selectedId === null || additionalSelectedIds.size === 0) return [];
+  const selectedIds = new Set([selectedId, ...additionalSelectedIds]);
+  return objects.filter(
+    (object) =>
+      selectedIds.has(object.id) && sceneObjectHasVisibleLayerFromMap(object, layerByColor),
+  );
 }
 
 function drawObjectPolylines(
