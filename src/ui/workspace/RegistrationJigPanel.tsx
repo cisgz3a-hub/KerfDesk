@@ -5,7 +5,7 @@
 // mouse handling and keyboard shortcuts keep working while it is open; it stays
 // open until the operator closes it (toolbar toggle or the × here).
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type RefObject } from 'react';
 import {
   findRegistrationBoxes,
   hasRegistrationArtwork,
@@ -25,6 +25,8 @@ type DragState = {
   readonly startX: number;
   readonly startY: number;
 };
+
+type PanelPositionSetter = (next: FloatingPanelPosition) => void;
 
 export function RegistrationJigPanel(): JSX.Element | null {
   const open = useUiStore((s) => s.registrationPanelOpen);
@@ -58,9 +60,10 @@ export function RegistrationJigPanel(): JSX.Element | null {
           aria-label="Move registration jig panel"
           role="button"
           tabIndex={0}
-          title="Drag to move this panel"
+          title="Drag or use arrow keys to move this panel"
           style={dragHandleStyle}
           onPointerDown={drag.startDrag}
+          onKeyDown={drag.nudgeWithKeyboard}
         >
           Registration Jig
         </strong>
@@ -101,6 +104,7 @@ type PanelDragControls = {
   readonly panelRef: RefObject<HTMLElement>;
   readonly placementStyle: React.CSSProperties;
   readonly startDrag: (event: React.PointerEvent<HTMLElement>) => void;
+  readonly nudgeWithKeyboard: (event: React.KeyboardEvent<HTMLElement>) => void;
 };
 
 function useRegistrationPanelDrag(): PanelDragControls {
@@ -122,6 +126,57 @@ function useRegistrationPanelDrag(): PanelDragControls {
     [position],
   );
 
+  usePanelPointerDragEffect(dragging, dragRef, panelRef, setDragging, setPosition);
+
+  const startDrag = (event: React.PointerEvent<HTMLElement>): void => {
+    if (event.button !== 0) return;
+    const panel = panelRef.current;
+    const parent = panel === null ? null : panel.parentElement;
+    if (panel === null || parent === null) return;
+    const currentPosition = currentPanelPosition(panel, parent, position);
+    dragRef.current = {
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: currentPosition.x,
+      startY: currentPosition.y,
+    };
+    setPosition(currentPosition);
+    setDragging(true);
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const nudgeWithKeyboard = (event: React.KeyboardEvent<HTMLElement>): void => {
+    const delta = keyboardMoveDelta(event.key, event.shiftKey ? 1 : 10);
+    if (delta === null) return;
+    const panel = panelRef.current;
+    const parent = panel === null ? null : panel.parentElement;
+    if (panel === null || parent === null) return;
+    const panelRect = panel.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    const currentPosition = currentPanelPosition(panel, parent, position);
+    setPosition(
+      clampPanelPosition(
+        currentPosition.x + delta.x,
+        currentPosition.y + delta.y,
+        parentRect,
+        panelRect,
+      ),
+    );
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  return { panelRef, placementStyle, startDrag, nudgeWithKeyboard };
+}
+
+function usePanelPointerDragEffect(
+  dragging: boolean,
+  dragRef: MutableRefObject<DragState | null>,
+  panelRef: RefObject<HTMLElement>,
+  setDragging: (next: boolean) => void,
+  setPosition: PanelPositionSetter,
+): void {
   useEffect(() => {
     if (!dragging) return;
     const onPointerMove = (event: PointerEvent): void => {
@@ -129,12 +184,10 @@ function useRegistrationPanelDrag(): PanelDragControls {
       const panel = panelRef.current;
       const parent = panel === null ? null : panel.parentElement;
       if (drag === null || panel === null || parent === null) return;
-      const nextX = drag.startX + event.clientX - drag.startClientX;
-      const nextY = drag.startY + event.clientY - drag.startClientY;
       setPosition(
         clampPanelPosition(
-          nextX,
-          nextY,
+          drag.startX + event.clientX - drag.startClientX,
+          drag.startY + event.clientY - drag.startClientY,
           parent.getBoundingClientRect(),
           panel.getBoundingClientRect(),
         ),
@@ -152,36 +205,41 @@ function useRegistrationPanelDrag(): PanelDragControls {
       window.removeEventListener('pointerup', onPointerEnd);
       window.removeEventListener('pointercancel', onPointerEnd);
     };
-  }, [dragging, setPosition]);
+  }, [dragging, dragRef, panelRef, setDragging, setPosition]);
+}
 
-  const startDrag = (event: React.PointerEvent<HTMLElement>): void => {
-    if (event.button !== 0) return;
-    const panel = panelRef.current;
-    const parent = panel === null ? null : panel.parentElement;
-    if (panel === null || parent === null) return;
-    const panelRect = panel.getBoundingClientRect();
-    const parentRect = parent.getBoundingClientRect();
-    const currentPosition =
-      position ??
-      clampPanelPosition(
-        panelRect.left - parentRect.left,
-        panelRect.top - parentRect.top,
-        parentRect,
-        panelRect,
-      );
-    dragRef.current = {
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: currentPosition.x,
-      startY: currentPosition.y,
-    };
-    setPosition(currentPosition);
-    setDragging(true);
-    event.preventDefault();
-    event.stopPropagation();
-  };
+function currentPanelPosition(
+  panel: HTMLElement,
+  parent: HTMLElement,
+  position: FloatingPanelPosition | null,
+): FloatingPanelPosition {
+  if (position !== null) return position;
+  const panelRect = panel.getBoundingClientRect();
+  const parentRect = parent.getBoundingClientRect();
+  return clampPanelPosition(
+    panelRect.left - parentRect.left,
+    panelRect.top - parentRect.top,
+    parentRect,
+    panelRect,
+  );
+}
 
-  return { panelRef, placementStyle, startDrag };
+function keyboardMoveDelta(
+  key: string,
+  stepPx: number,
+): { readonly x: number; readonly y: number } | null {
+  switch (key) {
+    case 'ArrowLeft':
+      return { x: -stepPx, y: 0 };
+    case 'ArrowRight':
+      return { x: stepPx, y: 0 };
+    case 'ArrowUp':
+      return { x: 0, y: -stepPx };
+    case 'ArrowDown':
+      return { x: 0, y: stepPx };
+    default:
+      return null;
+  }
 }
 
 function clampPanelPosition(

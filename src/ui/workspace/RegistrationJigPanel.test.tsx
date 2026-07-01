@@ -195,6 +195,48 @@ describe('RegistrationJigPanel', () => {
     expect(panel.style.right).toBe('auto');
   });
 
+  it('moves with arrow keys when the drag handle is focused', () => {
+    render();
+    const panel = container.querySelector<HTMLElement>('[aria-label="Registration jig"]');
+    const handle = container.querySelector<HTMLElement>(
+      '[aria-label="Move registration jig panel"]',
+    );
+    if (panel === null || handle === null) throw new Error('registration panel handle not found');
+
+    panel.getBoundingClientRect = () =>
+      ({
+        bottom: 320,
+        height: 120,
+        left: 300,
+        right: 550,
+        top: 200,
+        width: 250,
+        x: 300,
+        y: 200,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    container.getBoundingClientRect = () =>
+      ({
+        bottom: 600,
+        height: 600,
+        left: 0,
+        right: 900,
+        top: 0,
+        width: 900,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    act(() => {
+      handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    });
+
+    expect(panel.style.left).toBe('290px');
+    expect(panel.style.top).toBe('200px');
+    expect(panel.style.right).toBe('auto');
+  });
+
   it('locks the box via the Lock box checkbox', () => {
     useStore.getState().addRegistrationBox(80, 40);
     render();

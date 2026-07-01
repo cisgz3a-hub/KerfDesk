@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 describe('IslandFillRecoveryAction', () => {
-  it('offers one-click overscan recovery for 4040 Island Fill without runway', async () => {
+  it('offers one-click Scanline recovery for fine-detail 4040 Island Fill', async () => {
     installNeotronicsIslandFillProject({ fillOverscanMm: 0 });
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -28,7 +28,7 @@ describe('IslandFillRecoveryAction', () => {
         root.render(<IslandFillRecoveryAction streaming={false} />);
       });
       const recoveryButton = [...host.querySelectorAll('button')].find(
-        (button) => button.textContent === 'Set Island Fill overscan to 5 mm',
+        (button) => button.textContent === 'Switch Island Fill to Scanline',
       );
       expect(recoveryButton).not.toBeUndefined();
 
@@ -36,11 +36,10 @@ describe('IslandFillRecoveryAction', () => {
         recoveryButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      expect(useStore.getState().project.scene.layers[0]?.fillStyle).toBe('island');
-      expect(useStore.getState().project.scene.layers[0]?.fillOverscanMm).toBe(5);
-      expect(host.textContent).not.toContain('Set Island Fill overscan to 5 mm');
+      expect(useStore.getState().project.scene.layers[0]?.fillStyle).toBe('scanline');
+      expect(host.textContent).not.toContain('Switch Island Fill to Scanline');
       expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
-        message: 'Set Island Fill overscan to 5 mm.',
+        message: 'Switched Island Fill layers to Scanline.',
         variant: 'success',
       });
     } finally {
@@ -103,7 +102,7 @@ describe('IslandFillRecoveryAction', () => {
         root.render(<IslandFillRecoveryAction streaming={false} />);
       });
 
-      expect(host.textContent).not.toContain('Set Island Fill overscan to 5 mm');
+      expect(host.textContent).not.toContain('Switch Island Fill to Scanline');
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
@@ -112,7 +111,7 @@ describe('IslandFillRecoveryAction', () => {
     }
   });
 
-  it('offers overscan recovery for custom profiles using the 4040-safe dialect', async () => {
+  it('offers Scanline recovery for custom profiles using the 4040-safe dialect', async () => {
     installNeotronicsIslandFillProject({
       device: {
         ...DEFAULT_DEVICE_PROFILE,
@@ -131,7 +130,27 @@ describe('IslandFillRecoveryAction', () => {
         root.render(<IslandFillRecoveryAction streaming={false} />);
       });
 
-      expect(host.textContent).toContain('Set Island Fill overscan to 5 mm');
+      expect(host.textContent).toContain('Switch Island Fill to Scanline');
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('offers Scanline recovery for fine-detail 4040 Island Fill even when overscan is enabled', async () => {
+    installNeotronicsIslandFillProject({ fillOverscanMm: 5 });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<IslandFillRecoveryAction streaming={false} />);
+      });
+
+      expect(host.textContent).toContain('Switch Island Fill to Scanline');
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
