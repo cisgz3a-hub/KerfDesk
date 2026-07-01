@@ -107,6 +107,33 @@ describe('addRegistrationBox store action', () => {
     expect(scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.output).toBe(false);
     expect(scene.layers.find((layer) => layer.id === '#0000ff')?.output).toBe(true);
   });
+
+  it('does not re-enable disabled artwork layers when placing a box around artwork', () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'enabled-art',
+        color: '#0000ff',
+        spec: { widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 10, y: 10 },
+      }),
+    );
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'disabled-art',
+        color: '#00aa00',
+        spec: { widthMm: 20, heightMm: 20, cornerRadiusMm: 0 },
+        transform: { ...IDENTITY_TRANSFORM, x: 40, y: 10 },
+      }),
+    );
+    useStore.getState().setLayerParam('#00aa00', { output: false });
+
+    useStore.getState().addRegistrationBox(80, 40);
+
+    const scene = useStore.getState().project.scene;
+    expect(scene.layers.find((layer) => layer.id === REGISTRATION_LAYER_ID)?.output).toBe(false);
+    expect(scene.layers.find((layer) => layer.id === '#0000ff')?.output).toBe(true);
+    expect(scene.layers.find((layer) => layer.id === '#00aa00')?.output).toBe(false);
+  });
 });
 
 describe('addRegistrationCircle store action', () => {

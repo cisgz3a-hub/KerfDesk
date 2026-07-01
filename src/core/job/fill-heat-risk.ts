@@ -1,10 +1,12 @@
 import { effectiveFillOverscanMm } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
+import { isSensitiveIslandFillPolicy } from './island-fill-motion';
 import type { FillGroup, Job } from './job';
 import type { Vec2 } from '../scene';
 
 export type FillHeatRiskSummary = {
   readonly islandShortSweepCount: number;
+  readonly sensitiveIslandShortSweepCount: number;
   readonly islandPartialRunwaySweepCount: number;
   readonly islandNoRunwayShortSweepCount: number;
   readonly minIslandSweepMm: number | null;
@@ -12,6 +14,7 @@ export type FillHeatRiskSummary = {
 
 type MutableFillHeatRiskSummary = {
   islandShortSweepCount: number;
+  sensitiveIslandShortSweepCount: number;
   islandPartialRunwaySweepCount: number;
   islandNoRunwayShortSweepCount: number;
   minIslandSweepMm: number | null;
@@ -20,6 +23,7 @@ type MutableFillHeatRiskSummary = {
 export function analyzeFillHeatRisk(job: Job): FillHeatRiskSummary {
   const summary: MutableFillHeatRiskSummary = {
     islandShortSweepCount: 0,
+    sensitiveIslandShortSweepCount: 0,
     islandPartialRunwaySweepCount: 0,
     islandNoRunwayShortSweepCount: 0,
     minIslandSweepMm: null,
@@ -59,6 +63,9 @@ function accumulateShortSweepRisk(
 ): void {
   if (group.overscanMm <= 0 || length >= group.overscanMm * 2) return;
   summary.islandShortSweepCount += 1;
+  if (isSensitiveIslandFillPolicy(group.islandMotionPolicy)) {
+    summary.sensitiveIslandShortSweepCount += 1;
+  }
   const effective = effectiveFillOverscanMm(
     [start, end],
     group.overscanMm,

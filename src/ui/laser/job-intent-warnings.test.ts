@@ -84,6 +84,28 @@ const tinyIsland: SceneObject = {
   ],
 };
 
+const largeIsland: SceneObject = {
+  ...tinyIsland,
+  id: 'large-island',
+  bounds: { minX: 0, minY: 0, maxX: 30, maxY: 30 },
+  paths: [
+    {
+      color: '#ff0000',
+      polylines: [
+        {
+          points: [
+            { x: 0, y: 0 },
+            { x: 30, y: 0 },
+            { x: 30, y: 30 },
+            { x: 0, y: 30 },
+          ],
+          closed: true,
+        },
+      ],
+    },
+  ],
+};
+
 describe('detectJobIntentWarnings', () => {
   // H12 (AUDIT-2026-06-10): the engrave luma is extracted from the
   // 2048-px-capped decode (ADR-037, a TRACE runtime cap), and compile
@@ -156,6 +178,26 @@ describe('detectJobIntentWarnings', () => {
   });
 
   it('warns when the 4040-safe Island Fill motion policy is active', () => {
+    const project = projectWith(largeIsland, 'fill');
+    const layer = project.scene.layers[0];
+    const islandProject: Project = {
+      ...project,
+      device: NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      scene: {
+        ...project.scene,
+        layers:
+          layer === undefined
+            ? project.scene.layers
+            : [{ ...layer, fillStyle: 'island', fillOverscanMm: 5, hatchSpacingMm: 1 }],
+      },
+    };
+
+    expect(detectJobIntentWarnings(islandProject)).toContain(
+      '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
+    );
+  });
+
+  it('warns that fine-detail 4040 Island Fill can darken small islands even with overscan', () => {
     const project = projectWith(tinyIsland, 'fill');
     const layer = project.scene.layers[0];
     const islandProject: Project = {
@@ -171,6 +213,9 @@ describe('detectJobIntentWarnings', () => {
     };
 
     expect(detectJobIntentWarnings(islandProject)).toContain(
+      '4040-safe Island Fill has 3 short sweep(s) that can overburn or darken small details even with full laser-off runway. Use Scanline Fill for final 4040 burns until Island Fill is calibrated for this machine.',
+    );
+    expect(detectJobIntentWarnings(islandProject)).not.toContain(
       '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
     );
   });

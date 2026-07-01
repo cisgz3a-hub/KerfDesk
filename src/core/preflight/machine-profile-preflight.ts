@@ -23,11 +23,13 @@ export function findMachineProfilePreflightIssues(
       isSensitiveIslandFillPolicy(group.islandMotionPolicy) &&
       group.overscanMm <= 0,
   );
-  if (!hasSensitiveIslandFillWithoutOverscan) return [];
-  return [
-    {
-      code: MACHINE_ISLAND_FILL_RISK_CODE,
-      message: NEOTRONICS_4040_ISLAND_FILL_RISK_MESSAGE,
-    },
-  ];
+  if (hasSensitiveIslandFillWithoutOverscan) {
+    return [
+      {
+        code: MACHINE_ISLAND_FILL_RISK_CODE,
+        message: NEOTRONICS_4040_ISLAND_FILL_RISK_MESSAGE,
+      },
+    ];
+  }
+  return [];
 }

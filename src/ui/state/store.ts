@@ -150,6 +150,7 @@ export type AppState = ObjectPropertiesActions &
     readonly cursorMm: Vec2 | null;
     readonly jobPlacement: JobPlacementSettings;
     readonly outputScopeSettings: OutputScopeSettings;
+    readonly registrationArtworkOutputSnapshot: Readonly<Record<string, boolean>> | null;
     // F-A11 dirty / save tracking. `dirty` flips true on every mutating
     // action; flips false on a successful save. `savedName` is the file the
     // project was last saved as — drives the window title. `lastSaveTarget`
@@ -287,6 +288,7 @@ function initialState(): Pick<
   | 'cursorMm'
   | 'jobPlacement'
   | 'outputScopeSettings'
+  | 'registrationArtworkOutputSnapshot'
   | 'dirty'
   | 'savedName'
   | 'lastSaveTarget'
@@ -309,6 +311,7 @@ function initialState(): Pick<
     cursorMm: null,
     jobPlacement: DEFAULT_JOB_PLACEMENT,
     outputScopeSettings: DEFAULT_OUTPUT_SCOPE_SETTINGS,
+    registrationArtworkOutputSnapshot: null,
     // Fresh project is clean — no edits have happened, no name on disk.
     dirty: false,
     savedName: null,

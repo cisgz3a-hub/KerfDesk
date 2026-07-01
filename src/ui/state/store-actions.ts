@@ -113,6 +113,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           additionalSelectedIds: new Set(),
           selectedPathNode: null,
           selectedPathNodes: [],
+          registrationArtworkOutputSnapshot: null,
           dirty: true,
         };
       }),
@@ -128,6 +129,7 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           additionalSelectedIds: new Set(),
           selectedPathNode: null,
           selectedPathNodes: [],
+          registrationArtworkOutputSnapshot: null,
           dirty: true,
         };
       }),

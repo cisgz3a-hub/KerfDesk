@@ -253,7 +253,7 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.warnings).toContain(
-        '4040-safe Island Fill is active. KerfDesk will use local clustered, unidirectional sweeps with full laser-off runway; this may run slower but is safer for sensitive motion.',
+        '4040-safe Island Fill has 3 short sweep(s) that can overburn or darken small details even with full laser-off runway. Use Scanline Fill for final 4040 burns until Island Fill is calibrated for this machine.',
       );
     }
   });

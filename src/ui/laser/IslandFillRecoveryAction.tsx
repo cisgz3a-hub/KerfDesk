@@ -3,7 +3,7 @@ import {
   findMachineProfilePreflightIssues,
   MACHINE_ISLAND_FILL_RISK_CODE,
 } from '../../core/preflight';
-import { islandFillMotionPolicyForDevice } from '../../core/job';
+import { analyzeFillHeatRisk, compileJob, islandFillMotionPolicyForDevice } from '../../core/job';
 import { validateOutputScope, type OutputScope, type Project } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -17,7 +17,7 @@ export function IslandFillRecoveryAction({
   const outputScopeSettings = useStore((s) => s.outputScopeSettings);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
-  const setLayerParam = useStore((s) => s.setLayerParam);
+  const switchIslandFillLayersToScanline = useStore((s) => s.switchIslandFillLayersToScanline);
   const pushToast = useToastStore((s) => s.pushToast);
   const outputScope = useMemo<OutputScope>(
     () => ({
@@ -42,24 +42,20 @@ export function IslandFillRecoveryAction({
   if (!hasRisk) return null;
   return (
     <div style={islandFillRecoveryStyle} role="alert">
-      <strong>4040 Island Fill runway</strong>
+      <strong>4040 Island Fill risk</strong>
       <p style={islandFillRecoveryTextStyle}>
-        Island Fill can run on this profile, but it needs laser-off overscan runway.
+        Island Fill can darken fine details on this profile. Scanline is safer for final 4040 burns.
       </p>
       <button
         type="button"
         onClick={() => {
-          for (const layer of project.scene.layers) {
-            if (layer.output && layer.mode === 'fill' && layer.fillStyle === 'island') {
-              setLayerParam(layer.id, { fillOverscanMm: Math.max(layer.fillOverscanMm, 5) });
-            }
-          }
-          pushToast('Set Island Fill overscan to 5 mm.', 'success');
+          switchIslandFillLayersToScanline();
+          pushToast('Switched Island Fill layers to Scanline.', 'success');
         }}
         disabled={streaming}
-        title="Set every output Island Fill layer to at least 5 mm fill overscan."
+        title="Switch Island Fill layers to Scanline Fill for safer 4040 output."
       >
-        Set Island Fill overscan to 5 mm
+        Switch Island Fill to Scanline
       </button>
     </div>
   );
@@ -71,8 +67,16 @@ function hasMachineIslandFillRisk(project: Project, outputScope: OutputScope): b
   if (!scoped.ok) return false;
   const scopedProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
-  return findMachineProfilePreflightIssues(scopedProject).some(
-    (issue) => issue.code === MACHINE_ISLAND_FILL_RISK_CODE,
+  if (
+    findMachineProfilePreflightIssues(scopedProject).some(
+      (issue) => issue.code === MACHINE_ISLAND_FILL_RISK_CODE,
+    )
+  ) {
+    return true;
+  }
+  return (
+    analyzeFillHeatRisk(compileJob(scopedProject.scene, scopedProject.device))
+      .sensitiveIslandShortSweepCount > 0
   );
 }
 
