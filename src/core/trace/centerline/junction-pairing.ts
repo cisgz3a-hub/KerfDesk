@@ -110,6 +110,11 @@ function mergeEnds(a: ChainEnd, b: ChainEnd): void {
 }
 
 const MIN_BRIDGE_ALIGNMENT = Math.cos((35 * Math.PI) / 180);
+// Within the join gap the bridge is lenient, but ends whose tangents clearly
+// RECEDE from each other (summed forwardness below this) are two separate
+// stroke tips that merely end near each other — welding them draws a
+// doubled-back hairpin (adjacent glyph terminals in small traced text).
+const MIN_BRIDGE_FORWARDNESS_SUM = -0.25;
 
 function nearestBridgeableEnds(
   chains: ReadonlyArray<Chain>,
@@ -126,7 +131,10 @@ function nearestBridgeableEnds(
       if (a === undefined || b === undefined) continue;
       const d = endGap(a, b);
       if (d === null || d >= bestDist) continue;
-      if (d >= joinGapPx && !endsContinueEachOther(a, b)) continue;
+      const forward = bridgeForwardness(a, b);
+      if (forward === null) continue;
+      if (d >= joinGapPx && !continuesBoth(forward)) continue;
+      if (forward.aForward + forward.bForward < MIN_BRIDGE_FORWARDNESS_SUM) continue;
       bestDist = d;
       best = [a, b];
     }
@@ -155,19 +163,28 @@ function endPoint(end: ChainEnd): Vec2 | undefined {
   return end.atStart ? end.chain.points[0] : end.chain.points.at(-1);
 }
 
-// True when the bridge segment continues BOTH chains' directions of travel:
+// How well the bridge segment continues each chain's direction of travel:
 // each end's outward continuation (the reverse of its into-chain tangent)
-// points along the bridge toward the other end.
-function endsContinueEachOther(a: ChainEnd, b: ChainEnd): boolean {
+// dotted with the bridge direction toward the other end. 1 = perfect
+// continuation, -1 = pointing straight away.
+function bridgeForwardness(
+  a: ChainEnd,
+  b: ChainEnd,
+): { readonly aForward: number; readonly bForward: number } | null {
   const pa = endPoint(a);
   const pb = endPoint(b);
-  if (pa === undefined || pb === undefined) return false;
+  if (pa === undefined || pb === undefined) return null;
   const len = Math.hypot(pb.x - pa.x, pb.y - pa.y);
-  if (len < POINT_MATCH_EPS) return true;
+  if (len < POINT_MATCH_EPS) return { aForward: 1, bForward: 1 };
   const bridge = { x: (pb.x - pa.x) / len, y: (pb.y - pa.y) / len };
   const ta = outgoingTangent(a); // points INTO chain a
   const tb = outgoingTangent(b);
-  const aForward = -(ta.x * bridge.x + ta.y * bridge.y);
-  const bForward = tb.x * bridge.x + tb.y * bridge.y;
-  return aForward >= MIN_BRIDGE_ALIGNMENT && bForward >= MIN_BRIDGE_ALIGNMENT;
+  return {
+    aForward: -(ta.x * bridge.x + ta.y * bridge.y),
+    bForward: tb.x * bridge.x + tb.y * bridge.y,
+  };
+}
+
+function continuesBoth(forward: { readonly aForward: number; readonly bForward: number }): boolean {
+  return forward.aForward >= MIN_BRIDGE_ALIGNMENT && forward.bForward >= MIN_BRIDGE_ALIGNMENT;
 }

@@ -43,9 +43,13 @@ export function sharpenChainBends(
 ): Vec2[] {
   let pts = [...points];
   let i = 1;
-  // Bounds the scan even with closed-chain restarts: each restart follows a
-  // replacement, and the vertex-gain guard makes replacements finite.
-  let guard = pts.length * 6 + 64;
+  // Every closed-chain replacement restarts the scan (the returned array is
+  // rotated), so the iteration budget must grow with each replacement — a
+  // fixed multiple of n exhausts mid-scan on rings with many drawn corners
+  // (a gear or star) and silently leaves the rest chamfered. Replacements
+  // themselves are finite: the vertex-gain guard makes each corner fire once.
+  let guard = pts.length * 2 + 64;
+  let replacementsLeft = Math.max(8, Math.ceil(pts.length / 2));
   while (guard > 0) {
     guard -= 1;
     if (i >= (closed ? pts.length : pts.length - 1)) break;
@@ -61,6 +65,9 @@ export function sharpenChainBends(
       continue;
     }
     pts = bent.points;
+    replacementsLeft -= 1;
+    if (replacementsLeft <= 0) break;
+    guard += pts.length;
     // A closed replacement returns a ROTATED array — earlier indices now hold
     // unscanned points, so restart. Open arrays keep their prefix; skip ahead.
     i = closed ? 1 : bent.resumeAt;
