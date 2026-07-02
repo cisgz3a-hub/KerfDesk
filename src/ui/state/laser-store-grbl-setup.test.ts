@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -47,6 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  useStore.getState().setMachineKind('laser');
   useLaserStore.setState({ autofocusBusy: false });
   await useLaserStore.getState().disconnect();
   useLaserStore.setState({
@@ -96,6 +98,22 @@ describe('laser-store GRBL laser setup', () => {
     await useLaserStore.getState().configureGrblLaserSetup();
 
     expect(writes).toEqual(['$32=1\n', '$30=1000\n', '$130=400\n', '$131=400\n', '$$\n']);
+  });
+
+  it('refuses the laser-mode $32 write while the project machine is CNC', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    seedSettingsRead(connection);
+    useStore.getState().setMachineKind('cnc');
+    writes.length = 0;
+
+    await expect(useLaserStore.getState().configureGrblLaserSetup()).rejects.toThrow(/laser mode/i);
+
+    expect(writes).toEqual([]);
+    expect(useLaserStore.getState().lastWriteError).toMatch(/laser mode/i);
   });
 
   it('blocks GRBL laser setup while a job is active', async () => {
