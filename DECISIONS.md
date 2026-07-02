@@ -3696,6 +3696,63 @@ controller or reference files, then wire the UDP transport.
 
 ---
 
+## ADR-099 — Phase H collision: multi-controller yields Phase H / ADR-094 / v0.8 to the CNC-router track; renumber at integration
+
+**Status:** Accepted (resolution recorded; mechanical renumber deferred to integration) | **Date:** 2026-07-02
+
+**Context.** Two tracks branched from the same base (`main` at Phase G / ADR-093) and
+each independently applied the "next free number above the reserved range" rule,
+so both wrote **ADR-094** and named themselves **Phase H — v0.8**:
+
+- **This branch** (`claude/nice-fermat-55d508`, multi-controller): ADR-094
+  ControllerDriver seam, ADR-095 Marlin, ADR-096 Smoothieware, ADR-097 Ruida;
+  PROJECT.md "Phase H — v0.8 Multi-controller."
+- **`claude/elated-edison-157186`** (CNC router): a single ADR-094 "CNC router
+  mode becomes a first-class product track"; PROJECT.md "Phase H — v0.8 Router."
+  Its Decision §1 already invokes the **ADR-051 precedent** (a product surface
+  claims the phase letter; output-strategy work slides up) and states that
+  Marlin-class output-strategy work should renumber H→I.
+
+Neither track is on `main`. Left unresolved, whichever merges second double-books
+ADR-094, "Phase H," and v0.8.
+
+**Decision.**
+
+1. **CNC router keeps Phase H / ADR-094 / v0.8.** This (multi-controller) track is
+   redesignated **Phase I** at integration — consistent with the ADR-051
+   precedent and the CNC track's own ADR-094 §1 (product surface takes the
+   letter; controller/output-strategy work slides up).
+2. **Integration renumber mapping** — applied as the first step when this branch
+   rebases onto a `main` that already carries CNC's ADR-094, **not applied now**:
+   - ADR-094 (ControllerDriver seam) → **ADR-095**
+   - ADR-095 (Marlin) → **ADR-096**
+   - ADR-096 (Smoothieware) → **ADR-097**
+   - ADR-097 (Ruida) → **ADR-098**
+   - "Phase H" → "Phase I" and "v0.8" → the next free minor (proposed **v0.9**,
+     maintainer confirms) across PROJECT.md, WORKFLOW.md, AUDIT.md, PHASE-H-BUILD.md.
+   - The 28 `src/` comment citations of ADR-094..097 (drivers, strategies, UI)
+     shift +1; `pre-ADR-094` phrasing → `pre-ADR-095`.
+3. **Deferred, not done.** No renumbering happens in this commit. The ~34-file
+   mechanical shift before either track is on `main` is churn with rebase-conflict
+   risk; it belongs to the controller branch's integration step.
+4. **This ADR is numbered 099, not 098, on purpose** — the mapping above reserves
+   **098** for the renumbered Ruida ADR, so 098 must stay free on this branch
+   until integration. The next free independent ADR on this branch is **100**.
+
+**Consequences.** The CNC track needs no change; its ADR-094 already anticipates
+this. The controller ADRs stay at 094..097 here with a documented obligation to
+renumber; the "Future ADRs → Numbering" note below points here. **Integration
+checklist** (run at rebase): apply §2, grep-verify no stale `ADR-09[4-7]` /
+"Phase H" / "v0.8" controller refs remain, re-run CI (G-code snapshots must stay
+byte-identical — this is comment/label-only), then set this ADR's Status to
+"Applied at <commit>."
+
+**Reversal trigger.** If the maintainer later decides the controller track merges
+first and keeps Phase H, this ADR is superseded and the CNC track renumbers
+instead (the reverse mapping).
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
@@ -3705,6 +3762,13 @@ which collides with the already-written Registration Box, so that table needs
 reconciling before those tickets land. Independent (non-build-plan) ADRs should take
 the next free number **above** the reserved range (ADR-092 and up); ADR-092 (Device
 Setup wizard) is the first.
+
+**Collision (2026-07-02):** this track's ADR-094..097 / "Phase H" / v0.8 are
+double-booked with the CNC-router track (`claude/elated-edison-157186`), which
+also took ADR-094 / Phase H / v0.8. Resolved by **ADR-099**: this track becomes
+Phase I and renumbers ADR-094..097 → 095..098 at integration. **098 is reserved**
+for the renumbered Ruida ADR; the next free independent ADR on this branch is
+**ADR-100**.
 
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
