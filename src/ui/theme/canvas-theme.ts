@@ -33,6 +33,10 @@ export const canvasTheme = {
   outOfBounds: '#c62828',
   openFillContour: '#f57c00',
   noGoZoneFill: 'rgba(198, 40, 40, 0.12)',
+  // CNC stock footprint (draw-stock, H.2) — wood-toned so it reads as
+  // material, not chrome.
+  stockFill: 'rgba(193, 154, 107, 0.12)',
+  stockStroke: 'rgba(160, 120, 70, 0.55)',
   // Rulers (draw-rulers)
   rulerBackground: '#f0f0f0',
   rulerBorder: '#bbb',

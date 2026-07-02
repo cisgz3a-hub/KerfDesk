@@ -30,8 +30,11 @@ import {
   type DisplayPolylines,
 } from './display-polylines';
 import type { PathNodeRef } from '../state/path-node-edit-actions';
+import { drawCncRemoval } from './draw-cnc-removal';
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
+import { drawCncStock } from './draw-stock';
+import type { RemovalGrid } from '../../core/sim';
 import { drawRulers } from './draw-rulers';
 import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
 import { drawObjectSelectionOverlay, drawSelectionSetOverlay } from './draw-selection-overlay';
@@ -60,6 +63,9 @@ export type DrawOpts = {
   readonly displayPolylineCache?: DisplayPolylineCache;
   readonly previewToolpath?: Toolpath;
   readonly previewShowTravel?: boolean;
+  // CNC preview (H.2): the scene-space material-removal grid, depth-shaded
+  // under the route lines. Null/omitted for laser projects.
+  readonly cncRemovalGrid?: RemovalGrid | null;
   // User zoom + pan (F-A15). Defaults to fit-to-bed when omitted.
   readonly view?: ViewState;
   // Phase G (B5): the shape being dragged out right now, drawn as a dashed
@@ -92,20 +98,12 @@ export function drawScene(
   );
   drawBed(ctx, project, view);
   drawGrid(ctx, project, view);
+  // Stock footprint under everything else (CNC mode only — no-op for laser).
+  drawCncStock(ctx, project, view);
   drawNoGoZones(ctx, project, view);
   drawOriginMarker(ctx, view);
   if (opts.preview) {
-    drawObjectsFaint(ctx, project, view);
-    // Raster sim under the vector toolpath: image engrave is the burned
-    // "background", cuts/scans layer on top (matches LightBurn preview).
-    drawRasterPreview(ctx, project, view);
-    drawPreview(
-      ctx,
-      opts.previewToolpath ?? buildPreviewToolpath(project),
-      view,
-      opts.scrubberT ?? 1,
-      { showTravel: opts.previewShowTravel !== false, showFuture: true, showEndpoints: true },
-    );
+    drawPreviewFrame(ctx, project, view, opts);
   } else {
     const simplified = drawObjects(
       ctx,
@@ -136,6 +134,33 @@ export function drawScene(
   drawOutOfBoundsOutlines(ctx, project, view);
   // Rulers go LAST so they're on top of everything else (F-A2).
   drawRulers(ctx, canvasW, canvasH, view);
+}
+
+// Preview-mode frame: faint artwork, raster sim, CNC removal shading, then
+// the route lines on top (matches LightBurn's preview layering).
+function drawPreviewFrame(
+  ctx: CanvasRenderingContext2D,
+  project: Project,
+  view: ViewTransform,
+  opts: DrawOpts,
+): void {
+  drawObjectsFaint(ctx, project, view);
+  // Raster sim under the vector toolpath: image engrave is the burned
+  // "background", cuts/scans layer on top.
+  drawRasterPreview(ctx, project, view);
+  // CNC material-removal shading under the route lines (H.2).
+  if (opts.cncRemovalGrid != null) drawCncRemoval(ctx, opts.cncRemovalGrid, view);
+  drawPreview(
+    ctx,
+    opts.previewToolpath ?? buildPreviewToolpath(project),
+    view,
+    opts.scrubberT ?? 1,
+    {
+      showTravel: opts.previewShowTravel !== false,
+      showFuture: true,
+      showEndpoints: true,
+    },
+  );
 }
 
 function drawLiveWorkspaceOverlays(

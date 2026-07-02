@@ -75,6 +75,12 @@ export function PreviewStatsPanel(props: {
         <strong>{formatMm(stats.cutMm)}</strong>
         <span>Travel</span>
         <strong>{formatMm(stats.travelMm)}</strong>
+        {stats.plungeMm > 0 ? (
+          <>
+            <span>Plunge</span>
+            <strong>{formatMm(stats.plungeMm)}</strong>
+          </>
+        ) : null}
         <span>Total</span>
         <strong>{formatMm(stats.totalMm)}</strong>
         <span>Time</span>
@@ -97,7 +103,10 @@ export function PreviewControlsPanel(props: {
       role="group"
       aria-label="Preview route controls and statistics"
     >
-      <PreviewRouteControls disabled={props.disabled} />
+      <PreviewRouteControls
+        disabled={props.disabled}
+        passBoundaries={passBoundaryFractions(props.toolpath)}
+      />
       <PreviewStatsPanel
         toolpath={props.toolpath}
         estimate={props.estimate}
@@ -107,7 +116,27 @@ export function PreviewControlsPanel(props: {
   );
 }
 
-export function PreviewRouteControls(props: { readonly disabled?: boolean } = {}): JSX.Element {
+// CNC pass starts = downward plunges. Their arc-length fractions drive the
+// Prev/Next pass stepper; laser toolpaths have none, hiding the buttons.
+function passBoundaryFractions(toolpath: Toolpath): ReadonlyArray<number> {
+  if (toolpath.totalLength <= 0) return [];
+  const fractions: number[] = [];
+  let walked = 0;
+  for (const step of toolpath.steps) {
+    if (step.kind === 'plunge' && step.toZ < step.fromZ) {
+      fractions.push(walked / toolpath.totalLength);
+    }
+    walked += step.length;
+  }
+  return fractions;
+}
+
+export function PreviewRouteControls(
+  props: {
+    readonly disabled?: boolean;
+    readonly passBoundaries?: ReadonlyArray<number>;
+  } = {},
+): JSX.Element {
   const previewPlaying = useUiStore((s) => s.previewPlaying);
   const setPreviewPlaying = useUiStore((s) => s.setPreviewPlaying);
   const scrubberT = useUiStore((s) => s.scrubberT);
@@ -115,6 +144,7 @@ export function PreviewRouteControls(props: { readonly disabled?: boolean } = {}
   const previewPlaybackSpeed = useUiStore((s) => s.previewPlaybackSpeed);
   const setPreviewPlaybackSpeed = useUiStore((s) => s.setPreviewPlaybackSpeed);
   const disabled = props.disabled === true;
+  const passBoundaries = props.passBoundaries ?? [];
   return (
     <div style={routeControlsStyle} role="group" aria-label="Route preview controls">
       <button
@@ -133,6 +163,17 @@ export function PreviewRouteControls(props: { readonly disabled?: boolean } = {}
       >
         {previewPlaying ? 'Pause' : 'Play'}
       </button>
+      {passBoundaries.length > 0 ? (
+        <PassStepButtons
+          disabled={disabled}
+          boundaries={passBoundaries}
+          scrubberT={scrubberT}
+          onJump={(t) => {
+            setScrubberT(t);
+            setPreviewPlaying(false);
+          }}
+        />
+      ) : null}
       <button
         type="button"
         className="lf-button"
@@ -165,6 +206,51 @@ export function PreviewRouteControls(props: { readonly disabled?: boolean } = {}
         </select>
       </label>
     </div>
+  );
+}
+
+// Prev / Next CNC pass stepper (H.2). Jumps the scrubber to the arc-length
+// fraction just past a pass-start plunge so the depth shading shows that
+// pass completed.
+const PASS_JUMP_EPS = 1e-4;
+
+function PassStepButtons(props: {
+  readonly disabled: boolean;
+  readonly boundaries: ReadonlyArray<number>;
+  readonly scrubberT: number;
+  readonly onJump: (t: number) => void;
+}): JSX.Element {
+  const prev = [...props.boundaries].reverse().find((b) => b < props.scrubberT - PASS_JUMP_EPS);
+  const next = props.boundaries.find((b) => b > props.scrubberT + PASS_JUMP_EPS);
+  return (
+    <>
+      <button
+        type="button"
+        className="lf-button"
+        style={compactButtonStyle}
+        disabled={props.disabled || prev === undefined}
+        aria-label="Jump to previous pass"
+        title="Jump the preview to the start of the previous CNC pass."
+        onClick={() => {
+          if (prev !== undefined) props.onJump(prev);
+        }}
+      >
+        ⏮ Pass
+      </button>
+      <button
+        type="button"
+        className="lf-button"
+        style={compactButtonStyle}
+        disabled={props.disabled || next === undefined}
+        aria-label="Jump to next pass"
+        title="Jump the preview to the start of the next CNC pass."
+        onClick={() => {
+          if (next !== undefined) props.onJump(next);
+        }}
+      >
+        Pass ⏭
+      </button>
+    </>
   );
 }
 

@@ -33,6 +33,8 @@ import { PreviewControlsPanel, PreviewStatusOverlays } from './preview-overlays'
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewPlayback } from './use-preview-playback';
 import { usePreviewToolpath } from './use-preview-toolpath';
+import { useCncRemovalGrid } from './use-cnc-removal-grid';
+import type { RemovalGrid } from '../../core/sim';
 import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 import { useDragMove } from './use-workspace-drag';
 import { clientToCanvasPx, zoomAtCursorPx } from './view-transform';
@@ -50,15 +52,11 @@ export function Workspace(): JSX.Element {
   const scrubberT = useUiStore((s) => s.scrubberT);
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   const toolMode = useUiStore((s) => s.toolMode);
-  // Three primitive selectors — Zustand only re-runs the effect when one
-  // of them actually changes. A bundled `{...}` selector would create a
-  // fresh object every store update and force unnecessary redraws.
-  const zoomFactor = useUiStore((s) => s.zoomFactor);
-  const panX = useUiStore((s) => s.panX);
-  const panY = useUiStore((s) => s.panY);
-  const viewState = useMemo(() => ({ zoomFactor, panX, panY }), [zoomFactor, panX, panY]);
+  const viewState = useViewState();
+  const { zoomFactor, panX, panY } = viewState;
   const previewToolpath = usePreviewToolpath(project, previewMode);
   usePreviewPlayback(previewMode, previewToolpath);
+  const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
   const jobEstimate = useJobEstimate();
   const canvasSize = useCanvasBitmapSize(ref);
   useWorkspaceDraw({
@@ -71,6 +69,7 @@ export function Workspace(): JSX.Element {
     additionalSelectedIds,
     previewMode,
     previewToolpath,
+    cncRemovalGrid,
     scrubberT,
     showPreviewTravel,
     viewState,
@@ -121,6 +120,20 @@ export function Workspace(): JSX.Element {
       {!previewMode && <ZoomControls />}
     </>
   );
+}
+
+// Three primitive selectors — Zustand only re-runs the effect when one of
+// them actually changes. A bundled `{...}` selector would create a fresh
+// object every store update and force unnecessary redraws.
+function useViewState(): {
+  readonly zoomFactor: number;
+  readonly panX: number;
+  readonly panY: number;
+} {
+  const zoomFactor = useUiStore((s) => s.zoomFactor);
+  const panX = useUiStore((s) => s.panX);
+  const panY = useUiStore((s) => s.panY);
+  return useMemo(() => ({ zoomFactor, panX, panY }), [zoomFactor, panX, panY]);
 }
 
 function selectRoutePreviewLabel(state: ReturnType<typeof useStore.getState>): string {
@@ -195,6 +208,7 @@ function useWorkspaceDraw(args: {
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly previewMode: boolean;
   readonly previewToolpath: Toolpath | null;
+  readonly cncRemovalGrid: RemovalGrid | null;
   readonly scrubberT: number;
   readonly showPreviewTravel: boolean;
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
@@ -238,6 +252,7 @@ function useWorkspaceDraw(args: {
       onRasterBitmapReady: requestRasterRedraw,
       displayPolylineCache,
       ...(args.previewToolpath === null ? {} : { previewToolpath: args.previewToolpath }),
+      cncRemovalGrid: args.cncRemovalGrid,
       ...(draftShape === null ? {} : { draft: draftShape }),
       ...(penDraft === null ? {} : { penDraft }),
       ...(selectionMarquee === null ? {} : { selectionMarquee }),
@@ -261,6 +276,7 @@ function useWorkspaceDraw(args: {
     rasterRedrawTick,
     displayPolylineCache,
     args.previewToolpath,
+    args.cncRemovalGrid,
     requestRasterRedraw,
     draftShape,
     penDraft,
