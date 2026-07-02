@@ -76,7 +76,7 @@ MISSING = absent. "Ref" names the market anchor.
 | Tier | Feature | Ours | Notes |
 |---|---|---|---|
 | T1 | Toolpath preview, rapids vs cuts, time estimate (all) | HAVE | + scrubber + distance stats |
-| T1 | Material-removal simulation (all) | PARTIAL | 2D depth-shaded grid for any job; **3D only for reliefs** → ADR-102 G4 |
+| T1 | Material-removal simulation (all) | PARTIAL→HAVE | ADR-102 G4 shipped: 3D heightfield cut preview for ANY CNC job, scrubber-synced |
 | T2 | G-code file preview/insight on load (gSender, CM) | HAVE | H.6b .nc re-import simulator |
 
 ### D. Tools / materials / feeds
@@ -84,7 +84,7 @@ MISSING = absent. "Ref" names the market anchor.
 | Tier | Feature | Ours | Notes |
 |---|---|---|---|
 | T1 | Tool library w/ geometry + feeds (all) | HAVE | H.7, app-level persistence |
-| T2 | Recommended cut settings per material×bit (Easel signature; CC library) | **MISSING** | → ADR-102 G5 (chipload calculator + starter chart) |
+| T2 | Recommended cut settings per material×bit (Easel signature; CC library) | **MISSING**→HAVE | ADR-102 G5 shipped (chipload calculator, PROVISIONAL starter chart) |
 | T2 | Machine profiles (Easel 150+, gSender) | HAVE | H.7 snapshots |
 
 ### E. Machine control / sender
@@ -92,18 +92,29 @@ MISSING = absent. "Ref" names the market anchor.
 | Tier | Feature | Ours | Notes |
 |---|---|---|---|
 | T1 | Connect/jog/home/zero per axis (all) | HAVE | incl. zeroZHere, G54 persistent origin |
-| T1 | **Z touch-plate probe wizard** (Easel Z-probe, gSender, CM BitZero, OpenBuilds) | **MISSING** | → ADR-102 G2 — the single biggest sender gap |
-| T1 | **Feed override** (gSender sliders, Easel) | **MISSING** | → ADR-102 G3 |
+| T1 | **Z touch-plate probe wizard** (Easel Z-probe, gSender, CM BitZero, OpenBuilds) | **MISSING**→HAVE | ADR-102 G2 shipped (two-stage G38.2 + G10 L20) |
+| T1 | **Feed override** (gSender sliders, Easel) | **MISSING**→HAVE | ADR-102 G3 shipped (realtime bytes + Ov: readout) |
 | T1 | Console + $$ settings editor + alarm explanations (gSender, Easel Machine Inspector) | HAVE | ConsolePanel, FirmwareWritesPanel, alarm decode |
 | T1 | Start/pause/resume/stop + progress (all) | HAVE | char-counted streaming |
-| T2 | XYZ **corner** probing w/ bit diameter (gSender, BitZero) | MISSING | → ADR-102 G2 |
-| T2 | Spindle override (gSender) | MISSING | → ADR-102 G3 |
+| T2 | XYZ **corner** probing w/ bit diameter (gSender, BitZero) | MISSING→HAVE | ADR-102 G2 shipped (4 corners, radius-compensated) |
+| T2 | Spindle override (gSender) | MISSING→HAVE | ADR-102 G3 shipped (+ rapid 25/50/100) |
 | T2 | Start-from-line recovery (gSender) | MISSING | → ADR-102 G7 (stretch) |
 | T2 | Outline/frame job perimeter (gSender) | HAVE | Frame + CNC safe-Z retract |
 | T2 | Macros/quick actions (gSender, CM, OpenBuilds) | MISSING | roadmap |
 | T2 | Surfacing-wizard generator + squaring/steps calibration (gSender, OpenBuilds) | MISSING | → ADR-102 G8 (stretch: surfacing only) |
 | T2 | Keymap editor / gamepad; remote mode; diagnostics+maintenance (gSender) | MISSING | roadmap |
 | T3 | Firmware flashing (gSender/OpenBuilds) | MISSING | out of scope (web serial) |
+
+## Post-audit build-out (same day)
+
+ADR-102 G1-G5 shipped within this session: the matrix rows marked
+MISSING→HAVE above were closed by commits `250beac`..`966cc8e` and
+live-verified in the isolated preview (subtract on real scene objects,
+3D dialog ready in real WebGL, calculator math on the layer card,
+router-worded export banner). Stretch items G6-G8 (dogbone fillets,
+start-from-line, surfacing generator) remain open, as does the full
+roadmap tier. Hardware verification for probing and overrides is
+pending per ADR-094 s3.
 
 ## Defects noticed during the live E2E run (not features)
 
