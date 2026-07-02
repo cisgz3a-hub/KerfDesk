@@ -21,3 +21,12 @@ export {
   type FeedsCalculatorInput,
   type FeedsCalculatorResult,
 } from './feeds-calculator';
+export {
+  buildSurfacingProgram,
+  SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
+  SURFACING_DEFAULT_STEPOVER_PCT,
+  SURFACING_DEFAULT_TOTAL_DEPTH_MM,
+  surfacingRowYs,
+  type SurfacingParams,
+  type SurfacingProgram,
+} from './surfacing';

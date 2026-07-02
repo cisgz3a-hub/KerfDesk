@@ -7,6 +7,7 @@ import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 import { CncTilingPanel } from './CncTilingPanel';
+import { SurfacingPanel } from './SurfacingPanel';
 
 export function CncSetupPanel(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
@@ -90,6 +91,7 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
       <CncToolManager machine={machine} />
       <CncMachineProfilesRow />
       <CncTilingPanel machine={machine} />
+      <SurfacingPanel machine={machine} />
     </section>
   );
 }
