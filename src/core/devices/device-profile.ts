@@ -10,8 +10,9 @@ export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' |
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
 // Firmware families the app can drive (ADR-094). Each kind maps to a
 // ControllerDriver in core/controllers; grblHAL and FluidNC share the GRBL
-// protocol machinery with capability/code-table deltas.
-export type ControllerKind = 'grbl-v1.1' | 'grblhal' | 'fluidnc';
+// protocol machinery with capability/code-table deltas, Marlin is a fully
+// distinct dialect (no realtime bytes, queued M114 status, text errors).
+export type ControllerKind = 'grbl-v1.1' | 'grblhal' | 'fluidnc' | 'marlin';
 
 /** Single source of truth for validators (catalog, .lfmachine shape, .lf2
  *  normalize). Grows in lockstep with the ControllerKind union. */
@@ -19,6 +20,7 @@ export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
   'grbl-v1.1',
   'grblhal',
   'fluidnc',
+  'marlin',
 ];
 
 export function isKnownControllerKind(value: unknown): value is ControllerKind {

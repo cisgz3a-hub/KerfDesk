@@ -5,7 +5,7 @@
 
 import { runPreflight, type PreflightOptions, type PreflightResult } from '../../core/preflight';
 import type { JobOriginPlacement } from '../../core/job';
-import { grblStrategy } from '../../core/output';
+import { selectOutputStrategy } from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
 import { gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
 import { prepareOutput } from './prepare-output';
@@ -37,7 +37,10 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
     ...(options.outputScope ? { outputScope: options.outputScope } : {}),
   });
   if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
-  const body = grblStrategy.emit(prepared.job, prepared.project.device);
+  const body = selectOutputStrategy(prepared.project.device).emit(
+    prepared.job,
+    prepared.project.device,
+  );
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.

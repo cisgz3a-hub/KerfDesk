@@ -123,6 +123,10 @@ export type LaserState = {
    * panel renders identically to the pre-driver app.
    */
   readonly capabilities: ControllerCapabilities;
+  /** Kind of the ACTIVE driver (selected at connect). Components use this for
+   *  pure driver-data lookups (console quick commands); guards still gate on
+   *  `capabilities`, never on the kind. */
+  readonly activeControllerKind: ControllerKind;
   /** Firmware family detected from the welcome banner, null until seen. May
    *  disagree with the profile-selected driver (advisory — see line handler). */
   readonly detectedControllerKind: ControllerKind | null;

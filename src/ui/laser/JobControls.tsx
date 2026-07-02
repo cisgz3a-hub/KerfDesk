@@ -24,6 +24,8 @@ import { useFrameAction } from './use-frame-action';
 import { useJobEstimate } from './use-job-estimate';
 
 const PAUSE_HOLD_SAFETY_MESSAGE = 'Pause is feed hold only. Use Stop or physical E-stop if unsafe.';
+const PAUSE_STREAM_SIDE_MESSAGE =
+  'Pause stops sending; moves already buffered in the firmware finish first. Use Stop or physical E-stop if unsafe.';
 
 type Props = {
   readonly disabled: boolean;
@@ -169,13 +171,15 @@ function RunningControls(props: {
   const pauseJob = useLaserStore((s) => s.pauseJob);
   const resumeJob = useLaserStore((s) => s.resumeJob);
   const stopJob = useLaserStore((s) => s.stopJob);
+  const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
+  const pauseMessage = hasRealtimePause ? PAUSE_HOLD_SAFETY_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE;
   return (
     <div style={rowStyle}>
       {props.isStreaming && (
         <button
           type="button"
           onClick={() => void pauseJob().catch(() => undefined)}
-          title={PAUSE_HOLD_SAFETY_MESSAGE}
+          title={pauseMessage}
         >
           Pause
         </button>
@@ -184,7 +188,11 @@ function RunningControls(props: {
         <button
           type="button"
           onClick={() => void resumeJob().catch(() => undefined)}
-          title="Release the feed hold and continue the job"
+          title={
+            hasRealtimePause
+              ? 'Release the feed hold and continue the job'
+              : 'Continue sending the remaining job lines'
+          }
         >
           Resume
         </button>
@@ -193,18 +201,29 @@ function RunningControls(props: {
         type="button"
         onClick={() => void stopJob().catch(() => undefined)}
         style={stopBtnStyle}
-        title="Soft-reset the controller and halt the job (Ctrl+.)"
+        title="Halt the job and force the beam off (Ctrl+.)"
       >
         Stop
       </button>
-      <span style={runningSafetyStyle}>{PAUSE_HOLD_SAFETY_MESSAGE}</span>
+      <span style={runningSafetyStyle}>{pauseMessage}</span>
     </div>
   );
 }
 
 function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX.Element {
   const cancelJog = useLaserStore((s) => s.cancelJog);
+  const hasJogCancel = useLaserStore((s) => s.capabilities.jogCancel);
   const label = props.operationKind === 'frame' ? 'Cancel frame' : 'Cancel jog';
+  if (!hasJogCancel) {
+    return (
+      <div style={rowStyle}>
+        <span style={runningSafetyStyle}>
+          This firmware has no jog cancel — buffered motion finishes on its own. Use physical
+          E-stop if unsafe.
+        </span>
+      </div>
+    );
+  }
   return (
     <div style={rowStyle}>
       <button

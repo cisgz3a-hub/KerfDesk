@@ -4,6 +4,7 @@ export type {
   ControllerReadinessResult,
   ControllerReadinessWarningCode,
   ControllerSettingsSnapshot,
+  ReadinessSettingsCapability,
 } from './controller-readiness';
 export { runControllerReadiness } from './controller-readiness';
 export type { PreflightCode, PreflightIssue, PreflightOptions, PreflightResult } from './preflight';

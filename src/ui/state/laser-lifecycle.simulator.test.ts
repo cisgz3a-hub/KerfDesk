@@ -25,6 +25,7 @@ afterEach(async () => {
   await useLaserStore.getState().disconnect();
   useLaserStore.setState({
     capabilities: grblDriver.capabilities,
+    activeControllerKind: grblDriver.kind,
     detectedControllerKind: null,
     connection: { kind: 'disconnected' },
     statusReport: null,

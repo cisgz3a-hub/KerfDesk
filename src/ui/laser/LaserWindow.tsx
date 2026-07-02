@@ -34,6 +34,7 @@ export function LaserWindow(): JSX.Element {
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const controllerKind = useStore((s) => s.project.device.controllerKind);
   const profileBaudRate = useStore((s) => s.project.device.baudRate);
+  const canUnlock = useLaserStore((s) => s.capabilities.unlock);
   const machineOperationBusy = isMachineOperationBusy({
     autofocusBusy,
     motionOperation,
@@ -74,6 +75,7 @@ export function LaserWindow(): JSX.Element {
         <AlarmBanner
           code={alarmCode}
           homingEnabled={homingEnabled}
+          canUnlock={canUnlock}
           onHome={() => void home().catch(() => undefined)}
           onUnlock={() => void unlockAlarm().catch(() => undefined)}
         />
@@ -135,11 +137,13 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
 function AlarmBanner({
   code,
   homingEnabled,
+  canUnlock,
   onHome,
   onUnlock,
 }: {
   readonly code: number | null;
   readonly homingEnabled: boolean;
+  readonly canUnlock: boolean;
   readonly onHome: () => void;
   readonly onUnlock: () => void;
 }): JSX.Element {
@@ -155,31 +159,51 @@ function AlarmBanner({
           : (alarm?.detail ?? '')}
       </p>
       <p style={alarmDetailStyle}>{alarm?.action ?? STATUS_ALARM_START_MESSAGE}</p>
+      <AlarmRecoveryActions
+        homingEnabled={homingEnabled}
+        canUnlock={canUnlock}
+        onHome={onHome}
+        onUnlock={onUnlock}
+      />
+    </div>
+  );
+}
+
+function AlarmRecoveryActions(props: {
+  readonly homingEnabled: boolean;
+  readonly canUnlock: boolean;
+  readonly onHome: () => void;
+  readonly onUnlock: () => void;
+}): JSX.Element {
+  return (
+    <>
       <button
         type="button"
-        onClick={onHome}
-        disabled={!homingEnabled}
+        onClick={props.onHome}
+        disabled={!props.homingEnabled}
         title={
-          homingEnabled
+          props.homingEnabled
             ? 'Send $H. Use this only when the machine has working homing switches.'
             : 'Homing is disabled in Device settings. Enable "$H supported" first.'
         }
       >
         Home ($H)
       </button>
-      {!homingEnabled && (
+      {!props.homingEnabled && (
         <span style={alarmHintStyle}>
           Enable &quot;$H supported&quot; in Device settings if this machine has homing switches.
         </span>
       )}
-      <button
-        type="button"
-        onClick={onUnlock}
-        title="Send $X to unlock the controller after you have confirmed the machine is safe."
-      >
-        $X — Unlock
-      </button>
-    </div>
+      {props.canUnlock && (
+        <button
+          type="button"
+          onClick={props.onUnlock}
+          title="Send $X to unlock the controller after you have confirmed the machine is safe."
+        >
+          $X — Unlock
+        </button>
+      )}
+    </>
   );
 }
 

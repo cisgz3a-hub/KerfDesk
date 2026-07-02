@@ -8,6 +8,7 @@ import type { LaserState } from './laser-store';
 function makeLaserState(): LaserState {
   return {
     capabilities: grblDriver.capabilities,
+    activeControllerKind: grblDriver.kind,
     detectedControllerKind: null,
     connection: { kind: 'connected' },
     statusReport: null,

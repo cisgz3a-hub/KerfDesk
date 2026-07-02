@@ -18,6 +18,7 @@ import {
   buildPortClosePatch,
   detectStreamStall,
   disconnectStopCommands,
+  hasUnsettledStreamAcks,
   isActiveJob,
   pushLog,
 } from './laser-store-helpers';
@@ -55,6 +56,7 @@ export function connectionActions(
         transcript: [],
         homingState: 'unknown',
         capabilities: refs.driver.capabilities,
+        activeControllerKind: refs.driver.kind,
         detectedControllerKind: null,
       });
       const portRef = await adapter.serial.requestPort();
@@ -200,8 +202,9 @@ function teardown(refs: LiveRefs): void {
 }
 
 function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: SafeWriteFn): void {
-  const statusQuery = refs.driver.realtime.statusQuery;
-  if (statusQuery === null) return; // no realtime report on this firmware
+  const realtimeQuery = refs.driver.realtime.statusQuery;
+  const queuedQuery = refs.driver.commands.queuedStatusQuery;
+  if (realtimeQuery === null && queuedQuery === null) return;
   let pollTick = 0;
   refs.pollHandle = setInterval(() => {
     pollTick++;
@@ -209,8 +212,21 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
     refs.stallProbe = stall.probe;
     if (stall.stalled && s.safetyNotice === null) set({ safetyNotice: streamStalledNotice() });
+    if (realtimeQuery !== null) {
+      if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
+      void safeWrite(realtimeQuery).catch(() => undefined);
+      return;
+    }
+    // Queued status query (Marlin M114): it consumes planner space and emits
+    // its own ok, so NEVER poll while stream acks are outstanding (accounting
+    // would desync) or while a controller command awaits its ack (the poll's
+    // ok would resolve the wrong request). A 'done' stream with nothing in
+    // flight DOES poll — the post-job settle needs Idle reports to finish.
+    if (queuedQuery === null) return;
+    if (hasUnsettledStreamAcks(s.streamer)) return;
+    if (refs.controllerCommand !== null) return;
     if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
-    void safeWrite(statusQuery).catch(() => undefined);
+    void safeWrite(`${queuedQuery}\n`).catch(() => undefined);
   }, STATUS_POLL_MS);
 }
 

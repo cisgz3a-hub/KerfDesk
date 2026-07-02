@@ -18,9 +18,15 @@ describe('detectControllerFromBanner', () => {
     );
   });
 
+  it('detects Marlin boot banners and M115 identity lines', () => {
+    expect(detectControllerFromBanner('start')).toBe('marlin');
+    expect(detectControllerFromBanner('FIRMWARE_NAME:Marlin 2.1.2 (bugfix)')).toBe('marlin');
+    expect(detectControllerFromBanner('Marlin 2.1.2')).toBe('marlin');
+  });
+
   it('returns null for non-banner lines', () => {
     expect(detectControllerFromBanner('ok')).toBeNull();
     expect(detectControllerFromBanner('<Idle|MPos:0.000,0.000,0.000|FS:0,0>')).toBeNull();
-    expect(detectControllerFromBanner('start')).toBeNull();
+    expect(detectControllerFromBanner('restart')).toBeNull();
   });
 });

@@ -35,8 +35,15 @@ export type ControllerCommands = {
   readonly unlock: string | null;
   readonly sleep: string | null;
   readonly settingsQuery: string | null;
-  readonly coolantOff: string;
-  /** Ack-fenced no-op used as a settle marker after motion (GRBL 'G4 P0.01'). */
+  /** Queued (non-realtime) position/status query, polled ONLY while nothing
+   *  is streaming or awaiting acks (Marlin 'M114'). null when the firmware
+   *  has a realtime report instead. */
+  readonly queuedStatusQuery: string | null;
+  /** Lines written after a job stop/abort to guarantee the beam is off
+   *  (GRBL: ['M9']; Marlin: ['M5', 'M107']). No trailing newlines. */
+  readonly stopLaserLines: ReadonlyArray<string>;
+  /** Ack-fenced no-op used as a settle marker after motion (GRBL 'G4 P0.01';
+   *  Marlin 'M400' which acks only when buffered motion has drained). */
   readonly settleDwell: string;
   readonly setOriginHere: string | null;
   readonly clearOrigin: string | null;

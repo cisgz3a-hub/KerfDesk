@@ -89,7 +89,9 @@ export function jobActions(
       const softReset = driver().realtime.softReset;
       if (softReset !== null) await safeWrite(softReset, 'stop');
       try {
-        await safeWrite(`${driver().commands.coolantOff}\n`, 'stop');
+        for (const line of driver().commands.stopLaserLines) {
+          await safeWrite(`${line}\n`, 'stop');
+        }
       } catch {
         // Soft reset is the safety-critical command; coolant cleanup is best
         // effort and may fail if the serial link is already gone.
