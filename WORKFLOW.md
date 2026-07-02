@@ -1334,6 +1334,35 @@ F-CNC19 tiling.
 2. A stock larger than ~1M grid cells coarsens the simulation grid
    automatically; shading gets blockier, never freezes the app.
 
+### F-CNC7. Import an STL relief — Phase H.4
+
+#### Success
+1. In CNC mode, the user drags an `.stl` file onto the workspace. Both
+   binary and ASCII STLs parse (a binary file whose header starts with
+   "solid" is detected by its length signature).
+2. The mesh lands as a relief object at 100 mm wide (height by aspect),
+   5 mm relief depth, background carved away ('floor'), on a wood-brown
+   layer created automatically. Toast reports the triangle count.
+3. The canvas shows the relief as a grayscale depth map — light = stock
+   top, dark = floor. It selects, moves, and saves/loads like any object;
+   `.lf2` embeds the mesh so projects stay self-contained.
+4. Roughing toolpaths compile from it starting with H.5.
+
+#### Error — wrong mode / malformed / oversized
+1. Dropping an STL in laser mode toasts "STL relief import needs CNC
+   mode" and imports nothing.
+2. Truncated binaries, partial ASCII facets, and non-numeric vertices are
+   rejected with the specific reason; meshes over 200k triangles ask for
+   decimation.
+
+#### Empty
+1. An STL with zero facets is rejected ("contains no vertices").
+
+#### Edge — flat mesh / rotation
+1. A mesh flat in X or Y is rejected — nothing to carve.
+2. Rotated reliefs render axis-aligned in v1 (the depth map draws in the
+   transformed bounding box); toolpaths (H.5) will honor the transform.
+
 ### F-CNC6. V-carve a layer — Phase H.3
 
 #### Success

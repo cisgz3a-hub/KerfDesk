@@ -34,6 +34,7 @@ import { drawCncRemoval } from './draw-cnc-removal';
 import { drawRasterImage, pruneRasterImageCaches } from './draw-raster';
 import { drawRasterPreview } from './draw-raster-preview';
 import { drawCncStock } from './draw-stock';
+import { drawReliefObject } from './draw-relief';
 import type { RemovalGrid } from '../../core/sim';
 import { drawRulers } from './draw-rulers';
 import { drawOutOfBoundsOutlines } from './draw-out-of-bounds-outlines';
@@ -288,6 +289,8 @@ function drawObjects(
         onRasterBitmapReady === undefined ? undefined : { onBitmapReady: onRasterBitmapReady },
       );
     }
+    // H.4: reliefs render as grayscale depth maps (light = top, dark = floor).
+    if (obj.kind === 'relief') drawReliefObject(ctx, obj, layerByColor, view);
     drawObjectSelectionOverlay(ctx, obj, view, {
       isVisible,
       selectedId,

@@ -17,6 +17,7 @@ import type { SceneObject } from '../../core/scene';
 import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
 import { confirmOversizeImport } from './import-size-guard';
+import { importStlFiles, isStlFile } from './stl-import-action';
 import { useStore } from '../state';
 import type { ImportOutcome } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
@@ -60,17 +61,28 @@ export function useImportDragDrop(): void {
       if (e.dataTransfer === null) return;
       const svgFiles = pickSvgFiles(e.dataTransfer);
       const imageFiles = pickImageFiles(e.dataTransfer);
-      const ignored = e.dataTransfer.files.length - svgFiles.length - imageFiles.length;
-      if (e.dataTransfer.files.length > 0 && svgFiles.length === 0 && imageFiles.length === 0) {
-        pushToast('Drop ignored — no SVG or image (PNG/JPG) files in the selection', 'warning');
+      const stlFiles = [...e.dataTransfer.files].filter(isStlFile);
+      const recognized = svgFiles.length + imageFiles.length + stlFiles.length;
+      const ignored = e.dataTransfer.files.length - recognized;
+      if (e.dataTransfer.files.length > 0 && recognized === 0) {
+        pushToast(
+          'Drop ignored — no SVG, image (PNG/JPG), or STL files in the selection',
+          'warning',
+        );
         return;
       }
       // Mixed drops used to discard non-SVG files SILENTLY (M26) — name them.
       if (ignored > 0) {
-        pushToast(`Ignored ${ignored} file(s) — only SVG, PNG, and JPG import`, 'warning');
+        pushToast(`Ignored ${ignored} file(s) — only SVG, PNG, JPG, and STL import`, 'warning');
       }
       void importMany(svgFiles, importSvgObject, pushToast);
       void importImagesInOrder(imageFiles, importRasterImage, pushToast);
+      // H.4: STL → relief (CNC mode only; the action toasts the laser-mode case).
+      void importStlFiles(stlFiles, {
+        project: useStore.getState().project,
+        importObject: importSvgObject,
+        pushToast,
+      });
     };
     window.addEventListener('dragenter', onDragEnter);
     window.addEventListener('dragover', onDragOver);
