@@ -1,0 +1,88 @@
+// Spoilboard surfacing program generator (ADR-102 G8, F-CNC25) — the
+// gSender/OpenBuilds-style facing wizard. Serpentine rows over a W×H area,
+// stepping by a fraction of the bit diameter, one full raster per depth
+// step until the total depth is reached. Standalone program: it assumes the
+// operator zeroed X/Y at the area's front-left corner and Z on the surface
+// to be faced. Pure and deterministic (no clock, no randomness).
+
+export type SurfacingParams = {
+  readonly widthMm: number;
+  readonly heightMm: number;
+  readonly bitDiameterMm: number;
+  /** Row spacing as a percentage of bit diameter (10–100). */
+  readonly stepoverPct: number;
+  readonly depthPerPassMm: number;
+  readonly totalDepthMm: number;
+  readonly feedMmPerMin: number;
+  readonly plungeMmPerMin: number;
+  readonly spindleRpm: number;
+  readonly spindleSpinupSec: number;
+  readonly safeZMm: number;
+};
+
+export type SurfacingProgram = {
+  readonly lines: ReadonlyArray<string>;
+  readonly passes: number;
+  readonly rowsPerPass: number;
+};
+
+export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
+export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
+export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
+
+const MIN_STEPOVER_PCT = 10;
+const MAX_STEPOVER_PCT = 100;
+const MIN_STEP_MM = 0.05;
+
+function fmt(value: number): string {
+  const text = value.toFixed(3);
+  return text === '-0.000' ? '0.000' : text;
+}
+
+// Row centers 0..heightMm inclusive; the final row lands exactly on the far
+// edge so the whole area is faced even when the height doesn't divide.
+export function surfacingRowYs(heightMm: number, stepMm: number): ReadonlyArray<number> {
+  const rows: number[] = [];
+  for (let y = 0; y < heightMm; y += stepMm) rows.push(y);
+  rows.push(heightMm);
+  return rows;
+}
+
+export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram {
+  const stepover = Math.min(MAX_STEPOVER_PCT, Math.max(MIN_STEPOVER_PCT, params.stepoverPct));
+  const stepMm = Math.max(MIN_STEP_MM, (params.bitDiameterMm * stepover) / 100);
+  const rows = surfacingRowYs(params.heightMm, stepMm);
+  const depths = depthLadder(params.depthPerPassMm, params.totalDepthMm);
+  const lines: string[] = [
+    '; KerfDesk spoilboard surfacing',
+    `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${stepover}%`,
+    '; zero X/Y at the front-left corner of the area, Z0 on the surface to face',
+    'G21',
+    'G90',
+    `M3 S${Math.round(params.spindleRpm)}`,
+    `G4 P${params.spindleSpinupSec.toFixed(3)}`,
+    `G0 Z${fmt(params.safeZMm)}`,
+  ];
+  for (const depth of depths) {
+    lines.push('G0 X0.000 Y0.000');
+    lines.push(`G1 Z${fmt(-depth)} F${fmt(params.plungeMmPerMin)}`);
+    rows.forEach((y, index) => {
+      if (index > 0) lines.push(`G1 Y${fmt(y)} F${fmt(params.feedMmPerMin)}`);
+      // Serpentine: even rows cut toward +X, odd rows back toward 0.
+      lines.push(`G1 X${fmt(index % 2 === 0 ? params.widthMm : 0)} F${fmt(params.feedMmPerMin)}`);
+    });
+    lines.push(`G0 Z${fmt(params.safeZMm)}`);
+  }
+  lines.push('M5');
+  lines.push('G0 X0.000 Y0.000');
+  return { lines, passes: depths.length, rowsPerPass: rows.length };
+}
+
+function depthLadder(perPassMm: number, totalMm: number): ReadonlyArray<number> {
+  const step = Math.max(MIN_STEP_MM, perPassMm);
+  const total = Math.max(MIN_STEP_MM, totalMm);
+  const depths: number[] = [];
+  for (let depth = step; depth < total; depth += step) depths.push(depth);
+  depths.push(total);
+  return depths;
+}
