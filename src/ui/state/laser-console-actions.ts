@@ -1,8 +1,5 @@
-import {
-  prepareConsoleCommand,
-  startCollecting,
-  type SettingsCollectorState,
-} from '../../core/controllers/grbl';
+import { startCollecting, type SettingsCollectorState } from '../../core/controllers/grbl';
+import type { ControllerDriver } from '../../core/controllers';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -30,6 +27,7 @@ export type ConsoleCommandOptions = {
 };
 
 export type ConsoleActionRefs = {
+  driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
   nextTranscriptId: number;
 };
@@ -42,7 +40,7 @@ export function consoleActions(
 ): Pick<LaserState, 'sendConsoleCommand' | 'clearTranscript'> {
   return {
     sendConsoleCommand: async (input, options = {}) => {
-      const prepared = prepareConsoleCommand(input);
+      const prepared = refs.driver.prepareConsoleCommand(input);
       if (!prepared.ok) return block(set, get, refs, prepared.reason);
       const blocked = consoleCommandBlockReason(get(), prepared.command, false);
       if (blocked !== null) return block(set, get, refs, blocked);

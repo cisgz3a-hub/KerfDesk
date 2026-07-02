@@ -57,22 +57,5 @@ export function takeNextFrameJogLine(
   return { operation: startMotionOperation('frame', pendingLines), line };
 }
 
-export function buildFrameJogLines(
-  bounds: {
-    readonly minX: number;
-    readonly minY: number;
-    readonly maxX: number;
-    readonly maxY: number;
-  },
-  feed: number,
-): ReadonlyArray<string> {
-  const f = Math.max(1, Math.round(feed));
-  const fmt = (n: number): string => n.toFixed(3);
-  return [
-    { x: bounds.minX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.minY },
-  ].map((c) => `$J=G90 G21 X${fmt(c.x)} Y${fmt(c.y)} F${f}\n`);
-}
+// Frame move construction moved to the ControllerDriver (ADR-094):
+// core/controllers/grbl/frame-lines.ts owns the GRBL $J= perimeter builder.

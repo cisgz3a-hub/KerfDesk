@@ -1,10 +1,10 @@
 import {
-  CMD_SETTINGS,
   idleCollector,
   startCollecting,
   type GrblSettingRow,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
+import type { ControllerDriver } from '../../core/controllers';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
@@ -28,6 +28,7 @@ type SettingsWriteFn = (
 ) => Promise<void>;
 
 export type GrblSettingsActionRefs = ControllerLifecycleRefs & {
+  driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
 };
 
@@ -49,6 +50,10 @@ async function readMachineSettingsAction(
   refs: GrblSettingsActionRefs,
   write: SettingsWriteFn,
 ): Promise<void> {
+  const settingsQuery = refs.driver.commands.settingsQuery;
+  if (settingsQuery === null) {
+    return blockRead(set, get, 'This controller does not support a settings dump.');
+  }
   const blocked = machineSettingsReadBlockReason(get(), refs);
   if (blocked !== null) return blockRead(set, get, blocked);
   refs.settingsCollector = startCollecting();
@@ -67,7 +72,7 @@ async function readMachineSettingsAction(
     await startControllerCommand(refs, write, {
       kind: 'interactive-command',
       label: 'read controller settings',
-      command: `${CMD_SETTINGS}\n`,
+      command: `${settingsQuery}\n`,
       action: 'console',
       source: 'console',
     });
@@ -133,7 +138,7 @@ async function writeAndVerifySetting(
   await startControllerCommand(refs, write, {
     kind: 'interactive-command',
     label: 'verify controller settings',
-    command: `${CMD_SETTINGS}\n`,
+    command: `${refs.driver.commands.settingsQuery ?? '$$'}\n`,
     action: 'console',
     source: 'console',
   });

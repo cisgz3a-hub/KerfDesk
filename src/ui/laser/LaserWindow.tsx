@@ -32,6 +32,8 @@ export function LaserWindow(): JSX.Element {
   const streamer = useLaserStore((s) => s.streamer);
   const statusReport = useLaserStore((s) => s.statusReport);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  const controllerKind = useStore((s) => s.project.device.controllerKind);
+  const profileBaudRate = useStore((s) => s.project.device.baudRate);
   const machineOperationBusy = isMachineOperationBusy({
     autofocusBusy,
     motionOperation,
@@ -64,7 +66,7 @@ export function LaserWindow(): JSX.Element {
       <DeviceSetupControls />
       <ConnectionBar
         connection={connection}
-        onConnect={() => void connect(platform)}
+        onConnect={() => void connect(platform, { controllerKind, baudRate: profileBaudRate })}
         onDisconnect={() => void disconnect().catch(() => undefined)}
         disabled={!supportsSerial || machineOperationBusy}
       />
