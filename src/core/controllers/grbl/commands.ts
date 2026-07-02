@@ -117,6 +117,41 @@ export function buildJogCommand(params: JogParams): string {
 /** Jog-cancel real-time byte (0x85). Aborts the in-flight jog motion only. */
 export const RT_JOG_CANCEL = '\x85';
 
+// --- Real-time overrides (ADR-102 G3) ---
+// GRBL v1.1 extended real-time bytes: processed instantly mid-job without
+// touching the planner queue. Feed clamps to 10–200%, spindle to 10–200%,
+// rapid picks from {25, 50, 100}%. The controller reports the live values
+// in the status report's `Ov:` field.
+
+export const RT_FEED_OV_RESET = '\x90';
+export const RT_FEED_OV_PLUS_10 = '\x91';
+export const RT_FEED_OV_MINUS_10 = '\x92';
+export const RT_FEED_OV_PLUS_1 = '\x93';
+export const RT_FEED_OV_MINUS_1 = '\x94';
+export const RT_RAPID_OV_FULL = '\x95';
+export const RT_RAPID_OV_HALF = '\x96';
+export const RT_RAPID_OV_QUARTER = '\x97';
+export const RT_SPINDLE_OV_RESET = '\x99';
+export const RT_SPINDLE_OV_PLUS_10 = '\x9a';
+export const RT_SPINDLE_OV_MINUS_10 = '\x9b';
+export const RT_SPINDLE_OV_PLUS_1 = '\x9c';
+export const RT_SPINDLE_OV_MINUS_1 = '\x9d';
+
+export type RealtimeOverrideByte =
+  | typeof RT_FEED_OV_RESET
+  | typeof RT_FEED_OV_PLUS_10
+  | typeof RT_FEED_OV_MINUS_10
+  | typeof RT_FEED_OV_PLUS_1
+  | typeof RT_FEED_OV_MINUS_1
+  | typeof RT_RAPID_OV_FULL
+  | typeof RT_RAPID_OV_HALF
+  | typeof RT_RAPID_OV_QUARTER
+  | typeof RT_SPINDLE_OV_RESET
+  | typeof RT_SPINDLE_OV_PLUS_10
+  | typeof RT_SPINDLE_OV_MINUS_10
+  | typeof RT_SPINDLE_OV_PLUS_1
+  | typeof RT_SPINDLE_OV_MINUS_1;
+
 function formatMm(n: number): string {
   return n.toFixed(3);
 }

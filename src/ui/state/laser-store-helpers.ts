@@ -191,6 +191,7 @@ export function initialLaserState(): Pick<
   | 'grblSettingsRows'
   | 'lastSettingsReadAt'
   | 'wcoCache'
+  | 'ovCache'
   | 'workOriginActive'
   | 'workOriginSource'
   | 'frameVerification'
@@ -215,6 +216,7 @@ export function initialLaserState(): Pick<
     grblSettingsRows: [],
     lastSettingsReadAt: null,
     wcoCache: null,
+    ovCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
     frameVerification: null,
@@ -241,6 +243,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     // G54 can survive, but the cached WCO is no longer trustworthy until a
     // fresh status frame arrives.
     wcoCache: null,
+    ovCache: null,
     workOriginActive: state.workOriginSource === 'g54-persistent',
     workOriginSource: state.workOriginSource === 'g54-persistent' ? 'unknown' : 'none',
     // The origin is gone, so any Verified Frame is void (ADR-053 P2).

@@ -5,6 +5,8 @@ import {
   RT_STATUS,
   idleCollector,
   type JogParams,
+  type OverrideValues,
+  type RealtimeOverrideByte,
   type SettingsCollectorState,
   type StatusReport,
   type StreamerState,
@@ -31,6 +33,7 @@ import { handleLine, runHandshake } from './laser-line-handler';
 import type { LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
+import { overrideActions } from './override-actions';
 import type { FrameVerification } from './frame-verification';
 import {
   type LaserSafetyNotice,
@@ -105,6 +108,9 @@ export type LaserState = {
    * GRBL itself). UI reads `wcoCache`, NEVER `statusReport.wco`.
    */
   readonly wcoCache: WorkCoordinateOffset | null;
+  // ADR-102 G3 — last-seen `Ov:` feed/rapid/spindle override percentages,
+  // cached across frames exactly like wcoCache.
+  readonly ovCache: OverrideValues | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
   /**
@@ -123,6 +129,8 @@ export type LaserState = {
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
   // ADR-102 G2 — run a prepared touch-plate probing sequence.
   readonly probe: (lines: ReadonlyArray<string>) => Promise<ProbeResult>;
+  // ADR-102 G3 — send a real-time override byte (legal mid-job by design).
+  readonly sendRealtimeOverride: (byte: RealtimeOverrideByte) => Promise<void>;
   readonly unlockAlarm: () => Promise<void>;
   readonly wakeController: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
@@ -351,6 +359,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
     safeWrite(set, get, line, action, source),
   ),
   ...probeActions(set, get, refs),
+  ...overrideActions((line) => safeWrite(set, get, line)),
   ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
   ...grblSettingsActions(set, get, refs, (line, action, source) =>

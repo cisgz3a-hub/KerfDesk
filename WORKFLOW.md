@@ -1762,3 +1762,28 @@ F-CNC19 tiling.
    bytes written).
 2. The status poll keeps running during the cycle; an Alarm status seen
    mid-cycle aborts with the unlock hint even if the ALARM line raced.
+
+### F-CNC21. Adjust feed/spindle/rapids during a job — Phase H.11 (ADR-102 G3)
+
+#### Success
+1. While a job streams (or is paused), the job controls grow an
+   "overrides" box: Feed and Spindle each show the live percentage with
+   −10 / +10 / 100% buttons; Rapids offers 25 / 50 / 100.
+2. Each press sends the single GRBL real-time byte — applied instantly
+   mid-motion, no queueing, no stream disturbance (the bytes bypass the
+   character-counted buffer by design).
+3. The percentages read back from the controller's `Ov:` status field
+   (cached across frames like WCO, so the display never flickers).
+
+#### Error — none from the app's side
+1. GRBL itself clamps feed/spindle overrides to 10–200%; presses beyond
+   the clamp are no-ops on the controller. A failed serial write surfaces
+   the standard write-failure notice.
+
+#### Empty
+1. Before the first `Ov:` frame arrives the readouts show "—" (the
+   buttons still work).
+
+#### Edge — alarm / disconnect mid-job
+1. Alarm, Sleep, and port-close clear the cached percentages (the next
+   session re-learns them); overrides reset to 100% on GRBL's own reset.

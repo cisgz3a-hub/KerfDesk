@@ -14,17 +14,14 @@ import {
   progressFillStyle,
   progressLabelStyle,
   rowStyle,
-  runningSafetyStyle,
-  stopBtnStyle,
 } from './JobControls.styles';
 import { JobPlacementControls } from './JobPlacementControls';
 import { OriginRow } from './OriginRow';
+import { ControllerOperationControls, MotionControls, RunningControls } from './JobRunControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
 import { type LiveJobEstimate } from './live-job-estimate';
 import { useFrameAction } from './use-frame-action';
 import { useJobEstimate } from './use-job-estimate';
-
-const PAUSE_HOLD_SAFETY_MESSAGE = 'Pause is feed hold only. Use Stop or physical E-stop if unsafe.';
 
 type Props = {
   readonly disabled: boolean;
@@ -167,71 +164,6 @@ function EstimateBadge({ estimate }: { readonly estimate: LiveJobEstimate }): JS
     );
   }
   return null;
-}
-
-function RunningControls(props: {
-  readonly isStreaming: boolean;
-  readonly isPaused: boolean;
-}): JSX.Element {
-  const pauseJob = useLaserStore((s) => s.pauseJob);
-  const resumeJob = useLaserStore((s) => s.resumeJob);
-  const stopJob = useLaserStore((s) => s.stopJob);
-  return (
-    <div style={rowStyle}>
-      {props.isStreaming && (
-        <button
-          type="button"
-          onClick={() => void pauseJob().catch(() => undefined)}
-          title={PAUSE_HOLD_SAFETY_MESSAGE}
-        >
-          Pause
-        </button>
-      )}
-      {props.isPaused && (
-        <button
-          type="button"
-          onClick={() => void resumeJob().catch(() => undefined)}
-          title="Release the feed hold and continue the job"
-        >
-          Resume
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={() => void stopJob().catch(() => undefined)}
-        style={stopBtnStyle}
-        title="Soft-reset the controller and halt the job (Ctrl+.)"
-      >
-        Stop
-      </button>
-      <span style={runningSafetyStyle}>{PAUSE_HOLD_SAFETY_MESSAGE}</span>
-    </div>
-  );
-}
-
-function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX.Element {
-  const cancelJog = useLaserStore((s) => s.cancelJog);
-  const label = props.operationKind === 'frame' ? 'Cancel frame' : 'Cancel jog';
-  return (
-    <div style={rowStyle}>
-      <button
-        type="button"
-        onClick={() => void cancelJog().catch(() => undefined)}
-        title="Cancel the active framing or jog motion. Use physical E-stop if unsafe."
-      >
-        {label}
-      </button>
-      <span style={runningSafetyStyle}>Uses GRBL jog cancel. Use physical E-stop if unsafe.</span>
-    </div>
-  );
-}
-
-function ControllerOperationControls({ label }: { readonly label: string }): JSX.Element {
-  return (
-    <div style={rowStyle}>
-      <span style={runningSafetyStyle}>{label}</span>
-    </div>
-  );
 }
 
 function ProgressBar({

@@ -1,6 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+// handleLine Ov override caching (ADR-102 G3): the `Ov:` field is reported
+// intermittently, so the cache must persist across Ov-less frames and clear
+// on Alarm exactly like wcoCache. Split from laser-line-handler.test.ts
+// (file line cap); the state builder mirrors that file's.
+
+import { describe, expect, it } from 'vitest';
 import { startCollecting } from '../../core/controllers/grbl';
-import type { FrameVerification } from './frame-verification';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
 
@@ -84,34 +88,35 @@ function makeHarness(): {
   };
 }
 
-describe('handleLine queued Frame writes', () => {
-  it('clears frame verification when a queued frame leg fails to write', async () => {
+describe('handleLine Ov override caching (ADR-102 G3)', () => {
+  it('caches Ov values across frames that omit the field', () => {
     const { refs, set, get } = makeHarness();
-    const verification: FrameVerification = {
-      boundsSignature: '0,0,10,10',
-      wco: { x: 0, y: 0, z: 0 },
-      workOriginActive: false,
-    };
-    set({
-      frameVerification: verification,
-      motionOperation: {
-        kind: 'frame',
-        sawControllerBusy: true,
-        idleStatusReports: 0,
-        dispatchComplete: true,
-        pendingLines: ['$J=G90 G21 X10.000 Y0.000 F1000\n'],
-      },
-    });
-    const safeWrite = vi.fn(async () => {
-      throw new Error('port lost');
-    });
 
-    handleLine(set, get, refs, safeWrite, '<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    await Promise.resolve();
-    await Promise.resolve();
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Run|MPos:0.000,0.000,0.000|FS:1000,8000|Ov:120,50,90>',
+    );
+    expect(get().ovCache).toEqual({ feed: 120, rapid: 50, spindle: 90 });
 
-    expect(safeWrite).toHaveBeenCalledWith('$J=G90 G21 X10.000 Y0.000 F1000\n', 'frame');
-    expect(get().motionOperation).toBeNull();
-    expect(get().frameVerification).toBeNull();
+    // Next frame has no Ov field — the cache must NOT flicker back to null.
+    handleLine(set, get, refs, async () => undefined, '<Run|MPos:1.000,0.000,0.000|FS:1000,8000>');
+    expect(get().ovCache).toEqual({ feed: 120, rapid: 50, spindle: 90 });
+  });
+
+  it('clears the cache when the controller enters Alarm', () => {
+    const { refs, set, get } = makeHarness();
+    handleLine(
+      set,
+      get,
+      refs,
+      async () => undefined,
+      '<Run|MPos:0.000,0.000,0.000|FS:0,0|Ov:110,100,100>',
+    );
+    expect(get().ovCache).not.toBeNull();
+    handleLine(set, get, refs, async () => undefined, '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+    expect(get().ovCache).toBeNull();
   });
 });
