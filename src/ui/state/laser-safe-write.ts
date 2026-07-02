@@ -1,4 +1,4 @@
-import { RT_STATUS } from '../../core/controllers/grbl';
+import type { ControllerDriver } from '../../core/controllers';
 import type { SerialConnection } from '../../platform/types';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -8,13 +8,14 @@ import {
 } from './laser-transcript';
 import type { LaserState } from './laser-store';
 import {
-  idleOnlyDollarCommandBlockMessage,
+  activeJobCommandBlockMessage,
   pushLog,
   serialWriteErrorMessage,
 } from './laser-store-helpers';
 
 export type SafeWriteRefs = {
   readonly connection: SerialConnection | null;
+  readonly driver: ControllerDriver;
   nextTranscriptId: number;
 };
 
@@ -31,7 +32,11 @@ type GetFn = () => LaserState;
 
 export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): SafeWrite {
   return async (line, action, source) => {
-    const blockedMessage = idleOnlyDollarCommandBlockMessage(get(), line);
+    // Setup-only lines (GRBL `$` commands) are blocked while a job is active;
+    // the active driver decides what counts as setup-only for its firmware.
+    const blockedMessage = refs.driver.isSetupOnlyPayload(line)
+      ? activeJobCommandBlockMessage(get())
+      : null;
     if (blockedMessage !== null) {
       set({
         lastWriteError: blockedMessage,
@@ -53,7 +58,8 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       throw new Error(message);
     }
     try {
-      const writeSource = source ?? transcriptSourceForWrite(line, action);
+      const writeSource =
+        source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
       await conn.write(line);
       set((s) => ({
         transcript: appendTranscript(
@@ -80,8 +86,9 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
 function transcriptSourceForWrite(
   line: string,
   action: LaserSafetyAction | undefined,
+  statusQuery: string | null,
 ): TranscriptSource {
-  if (line === RT_STATUS) return 'poll';
+  if (statusQuery !== null && line === statusQuery) return 'poll';
   if (action === 'start' || action === 'resume') return 'job';
   if (action === 'frame' || action === 'jog' || action === 'home') return 'motion';
   if (action === 'origin') return 'origin';

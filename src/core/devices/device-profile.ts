@@ -68,6 +68,9 @@ export type DeviceProfile = {
   readonly evidence?: ReadonlyArray<ProfileEvidence>;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
+  // Serial baud rate override. Absent = the controller driver's default
+  // (GRBL family 115200; Marlin profiles typically 250000).
+  readonly baudRate?: number;
   // GRBL serial streaming behavior. Most controllers work best with
   // char-counted streaming and a conservative 120-byte RX window; profiles can
   // opt into one-line ping-pong for controllers that misreport/free buffers.

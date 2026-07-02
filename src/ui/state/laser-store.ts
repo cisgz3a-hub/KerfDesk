@@ -1,11 +1,9 @@
-// laser-store — Zustand store for the live serial connection to the GRBL
+// laser-store — Zustand store for the live serial connection to the laser
+// controller. Firmware specifics come from the active ControllerDriver
+// (ADR-094); this file must not hardcode any protocol bytes.
 import { create } from 'zustand';
 import {
-  CMD_UNLOCK,
   type GrblSettingRow,
-  RT_JOG_CANCEL,
-  RT_STATUS,
-  buildJogCommand,
   idleCollector,
   type JogParams,
   type SettingsCollectorState,
@@ -13,7 +11,12 @@ import {
   type StreamerState,
   type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
-import type { DeviceProfile } from '../../core/devices';
+import {
+  grblDriver,
+  type ControllerCapabilities,
+  type ControllerDriver,
+} from '../../core/controllers';
+import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
@@ -23,14 +26,10 @@ import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
 import { runHomeAction } from './laser-home-action';
-import {
-  cancelControllerLifecycleRefs,
-  type ControllerLifecycleRefs,
-} from './laser-interactive-command';
+import type { ControllerLifecycleRefs } from './laser-interactive-command';
+import { connectionActions } from './laser-connection-actions';
 import { jobActions } from './laser-job-actions';
-import { handleLine, runHandshake } from './laser-line-handler';
 import {
-  buildFrameJogLines,
   markMotionOperationDispatched,
   startMotionOperation,
   type LaserMotionOperation,
@@ -38,22 +37,14 @@ import {
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { FrameVerification } from './frame-verification';
-import {
-  type LaserSafetyNotice,
-  streamStalledNotice,
-  writeFailedNotice,
-} from './laser-safety-notice';
+import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import {
   activeJobCommandBlockMessage,
   assertAutofocusIdle,
-  buildPortClosePatch,
-  detectStreamStall,
-  disconnectStopCommands,
   initialLaserState,
-  isActiveJob,
   jogFrameCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
@@ -63,10 +54,12 @@ import {
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
 export { hasCustomOrigin, type WorkCoordinateOffset } from './origin-actions';
 
-const DEFAULT_BAUD = 115200;
-// 250 ms tick; idle machines only emit `?` every 4th tick.
-const STATUS_POLL_MS = 250;
-const IDLE_POLL_DIVISOR = 4;
+/** Connect-time controller selection. Omitted fields fall back to the GRBL
+ *  driver and its default baud — the only behavior that existed pre-ADR-094. */
+export type ConnectControllerOptions = {
+  readonly controllerKind?: ControllerKind | undefined;
+  readonly baudRate?: number | undefined;
+};
 
 export type ConnectionState =
   | { readonly kind: 'disconnected' }
@@ -123,8 +116,15 @@ export type LaserState = {
    * bounds signature stops matching). null = not verified.
    */
   readonly frameVerification: FrameVerification | null;
+  /**
+   * ADR-094 — capabilities snapshot of the active ControllerDriver. UI
+   * components gate controls on these flags, never on the controller kind.
+   * Defaults to GRBL's (all-enabled) capabilities while disconnected so the
+   * panel renders identically to the pre-driver app.
+   */
+  readonly capabilities: ControllerCapabilities;
 
-  readonly connect: (adapter: PlatformAdapter) => Promise<void>;
+  readonly connect: (adapter: PlatformAdapter, options?: ConnectControllerOptions) => Promise<void>;
   readonly disconnect: () => Promise<void>;
   readonly home: () => Promise<void>;
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
@@ -166,8 +166,11 @@ export type LaserState = {
   readonly markFrameVerified: (verification: FrameVerification) => void;
 };
 
-type LiveRefs = ControllerLifecycleRefs & {
+export type LiveRefs = ControllerLifecycleRefs & {
   connection: SerialConnection | null;
+  // The active firmware driver. Selected at connect time from the device
+  // profile's controllerKind; GRBL when disconnected (pre-ADR-094 behavior).
+  driver: ControllerDriver;
   unsubscribeLine: (() => void) | null;
   unsubscribeClose: (() => void) | null;
   pollHandle: ReturnType<typeof setInterval> | null;
@@ -185,6 +188,7 @@ type LiveRefs = ControllerLifecycleRefs & {
 
 const refs: LiveRefs = {
   connection: null,
+  driver: grblDriver,
   unsubscribeLine: null,
   unsubscribeClose: null,
   pollHandle: null,
@@ -196,28 +200,11 @@ const refs: LiveRefs = {
   controllerIdleWait: null,
 };
 
-function teardown(): void {
-  cancelControllerLifecycleRefs(refs);
-  refs.unsubscribeLine?.();
-  refs.unsubscribeClose?.();
-  if (refs.pollHandle !== null) clearInterval(refs.pollHandle);
-  refs.connection = null;
-  refs.unsubscribeLine = null;
-  refs.unsubscribeClose = null;
-  refs.pollHandle = null;
-  refs.settingsCollector = idleCollector();
-  refs.onLineArrived = null;
-  refs.nextTranscriptId = 1;
-  refs.stallProbe = null;
-  refs.controllerCommand = null;
-  refs.controllerIdleWait = null;
-}
-
 async function safeWrite(
   set: SetFn,
   get: GetFn,
   line: string,
-  action?: Parameters<typeof writeFailedNotice>[0],
+  action?: LaserSafetyAction,
   source?: TranscriptSource,
 ): Promise<void> {
   await createSafeWrite(set, get, refs)(line, action, source);
@@ -228,117 +215,11 @@ type SetFn = (
 ) => void;
 type GetFn = () => LaserState;
 
-function connectionActions(set: SetFn, get: GetFn): Pick<LaserState, 'connect' | 'disconnect'> {
-  return {
-    connect: async (adapter) => {
-      refs.nextTranscriptId = 1;
-      set({
-        connection: { kind: 'connecting' },
-        controllerOperation: null,
-        log: [],
-        transcript: [],
-        homingState: 'unknown',
-      });
-      const portRef = await adapter.serial.requestPort();
-      if (portRef === null) {
-        set({ connection: { kind: 'disconnected' } });
-        return;
-      }
-      try {
-        const conn = await portRef.open({ baudRate: DEFAULT_BAUD });
-        refs.connection = conn;
-        refs.unsubscribeLine = conn.onLine((line) =>
-          handleLine(set, get, refs, (out) => safeWrite(set, get, out), line),
-        );
-        refs.unsubscribeClose = conn.onClose(() => {
-          teardown();
-          set(buildPortClosePatch);
-        });
-        startStatusPolling(set, get);
-        set({
-          connection: { kind: 'connected' },
-          alarmCode: null,
-          lastWriteError: null,
-          safetyNotice: null,
-          controllerOperation: null,
-          homingState: 'unknown',
-        });
-        void runHandshake(set, get, refs, (out) => safeWrite(set, get, out)).catch(() => undefined);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        set({ connection: { kind: 'failed', error: message } });
-      }
-    },
-    disconnect: async () => {
-      assertAutofocusIdle(get());
-      const conn = refs.connection;
-      const stopCommands = disconnectStopCommands(get());
-      if (stopCommands.length > 0) {
-        try {
-          for (const stopCommand of stopCommands) {
-            await safeWrite(set, get, stopCommand, 'disconnect');
-          }
-        } catch {
-          // The stop-before-disconnect write failed (USB likely already gone),
-          // so the machine may still run buffered commands. Warn — but STILL
-          // tear down the link the operator asked to drop (don't rethrow).
-          set({ safetyNotice: writeFailedNotice('disconnect') });
-        }
-      }
-      teardown();
-      if (conn !== null) await conn.close().catch(() => undefined);
-      set({
-        connection: { kind: 'disconnected' },
-        statusReport: null,
-        controllerSettings: null,
-        grblSettingsRows: [],
-        lastSettingsReadAt: null,
-        streamer: null,
-        wcoCache: null,
-        workOriginActive: false,
-        workOriginSource: 'none',
-        frameVerification: null,
-        motionOperation: null,
-        controllerOperation: null,
-        homingState: 'unknown',
-        lastWriteError: null,
-      });
-    },
-  };
-}
-
-function startStatusPolling(set: SetFn, get: GetFn): void {
-  let pollTick = 0;
-  refs.pollHandle = setInterval(() => {
-    pollTick++;
-    const s = get();
-    const stall = detectStreamStall(s.streamer, s.statusReport, refs.stallProbe, Date.now());
-    refs.stallProbe = stall.probe;
-    if (stall.stalled && s.safetyNotice === null) set({ safetyNotice: streamStalledNotice() });
-    if (!shouldFastPoll(s) && pollTick % IDLE_POLL_DIVISOR !== 0) return;
-    void safeWrite(set, get, RT_STATUS).catch(() => undefined);
-  }, STATUS_POLL_MS);
-}
-
-function shouldFastPoll(state: LaserState): boolean {
-  return (
-    isActiveJob(state.streamer) ||
-    state.motionOperation !== null ||
-    state.controllerOperation !== null ||
-    state.autofocusBusy
-  );
-}
-
-function jogActions(
+function autofocusActions(
   set: SetFn,
   get: GetFn,
-): Pick<LaserState, 'home' | 'autofocus' | 'unlockAlarm' | 'jog' | 'cancelJog' | 'frame'> {
+): Pick<LaserState, 'autofocus' | 'unlockAlarm'> {
   return {
-    home: async () => {
-      await runHomeAction(set, get, refs, (line, action, source) =>
-        safeWrite(set, get, line, action, source),
-      );
-    },
     autofocus: async (command) => {
       const activeJobBlock = activeJobCommandBlockMessage(get());
       if (activeJobBlock !== null) return { kind: 'preflight-failed', reason: activeJobBlock };
@@ -362,15 +243,34 @@ function jogActions(
     },
     unlockAlarm: async () => {
       assertNoMotionOperation(set, get);
-      await safeWrite(set, get, `${CMD_UNLOCK}\n`, 'unlock');
+      const unlock = refs.driver.commands.unlock;
+      if (unlock === null) throw new Error('This controller has no unlock command.');
+      await safeWrite(set, get, `${unlock}\n`, 'unlock');
       set({ alarmCode: null, homingState: 'unknown' });
+    },
+  };
+}
+
+function jogActions(
+  set: SetFn,
+  get: GetFn,
+): Pick<LaserState, 'home' | 'jog' | 'cancelJog' | 'frame'> {
+  return {
+    home: async () => {
+      await runHomeAction(
+        set,
+        get,
+        refs,
+        (line, action, source) => safeWrite(set, get, line, action, source),
+        refs.driver,
+      );
     },
     jog: async (params) => {
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
       set({ motionOperation: startMotionOperation('jog') });
       try {
-        await safeWrite(set, get, `${buildJogCommand(params)}\n`, 'jog');
+        await safeWrite(set, get, `${refs.driver.commands.buildJog(params)}\n`, 'jog');
         set((s) => ({
           motionOperation: markMotionOperationDispatched(s.motionOperation, 'jog'),
         }));
@@ -379,14 +279,20 @@ function jogActions(
         throw err;
       }
     },
-    cancelJog: () =>
-      safeWrite(set, get, RT_JOG_CANCEL, 'jog').finally(() =>
+    cancelJog: async () => {
+      const jogCancel = refs.driver.realtime.jogCancel;
+      if (jogCancel === null) {
+        set({ motionOperation: null, frameVerification: null });
+        return;
+      }
+      await safeWrite(set, get, jogCancel, 'jog').finally(() =>
         set({ motionOperation: null, frameVerification: null }),
-      ),
+      );
+    },
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
-      const [firstLine, ...pendingLines] = buildFrameJogLines(bounds, feed);
+      const [firstLine, ...pendingLines] = refs.driver.commands.buildFrameLines(bounds, feed);
       if (firstLine === undefined) return;
       set({ motionOperation: startMotionOperation('frame', pendingLines) });
       try {
@@ -441,9 +347,17 @@ function detectedSettingsActions(
 
 export const useLaserStore = create<LaserState>((set, get) => ({
   ...initialLaserState(),
-  ...connectionActions(set, get),
+  ...connectionActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
+  ...autofocusActions(set, get),
   ...jogActions(set, get),
-  ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
+  ...jobActions(
+    set,
+    get,
+    (line, action) => safeWrite(set, get, line, action),
+    () => refs.driver,
+  ),
   ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
   ...grblSettingsActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
@@ -451,7 +365,12 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...consoleActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   ),
-  ...controllerRecoveryActions(set, refs, (line, action) => safeWrite(set, get, line, action)),
+  ...controllerRecoveryActions(
+    set,
+    refs,
+    (line, action) => safeWrite(set, get, line, action),
+    () => refs.driver,
+  ),
   ...originActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),

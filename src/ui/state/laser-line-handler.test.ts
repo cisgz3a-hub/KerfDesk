@@ -7,6 +7,7 @@ import {
   startCollecting,
   step,
 } from '../../core/controllers/grbl';
+import { grblDriver } from '../../core/controllers';
 import type { FrameVerification } from './frame-verification';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
@@ -17,6 +18,7 @@ afterEach(() => {
 
 function makeLaserState(): LaserState {
   return {
+    capabilities: grblDriver.capabilities,
     connection: { kind: 'connected' },
     statusReport: null,
     alarmCode: null,
@@ -80,6 +82,7 @@ function makeHarness(): {
   };
   return {
     refs: {
+      driver: grblDriver,
       settingsCollector: startCollecting(),
       onLineArrived: null,
       controllerCommand: null,

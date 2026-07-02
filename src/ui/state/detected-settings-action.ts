@@ -17,12 +17,12 @@
 
 import {
   collectorOnResponse,
-  type GrblResponse,
   type GrblSettingRow,
   idleCollector,
   type SettingsCollectorState,
   type ControllerSettingsSnapshot,
 } from '../../core/controllers/grbl';
+import type { ControllerEvent } from '../../core/controllers';
 import type { DeviceProfile } from '../../core/devices';
 import { useStore } from './store';
 
@@ -45,7 +45,7 @@ export type DetectedSettingsResult = {
 // LaserState.detectedSettings when non-null.
 export function consumeSettingsResponse(
   refs: DetectedSettingsRefs,
-  response: GrblResponse,
+  response: ControllerEvent,
 ): DetectedSettingsResult | null {
   const next = collectorOnResponse(refs.settingsCollector, response);
   if (next.kind === 'done') {

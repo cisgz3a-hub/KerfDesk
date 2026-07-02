@@ -31,7 +31,7 @@
 
 import type { DeviceProfile } from '../../devices/device-profile';
 import { settingsMapToRows, type GrblSettingRow } from './grbl-settings';
-import type { GrblResponse } from './response';
+import type { ControllerEvent } from '../controller-event';
 
 export type ControllerSettingsSnapshot = Partial<
   Pick<
@@ -84,7 +84,7 @@ export function startCollecting(): SettingsCollectorState {
 // (e.g., the welcome banner's ack) as if it were the end of the dump.
 export function onResponse(
   state: SettingsCollectorState,
-  response: GrblResponse,
+  response: ControllerEvent,
 ): SettingsCollectorState {
   if (state.kind !== 'collecting') return state;
   if (response.kind === 'setting') {

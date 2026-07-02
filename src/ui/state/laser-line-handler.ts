@@ -15,19 +15,16 @@
 // no behavior change.
 
 import {
-  classifyResponse,
-  CMD_COOLANT_OFF,
-  CMD_SETTINGS,
   disconnect as disconnectStreamer,
   type GrblPins,
   onAck,
-  RT_SOFT_RESET,
   type SettingsCollectorState,
   startCollecting,
   step,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
+import type { ControllerDriver } from '../../core/controllers';
 import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
   cancelControllerLifecycleRefs,
@@ -54,6 +51,9 @@ import type { TranscriptSource } from './laser-transcript';
 import { hasCustomOrigin } from './origin-actions';
 
 export type HandlerRefs = ControllerLifecycleRefs & {
+  // Active firmware driver — classification and follow-up command bytes come
+  // from here so this pipeline stays firmware-neutral (ADR-094).
+  driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
   // One-shot callback fired by handleLine the next time any line arrives.
   // runHandshake sets it before awaiting; handleLine clears it after
@@ -99,23 +99,29 @@ export async function runHandshake(
   });
 
   if (!gotLine) {
+    const driver = refs.driver;
     set({
       log: appendLog(
         get(),
-        '[lf2] No GRBL response within 2 s. Check baud rate (115200) and that the device is GRBL.',
+        `[lf2] No controller response within 2 s. Check baud rate (${driver.defaultBaudRate}) and that the device is ${driver.label}.`,
       ),
     });
     return;
   }
+  const settingsQuery = refs.driver.commands.settingsQuery;
+  if (settingsQuery === null) {
+    set({ log: appendLog(get(), '[lf2] Connected.') });
+    return;
+  }
   set({
-    log: appendLog(get(), '[lf2] Connected. Querying settings ($$)...'),
+    log: appendLog(get(), `[lf2] Connected. Querying settings (${settingsQuery})...`),
     detectedSettings: null,
     controllerSettings: null,
     grblSettingsRows: [],
     lastSettingsReadAt: null,
   });
   refs.settingsCollector = startCollecting();
-  await safeWrite(`${CMD_SETTINGS}\n`);
+  await safeWrite(`${settingsQuery}\n`);
 }
 
 function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
@@ -144,13 +150,13 @@ export function handleLine(
   safeWrite: SafeWriteFn,
   line: string,
 ): void {
-  const cls = classifyResponse(line);
+  const cls = refs.driver.classifyLine(line);
   const state = get();
   set({
     log: appendLog(state, line),
     transcript: appendTranscript(
       state.transcript,
-      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line),
+      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line, cls),
     ),
   });
   if (refs.onLineArrived !== null) {
@@ -177,27 +183,62 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'error') {
-    const state = get();
-    const rejectedLine = state.streamer?.inFlight[0]?.line.trim();
-    const motionErrorPatch =
-      state.motionOperation !== null ? { motionOperation: null, frameVerification: null } : {};
-    set({
-      lastError: cls.code,
-      safetyNotice: controllerErrorNotice(
-        cls.code,
-        controllerErrorContext(state),
-        cls.raw,
-        rejectedLine,
-      ),
-      ...motionErrorPatch,
-    });
-    requestRealtimeStopAfterStreamError(state.streamer, safeWrite);
-    advanceStream(set, get, refs, safeWrite, 'error');
+    handleErrorLine(set, get, refs, safeWrite, cls.code, cls.raw);
+    return;
+  }
+  // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
+  // NOT an ack, so the streamer must not advance.
+  if (cls.kind === 'busy') return;
+  if (cls.kind === 'resend') {
+    handleResendLine(set, get, refs, safeWrite, cls.line);
     return;
   }
   if (cls.kind === 'ok') {
     advanceStream(set, get, refs, safeWrite, 'ok');
   }
+}
+
+function handleErrorLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  code: number | null,
+  raw: string | undefined,
+): void {
+  const state = get();
+  const rejectedLine = state.streamer?.inFlight[0]?.line.trim();
+  const motionErrorPatch =
+    state.motionOperation !== null ? { motionOperation: null, frameVerification: null } : {};
+  set({
+    lastError: code,
+    safetyNotice: controllerErrorNotice(code, controllerErrorContext(state), raw, rejectedLine),
+    ...motionErrorPatch,
+  });
+  requestRealtimeStopAfterStreamError(state.streamer, refs.driver, safeWrite);
+  advanceStream(set, get, refs, safeWrite, 'error');
+}
+
+// Checksum-mode retransmission is not implemented (ADR-094 v1): the sender
+// and firmware are desynced, so a Resend is a fatal stream error rather than
+// a replay — replaying motion lines out of order could move a live laser.
+function handleResendLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  requestedLine: number,
+): void {
+  const current = get();
+  set({
+    safetyNotice: controllerErrorNotice(
+      null,
+      controllerErrorContext(current),
+      `Resend:${requestedLine} — line-number retransmission is not supported`,
+    ),
+  });
+  requestRealtimeStopAfterStreamError(current.streamer, refs.driver, safeWrite);
+  advanceStream(set, get, refs, safeWrite, 'error');
 }
 
 // GRBL ALARM:1 — hard limit triggered (see alarm-codes.ts).
@@ -318,13 +359,16 @@ function shouldReleaseStreamerAtIdle(
 
 function requestRealtimeStopAfterStreamError(
   streamer: StreamerState | null,
+  driver: ControllerDriver,
   safeWrite: SafeWriteFn,
 ): void {
   const streamCanStillHaveBufferedMotion =
     streamer !== null && ['streaming', 'paused', 'done'].includes(streamer.status);
   if (!streamCanStillHaveBufferedMotion) return;
-  void safeWrite(RT_SOFT_RESET, 'stop', 'system')
-    .then(() => safeWrite(`${CMD_COOLANT_OFF}\n`, 'stop', 'system'))
+  const softReset = driver.realtime.softReset;
+  const abort = softReset === null ? Promise.resolve() : safeWrite(softReset, 'stop', 'system');
+  void abort
+    .then(() => safeWrite(`${driver.commands.coolantOff}\n`, 'stop', 'system'))
     .catch(() => undefined);
 }
 
