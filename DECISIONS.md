@@ -3869,3 +3869,85 @@ buffers, and lighting is weeks of risk for zero product differentiation.
 
 - Bundle-size or supply-chain audit flags three.js → replace the viewer
   with a static isometric canvas projection (pure core, no dependency).
+
+
+## ADR-102 — Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03)
+
+**Status:** accepted (maintainer session directive). Individual G-items
+marked PROVISIONAL where this session applied judgment; review welcome.
+
+### Context
+
+Maintainer directive: "build a full working CNC app with everything the
+best CNC app on the market has." The grounded comparison
+(`audit/reports/cnc-market-gap-audit-2026-07-03.md`, researched against
+VCarve 12 / Easel / Carbide Create+Motion / gSender 1.6 / OpenBuilds)
+shows the post-Phase-H CAM core is competitive, and the remaining
+table-stakes (T1) and differentiator (T2) gaps cluster in sender
+workflows, vector editing, and 3D visualization. Per CLAUDE.md, scope
+lands here before code.
+
+### Decision — build now (Phase H.11, in priority order)
+
+- **G1. Vector booleans + offset.** Union / subtract / intersect /
+  exclude on selected closed paths, plus inward/outward offset with a
+  distance field. Implemented on **clipper2-ts, already the approved
+  geometry dependency** (ADR-094 §2) — this deliberately supersedes the
+  Phase-G note that deferred the "geometry kernel" to a future
+  evaluation: the evaluation happened (ADR-017 pattern) when clipper2
+  was adopted for pockets/v-carve; booleans use the same engine. Weld
+  = union. Node-level editing beyond this stays future work.
+- **G2. Probing wizard.** Guided touch-plate probing: **Z** (plate
+  thickness compensated) and **XYZ corner** (plate edge offsets + bit
+  diameter). Two-stage G38.2 (fast seek, retract, slow re-probe),
+  `G10 L20` work-offset zeroing, ALARM:4/5 decoded, Idle-only
+  preflight, 30 s watchdog. PROVISIONAL defaults: seek 150 mm/min,
+  re-probe 25 mm/min, retract 2 mm, max travel 25 mm.
+- **G3. Real-time overrides.** GRBL 1.1 realtime bytes: feed
+  0x90–0x94, rapid 0x95–0x97, spindle 0x99–0x9D, surfaced as
+  +/-10 / +/-1 / reset controls during a running job, with the live
+  `Ov:` values from status reports shown when present. Machine-agnostic
+  (GRBL overrides apply to laser jobs too).
+- **G4. General 3D cut preview.** The H.2 material-removal grid
+  rendered as a shaded heightfield in the ADR-101 three.js viewer for
+  ANY CNC job (not just reliefs). UI-only, same lazy chunk, same jsdom
+  fallback.
+- **G5. Feeds & speeds calculator.** Chipload-based: RPM x flutes x
+  chipload = feed; plunge as a percentage; starter chipload chart
+  (softwood / hardwood / plywood-MDF / acrylic / aluminum x bit
+  diameter bands) with every value editable. Writes into the layer
+  card; composes with H.7 presets. PROVISIONAL: chart values are
+  industry-typical starting points, clearly labeled as such.
+
+### Stretch (build if session capacity allows, same rules)
+
+- **G6. Dogbone / T-bone corner fillets** for interior square corners.
+- **G7. Start-from-line job recovery** (gSender-style, with safe-Z
+  preamble reconstruction).
+- **G8. Spoilboard surfacing generator** (pure G-code wizard).
+
+### Explicit roadmap — NOT silently skipped (each needs its own ADR)
+
+Arc/curved text; system-font import; drag-placeable tabs; pocket raster
+strategy + pocket rest-machining; v-carve inlay automation; macros /
+quick actions; keymap editor + gamepad; remote mode; diagnostics
+dashboards; G2/G3 arc **output**; adaptive clearing; nesting; rotary;
+two-sided; thread milling; photo/sketch carve; keep-out zones; firmware
+flashing. The standing "do not market as Easel-equivalent" directive
+stays until the maintainer lifts it.
+
+### Constraints carried over
+
+ADR-094 §1/§3 unchanged: clean-room, no new runtime deps (G1–G8 add
+none; G4 reuses ADR-101's three.js), every output-affecting feature
+lands CLAIMED until a 4040 air-cut. Defaults must keep existing G-code
+byte-identical; the one intentional exception is the **CNC banner fix**
+(the laser-worded `$32=1` header line in router exports — an E2E-run
+defect), which will carry the snapshot acknowledgment line.
+
+### Verification
+
+Per feature: unit + property tests, WORKFLOW.md flows (success / error /
+empty / edge) before UI, full gate per commit, isolated-preview
+perceptual pass where renderable, AUDIT.md CLAIMED rows with named
+pending hardware checks.
