@@ -23,7 +23,7 @@ import {
   type JobPlacementSettings,
   type ResolvedJobPlacement,
 } from '../job-placement';
-import { detectJobIntentWarnings } from './job-intent-warnings';
+import { detectMachineJobWarnings } from './machine-job-warnings';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
@@ -96,7 +96,7 @@ export function prepareStartJob(
   return {
     ok: true,
     gcode,
-    warnings: [...controller.warnings.map((i) => i.message), ...detectJobIntentWarnings(project)],
+    warnings: [...controller.warnings.map((i) => i.message), ...detectMachineJobWarnings(project)],
   };
 }
 

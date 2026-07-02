@@ -34,16 +34,7 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
           ))}
         </select>
       </Row>
-      <NumberRow
-        label="Stock thickness"
-        unit="mm"
-        value={machine.stock.thicknessMm}
-        min={0.1}
-        max={200}
-        step={0.05}
-        title="Workpiece thickness. Cut depths deeper than this (plus 1 mm) are blocked."
-        onCommit={(thicknessMm) => updateCncMachine({ stock: { thicknessMm } })}
-      />
+      <CncStockFields machine={machine} />
       <NumberRow
         label="Safe Z"
         unit="mm"
@@ -75,6 +66,68 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
       />
     </section>
+  );
+}
+
+// Stock (workpiece) dimensions + placement — split from CncSetupFields to
+// keep both components inside the size limits (H.2 added the XY footprint).
+function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
+  const { machine } = props;
+  const updateCncMachine = useStore((s) => s.updateCncMachine);
+  const origin = machine.stock.originOffset;
+  return (
+    <>
+      <NumberRow
+        label="Stock thickness"
+        unit="mm"
+        value={machine.stock.thicknessMm}
+        min={0.1}
+        max={200}
+        step={0.05}
+        title="Workpiece thickness. Cut depths deeper than this (plus 1 mm) are blocked."
+        onCommit={(thicknessMm) => updateCncMachine({ stock: { thicknessMm } })}
+      />
+      <NumberRow
+        label="Stock width"
+        unit="mm"
+        value={machine.stock.widthMm}
+        min={1}
+        max={1500}
+        step={1}
+        title="Workpiece width (X). Toolpaths outside the stock footprint raise an advisory."
+        onCommit={(widthMm) => updateCncMachine({ stock: { widthMm } })}
+      />
+      <NumberRow
+        label="Stock height"
+        unit="mm"
+        value={machine.stock.heightMm}
+        min={1}
+        max={1500}
+        step={1}
+        title="Workpiece height (Y). Toolpaths outside the stock footprint raise an advisory."
+        onCommit={(heightMm) => updateCncMachine({ stock: { heightMm } })}
+      />
+      <NumberRow
+        label="Stock origin X"
+        unit="mm"
+        value={origin.x}
+        min={-1500}
+        max={1500}
+        step={1}
+        title="Machine-coordinate X of the stock's near-left corner."
+        onCommit={(x) => updateCncMachine({ stock: { originOffset: { ...origin, x } } })}
+      />
+      <NumberRow
+        label="Stock origin Y"
+        unit="mm"
+        value={origin.y}
+        min={-1500}
+        max={1500}
+        step={1}
+        title="Machine-coordinate Y of the stock's near-left corner."
+        onCommit={(y) => updateCncMachine({ stock: { originOffset: { ...origin, y } } })}
+      />
+    </>
   );
 }
 
