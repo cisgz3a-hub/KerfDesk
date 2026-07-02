@@ -1443,3 +1443,46 @@ F-CNC19 tiling.
 #### Edge — pre-H.2 project file
 1. A `.lf2` saved before stock footprints existed loads with the default
    400 × 400 footprint at the origin; thickness is preserved.
+
+### F-CNC9. Import a DXF drawing — Phase H.6
+
+#### Success
+1. The user picks a `.dxf` in File → Import DXF (or drops one on the
+   workspace). Import works in BOTH machine modes — DXF vectors are
+   machine-agnostic geometry sources (ADR-100 §1).
+2. The clean-room parser (no libraries — ADR-094 §2) reads ASCII DXF
+   ENTITIES: LINE, CIRCLE, ARC, LWPOLYLINE (including bulge arcs), classic
+   POLYLINE/VERTEX/SEQEND, ELLIPSE, SPLINE (clean-room de Boor sampling),
+   and INSERT block references (translate/scale/rotate, recursive with a
+   depth cap). `$INSUNITS` scales to mm — unitless files assume mm; DXF's
+   Y-up frame flips to the canvas frame, and the drawing normalizes so its
+   bounding box lands at the workspace origin.
+3. Entity colors map through the AutoCAD Color Index: explicit per-entity
+   colors win, BYLAYER resolves through the LAYER table, and every distinct
+   resolved color becomes/joins a LaserForge layer — exactly like SVG
+   stroke colors.
+4. The result lands as one imported vector object (the same SceneObject
+   variant SVG uses, `source` = the .dxf filename), so Cut/CNC settings,
+   preview, save, and both compilers apply immediately. The toast reports
+   how many entities imported and what was skipped.
+
+#### Error — malformed / binary
+1. Binary DXF (the "AutoCAD Binary DXF" sentinel) is rejected with
+   "Binary DXF is not supported — re-export as ASCII DXF."
+2. A truncated tag stream or a non-numeric group code is rejected with the
+   offending line number; nothing partial imports.
+
+#### Empty
+1. A DXF whose ENTITIES section holds no supported geometry imports
+   nothing; the toast lists the skipped entity types so the user knows why
+   (e.g. "skipped 12 TEXT, 3 HATCH").
+
+#### Edge — unsupported entities / degenerate curves / nested blocks
+1. TEXT, MTEXT, DIMENSION, HATCH, 3DFACE, and other unsupported entities
+   are counted and skipped — never a crash, never partial geometry from
+   inside them.
+2. SPLINE sampling is bounded per span, so degenerate knot vectors cannot
+   hang the import; zero-radius arcs and zero-length lines are dropped.
+3. INSERT recursion caps at depth 8; deeper nesting (or a block cycle)
+   skips that reference with a note.
+4. Z coordinates are ignored (2.5D import): 3D polylines project onto XY.
