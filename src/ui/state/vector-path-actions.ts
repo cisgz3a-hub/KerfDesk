@@ -1,3 +1,4 @@
+import { dogboneVectorObject } from '../../core/geometry/dogbone';
 import {
   combineVectorObjects,
   offsetVectorObjects,
@@ -26,6 +27,8 @@ export type VectorPathActions = {
   readonly booleanSelection: (op: VectorBooleanOp) => void;
   // ADR-102 G1 — adds a NEW offset object; the sources stay.
   readonly offsetSelection: (deltaMm: number) => void;
+  // ADR-102 G6 — relieve sharp corners in place, one undo step.
+  readonly dogboneSelection: (bitDiameterMm: number) => void;
 };
 
 type VectorPathState = StateSlice & {
@@ -54,6 +57,41 @@ export function vectorPathActions(set: VectorPathSet): VectorPathActions {
     weldSelection: () => set((state) => weldSelectionMutation(state)),
     booleanSelection: (op) => set((state) => booleanSelectionMutation(state, op)),
     offsetSelection: (deltaMm) => set((state) => offsetSelectionMutation(state, deltaMm)),
+    dogboneSelection: (bitDiameterMm) =>
+      set((state) => dogboneSelectionMutation(state, bitDiameterMm)),
+  };
+}
+
+// Replace each selected object with its corner-relieved version, in place.
+function dogboneSelectionMutation(
+  state: VectorPathState,
+  bitDiameterMm: number,
+): VectorPathMutation | VectorPathState {
+  const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
+  if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
+  let scene = state.project.scene;
+  let changed = false;
+  for (const object of selected) {
+    let relieved;
+    try {
+      relieved = dogboneVectorObject(object, bitDiameterMm);
+    } catch {
+      continue; // no qualifying corners on this object — leave it alone
+    }
+    scene = replaceObject(scene, object.id, relieved);
+    scene = ensureLayersForColors(scene, relieved.paths);
+    changed = true;
+  }
+  if (!changed) return state;
+  return {
+    project: { ...state.project, scene },
+    selectedObjectId: state.selectedObjectId,
+    selectedPathNode: null,
+    selectedPathNodes: [],
+    additionalSelectedIds: new Set(state.additionalSelectedIds),
+    undoStack: pushUndo(state.project, state.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 
