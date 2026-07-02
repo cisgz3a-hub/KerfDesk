@@ -5,14 +5,20 @@
 import type { DeviceProfile } from '../devices';
 import { grblStrategy } from './grbl-strategy';
 import { marlinStrategy } from './marlin-strategy';
+import { smoothiewareStrategy } from './smoothieware-strategy';
 
-export type AnyOutputStrategy = typeof grblStrategy | typeof marlinStrategy;
+export type AnyOutputStrategy =
+  | typeof grblStrategy
+  | typeof marlinStrategy
+  | typeof smoothiewareStrategy;
 
 export function selectOutputStrategy(device: DeviceProfile): AnyOutputStrategy {
   const kind = device.controllerKind;
   switch (kind) {
     case 'marlin':
       return marlinStrategy;
+    case 'smoothieware':
+      return smoothiewareStrategy;
     case 'grbl-v1.1':
     case 'grblhal':
     case 'fluidnc':

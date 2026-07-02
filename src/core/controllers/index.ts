@@ -24,3 +24,4 @@ export { grblDriver, GRBL_DEFAULT_BAUD_RATE, GRBL_SETTLE_DWELL } from './grbl/dr
 export { grblHalDriver } from './grblhal/driver';
 export { fluidncDriver } from './fluidnc/driver';
 export { marlinDriver, MARLIN_DEFAULT_BAUD_RATE } from './marlin/driver';
+export { smoothiewareDriver, SMOOTHIE_DEFAULT_BAUD_RATE } from './smoothieware/driver';

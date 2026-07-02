@@ -8,6 +8,7 @@ import { fluidncDriver } from './fluidnc/driver';
 import { grblDriver } from './grbl/driver';
 import { grblHalDriver } from './grblhal/driver';
 import { marlinDriver } from './marlin/driver';
+import { smoothiewareDriver } from './smoothieware/driver';
 
 export function selectControllerDriver(kind: ControllerKind | undefined): ControllerDriver {
   switch (kind) {
@@ -20,5 +21,7 @@ export function selectControllerDriver(kind: ControllerKind | undefined): Contro
       return fluidncDriver;
     case 'marlin':
       return marlinDriver;
+    case 'smoothieware':
+      return smoothiewareDriver;
   }
 }
