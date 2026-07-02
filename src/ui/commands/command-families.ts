@@ -29,6 +29,7 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       'Ctrl+Shift+S',
     ),
     enabled('file.import-svg', 'file', 'Import SVG...', 'Import SVG file', ctx.importSvg, 'Ctrl+I'),
+    enabled('file.import-dxf', 'file', 'Import DXF...', 'Import DXF drawing', ctx.importDxf),
     enabled(
       'file.import-image',
       'file',

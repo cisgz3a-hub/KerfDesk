@@ -64,6 +64,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     saveProject: vi.fn(),
     saveProjectAs: vi.fn(),
     importSvg: vi.fn(),
+    importDxf: vi.fn(),
     importImage: vi.fn(),
     multiFileTrace: vi.fn(),
     saveGcode: vi.fn(),

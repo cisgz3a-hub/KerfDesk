@@ -29,6 +29,7 @@ const EMPTY_MORE_COMMANDS: ReadonlyArray<CommandId> = [
   'file.save',
   'file.save-as',
   'file.save-gcode',
+  'file.import-dxf',
   'tools.multi-file-trace',
 ];
 

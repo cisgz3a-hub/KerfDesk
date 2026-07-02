@@ -24,6 +24,7 @@ export type CommandId =
   | 'file.save'
   | 'file.save-as'
   | 'file.import-svg'
+  | 'file.import-dxf'
   | 'file.import-image'
   | 'file.save-gcode'
   | 'edit.undo'
@@ -135,6 +136,7 @@ export type AppCommandContext = {
   readonly saveProject: () => void;
   readonly saveProjectAs: () => void;
   readonly importSvg: () => void;
+  readonly importDxf: () => void;
   readonly importImage: () => void;
   readonly saveGcode: () => void;
   readonly undo: () => void;
