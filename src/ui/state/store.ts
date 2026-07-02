@@ -20,6 +20,7 @@ import {
   type Transform,
   type Vec2,
 } from '../../core/scene';
+import type { Toolpath } from '../../core/job';
 import type { SaveTarget } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import { imageImportActions } from './import-actions';
@@ -31,6 +32,7 @@ import {
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
 import { reliefParamActions, type ReliefParamPatch } from './relief-param-actions';
+import { externalGcodeActions, type ExternalGcodePreview } from './external-gcode-actions';
 import {
   layerActions,
   type LayerSettingsClipboard,
@@ -148,6 +150,11 @@ export type AppState = ObjectPropertiesActions &
     // operates on the primary selection. Move + Delete are multi-aware.
     readonly additionalSelectedIds: ReadonlySet<string>;
     readonly previewMode: boolean;
+    // External .nc program shown in the simulator instead of the compiled
+    // job (H.6b); cleared when Preview exits. Session-only, never persisted.
+    readonly externalGcodePreview: ExternalGcodePreview | null;
+    readonly openExternalGcodePreview: (name: string, toolpath: Toolpath) => void;
+    readonly closeExternalGcodePreview: () => void;
     readonly undoStack: ReadonlyArray<Project>;
     readonly redoStack: ReadonlyArray<Project>;
     readonly pendingUndo: Project | null;
@@ -291,6 +298,7 @@ function initialState(): Pick<
   | 'selectedPathNodes'
   | 'additionalSelectedIds'
   | 'previewMode'
+  | 'externalGcodePreview'
   | 'undoStack'
   | 'redoStack'
   | 'pendingUndo'
@@ -315,6 +323,7 @@ function initialState(): Pick<
     selectedPathNodes: [],
     additionalSelectedIds: new Set(),
     previewMode: false,
+    externalGcodePreview: null,
     undoStack: [],
     redoStack: [],
     pendingUndo: null,
@@ -379,6 +388,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...breakApartActions(set),
   ...rasterAdjustmentActions(set),
   ...reliefParamActions(set),
+  ...externalGcodeActions(set),
   ...layerActions(set),
   ...machineActions(set),
   ...fillSelectionActions(set),

@@ -34,6 +34,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'file',
     tooltip: 'Import a PNG or JPG image for engraving or tracing.',
   },
+  'file.open-gcode': {
+    family: 'file',
+    tooltip: 'Open a .nc G-code program in the CNC simulator (preview only, CNC mode).',
+  },
   'file.save-gcode': {
     family: 'file',
     tooltip: 'Export the current job as GRBL G-code.',

@@ -10,16 +10,26 @@ import { resolveJobPlacement } from '../job-placement';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath } from './draw-preview';
+import { mapToolpathToScene } from './preview-scene-frame';
 import type { PreviewToolpath } from './preview-status';
+
+const ZERO_OFFSET = { x: 0, y: 0 } as const;
 
 export function usePreviewToolpath(project: Project, previewMode: boolean): PreviewToolpath | null {
   const jobPlacement = useStore((s) => s.jobPlacement);
   const outputScope = useStore((s) => currentOutputScope(s));
+  const externalGcodePreview = useStore((s) => s.externalGcodePreview);
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   return useMemo(() => {
     if (!previewMode) return null;
+    // An opened .nc program (F-CNC10) REPLACES the compiled toolpath: it is
+    // already in machine coordinates, so it maps to scene space with a zero
+    // job-origin offset.
+    if (externalGcodePreview !== null) {
+      return mapToolpathToScene(externalGcodePreview.toolpath, ZERO_OFFSET, project.device);
+    }
     const placement = resolveJobPlacement(jobPlacement, {
       statusReport,
       workOriginActive,
@@ -30,5 +40,14 @@ export function usePreviewToolpath(project: Project, previewMode: boolean): Prev
       ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
       outputScope,
     });
-  }, [previewMode, project, jobPlacement, outputScope, statusReport, workOriginActive, wcoCache]);
+  }, [
+    previewMode,
+    project,
+    jobPlacement,
+    outputScope,
+    externalGcodePreview,
+    statusReport,
+    workOriginActive,
+    wcoCache,
+  ]);
 }

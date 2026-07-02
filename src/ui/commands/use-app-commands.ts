@@ -9,6 +9,7 @@ import {
   handleSaveGcode,
   handleSaveProject,
 } from '../app/file-actions';
+import { handleOpenGcodePreview } from '../app/gcode-open-action';
 import { handleSaveProcessedBitmap } from '../app/save-processed-bitmap';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -161,6 +162,7 @@ function fileCommandContext(
   | 'importDxf'
   | 'importImage'
   | 'saveGcode'
+  | 'openGcodePreview'
 > {
   return {
     confirmDiscard: (action) => confirmDiscardAsync(platform, action),
@@ -172,6 +174,8 @@ function fileCommandContext(
     importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
     saveGcode: saveGcodeAction(platform, app, laser, pushToast),
+    openGcodePreview: () =>
+      void handleOpenGcodePreview(platform, app.openExternalGcodePreview, pushToast),
   };
 }
 

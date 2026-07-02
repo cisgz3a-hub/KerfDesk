@@ -4,9 +4,8 @@
 // (menu bar, toolbar, workspace context menu) hides them uniformly.
 //
 // Classification checklist for NEW commands (ADR-100 consequence):
-//   * effect exists only in the laser output pipeline → add its id here
-//   * effect exists only in the CNC output pipeline → gate the other way
-//     (introduce a CNC_ONLY set when the first such command lands)
+//   * effect exists only in the laser output pipeline → LASER_ONLY set
+//   * effect exists only in the CNC output pipeline → CNC_ONLY set
 //   * machine-agnostic (geometry, edit, view, file) → leave ungated
 
 import type { MachineKind } from '../../core/scene';
@@ -37,10 +36,14 @@ export const LASER_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>
   'tools.optimization-settings',
 ]);
 
+// CNC-only commands (hidden in laser mode): the .nc program simulator —
+// the laser pipeline has no Z-aware removal model to feed.
+export const CNC_ONLY_COMMAND_IDS: ReadonlySet<CommandId> = new Set<CommandId>(['file.open-gcode']);
+
 export function gateCommandsForMachineKind(
   commands: ReadonlyArray<AppCommand>,
   machineKind: MachineKind,
 ): ReadonlyArray<AppCommand> {
-  if (machineKind !== 'cnc') return commands;
-  return commands.filter((command) => !LASER_ONLY_COMMAND_IDS.has(command.id));
+  const hidden = machineKind === 'cnc' ? LASER_ONLY_COMMAND_IDS : CNC_ONLY_COMMAND_IDS;
+  return commands.filter((command) => !hidden.has(command.id));
 }

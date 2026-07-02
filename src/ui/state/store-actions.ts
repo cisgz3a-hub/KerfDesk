@@ -190,6 +190,9 @@ export function viewActions(
     togglePreview: () =>
       set((s) => ({
         previewMode: !s.previewMode,
+        // Exiting Preview drops any external .nc program (F-CNC10): the
+        // next Preview shows the project's own compiled toolpath again.
+        ...(s.previewMode ? { externalGcodePreview: null } : {}),
         selectedPathNode: null,
         selectedPathNodes: [],
       })),
