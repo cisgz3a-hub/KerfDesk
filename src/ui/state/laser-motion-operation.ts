@@ -65,14 +65,23 @@ export function buildFrameJogLines(
     readonly maxY: number;
   },
   feed: number,
+  safeZMm?: number,
 ): ReadonlyArray<string> {
   const f = Math.max(1, Math.round(feed));
   const fmt = (n: number): string => n.toFixed(3);
+  // CNC framing must lift the bit clear of the stock before tracing the
+  // perimeter — an XY-only trace with the bit at or below stock top would
+  // drag it through material. GRBL clamps $J feeds to per-axis maximums,
+  // so reusing the framing feed for the retract is safe.
+  const retract = safeZMm === undefined ? [] : [`$J=G90 G21 Z${fmt(safeZMm)} F${f}\n`];
   return [
-    { x: bounds.minX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.minY },
-    { x: bounds.maxX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.maxY },
-    { x: bounds.minX, y: bounds.minY },
-  ].map((c) => `$J=G90 G21 X${fmt(c.x)} Y${fmt(c.y)} F${f}\n`);
+    ...retract,
+    ...[
+      { x: bounds.minX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.maxY },
+      { x: bounds.minX, y: bounds.maxY },
+      { x: bounds.minX, y: bounds.minY },
+    ].map((c) => `$J=G90 G21 X${fmt(c.x)} Y${fmt(c.y)} F${f}\n`),
+  ];
 }
