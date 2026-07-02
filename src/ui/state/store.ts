@@ -30,6 +30,7 @@ import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
+import { reliefParamActions, type ReliefParamPatch } from './relief-param-actions';
 import {
   layerActions,
   type LayerSettingsClipboard,
@@ -245,6 +246,7 @@ export type AppState = ObjectPropertiesActions &
     readonly resetLayerToDefault: (layerId: string) => void;
     readonly setLayerDefaults: (layerDefaults: LayerDefaultsState) => void;
     readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
+    readonly setReliefParams: (id: string, patch: ReliefParamPatch) => void;
     readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
     readonly replaceDeviceProfile: (profile: DeviceProfile) => void;
 
@@ -376,6 +378,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...imageImportActions(set, get),
   ...breakApartActions(set),
   ...rasterAdjustmentActions(set),
+  ...reliefParamActions(set),
   ...layerActions(set),
   ...machineActions(set),
   ...fillSelectionActions(set),
