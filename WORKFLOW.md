@@ -1787,3 +1787,34 @@ F-CNC19 tiling.
 #### Edge — alarm / disconnect mid-job
 1. Alarm, Sleep, and port-close clear the cached percentages (the next
    session re-learns them); overrides reset to 100% on GRBL's own reset.
+
+### F-CNC22. Boolean shapes and offset paths — Phase H.11 (ADR-102 G1)
+
+#### Success
+1. Tools → Subtract / Intersect / Exclude (next to Weld) combine two or
+   more selected closed vector shapes: the BOTTOM-MOST selected object
+   is the subject, the rest are cutters. Subtract cuts the upper shapes
+   out of it; Intersect keeps only the shared area; Exclude keeps
+   everything but the overlap. The result replaces the selection as one
+   path object (subject's color), selected, in one undo step.
+2. With closed shapes selected, the layers panel shows an "Offset" row:
+   distance + Outward / Inward adds a NEW offset path object (round
+   joins) and leaves the sources in place — kerf compensation on a
+   laser, clearing outlines and inlay gaps on a router.
+3. Both work in laser AND CNC modes (geometry is machine-agnostic).
+
+#### Error — invalid input
+1. Booleans refuse silently-noop when fewer than two closed vector
+   objects are selected (the menu items are disabled with the reason).
+2. Open contours are rejected — nothing changes (same rule as Weld).
+3. An inward offset large enough to collapse the shape changes nothing.
+
+#### Empty
+1. An Intersect of non-overlapping shapes produces nothing and leaves
+   the scene untouched (empty results never replace the sources).
+
+#### Edge — transforms and z-order
+1. Object transforms are baked to world space before combining, so a
+   moved/scaled/rotated shape combines where it VISIBLY sits.
+2. Changing which shape is bottom-most (Arrange z-order) changes what
+   Subtract keeps — by design; the flow documents the convention.

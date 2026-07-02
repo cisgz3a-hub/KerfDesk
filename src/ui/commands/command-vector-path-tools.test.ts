@@ -34,4 +34,38 @@ describe('vector path tool commands', () => {
     expect(runCommand(commandById(enabled, 'tools.weld'))).toBe(true);
     expect(weldSelection).toHaveBeenCalledTimes(1);
   });
+
+  it('gates and invokes Subtract / Intersect / Exclude from combine selection state', () => {
+    const subtractSelection = vi.fn();
+    const intersectSelection = vi.fn();
+    const excludeSelection = vi.fn();
+    const disabled = buildAppCommands(
+      baseCtx({
+        canCombineSelection: false,
+        subtractSelection,
+        intersectSelection,
+        excludeSelection,
+      }),
+    );
+    for (const id of ['tools.subtract', 'tools.intersect', 'tools.exclude'] as const) {
+      expect(commandById(disabled, id).enabled).toBe(false);
+      expect(runCommand(commandById(disabled, id))).toBe(false);
+    }
+
+    const enabled = buildAppCommands(
+      baseCtx({
+        canCombineSelection: true,
+        subtractSelection,
+        intersectSelection,
+        excludeSelection,
+      }),
+    );
+    for (const id of ['tools.subtract', 'tools.intersect', 'tools.exclude'] as const) {
+      expect(commandById(enabled, id).enabled).toBe(true);
+      expect(runCommand(commandById(enabled, id))).toBe(true);
+    }
+    expect(subtractSelection).toHaveBeenCalledTimes(1);
+    expect(intersectSelection).toHaveBeenCalledTimes(1);
+    expect(excludeSelection).toHaveBeenCalledTimes(1);
+  });
 });

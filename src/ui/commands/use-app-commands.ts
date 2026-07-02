@@ -41,6 +41,7 @@ import {
   selectedObject,
   selectedObjectIds,
   selectionCanBreakApart,
+  selectionCanCombine,
   selectionCanWeld,
   selectionHasUnlockedObject,
   selectionHasUnlockedVectorObject,
@@ -116,6 +117,7 @@ function appCommandContext(
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
     canWeldSelection: selectionCanWeld(app.project, selectedIds),
+    canCombineSelection: selectionCanCombine(app.project, selectedIds),
     hasFillableSelection: selectionHasVectorObject(app.project, selectedIds),
     canApplyImageMask: imageMaskPair !== null,
     canCloseOpenFillContours:
@@ -246,6 +248,9 @@ function toolCommandContext(
   | 'multiFileTrace'
   | 'convertSelectionToPath'
   | 'weldSelection'
+  | 'subtractSelection'
+  | 'intersectSelection'
+  | 'excludeSelection'
   | 'convertToBitmap'
   | 'fillSelectionSeparately'
   | 'closeSelectedOpenFillContours'
@@ -272,6 +277,9 @@ function toolCommandContext(
     multiFileTrace: callbacks.requestMultiFileTrace,
     convertSelectionToPath: app.convertSelectionToPath,
     weldSelection: app.weldSelection,
+    subtractSelection: () => app.booleanSelection('subtract'),
+    intersectSelection: () => app.booleanSelection('intersect'),
+    excludeSelection: () => app.booleanSelection('exclude'),
     convertToBitmap: callbacks.requestConvertToBitmap,
     fillSelectionSeparately: app.fillSelectionSeparately,
     closeSelectedOpenFillContours: app.closeSelectedOpenFillContours,

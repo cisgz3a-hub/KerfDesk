@@ -59,6 +59,9 @@ export type CommandId =
   | 'tools.multi-file-trace'
   | 'tools.convert-to-path'
   | 'tools.weld'
+  | 'tools.subtract'
+  | 'tools.intersect'
+  | 'tools.exclude'
   | 'tools.convert-to-bitmap'
   | 'tools.fill-selection'
   | 'tools.close-open-fill-contours'
@@ -118,6 +121,8 @@ export type AppCommandContext = {
   readonly hasConvertibleSelection: boolean;
   readonly canConvertSelectionToPath: boolean;
   readonly canWeldSelection: boolean;
+  // ADR-102 G1: booleans need >= 2 unlocked closed-contour vector objects.
+  readonly canCombineSelection: boolean;
   readonly hasFillableSelection: boolean;
   readonly canCloseOpenFillContours: boolean;
   readonly canReviewCloseOpenFillContours: boolean;
@@ -172,6 +177,9 @@ export type AppCommandContext = {
   readonly multiFileTrace: () => void;
   readonly convertSelectionToPath: () => void;
   readonly weldSelection: () => void;
+  readonly subtractSelection: () => void;
+  readonly intersectSelection: () => void;
+  readonly excludeSelection: () => void;
   readonly convertToBitmap: () => void;
   readonly fillSelectionSeparately: () => void;
   readonly closeSelectedOpenFillContours: () => void;
