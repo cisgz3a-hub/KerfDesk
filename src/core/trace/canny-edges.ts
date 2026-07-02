@@ -20,14 +20,11 @@ const DEFAULT_HIGH_RATIO = 0.2;
 // zero high-threshold from flagging every pixel as a strong edge.
 const MIN_GRADIENT = 1e-6;
 
-// Neighbour to compare against per direction bucket (0 = |, 1 = /, 2 = -,
-// 3 = \); the opposite neighbour is the negation, so NMS checks both sides.
-const NMS_DX = [1, 1, 0, 1];
-const NMS_DY = [0, -1, 1, 1];
-
 // The 8 neighbours, for hysteresis edge-following.
 const N8DX = [-1, 0, 1, -1, 1, -1, 0, 1];
 const N8DY = [-1, -1, -1, 0, 0, 1, 1, 1];
+
+const MIN_GRADIENT_LEN = 1e-12;
 
 export function cannyEdges(image: RawImageData, options: CannyOptions = {}): Uint8Array {
   const gradient = computeGradient(image, options.blurSigma ?? DEFAULT_BLUR_SIGMA);
@@ -41,22 +38,50 @@ export function cannyEdges(image: RawImageData, options: CannyOptions = {}): Uin
   );
 }
 
+// Interpolating NMS: compare each pixel against the bilinear magnitude one
+// step to EITHER side along its true gradient direction. Bucketed 4-way
+// comparisons systematically starve ridges near ±45° (hard synthetic edges
+// lose almost their whole diagonal), which fragments every traced curve.
 function nonMaxSuppress(gradient: Gradient): Float32Array {
-  const { mag, dir, width, height } = gradient;
+  const { mag, gradX, gradY, width, height } = gradient;
   const out = new Float32Array(mag.length);
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
       const i = y * width + x;
-      const d = at(dir, i);
-      const dx = NMS_DX[d] ?? 1;
-      const dy = NMS_DY[d] ?? 0;
       const m = at(mag, i);
-      const a = at(mag, (y + dy) * width + (x + dx));
-      const b = at(mag, (y - dy) * width + (x - dx));
+      if (m <= 0) continue;
+      const gx = at(gradX, i);
+      const gy = at(gradY, i);
+      const len = Math.hypot(gx, gy);
+      if (len < MIN_GRADIENT_LEN) continue;
+      const ux = gx / len;
+      const uy = gy / len;
+      const a = bilinearMag(mag, width, height, x + ux, y + uy);
+      const b = bilinearMag(mag, width, height, x - ux, y - uy);
       if (m >= a && m >= b) out[i] = m;
     }
   }
   return out;
+}
+
+function bilinearMag(
+  mag: Float32Array,
+  width: number,
+  height: number,
+  fx: number,
+  fy: number,
+): number {
+  const cx = Math.min(Math.max(fx, 0), width - 1);
+  const cy = Math.min(Math.max(fy, 0), height - 1);
+  const x0 = Math.floor(cx);
+  const y0 = Math.floor(cy);
+  const x1 = Math.min(x0 + 1, width - 1);
+  const y1 = Math.min(y0 + 1, height - 1);
+  const tx = cx - x0;
+  const ty = cy - y0;
+  const top = at(mag, y0 * width + x0) * (1 - tx) + at(mag, y0 * width + x1) * tx;
+  const bottom = at(mag, y1 * width + x0) * (1 - tx) + at(mag, y1 * width + x1) * tx;
+  return top * (1 - ty) + bottom * ty;
 }
 
 function hysteresis(

@@ -8,6 +8,10 @@ import type { RawImageData } from './trace-image';
 export type Gradient = {
   readonly mag: Float32Array;
   readonly dir: Uint8Array; // per pixel: 0 = |, 1 = /, 2 = -, 3 = \ (edge orientation)
+  // Raw Sobel components — non-max suppression interpolates along the TRUE
+  // gradient direction (bucketed comparisons starve diagonal ridges).
+  readonly gradX: Float32Array;
+  readonly gradY: Float32Array;
   readonly width: number;
   readonly height: number;
 };
@@ -83,6 +87,8 @@ function convolve1d(
 function sobelGradient(src: Float32Array, width: number, height: number): Gradient {
   const mag = new Float32Array(width * height);
   const dir = new Uint8Array(width * height);
+  const gradX = new Float32Array(width * height);
+  const gradY = new Float32Array(width * height);
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
       const i = y * width + x;
@@ -102,9 +108,11 @@ function sobelGradient(src: Float32Array, width: number, height: number): Gradie
         at(src, i - width + 1);
       mag[i] = Math.hypot(gx, gy);
       dir[i] = quantizeAngle(gx, gy);
+      gradX[i] = gx;
+      gradY[i] = gy;
     }
   }
-  return { mag, dir, width, height };
+  return { mag, dir, gradX, gradY, width, height };
 }
 
 function quantizeAngle(gx: number, gy: number): number {

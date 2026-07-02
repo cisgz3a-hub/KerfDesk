@@ -247,7 +247,9 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeBlurSigma: 1.2,
     edgeLowThresholdRatio: 0.08,
     edgeHighThresholdRatio: 0.2,
-    edgeMinLengthPx: 24,
+    // Minimum line is CHAIN length now (the old outline backend measured
+    // two-sided contour perimeters, roughly double).
+    edgeMinLengthPx: 12,
     edgeJoinGapPx: 5,
     edgeMedianFilter: true,
   },
