@@ -16,6 +16,7 @@ import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
+import { DogboneRow } from './DogboneRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 import { OffsetPathsRow } from './OffsetPathsRow';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
@@ -40,6 +41,7 @@ export function CutsLayersPanel(): JSX.Element {
       <AddLayerControls />
       <SelectedObjectProperties />
       <OffsetPathsRow />
+      <DogboneRow />
       <SelectedReliefProperties />
       {hasSelection ? (
         <>
