@@ -120,12 +120,23 @@ export type CncMachineParams = {
 
 export type LaserMachineConfig = { readonly kind: 'laser' };
 
+// H.10 tiling: split jobs larger than the bed into an indexed tile grid
+// with per-tile export and optional registration holes in the overlap
+// strips. Absent = no tiling (single-file export, the default).
+export type CncTiling = {
+  readonly tileWidthMm: number;
+  readonly tileHeightMm: number;
+  readonly overlapMm: number;
+  readonly registrationHoles: boolean;
+};
+
 export type CncMachineConfig = {
   readonly kind: 'cnc';
   readonly stock: CncStock;
   readonly tools: ReadonlyArray<CncTool>;
   readonly toolId: string; // active bit — one bit per job, like Easel
   readonly params: CncMachineParams;
+  readonly tiling?: CncTiling;
 };
 
 export type MachineConfig = LaserMachineConfig | CncMachineConfig;
@@ -153,6 +164,15 @@ export const DEFAULT_CNC_STOCK: CncStock = {
   widthMm: 400,
   heightMm: 400,
   originOffset: { x: 0, y: 0 },
+};
+
+// Starter tiling block for the 4040 bed: near-full-bed tiles with a 20 mm
+// registration overlap.
+export const DEFAULT_CNC_TILING: CncTiling = {
+  tileWidthMm: 380,
+  tileHeightMm: 380,
+  overlapMm: 20,
+  registrationHoles: true,
 };
 
 export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {

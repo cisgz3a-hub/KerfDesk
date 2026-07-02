@@ -12,6 +12,7 @@ import {
   type CncMachineConfig,
   type CncMachineParams,
   type CncStock,
+  type CncTiling,
   type CncTool,
   type MachineKind,
   type Project,
@@ -37,6 +38,8 @@ export type CncMachinePatch = {
   readonly tools?: ReadonlyArray<CncTool>;
   readonly stock?: Partial<CncStock>;
   readonly params?: Partial<CncMachineParams>;
+  // H.10: whole-block replacement; null clears tiling.
+  readonly tiling?: CncTiling | null;
 };
 
 export type MachineActions = {
@@ -83,12 +86,17 @@ export function machineActions(set: MachineSet): MachineActions {
       set((state) => {
         const current = state.project.machine;
         if (current?.kind !== 'cnc') return {};
+        // Destructure tiling away so a null patch genuinely DELETES the key
+        // (exact optional field — spreading undefined is not absence).
+        const { tiling: currentTiling, ...base } = current;
+        const nextTiling = patch.tiling === undefined ? (currentTiling ?? null) : patch.tiling;
         const machine: CncMachineConfig = {
-          ...current,
+          ...base,
           ...(patch.toolId !== undefined ? { toolId: patch.toolId } : {}),
           ...(patch.tools !== undefined ? { tools: patch.tools } : {}),
           stock: { ...current.stock, ...patch.stock },
           params: { ...current.params, ...patch.params },
+          ...(nextTiling === null ? {} : { tiling: nextTiling }),
         };
         return {
           project: { ...state.project, machine },

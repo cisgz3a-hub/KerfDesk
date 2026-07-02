@@ -29,6 +29,7 @@ import {
   describeReimportOutcome,
 } from './import-toasts';
 import { importDxfFiles } from './dxf-import-action';
+import { handleSaveTiledGcode } from './save-tiled-gcode';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
 
@@ -105,6 +106,18 @@ export type SaveGcodeCtx = {
 };
 
 export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
+  // H.10: tiling-enabled CNC projects export one file per tile instead
+  // (whole-job bed bounds don't apply; each tile preflights individually).
+  if (
+    await handleSaveTiledGcode({
+      platform: ctx.platform,
+      project: ctx.project,
+      savedName: ctx.savedName,
+      pushToast: ctx.pushToast,
+    })
+  ) {
+    return;
+  }
   // Saved exports carry a provenance header (build / commit / emitter) so a
   // stale file is obvious later. The streamed Start path intentionally omits it
   // for now (roadmap P0-A open Q2 — streamer comment handling unverified).

@@ -11,6 +11,7 @@ import {
 } from '../../core/devices';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
+  type CncTiling,
   DEFAULT_PROJECT_OPTIMIZATION,
   DEFAULT_CNC_TOOLS,
   PROJECT_SCHEMA_VERSION,
@@ -141,6 +142,33 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
       // H.9 park position: optional, any finite mm value.
       ...(isFiniteNumber(params['parkXMm']) ? { parkXMm: params['parkXMm'] } : {}),
       ...(isFiniteNumber(params['parkYMm']) ? { parkYMm: params['parkYMm'] } : {}),
+    },
+    ...normalizeCncTiling(raw['tiling']),
+  };
+}
+
+// H.10 tiling block: optional; malformed fields drop the whole block (a
+// half-valid tiling config must never silently split a job wrong).
+function normalizeCncTiling(raw: unknown): { tiling: CncTiling } | Record<string, never> {
+  if (!isObject(raw)) return {};
+  const tileWidthMm = raw['tileWidthMm'];
+  const tileHeightMm = raw['tileHeightMm'];
+  const overlapMm = raw['overlapMm'];
+  if (!isFiniteNumber(tileWidthMm) || tileWidthMm <= 0) return {};
+  if (!isFiniteNumber(tileHeightMm) || tileHeightMm <= 0) return {};
+  if (
+    !isFiniteNumber(overlapMm) ||
+    overlapMm < 0 ||
+    overlapMm >= Math.min(tileWidthMm, tileHeightMm)
+  ) {
+    return {};
+  }
+  return {
+    tiling: {
+      tileWidthMm,
+      tileHeightMm,
+      overlapMm,
+      registrationHoles: raw['registrationHoles'] === true,
     },
   };
 }
