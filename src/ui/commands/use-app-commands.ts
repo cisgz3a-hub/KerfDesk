@@ -3,6 +3,7 @@ import { machineKindOf } from '../../core/scene';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import {
+  handleImportDxf,
   handleImportSvg,
   handleOpenProject,
   handleSaveGcode,
@@ -157,6 +158,7 @@ function fileCommandContext(
   | 'saveProject'
   | 'saveProjectAs'
   | 'importSvg'
+  | 'importDxf'
   | 'importImage'
   | 'saveGcode'
 > {
@@ -167,6 +169,7 @@ function fileCommandContext(
     saveProject: () => saveProject(platform, app, pushToast, false),
     saveProjectAs: () => saveProject(platform, app, pushToast, true),
     importSvg: () => void handleImportSvg(platform, app.importSvgObject, pushToast),
+    importDxf: () => void handleImportDxf(platform, app.importSvgObject, pushToast),
     importImage: callbacks.requestImportImage,
     saveGcode: saveGcodeAction(platform, app, laser, pushToast),
   };

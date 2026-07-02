@@ -28,8 +28,24 @@ import {
   describeImportResult,
   describeReimportOutcome,
 } from './import-toasts';
+import { importDxfFiles } from './dxf-import-action';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
+
+export async function handleImportDxf(
+  platform: PlatformAdapter,
+  importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): Promise<void> {
+  let files: ReadonlyArray<{ readonly name: string; readonly text: () => Promise<string> }>;
+  try {
+    files = await platform.pickFilesForOpen({ accept: ['.dxf'], multiple: true });
+  } catch (err) {
+    pushToast(`Could not import DXF: ${errMsg(err)}`, 'error');
+    return;
+  }
+  await importDxfFiles(files, { importObject: importSvgObject, pushToast });
+}
 
 export async function handleImportSvg(
   platform: PlatformAdapter,

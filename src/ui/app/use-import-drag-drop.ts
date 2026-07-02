@@ -16,6 +16,7 @@ import { useEffect, useRef } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { parseSvg } from '../../io/svg';
 import { importImageFile } from '../commands/import-image-action';
+import { importDxfFiles, isDxfFile } from './dxf-import-action';
 import { confirmOversizeImport } from './import-size-guard';
 import { importStlFiles, isStlFile } from './stl-import-action';
 import { useStore } from '../state';
@@ -62,20 +63,26 @@ export function useImportDragDrop(): void {
       const svgFiles = pickSvgFiles(e.dataTransfer);
       const imageFiles = pickImageFiles(e.dataTransfer);
       const stlFiles = [...e.dataTransfer.files].filter(isStlFile);
-      const recognized = svgFiles.length + imageFiles.length + stlFiles.length;
+      const dxfFiles = [...e.dataTransfer.files].filter(isDxfFile);
+      const recognized = svgFiles.length + imageFiles.length + stlFiles.length + dxfFiles.length;
       const ignored = e.dataTransfer.files.length - recognized;
       if (e.dataTransfer.files.length > 0 && recognized === 0) {
         pushToast(
-          'Drop ignored — no SVG, image (PNG/JPG), or STL files in the selection',
+          'Drop ignored — no SVG, DXF, image (PNG/JPG), or STL files in the selection',
           'warning',
         );
         return;
       }
       // Mixed drops used to discard non-SVG files SILENTLY (M26) — name them.
       if (ignored > 0) {
-        pushToast(`Ignored ${ignored} file(s) — only SVG, PNG, JPG, and STL import`, 'warning');
+        pushToast(
+          `Ignored ${ignored} file(s) — only SVG, DXF, PNG, JPG, and STL import`,
+          'warning',
+        );
       }
       void importMany(svgFiles, importSvgObject, pushToast);
+      // H.6a: DXF → imported vector (both machine modes).
+      void importDxfFiles(dxfFiles, { importObject: importSvgObject, pushToast });
       void importImagesInOrder(imageFiles, importRasterImage, pushToast);
       // H.4: STL → relief (CNC mode only; the action toasts the laser-mode case).
       void importStlFiles(stlFiles, {

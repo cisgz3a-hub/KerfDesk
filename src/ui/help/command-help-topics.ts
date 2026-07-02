@@ -26,6 +26,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'file',
     tooltip: 'Import vector artwork from an SVG file.',
   },
+  'file.import-dxf': {
+    family: 'file',
+    tooltip: 'Import vector artwork from an ASCII DXF drawing (works in laser and CNC mode).',
+  },
   'file.import-image': {
     family: 'file',
     tooltip: 'Import a PNG or JPG image for engraving or tracing.',
