@@ -16,7 +16,14 @@ import { renderTraceOverlay } from './render-overlay';
 const OUT_DIR = join(process.cwd(), 'trace-audit-artifacts');
 const EDGE_OPTIONS = TRACE_PRESETS['Edge Detection'];
 
-type Crop = { readonly name: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number; readonly scale: number };
+type Crop = {
+  readonly name: string;
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  readonly scale: number;
+};
 
 const CROPS: ReadonlyArray<Crop> = [
   { name: 'zoom-langebaan', x: 300, y: 655, w: 440, h: 80, scale: 6 },
@@ -75,10 +82,7 @@ it('renders zoomed CENTERLINE crops of the arch-house logo', () => {
   const paths = traceCenterlineStrokePaths(image, centerlineOptions);
   const elapsedMs = Math.round(performance.now() - started);
   writeFileSync(join(OUT_DIR, 'centerline-arch-timing.txt'), `${elapsedMs} ms\n`);
-  writeFileSync(
-    join(OUT_DIR, 'centerline-arch-full.png'),
-    renderTraceOverlay(image, paths, 1),
-  );
+  writeFileSync(join(OUT_DIR, 'centerline-arch-full.png'), renderTraceOverlay(image, paths, 1));
   for (const crop of CROPS) {
     const png = renderTraceOverlay(cropImage(image, crop), cropPaths(paths, crop), crop.scale);
     writeFileSync(join(OUT_DIR, `centerline-${crop.name}.png`), png);
