@@ -45,7 +45,7 @@ and UI all capability-aware. Verified end-to-end against protocol simulators.
 | Stage | Scope | Status |
 |---|---|---|
 | S0 | Charter + task tracking | done |
-| S1 | FakeSerialConnection + GRBL simulator + lifecycle integration tests (baseline) | pending |
+| S1 | FakeSerialConnection + GRBL simulator + lifecycle integration tests (baseline) | done — `src/__fixtures__/controllers/` (fake port, pure GRBL v1.1 reducer, timing glue; 15 sim tests) + `src/ui/state/laser-lifecycle.simulator.test.ts` (13 store-level lifecycle tests: connect/handshake, poll, jog, frame, home, stream, pause/resume, stop→alarm→unlock, error:N terminal ×2, cable yank, G92 origin, console). Characterized finding: with an `errored` streamer, `unlockAlarm` is gated behind Stop by design. Not verified: real hardware. |
 | S2 | ControllerDriver seam: types, GRBL driver, store/line-handler/console via driver, capability-gated UI, per-profile baud | pending |
 | S3 | grblHAL + FluidNC: detection, code tables, catalog, sims | pending |
 | S4 | Marlin: protocol module + simulator + output strategy (inline/fan dialects) + UX | pending |
