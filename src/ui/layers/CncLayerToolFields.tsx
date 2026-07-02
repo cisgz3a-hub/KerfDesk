@@ -175,6 +175,59 @@ function ReliefFinishRow(props: {
   );
 }
 
+// H.9 motion polish rows — both opt-in: '' keeps the pre-H.9 behavior.
+export function MotionPolishRows(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
+}): JSX.Element {
+  return (
+    <Row label="Entry">
+      <select
+        value={props.settings.cutDirection ?? ''}
+        onChange={(e) => {
+          if (e.target.value === '') {
+            const { cutDirection: _removed, ...rest } = props.settings;
+            props.onCommitSettings(rest);
+          } else {
+            props.onCommit({
+              cutDirection: e.target.value === 'climb' ? 'climb' : 'conventional',
+            });
+          }
+        }}
+        aria-label={`Cut direction for ${props.layer.color}`}
+        title="Climb or conventional cutting for profile/pocket toolpaths (also moves entry points to mid-segment). Default keeps the compiler's natural direction."
+        style={directionSelectStyle}
+      >
+        <option value="">Default direction</option>
+        <option value="climb">Climb</option>
+        <option value="conventional">Conventional</option>
+      </select>
+      <input
+        type="number"
+        min={0}
+        max={45}
+        step={0.5}
+        value={props.settings.rampEntryDeg ?? 0}
+        onChange={(e) => {
+          const parsed = Number.parseFloat(e.target.value);
+          if (!Number.isFinite(parsed) || parsed <= 0) {
+            const { rampEntryDeg: _removed, ...rest } = props.settings;
+            props.onCommitSettings(rest);
+          } else {
+            props.onCommit({ rampEntryDeg: parsed });
+          }
+        }}
+        aria-label={`Ramp entry angle for ${props.layer.color}`}
+        title="Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default)."
+        style={rampInputStyle}
+      />
+      <span style={rampUnitStyle}>° ramp</span>
+    </Row>
+  );
+}
+
 // Feeds/speeds presets (H.7, F-CNC12): apply-on-select patches the layer's
 // feed/plunge/spindle/depth-per-pass/stepover; Save snapshots the current
 // values under a name into the app-level library.
@@ -250,6 +303,14 @@ const valueStyle: React.CSSProperties = { display: 'flex', alignItems: 'center',
 const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
 const presetNameStyle: React.CSSProperties = { width: 72, padding: '2px 6px', fontSize: 12 };
 const scallopInputStyle: React.CSSProperties = { width: 64, padding: '2px 6px' };
+const directionSelectStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  fontSize: 12,
+  padding: '2px 4px',
+};
+const rampInputStyle: React.CSSProperties = { width: 52, padding: '2px 6px' };
+const rampUnitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
 const reliefHintStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',

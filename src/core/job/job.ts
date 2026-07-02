@@ -143,6 +143,10 @@ export type CncGroup = {
   readonly spindleRpm: number; // S value; capped to machine spindleMaxRpm
   readonly spindleSpinupSec: number; // dwell after spindle start / speed change
   readonly safeZMm: number; // retract height for travel between passes
+  // H.9 parking parity: postamble/tool-change park position. Absent = the
+  // machine origin (pre-H.9 output stays byte-identical).
+  readonly parkXMm?: number;
+  readonly parkYMm?: number;
   readonly passes: ReadonlyArray<CncPass>;
 };
 

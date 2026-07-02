@@ -66,6 +66,26 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         title="Dwell after starting the spindle before the first plunge."
         onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
       />
+      <NumberRow
+        label="Park X"
+        unit="mm"
+        value={machine.params.parkXMm ?? 0}
+        min={-1500}
+        max={1500}
+        step={1}
+        title="Where the head parks after the job and during bit changes (H.9)."
+        onCommit={(parkXMm) => updateCncMachine({ params: { parkXMm } })}
+      />
+      <NumberRow
+        label="Park Y"
+        unit="mm"
+        value={machine.params.parkYMm ?? 0}
+        min={-1500}
+        max={1500}
+        step={1}
+        title="Where the head parks after the job and during bit changes (H.9)."
+        onCommit={(parkYMm) => updateCncMachine({ params: { parkYMm } })}
+      />
       <CncToolManager machine={machine} />
       <CncMachineProfilesRow />
     </section>

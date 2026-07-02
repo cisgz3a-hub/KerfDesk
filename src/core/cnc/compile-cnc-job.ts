@@ -37,6 +37,7 @@ import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
+import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { pocketToolpathRings } from './pocket-paths';
 import { profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
@@ -158,6 +159,7 @@ function cncGroupForLayer(
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
     safeZMm: Math.max(0, config.params.safeZMm),
+    ...parkFields(config),
     passes,
   };
 }
@@ -196,6 +198,7 @@ function vcarveClearanceGroupForLayer(
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
     safeZMm: Math.max(0, config.params.safeZMm),
+    ...parkFields(config),
     passes: depthMajorPasses(toolpaths, depths),
   };
 }
@@ -222,12 +225,22 @@ function passesForLayer(
       depthPerPassMm: settings.depthPerPassMm,
     });
   }
-  const toolpaths = xyToolpathsForCutType(polylines, settings, tool.diameterMm);
+  const raw = xyToolpathsForCutType(polylines, settings, tool.diameterMm);
+  // H.9 (opt-in): climb/conventional enforcement + mid-segment entry points.
+  const toolpaths =
+    settings.cutDirection === undefined
+      ? raw
+      : enforceCutDirection(raw, settings.cutDirection, settings.cutType);
   const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
   if (toolpaths.length === 0 || depths.length === 0) return [];
-  return settings.cutType === 'pocket'
-    ? depthMajorPasses(toolpaths, depths)
-    : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm);
+  const passes =
+    settings.cutType === 'pocket'
+      ? depthMajorPasses(toolpaths, depths)
+      : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm);
+  // H.9 (opt-in): plunges become along-path ramps at the configured angle.
+  return settings.rampEntryDeg === undefined
+    ? passes
+    : applyRampEntry(passes, settings.rampEntryDeg);
 }
 
 function xyToolpathsForCutType(

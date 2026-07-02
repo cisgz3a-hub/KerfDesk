@@ -90,8 +90,14 @@ function emitJob(job: Job, _device: DeviceProfile): string {
 
   appendRetract(lines, head, state.maxSafeZ);
   lines.push('M5');
-  lines.push('G0 X0.000 Y0.000');
+  lines.push(parkLine(cncGroups[cncGroups.length - 1]));
   return lines.join(LINE_END) + LINE_END;
+}
+
+// H.9 parking parity: the configured park position, or the machine origin
+// (the pre-H.9 default — keeps existing output byte-identical).
+function parkLine(group: CncGroup | undefined): string {
+  return `G0 X${fmt(group?.parkXMm ?? 0)} Y${fmt(group?.parkYMm ?? 0)}`;
 }
 
 type EmitState = {
@@ -130,9 +136,9 @@ function appendGroupTransition(
 function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm: number): void {
   appendRetract(lines, head, safeZMm);
   lines.push('M5');
-  lines.push('G0 X0.000 Y0.000');
-  head.x = fmt(0);
-  head.y = fmt(0);
+  lines.push(parkLine(group));
+  head.x = fmt(group.parkXMm ?? 0);
+  head.y = fmt(group.parkYMm ?? 0);
   lines.push(`; tool change: load ${group.toolName ?? 'next tool'}`);
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');

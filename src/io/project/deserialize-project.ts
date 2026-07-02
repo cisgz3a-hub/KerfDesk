@@ -138,6 +138,9 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
         params['spindleSpinupSec'],
         d.params.spindleSpinupSec,
       ),
+      // H.9 park position: optional, any finite mm value.
+      ...(isFiniteNumber(params['parkXMm']) ? { parkXMm: params['parkXMm'] } : {}),
+      ...(isFiniteNumber(params['parkYMm']) ? { parkYMm: params['parkYMm'] } : {}),
     },
   };
 }
@@ -205,6 +208,10 @@ function normalizeZTravelPatch(dev: Record<string, unknown>): Record<string, unk
 function hasCapability(dev: Record<string, unknown>, capability: string): boolean {
   const capabilities = dev['capabilities'];
   return Array.isArray(capabilities) && capabilities.includes(capability);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
 }
 
 function numberOrDefault(value: unknown, fallback: number): number {

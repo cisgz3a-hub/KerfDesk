@@ -45,6 +45,10 @@ export type CncStock = {
 //                      COMPILE-TIME ONLY: produced from relief objects,
 //                      never selectable on a layer (absent from
 //                      CNC_CUT_TYPES, rejected by .lf2 normalization).
+// H.9: which side of the travel direction the material sits on. With an M3
+// spindle, climb keeps material on the LEFT of travel (see motion-polish).
+export type CncCutDirection = 'climb' | 'conventional';
+
 export type CncCutType =
   | 'profile-outside'
   | 'profile-inside'
@@ -82,6 +86,11 @@ export type CncLayerSettings = {
   readonly reliefFinishToolId?: string;
   // Ball-nose scallop height target driving the finishing row spacing.
   readonly reliefScallopMm?: number;
+  // Motion polish (H.9), both opt-in — absent keeps pre-H.9 output:
+  // descend into cuts along the path at this angle instead of plunging.
+  readonly rampEntryDeg?: number;
+  // Enforce climb or conventional cutting on profile/pocket toolpaths.
+  readonly cutDirection?: CncCutDirection;
   // Total cut depth below stock top (positive). For v-carve this is the MAX
   // depth: wide regions clamp to it and cut a flat floor.
   readonly depthMm: number;
@@ -103,6 +112,10 @@ export type CncMachineParams = {
   readonly safeZMm: number; // travel clearance above stock top
   readonly spindleMaxRpm: number; // GRBL $30 equivalent — max S value
   readonly spindleSpinupSec: number; // dwell after M3 before first plunge
+  // H.9 parking parity: where the head parks after the job (and during
+  // M0 bit changes). Absent = the machine origin, the pre-H.9 behavior.
+  readonly parkXMm?: number;
+  readonly parkYMm?: number;
 };
 
 export type LaserMachineConfig = { readonly kind: 'laser' };

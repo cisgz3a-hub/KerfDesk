@@ -1,0 +1,154 @@
+// H.9 motion polish: climb/conventional orientation, mid-segment entry
+// rotation, along-path ramp entries, and parking parity. All opt-in — the
+// snapshot corpus separately pins that defaults stay byte-identical.
+
+import { describe, expect, it } from 'vitest';
+import { isCounterClockwise, signedAreaMm2 } from '../geometry/polyline-orientation';
+import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { cncGrblStrategy } from '../output';
+import {
+  createLayer,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
+  type CncLayerSettings,
+  type ImportedSvg,
+  type Polyline,
+  type Scene,
+} from '../scene';
+import { compileCncJob } from './compile-cnc-job';
+import { applyRampEntry, enforceCutDirection, rotateStartToLongestSegment } from './motion-polish';
+
+// CCW unit square (Y-up frame, shoelace positive).
+const CCW_SQUARE: Polyline = {
+  closed: true,
+  points: [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ],
+};
+
+describe('enforceCutDirection', () => {
+  it('outside-profile climb wants counter-clockwise; conventional reverses', () => {
+    const climb = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-outside');
+    expect(isCounterClockwise(climb[0] as Polyline)).toBe(true);
+    const conventional = enforceCutDirection([CCW_SQUARE], 'conventional', 'profile-outside');
+    expect(isCounterClockwise(conventional[0] as Polyline)).toBe(false);
+  });
+
+  it('inside/pocket climb wants clockwise (material lies outside the boundary)', () => {
+    const inside = enforceCutDirection([CCW_SQUARE], 'climb', 'profile-inside');
+    expect(isCounterClockwise(inside[0] as Polyline)).toBe(false);
+    const pocket = enforceCutDirection([CCW_SQUARE], 'climb', 'pocket');
+    expect(isCounterClockwise(pocket[0] as Polyline)).toBe(false);
+  });
+
+  it('leaves engraves and open paths untouched', () => {
+    const open: Polyline = { closed: false, points: CCW_SQUARE.points };
+    expect(enforceCutDirection([open], 'climb', 'profile-outside')[0]).toBe(open);
+    expect(enforceCutDirection([CCW_SQUARE], 'climb', 'engrave')[0]).toBe(CCW_SQUARE);
+  });
+
+  it('preserves the enclosed area when reversing and rotating', () => {
+    const result = enforceCutDirection([CCW_SQUARE], 'conventional', 'profile-outside');
+    expect(Math.abs(signedAreaMm2((result[0] as Polyline).points))).toBeCloseTo(100, 6);
+  });
+});
+
+describe('rotateStartToLongestSegment', () => {
+  it('starts the loop at the midpoint of its longest edge', () => {
+    const rectangle: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 40, y: 0 },
+        { x: 40, y: 10 },
+        { x: 0, y: 10 },
+      ],
+    };
+    const rotated = rotateStartToLongestSegment(rectangle);
+    // Longest edges are the 40 mm horizontals; the first one wins.
+    expect(rotated.points[0]).toEqual({ x: 20, y: 0 });
+    expect(rotated.points).toHaveLength(5);
+  });
+});
+
+describe('applyRampEntry', () => {
+  it('descends along the path at the configured angle, then re-cuts the ramp span', () => {
+    const pass = {
+      kind: 'contour' as const,
+      zMm: -2,
+      closed: true,
+      polyline: CCW_SQUARE.points,
+    };
+    const [ramped] = applyRampEntry([pass], 10);
+    if (ramped?.kind !== 'path3d') throw new Error('ramped pass must be path3d');
+    // Ramp length = 2 / tan(10°) ≈ 11.34 mm — crosses the first corner.
+    const first = ramped.points[0];
+    expect(first).toEqual({ x: 0, y: 0, z: 0 });
+    // Z never rises mid-ramp and ends at the pass depth.
+    let previous = 0;
+    for (const point of ramped.points) {
+      expect(point.z).toBeLessThanOrEqual(previous + 1e-9);
+      previous = Math.min(previous, point.z);
+    }
+    expect(ramped.points.at(-1)?.z).toBe(-2);
+    // The descent rate along the path matches tan(10°) within one segment.
+    const second = ramped.points[1];
+    if (second === undefined) throw new Error('ramp vertex missing');
+    const run = Math.hypot(second.x - 0, second.y - 0);
+    const drop = 0 - second.z;
+    expect(drop / run).toBeCloseTo(Math.tan((10 * Math.PI) / 180), 6);
+  });
+
+  it('ramps each depth step from the previous level in a contour ladder', () => {
+    const passes = applyRampEntry(
+      [
+        { kind: 'contour' as const, zMm: -1.5, closed: true, polyline: CCW_SQUARE.points },
+        { kind: 'contour' as const, zMm: -3, closed: true, polyline: CCW_SQUARE.points },
+      ],
+      15,
+    );
+    const second = passes[1];
+    if (second?.kind !== 'path3d') throw new Error('second ramped pass missing');
+    expect(second.points[0]?.z).toBe(-1.5);
+    expect(second.points.at(-1)?.z).toBe(-3);
+  });
+});
+
+describe('parking parity (compile → emit)', () => {
+  function squareScene(): Scene {
+    const object: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'O1',
+      source: 'square.svg',
+      bounds: { minX: 10, minY: 10, maxX: 30, maxY: 30 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [{ color: '#ff0000', polylines: [CCW_SQUARE] }],
+    };
+    const layer = {
+      ...createLayer({ id: '#ff0000', color: '#ff0000' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'engrave', depthMm: 1 } as CncLayerSettings,
+    };
+    return { objects: [object], layers: [layer] };
+  }
+
+  it('parks at the configured position; default stays at the origin', () => {
+    const parked = cncGrblStrategy.emit(
+      compileCncJob(squareScene(), DEFAULT_DEVICE_PROFILE, {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        params: { ...DEFAULT_CNC_MACHINE_CONFIG.params, parkXMm: 350, parkYMm: 5 },
+      }),
+      DEFAULT_DEVICE_PROFILE,
+    );
+    expect(parked.trimEnd().split('\n').at(-1)).toBe('G0 X350.000 Y5.000');
+
+    const defaulted = cncGrblStrategy.emit(
+      compileCncJob(squareScene(), DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG),
+      DEFAULT_DEVICE_PROFILE,
+    );
+    expect(defaulted.trimEnd().split('\n').at(-1)).toBe('G0 X0.000 Y0.000');
+  });
+});

@@ -17,6 +17,7 @@ import { useStore } from '../state';
 import {
   FeedPresetRow,
   LayerBitSelect,
+  MotionPolishRows,
   ReliefLayerRows,
   useLayerHasReliefObjects,
   VClearToolSelect,
@@ -37,7 +38,6 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
   // Whole-settings commit for edits that REMOVE an optional key (clearing
   // the per-layer bit override) — a spread patch can't delete.
   const commitSettings = (next: CncLayerSettings): void => setLayerParam(layer.id, { cnc: next });
-  const isProfile = settings.cutType.startsWith('profile');
 
   return (
     <>
@@ -86,23 +86,56 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
           onCommit={(stepoverPercent) => commit({ stepoverPercent })}
         />
       ) : null}
-      {hasReliefObjects ? (
+      <CutTypeSections
+        layer={layer}
+        settings={settings}
+        hasReliefObjects={hasReliefObjects}
+        onCommit={commit}
+        onCommitSettings={commitSettings}
+      />
+    </>
+  );
+}
+
+// The cut-type-specific tails (relief rows, v-carve options, H.9 polish,
+// tabs), grouped so the parent stays under the function-size cap.
+function CutTypeSections(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly hasReliefObjects: boolean;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
+}): JSX.Element {
+  const { layer, settings, onCommit, onCommitSettings } = props;
+  const isProfile = settings.cutType.startsWith('profile');
+  const showPolish = isProfile || settings.cutType === 'pocket' || settings.cutType === 'engrave';
+  return (
+    <>
+      {props.hasReliefObjects ? (
         <ReliefLayerRows
           layer={layer}
           settings={settings}
-          onCommit={commit}
-          onCommitSettings={commitSettings}
+          onCommit={onCommit}
+          onCommitSettings={onCommitSettings}
         />
       ) : null}
       {settings.cutType === 'v-carve' ? (
         <VCarveSection
           layer={layer}
           settings={settings}
-          onCommit={commit}
-          onCommitSettings={commitSettings}
+          onCommit={onCommit}
+          onCommitSettings={onCommitSettings}
         />
       ) : null}
-      {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
+      {showPolish ? (
+        <MotionPolishRows
+          layer={layer}
+          settings={settings}
+          onCommit={onCommit}
+          onCommitSettings={onCommitSettings}
+        />
+      ) : null}
+      {isProfile ? <TabFields layer={layer} settings={settings} onCommit={onCommit} /> : null}
     </>
   );
 }
