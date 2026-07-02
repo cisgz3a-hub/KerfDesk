@@ -1486,3 +1486,42 @@ F-CNC19 tiling.
 3. INSERT recursion caps at depth 8; deeper nesting (or a block cycle)
    skips that reference with a note.
 4. Z coordinates are ignored (2.5D import): 3D polylines project onto XY.
+
+### F-CNC10. Open a G-code program in the simulator — Phase H.6
+
+#### Success
+1. In CNC mode, the user picks a `.nc` / `.gcode` / `.tap` file via
+   File → Open G-code (Preview). The command is CNC-only (ADR-100
+   gate-and-hide, first CNC-only command).
+2. The clean-room modal parser (ADR-094 §2) reads GRBL-dialect G-code:
+   G0/G1 (including ramped XY+Z and pure-Z moves), G2/G3 arcs (I/J center
+   and R radius form, helical Z), G90/G91, G20/G21 units, F/S words,
+   `(...)` and `;` comments, `%` markers, and N line numbers. Unsupported
+   words are counted, never fatal.
+3. The program becomes a simulator toolpath directly — travel / cut /
+   plunge steps with Z spans. Preview turns on: route lines, the
+   material-removal grid, the scrubber, and distance stats all work.
+   Re-importing KerfDesk's own CNC export produces the same material
+   removal as the native compile (re-import parity, pinned by test).
+4. A toast names the file, its cut/travel totals, and anything skipped.
+   Exiting Preview drops the external program and returns to the
+   project's own compiled toolpath.
+
+#### Error — not G-code / bad arc
+1. Files with no recognizable G-code words are rejected ("does not look
+   like G-code") naming the first offending line.
+2. A G2/G3 without I/J or R (or with an inconsistent radius) is rejected
+   with its line number; nothing partial loads.
+
+#### Empty
+1. A program with no motion (comments/setup only) toasts "no motion
+   found" and leaves the current preview untouched.
+
+#### Edge — relative arcs / early end / huge files / other planes
+1. G91 relative coordinates apply to XY, Z, and arc targets alike.
+2. M2 / M30 ends the program mid-file; later lines are ignored.
+3. Programs beyond 500k lines are rejected with a note (guard against
+   runaway files, not a real-world limit).
+4. G18/G19 plane arcs are not supported: rejected with the line number
+   (XY-plane G17 is the GRBL default and the only plane GRBL arcs use
+   here).

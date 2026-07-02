@@ -1,44 +1,15 @@
-// Arc / bulge / ellipse sampling for the DXF importer (Phase H.6). All
-// samplers work in millimeters (entity converters scale drawing units to mm
-// BEFORE sampling) so one chordal tolerance governs curve fidelity
-// everywhere, independent of the file's $INSUNITS.
+// Bulge / ellipse sampling for the DXF importer (Phase H.6). All samplers
+// work in millimeters (entity converters scale drawing units to mm BEFORE
+// sampling) so one chordal tolerance governs curve fidelity everywhere,
+// independent of the file's $INSUNITS. The raw circular-arc sampler lives
+// in core/geometry/arc-sampling (shared with the G-code program parser).
 
+import { arcStepRad, sampleArcPoints } from '../../core/geometry/arc-sampling';
 import type { Vec2 } from '../../core/scene';
 
-// Max chord deviation from the true curve. Matches the SVG importer's
-// flattening scale: fine enough that a 0.1 mm kerf dominates the error.
-const CHORD_TOLERANCE_MM = 0.05;
-const MIN_STEP_RAD = Math.PI / 180; // never finer than 1°/segment
-const MAX_STEP_RAD = Math.PI / 12; // never coarser than 15°/segment
 const FULL_TURN = Math.PI * 2;
 
-export function arcStepRad(radiusMm: number): number {
-  if (!(radiusMm > 0)) return MAX_STEP_RAD;
-  const ratio = 1 - CHORD_TOLERANCE_MM / radiusMm;
-  if (ratio <= 0) return MAX_STEP_RAD;
-  const step = 2 * Math.acos(ratio);
-  return Math.min(MAX_STEP_RAD, Math.max(MIN_STEP_RAD, step));
-}
-
-// Sample a circular arc from startRad sweeping by sweepRad (signed; positive
-// = counter-clockwise). Includes both endpoints.
-export function sampleArc(
-  center: Vec2,
-  radiusMm: number,
-  startRad: number,
-  sweepRad: number,
-): Vec2[] {
-  const segments = Math.max(1, Math.ceil(Math.abs(sweepRad) / arcStepRad(radiusMm)));
-  const points: Vec2[] = [];
-  for (let i = 0; i <= segments; i += 1) {
-    const angle = startRad + (sweepRad * i) / segments;
-    points.push({
-      x: center.x + radiusMm * Math.cos(angle),
-      y: center.y + radiusMm * Math.sin(angle),
-    });
-  }
-  return points;
-}
+export const sampleArc = sampleArcPoints;
 
 export function sampleCircle(center: Vec2, radiusMm: number): Vec2[] {
   const points = sampleArc(center, radiusMm, 0, FULL_TURN);

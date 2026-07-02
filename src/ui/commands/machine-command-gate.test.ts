@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildAppCommands } from './command-registry';
-import { LASER_ONLY_COMMAND_IDS } from './machine-command-gate';
+import { CNC_ONLY_COMMAND_IDS, LASER_ONLY_COMMAND_IDS } from './machine-command-gate';
 import type { CommandId } from './command-types';
 import { baseCtx } from './command-registry-test-helpers';
 
@@ -26,21 +26,27 @@ const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
 ];
 
 describe('gateCommandsForMachineKind via buildAppCommands (ADR-100)', () => {
-  it('laser mode exposes every command, including the laser-only set', () => {
+  it('laser mode exposes the laser-only set and hides the CNC-only set', () => {
     const ids = buildAppCommands(baseCtx({ machineKind: 'laser' })).map((c) => c.id);
     for (const id of LASER_ONLY_COMMAND_IDS) {
       expect(ids).toContain(id);
+    }
+    for (const id of CNC_ONLY_COMMAND_IDS) {
+      expect(ids).not.toContain(id);
     }
     for (const id of CNC_SURVIVORS) {
       expect(ids).toContain(id);
     }
   });
 
-  it('cnc mode hides exactly the laser-only set', () => {
+  it('cnc mode hides exactly the laser-only set and shows the CNC-only set', () => {
     const laserIds = buildAppCommands(baseCtx({ machineKind: 'laser' })).map((c) => c.id);
     const cncIds = new Set(buildAppCommands(baseCtx({ machineKind: 'cnc' })).map((c) => c.id));
     for (const id of LASER_ONLY_COMMAND_IDS) {
       expect(cncIds.has(id)).toBe(false);
+    }
+    for (const id of CNC_ONLY_COMMAND_IDS) {
+      expect(cncIds.has(id)).toBe(true);
     }
     const hidden = laserIds.filter((id) => !cncIds.has(id));
     expect(new Set(hidden)).toEqual(new Set(LASER_ONLY_COMMAND_IDS));

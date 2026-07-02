@@ -45,6 +45,14 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
       ctx.saveGcode,
       'Ctrl+Shift+E',
     ),
+    // CNC-only (hidden in laser mode by the machine gate, ADR-100).
+    enabled(
+      'file.open-gcode',
+      'file',
+      'Open G-code (Preview)...',
+      'Simulate a .nc program',
+      ctx.openGcodePreview,
+    ),
   ];
 }
 
