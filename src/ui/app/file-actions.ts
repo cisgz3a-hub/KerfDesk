@@ -103,6 +103,12 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
+  // Ruida profiles export binary .rd jobs instead of G-code text (ADR-097).
+  if (ctx.project.device.controllerKind === 'ruida') {
+    const { handleSaveRd } = await import('./save-rd-action');
+    await handleSaveRd(ctx, placement);
+    return;
+  }
   const { gcode, preflight } = emitSaveGcode(ctx, placement);
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');

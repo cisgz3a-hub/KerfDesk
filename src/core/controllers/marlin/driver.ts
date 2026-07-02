@@ -27,6 +27,7 @@ export const marlinDriver: ControllerDriver = {
   label: 'Marlin',
   defaultBaudRate: MARLIN_DEFAULT_BAUD_RATE,
   capabilities: {
+    transport: 'serial',
     jog: 'gcode-relative',
     jogCancel: false,
     realtimePause: false,

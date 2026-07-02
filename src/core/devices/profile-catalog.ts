@@ -191,6 +191,27 @@ const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
   ],
 };
 
+const GENERIC_RUIDA_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-ruida-rd-export',
+  vendor: 'Generic',
+  model: 'Ruida RDC644x-class CO2 (.rd export)',
+  name: 'Generic Ruida CO2 900×600 (.rd export)',
+  machineFamily: 'generic-ruida',
+  controllerKind: 'ruida',
+  bedWidth: 900,
+  bedHeight: 600,
+  origin: 'rear-right',
+  capabilities: ['no-go-zones'],
+  evidence: [
+    {
+      label: 'Ruida protocol (public reverse-engineering)',
+      status: 'unverified',
+      note: 'EXPERIMENTAL: .rd encoding follows public research (MeerK40t / EduTech). Output round-trips through this app’s own decoder, but NO file has been accepted by a real Ruida controller yet. Live streaming is not available — export .rd and run from the panel/USB. Verify on scrap with the machine’s own preview first.',
+    },
+  ],
+};
+
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
   entry(DEFAULT_DEVICE_PROFILE, [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
@@ -221,6 +242,9 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(GENERIC_SMOOTHIEWARE_PROFILE, [
     'Smoothieware: fractional S power (0-1.0), realtime ?/!/~, M999 halt recovery, no $$/$J.',
+  ]),
+  entry(GENERIC_RUIDA_PROFILE, [
+    'Ruida: file-export only (.rd); encoder is EXPERIMENTAL and not accepted by real hardware yet.',
   ]),
 ];
 
@@ -262,7 +286,7 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
   if (profile.controllerKind !== undefined && !isKnownControllerKind(profile.controllerKind)) {
     errors.push(
-      'controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware',
+      'controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware, ruida',
     );
   }
   if (!isGcodeDialectSelection(profile.gcodeDialect)) {
