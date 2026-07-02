@@ -19,6 +19,7 @@ import { JobPlacementControls } from './JobPlacementControls';
 import { OriginRow } from './OriginRow';
 import { ControllerOperationControls, MotionControls, RunningControls } from './JobRunControls';
 import { IslandFillRecoveryAction } from './IslandFillRecoveryAction';
+import { StartFromLineControl } from './StartFromLineControl';
 import { type LiveJobEstimate } from './live-job-estimate';
 import { useFrameAction } from './use-frame-action';
 import { useJobEstimate } from './use-job-estimate';
@@ -55,6 +56,7 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
         <ControllerOperationControls label={describeControllerOperation(controllerOperation)} />
       )}
       <IslandFillRecoveryAction streaming={controlsBusy} />
+      <StartFromLineControl disabled={disabled} busy={controlsBusy} />
       {jobNeedsRecovery && <RunningControls isStreaming={isStreaming} isPaused={isPaused} />}
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
     </div>
