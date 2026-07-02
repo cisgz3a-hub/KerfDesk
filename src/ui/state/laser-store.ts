@@ -1,11 +1,8 @@
 // laser-store — Zustand store for the live serial connection to the GRBL
 import { create } from 'zustand';
 import {
-  CMD_UNLOCK,
   type GrblSettingRow,
-  RT_JOG_CANCEL,
   RT_STATUS,
-  buildJogCommand,
   idleCollector,
   type JogParams,
   type SettingsCollectorState,
@@ -16,26 +13,20 @@ import {
 import type { DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { type AutofocusResult, runAutofocus } from './autofocus-action';
+import type { AutofocusResult } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
 import type { LaserControllerOperation } from './laser-controller-operation';
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
-import { runHomeAction } from './laser-home-action';
 import {
   cancelControllerLifecycleRefs,
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
 import { jobActions } from './laser-job-actions';
+import { jogActions } from './laser-jog-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
-import { useStore } from './store';
-import {
-  buildFrameJogLines,
-  markMotionOperationDispatched,
-  startMotionOperation,
-  type LaserMotionOperation,
-} from './laser-motion-operation';
+import type { LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { FrameVerification } from './frame-verification';
@@ -48,15 +39,12 @@ import { createSafeWrite } from './laser-safe-write';
 import { setupActions } from './laser-setup-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import {
-  activeJobCommandBlockMessage,
   assertAutofocusIdle,
   buildPortClosePatch,
   detectStreamStall,
   disconnectStopCommands,
   initialLaserState,
   isActiveJob,
-  jogFrameCommandBlockMessage,
-  motionOperationCommandBlockMessage,
   pushLog,
   type StallProbe,
 } from './laser-store-helpers';
@@ -332,99 +320,6 @@ function shouldFastPoll(state: LaserState): boolean {
   );
 }
 
-function jogActions(
-  set: SetFn,
-  get: GetFn,
-): Pick<LaserState, 'home' | 'autofocus' | 'unlockAlarm' | 'jog' | 'cancelJog' | 'frame'> {
-  return {
-    home: async () => {
-      await runHomeAction(set, get, refs, (line, action, source) =>
-        safeWrite(set, get, line, action, source),
-      );
-    },
-    autofocus: async (command) => {
-      const activeJobBlock = activeJobCommandBlockMessage(get());
-      if (activeJobBlock !== null) return { kind: 'preflight-failed', reason: activeJobBlock };
-      const motionOperationBlock = motionOperationCommandBlockMessage(get());
-      if (motionOperationBlock !== null) {
-        return { kind: 'preflight-failed', reason: motionOperationBlock };
-      }
-      if (get().autofocusBusy) {
-        return { kind: 'preflight-failed', reason: 'Auto-focus is already running.' };
-      }
-      set({ autofocusBusy: true });
-      try {
-        return await runAutofocus({
-          connection: refs.connection,
-          statusReport: get().statusReport,
-          command,
-        });
-      } finally {
-        set({ autofocusBusy: false });
-      }
-    },
-    unlockAlarm: async () => {
-      assertMotionReady(set, get, motionOperationCommandBlockMessage);
-      await safeWrite(set, get, `${CMD_UNLOCK}\n`, 'unlock');
-      set({ alarmCode: null, homingState: 'unknown' });
-    },
-    jog: async (params) => {
-      assertAutofocusIdle(get());
-      assertMotionReady(set, get, jogFrameCommandBlockMessage);
-      set({ motionOperation: startMotionOperation('jog') });
-      try {
-        await safeWrite(set, get, `${buildJogCommand(params)}\n`, 'jog');
-        set((s) => ({
-          motionOperation: markMotionOperationDispatched(s.motionOperation, 'jog'),
-        }));
-      } catch (err) {
-        set({ motionOperation: null });
-        throw err;
-      }
-    },
-    cancelJog: () =>
-      safeWrite(set, get, RT_JOG_CANCEL, 'jog').finally(() =>
-        set({ motionOperation: null, frameVerification: null }),
-      ),
-    frame: async (bounds, feed) => {
-      assertAutofocusIdle(get());
-      assertMotionReady(set, get, jogFrameCommandBlockMessage);
-      // CNC projects retract to the configured safe height before the XY
-      // perimeter trace; the laser path stays Z-silent.
-      const machine = useStore.getState().project.machine;
-      const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
-      const [firstLine, ...pendingLines] = buildFrameJogLines(bounds, feed, safeZMm);
-      if (firstLine === undefined) return;
-      set({ motionOperation: startMotionOperation('frame', pendingLines) });
-      try {
-        await safeWrite(set, get, firstLine, 'frame');
-        set((s) => ({
-          motionOperation: markMotionOperationDispatched(s.motionOperation, 'frame'),
-        }));
-      } catch (err) {
-        set({ motionOperation: null });
-        throw err;
-      }
-    },
-  };
-}
-
-// Shared guard body for the two motion-readiness checks (jog/frame vs any
-// motion operation) — same block-message plumbing, different predicate.
-function assertMotionReady(
-  set: SetFn,
-  get: GetFn,
-  block: (state: LaserState) => string | null,
-): void {
-  const blockedMessage = block(get());
-  if (blockedMessage === null) return;
-  set({
-    lastWriteError: blockedMessage,
-    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
-  });
-  throw new Error(blockedMessage);
-}
-
 function detectedSettingsActions(
   set: SetFn,
   get: GetFn,
@@ -445,7 +340,7 @@ function detectedSettingsActions(
 export const useLaserStore = create<LaserState>((set, get) => ({
   ...initialLaserState(),
   ...connectionActions(set, get),
-  ...jogActions(set, get),
+  ...jogActions(set, get, refs, (line, action, source) => safeWrite(set, get, line, action, source)),
   ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
   ...grblSettingsActions(set, get, refs, (line, action, source) =>
