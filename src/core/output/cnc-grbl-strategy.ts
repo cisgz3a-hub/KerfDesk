@@ -63,29 +63,80 @@ function emitJob(job: Job, _device: DeviceProfile): string {
   const firstGroup = cncGroups[0];
   if (firstGroup === undefined) return '';
 
+  // Multi-tool jobs (H.7) get M0 change blocks between bit sections; a
+  // single-tool job emits byte-identically to pre-H.7 output.
+  const isMultiTool = new Set(cncGroups.map((group) => group.toolId ?? '')).size > 1;
+
   const lines: string[] = [];
   lines.push('G21');
   lines.push('G90');
   lines.push('G94');
+  if (isMultiTool && firstGroup.toolName !== undefined) {
+    lines.push(`; tool: ${firstGroup.toolName} (load before starting)`);
+  }
   appendSpindleStart(lines, firstGroup.spindleRpm, firstGroup.spindleSpinupSec);
 
   const head: Head = { x: null, y: null, z: null };
-  let currentRpm = firstGroup.spindleRpm;
-  let maxSafeZ = 0;
+  const state: EmitState = {
+    isMultiTool,
+    currentRpm: firstGroup.spindleRpm,
+    currentToolKey: firstGroup.toolId ?? '',
+    maxSafeZ: 0,
+  };
   for (const group of cncGroups) {
-    maxSafeZ = Math.max(maxSafeZ, group.safeZMm);
-    if (group.spindleRpm !== currentRpm) {
-      appendRetract(lines, head, group.safeZMm);
-      appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);
-      currentRpm = group.spindleRpm;
-    }
+    appendGroupTransition(lines, head, group, state);
     appendGroup(lines, head, group);
   }
 
-  appendRetract(lines, head, maxSafeZ);
+  appendRetract(lines, head, state.maxSafeZ);
   lines.push('M5');
   lines.push('G0 X0.000 Y0.000');
   return lines.join(LINE_END) + LINE_END;
+}
+
+type EmitState = {
+  isMultiTool: boolean;
+  currentRpm: number;
+  currentToolKey: string;
+  maxSafeZ: number;
+};
+
+// Between-group transitions: an M0 tool-change block when the bit changes
+// (multi-tool jobs only), else a spindle re-start when only the RPM does.
+function appendGroupTransition(
+  lines: string[],
+  head: Head,
+  group: CncGroup,
+  state: EmitState,
+): void {
+  state.maxSafeZ = Math.max(state.maxSafeZ, group.safeZMm);
+  if (state.isMultiTool && (group.toolId ?? '') !== state.currentToolKey) {
+    appendToolChange(lines, head, group, state.maxSafeZ);
+    state.currentToolKey = group.toolId ?? '';
+    state.currentRpm = group.spindleRpm;
+    return;
+  }
+  if (group.spindleRpm !== state.currentRpm) {
+    appendRetract(lines, head, group.safeZMm);
+    appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);
+    state.currentRpm = group.spindleRpm;
+  }
+}
+
+// The manual GRBL tool-change flow (F-CNC14/15): retract, spindle off,
+// park at the front for bit access, M0 pause. The operator swaps the bit,
+// re-zeros Z on the stock top (the new bit's length differs), and
+// cycle-starts/resumes; the spindle then spins back up before any motion.
+function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm: number): void {
+  appendRetract(lines, head, safeZMm);
+  lines.push('M5');
+  lines.push('G0 X0.000 Y0.000');
+  head.x = fmt(0);
+  head.y = fmt(0);
+  lines.push(`; tool change: load ${group.toolName ?? 'next tool'}`);
+  lines.push('; re-zero Z on the stock top, then cycle-start to resume');
+  lines.push('M0');
+  appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);
 }
 
 function appendSpindleStart(lines: string[], rpm: number, spinupSec: number): void {

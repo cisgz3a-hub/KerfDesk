@@ -34,6 +34,11 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
     cutType: CNC_CUT_TYPES.some((cutType) => cutType === raw['cutType'])
       ? raw['cutType']
       : d.cutType,
+    // H.7 multi-tool fields: optional bit ids. Stale/unknown ids are kept
+    // here and resolve to the machine bit at compile time (layerCncTool);
+    // non-strings are dropped.
+    ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
+    ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
     // 0 = auto ring spacing (H.3), so non-negative rather than positive.
