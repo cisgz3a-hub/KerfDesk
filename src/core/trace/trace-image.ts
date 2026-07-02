@@ -282,6 +282,13 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     useOtsuThreshold: true,
     despeckleMinPixels: 4,
+    // Potrace curve params — the fields that actually reach the binary
+    // backend (the imagetracerjs fields above are inert there). Default
+    // smoothness (1.0) blobs small features: 3-px letters become pills,
+    // square dots become circles. 0.55 keeps drawn corners as vertices
+    // while genuine large arcs still fit as curves.
+    smoothness: 0.55,
+    optimize: 0.15,
   },
 };
 
