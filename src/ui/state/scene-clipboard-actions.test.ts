@@ -2,15 +2,18 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createLayer,
   createProject,
+  DEFAULT_RELIEF_LAYER_COLOR,
   IDENTITY_TRANSFORM,
   type ColoredPath,
   type Project,
   type RasterImage,
+  type ReliefObject,
   type SceneObject,
   type ShapeObject,
   type TextObject,
   type TracedImage,
 } from '../../core/scene';
+import { useToastStore } from './toast-store';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
@@ -112,6 +115,90 @@ describe('scene clipboard actions', () => {
     expect(state.project.scene.layers.some((layer) => layer.color === '#808080')).toBe(true);
   });
 });
+
+describe('relief paste gate (CNC-only geometry)', () => {
+  beforeEach(() => {
+    resetStore();
+    useToastStore.setState({ toasts: [] });
+  });
+
+  it('pastes reliefs normally in CNC mode', () => {
+    useStore.setState({ project: cncProjectWithRelief() });
+    useStore.getState().selectAllObjects();
+    useStore.getState().copySelection();
+
+    useStore.getState().pasteClipboard();
+
+    expect(
+      useStore.getState().project.scene.objects.filter((object) => object.kind === 'relief'),
+    ).toHaveLength(2);
+  });
+
+  it('skips reliefs (with a toast) when pasting into a laser project, keeping the rest', () => {
+    useStore.setState({ project: cncProjectWithRelief() });
+    useStore.getState().selectAllObjects();
+    useStore.getState().copySelection();
+    useStore.getState().setMachineKind('laser');
+
+    useStore.getState().pasteClipboard();
+
+    const objects = useStore.getState().project.scene.objects;
+    expect(objects.filter((object) => object.kind === 'relief')).toHaveLength(1); // the original only
+    expect(objects.filter((object) => object.kind === 'imported-svg')).toHaveLength(2);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain('CNC mode');
+  });
+
+  it('is a no-op when the clipboard holds only reliefs in laser mode', () => {
+    useStore.setState({ project: cncProjectWithRelief() });
+    useStore.getState().selectObject('relief-1');
+    useStore.getState().copySelection();
+    useStore.getState().setMachineKind('laser');
+    const before = useStore.getState().project;
+
+    useStore.getState().pasteClipboard();
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toContain('reliefs only paste');
+  });
+});
+
+function cncProjectWithRelief(): Project {
+  const base = createProject();
+  const machine = { kind: 'cnc' as const };
+  const project: Project = {
+    ...base,
+    scene: {
+      objects: [
+        { ...svgObj('svg-1', ['#ff0000']), transform: { ...IDENTITY_TRANSFORM, x: 0, y: 0 } },
+        reliefTestObject(),
+      ],
+      layers: [
+        createLayer({ id: '#ff0000', color: '#ff0000', mode: 'line' }),
+        createLayer({ id: DEFAULT_RELIEF_LAYER_COLOR, color: DEFAULT_RELIEF_LAYER_COLOR }),
+      ],
+    },
+  };
+  // Route through the store action so the machine config is a real
+  // CncMachineConfig (not a hand-built partial).
+  useStore.setState({ project });
+  useStore.getState().setMachineKind(machine.kind);
+  return useStore.getState().project;
+}
+
+function reliefTestObject(): ReliefObject {
+  return {
+    kind: 'relief',
+    id: 'relief-1',
+    source: 'model.stl',
+    meshPositions: [0, 0, 0, 10, 0, 0, 0, 10, 5],
+    targetWidthMm: 100,
+    reliefDepthMm: 5,
+    emptyCells: 'floor',
+    color: DEFAULT_RELIEF_LAYER_COLOR,
+    bounds: { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+    transform: IDENTITY_TRANSFORM,
+  };
+}
 
 function projectWithVariants(): Project {
   const objects: ReadonlyArray<SceneObject> = [

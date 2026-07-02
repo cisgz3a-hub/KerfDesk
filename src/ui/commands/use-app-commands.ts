@@ -1,4 +1,5 @@
 import { profileSupportsCapability } from '../../core/devices';
+import { machineKindOf } from '../../core/scene';
 import { confirmDiscardAsync } from '../app/confirm-discard';
 import { usePlatform } from '../app/platform-context';
 import {
@@ -94,7 +95,7 @@ function appCommandContext(
     ...arrangeCommandContext(app),
     ...laserCommandContext(platform, laser),
     ...windowHelpCommandContext(callbacks, app),
-    machineKind: projectMachineKind(app.project),
+    machineKind: machineKindOf(app.project.machine),
     dirty: app.dirty,
     savedName: app.savedName,
     serialSupported: platform.serial.isSupported(),
@@ -386,14 +387,6 @@ function saveProject(
     },
     forceDialog,
   );
-}
-
-// Projects saved before MachineConfig existed have no machine field; they
-// are laser projects (the pre-CNC default).
-function projectMachineKind(
-  project: ReturnType<typeof useStore.getState>['project'],
-): AppCommandContext['machineKind'] {
-  return project.machine?.kind ?? 'laser';
 }
 
 function deleteSelection(): void {

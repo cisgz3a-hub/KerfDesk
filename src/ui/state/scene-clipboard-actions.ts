@@ -2,12 +2,14 @@ import {
   addLayer,
   addObject,
   createLayer,
+  machineKindOf,
   type Layer,
   type Scene,
   type SceneObject,
 } from '../../core/scene';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
+import { useToastStore } from './toast-store';
 import type { AppState } from './store';
 
 const PASTE_OFFSET_MM = 10;
@@ -55,7 +57,12 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
       set((state) => {
         const clipboard = state.sceneClipboard;
         if (clipboard === null || clipboard.objects.length === 0) return state;
-        const pasted = cloneClipboardObjects(clipboard.objects);
+        // Reliefs are CNC-only geometry: paste must honor the same machine
+        // gate as STL import, or the clipboard becomes a laser-mode back
+        // door (ADR-100 §8 follow-up).
+        const pasteable = pasteableClipboardObjects(clipboard.objects, state);
+        if (pasteable.length === 0) return state;
+        const pasted = cloneClipboardObjects(pasteable);
         let scene = ensureClipboardLayers(state.project.scene, clipboard.layers, pasted);
         for (const object of pasted) scene = addObject(scene, object);
         const [primary, ...rest] = pasted.map((object) => object.id);
@@ -69,6 +76,24 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
         };
       }),
   };
+}
+
+function pasteableClipboardObjects(
+  objects: ReadonlyArray<SceneObject>,
+  state: Pick<AppState, 'project'>,
+): ReadonlyArray<SceneObject> {
+  if (machineKindOf(state.project.machine) === 'cnc') return objects;
+  const kept = objects.filter((object) => object.kind !== 'relief');
+  if (kept.length !== objects.length) {
+    const skipped = objects.length - kept.length;
+    useToastStore
+      .getState()
+      .pushToast(
+        `Skipped ${skipped} relief object${skipped === 1 ? '' : 's'} — reliefs only paste in CNC mode.`,
+        'warning',
+      );
+  }
+  return kept;
 }
 
 function clipboardFromSelection(

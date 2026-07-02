@@ -281,6 +281,8 @@ describe('runPreflight — F-A10 check 6: empty output', () => {
     // Empty project has no output layers (different check) AND no G1 lines.
     expect(result.issues.map((i) => i.code)).toContain('empty-output');
   });
+  // The relief-only specialization of this check lives in
+  // preflight-relief.test.ts (this file is at the size cap).
 });
 
 describe('runPreflight offset fill validation', () => {
