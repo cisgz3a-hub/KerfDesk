@@ -136,6 +136,7 @@ export type {
   CncMachineConfig,
   CncMachineParams,
   CncStock,
+  CncTiling,
   CncTool,
   CncToolKind,
   LaserMachineConfig,
@@ -145,6 +146,7 @@ export type {
 export {
   CNC_CUT_TYPES,
   DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_TILING,
   DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_CNC_MACHINE_PARAMS,
   DEFAULT_CNC_STOCK,
