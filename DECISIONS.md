@@ -3757,9 +3757,13 @@ sources consumed by both compilers.
 5. **Auto-focus hides in CNC mode.** *Provisional* — flagged for maintainer
    review: auto-focus is a laser focus routine; the CNC Z-zeroing flow
    arrives as its own H.7 surface.
-6. **Device-setup laser-only fields (air assist, $30/S-value power range)
-   hide in CNC mode.** *Provisional* — H.7 CNC machine profiles add the
-   CNC counterparts.
+6. **Device-profile laser-only fields hide in CNC mode:** the $30/$31/$32
+   power range, air assist, scanning offsets (laser Image raster timing),
+   and the autofocus command editor. *Provisional* — H.7 CNC machine
+   profiles add the CNC counterparts. The connect-time Device Setup wizard
+   keeps its laser steps for now (its firmware writes are individually
+   confirmed, unlike the one-click path already gated in CNC); wizard
+   behavior on a CNC connect is an open H.7 question.
 7. **Shared chrome re-labels machine-aware** (right-rail heading, connect
    copy, "Estimated burn time" wording, "Laser:" shortcut hint, menu
    family label). The internal `'laser'` command-family key does NOT

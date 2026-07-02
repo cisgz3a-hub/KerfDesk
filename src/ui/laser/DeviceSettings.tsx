@@ -20,6 +20,7 @@ import { useStore } from '../state';
 import { AutofocusEditor } from './AutofocusEditor';
 import { Row } from './device-settings-shared';
 import { BasicRows, HomingEditor } from './DeviceProfileFields';
+import { AirAssistRow, LaserPowerRows } from './DeviceProfilePowerFields';
 import { ProfileRows, ZRows } from './DeviceProfileRows';
 import { PlannerAdvanced } from './PlannerAdvanced';
 import { ScanOffsetEditor } from './ScanOffsetEditor';
@@ -27,6 +28,10 @@ import { ScanOffsetEditor } from './ScanOffsetEditor';
 export function DeviceSettings(): JSX.Element {
   const device = useStore((s) => s.project.device);
   const update = useStore((s) => s.updateDeviceProfile);
+  // ADR-100 §6 (provisional): laser-output-only device fields — power range
+  // ($30/$31/$32), air assist, scanning offsets, autofocus command — hide on
+  // a router. H.7 CNC machine profiles add the CNC counterparts.
+  const isCncMachine = useStore((s) => s.project.machine?.kind === 'cnc');
   // Whole panel collapses to one row by default. <details> gives us the
   // disclosure widget without any React state — the user's last-chosen
   // open/closed status persists for the session (browser DOM owns it).
@@ -43,10 +48,16 @@ export function DeviceSettings(): JSX.Element {
       </summary>
       <div style={bodyStyle}>
         <BasicRows device={device} update={update} />
-        <ScanOffsetEditor
-          value={device.scanningOffsets}
-          onChange={(scanningOffsets) => update({ scanningOffsets })}
-        />
+        {!isCncMachine && (
+          <>
+            <LaserPowerRows device={device} update={update} />
+            <AirAssistRow device={device} update={update} />
+            <ScanOffsetEditor
+              value={device.scanningOffsets}
+              onChange={(scanningOffsets) => update({ scanningOffsets })}
+            />
+          </>
+        )}
         <ProfileRows device={device} update={update} />
         <ZRows device={device} update={update} />
         <Row label="Homing">
@@ -56,10 +67,12 @@ export function DeviceSettings(): JSX.Element {
             onChange={(homing) => update({ homing })}
           />
         </Row>
-        <AutofocusEditor
-          value={device.autofocusCommand}
-          onChange={(autofocusCommand) => update({ autofocusCommand })}
-        />
+        {!isCncMachine && (
+          <AutofocusEditor
+            value={device.autofocusCommand}
+            onChange={(autofocusCommand) => update({ autofocusCommand })}
+          />
+        )}
         <PlannerAdvanced
           accel={device.accelMmPerSec2}
           jd={device.junctionDeviationMm}
