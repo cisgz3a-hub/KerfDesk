@@ -1334,6 +1334,36 @@ F-CNC19 tiling.
 2. A stock larger than ~1M grid cells coarsens the simulation grid
    automatically; shading gets blockier, never freezes the app.
 
+### F-CNC8. Rough a relief — Phase H.5
+
+#### Success
+1. A relief object on an output-enabled layer compiles to waterline
+   roughing: the heightmap is dilated by the active bit's footprint plus a
+   0.5 mm finishing allowance (gouge-free by construction), sliced into Z
+   levels by the layer's depth-per-pass, and each level's region fills
+   with concentric rings at the layer's stepover.
+2. Passes run depth-major (whole level before stepping down) as a
+   clearing group — before any profile cuts. The preview's removal
+   shading shows the terraced relief forming.
+3. Emitted G-code passes both the plunged-travel and overdeep-cut
+   invariants; the object transform (move/scale/rotate) is honored.
+
+#### Error — bit too big for the detail
+1. Regions narrower than the bit's dilated footprint produce no rings
+   there — fine detail is left for the H.8 finishing pass (and the
+   preview shows it uncut). Nothing gouges.
+
+#### Empty
+1. A flat mesh or a zero-depth relief compiles to no passes; the layer
+   is skipped.
+
+#### Edge — allowance ≥ relief depth / huge mesh
+1. If the 0.5 mm allowance meets or exceeds the relief depth, only the
+   shallowest levels produce regions (possibly none) — correct: there is
+   nothing to rough without cutting into finishing stock.
+2. Roughing samples the heightmap at bit-diameter/8 cells (0.2 mm floor),
+   so compile stays fast even for large meshes.
+
 ### F-CNC7. Import an STL relief — Phase H.4
 
 #### Success

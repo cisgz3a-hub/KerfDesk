@@ -20,3 +20,10 @@ export {
   type MeshHeightmapOptions,
   type MeshHeightmapResult,
 } from './mesh-to-heightmap';
+export { marchingSquares } from './marching-squares';
+export { dilateHeightmapByTool } from './heightmap-tool-offset';
+export {
+  DEFAULT_RELIEF_ALLOWANCE_MM,
+  reliefRoughingPasses,
+  type ReliefRoughingOptions,
+} from './relief-roughing';

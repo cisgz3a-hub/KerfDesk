@@ -41,13 +41,18 @@ export type CncStock = {
 //   v-carve          — angled-bit variable-depth carve of closed shapes
 //                      (Phase H.3, ADR-094): depth follows the local inset,
 //                      z(d) = −min(d / tan(θ/2), depthMm)
+//   relief-rough     — waterline roughing of a relief heightmap (H.5).
+//                      COMPILE-TIME ONLY: produced from relief objects,
+//                      never selectable on a layer (absent from
+//                      CNC_CUT_TYPES, rejected by .lf2 normalization).
 export type CncCutType =
   | 'profile-outside'
   | 'profile-inside'
   | 'profile-on-path'
   | 'pocket'
   | 'engrave'
-  | 'v-carve';
+  | 'v-carve'
+  | 'relief-rough';
 
 export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'profile-outside',
@@ -183,5 +188,7 @@ export function cutTypeLabel(cutType: CncCutType): string {
       return 'Engrave (trace path)';
     case 'v-carve':
       return 'V-carve (angled bit)';
+    case 'relief-rough':
+      return 'Relief roughing';
   }
 }
