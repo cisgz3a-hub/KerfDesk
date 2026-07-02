@@ -7,6 +7,7 @@ import type { Polyline, Vec2 } from '../../scene';
 import type { RawImageData } from '../trace-image';
 import { squaredDistanceField, type InkMask } from './distance-field';
 import { thinToMedialAxis } from './medial-thinning';
+import { sharpenChainBends } from './sharpen-bends';
 import { traceCenterlineStrokePaths } from './trace-centerline';
 
 // --- fixture helpers -------------------------------------------------------
@@ -232,6 +233,89 @@ describe('traceCenterlineStrokePaths', () => {
     expect(minDistanceToPoint(polylines, { x: 38.5, y: 102.5 })).toBeLessThan(1);
   });
 
+  it('never deletes a small mark entirely (the stale last-chain-guard defect)', () => {
+    // A 3-px-wide "+" whose four arms are all short pinched-tip leaves: the
+    // per-sweep component snapshot once let every leaf die in one pass and
+    // the whole mark vanished. At least one chain must always survive.
+    const { mask, ink } = blankMask(40, 40);
+    stroke(ink, 40, 40, { x: 16, y: 20 }, { x: 24, y: 20 }, 1.5);
+    stroke(ink, 40, 40, { x: 20, y: 16 }, { x: 20, y: 24 }, 1.5);
+    const polylines = tracePolylines(mask);
+    expect(polylines.length).toBeGreaterThanOrEqual(1);
+    const total = polylines.reduce((acc, pl) => {
+      let len = 0;
+      for (let i = 1; i < pl.points.length; i += 1) {
+        const a = pl.points[i - 1];
+        const b = pl.points[i];
+        if (a !== undefined && b !== undefined) len += Math.hypot(b.x - a.x, b.y - a.y);
+      }
+      return acc + len;
+    }, 0);
+    expect(total).toBeGreaterThan(3);
+  });
+
+  it('keeps the distance field finite on a fully-inked image (virtual border)', () => {
+    const size = 30;
+    const { mask, ink } = blankMask(size, size);
+    ink.fill(1);
+    const distSq = squaredDistanceField(mask);
+    // Everything outside the image is background: centre pixel (15,15) is at
+    // most 15 from it. Without the clamp this is MAX_SAFE_INTEGER and every
+    // radius-scaled stage downstream (tip extension especially) blows up.
+    expect(distSq[15 * size + 15]).toBe(225);
+    expect(distSq[0]).toBe(1);
+    // The full pipeline must also complete quickly instead of walking a
+    // near-infinite tip-extension budget.
+    expect(Array.isArray(tracePolylines(mask))).toBe(true);
+  });
+
+  it('treats fully transparent pixels as paper (the alpha-blob defect)', () => {
+    // Transparent-background PNGs routinely carry black RGB under alpha=0.
+    const width = 60;
+    const height = 30;
+    const data = new Uint8ClampedArray(width * height * 4); // all black, alpha 0
+    for (let y = 13; y <= 16; y += 1)
+      for (let x = 10; x <= 50; x += 1) {
+        data[(y * width + x) * 4 + 3] = 255; // opaque black stroke
+      }
+    const paths = traceCenterlineStrokePaths({ width, height, data }, CENTERLINE_OPTIONS);
+    const polylines = paths.flatMap((p) => p.polylines);
+    expect(polylines.length).toBeGreaterThanOrEqual(1);
+    for (const pl of polylines)
+      for (const p of pl.points) {
+        expect(p.y).toBeGreaterThan(11);
+        expect(p.y).toBeLessThan(18);
+      }
+  });
+
+  it('does not weld receding stroke tips into a hairpin', () => {
+    // Two pen tips that END near each other while travelling apart (adjacent
+    // glyph terminals). Welding them draws a doubled-back fold.
+    const { mask, ink } = blankMask(40, 40);
+    stroke(ink, 40, 40, { x: 14, y: 27 }, { x: 20, y: 21 }, 1);
+    stroke(ink, 40, 40, { x: 26, y: 31 }, { x: 20, y: 25 }, 1);
+    const paths = traceCenterlineStrokePaths(maskToImage(mask), {
+      ...CENTERLINE_OPTIONS,
+      centerlineJoinGapPx: 5,
+    });
+    const polylines = paths.flatMap((p) => p.polylines);
+    expect(polylines).toHaveLength(2);
+  });
+
+  it('honours lineTolerance as the simplification budget', () => {
+    const { mask, ink } = blankMask(200, 40);
+    for (let x = 10; x <= 190; x += 4) {
+      const wobble = 20 + Math.sin(x / 9) * 2.2;
+      stroke(ink, 200, 40, { x, y: wobble }, { x: x + 4, y: wobble }, 1.6);
+    }
+    const image = maskToImage(mask);
+    const fine = traceCenterlineStrokePaths(image, { ...CENTERLINE_OPTIONS, lineTolerance: 1 });
+    const coarse = traceCenterlineStrokePaths(image, { ...CENTERLINE_OPTIONS, lineTolerance: 6 });
+    const count = (paths: ReturnType<typeof traceCenterlineStrokePaths>): number =>
+      paths.flatMap((p) => p.polylines).reduce((acc, pl) => acc + pl.points.length, 0);
+    expect(count(coarse)).toBeLessThan(count(fine));
+  });
+
   it('restores all four corners of a closed square ring band', () => {
     const { mask, ink } = blankMask(120, 120);
     inkRect(ink, 120, 20, 20, 100, 100);
@@ -251,3 +335,58 @@ describe('traceCenterlineStrokePaths', () => {
     }
   });
 });
+
+describe('sharpenChainBends', () => {
+  it('sharpens every corner of a many-cornered closed ring (the gear defect)', () => {
+    // 24 chamfered star corners on one closed chain. The old fixed 6n
+    // iteration budget exhausted after ~10 closed-chain restarts and left
+    // the remaining corners chamfered — which corners survived depended on
+    // where the array seam happened to sit.
+    const cx = 100;
+    const cy = 100;
+    const tips = 12;
+    const corners: Vec2[] = [];
+    for (let k = 0; k < tips * 2; k += 1) {
+      const angle = (k / (tips * 2)) * 2 * Math.PI;
+      const radius = k % 2 === 0 ? 60 : 38;
+      corners.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+    }
+    const chamferPx = 1.5;
+    const spacingPx = 1;
+    const points: Vec2[] = [];
+    for (let k = 0; k < corners.length; k += 1) {
+      const prev = corners[(k - 1 + corners.length) % corners.length];
+      const corner = corners[k];
+      const next = corners[(k + 1) % corners.length];
+      if (!prev || !corner || !next) continue;
+      const entry = stepToward(corner, prev, chamferPx);
+      const exit = stepToward(corner, next, chamferPx);
+      points.push(entry, exit);
+      appendSamples(points, exit, stepToward(next, corner, chamferPx), spacingPx);
+    }
+    const width = 200;
+    const distSq = new Float64Array(width * width).fill(9); // uniform 3-px radius
+    const sharpened = sharpenChainBends(points, true, distSq, width);
+    let restored = 0;
+    for (const corner of corners) {
+      let best = Infinity;
+      for (const p of sharpened) best = Math.min(best, Math.hypot(p.x - corner.x, p.y - corner.y));
+      if (best < 0.9) restored += 1;
+    }
+    expect(restored).toBe(corners.length);
+  });
+});
+
+function stepToward(from: Vec2, to: Vec2, distance: number): Vec2 {
+  const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  return { x: from.x + ((to.x - from.x) / len) * distance, y: from.y + ((to.y - from.y) / len) * distance };
+}
+
+function appendSamples(out: Vec2[], from: Vec2, to: Vec2, spacing: number): void {
+  const len = Math.hypot(to.x - from.x, to.y - from.y);
+  const steps = Math.max(1, Math.floor(len / spacing));
+  for (let s = 1; s < steps; s += 1) {
+    const t = s / steps;
+    out.push({ x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t });
+  }
+}

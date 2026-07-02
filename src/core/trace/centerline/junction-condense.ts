@@ -70,8 +70,12 @@ function rebuildGraph(graph: StrokeGraph, merged: Map<number, number>): StrokeGr
     }
     const a = remap.get(chain.a) ?? chain.a;
     const b = remap.get(chain.b) ?? chain.b;
-    // Connector chains INSIDE a merged crossing vanish.
-    if (a === b && arcLength(chain.points) < connectorBudget(nodes[a])) continue;
+    // Connector chains INSIDE a merged crossing vanish — but only chains the
+    // MERGE turned into self-loops (two distinct nodes collapsing into one).
+    // A chain that was self-anchored all along is a drawn loop (a cursive
+    // eyelet) and must survive no matter what merged elsewhere in the image.
+    const mergedIntoSelfLoop = chain.a !== chain.b && a === b;
+    if (mergedIntoSelfLoop && arcLength(chain.points) < connectorBudget(nodes[a])) continue;
     chains.push({ a, b, points: reanchorPoints(chain.points, nodes[a], nodes[b]), closed: false });
   }
   return { nodes, chains };

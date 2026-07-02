@@ -58,18 +58,8 @@ export function pruneSpurs(
 
   let changed = true;
   while (changed) {
-    changed = false;
-    const degree = liveDegrees(chains);
-    const componentSize = liveComponentChainCounts(chains);
-    for (const chain of chains) {
-      if (!chain.alive || chain.closed) continue;
-      if (!isPrunableLeaf(chain, degree, nodeKind)) continue;
-      if ((componentSize.get(componentKey(chain, chains)) ?? 1) <= 1) continue; // last chain guard
-      if (!isArtifactSpur(chain, degree, distSq, width, options)) continue;
-      chain.alive = false;
-      changed = true;
-    }
-    if (dissolvePassthroughJunctions(chains, nodeKind)) changed = true;
+    changed = pruneOneSpur(chains, nodeKind, distSq, width, options);
+    if (!changed && dissolvePassthroughJunctions(chains, nodeKind)) changed = true;
   }
 
   return {
@@ -78,6 +68,30 @@ export function pruneSpurs(
       .filter((c) => c.alive)
       .map((c) => ({ a: c.a, b: c.b, points: c.points, closed: c.closed })),
   };
+}
+
+// One prune per sweep: degree and component counts go stale the moment a
+// chain dies, and pruning further against the snapshot lets every leaf of a
+// small mark die in a single pass — a 3-px "+" or a dot vanishes entirely,
+// the exact last-chain violation the component guard exists to prevent.
+function pruneOneSpur(
+  chains: MutableChain[],
+  nodeKind: Map<number, StrokeNode['kind']>,
+  distSq: Float64Array,
+  width: number,
+  options: SpurPruneOptions,
+): boolean {
+  const degree = liveDegrees(chains);
+  const componentSize = liveComponentChainCounts(chains);
+  for (const chain of chains) {
+    if (!chain.alive || chain.closed) continue;
+    if (!isPrunableLeaf(chain, degree, nodeKind)) continue;
+    if ((componentSize.get(componentKey(chain, chains)) ?? 1) <= 1) continue; // last chain guard
+    if (!isArtifactSpur(chain, degree, distSq, width, options)) continue;
+    chain.alive = false;
+    return true;
+  }
+  return false;
 }
 
 function liveDegrees(chains: ReadonlyArray<MutableChain>): Map<number, number> {

@@ -25,6 +25,9 @@ export type ChainAssemblyOptions = {
    *  up to joinGapPx × this factor away (edge maps have detection dropouts
    *  much wider than their join knob). Default 1 = strict knob semantics. */
   readonly alignedJoinFactor?: number;
+  /** Multiplier on the simplification epsilon — the TraceOptions
+   *  lineTolerance contract (higher = fewer vertices). Default 1. */
+  readonly simplifyTolerance?: number;
 };
 
 const TANGENT_PROBE_PX = 3;
@@ -67,7 +70,8 @@ export function assembleStrokePaths(
     chain.points = repairJunctionSeams(chain.points, chain.closed, junctions, distSq, mask.width);
   }
   weldBranchEnds(chains, junctions);
-  return finalizeChains(chains, distSq, mask);
+  const simplifyEpsilonPx = SIMPLIFY_EPSILON_PX * Math.max(0.1, options.simplifyTolerance ?? 1);
+  return finalizeChains(chains, distSq, mask, simplifyEpsilonPx);
 }
 
 function closeOrExtend(
@@ -91,7 +95,12 @@ function closeOrExtend(
   }
 }
 
-function finalizeChains(chains: ReadonlyArray<Chain>, distSq: Float64Array, mask: InkMask): Polyline[] {
+function finalizeChains(
+  chains: ReadonlyArray<Chain>,
+  distSq: Float64Array,
+  mask: InkMask,
+  simplifyEpsilonPx: number,
+): Polyline[] {
   const result: Polyline[] = [];
   for (const chain of chains) {
     if (!chain.alive) continue;
@@ -100,7 +109,7 @@ function finalizeChains(chains: ReadonlyArray<Chain>, distSq: Float64Array, mask
     // vertices before simplification eats the dense points the tangent
     // estimates need.
     const sharpened = sharpenChainBends(chain.points, chain.closed, distSq, mask.width);
-    const simplified = simplify(sharpened, chain.closed);
+    const simplified = simplify(sharpened, chain.closed, simplifyEpsilonPx);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
     result.push({ points: simplified, closed: chain.closed });
@@ -315,13 +324,13 @@ function gapClosureIsAligned(chain: Chain, gap: number): boolean {
 
 // --- Douglas-Peucker simplification ---
 
-function simplify(points: ReadonlyArray<Vec2>, closed: boolean): Vec2[] {
+function simplify(points: ReadonlyArray<Vec2>, closed: boolean, epsilonPx: number): Vec2[] {
   if (points.length <= 2) return [...points];
-  if (!closed) return douglasPeucker(points, SIMPLIFY_EPSILON_PX);
+  if (!closed) return douglasPeucker(points, epsilonPx);
   // Closed: anchor at 0 and the farthest point, simplify both halves.
   const anchor = farthestIndexFrom(points, 0);
-  const half1 = douglasPeucker(points.slice(0, anchor + 1), SIMPLIFY_EPSILON_PX);
-  const half2 = douglasPeucker([...points.slice(anchor), points[0] as Vec2], SIMPLIFY_EPSILON_PX);
+  const half1 = douglasPeucker(points.slice(0, anchor + 1), epsilonPx);
+  const half2 = douglasPeucker([...points.slice(anchor), points[0] as Vec2], epsilonPx);
   return [...half1.slice(0, -1), ...half2.slice(0, -1)];
 }
 

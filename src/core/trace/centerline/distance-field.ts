@@ -15,7 +15,11 @@ export type InkMask = {
 };
 
 /** distSq[i] = exact squared distance from pixel centre i to the nearest
- *  background pixel centre; 0 for background pixels. */
+ *  background pixel centre; 0 for background pixels. Everything OUTSIDE the
+ *  image counts as background, so ink flush against the border keeps a
+ *  finite, border-clamped radius — without this, a fully-ink image gets
+ *  near-infinite distances and every radius-scaled stage downstream (spur
+ *  budgets, tip-extension walk length, artifact-loop rejection) blows up. */
 export function squaredDistanceField(mask: InkMask): Float64Array {
   const { width, height, ink } = mask;
   const distSq = new Float64Array(width * height);
@@ -41,7 +45,23 @@ export function squaredDistanceField(mask: InkMask): Float64Array {
       distSq[y * width + x] = transformed[x] ?? 0;
     }
   }
+  clampToVirtualBorder(distSq, width, height);
   return distSq;
+}
+
+// The 1D passes only see in-image background. Treat the first ring of
+// pixels OUTSIDE the image as background too: pixel (x, y) is at most
+// min(x+1, width-x, y+1, height-y) from it.
+function clampToVirtualBorder(distSq: Float64Array, width: number, height: number): void {
+  for (let y = 0; y < height; y += 1) {
+    const yEdge = Math.min(y + 1, height - y);
+    for (let x = 0; x < width; x += 1) {
+      const edge = Math.min(x + 1, width - x, yEdge);
+      const edgeSq = edge * edge;
+      const i = y * width + x;
+      if ((distSq[i] ?? 0) > edgeSq) distSq[i] = edgeSq;
+    }
+  }
 }
 
 type Envelope = {

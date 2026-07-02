@@ -68,10 +68,18 @@ function chainEdgeMask(mask: InkMask, options: TraceOptions, joinGapPx: number):
 }
 
 // Heavy pre-blur widens gradients and breeds faint speckle chains; below a
-// blur-scaled floor they are noise, not drawing.
+// blur-scaled floor they are noise, not drawing. The floor is measured in
+// CHAIN length: the old outline backend used sigma×10 against two-sided
+// contour perimeters (≈2× chain length), so the chain-unit equivalent is
+// sigma×5 — same reason the preset's edgeMinLengthPx halved 24→12.
+const BLUR_NOISE_FLOOR_MIN_SIGMA = 1.5;
+const BLUR_NOISE_FLOOR_PX_PER_SIGMA = 5;
+
 function blurNoiseFloorPx(edgeBlurSigma: number | undefined): number {
   if (edgeBlurSigma === undefined || edgeBlurSigma <= 0) return 0;
-  return edgeBlurSigma >= 1.5 ? edgeBlurSigma * 10 : 0;
+  return edgeBlurSigma >= BLUR_NOISE_FLOOR_MIN_SIGMA
+    ? edgeBlurSigma * BLUR_NOISE_FLOOR_PX_PER_SIGMA
+    : 0;
 }
 
 // A closed loop with a long-enough perimeter but almost no enclosed area is a
