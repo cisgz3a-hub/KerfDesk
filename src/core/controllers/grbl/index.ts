@@ -4,7 +4,7 @@ export { ALARM_CODES, describeAlarm } from './alarm-codes';
 export type { ErrorDescription } from './error-codes';
 export { ALL_ERROR_CODES, describeError } from './error-codes';
 
-export type { GrblPins, GrblState, StatusReport } from './status-parser';
+export type { GrblPins, GrblState, OverrideValues, StatusReport } from './status-parser';
 export { parseStatusReport } from './status-parser';
 
 export type { GrblResponse } from './response';
@@ -74,8 +74,21 @@ export {
   DEFAULT_Z_PROBE_PARAMS,
 } from './probe';
 
-export type { JogParams } from './commands';
+export type { JogParams, RealtimeOverrideByte } from './commands';
 export {
+  RT_FEED_OV_RESET,
+  RT_FEED_OV_PLUS_10,
+  RT_FEED_OV_MINUS_10,
+  RT_FEED_OV_PLUS_1,
+  RT_FEED_OV_MINUS_1,
+  RT_RAPID_OV_FULL,
+  RT_RAPID_OV_HALF,
+  RT_RAPID_OV_QUARTER,
+  RT_SPINDLE_OV_RESET,
+  RT_SPINDLE_OV_PLUS_10,
+  RT_SPINDLE_OV_MINUS_10,
+  RT_SPINDLE_OV_PLUS_1,
+  RT_SPINDLE_OV_MINUS_1,
   CMD_BUILD_INFO,
   CMD_CLEAR_ORIGIN,
   CMD_CLEAR_PERSISTENT_ORIGIN,

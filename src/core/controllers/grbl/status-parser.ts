@@ -15,7 +15,9 @@
 // `StatusReport.wco` directly (it would flicker on most frames).
 // Pn is OMITTED by GRBL whenever no pin is triggered, so `pins` is null on
 // those frames — it appears only while a limit / probe / door is active.
-// Other fields (Bf, Ln, Ov) are still not parsed.
+// Ov (feed/rapid/spindle override percentages) is reported on the same
+// intermittent cadence as WCO, so consumers cache it (`ovCache`) exactly
+// like `wcoCache`. Other fields (Bf, Ln) are still not parsed.
 
 export type GrblState =
   | 'Idle'
@@ -39,6 +41,13 @@ export type GrblPins = {
   readonly door: boolean;
 };
 
+// Live override percentages from the `Ov:` field (ADR-102 G3).
+export type OverrideValues = {
+  readonly feed: number;
+  readonly rapid: number;
+  readonly spindle: number;
+};
+
 export type StatusReport = {
   readonly state: GrblState;
   readonly subState: number | null;
@@ -53,6 +62,12 @@ export type StatusReport = {
    * (ADR-053 P3).
    */
   readonly pins?: GrblPins | null;
+  /**
+   * Feed/rapid/spindle override percentages from `Ov:`, reported
+   * intermittently like WCO. Optional so hand-built test mocks need not set
+   * it; UI code reads the laser-store's `ovCache`, never this field.
+   */
+  readonly ov?: OverrideValues | null;
   /**
    * Work Coordinate Offset — the machine-to-work translation that
    * GRBL is currently applying. WPos = MPos - WCO. Reported on a
@@ -95,7 +110,27 @@ export function parseStatusReport(line: string): StatusReport | null {
     spindle: pickFsValue(fields, 1),
     wco: pickAxisField(fields, 'WCO'),
     pins: pickPins(fields),
+    ov: pickOverrides(fields),
   };
+}
+
+function pickOverrides(fields: ReadonlyArray<string>): OverrideValues | null {
+  for (const f of fields) {
+    if (!f.startsWith('Ov:')) continue;
+    const [feed, rapid, spindle] = f.slice('Ov:'.length).split(',').map(Number);
+    if (
+      feed !== undefined &&
+      rapid !== undefined &&
+      spindle !== undefined &&
+      Number.isFinite(feed) &&
+      Number.isFinite(rapid) &&
+      Number.isFinite(spindle)
+    ) {
+      return { feed, rapid, spindle };
+    }
+    return null;
+  }
+  return null;
 }
 
 function pickPins(fields: ReadonlyArray<string>): GrblPins | null {

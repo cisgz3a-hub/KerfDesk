@@ -126,3 +126,20 @@ describe('parseStatusReport — degenerate inputs', () => {
     expect(r?.wPos).toBeNull();
   });
 });
+
+describe('parseStatusReport Ov overrides (ADR-102 G3)', () => {
+  it('parses Ov feed/rapid/spindle percentages', () => {
+    const r = parseStatusReport('<Run|MPos:1.000,2.000,3.000|FS:1500,8000|Ov:110,50,90>');
+    expect(r?.ov).toEqual({ feed: 110, rapid: 50, spindle: 90 });
+  });
+
+  it('reports null ov when the field is absent (intermittent cadence)', () => {
+    const r = parseStatusReport('<Run|MPos:1.000,2.000,3.000|FS:1500,8000>');
+    expect(r?.ov).toBeNull();
+  });
+
+  it('reports null ov for a malformed field', () => {
+    const r = parseStatusReport('<Run|MPos:1.000,2.000,3.000|Ov:110,x,90>');
+    expect(r?.ov).toBeNull();
+  });
+});

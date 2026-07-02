@@ -261,6 +261,7 @@ function handleStatusLine(
     set({
       statusReport: report,
       wcoCache: null,
+      ovCache: null,
       ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
@@ -275,6 +276,7 @@ function handleStatusLine(
       statusReport: report,
       alarmCode: null,
       wcoCache: null,
+      ovCache: null,
       ...originUnknownAfterControllerReset(get()),
       motionOperation: null,
       controllerOperation: null,
@@ -332,11 +334,15 @@ function statusPositionPatch(
   report: StatusReport,
   originSource: LaserState['workOriginSource'],
 ): Pick<LaserState, 'statusReport'> &
-  Partial<Pick<LaserState, 'wcoCache' | 'workOriginActive' | 'workOriginSource'>> {
-  if (report.wco === null) return { statusReport: report };
+  Partial<Pick<LaserState, 'wcoCache' | 'ovCache' | 'workOriginActive' | 'workOriginSource'>> {
+  // Ov: is reported on the same intermittent cadence as WCO — cache the
+  // last-seen values so the overrides readout doesn't flicker (ADR-102 G3).
+  const ovPatch = report.ov === null || report.ov === undefined ? {} : { ovCache: report.ov };
+  if (report.wco === null) return { statusReport: report, ...ovPatch };
   const active = hasCustomOrigin(report.wco);
   return {
     statusReport: report,
+    ...ovPatch,
     wcoCache: report.wco,
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(originSource) : 'none',
