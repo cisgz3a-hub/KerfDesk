@@ -1869,3 +1869,69 @@ F-CNC19 tiling.
 1. The calculator uses the bit's DIAMETER regardless of kind; for
    v-carving the chipload model is a rough guide only — the flow says
    so rather than pretending precision.
+
+### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-102 G8)
+
+#### Success
+1. Material & Bit → "Surface spoilboard": width/height (prefilled from
+   the stock), stepover % of the active bit, total depth. Save writes a
+   standalone .nc: serpentine rows per 0.5 mm depth step, spindle
+   spin-up first, park at the origin after M5.
+2. The toast repeats the operator contract: zero X/Y at the area's
+   front-left corner and Z on the surface to be faced before running.
+
+#### Error — save fails
+1. A failed dialog/write toasts the reason; nothing else changes.
+
+#### Empty
+1. Cancelling the save dialog writes nothing.
+
+#### Edge — non-dividing dimensions
+1. The last row lands exactly on the far edge, so the whole area is
+   faced even when height doesn't divide by the stepover.
+
+### F-CNC26. Relieve corners for slot-fit joinery (dogbone) — Phase H.11 (ADR-102 G6)
+
+#### Success
+1. With closed shapes selected in CNC mode, the "Dogbone" row (bit
+   diameter prefilled from the active bit) relieves every corner
+   sharper than 135° with a bit-radius overcut circle — square parts
+   then seat fully into routed slots. One undo step; objects are
+   replaced in place.
+2. Style is the corner overcut (circle centered on the vertex),
+   documented as the PROVISIONAL v1; directional dogbone/T-bone are
+   future refinements.
+
+#### Error — nothing qualifies
+1. Obtuse-only shapes (or open contours) leave the scene untouched.
+
+#### Empty
+1. The row renders only in CNC mode with an eligible selection.
+
+#### Edge — reflex corners and islands
+1. Reflex (inside-L) corners and hole rings (islands of remaining
+   material) are never relieved.
+
+### F-CNC27. Resume a job from a line — Phase H.11 (ADR-102 G7)
+
+#### Success
+1. Job controls → "Start from line…": enter the 1-based line of the
+   exported job and Resume. The app replays the program's modal state
+   up to that line and streams a safe re-entry: units + absolute mode,
+   spindle restart with spin-up dwell, safe-Z travel to the recorded
+   XY, feed back down to the recorded depth, feed restore, then the
+   rest of the job verbatim.
+2. A confirm spells out the contract: the work zero must be UNCHANGED
+   since the original run.
+
+#### Error — impossible resumes
+1. Out-of-range lines, programs using G91 before the resume point, and
+   empty tails are refused with the reason (nothing streams).
+
+#### Empty
+1. The control is disabled while disconnected or any job/motion is
+   active (same readiness gate as Start).
+
+#### Edge — laser jobs
+1. Programs with no Z words never receive Z commands in the preamble —
+   a laser resume re-fires at the recorded XY without touching Z.

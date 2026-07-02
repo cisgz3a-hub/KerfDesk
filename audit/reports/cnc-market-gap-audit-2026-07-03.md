@@ -50,7 +50,7 @@ MISSING = absent. "Ref" names the market anchor.
 | T1 | Text (system/bundled fonts) | PARTIAL | 4 bundled fonts; no system-font import |
 | T1 | SVG + DXF import, image trace | HAVE | H.6a DXF clean-room |
 | T2 | Arc/curved text (VCarve, CC) | MISSING | roadmap |
-| T2 | Dogbone/T-bone fillets (VCarve tool+gadget) | MISSING | → ADR-102 G6 (stretch) |
+| T2 | Dogbone/T-bone fillets (VCarve tool+gadget) | MISSING→HAVE | ADR-102 G6 shipped (corner-overcut style, PROVISIONAL) |
 | T2 | Array/paste-along-path (VCarve) | PARTIAL | duplicate exists; no grid/circular array |
 | T3 | True-shape nesting, dimensioning, vector validator (VCarve Pro) | MISSING | roadmap |
 
@@ -98,10 +98,10 @@ MISSING = absent. "Ref" names the market anchor.
 | T1 | Start/pause/resume/stop + progress (all) | HAVE | char-counted streaming |
 | T2 | XYZ **corner** probing w/ bit diameter (gSender, BitZero) | MISSING→HAVE | ADR-102 G2 shipped (4 corners, radius-compensated) |
 | T2 | Spindle override (gSender) | MISSING→HAVE | ADR-102 G3 shipped (+ rapid 25/50/100) |
-| T2 | Start-from-line recovery (gSender) | MISSING | → ADR-102 G7 (stretch) |
+| T2 | Start-from-line recovery (gSender) | MISSING→HAVE | ADR-102 G7 shipped (modal replay + safe re-entry) |
 | T2 | Outline/frame job perimeter (gSender) | HAVE | Frame + CNC safe-Z retract |
 | T2 | Macros/quick actions (gSender, CM, OpenBuilds) | MISSING | roadmap |
-| T2 | Surfacing-wizard generator + squaring/steps calibration (gSender, OpenBuilds) | MISSING | → ADR-102 G8 (stretch: surfacing only) |
+| T2 | Surfacing-wizard generator + squaring/steps calibration (gSender, OpenBuilds) | PARTIAL | ADR-102 G8 shipped the surfacing generator; squaring/steps calibration remains roadmap |
 | T2 | Keymap editor / gamepad; remote mode; diagnostics+maintenance (gSender) | MISSING | roadmap |
 | T3 | Firmware flashing (gSender/OpenBuilds) | MISSING | out of scope (web serial) |
 
@@ -111,9 +111,9 @@ ADR-102 G1-G5 shipped within this session: the matrix rows marked
 MISSING→HAVE above were closed by commits `250beac`..`966cc8e` and
 live-verified in the isolated preview (subtract on real scene objects,
 3D dialog ready in real WebGL, calculator math on the layer card,
-router-worded export banner). Stretch items G6-G8 (dogbone fillets,
-start-from-line, surfacing generator) remain open, as does the full
-roadmap tier. Hardware verification for probing and overrides is
+router-worded export banner). Stretch items G6-G8 shipped the same day (dogbone relief,
+start-from-line resume, surfacing generator); the roadmap tier
+remains scoped for future phases. Hardware verification for probing and overrides is
 pending per ADR-094 s3.
 
 ## Defects noticed during the live E2E run (not features)

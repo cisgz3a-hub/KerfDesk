@@ -877,3 +877,6 @@ VERIFIED.
 | H.11/G4 general 3D cut preview | **CLAIMED** | 2026-07-03: downsample tests + jsdom fallback; **live-verified**: dialog reaches ready in real WebGL from the CNC preview at scrubber position. UI-only |
 | H.11/G5 chipload feeds calculator | **CLAIMED** | 2026-07-03: feed-law + band + floor tests; **live-verified** (12,000 RPM × 2 × 0.060 → 1440 mm/min shown and applied). Chart values PROVISIONAL starting points |
 | CNC provenance banner fix (router wording) | **CLAIMED** | 2026-07-03: header variant tests; **live-verified in a real export** ($30=12000 S↔RPM, $32=0 router mode). Snapshot corpus untouched (headers excluded by design) |
+| H.11/G8 spoilboard surfacing generator | **CLAIMED** | 2026-07-03: coverage/ladder/bracketing/determinism tests. Standalone program — air-run of a generated file pending (maintainer) |
+| H.11/G6 dogbone corner relief | **CLAIMED** | 2026-07-03: area/bounds tests (square 4-corner relief, L-shape reflex untouched, 12-gon refusal). Corner-overcut style PROVISIONAL. Geometry-only |
+| H.11/G7 start-from-line resume | **CLAIMED** | 2026-07-03: modal-replay preamble tests (spindle/feed/depth re-entry, laser Z-silence, G91/range refusals). **Highest-risk of the stretch set on hardware — resume into a real cut pending (maintainer)** |
