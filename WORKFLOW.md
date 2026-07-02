@@ -1222,3 +1222,85 @@ last updated.
 - **Edge (quota / corrupt slot).** A failed auto-save warns once and
   points at Export...; a corrupt collection slot is discarded silently
   rather than failing every boot.
+
+## Phase H flows (CNC router mode — ADR-094)
+
+F-CNC1–3 document the surface that shipped in commit `032d476`. F-CNC4–19
+are reserved for sub-phases H.1–H.10 and are fleshed out at each sub-phase
+kickoff: F-CNC4 simulate, F-CNC5 stock setup, F-CNC6 v-carve, F-CNC7 STL
+import, F-CNC8 relief roughing, F-CNC9 DXF import, F-CNC10 .nc import,
+F-CNC11 tool library, F-CNC12 feeds/speeds apply, F-CNC13 CNC machine
+profile, F-CNC14 tool-change job, F-CNC15 Z zeroing, F-CNC16 drill,
+F-CNC17 relief finishing, F-CNC18 cut options (ramp/direction/leads),
+F-CNC19 tiling.
+
+### F-CNC1. Switch to CNC mode and configure the machine
+
+#### Success
+1. User clicks **CNC** on the machine-mode toggle atop the Cuts/Layers panel.
+2. The CNC setup panel appears: bit selector (8 starter tools), stock
+   thickness, safe Z, spindle max RPM, spin-up delay. The Material Library
+   hides (laser power/speed recipes have no CNC meaning).
+3. Layer rows swap laser fields for CNC fields. The change is undoable and
+   marks the project dirty; `.lf2` save round-trips the machine config.
+4. Toggling back to **Laser** restores laser fields; the CNC config is
+   cached in the session and restored if the user toggles again.
+
+#### Error — invalid setup value
+1. Out-of-range input (stock ≤ 0, safe Z ≤ 0, RPM ≤ 0) snaps back to the
+   committed value on blur; nothing invalid persists to the store.
+
+#### Empty
+1. A new project defaults to laser mode; CNC mode with no objects shows the
+   normal empty-workspace state with CNC fields on the default layer.
+
+#### Edge — project saved in CNC mode opened on another machine
+1. `.lf2` deserialization normalizes the machine config field-by-field;
+   unknown tools are dropped, a missing active tool falls back to the first
+   tool, and malformed values revert to defaults (never a crash).
+
+### F-CNC2. Set per-layer CNC cut settings
+
+#### Success
+1. User expands a layer row in CNC mode and picks a cut type: Outline —
+   outside / inside / on path, Pocket, or Engrave.
+2. Depth, depth-per-pass, feed, plunge, and spindle RPM accept typed values;
+   Pocket additionally shows stepover %, profile cut types show the tabs
+   group (enabled, height, width, count).
+3. Preview and time estimate update to the compiled CNC job (pockets and
+   engraves first, then profiles inner-before-outer).
+
+#### Error — depth exceeds stock
+1. Preflight (F-CNC3) reports depth > stock thickness + 1 mm; the save/start
+   path is blocked until fixed.
+
+#### Empty
+1. A layer with no geometry on its color compiles to no passes and is
+   skipped; no G-code group is emitted for it.
+
+#### Edge — open paths on a profile-outside layer
+1. Open polylines cannot be offset; they are cut on-path (documented
+   fallback), closed shapes on the same layer still offset normally.
+
+### F-CNC3. CNC preflight and save G-code
+
+#### Success
+1. User clicks **Save G-code** in CNC mode.
+2. CNC preflight runs: settings validity, depth ≤ stock + 1 mm, machine
+   bounds, no-go zones, plunged-travel scan (no XY rapid below safe Z, no
+   rapid plunge), non-empty output.
+3. The file emits through `cncGrblStrategy`: G21/G90/G94 preamble, M3 +
+   spin-up dwell, safe-Z discipline, per-layer comment headers, M5 + park
+   postamble.
+
+#### Error — preflight violation
+1. The modal lists each issue with its code and message; no file is written
+   (no-partial-output invariant).
+
+#### Empty
+1. No output-enabled CNC layers with geometry → "empty output" preflight
+   issue; no file written.
+
+#### Edge — feed or RPM above machine limits
+1. Values are capped at compile time (device max feed, spindle max RPM);
+   the emitted file never exceeds machine limits even if the layer fields do.

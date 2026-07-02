@@ -743,3 +743,20 @@ compiler.
 - Be honest about confidence. "high" means you'd defend this in a code review; "low" means you'd want a second opinion.
 - Verify licenses against the actual `LICENSE` file in the upstream repo, not against npm metadata or reputation.
 - A library is not added to `package.json` until its row exists here. CI enforces this with a custom lint rule cross-checking `package.json` against this file.
+
+## Phase H kickoff — CNC router mode (2026-07-02)
+
+ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
+
+- **No new runtime dependencies.** Maintainer mandate: all Phase H parsers
+  (DXF, STL, G-code `.nc`) are clean-room, hand-written in `src/io/`.
+  Candidate libraries (`dxf-parser` MIT, `three` MIT STL loaders, various
+  gcode parsers) were rejected without evaluation — mandate, not license.
+- **clipper2-ts** (already adopted; used by `src/core/geometry/kerf-offset.ts`
+  and `pocket-paths.ts`) is reaffirmed as the only geometry dependency. It
+  additionally powers the H.3 V-carve inward offset ladder. No version change.
+- Everything else in the phase (marching squares, triangle rasterization,
+  max-plus kernels, de Boor spline evaluation, modal G-code interpretation)
+  is implemented clean-room in pure core, per the house determinism rules.
+- Re-evaluate only if a reversal trigger in ADR-094 fires (e.g. the
+  clean-room DXF parser cannot reach usable real-world compatibility).

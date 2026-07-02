@@ -832,3 +832,35 @@ soft cap, 1 file (laser-store) at 399 lines (one shy of hard cap,
 flagged for pre-emptive split next edit). Karpathy principles
 preserved: every change carried evidence, single-responsibility, and
 verifiable verdicts.
+
+## CNC router mode verification (Phase H — ADR-094, 2026-07-02)
+
+Tracks the hardware-verification state of every CNC-output-affecting
+feature. Statuses follow the house convention: **VERIFIED** = proven on
+the 4040 via the standing air-cut protocol (ADR-094), **CLAIMED** = tests
+pass but no hardware evidence, **DEFERRED** = intentional documented gap.
+
+### Standing 4040 air-cut protocol (from ADR-094)
+
+Home → clamp scrap / set work XY zero → set Z zero ~30 mm above the
+spoilboard (air gap) → feed override 50% → run the job end-to-end →
+verify: retract before every travel, pass ordering (pockets/engraves
+before profiles, inner before outer), spindle spin-up dwell before first
+plunge, correct park. Log the result here; only then flip CLAIMED →
+VERIFIED.
+
+### Inventory
+
+| Feature | Status | Evidence |
+|---|---|---|
+| CNC MVP (profile/pocket/engrave, depth passes, tabs, spindle/Z GRBL, preflight) — `032d476` | **CLAIMED** | Full suite green (2595 tests at audit time); parity audit `audit/reports/cnc-easel-parity-audit-2026-07-02.md`; no 4040 run yet |
+| Plunged-travel invariant (`findPlungedTravelIssues`) | **CLAIMED** | Unit + property tests; enforced in CNC preflight |
+| H.1 pass-model union + overdeep-cut invariant | pending | — |
+| H.2 simulation + stock model | pending | sim-vs-machine side-by-side is the H.2 air-cut |
+| H.3 V-carve | pending | air-cut + MDF groove-width caliper check |
+| H.5 relief roughing | pending | air-cut + foam/MDF terrace cut |
+| H.6 DXF / .nc import | pending | DXF air-pass + .nc re-import simulator match |
+| H.7 multi-tool / tool change / Z zeroing | pending | highest-risk hardware session; budget a full one |
+| H.8 relief finishing | pending | two-tool air job + caliper peak/valley check |
+| H.9 motion polish | pending | ramps+leads air-cut, park position check |
+| H.10 tiling | pending | two-tile air job with physical re-registration |
