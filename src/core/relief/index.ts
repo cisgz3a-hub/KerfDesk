@@ -27,3 +27,4 @@ export {
   reliefRoughingPasses,
   type ReliefRoughingOptions,
 } from './relief-roughing';
+export { reliefSurfaceMesh, type ReliefSurfaceMesh } from './relief-surface-mesh';

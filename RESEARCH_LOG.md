@@ -760,3 +760,15 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
   is implemented clean-room in pure core, per the house determinism rules.
 - Re-evaluate only if a reversal trigger in ADR-094 fires (e.g. the
   clean-room DXF parser cannot reach usable real-world compatibility).
+
+### three — adopted for the 3D relief viewer (2026-07-03, ADR-101)
+
+- **Version:** ^0.180.0 (pinned caret; see package.json)
+- **License:** MIT (verified against the upstream three.js LICENSE file)
+- **Role:** WebGL scene graph for the relief 3D viewer ONLY — imported
+  beneath `src/ui/relief-viewer/`, lazy-loaded, never in core/ or io/
+  (clipper2-ts stays the only core geometry dependency).
+- **Why an exception to the Phase H no-new-deps rule:** ADR-101 records
+  the maintainer-approved override — the clean-room mandate covers
+  parsers/geometry we must own, not commodity WebGL presentation.
+- **Types:** `@types/three` (dev dependency, MIT/DefinitelyTyped).
