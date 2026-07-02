@@ -110,12 +110,30 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 - Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
 - OUT of this phase (still out of scope; a future phase + ADR + an ADR-017 polygon-clipping library evaluation): the geometry KERNEL — weld, boolean ops, offset, node editing.
 
+### Phase H — v0.8 "Router" [In progress]
+
+Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-094: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. Sub-phases (each = individually reviewed diffs; branch shippable after every one):
+
+| Sub-phase | Delivers |
+|---|---|
+| H.0 | Governance: ADR-094, this table, F-CNC flows, AUDIT checklist |
+| H.1 | `CncPass` contour/path3d union (tidy-first) + overdeep-cut invariant |
+| H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview |
+| H.3 | True V-carving: clipper2 inward offset ladder, `tipAngleDeg` depth law, flat-bottom fallback |
+| H.4 | Clean-room STL import → deterministic max-Z heightmap, `relief` SceneObject, canvas preview |
+| H.5 | Relief roughing: heightmap dilation + marching squares → existing pocket engine |
+| H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults |
+| H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) |
+| H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover |
+| H.9 | Motion polish: ramp/helical entry, climb/conventional, lead-in/out, parking parity |
+| H.10 | Tiling: indexed tile grid, registration marks, per-tile export |
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
 
-- Phase H: additional `OutputStrategy` implementations (Marlin et al). MIT references available (CNCjs has working Marlin/Smoothie code) — but ADR-006 still says one strategy ships per phase. (Renumbered from Phase G; drawing tools took that slot — ADR-051.)
-- Phase I: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP.
+- Phase I: additional `OutputStrategy` implementations (Marlin et al). MIT references available (CNCjs has working Marlin/Smoothie code) — but ADR-006 still says one strategy ships per phase. (Renumbered from Phase H; CNC router mode took that slot — ADR-094. Previously renumbered from Phase G — ADR-051.)
+- Phase J: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP. (Renumbered from Phase I — ADR-094.)
 
 **MIT-availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the policy.
 
@@ -320,7 +338,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Boolean ops.
 - Camera alignment, overhead camera.
 - Rotary attachment.
-- Auto-focus, Z-axis control beyond initial homing.
+- Auto-focus, Z-axis control beyond initial homing — **laser mode only**.
+  Phase H CNC router mode is inherently Z-aware (plunges, depth passes,
+  safe-Z retracts) — ADR-094.
 - Manufacturer setting profiles, LightBurn `.clb` compatibility, and linked
   material presets ("Link"). Minimal Material Test / Interval Test generators
   are scoped by Phase F.5 and ADR-044; the native Material Library recipe +
@@ -329,7 +349,8 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   ADR-093.
 - Multi-machine, networked control.
 - Cloud, accounts, sharing, sync.
-- DXF, AI, PDF import.
+- ~~DXF~~, AI, PDF import. **DXF moved in-scope by Phase H.6 (clean-room
+  parser, ADR-094)**; AI and PDF import remain out of scope.
 - Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Narrow
   Line-mode kerf compensation is scoped by ADR-052, automatic Line-mode
   hard-skip tabs are scoped by ADR-053, and simple Cross-Hatch fill is scoped by

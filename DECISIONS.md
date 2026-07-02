@@ -3592,3 +3592,97 @@ Setup wizard) is the first.
 - (Earlier reservations for ADR-019..023 were stale — Phase B / E
   shipped without formal ADRs at those slots. ADR-019 / ADR-020 /
   ADR-021 are the first three slots since reused.)
+
+## ADR-094 — CNC router mode becomes a first-class product track (Phase H "Router")
+
+**Status:** Accepted
+**Date:** 2026-07-02
+
+### Context
+
+Commit `032d476` landed an experimental CNC router mode: a `MachineConfig`
+discriminated union on `Project`, per-layer `CncLayerSettings`, a pure
+`compileCncJob` pipeline (profile / pocket / engrave with depth passes and
+tabs), a spindle/Z-aware `cncGrblStrategy` emitter, CNC preflight, and UI
+wiring. The independent parity audit
+(`audit/reports/cnc-easel-parity-audit-2026-07-02.md`) verified it is a real
+CNC MVP — not renamed laser UI — but landed without a scope-gating ADR, and
+PROJECT.md remained laser-only with DXF import explicitly out of scope.
+
+The maintainer has decided to build this into LaserForge's own full
+professional CNC/router mode — not a thin Easel clone — including true
+V-carving, toolpath simulation, DXF / STL / G-code import, 3D relief carving
+(first-class from the start), tool + feeds/speeds libraries, multi-tool jobs,
+motion polish (ramps, climb/conventional, leads, parking), and tiling.
+
+### Decision
+
+1. CNC router mode is adopted into the canon roadmap as **Phase H ("Router",
+   v0.8)**, sub-phased H.0–H.10. The previously anticipated phases renumber:
+   Marlin et al output strategies H→I, macOS/Linux desktop I→J (precedent:
+   ADR-051 renumbered Marlin G→H when drawing tools took Phase G).
+2. **All parsers are clean-room.** DXF, STL, and G-code (.nc) parsers are
+   hand-written in `src/io/` — no parser libraries. clipper2-ts (already
+   adopted) remains the only geometry dependency; no new runtime dependencies
+   are planned for Phase H.
+3. **Hardware verification targets the 4040 machine.** Every output-affecting
+   sub-phase ends with an air-cut checklist executed by the maintainer;
+   AUDIT.md rows stay CLAIMED until that evidence exists.
+4. The laser non-negotiables extend to CNC with analogs: bounds check, origin
+   honesty, no partial output, deterministic G-code (snapshot + fuzz), units
+   honest, pure core — plus two CNC-specific invariants enforced on emitted
+   text: **no XY rapid below safe Z** (`findPlungedTravelIssues`, shipped) and
+   **no cut below stock bottom + 1 mm** (`findOverdeepCutIssues`, Phase H.1).
+
+#### Standing 4040 air-cut protocol (referenced by every sub-phase)
+
+Home → clamp scrap / set work XY zero → set Z zero ~30 mm above the
+spoilboard (air gap) → feed override 50% → run the job end-to-end → verify:
+retract before every travel, pass ordering (pockets/engraves before profiles,
+inner before outer), spindle spin-up dwell before first plunge, correct park.
+Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
+
+### Alternatives considered
+
+- **Thin Easel-parity clone.** Rejected — the maintainer wants LaserForge's
+  own professional CNC surface; Easel is a reference point, not the spec.
+- **Parser libraries for DXF/STL (`dxf-parser`, MIT etc.).** Rejected by
+  maintainer mandate: clean-room everything. ADR-017 evaluation is therefore
+  moot for Phase H parsers; it still applies if a geometry library is ever
+  proposed.
+- **Keeping CNC as an experimental side branch.** Rejected — an unmerged
+  track rots against main and evades the governance the rest of the repo
+  follows.
+- **A separate CNC application.** Rejected — the Scene/Job pipeline, canvas,
+  and GRBL streaming are shared; the discriminated `MachineConfig` union
+  already isolates the differences cleanly.
+
+### Consequences
+
+- PROJECT.md gains the Phase H sub-phase table; DXF import moves in-scope
+  (AI / PDF import stay out).
+- WORKFLOW.md gains F-CNC flow IDs (F-CNC1–3 document the existing surface;
+  F-CNC4–19 are reserved for the sub-phases).
+- `CncPass` must become a discriminated union (contour | path3d) before
+  variable-Z features land (H.1 tidy-first refactor).
+- The G-code snapshot corpus grows CNC fixtures; CI time increases.
+- Two machine families now share the UI; every layer-panel change must be
+  checked in both modes.
+
+### Verification
+
+- Per diff: full CI gate (`pnpm test / lint / typecheck / format:check`);
+  refactor diffs prove byte-identical G-code snapshots.
+- Per feature: fast-check property tests (100 seeds) for each new invariant;
+  perceptual tests (ADR-025 analytic-ground-truth pattern) for every
+  geometric claim (V-carve depth field, relief terraces/scallops, pocket IoU).
+- Per output-affecting sub-phase: the standing 4040 air-cut protocol above.
+
+### Reversal triggers
+
+- 4040 air-cut failures traced to compiled toolpaths (not machine setup) in
+  two consecutive sub-phases → halt Phase H, re-audit the CNC core.
+- The clean-room DXF parser cannot reach usable real-world compatibility
+  within its sub-phase budget → revisit the no-library mandate via ADR-017.
+- Maintenance burden: if CNC-attributable regressions in laser mode exceed
+  ~1 per sub-phase, revisit the shared-UI decision.
