@@ -1305,6 +1305,35 @@ F-CNC19 tiling.
 1. Values are capped at compile time (device max feed, spindle max RPM);
    the emitted file never exceeds machine limits even if the layer fields do.
 
+### F-CNC4. Simulate a CNC job (material-removal preview) — Phase H.2
+
+#### Success
+1. In CNC mode with output layers, the user toggles Preview. The stock
+   footprint shows as a dashed wood-toned rectangle; the compiled job's
+   material removal renders as a depth-shaded overlay (light = shallow,
+   dark = deep) under the route lines.
+2. The scrubber (drag / Play) reveals removal progressively; the shading
+   at any scrub position shows exactly the material cut so far. Plunges
+   and retracts advance the scrubber by their Z distance.
+3. ⏮ Pass / Pass ⏭ buttons jump the scrubber between CNC pass starts
+   (each downward plunge). The stats panel shows Cut / Travel / Plunge /
+   Total distances and the time estimate.
+4. The simulation is provably faithful: a property test locks the
+   simulator's step sequence to the emitted G-code's motion (H.2.3).
+
+#### Error — job invalid
+1. Preflight-failing jobs show the same preview-blocked state as laser
+   (the preview reflects the compiled job only when one exists).
+
+#### Empty
+1. No output-enabled CNC layers → the standard "Nothing to preview" hint;
+   no removal overlay, stock rectangle still visible.
+
+#### Edge — single shallow engrave / huge stock
+1. A zero-depth pass removes nothing: overlay stays empty (transparent).
+2. A stock larger than ~1M grid cells coarsens the simulation grid
+   automatically; shading gets blockier, never freezes the app.
+
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
 
 #### Success
