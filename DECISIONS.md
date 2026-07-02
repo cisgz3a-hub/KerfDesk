@@ -3686,3 +3686,125 @@ Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
   within its sub-phase budget → revisit the no-library mandate via ADR-017.
 - Maintenance burden: if CNC-attributable regressions in laser mode exceed
   ~1 per sub-phase, revisit the shared-UI decision.
+
+## ADR-100 — CNC/laser UI separation policy: gate-and-hide
+
+**Status:** Accepted
+**Date:** 2026-07-02
+
+> **Numbering note:** ADR-100 follows ADR-094 on this branch by design, not
+> by accident. ADR-095–098 are reserved for the multi-controller track's
+> renumbered ADRs and ADR-099 is the Phase-H collision resolution, both
+> recorded on branch `claude/nice-fermat-55d508` (see
+> `HANDOFF-CNC-2026-07-02.md` §2). Do not fill the gap.
+
+### Context
+
+ADR-094 chose one shared shell for both machine families and rejected a
+separate CNC application. The CNC MVP and H.1–H.5 established a first
+gating precedent — the Material Library hides in CNC mode, the
+CncSetupPanel hides in laser mode, layer rows swap field sets — but the
+command registry (`src/ui/commands/`) has zero machine-kind awareness. In
+CNC mode today, the operator can invoke laser calibration generators
+(Material/Interval/Scan-Offset/Focus tests), Fill Selection, Convert to
+Bitmap, Trace, image-mask tools, and the Registration Jig; the per-object
+Power Scale editor renders and silently does nothing (CNC compile ignores
+`powerScale`); raster images import but are silently dropped by CNC
+compile (`compile-cnc-job.ts` ignores `raster-image` objects by design);
+and the right rail is laser-branded.
+
+The maintainer decided (2026-07-02 session): laser-only surfaces hide in
+CNC mode; there is no separate CNC workspace, no CNC-only shapes, and no
+parallel CNC tools palette — shapes and text are machine-agnostic geometry
+sources consumed by both compilers.
+
+### Decision
+
+1. **Policy — gate-and-hide.** A UI surface whose effect exists only in one
+   machine family's output pipeline is *hidden* (not disabled) while the
+   other family is active. Machine-agnostic surfaces — drawing tools, text,
+   vector import, edit/arrange, preview, save — are never gated.
+2. **The command registry gates at its single choke point.**
+   `AppCommandContext` gains `machineKind`; `buildAppCommands` filters a
+   laser-only ID set when the project machine is CNC
+   (`src/ui/commands/machine-command-gate.ts`). All command surfaces (menu
+   bar, toolbar, workspace context menu) already tolerate absent IDs, so
+   hiding is uniform and shortcut dispatch is unaffected (no gated command
+   has a hotkey). Laser-only set:
+   - From the separation audit list: `tools.material-test`,
+     `tools.interval-test`, `tools.scan-offset-test`, `tools.focus-test`,
+     `tools.fill-selection`, `tools.convert-to-bitmap`,
+     `tools.trace-image`, `tools.apply-image-mask`, `tools.crop-image`,
+     `tools.remove-image-mask`, `tools.registration-jig`.
+   - Same principle, beyond the audit list (each verified laser-only in
+     the current tree): `tools.retrace-original` and
+     `tools.multi-file-trace` (Trace family — the maintainer's directive
+     hides "Trace" in CNC), `tools.adjust-image` and
+     `tools.save-processed-bitmap` (laser Image-mode raster processing;
+     CNC compile never consumes rasters), `tools.close-open-fill-contours`
+     and `tools.close-fill-contours-with-tolerance` (Fill-mode repair),
+     `tools.optimization-settings` (its only lever, `reduceTravelMoves`,
+     is applied by `optimizePaths`, which passes `kind: 'cnc'` groups
+     through untouched — verified in `src/core/job/optimize-paths.ts`).
+3. **Laser-output-only object editors hide in CNC:** the per-object Power
+   Scale input and image-adjustment editors
+   (`src/ui/layers/SelectedObjectProperties.tsx`).
+4. **Raster images stay importable in CNC mode** (maintainer's chosen fix):
+   CNC preflight advisories gain a non-blocking warning when an
+   output-enabled layer carries raster images, naming what is dropped —
+   following the H.2 stock-footprint advisory pattern
+   (`detectMachineJobWarnings`).
+5. **Auto-focus hides in CNC mode.** *Provisional* — flagged for maintainer
+   review: auto-focus is a laser focus routine; the CNC Z-zeroing flow
+   arrives as its own H.7 surface.
+6. **Device-setup laser-only fields (air assist, $30/S-value power range)
+   hide in CNC mode.** *Provisional* — H.7 CNC machine profiles add the
+   CNC counterparts.
+7. **Shared chrome re-labels machine-aware** (right-rail heading, connect
+   copy, "Estimated burn time" wording, "Laser:" shortcut hint, menu
+   family label). The internal `'laser'` command-family key does NOT
+   rename — only user-visible labels — to avoid churn across help topics
+   and tests.
+8. Relief-objects-in-laser-mode UX (warn/strip/block) is a separate
+   decision, not part of this ADR.
+
+### Alternatives considered
+
+- **Disable-with-reason instead of hide.** Rejected — disabled laser
+  concepts would still advertise themselves inside a router workspace; the
+  maintainer chose hiding, extending the Material-Library precedent.
+- **Per-surface filtering (menu, toolbar, context menu each filter).**
+  Rejected — N surfaces × M commands drifts; one choke point in
+  `buildAppCommands` cannot.
+- **A separate CNC workspace.** Considered and rejected by the maintainer
+  this session (re-affirming ADR-094).
+- **Hiding raster import in CNC mode.** Rejected — the maintainer's
+  separation audit chose a preflight advisory; images may still serve as
+  visual reference, and projects opened from laser mode carry them.
+
+### Consequences
+
+- Every future command must be classified at birth: laser-only (add to the
+  gate set), CNC-only (gate the other way when the first such command
+  lands), or machine-agnostic. The gate module carries this checklist.
+- Laser-mode behavior is byte-identical: the gate is an identity function
+  for laser projects.
+- WORKFLOW.md F-CNC1 documents the hidden surfaces; the PROJECT.md Phase H
+  intro references this ADR between H.5 and H.6 (the maintainer-approved
+  integrated build order).
+
+### Verification
+
+- Unit tests pin the gate: laser context exposes every command; CNC
+  context hides exactly the laser-only set; machine-agnostic survivors
+  present in both.
+- Component tests for Power Scale and panel visibility in both modes;
+  preflight advisory unit test.
+- Full CI gate. No G-code change ⇒ no 4040 air-cut row (UI-only).
+
+### Reversal triggers
+
+- Operators report needing a hidden tool in CNC mode (e.g. Trace for
+  cut-a-logo workflows) → revisit per-command with the maintainer.
+- The laser-only set grows past ~25 entries → the shared-shell decision
+  itself is under strain; re-open ADR-094's shared-UI clause.
