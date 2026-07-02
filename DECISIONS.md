@@ -3696,6 +3696,66 @@ controller or reference files, then wire the UDP transport.
 
 ---
 
+## ADR-100 — Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params
+
+**Date.** 2026-07-03. **Status.** Accepted (replaces the Centerline
+implementation; amends ADR-059 Edge Detection).
+
+**Context.** The perceptual IoU/structure suite was green while traced art
+looked wrong (the Karpathy failure mode). A visual audit harness
+(`src/__fixtures__/perceptual/_trace-audit-render.test.ts`, `TRACE_AUDIT=1`)
+exposed: Centerline vanished whole strokes, retracted tips, tangled
+junctions, and chamfered every drawn corner; Edge Detection outlined its 1-px
+Canny mask with the filled-contour backend, doubling every line (the preset
+was hidden from the UI for exactly that reason); Sharp reached the potrace
+backend with Smooth's curve params (its imagetracerjs-era fields are inert
+there), so small features traced as blobs.
+
+**Decision.**
+
+1. **Centerline** is rebuilt from scratch in `src/core/trace/centerline/`:
+   exact squared EDT (Felzenszwalb–Huttenlocher) → distance-ordered homotopic
+   thinning with an exact (8,4) simple-point LUT, phase 1 anchored on centres
+   of maximal discs, phase 2 plateau reduction with a more-neighbours-first
+   tie-break (even-width ribbons cannot unzip tip-first) → junction-cluster
+   stroke graph → pinched-tip spur pruning (tip radius ≤ 1.6 px AND
+   protrusion beyond the trunk under budget; a component's last chain is
+   never pruned) → assembly: straightest-continuation junction pairing,
+   tangent-anchored ridge-walk tip extension to the ink cap apex, T-junction
+   seam repair (the medial axis genuinely dents toward every branch — seams
+   are stitched straight and branch ends welded back on), windowed corner
+   sharpening (chamfers and round-nib joins rebuild their vertex; fillets
+   of roughly 2 stroke radii and up stay round), Douglas-Peucker.
+2. **Edge Detection** keeps Canny but with interpolating non-max suppression
+   (bilinear along the true gradient — 4-bucket NMS starved diagonal ridges)
+   and feeds the edge map through the same chain machinery, emitting single
+   sub-pixel polylines: open for lines, closed for loops. Sliver loops
+   (area ≤ 4 px²) drop as debris. Tangent-ALIGNED continuations may
+   bridge/close up to 3× the join gap (hysteresis dropouts exceed the knob;
+   perpendicular welds stay capped). Preset minimum line is now chain length
+   (12 px), not two-sided contour perimeter (24 px). The preset is back in
+   the UI dropdown.
+3. **Sharp** sets the potrace params that actually apply: smoothness 0.55,
+   optimize 0.15 — corners stay vertices, genuine large arcs still curve.
+   Chosen from three rendered candidates (today-smooth / corner-faithful /
+   pure-polygon) over corner, pixel-art, curve, and fine-detail fixtures
+   (`_sharp-candidates.test.ts`, gated on `TRACE_AUDIT=1`).
+4. **Perceptual contracts updated to the single-line reality:** coverage
+   metrics sample the drawn path (not simplified vertices), closed polylines
+   have endpoint gap 0, centerline tips must reach the visible ink cap apex,
+   a dashed stroke traces as one closed outline per dash (LightBurn-
+   consistent; the old fused blob was a dilate/erode artifact), and open
+   polylines are a feature of Edge Detection, not a defect.
+
+**Consequences.** All five presets render correctly on the audit fixtures and
+the arch-house real logo (benchmark loop 10/10 across six benchmarks). Known
+limitation: at very shallow crossings, chain pairing can hand the connector
+to the wrong continuation — geometry stays correct, only travel-path grouping
+is affected. The audit harness stays in the tree, gated on `TRACE_AUDIT=1`,
+as the standing perceptual eyeball tool.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
