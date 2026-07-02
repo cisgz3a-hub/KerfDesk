@@ -22,16 +22,25 @@ export type GcodeMetadata = {
 // dynamic power for fill (ADR-036), and raster gap-rapid splitting (ADR-039).
 export const EMITTER_REVISION = 'adr-039-raster-gap-rapid-v1';
 
+// Machine-specific assumption lines (ADR-102 defect fix): router exports
+// previously carried the laser-worded `$32=1 (laser mode)` banner. The S
+// scale meaning differs per machine — laser: $30 = max beam power S; CNC:
+// $30 = spindle max RPM so `S<rpm>` maps 1:1 — and $32 must be 1 on a laser
+// but 0 on a router (laser mode alters M3 during rapids).
+export type GcodeHeaderAssumptions =
+  | { readonly kind: 'laser'; readonly maxPowerS: number }
+  | { readonly kind: 'cnc'; readonly spindleMaxRpm: number };
+
 // Leading `;` comment lines; GRBL ignores them. Ends with a trailing newline so
 // the motion body starts cleanly on its own line when concatenated.
 //
-// `assumed.maxPowerS` records the GRBL $30 the S values were scaled against
-// (M11, AUDIT-2026-06-10): a file emitted for $30=1000 but run on a $30=255
-// controller clamps every S>255 to 100% beam power — the header makes the
-// assumption auditable from the file alone (SD card / other senders).
+// The laser `maxPowerS` line records the GRBL $30 the S values were scaled
+// against (M11, AUDIT-2026-06-10): a file emitted for $30=1000 but run on a
+// $30=255 controller clamps every S>255 to 100% beam power — the header makes
+// the assumption auditable from the file alone (SD card / other senders).
 export function gcodeMetadataHeader(
   metadata: GcodeMetadata,
-  assumed: { readonly maxPowerS: number },
+  assumed: GcodeHeaderAssumptions,
 ): string {
   return [
     `; ${metadata.appName}`,
@@ -39,8 +48,20 @@ export function gcodeMetadataHeader(
     `; commit: ${metadata.gitSha}`,
     `; built: ${metadata.buildTimeUtc}`,
     `; emitter: ${metadata.emitterRevision}`,
-    `; assumes: GRBL $30=${assumed.maxPowerS} (max S), $32=1 (laser mode)`,
-    '; safety: G0 carries S0; blank gaps >5mm rapid (G0); fill+raster dynamic power (M4)',
+    ...assumptionLines(assumed),
     '',
   ].join('\n');
+}
+
+function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string> {
+  if (assumed.kind === 'cnc') {
+    return [
+      `; assumes: GRBL $30=${assumed.spindleMaxRpm} (S maps 1:1 to spindle RPM), $32=0 (router mode)`,
+      '; safety: retract to safe Z before travels; spindle spin-up dwell before first plunge',
+    ];
+  }
+  return [
+    `; assumes: GRBL $30=${assumed.maxPowerS} (max S), $32=1 (laser mode)`,
+    '; safety: G0 carries S0; blank gaps >5mm rapid (G0); fill+raster dynamic power (M4)',
+  ];
 }
