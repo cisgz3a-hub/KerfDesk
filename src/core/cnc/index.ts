@@ -13,3 +13,11 @@ export {
   type CncTile,
   type TiledJob,
 } from './tile-plan';
+export {
+  calculateFeeds,
+  CHIPLOAD_MATERIALS,
+  chiploadFor,
+  type ChiploadMaterial,
+  type FeedsCalculatorInput,
+  type FeedsCalculatorResult,
+} from './feeds-calculator';

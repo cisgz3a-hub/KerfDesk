@@ -22,6 +22,7 @@ import {
   useLayerHasReliefObjects,
   VClearToolSelect,
 } from './CncLayerToolFields';
+import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
@@ -266,6 +267,7 @@ function DepthAndFeedFields(props: {
         onCommit={(spindleRpm) => onCommit({ spindleRpm })}
       />
       <FeedPresetRow layer={layer} settings={settings} onCommit={onCommit} />
+      <FeedsCalculatorRow layer={layer} settings={settings} onCommit={onCommit} />
     </>
   );
 }
