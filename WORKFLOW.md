@@ -1334,6 +1334,34 @@ F-CNC19 tiling.
 2. A stock larger than ~1M grid cells coarsens the simulation grid
    automatically; shading gets blockier, never freezes the app.
 
+### F-CNC6. V-carve a layer — Phase H.3
+
+#### Success
+1. With a v-bit active in Material & Bit, the user sets a layer's cut type
+   to **V-carve (angled bit)**. Cut depth becomes the MAX depth (wide
+   regions clamp to it and cut a flat floor); a **Detail** field controls
+   ring spacing (0 = auto, bit diameter ÷ 8).
+2. Compile produces an inward offset ladder: rings at inset d cut at
+   z = −min(d / tan(θ/2), depth). Sharp corners reach their full depth via
+   the vanishing offset (medial axis); holes are respected.
+3. The preview's removal shading shows the V-groove deepening toward shape
+   centers; the emitted G-code passes both motion and depth invariants.
+4. V-carve groups run BEFORE profile cuts (they never free the part).
+
+#### Error — active bit is not a v-bit
+1. The layer panel shows an inline warning; preflight blocks Save/Start
+   with "V-carve requires a v-bit" until one is selected.
+
+#### Empty
+1. Open paths and layers with no closed shapes compile to no passes; the
+   layer is skipped.
+
+#### Edge — region narrower than the ring spacing / depth clamp
+1. Regions too narrow for even one ring at δ produce no rings there —
+   the groove simply ends (no gouge, no error).
+2. depthMm larger than the shape supports: the ladder stops where offsets
+   vanish; depth per pass still caps every plunge.
+
 ### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
 
 #### Success

@@ -115,6 +115,30 @@ describe('compileCncJob', () => {
     expect(new Set(tabbed.map((pass) => contourPass(pass).zMm))).toEqual(new Set([-6]));
   });
 
+  it('compiles v-carve as a clearing group ordered before profiles (H.3)', () => {
+    const vbitConfig = { ...config, toolId: 'vb-60' };
+    const scene = sceneWith(
+      [
+        cncLayer('profile', '#ff0000', { cutType: 'profile-outside' }),
+        cncLayer('vcarve', '#00ff00', { cutType: 'v-carve', depthMm: 2, vResolutionMm: 0.5 }),
+      ],
+      [squareObject('O1', '#ff0000', 40), squareObject('O2', '#00ff00', 20)],
+    );
+    const job = compileCncJob(scene, dev, vbitConfig);
+    expect(job.groups).toHaveLength(2);
+    const first = job.groups[0];
+    const second = job.groups[1];
+    if (first?.kind !== 'cnc' || second?.kind !== 'cnc') throw new Error('expected cnc groups');
+    expect(first.cutType).toBe('v-carve');
+    expect(second.cutType).toBe('profile-outside');
+    expect(first.passes.length).toBeGreaterThan(0);
+    // Every v-carve depth stays within the configured max.
+    for (const pass of first.passes) {
+      expect(contourPass(pass).zMm).toBeGreaterThanOrEqual(-2 - 1e-9);
+      expect(contourPass(pass).zMm).toBeLessThan(0);
+    }
+  });
+
   it('orders pocket groups before profile groups', () => {
     const scene = sceneWith(
       [

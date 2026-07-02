@@ -36,6 +36,10 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
       : d.cutType,
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
+    // 0 = auto ring spacing (H.3), so non-negative rather than positive.
+    vResolutionMm: isNonNegativeNumber(raw['vResolutionMm'])
+      ? raw['vResolutionMm']
+      : d.vResolutionMm,
     feedMmPerMin: positiveOr(raw['feedMmPerMin'], d.feedMmPerMin),
     plungeMmPerMin: positiveOr(raw['plungeMmPerMin'], d.plungeMmPerMin),
     spindleRpm: positiveOr(raw['spindleRpm'], d.spindleRpm),

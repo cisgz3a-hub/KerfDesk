@@ -38,12 +38,16 @@ export type CncStock = {
 //   profile-on-path  — cut centered on the path (open paths always use this)
 //   pocket           — clear the interior of closed shapes
 //   engrave          — trace the path itself, typically shallow
+//   v-carve          — angled-bit variable-depth carve of closed shapes
+//                      (Phase H.3, ADR-094): depth follows the local inset,
+//                      z(d) = −min(d / tan(θ/2), depthMm)
 export type CncCutType =
   | 'profile-outside'
   | 'profile-inside'
   | 'profile-on-path'
   | 'pocket'
-  | 'engrave';
+  | 'engrave'
+  | 'v-carve';
 
 export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'profile-outside',
@@ -51,12 +55,18 @@ export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'profile-on-path',
   'pocket',
   'engrave',
+  'v-carve',
 ];
 
 export type CncLayerSettings = {
   readonly cutType: CncCutType;
-  readonly depthMm: number; // total cut depth below stock top (positive)
+  // Total cut depth below stock top (positive). For v-carve this is the MAX
+  // depth: wide regions clamp to it and cut a flat floor.
+  readonly depthMm: number;
   readonly depthPerPassMm: number; // max material removed per Z pass (positive)
+  // V-carve ring spacing (mm). 0 = auto (tool diameter / 8, floor 0.1 mm).
+  // Smaller = finer walls, more rings, longer job.
+  readonly vResolutionMm: number;
   readonly feedMmPerMin: number; // XY cutting feed
   readonly plungeMmPerMin: number; // Z plunge feed
   readonly spindleRpm: number; // S value; GRBL $30 should equal spindleMaxRpm
@@ -122,6 +132,7 @@ export const DEFAULT_CNC_LAYER_SETTINGS: CncLayerSettings = {
   cutType: 'profile-outside',
   depthMm: 6.35,
   depthPerPassMm: 1.5,
+  vResolutionMm: 0,
   feedMmPerMin: 1000,
   plungeMmPerMin: 300,
   spindleRpm: 12000,
@@ -170,5 +181,7 @@ export function cutTypeLabel(cutType: CncCutType): string {
       return 'Pocket (clear inside)';
     case 'engrave':
       return 'Engrave (trace path)';
+    case 'v-carve':
+      return 'V-carve (angled bit)';
   }
 }

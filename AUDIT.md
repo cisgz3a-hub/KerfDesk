@@ -855,8 +855,8 @@ VERIFIED.
 |---|---|---|
 | CNC MVP (profile/pocket/engrave, depth passes, tabs, spindle/Z GRBL, preflight) — `032d476` | **CLAIMED** | Full suite green (2595 tests at audit time); parity audit `audit/reports/cnc-easel-parity-audit-2026-07-02.md`; no 4040 run yet |
 | Plunged-travel invariant (`findPlungedTravelIssues`) | **CLAIMED** | Unit + property tests; enforced in CNC preflight |
-| H.1 pass-model union + overdeep-cut invariant | pending | — |
-| H.2 simulation + stock model | pending | sim-vs-machine side-by-side is the H.2 air-cut |
+| H.1 pass-model union + overdeep-cut invariant | **CLAIMED** | 2026-07-02: unit + 100-seed properties (emitter × motion/depth invariants); snapshots byte-identical |
+| H.2 simulation + stock model | **CLAIMED** | 2026-07-02: simulator ≡ emitter property (100 seeds); pocket IoU ≥ 0.98 perceptual; full suite 2627 green. Sim-vs-machine side-by-side air-cut still pending (maintainer) |
 | H.3 V-carve | pending | air-cut + MDF groove-width caliper check |
 | H.5 relief roughing | pending | air-cut + foam/MDF terrace cut |
 | H.6 DXF / .nc import | pending | DXF air-pass + .nc re-import simulator match |
