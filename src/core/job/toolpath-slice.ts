@@ -33,6 +33,10 @@ function truncateStep(step: ToolpathStep, length: number): ToolpathStep {
     const to = lerp(step.from, step.to, length / step.length);
     return { kind: 'travel', from: step.from, to, length };
   }
+  if (step.kind === 'plunge') {
+    const t = length / step.length;
+    return { ...step, toZ: step.fromZ + (step.toZ - step.fromZ) * t, length };
+  }
   const partial = truncatePolyline(step.polyline, length);
   return {
     ...step,
@@ -69,13 +73,16 @@ function truncatePolyline(polyline: ReadonlyArray<Vec2>, length: number): Readon
 
 function headOf(step: ToolpathStep): Vec2 | null {
   if (step.kind === 'travel') return step.to;
+  if (step.kind === 'plunge') return step.at;
   return step.polyline[step.polyline.length - 1] ?? null;
 }
 
 function firstHead(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
   const first = steps[0];
   if (first === undefined) return null;
-  return first.kind === 'travel' ? first.from : (first.polyline[0] ?? null);
+  if (first.kind === 'travel') return first.from;
+  if (first.kind === 'plunge') return first.at;
+  return first.polyline[0] ?? null;
 }
 
 function lastHead(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {

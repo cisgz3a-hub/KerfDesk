@@ -32,5 +32,8 @@ function mapStep(step: ToolpathStep, mapPoint: (p: Vec2) => Vec2): ToolpathStep 
   if (step.kind === 'travel') {
     return { ...step, from: mapPoint(step.from), to: mapPoint(step.to) };
   }
+  if (step.kind === 'plunge') {
+    return { ...step, at: mapPoint(step.at) };
+  }
   return { ...step, polyline: step.polyline.map(mapPoint) };
 }
