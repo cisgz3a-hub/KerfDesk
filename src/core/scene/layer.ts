@@ -2,6 +2,7 @@
 // parameters (power, speed, passes) that the OutputStrategy consumes when
 // emitting G-code. WORKFLOW.md F-A7 defines defaults and value ranges.
 
+import type { CncLayerSettings } from './machine';
 import type { DitherAlgorithm } from './scene-object';
 
 // Phase F: 'line' = vector cut/engrave along polylines; 'fill' =
@@ -55,6 +56,10 @@ export type Layer = LayerOperationSettings & {
   readonly visible: boolean;
   readonly output: boolean;
   readonly subLayers: ReadonlyArray<LayerSubLayer>;
+  // CNC operation for this layer, used only when the project machine is
+  // 'cnc'. Laser fields above are ignored in CNC mode and vice versa, so a
+  // project can switch machine kinds without losing either setup.
+  readonly cnc?: CncLayerSettings;
 };
 
 export const LAYER_DEFAULTS = {

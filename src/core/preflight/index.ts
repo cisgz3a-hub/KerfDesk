@@ -14,3 +14,5 @@ export {
   MACHINE_ISLAND_FILL_RISK_CODE,
 } from './machine-profile-preflight';
 export { runPreEmitPreflight } from './pre-emit';
+export type { CncPreflightOptions } from './cnc-preflight';
+export { runCncPreflight } from './cnc-preflight';

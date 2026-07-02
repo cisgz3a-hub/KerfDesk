@@ -7,6 +7,7 @@
 
 import {
   captureLayerOperationSettings,
+  machineKindOf,
   sceneObjectUsesLayerColor,
   type Layer,
   type LayerMode,
@@ -16,6 +17,7 @@ import {
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { AssignSelectionButton } from './AssignSelectionButton';
+import { CncLayerFields } from './CncLayerFields';
 import { DeleteLayerButton } from './DeleteLayerButton';
 import { LayerOrderControls } from './LayerOrderControls';
 import { LayerRowCutSettings } from './LayerRowCutSettings';
@@ -86,11 +88,15 @@ export function LayerRow(props: {
   const { layer } = props;
   const activeLayerColor = useUiStore((s) => s.activeLayerColor);
   const setActiveLayerColor = useUiStore((s) => s.setActiveLayerColor);
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const { settingsOpen, cutSettingsBlocked, openSettings, closeSettings } =
     useCutSettingsLauncher();
   const isActive = activeLayerColor === layer.color;
   const operationTarget = useLayerOperationTarget(layer);
-  const editingSelectedObjects = operationTarget.selectedObjectCount > 0;
+  // Per-object laser overrides don't apply to CNC compilation; in CNC mode
+  // the card always edits the layer's CNC operation.
+  const isCncMachine = machineKind === 'cnc';
+  const editingSelectedObjects = !isCncMachine && operationTarget.selectedObjectCount > 0;
 
   return (
     <section
@@ -111,7 +117,7 @@ export function LayerRow(props: {
           canMoveUp={props.canMoveUp}
           canMoveDown={props.canMoveDown}
         />
-        {editingSelectedObjects ? null : (
+        {editingSelectedObjects || isCncMachine ? null : (
           <ModeSelect layer={layer} operationTarget={operationTarget} />
         )}
         {editingSelectedObjects ? (
@@ -124,30 +130,34 @@ export function LayerRow(props: {
         <AssignSelectionButton layer={layer} />
         <LayerSettingsClipboardButtons layer={layer} />
         <DeleteLayerButton layer={layer} />
-        <button
-          type="button"
-          onClick={openSettings}
-          disabled={cutSettingsBlocked}
-          aria-label={`Edit cut settings for ${layer.color}`}
-          title={
-            cutSettingsBlocked
-              ? 'Cut settings are available when the machine is idle.'
-              : 'Open advanced cut settings'
-          }
-        >
-          Edit...
-        </button>
+        {isCncMachine ? null : (
+          <button
+            type="button"
+            onClick={openSettings}
+            disabled={cutSettingsBlocked}
+            aria-label={`Edit cut settings for ${layer.color}`}
+            title={
+              cutSettingsBlocked
+                ? 'Cut settings are available when the machine is idle.'
+                : 'Open advanced cut settings'
+            }
+          >
+            Edit...
+          </button>
+        )}
         <HeaderToggle label="Show" layer={layer} field="visible" />
         <HeaderToggle label="Output" layer={layer} field="output" />
       </header>
-      {editingSelectedObjects ? (
+      {isCncMachine ? (
+        <CncLayerFields layer={layer} />
+      ) : editingSelectedObjects ? (
         <p style={compactSelectedHintStyle}>
           Use Selected Artwork Settings above for this selection.
         </p>
       ) : (
         <LayerRowSettingsFields layer={layer} operationTarget={operationTarget} />
       )}
-      <LayerSubLayers layer={layer} />
+      {isCncMachine ? null : <LayerSubLayers layer={layer} />}
       {settingsOpen ? <LayerRowCutSettings layer={layer} onClose={closeSettings} /> : null}
     </section>
   );

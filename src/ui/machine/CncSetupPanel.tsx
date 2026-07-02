@@ -1,0 +1,149 @@
+// CncSetupPanel — "Material & Bit" card shown in the left rail when the
+// project machine is CNC. The Easel-style job setup: what stock is on the
+// bed, which bit is in the spindle, and the machine's Z/spindle parameters.
+
+import { activeCncTool, type CncMachineConfig } from '../../core/scene';
+import { useStore } from '../state';
+import { useDebouncedCommit } from '../layers/use-debounced-commit';
+
+export function CncSetupPanel(): JSX.Element | null {
+  const machine = useStore((s) => s.project.machine);
+  if (machine === undefined || machine.kind !== 'cnc') return null;
+  return <CncSetupFields machine={machine} />;
+}
+
+function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
+  const { machine } = props;
+  const updateCncMachine = useStore((s) => s.updateCncMachine);
+  const tool = activeCncTool(machine);
+  return (
+    <section aria-label="Material and bit setup" style={cardStyle}>
+      <h3 style={headingStyle}>Material &amp; Bit</h3>
+      <Row label="Bit">
+        <select
+          value={tool.id}
+          onChange={(e) => updateCncMachine({ toolId: e.target.value })}
+          aria-label="Active bit"
+          title="The bit in the spindle. Profile offsets and pocket clearing use its diameter."
+          style={selectStyle}
+        >
+          {machine.tools.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.name} ({candidate.diameterMm} mm)
+            </option>
+          ))}
+        </select>
+      </Row>
+      <NumberRow
+        label="Stock thickness"
+        unit="mm"
+        value={machine.stock.thicknessMm}
+        min={0.1}
+        max={200}
+        step={0.05}
+        title="Workpiece thickness. Cut depths deeper than this (plus 1 mm) are blocked."
+        onCommit={(thicknessMm) => updateCncMachine({ stock: { thicknessMm } })}
+      />
+      <NumberRow
+        label="Safe Z"
+        unit="mm"
+        value={machine.params.safeZMm}
+        min={0.5}
+        max={50}
+        step={0.5}
+        title="Clearance height above the stock top for rapid moves between cuts."
+        onCommit={(safeZMm) => updateCncMachine({ params: { safeZMm } })}
+      />
+      <NumberRow
+        label="Spindle max"
+        unit="RPM"
+        value={machine.params.spindleMaxRpm}
+        min={1000}
+        max={60000}
+        step={500}
+        title="Maximum spindle speed. Set GRBL $30 to this value so S maps to RPM."
+        onCommit={(spindleMaxRpm) => updateCncMachine({ params: { spindleMaxRpm } })}
+      />
+      <NumberRow
+        label="Spin-up delay"
+        unit="s"
+        value={machine.params.spindleSpinupSec}
+        min={0}
+        max={30}
+        step={0.5}
+        title="Dwell after starting the spindle before the first plunge."
+        onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
+      />
+    </section>
+  );
+}
+
+function Row(props: { readonly label: string; readonly children: React.ReactNode }): JSX.Element {
+  return (
+    <div style={rowStyle}>
+      <span style={labelStyle}>{props.label}</span>
+      <div style={valueStyle}>{props.children}</div>
+    </div>
+  );
+}
+
+function NumberRow(props: {
+  readonly label: string;
+  readonly unit: string;
+  readonly value: number;
+  readonly min: number;
+  readonly max: number;
+  readonly step: number;
+  readonly title: string;
+  readonly onCommit: (value: number) => void;
+}): JSX.Element {
+  const debounced = useDebouncedCommit<number>({
+    value: props.value,
+    commit: props.onCommit,
+    parse: (s) => {
+      const n = Number.parseFloat(s);
+      if (!Number.isFinite(n)) return props.value;
+      return Math.max(props.min, Math.min(props.max, n));
+    },
+  });
+  return (
+    <Row label={props.label}>
+      <input
+        type="number"
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        value={debounced.displayValue}
+        onChange={debounced.onChange}
+        onBlur={debounced.onBlur}
+        style={inputStyle}
+        aria-label={props.label}
+        title={props.title}
+      />
+      <span style={unitStyle}>{props.unit}</span>
+    </Row>
+  );
+}
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--lf-bg-2)',
+  border: '1px solid var(--lf-border)',
+  borderRadius: 6,
+  padding: '10px 12px',
+  marginBottom: 10,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+};
+const headingStyle: React.CSSProperties = { margin: '0 0 6px 0', fontSize: 13 };
+const rowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  minHeight: 28,
+};
+const labelStyle: React.CSSProperties = { width: 108, fontSize: 12, color: 'var(--lf-text-muted)' };
+const valueStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, flex: 1 };
+const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
+const inputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
+const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };

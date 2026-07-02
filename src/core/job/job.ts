@@ -9,7 +9,7 @@
 // Consumers that only operate on vectors (optimizer, planner, estimator's
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
-import type { LayerFillStyle, Vec2 } from '../scene';
+import type { CncCutType, LayerFillStyle, Vec2 } from '../scene';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
 
 export type CutSegment = {
@@ -74,7 +74,31 @@ export type RasterGroup = {
   readonly bidirectional?: boolean;
 };
 
-export type Group = CutGroup | FillGroup | RasterGroup;
+// CNC (router/mill) group. One XY polyline at one Z depth per pass; passes are
+// pre-expanded by core/cnc/compile-cnc-job.ts (depth ramping, tab splitting,
+// pocket rings) so the emitter is a dumb, safe motion printer: retract to
+// safeZMm → rapid XY → plunge to zMm at plungeMmPerMin → feed the polyline.
+export type CncPass = {
+  readonly zMm: number; // cutting depth for this pass; negative below stock top
+  readonly polyline: ReadonlyArray<Vec2>;
+  readonly closed: boolean;
+};
+
+export type CncGroup = {
+  readonly kind: 'cnc';
+  readonly layerId: string;
+  readonly color: string;
+  readonly cutType: CncCutType;
+  readonly toolDiameterMm: number;
+  readonly feedMmPerMin: number; // already capped to device.maxFeed
+  readonly plungeMmPerMin: number;
+  readonly spindleRpm: number; // S value; capped to machine spindleMaxRpm
+  readonly spindleSpinupSec: number; // dwell after spindle start / speed change
+  readonly safeZMm: number; // retract height for travel between passes
+  readonly passes: ReadonlyArray<CncPass>;
+};
+
+export type Group = CutGroup | FillGroup | RasterGroup | CncGroup;
 
 export type Job = {
   readonly groups: ReadonlyArray<Group>;

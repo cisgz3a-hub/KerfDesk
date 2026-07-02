@@ -23,7 +23,7 @@
 // Pure-core compliant: no clock reads, no Math.random, no I/O.
 
 import type { DeviceProfile } from '../devices';
-import type { FillGroup, FillSegment, Job, RasterGroup } from './job';
+import type { CncGroup, CutGroup, FillGroup, FillSegment, Job, RasterGroup } from './job';
 import { estimateWithPlanner } from './planner';
 
 export type JobDurationEstimate = {
@@ -38,7 +38,60 @@ const PIXEL_CENTER_OFFSET = 0.5;
 const SWEEP_DIRECTION_PERIOD = 2;
 
 export function estimateJobDuration(job: Job, device: DeviceProfile): JobDurationEstimate {
-  return estimateWithPlanner(jobWithRasterSweeps(job), device);
+  const plannerJob = jobWithCncAsCutGroups(jobWithRasterSweeps(job));
+  const estimate = estimateWithPlanner(plannerJob, device);
+  const plungeSeconds = cncPlungeSeconds(job, device);
+  if (plungeSeconds === 0) return estimate;
+  return {
+    totalSeconds: estimate.totalSeconds + plungeSeconds,
+    breakdown: {
+      cutSeconds: estimate.breakdown.cutSeconds + plungeSeconds,
+      travelSeconds: estimate.breakdown.travelSeconds,
+    },
+  };
+}
+
+// The XY planner knows nothing about Z. CNC groups estimate as cut groups at
+// the XY feed, plus an analytic term for plunges (at plunge feed) and
+// retracts (approximated at the machine's max feed) per pass.
+function jobWithCncAsCutGroups(job: Job): Job {
+  let changed = false;
+  const groups = job.groups.map((group) => {
+    if (group.kind !== 'cnc') return group;
+    changed = true;
+    return cncAsCutGroup(group);
+  });
+  return changed ? { groups } : job;
+}
+
+function cncAsCutGroup(group: CncGroup): CutGroup {
+  return {
+    kind: 'cut',
+    layerId: group.layerId,
+    color: group.color,
+    power: 100,
+    speed: group.feedMmPerMin,
+    passes: 1,
+    airAssist: false,
+    segments: group.passes.map((pass) => ({ polyline: pass.polyline, closed: pass.closed })),
+  };
+}
+
+const SECONDS_PER_MINUTE = 60;
+
+function cncPlungeSeconds(job: Job, device: DeviceProfile): number {
+  let seconds = 0;
+  for (const group of job.groups) {
+    if (group.kind !== 'cnc') continue;
+    const plungeFeed = Math.max(1, group.plungeMmPerMin);
+    const retractFeed = Math.max(1, device.maxFeed);
+    for (const pass of group.passes) {
+      const travelZMm = group.safeZMm + Math.abs(pass.zMm);
+      seconds += (travelZMm / plungeFeed) * SECONDS_PER_MINUTE;
+      seconds += (travelZMm / retractFeed) * SECONDS_PER_MINUTE;
+    }
+  }
+  return seconds;
 }
 
 function jobWithRasterSweeps(job: Job): Job {

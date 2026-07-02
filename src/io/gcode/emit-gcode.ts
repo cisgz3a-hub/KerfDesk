@@ -3,9 +3,14 @@
 // I/O. The UI / platform adapter decides whether to actually write the file
 // based on `preflight.ok`.
 
-import { runPreflight, type PreflightOptions, type PreflightResult } from '../../core/preflight';
+import {
+  runCncPreflight,
+  runPreflight,
+  type PreflightOptions,
+  type PreflightResult,
+} from '../../core/preflight';
 import type { JobOriginPlacement } from '../../core/job';
-import { grblStrategy } from '../../core/output';
+import { cncGrblStrategy, grblStrategy } from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
 import { gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
 import { prepareOutput } from './prepare-output';
@@ -37,7 +42,11 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
     ...(options.outputScope ? { outputScope: options.outputScope } : {}),
   });
   if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
-  const body = grblStrategy.emit(prepared.job, prepared.project.device);
+  const machine = prepared.project.machine;
+  const isCncMachine = machine !== undefined && machine.kind === 'cnc';
+  const body = isCncMachine
+    ? cncGrblStrategy.emit(prepared.job, prepared.project.device)
+    : grblStrategy.emit(prepared.job, prepared.project.device);
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
@@ -45,10 +54,15 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
     options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
       ? 'relative-origin'
       : 'machine';
-  const preflight = runPreflight(prepared.project, body, {
-    motionOffset: options.preflightMotionOffset,
-    coordinateMode,
-  });
+  const preflight =
+    machine !== undefined && machine.kind === 'cnc'
+      ? runCncPreflight(prepared.project, machine, body, {
+          motionOffset: options.preflightMotionOffset,
+        })
+      : runPreflight(prepared.project, body, {
+          motionOffset: options.preflightMotionOffset,
+          coordinateMode,
+        });
   const gcode = options.metadata
     ? gcodeMetadataHeader(options.metadata, { maxPowerS: prepared.project.device.maxPowerS }) + body
     : body;

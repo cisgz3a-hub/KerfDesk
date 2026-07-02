@@ -125,3 +125,28 @@ export {
 
 export type { Project, ProjectOptimizationSettings, Workspace } from './project';
 export { DEFAULT_PROJECT_OPTIMIZATION, PROJECT_SCHEMA_VERSION, createProject } from './project';
+
+export type {
+  CncCutType,
+  CncLayerSettings,
+  CncMachineConfig,
+  CncMachineParams,
+  CncStock,
+  CncTool,
+  CncToolKind,
+  LaserMachineConfig,
+  MachineConfig,
+  MachineKind,
+} from './machine';
+export {
+  CNC_CUT_TYPES,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  DEFAULT_CNC_MACHINE_PARAMS,
+  DEFAULT_CNC_STOCK,
+  DEFAULT_CNC_TOOLS,
+  LASER_MACHINE_CONFIG,
+  activeCncTool,
+  cutTypeLabel,
+  machineKindOf,
+} from './machine';

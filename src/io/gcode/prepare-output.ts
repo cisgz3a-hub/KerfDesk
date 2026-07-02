@@ -18,6 +18,7 @@ import {
   type Job,
   type JobOriginPlacement,
 } from '../../core/job';
+import { compileCncJob } from '../../core/cnc';
 import { runPreEmitPreflight, type PreflightResult } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -67,9 +68,13 @@ export function prepareOutput(
   // Budget guard FIRST so an over-budget raster never reaches compileJob's large
   // allocations (P1-A). A failure flows out as the preflight result; every
   // consumer turns that into "can't" (empty g-code, empty preview, too-large).
-  const preEmit = runPreEmitPreflight(outputProject);
-  if (!preEmit.ok) return { ok: false, preflight: preEmit };
-  const compiled = compileJob(outputProject.scene, outputProject.device);
+  // CNC compiles ignore raster objects entirely, so the raster budget guard
+  // does not apply to them.
+  if (outputProject.machine?.kind !== 'cnc') {
+    const preEmit = runPreEmitPreflight(outputProject);
+    if (!preEmit.ok) return { ok: false, preflight: preEmit };
+  }
+  const compiled = compileForMachine(outputProject);
   const outputScope = options.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   const offset = options.jobOrigin
     ? resolveJobOriginOffset(project, compiled, options.jobOrigin, outputScope)
@@ -84,6 +89,15 @@ export function prepareOutput(
     job: project.optimization.reduceTravelMoves ? optimizePaths(placed) : placed,
     jobOriginOffset: offset,
   };
+}
+
+// One compile entry per machine kind: the project's machine choice routes to
+// the CNC compiler (depth passes, tool offsets) or the laser compiler.
+function compileForMachine(project: Project): Job {
+  const machine = project.machine;
+  return machine !== undefined && machine.kind === 'cnc'
+    ? compileCncJob(project.scene, project.device, machine)
+    : compileJob(project.scene, project.device);
 }
 
 function resolveJobOriginOffset(

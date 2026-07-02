@@ -22,6 +22,7 @@ import {
   CMD_SET_ORIGIN_HERE,
   CMD_SET_PERSISTENT_ORIGIN_HERE,
   CMD_SLEEP,
+  CMD_ZERO_Z_HERE,
 } from '../../core/controllers/grbl';
 
 /**
@@ -46,6 +47,15 @@ export type WorkCoordinateOffset = {
  */
 export async function setOriginHere(safeWrite: (line: string) => Promise<void>): Promise<void> {
   await safeWrite(`${CMD_SET_ORIGIN_HERE}\n`);
+}
+
+/**
+ * Send `G92 Z0` to declare the current bit height as work Z0 (CNC stock-top
+ * zeroing). Leaves any X/Y work origin untouched — GRBL applies G92 offsets
+ * per axis.
+ */
+export async function zeroZHere(safeWrite: (line: string) => Promise<void>): Promise<void> {
+  await safeWrite(`${CMD_ZERO_Z_HERE}\n`);
 }
 
 /**

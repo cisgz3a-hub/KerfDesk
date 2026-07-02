@@ -23,6 +23,8 @@ import {
 import type { SaveTarget } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import { imageImportActions } from './import-actions';
+import { machineActions, type MachineActions } from './machine-actions';
+import type { CncMachineConfig } from '../../core/scene';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
   rasterAdjustmentActions,
@@ -129,8 +131,12 @@ export type AppState = ObjectPropertiesActions &
   MaterialLibraryActions &
   ReturnType<typeof currentSavedLibrariesState> &
   SavedLibrariesActions &
-  MaterialPresetActions & {
+  MaterialPresetActions &
+  MachineActions & {
     readonly project: Project;
+    // Last CNC machine setup, kept when toggling back to laser so the
+    // choice of bit/stock survives a round-trip within the session.
+    readonly cachedCncMachine: CncMachineConfig | null;
     readonly selectedObjectId: string | null;
     readonly selectedPathNode: PathNodeRef | null;
     readonly selectedPathNodes: ReadonlyArray<PathNodeRef>;
@@ -277,6 +283,7 @@ type Setter = (
 function initialState(): Pick<
   AppState,
   | 'project'
+  | 'cachedCncMachine'
   | 'selectedObjectId'
   | 'selectedPathNode'
   | 'selectedPathNodes'
@@ -300,6 +307,7 @@ function initialState(): Pick<
   ReturnType<typeof currentSavedLibrariesState> {
   return {
     project: createProject(),
+    cachedCncMachine: null,
     selectedObjectId: null,
     selectedPathNode: null,
     selectedPathNodes: [],
@@ -369,6 +377,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...breakApartActions(set),
   ...rasterAdjustmentActions(set),
   ...layerActions(set),
+  ...machineActions(set),
   ...fillSelectionActions(set),
   ...vectorPathActions(set),
   ...closeOpenFillContoursActions(set),

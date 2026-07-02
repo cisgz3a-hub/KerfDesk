@@ -1,4 +1,6 @@
 import {
+  CNC_CUT_TYPES,
+  DEFAULT_CNC_LAYER_SETTINGS,
   DITHER_ALGORITHMS,
   LAYER_DEFAULTS,
   captureLayerOperationSettings,
@@ -11,8 +13,42 @@ export function normalizeLayer(layer: unknown): unknown {
   normalizeCommonLayerFields(out);
   normalizeFillLayerFields(out);
   normalizeImageLayerFields(out);
+  normalizeCncLayerField(out);
   normalizeSubLayers(out);
   return out;
+}
+
+// Optional CNC operation block. Absent stays absent (defaults apply at
+// compile time); present-but-malformed values fall back field-by-field so a
+// hand-edited .lf2 can't smuggle a zero feed or bogus cut type into the
+// pipeline.
+function normalizeCncLayerField(out: Record<string, unknown>): void {
+  const raw = out['cnc'];
+  if (raw === undefined) return;
+  if (!isObject(raw)) {
+    delete out['cnc'];
+    return;
+  }
+  const d = DEFAULT_CNC_LAYER_SETTINGS;
+  out['cnc'] = {
+    cutType: CNC_CUT_TYPES.some((cutType) => cutType === raw['cutType'])
+      ? raw['cutType']
+      : d.cutType,
+    depthMm: positiveOr(raw['depthMm'], d.depthMm),
+    depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
+    feedMmPerMin: positiveOr(raw['feedMmPerMin'], d.feedMmPerMin),
+    plungeMmPerMin: positiveOr(raw['plungeMmPerMin'], d.plungeMmPerMin),
+    spindleRpm: positiveOr(raw['spindleRpm'], d.spindleRpm),
+    stepoverPercent: positiveOr(raw['stepoverPercent'], d.stepoverPercent),
+    tabsEnabled: typeof raw['tabsEnabled'] === 'boolean' ? raw['tabsEnabled'] : d.tabsEnabled,
+    tabHeightMm: positiveOr(raw['tabHeightMm'], d.tabHeightMm),
+    tabWidthMm: positiveOr(raw['tabWidthMm'], d.tabWidthMm),
+    tabsPerShape: isPositiveInteger(raw['tabsPerShape']) ? raw['tabsPerShape'] : d.tabsPerShape,
+  };
+}
+
+function positiveOr(value: unknown, fallback: number): number {
+  return isPositiveNumber(value) ? value : fallback;
 }
 
 function normalizeCommonLayerFields(out: Record<string, unknown>): void {

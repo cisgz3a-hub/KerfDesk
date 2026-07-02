@@ -78,6 +78,12 @@ function appendGroupSteps(
       return appendFillGroupSteps(steps, prevEnd, group, options);
     case 'cut':
       return appendContourGroupSteps(steps, prevEnd, group.segments, group.color);
+    case 'cnc': {
+      // Depth passes flatten into the 2D preview: each pass renders as a cut
+      // polyline with travel between pass start points (Z is not visualized).
+      const passes = group.passes.map((pass) => ({ polyline: pass.polyline }));
+      return appendContourGroupSteps(steps, prevEnd, passes, group.color);
+    }
   }
 }
 

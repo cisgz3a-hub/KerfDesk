@@ -2,6 +2,7 @@
 // device profile, workspace dimensions, and the scene. Pure; never mutated.
 
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
+import type { MachineConfig } from './machine';
 import { EMPTY_SCENE, type Scene } from './scene';
 
 export const PROJECT_SCHEMA_VERSION = 1 as const;
@@ -26,6 +27,8 @@ export type Project = {
   readonly workspace: Workspace;
   readonly optimization: ProjectOptimizationSettings;
   readonly notes: string;
+  // Absent on laser projects saved before CNC support — treated as laser.
+  readonly machine?: MachineConfig;
   readonly scene: Scene;
 };
 

@@ -13,6 +13,7 @@ import {
   resetOrigin as resetOriginAction,
   setOriginHere as setOriginHereAction,
   setPersistentOriginHere as setPersistentOriginHereAction,
+  zeroZHere as zeroZHereAction,
 } from './origin-actions';
 import { type LaserSafetyAction } from './laser-safety-notice';
 import {
@@ -58,6 +59,7 @@ export function originActions(
 ): Pick<
   LaserState,
   | 'setOriginHere'
+  | 'zeroZHere'
   | 'resetOrigin'
   | 'setPersistentOriginHere'
   | 'clearPersistentOrigin'
@@ -70,6 +72,13 @@ export function originActions(
       const { statusReport, wcoCache } = get();
       const inferredWco = inferCurrentMachinePosition(statusReport, wcoCache);
       set(activeOriginPatch('g92', inferredWco));
+    },
+    zeroZHere: async () => {
+      assertOriginActionReady(set, get);
+      await zeroZHereAction((out) => safeWrite(out, 'origin'));
+      // Z-only offset: XY origin state is untouched, and the WCO cache
+      // refreshes from the next WCO-bearing status frame.
+      set({ log: pushLog(get(), '[lf2] Work Z zeroed at current bit height (G92 Z0).') });
     },
     resetOrigin: async () => {
       assertOriginActionReady(set, get);

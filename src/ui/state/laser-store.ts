@@ -155,6 +155,8 @@ export type LaserState = {
   readonly dismissDetectedSettings: () => void;
   // G92 is the default session-scoped origin; advanced controls use G10/G54.
   readonly setOriginHere: () => Promise<void>;
+  // CNC stock-top zeroing: G92 Z0 at the current bit height. XY untouched.
+  readonly zeroZHere: () => Promise<void>;
   readonly resetOrigin: () => Promise<void>;
   readonly setPersistentOriginHere: () => Promise<void>;
   readonly clearPersistentOrigin: () => Promise<void>;
@@ -361,13 +363,13 @@ function jogActions(
       }
     },
     unlockAlarm: async () => {
-      assertNoMotionOperation(set, get);
+      assertMotionReady(set, get, motionOperationCommandBlockMessage);
       await safeWrite(set, get, `${CMD_UNLOCK}\n`, 'unlock');
       set({ alarmCode: null, homingState: 'unknown' });
     },
     jog: async (params) => {
       assertAutofocusIdle(get());
-      assertJogFrameReady(set, get);
+      assertMotionReady(set, get, jogFrameCommandBlockMessage);
       set({ motionOperation: startMotionOperation('jog') });
       try {
         await safeWrite(set, get, `${buildJogCommand(params)}\n`, 'jog');
@@ -385,7 +387,7 @@ function jogActions(
       ),
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
-      assertJogFrameReady(set, get);
+      assertMotionReady(set, get, jogFrameCommandBlockMessage);
       const [firstLine, ...pendingLines] = buildFrameJogLines(bounds, feed);
       if (firstLine === undefined) return;
       set({ motionOperation: startMotionOperation('frame', pendingLines) });
@@ -402,18 +404,14 @@ function jogActions(
   };
 }
 
-function assertJogFrameReady(set: SetFn, get: GetFn): void {
-  const blockedMessage = jogFrameCommandBlockMessage(get());
-  if (blockedMessage === null) return;
-  set({
-    lastWriteError: blockedMessage,
-    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
-  });
-  throw new Error(blockedMessage);
-}
-
-function assertNoMotionOperation(set: SetFn, get: GetFn): void {
-  const blockedMessage = motionOperationCommandBlockMessage(get());
+// Shared guard body for the two motion-readiness checks (jog/frame vs any
+// motion operation) — same block-message plumbing, different predicate.
+function assertMotionReady(
+  set: SetFn,
+  get: GetFn,
+  block: (state: LaserState) => string | null,
+): void {
+  const blockedMessage = block(get());
   if (blockedMessage === null) return;
   set({
     lastWriteError: blockedMessage,

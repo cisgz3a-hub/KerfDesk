@@ -10,6 +10,9 @@
 // in a header strip, then power / speed / passes / mode-specific
 // fields as field rows below.
 
+import { machineKindOf } from '../../core/scene';
+import { CncSetupPanel } from '../machine/CncSetupPanel';
+import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
@@ -18,28 +21,36 @@ import { SelectedObjectProperties } from './SelectedObjectProperties';
 
 export function CutsLayersPanel(): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const hasSelection = selectedObjectId !== null || additionalSelectedIds.size > 0;
+  // The Material Library stores laser presets (power/speed); it hides in CNC
+  // mode where those numbers have no meaning.
+  const showMaterialLibrary = machineKind === 'laser';
   return (
     <aside aria-label="Cuts / Layers panel" className="lf-rail" style={panelStyle}>
       <h2 className="lf-heading" style={headingStyle}>
         Cuts / Layers
       </h2>
+      <MachineModeToggle />
+      <CncSetupPanel />
       <AddLayerControls />
       <SelectedObjectProperties />
       {hasSelection ? (
         <>
-          <CollapsedPanel label="Material Library" ariaLabel="Material Library section">
-            <MaterialLibraryPanel />
-          </CollapsedPanel>
+          {showMaterialLibrary ? (
+            <CollapsedPanel label="Material Library" ariaLabel="Material Library section">
+              <MaterialLibraryPanel />
+            </CollapsedPanel>
+          ) : null}
           <CollapsedPanel label="Layers" ariaLabel="Layer management section">
             <LayerList layers={layers} />
           </CollapsedPanel>
         </>
       ) : (
         <>
-          <MaterialLibraryPanel />
+          {showMaterialLibrary ? <MaterialLibraryPanel /> : null}
           <LayerList layers={layers} />
         </>
       )}

@@ -7,3 +7,5 @@ export {
 } from './predicates';
 export type { BlankFeedIssue, BlankFeedOptions } from './blank-feed';
 export { findLongBlankFeedMoves } from './blank-feed';
+export type { CncMotionIssue } from './cnc-motion';
+export { findPlungedTravelIssues } from './cnc-motion';
