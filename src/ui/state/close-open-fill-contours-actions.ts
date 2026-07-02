@@ -91,6 +91,7 @@ function closeObjectFillContours(
     case 'shape':
       return closeShapeFillContours(object, fillLayerColors, toleranceMm);
     case 'raster-image':
+    case 'relief':
       return object;
     default:
       return assertNever(object, 'SceneObject');

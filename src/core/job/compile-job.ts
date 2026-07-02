@@ -219,6 +219,7 @@ function vectorObjectMatchesLayer(obj: SceneObject, layer: Layer): boolean {
     case 'shape':
       return obj.paths.some((path) => path.color === layer.color);
     case 'raster-image':
+    case 'relief':
       return false;
     default:
       assertNever(obj, 'SceneObject');
@@ -330,6 +331,9 @@ function appendSegmentsFromObject(
       // them. Behaviour parity with the F.2.b standalone emit-raster
       // tests preserved.
       return;
+    case 'relief':
+      // CNC-only geometry — the laser compiler never emits it.
+      return;
     default:
       assertNever(obj, 'SceneObject');
   }
@@ -355,6 +359,7 @@ function appendFillContoursFromObject(
       appendFillPathContours(obj.paths, obj.transform, layer, device, out);
       return;
     case 'raster-image':
+    case 'relief':
       return;
     default:
       assertNever(obj, 'SceneObject');

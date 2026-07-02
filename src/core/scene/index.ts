@@ -47,6 +47,7 @@ export type {
   PolygonShape,
   RasterImage,
   RectangleShape,
+  ReliefObject,
   SceneObject,
   ShapeObject,
   ShapeSpec,
@@ -60,6 +61,7 @@ export type {
 export {
   DITHER_ALGORITHMS,
   DEFAULT_RASTER_LAYER_COLOR,
+  RELIEF_EMBED_TRIANGLE_LIMIT,
   IDENTITY_TRANSFORM,
   assertNever,
   sceneObjectPrimaryLayerColor,

@@ -134,6 +134,7 @@ function objectUsesLayerColor(object: SceneObject, color: string): boolean {
     case 'shape':
       return object.paths.some((path) => path.color === color);
     case 'raster-image':
+    case 'relief':
       return object.color === color;
     default:
       return assertNever(object, 'SceneObject');
@@ -150,6 +151,7 @@ function isVectorObject(
     case 'shape':
       return true;
     case 'raster-image':
+    case 'relief':
       return false;
     default:
       return assertNever(object, 'SceneObject');
@@ -179,6 +181,7 @@ function usedColors(scene: Scene): ReadonlySet<string> {
         for (const path of object.paths) colors.add(path.color);
         break;
       case 'raster-image':
+      case 'relief':
         colors.add(object.color);
         break;
       default:

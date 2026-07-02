@@ -56,6 +56,7 @@ function closedMaskContours(object: SceneObject): ReadonlyArray<ReadonlyArray<Ve
           ),
       );
     case 'raster-image':
+    case 'relief':
       return [];
     default:
       return assertNever(object, 'SceneObject');

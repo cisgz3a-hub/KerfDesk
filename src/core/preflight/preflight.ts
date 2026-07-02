@@ -213,6 +213,9 @@ function isStrandedOnLayer(obj: SceneObject, layer: Layer): boolean {
       if (obj.role === 'trace-source') return false;
       // Rasters emit only on image layers; a line/fill layer ignores them.
       return layer.mode !== 'image' && obj.color === layer.color;
+    case 'relief':
+      // CNC-only geometry — laser layer modes never mismatch it.
+      return false;
     default:
       return assertNever(obj, 'SceneObject');
   }
@@ -298,6 +301,7 @@ function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {
           path.polylines.some((polyline) => !isClosedEnough(polyline)),
       );
     case 'raster-image':
+    case 'relief':
       return false;
     default:
       return assertNever(obj, 'SceneObject');

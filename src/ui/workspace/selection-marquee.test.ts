@@ -29,7 +29,9 @@ function objectAt(
 function scene(objects: ReadonlyArray<SceneObject>): Scene {
   const colors = new Set(
     objects.flatMap((object) =>
-      object.kind === 'raster-image' ? [object.color] : object.paths.map((path) => path.color),
+      object.kind === 'raster-image' || object.kind === 'relief'
+        ? [object.color]
+        : object.paths.map((path) => path.color),
     ),
   );
   return { objects, layers: [...colors].map((color) => createLayer({ id: color, color })) };

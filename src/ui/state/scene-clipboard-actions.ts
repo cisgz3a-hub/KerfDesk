@@ -151,6 +151,8 @@ function layerSpecsForObject(
   object: SceneObject,
 ): ReadonlyArray<{ readonly color: string; readonly mode: Layer['mode'] }> {
   if (object.kind === 'raster-image') return [{ color: object.color, mode: 'image' }];
+  // Relief layers are CNC-keyed; the laser mode field is inert for them.
+  if (object.kind === 'relief') return [{ color: object.color, mode: 'line' }];
   const mode =
     object.kind === 'traced-image' &&
     object.traceMode !== 'centerline' &&

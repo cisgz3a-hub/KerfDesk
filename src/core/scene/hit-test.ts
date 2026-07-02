@@ -102,6 +102,9 @@ function vectorPathsFor(obj: SceneObject): ReadonlyArray<ColoredPath> | null {
     case 'traced-image':
       return obj.paths;
     case 'raster-image':
+    case 'relief':
+      // Bounds-rect objects: selectable via the bbox hit path, no vector
+      // outlines to hit-test.
       return null;
     default:
       return obj satisfies never;

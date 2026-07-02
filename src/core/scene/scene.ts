@@ -102,6 +102,7 @@ function assignSceneObjectColor(object: SceneObject, color: string): SceneObject
       return paths === object.paths ? object : { ...object, paths };
     }
     case 'raster-image':
+    case 'relief':
       return object.color === color ? object : { ...object, color };
     default:
       return assertNever(object, 'SceneObject');
