@@ -30,7 +30,7 @@ const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
     {
       label: 'KerfDesk Falcon baseline',
       status: 'researched',
-      note: 'Uses the existing KerfDesk/Falcon-compatible output behavior verified by tests.',
+      note: 'Uses the existing KerfDesk/Falcon-compatible output behavior verified by tests. Confirmed working on a real Falcon A1 Pro through the ADR-094 driver refactor, 2026-07-02.',
     },
   ],
 };
@@ -115,7 +115,7 @@ const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
     {
       label: 'grblHAL protocol compatibility',
       status: 'researched',
-      note: 'grblHAL speaks the GRBL v1.1 wire protocol with extended codes; the Falcon A1 Pro baseline runs GrblHAL 1.1f. Confirm bed size and S range from $$ on connect.',
+      note: 'grblHAL speaks the GRBL v1.1 wire protocol with extended codes. Confirmed working on a Creality Falcon A1 Pro (GrblHAL 1.1f), 2026-07-02. Confirm bed size and S range from $$ on connect.',
     },
   ],
 };

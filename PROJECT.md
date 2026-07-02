@@ -123,8 +123,9 @@ Verified end-to-end against scripted firmware simulators
   transcripts); per-profile `baudRate`; controller detection from welcome banners
   (advisory).
 - **H.2 — grblHAL + FluidNC**: capability deltas on the GRBL driver (FluidNC:
-  settings read-only); extended grblHAL alarm codes 11–13. grblHAL is
-  hardware-verifiable on the Falcon A1 Pro (not yet burned this phase).
+  settings read-only); extended grblHAL alarm codes 11–13. **grblHAL confirmed
+  working on the Falcon A1 Pro (GrblHAL 1.1f) by the maintainer, 2026-07-02.**
+  FluidNC still simulator-only.
 - **H.3 — Marlin** (ADR-095): queued M114 status, stream-side pause, G28 X Y,
   M400 settle, marlin-inline / marlin-fan dialects (M106/M107 transform).
   Simulator-verified only.
@@ -134,9 +135,12 @@ Verified end-to-end against scripted firmware simulators
   proven; NOT accepted by real hardware yet); `transport: 'file-only'` — no live
   link; pure UDP session state machine as groundwork.
 
-**Hardware truth table:** GRBL v1.1 + grblHAL = verifiable on the Falcon A1 Pro;
-FluidNC / Marlin / Smoothieware / Ruida = simulator-verified only, labeled
-`unverified` in catalog evidence and (for .rd) warned on every export.
+**Hardware truth table:** GRBL v1.1 + grblHAL = **hardware-verified on the Falcon
+A1 Pro (GrblHAL 1.1f), maintainer, 2026-07-02** — this also proves the S1/H.1
+driver refactor is byte-identical on real hardware, since the Falcon's normal
+`grbl-v1.1` profile drives it through the rewritten path unchanged. FluidNC /
+Marlin / Smoothieware / Ruida = simulator-verified only, labeled `unverified` in
+catalog evidence and (for .rd) warned on every export.
 
 ### Anything past Phase F
 
