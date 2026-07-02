@@ -2,6 +2,7 @@
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
 import { describeAlarm } from '../../core/controllers/grbl';
+import { selectControllerDriver } from '../../core/controllers';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -50,6 +51,10 @@ export function LaserWindow(): JSX.Element {
   const connected = connection.kind === 'connected';
 
   const supportsSerial = platform.serial.isSupported();
+  // File-only profiles (Ruida .rd export) have no live link to open — the
+  // Connect button and machine controls stay dark and a hint explains why.
+  const isFileOnlyProfile =
+    selectControllerDriver(controllerKind).capabilities.transport === 'file-only';
 
   return (
     <aside aria-label="Laser controls" className="lf-rail" style={panelStyle}>
@@ -58,18 +63,13 @@ export function LaserWindow(): JSX.Element {
         Laser
       </h2>
       <SafetyNoticeBanner />
-      {!supportsSerial && (
-        <p style={hintStyle}>
-          Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install
-          the Windows desktop app.
-        </p>
-      )}
+      <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <DeviceSetupControls />
       <ConnectionBar
         connection={connection}
         onConnect={() => void connect(platform, { controllerKind, baudRate: profileBaudRate })}
         onDisconnect={() => void disconnect().catch(() => undefined)}
-        disabled={!supportsSerial || machineOperationBusy}
+        disabled={!supportsSerial || machineOperationBusy || isFileOnlyProfile}
       />
       {showAlarmBanner && (
         <AlarmBanner
@@ -94,6 +94,29 @@ export function LaserWindow(): JSX.Element {
       <ConsolePanel />
     </aside>
   );
+}
+
+function ConnectionHints(props: {
+  readonly supportsSerial: boolean;
+  readonly isFileOnlyProfile: boolean;
+}): JSX.Element | null {
+  if (props.isFileOnlyProfile) {
+    return (
+      <p style={hintStyle}>
+        This profile is file-export only: use Save G-code… to write an experimental .rd job and
+        run it from the machine panel. Live Ruida streaming is not available in this build.
+      </p>
+    );
+  }
+  if (!props.supportsSerial) {
+    return (
+      <p style={hintStyle}>
+        Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install
+        the Windows desktop app.
+      </p>
+    );
+  }
+  return null;
 }
 
 function hasAlarmRecovery(code: number | null, state: string | undefined): boolean {

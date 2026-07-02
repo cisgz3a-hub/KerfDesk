@@ -37,6 +37,7 @@ export const grblDriver: ControllerDriver = {
   label: 'GRBL v1.1',
   defaultBaudRate: GRBL_DEFAULT_BAUD_RATE,
   capabilities: {
+    transport: 'serial',
     jog: 'native-jog',
     jogCancel: true,
     realtimePause: true,

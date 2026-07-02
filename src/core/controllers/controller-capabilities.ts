@@ -30,7 +30,15 @@ export type WcsCapability = 'g92-and-g10' | 'g92-only' | 'none';
 
 export type FirmwareSetupPanel = 'grbl-laser' | 'none';
 
+export type TransportCapability =
+  // Live serial link (Web Serial / Electron serial): connect, jog, stream.
+  | 'serial'
+  // No live link in this build — jobs are exported as files (Ruida .rd);
+  // the Connect button and machine controls are disabled for the profile.
+  | 'file-only';
+
 export type ControllerCapabilities = {
+  readonly transport: TransportCapability;
   readonly jog: JogCapability;
   readonly jogCancel: boolean;
   // `!` / `~` realtime feed hold. false ⇒ pause is stream-side only (stop

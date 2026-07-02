@@ -26,6 +26,7 @@ export const smoothiewareDriver: ControllerDriver = {
   label: 'Smoothieware',
   defaultBaudRate: SMOOTHIE_DEFAULT_BAUD_RATE,
   capabilities: {
+    transport: 'serial',
     jog: 'gcode-relative',
     jogCancel: false,
     realtimePause: true,

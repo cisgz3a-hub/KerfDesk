@@ -68,6 +68,7 @@ describe('grblDriver', () => {
 
   it('declares full GRBL capabilities so the UI renders unchanged', () => {
     expect(grblDriver.capabilities).toEqual({
+      transport: 'serial',
       jog: 'native-jog',
       jogCancel: true,
       realtimePause: true,
