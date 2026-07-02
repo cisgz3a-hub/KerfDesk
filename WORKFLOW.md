@@ -1843,3 +1843,29 @@ F-CNC19 tiling.
 #### Edge — huge stock
 1. The underlying grid already coarsens beyond 4M cells; the display
    pass reduces further, so a full-bed job cannot freeze the dialog.
+
+### F-CNC24. Calculate feeds & speeds from chipload — Phase H.11 (ADR-102 G5)
+
+#### Success
+1. Every CNC layer card has a "Feeds calculator": pick the material
+   family and flute count; the bit diameter comes from the layer's own
+   bit and RPM from the layer's spindle setting. The row shows the live
+   result — feed = RPM × flutes × chipload, plunge as a material
+   percentage, depth-per-pass as a fraction of bit diameter.
+2. "Apply to layer" writes feed / plunge / depth-per-pass / spindle in
+   one undoable patch. Cut type, depth, and tabs stay put. The values
+   compose with H.7 presets (calculate once, save as a preset).
+3. The chart values are labeled STARTING POINTS ("listen to the cut") —
+   PROVISIONAL industry-typical mid-range chiploads per diameter band.
+
+#### Error — none (inputs are bounded)
+1. Material and flutes are selects; tiny results floor at 50 mm/min feed
+   / 0.1 mm per pass rather than emitting zeros.
+
+#### Empty
+1. The row renders only in CNC mode (laser layers have no feeds).
+
+#### Edge — v-bits and unusual bits
+1. The calculator uses the bit's DIAMETER regardless of kind; for
+   v-carving the chipload model is a rough guide only — the flow says
+   so rather than pretending precision.
