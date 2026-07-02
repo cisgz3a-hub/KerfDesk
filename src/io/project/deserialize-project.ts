@@ -125,6 +125,9 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
     kind: 'cnc',
     stock: {
       thicknessMm: positiveNumberOrDefault(stock['thicknessMm'], d.stock.thicknessMm),
+      widthMm: positiveNumberOrDefault(stock['widthMm'], d.stock.widthMm),
+      heightMm: positiveNumberOrDefault(stock['heightMm'], d.stock.heightMm),
+      originOffset: normalizeStockOriginOffset(stock['originOffset'], d.stock.originOffset),
     },
     tools,
     toolId,
@@ -137,6 +140,21 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
       ),
     },
   };
+}
+
+// Stock placement may legitimately be anywhere on (or partially off) the bed
+// origin side, so any finite pair is accepted; anything else reverts to the
+// default corner.
+function normalizeStockOriginOffset(
+  raw: unknown,
+  fallback: { readonly x: number; readonly y: number },
+): { x: number; y: number } {
+  if (!isObject(raw)) return { ...fallback };
+  const x = raw['x'];
+  const y = raw['y'];
+  if (typeof x !== 'number' || !Number.isFinite(x)) return { ...fallback };
+  if (typeof y !== 'number' || !Number.isFinite(y)) return { ...fallback };
+  return { x, y };
 }
 
 function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {

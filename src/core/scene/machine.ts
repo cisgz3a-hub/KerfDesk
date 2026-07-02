@@ -4,6 +4,8 @@
 // strategy. The config is part of Project so a .lf2 file round-trips the
 // machine choice; projects without one are laser projects (back-compat).
 
+import type { Vec2 } from './scene-object';
+
 export type MachineKind = 'laser' | 'cnc';
 
 export type CncToolKind = 'end-mill' | 'ball-nose' | 'v-bit' | 'engraving';
@@ -18,9 +20,16 @@ export type CncTool = {
 };
 
 // Stock (workpiece) parameters. Z0 is the stock TOP surface; cut depths are
-// measured down from it. XY placement is governed by the bed bounds check.
+// measured down from it. The XY footprint (Phase H.2) locates the workpiece
+// on the bed: originOffset is the stock's min-XY corner in machine
+// coordinates. Bed bounds remain the hard preflight error; toolpaths leaving
+// the stock footprint are an advisory (clamps and offcuts are the operator's
+// call).
 export type CncStock = {
   readonly thicknessMm: number;
+  readonly widthMm: number;
+  readonly heightMm: number;
+  readonly originOffset: Vec2;
 };
 
 // How a layer's geometry is machined (Easel's "cut type"):
@@ -91,7 +100,15 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
   { id: 'vb-60', name: '60° V-bit', kind: 'v-bit', diameterMm: 6.35, tipAngleDeg: 60 },
 ];
 
-export const DEFAULT_CNC_STOCK: CncStock = { thicknessMm: 6.35 };
+// Footprint defaults sized to the 4040 target machine's 400 × 400 mm bed
+// (ADR-094): a full-bed sheet at the machine origin until the operator says
+// otherwise.
+export const DEFAULT_CNC_STOCK: CncStock = {
+  thicknessMm: 6.35,
+  widthMm: 400,
+  heightMm: 400,
+  originOffset: { x: 0, y: 0 },
+};
 
 export const DEFAULT_CNC_MACHINE_PARAMS: CncMachineParams = {
   safeZMm: 3.81, // Easel's 0.150 in safety height

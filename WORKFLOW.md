@@ -1304,3 +1304,26 @@ F-CNC19 tiling.
 #### Edge — feed or RPM above machine limits
 1. Values are capped at compile time (device max feed, spindle max RPM);
    the emitted file never exceeds machine limits even if the layer fields do.
+
+### F-CNC5. Stock setup (footprint on the bed) — Phase H.2
+
+#### Success
+1. In CNC mode, the Material & Bit panel offers stock width, height, and
+   origin X/Y alongside thickness. Defaults: 400 × 400 mm at the machine
+   origin (the 4040 bed).
+2. Committing a value is undoable and marks the project dirty; `.lf2` save
+   round-trips the footprint.
+3. On Save G-code / Start job, toolpaths that leave the stock footprint
+   raise a non-blocking advisory toast ("bit will cut air or clamps").
+   Bed bounds remain the blocking preflight error.
+
+#### Error — invalid dimension
+1. Width/height clamp to [1, 1500] mm; origin clamps to [-1500, 1500] mm;
+   non-numeric input snaps back to the committed value.
+
+#### Empty
+1. No geometry → no advisory (nothing to compare against the footprint).
+
+#### Edge — pre-H.2 project file
+1. A `.lf2` saved before stock footprints existed loads with the default
+   400 × 400 footprint at the origin; thickness is preserved.

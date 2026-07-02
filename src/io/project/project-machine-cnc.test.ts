@@ -65,6 +65,38 @@ describe('.lf2 machine / cnc round-trip', () => {
     expect(loaded.machine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
   });
 
+  it('round-trips a custom stock footprint (H.2)', () => {
+    const project: Project = {
+      ...cncProject(),
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        stock: { thicknessMm: 12, widthMm: 250, heightMm: 120, originOffset: { x: 25, y: 40 } },
+      },
+    };
+    const loaded = deserializeOk(serializeProject(project));
+    expect(loaded.machine).toEqual(project.machine);
+  });
+
+  it('rebuilds a malformed stock footprint from defaults (H.2)', () => {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    raw['machine'] = {
+      kind: 'cnc',
+      stock: { thicknessMm: 6.35, widthMm: -10, heightMm: 'wide', originOffset: { x: 'a', y: 0 } },
+    };
+    const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
+    expect(loaded.machine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
+  });
+
+  it('fills stock footprint defaults into a pre-H.2 CNC project', () => {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    raw['machine'] = { kind: 'cnc', stock: { thicknessMm: 9 } };
+    const loaded = deserializeOk(`${JSON.stringify(raw)}\n`);
+    expect(loaded.machine).toEqual({
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, thicknessMm: 9 },
+    });
+  });
+
   it('replaces a malformed layer cnc block with defaults and drops non-objects', () => {
     const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
     const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };

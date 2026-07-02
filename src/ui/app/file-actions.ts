@@ -5,7 +5,7 @@
 // anywhere.
 
 import { runControllerReadiness, type ControllerSettingsSnapshot } from '../../core/preflight';
-import type { OutputScope, Project, SceneObject } from '../../core/scene';
+import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
 import { emitGcode } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
 import { deserializeProject, serializeProject } from '../../io/project';
@@ -28,7 +28,7 @@ import {
   describeImportResult,
   describeReimportOutcome,
 } from './import-toasts';
-import { detectJobIntentWarnings } from '../laser/job-intent-warnings';
+import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
 
 export async function handleImportSvg(
@@ -127,11 +127,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     // H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
     // still see the same job-intent warnings the Start path surfaces (luma
     // upsample softer than preview, uncalibrated defaults, trace-vector cut
-    // risk) — non-blocking, since the export itself succeeded.
-    for (const warning of detectJobIntentWarnings(ctx.project)) {
+    // risk) — non-blocking, since the export itself succeeded. CNC mode has
+    // its own advisory set (stock footprint, H.2) via the machine-aware
+    // selector.
+    for (const warning of detectMachineJobWarnings(ctx.project)) {
       ctx.pushToast(warning, 'warning');
     }
-    if (ctx.controllerSettings === null) {
+    if (ctx.controllerSettings === null && machineKindOf(ctx.project.machine) !== 'cnc') {
       ctx.pushToast(
         `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
         'info',
