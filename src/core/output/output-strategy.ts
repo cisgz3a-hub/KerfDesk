@@ -8,7 +8,7 @@ import type { Job } from '../job';
 export type OutputStrategy = {
   // Discriminator on the future union — GrblStrategy returns 'grbl'. New
   // strategies add a literal here and a discriminated case at the call site.
-  readonly id: 'grbl';
+  readonly id: 'grbl' | 'grbl-cnc';
 
   // Emit a deterministic G-code string for `job` against `device`. Same input
   // + same params → byte-identical output (PROJECT.md non-negotiable #5).

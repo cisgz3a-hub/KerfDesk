@@ -44,6 +44,7 @@ function makeLaserState(): LaserState {
     applyDetectedSettings: () => undefined,
     dismissDetectedSettings: () => undefined,
     setOriginHere: async () => undefined,
+    zeroZHere: async () => undefined,
     resetOrigin: async () => undefined,
     setPersistentOriginHere: async () => undefined,
     clearPersistentOrigin: async () => undefined,

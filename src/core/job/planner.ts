@@ -90,8 +90,9 @@ function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] 
     // F.2.d: planner-aware estimator works on vector blocks (one
     // per polyline edge). Raster groups produce a different motion
     // model (constant-feed sweeps) — skipped here and accounted
-    // for separately in estimate-duration's raster path.
-    if (group.kind === 'raster') continue;
+    // for separately in estimate-duration's raster path. CNC groups
+    // are likewise pre-transformed into cut groups by the estimator.
+    if (group.kind === 'raster' || group.kind === 'cnc') continue;
     const cutV = groupCutVelocity(group, device);
     cursor =
       group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'

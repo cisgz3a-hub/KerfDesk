@@ -297,13 +297,18 @@ function emitAnyGroup(group: Group, device: DeviceProfile, dialect: GrblGcodeDia
       return emitFillGroup(group, device, dialect);
     case 'raster':
       return emitRasterGroupHere(group, device, dialect);
+    case 'cnc':
+      // CNC jobs are emitted by cncGrblStrategy; emit-gcode routes by the
+      // project's machine kind. A cnc group reaching the laser strategy is a
+      // pipeline bug — emit a visible marker instead of laser motion.
+      return `; cnc group ${group.layerId} skipped by laser strategy${LINE_END}`;
     default:
       return assertNever(group, 'Group');
   }
 }
 
 function groupCoolantMode(group: Group, device: DeviceProfile): CoolantMode {
-  if (!group.airAssist) return 'off';
+  if (group.kind === 'cnc' || !group.airAssist) return 'off';
   return device.airAssistCommand === 'none' ? 'off' : device.airAssistCommand;
 }
 
@@ -360,7 +365,7 @@ function emitJob(job: Job, device: DeviceProfile): string {
 
 function powerModeForGroup(group: Group, dialect: GrblGcodeDialect): 'M3' | 'M4' | 'group-managed' {
   if (group.kind === 'fill') return dialect.fillPowerMode === 'dynamic' ? 'M4' : 'M3';
-  if (group.kind === 'raster') return 'group-managed';
+  if (group.kind === 'raster' || group.kind === 'cnc') return 'group-managed';
   return laserModeWord(dialect.cutPowerMode);
 }
 

@@ -1,4 +1,14 @@
-export type { CutGroup, CutSegment, FillGroup, FillSegment, Group, Job, RasterGroup } from './job';
+export type {
+  CncGroup,
+  CncPass,
+  CutGroup,
+  CutSegment,
+  FillGroup,
+  FillSegment,
+  Group,
+  Job,
+  RasterGroup,
+} from './job';
 export { EMPTY_JOB } from './job';
 export { compileJob } from './compile-job';
 export { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';

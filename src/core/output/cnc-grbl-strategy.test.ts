@@ -1,0 +1,114 @@
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { findPlungedTravelIssues } from '../invariants';
+import type { CncGroup, Job } from '../job';
+import { cncGrblStrategy } from './cnc-grbl-strategy';
+
+const dev = DEFAULT_DEVICE_PROFILE;
+
+function squareLoop(at: number, size: number): ReadonlyArray<{ x: number; y: number }> {
+  return [
+    { x: at, y: at },
+    { x: at + size, y: at },
+    { x: at + size, y: at + size },
+    { x: at, y: at + size },
+    { x: at, y: at },
+  ];
+}
+
+function group(overrides: Partial<CncGroup> = {}): CncGroup {
+  return {
+    kind: 'cnc',
+    layerId: 'L1',
+    color: '#ff0000',
+    cutType: 'profile-on-path',
+    toolDiameterMm: 3.175,
+    feedMmPerMin: 1000,
+    plungeMmPerMin: 300,
+    spindleRpm: 12000,
+    spindleSpinupSec: 3,
+    safeZMm: 3.81,
+    passes: [
+      { zMm: -1.5, polyline: squareLoop(10, 20), closed: true },
+      { zMm: -3, polyline: squareLoop(10, 20), closed: true },
+    ],
+    ...overrides,
+  };
+}
+
+describe('cncGrblStrategy', () => {
+  it('emits the CNC preamble: units, absolute, feed mode, spindle, dwell', () => {
+    const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
+    expect(gcode.startsWith('G21\nG90\nG94\nM3 S12000\nG4 P3.000\n')).toBe(true);
+  });
+
+  it('retracts before XY travel and plunges at the plunge feed', () => {
+    const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
+    expect(gcode).toContain('G0 Z3.810\nG0 X10.000 Y10.000\nG1 Z-1.500 F300');
+    expect(gcode).toContain('G1 X30.000 Y10.000 F1000');
+  });
+
+  it('skips the retract when the next depth pass starts at the same XY', () => {
+    const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
+    // The loop closes at X10 Y10, then the deeper pass plunges directly.
+    expect(gcode).toContain('G1 X10.000 Y10.000\nG1 Z-3.000 F300');
+  });
+
+  it('ends with retract, spindle off, and XY park', () => {
+    const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
+    expect(gcode.endsWith('G0 Z3.810\nM5\nG0 X0.000 Y0.000\n')).toBe(true);
+  });
+
+  it('never travels XY with the bit below the safe height', () => {
+    const jobs: Job[] = [
+      { groups: [group()] },
+      {
+        groups: [
+          group(),
+          group({
+            layerId: 'L2',
+            spindleRpm: 8000,
+            passes: [{ zMm: -2, polyline: squareLoop(60, 15), closed: true }],
+          }),
+        ],
+      },
+    ];
+    for (const job of jobs) {
+      const gcode = cncGrblStrategy.emit(job, dev);
+      expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
+    }
+  });
+
+  it('re-issues spindle speed with a dwell when RPM changes between groups', () => {
+    const gcode = cncGrblStrategy.emit(
+      {
+        groups: [group(), group({ layerId: 'L2', spindleRpm: 8000, passes: group().passes })],
+      },
+      dev,
+    );
+    expect(gcode).toContain('M3 S8000\nG4 P3.000');
+  });
+
+  it('is byte-deterministic', () => {
+    const job: Job = { groups: [group()] };
+    expect(cncGrblStrategy.emit(job, dev)).toBe(cncGrblStrategy.emit(job, dev));
+  });
+
+  it('emits nothing for a job with no cnc groups', () => {
+    const laserJob: Job = {
+      groups: [
+        {
+          kind: 'cut',
+          layerId: 'L1',
+          color: '#ff0000',
+          power: 50,
+          speed: 1000,
+          passes: 1,
+          airAssist: false,
+          segments: [],
+        },
+      ],
+    };
+    expect(cncGrblStrategy.emit(laserJob, dev)).toBe('');
+  });
+});

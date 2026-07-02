@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { profileSupportsCapability, type DeviceProfile } from '../../core/devices';
+import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 
@@ -18,8 +19,10 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const [step, setStep] = useState<number>(10);
   const [focusStep, setFocusStep] = useState<number>(1);
   const device = useStore((s) => s.project.device);
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const jog = useLaserStore((s) => s.jog);
+  const zeroZHere = useLaserStore((s) => s.zeroZHere);
   const feed = Math.min(maxFeed, 3000);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
 
@@ -72,10 +75,12 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
       </div>
       <FocusJogControls
         device={device}
+        machineKind={machineKind}
         disabled={disabled}
         focusStep={focusStep}
         setFocusStep={setFocusStep}
         onJog={sendFocus}
+        onZeroZ={() => void zeroZHere()}
       />
     </div>
   );
@@ -83,23 +88,28 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
 
 function FocusJogControls(props: {
   readonly device: DeviceProfile;
+  readonly machineKind: MachineKind;
   readonly disabled: boolean;
   readonly focusStep: number;
   readonly setFocusStep: (step: number) => void;
   readonly onJog: (direction: 1 | -1) => void;
+  readonly onZeroZ: () => void;
 }): JSX.Element {
   const supportsZAxis = profileSupportsCapability(props.device, 'z-axis');
   const zTravelConfirmed = props.device.zTravelConfirmed === true;
   const zTravelReady = isPositive(props.device.zTravelMm);
-  if (!supportsZAxis) {
+  const isCncMachine = props.machineKind === 'cnc';
+  if (!supportsZAxis && !isCncMachine) {
     return <p style={focusHintStyle}>Manual focus: adjust the laser head by hand.</p>;
   }
-  const zReady = zTravelConfirmed && zTravelReady;
+  // A CNC project needs Z control by definition — the machine-kind toggle is
+  // the operator's declaration that this GRBL controller drives a Z axis.
+  const zReady = isCncMachine || (zTravelConfirmed && zTravelReady);
   const zDisabled = props.disabled || !zReady;
   return (
     <div style={focusPanelStyle}>
       <div style={headerRowStyle}>
-        <span style={labelStyle}>Focus / Z</span>
+        <span style={labelStyle}>{isCncMachine ? 'Z axis' : 'Focus / Z'}</span>
         <select
           value={props.focusStep}
           onChange={(e) => props.setFocusStep(Number(e.target.value))}
@@ -129,6 +139,17 @@ function FocusJogControls(props: {
         >
           Z-
         </Btn>
+        {isCncMachine ? (
+          <button
+            type="button"
+            onClick={props.onZeroZ}
+            disabled={zDisabled}
+            aria-label="Zero work Z at current bit height"
+            title="Touch the bit to the stock top, then click to declare that height Z0 (G92 Z0)."
+          >
+            Zero Z
+          </button>
+        ) : null}
         {!zReady && (
           <span style={focusHintStyle}>Confirm Z travel in Machine Setup before using Z jog.</span>
         )}

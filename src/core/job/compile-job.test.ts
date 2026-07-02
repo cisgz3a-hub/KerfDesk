@@ -120,7 +120,8 @@ describe('compileJob', () => {
       ],
     });
     const job = compileJob({ objects: [obj], layers: [layer] }, dev);
-    expect(job.groups[0]?.speed).toBe(dev.maxFeed);
+    const first = job.groups[0];
+    expect(first?.kind === 'cnc' ? undefined : first?.speed).toBe(dev.maxFeed);
   });
 
   it('carries air assist intent onto line groups', () => {

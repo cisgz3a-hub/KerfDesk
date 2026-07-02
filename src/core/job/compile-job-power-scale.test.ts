@@ -85,7 +85,7 @@ describe('compileJob object power scale', () => {
     );
 
     expect(job.groups).toHaveLength(2);
-    expect(job.groups.map((group) => group.power)).toEqual([15, 30]);
+    expect(job.groups.map((group) => (group.kind === 'cnc' ? -1 : group.power))).toEqual([15, 30]);
   });
 
   it('scales grayscale raster max and min power for one image object', () => {

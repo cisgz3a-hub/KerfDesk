@@ -10,7 +10,9 @@ import {
   normalizeScanOffsetTable,
 } from '../../core/devices';
 import {
+  DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_PROJECT_OPTIMIZATION,
+  DEFAULT_CNC_TOOLS,
   PROJECT_SCHEMA_VERSION,
   type Project,
 } from '../../core/scene';
@@ -79,7 +81,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   const objects = Array.isArray(scene['objects']) ? scene['objects'] : [];
   const layers = Array.isArray(scene['layers']) ? scene['layers'] : [];
   const groups = Array.isArray(scene['groups']) ? scene['groups'] : [];
-  const normalized = {
+  const normalized: Record<string, unknown> = {
     ...raw,
     device: normalizeDevice(dev),
     optimization: normalizeOptimization(raw['optimization']),
@@ -91,7 +93,63 @@ function normalizeProject(raw: Record<string, unknown>): Project {
       groups,
     },
   };
+  // `...raw` copied whatever `machine` value the file carried; replace it
+  // with the sanitized config, or REMOVE it entirely when unrecognized so an
+  // unknown kind can't ride through the spread.
+  const machine = normalizeMachineValue(raw['machine']);
+  if (machine === undefined) {
+    delete normalized['machine'];
+  } else {
+    normalized['machine'] = machine;
+  }
   return normalized as unknown as Project;
+}
+
+// Optional machine config (CNC support). Absent or unrecognized → undefined
+// (the key is dropped and the project loads as a laser project). A CNC config
+// is rebuilt from defaults field-by-field so malformed values cannot reach
+// the compiler.
+function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefined {
+  if (!isObject(raw)) return undefined;
+  if (raw['kind'] === 'laser') return { kind: 'laser' };
+  if (raw['kind'] !== 'cnc') return undefined;
+  const d = DEFAULT_CNC_MACHINE_CONFIG;
+  const stock = isObject(raw['stock']) ? raw['stock'] : {};
+  const params = isObject(raw['params']) ? raw['params'] : {};
+  const tools = normalizeCncTools(raw['tools']);
+  const toolId =
+    typeof raw['toolId'] === 'string' && tools.some((tool) => tool['id'] === raw['toolId'])
+      ? raw['toolId']
+      : d.toolId;
+  return {
+    kind: 'cnc',
+    stock: {
+      thicknessMm: positiveNumberOrDefault(stock['thicknessMm'], d.stock.thicknessMm),
+    },
+    tools,
+    toolId,
+    params: {
+      safeZMm: positiveNumberOrDefault(params['safeZMm'], d.params.safeZMm),
+      spindleMaxRpm: positiveNumberOrDefault(params['spindleMaxRpm'], d.params.spindleMaxRpm),
+      spindleSpinupSec: nonNegativeNumberOrDefault(
+        params['spindleSpinupSec'],
+        d.params.spindleSpinupSec,
+      ),
+    },
+  };
+}
+
+function normalizeCncTools(raw: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(raw)) return DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
+  const tools = raw.filter(
+    (tool): tool is Record<string, unknown> =>
+      isObject(tool) &&
+      typeof tool['id'] === 'string' &&
+      typeof tool['name'] === 'string' &&
+      typeof tool['diameterMm'] === 'number' &&
+      tool['diameterMm'] > 0,
+  );
+  return tools.length > 0 ? tools : DEFAULT_CNC_TOOLS.map((tool) => ({ ...tool }));
 }
 
 function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> {

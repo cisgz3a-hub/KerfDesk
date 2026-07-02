@@ -65,6 +65,11 @@ export const CMD_SET_ORIGIN_HERE = 'G92 X0 Y0';
  *  the operator's next "Set origin here" starts from a clean state. */
 export const CMD_CLEAR_ORIGIN = 'G92.1';
 
+/** Zero the work Z at the current bit/head height (CNC: touch the bit to the
+ *  stock top, then declare that plane Z0 so cut depths measure into the
+ *  material). G92 offsets are per-axis in GRBL — this leaves X/Y untouched. */
+export const CMD_ZERO_Z_HERE = 'G92 Z0';
+
 /** Set the G54 work coordinate origin to the current head position. Persistent:
  *  this writes controller coordinate storage and survives reset/power-cycle. */
 export const CMD_SET_PERSISTENT_ORIGIN_HERE = 'G10 L20 P1 X0 Y0';
