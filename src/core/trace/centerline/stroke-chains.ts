@@ -10,6 +10,7 @@
 //     the vertex count without moving the line visibly.
 
 import type { Polyline, Vec2 } from '../../scene';
+import { refineChainForOutput } from './curve-refine';
 import type { InkMask } from './distance-field';
 import { bridgeNearbyEnds, pairThroughJunctions, type Chain } from './junction-pairing';
 import { pointAtArcDistance, radiusAtPosition } from './polyline-window';
@@ -112,7 +113,7 @@ function finalizeChains(
     const simplified = simplify(sharpened, chain.closed, simplifyEpsilonPx);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
-    result.push({ points: simplified, closed: chain.closed });
+    result.push({ points: refineChainForOutput(simplified, chain.closed), closed: chain.closed });
   }
   return result;
 }
@@ -141,24 +142,39 @@ function closingSegmentLength(points: ReadonlyArray<Vec2>): number {
 
 // --- smoothing ---
 
+// Taubin λ|μ smoothing: a shrink-free alternative to plain Laplacian
+// passes. Laplacian smoothing contracts every closed loop toward its
+// centroid — small letter bowls visibly "melt" (the LANGEBAAN defect) —
+// while Taubin's negative μ pass re-inflates what the λ pass shrank,
+// killing the pixel staircase without eroding feature area.
+const TAUBIN_LAMBDA = 0.5;
+const TAUBIN_MU = -0.53;
+
 function smoothChain(chain: Chain): void {
   for (let pass = 0; pass < SMOOTHING_PASSES; pass += 1) {
-    const src = chain.points;
-    if (src.length < 3) return;
-    const out: Vec2[] = new Array<Vec2>(src.length);
-    for (let i = 0; i < src.length; i += 1) {
-      const p = src[i];
-      if (p === undefined) continue;
-      const prev = chain.closed ? src[(i - 1 + src.length) % src.length] : src[i - 1];
-      const next = chain.closed ? src[(i + 1) % src.length] : src[i + 1];
-      if (prev === undefined || next === undefined) {
-        out[i] = p; // pinned ends of open chains
-        continue;
-      }
-      out[i] = { x: (prev.x + 2 * p.x + next.x) / 4, y: (prev.y + 2 * p.y + next.y) / 4 };
-    }
-    chain.points = out.filter((p): p is Vec2 => p !== undefined);
+    smoothingStep(chain, TAUBIN_LAMBDA);
+    smoothingStep(chain, TAUBIN_MU);
   }
+}
+
+function smoothingStep(chain: Chain, factor: number): void {
+  const src = chain.points;
+  if (src.length < 3) return;
+  const out: Vec2[] = new Array<Vec2>(src.length);
+  for (let i = 0; i < src.length; i += 1) {
+    const p = src[i];
+    if (p === undefined) continue;
+    const prev = chain.closed ? src[(i - 1 + src.length) % src.length] : src[i - 1];
+    const next = chain.closed ? src[(i + 1) % src.length] : src[i + 1];
+    if (prev === undefined || next === undefined) {
+      out[i] = p; // pinned ends of open chains
+      continue;
+    }
+    const midX = (prev.x + next.x) / 2;
+    const midY = (prev.y + next.y) / 2;
+    out[i] = { x: p.x + factor * (midX - p.x), y: p.y + factor * (midY - p.y) };
+  }
+  chain.points = out.filter((p): p is Vec2 => p !== undefined);
 }
 
 // --- tip extension ---

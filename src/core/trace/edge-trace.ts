@@ -31,11 +31,47 @@ const EDGE_ALIGNED_JOIN_FACTOR = 3;
 
 export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
   const joinGapPx = Math.max(0, options.edgeJoinGapPx ?? DEFAULT_EDGE_JOIN_GAP_PX);
-  const edgeSource = options.edgeMedianFilter === false ? image : medianFilter(image);
+  const edgeSource = medianForEdges(image, options.edgeMedianFilter);
   const edges = cannyEdges(edgeSource, edgeCannyOptions(options));
   const mask: InkMask = { width: image.width, height: image.height, ink: edges };
   const polylines = chainEdgeMask(mask, options, joinGapPx);
   return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];
+}
+
+// Median pre-filtering: a 3×3 median protects noisy photos but DESTROYS
+// clean small features — 4-6 px letters trace as melted blobs (the
+// LANGEBAAN defect). Default (undefined) is therefore AUTO: apply the
+// median only when the image actually contains impulse noise, measured as
+// the fraction of pixels the median would change dramatically. An explicit
+// true/false still forces the choice.
+const IMPULSE_NOISE_LUMA_DELTA = 40;
+const IMPULSE_NOISE_MIN_RATIO = 0.004;
+
+function medianForEdges(image: RawImageData, edgeMedianFilter: boolean | undefined): RawImageData {
+  if (edgeMedianFilter === false) return image;
+  const filtered = medianFilter(image);
+  if (edgeMedianFilter === true) return filtered;
+  return impulseNoiseRatio(image, filtered) >= IMPULSE_NOISE_MIN_RATIO ? filtered : image;
+}
+
+function impulseNoiseRatio(image: RawImageData, filtered: RawImageData): number {
+  const pixels = image.width * image.height;
+  if (pixels === 0) return 0;
+  let impulses = 0;
+  for (let i = 0; i < pixels; i += 1) {
+    const a = lumaAt(image, i);
+    const b = lumaAt(filtered, i);
+    if (Math.abs(a - b) > IMPULSE_NOISE_LUMA_DELTA) impulses += 1;
+  }
+  return impulses / pixels;
+}
+
+function lumaAt(image: RawImageData, i: number): number {
+  return (
+    0.299 * (image.data[i * 4] ?? 0) +
+    0.587 * (image.data[i * 4 + 1] ?? 0) +
+    0.114 * (image.data[i * 4 + 2] ?? 0)
+  );
 }
 
 function edgeCannyOptions(options: TraceOptions): CannyOptions {

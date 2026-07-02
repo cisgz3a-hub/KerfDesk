@@ -11,7 +11,11 @@ import { arcLength } from './spur-pruning';
 import type { StrokeChain, StrokeGraph, StrokeNode } from './stroke-graph';
 
 const MERGE_RADIUS_FACTOR = 0.9;
-const MERGE_MIN_DISTANCE_PX = 3;
+const MERGE_MIN_DISTANCE_PX = 1.5;
+// Cap the merge reach at fat-stroke scale: blob-sized radii (shaded regions
+// binarized into big blobs) would otherwise weld every junction across tens
+// of pixels into one mega-node whose centroid drags chords across the art.
+const MERGE_MAX_DISTANCE_PX = 12;
 
 export function condenseJunctions(
   graph: StrokeGraph,
@@ -48,9 +52,12 @@ export function condenseJunctions(
 
 function shouldMerge(a: StrokeNode, b: StrokeNode, distSq: Float64Array, width: number): boolean {
   const distance = Math.hypot(b.pos.x - a.pos.x, b.pos.y - a.pos.y);
-  const budget = Math.max(
-    MERGE_MIN_DISTANCE_PX,
-    MERGE_RADIUS_FACTOR * (radiusNear(a.pos, distSq, width) + radiusNear(b.pos, distSq, width)),
+  const budget = Math.min(
+    MERGE_MAX_DISTANCE_PX,
+    Math.max(
+      MERGE_MIN_DISTANCE_PX,
+      MERGE_RADIUS_FACTOR * (radiusNear(a.pos, distSq, width) + radiusNear(b.pos, distSq, width)),
+    ),
   );
   return distance <= budget;
 }
