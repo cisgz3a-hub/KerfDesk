@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import type { MachineKind } from '../../core/scene';
+import { machineDisplayName } from '../machine/machine-labels';
 import {
   COMMAND_FAMILY_ORDER,
   runCommand,
@@ -7,7 +9,10 @@ import {
 } from './command-registry';
 import { commandHelpId, controlHelp, menuHelpId } from '../help/help-topics';
 
-export function AppMenuBar(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
+export function AppMenuBar(props: {
+  readonly commands: ReadonlyArray<AppCommand>;
+  readonly machineKind: MachineKind;
+}): JSX.Element {
   const [openFamily, setOpenFamily] = useState<CommandFamily | null>(null);
   const menuBarRef = useRef<HTMLElement | null>(null);
 
@@ -35,6 +40,7 @@ export function AppMenuBar(props: { readonly commands: ReadonlyArray<AppCommand>
         <MenuFamily
           key={family}
           family={family}
+          machineKind={props.machineKind}
           commands={props.commands}
           open={openFamily === family}
           onOpenChange={(open) =>
@@ -52,6 +58,7 @@ export function AppMenuBar(props: { readonly commands: ReadonlyArray<AppCommand>
 
 function MenuFamily(props: {
   readonly family: CommandFamily;
+  readonly machineKind: MachineKind;
   readonly commands: ReadonlyArray<AppCommand>;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -77,7 +84,7 @@ function MenuFamily(props: {
           toggle();
         }}
       >
-        {familyLabel(props.family)}
+        {familyLabel(props.family, props.machineKind)}
       </summary>
       {props.open ? (
         <div role="menu" className="lf-menu" style={menuStyle}>
@@ -110,7 +117,7 @@ function MenuFamily(props: {
   );
 }
 
-function familyLabel(family: CommandFamily): string {
+function familyLabel(family: CommandFamily, machineKind: MachineKind): string {
   switch (family) {
     case 'file':
       return 'File';
@@ -121,7 +128,9 @@ function familyLabel(family: CommandFamily): string {
     case 'arrange':
       return 'Arrange';
     case 'laser':
-      return 'Laser';
+      // The family KEY stays 'laser' (ADR-100 §7); only the visible label
+      // follows the machine kind.
+      return machineDisplayName(machineKind);
     case 'window':
       return 'Window';
     case 'help':

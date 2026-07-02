@@ -1,22 +1,26 @@
-// ConnectionBar — "Connect to laser" button + current status indicator.
+// ConnectionBar — machine connect button + current status indicator.
 //
 // State-driven button label per F-B1/F-B2:
 //   disconnected → "Connect…"
 //   connecting   → spinner + "Connecting…" (disabled)
 //   connected    → "Disconnect"
 //   failed       → "Connect (last error: …)"
+//
+// machineNoun keeps the hover copy machine-aware ("laser" / "router",
+// ADR-100 §7) while this component stays presentational.
 
 import type { ConnectionState } from '../state/laser-store';
 
 type Props = {
   readonly connection: ConnectionState;
+  readonly machineNoun: string;
   readonly onConnect: () => void;
   readonly onDisconnect: () => void;
   readonly disabled: boolean;
 };
 
 export function ConnectionBar(props: Props): JSX.Element {
-  const { connection, onConnect, onDisconnect, disabled } = props;
+  const { connection, machineNoun, onConnect, onDisconnect, disabled } = props;
   return (
     <div style={rowStyle}>
       {connection.kind === 'connected' ? (
@@ -24,7 +28,7 @@ export function ConnectionBar(props: Props): JSX.Element {
           type="button"
           onClick={onDisconnect}
           disabled={disabled}
-          title="Close the current laser serial connection."
+          title={`Close the current ${machineNoun} serial connection.`}
         >
           Disconnect
         </button>
@@ -33,7 +37,7 @@ export function ConnectionBar(props: Props): JSX.Element {
           type="button"
           onClick={onConnect}
           disabled={disabled || connection.kind === 'connecting'}
-          title="Open the browser serial picker and connect to your laser controller."
+          title={`Open the browser serial picker and connect to your ${machineNoun} controller.`}
         >
           {connection.kind === 'connecting' ? 'Connecting…' : 'Connect…'}
         </button>

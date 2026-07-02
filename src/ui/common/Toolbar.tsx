@@ -4,10 +4,15 @@
 import { runCommand, type AppCommand, type CommandId } from '../commands/command-registry';
 import { commandHelpId, controlHelp } from '../help/help-topics';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
+import type { MachineKind } from '../../core/scene';
+import { machineDisplayName } from '../machine/machine-labels';
 import { ConnectionBadge } from './ConnectionBadge';
 import { InstallButton } from './InstallButton';
 
-export function Toolbar(props: { readonly commands: ReadonlyArray<AppCommand> }): JSX.Element {
+export function Toolbar(props: {
+  readonly commands: ReadonlyArray<AppCommand>;
+  readonly machineKind: MachineKind;
+}): JSX.Element {
   return (
     <header aria-label="Toolbar" style={barStyle}>
       <span style={titleStyle}>{APP_DISPLAY_NAME}</span>
@@ -16,7 +21,7 @@ export function Toolbar(props: { readonly commands: ReadonlyArray<AppCommand> })
       <span style={separatorStyle} />
       <ToolbarButtons commands={props.commands} />
       <span style={separatorStyle} />
-      <span style={hintStyle} title={SHORTCUT_HINT}>
+      <span style={hintStyle} title={shortcutHint(props.machineKind)}>
         shortcuts
       </span>
       <InstallButton />
@@ -107,14 +112,17 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
 
 // Keep in sync with shortcuts.ts, use-job-shortcuts.ts, and drag-state.ts —
 // the audit (M27/A.5) caught this hint omitting four shipped shortcuts.
-const SHORTCUT_HINT = [
-  'File: Ctrl+N new - Ctrl+O open - Ctrl+S save - Ctrl+Shift+S save as - Ctrl+I import - Ctrl+Shift+E export G-code',
-  'Tools: Ctrl+R rectangle - Ctrl+E ellipse - Ctrl+L pen - Alt+M measure - Enter or double-click finish pen - Esc cancel',
-  'Edit: Ctrl+Z undo - Ctrl+Shift+Z redo - Ctrl+A select all - Ctrl+D duplicate - Delete/Backspace remove - Escape deselect',
-  'Transform: arrows nudge 1mm - Shift+arrows 10mm - H flip horizontal - V flip vertical',
-  'View: F or 0 fit-to-bed - Shift+F fit-to-selection - +/- zoom - P preview - Space or right-drag pan',
-  'Laser: Ctrl+Enter start job - Ctrl+. stop job',
-].join('\n');
+// The job-control line is machine-aware (ADR-100 §7): same keys, right noun.
+function shortcutHint(machineKind: MachineKind): string {
+  return [
+    'File: Ctrl+N new - Ctrl+O open - Ctrl+S save - Ctrl+Shift+S save as - Ctrl+I import - Ctrl+Shift+E export G-code',
+    'Tools: Ctrl+R rectangle - Ctrl+E ellipse - Ctrl+L pen - Alt+M measure - Enter or double-click finish pen - Esc cancel',
+    'Edit: Ctrl+Z undo - Ctrl+Shift+Z redo - Ctrl+A select all - Ctrl+D duplicate - Delete/Backspace remove - Escape deselect',
+    'Transform: arrows nudge 1mm - Shift+arrows 10mm - H flip horizontal - V flip vertical',
+    'View: F or 0 fit-to-bed - Shift+F fit-to-selection - +/- zoom - P preview - Space or right-drag pan',
+    `${machineDisplayName(machineKind)}: Ctrl+Enter start job - Ctrl+. stop job`,
+  ].join('\n');
+}
 
 const barStyle: React.CSSProperties = {
   display: 'flex',

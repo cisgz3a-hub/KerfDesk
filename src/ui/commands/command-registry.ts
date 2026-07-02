@@ -2,15 +2,10 @@
 // buildAppCommands, lookup, and the run guard. Family builders live in
 // command-families.ts; shared shapes in command-types.ts (ADR-015 split).
 
-import {
-  fileCommands,
-  helpCommand,
-  laserCommands,
-  toolsCommands,
-  windowCommands,
-} from './command-families';
+import { fileCommands, helpCommand, toolsCommands, windowCommands } from './command-families';
 import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
+import { laserCommands } from './laser-command-family';
 import { gateCommandsForMachineKind } from './machine-command-gate';
 import type { AppCommand, AppCommandContext, CommandId } from './command-types';
 

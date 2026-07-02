@@ -170,7 +170,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<Toolbar commands={[]} />);
+        root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
       expect(host.textContent).toContain('KerfDesk');
@@ -188,7 +188,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<Toolbar commands={[]} />);
+        root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
       const hint = [...host.querySelectorAll('span')].find(
@@ -203,6 +203,29 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
       expect(title).toContain('Ctrl+Shift+E'); // save G-code
       expect(title).not.toContain('Ctrl+E export G-code'); // reserved for future ellipse tool
       expect(title.toLowerCase()).toContain('right-drag'); // pan
+      expect(title).toContain('Laser: Ctrl+Enter');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('labels the job-control shortcuts with the machine noun in CNC mode (ADR-100 §7)', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={[]} machineKind="cnc" />);
+      });
+
+      const hint = [...host.querySelectorAll('span')].find(
+        (span) => span.textContent === 'shortcuts',
+      );
+      const title = hint?.getAttribute('title') ?? '';
+      expect(title).toContain('Router: Ctrl+Enter');
+      expect(title).not.toContain('Laser:');
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -230,7 +253,7 @@ describe('Toolbar command buttons', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<Toolbar commands={commands} />);
+        root.render(<Toolbar commands={commands} machineKind="laser" />);
       });
 
       const button = [...host.querySelectorAll('button')].find((item) =>
@@ -267,7 +290,7 @@ describe('Toolbar command buttons', () => {
     try {
       await act(async () => {
         root = createRoot(host);
-        root.render(<Toolbar commands={commands} />);
+        root.render(<Toolbar commands={commands} machineKind="laser" />);
       });
 
       const button = host.querySelector('button[data-help-id="command:file.new"]');

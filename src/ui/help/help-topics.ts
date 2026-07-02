@@ -115,8 +115,11 @@ export const MENU_HELP: Readonly<Record<CommandFamily, HelpTopic>> = {
     tooltip: 'Arrange menu for alignment, distribution, and flip actions.',
   },
   laser: {
-    label: 'Laser menu',
-    tooltip: 'Laser menu for connection and controller setup actions.',
+    // Machine-neutral copy: this family renders as "Laser" or "Router"
+    // depending on the project machine (ADR-100 §7); the help id stays
+    // 'laser' because ids never rename.
+    label: 'Machine menu',
+    tooltip: 'Machine menu for connection and controller setup actions.',
   },
   window: {
     label: 'Window menu',
