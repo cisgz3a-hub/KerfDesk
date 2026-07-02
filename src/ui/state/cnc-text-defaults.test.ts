@@ -1,0 +1,88 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { IDENTITY_TRANSFORM, type TextObject } from '../../core/scene';
+import { useStore } from './store';
+import { resetStore } from './test-helpers';
+
+const TEXT_COLOR = '#111111';
+
+function textObject(overrides: Partial<TextObject> = {}): TextObject {
+  return {
+    kind: 'text',
+    id: 'T1',
+    content: 'Oak',
+    fontKey: 'Roboto',
+    sizeMm: 20,
+    alignment: 'left',
+    lineHeight: 1,
+    letterSpacing: 0,
+    color: TEXT_COLOR,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 20 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: TEXT_COLOR,
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 0, y: 0 },
+              { x: 40, y: 0 },
+              { x: 40, y: 20 },
+            ],
+          },
+        ],
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function textLayerCutType(): string | undefined {
+  const layer = useStore.getState().project.scene.layers.find((l) => l.color === TEXT_COLOR);
+  return layer?.cnc?.cutType;
+}
+
+beforeEach(() => {
+  resetStore();
+});
+
+describe('CNC text defaults (H.6c)', () => {
+  it('a fresh text layer in CNC mode with a v-bit defaults to v-carve', () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().updateCncMachine({ toolId: 'vb-60' });
+
+    useStore.getState().upsertTextObject(textObject());
+
+    expect(textLayerCutType()).toBe('v-carve');
+  });
+
+  it('a fresh text layer in CNC mode with an end mill defaults to on-path engrave', () => {
+    useStore.getState().setMachineKind('cnc');
+
+    useStore.getState().upsertTextObject(textObject());
+
+    expect(textLayerCutType()).toBe('engrave');
+  });
+
+  it('laser mode leaves the new text layer without CNC settings', () => {
+    useStore.getState().upsertTextObject(textObject());
+
+    expect(textLayerCutType()).toBeUndefined();
+  });
+
+  it('never rewrites a layer the operator already configured', () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().upsertTextObject(textObject());
+    // Operator retunes the layer to a pocket...
+    const layer = useStore.getState().project.scene.layers.find((l) => l.color === TEXT_COLOR);
+    if (layer?.cnc === undefined) throw new Error('text layer with CNC settings missing');
+    useStore.getState().setLayerParam(layer.id, {
+      cnc: { ...layer.cnc, cutType: 'pocket' },
+    });
+
+    // ...then edits the text: settings must survive.
+    useStore.getState().upsertTextObject(textObject({ content: 'Oak Sign' }));
+
+    expect(textLayerCutType()).toBe('pocket');
+  });
+});

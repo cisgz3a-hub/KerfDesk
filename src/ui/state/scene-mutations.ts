@@ -23,6 +23,7 @@ import {
   type Transform,
   updateLayer,
 } from '../../core/scene';
+import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 
 const HISTORY_DEPTH = 50;
 const MULTI_IMPORT_OFFSET_MM = 10;
@@ -491,6 +492,7 @@ export function applyReimport(
 // re-renders. On add, fits to the bed like a fresh SVG import.
 export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult {
   const existing = s.project.scene.objects.find((o) => o.id === text.id);
+  const hadLayer = s.project.scene.layers.some((layer) => layer.color === text.color);
   let scene: Scene;
   if (existing !== undefined) {
     const preserved: TextObject = { ...text, transform: existing.transform };
@@ -500,6 +502,12 @@ export function applyUpsertText(s: StateSlice, text: TextObject): MutationResult
     scene = addObject(s.project.scene, fitted);
   }
   scene = ensureLayersForColors(scene, text.paths);
+  // H.6c: a text layer born in CNC mode gets text-appropriate CNC settings
+  // (v-carve with a v-bit, on-path engrave otherwise) instead of the
+  // letter-destroying profile-outside default.
+  if (!hadLayer) {
+    scene = applyCncTextDefaultsToNewLayer(scene, s.project.machine, text.color);
+  }
   return {
     project: { ...s.project, scene },
     selectedObjectId: text.id,
