@@ -13,10 +13,11 @@ import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncContourPass, CncGroup } from '../job';
 import { meshToHeightmap, reliefRoughingPasses } from '../relief';
 import {
-  activeCncTool,
   applyTransform,
+  layerCncTool,
   type CncLayerSettings,
   type CncMachineConfig,
+  type CncTool,
   type Layer,
   type ReliefObject,
   type SceneObject,
@@ -37,10 +38,10 @@ export function compileReliefGroupForLayer(
     (o): o is ReliefObject => o.kind === 'relief' && o.color === layer.color,
   );
   if (reliefs.length === 0) return null;
-  const tool = activeCncTool(config);
+  const tool = layerCncTool(config, settings);
   const passes: CncContourPass[] = [];
   for (const relief of reliefs) {
-    appendReliefPasses(passes, relief, settings, device, tool.diameterMm, config);
+    appendReliefPasses(passes, relief, settings, device, tool);
   }
   if (passes.length === 0) return null;
   return {
@@ -48,6 +49,8 @@ export function compileReliefGroupForLayer(
     layerId: layer.id,
     color: layer.color,
     cutType: 'relief-rough',
+    toolId: tool.id,
+    toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
     feedMmPerMin: cap(settings.feedMmPerMin, device.maxFeed),
     plungeMmPerMin: cap(settings.plungeMmPerMin, device.maxFeed),
@@ -63,8 +66,7 @@ function appendReliefPasses(
   relief: ReliefObject,
   settings: CncLayerSettings,
   device: DeviceProfile,
-  toolDiameterMm: number,
-  config: CncMachineConfig,
+  tool: CncTool,
 ): void {
   const heightmap = meshToHeightmap(
     { positions: Float32Array.from(relief.meshPositions) },
@@ -72,12 +74,12 @@ function appendReliefPasses(
       targetWidthMm: relief.targetWidthMm,
       reliefDepthMm: relief.reliefDepthMm,
       emptyCells: relief.emptyCells,
-      mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, toolDiameterMm / ROUGHING_CELL_TOOL_FRACTION),
+      mmPerCell: Math.max(MIN_ROUGHING_CELL_MM, tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION),
     },
   );
   if (heightmap.kind === 'error') return;
   const local = reliefRoughingPasses(heightmap.heightmap, {
-    tool: activeCncTool(config),
+    tool,
     reliefDepthMm: relief.reliefDepthMm,
     depthPerPassMm: settings.depthPerPassMm,
     stepoverPercent: settings.stepoverPercent,

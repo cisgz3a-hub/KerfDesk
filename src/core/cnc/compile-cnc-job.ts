@@ -16,12 +16,13 @@
 import { type DeviceProfile, toMachineCoords } from '../devices';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
-  activeCncTool,
   applyTransform,
   assertNever,
+  layerCncTool,
   type CncCutType,
   type CncLayerSettings,
   type CncMachineConfig,
+  type CncTool,
   type ColoredPath,
   type Layer,
   type Polyline,
@@ -33,9 +34,12 @@ import {
 import type { CncGroup, CncPass, Job } from '../job';
 import { passNeedsTabs, splitPassForTabs } from './cnc-tabs';
 import { compileReliefGroupForLayer } from './compile-cnc-relief';
+import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
+import { drillPeckPasses } from './drill-peck';
 import { pocketToolpathRings } from './pocket-paths';
 import { profileToolpathPolylines } from './profile-paths';
+import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarvePasses } from './vcarve-ladder';
 
 const COORD_EPS = 1e-9;
@@ -53,6 +57,10 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
     if (reliefGroup !== null) clearingGroups.push(reliefGroup);
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
+    // H.7 two-stage v-carve: the flat-floor clearance pocket runs before
+    // the v-bit ladder, with its own bit.
+    const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
+    if (clearance !== null) clearingGroups.push(clearance);
     const group = cncGroupForLayer(layer, settings, polylines, device, config);
     if (group === null) continue;
     if (isProfileCutType(settings.cutType)) {
@@ -61,7 +69,9 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
       clearingGroups.push(group);
     }
   }
-  return { groups: [...clearingGroups, ...profileGroups] };
+  // H.7 multi-tool: contiguous per-bit sections (one change per bit),
+  // profile-carrying sections last so freed parts are never re-machined.
+  return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
 }
 
 export function isProfileCutType(cutType: CncCutType): boolean {
@@ -124,16 +134,25 @@ function cncGroupForLayer(
   device: DeviceProfile,
   config: CncMachineConfig,
 ): CncGroup | null {
-  const tool = activeCncTool(config);
+  const tool = layerCncTool(config, settings);
   const passes = passesForLayer(polylines, settings, tool);
   if (passes.length === 0) return null;
+  // Drill holes run the whole peck cycle at the plunge feed: re-entry is
+  // air until the previous floor, and fresh material only ever meets the
+  // bit at plunge speed.
+  const cutFeed =
+    settings.cutType === 'drill'
+      ? Math.min(settings.feedMmPerMin, settings.plungeMmPerMin)
+      : settings.feedMmPerMin;
   return {
     kind: 'cnc',
     layerId: layer.id,
     color: layer.color,
     cutType: settings.cutType,
+    toolId: tool.id,
+    toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
-    feedMmPerMin: capFeed(settings.feedMmPerMin, device.maxFeed),
+    feedMmPerMin: capFeed(cutFeed, device.maxFeed),
     plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
     spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
@@ -142,10 +161,48 @@ function cncGroupForLayer(
   };
 }
 
+// The two-stage v-carve's clearing group (H.7): pocket the flat floors
+// with the layer's clearing bit before the v-bit ladder runs.
+function vcarveClearanceGroupForLayer(
+  layer: Layer,
+  settings: CncLayerSettings,
+  polylines: ReadonlyArray<Polyline>,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): CncGroup | null {
+  if (settings.cutType !== 'v-carve' || settings.vClearToolId === undefined) return null;
+  const clearTool = config.tools.find((tool) => tool.id === settings.vClearToolId);
+  if (clearTool === undefined) return null;
+  const vBit = layerCncTool(config, settings);
+  const toolpaths = vcarveClearanceToolpaths(polylines, {
+    vBit,
+    clearTool,
+    maxDepthMm: settings.depthMm,
+    stepoverPercent: settings.stepoverPercent,
+  });
+  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
+  if (toolpaths.length === 0 || depths.length === 0) return null;
+  return {
+    kind: 'cnc',
+    layerId: layer.id,
+    color: layer.color,
+    cutType: 'pocket',
+    toolId: clearTool.id,
+    toolName: clearTool.name,
+    toolDiameterMm: clearTool.diameterMm,
+    feedMmPerMin: capFeed(settings.feedMmPerMin, device.maxFeed),
+    plungeMmPerMin: capFeed(settings.plungeMmPerMin, device.maxFeed),
+    spindleRpm: capSpindle(settings.spindleRpm, config.params.spindleMaxRpm),
+    spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
+    safeZMm: Math.max(0, config.params.safeZMm),
+    passes: depthMajorPasses(toolpaths, depths),
+  };
+}
+
 function passesForLayer(
   polylines: ReadonlyArray<Polyline>,
   settings: CncLayerSettings,
-  tool: ReturnType<typeof activeCncTool>,
+  tool: CncTool,
 ): ReadonlyArray<CncPass> {
   // V-carve computes per-ring depths itself (H.3) — it does not fit the
   // "XY toolpaths × uniform depth ladder" shape of the other cut types.
@@ -155,6 +212,13 @@ function passesForLayer(
       maxDepthMm: settings.depthMm,
       depthPerPassMm: settings.depthPerPassMm,
       resolutionMm: settings.vResolutionMm,
+    });
+  }
+  // Drill encodes its own peck Z cycle (H.7) — no XY toolpath × depth grid.
+  if (settings.cutType === 'drill') {
+    return drillPeckPasses(polylines, {
+      depthMm: settings.depthMm,
+      depthPerPassMm: settings.depthPerPassMm,
     });
   }
   const toolpaths = xyToolpathsForCutType(polylines, settings, tool.diameterMm);
@@ -182,7 +246,8 @@ function xyToolpathsForCutType(
     case 'engrave':
       return polylines.filter((polyline) => polyline.points.length >= 2);
     case 'v-carve':
-      // Handled by the vcarvePasses branch upstream — unreachable here.
+    case 'drill':
+      // Handled by their dedicated branches upstream — unreachable here.
       return [];
     case 'relief-rough':
       // Compile-time-only cut type (produced by compile-cnc-relief from

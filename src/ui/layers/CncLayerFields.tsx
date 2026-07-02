@@ -14,6 +14,7 @@ import {
   type Layer,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { LayerBitSelect, useLayerHasReliefObjects, VClearToolSelect } from './CncLayerToolFields';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
@@ -23,15 +24,13 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
   const spindleMaxRpm = useStore((s) =>
     s.project.machine?.kind === 'cnc' ? s.project.machine.params.spindleMaxRpm : 24000,
   );
-  // Relief roughing (H.5) reads depth-per-pass + stepover + feeds from this
-  // layer but takes its total depth from the relief object itself — the
-  // fields must say so or the card lies (handoff §7.C contract fix).
-  const hasReliefObjects = useStore((s) =>
-    s.project.scene.objects.some((o) => o.kind === 'relief' && o.color === layer.color),
-  );
+  const hasReliefObjects = useLayerHasReliefObjects(layer.color);
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const commit = (patch: Partial<CncLayerSettings>): void =>
     setLayerParam(layer.id, { cnc: { ...settings, ...patch } });
+  // Whole-settings commit for edits that REMOVE an optional key (clearing
+  // the per-layer bit override) — a spread patch can't delete.
+  const commitSettings = (next: CncLayerSettings): void => setLayerParam(layer.id, { cnc: next });
   const isProfile = settings.cutType.startsWith('profile');
 
   return (
@@ -51,6 +50,12 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
           ))}
         </select>
       </Row>
+      <LayerBitSelect
+        layer={layer}
+        settings={settings}
+        onCommit={commit}
+        onCommitSettings={commitSettings}
+      />
       <DepthAndFeedFields
         layer={layer}
         settings={settings}
@@ -83,7 +88,12 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
         </div>
       ) : null}
       {settings.cutType === 'v-carve' ? (
-        <VCarveFields layer={layer} settings={settings} onCommit={commit} />
+        <VCarveSection
+          layer={layer}
+          settings={settings}
+          onCommit={commit}
+          onCommitSettings={commitSettings}
+        />
       ) : null}
       {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
     </>
@@ -96,6 +106,27 @@ const reliefHintStyle: React.CSSProperties = {
   padding: '2px 0 2px 4px',
   lineHeight: 1.35,
 };
+
+// H.3 ring detail + H.7 two-stage clearing bit, grouped so the parent
+// component stays under the function-size cap.
+function VCarveSection(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
+}): JSX.Element {
+  return (
+    <>
+      <VCarveFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <VClearToolSelect
+        layer={props.layer}
+        settings={props.settings}
+        onCommit={props.onCommit}
+        onCommitSettings={props.onCommitSettings}
+      />
+    </>
+  );
+}
 
 // H.3 V-carve options: ring detail + a live warning when the spindle's
 // active bit is not a v-bit (preflight blocks output until it is).

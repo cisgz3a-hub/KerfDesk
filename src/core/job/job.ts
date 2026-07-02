@@ -131,6 +131,12 @@ export type CncGroup = {
   readonly layerId: string;
   readonly color: string;
   readonly cutType: CncCutType;
+  // Multi-tool jobs (H.7): which bit cuts this group. Optional — absent
+  // means the machine's single active bit (pre-H.7 jobs, test fixtures);
+  // the emitter only inserts M0 tool-change blocks when a job actually
+  // switches between distinct bits.
+  readonly toolId?: string;
+  readonly toolName?: string;
   readonly toolDiameterMm: number;
   readonly feedMmPerMin: number; // already capped to device.maxFeed
   readonly plungeMmPerMin: number;

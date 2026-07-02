@@ -150,6 +150,7 @@ export {
   DEFAULT_CNC_TOOLS,
   LASER_MACHINE_CONFIG,
   activeCncTool,
+  layerCncTool,
   cutTypeLabel,
   machineKindOf,
 } from './machine';

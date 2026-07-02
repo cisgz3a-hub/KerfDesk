@@ -52,6 +52,7 @@ export type CncCutType =
   | 'pocket'
   | 'engrave'
   | 'v-carve'
+  | 'drill'
   | 'relief-rough';
 
 export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
@@ -61,10 +62,18 @@ export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'pocket',
   'engrave',
   'v-carve',
+  'drill',
 ];
 
 export type CncLayerSettings = {
   readonly cutType: CncCutType;
+  // Multi-tool jobs (H.7): the bit this layer cuts with. Absent = the
+  // machine's active bit. Unknown ids resolve to the active bit at compile
+  // time (F-CNC1 edge: unknown tools are dropped).
+  readonly toolId?: string;
+  // Two-stage v-carve (H.7): flat floors beyond the v-bit's reach are
+  // pocket-cleared with this bit first. Absent = single-stage v-carve.
+  readonly vClearToolId?: string;
   // Total cut depth below stock top (positive). For v-carve this is the MAX
   // depth: wide regions clamp to it and cut a flat floor.
   readonly depthMm: number;
@@ -174,6 +183,19 @@ export function activeCncTool(config: CncMachineConfig): CncTool {
   return found ?? config.tools[0] ?? FALLBACK_TOOL;
 }
 
+// The bit a layer actually cuts with (H.7 multi-tool): its own toolId when
+// set and known, the machine's active bit otherwise.
+export function layerCncTool(
+  config: CncMachineConfig,
+  settings: Pick<CncLayerSettings, 'toolId'>,
+): CncTool {
+  if (settings.toolId !== undefined) {
+    const found = config.tools.find((tool) => tool.id === settings.toolId);
+    if (found !== undefined) return found;
+  }
+  return activeCncTool(config);
+}
+
 export function cutTypeLabel(cutType: CncCutType): string {
   switch (cutType) {
     case 'profile-outside':
@@ -188,6 +210,8 @@ export function cutTypeLabel(cutType: CncCutType): string {
       return 'Engrave (trace path)';
     case 'v-carve':
       return 'V-carve (angled bit)';
+    case 'drill':
+      return 'Drill (peck at centers)';
     case 'relief-rough':
       return 'Relief roughing';
   }
