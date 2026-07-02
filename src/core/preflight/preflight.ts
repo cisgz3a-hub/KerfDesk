@@ -50,6 +50,7 @@ export type PreflightCode =
   | 'cnc-depth-exceeds-stock'
   | 'cnc-overdeep-cut'
   | 'plunged-travel'
+  | 'relief-needs-cnc'
   | 'empty-output';
 
 export type PreflightIssue = {
@@ -112,13 +113,32 @@ export function runPreflight(
   appendLongBlankFeedIssues(project, gcode, issues);
 
   if (!/\bG1\b/.test(gcode)) {
-    issues.push({
-      code: 'empty-output',
-      message: 'Internal error: G-code generation produced no cuts.',
-    });
+    issues.push(emptyOutputIssue(project, outputLayers));
   }
 
   return { ok: issues.length === 0, issues };
+}
+
+// A relief-only scene is the one EXPECTED way a laser compile comes back
+// empty (reliefs are CNC-only geometry) — name that instead of reporting an
+// internal error.
+function emptyOutputIssue(project: Project, outputLayers: ReadonlyArray<Layer>): PreflightIssue {
+  const outputColors = new Set(outputLayers.map((layer) => layer.color));
+  const hasOutputRelief = project.scene.objects.some(
+    (object) => object.kind === 'relief' && outputColors.has(object.color),
+  );
+  if (hasOutputRelief) {
+    return {
+      code: 'relief-needs-cnc',
+      message:
+        'Relief objects only carve in CNC mode — switch the machine type to CNC, ' +
+        'or add vector artwork for the laser.',
+    };
+  }
+  return {
+    code: 'empty-output',
+    message: 'Internal error: G-code generation produced no cuts.',
+  };
 }
 
 function appendNoGoZoneIssues(
