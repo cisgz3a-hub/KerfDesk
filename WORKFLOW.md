@@ -575,7 +575,22 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B4. Frame
 
-Phase B initial cut: not implemented. Phase B polish will compute the AABB of all output-enabled paths and dispatch four `$J=` jogs around the perimeter at a non-cut feed.
+#### Success
+1. User clicks **Frame** while connected and the controller is Idle.
+2. App resolves the job placement (start-from mode, anchor, cached WCO), compiles through the shared `prepareOutput` pipeline, and computes the job's motion bounds (including overscan).
+3. Frame preflight checks the motion bounds against the bed (with any placement offset) and no-go zones. On failure an error toast explains the violation and no bytes are sent.
+4. App builds five absolute `$J=G90 G21 X<x> Y<y> F<feed>` jogs tracing the perimeter (start corner, four edges back to the start) at `min(framingFeedMmPerMin, maxFeed)`.
+5. The first jog is written immediately; each remaining line is dispatched as the previous jog completes. Status polling shows `Jog`, then `Idle` when the box closes.
+6. When framing from a verified origin, a successful pass records frame verification for the Start-job preflight.
+
+#### Error — origin cannot be resolved
+1. Placement resolution fails (e.g. selection origin requested with nothing usable); error toast, no bytes sent.
+
+#### Edge — raster job exceeds the raster budget
+1. If preflight fails only with `raster-too-large`, the app still frames the outline using the frame bounds (framing must stay available for exactly these jobs).
+
+#### Edge — cancel mid-frame
+1. **Cancel** writes the real-time jog-cancel byte (`0x85`); pending frame lines are dropped and the motion operation clears.
 
 ### F-B5. Jog
 
@@ -592,7 +607,7 @@ Phase B initial cut: not implemented. Phase B polish will compute the AABB of al
 #### Success
 1. User clicks **Start job** while connected and idle.
 2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the 127-byte RX buffer can hold).
+3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
 4. Every `ok` advances the streamer by one line and writes more.
 5. Progress bar reflects `completed / total` lines.
 
