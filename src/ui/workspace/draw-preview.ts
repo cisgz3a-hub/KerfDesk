@@ -158,6 +158,9 @@ function drawStep(
 ): void {
   if (step.kind === 'travel') {
     if (showTravel) drawTravel(ctx, step.from, step.to, view);
+  } else if (step.kind === 'plunge') {
+    // Vertical-only move — no XY extent to draw in the 2D route. The
+    // depth-shaded CNC preview (H.2 removal grid) is where plunges show.
   } else drawCut(ctx, step.polyline, step.color, view);
 }
 
@@ -285,7 +288,9 @@ function drawCut(
 function firstRoutePoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
   const first = steps[0];
   if (first === undefined) return null;
-  return first.kind === 'travel' ? first.from : (first.polyline[0] ?? null);
+  if (first.kind === 'travel') return first.from;
+  if (first.kind === 'plunge') return first.at;
+  return first.polyline[0] ?? null;
 }
 
 function lastRoutePoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
@@ -293,6 +298,7 @@ function lastRoutePoint(steps: ReadonlyArray<ToolpathStep>): Vec2 | null {
     const step = steps[i];
     if (step === undefined) continue;
     if (step.kind === 'travel') return step.to;
+    if (step.kind === 'plunge') return step.at;
     const end = step.polyline[step.polyline.length - 1];
     if (end !== undefined) return end;
   }

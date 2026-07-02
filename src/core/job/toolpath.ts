@@ -13,10 +13,11 @@
 // './toolpath' importers are untouched.
 
 import type { Vec2 } from '../scene';
-import { cncPassXyPoints, type FillGroup, type Group, type Job } from './job';
+import type { FillGroup, Group, Job } from './job';
 import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from './fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
+import { appendCncGroupSteps, createCncSimState, type CncSimState } from './toolpath-cnc';
 import { appendTravelStep, dist, polylineLength } from './toolpath-math';
 import { appendRasterGroupSteps } from './toolpath-raster-steps';
 import type {
@@ -39,8 +40,10 @@ export { sliceToolpath } from './toolpath-slice';
 export function buildToolpath(job: Job, options: BuildToolpathOptions = {}): Toolpath {
   const steps: ToolpathStep[] = [];
   let prevEnd: Vec2 | null = options.startPoint ?? null;
+  // One modal-Z state for the whole job, like the emitter's head tracker.
+  const cncState = createCncSimState();
   for (const group of job.groups) {
-    prevEnd = appendGroupSteps(steps, prevEnd, group, options);
+    prevEnd = appendGroupSteps(steps, prevEnd, group, options, cncState);
   }
   if (options.parkPoint !== undefined && prevEnd !== null) {
     appendTravelStep(steps, prevEnd, options.parkPoint);
@@ -54,6 +57,7 @@ function appendGroupSteps(
   prevEnd: Vec2 | null,
   group: Group,
   options: BuildToolpathOptions,
+  cncState: CncSimState,
 ): Vec2 | null {
   switch (group.kind) {
     case 'raster':
@@ -62,12 +66,10 @@ function appendGroupSteps(
       return appendFillGroupSteps(steps, prevEnd, group, options);
     case 'cut':
       return appendContourGroupSteps(steps, prevEnd, group.segments, group.color);
-    case 'cnc': {
-      // Depth passes flatten into the 2D preview: each pass renders as a cut
-      // polyline with travel between pass start points (Z is not visualized).
-      const passes = group.passes.map((pass) => ({ polyline: cncPassXyPoints(pass) }));
-      return appendContourGroupSteps(steps, prevEnd, passes, group.color);
-    }
+    case 'cnc':
+      // Z-aware CNC steps (H.2): retract/travel/plunge/cut mirroring the
+      // emitter's motion contract, with per-step Z spans for depth shading.
+      return appendCncGroupSteps(steps, prevEnd, group, cncState);
   }
 }
 
@@ -124,11 +126,13 @@ function appendContourGroupSteps(
 export function summarizeToolpathDistances(toolpath: Toolpath): ToolpathDistanceSummary {
   let cutMm = 0;
   let travelMm = 0;
+  let plungeMm = 0;
   for (const step of toolpath.steps) {
     if (step.kind === 'cut') cutMm += step.length;
+    else if (step.kind === 'plunge') plungeMm += step.length;
     else travelMm += step.length;
   }
-  return { cutMm, travelMm, totalMm: cutMm + travelMm };
+  return { cutMm, travelMm, plungeMm, totalMm: cutMm + travelMm + plungeMm };
 }
 
 // One fill scanline as preview steps matching the emitted continuous sweep

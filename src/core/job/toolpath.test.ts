@@ -280,6 +280,7 @@ describe('summarizeToolpathDistances', () => {
     expect(summarizeToolpathDistances(tp)).toEqual({
       cutMm: 15,
       travelMm: 10,
+      plungeMm: 0, // laser jobs never plunge (CNC-only step kind, H.2)
       totalMm: 25,
     });
   });
