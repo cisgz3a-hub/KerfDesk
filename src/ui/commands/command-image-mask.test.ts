@@ -8,6 +8,7 @@ import {
 
 function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext {
   return {
+    machineKind: 'laser',
     dirty: false,
     savedName: null,
     serialSupported: true,

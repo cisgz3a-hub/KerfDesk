@@ -20,6 +20,7 @@ export function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandC
 
 function baseCtxFlags(): Partial<AppCommandContext> {
   return {
+    machineKind: 'laser',
     dirty: false,
     savedName: null,
     serialSupported: true,

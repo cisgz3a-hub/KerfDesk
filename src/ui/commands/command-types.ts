@@ -3,7 +3,7 @@
 // it hit the 400-line cap; a third file (not two) so command-registry ->
 // command-families -> command-types stays acyclic (import/no-cycle).
 
-import type { SelectionAlignKind, SelectionDistributeKind } from '../../core/scene';
+import type { MachineKind, SelectionAlignKind, SelectionDistributeKind } from '../../core/scene';
 import { commandHelpId, commandTitle, controlHelp } from '../help/help-topics';
 
 export const COMMAND_FAMILY_ORDER = [
@@ -99,6 +99,9 @@ export type AppCommand = {
 };
 
 export type AppCommandContext = {
+  // ADR-100 gate-and-hide: laser-only commands are filtered out of the
+  // registry's output when the project machine is CNC.
+  readonly machineKind: MachineKind;
   readonly dirty: boolean;
   readonly savedName: string | null;
   readonly serialSupported: boolean;

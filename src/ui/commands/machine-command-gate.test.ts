@@ -1,0 +1,64 @@
+import { describe, expect, it } from 'vitest';
+import { buildAppCommands } from './command-registry';
+import { LASER_ONLY_COMMAND_IDS } from './machine-command-gate';
+import type { CommandId } from './command-types';
+import { baseCtx } from './command-registry-test-helpers';
+
+// Machine-agnostic commands that must survive the CNC gate (ADR-100 §1):
+// geometry sources, edit/arrange, file, preview, connection.
+const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
+  'file.new',
+  'file.import-svg',
+  'file.import-image',
+  'file.save-gcode',
+  'edit.undo',
+  'edit.paste',
+  'tools.add-text',
+  'tools.measure',
+  'tools.convert-to-path',
+  'tools.weld',
+  'arrange.align-left',
+  'arrange.break-apart',
+  'laser.connect',
+  'window.toggle-preview',
+  'window.fit-view',
+  'help.about',
+];
+
+describe('gateCommandsForMachineKind via buildAppCommands (ADR-100)', () => {
+  it('laser mode exposes every command, including the laser-only set', () => {
+    const ids = buildAppCommands(baseCtx({ machineKind: 'laser' })).map((c) => c.id);
+    for (const id of LASER_ONLY_COMMAND_IDS) {
+      expect(ids).toContain(id);
+    }
+    for (const id of CNC_SURVIVORS) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  it('cnc mode hides exactly the laser-only set', () => {
+    const laserIds = buildAppCommands(baseCtx({ machineKind: 'laser' })).map((c) => c.id);
+    const cncIds = new Set(buildAppCommands(baseCtx({ machineKind: 'cnc' })).map((c) => c.id));
+    for (const id of LASER_ONLY_COMMAND_IDS) {
+      expect(cncIds.has(id)).toBe(false);
+    }
+    const hidden = laserIds.filter((id) => !cncIds.has(id));
+    expect(new Set(hidden)).toEqual(new Set(LASER_ONLY_COMMAND_IDS));
+  });
+
+  it('cnc mode keeps machine-agnostic commands', () => {
+    const cncIds = buildAppCommands(baseCtx({ machineKind: 'cnc' })).map((c) => c.id);
+    for (const id of CNC_SURVIVORS) {
+      expect(cncIds).toContain(id);
+    }
+  });
+
+  it('no gated command carries a keyboard shortcut (shortcut dispatch bypasses the gate)', () => {
+    const commands = buildAppCommands(baseCtx({ machineKind: 'laser' }));
+    for (const command of commands) {
+      if (LASER_ONLY_COMMAND_IDS.has(command.id)) {
+        expect(command.shortcut).toBeUndefined();
+      }
+    }
+  });
+});
