@@ -1237,3 +1237,61 @@ last updated.
 - **Edge (quota / corrupt slot).** A failed auto-save warns once and
   points at Export...; a corrupt collection slot is discarded silently
   rather than failing every boot.
+
+## Phase H flows — multi-controller (ADR-094..097)
+
+### F-H1. Select a controller family
+
+#### Success
+1. User picks a catalog profile (Machine Setup or Device Setup wizard) whose
+   `controllerKind` is `grbl-v1.1`, `grblhal`, `fluidnc`, `marlin`,
+   `smoothieware`, or `ruida`.
+2. Connect selects the matching ControllerDriver and opens the port at the
+   profile's `baudRate` (driver default when unset: GRBL family 115200,
+   Marlin 250000). The capabilities snapshot re-gates every machine control.
+3. The welcome banner runs through detection; `detectedControllerKind` is
+   recorded.
+
+#### Edge — banner disagrees with the profile
+1. Log line: "Controller banner looks like X, but the profile selected Y.
+   Check the device profile's controller setting." Nothing switches silently.
+
+### F-H2. Run a job on Marlin (no realtime bytes)
+
+#### Success
+1. Status = queued `M114`, polled only while nothing is streaming and no
+   controller command is pending; the DRO shows the parsed position.
+2. Jog sends `G91` / `G0 …` / `G90`; Home sends `G28 X Y`; framing runs
+   absolute `G0` legs; jobs stream ping-pong (one line per `ok`;
+   `echo:busy` is not an ack).
+3. **Pause** stops sending — buffered moves finish (the button title and
+   safety copy say so). **Resume** continues the stream. **Stop** stops
+   sending and writes `M5` + `M107`.
+4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
+
+#### Error — firmware answers `Error:` or `Resend:`
+1. Terminal for the stream (no replay); beam-off lines are written; with no
+   alarm state the errored stream auto-releases at the next Idle report.
+
+### F-H3. Smoothieware halt and recovery
+
+#### Success
+1. Realtime `?` / `!` / `~` work as on GRBL; pause is allowed WITHOUT the $32
+   proof (Smoothie cannot report $-settings; its laser module ties beam to
+   motion). Power words are fractional (S0.500 = 50% at the 0–1.0 scale).
+2. Stop sends Ctrl-X + `M5`/`M9`; a halted controller answers `!!` to normal
+   lines; the alarm banner's unlock sends `M999` and the machine returns Idle.
+
+### F-H4. Export a Ruida job (.rd, EXPERIMENTAL)
+
+#### Success
+1. With a Ruida profile the Laser panel shows the file-only hint and Connect
+   is disabled; preview/estimate work normally.
+2. **Save G-code…** writes a `.rd` file instead (binary, swizzled) and toasts
+   the EXPERIMENTAL warning every time: the encoding follows public research
+   and has NOT been verified on a real controller — preview on the machine
+   panel and test on scrap first.
+
+#### Error — raster layers present
+1. The export refuses with "Layer … uses Fill/Image raster output, which the
+   experimental .rd encoder does not support yet."
