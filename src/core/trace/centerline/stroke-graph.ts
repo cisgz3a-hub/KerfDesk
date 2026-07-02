@@ -210,7 +210,12 @@ function recordDirectLink(ctx: WalkCtx, node: StrokeNode, otherId: number): void
   ctx.chains.push({ a: node.id, b: otherId, points: [node.pos, other.pos], closed: false });
 }
 
-function traceCorridor(ctx: WalkCtx, startNode: StrokeNode, fromPixel: number, first: number): void {
+function traceCorridor(
+  ctx: WalkCtx,
+  startNode: StrokeNode,
+  fromPixel: number,
+  first: number,
+): void {
   const points: Vec2[] = [startNode.pos];
   let prev = fromPixel;
   let cur = first;

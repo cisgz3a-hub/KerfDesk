@@ -254,10 +254,7 @@ describe('GRBL-family variants against the simulator', () => {
   });
 
   it('grblHAL: decodes extended alarm 11 (homing required)', async () => {
-    const sim = await connectSim(
-      { firmwareBanner: 'GrblHAL 1.1f' },
-      { controllerKind: 'grblhal' },
-    );
+    const sim = await connectSim({ firmwareBanner: 'GrblHAL 1.1f' }, { controllerKind: 'grblhal' });
     sim.triggerAlarm(11);
     await pump(20);
     expect(useLaserStore.getState().alarmCode).toBe(11);

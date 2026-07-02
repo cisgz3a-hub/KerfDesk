@@ -99,7 +99,9 @@ function pushSegment(push: PushFn, polyline: ReadonlyArray<Point>, closed: boole
 
 function pushJobBounds(
   push: PushFn,
-  groups: ReadonlyArray<{ readonly segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Point> }> }>,
+  groups: ReadonlyArray<{
+    readonly segments: ReadonlyArray<{ readonly polyline: ReadonlyArray<Point> }>;
+  }>,
   _device: DeviceProfile,
 ): void {
   let minX = Number.POSITIVE_INFINITY;

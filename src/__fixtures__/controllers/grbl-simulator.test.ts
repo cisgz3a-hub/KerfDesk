@@ -68,7 +68,9 @@ describe('grbl-simulator', () => {
     await conn.write('?');
     await pump(5);
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(/^<Idle\|MPos:0\.000,0\.000,0\.000\|FS:0,0\|WCO:0\.000,0\.000,0\.000>$/);
+    expect(lines[0]).toMatch(
+      /^<Idle\|MPos:0\.000,0\.000,0\.000\|FS:0,0\|WCO:0\.000,0\.000,0\.000>$/,
+    );
   });
 
   it('jogs: moves position, reports Jog, then settles to Idle', async () => {

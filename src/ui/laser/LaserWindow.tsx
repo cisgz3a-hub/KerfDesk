@@ -103,16 +103,16 @@ function ConnectionHints(props: {
   if (props.isFileOnlyProfile) {
     return (
       <p style={hintStyle}>
-        This profile is file-export only: use Save G-code… to write an experimental .rd job and
-        run it from the machine panel. Live Ruida streaming is not available in this build.
+        This profile is file-export only: use Save G-code… to write an experimental .rd job and run
+        it from the machine panel. Live Ruida streaming is not available in this build.
       </p>
     );
   }
   if (!props.supportsSerial) {
     return (
       <p style={hintStyle}>
-        Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install
-        the Windows desktop app.
+        Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install the
+        Windows desktop app.
       </p>
     );
   }

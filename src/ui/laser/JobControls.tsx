@@ -218,8 +218,8 @@ function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX
     return (
       <div style={rowStyle}>
         <span style={runningSafetyStyle}>
-          This firmware has no jog cancel — buffered motion finishes on its own. Use physical
-          E-stop if unsafe.
+          This firmware has no jog cancel — buffered motion finishes on its own. Use physical E-stop
+          if unsafe.
         </span>
       </div>
     );

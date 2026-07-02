@@ -29,7 +29,14 @@ type MutableWords = {
 };
 
 export function parseMotionWords(body: string): ParsedMotionWords {
-  const acc: MutableWords = { x: null, y: null, z: null, feed: null, spindle: null, setsAbsolute: null };
+  const acc: MutableWords = {
+    x: null,
+    y: null,
+    z: null,
+    feed: null,
+    spindle: null,
+    setsAbsolute: null,
+  };
   for (const match of body.matchAll(WORD_RE)) {
     applyWord(acc, (match[1] ?? '').toUpperCase(), Number.parseFloat(match[2] ?? ''));
   }

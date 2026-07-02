@@ -3,10 +3,7 @@
 // make sense for a binary format (bounds; the G-code text invariants don't
 // apply), then encodes the .rd byte stream.
 
-import {
-  encodeRdJob,
-  type RdEncodeError,
-} from '../../core/controllers/ruida';
+import { encodeRdJob, type RdEncodeError } from '../../core/controllers/ruida';
 import {
   computeJobBounds,
   describeFramePreflightFailure,

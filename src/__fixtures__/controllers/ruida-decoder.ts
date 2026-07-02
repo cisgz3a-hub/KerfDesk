@@ -3,11 +3,7 @@
 // proves the encoder's INTERNAL consistency (geometry, power, speed, layer
 // structure survive encode→decode); it does NOT prove real-Ruida acceptance.
 
-import {
-  decodeCoord35,
-  decodePower14,
-  unswizzleBytes,
-} from '../../core/controllers/ruida';
+import { decodeCoord35, decodePower14, unswizzleBytes } from '../../core/controllers/ruida';
 
 export type RdDecodedEvent =
   | { readonly kind: 'stream-start' }
@@ -20,7 +16,12 @@ export type RdDecodedEvent =
   | { readonly kind: 'layer-max-power'; readonly layer: number; readonly percent: number }
   | { readonly kind: 'layer-color'; readonly layer: number; readonly packed: number }
   | { readonly kind: 'select-layer'; readonly layer: number }
-  | { readonly kind: 'job-bounds'; readonly tag: number; readonly xMm: number; readonly yMm: number }
+  | {
+      readonly kind: 'job-bounds';
+      readonly tag: number;
+      readonly xMm: number;
+      readonly yMm: number;
+    }
   | { readonly kind: 'unknown'; readonly byte: number };
 
 type Decoded = { readonly event: RdDecodedEvent; readonly advance: number };
@@ -76,7 +77,12 @@ function decodeLayerSetting(raw: Uint8Array, i: number): Decoded | null {
   return null;
 }
 
-function decodePowerSetting(raw: Uint8Array, i: number, sub: number, layer: number): Decoded | null {
+function decodePowerSetting(
+  raw: Uint8Array,
+  i: number,
+  sub: number,
+  layer: number,
+): Decoded | null {
   if (sub !== 0x31 && sub !== 0x32) return null;
   return {
     event: {

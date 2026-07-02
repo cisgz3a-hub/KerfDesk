@@ -13,10 +13,10 @@
 export type { RawImageData, TraceOptions } from './trace-image';
 export {
   DEFAULT_TRACE_OPTIONS,
-  TRACE_PRESETS,
   thresholdBandToMonochrome,
   traceImageToSvgString,
 } from './trace-image';
+export { TRACE_PRESETS } from './trace-presets';
 export {
   DEFAULT_LIGHTBURN_TRACE_SETTINGS,
   lightBurnTraceSettingsToPotraceParams,

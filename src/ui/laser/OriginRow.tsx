@@ -134,7 +134,9 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
     onReset: () => {
       void deps
         .resetOrigin()
-        .then(() => deps.pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'));
+        .then(() =>
+          deps.pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'),
+        );
     },
     onRelease: () => {
       if (!jobAwareConfirm(RELEASE_MOTORS_CONFIRM)) return;

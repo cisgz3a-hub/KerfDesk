@@ -189,7 +189,12 @@ function isTrueTip(
 // Inside a round cap the distance field is radial (no restoring force), so
 // an unanchored heading random-walks angularly and can veer 90° off-axis;
 // the medial continuation through a cap is straight, so anchor to it.
-function extendTip(chain: Chain, which: 'start' | 'end', distSq: Float64Array, mask: InkMask): void {
+function extendTip(
+  chain: Chain,
+  which: 'start' | 'end',
+  distSq: Float64Array,
+  mask: InkMask,
+): void {
   const pts = chain.points;
   if (pts.length < 2) return;
   const fromStart = which === 'start';
@@ -278,7 +283,6 @@ function normalize(x: number, y: number): Vec2 | null {
   const len = Math.hypot(x, y);
   return len < 1e-9 ? null : { x: x / len, y: y / len };
 }
-
 
 function isInk(p: Vec2, mask: InkMask): boolean {
   const x = Math.round(p.x - 0.5);

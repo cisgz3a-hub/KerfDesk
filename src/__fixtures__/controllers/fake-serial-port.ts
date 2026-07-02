@@ -3,11 +3,7 @@
 // it only moves strings between the host (laser-store) and whatever firmware
 // model is attached via onWrite.
 
-import type {
-  PlatformAdapter,
-  SerialConnection,
-  SerialOpenRequest,
-} from '../../platform/types';
+import type { PlatformAdapter, SerialConnection, SerialOpenRequest } from '../../platform/types';
 
 export type FakeSerialPort = {
   /** The connection handed to laser-store when it opens the port. */

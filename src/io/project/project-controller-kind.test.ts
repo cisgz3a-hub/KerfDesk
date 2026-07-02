@@ -18,7 +18,9 @@ function withDevicePatch(patch: Record<string, unknown>): string {
 describe('.lf2 controllerKind + baudRate round-trip', () => {
   it('preserves every non-default controller kind and a custom baud rate', () => {
     for (const kind of ['grblhal', 'fluidnc', 'marlin', 'smoothieware', 'ruida'] as const) {
-      const result = deserializeProject(withDevicePatch({ controllerKind: kind, baudRate: 250000 }));
+      const result = deserializeProject(
+        withDevicePatch({ controllerKind: kind, baudRate: 250000 }),
+      );
       if (result.kind !== 'ok') throw new Error(`expected ok, got ${result.kind}`);
       expect(result.project.device.controllerKind).toBe(kind);
       expect(result.project.device.baudRate).toBe(250000);

@@ -74,8 +74,7 @@ describe('traceImageToPotraceColoredPaths', () => {
       { x: 3, y: 7 },
     ];
     const worstCornerMiss = (options: TraceOptions): number => {
-      const points =
-        traceImageToPotraceColoredPaths(image, options)[0]?.polylines[0]?.points ?? [];
+      const points = traceImageToPotraceColoredPaths(image, options)[0]?.polylines[0]?.points ?? [];
       let worst = 0;
       for (const corner of corners) {
         let best = Infinity;

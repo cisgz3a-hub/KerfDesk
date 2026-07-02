@@ -222,10 +222,7 @@ type SetFn = (
 ) => void;
 type GetFn = () => LaserState;
 
-function autofocusActions(
-  set: SetFn,
-  get: GetFn,
-): Pick<LaserState, 'autofocus' | 'unlockAlarm'> {
+function autofocusActions(set: SetFn, get: GetFn): Pick<LaserState, 'autofocus' | 'unlockAlarm'> {
   return {
     autofocus: async (command) => {
       const activeJobBlock = activeJobCommandBlockMessage(get());
