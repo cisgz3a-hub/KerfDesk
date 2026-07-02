@@ -39,6 +39,12 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
     // non-strings are dropped.
     ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
+    ...(typeof raw['reliefFinishToolId'] === 'string'
+      ? { reliefFinishToolId: raw['reliefFinishToolId'] }
+      : {}),
+    ...(isPositiveNumber(raw['reliefScallopMm'])
+      ? { reliefScallopMm: raw['reliefScallopMm'] }
+      : {}),
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
     // 0 = auto ring spacing (H.3), so non-negative rather than positive.

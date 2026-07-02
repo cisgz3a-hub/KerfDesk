@@ -28,3 +28,9 @@ export {
   type ReliefRoughingOptions,
 } from './relief-roughing';
 export { reliefSurfaceMesh, type ReliefSurfaceMesh } from './relief-surface-mesh';
+export {
+  DEFAULT_RELIEF_SCALLOP_MM,
+  reliefFinishingPasses,
+  scallopRowSpacingMm,
+  type ReliefFinishingOptions,
+} from './relief-finishing';

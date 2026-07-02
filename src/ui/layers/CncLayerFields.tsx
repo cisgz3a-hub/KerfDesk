@@ -17,6 +17,7 @@ import { useStore } from '../state';
 import {
   FeedPresetRow,
   LayerBitSelect,
+  ReliefLayerRows,
   useLayerHasReliefObjects,
   VClearToolSelect,
 } from './CncLayerToolFields';
@@ -86,11 +87,12 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
         />
       ) : null}
       {hasReliefObjects ? (
-        <div style={reliefHintStyle}>
-          Reliefs on this layer rough with Depth/pass + Stepover; total depth comes from the
-          relief&apos;s own Depth (select the relief to edit it). Cut depth applies to the other
-          shapes only.
-        </div>
+        <ReliefLayerRows
+          layer={layer}
+          settings={settings}
+          onCommit={commit}
+          onCommitSettings={commitSettings}
+        />
       ) : null}
       {settings.cutType === 'v-carve' ? (
         <VCarveSection
@@ -104,13 +106,6 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
     </>
   );
 }
-
-const reliefHintStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-  padding: '2px 0 2px 4px',
-  lineHeight: 1.35,
-};
 
 // H.3 ring detail + H.7 two-stage clearing bit, grouped so the parent
 // component stays under the function-size cap.

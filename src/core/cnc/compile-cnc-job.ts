@@ -33,7 +33,7 @@ import {
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
 import { passNeedsTabs, splitPassForTabs } from './cnc-tabs';
-import { compileReliefGroupForLayer } from './compile-cnc-relief';
+import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
@@ -51,10 +51,11 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   for (const layer of scene.layers) {
     if (!layer.output) continue;
     const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
-    // H.5: relief objects on this layer rough as their own clearing group
-    // (waterline slices never free a part).
-    const reliefGroup = compileReliefGroupForLayer(scene.objects, layer, settings, device, config);
-    if (reliefGroup !== null) clearingGroups.push(reliefGroup);
+    // H.5/H.8: relief objects rough (and optionally finish, with their own
+    // bit) as clearing groups — neither ever frees a part.
+    clearingGroups.push(
+      ...compileReliefGroupsForLayer(scene.objects, layer, settings, device, config),
+    );
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
     // H.7 two-stage v-carve: the flat-floor clearance pocket runs before
@@ -250,8 +251,9 @@ function xyToolpathsForCutType(
       // Handled by their dedicated branches upstream — unreachable here.
       return [];
     case 'relief-rough':
-      // Compile-time-only cut type (produced by compile-cnc-relief from
-      // relief objects) — a layer can never carry it.
+    case 'relief-finish':
+      // Compile-time-only cut types (produced by compile-cnc-relief from
+      // relief objects) — a layer can never carry them.
       return [];
     default:
       return assertNever(settings.cutType, 'CncCutType');
