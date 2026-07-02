@@ -1,5 +1,11 @@
 # HANDOFF — CNC "Router" Phase H session (2026-07-02)
 
+> **STATUS UPDATE 2026-07-03: §6 and §7 A/B/C/E/F are BUILT — see §9 "Session-2
+> closeout" at the end of this file for what shipped, where, and what remains
+> (hardware verification §7.D + the PROVISIONAL decisions list). Sections 1–8
+> are kept verbatim as the historical kickoff brief; where §9 contradicts them,
+> §9 wins.**
+
 > Purpose: continue this work from another device. Read this file first, then the
 > read-in-order list below. **CRITICAL: as of writing, everything this session
 > produced is UNCOMMITTED in two local worktrees on the original machine — it does
@@ -239,3 +245,70 @@ requires a new PROJECT.md revision + ADR first.
   "Phase H — v0.8 Multi-controller" — correct until integration (ADR-099 §3).
 - The star shape/tool exists in code but is absent from ADR-051 — known doc
   drift, maintainer's call whether to backfill.
+
+---
+
+## 9. Session-2 closeout (2026-07-03) — Phase H built end-to-end
+
+Executed on worktree branch **`claude/determined-dewdney-7ec915`** (forked from
+`elated-edison-157186` @ `200f632`; carries its full history). Everything below
+is committed there. All Phase H sub-phases (H.6–H.10), ADR-100, ADR-101, and
+the relief-completion items are BUILT with tests; suite grew 2671 → 2805, all
+green with lint/typecheck/format at every commit.
+
+### Commits (oldest first)
+- `9c221ae` ADR-100 gate-and-hide — laser-only commands hidden in CNC mode
+- `0cb6a07` hide laser-only object/device editors in CNC + dropped-raster advisory
+- `6f9717e` machine-aware chrome labels — Router menu/rail/hints in CNC mode
+- `af7210c` relief mode boundaries — preview gate, named laser error, paste gate
+- `341add6` relief parameter editor + honest layer-card contract
+- `9838d5e` clean-room DXF parser — tags, entities, splines, blocks (H.6a core)
+- `b9b4faa` wire DXF import — File menu, drag-drop, context menu (H.6a)
+- `530d7a5` .nc G-code program simulator — clean-room modal parser (H.6b)
+- `fb009c7` CNC text defaults — fresh text layers v-carve or engrave (H.6c)
+- `605c04d` ADR-101 — three.js 3D relief viewer, lazy-loaded and UI-only
+- `7656b58` multi-tool jobs — per-layer bits, M0 changes, drill, 2-stage v-carve (H.7)
+- `58e4807` tool library, feeds/speeds presets, machine profiles (H.7)
+- `0e5e8f6` relief finishing — max-plus tip surface, scallop rows (H.8)
+- `76bb63b` motion polish — ramp entry, climb/conventional, entry points, parking (H.9)
+- `096a0c9` tiling — indexed tile grid, registration holes, per-tile export (H.10)
+- (this commit) docs closeout: F-CNC11–19 flows, PROJECT.md status column,
+  AUDIT.md CLAIMED rows, this section
+
+**G-code snapshot corpus untouched** — every new pipeline feature is opt-in;
+defaults are byte-identical, so no snapshot acknowledgment was needed.
+
+### Doc state after this session
+- WORKFLOW.md: F-CNC9–19 all fleshed out (success/error/empty/edge). §1's
+  "name-only placeholders" note is stale.
+- PROJECT.md: Phase H table now carries a Status column (all Built; ADR-100/101
+  noted in the intro).
+- AUDIT.md CNC inventory: every Phase H row CLAIMED with evidence; the five
+  "pending" rows are gone.
+- DECISIONS.md: ADR-100 (gate-and-hide policy) and ADR-101 (three.js, UI-only
+  override of ADR-094 §2) appended. Next free ADR is **102** (095–099 still
+  reserved/taken per §2).
+
+### PROVISIONAL decisions awaiting maintainer review (flagged in ADRs/commits)
+1. ADR-100 hide-list additions beyond the audit list (incl. optimization
+   settings); Auto-focus hidden in CNC; device laser fields hidden (not
+   re-labeled).
+2. H.6c "CNC text defaults" interpreted as: new text layers default to v-carve
+   when a v-bit is active, else engrave; existing layers untouched.
+3. H.9: entry-point rotation to the longest segment ships as the v1 lead-in;
+   arc lead-in/out and helical entry DEFERRED (ramp entry covers the plunge
+   problem).
+4. H.10: registration holes fixed at 3 mm depth; drilled at identical stock
+   positions in the overlap strip.
+5. Drill/peck chip-clear runs at plunge feed (GRBL has no G81/G83).
+6. Simulator kernel uses the active bit only in multi-tool jobs (per-section
+   bit diameters are not yet simulated).
+7. Two pre-existing `signedArea` copies noticed (core geometry + motion
+   polish) — tidy-first extraction candidate, NOT done (refactor ≠ feature).
+8. ADR-051 star-shape backfill (§8) — still the maintainer's call; not done.
+
+### What remains to "CNC done"
+Only §7.D — hardware verification on the 4040. Impossible from a software
+session by definition (ADR-094 §3): every AUDIT.md Phase H row stays CLAIMED
+until the maintainer logs air-cut results. The highest-risk session is the
+H.7 tool-change job; the AUDIT rows name each pending check.
