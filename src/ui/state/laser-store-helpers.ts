@@ -167,6 +167,7 @@ function streamPositionUnchanged(
 export function initialLaserState(): Pick<
   LaserState,
   | 'capabilities'
+  | 'detectedControllerKind'
   | 'connection'
   | 'statusReport'
   | 'alarmCode'
@@ -191,6 +192,7 @@ export function initialLaserState(): Pick<
 > {
   return {
     capabilities: grblDriver.capabilities,
+    detectedControllerKind: null,
     connection: { kind: 'disconnected' },
     statusReport: null,
     alarmCode: null,

@@ -4,12 +4,18 @@
 
 import type { ControllerKind } from '../devices/device-profile';
 import type { ControllerDriver } from './controller-driver';
+import { fluidncDriver } from './fluidnc/driver';
 import { grblDriver } from './grbl/driver';
+import { grblHalDriver } from './grblhal/driver';
 
 export function selectControllerDriver(kind: ControllerKind | undefined): ControllerDriver {
   switch (kind) {
     case 'grbl-v1.1':
     case undefined:
       return grblDriver;
+    case 'grblhal':
+      return grblHalDriver;
+    case 'fluidnc':
+      return fluidncDriver;
   }
 }

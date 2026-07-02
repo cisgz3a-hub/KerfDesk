@@ -16,6 +16,8 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       'xtool-d1-pro',
       'sculpfun-s30',
       'ortur-laser-master-3',
+      'generic-grblhal',
+      'generic-fluidnc',
     ]);
     for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {
       expect(validateMachineProfile(entry.profile)).toEqual([]);

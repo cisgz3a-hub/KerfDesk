@@ -90,6 +90,13 @@ async function writeGrblSettingAction(
   id: number,
   value: string,
 ): Promise<void> {
+  if (refs.driver.capabilities.settings !== 'grbl-dollar') {
+    return blockWrite(
+      set,
+      get,
+      `${refs.driver.label} does not accept numeric $ setting writes from the app. Configure the controller with its own tools.`,
+    );
+  }
   const blocked = machineSettingsWriteBlockReason(get(), refs, id, value);
   if (blocked !== null) return blockWrite(set, get, blocked);
   const trimmed = value.trim();

@@ -19,6 +19,7 @@ afterEach(() => {
 function makeLaserState(): LaserState {
   return {
     capabilities: grblDriver.capabilities,
+    detectedControllerKind: null,
     connection: { kind: 'connected' },
     statusReport: null,
     alarmCode: null,

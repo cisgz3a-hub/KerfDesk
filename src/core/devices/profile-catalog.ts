@@ -1,6 +1,7 @@
 import {
   DEFAULT_DEVICE_PROFILE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  isKnownControllerKind,
   type DeviceProfile,
   type NoGoZone,
   type ProfileCapability,
@@ -99,6 +100,44 @@ const ORTUR_LASER_MASTER_3_PROFILE: DeviceProfile = {
   ],
 };
 
+// Phase H controller-family starters. Wire-compatible with the GRBL driver
+// path; the controllerKind selects the matching ControllerDriver at connect.
+const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-grblhal',
+  vendor: 'Generic',
+  model: 'grblHAL controller',
+  name: 'Generic grblHAL 400×400',
+  machineFamily: 'generic-grblhal',
+  controllerKind: 'grblhal',
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'grblHAL protocol compatibility',
+      status: 'researched',
+      note: 'grblHAL speaks the GRBL v1.1 wire protocol with extended codes; the Falcon A1 Pro baseline runs GrblHAL 1.1f. Confirm bed size and S range from $$ on connect.',
+    },
+  ],
+};
+
+const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-fluidnc',
+  vendor: 'Generic',
+  model: 'FluidNC (ESP32)',
+  name: 'Generic FluidNC 400×400',
+  machineFamily: 'generic-fluidnc',
+  controllerKind: 'fluidnc',
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'FluidNC GRBL-compatible reporting',
+      status: 'unverified',
+      note: 'FluidNC reports as "Grbl 3.x [FluidNC vX]" and streams like GRBL, but real configuration lives in its YAML config — numeric $ writes are disabled in-app. Simulator-verified only; not hardware-verified.',
+    },
+  ],
+};
+
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
   entry(DEFAULT_DEVICE_PROFILE, [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
@@ -117,6 +156,12 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(ORTUR_LASER_MASTER_3_PROFILE, [
     'Work area from public specs; confirm bed size, homing, and S range before the first job.',
+  ]),
+  entry(GENERIC_GRBLHAL_PROFILE, [
+    'grblHAL is wire-compatible with the GRBL driver; extended alarm codes 11-13 are decoded.',
+  ]),
+  entry(GENERIC_FLUIDNC_PROFILE, [
+    'FluidNC numeric $ setting writes are blocked in-app (configuration lives in its YAML config).',
   ]),
 ];
 
@@ -156,8 +201,8 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   const errors: string[] = [];
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
-  if (profile.controllerKind !== undefined && profile.controllerKind !== 'grbl-v1.1') {
-    errors.push('controllerKind must be grbl-v1.1');
+  if (profile.controllerKind !== undefined && !isKnownControllerKind(profile.controllerKind)) {
+    errors.push('controllerKind must be one of: grbl-v1.1, grblhal, fluidnc');
   }
   if (!isGcodeDialectSelection(profile.gcodeDialect)) {
     errors.push('gcodeDialect must reference a known GRBL dialect');

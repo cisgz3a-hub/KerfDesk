@@ -4,10 +4,10 @@
 // profile's baud rate. Type-only LaserState/LiveRefs imports — no runtime
 // cycle (same pattern as the sibling action modules).
 
-import { idleCollector } from '../../core/controllers/grbl';
+import { idleCollector, startCollecting } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
 import { cancelControllerLifecycleRefs } from './laser-interactive-command';
-import { handleLine, runHandshake } from './laser-line-handler';
+import { handleLine, type HandlerRefs } from './laser-line-handler';
 import {
   streamStalledNotice,
   writeFailedNotice,
@@ -19,6 +19,7 @@ import {
   detectStreamStall,
   disconnectStopCommands,
   isActiveJob,
+  pushLog,
 } from './laser-store-helpers';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
@@ -54,6 +55,7 @@ export function connectionActions(
         transcript: [],
         homingState: 'unknown',
         capabilities: refs.driver.capabilities,
+        detectedControllerKind: null,
       });
       const portRef = await adapter.serial.requestPort();
       if (portRef === null) {
@@ -130,6 +132,54 @@ async function runDisconnect(
     homingState: 'unknown',
     lastWriteError: null,
   });
+}
+
+// Wait up to 2 s after connect for ANY controller line; when one arrives,
+// harvest the settings dump (if this firmware has one). Event-driven via the
+// onLineArrived one-shot rather than polling (R-L2 audit finding).
+async function runHandshake(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: (line: string) => Promise<void>,
+): Promise<void> {
+  const HANDSHAKE_TIMEOUT_MS = 2000;
+  const gotLine = await new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => {
+      refs.onLineArrived = null;
+      resolve(false);
+    }, HANDSHAKE_TIMEOUT_MS);
+    refs.onLineArrived = (): void => {
+      clearTimeout(timer);
+      refs.onLineArrived = null;
+      resolve(true);
+    };
+  });
+
+  if (!gotLine) {
+    const driver = refs.driver;
+    set({
+      log: pushLog(
+        get(),
+        `[lf2] No controller response within 2 s. Check baud rate (${driver.defaultBaudRate}) and that the device is ${driver.label}.`,
+      ),
+    });
+    return;
+  }
+  const settingsQuery = refs.driver.commands.settingsQuery;
+  if (settingsQuery === null) {
+    set({ log: pushLog(get(), '[lf2] Connected.') });
+    return;
+  }
+  set({
+    log: pushLog(get(), `[lf2] Connected. Querying settings (${settingsQuery})...`),
+    detectedSettings: null,
+    controllerSettings: null,
+    grblSettingsRows: [],
+    lastSettingsReadAt: null,
+  });
+  refs.settingsCollector = startCollecting();
+  await safeWrite(`${settingsQuery}\n`);
 }
 
 function teardown(refs: LiveRefs): void {

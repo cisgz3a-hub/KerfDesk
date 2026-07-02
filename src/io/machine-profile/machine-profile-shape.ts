@@ -2,7 +2,7 @@ import {
   isGcodeDialectSelection,
   isGrblRxBufferBytes,
   isGrblStreamingMode,
-  type ControllerKind,
+  isKnownControllerKind,
   type LaserAirAssistHardware,
   type LaserFocusMode,
   type MachineProfileSource,
@@ -13,7 +13,6 @@ import {
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
-const CONTROLLER_KINDS = ['grbl-v1.1'] as const;
 const PROFILE_CAPABILITIES = [
   'grbl',
   'wcs',
@@ -52,7 +51,7 @@ function validateProfileIdentity(value: Record<string, unknown>): string | null 
   if (value['profileSource'] !== undefined && !isProfileSource(value['profileSource'])) {
     return 'profile.profileSource is invalid';
   }
-  if (value['controllerKind'] !== undefined && !isControllerKind(value['controllerKind'])) {
+  if (value['controllerKind'] !== undefined && !isKnownControllerKind(value['controllerKind'])) {
     return 'profile.controllerKind is invalid';
   }
   return null;
@@ -194,10 +193,6 @@ function isNonNegativeFinite(value: unknown): value is number {
 
 function isProfileSource(value: unknown): value is MachineProfileSource {
   return PROFILE_SOURCES.some((source) => source === value);
-}
-
-function isControllerKind(value: unknown): value is ControllerKind {
-  return CONTROLLER_KINDS.some((kind) => kind === value);
 }
 
 function isProfileCapability(value: unknown): value is ProfileCapability {

@@ -56,6 +56,13 @@ describe('grblDriver', () => {
     expect(grblDriver.classifyLine('ALARM:3')).toEqual({ kind: 'alarm', code: 3 });
     expect(grblDriver.classifyLine('$32=1')).toEqual({ kind: 'setting', id: 32, value: '1' });
     expect(grblDriver.classifyLine('Grbl 1.1f')).toMatchObject({ kind: 'welcome' });
+    // Family banners must classify as welcome so detection can run on them.
+    expect(grblDriver.classifyLine("GrblHAL 1.1f ['$' or '$HELP' for help]")).toMatchObject({
+      kind: 'welcome',
+    });
+    expect(grblDriver.classifyLine('Grbl 3.7 [FluidNC v3.7.8]')).toMatchObject({
+      kind: 'welcome',
+    });
   });
 
   it('declares full GRBL capabilities so the UI renders unchanged', () => {

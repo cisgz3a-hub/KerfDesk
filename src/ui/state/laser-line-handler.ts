@@ -19,12 +19,11 @@ import {
   type GrblPins,
   onAck,
   type SettingsCollectorState,
-  startCollecting,
   step,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
-import type { ControllerDriver } from '../../core/controllers';
+import { detectControllerFromBanner, type ControllerDriver } from '../../core/controllers';
 import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
   cancelControllerLifecycleRefs,
@@ -77,51 +76,6 @@ const LOG_MAX = 200;
 
 function appendLog(state: LaserState, line: string): ReadonlyArray<string> {
   return [...state.log, line].slice(-LOG_MAX);
-}
-
-export async function runHandshake(
-  set: SetFn,
-  get: GetFn,
-  refs: HandlerRefs,
-  safeWrite: SafeWriteFn,
-): Promise<void> {
-  const HANDSHAKE_TIMEOUT_MS = 2000;
-  const gotLine = await new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => {
-      refs.onLineArrived = null;
-      resolve(false);
-    }, HANDSHAKE_TIMEOUT_MS);
-    refs.onLineArrived = (): void => {
-      clearTimeout(timer);
-      refs.onLineArrived = null;
-      resolve(true);
-    };
-  });
-
-  if (!gotLine) {
-    const driver = refs.driver;
-    set({
-      log: appendLog(
-        get(),
-        `[lf2] No controller response within 2 s. Check baud rate (${driver.defaultBaudRate}) and that the device is ${driver.label}.`,
-      ),
-    });
-    return;
-  }
-  const settingsQuery = refs.driver.commands.settingsQuery;
-  if (settingsQuery === null) {
-    set({ log: appendLog(get(), '[lf2] Connected.') });
-    return;
-  }
-  set({
-    log: appendLog(get(), `[lf2] Connected. Querying settings (${settingsQuery})...`),
-    detectedSettings: null,
-    controllerSettings: null,
-    grblSettingsRows: [],
-    lastSettingsReadAt: null,
-  });
-  refs.settingsCollector = startCollecting();
-  await safeWrite(`${settingsQuery}\n`);
 }
 
 function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
@@ -186,6 +140,10 @@ export function handleLine(
     handleErrorLine(set, get, refs, safeWrite, cls.code, cls.raw);
     return;
   }
+  if (cls.kind === 'welcome') {
+    handleWelcomeLine(set, get, refs, cls.raw);
+    return;
+  }
   // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
   // NOT an ack, so the streamer must not advance.
   if (cls.kind === 'busy') return;
@@ -196,6 +154,24 @@ export function handleLine(
   if (cls.kind === 'ok') {
     advanceStream(set, get, refs, safeWrite, 'ok');
   }
+}
+
+// Welcome banners carry the firmware identity. Record what was detected and
+// warn (log-only) when it disagrees with the profile-selected driver — GRBL
+// family members are wire-compatible, so this is advisory, not a refusal.
+function handleWelcomeLine(set: SetFn, get: GetFn, refs: HandlerRefs, raw: string): void {
+  const detected = detectControllerFromBanner(raw);
+  if (detected === null) return;
+  const mismatchLog =
+    detected === refs.driver.kind
+      ? {}
+      : {
+          log: appendLog(
+            get(),
+            `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
+          ),
+        };
+  set({ detectedControllerKind: detected, ...mismatchLog });
 }
 
 function handleErrorLine(

@@ -3,6 +3,7 @@ import {
   startCollecting,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
+import type { ControllerDriver } from '../../core/controllers';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
@@ -15,6 +16,7 @@ type GetFn = () => LaserState;
 type WriteLine = (line: string) => Promise<void>;
 
 export type LaserSetupRefs = {
+  driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
 };
 
@@ -27,6 +29,14 @@ export function setupActions(
   return {
     configureGrblLaserSetup: async () => {
       assertAutofocusIdle(get());
+      if (refs.driver.capabilities.firmwareSetupPanel !== 'grbl-laser') {
+        const reason = `${refs.driver.label} does not use the GRBL laser setup sequence.`;
+        set({
+          lastWriteError: reason,
+          log: pushLog(get(), `[lf2] Setup command blocked: ${reason}`),
+        });
+        throw new Error(reason);
+      }
       const blockedMessage = setupCommandBlockMessage(get());
       if (blockedMessage !== null) {
         set({

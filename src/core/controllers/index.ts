@@ -19,4 +19,7 @@ export type {
   FrameBounds,
 } from './controller-driver';
 export { selectControllerDriver } from './select-controller-driver';
+export { detectControllerFromBanner } from './detect-controller';
 export { grblDriver, GRBL_DEFAULT_BAUD_RATE, GRBL_SETTLE_DWELL } from './grbl/driver';
+export { grblHalDriver } from './grblhal/driver';
+export { fluidncDriver } from './fluidnc/driver';
