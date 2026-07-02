@@ -23,6 +23,12 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
   const spindleMaxRpm = useStore((s) =>
     s.project.machine?.kind === 'cnc' ? s.project.machine.params.spindleMaxRpm : 24000,
   );
+  // Relief roughing (H.5) reads depth-per-pass + stepover + feeds from this
+  // layer but takes its total depth from the relief object itself — the
+  // fields must say so or the card lies (handoff §7.C contract fix).
+  const hasReliefObjects = useStore((s) =>
+    s.project.scene.objects.some((o) => o.kind === 'relief' && o.color === layer.color),
+  );
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
   const commit = (patch: Partial<CncLayerSettings>): void =>
     setLayerParam(layer.id, { cnc: { ...settings, ...patch } });
@@ -52,7 +58,7 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
         spindleMaxRpm={spindleMaxRpm}
         onCommit={commit}
       />
-      {settings.cutType === 'pocket' ? (
+      {settings.cutType === 'pocket' || hasReliefObjects ? (
         <NumberField
           layer={layer}
           label="Stepover"
@@ -61,9 +67,20 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
           min={10}
           max={85}
           step={5}
-          title="Pocket ring spacing as a percentage of the bit diameter."
+          title={
+            hasReliefObjects
+              ? 'Ring spacing as a percentage of the bit diameter — drives pocket clearing and relief roughing.'
+              : 'Pocket ring spacing as a percentage of the bit diameter.'
+          }
           onCommit={(stepoverPercent) => commit({ stepoverPercent })}
         />
+      ) : null}
+      {hasReliefObjects ? (
+        <div style={reliefHintStyle}>
+          Reliefs on this layer rough with Depth/pass + Stepover; total depth comes from the
+          relief&apos;s own Depth (select the relief to edit it). Cut depth applies to the other
+          shapes only.
+        </div>
       ) : null}
       {settings.cutType === 'v-carve' ? (
         <VCarveFields layer={layer} settings={settings} onCommit={commit} />
@@ -72,6 +89,13 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
     </>
   );
 }
+
+const reliefHintStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-text-muted)',
+  padding: '2px 0 2px 4px',
+  lineHeight: 1.35,
+};
 
 // H.3 V-carve options: ring detail + a live warning when the spindle's
 // active bit is not a v-bit (preflight blocks output until it is).

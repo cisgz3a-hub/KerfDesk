@@ -18,6 +18,7 @@ import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
+import { SelectedReliefProperties } from './SelectedReliefProperties';
 
 export function CutsLayersPanel(): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
@@ -37,6 +38,7 @@ export function CutsLayersPanel(): JSX.Element {
       <CncSetupPanel />
       <AddLayerControls />
       <SelectedObjectProperties />
+      <SelectedReliefProperties />
       {hasSelection ? (
         <>
           {showMaterialLibrary ? (

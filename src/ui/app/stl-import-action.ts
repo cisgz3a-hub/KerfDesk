@@ -2,8 +2,8 @@
 // CNC-only: relief carving has no laser meaning, so drops in laser mode get
 // a clear toast instead of a silent no-op. Imports land at a default size
 // (100 mm wide × 5 mm deep, background carved away) on a dedicated relief
-// layer color; the size/depth become editable when relief settings surface
-// with H.5 roughing.
+// layer color; width/depth/background are edited afterwards in the Relief
+// properties panel (SelectedReliefProperties).
 
 import { meshToHeightmap, triangleCount } from '../../core/relief';
 import {
