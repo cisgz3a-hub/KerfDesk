@@ -71,12 +71,18 @@ export function jobActions(
       }
     },
     pauseJob: async () => {
-      const hold = driver().realtime.hold;
+      const activeDriver = driver();
+      const hold = activeDriver.realtime.hold;
       // Realtime feed hold pauses motion instantly but leaves the beam state
-      // to the firmware — only safe when laser mode is confirmed. Firmwares
-      // without a hold byte (Marlin) pause stream-side instead: the streamer
-      // stops sending and buffered motion drains.
-      if (hold !== null) assertPauseSafe(set, get);
+      // to the firmware — only provable safe when $32 laser mode is confirmed,
+      // which only grbl-dollar firmwares can report. Smoothieware ties beam
+      // power to motion in its laser module, so hold is accepted without the
+      // $32 proof there. Firmwares without a hold byte (Marlin) pause
+      // stream-side instead: the streamer stops sending and buffered motion
+      // drains.
+      const requiresLaserModeProof =
+        hold !== null && activeDriver.capabilities.settings === 'grbl-dollar';
+      if (requiresLaserModeProof) assertPauseSafe(set, get);
       if (hold !== null) await safeWrite(hold, 'pause');
       const s = get().streamer;
       if (s !== null) set({ streamer: pauseStreamer(s) });

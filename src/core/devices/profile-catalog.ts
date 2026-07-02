@@ -166,6 +166,31 @@ const GENERIC_MARLIN_PROFILE: DeviceProfile = {
   ],
 };
 
+const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-smoothieware',
+  vendor: 'Generic',
+  model: 'Smoothieware laser',
+  name: 'Generic Smoothieware 300×200',
+  machineFamily: 'generic-smoothieware',
+  controllerKind: 'smoothieware',
+  streamingMode: 'ping-pong',
+  bedWidth: 300,
+  bedHeight: 200,
+  // Smoothie's laser module scales S against laser_module_maximum_s_value,
+  // default 1.0 — power words are fractions (S0.500 = 50%).
+  maxPowerS: 1,
+  minPowerS: 0,
+  capabilities: ['wcs', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'Smoothieware laser module conventions',
+      status: 'unverified',
+      note: 'Fractional S scale (0-1.0) from the Smoothieware laser docs; realtime ?/!/~ supported, halt recovery via M999. Simulator-verified only; NOT hardware-verified. Confirm laser_module_maximum_s_value against your config.',
+    },
+  ],
+};
+
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
   entry(DEFAULT_DEVICE_PROFILE, [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
@@ -193,6 +218,9 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(GENERIC_MARLIN_PROFILE, [
     'Marlin: ping-pong streaming, no realtime pause/stop bytes, S 0-255, dialect must match the firmware build (inline vs fan).',
+  ]),
+  entry(GENERIC_SMOOTHIEWARE_PROFILE, [
+    'Smoothieware: fractional S power (0-1.0), realtime ?/!/~, M999 halt recovery, no $$/$J.',
   ]),
 ];
 
@@ -233,7 +261,9 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
   if (profile.controllerKind !== undefined && !isKnownControllerKind(profile.controllerKind)) {
-    errors.push('controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin');
+    errors.push(
+      'controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware',
+    );
   }
   if (!isGcodeDialectSelection(profile.gcodeDialect)) {
     errors.push('gcodeDialect must reference a known GRBL dialect');

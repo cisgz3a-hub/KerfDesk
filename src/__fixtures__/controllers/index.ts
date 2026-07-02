@@ -19,3 +19,8 @@ export {
   type CreateMarlinSimulatorOptions,
   type MarlinSimulator,
 } from './marlin-simulator';
+export {
+  createSmoothieSimulator,
+  type CreateSmoothieSimulatorOptions,
+  type SmoothieSimulator,
+} from './smoothie-simulator';

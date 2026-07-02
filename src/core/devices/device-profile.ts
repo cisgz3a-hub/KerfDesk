@@ -12,7 +12,7 @@ export type AirAssistCommand = 'none' | 'M7' | 'M8';
 // ControllerDriver in core/controllers; grblHAL and FluidNC share the GRBL
 // protocol machinery with capability/code-table deltas, Marlin is a fully
 // distinct dialect (no realtime bytes, queued M114 status, text errors).
-export type ControllerKind = 'grbl-v1.1' | 'grblhal' | 'fluidnc' | 'marlin';
+export type ControllerKind = 'grbl-v1.1' | 'grblhal' | 'fluidnc' | 'marlin' | 'smoothieware';
 
 /** Single source of truth for validators (catalog, .lfmachine shape, .lf2
  *  normalize). Grows in lockstep with the ControllerKind union. */
@@ -21,6 +21,7 @@ export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
   'grblhal',
   'fluidnc',
   'marlin',
+  'smoothieware',
 ];
 
 export function isKnownControllerKind(value: unknown): value is ControllerKind {

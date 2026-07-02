@@ -19,6 +19,9 @@ const BANNER_MATCHERS: ReadonlyArray<BannerMatcher> = [
   { kind: 'marlin', pattern: /^start$/ },
   { kind: 'marlin', pattern: /FIRMWARE_NAME:\s*Marlin/i },
   { kind: 'marlin', pattern: /^Marlin\b/ },
+  // Smoothieware greets with "Smoothie ..." and answers M115 with its name.
+  { kind: 'smoothieware', pattern: /^Smoothie\b/i },
+  { kind: 'smoothieware', pattern: /FIRMWARE_NAME:\s*Smoothie/i },
 ];
 
 export function detectControllerFromBanner(line: string): ControllerKind | null {

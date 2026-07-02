@@ -24,6 +24,13 @@ describe('detectControllerFromBanner', () => {
     expect(detectControllerFromBanner('Marlin 2.1.2')).toBe('marlin');
   });
 
+  it('detects Smoothieware banners and M115 identity lines', () => {
+    expect(detectControllerFromBanner('Smoothie command shell')).toBe('smoothieware');
+    expect(detectControllerFromBanner('FIRMWARE_NAME:Smoothieware, FIRMWARE_URL:x')).toBe(
+      'smoothieware',
+    );
+  });
+
   it('returns null for non-banner lines', () => {
     expect(detectControllerFromBanner('ok')).toBeNull();
     expect(detectControllerFromBanner('<Idle|MPos:0.000,0.000,0.000|FS:0,0>')).toBeNull();
