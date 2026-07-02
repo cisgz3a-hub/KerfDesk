@@ -55,11 +55,13 @@ and UI all capability-aware. Verified end-to-end against protocol simulators.
 
 ## What is NOT done (honest remainder)
 
-1. **Hardware passes** — nothing in Phase H has been burned on real hardware this
-   session. The Falcon A1 Pro can verify GRBL + grblHAL immediately; Marlin /
-   Smoothieware / FluidNC need borrowed boards or community verification (the
-   diagnostic-bundle export exists for that); every non-GRBL profile carries
-   `unverified` evidence.
+1. **Hardware passes** — GRBL v1.1 **and** grblHAL are now confirmed working on
+   the Falcon A1 Pro (GrblHAL 1.1f) by the maintainer (2026-07-02): both the
+   normal Falcon `grbl-v1.1` profile (proving the driver refactor is
+   byte-identical on real hardware) and the grblHAL profile connected and
+   operated. STILL simulator-only: Marlin / Smoothieware / FluidNC (need borrowed
+   boards or community verification — the diagnostic-bundle export exists for
+   that; their catalog profiles still carry `unverified` evidence).
 2. **Ruida real-controller validation** — the .rd encoder round-trips through this
    repo's own decoder only. Next: obtain a reference .rd (or a real RDC644x),
    compare/validate, only then wire the Electron UDP socket + IPC to the pure
