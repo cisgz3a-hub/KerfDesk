@@ -111,7 +111,20 @@ function render(image: RawImageData, paths: ReadonlyArray<ColoredPath>): Uint8Ar
   const W = image.width * SCALE;
   const H = image.height * SCALE;
   const rgb = new Uint8Array(W * H * 3).fill(255);
-  // faint source
+  paintSourceUnderlay(rgb, W, image);
+  // trace lines: closed=red, open=blue
+  for (const path of paths)
+    for (const pl of path.polylines) {
+      const color: Rgb = pl.closed ? [220, 0, 0] : [0, 90, 220];
+      for (let i = 0; i + 1 < pl.points.length; i += 1)
+        line(rgb, W, pl.points[i], pl.points[i + 1], color);
+      if (pl.closed && pl.points.length > 1)
+        line(rgb, W, pl.points[pl.points.length - 1], pl.points[0], color);
+    }
+  return encodePng(rgb, W, H);
+}
+
+function paintSourceUnderlay(rgb: Uint8Array, W: number, image: RawImageData): void {
   for (let y = 0; y < image.height; y += 1)
     for (let x = 0; x < image.width; x += 1) {
       const v = image.data[(y * image.width + x) * 4] ?? 255;
@@ -120,16 +133,6 @@ function render(image: RawImageData, paths: ReadonlyArray<ColoredPath>): Uint8Ar
           for (let sx = 0; sx < SCALE; sx += 1)
             setPx(rgb, W, x * SCALE + sx, y * SCALE + sy, [210, 210, 210]);
     }
-  // trace lines: closed=red, open=blue
-  for (const path of paths)
-    for (const pl of path.polylines) {
-      const color: Rgb = pl.closed ? [220, 0, 0] : [0, 90, 220];
-      for (let i = 0; i + 1 < pl.points.length; i += 1)
-        line(rgb, W, H, pl.points[i], pl.points[i + 1], color);
-      if (pl.closed && pl.points.length > 1)
-        line(rgb, W, H, pl.points[pl.points.length - 1], pl.points[0], color);
-    }
-  return encodePng(rgb, W, H);
 }
 type Rgb = readonly [number, number, number];
 function setPx(rgb: Uint8Array, W: number, x: number, y: number, c: Rgb): void {
@@ -140,7 +143,7 @@ function setPx(rgb: Uint8Array, W: number, x: number, y: number, c: Rgb): void {
   rgb[b + 1] = c[1];
   rgb[b + 2] = c[2];
 }
-function line(rgb: Uint8Array, W: number, H: number, a?: Vec2, b?: Vec2, c: Rgb = [0, 0, 0]): void {
+function line(rgb: Uint8Array, W: number, a?: Vec2, b?: Vec2, c: Rgb = [0, 0, 0]): void {
   if (!a || !b) return;
   let x0 = Math.round(a.x * SCALE);
   let y0 = Math.round(a.y * SCALE);
@@ -152,7 +155,7 @@ function line(rgb: Uint8Array, W: number, H: number, a?: Vec2, b?: Vec2, c: Rgb 
   const sy = y0 < y1 ? 1 : -1;
   let err = dx + dy;
   for (let guard = 0; guard < 100000; guard += 1) {
-    if (y0 >= 0 && y0 < H) setPx(rgb, W, x0, y0, c);
+    setPx(rgb, W, x0, y0, c); // setPx bounds-checks via the buffer index
     if (x0 === x1 && y0 === y1) break;
     const e2 = 2 * err;
     if (e2 >= dy) {

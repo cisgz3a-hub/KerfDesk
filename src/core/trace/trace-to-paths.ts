@@ -22,7 +22,7 @@ import {
   buildImageTracerOptions,
   preprocessForTrace,
 } from './trace-image';
-import { traceImageToCenterlinePaths } from './centerline-trace';
+import { traceCenterlineStrokePaths } from './centerline';
 import { traceImageToEdgePaths } from './edge-trace';
 import { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
 
@@ -131,7 +131,7 @@ export async function traceImageToColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
-  if (options.traceMode === 'centerline') return traceImageToCenterlinePaths(image, options);
+  if (options.traceMode === 'centerline') return traceCenterlineStrokePaths(image, options);
   if (options.traceMode === 'edge') return traceImageToEdgePaths(image, options);
   if (shouldUsePotraceTraceBackend(options)) return traceImageToPotraceColoredPaths(image, options);
   const tracer = await loadTracer();
