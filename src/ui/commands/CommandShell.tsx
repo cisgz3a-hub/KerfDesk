@@ -49,6 +49,7 @@ export function CommandShell(): JSX.Element {
   const selectedRaster = useSelectedRaster();
   const onImagePick = useImagePickHandler();
   const onMultiFileTracePick = useMultiFileTracePickHandler();
+  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const commands = useAppCommands({
     requestImportImage: () => imageInput.current?.click(),
     requestMultiFileTrace: () => multiFileTraceInput.current?.click(),
@@ -69,8 +70,8 @@ export function CommandShell(): JSX.Element {
   });
   return (
     <>
-      <AppMenuBar commands={commands} />
-      <Toolbar commands={commands} />
+      <AppMenuBar commands={commands} machineKind={machineKind} />
+      <Toolbar commands={commands} machineKind={machineKind} />
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
       <ImageImportInput inputRef={imageInput} onPick={onImagePick} />

@@ -305,40 +305,6 @@ function guardedCalibrationAction(
   };
 }
 
-export function laserCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
-  const connect =
-    ctx.serialSupported && !ctx.connected
-      ? enabled(
-          'laser.connect',
-          'laser',
-          'Connect',
-          'Connect to laser controller',
-          ctx.connectLaser,
-        )
-      : disabled('laser.connect', 'laser', 'Connect', connectDisabledReason(ctx), ctx.connectLaser);
-  const disconnect =
-    ctx.connected && !ctx.machineBusy
-      ? enabled(
-          'laser.disconnect',
-          'laser',
-          'Disconnect',
-          'Disconnect from laser controller',
-          ctx.disconnectLaser,
-        )
-      : disabled(
-          'laser.disconnect',
-          'laser',
-          'Disconnect',
-          disconnectDisabledReason(ctx),
-          ctx.disconnectLaser,
-        );
-  const home =
-    ctx.connected && ctx.homingEnabled && !ctx.machineBusy
-      ? enabled('laser.home', 'laser', 'Home', 'Send homing command', ctx.homeLaser)
-      : disabled('laser.home', 'laser', 'Home', homeDisabledReason(ctx), ctx.homeLaser);
-  return [connect, disconnect, home];
-}
-
 export function windowCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   // Preview is gated on previewable content (M27/F-A8) — but ALWAYS
   // exit-able, so emptying the scene mid-preview can't trap the mode on.
@@ -398,23 +364,4 @@ export function helpCommand(ctx: AppCommandContext): AppCommand {
     'Show build information',
     ctx.showAbout,
   );
-}
-
-function connectDisabledReason(ctx: AppCommandContext): string {
-  if (!ctx.serialSupported) return 'WebSerial is not supported in this browser.';
-  if (ctx.connected) return 'Laser is already connected.';
-  return 'Laser is not ready to connect.';
-}
-
-function disconnectDisabledReason(ctx: AppCommandContext): string {
-  if (!ctx.connected) return 'Laser is not connected.';
-  if (ctx.machineBusy) return 'Machine is busy. Use the laser panel controls first.';
-  return 'Disconnect is unavailable.';
-}
-
-function homeDisabledReason(ctx: AppCommandContext): string {
-  if (!ctx.connected) return 'Connect to the laser first.';
-  if (!ctx.homingEnabled) return 'Homing is disabled in Device settings.';
-  if (ctx.machineBusy) return 'Machine is busy. Wait or stop the active operation first.';
-  return 'Home is unavailable.';
 }

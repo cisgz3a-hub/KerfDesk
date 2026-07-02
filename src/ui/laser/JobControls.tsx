@@ -6,6 +6,7 @@ import { useStore } from '../state';
 import { describeControllerOperation } from '../state/laser-controller-operation';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
+import { jobTimeNoun } from '../machine/machine-labels';
 import {
   containerStyle,
   estimateStyle,
@@ -73,7 +74,8 @@ function SetupRow(props: {
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
   // ADR-100 §5 (provisional): auto-focus is a laser focus routine; it hides
   // on a router. The CNC Z-zeroing flow arrives as its own H.7 surface.
-  const isCncMachine = useStore((s) => s.project.machine?.kind === 'cnc');
+  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
+  const isCncMachine = machineKind === 'cnc';
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const statusReport = useLaserStore((s) => s.statusReport);
   const home = useLaserStore((s) => s.home);
@@ -129,7 +131,7 @@ function SetupRow(props: {
         type="button"
         onClick={props.onStartJob}
         disabled={busy}
-        title={startJobTitle(estimate)}
+        title={startJobTitle(estimate, jobTimeNoun(machineKind))}
       >
         Start job
       </button>
@@ -145,9 +147,9 @@ function frameBlockedTitle(state: string | undefined): string {
   return `Machine must be Idle before framing (currently ${state}).`;
 }
 
-function startJobTitle(estimate: LiveJobEstimate): string {
+function startJobTitle(estimate: LiveJobEstimate, timeNoun: string): string {
   if (estimate.kind === 'estimated') {
-    return `Estimated burn time: ${estimate.label}`;
+    return `Estimated ${timeNoun} time: ${estimate.label}`;
   }
   if (estimate.kind === 'too-large') {
     return 'Large job: Start will block until you reduce the artwork size or lower the raster settings.';

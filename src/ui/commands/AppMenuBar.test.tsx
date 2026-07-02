@@ -31,7 +31,10 @@ function commands(onNew = vi.fn()): ReadonlyArray<AppCommand> {
   ];
 }
 
-async function renderMenu(appCommands: ReadonlyArray<AppCommand>): Promise<{
+async function renderMenu(
+  appCommands: ReadonlyArray<AppCommand>,
+  machineKind: 'laser' | 'cnc' = 'laser',
+): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
 }> {
@@ -40,7 +43,7 @@ async function renderMenu(appCommands: ReadonlyArray<AppCommand>): Promise<{
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(<AppMenuBar commands={appCommands} />);
+    root.render(<AppMenuBar commands={appCommands} machineKind={machineKind} />);
   });
   if (root === null) throw new Error('root did not mount');
   return { host, root };
@@ -80,6 +83,36 @@ describe('AppMenuBar', () => {
       expect(openFamilyLabels(host)).toEqual([]);
     } finally {
       await act(async () => root.unmount());
+    }
+  });
+
+  it('labels the laser command family with the machine noun (ADR-100 §7)', async () => {
+    const laserFamily: ReadonlyArray<AppCommand> = [
+      {
+        id: 'laser.connect',
+        family: 'laser',
+        label: 'Connect',
+        title: 'Connect to controller',
+        enabled: true,
+        invoke: vi.fn(),
+      },
+    ];
+    const summaries = (host: HTMLElement): ReadonlyArray<string | null> =>
+      [...host.querySelectorAll('summary')].map((summary) => summary.textContent);
+
+    const laser = await renderMenu(laserFamily);
+    try {
+      expect(summaries(laser.host)).toContain('Laser');
+    } finally {
+      await act(async () => laser.root.unmount());
+    }
+
+    const cnc = await renderMenu(laserFamily, 'cnc');
+    try {
+      expect(summaries(cnc.host)).toContain('Router');
+      expect(summaries(cnc.host)).not.toContain('Laser');
+    } finally {
+      await act(async () => cnc.root.unmount());
     }
   });
 

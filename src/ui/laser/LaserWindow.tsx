@@ -6,6 +6,7 @@ import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { machineControlsLabel, machineDisplayName, machineNoun } from '../machine/machine-labels';
 import { ConnectionBar } from './ConnectionBar';
 import { ConsolePanel } from './ConsolePanel';
 import { DetectedSettingsToast } from './DetectedSettingsToast';
@@ -32,6 +33,8 @@ export function LaserWindow(): JSX.Element {
   const streamer = useLaserStore((s) => s.streamer);
   const statusReport = useLaserStore((s) => s.statusReport);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
+  // ADR-100 §7: shared chrome re-labels machine-aware; behavior is identical.
+  const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const machineOperationBusy = isMachineOperationBusy({
     autofocusBusy,
     motionOperation,
@@ -49,10 +52,10 @@ export function LaserWindow(): JSX.Element {
   const supportsSerial = platform.serial.isSupported();
 
   return (
-    <aside aria-label="Laser controls" className="lf-rail" style={panelStyle}>
+    <aside aria-label={machineControlsLabel(machineKind)} className="lf-rail" style={panelStyle}>
       <DetectedSettingsToast />
       <h2 className="lf-heading" style={headingStyle}>
-        Laser
+        {machineDisplayName(machineKind)}
       </h2>
       <SafetyNoticeBanner />
       {!supportsSerial && (
@@ -64,6 +67,7 @@ export function LaserWindow(): JSX.Element {
       <DeviceSetupControls />
       <ConnectionBar
         connection={connection}
+        machineNoun={machineNoun(machineKind)}
         onConnect={() => void connect(platform)}
         onDisconnect={() => void disconnect().catch(() => undefined)}
         disabled={!supportsSerial || machineOperationBusy}
