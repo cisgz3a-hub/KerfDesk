@@ -12,3 +12,4 @@ export {
 } from './removal-grid';
 export { kernelForTool, type ToolKernel, type ToolKernelOffset } from './tool-kernels';
 export { computeRemovalGrid, type ComputeRemovalOptions } from './stamp-toolpath';
+export { downsampleRemovalGrid } from './removal-grid-display';

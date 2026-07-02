@@ -95,6 +95,8 @@ export function PreviewControlsPanel(props: {
   readonly estimate: LiveJobEstimate;
   readonly routeLabel: string;
   readonly disabled: boolean;
+  // ADR-102 G4: present only when a CNC removal grid exists to render.
+  readonly onOpen3D?: () => void;
 }): JSX.Element {
   return (
     <div
@@ -107,6 +109,18 @@ export function PreviewControlsPanel(props: {
         disabled={props.disabled}
         passBoundaries={passBoundaryFractions(props.toolpath)}
       />
+      {props.onOpen3D !== undefined ? (
+        <button
+          type="button"
+          className="lf-button"
+          style={compactButtonStyle}
+          onClick={props.onOpen3D}
+          aria-label="Open 3D cut preview"
+          title="Open the 3D view of the simulated cut at the current scrubber position."
+        >
+          3D
+        </button>
+      ) : null}
       <PreviewStatsPanel
         toolpath={props.toolpath}
         estimate={props.estimate}

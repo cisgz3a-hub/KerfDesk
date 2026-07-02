@@ -30,6 +30,7 @@ import {
   ZoomControls,
 } from './overlays';
 import { PreviewControlsPanel, PreviewStatusOverlays } from './preview-overlays';
+import { Cut3DPreviewDialog } from '../relief-viewer';
 import { useCanvasBitmapSize, type CanvasBitmapSize } from './use-canvas-bitmap-size';
 import { usePreviewPlayback } from './use-preview-playback';
 import { usePreviewToolpath } from './use-preview-toolpath';
@@ -90,10 +91,7 @@ export function Workspace(): JSX.Element {
         onMouseUp={handlers.onMouseUp}
         onMouseLeave={handlers.onMouseUp}
         onDoubleClick={handleCanvasDoubleClick}
-        onWheel={(e) => {
-          useUiStore.getState().closeWorkspaceContextBar();
-          handleCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY });
-        }}
+        onWheel={(e) => onCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY })}
         onContextMenu={suppressCanvasContextMenu}
         style={canvasStyle}
         aria-label={`${APP_DISPLAY_NAME} workspace`}
@@ -113,6 +111,7 @@ export function Workspace(): JSX.Element {
         toolpath={previewToolpath}
         estimate={jobEstimate}
         routeLabel={routePreviewLabel}
+        cncRemovalGrid={cncRemovalGrid}
       />
       {previewMode && <PreviewScrubber />}
       {/* Bottom-right zoom controls — hidden during preview so the
@@ -150,14 +149,29 @@ function suppressCanvasContextMenu(e: React.MouseEvent<HTMLCanvasElement>): void
   e.preventDefault();
 }
 
+function onCanvasWheel(
+  e: React.WheelEvent<HTMLCanvasElement>,
+  canvas: HTMLCanvasElement | null,
+  project: Project,
+  viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number },
+): void {
+  useUiStore.getState().closeWorkspaceContextBar();
+  handleCanvasWheel(e, canvas, project, viewState);
+}
+
 function WorkspacePreviewOverlays(props: {
   readonly previewMode: boolean;
   readonly project: Project;
   readonly toolpath: Toolpath | null;
   readonly estimate: ReturnType<typeof useJobEstimate>;
   readonly routeLabel: string;
+  readonly cncRemovalGrid: RemovalGrid | null;
 }): JSX.Element | null {
+  const [cut3DOpen, setCut3DOpen] = useState(false);
   if (!props.previewMode || props.toolpath === null) return null;
+  const grid = props.cncRemovalGrid;
+  const machine = props.project.machine;
+  const stockThicknessMm = machine?.kind === 'cnc' ? machine.stock.thicknessMm : 0;
   return (
     <>
       <PreviewStatusOverlays project={props.project} toolpath={props.toolpath} />
@@ -166,7 +180,15 @@ function WorkspacePreviewOverlays(props: {
         estimate={props.estimate}
         routeLabel={props.routeLabel}
         disabled={props.toolpath.totalLength <= 0}
+        {...(grid !== null ? { onOpen3D: () => setCut3DOpen(true) } : {})}
       />
+      {cut3DOpen && grid !== null ? (
+        <Cut3DPreviewDialog
+          grid={grid}
+          stockThicknessMm={stockThicknessMm}
+          onClose={() => setCut3DOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
