@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
+import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { LaserWindow } from './LaserWindow';
 
@@ -21,6 +22,7 @@ const mockPlatform: PlatformAdapter = {
 };
 
 afterEach(() => {
+  useStore.getState().setMachineKind('laser');
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,
@@ -93,6 +95,54 @@ describe('GRBL laser setup panel', () => {
       }
       host.remove();
       confirm.mockRestore();
+    }
+  });
+});
+
+describe('GRBL laser setup panel in CNC mode', () => {
+  it('hides the one-time laser firmware write while the project machine is CNC', async () => {
+    useStore.getState().setMachineKind('cnc');
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: {
+        state: 'Idle',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        wco: null,
+        feed: 0,
+        spindle: 0,
+      },
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(
+          <PlatformProvider adapter={mockPlatform}>
+            <LaserWindow />
+          </PlatformProvider>,
+        );
+      });
+
+      expect(host.textContent).toContain('Machine Setup');
+      await act(async () => {
+        button(host, 'Machine Setup').click();
+        await Promise.resolve();
+      });
+      await act(async () => {
+        button(host, 'Controller Settings').click();
+        await Promise.resolve();
+      });
+
+      expect(host.textContent).not.toContain('One-time GRBL Setup');
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
     }
   });
 });

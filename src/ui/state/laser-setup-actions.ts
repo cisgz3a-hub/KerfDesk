@@ -3,10 +3,14 @@ import {
   startCollecting,
   type SettingsCollectorState,
 } from '../../core/controllers/grbl';
+import { machineKindOf } from '../../core/scene';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { useStore } from './store';
 
 const GRBL_LASER_SETUP_LINES = ['$32=1', '$30=1000', '$130=400', '$131=400'];
+const CNC_MODE_BLOCK_MESSAGE =
+  'One-time GRBL setup writes laser firmware values ($32=1); switch the project to Laser mode first.';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -26,6 +30,16 @@ export function setupActions(
 ): Pick<LaserState, 'configureGrblLaserSetup'> {
   return {
     configureGrblLaserSetup: async () => {
+      // $32=1 flips GRBL into laser mode; a router must never receive this
+      // write, so the action refuses while the project machine is CNC even
+      // if some UI path still reaches it.
+      if (machineKindOf(useStore.getState().project.machine) === 'cnc') {
+        set({
+          lastWriteError: CNC_MODE_BLOCK_MESSAGE,
+          log: pushLog(get(), `[lf2] Setup command blocked: ${CNC_MODE_BLOCK_MESSAGE}`),
+        });
+        throw new Error(CNC_MODE_BLOCK_MESSAGE);
+      }
       assertAutofocusIdle(get());
       const blockedMessage = setupCommandBlockMessage(get());
       if (blockedMessage !== null) {

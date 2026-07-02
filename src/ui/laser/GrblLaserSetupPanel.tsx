@@ -1,3 +1,5 @@
+import { machineKindOf } from '../../core/scene';
+import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
 
@@ -6,8 +8,16 @@ const SETUP_CONFIRMATION =
   '$32=1\n$30=1000\n$130=400\n$131=400\n$$\n\n' +
   'KerfDesk does not change $22 homing here. Read $$ and export a backup first, then confirm Z travel, homing, and air assist wiring on the machine.';
 
-export function GrblLaserSetupPanel({ disabled }: { readonly disabled: boolean }): JSX.Element {
+export function GrblLaserSetupPanel({
+  disabled,
+}: {
+  readonly disabled: boolean;
+}): JSX.Element | null {
+  const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const configure = useLaserStore((s) => s.configureGrblLaserSetup);
+  // $32=1 is a laser-mode firmware write; hide the helper for routers
+  // entirely (gate-and-hide, matching the Material Library precedent).
+  if (machineKind === 'cnc') return null;
   const handleSetup = (): void => {
     if (!jobAwareConfirm(SETUP_CONFIRMATION)) return;
     void configure().catch(() => undefined);
