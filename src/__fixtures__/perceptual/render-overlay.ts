@@ -56,7 +56,14 @@ function setPx(rgb: Uint8Array, W: number, x: number, y: number, c: Rgb): void {
   rgb[b + 2] = c[2];
 }
 
-function line(rgb: Uint8Array, W: number, scale: number, a?: Vec2, b?: Vec2, c: Rgb = [0, 0, 0]): void {
+function line(
+  rgb: Uint8Array,
+  W: number,
+  scale: number,
+  a?: Vec2,
+  b?: Vec2,
+  c: Rgb = [0, 0, 0],
+): void {
   if (!a || !b) return;
   let x0 = Math.round(a.x * scale);
   let y0 = Math.round(a.y * scale);

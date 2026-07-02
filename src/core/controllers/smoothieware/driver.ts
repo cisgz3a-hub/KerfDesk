@@ -67,7 +67,11 @@ export const smoothiewareDriver: ControllerDriver = {
   consoleQuickCommands: [
     { label: SMOOTHIE_CMD_UNLOCK, command: SMOOTHIE_CMD_UNLOCK, hint: 'Clear halt (kill/limit)' },
     { label: SMOOTHIE_CMD_POSITION, command: SMOOTHIE_CMD_POSITION, hint: 'Position report' },
-    { label: SMOOTHIE_CMD_FIRMWARE_INFO, command: SMOOTHIE_CMD_FIRMWARE_INFO, hint: 'Firmware info' },
+    {
+      label: SMOOTHIE_CMD_FIRMWARE_INFO,
+      command: SMOOTHIE_CMD_FIRMWARE_INFO,
+      hint: 'Firmware info',
+    },
     { label: SMOOTHIE_CMD_VERSION, command: SMOOTHIE_CMD_VERSION, hint: 'Smoothie version' },
     { label: RT_STATUS, command: RT_STATUS, hint: 'Status report' },
   ],

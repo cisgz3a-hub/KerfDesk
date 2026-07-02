@@ -29,8 +29,7 @@ export const MARLIN_GCODE_DIALECTS: ReadonlyArray<MarlinGcodeDialect> = [
   {
     id: 'marlin-inline',
     label: 'Marlin Inline (LASER_FEATURE)',
-    description:
-      'Marlin builds with LASER_FEATURE: M3/M4/M5 with per-move S power, S range 0-255.',
+    description: 'Marlin builds with LASER_FEATURE: M3/M4/M5 with per-move S power, S range 0-255.',
     powerMode: 'inline',
   },
   {
@@ -48,7 +47,9 @@ export function resolveMarlinDialect(device: {
   readonly gcodeDialect?: { readonly dialectId?: string };
 }): MarlinGcodeDialect {
   const dialectId = device.gcodeDialect?.dialectId;
-  return MARLIN_GCODE_DIALECTS.find((dialect) => dialect.id === dialectId) ?? DEFAULT_MARLIN_DIALECT;
+  return (
+    MARLIN_GCODE_DIALECTS.find((dialect) => dialect.id === dialectId) ?? DEFAULT_MARLIN_DIALECT
+  );
 }
 
 export type GrblPowerMode = 'constant' | 'dynamic';

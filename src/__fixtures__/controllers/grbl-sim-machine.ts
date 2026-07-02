@@ -142,11 +142,7 @@ function emit(line: string, opts: GrblSimOptions): GrblSimEffect {
   return { kind: 'emit', line, afterMs: opts.responseDelayMs };
 }
 
-function reduceRealtime(
-  state: GrblSimState,
-  byte: string,
-  opts: GrblSimOptions,
-): GrblSimReaction {
+function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions): GrblSimReaction {
   if (byte === '?') return { state, effects: [emit(statusReportLine(state), opts)] };
   if (byte === '!') {
     const holds = state.machine === 'Run' || state.machine === 'Jog';
@@ -225,7 +221,11 @@ function reduceDollarControl(
   }
   if (line === '$X') {
     return {
-      state: { ...state, locked: false, machine: state.machine === 'Alarm' ? 'Idle' : state.machine },
+      state: {
+        ...state,
+        locked: false,
+        machine: state.machine === 'Alarm' ? 'Idle' : state.machine,
+      },
       effects: [emit('[MSG:Caution: Unlocked]', opts), emit('ok', opts)],
     };
   }
@@ -253,14 +253,22 @@ function reduceDollarQuery(
   if (line === '$I') {
     return {
       state,
-      effects: [emit('[VER:1.1f.20170801:LASERFORGE-SIM]', opts), emit('[OPT:V,15,128]', opts), emit('ok', opts)],
+      effects: [
+        emit('[VER:1.1f.20170801:LASERFORGE-SIM]', opts),
+        emit('[OPT:V,15,128]', opts),
+        emit('ok', opts),
+      ],
     };
   }
   if (line === '$#') {
     const wco = formatVec3(totalWco(state));
     return {
       state,
-      effects: [emit(`[G54:${formatVec3(state.g54 ?? SIM_ZERO_VEC3)}]`, opts), emit(`[G92:${wco}]`, opts), emit('ok', opts)],
+      effects: [
+        emit(`[G54:${formatVec3(state.g54 ?? SIM_ZERO_VEC3)}]`, opts),
+        emit(`[G92:${wco}]`, opts),
+        emit('ok', opts),
+      ],
     };
   }
   if (line === '$G') {
@@ -313,11 +321,7 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
   };
 }
 
-function reduceGcodeLine(
-  state: GrblSimState,
-  line: string,
-  opts: GrblSimOptions,
-): GrblSimReaction {
+function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {
   if (state.locked) return { state, effects: [emit('error:9', opts)] };
   const g = leadingGWord(line);
   if (g === 92.1) return { state: { ...state, g92: null }, effects: [emit('ok', opts)] };

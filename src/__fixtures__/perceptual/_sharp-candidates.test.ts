@@ -22,11 +22,11 @@ import {
   calculatePotraceLongestStraightSegments,
 } from '../../core/trace/potrace-polygon';
 import {
-  TRACE_PRESETS,
   preprocessForTrace,
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace/trace-image';
+import { TRACE_PRESETS } from '../../core/trace/trace-presets';
 import { inkCellGlyph, inkDisc, inkRect, paper, paperRect, toRawImage } from './procedural-ink';
 import { renderTraceOverlay } from './render-overlay';
 
@@ -138,12 +138,7 @@ function fixtures(): Array<{ name: string; image: RawImageData }> {
   inkRect(fine, 80, 60, 84, 100); // 4px thin bar
   inkRect(fine, 92, 60, 132, 64); // 4px thin bar horizontal
   inkRect(fine, 92, 72, 96, 76); // 4px lone dot
-  inkCellGlyph(fine, 20, 116, 4, [
-    '####..####',
-    '#..#..#..#',
-    '#..#..#..#',
-    '####..####',
-  ]);
+  inkCellGlyph(fine, 20, 116, 4, ['####..####', '#..#..#..#', '#..#..#..#', '####..####']);
 
   return [
     { name: 'sharp1-hard-ring', image: toRawImage(hard) },

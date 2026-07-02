@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { traceImageToEdgePaths } from './edge-trace';
-import { TRACE_PRESETS, type RawImageData } from './trace-image';
+import { TRACE_PRESETS } from './trace-presets';
+import type { RawImageData } from './trace-image';
 
 const EDGE_OPTIONS = TRACE_PRESETS['Edge Detection']!;
 

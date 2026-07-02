@@ -69,9 +69,7 @@ export function weldBranchEnds(
 }
 
 function isJunctionPoint(p: Vec2, junctions: ReadonlyArray<Vec2>): boolean {
-  return junctions.some(
-    (j) => Math.abs(j.x - p.x) < MATCH_EPS && Math.abs(j.y - p.y) < MATCH_EPS,
-  );
+  return junctions.some((j) => Math.abs(j.x - p.x) < MATCH_EPS && Math.abs(j.y - p.y) < MATCH_EPS);
 }
 
 function indexOfPoint(pts: ReadonlyArray<Vec2>, target: Vec2): number {

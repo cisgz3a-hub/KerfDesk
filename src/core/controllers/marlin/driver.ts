@@ -69,9 +69,17 @@ export const marlinDriver: ControllerDriver = {
     { label: MARLIN_CMD_FIRMWARE_INFO, command: MARLIN_CMD_FIRMWARE_INFO, hint: 'Firmware info' },
     { label: MARLIN_CMD_POSITION, command: MARLIN_CMD_POSITION, hint: 'Position report' },
     { label: MARLIN_CMD_TEMPERATURES, command: MARLIN_CMD_TEMPERATURES, hint: 'Temperatures' },
-    { label: MARLIN_CMD_SETTINGS_DUMP, command: MARLIN_CMD_SETTINGS_DUMP, hint: 'Settings dump (read-only)' },
+    {
+      label: MARLIN_CMD_SETTINGS_DUMP,
+      command: MARLIN_CMD_SETTINGS_DUMP,
+      hint: 'Settings dump (read-only)',
+    },
     { label: MARLIN_CMD_SETTLE, command: MARLIN_CMD_SETTLE, hint: 'Wait for moves to finish' },
-    { label: MARLIN_CMD_EMERGENCY_STOP, command: MARLIN_CMD_EMERGENCY_STOP, hint: 'EMERGENCY STOP (halts firmware; reconnect required)' },
+    {
+      label: MARLIN_CMD_EMERGENCY_STOP,
+      command: MARLIN_CMD_EMERGENCY_STOP,
+      hint: 'EMERGENCY STOP (halts firmware; reconnect required)',
+    },
   ],
   // M500/M502 persist firmware state; block them inside streamed payloads the
   // same way GRBL blocks $-lines mid-job.

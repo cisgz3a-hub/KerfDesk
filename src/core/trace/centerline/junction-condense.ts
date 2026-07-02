@@ -40,7 +40,8 @@ export function condenseJunctions(
     }
   }
   const merged = new Map<number, number>();
-  for (const node of graph.nodes) merged.set(node.id, node.kind === 'junction' ? find(node.id) : node.id);
+  for (const node of graph.nodes)
+    merged.set(node.id, node.kind === 'junction' ? find(node.id) : node.id);
   if ([...merged.entries()].every(([id, root]) => id === root)) return graph;
   return rebuildGraph(graph, merged);
 }

@@ -104,7 +104,6 @@ function signedArea(points: ReadonlyArray<Vec2>): number {
   return sum / 2;
 }
 
-
 function polylineLength(polyline: Polyline): number {
   const points = polyline.points;
   let total = 0;

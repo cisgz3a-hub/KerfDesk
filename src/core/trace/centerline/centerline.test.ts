@@ -125,8 +125,7 @@ describe('squaredDistanceField', () => {
 function inkRingWithStub(ink: Uint8Array, w: number): void {
   // ring band
   for (let y = 15; y < 75; y += 1)
-    for (let x = 15; x < 75; x += 1)
-      if (x < 31 || x >= 59 || y < 31 || y >= 59) ink[y * w + x] = 1;
+    for (let x = 15; x < 75; x += 1) if (x < 31 || x >= 59 || y < 31 || y >= 59) ink[y * w + x] = 1;
   // stub on top
   for (let y = 5; y < 20; y += 1) for (let x = 42; x < 48; x += 1) ink[y * w + x] = 1;
 }
@@ -379,7 +378,10 @@ describe('sharpenChainBends', () => {
 
 function stepToward(from: Vec2, to: Vec2, distance: number): Vec2 {
   const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-  return { x: from.x + ((to.x - from.x) / len) * distance, y: from.y + ((to.y - from.y) / len) * distance };
+  return {
+    x: from.x + ((to.x - from.x) / len) * distance,
+    y: from.y + ((to.y - from.y) / len) * distance,
+  };
 }
 
 function appendSamples(out: Vec2[], from: Vec2, to: Vec2, spacing: number): void {

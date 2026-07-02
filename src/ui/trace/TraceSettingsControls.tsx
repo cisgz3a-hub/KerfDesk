@@ -213,8 +213,8 @@ function AutoSketchTraceNote(): JSX.Element {
 function EdgeTraceModeNote(): JSX.Element {
   return (
     <p style={edgeTraceNoteStyle}>
-      Traces brightness edges as single vector lines — best for full-colour art or logos that
-      should engrave as a line drawing of their edges.
+      Traces brightness edges as single vector lines — best for full-colour art or logos that should
+      engrave as a line drawing of their edges.
     </p>
   );
 }

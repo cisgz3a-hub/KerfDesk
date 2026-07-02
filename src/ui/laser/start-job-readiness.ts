@@ -5,10 +5,7 @@ import {
   frameBoundsSignature,
   framePreflight,
 } from '../../core/job';
-import type {
-  ControllerSettingsSnapshot,
-  ReadinessSettingsCapability,
-} from '../../core/preflight';
+import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,

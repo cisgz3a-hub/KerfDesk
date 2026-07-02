@@ -138,12 +138,7 @@ function isLocalDistanceMax(
 }
 
 /** 8-bit neighbourhood configuration of the ring around `index`. */
-export function ringConfig(
-  grid: Uint8Array,
-  width: number,
-  height: number,
-  index: number,
-): number {
+export function ringConfig(grid: Uint8Array, width: number, height: number, index: number): number {
   const x = index % width;
   const y = (index - x) / width;
   let config = 0;

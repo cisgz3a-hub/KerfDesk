@@ -51,9 +51,7 @@ async function pump(ms = 10): Promise<void> {
   await vi.advanceTimersByTimeAsync(ms);
 }
 
-async function connectMarlin(
-  options: CreateMarlinSimulatorOptions = {},
-): Promise<MarlinSimulator> {
+async function connectMarlin(options: CreateMarlinSimulatorOptions = {}): Promise<MarlinSimulator> {
   const sim = createMarlinSimulator(options);
   await useLaserStore.getState().connect(sim.adapter, { controllerKind: 'marlin' });
   await pump(20); // `start` banner → handshake (no settings query on Marlin)

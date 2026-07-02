@@ -136,8 +136,8 @@ export function PresetHint(): JSX.Element {
       <strong>Centerline</strong> — one vector path down black strokes. <strong>Sharp</strong> —
       pixel-perfect detail, no blur. <strong>Edge Detection</strong> — single lines along the
       brightness edges of full-colour art. For photos and shaded/continuous-tone images, do not
-      trace — engrave them directly as a raster image (Image layer), which is how LightBurn
-      handles photographs.
+      trace — engrave them directly as a raster image (Image layer), which is how LightBurn handles
+      photographs.
     </p>
   );
 }
