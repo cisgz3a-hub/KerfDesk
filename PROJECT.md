@@ -127,6 +127,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
 | H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry + arc leads deferred — DECISIONS.md) | Built |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
+| H.11 | Market-parity build-out (ADR-102): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator; stretch: dogbone fillets, start-from-line, surfacing generator | In progress |
 
 ### Anything past Phase F
 
