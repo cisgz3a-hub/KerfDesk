@@ -14,6 +14,7 @@ import { DeviceSetupControls } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { JobControls } from './JobControls';
+import { ProbePanel } from './ProbePanel';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { runStartJobFlow } from './start-job-flow';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
@@ -87,6 +88,7 @@ export function LaserWindow(): JSX.Element {
       <JogPad
         disabled={isJogPadDisabled(connected, controllerIdle, machineOperationBusy, jobActive)}
       />
+      <ProbePanel />
       <JobControls
         disabled={connection.kind !== 'connected' || autofocusBusy}
         onStartJob={() => void runStartJobFlow()}

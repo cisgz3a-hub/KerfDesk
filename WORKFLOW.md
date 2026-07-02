@@ -1728,3 +1728,37 @@ F-CNC19 tiling.
 #### Edge — cancelling mid-sequence
 1. Cancelling a save dialog stops the remaining tiles; the toast
    reports how many of the set were saved.
+
+### F-CNC20. Probe work zero with a touch plate — Phase H.11 (ADR-102 G2)
+
+#### Success
+1. Router controls → "Probe (touch plate)": pick Z-only (stock top) or
+   XYZ corner (plus which corner). Plate thickness, max travel, and (for
+   XYZ) bit diameter are editable; bit diameter prefills from the
+   machine's active bit. Run is enabled only when connected and Idle.
+2. Z cycle: fast G38.2 seek down, 2 mm back-off, slow re-touch, then
+   `G10 L20 P0 Z<thickness>` — work Z0 lands on the STOCK TOP (plate
+   underside) — and a retract. The toast confirms "work zero is set".
+3. XYZ corner cycle: Z first over the plate center, then each side face
+   (two-stage, flank contact below the plate top), zeroing X and Y one
+   bit-radius outside the stock faces, ending parked just outside the
+   zeroed corner. Corner choice mirrors all directions and signs.
+
+#### Error — probe never fires / fires early
+1. ALARM:5 (no contact within travel): named toast — check the clip
+   lead, start closer, `$X` to unlock, retry.
+2. ALARM:4 (already triggered): named toast — check for a short /
+   already-touching bit, `$X`, retry.
+3. Any error:N stops the sequence immediately; nothing further is sent.
+4. No `ok` within 45 s: timeout toast names the pending line and warns
+   the machine may still be moving (physical stop if unsafe).
+
+#### Empty
+1. The panel does not render in laser mode (auto-focus owns that flow).
+
+#### Edge — busy machine / mid-job
+1. Probing refuses while a job streams, a jog/frame is in flight,
+   auto-focus runs, or another probe is running (preflight toast, no
+   bytes written).
+2. The status poll keeps running during the cycle; an Alarm status seen
+   mid-cycle aborts with the unlock hint even if the ALARM line raced.

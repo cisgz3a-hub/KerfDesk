@@ -25,6 +25,8 @@ import {
 } from './laser-interactive-command';
 import { jobActions } from './laser-job-actions';
 import { jogActions } from './laser-jog-actions';
+import { probeActions } from './laser-probe-actions';
+import type { ProbeResult } from './probe-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
 import type { LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
@@ -77,6 +79,8 @@ export type LaserState = {
   // connect or via clearSafetyNotice.
   readonly safetyNotice: LaserSafetyNotice | null;
   readonly autofocusBusy: boolean;
+  // ADR-102 G2 — a touch-plate probe cycle is mid-flight.
+  readonly probeBusy: boolean;
   readonly motionOperation: LaserMotionOperation | null;
   readonly controllerOperation: LaserControllerOperation | null;
   readonly streamer: StreamerState | null;
@@ -117,6 +121,8 @@ export type LaserState = {
   readonly disconnect: () => Promise<void>;
   readonly home: () => Promise<void>;
   readonly autofocus: (command: string) => Promise<AutofocusResult>;
+  // ADR-102 G2 — run a prepared touch-plate probing sequence.
+  readonly probe: (lines: ReadonlyArray<string>) => Promise<ProbeResult>;
   readonly unlockAlarm: () => Promise<void>;
   readonly wakeController: () => Promise<void>;
   readonly configureGrblLaserSetup: () => Promise<void>;
@@ -316,7 +322,8 @@ function shouldFastPoll(state: LaserState): boolean {
     isActiveJob(state.streamer) ||
     state.motionOperation !== null ||
     state.controllerOperation !== null ||
-    state.autofocusBusy
+    state.autofocusBusy ||
+    state.probeBusy
   );
 }
 
@@ -340,7 +347,10 @@ function detectedSettingsActions(
 export const useLaserStore = create<LaserState>((set, get) => ({
   ...initialLaserState(),
   ...connectionActions(set, get),
-  ...jogActions(set, get, refs, (line, action, source) => safeWrite(set, get, line, action, source)),
+  ...jogActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
+  ...probeActions(set, get, refs),
   ...jobActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
   ...grblSettingsActions(set, get, refs, (line, action, source) =>
