@@ -3812,3 +3812,60 @@ sources consumed by both compilers.
   cut-a-logo workflows) → revisit per-command with the maintainer.
 - The laser-only set grows past ~25 entries → the shared-shell decision
   itself is under strain; re-open ADR-094's shared-UI clause.
+
+## ADR-101 — three.js for the 3D relief viewer (explicit ADR-094 §2 override)
+
+**Status:** Accepted
+**Date:** 2026-07-03
+
+### Context
+
+Relief carving (H.4/H.5) renders on the canvas as a 2D grayscale depth
+map. The maintainer approved a REAL 3D viewer for reliefs in the
+2026-07-02 session, with the explicit condition that it stay blocked
+behind this ADR: ADR-094 §2 says "no new runtime dependencies are planned
+for Phase H," and a WebGL scene graph is exactly the kind of wheel the
+clean-room mandate does not extend to — hand-rolling camera math, depth
+buffers, and lighting is weeks of risk for zero product differentiation.
+
+### Decision
+
+1. Adopt **three.js** (MIT) as a runtime dependency, explicitly overriding
+   ADR-094 §2 for this one library. The clean-room mandate is about
+   PARSERS and GEOMETRY (data fidelity we must own); presentation is not
+   canon-critical.
+2. **three.js is UI-only.** It may be imported beneath
+   `src/ui/relief-viewer/` and nowhere else — never in `core/` or `io/`.
+   clipper2-ts remains the only geometry dependency of the core. The
+   heightmap→mesh conversion stays a PURE core function returning plain
+   `Float32Array`s (positions/indices/normals feed three's BufferGeometry
+   at the UI boundary), so the viewer's geometry is testable without
+   WebGL.
+3. **Lazy-loaded.** The viewer dialog imports three via dynamic
+   `import()` so the ~150 KB gzip lands in its own chunk and the base
+   bundle is unchanged until the first 3D view opens.
+4. Environments without WebGL (jsdom, headless CI) get a graceful
+   fallback message, which is what component tests assert.
+
+### Alternatives considered
+
+- **Clean-room WebGL viewer.** Rejected — violates the spirit of
+  ADR-017 (don't rebuild commodity infrastructure); high defect surface.
+- **Keep the 2D depth map only.** Rejected by the maintainer — a relief
+  workflow without a 3D read of the carve is guesswork.
+- **babylon.js.** Heavier, Apache-2.0, no advantage at this scope.
+- **regl / raw-gl wrappers.** Lighter but shifts scene/camera/lighting
+  boilerplate back onto us.
+
+### Verification
+
+- RESEARCH_LOG.md dependency row (version, license re-verified) — CI
+  cross-checks package.json against it.
+- Pure mesh-builder unit tests against analytic heightmaps; component
+  fallback test in jsdom; full gate.
+- Visual check of the rendered relief in the isolated preview browser.
+
+### Reversal triggers
+
+- Bundle-size or supply-chain audit flags three.js → replace the viewer
+  with a static isometric canvas projection (pure core, no dependency).

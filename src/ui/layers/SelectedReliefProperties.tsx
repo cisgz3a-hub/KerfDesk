@@ -4,7 +4,9 @@
 // project with exactly one relief selected (the laser Shape Properties
 // panel is the mirror case — ADR-100 §3).
 
+import { useState } from 'react';
 import { machineKindOf, type ReliefObject } from '../../core/scene';
+import { Relief3DViewerDialog } from '../relief-viewer';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -21,6 +23,10 @@ export function SelectedReliefProperties(): JSX.Element | null {
     const selected = s.project.scene.objects.find((o) => o.id === s.selectedObjectId);
     return selected?.kind === 'relief' ? selected : null;
   });
+  const stockThicknessMm = useStore((s) =>
+    s.project.machine?.kind === 'cnc' ? s.project.machine.stock.thicknessMm : 0,
+  );
+  const [viewerOpen, setViewerOpen] = useState(false);
   if (relief === null) return null;
   return (
     <section aria-label="Relief properties" style={sectionStyle}>
@@ -29,6 +35,21 @@ export function SelectedReliefProperties(): JSX.Element | null {
         {relief.source} — {Math.round(relief.meshPositions.length / VERTICES_PER_TRIANGLE_FLOATS)}{' '}
         triangles
       </p>
+      <button
+        type="button"
+        onClick={() => setViewerOpen(true)}
+        title="Open the real-time 3D view of this relief (ADR-101)."
+        style={viewerButtonStyle}
+      >
+        View 3D…
+      </button>
+      {viewerOpen ? (
+        <Relief3DViewerDialog
+          relief={relief}
+          stockThicknessMm={stockThicknessMm}
+          onClose={() => setViewerOpen(false)}
+        />
+      ) : null}
       <ReliefNumberField
         relief={relief}
         label="Width"
@@ -155,3 +176,4 @@ const inputStyle: React.CSSProperties = {
 };
 const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
 const unitStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-faint)' };
+const viewerButtonStyle: React.CSSProperties = { marginBottom: 8 };
