@@ -1,5 +1,19 @@
 import type { Polyline, Vec2 } from '../../core/scene';
 import type { RawImageData } from '../../core/trace';
+import { sampleByArcLength } from './centerline-geometry';
+
+// Coverage must sample the drawn PATH, not the vertex list — simplified
+// polylines describe long arcs with a handful of points.
+const COVERAGE_SAMPLE_SPACING_PX = 1;
+
+/** Resample a polyline (closing segment included) at ~1 px spacing. */
+export function densifyPolyline(polyline: Polyline): Vec2[] {
+  const pts =
+    polyline.closed && polyline.points.length > 1 && polyline.points[0] !== undefined
+      ? [...polyline.points, polyline.points[0]]
+      : [...polyline.points];
+  return sampleByArcLength(pts, COVERAGE_SAMPLE_SPACING_PX);
+}
 
 export type CircleFixture = {
   readonly image: RawImageData;
@@ -11,6 +25,10 @@ export type SegmentedStrokeQuality = {
   readonly strokePolylineCount: number;
   readonly longestStrokeAngularCoverageRatio: number;
   readonly maxLongestStrokeAngularGapDeg: number;
+  /** Sector coverage by ALL stroke polylines together — the per-dash-outline
+   *  contract cares that every dash is traced, not that one contour spans
+   *  the drawn gaps. */
+  readonly aggregateAngularCoverageRatio: number;
 };
 
 export const SEGMENTED_STROKE_CIRCLE_FIXTURE = segmentedStrokeCircleFixture(
@@ -38,8 +56,32 @@ export function measureSegmentedStrokeContinuity(
     null,
   );
   const sectors = 72;
+  const covered = markCoveredSectors(
+    longest === null ? [] : densifyPolyline(longest),
+    fixture,
+    sectors,
+  );
+  const aggregate = markCoveredSectors(
+    strokePolylines.flatMap((polyline) => densifyPolyline(polyline)),
+    fixture,
+    sectors,
+  );
+
+  return {
+    strokePolylineCount: strokePolylines.length,
+    longestStrokeAngularCoverageRatio: countCovered(covered) / sectors,
+    maxLongestStrokeAngularGapDeg: (maxZeroRunCyclic(covered) * 360) / sectors,
+    aggregateAngularCoverageRatio: countCovered(aggregate) / sectors,
+  };
+}
+
+function markCoveredSectors(
+  points: ReadonlyArray<Vec2>,
+  fixture: CircleFixture,
+  sectors: number,
+): Uint8Array {
   const covered = new Uint8Array(sectors);
-  for (const point of longest?.points ?? []) {
+  for (const point of points) {
     const dx = point.x - fixture.center.x;
     const dy = point.y - fixture.center.y;
     const radius = Math.hypot(dx, dy);
@@ -48,12 +90,7 @@ export function measureSegmentedStrokeContinuity(
     const normalized = angle < 0 ? angle + Math.PI * 2 : angle;
     covered[Math.min(sectors - 1, Math.floor((normalized / (Math.PI * 2)) * sectors))] = 1;
   }
-
-  return {
-    strokePolylineCount: strokePolylines.length,
-    longestStrokeAngularCoverageRatio: countCovered(covered) / sectors,
-    maxLongestStrokeAngularGapDeg: (maxZeroRunCyclic(covered) * 360) / sectors,
-  };
+  return covered;
 }
 
 function segmentedStrokeCircleFixture(

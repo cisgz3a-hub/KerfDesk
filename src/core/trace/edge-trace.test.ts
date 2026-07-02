@@ -170,7 +170,10 @@ describe('traceImageToEdgePaths', () => {
       edgeHighThresholdRatio: 0.035,
     });
 
-    expect(pointCount(sensitive)).toBeGreaterThan(pointCount(insensitive) + 6);
+    // Chained output is Douglas-Peucker simplified, so point counts no longer
+    // scale with detected detail — traced LENGTH does (the faint bar's
+    // boundary only appears at sensitive thresholds).
+    expect(totalPolylineLength(sensitive)).toBeGreaterThan(totalPolylineLength(insensitive) + 40);
   });
 
   it('higher edge blur suppresses texture noise while preserving the large boundary', () => {

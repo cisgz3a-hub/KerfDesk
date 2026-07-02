@@ -33,10 +33,16 @@ export function pairThroughJunctions(chains: Chain[], graph: StrokeGraph): void 
   }
 }
 
-export function bridgeNearbyEnds(chains: Chain[], joinGapPx: number): void {
+/** Bridge loose open ends. Any two ends closer than `joinGapPx` merge; when
+ *  `alignedFactor` > 1, ends whose tangents CONTINUE each other across the
+ *  bridge (both within ~35° of the bridge direction) may merge from up to
+ *  `joinGapPx × alignedFactor` away — an aligned continuation is almost
+ *  always the same drawn line interrupted by detection dropout, while a
+ *  perpendicular weld almost never is. */
+export function bridgeNearbyEnds(chains: Chain[], joinGapPx: number, alignedFactor = 1): void {
   if (joinGapPx <= 0) return;
   for (;;) {
-    const pair = nearestBridgeableEnds(chains, joinGapPx);
+    const pair = nearestBridgeableEnds(chains, joinGapPx, alignedFactor);
     if (pair === null) return;
     mergeEnds(pair[0], pair[1]);
   }
@@ -103,36 +109,65 @@ function mergeEnds(a: ChainEnd, b: ChainEnd): void {
   b.chain.points = [];
 }
 
+const MIN_BRIDGE_ALIGNMENT = Math.cos((35 * Math.PI) / 180);
+
 function nearestBridgeableEnds(
   chains: ReadonlyArray<Chain>,
   joinGapPx: number,
+  alignedFactor: number,
 ): readonly [ChainEnd, ChainEnd] | null {
-  const ends: ChainEnd[] = [];
-  for (const chain of chains) {
-    if (!chain.alive || chain.closed || chain.points.length < 2) continue;
-    ends.push({ chain, atStart: true }, { chain, atStart: false });
-  }
+  const ends = collectOpenEnds(chains);
   let best: readonly [ChainEnd, ChainEnd] | null = null;
-  let bestDist = joinGapPx;
+  let bestDist = joinGapPx * Math.max(1, alignedFactor);
   for (let i = 0; i < ends.length; i += 1) {
     for (let j = i + 1; j < ends.length; j += 1) {
       const a = ends[i];
       const b = ends[j];
       if (a === undefined || b === undefined) continue;
       const d = endGap(a, b);
-      if (d !== null && d < bestDist) {
-        bestDist = d;
-        best = [a, b];
-      }
+      if (d === null || d >= bestDist) continue;
+      if (d >= joinGapPx && !endsContinueEachOther(a, b)) continue;
+      bestDist = d;
+      best = [a, b];
     }
   }
   return best;
 }
 
+function collectOpenEnds(chains: ReadonlyArray<Chain>): ChainEnd[] {
+  const ends: ChainEnd[] = [];
+  for (const chain of chains) {
+    if (!chain.alive || chain.closed || chain.points.length < 2) continue;
+    ends.push({ chain, atStart: true }, { chain, atStart: false });
+  }
+  return ends;
+}
+
 function endGap(a: ChainEnd, b: ChainEnd): number | null {
   if (a.chain === b.chain) return null;
-  const pa = a.atStart ? a.chain.points[0] : a.chain.points.at(-1);
-  const pb = b.atStart ? b.chain.points[0] : b.chain.points.at(-1);
+  const pa = endPoint(a);
+  const pb = endPoint(b);
   if (pa === undefined || pb === undefined) return null;
   return Math.hypot(pb.x - pa.x, pb.y - pa.y);
+}
+
+function endPoint(end: ChainEnd): Vec2 | undefined {
+  return end.atStart ? end.chain.points[0] : end.chain.points.at(-1);
+}
+
+// True when the bridge segment continues BOTH chains' directions of travel:
+// each end's outward continuation (the reverse of its into-chain tangent)
+// points along the bridge toward the other end.
+function endsContinueEachOther(a: ChainEnd, b: ChainEnd): boolean {
+  const pa = endPoint(a);
+  const pb = endPoint(b);
+  if (pa === undefined || pb === undefined) return false;
+  const len = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+  if (len < POINT_MATCH_EPS) return true;
+  const bridge = { x: (pb.x - pa.x) / len, y: (pb.y - pa.y) / len };
+  const ta = outgoingTangent(a); // points INTO chain a
+  const tb = outgoingTangent(b);
+  const aForward = -(ta.x * bridge.x + ta.y * bridge.y);
+  const bForward = tb.x * bridge.x + tb.y * bridge.y;
+  return aForward >= MIN_BRIDGE_ALIGNMENT && bForward >= MIN_BRIDGE_ALIGNMENT;
 }

@@ -1,4 +1,5 @@
 import type { Polyline, Vec2 } from '../../core/scene';
+import { sampleByArcLength } from './centerline-geometry';
 
 export type ArchContinuityQuality = {
   readonly archPolylineCount: number;
@@ -7,6 +8,19 @@ export type ArchContinuityQuality = {
   readonly longestArchCoverageRatio: number;
   readonly maxLongestArchGapDeg: number;
 };
+
+// Coverage must sample the drawn PATH, not the vertex list — simplified
+// polylines describe long arcs with a handful of points, and the laser burns
+// the segments between them.
+const COVERAGE_SAMPLE_SPACING_PX = 1;
+
+function densifiedPoints(polyline: Polyline): Vec2[] {
+  const pts =
+    polyline.closed && polyline.points.length > 1 && polyline.points[0] !== undefined
+      ? [...polyline.points, polyline.points[0]]
+      : [...polyline.points];
+  return sampleByArcLength(pts, COVERAGE_SAMPLE_SPACING_PX);
+}
 
 export function measureTopArchContinuity(
   polylines: ReadonlyArray<Polyline>,
@@ -22,7 +36,7 @@ export function measureTopArchContinuity(
   const archPolylines = polylines
     .map((polyline) => ({
       polyline,
-      points: polyline.points.filter((point) => pointFallsInArchBand(point, arch)),
+      points: densifiedPoints(polyline).filter((point) => pointFallsInArchBand(point, arch)),
     }))
     .filter((entry) => entry.points.length >= 8);
   const shortArchPolylineCount = archPolylines.filter(

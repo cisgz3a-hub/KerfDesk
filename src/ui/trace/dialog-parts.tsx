@@ -11,7 +11,13 @@
 import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
 
-export const VISIBLE_TRACE_PRESET_NAMES = ['Line Art', 'Smooth', 'Sharp', 'Centerline'] as const;
+export const VISIBLE_TRACE_PRESET_NAMES = [
+  'Line Art',
+  'Smooth',
+  'Sharp',
+  'Centerline',
+  'Edge Detection',
+] as const;
 
 export type TraceFillStyle = 'scanline' | 'offset' | 'island';
 

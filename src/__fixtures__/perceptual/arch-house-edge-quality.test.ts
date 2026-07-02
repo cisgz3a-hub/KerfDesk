@@ -30,7 +30,11 @@ describe('arch-house real logo Edge Detection quality', () => {
           `${artifact.metrics.pointCount} points, length=${artifact.metrics.totalPolylineLength}`,
       );
 
-      expect(artifact.metrics.openPolylineCount).toBe(0);
+      // The chained backend traces every edge as a SINGLE line: edges that
+      // loop come back closed, edges that don't (rooflines, waves, letter
+      // strokes) come back open. The old outline backend could only emit
+      // closed two-sided contours, which is why this once pinned open === 0.
+      expect(artifact.metrics.openPolylineCount).toBeGreaterThan(10);
       expect(artifact.metrics.closedPolylineCount).toBeGreaterThan(10);
       expect(artifact.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);
       expect(artifact.metrics.pointCount).toBeLessThan(120_000);
