@@ -112,21 +112,21 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 
 ### Phase H — v0.8 "Router" [In progress]
 
-Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-094: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. Sub-phases (each = individually reviewed diffs; branch shippable after every one):
+Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-094: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. UI separation between laser and CNC modes is governed by ADR-100 (gate-and-hide); the 3D relief viewer's three.js dependency by ADR-101 (UI-only override of ADR-094 §2). Sub-phases (each = individually reviewed diffs; branch shippable after every one). Status column: Built = code + tests landed, hardware pass still CLAIMED per AUDIT.md inventory:
 
-| Sub-phase | Delivers |
-|---|---|
-| H.0 | Governance: ADR-094, this table, F-CNC flows, AUDIT checklist |
-| H.1 | `CncPass` contour/path3d union (tidy-first) + overdeep-cut invariant |
-| H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview |
-| H.3 | True V-carving: clipper2 inward offset ladder, `tipAngleDeg` depth law, flat-bottom fallback |
-| H.4 | Clean-room STL import → deterministic max-Z heightmap, `relief` SceneObject, canvas preview |
-| H.5 | Relief roughing: heightmap dilation + marching squares → existing pocket engine |
-| H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults |
-| H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) |
-| H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover |
-| H.9 | Motion polish: ramp/helical entry, climb/conventional, lead-in/out, parking parity |
-| H.10 | Tiling: indexed tile grid, registration marks, per-tile export |
+| Sub-phase | Delivers | Status |
+|---|---|---|
+| H.0 | Governance: ADR-094, this table, F-CNC flows, AUDIT checklist | Done |
+| H.1 | `CncPass` contour/path3d union (tidy-first) + overdeep-cut invariant | Built |
+| H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview | Built |
+| H.3 | True V-carving: clipper2 inward offset ladder, `tipAngleDeg` depth law, flat-bottom fallback | Built |
+| H.4 | Clean-room STL import → deterministic max-Z heightmap, `relief` SceneObject, canvas preview | Built |
+| H.5 | Relief roughing: heightmap dilation + marching squares → existing pocket engine | Built |
+| H.6 | Clean-room DXF import; clean-room `.nc` parser → simulator; CNC text defaults | Built |
+| H.7 | Tool + feeds/speeds libraries (material-library pattern), multi-CNC-machine profiles; then multi-tool jobs (M0 tool change, Z-zeroing flow, drill/peck, two-stage V-carve) | Built |
+| H.8 | Relief finishing: ball-nose max-plus tip surface, scallop-driven stepover | Built |
+| H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry + arc leads deferred — DECISIONS.md) | Built |
+| H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 
 ### Anything past Phase F
 

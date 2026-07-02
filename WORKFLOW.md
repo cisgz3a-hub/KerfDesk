@@ -1525,3 +1525,206 @@ F-CNC19 tiling.
 4. G18/G19 plane arcs are not supported: rejected with the line number
    (XY-plane G17 is the GRBL default and the only plane GRBL arcs use
    here).
+
+### F-CNC11. Manage the bit library — Phase H.7
+
+#### Success
+1. Material & Bit → Manage bits lists every bit (starters + custom).
+   The add form takes name, kind (end mill / ball nose / v-bit /
+   engraving), diameter, and tip angle (v/engraving only).
+2. An added bit is selectable immediately (machine bit list and every
+   per-layer Bit select) and persists app-level in localStorage — it
+   merges into the tool list of every future CNC session, across
+   projects.
+3. Deleting a custom bit removes it from the library and the open
+   machine (undoable). Starters have no Delete button.
+
+#### Error — invalid fields
+1. Empty names and non-positive/oversized diameters are ignored — the
+   Add button does nothing until the fields are sane.
+
+#### Empty
+1. No custom bits: the list shows only starters; nothing is deletable.
+
+#### Edge — layers referencing a deleted bit
+1. Layers keep the stale toolId; compile falls back to the machine's
+   active bit (layerCncTool), so output never references a missing bit.
+
+### F-CNC12. Save and apply feeds/speeds presets — Phase H.7
+
+#### Success
+1. Every CNC layer card has a "Feeds preset" row: name the current
+   feed / plunge / spindle / depth-per-pass / stepover and Save.
+2. Choosing a preset from the select applies those five values to the
+   layer as one undoable patch. Cut type, depth, and tabs stay put.
+3. Presets are app-level (localStorage) — available in every project.
+
+#### Error — storage full
+1. A failed persist warns once per session; the in-memory library keeps
+   working.
+
+#### Empty
+1. No presets: the select offers only "Apply…".
+
+#### Edge — preset saved for a different bit
+1. Presets carry raw numbers; applying one to a layer whose bit differs
+   is allowed (feeds are material/bit judgment — the operator's call).
+
+### F-CNC13. Save and apply CNC machine profiles — Phase H.7
+
+#### Success
+1. Material & Bit → Machine profiles: Save snapshots the whole CNC
+   setup (stock, bit list, active bit, safe Z, spindle, park, tiling)
+   under a name; Apply replaces the current setup (undoable); Delete
+   removes the profile.
+2. Profiles are app-level (localStorage), usable across projects.
+
+#### Error — non-CNC project
+1. Save/Apply are no-ops in laser mode (the panel is CNC-only anyway).
+
+#### Empty
+1. No profiles: the select shows only "Choose profile…"; Apply and
+   Delete stay disabled.
+
+#### Edge — profile with bits the library no longer has
+1. The snapshot carries its own tool list, so applying restores those
+   bits for the project even if the library changed since.
+
+### F-CNC14. Run a multi-bit job (M0 tool change) — Phase H.7
+
+#### Success
+1. Layers may each pick their own bit (Bit select). Compile orders the
+   job into contiguous per-bit sections — one change per bit — with
+   profile-carrying sections last, so a freed part is never
+   re-machined.
+2. Between sections the G-code retracts, stops the spindle (M5), parks,
+   and pauses on M0 with comments naming the next bit. GRBL holds until
+   cycle start; the streaming UI's Resume continues the job.
+3. Geometry offsets use each layer's OWN bit diameter.
+
+#### Error — v-carve layer with a flat bit
+1. Preflight blocks with the layer's bit named (not just the machine
+   bit).
+
+#### Empty
+1. All layers on one bit → no M0 blocks; output is byte-identical to a
+   single-tool job.
+
+#### Edge — unknown per-layer bit id
+1. Falls back to the machine's active bit at compile time.
+
+### F-CNC15. Re-zero Z at a tool change — Phase H.7
+
+#### Success
+1. Every M0 change block carries "; re-zero Z on the stock top, then
+   cycle-start to resume". The operator swaps the bit, jogs Z to touch
+   the stock top, zeros Z (or probes), and resumes.
+2. The spindle restarts (M3 + spin-up dwell) after the pause, before
+   any motion.
+
+#### Error — resumed without re-zeroing
+1. Not detectable in software: the wrong Z persists until the next
+   change. The comment sequence is the guard; this flow documents the
+   risk (manual GRBL tool changes are inherently operator-owned).
+
+#### Empty
+1. Single-bit jobs never pause.
+
+#### Edge — manual feed-hold mid-section
+1. The operator's own feed-hold is unrelated to M0 blocks; Resume works
+   the same way.
+
+### F-CNC16. Drill holes (peck cycle) — Phase H.7
+
+#### Success
+1. Cut type "Drill (peck at centers)" drills one hole at the
+   bounding-box center of every closed shape on the layer.
+2. Each hole pecks: plunge one depth-per-pass step, feed back to the
+   stock top to clear chips, re-enter, repeat to full depth. The whole
+   cycle runs at the plunge feed (GRBL has no G81/G83 — the cycle is
+   explicit motion).
+
+#### Error — depth beyond stock + allowance
+1. The standard depth preflight blocks, same as any cut type.
+
+#### Empty
+1. Open paths are ignored; a layer with no closed shapes drills nothing
+   and the layer is skipped.
+
+#### Edge — very shallow holes
+1. depth ≤ depth-per-pass produces a single plunge with no clear moves.
+
+### F-CNC17. Finish a relief (ball-nose skim) — Phase H.8
+
+#### Success
+1. A relief layer's "Finish with" select names the finishing bit; the
+   scallop field sets the ridge-height target. Compile then emits the
+   roughing group AND a finishing group cut with that bit (an M0 change
+   separates them when the bits differ).
+2. Finishing rides the max-plus tip surface — the bit tip can never cut
+   below the target anywhere under its footprint — in serpentine rows
+   spaced 2·sqrt(c·(2r−c)) for a ball nose (flat bits step 40% of
+   diameter).
+3. Roughing still leaves its fixed 0.5 mm allowance (it exists FOR this
+   pass); finishing consumes it down to the true surface.
+
+#### Error — unknown finishing bit id
+1. The finishing group is skipped (roughing-only), never a crash.
+
+#### Empty
+1. "Roughing only" (the default) emits no finishing group.
+
+#### Edge — flat reliefs / tiny scallop
+1. A flat surface skims at exactly its depth; scallop clamps to
+   [0.001 mm, bit radius] and row spacing floors at 0.05 mm.
+
+### F-CNC18. Cut options: ramp entry, direction, entry points — Phase H.9
+
+#### Success
+1. The layer card's "Entry" row (profile/pocket/engrave) offers
+   Climb / Conventional / Default direction and a ramp angle.
+2. Direction enforcement re-orients closed toolpaths (M3 spindle: climb
+   keeps material LEFT of travel — outside profiles run CCW,
+   inside/pocket run CW) and rotates entry points to the midpoint of
+   the longest segment so witness marks land on a flat span.
+3. A ramp angle > 0 turns plunges into descents ALONG the toolpath at
+   that angle; closed loops re-cut the ramped span level afterwards.
+   Depth ladders ramp each step from the previous level.
+
+#### Error — none (both options are clamped)
+1. Ramp angle clamps to [0.5°, 45°]; direction only applies where a
+   material side exists (engraves/open paths are left alone).
+
+#### Empty
+1. Defaults (no direction, 0 ramp) keep output byte-identical to
+   pre-H.9.
+
+#### Edge — path shorter than the ramp
+1. The descent finishes at the path end (the ramp consumed the whole
+   path); the remainder cuts level on the next lap.
+
+### F-CNC19. Tile a job larger than the bed — Phase H.10
+
+#### Success
+1. Material & Bit → Tiling: enable, set tile size, overlap, and
+   registration holes. Save G-code then exports ONE FILE PER TILE
+   (sequential save dialogs, names carry the index: job_tile-r1-c2.nc).
+2. Each tile's file contains only the motion inside its rectangle
+   (clipped at boundaries, Z interpolated), translated so the tile's
+   corner is the machine origin: cut tile 1, slide the stock, re-zero
+   XY on the next tile frame, cut tile 2, and so on.
+3. With registration holes on, adjacent tiles drill 3 mm dowel holes at
+   IDENTICAL stock positions inside the overlap strip — pins re-index
+   the stock physically between tiles.
+
+#### Error — a tile fails preflight
+1. Every tile preflights BEFORE any file is written; a failure names
+   the tile and writes nothing (no-partial-output over the whole set).
+
+#### Empty
+1. An empty compile toasts "Nothing to tile"; a job smaller than one
+   tile exports a single (untiled-equivalent) file.
+
+#### Edge — cancelling mid-sequence
+1. Cancelling a save dialog stops the remaining tiles; the toast
+   reports how many of the set were saved.
