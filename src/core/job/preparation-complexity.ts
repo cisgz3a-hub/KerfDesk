@@ -89,6 +89,7 @@ function vectorPaths(obj: SceneObject): ReadonlyArray<ColoredPath> {
     case 'shape':
       return obj.paths;
     case 'raster-image':
+    case 'relief':
       return [];
   }
 }
@@ -101,6 +102,7 @@ function vectorTransform(obj: SceneObject): Transform | null {
     case 'shape':
       return obj.transform;
     case 'raster-image':
+    case 'relief':
       return null;
   }
 }

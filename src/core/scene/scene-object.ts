@@ -278,13 +278,47 @@ export type ShapeObject = ObjectPowerScale & {
   readonly paths: ReadonlyArray<ColoredPath>;
 };
 
-// Full union expanded through Phase G (ADR-014, ADR-020, ADR-051). Future
-// variants require an ADR + a PROJECT.md scope revision.
-export type SceneObject = ImportedSvg | TextObject | TracedImage | RasterImage | ShapeObject;
+// 3D relief for CNC carving, Phase H.4 (ADR-094). Carries the parsed
+// triangle mesh as plain numbers (9 per triangle, file order) so the pure
+// core compiler can rebuild the heightmap without any decode API, and .lf2
+// round-trips it as ordinary JSON (RasterImage's embedded-source precedent).
+// targetWidthMm scales the mesh's XY footprint; reliefDepthMm maps its Z
+// range to [−depth, 0]; emptyCells picks the background: 'floor' carves it
+// away so the model stands proud, 'top' leaves it at stock height. Laser
+// mode ignores relief objects entirely (CNC-only geometry).
+export type ReliefObject = ObjectPowerScale & {
+  readonly kind: 'relief';
+  readonly id: string;
+  readonly source: string; // filename for display
+  readonly meshPositions: ReadonlyArray<number>;
+  readonly targetWidthMm: number;
+  readonly reliefDepthMm: number;
+  readonly emptyCells: 'floor' | 'top';
+  readonly color: string; // lowercase hex; the layer key
+  readonly bounds: Bounds; // natural bounds: (0,0)..(targetWidth, height by aspect)
+  readonly transform: Transform;
+};
+
+// Embedding cap: meshes beyond this bloat the .lf2 JSON into the hundreds of
+// MB. Decorative reliefs are typically well under it; the import path tells
+// the user to decimate when over.
+export const RELIEF_EMBED_TRIANGLE_LIMIT = 200_000;
+
+// Full union expanded through Phase G (ADR-014, ADR-020, ADR-051) and
+// Phase H (ADR-094). Future variants require an ADR + a PROJECT.md scope
+// revision.
+export type SceneObject =
+  | ImportedSvg
+  | TextObject
+  | TracedImage
+  | RasterImage
+  | ShapeObject
+  | ReliefObject;
 
 export function sceneObjectPrimaryLayerColor(object: SceneObject): string | null {
   switch (object.kind) {
     case 'raster-image':
+    case 'relief':
     case 'shape':
     case 'text':
       return object.color;
@@ -299,6 +333,7 @@ export function sceneObjectPrimaryLayerColor(object: SceneObject): string | null
 export function sceneObjectUsesLayerColor(object: SceneObject, color: string): boolean {
   switch (object.kind) {
     case 'raster-image':
+    case 'relief':
     case 'shape':
     case 'text':
       return object.color === color;

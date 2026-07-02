@@ -58,6 +58,7 @@ function hasFaintVectorGeometry(obj: SceneObject): obj is FaintVectorObject {
     case 'shape':
       return true;
     case 'raster-image':
+    case 'relief':
       return false;
     default:
       return assertNever(obj, 'SceneObject');

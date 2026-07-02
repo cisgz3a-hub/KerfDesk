@@ -88,6 +88,10 @@ function extendBoundsForObject(
       if (!output.get(object.color)?.has('image')) return false;
       return extendBounds(bounds, rasterBoundsInMachineCoords(object, device));
     }
+    case 'relief':
+      // CNC-only geometry — the laser frame ignores it (CNC bounds come
+      // from the compiled job).
+      return false;
     default:
       return assertNever(object, 'SceneObject');
   }

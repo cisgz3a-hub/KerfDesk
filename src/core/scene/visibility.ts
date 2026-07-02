@@ -17,6 +17,7 @@ export function sceneObjectHasVisibleLayerFromMap(
 ): boolean {
   switch (object.kind) {
     case 'raster-image':
+    case 'relief':
       return layerByColor.get(object.color)?.visible !== false;
     case 'shape':
     case 'text':

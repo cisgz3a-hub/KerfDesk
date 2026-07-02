@@ -200,6 +200,7 @@ function objectUsesLayerColor(object: Scene['objects'][number], color: string): 
     case 'shape':
       return object.paths.some((path) => path.color === color);
     case 'raster-image':
+    case 'relief':
       return object.color === color;
     default:
       return assertNever(object, 'SceneObject');
@@ -251,6 +252,7 @@ function removeLayerColorFromObject(
         ? null
         : object;
     case 'raster-image':
+    case 'relief':
       return object.color === color ? null : object;
     default:
       return assertNever(object, 'SceneObject');
@@ -371,6 +373,7 @@ function usedLayerColors(scene: Scene): ReadonlySet<string> {
         for (const path of object.paths) colors.add(path.color);
         break;
       case 'raster-image':
+      case 'relief':
         colors.add(object.color);
         break;
       default:

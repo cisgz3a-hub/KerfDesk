@@ -67,7 +67,9 @@ function withObjectsAndLayerModes(
   ...objs: SceneObject[]
 ): Scene {
   const colors = new Set(
-    objs.flatMap((o) => (o.kind === 'raster-image' ? [o.color] : o.paths.map((p) => p.color))),
+    objs.flatMap((o) =>
+      o.kind === 'raster-image' || o.kind === 'relief' ? [o.color] : o.paths.map((p) => p.color),
+    ),
   );
   const scene = {
     ...EMPTY_SCENE,

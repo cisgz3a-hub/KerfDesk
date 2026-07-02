@@ -82,6 +82,10 @@ function collectLayerPolylines(
       case 'raster-image':
         // A router has no raster mode; bitmaps are ignored in CNC compile.
         break;
+      case 'relief':
+        // Relief heightmap toolpaths arrive with H.5 roughing — ignored by
+        // the polyline collector by design.
+        break;
       default:
         assertNever(obj, 'SceneObject');
     }

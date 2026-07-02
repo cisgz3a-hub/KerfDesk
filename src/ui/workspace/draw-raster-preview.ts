@@ -110,7 +110,7 @@ function maskCacheKey(maskObject: SceneObject | null): string {
     bounds: maskObject.bounds,
     transform: maskObject.transform,
     paths:
-      maskObject.kind === 'raster-image'
+      maskObject.kind === 'raster-image' || maskObject.kind === 'relief'
         ? []
         : maskObject.paths.map((path) => ({ color: path.color, polylines: path.polylines })),
   });

@@ -98,7 +98,7 @@ function artworkLayerColors(scene: Scene, outputOnly: boolean): ReadonlySet<stri
 }
 
 function objectLayerColors(object: SceneObject): ReadonlyArray<string> {
-  if (object.kind === 'raster-image') return [object.color];
+  if (object.kind === 'raster-image' || object.kind === 'relief') return [object.color];
   return object.paths.flatMap((path) => (path.polylines.length === 0 ? [] : [path.color]));
 }
 

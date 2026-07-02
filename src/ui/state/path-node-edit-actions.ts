@@ -182,7 +182,9 @@ function editObjectNodes(
   dy: number,
 ): SceneObject {
   if (object.locked === true) return object;
-  if (object.kind === 'raster-image' || object.kind === 'text') return object;
+  if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
+    return object;
+  }
   if (object.kind === 'shape' && object.spec.kind !== 'polyline') return object;
 
   const localDelta = sceneVectorToObjectLocal({ x: dx, y: dy }, object.transform);
@@ -196,7 +198,9 @@ function editObjectNodes(
 
 function deleteObjectNodes(object: SceneObject, refs: ReadonlyArray<PathNodeRef>): SceneObject {
   if (object.locked === true) return object;
-  if (object.kind === 'raster-image' || object.kind === 'text') return object;
+  if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
+    return object;
+  }
   if (object.kind === 'shape' && object.spec.kind !== 'polyline') return object;
 
   const edit = deletePathsNodes(object.paths, refs);
@@ -208,7 +212,9 @@ function deleteObjectNodes(object: SceneObject, refs: ReadonlyArray<PathNodeRef>
 
 function editObjectNodeToPoint(object: SceneObject, ref: PathNodeRef, point: Vec2): SceneObject {
   if (object.locked === true) return object;
-  if (object.kind === 'raster-image' || object.kind === 'text') return object;
+  if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
+    return object;
+  }
   if (object.kind === 'shape' && object.spec.kind !== 'polyline') return object;
 
   const edit = editPathsNodeToPoint(object.paths, ref, point);

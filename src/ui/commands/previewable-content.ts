@@ -15,6 +15,9 @@ function objectHasOutputGeometry(
     if (object.role === 'trace-source') return false;
     return outputLayers.get(object.color)?.mode === 'image';
   }
+  // Relief toolpaths arrive with H.5 roughing; until then a relief-only
+  // scene has nothing previewable.
+  if (object.kind === 'relief') return false;
   return object.paths.some((path) => {
     const layer = outputLayers.get(path.color);
     if (layer === undefined || layer.mode === 'image') return false;
