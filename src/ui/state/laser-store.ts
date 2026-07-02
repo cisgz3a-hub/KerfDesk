@@ -29,6 +29,7 @@ import {
 } from './laser-interactive-command';
 import { jobActions } from './laser-job-actions';
 import { handleLine, runHandshake } from './laser-line-handler';
+import { useStore } from './store';
 import {
   buildFrameJogLines,
   markMotionOperationDispatched,
@@ -388,7 +389,11 @@ function jogActions(
     frame: async (bounds, feed) => {
       assertAutofocusIdle(get());
       assertMotionReady(set, get, jogFrameCommandBlockMessage);
-      const [firstLine, ...pendingLines] = buildFrameJogLines(bounds, feed);
+      // CNC projects retract to the configured safe height before the XY
+      // perimeter trace; the laser path stays Z-silent.
+      const machine = useStore.getState().project.machine;
+      const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
+      const [firstLine, ...pendingLines] = buildFrameJogLines(bounds, feed, safeZMm);
       if (firstLine === undefined) return;
       set({ motionOperation: startMotionOperation('frame', pendingLines) });
       try {

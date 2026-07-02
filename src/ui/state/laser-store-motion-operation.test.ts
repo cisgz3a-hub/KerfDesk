@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_JOG_CANCEL } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
+import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -77,6 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  useStore.getState().setMachineKind('laser');
   useLaserStore.setState({ autofocusBusy: false });
   await useLaserStore.getState().disconnect();
   useLaserStore.setState({
@@ -171,6 +173,32 @@ describe('laser-store motion operation lifecycle', () => {
       '$J=G90 G21 X10.000 Y0.000 F1000\n',
     ]);
     expect(getMotionOperation()).toMatchObject({ kind: 'frame', sawControllerBusy: false });
+  });
+
+  it('retracts to the CNC safe height before dispatching the XY Frame legs', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    useStore.getState().setMachineKind('cnc');
+    writes.length = 0;
+
+    await useLaserStore.getState().frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000);
+
+    // Default CNC safe Z is 3.81 mm above stock top; the retract must
+    // complete before any XY leg so the bit is clear of the material.
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual(['$J=G90 G21 Z3.810 F1000\n']);
+
+    connection.emitLine('<Jog|MPos:0.000,0.000,0.000|FS:1000,0>');
+    connection.emitLine('<Idle|MPos:0.000,0.000,3.810|FS:0,0>');
+    await Promise.resolve();
+
+    expect(writes.filter((line) => line.startsWith('$J='))).toEqual([
+      '$J=G90 G21 Z3.810 F1000\n',
+      '$J=G90 G21 X0.000 Y0.000 F1000\n',
+    ]);
   });
 
   it('stops dispatching Frame legs after the controller rejects a jog command', async () => {
