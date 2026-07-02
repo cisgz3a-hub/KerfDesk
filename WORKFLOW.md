@@ -1818,3 +1818,28 @@ F-CNC19 tiling.
    moved/scaled/rotated shape combines where it VISIBLY sits.
 2. Changing which shape is bottom-most (Arrange z-order) changes what
    Subtract keeps — by design; the flow documents the convention.
+
+### F-CNC23. View the simulated cut in 3D — Phase H.11 (ADR-102 G4)
+
+#### Success
+1. In a CNC Preview, the route controls grow a "3D" button. It opens a
+   dialog rendering the material-removal grid as a shaded heightfield
+   over the stock outline — the VCarve-style solid cut preview, for ANY
+   job (profiles, pockets, v-carves, drills), not just reliefs.
+2. The 3D surface reflects the scrubber position: scrub to 40%, open 3D,
+   and only the material removed so far is missing. Drag orbits, scroll
+   zooms; depth is true to scale.
+3. The display grid downsamples to ~360 cells across, keeping the
+   deepest value per block so narrow slots stay visible.
+
+#### Error — no WebGL
+1. The dialog opens with "3D view unavailable: <reason>" instead of
+   crashing (same fallback contract as the relief viewer).
+
+#### Empty
+1. The button only appears when a removal grid exists — CNC previews
+   with a compiled toolpath. Laser previews never show it.
+
+#### Edge — huge stock
+1. The underlying grid already coarsens beyond 4M cells; the display
+   pass reduces further, so a full-bed job cannot freeze the dialog.
