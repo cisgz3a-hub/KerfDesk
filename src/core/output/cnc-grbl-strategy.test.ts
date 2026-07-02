@@ -29,8 +29,8 @@ function group(overrides: Partial<CncGroup> = {}): CncGroup {
     spindleSpinupSec: 3,
     safeZMm: 3.81,
     passes: [
-      { zMm: -1.5, polyline: squareLoop(10, 20), closed: true },
-      { zMm: -3, polyline: squareLoop(10, 20), closed: true },
+      { kind: 'contour', zMm: -1.5, polyline: squareLoop(10, 20), closed: true },
+      { kind: 'contour', zMm: -3, polyline: squareLoop(10, 20), closed: true },
     ],
     ...overrides,
   };
@@ -68,7 +68,7 @@ describe('cncGrblStrategy', () => {
           group({
             layerId: 'L2',
             spindleRpm: 8000,
-            passes: [{ zMm: -2, polyline: squareLoop(60, 15), closed: true }],
+            passes: [{ kind: 'contour', zMm: -2, polyline: squareLoop(60, 15), closed: true }],
           }),
         ],
       },
@@ -110,5 +110,63 @@ describe('cncGrblStrategy', () => {
       ],
     };
     expect(cncGrblStrategy.emit(laserJob, dev)).toBe('');
+  });
+
+  describe('path3d passes (Phase H.1)', () => {
+    const ramp = group({
+      passes: [
+        {
+          kind: 'path3d',
+          points: [
+            { x: 10, y: 10, z: -0.5 },
+            { x: 30, y: 10, z: -1.5 },
+            { x: 30, y: 30, z: -2.5 },
+          ],
+          closed: false,
+        },
+      ],
+    });
+
+    it('retracts, rapids to the first XY, plunges to the FIRST vertex Z at plunge feed', () => {
+      const gcode = cncGrblStrategy.emit({ groups: [ramp] }, dev);
+      expect(gcode).toContain('G0 Z3.810\nG0 X10.000 Y10.000\nG1 Z-0.500 F300');
+    });
+
+    it('feeds per-vertex XYZ moves with the feed word only on the first', () => {
+      const gcode = cncGrblStrategy.emit({ groups: [ramp] }, dev);
+      expect(gcode).toContain('G1 X30.000 Y10.000 Z-1.500 F1000\nG1 X30.000 Y30.000 Z-2.500');
+    });
+
+    it('in-cut Z changes ride G1, never G0 — the motion invariant holds', () => {
+      const gcode = cncGrblStrategy.emit({ groups: [ramp] }, dev);
+      expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
+    });
+
+    it('skips the retract+rapid when a path3d pass starts at the current XY', () => {
+      const chained = group({
+        passes: [
+          { kind: 'contour', zMm: -1, polyline: squareLoop(10, 20), closed: true },
+          {
+            kind: 'path3d',
+            points: [
+              { x: 10, y: 10, z: -1.5 },
+              { x: 12, y: 10, z: -2 },
+            ],
+            closed: false,
+          },
+        ],
+      });
+      const gcode = cncGrblStrategy.emit({ groups: [chained] }, dev);
+      // The loop closes at X10 Y10; the path3d pass plunges straight down.
+      expect(gcode).toContain('G1 X10.000 Y10.000\nG1 Z-1.500 F300');
+    });
+
+    it('drops degenerate path3d passes (fewer than 2 points)', () => {
+      const degenerate = group({
+        passes: [{ kind: 'path3d', points: [{ x: 5, y: 5, z: -1 }], closed: false }],
+      });
+      const gcode = cncGrblStrategy.emit({ groups: [degenerate] }, dev);
+      expect(gcode).not.toContain('X5.000');
+    });
   });
 });

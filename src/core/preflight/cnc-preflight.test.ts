@@ -57,6 +57,15 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.code === 'cnc-settings-invalid')).toBe(true);
   });
 
+  it('flags emitted Z below the stock floor even when settings look sane (H.1)', () => {
+    // Settings say 1 mm deep, but the emitted text plunges through the
+    // spoilboard — the text-level invariant catches what settings cannot.
+    const overdeep = GOOD_GCODE.replace('G1 Z-1.000 F300', 'G1 Z-99.000 F300');
+    const result = runCncPreflight(projectWithCnc({ depthMm: 1 }), config, overdeep);
+    expect(result.issues.some((issue) => issue.code === 'cnc-overdeep-cut')).toBe(true);
+    expect(result.ok).toBe(false);
+  });
+
   it('flags cut depth far beyond the stock thickness', () => {
     const result = runCncPreflight(projectWithCnc({ depthMm: 20 }), config, GOOD_GCODE);
     expect(result.issues.some((issue) => issue.code === 'cnc-depth-exceeds-stock')).toBe(true);

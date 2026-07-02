@@ -11,10 +11,14 @@
 //   5. No-go zones are respected (shared scanner — clamps matter on a router).
 //   6. Z is up on every XY rapid; no rapid plunges (findPlungedTravelIssues).
 //   7. Generated G-code is non-empty (at least one G1 line).
+//   8. No emitted Z below -(stock + through-cut allowance) — proves the depth
+//      invariant on the final text, not just the settings (findOverdeepCutIssues).
 
 import { machineBoundsForDevice } from '../devices';
 import {
+  DEFAULT_THROUGH_CUT_ALLOWANCE_MM,
   findOutOfBoundsCoords,
+  findOverdeepCutIssues,
   findPlungedTravelIssues,
   type MotionBoundsOffset,
 } from '../invariants';
@@ -30,7 +34,9 @@ export type CncPreflightOptions = {
 const MAX_REPORTED_ISSUES = 5;
 // Through-cuts intentionally run slightly past the stock bottom so the last
 // pass fully severs; more than this is a mis-set depth or stock thickness.
-const THROUGH_CUT_ALLOWANCE_MM = 1;
+// Shared with the emitted-text depth invariant (cnc-depth.ts) so the settings
+// check and the G-code check can never disagree.
+const THROUGH_CUT_ALLOWANCE_MM = DEFAULT_THROUGH_CUT_ALLOWANCE_MM;
 
 export function runCncPreflight(
   project: Project,
@@ -53,6 +59,7 @@ export function runCncPreflight(
   appendBoundsIssues(project, gcode, options, issues);
   appendNoGoZoneIssues(project, gcode, options, issues);
   appendPlungedTravelIssues(gcode, config, issues);
+  appendOverdeepCutIssues(gcode, config, issues);
 
   if (!/\bG1\b/.test(gcode)) {
     issues.push({
@@ -156,5 +163,19 @@ function appendPlungedTravelIssues(
   const travelIssues = findPlungedTravelIssues(gcode, { safeZMm: config.params.safeZMm });
   for (const issue of travelIssues.slice(0, MAX_REPORTED_ISSUES)) {
     issues.push({ code: 'plunged-travel', message: `Line ${issue.lineNumber}: ${issue.reason}` });
+  }
+}
+
+function appendOverdeepCutIssues(
+  gcode: string,
+  config: CncMachineConfig,
+  issues: PreflightIssue[],
+): void {
+  const depthIssues = findOverdeepCutIssues(gcode, {
+    stockThicknessMm: config.stock.thicknessMm,
+    allowanceMm: THROUGH_CUT_ALLOWANCE_MM,
+  });
+  for (const issue of depthIssues.slice(0, MAX_REPORTED_ISSUES)) {
+    issues.push({ code: 'cnc-overdeep-cut', message: `Line ${issue.lineNumber}: ${issue.reason}` });
   }
 }

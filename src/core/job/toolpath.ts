@@ -7,7 +7,7 @@
 // the controller's job).
 
 import type { Vec2 } from '../scene';
-import type { FillGroup, Group, Job, RasterGroup } from './job';
+import { cncPassXyPoints, type FillGroup, type Group, type Job, type RasterGroup } from './job';
 import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from './fill-sweeps';
 import { offsetForSpeed, shiftAlongTravel, type ScanOffsetPoint } from './scan-offset';
@@ -81,7 +81,7 @@ function appendGroupSteps(
     case 'cnc': {
       // Depth passes flatten into the 2D preview: each pass renders as a cut
       // polyline with travel between pass start points (Z is not visualized).
-      const passes = group.passes.map((pass) => ({ polyline: pass.polyline }));
+      const passes = group.passes.map((pass) => ({ polyline: cncPassXyPoints(pass) }));
       return appendContourGroupSteps(steps, prevEnd, passes, group.color);
     }
   }

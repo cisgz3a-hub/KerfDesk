@@ -21,7 +21,7 @@
 // down to the next level.
 
 import type { DeviceProfile } from '../devices';
-import type { CncGroup, CncPass, Job } from '../job';
+import type { CncContourPass, CncGroup, CncPass, CncPath3dPass, Job } from '../job';
 import { assertNever } from '../scene';
 import type { OutputStrategy } from './output-strategy';
 
@@ -114,6 +114,26 @@ function appendPass(
   feed: number,
   plunge: number,
 ): void {
+  switch (pass.kind) {
+    case 'contour':
+      appendContourPass(lines, head, pass, safeZMm, feed, plunge);
+      break;
+    case 'path3d':
+      appendPath3dPass(lines, head, pass, safeZMm, feed, plunge);
+      break;
+    default:
+      assertNever(pass, 'CncPass');
+  }
+}
+
+function appendContourPass(
+  lines: string[],
+  head: Head,
+  pass: CncContourPass,
+  safeZMm: number,
+  feed: number,
+  plunge: number,
+): void {
   const first = pass.polyline[0];
   if (first === undefined || pass.polyline.length < 2) return;
   const startX = fmt(first.x);
@@ -134,7 +154,53 @@ function appendPass(
   appendCutMoves(lines, head, pass, feed);
 }
 
-function appendCutMoves(lines: string[], head: Head, pass: CncPass, feed: number): void {
+// path3d: same retract → rapid → plunge discipline as a contour pass, then
+// per-vertex XYZ feed moves. Plunge targets the FIRST vertex's Z; every
+// in-cut Z change after that rides a G1 at the cutting feed (never a rapid),
+// so findPlungedTravelIssues holds by construction.
+function appendPath3dPass(
+  lines: string[],
+  head: Head,
+  pass: CncPath3dPass,
+  safeZMm: number,
+  feed: number,
+  plunge: number,
+): void {
+  const first = pass.points[0];
+  if (first === undefined || pass.points.length < 2) return;
+  const startX = fmt(first.x);
+  const startY = fmt(first.y);
+  const startZ = fmt(first.z);
+
+  const alreadyAtStartXy = head.x === startX && head.y === startY;
+  if (!alreadyAtStartXy) {
+    appendRetract(lines, head, safeZMm);
+    lines.push(`G0 X${startX} Y${startY}`);
+    head.x = startX;
+    head.y = startY;
+  }
+  if (head.z !== startZ) {
+    lines.push(`G1 Z${startZ} F${plunge}`);
+    head.z = startZ;
+  }
+  let feedEmitted = false;
+  for (let i = 1; i < pass.points.length; i += 1) {
+    const point = pass.points[i];
+    if (point === undefined) continue;
+    const x = fmt(point.x);
+    const y = fmt(point.y);
+    const z = fmt(point.z);
+    if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
+    const feedWord = feedEmitted ? '' : ` F${feed}`;
+    feedEmitted = true;
+    lines.push(`G1 X${x} Y${y} Z${z}${feedWord}`);
+    head.x = x;
+    head.y = y;
+    head.z = z;
+  }
+}
+
+function appendCutMoves(lines: string[], head: Head, pass: CncContourPass, feed: number): void {
   let feedEmitted = false;
   for (let i = 1; i < pass.polyline.length; i += 1) {
     const point = pass.polyline[i];

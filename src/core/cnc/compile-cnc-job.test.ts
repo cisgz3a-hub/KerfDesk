@@ -10,8 +10,15 @@ import {
   type Layer,
   type Scene,
 } from '../scene';
-import type { CncGroup } from '../job';
+import type { CncContourPass, CncGroup, CncPass } from '../job';
 import { compileCncJob } from './compile-cnc-job';
+
+// compileCncJob only ever produces contour passes today (path3d arrives with
+// relief finishing / ramps); tests narrow through this to read zMm/polyline.
+function contourPass(pass: CncPass): CncContourPass {
+  if (pass.kind !== 'contour') throw new Error('expected a contour pass');
+  return pass;
+}
 
 const dev = DEFAULT_DEVICE_PROFILE;
 const config = DEFAULT_CNC_MACHINE_CONFIG; // 1/8 in bit (3.175 mm)
@@ -65,7 +72,7 @@ describe('compileCncJob', () => {
       [squareObject('O1', '#ff0000', 20)],
     );
     const group = onlyGroup(scene);
-    expect(group.passes.map((pass) => pass.zMm)).toEqual([-1.5, -3]);
+    expect(group.passes.map((pass) => contourPass(pass).zMm)).toEqual([-1.5, -3]);
     expect(group.passes.every((pass) => pass.closed)).toBe(true);
   });
 
@@ -76,8 +83,9 @@ describe('compileCncJob', () => {
     );
     const group = onlyGroup(scene);
     for (const pass of group.passes) {
-      const first = pass.polyline[0];
-      const last = pass.polyline[pass.polyline.length - 1];
+      const polyline = contourPass(pass).polyline;
+      const first = polyline[0];
+      const last = polyline[polyline.length - 1];
       expect(first).toEqual(last);
     }
   });
@@ -104,7 +112,7 @@ describe('compileCncJob', () => {
     const tabbed = group.passes.filter((pass) => !pass.closed);
     expect(fullLoops).toHaveLength(2);
     expect(tabbed).toHaveLength(4);
-    expect(new Set(tabbed.map((pass) => pass.zMm))).toEqual(new Set([-6]));
+    expect(new Set(tabbed.map((pass) => contourPass(pass).zMm))).toEqual(new Set([-6]));
   });
 
   it('orders pocket groups before profile groups', () => {

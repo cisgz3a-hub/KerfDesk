@@ -216,7 +216,7 @@ function depthMajorPasses(
 }
 
 function passFromPolyline(polyline: Polyline, zMm: number): CncPass {
-  return { zMm, polyline: ensureRingClosure(polyline), closed: polyline.closed };
+  return { kind: 'contour', zMm, polyline: ensureRingClosure(polyline), closed: polyline.closed };
 }
 
 // Job convention (job.ts CutSegment): a closed pass's polyline ends where it
