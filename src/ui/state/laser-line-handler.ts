@@ -140,8 +140,9 @@ export function handleLine(
     handleErrorLine(set, get, refs, safeWrite, cls.code, cls.raw);
     return;
   }
-  if (cls.kind === 'welcome') {
-    handleWelcomeLine(set, get, refs, cls.raw);
+  const bannerRaw = bannerCandidateRaw(cls);
+  if (bannerRaw !== null) {
+    handleWelcomeLine(set, get, refs, bannerRaw);
     return;
   }
   // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
@@ -154,6 +155,15 @@ export function handleLine(
   if (cls.kind === 'ok') {
     advanceStream(set, get, refs, safeWrite, 'ok');
   }
+}
+
+// Unknown lines run through banner detection too: connecting with the wrong
+// driver selected (e.g. GRBL driver hearing Marlin's `start`) classifies the
+// foreign banner as unknown, and the advisory is exactly what the operator
+// needs to fix the profile.
+function bannerCandidateRaw(cls: { readonly kind: string; readonly raw?: string }): string | null {
+  if (cls.kind !== 'welcome' && cls.kind !== 'unknown') return null;
+  return cls.raw ?? null;
 }
 
 // Welcome banners carry the firmware identity. Record what was detected and
@@ -344,7 +354,11 @@ function requestRealtimeStopAfterStreamError(
   const softReset = driver.realtime.softReset;
   const abort = softReset === null ? Promise.resolve() : safeWrite(softReset, 'stop', 'system');
   void abort
-    .then(() => safeWrite(`${driver.commands.coolantOff}\n`, 'stop', 'system'))
+    .then(async () => {
+      for (const line of driver.commands.stopLaserLines) {
+        await safeWrite(`${line}\n`, 'stop', 'system');
+      }
+    })
     .catch(() => undefined);
 }
 

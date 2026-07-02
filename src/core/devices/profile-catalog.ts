@@ -138,6 +138,34 @@ const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
   ],
 };
 
+const GENERIC_MARLIN_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-marlin-laser',
+  vendor: 'Generic',
+  model: 'Marlin laser (LASER_FEATURE)',
+  name: 'Generic Marlin laser 300×200',
+  machineFamily: 'generic-marlin',
+  controllerKind: 'marlin',
+  baudRate: 250000,
+  // Marlin has no realtime buffer reporting; ping-pong (one line per ok) is
+  // the only safe streaming mode.
+  streamingMode: 'ping-pong',
+  gcodeDialect: { dialectId: 'marlin-inline' },
+  bedWidth: 300,
+  bedHeight: 200,
+  // Marlin laser convention: S range 0-255.
+  maxPowerS: 255,
+  minPowerS: 0,
+  capabilities: ['no-go-zones'],
+  evidence: [
+    {
+      label: 'Marlin LASER_FEATURE conventions',
+      status: 'unverified',
+      note: 'Marlin builds vary widely (LASER_FEATURE inline vs fan-mosfet wiring, S 0-255 vs 0-100). Simulator-verified only; NOT hardware-verified. Confirm the dialect and S range against your firmware configuration before burning.',
+    },
+  ],
+};
+
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
   entry(DEFAULT_DEVICE_PROFILE, [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
@@ -162,6 +190,9 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(GENERIC_FLUIDNC_PROFILE, [
     'FluidNC numeric $ setting writes are blocked in-app (configuration lives in its YAML config).',
+  ]),
+  entry(GENERIC_MARLIN_PROFILE, [
+    'Marlin: ping-pong streaming, no realtime pause/stop bytes, S 0-255, dialect must match the firmware build (inline vs fan).',
   ]),
 ];
 
@@ -202,7 +233,7 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
   if (profile.controllerKind !== undefined && !isKnownControllerKind(profile.controllerKind)) {
-    errors.push('controllerKind must be one of: grbl-v1.1, grblhal, fluidnc');
+    errors.push('controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin');
   }
   if (!isGcodeDialectSelection(profile.gcodeDialect)) {
     errors.push('gcodeDialect must reference a known GRBL dialect');

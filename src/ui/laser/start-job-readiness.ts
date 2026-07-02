@@ -5,7 +5,10 @@ import {
   frameBoundsSignature,
   framePreflight,
 } from '../../core/job';
-import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type {
+  ControllerSettingsSnapshot,
+  ReadinessSettingsCapability,
+} from '../../core/preflight';
 import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
@@ -52,6 +55,9 @@ export type MachineStartSnapshot = {
   readonly wcoCache?: WorkCoordinateOffset | null;
   // ADR-053 P2 — the last clean Verified Frame, gating verified-origin starts.
   readonly frameVerification?: FrameVerification | null;
+  // ADR-094 — how the connected firmware exposes settings. Non-GRBL values
+  // relax the $30/$32 readiness proof into an explicit unverified warning.
+  readonly settingsCapability?: ReadinessSettingsCapability;
 };
 
 export function prepareStartJob(
@@ -88,7 +94,7 @@ export function prepareStartJob(
     return { ok: false, messages: [verifiedFrameIssue] };
   }
 
-  const controller = runControllerReadiness(project, controllerSettings);
+  const controller = runControllerReadiness(project, controllerSettings, readinessMode(machine));
   if (!controller.ok) {
     return { ok: false, messages: controller.errors.map((i) => i.message) };
   }
@@ -98,6 +104,10 @@ export function prepareStartJob(
     gcode,
     warnings: [...controller.warnings.map((i) => i.message), ...detectJobIntentWarnings(project)],
   };
+}
+
+function readinessMode(machine: MachineStartSnapshot): ReadinessSettingsCapability {
+  return machine.settingsCapability ?? 'grbl-dollar';
 }
 
 function findScopedPreEmitIssues(

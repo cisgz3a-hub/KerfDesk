@@ -14,3 +14,8 @@ export {
   type GrblSimState,
 } from './grbl-sim-machine';
 export { defaultGrblSimSettings, DEFAULT_GRBL_SIM_SETTINGS } from './grbl-sim-settings';
+export {
+  createMarlinSimulator,
+  type CreateMarlinSimulatorOptions,
+  type MarlinSimulator,
+} from './marlin-simulator';

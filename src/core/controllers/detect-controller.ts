@@ -15,6 +15,10 @@ const BANNER_MATCHERS: ReadonlyArray<BannerMatcher> = [
   { kind: 'fluidnc', pattern: /^Grbl [\d.]+ \[FluidNC/i },
   { kind: 'grblhal', pattern: /^GrblHAL [\d.]+/i },
   { kind: 'grbl-v1.1', pattern: /^Grbl [\d.]+/i },
+  // Marlin prints a bare `start` on boot; M115 answers FIRMWARE_NAME:Marlin.
+  { kind: 'marlin', pattern: /^start$/ },
+  { kind: 'marlin', pattern: /FIRMWARE_NAME:\s*Marlin/i },
+  { kind: 'marlin', pattern: /^Marlin\b/ },
 ];
 
 export function detectControllerFromBanner(line: string): ControllerKind | null {

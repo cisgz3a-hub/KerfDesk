@@ -62,7 +62,8 @@ export const grblDriver: ControllerDriver = {
     unlock: CMD_UNLOCK,
     sleep: CMD_SLEEP,
     settingsQuery: CMD_SETTINGS,
-    coolantOff: CMD_COOLANT_OFF,
+    queuedStatusQuery: null,
+    stopLaserLines: [CMD_COOLANT_OFF],
     settleDwell: GRBL_SETTLE_DWELL,
     setOriginHere: CMD_SET_ORIGIN_HERE,
     clearOrigin: CMD_CLEAR_ORIGIN,
@@ -73,13 +74,14 @@ export const grblDriver: ControllerDriver = {
   },
   classifyLine: classifyResponse,
   prepareConsoleCommand,
+  // Order matches the pre-ADR-094 ConsolePanel quick row exactly.
   consoleQuickCommands: [
-    { label: RT_STATUS, command: RT_STATUS, hint: 'Status report' },
     { label: CMD_UNLOCK, command: CMD_UNLOCK, hint: 'Unlock (clear alarm)' },
     { label: CMD_SETTINGS, command: CMD_SETTINGS, hint: 'Settings dump' },
     { label: CMD_OFFSETS, command: CMD_OFFSETS, hint: 'Work offsets' },
     { label: CMD_BUILD_INFO, command: CMD_BUILD_INFO, hint: 'Build info' },
     { label: CMD_MODAL_STATE, command: CMD_MODAL_STATE, hint: 'Modal state' },
+    { label: RT_STATUS, command: RT_STATUS, hint: 'Status report' },
   ],
   isSetupOnlyPayload: (payload) =>
     payload.split(/\r?\n/).some((line) => line.trim().startsWith('$')),

@@ -54,8 +54,10 @@ function stripComment(line: string): string {
 // PROJECT.md non-negotiable #3 — Laser-off on travel.
 // A `G0` is safe if any of:
 //   (a) `S0` is on the same line,
-//   (b) the most recent non-comment line was `M5`,
-//   (c) the most recent S value seen is 0 (sticky firmware state).
+//   (b) the most recent non-comment line was `M5` or `M107` (fan-laser off,
+//       Marlin fan-mode dialect — ADR-095),
+//   (c) the most recent S value seen is 0 (sticky firmware state; `M107`
+//       counts as S0 because it zeroes the fan-laser PWM).
 export function findLaserOnTravelIssues(gcode: string): readonly Issue[] {
   const lines = gcode.split('\n');
   const issues: Issue[] = [];
@@ -68,11 +70,12 @@ export function findLaserOnTravelIssues(gcode: string): readonly Issue[] {
     if (stripped === '') continue;
     const sVal = parseValue(stripped, S_RE);
     if (sVal !== null) stickyS = sVal;
+    if (/^M107\b/.test(stripped)) stickyS = 0;
     if (/^G0\b/.test(stripped)) {
       const okInline = sVal === 0;
-      const okPriorM5 = /^M5\b/.test(lastEffective);
+      const okPriorOff = /^M5\b|^M107\b/.test(lastEffective);
       const okSticky = stickyS === 0;
-      if (!okInline && !okPriorM5 && !okSticky) {
+      if (!okInline && !okPriorOff && !okSticky) {
         issues.push({
           lineNumber: i + 1,
           line: raw,

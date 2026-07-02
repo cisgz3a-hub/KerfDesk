@@ -43,6 +43,18 @@ export function activeJobCommandBlockMessage(state: LaserState): string | null {
   return isActiveJob(state.streamer) ? ACTIVE_JOB_COMMAND_MESSAGE : null;
 }
 
+// True while stream acks are still outstanding — sending or paused, or any
+// in-flight line not yet acknowledged. Queued status queries (Marlin M114)
+// must stay silent through THIS window (their ok would desync the ack
+// accounting), but may resume once everything is acked: 'done' still blocks
+// isActiveJob until the post-job settle sees Idle, and that settle NEEDS the
+// M114 polls to observe Idle at all.
+export function hasUnsettledStreamAcks(streamer: StreamerState | null): boolean {
+  if (streamer === null) return false;
+  if (streamer.status === 'streaming' || streamer.status === 'paused') return true;
+  return streamer.inFlight.length > 0;
+}
+
 export function motionOperationCommandBlockMessage(state: LaserState): string | null {
   return state.motionOperation !== null
     ? MOTION_OPERATION_ACTIVE_MESSAGE
@@ -75,7 +87,10 @@ export function disconnectStopCommands(
 ): ReadonlyArray<string> {
   if (isActiveJob(state.streamer)) {
     const softReset = driver.realtime.softReset;
-    return [...(softReset === null ? [] : [softReset]), `${driver.commands.coolantOff}\n`];
+    return [
+      ...(softReset === null ? [] : [softReset]),
+      ...driver.commands.stopLaserLines.map((line) => `${line}\n`),
+    ];
   }
   if (state.motionOperation === null) return [];
   const jogCancel = driver.realtime.jogCancel;
@@ -167,6 +182,7 @@ function streamPositionUnchanged(
 export function initialLaserState(): Pick<
   LaserState,
   | 'capabilities'
+  | 'activeControllerKind'
   | 'detectedControllerKind'
   | 'connection'
   | 'statusReport'
@@ -192,6 +208,7 @@ export function initialLaserState(): Pick<
 > {
   return {
     capabilities: grblDriver.capabilities,
+    activeControllerKind: grblDriver.kind,
     detectedControllerKind: null,
     connection: { kind: 'disconnected' },
     statusReport: null,

@@ -1,15 +1,23 @@
 export type {
+  GcodeDialectId,
   GcodeDialectSelection,
   GrblGcodeDialect,
   GrblGcodeDialectId,
   GrblPowerMode,
+  MarlinGcodeDialect,
+  MarlinGcodeDialectId,
+  MarlinPowerMode,
 } from './gcode-dialects';
 export {
   GRBL_GCODE_DIALECTS,
+  MARLIN_GCODE_DIALECTS,
+  isGcodeDialectId,
   isGcodeDialectSelection,
   isGrblGcodeDialectId,
+  isMarlinGcodeDialectId,
   normalizeGcodeDialectSelection,
   resolveGrblDialect,
+  resolveMarlinDialect,
 } from './gcode-dialects';
 export type {
   ControllerKind,

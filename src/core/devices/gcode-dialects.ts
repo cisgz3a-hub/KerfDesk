@@ -4,9 +4,52 @@ export type GrblGcodeDialectId =
   | 'grbl-raster'
   | 'neotronics-4040-safe';
 
+// Marlin output dialects (ADR-095): 'marlin-inline' assumes LASER_FEATURE
+// (M3/M4/M5 + per-move S, same wire shape as GRBL with maxPowerS=255);
+// 'marlin-fan' drives a fan-mosfet laser with M106 Sn / M107 power changes
+// between moves (no per-move S support at all).
+export type MarlinGcodeDialectId = 'marlin-inline' | 'marlin-fan';
+
+export type GcodeDialectId = GrblGcodeDialectId | MarlinGcodeDialectId;
+
 export type GcodeDialectSelection = {
-  readonly dialectId: GrblGcodeDialectId;
+  readonly dialectId: GcodeDialectId;
 };
+
+export type MarlinPowerMode = 'inline' | 'fan';
+
+export type MarlinGcodeDialect = {
+  readonly id: MarlinGcodeDialectId;
+  readonly label: string;
+  readonly description: string;
+  readonly powerMode: MarlinPowerMode;
+};
+
+export const MARLIN_GCODE_DIALECTS: ReadonlyArray<MarlinGcodeDialect> = [
+  {
+    id: 'marlin-inline',
+    label: 'Marlin Inline (LASER_FEATURE)',
+    description:
+      'Marlin builds with LASER_FEATURE: M3/M4/M5 with per-move S power, S range 0-255.',
+    powerMode: 'inline',
+  },
+  {
+    id: 'marlin-fan',
+    label: 'Marlin Fan-mosfet',
+    description:
+      'Laser wired to the part-cooling fan output: power via M106 Sn / M107 between moves. Raster is slow and coarse in this mode.',
+    powerMode: 'fan',
+  },
+];
+
+const DEFAULT_MARLIN_DIALECT = MARLIN_GCODE_DIALECTS[0] as MarlinGcodeDialect;
+
+export function resolveMarlinDialect(device: {
+  readonly gcodeDialect?: { readonly dialectId?: string };
+}): MarlinGcodeDialect {
+  const dialectId = device.gcodeDialect?.dialectId;
+  return MARLIN_GCODE_DIALECTS.find((dialect) => dialect.id === dialectId) ?? DEFAULT_MARLIN_DIALECT;
+}
 
 export type GrblPowerMode = 'constant' | 'dynamic';
 
@@ -94,11 +137,19 @@ export function normalizeGcodeDialectSelection(value: unknown): GcodeDialectSele
 
 export function isGcodeDialectSelection(value: unknown): value is GcodeDialectSelection {
   if (!isRecord(value)) return false;
-  return isGrblGcodeDialectId(value['dialectId']);
+  return isGcodeDialectId(value['dialectId']);
+}
+
+export function isGcodeDialectId(value: unknown): value is GcodeDialectId {
+  return isGrblGcodeDialectId(value) || isMarlinGcodeDialectId(value);
 }
 
 export function isGrblGcodeDialectId(value: unknown): value is GrblGcodeDialectId {
   return GRBL_GCODE_DIALECTS.some((dialect) => dialect.id === value);
+}
+
+export function isMarlinGcodeDialectId(value: unknown): value is MarlinGcodeDialectId {
+  return MARLIN_GCODE_DIALECTS.some((dialect) => dialect.id === value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

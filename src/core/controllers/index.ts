@@ -23,3 +23,4 @@ export { detectControllerFromBanner } from './detect-controller';
 export { grblDriver, GRBL_DEFAULT_BAUD_RATE, GRBL_SETTLE_DWELL } from './grbl/driver';
 export { grblHalDriver } from './grblhal/driver';
 export { fluidncDriver } from './fluidnc/driver';
+export { marlinDriver, MARLIN_DEFAULT_BAUD_RATE } from './marlin/driver';

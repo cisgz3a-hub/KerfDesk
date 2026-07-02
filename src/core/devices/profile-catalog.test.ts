@@ -18,6 +18,7 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
       'ortur-laser-master-3',
       'generic-grblhal',
       'generic-fluidnc',
+      'generic-marlin-laser',
     ]);
     for (const entry of GRBL_MACHINE_PROFILE_CATALOG) {
       expect(validateMachineProfile(entry.profile)).toEqual([]);

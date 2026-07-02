@@ -22,7 +22,8 @@ describe('grblDriver', () => {
     expect(grblDriver.commands.unlock).toBe('$X');
     expect(grblDriver.commands.sleep).toBe('$SLP');
     expect(grblDriver.commands.settingsQuery).toBe('$$');
-    expect(grblDriver.commands.coolantOff).toBe('M9');
+    expect(grblDriver.commands.queuedStatusQuery).toBeNull();
+    expect(grblDriver.commands.stopLaserLines).toEqual(['M9']);
     expect(grblDriver.commands.settleDwell).toBe('G4 P0.01');
     expect(grblDriver.commands.setOriginHere).toBe('G92 X0 Y0');
     expect(grblDriver.commands.clearOrigin).toBe('G92.1');
