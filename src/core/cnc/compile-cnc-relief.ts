@@ -28,6 +28,7 @@ import {
   type SceneObject,
 } from '../scene';
 import { kernelForTool } from '../sim';
+import { parkFields } from './motion-polish';
 
 const MIN_FEED_MM_PER_MIN = 1;
 const MIN_ROUGHING_CELL_MM = 0.2;
@@ -82,6 +83,7 @@ function reliefGroup(
     spindleRpm: Math.min(Math.max(0, settings.spindleRpm), config.params.spindleMaxRpm),
     spindleSpinupSec: Math.max(0, config.params.spindleSpinupSec),
     safeZMm: Math.max(0, config.params.safeZMm),
+    ...parkFields(config),
     passes,
   };
 }

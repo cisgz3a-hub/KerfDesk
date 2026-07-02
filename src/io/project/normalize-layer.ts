@@ -34,17 +34,7 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
     cutType: CNC_CUT_TYPES.some((cutType) => cutType === raw['cutType'])
       ? raw['cutType']
       : d.cutType,
-    // H.7 multi-tool fields: optional bit ids. Stale/unknown ids are kept
-    // here and resolve to the machine bit at compile time (layerCncTool);
-    // non-strings are dropped.
-    ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
-    ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
-    ...(typeof raw['reliefFinishToolId'] === 'string'
-      ? { reliefFinishToolId: raw['reliefFinishToolId'] }
-      : {}),
-    ...(isPositiveNumber(raw['reliefScallopMm'])
-      ? { reliefScallopMm: raw['reliefScallopMm'] }
-      : {}),
+    ...optionalCncLayerFields(raw),
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
     // 0 = auto ring spacing (H.3), so non-negative rather than positive.
@@ -59,6 +49,26 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
     tabHeightMm: positiveOr(raw['tabHeightMm'], d.tabHeightMm),
     tabWidthMm: positiveOr(raw['tabWidthMm'], d.tabWidthMm),
     tabsPerShape: isPositiveInteger(raw['tabsPerShape']) ? raw['tabsPerShape'] : d.tabsPerShape,
+  };
+}
+
+// The H.7 multi-tool + H.8 finishing + H.9 polish fields, all optional:
+// stale/unknown bit ids are kept (they resolve to the machine bit at
+// compile time via layerCncTool); malformed values are dropped.
+function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
+    ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
+    ...(typeof raw['reliefFinishToolId'] === 'string'
+      ? { reliefFinishToolId: raw['reliefFinishToolId'] }
+      : {}),
+    ...(isPositiveNumber(raw['reliefScallopMm'])
+      ? { reliefScallopMm: raw['reliefScallopMm'] }
+      : {}),
+    ...(isPositiveNumber(raw['rampEntryDeg']) ? { rampEntryDeg: raw['rampEntryDeg'] } : {}),
+    ...(raw['cutDirection'] === 'climb' || raw['cutDirection'] === 'conventional'
+      ? { cutDirection: raw['cutDirection'] }
+      : {}),
   };
 }
 
