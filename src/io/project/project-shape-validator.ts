@@ -1,4 +1,4 @@
-import { DITHER_ALGORITHMS } from '../../core/scene';
+import { DITHER_ALGORITHMS, RELIEF_EMBED_TRIANGLE_LIMIT } from '../../core/scene';
 import {
   isGcodeDialectSelection,
   isGrblRxBufferBytes,
@@ -154,7 +154,45 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   if (kind === 'traced-image') return validateTracedImageObject(obj, path);
   if (kind === 'raster-image') return validateRasterObject(obj, path);
   if (kind === 'shape') return validateShapeObject(obj, path);
+  if (kind === 'relief') return validateReliefObject(obj, path);
   return `missing or invalid \`${path}.kind\``;
+}
+
+// H.4 (ADR-094): the embedded mesh is the carving source — a malformed or
+// non-finite mesh must never reach the heightmap sampler.
+function validateReliefObject(obj: Record<string, unknown>, path: string): string | null {
+  return firstError([
+    requireString(obj, `${path}.id`),
+    requireString(obj, `${path}.source`),
+    validateMeshPositions(obj['meshPositions'], `${path}.meshPositions`),
+    requirePositiveNumber(obj, `${path}.targetWidthMm`),
+    requirePositiveNumber(obj, `${path}.reliefDepthMm`),
+    requireLiteral(obj, `${path}.emptyCells`, ['floor', 'top']),
+    requireString(obj, `${path}.color`),
+    optionalPercent(obj, `${path}.powerScale`),
+    validateObjectOperationOverride(obj['operationOverride'], `${path}.operationOverride`),
+    optionalBoolean(obj, `${path}.locked`),
+    validateBounds(obj['bounds'], `${path}.bounds`),
+    validateTransform(obj['transform'], `${path}.transform`),
+  ]);
+}
+
+function validateMeshPositions(value: unknown, path: string): string | null {
+  if (!Array.isArray(value) || value.length === 0) {
+    return `missing or invalid \`${path}\``;
+  }
+  if (value.length % 9 !== 0) {
+    return `\`${path}\` length must be a multiple of 9 (three xyz vertices per triangle)`;
+  }
+  if (value.length > RELIEF_EMBED_TRIANGLE_LIMIT * 9) {
+    return `\`${path}\` exceeds the ${RELIEF_EMBED_TRIANGLE_LIMIT}-triangle embed limit`;
+  }
+  for (const n of value) {
+    if (typeof n !== 'number' || !Number.isFinite(n)) {
+      return `non-finite number in \`${path}\``;
+    }
+  }
+  return null;
 }
 
 function validateVectorObject(obj: Record<string, unknown>, path: string): string | null {

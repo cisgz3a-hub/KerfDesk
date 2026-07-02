@@ -302,6 +302,10 @@ export function applyFreshImport(
     // on the created layer so the eventual F.2.d compile arm
     // dispatches to emit-raster.
     scene = ensureRasterImageLayer(scene, positioned.color);
+  } else if (positioned.kind === 'relief') {
+    // H.4: a relief binds to a plain layer by color; its CNC settings live
+    // on that layer (laser mode fields are inert for it).
+    scene = ensureLayersForColors(scene, [{ color: positioned.color }]);
   }
   return {
     project: { ...s.project, scene },

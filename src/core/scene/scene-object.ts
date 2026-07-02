@@ -304,6 +304,10 @@ export type ReliefObject = ObjectPowerScale & {
 // the user to decimate when over.
 export const RELIEF_EMBED_TRIANGLE_LIMIT = 200_000;
 
+// Canonical layer color for fresh relief imports (DEFAULT_RASTER_LAYER_COLOR
+// precedent): wood-brown, unlikely to collide with drawing colors.
+export const DEFAULT_RELIEF_LAYER_COLOR = '#a0522d';
+
 // Full union expanded through Phase G (ADR-014, ADR-020, ADR-051) and
 // Phase H (ADR-094). Future variants require an ADR + a PROJECT.md scope
 // revision.
