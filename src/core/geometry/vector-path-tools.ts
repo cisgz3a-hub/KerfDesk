@@ -112,15 +112,15 @@ function objectPowerScale(
   };
 }
 
-function isClosedPolygon(polyline: Polyline): boolean {
+export function isClosedPolygon(polyline: Polyline): boolean {
   return polyline.closed && normalizeClosedPoints(polyline.points).length >= MIN_CLOSED_POINTS;
 }
 
-function polylineToPathD(polyline: Polyline): PathD {
+export function polylineToPathD(polyline: Polyline): PathD {
   return normalizeClosedPoints(polyline.points).map((point) => ({ x: point.x, y: point.y }));
 }
 
-function pathDToPolyline(path: PathD): Polyline {
+export function pathDToPolyline(path: PathD): Polyline {
   const points = path.map((point) => cleanPoint(point));
   const first = points[0];
   const last = points[points.length - 1];
@@ -146,7 +146,7 @@ function normalizeClosedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2>
   return out;
 }
 
-function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds | null {
+export function boundsForPaths(paths: ReadonlyArray<ColoredPath>): Bounds | null {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;

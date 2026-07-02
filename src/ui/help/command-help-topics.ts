@@ -168,6 +168,18 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Union selected closed vector contours into one baked path object by layer color.',
   },
+  'tools.subtract': {
+    family: 'tools',
+    tooltip: 'Cut the upper selected shapes out of the bottom-most one (boolean difference).',
+  },
+  'tools.intersect': {
+    family: 'tools',
+    tooltip: 'Keep only the area every selected shape shares (boolean intersection).',
+  },
+  'tools.exclude': {
+    family: 'tools',
+    tooltip: 'Keep everything except where the selected shapes overlap (boolean XOR).',
+  },
   'tools.convert-to-bitmap': {
     family: 'tools',
     tooltip: 'Rasterize selected vector artwork into a bitmap image.',

@@ -45,8 +45,8 @@ MISSING = absent. "Ref" names the market anchor.
 | T1 | Shape tools + polyline/pen (all) | HAVE | rect/ellipse/polygon/star/pen (ADR-051) |
 | T1 | Node editing (VCarve/Carbide) | HAVE | Edit-nodes tool |
 | T1 | Align/distribute/flip (all) | HAVE | 12 arrange commands |
-| T1 | Boolean union/subtract/intersect (VCarve weld, Easel Combine, CC booleans) | **MISSING** | → ADR-102 G1 (clipper2-ts already a dep) |
-| T1 | Vector offset in/out (VCarve, CC, Easel Offsetter) | **MISSING** | → ADR-102 G1 |
+| T1 | Boolean union/subtract/intersect (VCarve weld, Easel Combine, CC booleans) | PARTIAL→HAVE | Union shipped earlier as `tools.weld` (this audit initially missed it — the grep covered only `arrange.*`); subtract/intersect/exclude added by ADR-102 G1 |
+| T1 | Vector offset in/out (VCarve, CC, Easel Offsetter) | **MISSING**→HAVE | ADR-102 G1 Offset row (round joins, new object) |
 | T1 | Text (system/bundled fonts) | PARTIAL | 4 bundled fonts; no system-font import |
 | T1 | SVG + DXF import, image trace | HAVE | H.6a DXF clean-room |
 | T2 | Arc/curved text (VCarve, CC) | MISSING | roadmap |

@@ -105,6 +105,76 @@ describe('vector path actions', () => {
   });
 });
 
+describe('boolean + offset actions (ADR-102 G1)', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it('subtract cuts the clip out of the bottom-most subject and replaces the selection', () => {
+    loadObjects([
+      shapeObject('base', '#222222', squarePath('#222222', 0, 0, 10), IDENTITY_TRANSFORM),
+      shapeObject('cutter', '#222222', squarePath('#222222', 5, 0, 10), IDENTITY_TRANSFORM),
+    ]);
+    useStore.setState({
+      selectedObjectId: 'base',
+      additionalSelectedIds: new Set(['cutter']),
+      dirty: false,
+    });
+
+    useStore.getState().booleanSelection('subtract');
+
+    const state = useStore.getState();
+    expect(state.project.scene.objects).toHaveLength(1);
+    const object = state.project.scene.objects[0];
+    expect(object).toMatchObject({
+      kind: 'imported-svg',
+      source: 'Subtracted paths',
+      bounds: { minX: 0, minY: 0, maxX: 5, maxY: 10 },
+    });
+    expect(state.selectedObjectId).toBe(object?.id);
+    expect(state.undoStack).toHaveLength(1);
+    // Undo restores both source objects.
+    state.undo();
+    expect(useStore.getState().project.scene.objects).toHaveLength(2);
+  });
+
+  it('refuses booleans on a single object', () => {
+    loadObjects([shapeObject('only', '#222222', squarePath('#222222', 0, 0, 10))]);
+    useStore.setState({ selectedObjectId: 'only', dirty: false });
+    const before = useStore.getState().project;
+
+    useStore.getState().booleanSelection('intersect');
+
+    expect(useStore.getState().project).toBe(before);
+  });
+
+  it('offset adds a NEW grown object and keeps the source', () => {
+    loadObjects([shapeObject('src', '#222222', squarePath('#222222', 0, 0, 10))]);
+    useStore.setState({ selectedObjectId: 'src', dirty: false });
+
+    useStore.getState().offsetSelection(2);
+
+    const state = useStore.getState();
+    expect(state.project.scene.objects).toHaveLength(2);
+    const offset = state.project.scene.objects.find((object) => object.id !== 'src');
+    expect(offset).toMatchObject({ kind: 'imported-svg', source: 'Offset paths (+2 mm)' });
+    expect(offset?.bounds.minX).toBeCloseTo(-2, 3);
+    expect(state.selectedObjectId).toBe(offset?.id);
+    expect(state.undoStack).toHaveLength(1);
+  });
+
+  it('leaves state untouched when an inward offset collapses the shape', () => {
+    loadObjects([shapeObject('src', '#222222', squarePath('#222222', 0, 0, 10))]);
+    useStore.setState({ selectedObjectId: 'src', dirty: false });
+    const before = useStore.getState().project;
+
+    useStore.getState().offsetSelection(-6);
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+});
+
 function loadObjects(objects: ReadonlyArray<ShapeObject>): void {
   const colors = [...new Set(objects.map((object) => object.color))];
   useStore.setState({

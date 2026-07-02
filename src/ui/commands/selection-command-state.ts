@@ -59,6 +59,15 @@ export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<st
   return objects.length > 0 && objects.every(objectHasOnlyClosedContours);
 }
 
+// ADR-102 G1: booleans need a subject AND at least one clip.
+export function selectionCanCombine(project: Project, selectedIds: ReadonlyArray<string>): boolean {
+  const selected = new Set(selectedIds);
+  const objects = project.scene.objects.filter(
+    (object) => selected.has(object.id) && object.locked !== true && isConvertibleVector(object),
+  );
+  return objects.length >= 2 && objects.every(objectHasOnlyClosedContours);
+}
+
 export function selectionCanBreakApart(
   project: Project,
   selectedIds: ReadonlyArray<string>,

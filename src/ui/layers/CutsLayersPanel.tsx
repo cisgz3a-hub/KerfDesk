@@ -17,6 +17,7 @@ import { useStore } from '../state';
 import { AddLayerControls } from './AddLayerControls';
 import { LayerRow } from './LayerRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
+import { OffsetPathsRow } from './OffsetPathsRow';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
 import { SelectedReliefProperties } from './SelectedReliefProperties';
 
@@ -38,6 +39,7 @@ export function CutsLayersPanel(): JSX.Element {
       <CncSetupPanel />
       <AddLayerControls />
       <SelectedObjectProperties />
+      <OffsetPathsRow />
       <SelectedReliefProperties />
       {hasSelection ? (
         <>

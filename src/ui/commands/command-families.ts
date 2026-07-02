@@ -3,6 +3,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { registrationJigCommand } from './registration-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
+import { vectorBooleanCommands } from './vector-boolean-commands';
 
 export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
@@ -93,6 +94,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     ),
     convertToPathCommand(ctx),
     weldCommand(ctx),
+    ...vectorBooleanCommands(ctx),
     ctx.hasFillableSelection
       ? enabled(
           'tools.fill-selection',
