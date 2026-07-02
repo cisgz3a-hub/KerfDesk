@@ -34,6 +34,12 @@ import {
 import { reliefParamActions, type ReliefParamPatch } from './relief-param-actions';
 import { externalGcodeActions, type ExternalGcodePreview } from './external-gcode-actions';
 import {
+  CNC_LIBRARY_STATE_DEFAULTS,
+  cncLibraryActions,
+  type CncLibraryActions,
+} from './cnc-library-actions';
+import type { CncLibrary } from './cnc-library-persistence';
+import {
   layerActions,
   type LayerSettingsClipboard,
   type LayerSubLayerPatch,
@@ -135,6 +141,7 @@ export type AppState = ObjectPropertiesActions &
   ReturnType<typeof currentSavedLibrariesState> &
   SavedLibrariesActions &
   MaterialPresetActions &
+  CncLibraryActions &
   MachineActions & {
     readonly project: Project;
     // Last CNC machine setup, kept when toggling back to laser so the
@@ -150,6 +157,9 @@ export type AppState = ObjectPropertiesActions &
     // operates on the primary selection. Move + Delete are multi-aware.
     readonly additionalSelectedIds: ReadonlySet<string>;
     readonly previewMode: boolean;
+    // App-level CNC library (H.7): custom bits, feed presets, machine
+    // profiles. Restored/persisted by use-cnc-library-persistence.
+    readonly cncLibrary: CncLibrary;
     // External .nc program shown in the simulator instead of the compiled
     // job (H.6b); cleared when Preview exits. Session-only, never persisted.
     readonly externalGcodePreview: ExternalGcodePreview | null;
@@ -298,6 +308,7 @@ function initialState(): Pick<
   | 'selectedPathNodes'
   | 'additionalSelectedIds'
   | 'previewMode'
+  | 'cncLibrary'
   | 'externalGcodePreview'
   | 'undoStack'
   | 'redoStack'
@@ -323,6 +334,7 @@ function initialState(): Pick<
     selectedPathNodes: [],
     additionalSelectedIds: new Set(),
     previewMode: false,
+    ...CNC_LIBRARY_STATE_DEFAULTS,
     externalGcodePreview: null,
     undoStack: [],
     redoStack: [],
@@ -349,6 +361,12 @@ function currentLayerDefaultsState(
   return { layerDefaults: state.layerDefaults };
 }
 
+// The CNC library is app-level (H.7) — like the material library, it must
+// survive New Project / Open.
+function currentCncLibraryState(state: Pick<AppState, 'cncLibrary'>): Pick<AppState, 'cncLibrary'> {
+  return { cncLibrary: state.cncLibrary };
+}
+
 function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'> {
   return {
     setProject: (project) =>
@@ -358,6 +376,7 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
         ...currentMaterialLibraryState(s),
         ...currentSavedLibrariesState(s),
         ...currentLayerDefaultsState(s),
+        ...currentCncLibraryState(s),
       })),
     newProject: () =>
       set((s) => ({
@@ -365,6 +384,7 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
         ...currentMaterialLibraryState(s),
         ...currentSavedLibrariesState(s),
         ...currentLayerDefaultsState(s),
+        ...currentCncLibraryState(s),
       })),
   };
 }
@@ -389,6 +409,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...rasterAdjustmentActions(set),
   ...reliefParamActions(set),
   ...externalGcodeActions(set),
+  ...cncLibraryActions(set),
   ...layerActions(set),
   ...machineActions(set),
   ...fillSelectionActions(set),

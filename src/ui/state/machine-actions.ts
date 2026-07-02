@@ -12,9 +12,11 @@ import {
   type CncMachineConfig,
   type CncMachineParams,
   type CncStock,
+  type CncTool,
   type MachineKind,
   type Project,
 } from '../../core/scene';
+import type { CncLibrary } from './cnc-library-persistence';
 import { pushUndo } from './scene-mutations';
 
 type MachineState = {
@@ -23,12 +25,16 @@ type MachineState = {
   readonly redoStack: ReadonlyArray<Project>;
   readonly dirty: boolean;
   readonly cachedCncMachine: CncMachineConfig | null;
+  // App-level custom bits (H.7) merge into every CNC session's tool list.
+  readonly cncLibrary: CncLibrary;
 };
 
 type MachineSet = (fn: (state: MachineState) => Partial<MachineState>) => void;
 
 export type CncMachinePatch = {
   readonly toolId?: string;
+  // Whole-list replacement (H.7 tool manager add/remove).
+  readonly tools?: ReadonlyArray<CncTool>;
   readonly stock?: Partial<CncStock>;
   readonly params?: Partial<CncMachineParams>;
 };
@@ -37,6 +43,19 @@ export type MachineActions = {
   readonly setMachineKind: (kind: MachineKind) => void;
   readonly updateCncMachine: (patch: CncMachinePatch) => void;
 };
+
+// Library bits the session's tool list doesn't already carry are appended
+// (id-keyed), so a saved custom bit is selectable in every CNC project.
+function withCustomTools(
+  machine: CncMachineConfig,
+  customTools: ReadonlyArray<CncTool>,
+): CncMachineConfig {
+  const missing = customTools.filter(
+    (tool) => !machine.tools.some((existing) => existing.id === tool.id),
+  );
+  if (missing.length === 0) return machine;
+  return { ...machine, tools: [...machine.tools, ...missing] };
+}
 
 export function machineActions(set: MachineSet): MachineActions {
   return {
@@ -48,7 +67,10 @@ export function machineActions(set: MachineSet): MachineActions {
         const machine =
           kind === 'laser'
             ? LASER_MACHINE_CONFIG
-            : (state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG);
+            : withCustomTools(
+                state.cachedCncMachine ?? DEFAULT_CNC_MACHINE_CONFIG,
+                state.cncLibrary.customTools,
+              );
         return {
           project: { ...state.project, machine },
           cachedCncMachine: current?.kind === 'cnc' ? current : state.cachedCncMachine,
@@ -64,6 +86,7 @@ export function machineActions(set: MachineSet): MachineActions {
         const machine: CncMachineConfig = {
           ...current,
           ...(patch.toolId !== undefined ? { toolId: patch.toolId } : {}),
+          ...(patch.tools !== undefined ? { tools: patch.tools } : {}),
           stock: { ...current.stock, ...patch.stock },
           params: { ...current.params, ...patch.params },
         };

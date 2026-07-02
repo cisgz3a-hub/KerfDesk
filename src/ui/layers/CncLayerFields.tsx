@@ -14,7 +14,12 @@ import {
   type Layer,
 } from '../../core/scene';
 import { useStore } from '../state';
-import { LayerBitSelect, useLayerHasReliefObjects, VClearToolSelect } from './CncLayerToolFields';
+import {
+  FeedPresetRow,
+  LayerBitSelect,
+  useLayerHasReliefObjects,
+  VClearToolSelect,
+} from './CncLayerToolFields';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
@@ -232,6 +237,7 @@ function DepthAndFeedFields(props: {
         title="Spindle speed for this layer."
         onCommit={(spindleRpm) => onCommit({ spindleRpm })}
       />
+      <FeedPresetRow layer={layer} settings={settings} onCommit={onCommit} />
     </>
   );
 }

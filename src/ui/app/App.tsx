@@ -13,6 +13,7 @@ import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
+import { useCncLibraryPersistence } from './use-cnc-library-persistence';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
@@ -31,6 +32,7 @@ export function App(): JSX.Element {
   useAutosaveRecovery();
   useAutosave();
   useMaterialLibraryPersistence();
+  useCncLibraryPersistence();
   useLayerDefaultsPersistence();
   useGlobalErrorHandlers();
   useImportDragDrop();

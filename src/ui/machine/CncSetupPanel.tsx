@@ -5,6 +5,7 @@
 import { activeCncTool, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
+import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 
 export function CncSetupPanel(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
@@ -65,6 +66,8 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         title="Dwell after starting the spindle before the first plunge."
         onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
       />
+      <CncToolManager machine={machine} />
+      <CncMachineProfilesRow />
     </section>
   );
 }
