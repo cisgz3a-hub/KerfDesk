@@ -57,6 +57,21 @@ describe('runCncPreflight', () => {
     expect(result.issues.some((issue) => issue.code === 'cnc-settings-invalid')).toBe(true);
   });
 
+  it('flags v-carve when the active bit is not a v-bit (H.3)', () => {
+    // Default config's active tool is the 1/8 in end mill.
+    const result = runCncPreflight(projectWithCnc({ cutType: 'v-carve' }), config, GOOD_GCODE);
+    expect(result.issues.some((issue) => issue.message.includes('V-carve requires a v-bit'))).toBe(
+      true,
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it('accepts v-carve when a v-bit is active (H.3)', () => {
+    const vbitConfig = { ...config, toolId: 'vb-60' };
+    const result = runCncPreflight(projectWithCnc({ cutType: 'v-carve' }), vbitConfig, GOOD_GCODE);
+    expect(result.issues.some((issue) => issue.message.includes('V-carve requires'))).toBe(false);
+  });
+
   it('flags emitted Z below the stock floor even when settings look sane (H.1)', () => {
     // Settings say 1 mm deep, but the emitted text plunges through the
     // spoilboard — the text-level invariant catches what settings cannot.

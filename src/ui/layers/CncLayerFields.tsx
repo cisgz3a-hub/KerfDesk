@@ -5,6 +5,7 @@
 // .lf2 persistence come for free.
 
 import {
+  activeCncTool,
   CNC_CUT_TYPES,
   DEFAULT_CNC_LAYER_SETTINGS,
   cutTypeLabel,
@@ -64,10 +65,52 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
           onCommit={(stepoverPercent) => commit({ stepoverPercent })}
         />
       ) : null}
+      {settings.cutType === 'v-carve' ? (
+        <VCarveFields layer={layer} settings={settings} onCommit={commit} />
+      ) : null}
       {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
     </>
   );
 }
+
+// H.3 V-carve options: ring detail + a live warning when the spindle's
+// active bit is not a v-bit (preflight blocks output until it is).
+function VCarveFields(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element {
+  const activeToolIsVBit = useStore(
+    (s) => s.project.machine?.kind === 'cnc' && activeCncTool(s.project.machine).kind === 'v-bit',
+  );
+  return (
+    <>
+      <NumberField
+        layer={props.layer}
+        label="Detail"
+        unit="mm"
+        value={props.settings.vResolutionMm}
+        min={0}
+        max={5}
+        step={0.05}
+        title="V-carve ring spacing. 0 = automatic (bit diameter ÷ 8). Smaller = crisper walls, longer job."
+        onCommit={(vResolutionMm) => props.onCommit({ vResolutionMm })}
+      />
+      {!activeToolIsVBit ? (
+        <div style={vbitWarningStyle} role="alert">
+          V-carve needs a v-bit — pick one in Material &amp; Bit. Preflight blocks output until
+          then.
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+const vbitWarningStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-danger)',
+  padding: '2px 0 2px 4px',
+};
 
 function DepthAndFeedFields(props: {
   readonly layer: Layer;

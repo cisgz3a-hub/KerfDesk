@@ -35,6 +35,7 @@ import { passNeedsTabs, splitPassForTabs } from './cnc-tabs';
 import { zPassDepths } from './depth-passes';
 import { pocketToolpathRings } from './pocket-paths';
 import { profileToolpathPolylines } from './profile-paths';
+import { vcarvePasses } from './vcarve-ladder';
 
 const COORD_EPS = 1e-9;
 const MIN_FEED_MM_PER_MIN = 1;
@@ -115,13 +116,7 @@ function cncGroupForLayer(
   config: CncMachineConfig,
 ): CncGroup | null {
   const tool = activeCncTool(config);
-  const toolpaths = xyToolpathsForCutType(polylines, settings, tool.diameterMm);
-  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
-  if (toolpaths.length === 0 || depths.length === 0) return null;
-  const passes =
-    settings.cutType === 'pocket'
-      ? depthMajorPasses(toolpaths, depths)
-      : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm);
+  const passes = passesForLayer(polylines, settings, tool);
   if (passes.length === 0) return null;
   return {
     kind: 'cnc',
@@ -136,6 +131,29 @@ function cncGroupForLayer(
     safeZMm: Math.max(0, config.params.safeZMm),
     passes,
   };
+}
+
+function passesForLayer(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  tool: ReturnType<typeof activeCncTool>,
+): ReadonlyArray<CncPass> {
+  // V-carve computes per-ring depths itself (H.3) — it does not fit the
+  // "XY toolpaths × uniform depth ladder" shape of the other cut types.
+  if (settings.cutType === 'v-carve') {
+    return vcarvePasses(polylines, {
+      tool,
+      maxDepthMm: settings.depthMm,
+      depthPerPassMm: settings.depthPerPassMm,
+      resolutionMm: settings.vResolutionMm,
+    });
+  }
+  const toolpaths = xyToolpathsForCutType(polylines, settings, tool.diameterMm);
+  const depths = zPassDepths(settings.depthMm, settings.depthPerPassMm);
+  if (toolpaths.length === 0 || depths.length === 0) return [];
+  return settings.cutType === 'pocket'
+    ? depthMajorPasses(toolpaths, depths)
+    : contourMajorPasses(toolpaths, depths, settings, tool.diameterMm);
 }
 
 function xyToolpathsForCutType(
@@ -154,6 +172,9 @@ function xyToolpathsForCutType(
       return pocketToolpathRings(polylines, toolDiameterMm, settings.stepoverPercent);
     case 'engrave':
       return polylines.filter((polyline) => polyline.points.length >= 2);
+    case 'v-carve':
+      // Handled by the vcarvePasses branch upstream — unreachable here.
+      return [];
     default:
       return assertNever(settings.cutType, 'CncCutType');
   }

@@ -23,7 +23,7 @@ import {
   type MotionBoundsOffset,
 } from '../invariants';
 import type { CncMachineConfig, Layer, Project } from '../scene';
-import { DEFAULT_CNC_LAYER_SETTINGS, type CncLayerSettings } from '../scene';
+import { activeCncTool, DEFAULT_CNC_LAYER_SETTINGS, type CncLayerSettings } from '../scene';
 import { findNoGoZoneCollisions } from './no-go-zone-preflight';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
@@ -103,6 +103,16 @@ function appendCncLayerIssues(
         `Layer ${layer.id}: cut depth ${settings.depthMm} mm exceeds stock thickness ` +
         `${config.stock.thicknessMm} mm by more than ${THROUGH_CUT_ALLOWANCE_MM} mm. ` +
         'Reduce the depth or correct the material thickness.',
+    });
+  }
+  // H.3: v-carve depth math is driven by the bit's tip angle — a flat end
+  // mill would gouge full-width trenches at the commanded depths.
+  if (settings.cutType === 'v-carve' && activeCncTool(config).kind !== 'v-bit') {
+    issues.push({
+      code: 'cnc-settings-invalid',
+      message:
+        `Layer ${layer.id}: V-carve requires a v-bit in the spindle; the active bit ` +
+        `("${activeCncTool(config).name}") is not one. Pick a v-bit in Material & Bit.`,
     });
   }
 }
