@@ -66,6 +66,7 @@ export {
 } from './streamer';
 
 export type { CornerProbeParams, ProbeCorner, ZProbeParams } from './probe';
+export { buildResumeProgram, type ResumeOptions, type ResumeProgramResult } from './resume-program';
 export {
   buildCornerProbeLines,
   buildZProbeLines,
