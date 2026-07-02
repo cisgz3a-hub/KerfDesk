@@ -8,7 +8,22 @@ import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-st
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
-export type ControllerKind = 'grbl-v1.1';
+// Firmware families the app can drive (ADR-094). Each kind maps to a
+// ControllerDriver in core/controllers; grblHAL and FluidNC share the GRBL
+// protocol machinery with capability/code-table deltas.
+export type ControllerKind = 'grbl-v1.1' | 'grblhal' | 'fluidnc';
+
+/** Single source of truth for validators (catalog, .lfmachine shape, .lf2
+ *  normalize). Grows in lockstep with the ControllerKind union. */
+export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
+  'grbl-v1.1',
+  'grblhal',
+  'fluidnc',
+];
+
+export function isKnownControllerKind(value: unknown): value is ControllerKind {
+  return (KNOWN_CONTROLLER_KINDS as ReadonlyArray<unknown>).includes(value);
+}
 export type LaserFocusMode = 'fixed-lever' | 'manual' | 'unknown';
 export type LaserAirAssistHardware = 'built-in' | 'manual' | 'none' | 'unknown';
 export type MachineProfileSource = 'built-in' | 'custom' | 'imported' | 'lightburn';

@@ -123,6 +123,9 @@ export type LaserState = {
    * panel renders identically to the pre-driver app.
    */
   readonly capabilities: ControllerCapabilities;
+  /** Firmware family detected from the welcome banner, null until seen. May
+   *  disagree with the profile-selected driver (advisory — see line handler). */
+  readonly detectedControllerKind: ControllerKind | null;
 
   readonly connect: (adapter: PlatformAdapter, options?: ConnectControllerOptions) => Promise<void>;
   readonly disconnect: () => Promise<void>;

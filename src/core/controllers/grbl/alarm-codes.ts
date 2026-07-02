@@ -7,7 +7,7 @@
 // UI surfaces these messages on the F-B9 modal. F-A10 preflight does not
 // reference these (it runs before any streaming).
 
-export type AlarmCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type AlarmCode = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 
 export type AlarmDescription = {
   readonly code: AlarmCode;
@@ -87,6 +87,29 @@ export const ALARM_CODES: ReadonlyArray<AlarmDescription> = [
     detail: 'The hardware E-stop is active.',
     positionLost: true,
     action: 'Release the E-stop, soft-reset, then $X to unlock.',
+  },
+  // 11–13 are grblHAL extensions (grblHAL core alarms.h); vanilla GRBL v1.1
+  // never emits them. Unknown higher codes degrade to "Alarm N: unknown".
+  {
+    code: 11,
+    title: 'Homing required (grblHAL)',
+    detail: 'The controller requires a homing cycle before motion is allowed.',
+    positionLost: true,
+    action: 'Run the homing cycle ($H).',
+  },
+  {
+    code: 12,
+    title: 'Limit switch engaged (grblHAL)',
+    detail: 'A limit switch is active while the machine is trying to move.',
+    positionLost: true,
+    action: 'Move the head off the switch, then re-home ($H).',
+  },
+  {
+    code: 13,
+    title: 'Probe protection triggered (grblHAL)',
+    detail: 'The probe protection input tripped during motion.',
+    positionLost: false,
+    action: 'Check the probe wiring, soft-reset, then $X to unlock.',
   },
 ];
 

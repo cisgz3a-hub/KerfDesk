@@ -11,6 +11,8 @@ import {
   type CreateGrblSimulatorOptions,
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
+import { grblDriver } from '../../core/controllers';
+import type { ConnectControllerOptions } from './laser-store';
 import { useLaserStore } from './laser-store';
 
 beforeEach(() => {
@@ -22,6 +24,8 @@ afterEach(async () => {
   useLaserStore.setState({ autofocusBusy: false });
   await useLaserStore.getState().disconnect();
   useLaserStore.setState({
+    capabilities: grblDriver.capabilities,
+    detectedControllerKind: null,
     connection: { kind: 'disconnected' },
     statusReport: null,
     alarmCode: null,
@@ -51,9 +55,12 @@ async function pump(ms = 10): Promise<void> {
 }
 
 /** Connect the real store to a fresh simulator and let the handshake finish. */
-async function connectSim(options: CreateGrblSimulatorOptions = {}): Promise<GrblSimulator> {
+async function connectSim(
+  options: CreateGrblSimulatorOptions = {},
+  connectOptions: ConnectControllerOptions = {},
+): Promise<GrblSimulator> {
   const sim = createGrblSimulator(options);
-  await useLaserStore.getState().connect(sim.adapter);
+  await useLaserStore.getState().connect(sim.adapter, connectOptions);
   await pump(20); // banner → $$ harvest → settings collected
   return sim;
 }
@@ -227,5 +234,59 @@ describe('laser lifecycle against the GRBL simulator', () => {
     await send;
     expect(sim.outbound()).toContain('$I\n');
     expect(useLaserStore.getState().log.some((l) => l.includes('[VER:'))).toBe(true);
+  });
+});
+
+describe('GRBL-family variants against the simulator', () => {
+  it('grblHAL: detects the banner and drives the full jog path', async () => {
+    const sim = await connectSim(
+      { firmwareBanner: "GrblHAL 1.1f ['$' or '$HELP' for help]", motionMs: 300 },
+      { controllerKind: 'grblhal' },
+    );
+    expect(useLaserStore.getState().detectedControllerKind).toBe('grblhal');
+    expect(useLaserStore.getState().capabilities.settings).toBe('grbl-dollar');
+    await pump(1100);
+    await useLaserStore.getState().jog({ dx: 5, feed: 1000 });
+    expect(sim.outbound().at(-1)).toBe('$J=G91 G21 X5.000 F1000\n');
+    await pump(800);
+    expect(useLaserStore.getState().motionOperation).toBeNull();
+  });
+
+  it('grblHAL: decodes extended alarm 11 (homing required)', async () => {
+    const sim = await connectSim(
+      { firmwareBanner: 'GrblHAL 1.1f' },
+      { controllerKind: 'grblhal' },
+    );
+    sim.triggerAlarm(11);
+    await pump(20);
+    expect(useLaserStore.getState().alarmCode).toBe(11);
+  });
+
+  it('FluidNC: detects the banner, streams, and blocks numeric $ writes', async () => {
+    const sim = await connectSim(
+      { firmwareBanner: "Grbl 3.7 [FluidNC v3.7.8 '$' for help]" },
+      { controllerKind: 'fluidnc' },
+    );
+    expect(useLaserStore.getState().detectedControllerKind).toBe('fluidnc');
+    expect(useLaserStore.getState().capabilities.settings).toBe('readonly-dump');
+    await pump(1100);
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X5 Y0 F600 S100\nM5\n');
+    await pump(3000);
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(sim.state().mpos.x).toBe(5);
+    await expect(useLaserStore.getState().writeGrblSetting(30, '1000')).rejects.toThrow(
+      /does not accept numeric \$ setting writes/i,
+    );
+    expect(sim.outbound()).not.toContain('$30=1000\n');
+  });
+
+  it('logs an advisory when the banner disagrees with the selected profile', async () => {
+    await connectSim(
+      { firmwareBanner: "Grbl 3.7 [FluidNC v3.7.8 '$' for help]" },
+      { controllerKind: 'grbl-v1.1' },
+    );
+    const s = useLaserStore.getState();
+    expect(s.detectedControllerKind).toBe('fluidnc');
+    expect(s.log.some((l) => l.includes('banner looks like fluidnc'))).toBe(true);
   });
 });
