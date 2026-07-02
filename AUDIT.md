@@ -859,7 +859,7 @@ VERIFIED.
 | H.2 simulation + stock model | **CLAIMED** | 2026-07-02: simulator ≡ emitter property (100 seeds); pocket IoU ≥ 0.98 perceptual; full suite 2627 green. Sim-vs-machine side-by-side air-cut still pending (maintainer) |
 | H.3 V-carve | **CLAIMED** | 2026-07-02: perceptual pyramid-field match (max err ≤ δ+2·cell, IoU ≥ 0.97); 100-seed properties; G-code snapshot; suite 2639 green. Air-cut + MDF caliper check (groove width = 2·depth·tan(θ/2)) pending (maintainer) |
 | H.4 STL import + heightmap + relief object | **CLAIMED** | 2026-07-02: 17 focused tests (parser corpus + round-trip property; heightmap vs analytic pyramid/ramp; .lf2 round-trip + rejection); full suite 2656 green. Not output-affecting — no air-cut applies; canvas depth-map appearance not yet visually reviewed |
-| H.5 relief roughing | pending | air-cut + foam/MDF terrace cut |
+| H.5 relief roughing | **CLAIMED** | 2026-07-02: marching-squares cases + 100-seed closed/deterministic property; no-gouge vs dilated target; depth-major ordering; compile→emit invariant-clean + G-code snapshot. Air-cut + foam/MDF terrace cut pending (maintainer) |
 | H.6 DXF / .nc import | pending | DXF air-pass + .nc re-import simulator match |
 | H.7 multi-tool / tool change / Z zeroing | pending | highest-risk hardware session; budget a full one |
 | H.8 relief finishing | pending | two-tool air job + caliper peak/valley check |
