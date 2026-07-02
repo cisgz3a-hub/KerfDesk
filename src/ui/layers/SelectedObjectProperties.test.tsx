@@ -71,6 +71,19 @@ describe('SelectedObjectProperties', () => {
     }
   });
 
+  it('renders nothing in CNC mode — every editor here is laser-only (ADR-100 §3)', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().selectObject('O1');
+    useStore.getState().setMachineKind('cnc');
+    const { host, root } = await render();
+    try {
+      expect(host.querySelector('[aria-label="Selected object properties"]')).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('edits operation settings only on the selected object', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#000000']));

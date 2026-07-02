@@ -71,6 +71,9 @@ function SetupRow(props: {
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
+  // ADR-100 §5 (provisional): auto-focus is a laser focus routine; it hides
+  // on a router. The CNC Z-zeroing flow arrives as its own H.7 surface.
+  const isCncMachine = useStore((s) => s.project.machine?.kind === 'cnc');
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const statusReport = useLaserStore((s) => s.statusReport);
   const home = useLaserStore((s) => s.home);
@@ -96,18 +99,20 @@ function SetupRow(props: {
       >
         Home
       </button>
-      <button
-        type="button"
-        onClick={onAutofocus}
-        disabled={busy || noAutofocus}
-        title={
-          noAutofocus
-            ? 'Set your machine’s autofocus command in Device settings below'
-            : 'Run the autofocus command configured in Device settings'
-        }
-      >
-        Auto-focus
-      </button>
+      {!isCncMachine && (
+        <button
+          type="button"
+          onClick={onAutofocus}
+          disabled={busy || noAutofocus}
+          title={
+            noAutofocus
+              ? 'Set your machine’s autofocus command in Device settings below'
+              : 'Run the autofocus command configured in Device settings'
+          }
+        >
+          Auto-focus
+        </button>
+      )}
       <button
         type="button"
         onClick={onFrame}

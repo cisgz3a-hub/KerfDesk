@@ -13,11 +13,17 @@ export function SelectedObjectProperties(): JSX.Element | null {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const objects = useStore((s) => s.project.scene.objects);
+  const isCncMachine = useStore((s) => s.project.machine?.kind === 'cnc');
   const selectedObjects = useMemo(
     () => selectedSceneObjects(objects, selectedObjectId, additionalSelectedIds),
     [objects, selectedObjectId, additionalSelectedIds],
   );
   if (selectedObjects.length === 0) return null;
+  // ADR-100 §3: every editor in this section (power scale, operation
+  // override, image adjustments) exists only in the laser output pipeline —
+  // the CNC compiler reads none of them. CNC object editors (relief
+  // parameters) mount their own panel.
+  if (isCncMachine) return null;
   return (
     <section aria-label="Selected object properties" style={sectionStyle}>
       <h3 style={headingStyle}>Shape Properties</h3>

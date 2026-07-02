@@ -9,7 +9,6 @@
 
 import type { DeviceProfile, Origin } from '../../core/devices';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
-import { AirAssistRow, LaserPowerRows } from './DeviceProfilePowerFields';
 
 const ORIGIN_OPTIONS: ReadonlyArray<{ readonly value: Origin; readonly label: string }> = [
   { value: 'front-left', label: 'Front left' },
@@ -179,9 +178,11 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
   );
 }
 
-// The inline Device Profile panel's core fields in one block. Composed from the
-// granular rows (plus the power/air-assist rows) so the wizard can reuse them
-// piecemeal while this keeps rendering the same controls in the same order.
+// The inline Device Profile panel's machine-agnostic fields in one block,
+// composed from the granular rows so the wizard can reuse them piecemeal.
+// The laser-only power/air-assist rows moved to DeviceSettings, which gates
+// them on the machine kind (ADR-100 §6) — the wizard steps already mount
+// LaserPowerRows / AirAssistRow directly.
 export function BasicRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
@@ -190,8 +191,6 @@ export function BasicRows(props: DeviceRowsProps): JSX.Element {
       <BedRows device={device} update={update} />
       <OriginCornerRow device={device} update={update} />
       <FeedRows device={device} update={update} />
-      <LaserPowerRows device={device} update={update} />
-      <AirAssistRow device={device} update={update} />
     </>
   );
 }

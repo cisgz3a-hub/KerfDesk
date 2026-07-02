@@ -208,6 +208,28 @@ describe('DeviceSettings air assist command', () => {
   });
 });
 
+describe('DeviceSettings in CNC mode (ADR-100 §6)', () => {
+  it('hides the laser-only fields but keeps the machine-agnostic ones', async () => {
+    useStore.getState().setMachineKind('cnc');
+    const { host, unmount } = await renderDeviceSettings();
+    try {
+      const details = host.querySelector('details');
+      if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
+      details.open = true;
+
+      expect(host.querySelector('select[aria-label="Air assist command"]')).toBeNull();
+      expect(host.querySelector('input[aria-label="GRBL $30 max power S"]')).toBeNull();
+      expect(host.textContent).not.toContain('Scan offset');
+      expect(host.textContent).not.toContain('Auto-focus command');
+
+      expect(host.querySelector('input[aria-label="Z travel (mm)"]')).not.toBeNull();
+      expect(host.querySelector('input[aria-label="Powered Z jog enabled"]')).not.toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+});
+
 describe('DeviceSettings scan offsets', () => {
   it('lets the operator edit calibrated scan-offset points on the device profile', async () => {
     const { host, unmount } = await renderDeviceSettings();
