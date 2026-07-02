@@ -1,0 +1,138 @@
+// Junction pairing and gap bridging. At every junction the incident chain
+// ends are paired by STRAIGHTEST CONTINUATION (angle closest to a through-
+// line), so an X crossing becomes two long strokes instead of four stubs;
+// afterwards any two loose open ends closer than the join gap are bridged.
+
+import type { Vec2 } from '../../scene';
+import { pointAtArcDistance } from './polyline-window';
+import type { StrokeGraph } from './stroke-graph';
+
+/** A chain being assembled: mutable point list + liveness. */
+export type Chain = {
+  points: Vec2[];
+  closed: boolean;
+  alive: boolean;
+};
+
+const MIN_THROUGH_ANGLE_RAD = (110 * Math.PI) / 180;
+const TANGENT_PROBE_PX = 3;
+const POINT_MATCH_EPS = 1e-6;
+
+type ChainEnd = { readonly chain: Chain; readonly atStart: boolean };
+
+export function pairThroughJunctions(chains: Chain[], graph: StrokeGraph): void {
+  for (const node of graph.nodes) {
+    if (node.kind !== 'junction') continue;
+    let ends = endsAtPoint(chains, node.pos);
+    while (ends.length >= 2) {
+      const pair = straightestPair(ends);
+      if (pair === null) break;
+      mergeEnds(pair[0], pair[1]);
+      ends = endsAtPoint(chains, node.pos);
+    }
+  }
+}
+
+export function bridgeNearbyEnds(chains: Chain[], joinGapPx: number): void {
+  if (joinGapPx <= 0) return;
+  for (;;) {
+    const pair = nearestBridgeableEnds(chains, joinGapPx);
+    if (pair === null) return;
+    mergeEnds(pair[0], pair[1]);
+  }
+}
+
+function endsAtPoint(chains: ReadonlyArray<Chain>, pos: Vec2): ChainEnd[] {
+  const ends: ChainEnd[] = [];
+  for (const chain of chains) {
+    if (!chain.alive || chain.closed) continue;
+    const first = chain.points[0];
+    const last = chain.points.at(-1);
+    if (first !== undefined && samePoint(first, pos)) ends.push({ chain, atStart: true });
+    if (last !== undefined && samePoint(last, pos)) ends.push({ chain, atStart: false });
+  }
+  return ends;
+}
+
+function samePoint(a: Vec2, b: Vec2): boolean {
+  return Math.abs(a.x - b.x) < POINT_MATCH_EPS && Math.abs(a.y - b.y) < POINT_MATCH_EPS;
+}
+
+function straightestPair(ends: ReadonlyArray<ChainEnd>): readonly [ChainEnd, ChainEnd] | null {
+  let best: readonly [ChainEnd, ChainEnd] | null = null;
+  let bestAngle = MIN_THROUGH_ANGLE_RAD;
+  for (let i = 0; i < ends.length; i += 1) {
+    for (let j = i + 1; j < ends.length; j += 1) {
+      const a = ends[i];
+      const b = ends[j];
+      if (a === undefined || b === undefined || a.chain === b.chain) continue;
+      const angle = angleBetween(outgoingTangent(a), outgoingTangent(b));
+      if (angle > bestAngle) {
+        bestAngle = angle;
+        best = [a, b];
+      }
+    }
+  }
+  return best;
+}
+
+// Tangent pointing AWAY from the junction into the chain.
+function outgoingTangent(end: ChainEnd): Vec2 {
+  const pts = end.chain.points;
+  const anchor = end.atStart ? pts[0] : pts.at(-1);
+  const probe = pointAtArcDistance(pts, end.atStart, TANGENT_PROBE_PX);
+  if (anchor === undefined || probe === undefined) return { x: 1, y: 0 };
+  const dx = probe.x - anchor.x;
+  const dy = probe.y - anchor.y;
+  const len = Math.hypot(dx, dy);
+  return len < 1e-9 ? { x: 1, y: 0 } : { x: dx / len, y: dy / len };
+}
+
+// Angle between two outgoing tangents; π means a perfect through-line.
+function angleBetween(a: Vec2, b: Vec2): number {
+  const dot = Math.max(-1, Math.min(1, a.x * b.x + a.y * b.y));
+  return Math.acos(dot);
+}
+
+function mergeEnds(a: ChainEnd, b: ChainEnd): void {
+  // Orient chain A to END at the junction and chain B to START at it.
+  if (a.atStart) a.chain.points.reverse();
+  if (!b.atStart) b.chain.points.reverse();
+  a.chain.points.push(...b.chain.points.slice(1));
+  b.chain.alive = false;
+  b.chain.points = [];
+}
+
+function nearestBridgeableEnds(
+  chains: ReadonlyArray<Chain>,
+  joinGapPx: number,
+): readonly [ChainEnd, ChainEnd] | null {
+  const ends: ChainEnd[] = [];
+  for (const chain of chains) {
+    if (!chain.alive || chain.closed || chain.points.length < 2) continue;
+    ends.push({ chain, atStart: true }, { chain, atStart: false });
+  }
+  let best: readonly [ChainEnd, ChainEnd] | null = null;
+  let bestDist = joinGapPx;
+  for (let i = 0; i < ends.length; i += 1) {
+    for (let j = i + 1; j < ends.length; j += 1) {
+      const a = ends[i];
+      const b = ends[j];
+      if (a === undefined || b === undefined) continue;
+      const d = endGap(a, b);
+      if (d !== null && d < bestDist) {
+        bestDist = d;
+        best = [a, b];
+      }
+    }
+  }
+  return best;
+}
+
+function endGap(a: ChainEnd, b: ChainEnd): number | null {
+  if (a.chain === b.chain) return null;
+  const pa = a.atStart ? a.chain.points[0] : a.chain.points.at(-1);
+  const pb = b.atStart ? b.chain.points[0] : b.chain.points.at(-1);
+  if (pa === undefined || pb === undefined) return null;
+  return Math.hypot(pb.x - pa.x, pb.y - pa.y);
+}

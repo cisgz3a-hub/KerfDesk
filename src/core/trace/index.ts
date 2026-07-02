@@ -29,7 +29,7 @@ export {
   tracedataToColoredPaths,
 } from './trace-to-paths';
 export { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
-export { traceImageToCenterlinePaths } from './centerline-trace';
+export { traceCenterlineStrokePaths } from './centerline';
 export { coloredPathsToSvg } from './paths-to-svg';
 export type { BatchTraceDependencies, BatchTraceImageJob, BatchTraceSvgFile } from './batch-trace';
 export { traceImagesToSvgFiles } from './batch-trace';

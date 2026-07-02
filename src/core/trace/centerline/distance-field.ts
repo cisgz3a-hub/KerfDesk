@@ -44,12 +44,22 @@ export function squaredDistanceField(mask: InkMask): Float64Array {
   return distSq;
 }
 
+type Envelope = {
+  readonly v: Int32Array; // parabola roots
+  readonly z: Float64Array; // envelope boundaries
+  readonly k: number; // last envelope index
+};
+
 // 1D squared-distance transform via the lower envelope of parabolas
 // rooted at (i, f[i]).
 function distanceTransform1d(f: Float64Array, n: number): Float64Array {
-  const d = new Float64Array(n);
-  const v = new Int32Array(n); // parabola roots
-  const z = new Float64Array(n + 1); // envelope boundaries
+  const envelope = buildLowerEnvelope(f, n);
+  return sampleEnvelope(f, n, envelope);
+}
+
+function buildLowerEnvelope(f: Float64Array, n: number): Envelope {
+  const v = new Int32Array(n);
+  const z = new Float64Array(n + 1);
   let k = 0;
   v[0] = 0;
   z[0] = -Infinity;
@@ -69,7 +79,13 @@ function distanceTransform1d(f: Float64Array, n: number): Float64Array {
     z[k] = s;
     z[k + 1] = Infinity;
   }
-  k = 0;
+  return { v, z, k };
+}
+
+function sampleEnvelope(f: Float64Array, n: number, envelope: Envelope): Float64Array {
+  const { v, z } = envelope;
+  const d = new Float64Array(n);
+  let k = 0;
   for (let q = 0; q < n; q += 1) {
     while ((z[k + 1] ?? Infinity) < q) k += 1;
     const root = v[k] ?? 0;
