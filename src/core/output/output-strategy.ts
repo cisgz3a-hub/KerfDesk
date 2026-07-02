@@ -1,6 +1,7 @@
 // OutputStrategy — the abstraction over controller dialects (ADR-006).
-// Phase A ships only GRBL; the interface is here so Phase G's Marlin/etc. can
-// land as additional implementations without touching JobCompiler.
+// Phase A ships only GRBL; the interface is here so Phase H's Marlin/etc. can
+// land as additional implementations without touching JobCompiler. (Drawing
+// tools took the Phase G slot — see PROJECT.md "Anything past Phase F".)
 
 import type { DeviceProfile } from '../devices';
 import type { Job } from '../job';
