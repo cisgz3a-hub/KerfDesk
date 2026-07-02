@@ -110,11 +110,43 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 - Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
 - OUT of this phase (still out of scope; a future phase + ADR + an ADR-017 polygon-clipping library evaluation): the geometry KERNEL — weld, boolean ops, offset, node editing.
 
+### Phase H — v0.8 "Multi-controller" [Built on branch `claude/angry-mcnulty-bc6bfe`; awaiting merge + hardware passes]
+
+Every controller family drives the whole app through the ControllerDriver seam
+(ADR-094): connect → identify → jog/frame → run/pause/resume/stop → recover, with
+output, streaming, console, settings, and UI capability-gated per firmware.
+Verified end-to-end against scripted firmware simulators
+(`src/__fixtures__/controllers/`) driving the REAL laser-store.
+
+- **H.1 — Driver seam** (ADR-094): `src/core/controllers/` ControllerDriver +
+  ControllerEvent + ControllerCapabilities; GRBL byte-identical (snapshots + sim
+  transcripts); per-profile `baudRate`; controller detection from welcome banners
+  (advisory).
+- **H.2 — grblHAL + FluidNC**: capability deltas on the GRBL driver (FluidNC:
+  settings read-only); extended grblHAL alarm codes 11–13. grblHAL is
+  hardware-verifiable on the Falcon A1 Pro (not yet burned this phase).
+- **H.3 — Marlin** (ADR-095): queued M114 status, stream-side pause, G28 X Y,
+  M400 settle, marlin-inline / marlin-fan dialects (M106/M107 transform).
+  Simulator-verified only.
+- **H.4 — Smoothieware** (ADR-096): realtime ?/!/~ kept, M999 halt recovery,
+  fractional S power (S0.500 at the 0–1.0 default scale). Simulator-verified only.
+- **H.5 — Ruida** (ADR-097): EXPERIMENTAL `.rd` export (encode→decode round-trip
+  proven; NOT accepted by real hardware yet); `transport: 'file-only'` — no live
+  link; pure UDP session state machine as groundwork.
+
+**Hardware truth table:** GRBL v1.1 + grblHAL = verifiable on the Falcon A1 Pro;
+FluidNC / Marlin / Smoothieware / Ruida = simulator-verified only, labeled
+`unverified` in catalog evidence and (for .rd) warned on every export.
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
 
-- Phase H: additional `OutputStrategy` implementations (Marlin et al). MIT references available (CNCjs has working Marlin/Smoothie code) — but ADR-006 still says one strategy ships per phase. (Renumbered from Phase G; drawing tools took that slot — ADR-051.)
+- ~~Phase H: additional `OutputStrategy` implementations (Marlin et al).~~ **Built —
+  see Phase H above (ADR-094..097).** Remaining follow-ups: hardware passes (Falcon
+  grblHAL burn; community Marlin/Smoothie/FluidNC verification), Ruida
+  real-controller validation then the Electron UDP transport, wizard
+  controller-family step polish. Trocen/TopWisdom/galvo stay out of scope.
 - Phase I: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP.
 
 **MIT-availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the policy.
