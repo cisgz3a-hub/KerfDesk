@@ -12,7 +12,11 @@ import {
 import type { JobOriginPlacement } from '../../core/job';
 import { cncGrblStrategy, grblStrategy } from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
-import { gcodeMetadataHeader, type GcodeMetadata } from './gcode-metadata';
+import {
+  gcodeMetadataHeader,
+  type GcodeHeaderAssumptions,
+  type GcodeMetadata,
+} from './gcode-metadata';
 import { prepareOutput } from './prepare-output';
 
 export type EmitGcodeResult = {
@@ -64,7 +68,17 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
           coordinateMode,
         });
   const gcode = options.metadata
-    ? gcodeMetadataHeader(options.metadata, { maxPowerS: prepared.project.device.maxPowerS }) + body
+    ? gcodeMetadataHeader(options.metadata, headerAssumptionsFor(prepared.project)) + body
     : body;
   return { gcode, preflight };
+}
+
+// The provenance header's assumption lines are machine-specific (ADR-102
+// defect fix): laser files record the $30 S-scale; router files record the
+// RPM mapping and $32=0.
+function headerAssumptionsFor(project: Project): GcodeHeaderAssumptions {
+  const machine = project.machine;
+  return machine !== undefined && machine.kind === 'cnc'
+    ? { kind: 'cnc', spindleMaxRpm: machine.params.spindleMaxRpm }
+    : { kind: 'laser', maxPowerS: project.device.maxPowerS };
 }
