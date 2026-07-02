@@ -17,7 +17,14 @@ const MATCH_EPS = 1e-6;
 // their junction point has drifted off the exact centroid — match the
 // nearest chain point within this reach instead of exact equality.
 const MATCH_REACH_PX = 2.5;
-const MIN_SEAM_RADIUS_PX = 2;
+const MIN_SEAM_RADIUS_PX = 1.25;
+// Seam stitching exists to FLATTEN A DENT: the window it removes must
+// already hug the replacement chord. If the removed span wanders further
+// than this from the chord, the "seam" is real geometry (a blob-interior
+// squiggle from binarized shading) and stitching would slash a straight
+// chord across the drawing. Scale-free: fat drawn strokes pass (their T
+// dents are ~1-2 px), blobs of any radius fail.
+const MAX_STITCH_SAG_PX = 1.75;
 const WELD_REACH_PX = 4;
 // Stitch only seams the stroke passes STRAIGHT through (a T or X). A harder
 // turn is a drawn bend — a fork elbow or corner — that belongs to the path
@@ -96,8 +103,32 @@ function stitchOpen(pts: ReadonlyArray<Vec2>, idx: number, radius: number): Vec2
   if (junction === undefined || headEnd === undefined || tailStart === undefined) return [...pts];
   if (head.length < 2 || tail.length < 2) return [...pts]; // junction too near an end
   if (seamTurn(head, tail) > MAX_STITCH_TURN_RAD) return [...pts]; // drawn corner
+  if (!removedSpanHugsChord(pts, head.length - 1, pts.length - tail.length, headEnd, tailStart)) {
+    return [...pts]; // real geometry, not a dent — never fabricate a shortcut
+  }
   const seat = projectOntoSegment(junction, headEnd, tailStart);
   return [...head, seat, ...tail];
+}
+
+function removedSpanHugsChord(
+  pts: ReadonlyArray<Vec2>,
+  from: number,
+  to: number,
+  chordA: Vec2,
+  chordB: Vec2,
+): boolean {
+  for (let k = Math.max(0, from); k <= Math.min(pts.length - 1, to); k += 1) {
+    const p = pts[k];
+    if (p === undefined) continue;
+    const d = distanceToSegment(p, chordA, chordB);
+    if (d > MAX_STITCH_SAG_PX) return false;
+  }
+  return true;
+}
+
+function distanceToSegment(p: Vec2, a: Vec2, b: Vec2): number {
+  const foot = projectOntoSegment(p, a, b);
+  return Math.hypot(p.x - foot.x, p.y - foot.y);
 }
 
 // Turn between the head's exit tangent and the tail's entry tangent, each

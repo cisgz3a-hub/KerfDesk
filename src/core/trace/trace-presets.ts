@@ -81,7 +81,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // two-sided contour perimeters, roughly double).
     edgeMinLengthPx: 12,
     edgeJoinGapPx: 5,
-    edgeMedianFilter: true,
+    // undefined = AUTO median: applied only when impulse noise is detected,
+    // so clean art keeps its small features (see edge-trace.ts).
   },
   Smooth: {
     // For slightly noisy / hand-drawn line art. Median filter kills

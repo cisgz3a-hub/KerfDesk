@@ -27,6 +27,10 @@ const MAX_VERTEX_OFFSET_FACTOR = 0.65;
 // would churn (and on closed chains, never converge).
 const MIN_VERTEX_GAIN_PX = 0.35;
 const MIN_WINDOW_RADIUS_PX = 2;
+// Cap the window arm at stroke scale: inside blob-sized regions (shading
+// binarized into big blobs) the local radius is tens of pixels, and an
+// uncapped window replaces long real spans with chord pairs.
+const MAX_WINDOW_ARM_PX = 12;
 // A closed chain's window may not swallow the whole loop: cap the arm so two
 // corners of a tiny feature can't trim each other away.
 const CLOSED_ARM_LENGTH_DIVISOR = 6;
@@ -108,12 +112,58 @@ function trySharpenOpen(
   const head = trimArc(pts.slice(0, i + 1), 'tail', arm);
   const tail = trimArc(pts.slice(i), 'head', arm);
   if (head.length < 2 || tail.length < 2) return null;
+  // A drawn corner has STRAIGHT legs on both sides of the vertex; a small
+  // round bowl (letter counters, tiny loops) curves continuously through
+  // the window and must stay round — without this gate the sharpener
+  // polygonizes every curve whose radius is near its window size.
+  if (!legIsStraight(pts, i, arm, 'before') || !legIsStraight(pts, i, arm, 'after')) return null;
   const corner = bendVertex(head, tail);
   if (corner === null) return null;
   const removedFrom = head.length;
   const removedTo = pts.length - tail.length;
   if (!vertexHugsChain(corner, pts, removedFrom, removedTo, window.maxRadius)) return null;
   return { points: [...head, corner, ...tail], resumeAt: head.length + 1 };
+}
+
+// Max deviation of the leg (the window-length run leading into / out of the
+// bend) from its own chord, as a fraction of the chord length.
+const MAX_LEG_SAG_RATIO = 0.14;
+const MIN_LEG_CHORD_PX = 1.5;
+
+function legIsStraight(
+  pts: ReadonlyArray<Vec2>,
+  bendIndex: number,
+  arm: number,
+  side: 'before' | 'after',
+): boolean {
+  const leg: Vec2[] = [];
+  let cum = 0;
+  const step = side === 'before' ? -1 : 1;
+  for (let k = bendIndex + step; k > 0 && k < pts.length - 1 && cum <= arm; k += step) {
+    const a = pts[k];
+    const b = pts[k - step];
+    if (a === undefined || b === undefined) break;
+    cum += Math.hypot(a.x - b.x, a.y - b.y);
+    leg.push(a);
+  }
+  if (leg.length < 3) return true; // too short to measure curvature
+  const first = leg[0];
+  const last = leg[leg.length - 1];
+  if (first === undefined || last === undefined) return true;
+  const chord = Math.hypot(last.x - first.x, last.y - first.y);
+  if (chord < MIN_LEG_CHORD_PX) return false; // leg loops back — not a corner
+  let sag = 0;
+  for (const q of leg) sag = Math.max(sag, pointToSegment(q, first, last));
+  return sag <= chord * MAX_LEG_SAG_RATIO;
+}
+
+function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < PARALLEL_EPS) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
 // Rotate the closed chain so the candidate sits mid-array, then reuse the
@@ -165,7 +215,7 @@ function bendWindow(
       maxRadius = Math.max(maxRadius, radiusAtPosition(b, distSq, width));
     }
   }
-  return { arm: maxRadius * WINDOW_RADIUS_FACTOR, maxRadius };
+  return { arm: Math.min(maxRadius * WINDOW_RADIUS_FACTOR, MAX_WINDOW_ARM_PX), maxRadius };
 }
 
 // Intersect the head's exit tangent with the tail's entry tangent. Null for
