@@ -7,11 +7,7 @@
 // receives it as a parameter so the actions stay pure functions of their
 // inputs and trivially testable with a mock.
 
-import {
-  CMD_UNLOCK,
-  RT_JOG_CANCEL,
-  buildJogCommand,
-} from '../../core/controllers/grbl';
+import { CMD_UNLOCK, RT_JOG_CANCEL, buildJogCommand } from '../../core/controllers/grbl';
 import type { SerialConnection } from '../../platform/types';
 import { runAutofocus } from './autofocus-action';
 import { runHomeAction } from './laser-home-action';

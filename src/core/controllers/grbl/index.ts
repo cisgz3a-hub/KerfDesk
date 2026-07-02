@@ -65,6 +65,15 @@ export {
   step,
 } from './streamer';
 
+export type { CornerProbeParams, ProbeCorner, ZProbeParams } from './probe';
+export {
+  buildCornerProbeLines,
+  buildZProbeLines,
+  DEFAULT_SIDE_CLEARANCE_MM,
+  DEFAULT_SIDE_DROP_MM,
+  DEFAULT_Z_PROBE_PARAMS,
+} from './probe';
+
 export type { JogParams } from './commands';
 export {
   CMD_BUILD_INFO,

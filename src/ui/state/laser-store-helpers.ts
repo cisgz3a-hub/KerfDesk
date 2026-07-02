@@ -179,6 +179,7 @@ export function initialLaserState(): Pick<
   | 'lastWriteError'
   | 'safetyNotice'
   | 'autofocusBusy'
+  | 'probeBusy'
   | 'motionOperation'
   | 'controllerOperation'
   | 'streamer'
@@ -202,6 +203,7 @@ export function initialLaserState(): Pick<
     lastWriteError: null,
     safetyNotice: null,
     autofocusBusy: false,
+    probeBusy: false,
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
