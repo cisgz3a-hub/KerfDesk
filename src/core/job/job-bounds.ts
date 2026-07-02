@@ -7,7 +7,15 @@ import { assertNever } from '../scene';
 import type { DeviceProfile } from '../devices';
 import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
-import type { CncGroup, CutGroup, FillGroup, Group, Job, RasterGroup } from './job';
+import {
+  cncPassXyPoints,
+  type CncGroup,
+  type CutGroup,
+  type FillGroup,
+  type Group,
+  type Job,
+  type RasterGroup,
+} from './job';
 import { offsetForSpeed, shiftAlongTravel } from './scan-offset';
 
 export type JobBounds = {
@@ -72,7 +80,7 @@ function extendBoundsForGroup(
 function extendBoundsForCnc(b: MutableBounds, group: CncGroup): boolean {
   let any = false;
   for (const pass of group.passes) {
-    for (const p of pass.polyline) {
+    for (const p of cncPassXyPoints(pass)) {
       extendBoundsForPoint(b, p);
       any = true;
     }

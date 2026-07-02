@@ -1,5 +1,14 @@
 import { assertNever, type Vec2 } from '../scene';
-import type { CncGroup, CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from './job';
+import type {
+  CncGroup,
+  CncPass,
+  CutGroup,
+  CutSegment,
+  FillGroup,
+  Group,
+  Job,
+  RasterGroup,
+} from './job';
 import type { JobBounds } from './job-bounds';
 import { computeJobBounds } from './job-bounds';
 
@@ -169,11 +178,25 @@ function translateGroup(group: Group, dx: number, dy: number): Group {
 function translateCncGroup(group: CncGroup, dx: number, dy: number): CncGroup {
   return {
     ...group,
-    passes: group.passes.map((pass) => ({
-      ...pass,
-      polyline: pass.polyline.map((point) => ({ x: point.x + dx, y: point.y + dy })),
-    })),
+    passes: group.passes.map((pass) => translateCncPass(pass, dx, dy)),
   };
+}
+
+function translateCncPass(pass: CncPass, dx: number, dy: number): CncPass {
+  switch (pass.kind) {
+    case 'contour':
+      return {
+        ...pass,
+        polyline: pass.polyline.map((point) => ({ x: point.x + dx, y: point.y + dy })),
+      };
+    case 'path3d':
+      return {
+        ...pass,
+        points: pass.points.map((point) => ({ x: point.x + dx, y: point.y + dy, z: point.z })),
+      };
+    default:
+      return assertNever(pass, 'CncPass');
+  }
 }
 
 function translateCutGroup(group: CutGroup, dx: number, dy: number): CutGroup {

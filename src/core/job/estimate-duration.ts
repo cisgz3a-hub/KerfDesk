@@ -23,7 +23,16 @@
 // Pure-core compliant: no clock reads, no Math.random, no I/O.
 
 import type { DeviceProfile } from '../devices';
-import type { CncGroup, CutGroup, FillGroup, FillSegment, Job, RasterGroup } from './job';
+import {
+  cncPassEntryDepthMm,
+  cncPassXyPoints,
+  type CncGroup,
+  type CutGroup,
+  type FillGroup,
+  type FillSegment,
+  type Job,
+  type RasterGroup,
+} from './job';
 import { estimateWithPlanner } from './planner';
 
 export type JobDurationEstimate = {
@@ -73,7 +82,12 @@ function cncAsCutGroup(group: CncGroup): CutGroup {
     speed: group.feedMmPerMin,
     passes: 1,
     airAssist: false,
-    segments: group.passes.map((pass) => ({ polyline: pass.polyline, closed: pass.closed })),
+    // path3d passes project to XY here; their Z travel is approximated by the
+    // plunge term below (exact 3D length arrives with the H.2 simulator).
+    segments: group.passes.map((pass) => ({
+      polyline: cncPassXyPoints(pass),
+      closed: pass.closed,
+    })),
   };
 }
 
@@ -86,7 +100,7 @@ function cncPlungeSeconds(job: Job, device: DeviceProfile): number {
     const plungeFeed = Math.max(1, group.plungeMmPerMin);
     const retractFeed = Math.max(1, device.maxFeed);
     for (const pass of group.passes) {
-      const travelZMm = group.safeZMm + Math.abs(pass.zMm);
+      const travelZMm = group.safeZMm + Math.abs(cncPassEntryDepthMm(pass));
       seconds += (travelZMm / plungeFeed) * SECONDS_PER_MINUTE;
       seconds += (travelZMm / retractFeed) * SECONDS_PER_MINUTE;
     }

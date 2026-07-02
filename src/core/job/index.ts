@@ -1,6 +1,8 @@
 export type {
+  CncContourPass,
   CncGroup,
   CncPass,
+  CncPath3dPass,
   CutGroup,
   CutSegment,
   FillGroup,
@@ -9,7 +11,7 @@ export type {
   Job,
   RasterGroup,
 } from './job';
-export { EMPTY_JOB } from './job';
+export { cncPassEntryDepthMm, cncPassXyPoints, EMPTY_JOB } from './job';
 export { compileJob } from './compile-job';
 export { DEFAULT_OVERSCAN_MM } from './compile-job-defaults';
 export type { JobBounds } from './job-bounds';

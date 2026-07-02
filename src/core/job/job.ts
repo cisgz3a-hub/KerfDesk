@@ -9,7 +9,8 @@
 // Consumers that only operate on vectors (optimizer, planner, estimator's
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
-import type { CncCutType, LayerFillStyle, Vec2 } from '../scene';
+import { assertNever, type CncCutType, type LayerFillStyle, type Vec2 } from '../scene';
+import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
 
 export type CutSegment = {
@@ -74,15 +75,56 @@ export type RasterGroup = {
   readonly bidirectional?: boolean;
 };
 
-// CNC (router/mill) group. One XY polyline at one Z depth per pass; passes are
-// pre-expanded by core/cnc/compile-cnc-job.ts (depth ramping, tab splitting,
-// pocket rings) so the emitter is a dumb, safe motion printer: retract to
-// safeZMm → rapid XY → plunge to zMm at plungeMmPerMin → feed the polyline.
-export type CncPass = {
+// CNC (router/mill) passes. Pre-expanded by core/cnc/compile-cnc-job.ts
+// (depth ramping, tab splitting, pocket rings) so the emitter is a dumb, safe
+// motion printer: retract to safeZMm → rapid XY → plunge at plungeMmPerMin →
+// feed. Two shapes (ADR-094, Phase H.1):
+//   - contour: one XY polyline at one constant Z depth (profiles, pockets,
+//     engraves, v-carve rings)
+//   - path3d:  per-vertex XYZ motion (relief finishing, ramp entries,
+//     imported .nc toolpaths)
+export type CncContourPass = {
+  readonly kind: 'contour';
   readonly zMm: number; // cutting depth for this pass; negative below stock top
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
 };
+
+export type CncPath3dPass = {
+  readonly kind: 'path3d';
+  // Machine-coord XY plus Z (0 = stock top, negative into the stock).
+  readonly points: ReadonlyArray<Vec3>;
+  readonly closed: boolean;
+};
+
+export type CncPass = CncContourPass | CncPath3dPass;
+
+// XY projection of a pass — for bounds, origin translation, and the 2D
+// preview. Vec3 is structurally assignable to Vec2, so path3d points pass
+// through unchanged.
+export function cncPassXyPoints(pass: CncPass): ReadonlyArray<Vec2> {
+  switch (pass.kind) {
+    case 'contour':
+      return pass.polyline;
+    case 'path3d':
+      return pass.points;
+    default:
+      return assertNever(pass, 'CncPass');
+  }
+}
+
+// Depth the plunge move enters at — contour passes plunge to their single Z;
+// path3d passes plunge to their first vertex's Z (used by the estimator).
+export function cncPassEntryDepthMm(pass: CncPass): number {
+  switch (pass.kind) {
+    case 'contour':
+      return pass.zMm;
+    case 'path3d':
+      return pass.points[0]?.z ?? 0;
+    default:
+      return assertNever(pass, 'CncPass');
+  }
+}
 
 export type CncGroup = {
   readonly kind: 'cnc';
