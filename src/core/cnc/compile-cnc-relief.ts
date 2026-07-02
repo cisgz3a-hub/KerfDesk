@@ -1,6 +1,6 @@
-// compileReliefGroupForLayer — relief objects → roughing CncGroup (Phase
-// H.5, ADR-094). Split from compile-cnc-job.ts (284 lines) by design: the
-// main compiler dispatches, this file owns the relief branch.
+// compileReliefGroupsForLayer — relief objects → roughing CncGroup (H.5)
+// plus the optional finishing CncGroup (H.8). Split from compile-cnc-job.ts
+// by design: the main compiler dispatches, this file owns the relief branch.
 //
 // Per relief on the layer: rebuild the heightmap from the embedded mesh
 // (coarsened to tool-diameter/8 cells — roughing tolerance, keeps compile
@@ -10,8 +10,13 @@
 // honored.
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
-import type { CncContourPass, CncGroup } from '../job';
-import { meshToHeightmap, reliefRoughingPasses } from '../relief';
+import type { CncContourPass, CncGroup, CncPass } from '../job';
+import {
+  DEFAULT_RELIEF_SCALLOP_MM,
+  meshToHeightmap,
+  reliefFinishingPasses,
+  reliefRoughingPasses,
+} from '../relief';
 import {
   applyTransform,
   layerCncTool,
@@ -22,33 +27,53 @@ import {
   type ReliefObject,
   type SceneObject,
 } from '../scene';
+import { kernelForTool } from '../sim';
 
 const MIN_FEED_MM_PER_MIN = 1;
 const MIN_ROUGHING_CELL_MM = 0.2;
 const ROUGHING_CELL_TOOL_FRACTION = 8;
+// Finishing samples finer than roughing: quality lives in the skim.
+const MIN_FINISHING_CELL_MM = 0.1;
+const FINISHING_CELL_TOOL_FRACTION = 10;
 
-export function compileReliefGroupForLayer(
+// Roughing group (H.5) plus — when the layer names a finishing bit — the
+// H.8 finishing group that skims the true surface with it.
+export function compileReliefGroupsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   settings: CncLayerSettings,
   device: DeviceProfile,
   config: CncMachineConfig,
-): CncGroup | null {
+): ReadonlyArray<CncGroup> {
   const reliefs = objects.filter(
     (o): o is ReliefObject => o.kind === 'relief' && o.color === layer.color,
   );
-  if (reliefs.length === 0) return null;
+  if (reliefs.length === 0) return [];
   const tool = layerCncTool(config, settings);
   const passes: CncContourPass[] = [];
   for (const relief of reliefs) {
     appendReliefPasses(passes, relief, settings, device, tool);
   }
-  if (passes.length === 0) return null;
+  if (passes.length === 0) return [];
+  const roughing = reliefGroup(layer, settings, device, config, tool, 'relief-rough', passes);
+  const finishing = reliefFinishingGroup(reliefs, layer, settings, device, config);
+  return finishing === null ? [roughing] : [roughing, finishing];
+}
+
+function reliefGroup(
+  layer: Layer,
+  settings: CncLayerSettings,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+  tool: CncTool,
+  cutType: 'relief-rough' | 'relief-finish',
+  passes: ReadonlyArray<CncPass>,
+): CncGroup {
   return {
     kind: 'cnc',
     layerId: layer.id,
     color: layer.color,
-    cutType: 'relief-rough',
+    cutType,
     toolId: tool.id,
     toolName: tool.name,
     toolDiameterMm: tool.diameterMm,
@@ -59,6 +84,55 @@ export function compileReliefGroupForLayer(
     safeZMm: Math.max(0, config.params.safeZMm),
     passes,
   };
+}
+
+// The H.8 finishing skim: its own heightmap at the finishing bit's (finer)
+// resolution, serpentine max-plus tip-surface rows, mapped through the
+// object transform + device origin exactly like roughing.
+function reliefFinishingGroup(
+  reliefs: ReadonlyArray<ReliefObject>,
+  layer: Layer,
+  settings: CncLayerSettings,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): CncGroup | null {
+  if (settings.reliefFinishToolId === undefined) return null;
+  const finishTool = config.tools.find((tool) => tool.id === settings.reliefFinishToolId);
+  if (finishTool === undefined) return null;
+  const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
+  const passes: CncPass[] = [];
+  for (const relief of reliefs) {
+    const heightmap = meshToHeightmap(
+      { positions: Float32Array.from(relief.meshPositions) },
+      {
+        targetWidthMm: relief.targetWidthMm,
+        reliefDepthMm: relief.reliefDepthMm,
+        emptyCells: relief.emptyCells,
+        mmPerCell: Math.max(
+          MIN_FINISHING_CELL_MM,
+          finishTool.diameterMm / FINISHING_CELL_TOOL_FRACTION,
+        ),
+      },
+    );
+    if (heightmap.kind === 'error') continue;
+    const kernel = kernelForTool(finishTool, heightmap.heightmap.mmPerCell);
+    for (const pass of reliefFinishingPasses(heightmap.heightmap, {
+      tool: finishTool,
+      kernel,
+      scallopMm,
+    })) {
+      if (pass.kind !== 'path3d') continue;
+      passes.push({
+        ...pass,
+        points: pass.points.map((p) => ({
+          ...toMachineCoords(applyTransform(p, relief.transform), device),
+          z: p.z,
+        })),
+      });
+    }
+  }
+  if (passes.length === 0) return null;
+  return reliefGroup(layer, settings, device, config, finishTool, 'relief-finish', passes);
 }
 
 function appendReliefPasses(

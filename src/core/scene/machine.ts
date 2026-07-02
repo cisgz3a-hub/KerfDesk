@@ -53,7 +53,10 @@ export type CncCutType =
   | 'engrave'
   | 'v-carve'
   | 'drill'
-  | 'relief-rough';
+  | 'relief-rough'
+  // H.8 finishing skim over the true relief surface. COMPILE-TIME ONLY,
+  // like relief-rough: produced when a relief layer has a finishing bit.
+  | 'relief-finish';
 
 export const CNC_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'profile-outside',
@@ -74,6 +77,11 @@ export type CncLayerSettings = {
   // Two-stage v-carve (H.7): flat floors beyond the v-bit's reach are
   // pocket-cleared with this bit first. Absent = single-stage v-carve.
   readonly vClearToolId?: string;
+  // Relief finishing (H.8): the bit that skims the true surface after
+  // roughing. Absent = roughing only (the part stays one allowance proud).
+  readonly reliefFinishToolId?: string;
+  // Ball-nose scallop height target driving the finishing row spacing.
+  readonly reliefScallopMm?: number;
   // Total cut depth below stock top (positive). For v-carve this is the MAX
   // depth: wide regions clamp to it and cut a flat floor.
   readonly depthMm: number;
@@ -214,5 +222,7 @@ export function cutTypeLabel(cutType: CncCutType): string {
       return 'Drill (peck at centers)';
     case 'relief-rough':
       return 'Relief roughing';
+    case 'relief-finish':
+      return 'Relief finishing';
   }
 }
