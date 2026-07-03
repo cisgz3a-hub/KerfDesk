@@ -4163,9 +4163,55 @@ numbers win.
 - ADR-099 is retired unused; the number stays reserved to avoid a third
   meaning. Next free ADR: **105**.
 
-## ADR-105 — Parametric finger-joint box generator: claim-model joinery (2026-07-03)
+## ADR-105 — Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03)
+
+**Status:** accepted (maintainer directive: "make sure that we have
+everything Easel has and more"). Grounded by
+`audit/reports/easel-1v1-comparison-2026-07-03.md`.
+
+### Decisions
+
+- **G9 — persistent 3D pane.** A docked, collapsible right-side pane in
+  CNC mode renders the simulated cut result (stock + removal heightfield,
+  the ADR-102 scene) LIVE while designing — Easel's split-view. The pane
+  computes a coarse toolpath + removal grid outside Preview mode,
+  debounced per edit; Preview mode reuses the scrubbed preview grid.
+  UI-only; compile/emit untouched.
+- **G10 — pocket raster fill.** `CncLayerSettings.pocketStrategy?:
+  'offset' | 'raster-x' | 'raster-y'` (absent = offset, byte-identical
+  output). Raster pockets inset the region by the bit radius (clipper2),
+  hatch it with serpentine sweeps at the layer stepover, and finish with
+  the innermost perimeter ring per depth pass — Easel's Fill Method
+  offset/raster X/raster Y.
+- **G11 — bundled design library.** A curated, LOCAL starter library
+  (Easel's cloud "3M designs" is out of scope for a local-first app):
+  `lucide-static` (ISC — MIT-compatible per ADR-017) provides the icon
+  corpus; a manifest bundles a curated subset by category into a Library
+  dialog that inserts through the existing SVG import pipeline. Larger
+  art: users import SVGs from CC0 sources (openclipart et al) — the
+  dialog links the guidance. PROVISIONAL curation; growable.
+- **Explicitly NOT gaps (answering the drivers question):** Easel Driver
+  exists because a cloud page cannot reach serial ports; KerfDesk talks
+  WebSerial directly (browser) / native serial (Electron) — no agent to
+  install. FTDI/CH340 USB-UART drivers are OS/board-level, identical for
+  every sender. Post-processors: external CAM (Vectric/Fusion) targets
+  us with their stock GRBL post; running such files live is roadmap
+  (G12, external-program streaming — the simulator already re-imports
+  them read-only).
+
+### Verification
+
+Unit tests per feature; raster-fill coverage/no-gouge checks; jsdom
+fallback for the pane; license-check green with the new dependency;
+full gate per commit. Hardware remains CLAIMED per ADR-098 §3.
+
+## ADR-106 — Parametric finger-joint box generator: claim-model joinery (2026-07-03)
 
 **Status:** accepted (maintainer-approved build plan, 2026-07-03).
+**Numbering note:** drafted as ADR-105 on the box-generator branch, but
+the Easel-parity pack published 105 on `main` first — published numbers
+win (ADR-104 precedent). Pre-merge commit messages on
+`claude/relaxed-liskov-0df88b` say ADR-105; read them as this ADR.
 
 ### Context
 

@@ -1,5 +1,5 @@
 // box-spec — the BoxSpec parameter type, inner/outer dimension derivation,
-// and validateBoxSpec (ADR-105). Validation is a pure Result-style union; the
+// and validateBoxSpec (ADR-106). Validation is a pure Result-style union; the
 // dialog renders issues and disables generation — nothing here throws.
 
 import { edgePattern, MIN_FINGER_WIDTH_MM } from './edge-pattern';
@@ -22,9 +22,9 @@ export type BoxSpec = {
   readonly thicknessMm: number;
   readonly targetFingerWidthMm: number;
   readonly style: BoxStyle;
-  /** Signed joint play; + = looser. Applied as a uniform −c/2 contour offset. */
+  /** Signed joint play; + = looser. Applied as a uniform −c/4 contour offset. */
   readonly clearanceMm: number;
-  /** CNC corner-overcut relief; 'none' for laser (ADR-105 fit division). */
+  /** CNC corner-overcut relief; 'none' for laser (ADR-106 fit division). */
   readonly relief: BoxRelief;
   readonly partSpacingMm: number;
 };

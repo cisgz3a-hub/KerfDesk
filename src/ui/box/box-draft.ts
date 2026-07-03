@@ -1,4 +1,4 @@
-// box-draft — the Box Generator dialog's string draft model (ADR-105):
+// box-draft — the Box Generator dialog's string draft model (ADR-106):
 // machine-aware defaults, draft→spec parsing with explicit empty-field
 // reporting (F-K1 empty state), and the persistence field list. String
 // drafts keep half-typed numbers editable; the spec is derived per render.
@@ -40,7 +40,7 @@ export const BOX_DRAFT_PERSISTED_FIELDS: ReadonlyArray<keyof BoxDraft> = [
   'partSpacing',
 ];
 
-// CNC glue fit vs laser press fit (ADR-105 fit division of labor).
+// CNC glue fit vs laser press fit (ADR-106 fit division of labor).
 const CNC_DEFAULT_CLEARANCE_MM = 0.15;
 
 export function defaultBoxDraft(machine: BoxMachineContext): BoxDraft {

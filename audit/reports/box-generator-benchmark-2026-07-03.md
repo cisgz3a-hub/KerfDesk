@@ -1,4 +1,4 @@
-# Box generator (Phase K, ADR-105) — build + verification report, 2026-07-03
+# Box generator (Phase K, ADR-106) — build + verification report, 2026-07-03
 
 Parametric finger-joint box generator, laser + CNC router, built S0–S6 on
 `claude/relaxed-liskov-0df88b` in six individually CI-green commits.
@@ -45,7 +45,7 @@ material), and full repo gates green: **3042 tests, lint, typecheck**.
 1. **Clearance offset is −c/4, not the plan's −c/2.** A uniform inward
    offset δ narrows a tab by 2δ AND widens the mating notch by 2δ, so
    joint play = 4δ. The plan's own contract ("total joint play = c")
-   wins; −c/2 would have doubled it. ADR-105 §fit and F-K3 amended;
+   wins; −c/2 would have doubled it. ADR-106 §fit and F-K3 amended;
    measured play == c pinned by tests.
 2. **Panel names don't reach the scene** — `SceneObject` has no name
    field; names show in the dialog preview only. F-K1 wording trued up.

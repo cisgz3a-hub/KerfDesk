@@ -1,5 +1,5 @@
 // panel-outline — walks one panel's claims into a closed rectilinear polygon
-// (ADR-105). The boundary follows the outer face line over owned intervals
+// (ADR-106). The boundary follows the outer face line over owned intervals
 // and recesses by T over intervals the mate owns. Every vertex coordinate is
 // taken verbatim from the shared claim boundaries (never re-accumulated), so
 // mating panels and the assembly referee land on bit-identical floats.

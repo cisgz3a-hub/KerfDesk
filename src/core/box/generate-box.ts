@@ -1,4 +1,4 @@
-// generate-box — the ADR-105 orchestrator: validated spec → claims →
+// generate-box — the ADR-106 orchestrator: validated spec → claims →
 // outlines → fit/relief → sheet layout. Pure and deterministic (no RNG, no
 // clock); ids and layer colors are the UI's job at insertion. Failure is a
 // value, never a throw, and a failed generation emits no panels at all

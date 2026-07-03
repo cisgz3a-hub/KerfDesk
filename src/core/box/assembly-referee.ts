@@ -1,4 +1,4 @@
-// assembly-referee — the virtual 3D assembly check (ADR-105 verification §1).
+// assembly-referee — the virtual 3D assembly check (ADR-106 verification §1).
 // Consumes ONLY the generated outlines plus the spec: panels are mapped into
 // box coordinates through the documented drawing convention (re-stated here,
 // deliberately not imported), then every cube edge's shared T×T band is
@@ -15,7 +15,7 @@ export type RefereePanel = { readonly panel: PanelId; readonly outline: Polyline
  * playMm > 0 switches the bands to fit-with-clearance mode: material is
  * collected within T/4 of each face line (tab tips recede by play/4), every
  * gap between consecutive tabs must measure play/2 per flank (two flanks per
- * tab ⇒ the ADR-105 contract of play per joint), and interference is never
+ * tab ⇒ the ADR-106 contract of play per joint), and interference is never
  * tolerated. toleranceMm covers clipper's 3-decimal rounding.
  */
 export type RefereeOptions = { readonly playMm?: number; readonly toleranceMm?: number };

@@ -1,5 +1,5 @@
 // box-insert-mutation — commit a generated box panel sheet into the scene
-// (ADR-105, F-K1): one polyline ShapeObject per panel, all on one cut-layer
+// (ADR-106, F-K1): one polyline ShapeObject per panel, all on one cut-layer
 // color (auto-created on demand), every inserted panel selected, and ONE
 // undo entry so Undo removes the whole sheet in a single step.
 

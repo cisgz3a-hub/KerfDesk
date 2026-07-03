@@ -218,7 +218,7 @@ export type AppState = ObjectPropertiesActions &
     readonly upsertTextObject: (text: TextObject) => void;
     // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
     readonly drawShape: (shape: ShapeObject) => void;
-    // Phase K (ADR-105): insert a generated box panel sheet — one polyline
+    // Phase K (ADR-106): insert a generated box panel sheet — one polyline
     // shape per panel, one undo step, every panel selected.
     readonly insertBoxPanels: (panels: ReadonlyArray<BoxPanel>) => void;
     // ADR-057: add (or replace) the registration jig box on the reserved

@@ -1,5 +1,5 @@
 // edge-pattern — the ONE alternating finger sequence both panels of a cube
-// edge derive material ownership from (ADR-105). The sequence covers the
+// edge derive material ownership from (ADR-106). The sequence covers the
 // edge's interior span between the two T×T×T corner cubes; corner ownership
 // is panel-claims' corner rule, not the pattern's job. Complementarity is by
 // construction: panel A owns exactly the cells panel B does not, so

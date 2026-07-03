@@ -1,4 +1,4 @@
-// Perceptual fixture for the box generator (ADR-105 verification §3).
+// Perceptual fixture for the box generator (ADR-106 verification §3).
 // The predicted mask rasterizes the generated sheet outlines; the truth mask
 // is built INDEPENDENTLY from the claim rectangles (face rect minus unowned
 // cell bites minus unclaimed corner squares) — it never touches the outline

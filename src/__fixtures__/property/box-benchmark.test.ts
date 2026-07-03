@@ -1,4 +1,4 @@
-// box-benchmark — the aggregated ADR-105 verification battery as a single
+// box-benchmark — the aggregated ADR-106 verification battery as a single
 // reproducible scorecard. A seeded corpus (no Math.random — bit-identical
 // every run) sweeps the fuzz ranges plus the known hard cases, and every
 // category must score 100%:

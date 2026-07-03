@@ -1,11 +1,11 @@
 // panel-fit — bakes the two generator-owned fit corrections into a panel
-// outline (ADR-105): joint clearance as a uniform contour offset, then CNC
+// outline (ADR-106): joint clearance as a uniform contour offset, then CNC
 // corner-overcut reliefs at the seat-critical reflex corners. Laser kerf
 // compensation and CNC cutter compensation stay in the shipped pipeline
 // (kerf-offset at compile / profile-paths) — never duplicated here.
 //
 // Offset derivation: a uniform inward offset δ narrows every tab by 2δ AND
-// widens the mating recess by 2δ, so the joint play is 4δ. The ADR-105
+// widens the mating recess by 2δ, so the joint play is 4δ. The ADR-106
 // contract is play == clearance c, hence δ = c/4 inward (a negative c grows
 // tabs into a press fit). Reliefs subtract AFTER the offset so every relief
 // circle keeps the full bit radius (offsetting afterwards would shrink the
