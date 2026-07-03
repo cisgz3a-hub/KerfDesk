@@ -35,9 +35,10 @@ type ControllerCommandRequest = {
 type ControllerIdleWaitRequest = {
   readonly kind: ControllerCommandKind;
   readonly requiredReports: number;
+  readonly timeoutMs: number;
   readonly resolve: () => void;
   readonly reject: (err: Error) => void;
-  readonly timer: ReturnType<typeof setTimeout>;
+  timer: ReturnType<typeof setTimeout>;
   idleReports: number;
 };
 
@@ -140,15 +141,17 @@ export function waitForFreshIdle(
     return Promise.reject(new Error('A controller Idle wait is already active.'));
   }
   return new Promise((resolve, reject) => {
+    const timeoutMs = options.timeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
     const request: ControllerIdleWaitRequest = {
       kind: options.kind,
       requiredReports: options.requiredReports ?? 1,
+      timeoutMs,
       resolve,
       reject,
       idleReports: 0,
       timer: setTimeout(() => {
         finishIdleWait(refs, request, 'reject', 'Timed out waiting for fresh Idle.');
-      }, options.timeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS),
+      }, timeoutMs),
     };
     refs.controllerIdleWait = request;
   });
@@ -165,6 +168,14 @@ export function observeControllerIdleWait(
     finishIdleWait(refs, request, 'reject', `Controller entered ${report.state}.`);
     return;
   }
+  // GRBL acks lines at parse time, so buffered motion legally outlasts any
+  // fixed wall-clock budget (slow feeds run minutes past the last ok). Every
+  // status report proves the controller is alive, so the timeout measures
+  // status silence, not elapsed time.
+  clearTimeout(request.timer);
+  request.timer = setTimeout(() => {
+    finishIdleWait(refs, request, 'reject', 'Timed out waiting for fresh Idle.');
+  }, request.timeoutMs);
   request.idleReports = report.state === 'Idle' ? request.idleReports + 1 : 0;
   set((state) => updateOperationIdleReports(state, request.kind, request.idleReports));
   if (request.idleReports >= request.requiredReports) {

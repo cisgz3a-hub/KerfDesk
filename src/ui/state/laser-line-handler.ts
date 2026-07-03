@@ -325,7 +325,10 @@ function handleStatusLine(
   // forever, so isActiveJob stayed true and every setup/jog/console command —
   // plus the clear-canvas guard — was blocked until a reconnect. The
   // controller-error safetyNotice lives in separate state and survives.
-  const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, report);
+  // A 'done' streamer normally belongs to the post-job settle, which releases
+  // it itself — but when the settle failed or never started, no operation owns
+  // the release and the same Idle-means-motion-stopped reasoning applies.
+  const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, state.controllerOperation, report);
   const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
 
   set({
@@ -340,9 +343,12 @@ function handleStatusLine(
 
 function shouldReleaseStreamerAtIdle(
   streamer: StreamerState | null,
+  controllerOperation: LaserState['controllerOperation'],
   report: StatusReport,
 ): boolean {
-  return streamer !== null && streamer.status === 'errored' && report.state === 'Idle';
+  if (streamer === null || report.state !== 'Idle') return false;
+  if (streamer.status === 'errored') return true;
+  return streamer.status === 'done' && controllerOperation === null;
 }
 
 function requestRealtimeStopAfterStreamError(
