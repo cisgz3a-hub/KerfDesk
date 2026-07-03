@@ -91,6 +91,35 @@ it('renders zoomed CENTERLINE crops of the arch-house logo', () => {
   }
 }, 240000);
 
+it('renders the ARCH letters crop under knob variants (gap sweep)', () => {
+  if (process.env['TRACE_AUDIT'] !== '1') return;
+  if (EDGE_OPTIONS === undefined) throw new Error('missing preset');
+  mkdirSync(OUT_DIR, { recursive: true });
+  const image = decodePngFile('audit/fixtures/trace/arch-house-langebaan-source.png');
+  const crop = CROPS[1];
+  if (crop === undefined) throw new Error('missing crop');
+  const variants: ReadonlyArray<{ name: string; options: typeof EDGE_OPTIONS }> = [
+    { name: 'sweep-preset', options: EDGE_OPTIONS },
+    {
+      name: 'sweep-lowsens',
+      options: { ...EDGE_OPTIONS, edgeLowThresholdRatio: 0.13, edgeHighThresholdRatio: 0.32 },
+    },
+    {
+      name: 'sweep-highdetail',
+      options: { ...EDGE_OPTIONS, edgeBlurSigma: 0.7, edgeJoinGapPx: 2.9 },
+    },
+    {
+      name: 'sweep-lowdetail',
+      options: { ...EDGE_OPTIONS, edgeBlurSigma: 2.0, edgeJoinGapPx: 8.3, edgeMinLengthPx: 12 },
+    },
+  ];
+  for (const variant of variants) {
+    const traced = traceImageToEdgePaths(image, variant.options);
+    const png = renderTraceOverlay(cropImage(image, crop), cropPaths(traced, crop), crop.scale);
+    writeFileSync(join(OUT_DIR, `${variant.name}.png`), png);
+  }
+}, 240000);
+
 it('renders raw Canny masks for the LANGEBAAN crop under preprocessing variants', () => {
   if (process.env['TRACE_AUDIT'] !== '1') return;
   if (EDGE_OPTIONS === undefined) throw new Error('missing preset');

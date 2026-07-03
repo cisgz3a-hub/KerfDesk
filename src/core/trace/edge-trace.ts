@@ -9,7 +9,8 @@
 // tiny loop gaps closed, drawn corners re-sharpened).
 
 import type { ColoredPath, Polyline, Vec2 } from '../scene';
-import { cannyEdges, type CannyOptions } from './canny-edges';
+import { cannyEdgeField, type CannyField, type CannyOptions } from './canny-edges';
+import { reconnectAlongRidge } from './edge-reconnect';
 import {
   assembleStrokePaths,
   buildStrokeGraph,
@@ -32,9 +33,9 @@ const EDGE_ALIGNED_JOIN_FACTOR = 3;
 export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
   const joinGapPx = Math.max(0, options.edgeJoinGapPx ?? DEFAULT_EDGE_JOIN_GAP_PX);
   const edgeSource = medianForEdges(image, options.edgeMedianFilter);
-  const edges = cannyEdges(edgeSource, edgeCannyOptions(options));
-  const mask: InkMask = { width: image.width, height: image.height, ink: edges };
-  const polylines = chainEdgeMask(mask, options, joinGapPx);
+  const field = cannyEdgeField(edgeSource, edgeCannyOptions(options));
+  const mask: InkMask = { width: image.width, height: image.height, ink: field.edges };
+  const polylines = chainEdgeMask(mask, options, joinGapPx, field);
   return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];
 }
 
@@ -86,7 +87,19 @@ function edgeCannyOptions(options: TraceOptions): CannyOptions {
   };
 }
 
-function chainEdgeMask(mask: InkMask, options: TraceOptions, joinGapPx: number): Polyline[] {
+// Ridge reconnection may walk this many pixels past a chain end, scaled from
+// the join knob — soft sources (rescaled/recompressed art) drop stretches
+// well beyond the knob itself.
+const RIDGE_WALK_MIN_PX = 8;
+const RIDGE_WALK_MAX_PX = 24;
+const RIDGE_WALK_PER_JOIN_GAP = 3;
+
+function chainEdgeMask(
+  mask: InkMask,
+  options: TraceOptions,
+  joinGapPx: number,
+  field: CannyField,
+): Polyline[] {
   const distSq = squaredDistanceField(mask);
   const skeleton = thinToMedialAxis(mask, distSq);
   const graph = buildStrokeGraph(skeleton, mask.width, mask.height);
@@ -100,11 +113,28 @@ function chainEdgeMask(mask: InkMask, options: TraceOptions, joinGapPx: number):
     // visibly join — weld them on.
     weldOpenEndsPx: Math.max(2, Math.min(6, joinGapPx)),
   });
+  const maxWalkPx =
+    joinGapPx <= 0
+      ? 0
+      : Math.min(
+          RIDGE_WALK_MAX_PX,
+          Math.max(RIDGE_WALK_MIN_PX, joinGapPx * RIDGE_WALK_PER_JOIN_GAP),
+        );
+  const reconnected = reconnectAlongRidge(
+    assembled,
+    {
+      ridgeMag: field.ridgeMag,
+      lowThreshold: field.lowThreshold,
+      width: mask.width,
+      height: mask.height,
+    },
+    maxWalkPx,
+  );
   const minLengthPx = Math.max(
     Math.max(0, options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX),
     blurNoiseFloorPx(options.edgeBlurSigma),
   );
-  return assembled.filter((pl) => polylineLength(pl) >= minLengthPx && !isSliverLoop(pl));
+  return reconnected.filter((pl) => polylineLength(pl) >= minLengthPx && !isSliverLoop(pl));
 }
 
 // Heavy pre-blur widens gradients and breeds faint speckle chains; below a

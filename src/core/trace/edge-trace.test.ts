@@ -208,6 +208,36 @@ describe('traceImageToEdgePaths', () => {
     expect(traceImageToEdgePaths(filledSquare(32, 1, 0), EDGE_OPTIONS)).toEqual([]);
   });
 
+  // Soft sources (rescaled / recompressed art) drop edge stretches whose
+  // gradient dips below the hysteresis LOW threshold — far wider than any
+  // blind bridge. The ridge walk must follow the sub-threshold gradient
+  // across the gap and close the contour.
+  it('reconnects a contour across a weak sub-threshold stretch (ridge walk)', () => {
+    const size = 96;
+    const data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y += 1)
+      for (let x = 0; x < size; x += 1) {
+        const dx = x + 0.5 - 48;
+        const dy = y + 0.5 - 48;
+        const onRing = Math.abs(Math.hypot(dx, dy) - 30) <= 2;
+        const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+        const inWeakArc = angleDeg > -15 && angleDeg < 15;
+        // Strong black ring, except one faint arc: contrast ~13 luma sits
+        // between the ridge floor and the hysteresis low threshold.
+        const v = onRing ? (inWeakArc ? 242 : 0) : 255;
+        const o = (y * size + x) * 4;
+        data[o] = v;
+        data[o + 1] = v;
+        data[o + 2] = v;
+        data[o + 3] = 255;
+      }
+    const lines = traceImageToEdgePaths({ width: size, height: size, data }, EDGE_OPTIONS).flatMap(
+      (p) => p.polylines,
+    );
+    const closed = lines.filter((pl) => pl.closed);
+    expect(closed.length).toBeGreaterThanOrEqual(1);
+  });
+
   // Canny drops pixels wherever edges meet (junction gradients are
   // ambiguous), leaving lines that end a hair before the line they visibly
   // join. The weld/bridge stages must close those — no open end may float
