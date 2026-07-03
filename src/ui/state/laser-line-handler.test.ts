@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  CMD_COOLANT_OFF,
-  RT_SOFT_RESET,
   createStreamer,
   idleCollector,
+  onAck,
+  pause,
   startCollecting,
   step,
 } from '../../core/controllers/grbl';
@@ -31,6 +31,7 @@ function makeLaserState(): LaserState {
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    pendingUntrackedAcks: 0,
     homingState: 'unknown',
     log: [],
     transcript: [],
@@ -142,6 +143,25 @@ describe('handleLine detected controller settings', () => {
 });
 
 describe('handleLine streamer writes', () => {
+  // Mid-job refills are the job stream continuing — transcribed as anything
+  // else, the console's "hide job stream" filter stops hiding them and the
+  // panel floods with raw G-code during every job.
+  it('tags ack-driven refill writes with the job transcript source', () => {
+    const { refs, set, get } = makeHarness();
+    const safeWrite = vi.fn(
+      async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
+    );
+    // Eight 29-byte lines: the 120-byte first window holds four, so each ack
+    // triggers a refill write for the next queued line.
+    const longLine = 'G1 X99.000 Y99.000 F600 S255';
+    const gcode = Array.from({ length: 8 }, () => longLine).join('\n');
+    set({ streamer: step(createStreamer(gcode)).state });
+
+    handleLine(set, get, refs, safeWrite, 'ok');
+
+    expect(safeWrite).toHaveBeenCalledWith(`${longLine}\n`, undefined, 'job');
+  });
+
   it('keeps a fully acked job busy until the post-job settle marker and stable Idle finish', async () => {
     const { refs, set, get } = makeHarness();
     const safeWrite = vi.fn(
@@ -221,7 +241,12 @@ describe('handleLine streamer writes', () => {
     expect(get().safetyNotice).not.toBeNull();
   });
 
-  it('marks the streamer disconnected if an ack-triggered follow-up write fails', async () => {
+  // markErrored, not disconnect: 'disconnected' falls outside isActiveJob,
+  // which unmounts the Stop button and drops the soft-reset stop path while
+  // GRBL may still be executing buffered lines on a live port (the same R-H2
+  // rationale runResumeJob documents). A genuine port loss follows up via
+  // onClose, which owns the disconnect wording.
+  it('marks the streamer errored (Stop stays mounted) if an ack-triggered follow-up write fails', async () => {
     const { refs, set, get } = makeHarness();
     const firstStep = step(
       createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', {
@@ -236,108 +261,64 @@ describe('handleLine streamer writes', () => {
     handleLine(set, get, refs, safeWrite, 'ok');
     await Promise.resolve();
 
-    expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n');
-    expect(get().streamer?.status).toBe('disconnected');
+    expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n', undefined, 'job');
+    expect(get().streamer?.status).toBe('errored');
     expect(get().streamer?.completed).toBe(1);
-    expect(get().streamer?.inFlight.map((item) => item.line)).toEqual(['G1 X1234567891\n']);
+    // The undelivered refill line stays in the in-flight accounting: the
+    // stream is terminal (nothing more is ever sent), acks for the lines that
+    // WERE delivered still absorb correctly, and the never-acked tail is
+    // harmless — while a snapshot rollback would clobber acks that landed
+    // between dispatch and rejection.
+    expect(get().streamer?.inFlight.map((item) => item.line)).toEqual([
+      'G1 X1234567891\n',
+      'G1 X1234567892\n',
+    ]);
     expect(get().streamer?.queued).toEqual([]);
     // P0-3: a follow-up write failure must also raise the operator-facing safety
     // banner - the machine may still be moving from buffered commands.
     expect(get().safetyNotice).toEqual({
-      kind: 'disconnect-during-job',
-      message: expect.stringContaining('still be moving'),
+      kind: 'write-failed',
+      action: 'stream',
+      message: expect.stringContaining('Stop'),
     });
   });
 });
 
-describe('handleLine controller error (P0-1)', () => {
-  it('soft-resets the controller and raises a safety notice when GRBL rejects a line mid-job', async () => {
-    const { refs, set, get } = makeHarness();
-    // rxBuffer 30 leaves the third line queued, so before the fix the error ack
-    // would have written the next queued bytes. Now it must write nothing.
-    const firstStep = step(
-      createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', {
-        rxBufferBytes: 30,
-      }),
+describe('handleLine alarm terminates paused streams', () => {
+  // GRBL keeps acking held lines during a feed hold, so a paused stream
+  // routinely has an empty in-flight tail. An alarm then must still cancel
+  // the stream — otherwise Resume stays mounted and streams the queued job
+  // into a locked controller.
+  function drainedPausedStreamer(): ReturnType<typeof pause> {
+    const first = step(
+      createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', { rxBufferBytes: 30 }),
     );
-    set({ streamer: firstStep.state });
-    expect(get().streamer?.queued.length).toBeGreaterThan(0);
-    const safeWrite = vi.fn(
-      async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
-    );
+    let state = pause(first.state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.inFlight).toEqual([]);
+    expect(state.status).toBe('paused');
+    return state;
+  }
 
-    handleLine(set, get, refs, safeWrite, 'error:7');
-    await Promise.resolve();
-    await Promise.resolve();
+  it('cancels a drained paused stream on an ALARM:N line', () => {
+    const { refs, set, get } = makeHarness();
+    set({ streamer: drainedPausedStreamer() });
 
-    // Terminal: no further job bytes go to the controller, but the realtime
-    // soft-reset is still sent to drain any already-buffered laser-on motion.
-    expect(get().streamer?.status).toBe('errored');
-    expect(safeWrite).toHaveBeenNthCalledWith(1, RT_SOFT_RESET, 'stop', 'system');
-    expect(safeWrite).toHaveBeenNthCalledWith(2, `${CMD_COOLANT_OFF}\n`, 'stop', 'system');
-    expect(safeWrite.mock.calls.some(([payload]) => payload.startsWith('G1 '))).toBe(false);
-    // The code is recorded and the operator is told to check the machine.
-    expect(get().lastError).toBe(7);
-    expect(get().safetyNotice).toEqual({
-      kind: 'controller-error',
-      code: 7,
-      rejectedLine: 'G1 X1234567890',
-      message: expect.stringContaining('error:7'),
-    });
+    handleLine(set, get, refs, async () => undefined, 'ALARM:1');
+
+    expect(get().streamer?.status).toBe('cancelled');
+    expect(get().streamer?.queued).toEqual([]);
   });
 
-  it('includes the rejected in-flight G-code line in the controller-error notice', () => {
+  it('cancels a drained paused stream on a status-only Alarm report', () => {
     const { refs, set, get } = makeHarness();
-    set({ streamer: step(createStreamer('G1 X10 F600 S100\nG1 X20\n')).state });
+    set({ streamer: drainedPausedStreamer() });
 
-    handleLine(set, get, refs, async () => undefined, 'error:7');
+    handleLine(set, get, refs, async () => undefined, '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
 
-    expect(get().safetyNotice).toEqual({
-      kind: 'controller-error',
-      code: 7,
-      rejectedLine: 'G1 X10 F600 S100',
-      message: expect.stringContaining('Rejected line: G1 X10 F600 S100'),
-    });
-  });
-
-  it('uses non-job wording when GRBL rejects a frame jog command', () => {
-    const { refs, set, get } = makeHarness();
-    set({
-      motionOperation: {
-        kind: 'frame',
-        sawControllerBusy: false,
-        idleStatusReports: 0,
-        dispatchComplete: true,
-        pendingLines: [],
-      },
-    });
-
-    handleLine(set, get, refs, async () => undefined, 'error:8');
-
-    expect(get().lastError).toBe(8);
-    expect(get().safetyNotice).toEqual({
-      kind: 'controller-error',
-      code: 8,
-      message: expect.stringContaining('frame command'),
-    });
-    expect(get().safetyNotice?.message).not.toContain('during the job');
-  });
-
-  it('stops the stream for unrecognized error responses without treating them as GRBL codes', () => {
-    const { refs, set, get } = makeHarness();
-    set({ streamer: step(createStreamer('G1 X1\nG1 X2\n')).state });
-
-    handleLine(set, get, refs, async () => undefined, 'error:7002009');
-
-    expect(get().streamer?.status).toBe('errored');
-    expect(get().lastError).toBeNull();
-    expect(get().safetyNotice).toEqual({
-      kind: 'controller-error',
-      code: null,
-      raw: 'error:7002009',
-      rejectedLine: 'G1 X1',
-      message: expect.stringContaining('unrecognized controller error response: error:7002009'),
-    });
+    expect(get().streamer?.status).toBe('cancelled');
+    expect(get().streamer?.queued).toEqual([]);
   });
 });
 

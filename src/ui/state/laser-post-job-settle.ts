@@ -80,14 +80,15 @@ async function runPostJobSettle(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // The failure is terminal for the operation — clear it rather than park it
+    // in a blocking phase. Every command (including Disconnect) gates on
+    // controllerOperation being null, so a sticky failure would wedge the
+    // whole panel until a cable yank. The 'done' streamer stays; the line
+    // handler releases it at the next Idle report.
     set((state) =>
       state.controllerOperation?.kind === 'post-job-settle'
         ? {
-            controllerOperation: {
-              ...state.controllerOperation,
-              phase: 'failed',
-              error: message,
-            },
+            controllerOperation: null,
             lastWriteError: message,
             safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
             log: pushLog(state, `[lf2] Post-job controller settle failed: ${message}`),

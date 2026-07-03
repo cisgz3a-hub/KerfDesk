@@ -195,6 +195,7 @@ export function initialLaserState(): Pick<
   | 'motionOperation'
   | 'controllerOperation'
   | 'streamer'
+  | 'pendingUntrackedAcks'
   | 'homingState'
   | 'log'
   | 'transcript'
@@ -223,6 +224,7 @@ export function initialLaserState(): Pick<
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    pendingUntrackedAcks: 0,
     homingState: 'unknown',
     log: [],
     transcript: [],
@@ -267,6 +269,8 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     controllerOperation: null,
     homingState: 'unknown',
     streamer: stream,
+    // Replies owed by the dead controller will never arrive.
+    pendingUntrackedAcks: 0,
     ...(wasUnsafeActive ? { safetyNotice: disconnectDuringJobNotice() } : {}),
   };
 }

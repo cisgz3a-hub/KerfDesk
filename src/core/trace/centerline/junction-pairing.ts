@@ -115,6 +115,13 @@ const MIN_BRIDGE_ALIGNMENT = Math.cos((35 * Math.PI) / 180);
 // stroke tips that merely end near each other — welding them draws a
 // doubled-back hairpin (adjacent glyph terminals in small traced text).
 const MIN_BRIDGE_FORWARDNESS_SUM = -0.25;
+// Corner tier: two edges meeting at a drawn corner approach the gap at up to
+// ~90° to each other, so neither passes the collinear-ALIGNED test — but both
+// still travel TOWARD each other. Canny drops pixels at exactly these
+// meetings (junction gradients are ambiguous), leaving corner gaps a bit
+// wider than the knob.
+const CORNER_BRIDGE_FACTOR = 2;
+const MIN_CORNER_FORWARDNESS = 0.25;
 
 function nearestBridgeableEnds(
   chains: ReadonlyArray<Chain>,
@@ -133,13 +140,31 @@ function nearestBridgeableEnds(
       if (d === null || d >= bestDist) continue;
       const forward = bridgeForwardness(a, b);
       if (forward === null) continue;
-      if (d >= joinGapPx && !continuesBoth(forward)) continue;
-      if (forward.aForward + forward.bForward < MIN_BRIDGE_FORWARDNESS_SUM) continue;
+      if (!passesBridgeTier(d, joinGapPx, alignedFactor, forward)) continue;
       bestDist = d;
       best = [a, b];
     }
   }
   return best;
+}
+
+function passesBridgeTier(
+  d: number,
+  joinGapPx: number,
+  alignedFactor: number,
+  forward: { readonly aForward: number; readonly bForward: number },
+): boolean {
+  if (forward.aForward + forward.bForward < MIN_BRIDGE_FORWARDNESS_SUM) return false;
+  if (d < joinGapPx) return true;
+  const cornerReach = joinGapPx * Math.min(CORNER_BRIDGE_FACTOR, Math.max(1, alignedFactor));
+  if (
+    d < cornerReach &&
+    forward.aForward >= MIN_CORNER_FORWARDNESS &&
+    forward.bForward >= MIN_CORNER_FORWARDNESS
+  ) {
+    return true;
+  }
+  return continuesBoth(forward);
 }
 
 function collectOpenEnds(chains: ReadonlyArray<Chain>): ChainEnd[] {

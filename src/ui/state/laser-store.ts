@@ -91,6 +91,12 @@ export type LaserState = {
   readonly motionOperation: LaserMotionOperation | null;
   readonly controllerOperation: LaserControllerOperation | null;
   readonly streamer: StreamerState | null;
+  // Queued writes outside the job stream (console, origin, unlock, the
+  // handshake $$ …) that still owe a terminal ok/error. GRBL acks in strict
+  // receive order, so Start must wait for 0: a stale ok mis-attributed to a
+  // fresh job stream frees RX budget GRBL has not freed, and the phantom
+  // refill can overflow the real 128-byte buffer mid-burn.
+  readonly pendingUntrackedAcks: number;
   readonly homingState: HomingState;
   readonly log: ReadonlyArray<string>;
   readonly transcript: ReadonlyArray<SerialTranscriptEntry>;

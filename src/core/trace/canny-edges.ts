@@ -26,16 +26,35 @@ const N8DY = [-1, -1, -1, 0, 0, 1, 1, 1];
 
 const MIN_GRADIENT_LEN = 1e-12;
 
+export type CannyField = {
+  /** 1-px binary edge map after hysteresis. */
+  readonly edges: Uint8Array;
+  /** Non-max-suppressed gradient magnitude — the edge RIDGE including the
+   *  sub-threshold stretches hysteresis dropped. Ridge-following reconnection
+   *  walks this to close gaps where a weak edge really continues. */
+  readonly ridgeMag: Float32Array;
+  /** The hysteresis low threshold in ridgeMag units. */
+  readonly lowThreshold: number;
+};
+
 export function cannyEdges(image: RawImageData, options: CannyOptions = {}): Uint8Array {
+  return cannyEdgeField(image, options).edges;
+}
+
+export function cannyEdgeField(image: RawImageData, options: CannyOptions = {}): CannyField {
   const gradient = computeGradient(image, options.blurSigma ?? DEFAULT_BLUR_SIGMA);
   const thinned = nonMaxSuppress(gradient);
-  return hysteresis(
+  let max = 0;
+  for (const v of thinned) if (v > max) max = v;
+  const lowRatio = options.lowThresholdRatio ?? DEFAULT_LOW_RATIO;
+  const edges = hysteresis(
     thinned,
     gradient.width,
     gradient.height,
-    options.lowThresholdRatio ?? DEFAULT_LOW_RATIO,
+    lowRatio,
     options.highThresholdRatio ?? DEFAULT_HIGH_RATIO,
   );
+  return { edges, ridgeMag: thinned, lowThreshold: max * lowRatio };
 }
 
 // Interpolating NMS: compare each pixel against the bilinear magnitude one

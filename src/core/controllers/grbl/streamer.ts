@@ -192,19 +192,28 @@ export function step(state: StreamerState): StepResult {
 // (e.g. a safety notice); this only updates state so step() refuses to
 // send more.
 export function onAck(state: StreamerState, kind: AckKind): AckResult {
-  if (state.inFlight.length === 0) return { state, acked: null };
+  // GRBL keeps acking held-but-parsed lines during a feed hold, so a paused
+  // stream routinely drains its in-flight tail while lines stay queued. An
+  // alarm/error arriving then consumes no line, but terminality must not
+  // depend on having one — otherwise resume() stays legal and streams the
+  // queue into a locked controller.
+  if (state.inFlight.length === 0) return { state: ackStatusWithoutLine(state, kind), acked: null };
   const head = state.inFlight[0];
-  if (head === undefined) return { state, acked: null };
+  if (head === undefined) return { state: ackStatusWithoutLine(state, kind), acked: null };
   const nextInFlight = state.inFlight.slice(1);
   const nextBytes = state.inFlightBytes - head.bytes;
   const completed = state.completed + 1;
+  // A paused stream never promotes to 'done': GRBL acks held-but-parsed
+  // lines during a feed hold, so pausing near the end of a job drains the
+  // queues while the machine still holds unexecuted planner motion. resume()
+  // completes a drained stream instead.
   const nextStatus: StreamerStatus = isTerminal(state.status)
     ? state.status
     : kind === 'alarm'
       ? 'cancelled'
       : kind === 'error'
         ? 'errored'
-        : nextInFlight.length === 0 && state.queued.length === 0
+        : state.status !== 'paused' && nextInFlight.length === 0 && state.queued.length === 0
           ? 'done'
           : state.status;
   return {
@@ -219,6 +228,11 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
   };
 }
 
+function ackStatusWithoutLine(state: StreamerState, kind: AckKind): StreamerState {
+  if (kind === 'ok' || isTerminal(state.status)) return state;
+  return kind === 'alarm' ? cancel(state) : markErrored(state);
+}
+
 export function pause(state: StreamerState): StreamerState {
   if (state.status !== 'streaming' && state.status !== 'idle') return state;
   return { ...state, status: 'paused' };
@@ -226,6 +240,13 @@ export function pause(state: StreamerState): StreamerState {
 
 export function resume(state: StreamerState): StreamerState {
   if (state.status !== 'paused') return state;
+  // Everything was already delivered and acked during the hold — resuming
+  // has nothing left to send, so the stream completes here. The job lock
+  // still holds until the machine reports Idle (the caller's release path),
+  // because the resumed planner motion is still executing.
+  if (state.inFlight.length === 0 && state.queued.length === 0) {
+    return { ...state, status: 'done' };
+  }
   return { ...state, status: 'streaming' };
 }
 
