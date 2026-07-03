@@ -94,6 +94,56 @@ function separatedSquares(): RawImageData {
   return { width, height, data };
 }
 
+function plusOfBars(): RawImageData {
+  const size = 96;
+  const data = new Uint8ClampedArray(size * size * 4);
+  for (let y = 0; y < size; y += 1)
+    for (let x = 0; x < size; x += 1) {
+      const inV = x >= 40 && x < 56 && y >= 12 && y < 84;
+      const inH = y >= 40 && y < 56 && x >= 12 && x < 84;
+      const v = inV || inH ? 0 : 255;
+      const o = (y * size + x) * 4;
+      data[o] = v;
+      data[o + 1] = v;
+      data[o + 2] = v;
+      data[o + 3] = 255;
+    }
+  return { width: size, height: size, data };
+}
+
+type TestPolyline = ReturnType<typeof traceImageToEdgePaths>[number]['polylines'][number];
+
+function nearestOtherLineDistance(
+  lines: ReadonlyArray<TestPolyline>,
+  own: TestPolyline,
+  end: { readonly x: number; readonly y: number },
+): number {
+  let nearest = Infinity;
+  for (const other of lines) {
+    if (other === own) continue;
+    const segmentCount = other.points.length + (other.closed ? 1 : 0) - 1;
+    for (let i = 0; i < segmentCount; i += 1) {
+      const a = other.points[i];
+      const b = other.points[(i + 1) % other.points.length];
+      if (a === undefined || b === undefined) continue;
+      nearest = Math.min(nearest, pointToSegmentDistance(end, a, b));
+    }
+  }
+  return nearest;
+}
+
+function pointToSegmentDistance(
+  p: { readonly x: number; readonly y: number },
+  a: { readonly x: number; readonly y: number },
+  b: { readonly x: number; readonly y: number },
+): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
 function pointCount(paths: ReturnType<typeof traceImageToEdgePaths>): number {
   return paths
     .flatMap((path) => path.polylines)
@@ -156,6 +206,24 @@ describe('traceImageToEdgePaths', () => {
 
   it('returns no paths for a flat image (no edges)', () => {
     expect(traceImageToEdgePaths(filledSquare(32, 1, 0), EDGE_OPTIONS)).toEqual([]);
+  });
+
+  // Canny drops pixels wherever edges meet (junction gradients are
+  // ambiguous), leaving lines that end a hair before the line they visibly
+  // join. The weld/bridge stages must close those — no open end may float
+  // just short of another polyline.
+  it('leaves no open end floating just short of another line (a plus of bars)', () => {
+    const lines = traceImageToEdgePaths(plusOfBars(), EDGE_OPTIONS).flatMap((p) => p.polylines);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const pl of lines) {
+      if (pl.closed) continue;
+      for (const end of [pl.points[0], pl.points.at(-1)]) {
+        if (end === undefined) continue;
+        const nearestOther = nearestOtherLineDistance(lines, pl, end);
+        const floats = nearestOther > 0.5 && nearestOther <= 4;
+        expect(floats).toBe(false);
+      }
+    }
   });
 
   it('edge sensitivity changes whether low-contrast detail survives', () => {

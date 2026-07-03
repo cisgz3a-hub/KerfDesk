@@ -30,6 +30,8 @@ const CROPS: ReadonlyArray<Crop> = [
   { name: 'zoom-arch-letters', x: 130, y: 540, w: 400, h: 140, scale: 4 },
   { name: 'zoom-r-bowl', x: 215, y: 545, w: 120, h: 120, scale: 8 },
   { name: 'zoom-doorway', x: 430, y: 270, w: 165, h: 190, scale: 4 },
+  { name: 'zoom-steps', x: 400, y: 390, w: 230, h: 100, scale: 5 },
+  { name: 'zoom-roof-left', x: 170, y: 330, w: 160, h: 90, scale: 5 },
 ];
 
 function cropImage(image: RawImageData, crop: Crop): RawImageData {

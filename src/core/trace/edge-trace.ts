@@ -95,6 +95,10 @@ function chainEdgeMask(mask: InkMask, options: TraceOptions, joinGapPx: number):
   const assembled = assembleStrokePaths(pruned, distSq, mask, {
     joinGapPx,
     alignedJoinFactor: EDGE_ALIGNED_JOIN_FACTOR,
+    // Canny drops pixels wherever edges MEET (junction gradients are
+    // ambiguous), so ends routinely stop 1-3 px short of the line they
+    // visibly join — weld them on.
+    weldOpenEndsPx: Math.max(2, Math.min(6, joinGapPx)),
   });
   const minLengthPx = Math.max(
     Math.max(0, options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX),
