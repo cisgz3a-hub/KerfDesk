@@ -432,7 +432,10 @@ function advanceStream(
     beginPostJobSettle(set, get, refs, safeWrite);
   }
   if (stepped.toSend.length > 0) {
-    void safeWrite(stepped.toSend).catch(() => {
+    // Refills are the job stream continuing: tag them so the console's
+    // "hide job stream" filter keeps hiding them. No action — the catch
+    // below owns the failure notice.
+    void safeWrite(stepped.toSend, undefined, 'job').catch(() => {
       set({
         streamer: disconnectStreamer(acked.state),
         safetyNotice: disconnectDuringJobNotice(),
