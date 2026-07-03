@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 
 const expectedRepoName = 'LaserForge-2.0';
 const expectedRemote = 'https://github.com/cisgz3a-hub/LaserForge-2.0';
@@ -23,9 +23,18 @@ function normalizeGitRemoteUrl(remote) {
 }
 
 const repoRoot = resolve(git(['rev-parse', '--show-toplevel']));
-const repoName = basename(repoRoot);
-if (repoName !== expectedRepoName) {
-  fail(`expected checkout folder "${expectedRepoName}", got "${repoRoot}"`);
+// Release runs are allowed from linked git worktrees (.claude/worktrees/<name>)
+// of the canonical checkout. The repository's identity lives with the main
+// .git directory, so validate the folder that owns the common dir — a linked
+// worktree's own folder name is arbitrary, while a clone under a wrong folder
+// name still fails because its common dir lives inside that wrong folder.
+const commonDir = resolve(repoRoot, git(['rev-parse', '--git-common-dir']));
+const identityRoot = dirname(commonDir);
+if (basename(identityRoot) !== expectedRepoName) {
+  fail(
+    `expected the checkout (or the worktree's main repository) to live in a folder named ` +
+      `"${expectedRepoName}", got "${identityRoot}"`,
+  );
 }
 
 const origin = git(['remote', 'get-url', 'origin']);
