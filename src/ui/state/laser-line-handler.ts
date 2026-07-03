@@ -15,6 +15,7 @@
 // no behavior change.
 
 import {
+  cancel as cancelStreamer,
   disconnect as disconnectStreamer,
   type GrblPins,
   onAck,
@@ -322,6 +323,11 @@ function handleStatusLine(
       controllerOperation: null,
       frameVerification: null,
       homingState: 'unknown',
+      // A status-only Alarm (the ALARM:N line may have been consumed by a
+      // pending command) must still terminate an active stream — a paused
+      // stream would otherwise keep Resume mounted against a locked
+      // controller.
+      ...cancelActiveStreamerPatch(streamer),
     });
     cancelControllerLifecycleRefs(refs, 'Controller entered Alarm.');
     return;
@@ -367,6 +373,14 @@ function handleStatusLine(
   observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
+}
+
+function cancelActiveStreamerPatch(
+  streamer: StreamerState | null,
+): Partial<Pick<LaserState, 'streamer'>> {
+  if (streamer === null) return {};
+  if (!['idle', 'streaming', 'paused'].includes(streamer.status)) return {};
+  return { streamer: cancelStreamer(streamer) };
 }
 
 function shouldReleaseStreamerAtIdle(
