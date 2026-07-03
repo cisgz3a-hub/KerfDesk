@@ -14,6 +14,7 @@ function mockCamera(overrides?: Partial<CameraAdapter>): CameraAdapter {
 
 beforeEach(() => {
   useCameraStore.setState({
+    panelOpen: false,
     isSupported: false,
     cameras: [],
     selectedDeviceId: null,
@@ -25,6 +26,18 @@ beforeEach(() => {
 });
 
 describe('camera-store', () => {
+  it('togglePanel flips the panel and closePanel always closes it', () => {
+    useCameraStore.getState().togglePanel();
+    expect(useCameraStore.getState().panelOpen).toBe(true);
+    useCameraStore.getState().togglePanel();
+    expect(useCameraStore.getState().panelOpen).toBe(false);
+    useCameraStore.getState().togglePanel();
+    useCameraStore.getState().closePanel();
+    expect(useCameraStore.getState().panelOpen).toBe(false);
+    useCameraStore.getState().closePanel();
+    expect(useCameraStore.getState().panelOpen).toBe(false);
+  });
+
   it('detects support from the adapter (and false when absent)', () => {
     useCameraStore.getState().detectSupport(mockCamera({ isSupported: () => true }));
     expect(useCameraStore.getState().isSupported).toBe(true);

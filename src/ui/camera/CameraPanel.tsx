@@ -13,12 +13,12 @@ import {
   type NetworkCameraState,
   useCameraStore,
 } from '../state/camera-store';
-import { useUiStore } from '../state/ui-store';
+import type { CameraAdapter } from '../../platform/types';
 import { NetworkCameraView } from './NetworkCameraView';
 
 export function CameraPanel(): JSX.Element {
-  const open = useUiStore((s) => s.cameraPanelOpen);
-  const toggle = useUiStore((s) => s.toggleCameraPanel);
+  const open = useCameraStore((s) => s.panelOpen);
+  const toggle = useCameraStore((s) => s.togglePanel);
   if (!open) {
     return (
       <button
@@ -36,16 +36,11 @@ export function CameraPanel(): JSX.Element {
 }
 
 function CameraPanelOpen(): JSX.Element {
-  const close = useUiStore((s) => s.closeCameraPanel);
+  const close = useCameraStore((s) => s.closePanel);
   const camera = usePlatform().camera;
   const isSupported = useCameraStore((s) => s.isSupported);
-  const cameras = useCameraStore((s) => s.cameras);
-  const selectedDeviceId = useCameraStore((s) => s.selectedDeviceId);
-  const stream = useCameraStore((s) => s.stream);
   const detectSupport = useCameraStore((s) => s.detectSupport);
   const refreshCameras = useCameraStore((s) => s.refreshCameras);
-  const selectCamera = useCameraStore((s) => s.selectCamera);
-  const startStream = useCameraStore((s) => s.startStream);
   const stopStream = useCameraStore((s) => s.stopStream);
   const networkCamera = useCameraStore((s) => s.networkCamera);
   const detectNetworkCamera = useCameraStore((s) => s.detectNetworkCamera);
@@ -74,63 +69,79 @@ function CameraPanelOpen(): JSX.Element {
         state={networkCamera}
         onDetect={() => void detectNetworkCamera(camera)}
       />
-      {!isSupported ? (
+      {isSupported ? (
+        <UsbCameraSection camera={camera} />
+      ) : (
         <p style={noteStyle}>
           A USB webcam needs a Chromium browser over https/localhost — not available here. The
           machine camera above does not need it.
         </p>
-      ) : (
-        <>
-          {cameras.length > 1 ? (
-            <select
-              aria-label="Camera device"
-              title="Choose which connected camera to preview."
-              value={selectedDeviceId ?? ''}
-              onChange={(e) => {
-                selectCamera(e.currentTarget.value);
-                // Switch the live feed immediately to the picked camera.
-                if (stream.kind === 'live' || stream.kind === 'starting') {
-                  void startStream(camera);
-                }
-              }}
-              style={selectStyle}
-            >
-              {cameras.map((device, index) => (
-                <option key={device.deviceId} value={device.deviceId}>
-                  {device.label === '' ? `Camera ${index + 1}` : device.label}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          {stream.kind === 'live' || stream.kind === 'starting' ? (
-            <CameraFeed stream={stream} />
-          ) : null}
-          <div style={rowStyle}>
-            {stream.kind === 'live' ? (
-              <button
-                type="button"
-                className="lf-btn"
-                onClick={stopStream}
-                title="Stop the live camera feed."
-              >
-                Stop camera
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="lf-btn"
-                disabled={stream.kind === 'starting'}
-                onClick={() => void startStream(camera)}
-                title="Start the live camera feed."
-              >
-                {stream.kind === 'starting' ? 'Starting…' : 'Start camera'}
-              </button>
-            )}
-          </div>
-          <StreamNote stream={stream} />
-        </>
       )}
     </div>
+  );
+}
+
+// The UVC/getUserMedia half of the panel: device picker, live feed, and the
+// start/stop control. Split from CameraPanelOpen to respect the function size
+// limit and because it owns a distinct concern (browser webcams, not the
+// machine-integrated network camera above it).
+function UsbCameraSection(props: { readonly camera: CameraAdapter | undefined }): JSX.Element {
+  const { camera } = props;
+  const cameras = useCameraStore((s) => s.cameras);
+  const selectedDeviceId = useCameraStore((s) => s.selectedDeviceId);
+  const stream = useCameraStore((s) => s.stream);
+  const selectCamera = useCameraStore((s) => s.selectCamera);
+  const startStream = useCameraStore((s) => s.startStream);
+  const stopStream = useCameraStore((s) => s.stopStream);
+
+  return (
+    <>
+      {cameras.length > 1 ? (
+        <select
+          aria-label="Camera device"
+          title="Choose which connected camera to preview."
+          value={selectedDeviceId ?? ''}
+          onChange={(e) => {
+            selectCamera(e.currentTarget.value);
+            // Switch the live feed immediately to the picked camera.
+            if (stream.kind === 'live' || stream.kind === 'starting') {
+              void startStream(camera);
+            }
+          }}
+          style={selectStyle}
+        >
+          {cameras.map((device, index) => (
+            <option key={device.deviceId} value={device.deviceId}>
+              {device.label === '' ? `Camera ${index + 1}` : device.label}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      {stream.kind === 'live' || stream.kind === 'starting' ? <CameraFeed stream={stream} /> : null}
+      <div style={rowStyle}>
+        {stream.kind === 'live' ? (
+          <button
+            type="button"
+            className="lf-btn"
+            onClick={stopStream}
+            title="Stop the live camera feed."
+          >
+            Stop camera
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="lf-btn"
+            disabled={stream.kind === 'starting'}
+            onClick={() => void startStream(camera)}
+            title="Start the live camera feed."
+          >
+            {stream.kind === 'starting' ? 'Starting…' : 'Start camera'}
+          </button>
+        )}
+      </div>
+      <StreamNote stream={stream} />
+    </>
   );
 }
 

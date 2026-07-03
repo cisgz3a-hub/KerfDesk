@@ -25,6 +25,9 @@ export type NetworkCameraState =
   | { readonly kind: 'not-found' };
 
 export type CameraStore = {
+  // Camera panel visibility — floating, NON-modal like the registration jig
+  // panel. Lives here (not ui-store) so all Camera Mode state is one slice.
+  readonly panelOpen: boolean;
   readonly isSupported: boolean;
   readonly cameras: ReadonlyArray<CameraDevice>;
   readonly selectedDeviceId: string | null;
@@ -36,6 +39,8 @@ export type CameraStore = {
   // The machine-integrated HTTP camera (Falcon A1 Pro) found by auto-detect.
   readonly networkCamera: NetworkCameraState;
 
+  readonly togglePanel: () => void;
+  readonly closePanel: () => void;
   readonly detectSupport: (camera: CameraAdapter | undefined) => void;
   readonly detectNetworkCamera: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
@@ -58,6 +63,7 @@ function cameraErrorMessage(err: unknown): string {
 }
 
 export const useCameraStore = create<CameraStore>((set, get) => ({
+  panelOpen: false,
   isSupported: false,
   cameras: [],
   selectedDeviceId: null,
@@ -66,6 +72,8 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   streamEpoch: 0,
   networkCamera: { kind: 'idle' },
 
+  togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
+  closePanel: () => set({ panelOpen: false }),
   detectSupport: (camera) => set({ isSupported: camera?.isSupported() ?? false }),
 
   detectNetworkCamera: async (camera) => {
