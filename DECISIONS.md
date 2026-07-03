@@ -4210,10 +4210,13 @@ design is built around:
   `profile-paths.ts` (`profile-outside`). The generator bakes exactly
   two things:
   1. **Clearance `c`** (signed, + = looser; default 0 laser = press
-     fit, 0.15 mm CNC = glue fit): every panel polygon offset by −c/2
-     via `offsetClosedPolylinesForKerf` — tabs narrow c/2 per side,
-     recesses widen ⇒ total joint play = c, uniformly. Never per-tab
-     arithmetic.
+     fit, 0.15 mm CNC = glue fit): every panel polygon offset by −c/4
+     via `offsetClosedPolylinesForKerf`. Derivation (corrected at S2
+     from an earlier −c/2 draft): a uniform inward offset δ narrows
+     every tab by 2δ AND widens the mating recess by 2δ, so joint play
+     = 4δ; the contract is play == c, hence δ = c/4 — tabs narrow c/4
+     per flank, recesses widen c/4 per flank, notch − tab = c exactly,
+     uniformly. Never per-tab arithmetic.
   2. **CNC corner relief** in the shipped F-CNC26 corner-overcut
      convention (`dogbone.ts` precedent): a circle of one bit RADIUS
      centered ON the seat-critical reflex corner vertices, subtracted

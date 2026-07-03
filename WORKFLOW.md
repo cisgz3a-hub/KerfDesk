@@ -2083,7 +2083,8 @@ F-CNC19 tiling.
 2. Generated panels carry corner-overcut reliefs (F-CNC26 style: circle
    of one bit radius centered on the vertex) at exactly the
    seat-critical reflex corners — notch bottoms where a mating tab must
-   seat. Tabs narrow and recesses widen by clearance/2 per side.
+   seat. Tabs narrow and recesses widen by clearance/4 per flank, so
+   each joint's notch − tab play equals the clearance exactly.
 3. The panels then flow through the normal CNC pipeline: the layer's
    profile-outside cutter compensation applies at compile, unchanged.
 

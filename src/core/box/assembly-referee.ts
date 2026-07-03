@@ -11,6 +11,17 @@ import type { PanelId } from './panel-claims';
 
 export type RefereePanel = { readonly panel: PanelId; readonly outline: Polyline };
 
+/**
+ * playMm > 0 switches the bands to fit-with-clearance mode: material is
+ * collected within T/4 of each face line (tab tips recede by play/4), every
+ * gap between consecutive tabs must measure play/2 per flank (two flanks per
+ * tab ⇒ the ADR-105 contract of play per joint), and interference is never
+ * tolerated. toleranceMm covers clipper's 3-decimal rounding.
+ */
+export type RefereeOptions = { readonly playMm?: number; readonly toleranceMm?: number };
+
+const DEFAULT_PLAY_TOLERANCE_MM = 4e-3;
+
 type Axis = 'x' | 'y' | 'z';
 type AxisEnd = 'min' | 'max';
 type Interval = { readonly fromMm: number; readonly toMm: number };
@@ -31,12 +42,15 @@ const PLACEMENTS: Readonly<
 export function checkBoxAssembly(
   panels: ReadonlyArray<RefereePanel>,
   spec: BoxSpec,
+  options: RefereeOptions = {},
 ): ReadonlyArray<string> {
   const spans = outerSpans(spec);
+  const playMm = options.playMm ?? 0;
+  const toleranceMm = options.toleranceMm ?? DEFAULT_PLAY_TOLERANCE_MM;
   return [
-    ...checkEdgeBands(panels, spec.thicknessMm, spans),
+    ...checkEdgeBands(panels, spec.thicknessMm, spans, playMm, toleranceMm),
     ...checkCornerCubes(panels, spec.thicknessMm, spans),
-    ...checkAssembledBounds(panels, spans),
+    ...checkAssembledBounds(panels, spans, playMm + toleranceMm),
   ];
 }
 
@@ -52,6 +66,8 @@ function checkEdgeBands(
   panels: ReadonlyArray<RefereePanel>,
   thicknessMm: number,
   spans: Readonly<Record<Axis, number>>,
+  playMm: number,
+  toleranceMm: number,
 ): string[] {
   const issues: string[] = [];
   for (let i = 0; i < panels.length; i += 1) {
@@ -63,28 +79,37 @@ function checkEdgeBands(
       const edgeAxis = thirdAxis(PLACEMENTS[a.panel].normalAxis, PLACEMENTS[b.panel].normalAxis);
       const label = `${a.panel}/${b.panel}`;
       const merged = [
-        ...faceIntervals(a, b.panel, thicknessMm, spans),
-        ...faceIntervals(b, a.panel, thicknessMm, spans),
+        ...faceIntervals(a, b.panel, thicknessMm, spans, playMm),
+        ...faceIntervals(b, a.panel, thicknessMm, spans, playMm),
       ].sort((p, q) => p.fromMm - q.fromMm);
-      issues.push(...checkPartition(merged, thicknessMm, spans[edgeAxis] - thicknessMm, label));
+      issues.push(
+        ...(playMm === 0
+          ? checkExactPartition(merged, thicknessMm, spans[edgeAxis] - thicknessMm, label)
+          : checkPlayPartition(merged, playMm, toleranceMm, label)),
+      );
     }
   }
   return issues;
 }
 
 // Material intervals of `panel` along the face line it shares with `mate`,
-// clipped to the edge interior (corner cubes are judged separately).
+// clipped to the edge interior (corner cubes are judged separately). At
+// play 0 the face line is matched exactly (shared float expressions); with
+// play, tab tips sit play/4 inside the face, so material within T/4 of the
+// face is collected (recess floors at ~T stay far outside the window).
 function faceIntervals(
   panel: RefereePanel,
   mate: PanelId,
   thicknessMm: number,
   spans: Readonly<Record<Axis, number>>,
+  playMm: number,
 ): Interval[] {
   const place = PLACEMENTS[panel.panel];
   const matePlace = PLACEMENTS[mate];
   const fixedIsU = matePlace.normalAxis === place.uAxis;
   const fixedSpan = spans[fixedIsU ? place.uAxis : place.vAxis];
   const fixedValue = matePlace.normalEnd === 'min' ? 0 : fixedSpan;
+  const windowMm = playMm === 0 ? 0 : thicknessMm / 4;
   const interiorStart = thicknessMm;
   const interiorEnd = spans[fixedIsU ? place.vAxis : place.uAxis] - thicknessMm;
   const out: Interval[] = [];
@@ -93,17 +118,32 @@ function faceIntervals(
     const p = pts[k];
     const q = pts[k + 1];
     if (p === undefined || q === undefined) continue;
-    const [pFixed, pVary] = fixedIsU ? [p.x, p.y] : [p.y, p.x];
-    const [qFixed, qVary] = fixedIsU ? [q.x, q.y] : [q.y, q.x];
-    if (pFixed !== fixedValue || qFixed !== fixedValue) continue;
-    const fromMm = Math.max(Math.min(pVary, qVary), interiorStart);
-    const toMm = Math.min(Math.max(pVary, qVary), interiorEnd);
-    if (fromMm < toMm) out.push({ fromMm, toMm });
+    const interval = bandSegment(p, q, fixedIsU, fixedValue, windowMm, interiorStart, interiorEnd);
+    if (interval !== undefined) out.push(interval);
   }
   return out;
 }
 
-function checkPartition(
+function bandSegment(
+  p: { x: number; y: number },
+  q: { x: number; y: number },
+  fixedIsU: boolean,
+  fixedValue: number,
+  windowMm: number,
+  interiorStart: number,
+  interiorEnd: number,
+): Interval | undefined {
+  const [pFixed, pVary] = fixedIsU ? [p.x, p.y] : [p.y, p.x];
+  const [qFixed, qVary] = fixedIsU ? [q.x, q.y] : [q.y, q.x];
+  if (Math.abs(pFixed - fixedValue) > windowMm || Math.abs(qFixed - fixedValue) > windowMm) {
+    return undefined;
+  }
+  const fromMm = Math.max(Math.min(pVary, qVary), interiorStart);
+  const toMm = Math.min(Math.max(pVary, qVary), interiorEnd);
+  return fromMm < toMm ? { fromMm, toMm } : undefined;
+}
+
+function checkExactPartition(
   sorted: ReadonlyArray<Interval>,
   startMm: number,
   endMm: number,
@@ -120,6 +160,34 @@ function checkPartition(
     cursor = interval.toMm;
   }
   if (cursor !== endMm) return [`${label}: void in joint at ${cursor}..${endMm} mm`];
+  return [];
+}
+
+// With clearance, tabs from the two panels alternate along the band with a
+// play/2 gap at every flank (each tab has two flanks ⇒ play per joint).
+// Interference is never tolerated; the first/last gaps against the corner
+// regions are skipped (the clip boundary hides half of each).
+function checkPlayPartition(
+  sorted: ReadonlyArray<Interval>,
+  playMm: number,
+  toleranceMm: number,
+  label: string,
+): string[] {
+  const flankGapMm = playMm / 2;
+  for (let i = 1; i < sorted.length; i += 1) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    if (prev === undefined || curr === undefined) continue;
+    const gap = curr.fromMm - prev.toMm;
+    if (gap < -toleranceMm) {
+      return [`${label}: parts interfere by ${-gap} mm at ${curr.fromMm} mm`];
+    }
+    if (Math.abs(gap - flankGapMm) > toleranceMm) {
+      return [
+        `${label}: flank gap ${gap} mm at ${prev.toMm} mm; expected ${flankGapMm} ± ${toleranceMm} mm`,
+      ];
+    }
+  }
   return [];
 }
 
@@ -180,10 +248,12 @@ function pointInOutline(x: number, y: number, outline: Polyline): boolean {
   return inside;
 }
 
-// The assembled slab-and-outline union must measure exactly the outer box.
+// The assembled slab-and-outline union must measure the outer box — exactly
+// at play 0; within the clearance recession otherwise.
 function checkAssembledBounds(
   panels: ReadonlyArray<RefereePanel>,
   spans: Readonly<Record<Axis, number>>,
+  slackMm: number,
 ): string[] {
   const issues: string[] = [];
   for (const axis of ['x', 'y', 'z'] as const) {
@@ -195,7 +265,9 @@ function checkAssembledBounds(
       minMm = Math.min(minMm, extent.fromMm);
       maxMm = Math.max(maxMm, extent.toMm);
     }
-    if (minMm !== 0 || maxMm !== spans[axis]) {
+    const minOk = slackMm === 0 ? minMm === 0 : Math.abs(minMm) <= slackMm;
+    const maxOk = slackMm === 0 ? maxMm === spans[axis] : Math.abs(maxMm - spans[axis]) <= slackMm;
+    if (!minOk || !maxOk) {
       issues.push(`assembled ${axis} extent ${minMm}..${maxMm} ≠ 0..${spans[axis]} mm`);
     }
   }
