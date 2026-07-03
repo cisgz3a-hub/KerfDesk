@@ -6,7 +6,11 @@
 // hold-down jogging is Phase B polish.
 
 import { useState } from 'react';
-import { profileSupportsCapability, type DeviceProfile } from '../../core/devices';
+import {
+  jogAxisSignsForOrigin,
+  profileSupportsCapability,
+  type DeviceProfile,
+} from '../../core/devices';
 import { machineKindOf, type MachineKind } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -26,8 +30,20 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const feed = Math.min(maxFeed, 3000);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
 
-  const send = (dx: number, dy: number): void => {
-    void jog({ dx: dx * step, dy: dy * step, feed });
+  // The arrows are physical directions (↑ = away from the operator, → = the
+  // operator's right); the device origin decides which machine-axis sign that
+  // is. G-code emission maps geometry the same way (origin-transform.ts) — a
+  // hardcoded +Y here rams rear-origin machines into their front rail.
+  const signs = jogAxisSignsForOrigin(device.origin);
+  const deltaFor = (axis: 'x' | 'y', physicalDirection: 1 | -1): number =>
+    physicalDirection * step * signs[axis];
+  const send = (axis: 'x' | 'y', physicalDirection: 1 | -1): void => {
+    const delta = deltaFor(axis, physicalDirection);
+    void jog(axis === 'x' ? { dx: delta, feed } : { dy: delta, feed });
+  };
+  const jogLabel = (axis: 'x' | 'y', physicalDirection: 1 | -1): string => {
+    const delta = deltaFor(axis, physicalDirection);
+    return `Jog ${delta >= 0 ? '+' : '-'}${axis.toUpperCase()} ${step} mm`;
   };
 
   const sendFocus = (direction: 1 | -1): void => {
@@ -54,21 +70,19 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
       </div>
       <div style={gridStyle}>
         <span />
-        {/* For front-left/right origin, "↑ away from operator" maps to +Y in
-            machine coords. We send +dy for ↑ and -dy for ↓ accordingly. */}
-        <Btn onClick={() => send(0, 1)} disabled={disabled} label={`Jog +Y ${step} mm`}>
+        <Btn onClick={() => send('y', 1)} disabled={disabled} label={jogLabel('y', 1)}>
           ↑
         </Btn>
         <span />
-        <Btn onClick={() => send(-1, 0)} disabled={disabled} label={`Jog -X ${step} mm`}>
+        <Btn onClick={() => send('x', -1)} disabled={disabled} label={jogLabel('x', -1)}>
           ←
         </Btn>
         <span />
-        <Btn onClick={() => send(1, 0)} disabled={disabled} label={`Jog +X ${step} mm`}>
+        <Btn onClick={() => send('x', 1)} disabled={disabled} label={jogLabel('x', 1)}>
           →
         </Btn>
         <span />
-        <Btn onClick={() => send(0, -1)} disabled={disabled} label={`Jog -Y ${step} mm`}>
+        <Btn onClick={() => send('y', -1)} disabled={disabled} label={jogLabel('y', -1)}>
           ↓
         </Btn>
         <span />

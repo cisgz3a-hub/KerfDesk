@@ -144,6 +144,71 @@ describe('JogPad accessible labels', () => {
     await unmount();
   });
 
+  // The arrows are physical directions (↑ = away from the operator). On
+  // rear-*/right-origin machines the machine axes point the other way, so the
+  // emitted deltas — and the labels, which describe the wire command — must
+  // flip with the device origin. A hardcoded +Y for ↑ rams the head into the
+  // front rail on a rear-origin machine.
+  it('flips Y for ↑ on a rear-left origin machine', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.getState().updateDeviceProfile({ origin: 'rear-left', maxFeed: 6000 });
+    const { host, unmount } = await renderJogPad();
+
+    const up = buttonByLabel(host, 'Jog -Y 10 mm');
+    if (up === null) throw new Error('↑ button missing its origin-corrected -Y label');
+    await act(async () => {
+      up.click();
+    });
+    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 });
+
+    const right = buttonByLabel(host, 'Jog +X 10 mm');
+    if (right === null) throw new Error('→ button missing its +X label');
+    await act(async () => {
+      right.click();
+    });
+    expect(jog).toHaveBeenLastCalledWith({ dx: 10, feed: 3000 });
+
+    await unmount();
+  });
+
+  it('flips both axes on a rear-right origin machine', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.getState().updateDeviceProfile({ origin: 'rear-right', maxFeed: 6000 });
+    const { host, unmount } = await renderJogPad();
+
+    const up = buttonByLabel(host, 'Jog -Y 10 mm');
+    const right = buttonByLabel(host, 'Jog -X 10 mm');
+    if (up === null || right === null) throw new Error('origin-corrected labels missing');
+    await act(async () => {
+      up.click();
+    });
+    expect(jog).toHaveBeenCalledWith({ dy: -10, feed: 3000 });
+    await act(async () => {
+      right.click();
+    });
+    expect(jog).toHaveBeenLastCalledWith({ dx: -10, feed: 3000 });
+
+    await unmount();
+  });
+
+  it('keeps the front-left mapping for ↑ and →', async () => {
+    const jog = vi.fn(async () => undefined);
+    useLaserStore.setState({ jog });
+    useStore.getState().updateDeviceProfile({ maxFeed: 6000 });
+    const { host, unmount } = await renderJogPad();
+
+    const up = buttonByLabel(host, 'Jog +Y 10 mm');
+    if (up === null) throw new Error('↑ button missing its +Y label');
+    await act(async () => {
+      up.click();
+    });
+    expect(jog).toHaveBeenCalledWith({ dy: 10, feed: 3000 });
+
+    await unmount();
+  });
+
   it('sends relative Z jogs only for confirmed Z-axis profiles', async () => {
     const jog = vi.fn(async () => undefined);
     useLaserStore.setState({ jog });
