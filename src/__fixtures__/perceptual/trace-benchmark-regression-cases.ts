@@ -1,6 +1,6 @@
 import {
   TRACE_PRESETS,
-  traceImageToCenterlinePaths,
+  traceCenterlineStrokePaths,
   traceImageToColoredPaths,
 } from '../../core/trace';
 import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
@@ -57,7 +57,7 @@ export function centerlineLandedRegressionBenchmark(): TraceBenchmarkResult {
   let shortFragmentCount = 0;
   let fragmentOverLimitCount = 0;
   for (const fixture of CENTERLINE_TRUTH_FIXTURES) {
-    const traced = traceImageToCenterlinePaths(fixture.image, CENTERLINE_OPTIONS);
+    const traced = traceCenterlineStrokePaths(fixture.image, CENTERLINE_OPTIONS);
     const metric = measureCenterlineDeviation(traced, fixture);
     const limit = CENTERLINE_REGRESSION_LIMITS[fixture.name] ?? STRICT_CENTERLINE_LIMIT;
     maxDeviationPx = Math.max(maxDeviationPx, metric.maxDeviationPx);

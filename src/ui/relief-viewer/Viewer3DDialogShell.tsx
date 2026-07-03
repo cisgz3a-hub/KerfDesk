@@ -1,4 +1,4 @@
-// Viewer3DDialogShell — shared chrome for the ADR-101 3D viewers (relief
+// Viewer3DDialogShell — shared chrome for the ADR-102 3D viewers (relief
 // surface, cut preview): backdrop dialog, canvas, loading / ready / failed
 // state machine, and scene lifecycle (cancel + dispose on unmount).
 // Extracted from Relief3DViewerDialog when the H.11 cut preview became the

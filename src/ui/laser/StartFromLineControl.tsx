@@ -1,5 +1,5 @@
 // StartFromLineControl — resume a stopped/errored job from a chosen G-code
-// line (ADR-102 G7, F-CNC27). The heavy lifting (readiness gate, modal-state
+// line (ADR-103 G7, F-CNC27). The heavy lifting (readiness gate, modal-state
 // replay, confirm, stream) lives in runStartFromLineFlow.
 
 import { useState } from 'react';

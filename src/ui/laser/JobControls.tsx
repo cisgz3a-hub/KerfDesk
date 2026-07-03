@@ -71,7 +71,7 @@ function SetupRow(props: {
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
-  // ADR-100 §5 (provisional): auto-focus is a laser focus routine; it hides
+  // ADR-101 §5 (provisional): auto-focus is a laser focus routine; it hides
   // on a router. The CNC Z-zeroing flow arrives as its own H.7 surface.
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const isCncMachine = machineKind === 'cnc';

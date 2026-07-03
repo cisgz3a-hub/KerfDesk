@@ -2,7 +2,8 @@
 // Sleep wake uses GRBL soft reset (Ctrl-X), so it must invalidate any transient
 // origin/frame state just like Stop does.
 
-import { RT_SOFT_RESET, cancel as cancelStreamer } from '../../core/controllers/grbl';
+import { cancel as cancelStreamer } from '../../core/controllers/grbl';
+import type { ControllerDriver } from '../../core/controllers';
 import {
   cancelControllerLifecycleRefs,
   waitForFreshIdle,
@@ -16,18 +17,22 @@ type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
 ) => void;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+type DriverFn = () => ControllerDriver;
 
 export function controllerRecoveryActions(
   set: SetFn,
   refs: ControllerLifecycleRefs,
   safeWrite: SafeWriteFn,
+  driver: DriverFn,
 ): Pick<LaserState, 'wakeController'> {
   return {
     wakeController: async () => {
+      const softReset = driver().realtime.softReset;
+      if (softReset === null) throw new Error('This controller cannot be woken by soft reset.');
       cancelControllerLifecycleRefs(refs, 'Controller recovery started.');
       set({ controllerOperation: { kind: 'recovery', phase: 'reset', idleReports: 0 } });
       try {
-        await safeWrite(RT_SOFT_RESET, 'wake');
+        await safeWrite(softReset, 'wake');
         set((state) => ({
           statusReport: null,
           alarmCode: null,

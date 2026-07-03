@@ -1,6 +1,7 @@
 import {
   DEFAULT_DEVICE_PROFILE,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  isKnownControllerKind,
   type DeviceProfile,
   type NoGoZone,
   type ProfileCapability,
@@ -29,7 +30,7 @@ const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
     {
       label: 'KerfDesk Falcon baseline',
       status: 'researched',
-      note: 'Uses the existing KerfDesk/Falcon-compatible output behavior verified by tests.',
+      note: 'Uses the existing KerfDesk/Falcon-compatible output behavior verified by tests. Confirmed working on a real Falcon A1 Pro through the ADR-094 driver refactor, 2026-07-02.',
     },
   ],
 };
@@ -99,6 +100,118 @@ const ORTUR_LASER_MASTER_3_PROFILE: DeviceProfile = {
   ],
 };
 
+// Phase H controller-family starters. Wire-compatible with the GRBL driver
+// path; the controllerKind selects the matching ControllerDriver at connect.
+const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-grblhal',
+  vendor: 'Generic',
+  model: 'grblHAL controller',
+  name: 'Generic grblHAL 400×400',
+  machineFamily: 'generic-grblhal',
+  controllerKind: 'grblhal',
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'scan-offsets', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'grblHAL protocol compatibility',
+      status: 'researched',
+      note: 'grblHAL speaks the GRBL v1.1 wire protocol with extended codes. Confirmed working on a Creality Falcon A1 Pro (GrblHAL 1.1f), 2026-07-02. Confirm bed size and S range from $$ on connect.',
+    },
+  ],
+};
+
+const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-fluidnc',
+  vendor: 'Generic',
+  model: 'FluidNC (ESP32)',
+  name: 'Generic FluidNC 400×400',
+  machineFamily: 'generic-fluidnc',
+  controllerKind: 'fluidnc',
+  capabilities: ['grbl', 'wcs', 'verified-origin', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'FluidNC GRBL-compatible reporting',
+      status: 'unverified',
+      note: 'FluidNC reports as "Grbl 3.x [FluidNC vX]" and streams like GRBL, but real configuration lives in its YAML config — numeric $ writes are disabled in-app. Simulator-verified only; not hardware-verified.',
+    },
+  ],
+};
+
+const GENERIC_MARLIN_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-marlin-laser',
+  vendor: 'Generic',
+  model: 'Marlin laser (LASER_FEATURE)',
+  name: 'Generic Marlin laser 300×200',
+  machineFamily: 'generic-marlin',
+  controllerKind: 'marlin',
+  baudRate: 250000,
+  // Marlin has no realtime buffer reporting; ping-pong (one line per ok) is
+  // the only safe streaming mode.
+  streamingMode: 'ping-pong',
+  gcodeDialect: { dialectId: 'marlin-inline' },
+  bedWidth: 300,
+  bedHeight: 200,
+  // Marlin laser convention: S range 0-255.
+  maxPowerS: 255,
+  minPowerS: 0,
+  capabilities: ['no-go-zones'],
+  evidence: [
+    {
+      label: 'Marlin LASER_FEATURE conventions',
+      status: 'unverified',
+      note: 'Marlin builds vary widely (LASER_FEATURE inline vs fan-mosfet wiring, S 0-255 vs 0-100). Simulator-verified only; NOT hardware-verified. Confirm the dialect and S range against your firmware configuration before burning.',
+    },
+  ],
+};
+
+const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-smoothieware',
+  vendor: 'Generic',
+  model: 'Smoothieware laser',
+  name: 'Generic Smoothieware 300×200',
+  machineFamily: 'generic-smoothieware',
+  controllerKind: 'smoothieware',
+  streamingMode: 'ping-pong',
+  bedWidth: 300,
+  bedHeight: 200,
+  // Smoothie's laser module scales S against laser_module_maximum_s_value,
+  // default 1.0 — power words are fractions (S0.500 = 50%).
+  maxPowerS: 1,
+  minPowerS: 0,
+  capabilities: ['wcs', 'no-go-zones'],
+  evidence: [
+    {
+      label: 'Smoothieware laser module conventions',
+      status: 'unverified',
+      note: 'Fractional S scale (0-1.0) from the Smoothieware laser docs; realtime ?/!/~ supported, halt recovery via M999. Simulator-verified only; NOT hardware-verified. Confirm laser_module_maximum_s_value against your config.',
+    },
+  ],
+};
+
+const GENERIC_RUIDA_PROFILE: DeviceProfile = {
+  ...DEFAULT_DEVICE_PROFILE,
+  profileId: 'generic-ruida-rd-export',
+  vendor: 'Generic',
+  model: 'Ruida RDC644x-class CO2 (.rd export)',
+  name: 'Generic Ruida CO2 900×600 (.rd export)',
+  machineFamily: 'generic-ruida',
+  controllerKind: 'ruida',
+  bedWidth: 900,
+  bedHeight: 600,
+  origin: 'rear-right',
+  capabilities: ['no-go-zones'],
+  evidence: [
+    {
+      label: 'Ruida protocol (public reverse-engineering)',
+      status: 'unverified',
+      note: 'EXPERIMENTAL: .rd encoding follows public research (MeerK40t / EduTech). Output round-trips through this app’s own decoder, but NO file has been accepted by a real Ruida controller yet. Live streaming is not available — export .rd and run from the panel/USB. Verify on scrap with the machine’s own preview first.',
+    },
+  ],
+};
+
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
   entry(DEFAULT_DEVICE_PROFILE, [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
@@ -117,6 +230,21 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   ]),
   entry(ORTUR_LASER_MASTER_3_PROFILE, [
     'Work area from public specs; confirm bed size, homing, and S range before the first job.',
+  ]),
+  entry(GENERIC_GRBLHAL_PROFILE, [
+    'grblHAL is wire-compatible with the GRBL driver; extended alarm codes 11-13 are decoded.',
+  ]),
+  entry(GENERIC_FLUIDNC_PROFILE, [
+    'FluidNC numeric $ setting writes are blocked in-app (configuration lives in its YAML config).',
+  ]),
+  entry(GENERIC_MARLIN_PROFILE, [
+    'Marlin: ping-pong streaming, no realtime pause/stop bytes, S 0-255, dialect must match the firmware build (inline vs fan).',
+  ]),
+  entry(GENERIC_SMOOTHIEWARE_PROFILE, [
+    'Smoothieware: fractional S power (0-1.0), realtime ?/!/~, M999 halt recovery, no $$/$J.',
+  ]),
+  entry(GENERIC_RUIDA_PROFILE, [
+    'Ruida: file-export only (.rd); encoder is EXPERIMENTAL and not accepted by real hardware yet.',
   ]),
 ];
 
@@ -156,8 +284,10 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   const errors: string[] = [];
   requireNonEmpty(profile.name, 'name', errors);
   if (profile.profileId !== undefined) requireNonEmpty(profile.profileId, 'profileId', errors);
-  if (profile.controllerKind !== undefined && profile.controllerKind !== 'grbl-v1.1') {
-    errors.push('controllerKind must be grbl-v1.1');
+  if (profile.controllerKind !== undefined && !isKnownControllerKind(profile.controllerKind)) {
+    errors.push(
+      'controllerKind must be one of: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware, ruida',
+    );
   }
   if (!isGcodeDialectSelection(profile.gcodeDialect)) {
     errors.push('gcodeDialect must reference a known GRBL dialect');

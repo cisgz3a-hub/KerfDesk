@@ -1,9 +1,9 @@
 // machine-command-gate — decides which registry commands are visible for
-// the active machine kind (ADR-100 gate-and-hide). Hidden commands are
+// the active machine kind (ADR-101 gate-and-hide). Hidden commands are
 // filtered out of buildAppCommands' result, so every command surface
 // (menu bar, toolbar, workspace context menu) hides them uniformly.
 //
-// Classification checklist for NEW commands (ADR-100 consequence):
+// Classification checklist for NEW commands (ADR-101 consequence):
 //   * effect exists only in the laser output pipeline → LASER_ONLY set
 //   * effect exists only in the CNC output pipeline → CNC_ONLY set
 //   * machine-agnostic (geometry, edit, view, file) → leave ungated
@@ -11,7 +11,7 @@
 import type { MachineKind } from '../../core/scene';
 import type { AppCommand, CommandId } from './command-types';
 
-// Laser-only commands, per ADR-100 §2: calibration generators, Fill-mode
+// Laser-only commands, per ADR-101 §2: calibration generators, Fill-mode
 // tools, raster/Image-mode processing (CNC compile never consumes rasters),
 // the Trace family, the Registration Jig, and laser path optimization
 // (optimizePaths passes kind:'cnc' groups through untouched).

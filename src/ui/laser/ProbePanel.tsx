@@ -1,4 +1,4 @@
-// ProbePanel — guided touch-plate probing (ADR-102 G2, F-CNC20). CNC-only:
+// ProbePanel — guided touch-plate probing (ADR-103 G2, F-CNC20). CNC-only:
 // laser projects auto-focus instead. Builds the G38.2 sequence from the
 // editable plate/bit geometry and hands it to the store's probe action.
 

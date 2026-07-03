@@ -71,7 +71,7 @@ describe('SelectedObjectProperties', () => {
     }
   });
 
-  it('renders nothing in CNC mode — every editor here is laser-only (ADR-100 §3)', async () => {
+  it('renders nothing in CNC mode — every editor here is laser-only (ADR-101 §3)', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().selectObject('O1');
     useStore.getState().setMachineKind('cnc');

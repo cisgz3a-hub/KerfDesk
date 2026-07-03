@@ -13,10 +13,10 @@
 export type { RawImageData, TraceOptions } from './trace-image';
 export {
   DEFAULT_TRACE_OPTIONS,
-  TRACE_PRESETS,
   thresholdBandToMonochrome,
   traceImageToSvgString,
 } from './trace-image';
+export { TRACE_PRESETS } from './trace-presets';
 export {
   DEFAULT_LIGHTBURN_TRACE_SETTINGS,
   lightBurnTraceSettingsToPotraceParams,
@@ -29,7 +29,7 @@ export {
   tracedataToColoredPaths,
 } from './trace-to-paths';
 export { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
-export { traceImageToCenterlinePaths } from './centerline-trace';
+export { traceCenterlineStrokePaths } from './centerline';
 export { coloredPathsToSvg } from './paths-to-svg';
 export type { BatchTraceDependencies, BatchTraceImageJob, BatchTraceSvgFile } from './batch-trace';
 export { traceImagesToSvgFiles } from './batch-trace';

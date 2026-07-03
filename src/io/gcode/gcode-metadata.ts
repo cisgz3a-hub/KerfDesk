@@ -22,7 +22,7 @@ export type GcodeMetadata = {
 // dynamic power for fill (ADR-036), and raster gap-rapid splitting (ADR-039).
 export const EMITTER_REVISION = 'adr-039-raster-gap-rapid-v1';
 
-// Machine-specific assumption lines (ADR-102 defect fix): router exports
+// Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
 // scale meaning differs per machine — laser: $30 = max beam power S; CNC:
 // $30 = spindle max RPM so `S<rpm>` maps 1:1 — and $32 must be 1 on a laser

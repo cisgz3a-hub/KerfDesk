@@ -1,5 +1,5 @@
 // reliefSurfaceMesh — heightmap → plain vertex/index arrays for the 3D
-// relief viewer (ADR-101). PURE: returns Float32Array/Uint32Array only, so
+// relief viewer (ADR-102). PURE: returns Float32Array/Uint32Array only, so
 // the viewer geometry is testable without WebGL; three.js consumes these at
 // the UI boundary (src/ui/relief-viewer/) and computes shading normals
 // itself. One vertex per heightmap cell center, two triangles per cell

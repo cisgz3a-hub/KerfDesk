@@ -1,4 +1,4 @@
-// Clean-room marching squares (Phase H.5, ADR-094): boolean cell mask →
+// Clean-room marching squares (Phase H.5, ADR-098): boolean cell mask →
 // closed iso-contours on the dual grid. Each 2×2 cell block maps through the
 // classic 16-case table; segments chain into closed loops by walking shared
 // edge midpoints. Saddles (cases 5/10) resolve by a FIXED rule (treat as

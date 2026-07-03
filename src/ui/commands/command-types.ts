@@ -104,7 +104,7 @@ export type AppCommand = {
 };
 
 export type AppCommandContext = {
-  // ADR-100 gate-and-hide: laser-only commands are filtered out of the
+  // ADR-101 gate-and-hide: laser-only commands are filtered out of the
   // registry's output when the project machine is CNC.
   readonly machineKind: MachineKind;
   readonly dirty: boolean;
@@ -121,7 +121,7 @@ export type AppCommandContext = {
   readonly hasConvertibleSelection: boolean;
   readonly canConvertSelectionToPath: boolean;
   readonly canWeldSelection: boolean;
-  // ADR-102 G1: booleans need >= 2 unlocked closed-contour vector objects.
+  // ADR-103 G1: booleans need >= 2 unlocked closed-contour vector objects.
   readonly canCombineSelection: boolean;
   readonly hasFillableSelection: boolean;
   readonly canCloseOpenFillContours: boolean;

@@ -1,4 +1,4 @@
-// downsampleRemovalGrid (ADR-102 G4): block-deepest reduction, scale
+// downsampleRemovalGrid (ADR-103 G4): block-deepest reduction, scale
 // preservation, and the no-op fast path.
 
 import { describe, expect, it } from 'vitest';

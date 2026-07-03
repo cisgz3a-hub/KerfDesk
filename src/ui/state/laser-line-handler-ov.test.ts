@@ -1,15 +1,19 @@
-// handleLine Ov override caching (ADR-102 G3): the `Ov:` field is reported
+// handleLine Ov override caching (ADR-103 G3): the `Ov:` field is reported
 // intermittently, so the cache must persist across Ov-less frames and clear
 // on Alarm exactly like wcoCache. Split from laser-line-handler.test.ts
 // (file line cap); the state builder mirrors that file's.
 
 import { describe, expect, it } from 'vitest';
 import { startCollecting } from '../../core/controllers/grbl';
+import { grblDriver } from '../../core/controllers';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
 
 function makeLaserState(): LaserState {
   return {
+    capabilities: grblDriver.capabilities,
+    activeControllerKind: grblDriver.kind,
+    detectedControllerKind: null,
     connection: { kind: 'connected' },
     statusReport: null,
     alarmCode: null,
@@ -78,6 +82,7 @@ function makeHarness(): {
   };
   return {
     refs: {
+      driver: grblDriver,
       settingsCollector: startCollecting(),
       onLineArrived: null,
       controllerCommand: null,
@@ -88,7 +93,7 @@ function makeHarness(): {
   };
 }
 
-describe('handleLine Ov override caching (ADR-102 G3)', () => {
+describe('handleLine Ov override caching (ADR-103 G3)', () => {
   it('caches Ov values across frames that omit the field', () => {
     const { refs, set, get } = makeHarness();
 

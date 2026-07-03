@@ -1,4 +1,4 @@
-// Probing sequence builders (ADR-102 G2): exact line sequences, two-stage
+// Probing sequence builders (ADR-103 G2): exact line sequences, two-stage
 // contact, thickness-compensated Z zero, bit-radius-compensated XY zeros,
 // and per-corner sign symmetry.
 

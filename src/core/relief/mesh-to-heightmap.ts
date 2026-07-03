@@ -1,5 +1,5 @@
 // meshToHeightmap — sample a triangle mesh into a carveable heightmap
-// (Phase H.4, ADR-094). The mesh's XY bounds scale uniformly to the target
+// (Phase H.4, ADR-098). The mesh's XY bounds scale uniformly to the target
 // width (height follows the aspect ratio); its Z range normalizes to
 // [−reliefDepthMm, 0] with the mesh's highest point at the stock top.
 // Cells no triangle covers are the relief "background": 'floor' (default)

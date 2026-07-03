@@ -1,5 +1,5 @@
 // jsdom has no WebGL, so the dialog's graceful fallback IS the testable
-// path (ADR-101 §4): the real three.js import runs, the renderer fails to
+// path (ADR-102 §4): the real three.js import runs, the renderer fails to
 // start, and the viewer reports it instead of crashing.
 
 import { act } from 'react';

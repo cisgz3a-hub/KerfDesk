@@ -3,7 +3,7 @@ import { machineKindOf, type Layer, type Project, type SceneObject } from '../..
 // Preview reflects the compiled job, so this predicate must match what the
 // active machine's compiler consumes: laser cuts vectors by layer mode and
 // engraves rasters; CNC cuts vectors regardless of the (laser-only) layer
-// mode, roughs reliefs (H.5), and drops rasters (ADR-100 §4).
+// mode, roughs reliefs (H.5), and drops rasters (ADR-101 §4).
 export function hasPreviewableContent(project: Project): boolean {
   const outputLayers = new Map(
     project.scene.layers.filter((layer) => layer.output).map((layer) => [layer.color, layer]),

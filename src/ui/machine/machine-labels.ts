@@ -1,5 +1,5 @@
 // machine-labels — machine-kind-aware display strings for chrome shared by
-// laser and CNC modes (ADR-100 §7). Only user-visible copy changes with the
+// laser and CNC modes (ADR-101 §7). Only user-visible copy changes with the
 // machine kind; internal keys (the 'laser' command family, store names, file
 // names) deliberately do not rename.
 

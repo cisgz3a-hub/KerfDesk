@@ -1,4 +1,4 @@
-// parseStl — format-sniffing entry point (Phase H.4, ADR-094). The classic
+// parseStl — format-sniffing entry point (Phase H.4, ADR-098). The classic
 // trap: binary STLs whose 80-byte header happens to start with "solid". The
 // binary length signature (declared count × 50 bytes matches the file size)
 // is authoritative; ASCII is only attempted when the binary check fails.

@@ -1,4 +1,4 @@
-// laser-probe-actions — store-facing probe action (ADR-102 G2). Sibling to
+// laser-probe-actions — store-facing probe action (ADR-103 G2). Sibling to
 // laser-jog-actions.ts; guards the shared machine against overlapping
 // operations, then delegates to the pure protocol runner.
 

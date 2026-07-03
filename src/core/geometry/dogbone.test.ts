@@ -1,4 +1,4 @@
-// Dogbone corner relief (ADR-102 G6): vertex-centered overcut circles on
+// Dogbone corner relief (ADR-103 G6): vertex-centered overcut circles on
 // sharp convex corners, reflex corners untouched, islands skipped, errors
 // on no-op selections.
 

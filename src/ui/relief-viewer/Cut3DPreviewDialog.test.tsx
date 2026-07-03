@@ -1,5 +1,5 @@
-// Cut3DPreviewDialog (ADR-102 G4): dialog frame + jsdom no-WebGL fallback,
-// same contract as the relief viewer (ADR-101 §4).
+// Cut3DPreviewDialog (ADR-103 G4): dialog frame + jsdom no-WebGL fallback,
+// same contract as the relief viewer (ADR-102 §4).
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

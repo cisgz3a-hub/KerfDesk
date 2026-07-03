@@ -78,7 +78,7 @@ export type RasterGroup = {
 // CNC (router/mill) passes. Pre-expanded by core/cnc/compile-cnc-job.ts
 // (depth ramping, tab splitting, pocket rings) so the emitter is a dumb, safe
 // motion printer: retract to safeZMm → rapid XY → plunge at plungeMmPerMin →
-// feed. Two shapes (ADR-094, Phase H.1):
+// feed. Two shapes (ADR-098, Phase H.1):
 //   - contour: one XY polyline at one constant Z depth (profiles, pockets,
 //     engraves, v-carve rings)
 //   - path3d:  per-vertex XYZ motion (relief finishing, ramp entries,

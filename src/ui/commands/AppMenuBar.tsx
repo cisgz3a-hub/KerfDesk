@@ -128,7 +128,7 @@ function familyLabel(family: CommandFamily, machineKind: MachineKind): string {
     case 'arrange':
       return 'Arrange';
     case 'laser':
-      // The family KEY stays 'laser' (ADR-100 §7); only the visible label
+      // The family KEY stays 'laser' (ADR-101 §7); only the visible label
       // follows the machine kind.
       return machineDisplayName(machineKind);
     case 'window':

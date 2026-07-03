@@ -4,7 +4,7 @@ import { CNC_ONLY_COMMAND_IDS, LASER_ONLY_COMMAND_IDS } from './machine-command-
 import type { CommandId } from './command-types';
 import { baseCtx } from './command-registry-test-helpers';
 
-// Machine-agnostic commands that must survive the CNC gate (ADR-100 §1):
+// Machine-agnostic commands that must survive the CNC gate (ADR-101 §1):
 // geometry sources, edit/arrange, file, preview, connection.
 const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'file.new',
@@ -25,7 +25,7 @@ const CNC_SURVIVORS: ReadonlyArray<CommandId> = [
   'help.about',
 ];
 
-describe('gateCommandsForMachineKind via buildAppCommands (ADR-100)', () => {
+describe('gateCommandsForMachineKind via buildAppCommands (ADR-101)', () => {
   it('laser mode exposes the laser-only set and hides the CNC-only set', () => {
     const ids = buildAppCommands(baseCtx({ machineKind: 'laser' })).map((c) => c.id);
     for (const id of LASER_ONLY_COMMAND_IDS) {

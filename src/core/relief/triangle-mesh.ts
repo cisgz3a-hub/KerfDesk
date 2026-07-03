@@ -1,4 +1,4 @@
-// TriangleMesh — a triangle soup in model units (Phase H.4, ADR-094). The
+// TriangleMesh — a triangle soup in model units (Phase H.4, ADR-098). The
 // shared shape between the clean-room STL parsers (io/stl) and the relief
 // heightmap sampler (core/relief). Lives in core so io → core imports stay
 // one-directional.

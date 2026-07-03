@@ -1,5 +1,5 @@
 // drawReliefObject — grayscale heightmap preview of a relief on the canvas
-// (Phase H.4, ADR-094). Light = stock top, dark = relief floor, so the
+// (Phase H.4, ADR-098). Light = stock top, dark = relief floor, so the
 // carving reads like a depth map. Rendered at the object's transformed AABB;
 // rotation draws axis-aligned in v1 (noted in F-CNC7's edge states).
 

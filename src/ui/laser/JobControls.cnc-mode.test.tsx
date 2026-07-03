@@ -1,4 +1,4 @@
-// JobControls CNC-mode gating (ADR-100 §5). Split from JobControls.test.tsx,
+// JobControls CNC-mode gating (ADR-101 §5). Split from JobControls.test.tsx,
 // which sits at the file-size cap — same precedent as the laser-store
 // split test files.
 
@@ -41,7 +41,7 @@ function buttonLabels(host: HTMLElement): ReadonlyArray<string> {
   return [...host.querySelectorAll('button')].map((button) => button.textContent ?? '');
 }
 
-describe('JobControls machine gating (ADR-100 §5)', () => {
+describe('JobControls machine gating (ADR-101 §5)', () => {
   it('shows the Auto-focus button for laser projects', async () => {
     useStore.setState({
       project: {

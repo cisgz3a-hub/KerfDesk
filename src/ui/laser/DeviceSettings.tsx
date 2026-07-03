@@ -28,7 +28,7 @@ import { ScanOffsetEditor } from './ScanOffsetEditor';
 export function DeviceSettings(): JSX.Element {
   const device = useStore((s) => s.project.device);
   const update = useStore((s) => s.updateDeviceProfile);
-  // ADR-100 §6 (provisional): laser-output-only device fields — power range
+  // ADR-101 §6 (provisional): laser-output-only device fields — power range
   // ($30/$31/$32), air assist, scanning offsets, autofocus command — hide on
   // a router. H.7 CNC machine profiles add the CNC counterparts.
   const isCncMachine = useStore((s) => s.project.machine?.kind === 'cnc');

@@ -1,4 +1,4 @@
-// override-actions — real-time feed/rapid/spindle override sends (ADR-102
+// override-actions — real-time feed/rapid/spindle override sends (ADR-103
 // G3). GRBL processes these single bytes instantly without queueing, so —
 // unlike every other command surface — they are legal DURING a streaming
 // job; that is their whole purpose. The live percentages come back in the

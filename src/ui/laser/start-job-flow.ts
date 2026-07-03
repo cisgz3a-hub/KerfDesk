@@ -33,6 +33,7 @@ export async function runStartJobFlow(): Promise<void> {
       workOriginActive: laser.workOriginActive,
       wcoCache: laser.wcoCache,
       frameVerification: laser.frameVerification,
+      settingsCapability: laser.capabilities.settings,
     },
     jobPlacement,
     currentOutputScope(app),
@@ -57,7 +58,7 @@ export async function runStartJobFlow(): Promise<void> {
   }
 }
 
-// Resume a stopped/errored job from a chosen 1-based line (ADR-102 G7,
+// Resume a stopped/errored job from a chosen 1-based line (ADR-103 G7,
 // F-CNC27). Same readiness gate as a fresh start; the resume preamble
 // rebuilds units/spindle/feed/position and re-enters the cut at the
 // recorded depth before replaying the tail.

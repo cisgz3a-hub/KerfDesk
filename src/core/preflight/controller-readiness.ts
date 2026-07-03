@@ -10,7 +10,11 @@ export type ControllerReadinessErrorCode =
   | 'laser-mode-unknown'
   | 'laser-mode-disabled';
 
-export type ControllerReadinessWarningCode = 'min-power-nonzero';
+export type ControllerReadinessWarningCode = 'min-power-nonzero' | 'power-scale-unverified';
+
+/** How the connected firmware exposes settings — mirrors
+ *  ControllerCapabilities['settings'] without importing the driver layer. */
+export type ReadinessSettingsCapability = 'grbl-dollar' | 'readonly-dump' | 'none';
 
 export type ControllerReadinessMessage<Code extends string> = {
   readonly code: Code;
@@ -26,9 +30,21 @@ export type ControllerReadinessResult = {
 export function runControllerReadiness(
   project: Project,
   controller: ControllerSettingsSnapshot | null,
+  settingsCapability: ReadinessSettingsCapability = 'grbl-dollar',
 ): ControllerReadinessResult {
   const errors: Array<ControllerReadinessMessage<ControllerReadinessErrorCode>> = [];
   const warnings: Array<ControllerReadinessMessage<ControllerReadinessWarningCode>> = [];
+
+  // Firmwares without a numeric $-settings dump (Marlin, FluidNC) cannot
+  // prove $30/$32 agreement. The power scale then rests on the device
+  // profile alone — allowed, but stated plainly (Phase H honesty rule).
+  if (settingsCapability !== 'grbl-dollar') {
+    warnings.push({
+      code: 'power-scale-unverified',
+      message: `This controller does not report GRBL $-settings, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`,
+    });
+    return { ok: true, errors, warnings };
+  }
 
   if (controller === null) {
     errors.push({

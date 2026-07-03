@@ -1,4 +1,4 @@
-// Start-from-line job recovery (ADR-102 G7, F-CNC27) — the gSender-style
+// Start-from-line job recovery (ADR-103 G7, F-CNC27) — the gSender-style
 // resume: scan the program's modal state up to the chosen line, then emit a
 // safe re-entry preamble (units/positioning, spindle + spin-up, feed, safe-Z
 // travel to the resume XY, feed back down to the recorded depth) followed by

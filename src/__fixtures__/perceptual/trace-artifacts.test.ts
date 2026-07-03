@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import {
   TRACE_PRESETS,
-  traceImageToCenterlinePaths,
+  traceCenterlineStrokePaths,
   traceImageToColoredPaths,
 } from '../../core/trace';
 import { cannyEdges } from '../../core/trace/canny-edges';
@@ -37,7 +37,7 @@ const LINE_ART_OPTIONS = TRACE_PRESETS['Line Art']!;
 describe('trace artifact harness', () => {
   it('builds deterministic JSON and SVG overlay artifacts for centerline traces', () => {
     const fixture = CENTERLINE_TRUTH_FIXTURES.find((item) => item.name === 'h-stroke')!;
-    const paths = traceImageToCenterlinePaths(fixture.image, CENTERLINE_OPTIONS);
+    const paths = traceCenterlineStrokePaths(fixture.image, CENTERLINE_OPTIONS);
 
     const artifact = buildTraceArtifact({
       name: fixture.name,

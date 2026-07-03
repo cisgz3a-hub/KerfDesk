@@ -1,4 +1,4 @@
-// Probe protocol runner (ADR-102 G2) — sibling to autofocus-action.ts.
+// Probe protocol runner (ADR-103 G2) — sibling to autofocus-action.ts.
 //
 // Sends a probing sequence one line at a time, waiting for GRBL's `ok`
 // before the next line (G38.2 blocks until contact or failure, so its `ok`

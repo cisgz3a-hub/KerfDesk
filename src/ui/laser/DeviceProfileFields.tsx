@@ -181,7 +181,7 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
 // The inline Device Profile panel's machine-agnostic fields in one block,
 // composed from the granular rows so the wizard can reuse them piecemeal.
 // The laser-only power/air-assist rows moved to DeviceSettings, which gates
-// them on the machine kind (ADR-100 §6) — the wizard steps already mount
+// them on the machine kind (ADR-101 §6) — the wizard steps already mount
 // LaserPowerRows / AirAssistRow directly.
 export function BasicRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;

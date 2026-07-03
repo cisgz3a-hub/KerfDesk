@@ -59,7 +59,7 @@ export function sceneClipboardActions(set: Setter): SceneClipboardActions {
         if (clipboard === null || clipboard.objects.length === 0) return state;
         // Reliefs are CNC-only geometry: paste must honor the same machine
         // gate as STL import, or the clipboard becomes a laser-mode back
-        // door (ADR-100 §8 follow-up).
+        // door (ADR-101 §8 follow-up).
         const pasteable = pasteableClipboardObjects(clipboard.objects, state);
         if (pasteable.length === 0) return state;
         const pasted = cloneClipboardObjects(pasteable);

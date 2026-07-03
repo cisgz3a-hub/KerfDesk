@@ -8,7 +8,32 @@ import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-st
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
-export type ControllerKind = 'grbl-v1.1';
+// Firmware families the app can drive (ADR-094). Each kind maps to a
+// ControllerDriver in core/controllers; grblHAL and FluidNC share the GRBL
+// protocol machinery with capability/code-table deltas, Marlin is a fully
+// distinct dialect (no realtime bytes, queued M114 status, text errors).
+export type ControllerKind =
+  | 'grbl-v1.1'
+  | 'grblhal'
+  | 'fluidnc'
+  | 'marlin'
+  | 'smoothieware'
+  | 'ruida';
+
+/** Single source of truth for validators (catalog, .lfmachine shape, .lf2
+ *  normalize). Grows in lockstep with the ControllerKind union. */
+export const KNOWN_CONTROLLER_KINDS: ReadonlyArray<ControllerKind> = [
+  'grbl-v1.1',
+  'grblhal',
+  'fluidnc',
+  'marlin',
+  'smoothieware',
+  'ruida',
+];
+
+export function isKnownControllerKind(value: unknown): value is ControllerKind {
+  return (KNOWN_CONTROLLER_KINDS as ReadonlyArray<unknown>).includes(value);
+}
 export type LaserFocusMode = 'fixed-lever' | 'manual' | 'unknown';
 export type LaserAirAssistHardware = 'built-in' | 'manual' | 'none' | 'unknown';
 export type MachineProfileSource = 'built-in' | 'custom' | 'imported' | 'lightburn';
@@ -68,6 +93,9 @@ export type DeviceProfile = {
   readonly evidence?: ReadonlyArray<ProfileEvidence>;
   readonly machineFamily?: string;
   readonly controllerKind?: ControllerKind;
+  // Serial baud rate override. Absent = the controller driver's default
+  // (GRBL family 115200; Marlin profiles typically 250000).
+  readonly baudRate?: number;
   // GRBL serial streaming behavior. Most controllers work best with
   // char-counted streaming and a conservative 120-byte RX window; profiles can
   // opt into one-line ping-pong for controllers that misreport/free buffers.

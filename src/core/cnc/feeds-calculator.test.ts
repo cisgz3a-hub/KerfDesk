@@ -1,4 +1,4 @@
-// Chipload calculator (ADR-102 G5): the feed law, band selection, material
+// Chipload calculator (ADR-103 G5): the feed law, band selection, material
 // factors, rounding, and floors.
 
 import { describe, expect, it } from 'vitest';

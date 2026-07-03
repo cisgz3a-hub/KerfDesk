@@ -208,7 +208,7 @@ describe('DeviceSettings air assist command', () => {
   });
 });
 
-describe('DeviceSettings in CNC mode (ADR-100 §6)', () => {
+describe('DeviceSettings in CNC mode (ADR-101 §6)', () => {
   it('hides the laser-only fields but keeps the machine-agnostic ones', async () => {
     useStore.getState().setMachineKind('cnc');
     const { host, unmount } = await renderDeviceSettings();

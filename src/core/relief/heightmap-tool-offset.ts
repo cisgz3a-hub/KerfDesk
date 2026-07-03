@@ -1,4 +1,4 @@
-// Max-plus heightmap dilation (Phase H.5, ADR-094): the SAFE tool-center
+// Max-plus heightmap dilation (Phase H.5, ADR-098): the SAFE tool-center
 // height field. A tool tip at (x, y) may descend to
 //   dilated(x, y) = max over kernel offsets of (h(x+dx, y+dy) − dz)
 // without cutting below the target surface anywhere under its footprint

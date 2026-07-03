@@ -575,7 +575,22 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B4. Frame
 
-Phase B initial cut: not implemented. Phase B polish will compute the AABB of all output-enabled paths and dispatch four `$J=` jogs around the perimeter at a non-cut feed.
+#### Success
+1. User clicks **Frame** while connected and the controller is Idle.
+2. App resolves the job placement (start-from mode, anchor, cached WCO), compiles through the shared `prepareOutput` pipeline, and computes the job's motion bounds (including overscan).
+3. Frame preflight checks the motion bounds against the bed (with any placement offset) and no-go zones. On failure an error toast explains the violation and no bytes are sent.
+4. App builds five absolute `$J=G90 G21 X<x> Y<y> F<feed>` jogs tracing the perimeter (start corner, four edges back to the start) at `min(framingFeedMmPerMin, maxFeed)`.
+5. The first jog is written immediately; each remaining line is dispatched as the previous jog completes. Status polling shows `Jog`, then `Idle` when the box closes.
+6. When framing from a verified origin, a successful pass records frame verification for the Start-job preflight.
+
+#### Error — origin cannot be resolved
+1. Placement resolution fails (e.g. selection origin requested with nothing usable); error toast, no bytes sent.
+
+#### Edge — raster job exceeds the raster budget
+1. If preflight fails only with `raster-too-large`, the app still frames the outline using the frame bounds (framing must stay available for exactly these jobs).
+
+#### Edge — cancel mid-frame
+1. **Cancel** writes the real-time jog-cancel byte (`0x85`); pending frame lines are dropped and the motion operation clears.
 
 ### F-B5. Jog
 
@@ -592,7 +607,7 @@ Phase B initial cut: not implemented. Phase B polish will compute the AABB of al
 #### Success
 1. User clicks **Start job** while connected and idle.
 2. App runs the F-A10 preflight on the current project. If issues, surfaces the modal (same as Save G-code path).
-3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the 127-byte RX buffer can hold).
+3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
 4. Every `ok` advances the streamer by one line and writes more.
 5. Progress bar reflects `completed / total` lines.
 
@@ -1223,7 +1238,7 @@ last updated.
   points at Export...; a corrupt collection slot is discarded silently
   rather than failing every boot.
 
-## Phase H flows (CNC router mode — ADR-094)
+## Phase H flows (CNC router mode — ADR-098)
 
 F-CNC1–3 document the surface that shipped in commit `032d476`. F-CNC4–19
 are reserved for sub-phases H.1–H.10 and are fleshed out at each sub-phase
@@ -1449,8 +1464,8 @@ F-CNC19 tiling.
 #### Success
 1. The user picks a `.dxf` in File → Import DXF (or drops one on the
    workspace). Import works in BOTH machine modes — DXF vectors are
-   machine-agnostic geometry sources (ADR-100 §1).
-2. The clean-room parser (no libraries — ADR-094 §2) reads ASCII DXF
+   machine-agnostic geometry sources (ADR-101 §1).
+2. The clean-room parser (no libraries — ADR-098 §2) reads ASCII DXF
    ENTITIES: LINE, CIRCLE, ARC, LWPOLYLINE (including bulge arcs), classic
    POLYLINE/VERTEX/SEQEND, ELLIPSE, SPLINE (clean-room de Boor sampling),
    and INSERT block references (translate/scale/rotate, recursive with a
@@ -1491,9 +1506,9 @@ F-CNC19 tiling.
 
 #### Success
 1. In CNC mode, the user picks a `.nc` / `.gcode` / `.tap` file via
-   File → Open G-code (Preview). The command is CNC-only (ADR-100
+   File → Open G-code (Preview). The command is CNC-only (ADR-101
    gate-and-hide, first CNC-only command).
-2. The clean-room modal parser (ADR-094 §2) reads GRBL-dialect G-code:
+2. The clean-room modal parser (ADR-098 §2) reads GRBL-dialect G-code:
    G0/G1 (including ramped XY+Z and pure-Z moves), G2/G3 arcs (I/J center
    and R radius form, helical Z), G90/G91, G20/G21 units, F/S words,
    `(...)` and `;` comments, `%` markers, and N line numbers. Unsupported
@@ -1729,7 +1744,7 @@ F-CNC19 tiling.
 1. Cancelling a save dialog stops the remaining tiles; the toast
    reports how many of the set were saved.
 
-### F-CNC20. Probe work zero with a touch plate — Phase H.11 (ADR-102 G2)
+### F-CNC20. Probe work zero with a touch plate — Phase H.11 (ADR-103 G2)
 
 #### Success
 1. Router controls → "Probe (touch plate)": pick Z-only (stock top) or
@@ -1763,7 +1778,7 @@ F-CNC19 tiling.
 2. The status poll keeps running during the cycle; an Alarm status seen
    mid-cycle aborts with the unlock hint even if the ALARM line raced.
 
-### F-CNC21. Adjust feed/spindle/rapids during a job — Phase H.11 (ADR-102 G3)
+### F-CNC21. Adjust feed/spindle/rapids during a job — Phase H.11 (ADR-103 G3)
 
 #### Success
 1. While a job streams (or is paused), the job controls grow an
@@ -1788,7 +1803,7 @@ F-CNC19 tiling.
 1. Alarm, Sleep, and port-close clear the cached percentages (the next
    session re-learns them); overrides reset to 100% on GRBL's own reset.
 
-### F-CNC22. Boolean shapes and offset paths — Phase H.11 (ADR-102 G1)
+### F-CNC22. Boolean shapes and offset paths — Phase H.11 (ADR-103 G1)
 
 #### Success
 1. Tools → Subtract / Intersect / Exclude (next to Weld) combine two or
@@ -1819,7 +1834,7 @@ F-CNC19 tiling.
 2. Changing which shape is bottom-most (Arrange z-order) changes what
    Subtract keeps — by design; the flow documents the convention.
 
-### F-CNC23. View the simulated cut in 3D — Phase H.11 (ADR-102 G4)
+### F-CNC23. View the simulated cut in 3D — Phase H.11 (ADR-103 G4)
 
 #### Success
 1. In a CNC Preview, the route controls grow a "3D" button. It opens a
@@ -1844,7 +1859,7 @@ F-CNC19 tiling.
 1. The underlying grid already coarsens beyond 4M cells; the display
    pass reduces further, so a full-bed job cannot freeze the dialog.
 
-### F-CNC24. Calculate feeds & speeds from chipload — Phase H.11 (ADR-102 G5)
+### F-CNC24. Calculate feeds & speeds from chipload — Phase H.11 (ADR-103 G5)
 
 #### Success
 1. Every CNC layer card has a "Feeds calculator": pick the material
@@ -1870,7 +1885,7 @@ F-CNC19 tiling.
    v-carving the chipload model is a rough guide only — the flow says
    so rather than pretending precision.
 
-### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-102 G8)
+### F-CNC25. Surface the spoilboard — Phase H.11 (ADR-103 G8)
 
 #### Success
 1. Material & Bit → "Surface spoilboard": width/height (prefilled from
@@ -1890,7 +1905,7 @@ F-CNC19 tiling.
 1. The last row lands exactly on the far edge, so the whole area is
    faced even when height doesn't divide by the stepover.
 
-### F-CNC26. Relieve corners for slot-fit joinery (dogbone) — Phase H.11 (ADR-102 G6)
+### F-CNC26. Relieve corners for slot-fit joinery (dogbone) — Phase H.11 (ADR-103 G6)
 
 #### Success
 1. With closed shapes selected in CNC mode, the "Dogbone" row (bit
@@ -1912,7 +1927,7 @@ F-CNC19 tiling.
 1. Reflex (inside-L) corners and hole rings (islands of remaining
    material) are never relieved.
 
-### F-CNC27. Resume a job from a line — Phase H.11 (ADR-102 G7)
+### F-CNC27. Resume a job from a line — Phase H.11 (ADR-103 G7)
 
 #### Success
 1. Job controls → "Start from line…": enter the 1-based line of the
@@ -1935,3 +1950,63 @@ F-CNC19 tiling.
 #### Edge — laser jobs
 1. Programs with no Z words never receive Z commands in the preamble —
    a laser resume re-fires at the recorded XY without touching Z.
+
+## Phase I flows — multi-controller (ADR-094..097)
+
+(Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)
+
+### F-H1. Select a controller family
+
+#### Success
+1. User picks a catalog profile (Machine Setup or Device Setup wizard) whose
+   `controllerKind` is `grbl-v1.1`, `grblhal`, `fluidnc`, `marlin`,
+   `smoothieware`, or `ruida`.
+2. Connect selects the matching ControllerDriver and opens the port at the
+   profile's `baudRate` (driver default when unset: GRBL family 115200,
+   Marlin 250000). The capabilities snapshot re-gates every machine control.
+3. The welcome banner runs through detection; `detectedControllerKind` is
+   recorded.
+
+#### Edge — banner disagrees with the profile
+1. Log line: "Controller banner looks like X, but the profile selected Y.
+   Check the device profile's controller setting." Nothing switches silently.
+
+### F-H2. Run a job on Marlin (no realtime bytes)
+
+#### Success
+1. Status = queued `M114`, polled only while nothing is streaming and no
+   controller command is pending; the DRO shows the parsed position.
+2. Jog sends `G91` / `G0 …` / `G90`; Home sends `G28 X Y`; framing runs
+   absolute `G0` legs; jobs stream ping-pong (one line per `ok`;
+   `echo:busy` is not an ack).
+3. **Pause** stops sending — buffered moves finish (the button title and
+   safety copy say so). **Resume** continues the stream. **Stop** stops
+   sending and writes `M5` + `M107`.
+4. Start shows the power-scale-unverified warning (no $30/$32 proof exists).
+
+#### Error — firmware answers `Error:` or `Resend:`
+1. Terminal for the stream (no replay); beam-off lines are written; with no
+   alarm state the errored stream auto-releases at the next Idle report.
+
+### F-H3. Smoothieware halt and recovery
+
+#### Success
+1. Realtime `?` / `!` / `~` work as on GRBL; pause is allowed WITHOUT the $32
+   proof (Smoothie cannot report $-settings; its laser module ties beam to
+   motion). Power words are fractional (S0.500 = 50% at the 0–1.0 scale).
+2. Stop sends Ctrl-X + `M5`/`M9`; a halted controller answers `!!` to normal
+   lines; the alarm banner's unlock sends `M999` and the machine returns Idle.
+
+### F-H4. Export a Ruida job (.rd, EXPERIMENTAL)
+
+#### Success
+1. With a Ruida profile the Laser panel shows the file-only hint and Connect
+   is disabled; preview/estimate work normally.
+2. **Save G-code…** writes a `.rd` file instead (binary, swizzled) and toasts
+   the EXPERIMENTAL warning every time: the encoding follows public research
+   and has NOT been verified on a real controller — preview on the machine
+   panel and test on scrap first.
+
+#### Error — raster layers present
+1. The export refuses with "Layer … uses Fill/Image raster output, which the
+   experimental .rd encoder does not support yet."

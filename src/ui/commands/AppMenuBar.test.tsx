@@ -86,7 +86,7 @@ describe('AppMenuBar', () => {
     }
   });
 
-  it('labels the laser command family with the machine noun (ADR-100 §7)', async () => {
+  it('labels the laser command family with the machine noun (ADR-101 §7)', async () => {
     const laserFamily: ReadonlyArray<AppCommand> = [
       {
         id: 'laser.connect',

@@ -19,7 +19,7 @@ export function SelectedObjectProperties(): JSX.Element | null {
     [objects, selectedObjectId, additionalSelectedIds],
   );
   if (selectedObjects.length === 0) return null;
-  // ADR-100 §3: every editor in this section (power scale, operation
+  // ADR-101 §3: every editor in this section (power scale, operation
   // override, image adjustments) exists only in the laser output pipeline —
   // the CNC compiler reads none of them. CNC object editors (relief
   // parameters) mount their own panel.

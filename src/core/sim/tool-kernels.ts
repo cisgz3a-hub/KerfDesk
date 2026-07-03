@@ -1,5 +1,5 @@
 // Tool kernels — the precomputed cutting footprint of a bit on the removal
-// grid (Phase H.2, ADR-094). Each offset is a cell displacement plus the
+// grid (Phase H.2, ADR-098). Each offset is a cell displacement plus the
 // vertical clearance of the cutting surface at that horizontal distance
 // (dz ≥ 0 above the tool tip):
 //

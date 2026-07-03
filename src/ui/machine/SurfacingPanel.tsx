@@ -1,4 +1,4 @@
-// SurfacingPanel — spoilboard facing wizard (ADR-102 G8, F-CNC25). Collects
+// SurfacingPanel — spoilboard facing wizard (ADR-103 G8, F-CNC25). Collects
 // the area + cut numbers, generates the serpentine program in pure core, and
 // saves it as a standalone .nc file. Defaults prefill from the machine's
 // stock footprint and active bit.

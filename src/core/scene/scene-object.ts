@@ -278,7 +278,7 @@ export type ShapeObject = ObjectPowerScale & {
   readonly paths: ReadonlyArray<ColoredPath>;
 };
 
-// 3D relief for CNC carving, Phase H.4 (ADR-094). Carries the parsed
+// 3D relief for CNC carving, Phase H.4 (ADR-098). Carries the parsed
 // triangle mesh as plain numbers (9 per triangle, file order) so the pure
 // core compiler can rebuild the heightmap without any decode API, and .lf2
 // round-trips it as ordinary JSON (RasterImage's embedded-source precedent).
@@ -309,7 +309,7 @@ export const RELIEF_EMBED_TRIANGLE_LIMIT = 200_000;
 export const DEFAULT_RELIEF_LAYER_COLOR = '#a0522d';
 
 // Full union expanded through Phase G (ADR-014, ADR-020, ADR-051) and
-// Phase H (ADR-094). Future variants require an ADR + a PROJECT.md scope
+// Phase H (ADR-098). Future variants require an ADR + a PROJECT.md scope
 // revision.
 export type SceneObject =
   | ImportedSvg

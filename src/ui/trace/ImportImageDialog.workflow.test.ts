@@ -46,7 +46,7 @@ function seedRaster(): RasterImage {
 }
 
 describe('Trace Image workflow controls', () => {
-  it('does not offer Edge Detection as a user-facing trace preset', async () => {
+  it('offers all five trace presets including the rebuilt Edge Detection', async () => {
     await withTraceDialog(async (host) => {
       const select = presetSelect(host);
       const values = Array.from(select.options).map((option) => option.value);
@@ -54,7 +54,9 @@ describe('Trace Image workflow controls', () => {
       expect(values).toContain('Smooth');
       expect(values).toContain('Sharp');
       expect(values).toContain('Centerline');
-      expect(values).not.toContain('Edge Detection');
+      // Re-exposed with the chained single-line backend (it was hidden while
+      // the outline backend doubled every edge).
+      expect(values).toContain('Edge Detection');
     });
   });
 
@@ -156,11 +158,12 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
-  it('does not show Edge Detection guidance in the user-facing workflow', async () => {
+  it('shows the edge-specific controls when Edge Detection is selected', async () => {
     await withTraceDialog(async (host) => {
+      const select = presetSelect(host);
+      await changePreset(select, 'Edge Detection');
       const text = host.textContent ?? '';
-      expect(text).not.toContain('Edge Detection');
-      expect(host.querySelector('div[aria-label="Edge Detection guidance"]')).toBeNull();
+      expect(text).toContain('Sensitivity');
     });
   });
 });

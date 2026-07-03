@@ -1,5 +1,5 @@
 // OffsetPathsRow — inset/outset the selected closed vector shapes by a
-// distance (ADR-102 G1). Machine-agnostic (kerf compensation on a laser,
+// distance (ADR-103 G1). Machine-agnostic (kerf compensation on a laser,
 // clearing outlines and inlay gaps on a router), so it mounts OUTSIDE the
 // laser-only Shape Properties gate. The result is a NEW object; the
 // sources stay (VCarve/Offsetter convention).

@@ -1,6 +1,6 @@
 // detectMachineJobWarnings — selects the machine-appropriate advisory set for
 // the Save G-code and Start job paths: CNC projects get stock-footprint
-// advisories (H.2) plus dropped-raster advisories (ADR-100 §4); laser
+// advisories (H.2) plus dropped-raster advisories (ADR-101 §4); laser
 // projects get the job-intent warnings (H12). Keeps the machine-kind branch
 // in ONE place so both call sites stay simple.
 

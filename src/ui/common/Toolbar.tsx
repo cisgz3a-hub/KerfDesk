@@ -112,7 +112,7 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
 
 // Keep in sync with shortcuts.ts, use-job-shortcuts.ts, and drag-state.ts —
 // the audit (M27/A.5) caught this hint omitting four shipped shortcuts.
-// The job-control line is machine-aware (ADR-100 §7): same keys, right noun.
+// The job-control line is machine-aware (ADR-101 §7): same keys, right noun.
 function shortcutHint(machineKind: MachineKind): string {
   return [
     'File: Ctrl+N new - Ctrl+O open - Ctrl+S save - Ctrl+Shift+S save as - Ctrl+I import - Ctrl+Shift+E export G-code',

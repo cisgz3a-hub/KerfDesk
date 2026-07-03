@@ -2,7 +2,7 @@
 // depth / background), promised when H.5 roughing landed. CNC-only: relief
 // objects are inert in laser mode, so the section only renders for a CNC
 // project with exactly one relief selected (the laser Shape Properties
-// panel is the mirror case — ADR-100 §3).
+// panel is the mirror case — ADR-101 §3).
 
 import { useState } from 'react';
 import { machineKindOf, type ReliefObject } from '../../core/scene';
@@ -38,7 +38,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
       <button
         type="button"
         onClick={() => setViewerOpen(true)}
-        title="Open the real-time 3D view of this relief (ADR-101)."
+        title="Open the real-time 3D view of this relief (ADR-102)."
         style={viewerButtonStyle}
       >
         View 3D…

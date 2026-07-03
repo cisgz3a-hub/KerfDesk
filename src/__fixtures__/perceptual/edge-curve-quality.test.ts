@@ -4,6 +4,7 @@ import { cannyEdges } from '../../core/trace/canny-edges';
 import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
 import { TRACE_PRESETS } from '../../core/trace';
 import {
+  densifyPolyline,
   measureSegmentedStrokeContinuity,
   SEGMENTED_STROKE_CIRCLE_FIXTURE,
   type CircleFixture,
@@ -27,13 +28,15 @@ describe('Edge Detection curved-corner quality', () => {
 
   it('traces a clean circle as one continuous, well-covered curved boundary', () => {
     const fixture = filledCircleFixture(112, { x: 56, y: 56 }, 30);
+    // Join gap stays at the preset default: Canny drops diagonal stretches of
+    // a clean circle far wider than 2 px, and the chained backend heals them
+    // with tangent-aligned bridging scaled from the join knob.
     const paths = traceImageToEdgePaths(fixture.image, {
       ...EDGE_OPTIONS,
       edgeBlurSigma: 1.1,
       edgeLowThresholdRatio: 0.04,
       edgeHighThresholdRatio: 0.12,
       edgeMinLengthPx: 12,
-      edgeJoinGapPx: 2,
     });
     const polylines = paths.flatMap((path) => path.polylines);
     const quality = measureCircleBoundaryQuality(polylines, fixture);
@@ -65,7 +68,14 @@ describe('Edge Detection curved-corner quality', () => {
     expect(noisyQuality.totalLengthPx).toBeLessThanOrEqual(cleanQuality.totalLengthPx * 1.25);
   });
 
-  it('links small breaks in curved stroke artwork into continuous smooth contours', () => {
+  // Contract change with the chained backend: a 5-px-wide DASHED stroke has
+  // real contrast edges at every dash end, so its truthful edge trace is one
+  // closed outline PER DASH (LightBurn's trace of the same art does the
+  // same). The old backend fused dashes into one blob outline — an artifact
+  // of its dilate/erode step, not a feature. Users who want broken strokes
+  // relinked into single lines trace with Centerline, whose join-gap
+  // bridging works on open stroke chains.
+  it('outlines each dash of a segmented stroke as its own closed contour', () => {
     const fixture = SEGMENTED_STROKE_CIRCLE_FIXTURE;
     const paths = traceImageToEdgePaths(fixture.image, {
       ...EDGE_OPTIONS,
@@ -73,14 +83,17 @@ describe('Edge Detection curved-corner quality', () => {
       edgeLowThresholdRatio: 0.04,
       edgeHighThresholdRatio: 0.12,
       edgeMinLengthPx: 10,
-      edgeJoinGapPx: 3,
     });
     const polylines = paths.flatMap((path) => path.polylines);
     const quality = measureSegmentedStrokeContinuity(polylines, fixture);
 
-    expect(quality.strokePolylineCount).toBeLessThanOrEqual(6);
-    expect(quality.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
-    expect(quality.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
+    // Six dashes → six outlines (a seventh fragment tolerated for Canny
+    // jitter), together covering the whole dashed ring.
+    expect(quality.strokePolylineCount).toBeGreaterThanOrEqual(6);
+    expect(quality.strokePolylineCount).toBeLessThanOrEqual(7);
+    const closedStrokeCount = polylines.filter((pl) => pl.closed).length;
+    expect(closedStrokeCount).toBeGreaterThanOrEqual(6);
+    expect(quality.aggregateAngularCoverageRatio).toBeGreaterThanOrEqual(0.85);
   });
 });
 
@@ -161,7 +174,7 @@ function measureCircleBoundaryQuality(
         : best,
     null,
   );
-  const points = polylines.flatMap((polyline) => polyline.points);
+  const points = polylines.flatMap((polyline) => densifyPolyline(polyline));
   const sectors = 48;
   const covered = new Uint8Array(sectors);
   let radialErrorTotal = 0;
@@ -178,7 +191,13 @@ function measureCircleBoundaryQuality(
 
   return {
     polylineCount: polylines.length,
-    endpointGapPx: longest === null ? Number.POSITIVE_INFINITY : endpointGap(longest.points),
+    // A CLOSED polyline has no endpoint gap: the closing segment is drawn.
+    endpointGapPx:
+      longest === null
+        ? Number.POSITIVE_INFINITY
+        : longest.closed
+          ? 0
+          : endpointGap(longest.points),
     angularCoverageRatio: countCovered(covered) / sectors,
     maxAngularGapDeg: (maxZeroRunCyclic(covered) * 360) / sectors,
     meanRadialErrorPx:

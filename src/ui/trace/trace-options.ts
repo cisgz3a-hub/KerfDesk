@@ -106,14 +106,23 @@ function edgeSensitivityToThresholds(sensitivity: number): {
   return { low: roundRatio(high * 0.4), high };
 }
 
+// Join gap scales WITH blur: Canny's detection dropouts widen with the blur
+// kernel, so heavier smoothing needs a proportionally longer bridge. The
+// ratio is anchored so the preset default (blur 1.2, joinGap 5) round-trips
+// exactly at the default Detail position — the old fixed [0.5, 2] range was
+// calibrated for the deleted outline backend and collapsed the preset's
+// join gap the moment Detail moved at all.
+const EDGE_JOIN_GAP_PX_PER_BLUR_SIGMA = 5 / 1.2;
+
 function edgeDetailToCanny(detail: number): {
   readonly blurSigma: number;
   readonly joinGapPx: number;
 } {
   const t = clamp(detail, 0, 100) / 100;
+  const blurSigma = roundRatio(2.5 + (0.6 - 2.5) * t);
   return {
-    blurSigma: roundRatio(2.5 + (0.6 - 2.5) * t),
-    joinGapPx: roundRatio(2 + (0.5 - 2) * t),
+    blurSigma,
+    joinGapPx: roundRatio(blurSigma * EDGE_JOIN_GAP_PX_PER_BLUR_SIGMA),
   };
 }
 
@@ -129,6 +138,10 @@ function copyIfDefined<T extends keyof TraceOptions>(
 // can collapse a near-uniform image to zero paths: Otsu histogram
 // binarization, fixedPalette, or despeckle.
 export function hasAggressivePreprocessing(options: TraceOptions): boolean {
+  // Edge mode never runs the shared preprocessing (Canny reads the raw
+  // image), so relaxing these flags cannot change its output — a zero-paths
+  // retry would just repeat the identical multi-second pipeline.
+  if (options.traceMode === 'edge') return false;
   return (
     options.useOtsuThreshold === true ||
     options.fixedPalette !== undefined ||

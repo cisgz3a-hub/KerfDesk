@@ -1,4 +1,4 @@
-// Triangle rasterization onto a max-Z grid (Phase H.4, ADR-094 — the
+// Triangle rasterization onto a max-Z grid (Phase H.4, ADR-098 — the
 // riskiest H.4 algorithm, kept deliberately boring): per triangle, walk its
 // cell bounding box; point-in-triangle by edge functions with a fixed
 // top-left tie rule; Z by barycentric interpolation; cell value = MAX over

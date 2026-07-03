@@ -202,6 +202,11 @@ function edgeNoisyPhotoControlsBenchmark(): TraceBenchmarkResult {
   return buildNoisyPhotoControlsBenchmark(detailed, restrained);
 }
 
+// Contract change with the chained backend (see edge-curve-quality.test.ts):
+// a 5-px-wide dashed stroke has real contrast edges at every dash end, so the
+// truthful edge trace is one CLOSED outline per dash — the old fused blob was
+// a dilate/erode artifact. The benchmark now checks per-dash outlining and
+// aggregate coverage instead of one-contour continuity.
 function edgeSegmentedCurveLinkingBenchmark(): TraceBenchmarkResult {
   const paths = traceImageToEdgePaths(SEGMENTED_STROKE_CIRCLE_FIXTURE.image, {
     ...EDGE_OPTIONS,
@@ -209,49 +214,50 @@ function edgeSegmentedCurveLinkingBenchmark(): TraceBenchmarkResult {
     edgeLowThresholdRatio: 0.04,
     edgeHighThresholdRatio: 0.12,
     edgeMinLengthPx: 10,
-    edgeJoinGapPx: 3,
   });
   const polylines = paths.flatMap((path) => path.polylines);
   const quality = measureSegmentedStrokeContinuity(polylines, SEGMENTED_STROKE_CIRCLE_FIXTURE);
+  const closedStrokeCount = polylines.filter((polyline) => polyline.closed).length;
   const findings: TraceBenchmarkFinding[] = [];
-  pushFindingIf(quality.strokePolylineCount > 6, findings, {
+  pushFindingIf(quality.strokePolylineCount < 6 || quality.strokePolylineCount > 7, findings, {
     severity: 'high',
     metric: 'strokePolylineCount',
     actual: quality.strokePolylineCount,
-    target: '<= 6',
-    message: 'Edge Detection leaves small broken curve gaps as separate stroke fragments.',
-    fixHint:
-      'Improve bounded curve-gap linking before contour smoothing without broadening independent edges.',
+    target: '6..7',
+    message: 'Edge Detection did not outline each dash of the segmented stroke exactly once.',
+    fixHint: 'Keep per-dash closed outlines: no cross-gap welding, no dash fragmentation.',
   });
-  pushFindingIf(quality.longestStrokeAngularCoverageRatio < 0.9, findings, {
+  pushFindingIf(closedStrokeCount < 6, findings, {
     severity: 'high',
-    metric: 'longestStrokeAngularCoverageRatio',
-    actual: quality.longestStrokeAngularCoverageRatio,
-    target: '>= 0.9',
-    message: 'The longest curved stroke contour does not cover enough of the intended arc.',
-    fixHint: 'Preserve small curved stroke continuity through the Canny-to-contour bridge.',
+    metric: 'closedStrokeCount',
+    actual: closedStrokeCount,
+    target: '>= 6',
+    message: 'Dash outlines came back open instead of closed contours.',
+    fixHint: 'Preserve loop closing for small closed edge contours.',
   });
-  pushFindingIf(quality.maxLongestStrokeAngularGapDeg > 30, findings, {
-    severity: 'medium',
-    metric: 'maxLongestStrokeAngularGapDeg',
-    actual: quality.maxLongestStrokeAngularGapDeg,
-    target: '<= 30',
-    message: 'The linked curved stroke still has an overly large angular gap.',
-    fixHint: 'Tune small-gap linking or post-link cleanup for curved strokes.',
+  pushFindingIf(quality.aggregateAngularCoverageRatio < 0.85, findings, {
+    severity: 'high',
+    metric: 'aggregateAngularCoverageRatio',
+    actual: quality.aggregateAngularCoverageRatio,
+    target: '>= 0.85',
+    message: 'The dash outlines together lost coverage of the drawn ring.',
+    fixHint: 'Preserve small curved stroke continuity through the Canny-to-contour chain.',
   });
   return {
     id: 'edge-segmented-curve-linking',
-    name: 'Segmented curved-stroke Edge Detection linking',
+    name: 'Segmented curved-stroke Edge Detection outlining',
     rating: ratingFromFindings(findings),
     metrics: {
       strokePolylineCount: quality.strokePolylineCount,
+      closedStrokeCount,
+      aggregateAngularCoverageRatio: quality.aggregateAngularCoverageRatio,
       longestStrokeAngularCoverageRatio: quality.longestStrokeAngularCoverageRatio,
       maxLongestStrokeAngularGapDeg: quality.maxLongestStrokeAngularGapDeg,
     },
     benchmark: {
-      strokePolylineCount: '<= 6',
-      longestStrokeAngularCoverageRatio: '>= 0.9',
-      maxLongestStrokeAngularGapDeg: '<= 30',
+      strokePolylineCount: '6..7',
+      closedStrokeCount: '>= 6',
+      aggregateAngularCoverageRatio: '>= 0.85',
     },
     findings,
   };
