@@ -69,9 +69,11 @@ export function connectionActions(
           baudRate: options.baudRate ?? refs.driver.defaultBaudRate,
         });
         refs.connection = conn;
-        refs.unsubscribeLine = conn.onLine((line) =>
-          handleLine(set, get, refs, (out) => safeWrite(out), line),
-        );
+        // Pass safeWrite through whole: the line handler attaches action and
+        // source metadata to its writes (post-error stop escalation, frame
+        // dispatch, job refills) — a bare (out) => safeWrite(out) wrapper
+        // silently drops both.
+        refs.unsubscribeLine = conn.onLine((line) => handleLine(set, get, refs, safeWrite, line));
         refs.unsubscribeClose = conn.onClose(() => {
           teardown(refs);
           set(buildPortClosePatch);
@@ -85,7 +87,7 @@ export function connectionActions(
           controllerOperation: null,
           homingState: 'unknown',
         });
-        void runHandshake(set, get, refs, (out) => safeWrite(out)).catch(() => undefined);
+        void runHandshake(set, get, refs, safeWrite).catch(() => undefined);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         set({ connection: { kind: 'failed', error: message } });

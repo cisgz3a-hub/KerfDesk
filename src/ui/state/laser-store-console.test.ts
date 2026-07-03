@@ -156,3 +156,32 @@ describe('laser-store console commands', () => {
     expect(writes.at(-1)).toBe('$32=1\n');
   });
 });
+
+describe('job stream transcript source', () => {
+  // The console panel hides source 'job' entries unless "show stream" is on.
+  // Ack-driven refills travel through the line handler's write wrapper — if
+  // that path drops the source, every refill lands as 'system' and the
+  // console floods with raw G-code during jobs.
+  it('tags mid-job refill writes as job traffic end-to-end', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    connection.emitLine('ok');
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await Promise.resolve();
+
+    // Eight 29-byte lines: the 120-byte first window holds four; each ok
+    // triggers a refill write for the next queued line.
+    const longLine = 'G1 X99.000 Y99.000 F600 S255';
+    await useLaserStore.getState().startJob(Array.from({ length: 8 }, () => longLine).join('\n'));
+    connection.emitLine('ok');
+    connection.emitLine('ok');
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+
+    const outbound = useLaserStore
+      .getState()
+      .transcript.filter((e) => e.direction === 'out' && e.raw.startsWith('G1 X99'));
+    // Initial window plus at least two refills.
+    expect(outbound.length).toBeGreaterThanOrEqual(3);
+    expect([...new Set(outbound.map((e) => e.source))]).toEqual(['job']);
+  });
+});

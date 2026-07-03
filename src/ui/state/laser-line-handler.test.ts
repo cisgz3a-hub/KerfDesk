@@ -142,6 +142,25 @@ describe('handleLine detected controller settings', () => {
 });
 
 describe('handleLine streamer writes', () => {
+  // Mid-job refills are the job stream continuing — transcribed as anything
+  // else, the console's "hide job stream" filter stops hiding them and the
+  // panel floods with raw G-code during every job.
+  it('tags ack-driven refill writes with the job transcript source', () => {
+    const { refs, set, get } = makeHarness();
+    const safeWrite = vi.fn(
+      async (_payload: string, _action?: unknown, _source?: unknown): Promise<void> => undefined,
+    );
+    // Eight 29-byte lines: the 120-byte first window holds four, so each ack
+    // triggers a refill write for the next queued line.
+    const longLine = 'G1 X99.000 Y99.000 F600 S255';
+    const gcode = Array.from({ length: 8 }, () => longLine).join('\n');
+    set({ streamer: step(createStreamer(gcode)).state });
+
+    handleLine(set, get, refs, safeWrite, 'ok');
+
+    expect(safeWrite).toHaveBeenCalledWith(`${longLine}\n`, undefined, 'job');
+  });
+
   it('keeps a fully acked job busy until the post-job settle marker and stable Idle finish', async () => {
     const { refs, set, get } = makeHarness();
     const safeWrite = vi.fn(
@@ -236,7 +255,7 @@ describe('handleLine streamer writes', () => {
     handleLine(set, get, refs, safeWrite, 'ok');
     await Promise.resolve();
 
-    expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n');
+    expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n', undefined, 'job');
     expect(get().streamer?.status).toBe('disconnected');
     expect(get().streamer?.completed).toBe(1);
     expect(get().streamer?.inFlight.map((item) => item.line)).toEqual(['G1 X1234567891\n']);
