@@ -56,6 +56,10 @@ describe('trace benchmark loop', () => {
       expect(archHouseEdge.metrics.aggregateArchCoverageRatio).toBeGreaterThanOrEqual(0.95);
       expect(archHouseEdge.metrics.longestArchCoverageRatio).toBeGreaterThanOrEqual(0.7);
       expect(archHouseEdge.metrics.maxLongestArchGapDeg).toBeLessThanOrEqual(30);
+      // The 2026-07-03 defects: letter outlines left open with small visible
+      // gaps, and faceted (lumpy) small-letter curves.
+      expect(archHouseEdge.metrics.nearlyClosedOpenCount).toBe(0);
+      expect(archHouseEdge.metrics.langebaanExcessTurnPer100Px).toBeLessThanOrEqual(12);
 
       expect(centerline.findings).toEqual([]);
       expect(centerline.metrics.maxDeviationPx).toBeLessThanOrEqual(1.6);

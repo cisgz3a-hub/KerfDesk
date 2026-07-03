@@ -35,6 +35,10 @@ export type CannyField = {
   readonly ridgeMag: Float32Array;
   /** The hysteresis low threshold in ridgeMag units. */
   readonly lowThreshold: number;
+  /** Pre-NMS gradient magnitude — sub-pixel refinement fits its peak. */
+  readonly gradMag: Float32Array;
+  readonly gradX: Float32Array;
+  readonly gradY: Float32Array;
 };
 
 export function cannyEdges(image: RawImageData, options: CannyOptions = {}): Uint8Array {
@@ -54,7 +58,14 @@ export function cannyEdgeField(image: RawImageData, options: CannyOptions = {}):
     lowRatio,
     options.highThresholdRatio ?? DEFAULT_HIGH_RATIO,
   );
-  return { edges, ridgeMag: thinned, lowThreshold: max * lowRatio };
+  return {
+    edges,
+    ridgeMag: thinned,
+    lowThreshold: max * lowRatio,
+    gradMag: gradient.mag,
+    gradX: gradient.gradX,
+    gradY: gradient.gradY,
+  };
 }
 
 // Interpolating NMS: compare each pixel against the bilinear magnitude one

@@ -1,6 +1,61 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { despeckle, medianFilter, otsuThreshold } from './preprocess';
+import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import type { RawImageData } from './trace-image';
+
+// ITU-R BT.601 luma, rounded — matches preprocess.ts's lumaAt exactly. The
+// naive reference median below must classify pixels identically to the
+// implementation under test, so it derives the median from these same luma
+// values rather than from a separate colour model.
+function naiveLuma(data: Uint8ClampedArray, offset: number): number {
+  const r = data[offset] ?? 0;
+  const g = data[offset + 1] ?? 0;
+  const b = data[offset + 2] ?? 0;
+  return Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+}
+
+// Deliberately naive 3×3 median: gather neighbours, full JS sort, take the
+// middle. This is the exact semantics the fast in-place median must preserve,
+// so the property test can assert byte-equality against it.
+function naiveMedianFilter(image: RawImageData): RawImageData {
+  const { width: w, height: h, data } = image;
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const samples: number[] = [];
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+          samples.push(naiveLuma(data, (ny * w + nx) * 4));
+        }
+      }
+      samples.sort((a, b) => a - b);
+      const median = samples[samples.length >> 1] ?? 0;
+      const pi = (y * w + x) * 4;
+      out[pi] = median;
+      out[pi + 1] = median;
+      out[pi + 2] = median;
+      out[pi + 3] = 255;
+    }
+  }
+  return { width: w, height: h, data: out };
+}
+
+// Random RGBA image up to 12×12 for the property tests. Small on purpose:
+// borders (the count < 9 insertion-sort path) are a large fraction of the
+// pixels, so the network and border paths both get heavy coverage.
+const randomImage = fc
+  .tuple(fc.integer({ min: 1, max: 12 }), fc.integer({ min: 1, max: 12 }))
+  .chain(([w, h]) =>
+    fc
+      .array(fc.integer({ min: 0, max: 255 }), {
+        minLength: w * h * 4,
+        maxLength: w * h * 4,
+      })
+      .map((bytes): RawImageData => ({ width: w, height: h, data: new Uint8ClampedArray(bytes) })),
+  );
 
 // Build a RawImageData from a grid of luma values. Each entry is
 // duplicated across R/G/B; alpha = 255. Tests read clearly when the
@@ -116,6 +171,53 @@ describe('medianFilter', () => {
     const before = Array.from(img.data);
     medianFilter(img);
     expect(Array.from(img.data)).toEqual(before);
+  });
+
+  it('is byte-identical to a naive reference median over random small images', () => {
+    // The fast median (fixed 9-element network for interior pixels,
+    // insertion sort for borders) must produce EXACTLY the same bytes as the
+    // straightforward gather-sort-middle reference — the optimisation is
+    // purely for speed and may not change a single output pixel.
+    fc.assert(
+      fc.property(randomImage, (image) => {
+        const fast = medianFilter(image);
+        const naive = naiveMedianFilter(image);
+        expect(Array.from(fast.data)).toEqual(Array.from(naive.data));
+      }),
+      { numRuns: 40 },
+    );
+  });
+});
+
+describe('hasImpulseNoise', () => {
+  it('reports false for a clean image with no salt-and-pepper', () => {
+    // A crisp black-on-white glyph edge: the median changes anti-aliasing-free
+    // pixels by 0, so the impulse ratio is 0 — no median should be applied.
+    const img = gridImage([
+      [0, 0, 0, 255, 255, 255],
+      [0, 0, 0, 255, 255, 255],
+      [0, 0, 0, 255, 255, 255],
+      [0, 0, 0, 255, 255, 255],
+    ]);
+    expect(hasImpulseNoise(img)).toBe(false);
+  });
+
+  it('reports true for an image peppered with isolated salt pixels', () => {
+    // ~11% of pixels flipped to the opposite extreme (values the 3×3 median
+    // reverts by ~255) — well over the impulse ratio floor.
+    const width = 12;
+    const height = 12;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let i = 0; i < width * height; i += 1) {
+      const salt = i % 9 === 0; // isolated speckle
+      const v = salt ? 255 : 0;
+      const o = i * 4;
+      data[o] = v;
+      data[o + 1] = v;
+      data[o + 2] = v;
+      data[o + 3] = 255;
+    }
+    expect(hasImpulseNoise({ width, height, data })).toBe(true);
   });
 });
 

@@ -41,6 +41,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     smoothness: 1,
     optimize: 0.2,
     despeckleMinPixels: 12,
+    // Supersample small thin-featured sources 2x before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
   },
   Centerline: {
     // For black strokes that should engrave as one path down the
@@ -58,6 +60,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     useOtsuThreshold: true,
     despeckleMinPixels: 12,
     centerlineJoinGapPx: 3,
+    // Supersample small thin-featured sources 2x before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
   },
   'Edge Detection': {
     // Contrast edge vectorization -> stroked contour vectors around brightness
@@ -83,12 +87,20 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeJoinGapPx: 5,
     // undefined = AUTO median: applied only when impulse noise is detected,
     // so clean art keeps its small features (see edge-trace.ts).
+    // Supersample small thin-featured sources 2x before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
   },
   Smooth: {
-    // For slightly noisy / hand-drawn line art. Median filter kills
+    // For slightly noisy / hand-drawn line art. The median kills
     // salt-and-pepper noise before threshold; despeckle catches what
     // survives. Blur slider remains for compatibility but the median
     // does most of the work.
+    //
+    // medianFilter is 'auto', NOT true: forcing the median on every input
+    // melts clean small glyphs (the LANGEBAAN defect — 4-6 px letters trace
+    // as blobs) and cost ~2.5s on a 1024² logo for zero benefit on crisp
+    // art. 'auto' runs the median only when impulse noise is actually
+    // present, matching the Edge Detection tracer's policy.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 2,
@@ -97,9 +109,11 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurDelta: 20,
     lineFilter: true,
     fixedPalette: ['#ffffff', '#000000'],
-    medianFilter: true,
+    medianFilter: 'auto',
     useOtsuThreshold: true,
     despeckleMinPixels: 24,
+    // Supersample small thin-featured sources 2x before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
   },
   Sharp: {
     // For pixel-art / blueprint inputs where every notch matters.
@@ -122,5 +136,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // while genuine large arcs still fit as curves.
     smoothness: 0.55,
     optimize: 0.15,
+    // Supersample small thin-featured sources 2x before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
   },
 };

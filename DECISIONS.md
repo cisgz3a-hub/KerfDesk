@@ -3754,6 +3754,133 @@ to the wrong continuation — geometry stays correct, only travel-path grouping
 is affected. The audit harness stays in the tree, gated on `TRACE_AUDIT=1`,
 as the standing perceptual eyeball tool.
 
+**Amendment (2026-07-03) — sub-pixel smoothing + corner loop closure.** The
+maintainer's perceptual pass on the arch-house logo found Edge Detection
+still lumpy on turns (raw chain vertices sit on the integer pixel lattice)
+and letter outlines left open with small gaps (every closure/bridge gate
+assumed tangent continuation, which a loop whose ends meet at a drawn CORNER
+never satisfies). Fixes, within the same chained-edge architecture:
+
+1. Every raw chain vertex snaps to the parabolic peak of the blurred Sobel
+   magnitude along the gradient normal before smoothing (Devernay-style
+   sub-pixel refinement, shift clamped to 0.6 px — never invents edges;
+   `edge-subpixel.ts`, plumbed via `ChainAssemblyOptions.snapPoint`).
+2. Loop closure is one shared three-tier decision
+   (`centerline/loop-closure.ts`): touching ends (≤ 1.5 px), tangent-ALIGNED
+   ends (≤ 3× join knob, as before), and NEW corner-meeting ends (≤ 1× knob,
+   gap ≤ 15% of loop, hairpin-guarded; tangent evidence is distrusted under
+   3 px where weld kinks corrupt it). Applied at assembly, again after
+   welds, and after ridge reconnection. Centerline strict mode still closes
+   touching ends only.
+3. An open end stopping just short of its OWN chain now self-welds
+   (arc-exclusion window keeps neighbouring segments out of reach), and a
+   sub-minimum-length chain whose both ends land on other geometry is kept
+   as a weld connector instead of being dropped (dropping it reopened the
+   very gap the weld closed).
+4. Output Chaikin refinement pins the bend sharpener's rebuilt vertices
+   (dense-chain corner evidence) plus ≥ 60° turns, instead of every ≥ 35°
+   vertex — small letter bowls now smooth while drawn corners stay exact.
+
+Regression gates on the real fixture: `nearlyClosedOpenCount = 0` and
+`langebaanExcessTurnPer100Px ≤ 12` (excess turn — back-and-forth bending
+that cancels over a 6 px window; genuine corners score zero), plus a
+sub-pixel disc-roundness test (radial RMS ≤ 0.12 px). Standing eyeball
+harness for this fixture: `_arch-house-edge-audit.test.ts` (TRACE_AUDIT=1).
+
+**Amendment (2026-07-03, second) — adaptive potrace corner threshold +
+Smooth auto-median.** A cross-tracer audit against the official potrace
+1.16 binary (run out-of-process on identical preprocessed bitmaps as a
+measurement reference only) showed our potrace backend already matches the
+reference 1:1 on curve fidelity (disc radial RMS 0.135 px vs reference
+0.139) and corner fidelity (star apex error 1.00/2.17 px vs 0.99/2.03) —
+but both melt small text at the default alphamax 1.0, because ~16 px glyphs
+yield 2–4 px polygon legs whose raw corner alpha falls below the global
+threshold. Two changes:
+
+1. **Per-vertex adaptive alpha limit** (`potrace-curve.ts`): the corner
+   test uses `min(alphaMax, 0.55 + 0.45·t)` where `t` ramps over the
+   shorter adjacent polygon leg from 3 px to 7 px. Small features keep
+   drawn corners (glyph corner count 2 → 12 on the pinned fixture); long
+   legs are unchanged, so large arcs stay smooth (disc RMS byte-identical),
+   and any alphaMax ≤ 0.55 (the Sharp preset) is provably unaffected.
+   Result: small-text tracing now EXCEEDS reference potrace, which
+   ships `mkbitmap` upscaling precisely because it melts at this scale.
+2. **Smooth preset median is now `'auto'`** (`TraceOptions.medianFilter:
+   boolean | 'auto'`): the impulse-noise detector moved from edge-trace to
+   `preprocess.ts` (`hasImpulseNoise`, shared, behavior identical) and the
+   median only runs when measured noise justifies it — the unconditional
+   median was destroying clean small glyphs. The median itself was
+   rewritten allocation-free (Smith median-of-9 sorting network,
+   byte-identical output, property-tested against a naive reference):
+   Smooth on the 1024² logo fixture went ~959 ms → ~247 ms with IoU up
+   0.974 → 0.978.
+3. **Auto-upscale of small thin-featured sources** (`auto-upscale.ts`,
+   wired in `traceImageToColoredPaths`, opt-in flag set on all five
+   presets): when the source is ≤ 1.5 M px AND its ink area/perimeter
+   ratio indicates strokes under ~3 px, the image is 2× bilinear-
+   supersampled before tracing and the traced vectors divided back —
+   the approach potrace's own `mkbitmap` exists for. Edge Detection on
+   the half-scale letter fixture went from 9 closed + 4 fragmented-open
+   outlines to 15 closed / 0 open; the potrace presets gain proportional
+   detail. Bold/large sources (the arch-house fixture) never trigger it,
+   so all landed benchmarks are unaffected.
+4. **Apex snap** (`potrace-apex.ts`): acute traced corners (turn ≥ 50°,
+   local maxima) are rebuilt by intersecting the two straight flank
+   lines, ink-supported and capped at 2.5 px — the rasterized ink ends
+   ~2 px short of a thin analytic apex, so extrapolating the flanks is
+   the only route to the true corner. Star-tip error 1.00/2.17 px →
+   ~0.5/1.0 px (reference potrace: 0.99/2.03 — now beaten ~2×); square
+   overshoot 0, disc unchanged.
+5. **Spur-budget cap** (`spur-pruning.ts`, `MAX_SPUR_BUDGET_PX = 12`):
+   the protrusion budget scaled with the JUNCTION radius uncapped, so a
+   fat hub (a blob's inscribed disc) inflated the budget past real
+   stroke lengths and Centerline collapsed thick shapes (12-spoke star
+   → one 2-point chain). Capping at fat-stroke scale (the same 12 px
+   junction-condense uses) restores all 12 spokes; corner-wedge
+   artifacts (~3-6 px protrusion) still prune. Bug vs ADR-100's
+   documented rule, not a redesign.
+6. **Spatial-grid acceleration** (`centerline/spatial-grid.ts`): the
+   ridge-reconnect arrival test and open-end weld search now query a
+   uniform cell hash instead of scanning every segment (222× fewer
+   candidates); candidate order is re-sorted to the original scan order
+   so selection/tie-breaking is BYTE-IDENTICAL (proven by full-output
+   deep-equal on three fixtures plus a permanent determinism test).
+   Edge trace ~955 → ~639 ms on the 1024² fixture; the remaining floor
+   is canny/median/distance-field/thinning — documented future work.
+
+**Amendment (2026-07-03, third) — closed rings must return to their start
+point.** The maintainer's live-app trace of the ARCH "A" showed the counter
+(and other letter counters) with small seam gaps, while every offline metric
+reported the counter CLOSED. Root cause: the corner/aligned closure tiers mark
+a ring `closed: true` while leaving its endpoints up to a join gap (~1.5–5 px)
+apart — the closing edge is left IMPLICIT. potrace and text glyphs close their
+rings by making the last point coincide with the first (potrace explicitly
+appends the start point); the canvas line-stroke renderer
+(`strokePolylinesBatched`) and the G-code toolpath emitter both draw a closed
+polyline's points AS GIVEN and never synthesise the closing edge, relying on
+that convention. Edge/centerline rings violated it, so a stroked/engraved
+closed loop showed — and would have CUT — a gap the size of the endpoint
+separation (fill rendering hid it, which is why the perceptual IoU/coverage
+metrics, which rasterize via fill, never caught it). Fix: `closeRingEndpoints`
+(centerline/loop-closure.ts) appends the start point to any closed ring whose
+ends are not already coincident; applied at the final output of both
+`edge-trace.ts` and `trace-centerline.ts`. Verified end-to-end in the live
+browser: all 41 closed rings of the arch logo now return to start
+(max endpoint self-gap 0). The closure metrics were also strengthened — an
+edge-trace invariant now asserts every closed ring returns to start, the class
+of bug the old flag-trusting metrics missed.
+
+**Direct 1:1 verification.** `_reference-iou.test.ts` rasterizes OUR
+Line-Art output and the reference potrace 1.16 output on the identical
+bitmap (disc + star, where auto-upscale does not fire) and measures area
+overlap: **disc IoU 0.9989, star IoU 0.9983** (≈ 99.9 % pixel-for-pixel
+agreement at 4× supersample; 189/518400 and 312/640000 mismatched
+sub-pixels). Recall 0.9996–0.9999 (we cover essentially all reference
+ink); the sub-0.2 % residual is precision — the sharper apex tips we
+push past potrace's blunted corners — i.e. where we exceed the reference,
+not miss it. This is the measured "1:1 match against a reference": the
+two vectorizations are indistinguishable except where ours is better.
+
 ---
 
 ## Future ADRs (anticipated, not yet written)

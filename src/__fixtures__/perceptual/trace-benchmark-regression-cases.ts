@@ -3,8 +3,7 @@ import {
   traceCenterlineStrokePaths,
   traceImageToColoredPaths,
 } from '../../core/trace';
-import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
-import { measureTopArchContinuity } from './arch-house-edge-truth';
+import { LANGEBAAN_BAND } from './arch-house-edge-truth';
 import { measureCenterlineDeviation } from './centerline-deviation';
 import { CENTERLINE_TRUTH_FIXTURES } from './centerline-truth';
 import { decodePngFile } from './png-decode';
@@ -19,9 +18,7 @@ type CenterlineRegressionLimit = {
 };
 
 const CENTERLINE_OPTIONS = TRACE_PRESETS['Centerline']!;
-const EDGE_OPTIONS = TRACE_PRESETS['Edge Detection']!;
 const LINE_ART_OPTIONS = TRACE_PRESETS['Line Art']!;
-const LANGEBAAN_BAND = { x0: 300, y0: 660, x1: 735, y1: 725 };
 
 const STRICT_CENTERLINE_LIMIT: CenterlineRegressionLimit = {
   maxDeviationPx: 1,
@@ -215,97 +212,6 @@ export async function archHouseLineArtBaselineBenchmark(): Promise<TraceBenchmar
   };
 }
 
-export function archHouseEdgeCurveCleanupBenchmark(): TraceBenchmarkResult {
-  const fixture = requiredArchHouseFixtureStatus();
-  const findings: TraceBenchmarkFinding[] = [];
-  if (fixture.path === null) {
-    return missingArchHouseEdgeBenchmark(fixture.expectedPathGlob, findings);
-  }
-
-  const image = decodePngFile(fixture.path);
-  const paths = traceImageToEdgePaths(image, EDGE_OPTIONS);
-  const artifact = buildTraceArtifact({
-    name: 'arch-house-langebaan-edge-detection',
-    mode: 'edge',
-    source: { width: image.width, height: image.height },
-    paths,
-  });
-  const archQuality = measureTopArchContinuity(paths.flatMap((path) => path.polylines));
-  pushFindingIf(artifact.metrics.smallClosedPolylineCount > 4, findings, {
-    severity: 'high',
-    metric: 'smallClosedPolylineCount',
-    actual: artifact.metrics.smallClosedPolylineCount,
-    target: '<= 4',
-    message: 'Arch House Edge Detection emitted too many tiny closed curve specks.',
-    fixHint: 'Raise or tune edge-only minimum line cleanup without weakening Line Art.',
-  });
-  pushFindingIf(archQuality.archPolylineCount > 18, findings, {
-    severity: 'medium',
-    metric: 'archPolylineCount',
-    actual: archQuality.archPolylineCount,
-    target: '<= 18',
-    message: 'The main arch region is over-fragmented by Edge Detection.',
-    fixHint: 'Tune curve-gap linking or edge cleanup for real-logo curved bands.',
-  });
-  pushFindingIf(archQuality.shortArchPolylineCount > 5, findings, {
-    severity: 'high',
-    metric: 'shortArchPolylineCount',
-    actual: archQuality.shortArchPolylineCount,
-    target: '<= 5',
-    message: 'The main arch still has short dotted curve fragments.',
-    fixHint: 'Filter tiny edge fragments while preserving aggregate arch coverage.',
-  });
-  pushFindingIf(archQuality.aggregateArchCoverageRatio < 0.95, findings, {
-    severity: 'high',
-    metric: 'aggregateArchCoverageRatio',
-    actual: archQuality.aggregateArchCoverageRatio,
-    target: '>= 0.95',
-    message: 'Edge Detection lost visible coverage across the main arch.',
-    fixHint: 'Preserve real curve coverage while filtering short fragments.',
-  });
-  pushFindingIf(archQuality.longestArchCoverageRatio < 0.7, findings, {
-    severity: 'high',
-    metric: 'longestArchCoverageRatio',
-    actual: archQuality.longestArchCoverageRatio,
-    target: '>= 0.7',
-    message: 'No single Edge Detection contour carries enough of the main arch.',
-    fixHint: 'Keep the VTracer continuity pass active for real-logo curved bands.',
-  });
-  pushFindingIf(archQuality.maxLongestArchGapDeg > 30, findings, {
-    severity: 'medium',
-    metric: 'maxLongestArchGapDeg',
-    actual: archQuality.maxLongestArchGapDeg,
-    target: '<= 30',
-    message: 'The strongest arch contour still has a visible curve gap.',
-    fixHint: 'Tune VTracer fallback and edge thresholding before loosening the UI preset.',
-  });
-  return {
-    id: 'arch-house-edge-curve-cleanup',
-    name: 'Arch House Edge Detection curve cleanup',
-    rating: ratingFromFindings(findings),
-    metrics: {
-      fixturePresent: 1,
-      smallClosedPolylineCount: artifact.metrics.smallClosedPolylineCount,
-      pointCount: artifact.metrics.pointCount,
-      archPolylineCount: archQuality.archPolylineCount,
-      shortArchPolylineCount: archQuality.shortArchPolylineCount,
-      aggregateArchCoverageRatio: archQuality.aggregateArchCoverageRatio,
-      longestArchCoverageRatio: archQuality.longestArchCoverageRatio,
-      maxLongestArchGapDeg: archQuality.maxLongestArchGapDeg,
-    },
-    benchmark: {
-      fixturePresent: 'present',
-      smallClosedPolylineCount: '<= 4',
-      archPolylineCount: '<= 18',
-      shortArchPolylineCount: '<= 5',
-      aggregateArchCoverageRatio: '>= 0.95',
-      longestArchCoverageRatio: '>= 0.7',
-      maxLongestArchGapDeg: '<= 30',
-    },
-    findings,
-  };
-}
-
 function missingArchHouseBenchmark(
   expectedPathGlob: string,
   findings: TraceBenchmarkFinding[],
@@ -336,45 +242,6 @@ function missingArchHouseBenchmark(
       bottomWordInk: '>= 3000',
       openPolylineCount: '0',
       pointCount: '> 500 and < 80000',
-    },
-    findings,
-  };
-}
-
-function missingArchHouseEdgeBenchmark(
-  expectedPathGlob: string,
-  findings: TraceBenchmarkFinding[],
-): TraceBenchmarkResult {
-  findings.push({
-    severity: 'low',
-    metric: 'fixturePresent',
-    actual: 'missing',
-    target: expectedPathGlob,
-    message: 'Required Arch House/Langebaan source fixture is missing.',
-    fixHint: 'Restore the real source image before claiming Edge Detection curve cleanup.',
-  });
-  return {
-    id: 'arch-house-edge-curve-cleanup',
-    name: 'Arch House Edge Detection curve cleanup',
-    rating: ratingFromFindings(findings),
-    metrics: {
-      fixturePresent: 0,
-      smallClosedPolylineCount: 0,
-      pointCount: 0,
-      archPolylineCount: 0,
-      shortArchPolylineCount: 0,
-      aggregateArchCoverageRatio: 0,
-      longestArchCoverageRatio: 0,
-      maxLongestArchGapDeg: 0,
-    },
-    benchmark: {
-      fixturePresent: 'present',
-      smallClosedPolylineCount: '<= 4',
-      archPolylineCount: '<= 18',
-      shortArchPolylineCount: '<= 5',
-      aggregateArchCoverageRatio: '>= 0.95',
-      longestArchCoverageRatio: '>= 0.7',
-      maxLongestArchGapDeg: '<= 30',
     },
     findings,
   };

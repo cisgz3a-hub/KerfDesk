@@ -22,9 +22,14 @@ import {
   buildImageTracerOptions,
   preprocessForTrace,
 } from './trace-image';
+import { downscaleTracedPaths, shouldAutoUpscale, upscaleDouble } from './auto-upscale';
 import { traceCenterlineStrokePaths } from './centerline';
 import { traceImageToEdgePaths } from './edge-trace';
 import { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
+
+// 2x is the supersample factor auto-upscale applies; the traced vectors are
+// divided by the same factor to land back in source coordinates.
+const AUTO_UPSCALE_FACTOR = 2;
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -131,6 +136,20 @@ export async function traceImageToColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
+  // Small thin-featured sources trace poorly at native resolution; supersample
+  // 2x, trace, then scale the vectors back down. The inner dispatch is called
+  // directly so this never re-enters itself and double-upscales.
+  if (options.autoUpscaleSmallSources === true && shouldAutoUpscale(image)) {
+    const upscaled = await dispatchTrace(upscaleDouble(image), options);
+    return downscaleTracedPaths(upscaled, AUTO_UPSCALE_FACTOR);
+  }
+  return dispatchTrace(image, options);
+}
+
+// The backend selection shared by both the direct and the upscaled paths.
+// Extracted so the public wrapper stays a thin guard and complexity stays
+// under the lint cap.
+async function dispatchTrace(image: RawImageData, options: TraceOptions): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline') return traceCenterlineStrokePaths(image, options);
   if (options.traceMode === 'edge') return traceImageToEdgePaths(image, options);
   if (shouldUsePotraceTraceBackend(options)) return traceImageToPotraceColoredPaths(image, options);
