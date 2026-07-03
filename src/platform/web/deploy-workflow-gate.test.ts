@@ -101,5 +101,32 @@ describe('Cloudflare production deploy gate', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
+  }, 30000);
+
+  // 2026-07-03 rename: cisgz3a-hub/LaserForge-2.0 -> cisgz3a-hub/KerfDesk. The
+  // guard rejected the new folder name + remote, so every Deploy run failed at
+  // guard:repo and production went stale. Pin the new identity as accepted.
+  it('repo guard accepts the KerfDesk identity after the 2026-07-03 rename', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kerfdesk-repo-guard-'));
+    const fakeRepo = join(root, 'KerfDesk');
+    mkdirSync(fakeRepo);
+    writeFileSync(join(fakeRepo, 'index.html'), '<title>KerfDesk</title><div id="app-root"></div>');
+    execFileSync('git', ['init'], { cwd: fakeRepo, stdio: 'ignore' });
+    execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/cisgz3a-hub/KerfDesk'], {
+      cwd: fakeRepo,
+      stdio: 'ignore',
+    });
+
+    const nodeScript = join(process.cwd(), 'scripts/assert-correct-repo.mjs');
+
+    try {
+      const output = execFileSync(process.execPath, [nodeScript], {
+        cwd: fakeRepo,
+        encoding: 'utf8',
+      });
+      expect(output).toContain('Repository guard passed');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30000);
 });
