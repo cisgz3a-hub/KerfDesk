@@ -44,7 +44,8 @@ export function rectifyImage(source: RgbaImage, target: RectifyTarget): RgbaImag
 // `offset`. The valid region is the convex hull of pixel centres [0, w-1]x[0, h-1];
 // outside it the output pixel is transparent. On the far edge the high bilinear tap
 // is clamped to the last index (its weight is 0 there) so the boundary has no seam.
-function writeBilinear(
+// Exported for the bed warp (warp-to-bed.ts), which shares the sampling rules.
+export function writeBilinear(
   out: Uint8ClampedArray,
   offset: number,
   source: RgbaImage,

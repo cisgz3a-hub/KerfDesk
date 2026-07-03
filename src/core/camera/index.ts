@@ -52,3 +52,6 @@ export {
 export type { CalibrationSession } from './calibration-session';
 export { alignMarkerLayout, detectAlignMarkers, solveMarkerAlignment } from './align-markers';
 export type { AlignMarkerLayout, MarkerDetection, MarkerFailure } from './align-markers';
+export { invertMat3 } from './mat3';
+export { warpFrameToBed } from './warp-to-bed';
+export type { BedWarpOptions, BedWarpResult } from './warp-to-bed';
