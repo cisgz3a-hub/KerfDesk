@@ -1,4 +1,4 @@
-// Auto-capture novelty gate (ADR-106 wizard). A new detection is worth
+// Auto-capture novelty gate (ADR-107 wizard). A new detection is worth
 // capturing only when the board has actually MOVED versus every capture
 // already taken — repeated near-identical shots add nothing and trap the
 // solver in the focal/depth ambiguity (the pose-diversity finding). Pure

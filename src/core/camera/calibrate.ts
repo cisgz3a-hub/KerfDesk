@@ -1,4 +1,4 @@
-// Fisheye intrinsic calibration entry point (ADR-106, v2.c). Validates board
+// Fisheye intrinsic calibration entry point (ADR-107, v2.c). Validates board
 // observations, seeds intrinsics/extrinsics, refines them by minimising total
 // reprojection error with Levenberg-Marquardt, and reports per-corner RMS and
 // quadrant coverage. Pure core: deterministic, no I/O. The single public surface

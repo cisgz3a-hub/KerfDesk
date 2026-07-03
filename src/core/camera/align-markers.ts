@@ -1,4 +1,4 @@
-// Automatic camera alignment from engraved markers (ADR-107, camera v3). The
+// Automatic camera alignment from engraved markers (ADR-108, camera v3). The
 // pattern is four 2×2 checker patches inset from the bed corners — each patch
 // center is a literal X-corner, so the proven checkerboard corner detector
 // finds them. The ORIGIN (top-left) target is a PAIR of patches whose midpoint

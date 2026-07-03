@@ -4161,22 +4161,65 @@ numbers win.
   messages retain the old numbers (immutable history — read them against
   this table).
 - ADR-099 is retired unused; the number stays reserved to avoid a third
-  meaning. Next free ADR: **105**. *(Update at camera merge: ADR-105/106
-  taken by Camera Mode v1/v2, ADR-107/108 reserved for camera v3/v4 —
-  next free ADR: **109**.)* *(ADR-107 written at camera-v3 ship; ADR-108 reserved for camera v4; next free: **109**.)*
+  meaning. Next free ADR: **105**. *(Update: ADR-105 = Easel-parity pack;
+  the camera merge renumbered its ADRs to 106–109 — next free ADR: **110**.)*
 
+## ADR-105 — Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03)
+
+**Status:** accepted (maintainer directive: "make sure that we have
+everything Easel has and more"). Grounded by
+`audit/reports/easel-1v1-comparison-2026-07-03.md`.
+
+### Decisions
+
+- **G9 — persistent 3D pane.** A docked, collapsible right-side pane in
+  CNC mode renders the simulated cut result (stock + removal heightfield,
+  the ADR-102 scene) LIVE while designing — Easel's split-view. The pane
+  computes a coarse toolpath + removal grid outside Preview mode,
+  debounced per edit; Preview mode reuses the scrubbed preview grid.
+  UI-only; compile/emit untouched.
+- **G10 — pocket raster fill.** `CncLayerSettings.pocketStrategy?:
+  'offset' | 'raster-x' | 'raster-y'` (absent = offset, byte-identical
+  output). Raster pockets inset the region by the bit radius (clipper2),
+  hatch it with serpentine sweeps at the layer stepover, and finish with
+  the innermost perimeter ring per depth pass — Easel's Fill Method
+  offset/raster X/raster Y.
+- **G11 — bundled design library.** A curated, LOCAL starter library
+  (Easel's cloud "3M designs" is out of scope for a local-first app):
+  `lucide-static` (ISC — MIT-compatible per ADR-017) provides the icon
+  corpus; a manifest bundles a curated subset by category into a Library
+  dialog that inserts through the existing SVG import pipeline. Larger
+  art: users import SVGs from CC0 sources (openclipart et al) — the
+  dialog links the guidance. PROVISIONAL curation; growable.
+- **Explicitly NOT gaps (answering the drivers question):** Easel Driver
+  exists because a cloud page cannot reach serial ports; KerfDesk talks
+  WebSerial directly (browser) / native serial (Electron) — no agent to
+  install. FTDI/CH340 USB-UART drivers are OS/board-level, identical for
+  every sender. Post-processors: external CAM (Vectric/Fusion) targets
+  us with their stock GRBL post; running such files live is roadmap
+  (G12, external-program streaming — the simulator already re-imports
+  them read-only).
+
+### Verification
+
+Unit tests per feature; raster-fill coverage/no-gouge checks; jsdom
+fallback for the pane; license-check green with the new dependency;
+full gate per commit. Hardware remains CLAIMED per ADR-098 §3.
 ---
 
-## ADR-105 — Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4)
+## ADR-106 — Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4)
 
 **Status:** Accepted; staged in small PRs. | **Date:** 2026-06-27
 
 > Numbering note: authored on `claude/camera-mode-v1` as ADR-094/095 (then the next
 > free slots above the build plan's ADR-054..091 reservation). Merged after ADR-104's
 > integration renumbering had assigned 094–104 to the controller/CNC tracks, so —
-> following the ADR-104 precedent — the camera ADRs renumber on merge: v1 = ADR-105,
-> v2 = ADR-106; v3 / v4 reserve ADR-107 / ADR-108. Pre-merge commit messages retain
+> following the ADR-104 precedent — the camera ADRs renumber on merge: v1 = ADR-106,
+> v2 = ADR-107; v3 / v4 reserve ADR-108 / ADR-109. Pre-merge commit messages retain
 > the old numbers (immutable history — read them against this note).
+> Renumbered AGAIN at the main merge: origin/main had published ADR-105
+> (Easel-parity pack) meanwhile — published numbers win (ADR-104) — so the
+> camera ADRs are finally v1=ADR-106, v2=ADR-107, v3=ADR-108, v4=ADR-109.
 
 ### Context
 
@@ -4213,8 +4256,8 @@ each a few dozen lines — and hand-rolls to ~150–250 LOC of pure TypeScript.
    `scanningOffsets`; additive normalize in `deserialize-project.ts`; no `schemaVersion` bump).
    In-progress calibration drafts use the existing `localStorage` calibration-draft pattern.
 6. **Staging:** v1 overlay + manual 4-point (this ADR) → v2 Brown–Conrady lens calibration
-   (ADR-106) → v3 fiducial auto-align + 2-point print-and-cut (ADR-107) → v4 capture-to-trace
-   reusing the existing trace pipeline (ADR-108). Each phase ships as its own small PR set.
+   (ADR-107) → v3 fiducial auto-align + 2-point print-and-cut (ADR-108) → v4 capture-to-trace
+   reusing the existing trace pipeline (ADR-109). Each phase ships as its own small PR set.
 
 ### Consequences
 
@@ -4240,18 +4283,18 @@ https / secure context or `getUserMedia` silently fails.
 ### Out of scope for v1
 
 Lens distortion correction (v2), fiducial auto-detection (v3), capture-to-trace (v4), and
-non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-106 / 107 / 108.
+non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-107 / 108 / 109.
 
 ---
 
-## ADR-106 — Camera Mode v2: fisheye lens calibration + de-fisheye render
+## ADR-107 — Camera Mode v2: fisheye lens calibration + de-fisheye render
 
 **Status:** Accepted; staged in small PRs. | **Date:** 2026-06-28
 
 ### Context
 
 The Falcon A1 Pro (like most laser bed cameras) uses a wide-angle lens, so the live feed
-is visibly barrel-bowed. The ADR-105 4-point homography corrects perspective only — it
+is visibly barrel-bowed. The ADR-106 4-point homography corrects perspective only — it
 pins the four corners but cannot remove lens curvature, so straight bed edges stay curved.
 A camera-implementation study (MeerK40t, OpenPnP, LightBurn, Rayforge, LaserWeb4, OpenCV)
 confirmed the universal fix: a lens-distortion model applied to the frame **before** the
@@ -4259,7 +4302,7 @@ homography.
 
 Licensing (ADR-017/018): GPL/AGPL apps (OpenPnP, LaserWeb4) may be **studied** but not
 vendored; only MIT/BSD/Apache code may be copied. OpenCV.js (the build) is excluded on
-bundle size (ADR-105), not licence — and the distortion math is not copyrightable, so the
+bundle size (ADR-106), not licence — and the distortion math is not copyrightable, so the
 equations are clean-roomed in TypeScript from the published Kannala-Brandt model.
 
 ### Decision (maintainer-chosen, 2026-06-28)
@@ -4272,13 +4315,13 @@ equations are clean-roomed in TypeScript from the published Kannala-Brandt model
    centre) with a per-capture reprojection-error score (LightBurn) and per-quadrant
    coverage feedback (Rayforge); fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
    Levenberg-Marquardt minimiser over reprojection error. ChArUco is rejected — its ArUco
-   decode needs an LGPL bundle barred by ADR-105; a plain checkerboard detects clean-room.
+   decode needs an LGPL bundle barred by ADR-106; a plain checkerboard detects clean-room.
 3. **Render: WebGL fragment shader.** The inverse-distortion sampling runs per-pixel on the
    GPU (LaserWeb4 proves `regl` does this < 1 MB, no OpenCV); output→input sampling so a
    rectified output pixel reads the distorted source. Supports live UVC video, not only the
    polled still.
-4. **Order:** capture → de-fisheye → 4-point homography (ADR-105) → overlay. The homography
-   now runs on rectified pixels. K + D persist on the readonly `DeviceProfile` field ADR-105
+4. **Order:** capture → de-fisheye → 4-point homography (ADR-106) → overlay. The homography
+   now runs on rectified pixels. K + D persist on the readonly `DeviceProfile` field ADR-106
    reserved.
 
 ### Staging
@@ -4336,8 +4379,8 @@ Decisions made during the build (deviating from / refining the draft design):
 Shipped pure-core, all verified: `rectify-map.ts` (per-pixel output->input sample point, the
 math the renderer mirrors), `cpu-rectify.ts` (bilinear-sampled de-fisheye over an RGBA buffer),
 `camera-calibration.ts` (the persisted `CameraCalibration` type + an untrusted-JSON normaliser),
-and a new optional `cameraCalibration?: CameraCalibration` on `DeviceProfile` (the ADR-105 #5 /
-ADR-106 #4 "reserved" field — it did NOT exist in code; this closes that doc-vs-code drift),
+and a new optional `cameraCalibration?: CameraCalibration` on `DeviceProfile` (the ADR-106 #5 /
+ADR-107 #4 "reserved" field — it did NOT exist in code; this closes that doc-vs-code drift),
 normalised in `deserialize-project.ts` (override, not merge, so a malformed value is dropped).
 
 **Render refinement (flag for the maintainer).** Decision #3 chose a WebGL fragment shader,
@@ -4461,17 +4504,17 @@ Overlay sources: a captured still (LightBurn's Update Overlay model, the
 accurate default-to-be once rectified alignment lands) or the continuous live
 video; panel controls cover show/hide + fade + still/live. Material-thickness
 shift compensation and the rectified-basis alignment flow are follow-ups
-(ADR-107 scope).
+(ADR-108 scope).
 
 ---
 
-## ADR-107 — Camera Mode v3: automatic marker alignment (no-click homography)
+## ADR-108 — Camera Mode v3: automatic marker alignment (no-click homography)
 
 **Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
 
 ### Context
 
-ADR-105 reserved v3 for "fiducial auto-align," rejecting ArUco decoders on
+ADR-106 reserved v3 for "fiducial auto-align," rejecting ArUco decoders on
 licence (LGPV-bundle) grounds. The v2.b work shipped a proven clean-room
 X-corner detector — which is itself a fiducial detector if the fiducials are
 checker patches. Manual 4-point alignment (clicking bed corners in the frame)
@@ -4510,17 +4553,17 @@ the physical burn-vs-overlay registration — the maintainer's F-CAM4 pass.
 ### Out of scope
 
 Print-and-cut (2-point re-registration of a printed sheet) — the natural v3.5
-follow-on now that marker detection exists; capture-to-trace stays ADR-108.
+follow-on now that marker detection exists; capture-to-trace stays ADR-109.
 
 ---
 
-## ADR-108 — Camera Mode v4: capture-to-trace at true bed coordinates
+## ADR-109 — Camera Mode v4: capture-to-trace at true bed coordinates
 
 **Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
 
 ### Context
 
-ADR-105 reserved v4 for capture-to-trace. The prerequisite geometry all
+ADR-106 reserved v4 for capture-to-trace. The prerequisite geometry all
 exists now: rectification (v2), a persisted basis-tagged alignment (overlay
 wiring), and the marker auto-align (v3). LightBurn's equivalent traces a
 camera capture the user then positions manually; because our warp lands in

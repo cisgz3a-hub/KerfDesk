@@ -761,14 +761,29 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
 - Re-evaluate only if a reversal trigger in ADR-094 fires (e.g. the
   clean-room DXF parser cannot reach usable real-world compatibility).
 
-### three — adopted for the 3D relief viewer (2026-07-03, ADR-101)
+### three — adopted for the 3D relief viewer (2026-07-03, ADR-102)
 
 - **Version:** ^0.180.0 (pinned caret; see package.json)
 - **License:** MIT (verified against the upstream three.js LICENSE file)
 - **Role:** WebGL scene graph for the relief 3D viewer ONLY — imported
   beneath `src/ui/relief-viewer/`, lazy-loaded, never in core/ or io/
   (clipper2-ts stays the only core geometry dependency).
-- **Why an exception to the Phase H no-new-deps rule:** ADR-101 records
+- **Why an exception to the Phase H no-new-deps rule:** ADR-102 records
   the maintainer-approved override — the clean-room mandate covers
   parsers/geometry we must own, not commodity WebGL presentation.
 - **Types:** `@types/three` (dev dependency, MIT/DefinitelyTyped).
+
+### lucide-static — adopted for the bundled design library (2026-07-03, ADR-105)
+
+- **Version:** ^1.23.0 (see package.json)
+- **License:** ISC (verified via `node -e "require('lucide-static/package.json').license"`)
+  — MIT-compatible per ADR-017.
+- **Role:** static SVG icon corpus for the local starter Design Library
+  ONLY — a curated subset is bundled at build time via `?raw` imports in
+  `src/ui/library/design-library.ts`; nothing from the package runs at
+  runtime and nothing enters core/ or io/. Inserted art flows through the
+  normal SVG import pipeline (parse → sanitize → scene object).
+- **Alternatives considered:** hand-drawn set (too little art to matter),
+  openclipart bundling (CC0 but per-file provenance is unauditable at
+  scale — kept as the documented IMPORT path instead), The Noun Project
+  (not license-compatible).

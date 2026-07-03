@@ -1,4 +1,4 @@
-// Trace-from-camera (ADR-108, camera v4): capture the aligned camera view,
+// Trace-from-camera (ADR-109, camera v4): capture the aligned camera view,
 // warp it top-down into bed millimetre space, and hand it to the existing
 // trace pipeline as a RasterImage whose bounds ARE the bed — so the traced
 // vectors land at the object's true machine coordinates.

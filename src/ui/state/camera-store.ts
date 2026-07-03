@@ -1,4 +1,4 @@
-// camera-store — ephemeral Zustand store for Camera Mode (ADR-105): the live
+// camera-store — ephemeral Zustand store for Camera Mode (ADR-106): the live
 // overhead-camera stream plus the 4-point manual alignment flow. Not project
 // data and not undoable, so it lives outside the project store (like ui-store).
 //

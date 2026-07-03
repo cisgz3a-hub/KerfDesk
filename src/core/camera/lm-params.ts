@@ -1,4 +1,4 @@
-// Flat LM parameter-vector layout for fisheye calibration (ADR-106, v2.c).
+// Flat LM parameter-vector layout for fisheye calibration (ADR-107, v2.c).
 // The minimiser optimises one number[]; this module is the single source of truth
 // for its layout: [fx, fy, cx, cy, k1, k2, k3, k4] then six numbers per view
 // (rvec x3, tvec x3). Pack/unpack are exact inverses. Pure core. Reads are guarded

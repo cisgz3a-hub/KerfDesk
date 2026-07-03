@@ -1,4 +1,4 @@
-// Preferred-camera persistence (ADR-105 UX). The chosen deviceId is a
+// Preferred-camera persistence (ADR-106 UX). The chosen deviceId is a
 // BROWSER-local identifier (it changes across machines and permission
 // resets), so it lives in localStorage — never in the .lf2 project — same as
 // the calibration draft pattern. Failures (private mode, quota) degrade to

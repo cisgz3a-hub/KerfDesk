@@ -1,4 +1,4 @@
-// Kannala-Brandt fisheye camera model (ADR-106) — the equidistant projection
+// Kannala-Brandt fisheye camera model (ADR-107) — the equidistant projection
 // theta = atan(r) with a theta-power distortion polynomial. Used to de-fisheye
 // wide-angle laser cameras (Falcon A1 Pro) where the Brown-Conrady r^6 term
 // diverges. Pure core: math only, no I/O. Clean-room from the published model.

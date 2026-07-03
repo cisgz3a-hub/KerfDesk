@@ -1,4 +1,4 @@
-// Generic Levenberg-Marquardt least-squares minimiser (ADR-106, calibration v2.c).
+// Generic Levenberg-Marquardt least-squares minimiser (ADR-107, calibration v2.c).
 // Minimises 0.5*Σ rᵢ(p)² for a caller-supplied residual closure, using a
 // central-difference numeric Jacobian and Marquardt diagonal-scaled damping.
 // Camera-agnostic and deterministic: no clock, no RNG, no I/O — the same inputs
