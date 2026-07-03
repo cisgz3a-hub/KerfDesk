@@ -11,6 +11,7 @@ import {
 } from '../app/file-actions';
 import { handleOpenGcodePreview } from '../app/gcode-open-action';
 import { currentOutputScope, useStore } from '../state';
+import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -51,6 +52,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const toolMode = useUiStore((s) => s.toolMode);
   const registrationPanelOpen = useUiStore((s) => s.registrationPanelOpen);
   const toggleRegistrationPanel = useUiStore((s) => s.toggleRegistrationPanel);
+  const cameraPanelOpen = useCameraStore((s) => s.panelOpen);
+  const toggleCameraPanel = useCameraStore((s) => s.togglePanel);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -59,6 +62,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       measureActive: toolMode.kind === 'measure',
       registrationPanelOpen,
       toggleRegistrationPanel,
+      cameraPanelOpen,
+      toggleCameraPanel,
     }),
   );
 }
@@ -101,6 +106,8 @@ function appCommandContext(
     hasSelection: selectedIds.length > 0,
     registrationPanelOpen: dialogs.registrationPanelOpen,
     toggleRegistrationPanel: dialogs.toggleRegistrationPanel,
+    cameraPanelOpen: dialogs.cameraPanelOpen,
+    toggleCameraPanel: dialogs.toggleCameraPanel,
     hasRasterSelection: selected?.kind === 'raster-image',
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),

@@ -1,10 +1,8 @@
-// CameraPanel — a minimal, non-modal preview panel for Camera Mode (ADR-107).
-// This v1 slice wires the CAPTURE layer end to end so it can be tested on real
-// hardware: pick a camera, start the stream, and see the live feed. It does NOT
-// yet do the 4-point alignment or the warped bed overlay — those follow once the
-// capture path is confirmed on a real camera. Closed state is a small launcher
-// button; open state is the preview. A temporary toolbar/command entry is a
-// follow-up (kept off the command registry to stay a small, reviewable slice).
+// CameraPanel — a non-modal preview panel for Camera Mode (ADR-107): pick a
+// camera, start the stream, calibrate the lens, align to the bed, and control
+// the workspace overlay. The panel is opened from the top toolbar / Tools menu
+// via the `tools.camera` command (like the registration jig); it renders
+// nothing until opened, and its own × button closes it.
 
 import { useEffect, useRef } from 'react';
 import { usePlatform } from '../app';
@@ -20,23 +18,9 @@ import { OverlayControls } from './OverlayControls';
 import { CameraCalibrationWizard } from './wizard/CameraCalibrationWizard';
 import { useCameraWizardStore } from './wizard/camera-wizard-store';
 
-export function CameraPanel(): JSX.Element {
+export function CameraPanel(): JSX.Element | null {
   const open = useCameraStore((s) => s.panelOpen);
-  const toggle = useCameraStore((s) => s.togglePanel);
-  if (!open) {
-    return (
-      <button
-        type="button"
-        className="lf-btn"
-        style={launcherStyle}
-        onClick={toggle}
-        title="Open the camera preview (ADR-107)"
-      >
-        Camera
-      </button>
-    );
-  }
-  return <CameraPanelOpen />;
+  return open ? <CameraPanelOpen /> : null;
 }
 
 function CameraPanelOpen(): JSX.Element {
@@ -222,12 +206,6 @@ function StreamNote(props: { readonly stream: CameraStreamState }): JSX.Element 
   return null;
 }
 
-const launcherStyle: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 12,
-  left: 12,
-  zIndex: 5,
-};
 const panelStyle: React.CSSProperties = {
   position: 'absolute',
   bottom: 12,
