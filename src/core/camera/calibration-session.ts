@@ -3,13 +3,13 @@
 // and folds in the trust and pose-diversity assessments so the UI stays a thin
 // renderer of a discriminated-union state. Pure core: no I/O, deterministic.
 
-import {
-  type BoardObservation,
-  calibrate,
-  type CalibrationFailure,
-  type CalibrationOptions,
-  type CalibrationResult,
+import type {
+  BoardObservation,
+  CalibrationFailure,
+  CalibrationOptions,
+  CalibrationResult,
 } from './calibrate';
+import { calibrateWithFocalSweep } from './calibrate-sweep';
 import { assessCalibrationTrust, type TrustVerdict } from './calibration-trust';
 import { checkPoseDiversity, type PoseDiversityVerdict } from './pose-diversity';
 
@@ -56,7 +56,9 @@ export function solveSession(
   session: CalibrationSession,
   options?: CalibrationOptions,
 ): CalibrationSession {
-  const result = calibrate(session.captures, options);
+  // Focal multi-start: without a measured focal seed, a single LM run can stall
+  // far up the focal↔distortion valley (see calibrate-sweep.ts).
+  const result = calibrateWithFocalSweep(session.captures, options);
   if (result.kind !== 'ok') {
     return { kind: 'failed', captures: session.captures, reason: result.reason };
   }
