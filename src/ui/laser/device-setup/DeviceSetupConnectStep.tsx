@@ -63,8 +63,8 @@ export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps
       )}
       {!supportsSerial && (
         <p style={hintStyle}>
-          Web Serial is not supported in this browser — use Chrome or Edge to connect, or
-          continue and enter settings by hand.
+          Web Serial is not supported in this browser — use Chrome or Edge to connect, or continue
+          and enter settings by hand.
         </p>
       )}
       {rows.length > 0 ? (
