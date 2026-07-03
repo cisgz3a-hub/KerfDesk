@@ -4163,7 +4163,7 @@ numbers win.
 - ADR-099 is retired unused; the number stays reserved to avoid a third
   meaning. Next free ADR: **105**. *(Update at camera merge: ADR-105/106
   taken by Camera Mode v1/v2, ADR-107/108 reserved for camera v3/v4 —
-  next free ADR: **109**.)*
+  next free ADR: **109**.)* *(ADR-107 written at camera-v3 ship; ADR-108 reserved for camera v4; next free: **109**.)*
 
 ---
 
@@ -4462,3 +4462,52 @@ accurate default-to-be once rectified alignment lands) or the continuous live
 video; panel controls cover show/hide + fade + still/live. Material-thickness
 shift compensation and the rectified-basis alignment flow are follow-ups
 (ADR-107 scope).
+
+---
+
+## ADR-107 — Camera Mode v3: automatic marker alignment (no-click homography)
+
+**Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
+
+### Context
+
+ADR-105 reserved v3 for "fiducial auto-align," rejecting ArUco decoders on
+licence (LGPV-bundle) grounds. The v2.b work shipped a proven clean-room
+X-corner detector — which is itself a fiducial detector if the fiducials are
+checker patches. Manual 4-point alignment (clicking bed corners in the frame)
+remains as the fallback and the Falcon path (its cross-origin frames block
+pixel readback, so no client-side detection is possible there).
+
+### Decision
+
+1. **Markers = five 2×2 checker patches**, engraved at known bed coordinates
+   (`generateCameraAlignPattern`, flowing through the normal generator →
+   preview → burn pipeline). Each patch centre is a literal X-corner for the
+   existing detector. 10 mm cells keep the sub-pixel refinement window inside
+   one cell even at ~1.3 px/mm camera resolution (smaller cells measurably
+   biased the corner by ~1.5 px in the harness).
+2. **The origin target is a patch PAIR** (two patches, 30 mm apart, midpoint =
+   target): the unique tight pair disambiguates camera rotation — including a
+   180°-mounted camera — with zero user input. Detection = top X-corner
+   candidates → the dominant closest pair → remaining three singles → points
+   ordered clockwise from the origin (a physical camera never mirrors, so
+   image-clockwise equals bed-clockwise).
+3. **Rectify before aligning when a lens calibration exists.** The alignment
+   then lives in the rectified basis (`CameraAlignment.basis`), giving
+   distortion-free registration bed-wide; without calibration the raw-basis
+   homography is exact at the four targets and slightly bowed between them.
+
+### Verification
+
+Rendered-frame harness (plane renderer shared with the board fixtures):
+detection finds all four targets in layout order for fronto / tilted / 180°-
+rotated cameras (≤1.5 px vs projected truth); typed failures for a blank bed
+and a missing origin pair; solved homography registers a mid-bed probe to
+< 2 mm raw-basis under a mild lens, and < 0.7 mm bed-wide in the rectified
+flow. NOT verified on real hardware: engraved-marker contrast/lighting and
+the physical burn-vs-overlay registration — the maintainer's F-CAM4 pass.
+
+### Out of scope
+
+Print-and-cut (2-point re-registration of a printed sheet) — the natural v3.5
+follow-on now that marker detection exists; capture-to-trace stays ADR-108.
