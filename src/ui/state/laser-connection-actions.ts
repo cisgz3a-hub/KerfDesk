@@ -90,6 +90,7 @@ export function connectionActions(
           safetyNotice: null,
           controllerOperation: null,
           homingState: 'unknown',
+          pendingUntrackedAcks: 0,
         });
         void runHandshake(set, get, refs, safeWrite).catch(() => undefined);
       } catch (err) {
@@ -139,6 +140,7 @@ async function runDisconnect(
     controllerOperation: null,
     homingState: 'unknown',
     lastWriteError: null,
+    pendingUntrackedAcks: 0,
   });
 }
 

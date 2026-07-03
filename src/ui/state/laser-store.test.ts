@@ -73,8 +73,12 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 async function connectWith(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
+  // Let the handshake's $$ write land, then ack it like real GRBL does —
+  // startJob waits for owed untracked acks to drain.
+  await flush();
+  connection.emitLine('ok');
   connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-  await Promise.resolve();
+  await flush();
 }
 
 async function flush(): Promise<void> {

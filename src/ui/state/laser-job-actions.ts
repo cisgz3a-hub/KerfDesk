@@ -31,6 +31,16 @@ const PAUSE_REQUIRES_LASER_MODE_MESSAGE =
   'Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.';
 const PAUSE_UNSUPPORTED_MESSAGE =
   'This controller has no realtime feed hold. Pause is stream-side only: sending stops, but buffered motion finishes. Use Stop for an immediate halt.';
+// GRBL acks in strict receive order: an ok still owed to a console/origin/
+// handshake write, mis-attributed to a fresh job stream, frees RX budget the
+// controller has not freed — the phantom refill can overflow the real buffer
+// mid-burn. Start briefly waits for the owed acks; a controller that stays
+// silent past this budget is a connection problem the operator must see.
+const UNTRACKED_ACK_DRAIN_TIMEOUT_MS = 1_500;
+const UNTRACKED_ACK_DRAIN_POLL_MS = 25;
+const START_PENDING_ACK_MESSAGE =
+  'The controller has not acknowledged a previous command yet. Start was blocked so the stale ' +
+  'acknowledgement cannot corrupt the job stream — check the connection and try again.';
 
 export function jobActions(
   set: SetFn,
@@ -40,14 +50,13 @@ export function jobActions(
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
   return {
     startJob: async (gcode, options = {}) => {
-      assertAutofocusIdle(get());
-      const blockedMessage = setupCommandBlockMessage(get());
-      if (blockedMessage !== null) {
-        set({
-          lastWriteError: blockedMessage,
-          log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
-        });
-        throw new Error(blockedMessage);
+      assertStartAllowed(set, get);
+      if (get().pendingUntrackedAcks > 0) {
+        await waitForUntrackedAckDrain(get);
+        // The wait yielded the task queue — anything could have changed
+        // (another Start, an alarm, a disconnect). Re-assert every guard so
+        // the synchronous double-start protection below still holds.
+        assertStartAllowed(set, get);
       }
       // M13: a line longer than the RX buffer can never send — step() would
       // break silently, leaving a phantom idle job and a frozen progress bar.
@@ -113,6 +122,31 @@ export function jobActions(
       }));
     },
   };
+}
+
+function assertStartAllowed(set: SetFn, get: GetFn): void {
+  assertAutofocusIdle(get());
+  const blockedMessage = setupCommandBlockMessage(get());
+  if (blockedMessage === null) return;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
+}
+
+async function waitForUntrackedAckDrain(get: GetFn): Promise<void> {
+  const deadline = Date.now() + UNTRACKED_ACK_DRAIN_TIMEOUT_MS;
+  while (get().pendingUntrackedAcks > 0) {
+    if (Date.now() > deadline) throw new Error(START_PENDING_ACK_MESSAGE);
+    await sleep(UNTRACKED_ACK_DRAIN_POLL_MS);
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn): Promise<void> {
