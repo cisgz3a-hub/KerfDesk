@@ -2030,3 +2030,28 @@ F-CNC19 tiling.
 - **Edge / degenerate corners.** If the four chosen points are collinear or coincident (no
   valid homography), the solve is rejected with "Move the alignment points apart — they can't
   form a rectangle"; the previous calibration, if any, is retained.
+
+### F-CAM2. Camera lens calibration wizard (v2 — ADR-106)
+
+- **Success / calibrated.** With the camera live, the operator opens "Calibrate
+  lens…" from the Camera panel, describes their printed checkerboard (inner
+  corners across/down + measured square size), and holds the board in front of
+  the camera. Detected corners light up on the live view; each genuinely NEW
+  pose held steady is captured automatically (a manual Capture button exists).
+  After five or more poses, Solve runs the focal-sweep calibration and the
+  review step shows the reprojection error plus an Original / Corrected A/B of
+  the last capture. If the corrected view's straight edges LOOK straight, the
+  operator applies; the calibration persists on the device profile (undoable)
+  and survives reload.
+- **Error / solve rejected.** A failed solve (too few views, degenerate
+  geometry) shows the typed reason with "Back to capture"; nothing persists.
+  A suspect solve (implausible coefficients, high RMS, uneven coverage, too-
+  similar poses) still shows the A/B but with plain-language warnings telling
+  the operator what to recapture.
+- **Empty / no feed.** Opening the wizard without a live camera shows a
+  one-line pointer back to the Camera panel's Start control; the Calibrate
+  button itself is disabled until the feed runs.
+- **Edge / mid-session changes.** Captures with no full board in view are
+  rejected with a hint (not silently dropped); a camera-resolution change
+  mid-session refuses to mix pixel bases and offers Reset; changing the board
+  description discards captures taken against the old board.

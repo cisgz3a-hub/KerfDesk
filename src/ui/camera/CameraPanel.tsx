@@ -15,6 +15,8 @@ import {
 } from '../state/camera-store';
 import type { CameraAdapter } from '../../platform/types';
 import { NetworkCameraView } from './NetworkCameraView';
+import { CameraCalibrationWizard } from './wizard/CameraCalibrationWizard';
+import { useCameraWizardStore } from './wizard/camera-wizard-store';
 
 export function CameraPanel(): JSX.Element {
   const open = useCameraStore((s) => s.panelOpen);
@@ -93,6 +95,8 @@ function UsbCameraSection(props: { readonly camera: CameraAdapter | undefined })
   const selectCamera = useCameraStore((s) => s.selectCamera);
   const startStream = useCameraStore((s) => s.startStream);
   const stopStream = useCameraStore((s) => s.stopStream);
+  const wizardOpen = useCameraWizardStore((s) => s.open);
+  const openWizard = useCameraWizardStore((s) => s.openWizard);
 
   return (
     <>
@@ -139,8 +143,18 @@ function UsbCameraSection(props: { readonly camera: CameraAdapter | undefined })
             {stream.kind === 'starting' ? 'Starting…' : 'Start camera'}
           </button>
         )}
+        <button
+          type="button"
+          className="lf-btn"
+          disabled={stream.kind !== 'live'}
+          onClick={openWizard}
+          title="Calibrate the camera lens: print a checkerboard, capture poses, and de-fisheye the feed."
+        >
+          Calibrate lens…
+        </button>
       </div>
       <StreamNote stream={stream} />
+      {wizardOpen ? <CameraCalibrationWizard /> : null}
     </>
   );
 }
