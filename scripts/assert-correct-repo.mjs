@@ -2,8 +2,18 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 
-const expectedRepoName = 'LaserForge-2.0';
-const expectedRemote = 'https://github.com/cisgz3a-hub/LaserForge-2.0';
+// The repo was renamed cisgz3a-hub/LaserForge-2.0 -> cisgz3a-hub/KerfDesk on
+// 2026-07-03. Both identities are accepted during and after the transition:
+// GitHub redirects the old URL, GitHub Actions checks the new name out under
+// work/KerfDesk, and existing local clones/worktrees carry either folder name
+// (this machine's is plain "LaserForge"). The remote-URL allowlist is the
+// strong identity check; the folder-name allowlist is defense-in-depth against
+// deploying a look-alike repo.
+const expectedRepoNames = ['KerfDesk', 'LaserForge-2.0', 'LaserForge'];
+const expectedRemotes = [
+  'https://github.com/cisgz3a-hub/KerfDesk',
+  'https://github.com/cisgz3a-hub/LaserForge-2.0',
+];
 
 function fail(message) {
   console.error(`Repository guard failed: ${message}`);
@@ -30,16 +40,16 @@ const repoRoot = resolve(git(['rev-parse', '--show-toplevel']));
 // name still fails because its common dir lives inside that wrong folder.
 const commonDir = resolve(repoRoot, git(['rev-parse', '--git-common-dir']));
 const identityRoot = dirname(commonDir);
-if (basename(identityRoot) !== expectedRepoName) {
+if (!expectedRepoNames.includes(basename(identityRoot))) {
   fail(
     `expected the checkout (or the worktree's main repository) to live in a folder named ` +
-      `"${expectedRepoName}", got "${identityRoot}"`,
+      `one of ${expectedRepoNames.join(', ')}, got "${identityRoot}"`,
   );
 }
 
 const origin = git(['remote', 'get-url', 'origin']);
-if (normalizeGitRemoteUrl(origin) !== expectedRemote) {
-  fail(`expected origin ${expectedRemote}(.git), got ${origin}`);
+if (!expectedRemotes.includes(normalizeGitRemoteUrl(origin))) {
+  fail(`expected origin to be one of ${expectedRemotes.join(', ')}(.git), got ${origin}`);
 }
 
 const indexHtml = readFileSync(resolve(repoRoot, 'index.html'), 'utf8');
