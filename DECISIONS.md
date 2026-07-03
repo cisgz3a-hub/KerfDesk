@@ -4403,3 +4403,44 @@ gates (`intrinsics-implausible`: non-positive/non-finite focal, or a principal p
 outside the frame) — a degenerate-but-finite K with a low RMS no longer reads "trusted".
 `CalibrationResult.ok` now carries `converged: boolean` + a typed `exit` (`tolerance` |
 `iteration-cap` | `damping-stall`) so the wizard can warn before applying a best-effort fit; the
+LM damping-stall stop is now `converged:false` (a stall is not a tolerance stop). Non-finite
+distortion coefficients are flagged explicitly, `scaleIntrinsicsToFrame` guards non-positive frame
+sizes, and the pose-diversity floor is documented as provisional + overridable.
+
+### v2.b as-built (2026-07-03) — checkerboard auto-detection ships; focal sweep added
+
+The handed-off GRID DETECTOR is now shipped as pure core, closing v2.b: `gray.ts`
+(RGBA→luma), `xcorner.ts` (a clean-room centrosymmetry ring response — 16 taps at
+radius 3; alternation across 90° minus an opposite-sample edge penalty — plus
+non-max suppression), `grid-lattice.ts` (seed at the candidate nearest the cloud
+centroid, basis from its two non-collinear nearest neighbours, then BFS integer-
+lattice growth with second-order local extrapolation, full-window extraction and a
+deterministic orientation), and `detect-checkerboard.ts` (orchestration + sub-pixel
+refinement + `checkerboardObjectPoints`/`toBoardObservation` for the session).
+
+**Verification (per CLAUDE.md rule 2, no hardware needed for this layer).** The
+harness RENDERS frames through the forward KB model (`board-render-fixtures.ts`:
+undistort each pixel to a ray, intersect the board plane, supersampled checker
+shading) and detection runs on pixels alone: 54/54 corners on all seven test poses
+(mean error < 0.4 px, matched bijectively against projected truth), robust to
+sensor-scale noise, typed failures on blank/cut-off frames, and an end-to-end run
+whose detections calibrate back to the true camera. A rendered A/B (distorted grid
+with detections marked vs. de-fisheyed with the AUTO-recovered fit) was visually
+confirmed straight. What remains hardware-gated is only real-Falcon frames
+(lighting, blur, real sensor noise) via the wizard's live view.
+
+**Solver finding (measured) + focal sweep decision.** From the default focal seed
+(0.7·width) on detected corners, LM crawls the flat focal↔k1k2 valley: fx error
+was still ~22% after 300 iterations, ~12% after 800, ~4% after 3000 — while the
+same data seeded near the true focal settles in a few hundred (fx to ~1%). The
+audited solver is left untouched; instead `calibrate-sweep.ts` adds
+`calibrateWithFocalSweep()`: five short probes at fx/width ∈ {0.45, 0.55, 0.7,
+0.9, 1.2}, keep the lowest-RMS basin, polish that seed with the caller's budget.
+`solveSession` now routes through it, and it degrades to exactly one `calibrate()`
+call when the caller supplies a measured focal. Corollary (also measured): the
+step/cost tolerances are tight enough that realistic solves end `iteration-cap`
+while micro-improving — the wizard must treat `iteration-cap` + trusted-gate-pass
+as normal, not as a warning state, and should pass a generous `maxIterations`
+(hundreds; a solve is seconds, cost scales with corners not pixels). Individual
+K/D parameters remain only weakly identifiable on planar targets — acceptance is
+judged on the fitted MAPPING (and the A/B view), not parameter closeness.

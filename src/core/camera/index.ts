@@ -8,8 +8,20 @@ export { distortFisheye, projectFisheye, undistortPixel } from './fisheye';
 export type { CameraIntrinsics, FisheyeDistortion } from './fisheye';
 export { refineCornerSubpixel } from './corner-subpix';
 export type { GrayImage } from './corner-subpix';
+export { toGrayImage } from './gray';
+export {
+  checkerboardObjectPoints,
+  detectCheckerboard,
+  toBoardObservation,
+} from './detect-checkerboard';
+export type {
+  CheckerboardDetection,
+  CheckerboardFailure,
+  CheckerboardSpec,
+} from './detect-checkerboard';
 export { multiplyMat3 } from './mat3';
 export { calibrate } from './calibrate';
+export { calibrateWithFocalSweep } from './calibrate-sweep';
 export type {
   BoardObservation,
   CalibrationFailure,
