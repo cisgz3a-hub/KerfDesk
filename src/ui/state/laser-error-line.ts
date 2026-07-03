@@ -4,10 +4,7 @@
 
 import type { StreamerState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
-import {
-  controllerErrorNotice,
-  type ControllerErrorContext,
-} from './laser-safety-notice';
+import { controllerErrorNotice, type ControllerErrorContext } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { advanceStream } from './laser-stream-ack';
 import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
