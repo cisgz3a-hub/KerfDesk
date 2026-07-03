@@ -192,9 +192,14 @@ export function step(state: StreamerState): StepResult {
 // (e.g. a safety notice); this only updates state so step() refuses to
 // send more.
 export function onAck(state: StreamerState, kind: AckKind): AckResult {
-  if (state.inFlight.length === 0) return { state, acked: null };
+  // GRBL keeps acking held-but-parsed lines during a feed hold, so a paused
+  // stream routinely drains its in-flight tail while lines stay queued. An
+  // alarm/error arriving then consumes no line, but terminality must not
+  // depend on having one — otherwise resume() stays legal and streams the
+  // queue into a locked controller.
+  if (state.inFlight.length === 0) return { state: ackStatusWithoutLine(state, kind), acked: null };
   const head = state.inFlight[0];
-  if (head === undefined) return { state, acked: null };
+  if (head === undefined) return { state: ackStatusWithoutLine(state, kind), acked: null };
   const nextInFlight = state.inFlight.slice(1);
   const nextBytes = state.inFlightBytes - head.bytes;
   const completed = state.completed + 1;
@@ -217,6 +222,11 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
     },
     acked: head.line,
   };
+}
+
+function ackStatusWithoutLine(state: StreamerState, kind: AckKind): StreamerState {
+  if (kind === 'ok' || isTerminal(state.status)) return state;
+  return kind === 'alarm' ? cancel(state) : markErrored(state);
 }
 
 export function pause(state: StreamerState): StreamerState {

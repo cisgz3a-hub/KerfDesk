@@ -5,6 +5,8 @@ import {
   cancel,
   createStreamer,
   idleCollector,
+  onAck,
+  pause,
   startCollecting,
   step,
 } from '../../core/controllers/grbl';
@@ -267,6 +269,44 @@ describe('handleLine streamer writes', () => {
       kind: 'disconnect-during-job',
       message: expect.stringContaining('still be moving'),
     });
+  });
+});
+
+describe('handleLine alarm terminates paused streams', () => {
+  // GRBL keeps acking held lines during a feed hold, so a paused stream
+  // routinely has an empty in-flight tail. An alarm then must still cancel
+  // the stream — otherwise Resume stays mounted and streams the queued job
+  // into a locked controller.
+  function drainedPausedStreamer(): ReturnType<typeof pause> {
+    const first = step(
+      createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', { rxBufferBytes: 30 }),
+    );
+    let state = pause(first.state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.inFlight).toEqual([]);
+    expect(state.status).toBe('paused');
+    return state;
+  }
+
+  it('cancels a drained paused stream on an ALARM:N line', () => {
+    const { refs, set, get } = makeHarness();
+    set({ streamer: drainedPausedStreamer() });
+
+    handleLine(set, get, refs, async () => undefined, 'ALARM:1');
+
+    expect(get().streamer?.status).toBe('cancelled');
+    expect(get().streamer?.queued).toEqual([]);
+  });
+
+  it('cancels a drained paused stream on a status-only Alarm report', () => {
+    const { refs, set, get } = makeHarness();
+    set({ streamer: drainedPausedStreamer() });
+
+    handleLine(set, get, refs, async () => undefined, '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+
+    expect(get().streamer?.status).toBe('cancelled');
+    expect(get().streamer?.queued).toEqual([]);
   });
 });
 
