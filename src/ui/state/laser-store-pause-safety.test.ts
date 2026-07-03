@@ -40,7 +40,15 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 async function connectWith(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
-  await Promise.resolve();
+  // Let the handshake's $$ write land, then ack it like real GRBL does —
+  // startJob waits for owed untracked acks to drain.
+  await flushConnect();
+  connection.emitLine('ok');
+  await flushConnect();
+}
+
+async function flushConnect(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -99,5 +107,32 @@ describe('laser-store pause safety', () => {
 
     expect(writes).not.toContain(RT_HOLD);
     expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+  });
+});
+
+describe('laser-store pause at end of stream', () => {
+  // GRBL keeps acking held-but-parsed lines during a feed hold. Pausing near
+  // the end of a job drains every ack while the machine still holds
+  // unexecuted motion — the job must stay paused (Resume mounted), and Resume
+  // must complete it through the normal Idle release.
+  it('stays paused when the held tail acks out; resume completes the job at Idle', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: true } });
+    await useLaserStore.getState().startJob('G21\nG90\nM3 S0\nG1 X1 S100\nM5\n');
+    await useLaserStore.getState().pauseJob();
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
+
+    for (let i = 0; i < 5; i += 1) connection.emitLine('ok');
+    await Promise.resolve();
+
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
+
+    await useLaserStore.getState().resumeJob();
+    expect(useLaserStore.getState().streamer?.status).toBe('done');
+
+    connection.emitLine('<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
+    await Promise.resolve();
+    expect(useLaserStore.getState().streamer).toBeNull();
   });
 });
