@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { MachineKind } from '../../core/scene';
 import { machineDisplayName } from '../machine/machine-labels';
 import {
@@ -6,6 +6,7 @@ import {
   runCommand,
   type AppCommand,
   type CommandFamily,
+  type CommandId,
 } from './command-registry';
 import { commandHelpId, controlHelp, menuHelpId } from '../help/help-topics';
 
@@ -88,33 +89,87 @@ function MenuFamily(props: {
       </summary>
       {props.open ? (
         <div role="menu" className="lf-menu" style={menuStyle}>
-          {commands.map((command) => {
-            const commandHelp = commandHelpId(command.id);
-            return (
-              <button
-                key={command.id}
-                type="button"
-                role="menuitem"
-                className="lf-menu-item"
-                disabled={!command.enabled}
-                title={controlHelp(commandHelp, command.disabledReason)}
-                data-help-id={commandHelp}
-                style={menuItemStyle}
-                onClick={() => {
-                  if (runCommand(command)) props.onCommandRun();
-                }}
-              >
-                <span>{command.label}</span>
-                {command.shortcut !== undefined ? (
-                  <span style={shortcutStyle}>{command.shortcut}</span>
-                ) : null}
-              </button>
-            );
-          })}
+          {groupCommands(props.family, commands).map((group, index) => (
+            <Fragment key={index}>
+              {index > 0 ? <div role="separator" style={menuSeparatorStyle} /> : null}
+              {group.map((command) => (
+                <MenuItem key={command.id} command={command} onCommandRun={props.onCommandRun} />
+              ))}
+            </Fragment>
+          ))}
         </div>
       ) : null}
     </details>
   );
+}
+
+function MenuItem(props: {
+  readonly command: AppCommand;
+  readonly onCommandRun: () => void;
+}): JSX.Element {
+  const command = props.command;
+  const commandHelp = commandHelpId(command.id);
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className="lf-menu-item"
+      disabled={!command.enabled}
+      title={controlHelp(commandHelp, command.disabledReason)}
+      data-help-id={commandHelp}
+      style={menuItemStyle}
+      onClick={() => {
+        if (runCommand(command)) props.onCommandRun();
+      }}
+    >
+      <span>{command.label}</span>
+      {command.shortcut !== undefined ? (
+        <span style={shortcutStyle}>{command.shortcut}</span>
+      ) : null}
+    </button>
+  );
+}
+
+// Presentation-only grouping: separators render between these blocks, in this
+// order. Commands a family registers that are NOT listed here fall into a
+// trailing block — grouping must never hide a command.
+const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<ReadonlyArray<CommandId>>>> = {
+  tools: [
+    ['tools.measure', 'tools.add-text', 'tools.registration-jig'],
+    ['tools.material-test', 'tools.interval-test', 'tools.scan-offset-test', 'tools.focus-test'],
+    ['tools.optimization-settings'],
+    [
+      'tools.adjust-image',
+      'tools.apply-image-mask',
+      'tools.crop-image',
+      'tools.remove-image-mask',
+      'tools.save-processed-bitmap',
+    ],
+    ['tools.trace-image', 'tools.retrace-original', 'tools.multi-file-trace'],
+    ['tools.convert-to-path', 'tools.weld', 'tools.subtract', 'tools.intersect', 'tools.exclude'],
+    [
+      'tools.fill-selection',
+      'tools.close-open-fill-contours',
+      'tools.close-fill-contours-with-tolerance',
+    ],
+    ['tools.convert-to-bitmap'],
+  ],
+};
+
+function groupCommands(
+  family: CommandFamily,
+  commands: ReadonlyArray<AppCommand>,
+): ReadonlyArray<ReadonlyArray<AppCommand>> {
+  const layout = MENU_GROUPS[family];
+  if (layout === undefined) return [commands];
+  const grouped = layout.map((ids) =>
+    ids
+      .map((id) => commands.find((command) => command.id === id))
+      .filter((command): command is AppCommand => command !== undefined),
+  );
+  const placed = new Set(layout.flat());
+  const leftovers = commands.filter((command) => !placed.has(command.id));
+  return [...grouped, leftovers].filter((group) => group.length > 0);
 }
 
 function familyLabel(family: CommandFamily, machineKind: MachineKind): string {
@@ -169,6 +224,16 @@ const menuStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 1,
+  // Long menus (Tools is 25 items) must scroll instead of running off the
+  // bottom of short windows; 80px ≈ menu bar + toolbar above the dropdown.
+  maxHeight: 'calc(100vh - 80px)',
+  overflowY: 'auto',
+};
+const menuSeparatorStyle: React.CSSProperties = {
+  height: 1,
+  flexShrink: 0,
+  background: 'var(--lf-border)',
+  margin: '3px 6px',
 };
 const menuItemStyle: React.CSSProperties = {
   display: 'flex',
