@@ -1,4 +1,4 @@
-// Apply-time resolution matching (ADR-107, v2.e). A calibration's intrinsics are
+// Apply-time resolution matching (ADR-108, v2.e). A calibration's intrinsics are
 // pixels of the frame it was captured at; applying it to a differently-sized frame
 // requires rescaling fx,cx by the width ratio and fy,cy by the height ratio. The
 // wizard warns on a mismatch and feeds the scaled intrinsics into the rectify map.

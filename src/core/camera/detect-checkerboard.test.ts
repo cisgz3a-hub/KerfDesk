@@ -19,7 +19,7 @@ import type { Vec2 } from '../scene';
 // A Falcon-class wide fisheye: board corners reach ~0.6 rad of field angle,
 // where the theta-polynomial separates cleanly from the focal length. (At
 // narrow FOV f and k1 are near-interchangeable and planar calibration cannot
-// pin the focal — the ADR-107 v2.e conditioning finding, confirmed here.)
+// pin the focal — the ADR-108 v2.e conditioning finding, confirmed here.)
 const K = { fx: 180, fy: 180, cx: 160, cy: 120 };
 const D = [-0.18, 0.03, 0, 0] as const;
 const SPEC = { rows: 6, cols: 9 };
@@ -35,7 +35,7 @@ const BASE: Omit<BoardRenderOptions, 'rvec' | 'tvec'> = {
 };
 
 // Seven poses with genuine rotation AND depth spread. Mild tilts leave the
-// focal/depth ambiguity of planar calibration unresolved (the ADR-107 v2.e
+// focal/depth ambiguity of planar calibration unresolved (the ADR-108 v2.e
 // conditioning finding): strong (~26°) tilts and varied stand-off are exactly
 // what the wizard's pose-diversity gate pushes the operator toward.
 const POSES: ReadonlyArray<{

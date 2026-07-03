@@ -2068,11 +2068,142 @@ F-CNC19 tiling.
 1. The export refuses with "Layer … uses Fill/Image raster output, which the
    experimental .rd encoder does not support yet."
 
----
+## Phase K flows (box generator — ADR-106)
+
+### F-K1. Generate a finger-joint box
+
+#### Success
+1. User opens **Tools → Box Generator…**. The dialog shows dimensions
+   (W × D × H, inner/outer toggle — inner default), material thickness,
+   target finger width, style (closed / open top), part spacing, and —
+   prefilled from the active machine — the fit group: clearance
+   (0 laser, 0.15 mm CNC) plus, in CNC mode only, the relief tool
+   diameter (prefilled from the active tool).
+2. A live preview pane shows the panel sheet re-laid-out on every valid
+   edit; an invalid draft keeps the last valid preview and disables
+   **Generate**.
+3. **Generate** inserts one polyline object per panel (6 closed / 5 open
+   top) in the fixed order Bottom/Top/Front/Back/Left/Right (names shown
+   in the dialog preview; scene objects carry no name field), laid out in
+   a flat grid with the requested spacing, all on one auto-created layer
+   color, all selected, as ONE undo step. A toast reports "N panels
+   inserted". The dialog closes; the user assigns cut settings on that
+   layer as usual.
+4. Laser fit contract: with the layer's kerf compensation set (Line
+   mode cut settings, ADR-052), mating edges assemble line-to-line
+   (press fit) at clearance 0; positive clearance loosens the joint by
+   exactly that amount, uniformly.
+
+#### Error — generation failure
+1. If polygon assembly fails internally (degenerate spec that slipped
+   past validation), the dialog shows the error inline; nothing is
+   inserted, the scene is untouched (no-partial-output).
+
+#### Empty
+1. Empty or whitespace dimension fields disable **Generate** with the
+   field-level message "Enter a value"; no toast, no insertion.
+
+#### Edge — box larger than the bed
+1. Panels insert normally even when the sheet exceeds the workspace
+   (LightBurn parity: generation is not bounds-gated); the existing
+   bounds preflight blocks save/start until the user re-nests panels
+   across jobs.
+
+### F-K2. Validation rejects an impossible spec
+
+#### Success
+1. Each field edit re-runs `validateBoxSpec`; issues render as a list
+   under the fields, each naming the offending field.
+2. Rules: dimensions and thickness > 0; derived inner dimensions must
+   stay positive (outer entry mode); finger width clamps to
+   [max(2 mm, T), span/3]; CNC: finger cell must exceed the relief tool
+   diameter (error) and warns below 2× diameter; |clearance| <
+   min(finger, T)/2.
+
+#### Error — CNC finger cell smaller than the bit
+1. "Finger width 2 mm is smaller than the 3.175 mm relief tool — tabs
+   cannot be relieved. Increase finger width or use a smaller bit."
+   **Generate** stays disabled.
+
+#### Empty
+1. A zero-dimension draft shows "must be greater than 0" on that field
+   only; other fields keep their state.
+
+#### Edge — thickness ≥ half the smallest dimension
+1. Derived inner dimension goes non-positive; the error names both the
+   dimension and the thickness so the user knows which to change.
+
+### F-K3. CNC mode — clearance and corner relief
+
+#### Success
+1. With the machine in CNC mode, the dialog defaults clearance to
+   0.15 mm and shows the relief tool diameter prefilled from the active
+   tool; stock thickness prefills the material thickness field.
+2. Generated panels carry corner-overcut reliefs (F-CNC26 style: circle
+   of one bit radius centered on the vertex) at exactly the
+   seat-critical reflex corners — notch bottoms where a mating tab must
+   seat. Tabs narrow and recesses widen by clearance/4 per flank, so
+   each joint's notch − tab play equals the clearance exactly.
+3. The panels then flow through the normal CNC pipeline: the layer's
+   profile-outside cutter compensation applies at compile, unchanged.
+
+#### Error — relief tool larger than a finger cell
+1. Validation error per F-K2; generation disabled until resolved.
+
+#### Empty
+1. Switching the machine to CNC with the dialog open re-runs defaults
+   only for untouched fields; user-edited drafts are preserved.
+
+#### Edge — laser mode
+1. Laser mode never emits reliefs and defaults clearance to 0; the
+   relief tool field is hidden (gate-and-hide, ADR-101).
+
+### F-K4. Open-top box
+
+#### Success
+1. Style "Open top" drops the Top panel (5 panels) and flattens the
+   walls' top edges at the outer face line — no orphan fingers pointing
+   at a missing lid.
+2. Corner cells that the Top would have claimed fall to the
+   next-priority panel (Z > Y > X among present panels); the assembled
+   rim is flush.
+
+#### Error
+1. (None specific — validation is style-independent.)
+
+#### Empty
+1. (Not applicable — style always yields ≥ 5 panels.)
+
+#### Edge — height smaller than one finger cell
+1. Wall corner columns degenerate to a single cell; the referee
+   invariants still hold (edge pattern clamps to one full-span cell).
+
+### F-K5. Undo, empty scene, and re-generation
+
+#### Success
+1. **Undo** after Generate removes all inserted panels and any
+   auto-created layer in one step; **Redo** restores them still
+   selected.
+2. Generating into an empty scene creates the layer and panels exactly
+   as into a populated scene; existing objects and selection are
+   otherwise untouched.
+
+#### Error
+1. (Covered by F-K1 error state.)
+
+#### Empty
+1. Cancelling the dialog inserts nothing and leaves the draft persisted
+   for the session (calibration-dialog convention), so reopening
+   restores the last-entered values.
+
+#### Edge — repeated Generate
+1. Each Generate inserts a fresh, independent panel set offset onto the
+   same layer color; no id collisions (fresh UUIDs), each set is its own
+   undo step.
 
 ## Camera Mode flows
 
-### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-106)
+### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)
 
 - **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
   feed. They engrave the four alignment targets (reusing the registration jig), then drag the
@@ -2088,7 +2219,7 @@ F-CNC19 tiling.
   valid homography), the solve is rejected with "Move the alignment points apart — they can't
   form a rectangle"; the previous calibration, if any, is retained.
 
-### F-CAM2. Camera lens calibration wizard (v2 — ADR-107)
+### F-CAM2. Camera lens calibration wizard (v2 — ADR-108)
 
 - **Success / calibrated.** With the camera live, the operator opens "Calibrate
   lens…" from the Camera panel, describes their printed checkerboard (inner
@@ -2113,7 +2244,7 @@ F-CNC19 tiling.
   mid-session refuses to mix pixel bases and offers Reset; changing the board
   description discards captures taken against the old board.
 
-### F-CAM3. Workspace camera overlay (ADR-106 v1 wiring)
+### F-CAM3. Workspace camera overlay (ADR-107 v1 wiring)
 
 - **Success / overlay on canvas.** After aligning (F-CAM1), the operator presses
   "Save & show on canvas": the alignment persists on the device profile
@@ -2131,7 +2262,7 @@ F-CNC19 tiling.
 - **Edge / reload.** A corrupt persisted alignment is dropped on load (never
   trusted); the overlay simply stays off until re-aligned.
 
-### F-CAM4. Automatic marker alignment (v3 — ADR-108)
+### F-CAM4. Automatic marker alignment (v3 — ADR-109)
 
 - **Success / one-click align.** The operator presses "Add markers to project"
   (the scene is replaced by the five-patch pattern, like the other calibration
@@ -2152,7 +2283,7 @@ F-CNC19 tiling.
   labels the corners correctly — the origin pair, not the operator, carries
   the orientation.
 
-### F-CAM5. Trace from camera (v4 — ADR-109)
+### F-CAM5. Trace from camera (v4 — ADR-110)
 
 - **Success / trace in place.** With the camera aligned and live, the operator
   places an object on the bed and presses "Trace from camera": the frame is

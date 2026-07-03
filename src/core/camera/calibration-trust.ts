@@ -1,4 +1,4 @@
-// Calibration trust assessment (ADR-107, v2.e). The reprojection RMS alone does NOT
+// Calibration trust assessment (ADR-108, v2.e). The reprojection RMS alone does NOT
 // indicate a usable calibration: under detection noise the weakly-observed k3,k4
 // terms overfit to absurd values while the RMS stays low (DECISIONS.md v2.c finding).
 // This pure check is the gate the wizard's "Apply Calibration?" toggle consults —

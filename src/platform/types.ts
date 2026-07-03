@@ -59,7 +59,7 @@ export type SerialAdapter = {
   readonly requestPort: () => Promise<SerialPortRef | null>;
 };
 
-// --- Camera (Camera Mode, ADR-106) ---
+// --- Camera (Camera Mode, ADR-107) ---
 
 export type CameraDevice = {
   readonly deviceId: string;
@@ -115,7 +115,7 @@ export type PlatformAdapter = {
   // Phase B: serial port access for connecting to the laser controller.
   readonly serial: SerialAdapter;
 
-  // Camera Mode (ADR-106): overhead-camera capture. Optional — present on
+  // Camera Mode (ADR-107): overhead-camera capture. Optional — present on
   // platforms that expose getUserMedia; UI hides Camera Mode when absent.
   readonly camera?: CameraAdapter;
 };

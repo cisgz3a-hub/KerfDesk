@@ -1,5 +1,5 @@
 // TraceFromCameraButton — capture → basis-correct → top-down bed warp → the
-// normal Trace dialog (ADR-109). Split from OverlayControls: tracing is a
+// normal Trace dialog (ADR-110). Split from OverlayControls: tracing is a
 // capture pipeline, not an overlay preference.
 
 import { useStore } from '../state';

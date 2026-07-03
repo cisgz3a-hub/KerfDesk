@@ -1,4 +1,4 @@
-// Focal-sweep calibration driver (ADR-107, v2.b follow-on). calibrate() seeds
+// Focal-sweep calibration driver (ADR-108, v2.b follow-on). calibrate() seeds
 // the focal at 0.7×imageWidth when the caller has no measured value; measured
 // probes show LM then needs thousands of FD iterations to walk the flat
 // focal↔distortion valley from a wrong seed, while a near-truth seed settles in

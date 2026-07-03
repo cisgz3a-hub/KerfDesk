@@ -1,5 +1,5 @@
 // NetworkCameraView — the machine (Falcon) camera feed plus the 4-point bed
-// alignment (ADR-106). The operator clicks the four bed corners in the live
+// alignment (ADR-107). The operator clicks the four bed corners in the live
 // snapshot; the solved camera-pixel → bed-mm homography then warps the frame to
 // a top-down "rectified" view (the bed flattened to a rectangle) via the shared
 // overlayMatrix3d. Display-only CSS matrix3d on an <img>, so it stays CORS-safe.

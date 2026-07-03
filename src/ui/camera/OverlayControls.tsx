@@ -1,4 +1,4 @@
-// OverlayControls — the Camera panel's workspace-overlay row (ADR-106,
+// OverlayControls — the Camera panel's workspace-overlay row (ADR-107,
 // LightBurn "Camera Control" parity): show/hide on canvas, a fade slider, and
 // the still-vs-live source choice. "Update still" freezes the current frame
 // (LightBurn's Update Overlay); "Live" returns to the continuous video.

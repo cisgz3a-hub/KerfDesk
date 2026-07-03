@@ -1,4 +1,4 @@
-// .lf2 round-trip for the persisted camera alignment (ADR-106): a saved
+// .lf2 round-trip for the persisted camera alignment (ADR-107): a saved
 // alignment must survive save/reload, a malformed one must be DROPPED (never
 // trusted), and its absence stays absent (no phantom field).
 
