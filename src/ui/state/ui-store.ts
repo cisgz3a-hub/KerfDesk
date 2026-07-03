@@ -169,11 +169,6 @@ export type UiState = {
   readonly openRegistrationPanel: () => void;
   readonly closeRegistrationPanel: () => void;
   readonly setRegistrationPanelPosition: (next: FloatingPanelPosition | null) => void;
-
-  // Camera Mode (ADR-105) preview panel — floating, NON-modal like the jig.
-  readonly cameraPanelOpen: boolean;
-  readonly toggleCameraPanel: () => void;
-  readonly closeCameraPanel: () => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -256,10 +251,6 @@ export const useUiStore = create<UiState>((set) => ({
   openRegistrationPanel: () => set({ registrationPanelOpen: true }),
   closeRegistrationPanel: () => set({ registrationPanelOpen: false }),
   setRegistrationPanelPosition: (next) => set({ registrationPanelPosition: next }),
-
-  cameraPanelOpen: false,
-  toggleCameraPanel: () => set((s) => ({ cameraPanelOpen: !s.cameraPanelOpen })),
-  closeCameraPanel: () => set({ cameraPanelOpen: false }),
 }));
 
 export function isModalOpen(
