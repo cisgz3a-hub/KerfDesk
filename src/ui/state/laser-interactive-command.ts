@@ -1,4 +1,5 @@
-import type { GrblResponse, StatusReport } from '../../core/controllers/grbl';
+import type { StatusReport } from '../../core/controllers/grbl';
+import type { ControllerEvent } from '../../core/controllers';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
@@ -100,7 +101,7 @@ export function startControllerCommand(
 
 export function consumeControllerCommandResponse(
   refs: ControllerLifecycleRefs,
-  response: GrblResponse,
+  response: ControllerEvent,
   rawLine: string,
 ): boolean {
   const request = refs.controllerCommand;

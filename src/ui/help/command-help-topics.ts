@@ -255,7 +255,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'laser.connect': {
     family: 'laser',
     // Machine-neutral: the same command serves laser and router projects
-    // (ADR-100 §7); the noun-aware hover copy lives on the connection bar.
+    // (ADR-101 §7); the noun-aware hover copy lives on the connection bar.
     tooltip: 'Open the browser serial picker and connect to the machine controller.',
   },
   'laser.disconnect': {

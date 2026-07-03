@@ -117,7 +117,7 @@ export function buildJogCommand(params: JogParams): string {
 /** Jog-cancel real-time byte (0x85). Aborts the in-flight jog motion only. */
 export const RT_JOG_CANCEL = '\x85';
 
-// --- Real-time overrides (ADR-102 G3) ---
+// --- Real-time overrides (ADR-103 G3) ---
 // GRBL v1.1 extended real-time bytes: processed instantly mid-job without
 // touching the planner queue. Feed clamps to 10–200%, spindle to 10–200%,
 // rapid picks from {25, 50, 100}%. The controller reports the live values

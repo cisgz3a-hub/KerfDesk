@@ -7,7 +7,7 @@
 //   failed       → "Connect (last error: …)"
 //
 // machineNoun keeps the hover copy machine-aware ("laser" / "router",
-// ADR-100 §7) while this component stays presentational.
+// ADR-101 §7) while this component stays presentational.
 
 import type { ConnectionState } from '../state/laser-store';
 

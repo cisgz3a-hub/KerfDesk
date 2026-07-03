@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
-import { prepareConsoleCommand } from '../../core/controllers/grbl';
+import {
+  selectControllerDriver,
+  type ConsoleQuickCommand,
+  type ControllerDriver,
+} from '../../core/controllers';
 import { helpProps } from '../help/help-topics';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { controllerOperationCommandBlockMessage } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import type { SerialTranscriptEntry } from '../state/laser-transcript';
-
-const QUICK_COMMANDS = ['$X', '$$', '$#', '$I', '$G', '?'] as const;
-type QuickCommand = (typeof QUICK_COMMANDS)[number];
 
 export function ConsolePanel(): JSX.Element {
   const transcript = useLaserStore((s) => s.transcript);
@@ -18,8 +19,12 @@ export function ConsolePanel(): JSX.Element {
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
+  const activeControllerKind = useLaserStore((s) => s.activeControllerKind);
   const sendConsoleCommand = useLaserStore((s) => s.sendConsoleCommand);
   const clearTranscript = useLaserStore((s) => s.clearTranscript);
+  // Pure data lookup for the active firmware's console vocabulary (quick
+  // commands + input validation). Guards still gate on capabilities.
+  const driver = selectControllerDriver(activeControllerKind);
   const [showStatus, setShowStatus] = useState(false);
   const [showStream, setShowStream] = useState(false);
   const [command, setCommand] = useState('');
@@ -36,7 +41,7 @@ export function ConsolePanel(): JSX.Element {
     (autofocusBusy &&
       'Auto-focus is active. Wait for it to finish before sending console commands.') ||
     null;
-  const sendDisabledReason = consoleCommandDisabledReason(command, {
+  const sendDisabledReason = consoleCommandDisabledReason(driver, command, {
     disconnected,
     activeOperationReason,
     machineState: statusReport?.state ?? null,
@@ -47,8 +52,8 @@ export function ConsolePanel(): JSX.Element {
   const handleSend = (): void => {
     const input = command.trim();
     if (input === '') return;
-    if (!confirmIfNeeded(input)) return;
-    void sendConsoleCommand(input, confirmedOptions(input)).then(() => setCommand(''));
+    if (!confirmIfNeeded(driver, input)) return;
+    void sendConsoleCommand(input, confirmedOptions(driver, input)).then(() => setCommand(''));
   };
 
   const handleCopy = (): void => {
@@ -65,6 +70,7 @@ export function ConsolePanel(): JSX.Element {
         onClear={clearTranscript}
       />
       <QuickCommandRow
+        quickCommands={driver.consoleQuickCommands}
         disconnected={disconnected}
         activeOperationReason={activeOperationReason}
         onSend={sendConsoleCommand}
@@ -125,24 +131,25 @@ function ConsoleHeader(props: {
 }
 
 function QuickCommandRow(props: {
+  readonly quickCommands: ReadonlyArray<ConsoleQuickCommand>;
   readonly disconnected: boolean;
   readonly activeOperationReason: string | null;
   readonly onSend: (command: string) => Promise<void>;
 }): JSX.Element {
   return (
     <div style={quickStyle}>
-      {QUICK_COMMANDS.map((quick) => {
+      {props.quickCommands.map((quick) => {
         const quickHelp = quickHelpProps(quick, props.disconnected, props.activeOperationReason);
         return (
           <button
-            key={quick}
+            key={quick.command}
             type="button"
-            onClick={() => void props.onSend(quick)}
+            onClick={() => void props.onSend(quick.command)}
             disabled={quickDisabled(quick, props.disconnected, props.activeOperationReason)}
-            title={quickHelp.title}
+            title={quickHelp.title ?? quick.hint}
             data-help-id={quickHelp['data-help-id']}
           >
-            {quick}
+            {quick.label}
           </button>
         );
       })}
@@ -251,38 +258,44 @@ function visibleEntries(
   });
 }
 
-function confirmIfNeeded(input: string): boolean {
-  const prepared = prepareConsoleCommand(input);
+function confirmIfNeeded(driver: ControllerDriver, input: string): boolean {
+  const prepared = driver.prepareConsoleCommand(input);
   if (!prepared.ok || !prepared.command.requiresConfirmation) return true;
-  return jobAwareConfirm(`Send persistent GRBL setting?\n\n${prepared.command.normalized}`);
+  return jobAwareConfirm(`Send persistent controller setting?\n\n${prepared.command.normalized}`);
 }
 
-function confirmedOptions(input: string): { readonly confirmed: true } | undefined {
-  const prepared = prepareConsoleCommand(input);
+function confirmedOptions(
+  driver: ControllerDriver,
+  input: string,
+): { readonly confirmed: true } | undefined {
+  const prepared = driver.prepareConsoleCommand(input);
   return prepared.ok && prepared.command.requiresConfirmation ? { confirmed: true } : undefined;
 }
 
 function quickDisabled(
-  command: QuickCommand,
+  quick: ConsoleQuickCommand,
   disconnected: boolean,
   activeOperationReason: string | null,
 ): boolean {
   if (disconnected) return true;
-  return command !== '?' && activeOperationReason !== null;
+  // Realtime status ('?') stays available during operations; everything else
+  // waits for the machine to be free — same behavior as the pre-driver panel.
+  return quick.command !== '?' && activeOperationReason !== null;
 }
 
 function quickHelpProps(
-  command: QuickCommand,
+  quick: ConsoleQuickCommand,
   disconnected: boolean,
   activeOperationReason: string | null,
 ): ReturnType<typeof helpProps> {
   const disabledReason = disconnected
     ? 'Connect to the laser before sending console commands.'
     : activeOperationReason;
-  return helpProps(`control:laser.console.quick.${command}`, disabledReason ?? undefined);
+  return helpProps(`control:laser.console.quick.${quick.command}`, disabledReason ?? undefined);
 }
 
 function consoleCommandDisabledReason(
+  driver: ControllerDriver,
   input: string,
   state: {
     readonly disconnected: boolean;
@@ -293,7 +306,7 @@ function consoleCommandDisabledReason(
   if (state.disconnected) return 'Connect to the laser before sending console commands.';
   const trimmed = input.trim();
   if (trimmed === '') return 'Enter one command before sending.';
-  const prepared = prepareConsoleCommand(trimmed);
+  const prepared = driver.prepareConsoleCommand(trimmed);
   if (!prepared.ok) return prepared.reason;
   if (prepared.command.requiresNoActiveOperation && state.activeOperationReason !== null) {
     return state.activeOperationReason;

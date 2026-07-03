@@ -1,4 +1,4 @@
-// importStlFiles — drag-and-drop STL → ReliefObject (Phase H.4, ADR-094).
+// importStlFiles — drag-and-drop STL → ReliefObject (Phase H.4, ADR-098).
 // CNC-only: relief carving has no laser meaning, so drops in laser mode get
 // a clear toast instead of a silent no-op. Imports land at a default size
 // (100 mm wide × 5 mm deep, background carved away) on a dedicated relief

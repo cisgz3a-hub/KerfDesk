@@ -1,4 +1,4 @@
-// Touch-plate probing sequences (ADR-102 G2, F-CNC20).
+// Touch-plate probing sequences (ADR-103 G2, F-CNC20).
 //
 // Two workflows, both two-stage (fast seek, back off, slow re-touch — the
 // gSender/Carbide-Motion convention that removes seek-speed overshoot from
@@ -9,7 +9,7 @@
 //     contact the bit CENTER sits one bit-radius outside the stock face, so
 //     the work zero is `G10 L20 P0 <axis><-dir·radius>`.
 //
-// Geometry model (PROVISIONAL, ADR-102): a rectangular corner plate whose
+// Geometry model (PROVISIONAL, ADR-103): a rectangular corner plate whose
 // outer faces sit flush with the stock faces, wide enough that the plate
 // center is ~15 mm inside the probed corner. The operator starts the cycle
 // with the bit hovering over the plate center. All distances are editable

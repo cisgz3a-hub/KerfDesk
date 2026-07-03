@@ -1,5 +1,5 @@
 // tokenizeDxf — ASCII DXF group-code/value pair reader (Phase H.6,
-// ADR-094 clean-room mandate: no parser libraries). A DXF file is a flat
+// ADR-098 clean-room mandate: no parser libraries). A DXF file is a flat
 // list of two-line tags: an integer group code line followed by a value
 // line; every higher construct (sections, tables, entities) is built from
 // runs of these tags.

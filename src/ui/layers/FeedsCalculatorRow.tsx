@@ -1,5 +1,5 @@
 // FeedsCalculatorRow — chipload-based feeds & speeds calculator on the CNC
-// layer card (ADR-102 G5, F-CNC24). Computes feed/plunge/depth-per-pass from
+// layer card (ADR-103 G5, F-CNC24). Computes feed/plunge/depth-per-pass from
 // material × bit diameter × flutes × RPM and applies them as one undoable
 // layer patch. The chart values are labeled starting points (PROVISIONAL,
 // see core/cnc/feeds-calculator.ts); every number stays editable after.

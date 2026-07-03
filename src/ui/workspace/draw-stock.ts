@@ -1,4 +1,4 @@
-// drawCncStock — the workpiece footprint on the bed (Phase H.2, ADR-094).
+// drawCncStock — the workpiece footprint on the bed (Phase H.2, ADR-098).
 // Machine-coordinate stock rect mapped into scene space (the origin transform
 // may flip an axis), drawn as a faint fill + dashed outline under the
 // artwork so the operator always sees where the material is.

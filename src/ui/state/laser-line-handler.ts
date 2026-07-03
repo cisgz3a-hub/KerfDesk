@@ -15,19 +15,15 @@
 // no behavior change.
 
 import {
-  classifyResponse,
-  CMD_COOLANT_OFF,
-  CMD_SETTINGS,
   disconnect as disconnectStreamer,
   type GrblPins,
   onAck,
-  RT_SOFT_RESET,
   type SettingsCollectorState,
-  startCollecting,
   step,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
+import { detectControllerFromBanner, type ControllerDriver } from '../../core/controllers';
 import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
   cancelControllerLifecycleRefs,
@@ -54,6 +50,9 @@ import type { TranscriptSource } from './laser-transcript';
 import { hasCustomOrigin } from './origin-actions';
 
 export type HandlerRefs = ControllerLifecycleRefs & {
+  // Active firmware driver — classification and follow-up command bytes come
+  // from here so this pipeline stays firmware-neutral (ADR-094).
+  driver: ControllerDriver;
   settingsCollector: SettingsCollectorState;
   // One-shot callback fired by handleLine the next time any line arrives.
   // runHandshake sets it before awaiting; handleLine clears it after
@@ -77,45 +76,6 @@ const LOG_MAX = 200;
 
 function appendLog(state: LaserState, line: string): ReadonlyArray<string> {
   return [...state.log, line].slice(-LOG_MAX);
-}
-
-export async function runHandshake(
-  set: SetFn,
-  get: GetFn,
-  refs: HandlerRefs,
-  safeWrite: SafeWriteFn,
-): Promise<void> {
-  const HANDSHAKE_TIMEOUT_MS = 2000;
-  const gotLine = await new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => {
-      refs.onLineArrived = null;
-      resolve(false);
-    }, HANDSHAKE_TIMEOUT_MS);
-    refs.onLineArrived = (): void => {
-      clearTimeout(timer);
-      refs.onLineArrived = null;
-      resolve(true);
-    };
-  });
-
-  if (!gotLine) {
-    set({
-      log: appendLog(
-        get(),
-        '[lf2] No GRBL response within 2 s. Check baud rate (115200) and that the device is GRBL.',
-      ),
-    });
-    return;
-  }
-  set({
-    log: appendLog(get(), '[lf2] Connected. Querying settings ($$)...'),
-    detectedSettings: null,
-    controllerSettings: null,
-    grblSettingsRows: [],
-    lastSettingsReadAt: null,
-  });
-  refs.settingsCollector = startCollecting();
-  await safeWrite(`${CMD_SETTINGS}\n`);
 }
 
 function shouldShowDetectedSettingsReview(detected: DetectedSettingsResult): boolean {
@@ -144,13 +104,13 @@ export function handleLine(
   safeWrite: SafeWriteFn,
   line: string,
 ): void {
-  const cls = classifyResponse(line);
+  const cls = refs.driver.classifyLine(line);
   const state = get();
   set({
     log: appendLog(state, line),
     transcript: appendTranscript(
       state.transcript,
-      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line),
+      inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line, cls),
     ),
   });
   if (refs.onLineArrived !== null) {
@@ -177,27 +137,94 @@ export function handleLine(
     return;
   }
   if (cls.kind === 'error') {
-    const state = get();
-    const rejectedLine = state.streamer?.inFlight[0]?.line.trim();
-    const motionErrorPatch =
-      state.motionOperation !== null ? { motionOperation: null, frameVerification: null } : {};
-    set({
-      lastError: cls.code,
-      safetyNotice: controllerErrorNotice(
-        cls.code,
-        controllerErrorContext(state),
-        cls.raw,
-        rejectedLine,
-      ),
-      ...motionErrorPatch,
-    });
-    requestRealtimeStopAfterStreamError(state.streamer, safeWrite);
-    advanceStream(set, get, refs, safeWrite, 'error');
+    handleErrorLine(set, get, refs, safeWrite, cls.code, cls.raw);
+    return;
+  }
+  const bannerRaw = bannerCandidateRaw(cls);
+  if (bannerRaw !== null) {
+    handleWelcomeLine(set, get, refs, bannerRaw);
+    return;
+  }
+  // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
+  // NOT an ack, so the streamer must not advance.
+  if (cls.kind === 'busy') return;
+  if (cls.kind === 'resend') {
+    handleResendLine(set, get, refs, safeWrite, cls.line);
     return;
   }
   if (cls.kind === 'ok') {
     advanceStream(set, get, refs, safeWrite, 'ok');
   }
+}
+
+// Unknown lines run through banner detection too: connecting with the wrong
+// driver selected (e.g. GRBL driver hearing Marlin's `start`) classifies the
+// foreign banner as unknown, and the advisory is exactly what the operator
+// needs to fix the profile.
+function bannerCandidateRaw(cls: { readonly kind: string; readonly raw?: string }): string | null {
+  if (cls.kind !== 'welcome' && cls.kind !== 'unknown') return null;
+  return cls.raw ?? null;
+}
+
+// Welcome banners carry the firmware identity. Record what was detected and
+// warn (log-only) when it disagrees with the profile-selected driver — GRBL
+// family members are wire-compatible, so this is advisory, not a refusal.
+function handleWelcomeLine(set: SetFn, get: GetFn, refs: HandlerRefs, raw: string): void {
+  const detected = detectControllerFromBanner(raw);
+  if (detected === null) return;
+  const mismatchLog =
+    detected === refs.driver.kind
+      ? {}
+      : {
+          log: appendLog(
+            get(),
+            `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
+          ),
+        };
+  set({ detectedControllerKind: detected, ...mismatchLog });
+}
+
+function handleErrorLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  code: number | null,
+  raw: string | undefined,
+): void {
+  const state = get();
+  const rejectedLine = state.streamer?.inFlight[0]?.line.trim();
+  const motionErrorPatch =
+    state.motionOperation !== null ? { motionOperation: null, frameVerification: null } : {};
+  set({
+    lastError: code,
+    safetyNotice: controllerErrorNotice(code, controllerErrorContext(state), raw, rejectedLine),
+    ...motionErrorPatch,
+  });
+  requestRealtimeStopAfterStreamError(state.streamer, refs.driver, safeWrite);
+  advanceStream(set, get, refs, safeWrite, 'error');
+}
+
+// Checksum-mode retransmission is not implemented (ADR-094 v1): the sender
+// and firmware are desynced, so a Resend is a fatal stream error rather than
+// a replay — replaying motion lines out of order could move a live laser.
+function handleResendLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  requestedLine: number,
+): void {
+  const current = get();
+  set({
+    safetyNotice: controllerErrorNotice(
+      null,
+      controllerErrorContext(current),
+      `Resend:${requestedLine} — line-number retransmission is not supported`,
+    ),
+  });
+  requestRealtimeStopAfterStreamError(current.streamer, refs.driver, safeWrite);
+  advanceStream(set, get, refs, safeWrite, 'error');
 }
 
 // GRBL ALARM:1 — hard limit triggered (see alarm-codes.ts).
@@ -320,13 +347,20 @@ function shouldReleaseStreamerAtIdle(
 
 function requestRealtimeStopAfterStreamError(
   streamer: StreamerState | null,
+  driver: ControllerDriver,
   safeWrite: SafeWriteFn,
 ): void {
   const streamCanStillHaveBufferedMotion =
     streamer !== null && ['streaming', 'paused', 'done'].includes(streamer.status);
   if (!streamCanStillHaveBufferedMotion) return;
-  void safeWrite(RT_SOFT_RESET, 'stop', 'system')
-    .then(() => safeWrite(`${CMD_COOLANT_OFF}\n`, 'stop', 'system'))
+  const softReset = driver.realtime.softReset;
+  const abort = softReset === null ? Promise.resolve() : safeWrite(softReset, 'stop', 'system');
+  void abort
+    .then(async () => {
+      for (const line of driver.commands.stopLaserLines) {
+        await safeWrite(`${line}\n`, 'stop', 'system');
+      }
+    })
     .catch(() => undefined);
 }
 
@@ -336,7 +370,7 @@ function statusPositionPatch(
 ): Pick<LaserState, 'statusReport'> &
   Partial<Pick<LaserState, 'wcoCache' | 'ovCache' | 'workOriginActive' | 'workOriginSource'>> {
   // Ov: is reported on the same intermittent cadence as WCO — cache the
-  // last-seen values so the overrides readout doesn't flicker (ADR-102 G3).
+  // last-seen values so the overrides readout doesn't flicker (ADR-103 G3).
   const ovPatch = report.ov === null || report.ov === undefined ? {} : { ovCache: report.ov };
   if (report.wco === null) return { statusReport: report, ...ovPatch };
   const active = hasCustomOrigin(report.wco);

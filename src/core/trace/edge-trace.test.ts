@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { traceImageToEdgePaths } from './edge-trace';
-import { TRACE_PRESETS, type RawImageData } from './trace-image';
+import { TRACE_PRESETS } from './trace-presets';
+import type { RawImageData } from './trace-image';
 
 const EDGE_OPTIONS = TRACE_PRESETS['Edge Detection']!;
 
@@ -170,7 +171,10 @@ describe('traceImageToEdgePaths', () => {
       edgeHighThresholdRatio: 0.035,
     });
 
-    expect(pointCount(sensitive)).toBeGreaterThan(pointCount(insensitive) + 6);
+    // Chained output is Douglas-Peucker simplified, so point counts no longer
+    // scale with detected detail — traced LENGTH does (the faint bar's
+    // boundary only appears at sensitive thresholds).
+    expect(totalPolylineLength(sensitive)).toBeGreaterThan(totalPolylineLength(insensitive) + 40);
   });
 
   it('higher edge blur suppresses texture noise while preserving the large boundary', () => {

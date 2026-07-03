@@ -1,9 +1,9 @@
 // Boolean combine (subtract / intersect / exclude) and path offsetting for
-// selected vector objects (ADR-102 G1). Sibling to vector-path-tools.ts,
+// selected vector objects (ADR-103 G1). Sibling to vector-path-tools.ts,
 // which owns Weld (= union) — these ops need a subject/clip split, so they
 // live apart from the color-grouped union.
 //
-// Subject convention (PROVISIONAL, ADR-102): the BOTTOM-MOST selected object
+// Subject convention (PROVISIONAL, ADR-103): the BOTTOM-MOST selected object
 // in z-order is the subject; every other selected object is a clip. Matches
 // the "cut the front shapes out of the back shape" reading of Subtract. The
 // result inherits the subject's color and lands as a plain path object with

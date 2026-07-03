@@ -27,7 +27,10 @@ export type GrblResponse =
 
 const SETTING_RE = /^\$(\d+)=(.+)$/;
 const MESSAGE_RE = /^\[([^:\]]+):([^\]]*)\]$/;
-const WELCOME_RE = /^Grbl [\d.]+/i;
+// Matches vanilla GRBL ("Grbl 1.1f [...]"), grblHAL ("GrblHAL 1.1f [...]"),
+// and FluidNC ("Grbl 3.7 [FluidNC v3.7.x]") welcome banners; the family is
+// disambiguated downstream by detectControllerFromBanner.
+const WELCOME_RE = /^Grbl(?:HAL)? [\d.]+/i;
 
 type Matcher = (line: string) => GrblResponse | null;
 

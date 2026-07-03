@@ -1,5 +1,5 @@
 // OverrideControls — real-time feed/spindle/rapid overrides while a job
-// runs (ADR-102 G3, F-CNC21). GRBL applies these instantly mid-stream; the
+// runs (ADR-103 G3, F-CNC21). GRBL applies these instantly mid-stream; the
 // live percentages come back in `Ov:` and are cached in ovCache. Rendered
 // by JobControls only while a job is streaming or paused.
 

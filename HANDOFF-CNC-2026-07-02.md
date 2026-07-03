@@ -1,5 +1,10 @@
 # HANDOFF — CNC "Router" Phase H session (2026-07-02)
 
+> **ADR RENUMBER (integration, 2026-07-03): the numbers in this file are
+> HISTORICAL. At the merge to main the CNC ADRs became 094→098, 100→101,
+> 101→102, 102→103 (controllers kept 094–097; trace kept 100) — see
+> ADR-104. Next free ADR: 105.**
+
 > **STATUS UPDATE 2026-07-03: §6 and §7 A/B/C/E/F are BUILT — see §9 "Session-2
 > closeout" at the end of this file for what shipped, where, and what remains
 > (hardware verification §7.D + the PROVISIONAL decisions list). Sections 1–8

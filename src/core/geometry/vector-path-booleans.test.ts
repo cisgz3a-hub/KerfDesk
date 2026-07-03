@@ -1,4 +1,4 @@
-// Boolean combine + offset (ADR-102 G1): subject/clip semantics, per-op
+// Boolean combine + offset (ADR-103 G1): subject/clip semantics, per-op
 // results on overlapping rectangles, empty-result and open-contour errors,
 // and offset area growth/shrink with round joins.
 

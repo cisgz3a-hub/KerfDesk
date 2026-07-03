@@ -1,5 +1,5 @@
 // parseDxf — clean-room ASCII DXF → ImportedSvg pipeline (Phase H.6,
-// ADR-094 §2: no parser libraries; WORKFLOW.md F-CNC9).
+// ADR-098 §2: no parser libraries; WORKFLOW.md F-CNC9).
 //
 // 1. Tokenize the two-line group-code/value tag stream (dxf-tags).
 // 2. Walk sections: HEADER ($INSUNITS → mm scale), TABLES (LAYER colors),

@@ -1,5 +1,5 @@
 // reliefRoughingPasses — waterline roughing of a heightmap (Phase H.5,
-// ADR-094). For each Z level from zPassDepths, cells whose dilated (safe
+// ADR-098). For each Z level from zPassDepths, cells whose dilated (safe
 // tool-center) target lies at or below the level form the region the tool
 // must clear at that level; marching squares turns the region into closed
 // contours, and concentric inward rings at the stepover spacing fill it.

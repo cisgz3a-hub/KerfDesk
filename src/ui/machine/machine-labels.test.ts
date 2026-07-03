@@ -6,7 +6,7 @@ import {
   machineNoun,
 } from './machine-labels';
 
-describe('machine-labels (ADR-100 §7)', () => {
+describe('machine-labels (ADR-101 §7)', () => {
   it('keeps laser copy byte-identical for laser projects', () => {
     expect(machineNoun('laser')).toBe('laser');
     expect(machineDisplayName('laser')).toBe('Laser');

@@ -1,5 +1,5 @@
 // DogboneRow — relieve sharp interior corners of the selected closed shapes
-// with bit-sized overcuts (ADR-102 G6, F-CNC26). CNC-only: dogbones exist so
+// with bit-sized overcuts (ADR-103 G6, F-CNC26). CNC-only: dogbones exist so
 // square joinery seats into routed slots; a laser kerf has no such limit.
 // The bit diameter prefills from the machine's active bit.
 

@@ -1,5 +1,5 @@
 // computeRemovalGrid — sweep the tool kernel along a toolpath's cutting steps
-// and record the deepest visit per cell (Phase H.2, ADR-094). This is the
+// and record the deepest visit per cell (Phase H.2, ADR-098). This is the
 // depth field behind the CNC preview's material-removal shading, and the
 // verification instrument for every depth-producing feature after it
 // (V-carve, relief): the perceptual tests compare this grid against analytic

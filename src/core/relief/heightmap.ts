@@ -1,4 +1,4 @@
-// Heightmap — the carveable surface of a relief (Phase H.4, ADR-094).
+// Heightmap — the carveable surface of a relief (Phase H.4, ADR-098).
 // Row-major Float32 depths in mm: 0 = stock top, negative = into the stock,
 // floor = −reliefDepthMm. Produced by mesh-to-heightmap, consumed by the
 // canvas preview (H.4) and the roughing/finishing toolpath generators

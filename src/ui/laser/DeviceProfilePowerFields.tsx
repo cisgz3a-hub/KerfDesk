@@ -3,7 +3,7 @@
 // DeviceProfileFields so the Device Setup wizard can place the controller-
 // reported power on its "confirm settings" step and air-assist (which $$ cannot
 // report) on its "placement & safety" step. The inline Device Profile panel
-// renders both directly and hides them in CNC mode (ADR-100 §6).
+// renders both directly and hides them in CNC mode (ADR-101 §6).
 
 import type { DeviceProfile } from '../../core/devices';
 import { numInputStyle, Row } from './device-settings-shared';

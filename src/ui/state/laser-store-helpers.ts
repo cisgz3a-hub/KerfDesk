@@ -5,13 +5,11 @@
 // at runtime.
 
 import {
-  CMD_COOLANT_OFF,
-  RT_JOG_CANCEL,
-  RT_SOFT_RESET,
   disconnect as disconnectStreamer,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
+import { grblDriver, type ControllerDriver } from '../../core/controllers';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { disconnectDuringJobNotice } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
@@ -45,6 +43,18 @@ export function activeJobCommandBlockMessage(state: LaserState): string | null {
   return isActiveJob(state.streamer) ? ACTIVE_JOB_COMMAND_MESSAGE : null;
 }
 
+// True while stream acks are still outstanding — sending or paused, or any
+// in-flight line not yet acknowledged. Queued status queries (Marlin M114)
+// must stay silent through THIS window (their ok would desync the ack
+// accounting), but may resume once everything is acked: 'done' still blocks
+// isActiveJob until the post-job settle sees Idle, and that settle NEEDS the
+// M114 polls to observe Idle at all.
+export function hasUnsettledStreamAcks(streamer: StreamerState | null): boolean {
+  if (streamer === null) return false;
+  if (streamer.status === 'streaming' || streamer.status === 'paused') return true;
+  return streamer.inFlight.length > 0;
+}
+
 export function motionOperationCommandBlockMessage(state: LaserState): string | null {
   return state.motionOperation !== null
     ? MOTION_OPERATION_ACTIVE_MESSAGE
@@ -71,17 +81,20 @@ export function jogFrameCommandBlockMessage(state: LaserState): string | null {
   return null;
 }
 
-export function idleOnlyDollarCommandBlockMessage(
+export function disconnectStopCommands(
   state: LaserState,
-  payload: string,
-): string | null {
-  if (!payloadContainsDollarLineCommand(payload)) return null;
-  return activeJobCommandBlockMessage(state);
-}
-
-export function disconnectStopCommands(state: LaserState): ReadonlyArray<string> {
-  if (isActiveJob(state.streamer)) return [RT_SOFT_RESET, `${CMD_COOLANT_OFF}\n`];
-  return state.motionOperation !== null ? [RT_JOG_CANCEL] : [];
+  driver: ControllerDriver,
+): ReadonlyArray<string> {
+  if (isActiveJob(state.streamer)) {
+    const softReset = driver.realtime.softReset;
+    return [
+      ...(softReset === null ? [] : [softReset]),
+      ...driver.commands.stopLaserLines.map((line) => `${line}\n`),
+    ];
+  }
+  if (state.motionOperation === null) return [];
+  const jogCancel = driver.realtime.jogCancel;
+  return jogCancel === null ? [] : [jogCancel];
 }
 
 export function assertAutofocusIdle(state: LaserState): void {
@@ -91,10 +104,6 @@ export function assertAutofocusIdle(state: LaserState): void {
 export function assertNoActiveJob(state: LaserState): void {
   const message = activeJobCommandBlockMessage(state);
   if (message !== null) throw new Error(message);
-}
-
-function payloadContainsDollarLineCommand(payload: string): boolean {
-  return payload.split(/\r?\n/).some((line) => line.trim().startsWith('$'));
 }
 
 // M13 (AUDIT-2026-06-10): ack watchdog. The streamer is purely ack-driven —
@@ -172,6 +181,9 @@ function streamPositionUnchanged(
 
 export function initialLaserState(): Pick<
   LaserState,
+  | 'capabilities'
+  | 'activeControllerKind'
+  | 'detectedControllerKind'
   | 'connection'
   | 'statusReport'
   | 'alarmCode'
@@ -197,6 +209,9 @@ export function initialLaserState(): Pick<
   | 'frameVerification'
 > {
   return {
+    capabilities: grblDriver.capabilities,
+    activeControllerKind: grblDriver.kind,
+    detectedControllerKind: null,
     connection: { kind: 'disconnected' },
     statusReport: null,
     alarmCode: null,

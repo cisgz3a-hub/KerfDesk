@@ -1,4 +1,4 @@
-// Relief-specific preflight behavior (ADR-100 §8 follow-up): a relief-only
+// Relief-specific preflight behavior (ADR-101 §8 follow-up): a relief-only
 // laser scene must fail with a NAMED issue, not the generic empty-output
 // internal error. Split from preflight.test.ts, which is at the size cap
 // (preflight-raster.test.ts precedent).

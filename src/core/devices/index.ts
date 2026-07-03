@@ -1,15 +1,23 @@
 export type {
+  GcodeDialectId,
   GcodeDialectSelection,
   GrblGcodeDialect,
   GrblGcodeDialectId,
   GrblPowerMode,
+  MarlinGcodeDialect,
+  MarlinGcodeDialectId,
+  MarlinPowerMode,
 } from './gcode-dialects';
 export {
   GRBL_GCODE_DIALECTS,
+  MARLIN_GCODE_DIALECTS,
+  isGcodeDialectId,
   isGcodeDialectSelection,
   isGrblGcodeDialectId,
+  isMarlinGcodeDialectId,
   normalizeGcodeDialectSelection,
   resolveGrblDialect,
+  resolveMarlinDialect,
 } from './gcode-dialects';
 export type {
   ControllerKind,
@@ -26,7 +34,12 @@ export type {
   ProfileEvidence,
   ProfileEvidenceStatus,
 } from './device-profile';
-export { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from './device-profile';
+export {
+  DEFAULT_DEVICE_PROFILE,
+  isKnownControllerKind,
+  KNOWN_CONTROLLER_KINDS,
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+} from './device-profile';
 export type { MachineProfileCatalogEntry } from './profile-catalog';
 export {
   duplicateProfileAsCustom,

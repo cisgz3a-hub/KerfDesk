@@ -29,12 +29,15 @@ export function ControllerSettingsPanel(): JSX.Element {
   );
 }
 
-function GrblSetupSlot(): JSX.Element {
+function GrblSetupSlot(): JSX.Element | null {
   const connection = useLaserStore((s) => s.connection);
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
   const streamer = useLaserStore((s) => s.streamer);
+  const firmwareSetupPanel = useLaserStore((s) => s.capabilities.firmwareSetupPanel);
+  // ADR-094: the $32/$30 setup sequence only exists on GRBL-dollar firmwares.
+  if (firmwareSetupPanel !== 'grbl-laser') return null;
   const disabled =
     connection.kind !== 'connected' ||
     autofocusBusy ||
@@ -47,9 +50,23 @@ function GrblSetupSlot(): JSX.Element {
 export function FirmwareWritesPanel(): JSX.Element {
   const rows = useLaserStore((s) => s.grblSettingsRows);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
+  const settingsCapability = useLaserStore((s) => s.capabilities.settings);
   const writableRows = rows.filter(
     (row) => row.writeRisk === 'common' && COMMON_WRITE_IDS.has(row.id),
   );
+  if (settingsCapability !== 'grbl-dollar') {
+    return (
+      <div style={stackStyle}>
+        <section style={sectionStyle}>
+          <h3 style={sectionHeadingStyle}>Guarded Writes</h3>
+          <p style={mutedStyle}>
+            This controller does not accept numeric $ setting writes from the app. Configure the
+            firmware with its own tools.
+          </p>
+        </section>
+      </div>
+    );
+  }
   return (
     <div style={stackStyle}>
       <section style={sectionStyle}>

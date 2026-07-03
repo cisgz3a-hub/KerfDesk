@@ -1,6 +1,6 @@
 // handleOpenGcodePreview — pick a .nc/.gcode/.tap file, parse it with the
 // clean-room modal parser, and hand the toolpath to the simulator slot
-// (Phase H.6b, F-CNC10). CNC-only at the command layer (ADR-100).
+// (Phase H.6b, F-CNC10). CNC-only at the command layer (ADR-101).
 
 import type { Toolpath } from '../../core/job';
 import { parseGcodeProgram } from '../../io/gcode';

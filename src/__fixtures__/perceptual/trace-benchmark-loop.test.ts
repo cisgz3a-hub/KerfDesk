@@ -42,9 +42,12 @@ describe('trace benchmark loop', () => {
       const archHouse = requiredResult(results, 'arch-house-line-art-baseline');
 
       expect(curveLinking.findings).toEqual([]);
-      expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(6);
-      expect(curveLinking.metrics.longestStrokeAngularCoverageRatio).toBeGreaterThanOrEqual(0.9);
-      expect(curveLinking.metrics.maxLongestStrokeAngularGapDeg).toBeLessThanOrEqual(30);
+      // Per-dash outline contract (see edge-curve-quality.test.ts): six dashes
+      // trace as six closed outlines that together cover the drawn ring.
+      expect(curveLinking.metrics.strokePolylineCount).toBeGreaterThanOrEqual(6);
+      expect(curveLinking.metrics.strokePolylineCount).toBeLessThanOrEqual(7);
+      expect(curveLinking.metrics.closedStrokeCount).toBeGreaterThanOrEqual(6);
+      expect(curveLinking.metrics.aggregateAngularCoverageRatio).toBeGreaterThanOrEqual(0.85);
 
       expect(archHouseEdge.findings).toEqual([]);
       expect(archHouseEdge.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);

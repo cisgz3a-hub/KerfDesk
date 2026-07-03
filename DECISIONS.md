@@ -3574,6 +3574,188 @@ ADR-009 (Vite stack), ADR-047 (design tokens).
 
 ---
 
+## ADR-094 — Phase H multi-controller architecture: ControllerDriver seam + capability-gated UI
+
+**Status:** Accepted; shipped (Phase H build, branch `claude/angry-mcnulty-bc6bfe`). | **Date:** 2026-07-02
+
+**Context.** ADR-006 shipped GRBL v1.1 only and promised an extensible strategy for
+future controllers. The maintainer directed Phase H: support grblHAL, FluidNC,
+Marlin, Smoothieware, and Ruida. The store layer hardcoded GRBL bytes ($J=, $X,
+!, ~, ?, Ctrl-X) across nine ui/state files; only the G-code emitter was abstract.
+
+**Decision.**
+
+1. **ControllerDriver seam** (`src/core/controllers/`): per-firmware pure object —
+   command vocabulary, realtime bytes (nullable), line classifier into a shared
+   `ControllerEvent` union (superset: adds `busy`/`resend`), console rules, jog/frame
+   builders, default baud. `selectControllerDriver(kind)` resolves from the profile's
+   `controllerKind`; the driver lives in the store's non-serializable refs.
+2. **Capability gating, never kind-checking, in ui/**: a declarative
+   `ControllerCapabilities` snapshot in LaserState (transport, jog, realtimePause,
+   statusQuery, settings, unlock, sleep, wcs, homing, console, firmwareSetupPanel).
+   `kind === 'grbl'` in ui/ is the same anti-pattern class as platform conditionals.
+3. **Byte-identical proof for the refactor**: firmware simulators
+   (`src/__fixtures__/controllers/`) + store-level lifecycle integration tests landed
+   BEFORE the seam; the refactor kept G-code snapshots and sim transcripts identical.
+4. **Detection is advisory**: welcome banners (and unknown lines) run through a
+   detection registry; a mismatch with the selected profile logs a warning, never
+   silently switches drivers.
+5. `.lf2`/.lfmachine round-trip `controllerKind` + optional `baudRate`; unknown
+   values are dropped to the GRBL default at the deserialize boundary
+   (`isKnownControllerKind` is the single source of truth).
+
+**Consequences.** grblHAL/FluidNC land as capability deltas on the GRBL driver
+(FluidNC: settings read-only, no $-writes). One family per sub-phase (keeps
+ADR-006's discipline). Supersedes ADR-006's GRBL-only scope; everything else in
+ADR-006 stands. grblHAL is hardware-verifiable on the Falcon A1 Pro; FluidNC is
+simulator-verified only.
+
+---
+
+## ADR-095 — Marlin controller support (queued status, stream-side pause, inline/fan dialects)
+
+**Status:** Accepted; shipped, simulator-verified only. | **Date:** 2026-07-02
+
+**Context.** Marlin has NO realtime bytes: no `?` report, no `!`/`~`, no soft-reset
+char, no `$` vocabulary, text errors, `ok`-per-line acks, `echo:busy` keepalives.
+Laser wiring is fragmented: LASER_FEATURE builds take M3/M4/M5 + per-move S
+(0–255); fan-mosfet rigs only know M106 Sn/M107.
+
+**Decision.** Status = queued `M114` (synthesized Idle report), polled ONLY while
+no stream acks are outstanding and no controller command is pending — a queued
+query consumes planner space and emits its own `ok`, so polling mid-stream would
+desync the character accounting. Pause = stream-side (stop sending; buffered
+motion drains; UI copy says so). Stop = stop sending + `M5`/`M107` beam-off lines.
+Jog = `G91`/`G0`/`G90`; frame = absolute `G0` legs; home = `G28 X Y` (never bare
+G28 — Z would crash a laser rig); settle marker = `M400`. Two output dialects:
+`marlin-inline` (GRBL wire shape at S 0–255) and `marlin-fan` (per-move S →
+`M106/M107` between moves; the laser-off-on-travel checker treats `M107` as
+beam-off). Checksum `Resend:` is a terminal stream error (no line-number replay
+in v1). Start readiness passes with an explicit power-scale-unverified warning
+instead of demanding $30/$32 proof.
+
+**Consequences.** Ping-pong streaming only (profile default). Raster in fan mode
+is slow/coarse by physics — documented, not hidden. NOT hardware-verified; the
+catalog profile carries `unverified` evidence saying exactly that.
+
+---
+
+## ADR-096 — Smoothieware controller support (fractional S power scale)
+
+**Status:** Accepted; shipped, simulator-verified only. | **Date:** 2026-07-02
+
+**Context.** Smoothie speaks GRBL-flavored realtime (`?` status, `!`/`~`, Ctrl-X)
+but has no `$J`/`$$`/`$X`/`$SLP`; halt recovery is `M999`; homing is `G28.2`; and
+the laser module's S scale defaults to **0–1.0** — the GRBL emitter's integer
+rounding would collapse every power to 0 or 1.
+
+**Decision.** Reuse the GRBL status-parser and realtime bytes; jog/frame like
+Marlin (G91/G0/G90); `!!`/text errors classify as terminal stream errors (halt
+state arrives via status reports; there are no numeric alarm codes).
+`smoothiewareStrategy` emits against a virtual S-1000 scale and rescales every S
+word to the profile maximum (S0.500 at max 1.0; integers at large scales) —
+non-negotiables #3/#5/#7 property-tested at fractional scale. Realtime pause is
+allowed WITHOUT the $32 proof on firmwares that cannot report $-settings
+(Smoothie's laser module ties beam power to motion); grbl-dollar firmwares keep
+the strict gate. `config-set`/`config-load` are blocked in console and payloads.
+
+**Consequences.** NOT hardware-verified (catalog evidence says so). `maxPowerS`
+may now be fractional; consumers were audited for integer assumptions.
+
+---
+
+## ADR-097 — Ruida: experimental .rd export, file-only transport
+
+**Status:** Accepted; shipped as EXPERIMENTAL (file export only), NOT accepted by real hardware yet. | **Date:** 2026-07-02
+
+**Context.** Ruida DSP controllers (RDC644x class, most Chinese CO2 lasers) speak
+a proprietary swizzled binary protocol over USB/UDP — no serial G-code link
+exists. Byte meanings come from public reverse-engineering (MeerK40t, EduTech
+wiki); LaserForge reimplements clean-room (ADR-017 discipline, no code copied).
+
+**Decision.**
+
+1. `core/controllers/ruida/`: swizzle (round-trip property-tested), 35-bit
+   coordinate / 14-bit power encodings, a minimal command vocabulary, and a
+   deterministic `.rd` encoder that REFUSES raster groups rather than guessing.
+2. **Verification is round-trip, honestly labeled**: a decoder test-instrument
+   proves encode→decode fidelity (geometry, power, speed, passes, layers) —
+   internal consistency, NOT real-device acceptance. Every save shows an
+   EXPERIMENTAL toast; the catalog evidence repeats it.
+3. **Transport `file-only`**: a new capability disables Connect and all live
+   controls for Ruida profiles; Save G-code routes to `io/rd` → `.rd` (Blob).
+4. A pure UDP session state machine (checksum datagram framing, ACK advance,
+   ERR retry budget, port 50200) is implemented and sim-tested as groundwork.
+   The Electron UDP socket + IPC bridge is deliberately NOT built: streaming
+   never-hardware-validated bytes to a live CO2 laser fails the Phase H honesty
+   rules. Profiles stay file-only until a real controller accepts the output.
+
+**Consequences.** Ruida users get preview/estimate/export today with explicit
+warnings. Next steps (in order): validate a generated `.rd` against a real
+controller or reference files, then wire the UDP transport.
+
+---
+
+## ADR-100 — Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params
+
+**Date.** 2026-07-03. **Status.** Accepted (replaces the Centerline
+implementation; amends ADR-059 Edge Detection).
+
+**Context.** The perceptual IoU/structure suite was green while traced art
+looked wrong (the Karpathy failure mode). A visual audit harness
+(`src/__fixtures__/perceptual/_trace-audit-render.test.ts`, `TRACE_AUDIT=1`)
+exposed: Centerline vanished whole strokes, retracted tips, tangled
+junctions, and chamfered every drawn corner; Edge Detection outlined its 1-px
+Canny mask with the filled-contour backend, doubling every line (the preset
+was hidden from the UI for exactly that reason); Sharp reached the potrace
+backend with Smooth's curve params (its imagetracerjs-era fields are inert
+there), so small features traced as blobs.
+
+**Decision.**
+
+1. **Centerline** is rebuilt from scratch in `src/core/trace/centerline/`:
+   exact squared EDT (Felzenszwalb–Huttenlocher) → distance-ordered homotopic
+   thinning with an exact (8,4) simple-point LUT, phase 1 anchored on centres
+   of maximal discs, phase 2 plateau reduction with a more-neighbours-first
+   tie-break (even-width ribbons cannot unzip tip-first) → junction-cluster
+   stroke graph → pinched-tip spur pruning (tip radius ≤ 1.6 px AND
+   protrusion beyond the trunk under budget; a component's last chain is
+   never pruned) → assembly: straightest-continuation junction pairing,
+   tangent-anchored ridge-walk tip extension to the ink cap apex, T-junction
+   seam repair (the medial axis genuinely dents toward every branch — seams
+   are stitched straight and branch ends welded back on), windowed corner
+   sharpening (chamfers and round-nib joins rebuild their vertex; fillets
+   of roughly 2 stroke radii and up stay round), Douglas-Peucker.
+2. **Edge Detection** keeps Canny but with interpolating non-max suppression
+   (bilinear along the true gradient — 4-bucket NMS starved diagonal ridges)
+   and feeds the edge map through the same chain machinery, emitting single
+   sub-pixel polylines: open for lines, closed for loops. Sliver loops
+   (area ≤ 4 px²) drop as debris. Tangent-ALIGNED continuations may
+   bridge/close up to 3× the join gap (hysteresis dropouts exceed the knob;
+   perpendicular welds stay capped). Preset minimum line is now chain length
+   (12 px), not two-sided contour perimeter (24 px). The preset is back in
+   the UI dropdown.
+3. **Sharp** sets the potrace params that actually apply: smoothness 0.55,
+   optimize 0.15 — corners stay vertices, genuine large arcs still curve.
+   Chosen from three rendered candidates (today-smooth / corner-faithful /
+   pure-polygon) over corner, pixel-art, curve, and fine-detail fixtures
+   (`_sharp-candidates.test.ts`, gated on `TRACE_AUDIT=1`).
+4. **Perceptual contracts updated to the single-line reality:** coverage
+   metrics sample the drawn path (not simplified vertices), closed polylines
+   have endpoint gap 0, centerline tips must reach the visible ink cap apex,
+   a dashed stroke traces as one closed outline per dash (LightBurn-
+   consistent; the old fused blob was a dilate/erode artifact), and open
+   polylines are a feature of Edge Detection, not a defect.
+
+**Consequences.** All five presets render correctly on the audit fixtures and
+the arch-house real logo (benchmark loop 10/10 across six benchmarks). Known
+limitation: at very shallow crossings, chain pairing can hand the connector
+to the wrong continuation — geometry stays correct, only travel-path grouping
+is affected. The audit harness stays in the tree, gated on `TRACE_AUDIT=1`,
+as the standing perceptual eyeball tool.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
@@ -3593,7 +3775,7 @@ Setup wizard) is the first.
   shipped without formal ADRs at those slots. ADR-019 / ADR-020 /
   ADR-021 are the first three slots since reused.)
 
-## ADR-094 — CNC router mode becomes a first-class product track (Phase H "Router")
+## ADR-098 — CNC router mode becomes a first-class product track (Phase H "Router")
 
 **Status:** Accepted
 **Date:** 2026-07-02
@@ -3687,12 +3869,12 @@ Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
 - Maintenance burden: if CNC-attributable regressions in laser mode exceed
   ~1 per sub-phase, revisit the shared-UI decision.
 
-## ADR-100 — CNC/laser UI separation policy: gate-and-hide
+## ADR-101 — CNC/laser UI separation policy: gate-and-hide
 
 **Status:** Accepted
 **Date:** 2026-07-02
 
-> **Numbering note:** ADR-100 follows ADR-094 on this branch by design, not
+> **Numbering note:** ADR-101 follows ADR-098 on this branch by design, not
 > by accident. ADR-095–098 are reserved for the multi-controller track's
 > renumbered ADRs and ADR-099 is the Phase-H collision resolution, both
 > recorded on branch `claude/nice-fermat-55d508` (see
@@ -3700,7 +3882,7 @@ Log the result in AUDIT.md; only then may a row flip CLAIMED → VERIFIED.
 
 ### Context
 
-ADR-094 chose one shared shell for both machine families and rejected a
+ADR-098 chose one shared shell for both machine families and rejected a
 separate CNC application. The CNC MVP and H.1–H.5 established a first
 gating precedent — the Material Library hides in CNC mode, the
 CncSetupPanel hides in laser mode, layer rows swap field sets — but the
@@ -3781,7 +3963,7 @@ sources consumed by both compilers.
   Rejected — N surfaces × M commands drifts; one choke point in
   `buildAppCommands` cannot.
 - **A separate CNC workspace.** Considered and rejected by the maintainer
-  this session (re-affirming ADR-094).
+  this session (re-affirming ADR-098).
 - **Hiding raster import in CNC mode.** Rejected — the maintainer's
   separation audit chose a preflight advisory; images may still serve as
   visual reference, and projects opened from laser mode carry them.
@@ -3811,9 +3993,9 @@ sources consumed by both compilers.
 - Operators report needing a hidden tool in CNC mode (e.g. Trace for
   cut-a-logo workflows) → revisit per-command with the maintainer.
 - The laser-only set grows past ~25 entries → the shared-shell decision
-  itself is under strain; re-open ADR-094's shared-UI clause.
+  itself is under strain; re-open ADR-098's shared-UI clause.
 
-## ADR-101 — three.js for the 3D relief viewer (explicit ADR-094 §2 override)
+## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
 **Status:** Accepted
 **Date:** 2026-07-03
@@ -3823,7 +4005,7 @@ sources consumed by both compilers.
 Relief carving (H.4/H.5) renders on the canvas as a 2D grayscale depth
 map. The maintainer approved a REAL 3D viewer for reliefs in the
 2026-07-02 session, with the explicit condition that it stay blocked
-behind this ADR: ADR-094 §2 says "no new runtime dependencies are planned
+behind this ADR: ADR-098 §2 says "no new runtime dependencies are planned
 for Phase H," and a WebGL scene graph is exactly the kind of wheel the
 clean-room mandate does not extend to — hand-rolling camera math, depth
 buffers, and lighting is weeks of risk for zero product differentiation.
@@ -3831,7 +4013,7 @@ buffers, and lighting is weeks of risk for zero product differentiation.
 ### Decision
 
 1. Adopt **three.js** (MIT) as a runtime dependency, explicitly overriding
-   ADR-094 §2 for this one library. The clean-room mandate is about
+   ADR-098 §2 for this one library. The clean-room mandate is about
    PARSERS and GEOMETRY (data fidelity we must own); presentation is not
    canon-critical.
 2. **three.js is UI-only.** It may be imported beneath
@@ -3871,7 +4053,7 @@ buffers, and lighting is weeks of risk for zero product differentiation.
   with a static isometric canvas projection (pure core, no dependency).
 
 
-## ADR-102 — Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03)
+## ADR-103 — Market-parity build-out: sender workflows, vector booleans, 3D cut preview (2026-07-03)
 
 **Status:** accepted (maintainer session directive). Individual G-items
 marked PROVISIONAL where this session applied judgment; review welcome.
@@ -3892,7 +4074,7 @@ lands here before code.
 - **G1. Vector booleans + offset.** Union / subtract / intersect /
   exclude on selected closed paths, plus inward/outward offset with a
   distance field. Implemented on **clipper2-ts, already the approved
-  geometry dependency** (ADR-094 §2) — this deliberately supersedes the
+  geometry dependency** (ADR-098 §2) — this deliberately supersedes the
   Phase-G note that deferred the "geometry kernel" to a future
   evaluation: the evaluation happened (ADR-017 pattern) when clipper2
   was adopted for pockets/v-carve; booleans use the same engine. Weld
@@ -3909,7 +4091,7 @@ lands here before code.
   `Ov:` values from status reports shown when present. Machine-agnostic
   (GRBL overrides apply to laser jobs too).
 - **G4. General 3D cut preview.** The H.2 material-removal grid
-  rendered as a shaded heightfield in the ADR-101 three.js viewer for
+  rendered as a shaded heightfield in the ADR-102 three.js viewer for
   ANY CNC job (not just reliefs). UI-only, same lazy chunk, same jsdom
   fallback.
 - **G5. Feeds & speeds calculator.** Chipload-based: RPM x flutes x
@@ -3938,8 +4120,8 @@ stays until the maintainer lifts it.
 
 ### Constraints carried over
 
-ADR-094 §1/§3 unchanged: clean-room, no new runtime deps (G1–G8 add
-none; G4 reuses ADR-101's three.js), every output-affecting feature
+ADR-098 §1/§3 unchanged: clean-room, no new runtime deps (G1–G8 add
+none; G4 reuses ADR-102's three.js), every output-affecting feature
 lands CLAIMED until a 4040 air-cut. Defaults must keep existing G-code
 byte-identical; the one intentional exception is the **CNC banner fix**
 (the laser-worded `$32=1` header line in router exports — an E2E-run
@@ -3951,3 +4133,32 @@ Per feature: unit + property tests, WORKFLOW.md flows (success / error /
 empty / edge) before UI, full gate per commit, isolated-preview
 perceptual pass where renderable, AUDIT.md CLAIMED rows with named
 pending hardware checks.
+
+## ADR-104 — Integration numbering: controllers keep 094–097 + Phase I; CNC renumbers to 098/101/102/103 + keeps Phase H (2026-07-03)
+
+**Status:** accepted (recorded at the merge of `claude/determined-dewdney-7ec915` into `main`).
+
+### Context
+
+Two Phase H tracks were built in parallel off pre-Phase-H mains: the CNC
+router track (ADR-094 = CNC scope on its branch) and the multi-controller
+track (ADR-094–097 = driver seam/Marlin/Smoothie/Ruida). An earlier
+resolution (ADR-099, drafted on the controller branch but never landed)
+gave CNC the 094 number — however the controller track merged to `main`
+FIRST, publishing 094–097 and (via the trace rebuild) ADR-100. Published
+numbers win.
+
+### Decision
+
+- Controller ADRs keep **094–097** as published on `main`; the trace
+  rebuild keeps **ADR-100**. The controller product phase is relabeled
+  **Phase I — v0.9 "Multi-controller"** in PROJECT.md (its WORKFLOW flow
+  IDs keep their original F-H prefix).
+- The CNC track keeps the product label **Phase H — v0.8 "Router"** and
+  its ADRs renumber at integration: CNC scope 094→**098**, gate-and-hide
+  100→**101**, three.js 101→**102**, market-parity 102→**103**. Every
+  in-tree reference was swept in the merge commit; pre-merge commit
+  messages retain the old numbers (immutable history — read them against
+  this table).
+- ADR-099 is retired unused; the number stays reserved to avoid a third
+  meaning. Next free ADR: **105**.

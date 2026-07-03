@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { RawImageData } from '../../core/trace';
-import { TRACE_PRESETS, traceImageToCenterlinePaths } from '../../core/trace';
+import { TRACE_PRESETS, traceCenterlineStrokePaths } from '../../core/trace';
 
 const RGBA = 4;
 const BLACK = 0;
@@ -41,7 +41,7 @@ describe('centerline trace performance on a big image', () => {
   it('traces a ~1.9MP thick-stroke grid within the worker budget', { timeout: 90_000 }, () => {
     const image = gridImage(1600, 1200, 24, 140);
     const start = performance.now();
-    const paths = traceImageToCenterlinePaths(image, CENTERLINE_OPTIONS);
+    const paths = traceCenterlineStrokePaths(image, CENTERLINE_OPTIONS);
     const elapsedMs = performance.now() - start;
     console.log(
       `[centerline-perf] 1600x1200 stroke24: ${elapsedMs.toFixed(0)}ms, paths=${paths.length}`,

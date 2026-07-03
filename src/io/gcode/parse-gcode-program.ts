@@ -1,5 +1,5 @@
 // parseGcodeProgram — clean-room modal G-code (.nc) parser feeding the CNC
-// simulator (Phase H.6b, ADR-094 §2, WORKFLOW.md F-CNC10). The program is
+// simulator (Phase H.6b, ADR-098 §2, WORKFLOW.md F-CNC10). The program is
 // converted straight into the preview's Toolpath model (travel / cut /
 // plunge steps with Z spans), so the removal grid, scrubber, and distance
 // stats work on external programs exactly as on native compiles.

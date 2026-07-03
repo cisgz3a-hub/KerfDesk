@@ -1,4 +1,4 @@
-// Chipload feeds & speeds calculator (ADR-102 G5, F-CNC24).
+// Chipload feeds & speeds calculator (ADR-103 G5, F-CNC24).
 //
 //   feed (mm/min) = RPM × flutes × chipload (mm/tooth)
 //

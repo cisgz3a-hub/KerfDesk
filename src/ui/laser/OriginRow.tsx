@@ -36,7 +36,9 @@ const CLEAR_PERSISTENT_ORIGIN_CONFIRM =
 export function OriginRow(props: {
   readonly disabled: boolean;
   readonly streaming: boolean;
-}): JSX.Element {
+}): JSX.Element | null {
+  const wcs = useLaserStore((s) => s.capabilities.wcs);
+  const canSleep = useLaserStore((s) => s.capabilities.sleep);
   const setOrigin = useLaserStore((s) => s.setOriginHere);
   const resetOrigin = useLaserStore((s) => s.resetOrigin);
   const releaseMotors = useLaserStore((s) => s.releaseMotors);
@@ -47,33 +49,19 @@ export function OriginRow(props: {
   const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const busy = props.disabled || props.streaming;
+  // ADR-094: firmwares without work-coordinate-system support (Marlin v1)
+  // have no origin vocabulary at all — the whole row disappears.
+  if (wcs === 'none') return null;
   const hasCustom = workOriginActive || hasCustomOrigin(wcoCache);
   const persistentOrUnknown =
     workOriginSource === 'g54-persistent' || workOriginSource === 'unknown';
-  // Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
-  // intermittently (every Nth status per `$10`), so the StatusDisplay
-  // readout may take 1-30 frames (~0.25-7.5s) to update after a G92.
-  // The toast gives instant feedback so the user doesn't re-click.
-  const onSet = (): void => {
-    void setOrigin().then(() => {
-      setJobPlacement({ startFrom: 'user-origin' });
-      pushToast('Origin set to current head position (G92).', 'success');
-    });
-  };
-  const onReset = (): void => {
-    void resetOrigin().then(() =>
-      pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'),
-    );
-  };
-  const onRelease = (): void => {
-    if (!jobAwareConfirm(RELEASE_MOTORS_CONFIRM)) return;
-    void releaseMotors().then(() =>
-      pushToast(
-        'Motors released ($SLP). Move the head by hand, then Wake and Set origin again.',
-        'success',
-      ),
-    );
-  };
+  const { onSet, onReset, onRelease } = makeOriginHandlers({
+    setOrigin,
+    resetOrigin,
+    releaseMotors,
+    setJobPlacement,
+    pushToast,
+  });
   return (
     <div style={originRowStyle}>
       <button
@@ -98,21 +86,70 @@ export function OriginRow(props: {
       >
         Reset origin
       </button>
-      <AdvancedOriginControls
-        busy={busy}
-        hasCustom={hasCustom}
-        persistentOriginReady={persistentOriginReady}
-      />
-      <button
-        type="button"
-        onClick={onRelease}
-        disabled={busy}
-        title="Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward."
-      >
-        Release motors
-      </button>
+      {wcs === 'g92-and-g10' && (
+        <AdvancedOriginControls
+          busy={busy}
+          hasCustom={hasCustom}
+          persistentOriginReady={persistentOriginReady}
+        />
+      )}
+      {canSleep && (
+        <button
+          type="button"
+          onClick={onRelease}
+          disabled={busy}
+          title="Release the motors ($SLP) so you can move the head by hand. Clears the work origin; Wake and Set origin again afterward."
+        >
+          Release motors
+        </button>
+      )}
     </div>
   );
+}
+
+type OriginHandlerDeps = {
+  readonly setOrigin: () => Promise<void>;
+  readonly resetOrigin: () => Promise<void>;
+  readonly releaseMotors: () => Promise<void>;
+  readonly setJobPlacement: (placement: { readonly startFrom: 'user-origin' }) => void;
+  readonly pushToast: (message: string, variant: 'success') => void;
+};
+
+// Toast on ack covers the WCO-frame latency gap — GRBL reports WCO
+// intermittently (every Nth status per `$10`), so the StatusDisplay readout
+// may take 1-30 frames (~0.25-7.5s) to update after a G92. The toast gives
+// instant feedback so the user doesn't re-click.
+function makeOriginHandlers(deps: OriginHandlerDeps): {
+  readonly onSet: () => void;
+  readonly onReset: () => void;
+  readonly onRelease: () => void;
+} {
+  return {
+    onSet: () => {
+      void deps.setOrigin().then(() => {
+        deps.setJobPlacement({ startFrom: 'user-origin' });
+        deps.pushToast('Origin set to current head position (G92).', 'success');
+      });
+    },
+    onReset: () => {
+      void deps
+        .resetOrigin()
+        .then(() =>
+          deps.pushToast('Work origin cleared — back to machine zero (G92.1).', 'success'),
+        );
+    },
+    onRelease: () => {
+      if (!jobAwareConfirm(RELEASE_MOTORS_CONFIRM)) return;
+      void deps
+        .releaseMotors()
+        .then(() =>
+          deps.pushToast(
+            'Motors released ($SLP). Move the head by hand, then Wake and Set origin again.',
+            'success',
+          ),
+        );
+    },
+  };
 }
 
 function AdvancedOriginControls(props: {

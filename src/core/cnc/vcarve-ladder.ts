@@ -1,5 +1,5 @@
 // vcarvePasses — true V-carving via an inward offset ladder (Phase H.3,
-// ADR-094).
+// ADR-098).
 //
 // For the closed shapes of a layer, successive inward offsets at insets
 // d_k = k·δ are cut at z(d) = −min(d / tan(θ/2), maxDepth), where θ is the

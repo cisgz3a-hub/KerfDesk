@@ -210,7 +210,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
     }
   });
 
-  it('labels the job-control shortcuts with the machine noun in CNC mode (ADR-100 §7)', async () => {
+  it('labels the job-control shortcuts with the machine noun in CNC mode (ADR-101 §7)', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;

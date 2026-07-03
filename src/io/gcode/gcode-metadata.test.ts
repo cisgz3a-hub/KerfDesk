@@ -37,7 +37,7 @@ describe('gcodeMetadataHeader', () => {
     expect(header).toContain('; assumes: GRBL $30=255 (max S), $32=1 (laser mode)');
   });
 
-  // ADR-102 defect fix: router exports carried the laser-worded banner. The
+  // ADR-103 defect fix: router exports carried the laser-worded banner. The
   // CNC header names the RPM mapping and router mode instead.
   it('records router-mode assumptions for CNC exports', () => {
     const header = gcodeMetadataHeader(META, { kind: 'cnc', spindleMaxRpm: 24000 });

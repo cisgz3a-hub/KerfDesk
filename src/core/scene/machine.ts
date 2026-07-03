@@ -39,7 +39,7 @@ export type CncStock = {
 //   pocket           — clear the interior of closed shapes
 //   engrave          — trace the path itself, typically shallow
 //   v-carve          — angled-bit variable-depth carve of closed shapes
-//                      (Phase H.3, ADR-094): depth follows the local inset,
+//                      (Phase H.3, ADR-098): depth follows the local inset,
 //                      z(d) = −min(d / tan(θ/2), depthMm)
 //   relief-rough     — waterline roughing of a relief heightmap (H.5).
 //                      COMPILE-TIME ONLY: produced from relief objects,
@@ -157,7 +157,7 @@ export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
 ];
 
 // Footprint defaults sized to the 4040 target machine's 400 × 400 mm bed
-// (ADR-094): a full-bed sheet at the machine origin until the operator says
+// (ADR-098): a full-bed sheet at the machine origin until the operator says
 // otherwise.
 export const DEFAULT_CNC_STOCK: CncStock = {
   thicknessMm: 6.35,

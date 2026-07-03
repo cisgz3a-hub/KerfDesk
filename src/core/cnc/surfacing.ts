@@ -1,4 +1,4 @@
-// Spoilboard surfacing program generator (ADR-102 G8, F-CNC25) — the
+// Spoilboard surfacing program generator (ADR-103 G8, F-CNC25) — the
 // gSender/OpenBuilds-style facing wizard. Serpentine rows over a W×H area,
 // stepping by a fraction of the bit diameter, one full raster per depth
 // step until the total depth is reached. Standalone program: it assumes the

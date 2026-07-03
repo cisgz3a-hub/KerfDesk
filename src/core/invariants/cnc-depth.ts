@@ -1,5 +1,5 @@
 // CNC depth invariant — "never cut below the stock", the depth analog of the
-// bounds check (PROJECT non-negotiable #1, extended by ADR-094).
+// bounds check (PROJECT non-negotiable #1, extended by ADR-098).
 //
 // Scans emitted G-code and flags any motion line (G0 or G1) whose Z target is
 // below -(stock thickness + through-cut allowance). Preflight already rejects

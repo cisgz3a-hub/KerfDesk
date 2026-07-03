@@ -53,4 +53,39 @@ describe('traceImageToPotraceColoredPaths', () => {
 
     expect(routed).toEqual(direct);
   });
+
+  // The Sharp preset's reason to exist: small drawn features keep their
+  // corners. Default smoothness (1.0) turns a 4×4 square dot into a rounded
+  // blob; Sharp must keep a vertex at each corner.
+  it('Sharp keeps the corners of a small square that default smoothness rounds off', () => {
+    const sharp = TRACE_PRESETS['Sharp'];
+    if (sharp === undefined) throw new Error('Missing Sharp preset');
+    const side = 10;
+    const mask = Array.from({ length: side * side }, (_, i) => {
+      const x = i % side;
+      const y = (i - x) / side;
+      return x >= 3 && x < 7 && y >= 3 && y < 7 ? 1 : 0;
+    });
+    const image = imageFromMask(side, mask);
+    const corners = [
+      { x: 3, y: 3 },
+      { x: 7, y: 3 },
+      { x: 7, y: 7 },
+      { x: 3, y: 7 },
+    ];
+    const worstCornerMiss = (options: TraceOptions): number => {
+      const points = traceImageToPotraceColoredPaths(image, options)[0]?.polylines[0]?.points ?? [];
+      let worst = 0;
+      for (const corner of corners) {
+        let best = Infinity;
+        for (const p of points) best = Math.min(best, Math.hypot(p.x - corner.x, p.y - corner.y));
+        worst = Math.max(worst, best);
+      }
+      return worst;
+    };
+    expect(worstCornerMiss(sharp)).toBeLessThan(0.7);
+    // Contrast: the same trace at default smoothness misses corners — this is
+    // what guards the preset's smoothness value from silently regressing.
+    expect(worstCornerMiss({ ...sharp, smoothness: 1, optimize: 0.2 })).toBeGreaterThan(0.7);
+  });
 });

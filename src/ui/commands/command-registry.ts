@@ -13,7 +13,7 @@ export { COMMAND_FAMILY_ORDER } from './command-types';
 export type { AppCommand, AppCommandContext, CommandFamily, CommandId } from './command-types';
 
 export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
-  // ADR-100: hide laser-only commands in CNC mode at the single choke
+  // ADR-101: hide laser-only commands in CNC mode at the single choke
   // point, so every command surface stays machine-correct for free.
   return gateCommandsForMachineKind(
     [

@@ -127,7 +127,7 @@ describe('parseStatusReport — degenerate inputs', () => {
   });
 });
 
-describe('parseStatusReport Ov overrides (ADR-102 G3)', () => {
+describe('parseStatusReport Ov overrides (ADR-103 G3)', () => {
   it('parses Ov feed/rapid/spindle percentages', () => {
     const r = parseStatusReport('<Run|MPos:1.000,2.000,3.000|FS:1500,8000|Ov:110,50,90>');
     expect(r?.ov).toEqual({ feed: 110, rapid: 50, spindle: 90 });

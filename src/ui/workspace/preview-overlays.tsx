@@ -95,7 +95,7 @@ export function PreviewControlsPanel(props: {
   readonly estimate: LiveJobEstimate;
   readonly routeLabel: string;
   readonly disabled: boolean;
-  // ADR-102 G4: present only when a CNC removal grid exists to render.
+  // ADR-103 G4: present only when a CNC removal grid exists to render.
   readonly onOpen3D?: () => void;
 }): JSX.Element {
   return (

@@ -1,4 +1,4 @@
-// Probe protocol runner (ADR-102 G2): line-by-line ok pacing, probe-alarm
+// Probe protocol runner (ADR-103 G2): line-by-line ok pacing, probe-alarm
 // decoding (ALARM:4/5), rejection, timeout watchdog, and preflight.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

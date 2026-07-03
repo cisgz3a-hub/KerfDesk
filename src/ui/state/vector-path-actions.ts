@@ -23,11 +23,11 @@ import {
 export type VectorPathActions = {
   readonly convertSelectionToPath: () => void;
   readonly weldSelection: () => void;
-  // ADR-102 G1 — subject = bottom-most selected object, clips = the rest.
+  // ADR-103 G1 — subject = bottom-most selected object, clips = the rest.
   readonly booleanSelection: (op: VectorBooleanOp) => void;
-  // ADR-102 G1 — adds a NEW offset object; the sources stay.
+  // ADR-103 G1 — adds a NEW offset object; the sources stay.
   readonly offsetSelection: (deltaMm: number) => void;
-  // ADR-102 G6 — relieve sharp corners in place, one undo step.
+  // ADR-103 G6 — relieve sharp corners in place, one undo step.
   readonly dogboneSelection: (bitDiameterMm: number) => void;
 };
 

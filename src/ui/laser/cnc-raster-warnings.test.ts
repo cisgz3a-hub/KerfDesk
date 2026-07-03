@@ -38,7 +38,7 @@ function cncProject(objects: ReadonlyArray<SceneObject>, layerPatch: Partial<Lay
   };
 }
 
-describe('detectCncRasterWarnings (ADR-100 §4)', () => {
+describe('detectCncRasterWarnings (ADR-101 §4)', () => {
   it('warns when a raster image sits on an output-enabled layer', () => {
     const warnings = detectCncRasterWarnings(cncProject([rasterObject()]));
     expect(warnings).toHaveLength(1);

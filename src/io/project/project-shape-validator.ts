@@ -158,7 +158,7 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   return `missing or invalid \`${path}.kind\``;
 }
 
-// H.4 (ADR-094): the embedded mesh is the carving source — a malformed or
+// H.4 (ADR-098): the embedded mesh is the carving source — a malformed or
 // non-finite mesh must never reach the heightmap sampler.
 function validateReliefObject(obj: Record<string, unknown>, path: string): string | null {
   return firstError([

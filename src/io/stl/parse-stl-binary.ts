@@ -1,7 +1,7 @@
-// Clean-room binary STL parser (Phase H.4, ADR-094). Format: 80-byte header,
+// Clean-room binary STL parser (Phase H.4, ADR-098). Format: 80-byte header,
 // uint32 LE triangle count, then 50-byte records — normal (3 × f32, ignored),
 // three vertices (9 × f32), attribute byte count (u16, ignored). No parser
-// library per the ADR-094 clean-room mandate.
+// library per the ADR-098 clean-room mandate.
 
 import { FLOATS_PER_TRIANGLE, type TriangleMesh } from '../../core/relief';
 

@@ -41,7 +41,7 @@ export type GrblPins = {
   readonly door: boolean;
 };
 
-// Live override percentages from the `Ov:` field (ADR-102 G3).
+// Live override percentages from the `Ov:` field (ADR-103 G3).
 export type OverrideValues = {
   readonly feed: number;
   readonly rapid: number;

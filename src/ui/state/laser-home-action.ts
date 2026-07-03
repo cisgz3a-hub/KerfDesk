@@ -1,4 +1,4 @@
-import { CMD_HOME } from '../../core/controllers/grbl';
+import type { ControllerDriver } from '../../core/controllers';
 import {
   startControllerCommand,
   waitForFreshIdle,
@@ -19,23 +19,27 @@ type SafeWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
-const SETTLE_DWELL_COMMAND = 'G4 P0.01\n';
+function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): string {
+  assertAutofocusIdle(get());
+  const homeCommand = driver.commands.home;
+  if (homeCommand === null) throw new Error('This controller has no homing command.');
+  const blockedMessage = setupCommandBlockMessage(get());
+  if (blockedMessage === null) return homeCommand;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(get(), `[lf2] Home command blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
+}
 
 export async function runHomeAction(
   set: SetFn,
   get: GetFn,
   refs: ControllerLifecycleRefs,
   safeWrite: SafeWriteFn,
+  driver: ControllerDriver,
 ): Promise<void> {
-  assertAutofocusIdle(get());
-  const blockedMessage = setupCommandBlockMessage(get());
-  if (blockedMessage !== null) {
-    set({
-      lastWriteError: blockedMessage,
-      log: pushLog(get(), `[lf2] Home command blocked: ${blockedMessage}`),
-    });
-    throw new Error(blockedMessage);
-  }
+  const homeCommand = assertHomeReady(set, get, driver);
   set((state) => ({
     controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
     homingState: 'homing',
@@ -53,7 +57,7 @@ export async function runHomeAction(
     await startControllerCommand(refs, safeWrite, {
       kind: 'home',
       label: 'home',
-      command: `${CMD_HOME}\n`,
+      command: `${homeCommand}\n`,
       action: 'home',
       source: 'motion',
     });
@@ -67,7 +71,7 @@ export async function runHomeAction(
     await startControllerCommand(refs, safeWrite, {
       kind: 'home',
       label: 'home settle marker',
-      command: SETTLE_DWELL_COMMAND,
+      command: `${driver.commands.settleDwell}\n`,
       action: 'home',
       source: 'system',
     });

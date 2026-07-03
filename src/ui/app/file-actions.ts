@@ -132,6 +132,12 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
+  // Ruida profiles export binary .rd jobs instead of G-code text (ADR-097).
+  if (ctx.project.device.controllerKind === 'ruida') {
+    const { handleSaveRd } = await import('./save-rd-action');
+    await handleSaveRd(ctx, placement);
+    return;
+  }
   const { gcode, preflight } = emitSaveGcode(ctx, placement);
   if (!preflight.ok) {
     const lines = preflight.issues.map((i) => `• ${i.message}`).join('\n');
@@ -153,23 +159,26 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
   try {
     await target.write(gcode);
     ctx.pushToast(`Saved G-code to ${target.displayName}`, 'success');
-    // H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
-    // still see the same job-intent warnings the Start path surfaces (luma
-    // upsample softer than preview, uncalibrated defaults, trace-vector cut
-    // risk) — non-blocking, since the export itself succeeded. CNC mode has
-    // its own advisory set (stock footprint, H.2) via the machine-aware
-    // selector.
-    for (const warning of detectMachineJobWarnings(ctx.project)) {
-      ctx.pushToast(warning, 'warning');
-    }
-    if (ctx.controllerSettings === null && machineKindOf(ctx.project.machine) !== 'cnc') {
-      ctx.pushToast(
-        `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
-        'info',
-      );
-    }
+    pushPostSaveAdvisories(ctx);
   } catch (err) {
     ctx.pushToast(`Could not save G-code: ${errMsg(err)}`, 'error');
+  }
+}
+
+// H12 (AUDIT-2026-06-10): the saved file is valid, but the operator should
+// still see the same job-intent warnings the Start path surfaces (luma
+// upsample softer than preview, uncalibrated defaults, trace-vector cut
+// risk) — non-blocking, since the export itself succeeded. CNC mode has
+// its own advisory set (stock footprint, H.2) via the machine-aware selector.
+function pushPostSaveAdvisories(ctx: SaveGcodeCtx): void {
+  for (const warning of detectMachineJobWarnings(ctx.project)) {
+    ctx.pushToast(warning, 'warning');
+  }
+  if (ctx.controllerSettings === null && machineKindOf(ctx.project.machine) !== 'cnc') {
+    ctx.pushToast(
+      `Exported G-code assumes GRBL $30=${ctx.project.device.maxPowerS} and laser mode ($32=1) — not verified against a connected controller this session.`,
+      'info',
+    );
   }
 }
 

@@ -6,8 +6,8 @@ import {
   thresholdBandToMonochrome,
   thresholdToMonochrome,
   traceImageToSvgString,
-  TRACE_PRESETS,
 } from './trace-image';
+import { TRACE_PRESETS } from './trace-presets';
 import { lightBurnTraceSettingsToPotraceParams } from './potrace-params';
 
 type Fixture = {

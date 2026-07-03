@@ -1,6 +1,6 @@
 // detectCncRasterWarnings — CNC-mode advisory: raster images on
 // output-enabled layers are silently ignored by the CNC compiler (a router
-// has no raster mode; compile-cnc-job skips them by design — ADR-100 §4).
+// has no raster mode; compile-cnc-job skips them by design — ADR-101 §4).
 // Non-blocking: vector artwork on those layers still cuts, and the operator
 // may keep bitmaps as visual reference.
 

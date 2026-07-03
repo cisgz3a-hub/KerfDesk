@@ -1,4 +1,4 @@
-// Dogbone corner relief (ADR-102 G6, F-CNC26). A round bit cannot reach into
+// Dogbone corner relief (ADR-103 G6, F-CNC26). A round bit cannot reach into
 // a corner sharper than its radius, so slot-fit joinery relieves each sharp
 // corner with a bit-sized overcut. Style (PROVISIONAL, documented in the
 // flow): a circle of one bit RADIUS centered ON the corner vertex — the

@@ -1,4 +1,4 @@
-// OverrideControls (ADR-102 G3): live percentages from ovCache and the
+// OverrideControls (ADR-103 G3): live percentages from ovCache and the
 // exact GRBL realtime bytes fired per button.
 
 import { act } from 'react';

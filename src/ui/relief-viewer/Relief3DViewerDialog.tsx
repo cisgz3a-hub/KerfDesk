@@ -1,4 +1,4 @@
-// Relief3DViewerDialog — the ADR-101 3D relief viewer. Rebuilds the
+// Relief3DViewerDialog — the ADR-102 3D relief viewer. Rebuilds the
 // heightmap at display resolution, converts it to plain mesh arrays in pure
 // core, and hands them to the lazy three.js scene module through the shared
 // dialog shell. Environments without WebGL get a plain-text fallback (what

@@ -1,5 +1,5 @@
 // useCncRemovalGrid — derive the depth-shaded removal grid for the CNC
-// preview (Phase H.2, ADR-094). The preview toolpath is already mapped into
+// preview (Phase H.2, ADR-098). The preview toolpath is already mapped into
 // SCENE space (preview-scene-frame), and the origin transform is an isometry,
 // so lengths and Z survive — the grid is therefore computed directly in scene
 // space over the scene-mapped stock rect and needs no flip handling to draw.

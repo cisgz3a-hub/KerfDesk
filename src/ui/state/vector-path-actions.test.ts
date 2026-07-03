@@ -105,7 +105,7 @@ describe('vector path actions', () => {
   });
 });
 
-describe('boolean + offset actions (ADR-102 G1)', () => {
+describe('boolean + offset actions (ADR-103 G1)', () => {
   beforeEach(() => {
     resetStore();
   });

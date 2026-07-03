@@ -1,5 +1,5 @@
 // downsampleRemovalGrid — reduce a removal grid to a display-sized grid for
-// the 3D cut preview (ADR-102 G4). Each output cell takes the DEEPEST value
+// the 3D cut preview (ADR-103 G4). Each output cell takes the DEEPEST value
 // of its source block so narrow cuts stay visible at coarse resolution.
 // Pure and deterministic (indexed loops only).
 

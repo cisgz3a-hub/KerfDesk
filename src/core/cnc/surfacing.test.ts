@@ -1,4 +1,4 @@
-// Surfacing generator (ADR-102 G8): serpentine coverage, depth ladder,
+// Surfacing generator (ADR-103 G8): serpentine coverage, depth ladder,
 // spindle bracketing, and determinism.
 
 import { describe, expect, it } from 'vitest';

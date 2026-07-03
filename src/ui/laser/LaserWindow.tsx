@@ -2,6 +2,7 @@
 // controls. Renders alongside the Cuts/Layers panel on the right rail.
 
 import { describeAlarm } from '../../core/controllers/grbl';
+import { selectControllerDriver } from '../../core/controllers';
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
@@ -34,8 +35,11 @@ export function LaserWindow(): JSX.Element {
   const streamer = useLaserStore((s) => s.streamer);
   const statusReport = useLaserStore((s) => s.statusReport);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
-  // ADR-100 §7: shared chrome re-labels machine-aware; behavior is identical.
+  // ADR-101 §7: shared chrome re-labels machine-aware; behavior is identical.
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
+  const controllerKind = useStore((s) => s.project.device.controllerKind);
+  const profileBaudRate = useStore((s) => s.project.device.baudRate);
+  const canUnlock = useLaserStore((s) => s.capabilities.unlock);
   const machineOperationBusy = isMachineOperationBusy({
     autofocusBusy,
     motionOperation,
@@ -51,6 +55,10 @@ export function LaserWindow(): JSX.Element {
   const connected = connection.kind === 'connected';
 
   const supportsSerial = platform.serial.isSupported();
+  // File-only profiles (Ruida .rd export) have no live link to open — the
+  // Connect button and machine controls stay dark and a hint explains why.
+  const isFileOnlyProfile =
+    selectControllerDriver(controllerKind).capabilities.transport === 'file-only';
 
   return (
     <aside aria-label={machineControlsLabel(machineKind)} className="lf-rail" style={panelStyle}>
@@ -59,24 +67,20 @@ export function LaserWindow(): JSX.Element {
         {machineDisplayName(machineKind)}
       </h2>
       <SafetyNoticeBanner />
-      {!supportsSerial && (
-        <p style={hintStyle}>
-          Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install
-          the Windows desktop app.
-        </p>
-      )}
+      <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <DeviceSetupControls />
       <ConnectionBar
         connection={connection}
         machineNoun={machineNoun(machineKind)}
-        onConnect={() => void connect(platform)}
+        onConnect={() => void connect(platform, { controllerKind, baudRate: profileBaudRate })}
         onDisconnect={() => void disconnect().catch(() => undefined)}
-        disabled={!supportsSerial || machineOperationBusy}
+        disabled={!supportsSerial || machineOperationBusy || isFileOnlyProfile}
       />
       {showAlarmBanner && (
         <AlarmBanner
           code={alarmCode}
           homingEnabled={homingEnabled}
+          canUnlock={canUnlock}
           onHome={() => void home().catch(() => undefined)}
           onUnlock={() => void unlockAlarm().catch(() => undefined)}
         />
@@ -96,6 +100,29 @@ export function LaserWindow(): JSX.Element {
       <ConsolePanel />
     </aside>
   );
+}
+
+function ConnectionHints(props: {
+  readonly supportsSerial: boolean;
+  readonly isFileOnlyProfile: boolean;
+}): JSX.Element | null {
+  if (props.isFileOnlyProfile) {
+    return (
+      <p style={hintStyle}>
+        This profile is file-export only: use Save G-code… to write an experimental .rd job and run
+        it from the machine panel. Live Ruida streaming is not available in this build.
+      </p>
+    );
+  }
+  if (!props.supportsSerial) {
+    return (
+      <p style={hintStyle}>
+        Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install the
+        Windows desktop app.
+      </p>
+    );
+  }
+  return null;
 }
 
 function hasAlarmRecovery(code: number | null, state: string | undefined): boolean {
@@ -139,11 +166,13 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
 function AlarmBanner({
   code,
   homingEnabled,
+  canUnlock,
   onHome,
   onUnlock,
 }: {
   readonly code: number | null;
   readonly homingEnabled: boolean;
+  readonly canUnlock: boolean;
   readonly onHome: () => void;
   readonly onUnlock: () => void;
 }): JSX.Element {
@@ -159,31 +188,51 @@ function AlarmBanner({
           : (alarm?.detail ?? '')}
       </p>
       <p style={alarmDetailStyle}>{alarm?.action ?? STATUS_ALARM_START_MESSAGE}</p>
+      <AlarmRecoveryActions
+        homingEnabled={homingEnabled}
+        canUnlock={canUnlock}
+        onHome={onHome}
+        onUnlock={onUnlock}
+      />
+    </div>
+  );
+}
+
+function AlarmRecoveryActions(props: {
+  readonly homingEnabled: boolean;
+  readonly canUnlock: boolean;
+  readonly onHome: () => void;
+  readonly onUnlock: () => void;
+}): JSX.Element {
+  return (
+    <>
       <button
         type="button"
-        onClick={onHome}
-        disabled={!homingEnabled}
+        onClick={props.onHome}
+        disabled={!props.homingEnabled}
         title={
-          homingEnabled
+          props.homingEnabled
             ? 'Send $H. Use this only when the machine has working homing switches.'
             : 'Homing is disabled in Device settings. Enable "$H supported" first.'
         }
       >
         Home ($H)
       </button>
-      {!homingEnabled && (
+      {!props.homingEnabled && (
         <span style={alarmHintStyle}>
           Enable &quot;$H supported&quot; in Device settings if this machine has homing switches.
         </span>
       )}
-      <button
-        type="button"
-        onClick={onUnlock}
-        title="Send $X to unlock the controller after you have confirmed the machine is safe."
-      >
-        $X — Unlock
-      </button>
-    </div>
+      {props.canUnlock && (
+        <button
+          type="button"
+          onClick={props.onUnlock}
+          title="Send $X to unlock the controller after you have confirmed the machine is safe."
+        >
+          $X — Unlock
+        </button>
+      )}
+    </>
   );
 }
 

@@ -3,6 +3,7 @@
 
 import {
   DEFAULT_DEVICE_PROFILE,
+  isKnownControllerKind,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   normalizeGcodeDialectSelection,
   normalizeGrblRxBufferBytes,
@@ -222,7 +223,24 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     scanningOffsets: normalizeScanOffsetTable(dev['scanningOffsets']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
     ...normalizeZTravelPatch(dev),
+    ...normalizeControllerPatch(dev),
   };
+}
+
+// ADR-094: a corrupt/unknown controllerKind must never reach
+// selectControllerDriver (its switch is exhaustive over the union, so junk
+// would return undefined at runtime). Drop invalid values back to the GRBL
+// default; same for a non-positive baud rate.
+function normalizeControllerPatch(dev: Record<string, unknown>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (dev['controllerKind'] !== undefined && !isKnownControllerKind(dev['controllerKind'])) {
+    patch['controllerKind'] = undefined;
+  }
+  const baud = dev['baudRate'];
+  if (baud !== undefined && !(typeof baud === 'number' && Number.isFinite(baud) && baud > 0)) {
+    patch['baudRate'] = undefined;
+  }
+  return patch;
 }
 
 function normalizeZTravelPatch(dev: Record<string, unknown>): Record<string, unknown> {

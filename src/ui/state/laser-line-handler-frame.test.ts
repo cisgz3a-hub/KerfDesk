@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { startCollecting } from '../../core/controllers/grbl';
+import { grblDriver } from '../../core/controllers';
 import type { FrameVerification } from './frame-verification';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
 import type { LaserState } from './laser-store';
 
 function makeLaserState(): LaserState {
   return {
+    capabilities: grblDriver.capabilities,
+    activeControllerKind: grblDriver.kind,
+    detectedControllerKind: null,
     connection: { kind: 'connected' },
     statusReport: null,
     alarmCode: null,
@@ -74,6 +78,7 @@ function makeHarness(): {
   };
   return {
     refs: {
+      driver: grblDriver,
       settingsCollector: startCollecting(),
       onLineArrived: null,
       controllerCommand: null,
@@ -112,6 +117,75 @@ describe('handleLine queued Frame writes', () => {
 
     expect(safeWrite).toHaveBeenCalledWith('$J=G90 G21 X10.000 Y0.000 F1000\n', 'frame');
     expect(get().motionOperation).toBeNull();
+    expect(get().frameVerification).toBeNull();
+  });
+});
+
+describe('handleLine hard-limit during Verified Frame (ADR-053 P3)', () => {
+  const verification: FrameVerification = {
+    boundsSignature: '0,0,50,50',
+    wco: { x: 100, y: 80, z: 0 },
+    workOriginActive: true,
+  };
+
+  function frameInFlightState(set: SetFn): void {
+    set({
+      frameVerification: verification,
+      workOriginActive: true,
+      wcoCache: { x: 100, y: 80, z: 0 },
+      statusReport: {
+        state: 'Run',
+        subState: null,
+        mPos: { x: 0, y: 0, z: 0 },
+        wPos: null,
+        feed: 0,
+        spindle: 0,
+        wco: null,
+        pins: { limitX: true, limitY: false, limitZ: false, probe: false, door: false },
+      },
+      motionOperation: {
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    });
+  }
+
+  it('raises a frame-limit notice naming the axis and clears the verification', () => {
+    const { refs, set, get } = makeHarness();
+    frameInFlightState(set);
+
+    handleLine(set, get, refs, async () => undefined, 'ALARM:1');
+
+    expect(get().alarmCode).toBe(1);
+    expect(get().safetyNotice?.kind).toBe('frame-limit');
+    expect(get().safetyNotice?.message).toContain('X limit');
+    expect(get().frameVerification).toBeNull();
+    expect(get().motionOperation).toBeNull();
+  });
+
+  it('does not raise a frame-limit notice for a hard-limit alarm outside a frame', () => {
+    const { refs, set, get } = makeHarness();
+    frameInFlightState(set);
+    set({ motionOperation: null });
+
+    handleLine(set, get, refs, async () => undefined, 'ALARM:1');
+
+    expect(get().alarmCode).toBe(1);
+    expect(get().safetyNotice).toBeNull();
+    expect(get().frameVerification).toBeNull();
+  });
+
+  it('does not treat a non-limit alarm (ALARM:2) during a frame as a limit hit', () => {
+    const { refs, set, get } = makeHarness();
+    frameInFlightState(set);
+
+    handleLine(set, get, refs, async () => undefined, 'ALARM:2');
+
+    expect(get().alarmCode).toBe(2);
+    expect(get().safetyNotice).toBeNull();
     expect(get().frameVerification).toBeNull();
   });
 });

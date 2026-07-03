@@ -9,7 +9,7 @@
 // the real proof, not a green structural suite.
 
 import { describe, expect, it } from 'vitest';
-import { TRACE_PRESETS, traceImageToCenterlinePaths } from '../../core/trace';
+import { TRACE_PRESETS, traceCenterlineStrokePaths } from '../../core/trace';
 import { measureCenterlineDeviation } from './centerline-deviation';
 import { CENTERLINE_TRUTH_FIXTURES } from './centerline-truth';
 
@@ -53,7 +53,7 @@ const CENTERLINE_REGRESSION_LIMITS: Readonly<Record<string, CenterlineRegression
 describe('centerline trace meets the landed regression bar', () => {
   for (const fixture of CENTERLINE_TRUTH_FIXTURES) {
     it(`${fixture.name}: stays inside its current regression limits`, () => {
-      const traced = traceImageToCenterlinePaths(fixture.image, CENTERLINE_OPTIONS);
+      const traced = traceCenterlineStrokePaths(fixture.image, CENTERLINE_OPTIONS);
       const metric = measureCenterlineDeviation(traced, fixture);
       const limit = CENTERLINE_REGRESSION_LIMITS[fixture.name] ?? STRICT_LIMIT;
       // Surfaced so the baseline and every iteration are visible in the run log.

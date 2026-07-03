@@ -1,4 +1,4 @@
-// Start-from-line recovery (ADR-102 G7): modal-state replay, safe re-entry
+// Start-from-line recovery (ADR-103 G7): modal-state replay, safe re-entry
 // preamble, and refusals.
 
 import { describe, expect, it } from 'vitest';

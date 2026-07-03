@@ -1,4 +1,4 @@
-// ProbePanel (ADR-102 G2): CNC-only visibility, Idle gating, and the
+// ProbePanel (ADR-103 G2): CNC-only visibility, Idle gating, and the
 // built sequence handed to the store's probe action.
 
 import { act } from 'react';

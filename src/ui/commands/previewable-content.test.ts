@@ -52,7 +52,7 @@ describe('hasPreviewableContent', () => {
   });
 });
 
-describe('hasPreviewableContent — CNC machine (H.5 / ADR-100)', () => {
+describe('hasPreviewableContent — CNC machine (H.5 / ADR-101)', () => {
   it('a relief-only scene previews in CNC mode but not in laser mode', () => {
     const scene: Project['scene'] = {
       objects: [reliefObject('relief', '#a0522d')],

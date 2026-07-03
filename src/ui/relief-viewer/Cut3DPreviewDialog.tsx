@@ -1,7 +1,7 @@
-// Cut3DPreviewDialog — the ADR-102 G4 general 3D cut preview: the CNC
+// Cut3DPreviewDialog — the ADR-103 G4 general 3D cut preview: the CNC
 // preview's material-removal grid rendered as a shaded heightfield for ANY
 // job (profiles, pockets, v-carves, drills — not just reliefs). Reuses the
-// ADR-101 three.js scene + dialog shell; the grid is downsampled to display
+// ADR-102 three.js scene + dialog shell; the grid is downsampled to display
 // resolution in pure core first. Reflects the scrubber position — the 3D
 // surface shows exactly what the 2D depth shading shows.
 

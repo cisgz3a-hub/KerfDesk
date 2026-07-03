@@ -99,7 +99,10 @@ describe('mergeLightBurnTraceSettings', () => {
     expect(merged.edgeHighThresholdRatio).toBeLessThan(EDGE.edgeHighThresholdRatio ?? 0.2);
     expect(merged.edgeLowThresholdRatio).toBeLessThan(EDGE.edgeLowThresholdRatio ?? 0.08);
     expect(merged.edgeBlurSigma).toBeGreaterThan(EDGE.edgeBlurSigma ?? 1.2);
-    expect(merged.edgeJoinGapPx).not.toBe(EDGE.edgeJoinGapPx);
+    // Join gap scales WITH blur (heavier smoothing widens Canny dropouts);
+    // lower Detail must therefore RAISE the gap, never collapse it below the
+    // preset the way the old outline-era [0.5, 2] mapping did.
+    expect(merged.edgeJoinGapPx).toBeGreaterThan(EDGE.edgeJoinGapPx ?? 5);
     expect(merged.edgeMinLengthPx).toBe(9);
   });
 

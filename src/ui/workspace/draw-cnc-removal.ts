@@ -1,5 +1,5 @@
 // drawCncRemoval — depth-shaded material-removal overlay for the CNC preview
-// (Phase H.2, ADR-094). The removal grid (computed in SCENE space by
+// (Phase H.2, ADR-098). The removal grid (computed in SCENE space by
 // use-cnc-removal-grid) rasterizes to an offscreen canvas — transparent where
 // untouched, wood-toned light→dark with depth — and blits over the faint
 // artwork so the operator sees exactly what the job will carve, scrubbed

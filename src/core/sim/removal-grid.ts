@@ -1,5 +1,5 @@
 // RemovalGrid — a uniform depth field over the stock footprint recording how
-// deep the cutter has been at every XY cell (Phase H.2, ADR-094). 0 = the
+// deep the cutter has been at every XY cell (Phase H.2, ADR-098). 0 = the
 // untouched stock top; values go negative as material is removed. Row-major
 // Float32, deterministic by construction (indexed loops only).
 

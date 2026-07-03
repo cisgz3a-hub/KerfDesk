@@ -10,7 +10,7 @@ import {
   type PreflightResult,
 } from '../../core/preflight';
 import type { JobOriginPlacement } from '../../core/job';
-import { cncGrblStrategy, grblStrategy } from '../../core/output';
+import { cncGrblStrategy, selectOutputStrategy } from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
 import {
   gcodeMetadataHeader,
@@ -47,10 +47,12 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   });
   if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
   const machine = prepared.project.machine;
-  const isCncMachine = machine !== undefined && machine.kind === 'cnc';
-  const body = isCncMachine
-    ? cncGrblStrategy.emit(prepared.job, prepared.project.device)
-    : grblStrategy.emit(prepared.job, prepared.project.device);
+  // CNC router projects always emit through the Z-aware GRBL strategy; laser
+  // projects pick their controller dialect via the ADR-094 driver seam.
+  const body =
+    machine !== undefined && machine.kind === 'cnc'
+      ? cncGrblStrategy.emit(prepared.job, prepared.project.device)
+      : selectOutputStrategy(prepared.project.device).emit(prepared.job, prepared.project.device);
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
@@ -73,7 +75,7 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   return { gcode, preflight };
 }
 
-// The provenance header's assumption lines are machine-specific (ADR-102
+// The provenance header's assumption lines are machine-specific (ADR-103
 // defect fix): laser files record the $30 S-scale; router files record the
 // RPM mapping and $32=0.
 function headerAssumptionsFor(project: Project): GcodeHeaderAssumptions {

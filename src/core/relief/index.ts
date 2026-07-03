@@ -1,5 +1,5 @@
 // core/relief — 3D relief carving: mesh → heightmap → toolpaths (Phase H.4+,
-// ADR-094). Public API.
+// ADR-098). Public API.
 
 export {
   FLOATS_PER_TRIANGLE,

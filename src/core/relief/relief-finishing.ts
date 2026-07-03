@@ -1,4 +1,4 @@
-// reliefFinishingPasses — the H.8 finishing skim (ADR-094). After H.5
+// reliefFinishingPasses — the H.8 finishing skim (ADR-098). After H.5
 // roughing leaves its fixed allowance, the finishing bit rides the TRUE
 // surface: serpentine rows of per-vertex XYZ motion whose Z at every sample
 // is the max-plus tip surface — dilateHeightmapByTool with ZERO allowance —

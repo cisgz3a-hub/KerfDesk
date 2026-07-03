@@ -116,7 +116,7 @@ export const MENU_HELP: Readonly<Record<CommandFamily, HelpTopic>> = {
   },
   laser: {
     // Machine-neutral copy: this family renders as "Laser" or "Router"
-    // depending on the project machine (ADR-100 §7); the help id stays
+    // depending on the project machine (ADR-101 §7); the help id stays
     // 'laser' because ids never rename.
     label: 'Machine menu',
     tooltip: 'Machine menu for connection and controller setup actions.',

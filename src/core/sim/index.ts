@@ -1,4 +1,4 @@
-// core/sim — CNC material-removal simulation (Phase H.2, ADR-094). Public API.
+// core/sim — CNC material-removal simulation (Phase H.2, ADR-098). Public API.
 
 export {
   createRemovalGrid,

@@ -833,14 +833,14 @@ flagged for pre-emptive split next edit). Karpathy principles
 preserved: every change carried evidence, single-responsibility, and
 verifiable verdicts.
 
-## CNC router mode verification (Phase H — ADR-094, 2026-07-02)
+## CNC router mode verification (Phase H — ADR-098, 2026-07-02)
 
 Tracks the hardware-verification state of every CNC-output-affecting
 feature. Statuses follow the house convention: **VERIFIED** = proven on
-the 4040 via the standing air-cut protocol (ADR-094), **CLAIMED** = tests
+the 4040 via the standing air-cut protocol (ADR-098), **CLAIMED** = tests
 pass but no hardware evidence, **DEFERRED** = intentional documented gap.
 
-### Standing 4040 air-cut protocol (from ADR-094)
+### Standing 4040 air-cut protocol (from ADR-098)
 
 Home → clamp scrap / set work XY zero → set Z zero ~30 mm above the
 spoilboard (air gap) → feed override 50% → run the job end-to-end →
@@ -863,9 +863,9 @@ VERIFIED.
 | H.6a DXF import (clean-room) | **CLAIMED** | 2026-07-03: tag/entity/spline/INSERT unit corpus + ACI color table tests; drag-drop verified in isolated preview (LINE/ARC/LWPOLYLINE-bulge/SPLINE render at correct mm scale). Not output-affecting beyond existing vector pipeline; DXF air-pass pending (maintainer) |
 | H.6b .nc re-import → simulator | **CLAIMED** | 2026-07-03: modal-parser unit corpus (G0/1/2/3 IJ+R, G90/91, G20/21, M2/30); re-import parity test pins removal-grid IoU ≥ 0.98 vs the native compile. Read-only preview path — no G-code emitted; simulator-vs-machine check pending (maintainer) |
 | H.6c CNC text defaults | **CLAIMED** | 2026-07-03: new-layer-only defaulting (v-carve when a v-bit is active, else engrave) pinned by unit tests; existing layers untouched. PROVISIONAL semantics — maintainer review |
-| ADR-100 gate-and-hide (laser⇄CNC UI separation) | **CLAIMED** | 2026-07-03: command-registry gate tests both directions + hidden-panel tests; noun-aware labels checked in isolated preview. UI-only — no G-code path touched |
+| ADR-101 gate-and-hide (laser⇄CNC UI separation) | **CLAIMED** | 2026-07-03: command-registry gate tests both directions + hidden-panel tests; noun-aware labels checked in isolated preview. UI-only — no G-code path touched |
 | Relief on-canvas param editor (width/depth/background) | **CLAIMED** | 2026-07-03: aspect-locked rescale + background-mode unit tests; edited values flow into roughing compile (test-pinned). Perceptual pass on a real carve pending |
-| ADR-101 3D relief viewer (three.js, UI-only) | **CLAIMED** | 2026-07-03: mesh-builder unit tests; jsdom fallback test; real-WebGL render verified by canvas pixel sampling in isolated preview. Never touches compile/emit |
+| ADR-102 3D relief viewer (three.js, UI-only) | **CLAIMED** | 2026-07-03: mesh-builder unit tests; jsdom fallback test; real-WebGL render verified by canvas pixel sampling in isolated preview. Never touches compile/emit |
 | H.7 tool library / feeds presets / machine profiles | **CLAIMED** | 2026-07-03: localStorage round-trip + corrupt-payload tests; survives newProject; library merge into machine tool list pinned. UI/persistence only until a layer selects a bit |
 | H.7 multi-tool jobs (M0 change, park, re-zero comments, drill/peck, v-carve clearance) | **CLAIMED** | 2026-07-03: per-bit sectioning (profiles last), M5→park→M0→M3 block content, peck cycle shape, clearance flat-floor depth law — all test-pinned; single-tool output byte-identical (snapshot corpus untouched). **Highest-risk hardware gap: full 4040 tool-change session pending (maintainer)** |
 | H.8 relief finishing (ball-nose tip surface, scallop rows) | **CLAIMED** | 2026-07-03: no-gouge property vs max-plus tip surface; scallop row-spacing law 2·sqrt(c(2r−c)); serpentine ordering; roughing+finishing group compile tests. Two-tool air job + caliper peak/valley check pending (maintainer) |

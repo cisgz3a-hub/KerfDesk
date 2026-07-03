@@ -1,4 +1,4 @@
-// Boolean combine commands (ADR-102 G1) — Subtract / Intersect / Exclude,
+// Boolean combine commands (ADR-103 G1) — Subtract / Intersect / Exclude,
 // siblings of tools.weld (union). Machine-agnostic geometry: available in
 // both laser and CNC modes. The bottom-most selected object is the subject.
 

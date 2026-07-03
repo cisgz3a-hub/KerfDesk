@@ -1,5 +1,5 @@
 // detectCncStockWarnings — CNC-mode advisory: the compiled job's XY extent
-// leaves the stock footprint (Phase H.2, ADR-094). Bed bounds stay a hard
+// leaves the stock footprint (Phase H.2, ADR-098). Bed bounds stay a hard
 // preflight ERROR; leaving the stock is only an advisory because cutting into
 // an offcut edge or jig is often intentional — the operator decides.
 //

@@ -14,7 +14,7 @@ Our side is code-verified in this worktree at `eafa364`.
 ## 1. The honest 3D answer
 
 **The main KerfDesk canvas is 2D (Canvas2D), like Easel's LEFT pane.**
-three.js IS in the app (ADR-101, lazy-loaded, `src/ui/relief-viewer/`)
+three.js IS in the app (ADR-102, lazy-loaded, `src/ui/relief-viewer/`)
 but it powers two ON-DEMAND dialogs, not a persistent pane:
 
 | 3D surface | Where it lives | Verified |
@@ -147,4 +147,4 @@ home→zero/probe→confirm→start.
 Easel bullets marked [partial] rest on snippets, not full articles (the
 support site blocks fetching); no Easel account was driven live. Our
 column is code-verified + isolated-preview-verified, but every
-output-affecting feature remains hardware-CLAIMED per ADR-094 §3.
+output-affecting feature remains hardware-CLAIMED per ADR-098 §3.

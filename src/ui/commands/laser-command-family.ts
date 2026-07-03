@@ -1,7 +1,7 @@
 // laser-command-family — the machine-connection commands (Connect /
 // Disconnect / Home). Split from command-families.ts when it crossed the
 // 400-line cap. The family KEY stays 'laser' for both machine kinds
-// (ADR-100 §7); only user-visible copy follows the machine noun.
+// (ADR-101 §7); only user-visible copy follows the machine noun.
 
 import { machineNoun } from '../machine/machine-labels';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';

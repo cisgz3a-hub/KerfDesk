@@ -1,10 +1,10 @@
-// createReliefThreeScene — the ONLY module that touches three.js (ADR-101
+// createReliefThreeScene — the ONLY module that touches three.js (ADR-102
 // §2: three is UI-only, lazy-loaded). Builds a Z-up scene from the pure
 // core mesh arrays: carved surface + stock outline, orbit controls, and
 // render-on-demand (no rAF loop — renders on interaction/resize only).
 
 // Type-only import: erased at compile time, so three itself still loads
-// lazily through the dynamic import() below (ADR-101 §3).
+// lazily through the dynamic import() below (ADR-102 §3).
 import type { WebGLRenderer } from 'three';
 import type { ReliefSurfaceMesh } from '../../core/relief';
 
