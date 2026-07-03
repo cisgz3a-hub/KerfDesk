@@ -26,6 +26,27 @@ const POTRACE_MAX_CURVE_ALPHA = 1;
 const DEFAULT_CUBIC_SAMPLES = 16;
 const GEOMETRY_EPS = 1e-9;
 
+// Small-feature corner protection (2026-07-03 melt fix).
+//
+// The corner-vs-curve test compares each vertex's raw alpha against the
+// global alphaMax. At the preset default smoothness (alphaMax = 1.0) that
+// threshold is so high that the shallow raw alphas produced by SHORT polygon
+// legs — the 2–4px legs of ~16px glyph strokes — always fall below it, so
+// every drawn corner is tagged CURVE and rounded into a blob. Large arcs,
+// whose legs are long, are unaffected: they legitimately want curves.
+//
+// The fix scales the effective alpha limit DOWN toward the crisp "Sharp"
+// value on short legs and back UP to the caller's alphaMax on long legs, so
+// the same input crisps where it must (small text) and curves where it
+// should (big discs). Leg thresholds are in source pixels.
+const CORNER_LEG_LO_PX = 3;
+const CORNER_LEG_HI_PX = 7;
+// The short-leg floor is deliberately POTRACE_MIN_CURVE_ALPHA (0.55): it is
+// the empirically crisp "Sharp" preset value, and reusing it makes the
+// invariant below exact — when a caller passes alphaMax <= 0.55 the min()
+// collapses to alphaMax and this whole ramp is a no-op.
+const SMALL_FEATURE_ALPHA_MAX = POTRACE_MIN_CURVE_ALPHA;
+
 function mod(value: number, divisor: number): number {
   return ((value % divisor) + divisor) % divisor;
 }
@@ -85,6 +106,28 @@ function clampCurveAlpha(alpha: number): number {
   return Math.max(POTRACE_MIN_CURVE_ALPHA, Math.min(POTRACE_MAX_CURVE_ALPHA, alpha));
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+/**
+ * Per-vertex effective corner/curve alpha limit, scaled by local polygon leg
+ * length. Short legs (small features) ramp the limit down toward the crisp
+ * {@link SMALL_FEATURE_ALPHA_MAX}; long legs (large arcs) leave it at the
+ * caller's `alphaMax`.
+ *
+ * Invariant: when `alphaMax <= SMALL_FEATURE_ALPHA_MAX` the `Math.min` returns
+ * `alphaMax` for every leg length, so behavior is IDENTICAL to a plain global
+ * limit. This is what proves the "Sharp" preset (smoothness 0.55) is unchanged.
+ */
+export function smallFeatureEffectiveAlphaMax(alphaMax: number, minLegPx: number): number {
+  const t = clamp01((minLegPx - CORNER_LEG_LO_PX) / (CORNER_LEG_HI_PX - CORNER_LEG_LO_PX));
+  return Math.min(
+    alphaMax,
+    SMALL_FEATURE_ALPHA_MAX + (POTRACE_MAX_CURVE_ALPHA - SMALL_FEATURE_ALPHA_MAX) * t,
+  );
+}
+
 export function potraceAlphaForVertex(
   previous: PointLike,
   vertex: PointLike,
@@ -113,7 +156,13 @@ export function smoothClosedPolygonToPotraceCurve(
     const endpoint = interval(0.5, next, vertex);
     const rawAlpha = potraceAlphaForVertex(previous, vertex, next);
 
-    if (alphaLimit <= 0 || rawAlpha >= alphaLimit) {
+    // Corner-vs-curve uses a PER-VERTEX limit scaled by the shorter of the two
+    // adjoining polygon legs, so short-legged small-feature vertices stay crisp
+    // while long-legged arc vertices still round (see constants above).
+    const minLeg = Math.min(ddist(previous, vertex), ddist(vertex, next));
+    const effectiveAlphaMax = smallFeatureEffectiveAlphaMax(alphaLimit, minLeg);
+
+    if (alphaLimit <= 0 || rawAlpha >= effectiveAlphaMax) {
       segments.push({
         tag: 'CORNER',
         vertex: copyPoint(vertex),

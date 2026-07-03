@@ -1,4 +1,5 @@
 import type { ColoredPath, Polyline } from '../scene';
+import { snapCornersToInk } from './potrace-apex';
 import { lightBurnTraceBitmapFromImage } from './potrace-bitmap';
 import { potraceCurveToPolylinePoints, smoothClosedPolygonToPotraceCurve } from './potrace-curve';
 import { optimizePotraceCurve } from './potrace-curve-optimize';
@@ -52,5 +53,9 @@ export function traceImageToPotraceColoredPaths(
     if (points.length >= 2) polylines.push({ points, closed: true });
   }
 
-  return polylines.length === 0 ? [] : [{ color: POTRACE_COLOR, polylines }];
+  // Recover sharp convex tips potrace's polygon stage blunts, snapping corner
+  // vertices outward to the true ink apex in the same bitmap potrace scanned.
+  const apexSnapped = snapCornersToInk(polylines, bitmap);
+
+  return apexSnapped.length === 0 ? [] : [{ color: POTRACE_COLOR, polylines: apexSnapped }];
 }

@@ -11,16 +11,21 @@
 import type { ColoredPath, Polyline, Vec2 } from '../scene';
 import { cannyEdgeField, type CannyField, type CannyOptions } from './canny-edges';
 import { reconnectAlongRidge } from './edge-reconnect';
+import { makeRidgeSnapper } from './edge-subpixel';
 import {
   assembleStrokePaths,
   buildStrokeGraph,
+  closePolylineLoops,
+  closeRingEndpoints,
   condenseJunctions,
+  LOOP_TOUCH_GAP_PX,
   pruneSpurs,
   squaredDistanceField,
   thinToMedialAxis,
   type InkMask,
+  type LoopClosureOptions,
 } from './centerline';
-import { medianFilter } from './preprocess';
+import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
 import type { RawImageData, TraceOptions } from './trace-image';
 
 const EDGE_COLOR = '#000000';
@@ -42,37 +47,17 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
 // Median pre-filtering: a 3×3 median protects noisy photos but DESTROYS
 // clean small features — 4-6 px letters trace as melted blobs (the
 // LANGEBAAN defect). Default (undefined) is therefore AUTO: apply the
-// median only when the image actually contains impulse noise, measured as
-// the fraction of pixels the median would change dramatically. An explicit
-// true/false still forces the choice.
-const IMPULSE_NOISE_LUMA_DELTA = 40;
-const IMPULSE_NOISE_MIN_RATIO = 0.004;
-
+// median only when the image actually contains impulse noise (see
+// hasImpulseNoise in preprocess.ts, which owns the shared detector and its
+// constants). An explicit true/false still forces the choice.
+//
+// The auto branch reuses the median it already computed rather than calling
+// hasImpulseNoise (which would filter a second time).
 function medianForEdges(image: RawImageData, edgeMedianFilter: boolean | undefined): RawImageData {
   if (edgeMedianFilter === false) return image;
   const filtered = medianFilter(image);
   if (edgeMedianFilter === true) return filtered;
   return impulseNoiseRatio(image, filtered) >= IMPULSE_NOISE_MIN_RATIO ? filtered : image;
-}
-
-function impulseNoiseRatio(image: RawImageData, filtered: RawImageData): number {
-  const pixels = image.width * image.height;
-  if (pixels === 0) return 0;
-  let impulses = 0;
-  for (let i = 0; i < pixels; i += 1) {
-    const a = lumaAt(image, i);
-    const b = lumaAt(filtered, i);
-    if (Math.abs(a - b) > IMPULSE_NOISE_LUMA_DELTA) impulses += 1;
-  }
-  return impulses / pixels;
-}
-
-function lumaAt(image: RawImageData, i: number): number {
-  return (
-    0.299 * (image.data[i * 4] ?? 0) +
-    0.587 * (image.data[i * 4 + 1] ?? 0) +
-    0.114 * (image.data[i * 4 + 2] ?? 0)
-  );
 }
 
 function edgeCannyOptions(options: TraceOptions): CannyOptions {
@@ -112,6 +97,16 @@ function chainEdgeMask(
     // ambiguous), so ends routinely stop 1-3 px short of the line they
     // visibly join — weld them on.
     weldOpenEndsPx: Math.max(2, Math.min(6, joinGapPx)),
+    // The binary mask localises edges to whole pixels; the Sobel ridge
+    // localises them to sub-pixel. Snap raw vertices onto the ridge so
+    // curves come out smooth instead of staircase-lumpy.
+    snapPoint: makeRidgeSnapper({
+      gradMag: field.gradMag,
+      gradX: field.gradX,
+      gradY: field.gradY,
+      width: mask.width,
+      height: mask.height,
+    }),
   });
   const maxWalkPx =
     joinGapPx <= 0
@@ -130,11 +125,64 @@ function chainEdgeMask(
     },
     maxWalkPx,
   );
+  // Ridge reconnection merges chains; a merged ring whose ends meet at a
+  // drawn corner can only close NOW (the walk's tangent cone cannot turn a
+  // corner, so it never self-closes there).
+  const closure: LoopClosureOptions = {
+    touchGapPx: LOOP_TOUCH_GAP_PX,
+    cornerGapPx: Math.max(LOOP_TOUCH_GAP_PX, joinGapPx),
+    alignedGapPx: Math.max(LOOP_TOUCH_GAP_PX, joinGapPx * EDGE_ALIGNED_JOIN_FACTOR),
+  };
+  const looped = closePolylineLoops(reconnected, closure);
   const minLengthPx = Math.max(
     Math.max(0, options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX),
     blurNoiseFloorPx(options.edgeBlurSigma),
   );
-  return reconnected.filter((pl) => polylineLength(pl) >= minLengthPx && !isSliverLoop(pl));
+  const kept = looped.filter(
+    (pl) =>
+      (polylineLength(pl) >= minLengthPx || isWeldedConnector(pl, looped)) && !isSliverLoop(pl),
+  );
+  // Corner/aligned closure leaves a closed ring's endpoints a join gap apart;
+  // make every ring explicitly return to its start so the stroke renderer and
+  // the G-code emitter draw/cut the closing edge instead of a visible gap.
+  return closeRingEndpoints(kept);
+}
+
+// A short OPEN chain whose both ends sit ON other geometry is a weld
+// connector patching a detection dropout between two lines — dropping it as
+// "too short" would reopen the very gap the weld closed. Everything else
+// under the minimum length is debris.
+const CONNECTOR_TOUCH_PX = 1.0;
+
+function isWeldedConnector(polyline: Polyline, all: ReadonlyArray<Polyline>): boolean {
+  if (polyline.closed || polyline.points.length < 2) return false;
+  const first = polyline.points[0];
+  const last = polyline.points.at(-1);
+  if (first === undefined || last === undefined) return false;
+  return touchesOtherGeometry(first, polyline, all) && touchesOtherGeometry(last, polyline, all);
+}
+
+function touchesOtherGeometry(p: Vec2, own: Polyline, all: ReadonlyArray<Polyline>): boolean {
+  for (const other of all) {
+    if (other === own || other.points.length < 2) continue;
+    const count = other.points.length + (other.closed ? 0 : -1);
+    for (let i = 0; i < count; i += 1) {
+      const a = other.points[i];
+      const b = other.points[(i + 1) % other.points.length];
+      if (a === undefined || b === undefined) continue;
+      if (pointToSegmentDistance(p, a, b) <= CONNECTOR_TOUCH_PX) return true;
+    }
+  }
+  return false;
+}
+
+function pointToSegmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-12) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
 }
 
 // Heavy pre-blur widens gradients and breeds faint speckle chains; below a
