@@ -19,6 +19,15 @@ type SafeWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
+// GRBL acks $H only after the homing cycle physically completes — commonly
+// 10-60 s on real beds, so the default 8 s ack budget reports a spurious
+// "home timed out" while the machine is still homing. With the
+// non-idle-status-activity mode the <Home|...> poll replies keep the command
+// alive, so this budget only measures status silence; on firmwares whose
+// status polling pauses during a pending command (Marlin) it must cover the
+// whole cycle.
+const HOME_COMMAND_TIMEOUT_MS = 120_000;
+
 function assertHomeReady(set: SetFn, get: GetFn, driver: ControllerDriver): string {
   assertAutofocusIdle(get());
   const homeCommand = driver.commands.home;
@@ -60,6 +69,8 @@ export async function runHomeAction(
       command: `${homeCommand}\n`,
       action: 'home',
       source: 'motion',
+      timeoutMs: HOME_COMMAND_TIMEOUT_MS,
+      timeoutMode: 'non-idle-status-activity',
     });
     set((state) =>
       state.controllerOperation?.kind === 'home'

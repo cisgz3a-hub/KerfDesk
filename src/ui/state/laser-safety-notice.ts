@@ -28,7 +28,10 @@ export type LaserSafetyAction =
   | 'home'
   | 'unlock'
   | 'wake'
-  | 'console';
+  | 'console'
+  // A mid-job refill send (the ack-driven stream continuing), as opposed to
+  // the operator-initiated 'start'/'resume' writes.
+  | 'stream';
 
 export type LaserSafetyNotice =
   | {
@@ -113,6 +116,12 @@ export function writeFailedMessage(action: LaserSafetyAction): string {
     return (
       'The wake soft-reset was not written to the controller; the machine may stay asleep ' +
       'or locked. Use physical E-stop or power cutoff now if unsafe.'
+    );
+  }
+  if (action === 'stream') {
+    return (
+      'A mid-job send failed, so the stream was stopped. The machine may still be executing ' +
+      'buffered commands — press Stop; use physical E-stop or power cutoff now if unsafe.'
     );
   }
   return (

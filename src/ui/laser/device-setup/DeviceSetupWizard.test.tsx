@@ -26,7 +26,7 @@ const IDLE_STATUS = {
   spindle: 0,
 } as const;
 
-function mockPlatform(): PlatformAdapter {
+function mockPlatform(serialSupported = true): PlatformAdapter {
   return {
     id: 'mock',
     pickFilesForOpen: vi.fn(async (_request: FileOpenRequest) => []),
@@ -34,11 +34,14 @@ function mockPlatform(): PlatformAdapter {
       displayName: 'mock.json',
       write: vi.fn(async () => undefined),
     })),
-    serial: { isSupported: () => true, requestPort: async () => null },
+    serial: { isSupported: () => serialSupported, requestPort: async () => null },
   };
 }
 
-async function renderWizard(onClose: () => void = () => undefined): Promise<{
+async function renderWizard(
+  onClose: () => void = () => undefined,
+  adapter: PlatformAdapter = mockPlatform(),
+): Promise<{
   readonly host: HTMLDivElement;
   readonly unmount: () => Promise<void>;
 }> {
@@ -48,7 +51,7 @@ async function renderWizard(onClose: () => void = () => undefined): Promise<{
   await act(async () => {
     root = createRoot(host);
     root.render(
-      <PlatformProvider adapter={mockPlatform()}>
+      <PlatformProvider adapter={adapter}>
         <DeviceSetupWizard onClose={onClose} />
       </PlatformProvider>,
     );
@@ -79,6 +82,38 @@ describe('DeviceSetupWizard', () => {
     try {
       expect(host.textContent).toContain('Step 1 of 6');
       expect(host.textContent).toContain('Connect & read');
+    } finally {
+      await unmount();
+    }
+  });
+
+  // The wizard is the documented connect-time setup path (ADR-092): its
+  // Connect must bind the draft profile's firmware and baud rate exactly like
+  // the rail's ConnectionBar does — a bare connect() drives a Marlin box with
+  // the GRBL driver at 115200.
+  it('connects with the draft profile controller kind and baud rate', async () => {
+    const originalConnect = useLaserStore.getState().connect;
+    const connect = vi.fn(async () => undefined);
+    useLaserStore.setState({ connect });
+    useStore.getState().updateDeviceProfile({ controllerKind: 'marlin', baudRate: 250000 });
+    const { host, unmount } = await renderWizard();
+    try {
+      await act(async () => button(host, 'Connect…').click());
+      expect(connect).toHaveBeenCalledTimes(1);
+      expect(connect).toHaveBeenCalledWith(expect.anything(), {
+        controllerKind: 'marlin',
+        baudRate: 250000,
+      });
+    } finally {
+      useLaserStore.setState({ connect: originalConnect });
+      await unmount();
+    }
+  });
+
+  it('disables the wizard Connect button when Web Serial is unsupported', async () => {
+    const { host, unmount } = await renderWizard(undefined, mockPlatform(false));
+    try {
+      expect(button(host, 'Connect…').disabled).toBe(true);
     } finally {
       await unmount();
     }

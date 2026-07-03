@@ -6,9 +6,8 @@ export type LaserControllerOperation =
     }
   | {
       readonly kind: 'post-job-settle';
-      readonly phase: 'dwell' | 'awaiting-idle' | 'failed';
+      readonly phase: 'dwell' | 'awaiting-idle';
       readonly idleReports: number;
-      readonly error?: string;
     }
   | {
       readonly kind: 'interactive-command';
@@ -38,7 +37,6 @@ export function describeControllerOperation(operation: LaserControllerOperation 
     return 'Waiting for fresh Idle after Home';
   }
   if (operation.kind === 'post-job-settle') {
-    if (operation.phase === 'failed') return 'Controller settle failed';
     if (operation.phase === 'dwell') return 'Settling after job';
     return 'Waiting for stable Idle after job';
   }

@@ -59,19 +59,25 @@ export function connectionActions(
         activeControllerKind: refs.driver.kind,
         detectedControllerKind: null,
       });
-      const portRef = await adapter.serial.requestPort();
-      if (portRef === null) {
-        set({ connection: { kind: 'disconnected' } });
-        return;
-      }
       try {
+        // Inside the try: requestPort throws on browsers without Web Serial
+        // (TypeError) and on Chromium policy/concurrency errors. Thrown
+        // outside, the store stayed at 'connecting' forever with both
+        // Connect buttons disabled.
+        const portRef = await adapter.serial.requestPort();
+        if (portRef === null) {
+          set({ connection: { kind: 'disconnected' } });
+          return;
+        }
         const conn = await portRef.open({
           baudRate: options.baudRate ?? refs.driver.defaultBaudRate,
         });
         refs.connection = conn;
-        refs.unsubscribeLine = conn.onLine((line) =>
-          handleLine(set, get, refs, (out) => safeWrite(out), line),
-        );
+        // Pass safeWrite through whole: the line handler attaches action and
+        // source metadata to its writes (post-error stop escalation, frame
+        // dispatch, job refills) — a bare (out) => safeWrite(out) wrapper
+        // silently drops both.
+        refs.unsubscribeLine = conn.onLine((line) => handleLine(set, get, refs, safeWrite, line));
         refs.unsubscribeClose = conn.onClose(() => {
           teardown(refs);
           set(buildPortClosePatch);
@@ -84,8 +90,9 @@ export function connectionActions(
           safetyNotice: null,
           controllerOperation: null,
           homingState: 'unknown',
+          pendingUntrackedAcks: 0,
         });
-        void runHandshake(set, get, refs, (out) => safeWrite(out)).catch(() => undefined);
+        void runHandshake(set, get, refs, safeWrite).catch(() => undefined);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         set({ connection: { kind: 'failed', error: message } });
@@ -133,6 +140,7 @@ async function runDisconnect(
     controllerOperation: null,
     homingState: 'unknown',
     lastWriteError: null,
+    pendingUntrackedAcks: 0,
   });
 }
 

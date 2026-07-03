@@ -29,6 +29,11 @@ export type ChainAssemblyOptions = {
   /** Multiplier on the simplification epsilon — the TraceOptions
    *  lineTolerance contract (higher = fewer vertices). Default 1. */
   readonly simplifyTolerance?: number;
+  /** When > 0, ANY open end stopping within this many pixels of another
+   *  polyline welds onto it (approach-gated). Edge maps need this: Canny
+   *  drops pixels wherever edges meet, so lines end a hair before the line
+   *  they visibly join. Default 0 = junction-anchored welds only. */
+  readonly weldOpenEndsPx?: number;
 };
 
 const TANGENT_PROBE_PX = 3;
@@ -70,7 +75,7 @@ export function assembleStrokePaths(
     if (!chain.alive) continue;
     chain.points = repairJunctionSeams(chain.points, chain.closed, junctions, distSq, mask.width);
   }
-  weldBranchEnds(chains, junctions);
+  weldBranchEnds(chains, junctions, Math.max(0, options.weldOpenEndsPx ?? 0));
   const simplifyEpsilonPx = SIMPLIFY_EPSILON_PX * Math.max(0.1, options.simplifyTolerance ?? 1);
   return finalizeChains(chains, distSq, mask, simplifyEpsilonPx);
 }

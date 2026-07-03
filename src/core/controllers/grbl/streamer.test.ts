@@ -122,11 +122,74 @@ describe('onAck — consuming acks', () => {
     expect(onAck(s, 'ok').acked).toBeNull();
   });
 
+  // GRBL keeps acking held-but-parsed lines during a feed hold, so a paused
+  // stream routinely drains its in-flight tail while lines remain queued. An
+  // ALARM arriving then (limit trip, external reset) is not a line ack — but
+  // it must still make the stream terminal, or resume() stays available and
+  // streams the queue into a locked controller.
+  it('cancels a paused stream on alarm even with nothing in flight', () => {
+    const first = step(
+      createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', { rxBufferBytes: 30 }),
+    );
+    let state = pause(first.state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.inFlight).toEqual([]);
+    expect(state.queued.length).toBeGreaterThan(0);
+    expect(state.status).toBe('paused');
+
+    const alarmed = onAck(state, 'alarm');
+
+    expect(alarmed.acked).toBeNull();
+    expect(alarmed.state.status).toBe('cancelled');
+    expect(alarmed.state.queued).toEqual([]);
+    expect(step(alarmed.state).toSend).toBe('');
+  });
+
+  it('marks a drained streaming state errored on an error ack with nothing in flight', () => {
+    const first = step(
+      createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', { rxBufferBytes: 30 }),
+    );
+    let state = pause(first.state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    state = { ...state, status: 'streaming' };
+
+    const errored = onAck(state, 'error');
+
+    expect(errored.state.status).toBe('errored');
+    expect(errored.state.queued).toEqual([]);
+  });
+
   it('transitions to done when last line is acked', () => {
     let state = step(createStreamer('G21\nG90')).state;
     state = onAck(state, 'ok').state;
     state = onAck(state, 'ok').state;
     expect(state.status).toBe('done');
+  });
+
+  // GRBL acks held-but-parsed lines during a feed hold, so pausing near the
+  // end of a job routinely drains the queues while the machine still holds
+  // unexecuted planner motion. Promoting to 'done' there unmounts Resume and
+  // reports completion for a job whose tail was never cut.
+  it('stays paused while the held tail acks out (no done promotion during hold)', () => {
+    let state = pause(step(createStreamer('G21\nG90')).state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.inFlight).toEqual([]);
+    expect(state.queued).toEqual([]);
+    expect(state.status).toBe('paused');
+  });
+
+  it('resume of a fully-drained paused stream completes to done', () => {
+    let state = pause(step(createStreamer('G21\nG90')).state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+
+    const resumed = resume(state);
+
+    expect(resumed.status).toBe('done');
+    expect(step(resumed).toSend).toBe('');
   });
 
   it('keeps errored terminal when trailing oks drain the in-flight tail (H5)', () => {
