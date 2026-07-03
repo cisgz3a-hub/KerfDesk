@@ -86,14 +86,17 @@ export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Ele
           bedHeight={device.bedHeight}
         />
         <span style={hintStyle}>Aligned — the bed is flattened to a rectangle.</span>
-        <button
-          type="button"
-          className="lf-btn"
-          onClick={resetAlignment}
-          title="Re-run the 4-point bed alignment."
-        >
-          Re-align
-        </button>
+        <div style={rowStyle}>
+          <SaveAlignmentButton homography={alignment.homography} natural={natural} />
+          <button
+            type="button"
+            className="lf-btn"
+            onClick={resetAlignment}
+            title="Re-run the 4-point bed alignment."
+          >
+            Re-align
+          </button>
+        </div>
       </div>
     );
   }
@@ -116,6 +119,39 @@ export function NetworkCameraView(props: { readonly frameUrl: string }): JSX.Ele
         onReset={resetAlignment}
       />
     </div>
+  );
+}
+
+// Persist the solved homography onto the device profile (undoable) so the
+// workspace overlay survives reload. basis 'raw': the corners were clicked on
+// the distorted frame, so only same-basis (raw) frames may be warped with it.
+function SaveAlignmentButton(props: {
+  readonly homography: Mat3;
+  readonly natural: IntrinsicSize;
+}): JSX.Element {
+  const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
+  const saved = useStore((s) => s.project.device.cameraAlignment);
+  const isCurrent = saved !== undefined && saved.homography === props.homography;
+  return (
+    <button
+      type="button"
+      className="lf-btn lf-btn--primary"
+      disabled={isCurrent}
+      onClick={() =>
+        updateDeviceProfile({
+          cameraAlignment: {
+            homography: props.homography,
+            frameWidth: props.natural.width,
+            frameHeight: props.natural.height,
+            basis: 'raw',
+            alignedAt: Date.now(),
+          },
+        })
+      }
+      title="Save this alignment to the device and show the camera on the workspace canvas."
+    >
+      {isCurrent ? 'Saved to device' : 'Save & show on canvas'}
+    </button>
   );
 }
 
@@ -217,6 +253,7 @@ function RectifiedView(props: {
 }
 
 const columnStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
+const rowStyle: CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
 const feedStyle: CSSProperties = {
   width: '100%',
   aspectRatio: '4 / 3',

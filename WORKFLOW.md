@@ -2055,3 +2055,21 @@ F-CNC19 tiling.
   rejected with a hint (not silently dropped); a camera-resolution change
   mid-session refuses to mix pixel bases and offers Reset; changing the board
   description discards captures taken against the old board.
+
+### F-CAM3. Workspace camera overlay (ADR-105 v1 wiring)
+
+- **Success / overlay on canvas.** After aligning (F-CAM1), the operator presses
+  "Save & show on canvas": the alignment persists on the device profile
+  (undoable, survives reload) and the camera image appears on the workspace
+  under the artwork, tracking zoom and pan. The Camera panel's overlay row
+  offers show/hide, a Fade slider, "Update still" (freeze the current frame —
+  LightBurn's Update Overlay model), and "Live" (continuous video, USB only).
+- **Error / basis mismatch prevented.** The persisted alignment records the
+  pixel basis it was clicked in (raw vs de-fisheyed); frames of the other basis
+  are never warped with it, so a later lens calibration cannot silently
+  mis-register the overlay.
+- **Empty / nothing to show.** With no saved alignment the overlay row is
+  absent and the canvas is untouched; with an alignment but no camera source
+  (no still, feed stopped) nothing renders.
+- **Edge / reload.** A corrupt persisted alignment is dropped on load (never
+  trusted); the overlay simply stays off until re-aligned.

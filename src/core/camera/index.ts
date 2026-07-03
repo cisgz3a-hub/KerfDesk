@@ -35,6 +35,8 @@ export { rectifyImage } from './cpu-rectify';
 export type { RectifyTarget, RgbaImage } from './cpu-rectify';
 export { normalizeCameraCalibration, toCameraCalibration } from './camera-calibration';
 export type { CalibrationSnapshot, CameraCalibration } from './camera-calibration';
+export { normalizeCameraAlignment } from './camera-alignment';
+export type { CameraAlignment } from './camera-alignment';
 export { assessCalibrationTrust } from './calibration-trust';
 export type { TrustInput, TrustReason, TrustVerdict } from './calibration-trust';
 export { checkPoseDiversity } from './pose-diversity';
