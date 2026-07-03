@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CMD_COOLANT_OFF,
   RT_SOFT_RESET,
+  cancel,
   createStreamer,
   idleCollector,
   startCollecting,
@@ -266,6 +267,46 @@ describe('handleLine streamer writes', () => {
       kind: 'disconnect-during-job',
       message: expect.stringContaining('still be moving'),
     });
+  });
+});
+
+describe('handleLine controller error notices after stop', () => {
+  // Stop sends realtime 0x18 then a queued beam-off line; GRBL is locked
+  // after the reset and bounces that line with error:9. That echo is part of
+  // the shutdown the user asked for — painting it as "the laser may have
+  // fired out of place" turns every routine Stop into a false alarm.
+  it('raises no safety notice for an error acking an already-cancelled stream', () => {
+    const { refs, set, get } = makeHarness();
+    const streaming = step(createStreamer('G1 X10 F600\nM5\n')).state;
+    set({ streamer: cancel(streaming) });
+
+    handleLine(set, get, refs, async () => undefined, 'error:9');
+
+    expect(get().safetyNotice).toBeNull();
+    expect(get().lastError).toBe(9);
+    expect(get().streamer?.status).toBe('cancelled');
+  });
+
+  it('keeps the root-cause notice when the auto-stop beam-off line bounces afterwards', () => {
+    const { refs, set, get } = makeHarness();
+    set({
+      streamer: step(
+        createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', {
+          rxBufferBytes: 30,
+        }),
+      ).state,
+    });
+
+    // The real stream error — this is the notice the operator must keep.
+    handleLine(set, get, refs, async () => undefined, 'error:7');
+    expect(get().streamer?.status).toBe('errored');
+    expect(get().safetyNotice).toMatchObject({ kind: 'controller-error', code: 7 });
+
+    // The auto-stop's queued M9 bouncing off the post-reset lock.
+    handleLine(set, get, refs, async () => undefined, 'error:9');
+
+    expect(get().safetyNotice).toMatchObject({ kind: 'controller-error', code: 7 });
+    expect(get().lastError).toBe(9);
   });
 });
 
