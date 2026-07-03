@@ -59,12 +59,16 @@ export function connectionActions(
         activeControllerKind: refs.driver.kind,
         detectedControllerKind: null,
       });
-      const portRef = await adapter.serial.requestPort();
-      if (portRef === null) {
-        set({ connection: { kind: 'disconnected' } });
-        return;
-      }
       try {
+        // Inside the try: requestPort throws on browsers without Web Serial
+        // (TypeError) and on Chromium policy/concurrency errors. Thrown
+        // outside, the store stayed at 'connecting' forever with both
+        // Connect buttons disabled.
+        const portRef = await adapter.serial.requestPort();
+        if (portRef === null) {
+          set({ connection: { kind: 'disconnected' } });
+          return;
+        }
         const conn = await portRef.open({
           baudRate: options.baudRate ?? refs.driver.defaultBaudRate,
         });
