@@ -17,6 +17,7 @@ export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps
   const connect = useLaserStore((s) => s.connect);
   const readMachineSettings = useLaserStore((s) => s.readMachineSettings);
   const connected = connection.kind === 'connected';
+  const supportsSerial = platform.serial.isSupported();
   const rows = detected === null ? [] : describePatch(detected, state.baseline);
   return (
     <section style={sectionStyle}>
@@ -45,12 +46,26 @@ export function DeviceSetupConnectStep({ state, dispatch }: DeviceSetupStepProps
       ) : (
         <Button
           variant="primary"
-          onClick={() => void connect(platform).catch(() => undefined)}
-          disabled={connection.kind === 'connecting'}
+          // Bind the draft profile's firmware + baud, exactly like the rail's
+          // ConnectionBar: a bare connect() selects the GRBL driver at 115200
+          // and drives Marlin/Smoothie boxes with the wrong protocol.
+          onClick={() =>
+            void connect(platform, {
+              controllerKind: state.draft.controllerKind,
+              baudRate: state.draft.baudRate,
+            }).catch(() => undefined)
+          }
+          disabled={connection.kind === 'connecting' || !supportsSerial}
           {...helpProps('control:laser.device-setup.connect')}
         >
           Connect…
         </Button>
+      )}
+      {!supportsSerial && (
+        <p style={hintStyle}>
+          Web Serial is not supported in this browser — use Chrome or Edge to connect, or
+          continue and enter settings by hand.
+        </p>
       )}
       {rows.length > 0 ? (
         <ul style={listStyle}>
