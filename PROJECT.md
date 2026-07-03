@@ -164,7 +164,7 @@ driver refactor is byte-identical on real hardware, since the Falcon's normal
 Marlin / Smoothieware / Ruida = simulator-verified only, labeled `unverified` in
 catalog evidence and (for .rd) warned on every export.
 
-### Phase K — v0.10 "Box generator" [Approved; staged]
+### Phase K — v0.10 "Box generator" [Built (S0–S6); hardware fit CLAIMED]
 
 Parametric finger-joint box generator producing cut-ready panels for both
 laser and CNC router modes — the first multi-panel parametric generator

@@ -44,6 +44,7 @@ export type CommandId =
   | 'tools.measure'
   | 'tools.add-text'
   | 'tools.registration-jig'
+  | 'tools.box-generator'
   | 'tools.material-test'
   | 'tools.interval-test'
   | 'tools.scan-offset-test'
@@ -164,6 +165,7 @@ export type AppCommandContext = {
   readonly addText: () => void;
   readonly registrationPanelOpen: boolean;
   readonly toggleRegistrationPanel: () => void;
+  readonly boxGenerator: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;
   readonly scanOffsetTest: () => void;

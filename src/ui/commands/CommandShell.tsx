@@ -11,6 +11,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
+import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { ScanOffsetCalibrationDialog } from '../calibration/ScanOffsetCalibrationDialog';
@@ -38,6 +39,7 @@ export function CommandShell(): JSX.Element {
   const multiFileTraceInput = useRef<HTMLInputElement | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
@@ -55,6 +57,7 @@ export function CommandShell(): JSX.Element {
     requestMultiFileTrace: () => multiFileTraceInput.current?.click(),
     requestConvertToBitmap: () => setConvertDialogOpen(true),
     requestAdjustImage: () => setAdjustDialogOpen(true),
+    requestBoxGenerator: () => setBoxGeneratorOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
@@ -85,15 +88,16 @@ export function CommandShell(): JSX.Element {
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
       ) : null}
-      {materialTestDialogOpen ? (
-        <MaterialDialog onClose={() => setMaterialTestDialogOpen(false)} />
-      ) : null}
-      {intervalTestDialogOpen ? (
-        <IntervalDialog onClose={() => setIntervalTestDialogOpen(false)} />
-      ) : null}
-      {scanOffsetTestDialogOpen ? (
-        <ScanOffsetDialog onClose={() => setScanOffsetTestDialogOpen(false)} />
-      ) : null}
+      <GeneratorDialogs
+        boxOpen={boxGeneratorOpen}
+        onBoxClose={() => setBoxGeneratorOpen(false)}
+        materialOpen={materialTestDialogOpen}
+        onMaterialClose={() => setMaterialTestDialogOpen(false)}
+        intervalOpen={intervalTestDialogOpen}
+        onIntervalClose={() => setIntervalTestDialogOpen(false)}
+        scanOffsetOpen={scanOffsetTestDialogOpen}
+        onScanOffsetClose={() => setScanOffsetTestDialogOpen(false)}
+      />
       {optimizationDialogOpen ? (
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
       ) : null}
@@ -102,6 +106,28 @@ export function CommandShell(): JSX.Element {
       {closeToleranceDialogOpen ? (
         <CloseOpenFillContoursPanel onClose={() => setCloseToleranceDialogOpen(false)} />
       ) : null}
+    </>
+  );
+}
+
+// The four scene-generator dialog mounts, grouped so CommandShell itself
+// stays inside the complexity cap.
+function GeneratorDialogs(props: {
+  readonly boxOpen: boolean;
+  readonly onBoxClose: () => void;
+  readonly materialOpen: boolean;
+  readonly onMaterialClose: () => void;
+  readonly intervalOpen: boolean;
+  readonly onIntervalClose: () => void;
+  readonly scanOffsetOpen: boolean;
+  readonly onScanOffsetClose: () => void;
+}): JSX.Element {
+  return (
+    <>
+      {props.boxOpen ? <BoxGeneratorHost onClose={props.onBoxClose} /> : null}
+      {props.materialOpen ? <MaterialDialog onClose={props.onMaterialClose} /> : null}
+      {props.intervalOpen ? <IntervalDialog onClose={props.onIntervalClose} /> : null}
+      {props.scanOffsetOpen ? <ScanOffsetDialog onClose={props.onScanOffsetClose} /> : null}
     </>
   );
 }
