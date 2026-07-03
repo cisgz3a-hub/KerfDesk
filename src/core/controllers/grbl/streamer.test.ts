@@ -168,6 +168,30 @@ describe('onAck — consuming acks', () => {
     expect(state.status).toBe('done');
   });
 
+  // GRBL acks held-but-parsed lines during a feed hold, so pausing near the
+  // end of a job routinely drains the queues while the machine still holds
+  // unexecuted planner motion. Promoting to 'done' there unmounts Resume and
+  // reports completion for a job whose tail was never cut.
+  it('stays paused while the held tail acks out (no done promotion during hold)', () => {
+    let state = pause(step(createStreamer('G21\nG90')).state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.inFlight).toEqual([]);
+    expect(state.queued).toEqual([]);
+    expect(state.status).toBe('paused');
+  });
+
+  it('resume of a fully-drained paused stream completes to done', () => {
+    let state = pause(step(createStreamer('G21\nG90')).state);
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+
+    const resumed = resume(state);
+
+    expect(resumed.status).toBe('done');
+    expect(step(resumed).toSend).toBe('');
+  });
+
   it('keeps errored terminal when trailing oks drain the in-flight tail (H5)', () => {
     // All three lines fit in flight at once — the final RX window. G21 is
     // rejected; the trailing oks for G90/M5 must not promote the stream back
