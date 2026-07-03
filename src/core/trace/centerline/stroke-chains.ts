@@ -10,6 +10,7 @@
 //     the vertex count without moving the line visibly.
 
 import type { Polyline, Vec2 } from '../../scene';
+import { smoothChainCurvature } from './chain-smoothing';
 import { refineChainForOutput } from './curve-refine';
 import type { InkMask } from './distance-field';
 import { bridgeNearbyEnds, pairThroughJunctions, type Chain } from './junction-pairing';
@@ -42,7 +43,7 @@ export type ChainAssemblyOptions = {
 
 const TANGENT_PROBE_PX = 3;
 const SMOOTHING_PASSES = 2;
-const SIMPLIFY_EPSILON_PX = 0.55;
+const SIMPLIFY_EPSILON_PX = 0.45;
 const MIN_CHAIN_LENGTH_PX = 1.5;
 const TIP_STEP_PX = 0.5;
 
@@ -151,7 +152,12 @@ function finalizeChains(
     // vertices before simplification eats the dense points the tangent
     // estimates need.
     const sharpened = sharpenChainBends(chain.points, chain.closed, distSq, mask.width);
-    const simplified = simplify(sharpened.points, chain.closed, simplifyEpsilonPx);
+    // Even out the residual pixel-scale curvature noise on the DENSE chain
+    // (corners pinned) before Douglas-Peucker samples it — otherwise every
+    // sampled vertex inherits a slightly-wrong tangent and the curve facets
+    // (the angular-bowl defect). Corners stay exact objects for output pinning.
+    const evened = smoothChainCurvature(sharpened.points, chain.closed, sharpened.corners);
+    const simplified = simplify(evened, chain.closed, simplifyEpsilonPx);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
     result.push({

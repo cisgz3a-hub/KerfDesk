@@ -49,7 +49,30 @@ const APEX_INK_PROBE_PX = 0.25;
 // near the tip all clear the threshold.
 const APEX_MIN_CORNER_SPACING_PX = 4;
 
+// Smallest ring perimeter, in pixels, whose flanks can host a well-separated
+// reconstructed apex: both flank windows plus a gap between them.
+const APEX_MIN_RING_PERIMETER_PX = 2 * APEX_FLANK_FAR_PX;
+
 type Ring = ReadonlyArray<Vec2>;
+
+/**
+ * Tuning for {@link snapCornersToInk}.
+ *
+ * `minRingPerimeterPx` — rings shorter than this are left untouched. Potrace
+ * feeds well-separated glyph/shape contours whose every acute corner is a
+ * genuinely blunted tip, so it needs no size floor beyond the geometric minimum
+ * (default 0). Edge Detection additionally traces SMALL TEXT, whose ~30-180px
+ * rings the Canny+ridge path already localises accurately; snapping their many
+ * closely-spaced corners only re-facets them. Raising the floor above small-text
+ * scale confines recovery to genuine large silhouette tips (star points, big
+ * letter apexes) while leaving small text — and smooth curves, which have no
+ * qualifying corners either way — exactly as traced.
+ */
+export type ApexSnapOptions = {
+  readonly minRingPerimeterPx: number;
+};
+
+const DEFAULT_APEX_SNAP_OPTIONS: ApexSnapOptions = { minRingPerimeterPx: 0 };
 
 /**
  * Snap genuine acute corner vertices of each closed polyline outward to the true
@@ -61,18 +84,25 @@ type Ring = ReadonlyArray<Vec2>;
 export function snapCornersToInk(
   polylines: ReadonlyArray<Polyline>,
   bitmap: TraceBitmap,
+  options: ApexSnapOptions = DEFAULT_APEX_SNAP_OPTIONS,
 ): Polyline[] {
-  return polylines.map((polyline) => (polyline.closed ? snapRing(polyline, bitmap) : polyline));
+  return polylines.map((polyline) =>
+    polyline.closed ? snapRing(polyline, bitmap, options) : polyline,
+  );
 }
 
-function snapRing(polyline: Polyline, bitmap: TraceBitmap): Polyline {
+function snapRing(polyline: Polyline, bitmap: TraceBitmap, options: ApexSnapOptions): Polyline {
   const ring = dedupeClosingPoint(polyline.points);
   if (ring.length < 3) return polyline;
 
   // Both flanks must fit on the ring without wrapping into each other, otherwise
   // the extrapolated intersection is meaningless. Tiny features (a single-pixel
-  // 1x1 box) have too little perimeter and are left untouched.
-  if (ringPerimeter(ring) < 2 * APEX_FLANK_FAR_PX) return polyline;
+  // 1x1 box) have too little perimeter and are left untouched. Callers may raise
+  // the floor further (Edge Detection excludes small text this way).
+  const perimeter = ringPerimeter(ring);
+  if (perimeter < APEX_MIN_RING_PERIMETER_PX || perimeter < options.minRingPerimeterPx) {
+    return polyline;
+  }
 
   const cornerIndexes = selectCornerVertices(ring);
   if (cornerIndexes.size === 0) return polyline;

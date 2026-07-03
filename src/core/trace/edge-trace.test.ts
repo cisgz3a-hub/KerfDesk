@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { inkDisc, paper, toRawImage } from '../../__fixtures__/perceptual/procedural-ink';
+import { filledStarImage, starOuterTips } from '../../__fixtures__/perceptual/star-fixture';
 import { traceImageToEdgePaths } from './edge-trace';
 import { TRACE_PRESETS } from './trace-presets';
 import type { RawImageData } from './trace-image';
@@ -93,6 +94,23 @@ function separatedSquares(): RawImageData {
     }
   }
   return { width, height, data };
+}
+
+// Nearest traced PATH sample (segments densely resampled) to a target point —
+// the laser burns segments, so fidelity is measured on the drawn path.
+function nearestPathDistance(
+  paths: ReturnType<typeof traceImageToEdgePaths>,
+  target: { x: number; y: number },
+): number {
+  let best = Infinity;
+  for (const path of paths) {
+    for (const polyline of path.polylines) {
+      for (const sample of samplePathAtUnitSteps(polyline)) {
+        best = Math.min(best, Math.hypot(sample.x - target.x, sample.y - target.y));
+      }
+    }
+  }
+  return best;
 }
 
 function plusOfBars(): RawImageData {
@@ -367,6 +385,22 @@ describe('traceImageToEdgePaths', () => {
     const maxDev = radii.reduce((max, r) => Math.max(max, Math.abs(r - mean)), 0);
     expect(rms).toBeLessThanOrEqual(0.12);
     expect(maxDev).toBeLessThanOrEqual(0.3);
+  });
+
+  // Edge traces the silhouette, so a filled star's convex tips are genuine
+  // drawn points that should REACH the analytic apex. Potrace's polygon stage
+  // blunts them and the Canny/thinning path does too (the tip pixel is the last
+  // ink cell, ~1.8-2.8px short), so — like Line Art (potrace-apex.ts) — the
+  // closed ring's acute tips are reconstructed by extending the two flanks to
+  // their intersection. Each outer tip must land within a pixel and a half.
+  it("snaps a filled star's convex tips to the analytic apex", () => {
+    const paths = traceImageToEdgePaths(filledStarImage(), EDGE_OPTIONS);
+    expect(paths.length).toBeGreaterThan(0);
+    const errors = starOuterTips().map((tip) => nearestPathDistance(paths, tip));
+    const mean = errors.reduce((sum, e) => sum + e, 0) / errors.length;
+    const max = errors.reduce((m, e) => Math.max(m, e), 0);
+    expect(mean).toBeLessThanOrEqual(1.0);
+    expect(max).toBeLessThanOrEqual(1.6);
   });
 
   // A closed polyline's closing edge is implicit; the canvas line-stroke
