@@ -8,6 +8,7 @@ export {
   type BoxDims,
   type BoxRelief,
   type BoxSpec,
+  type BoxSpecField,
   type BoxSpecIssue,
   type BoxSpecValidation,
   type BoxStyle,
