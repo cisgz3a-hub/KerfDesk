@@ -9,6 +9,7 @@ import { CommandShell } from '../commands';
 import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
+import { CameraPanel } from '../camera';
 import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
@@ -51,6 +52,7 @@ export function App(): JSX.Element {
         <div style={canvasAreaStyle}>
           <Workspace />
           <RegistrationJigPanel />
+          <CameraPanel />
         </div>
         <CutsLayersPanel />
         <LaserWindow />

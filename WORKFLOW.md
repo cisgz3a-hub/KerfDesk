@@ -2010,3 +2010,23 @@ F-CNC19 tiling.
 #### Error — raster layers present
 1. The export refuses with "Layer … uses Fill/Image raster output, which the
    experimental .rd encoder does not support yet."
+
+---
+
+## Camera Mode flows
+
+### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-105)
+
+- **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
+  feed. They engrave the four alignment targets (reusing the registration jig), then drag the
+  four on-screen markers onto the engraved crosshairs. On the fourth point the homography
+  solves and the feed warps to sit on the bed; the operator places artwork over the real
+  material and adjusts overlay opacity. The applied calibration is saved to the device profile.
+- **Error / permission denied.** If the browser or OS denies camera access (or the page is not
+  served over https), a one-line message explains how to grant permission. No overlay is shown
+  and the rest of the app is unaffected.
+- **Empty / no camera.** With no camera detected, Camera Mode shows an empty state ("No camera
+  found — connect a USB camera") and the camera picker is disabled.
+- **Edge / degenerate corners.** If the four chosen points are collinear or coincident (no
+  valid homography), the solve is rejected with "Move the alignment points apart — they can't
+  form a rectangle"; the previous calibration, if any, is retained.
