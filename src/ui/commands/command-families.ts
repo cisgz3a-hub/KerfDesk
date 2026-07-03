@@ -260,6 +260,15 @@ function imageMaskCropCommand(ctx: AppCommandContext): AppCommand {
 
 function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
+    // Additive (inserts panels into the current scene), so no dirty-project
+    // guard — unlike the calibration grids, which replace the scene.
+    enabled(
+      'tools.box-generator',
+      'tools',
+      'Box Generator...',
+      'Generate a finger-joint box as cut-ready panels.',
+      ctx.boxGenerator,
+    ),
     enabled(
       'tools.material-test',
       'tools',
