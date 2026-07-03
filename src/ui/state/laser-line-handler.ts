@@ -16,8 +16,8 @@
 
 import {
   cancel as cancelStreamer,
-  disconnect as disconnectStreamer,
   type GrblPins,
+  markErrored,
   onAck,
   type SettingsCollectorState,
   step,
@@ -35,8 +35,8 @@ import {
 import { beginPostJobSettle } from './laser-post-job-settle';
 import {
   controllerErrorNotice,
-  disconnectDuringJobNotice,
   frameHitLimitNotice,
+  writeFailedNotice,
   type ControllerErrorContext,
   type LaserSafetyAction,
 } from './laser-safety-notice';
@@ -478,10 +478,17 @@ function advanceStream(
     // "hide job stream" filter keeps hiding them. No action — the catch
     // below owns the failure notice.
     void safeWrite(stepped.toSend, undefined, 'job').catch(() => {
-      set({
-        streamer: disconnectStreamer(acked.state),
-        safetyNotice: disconnectDuringJobNotice(),
-      });
+      // markErrored, not disconnect: 'disconnected' falls outside
+      // isActiveJob, which unmounts the Stop button and drops the
+      // soft-reset stop command while GRBL may still be executing
+      // buffered lines on a live port (same R-H2 rationale as
+      // runResumeJob). A genuine port loss follows up via onClose, which
+      // owns the disconnect wording. Functional set: acks can land
+      // between dispatch and rejection, so no snapshot rollback.
+      set((s) => ({
+        streamer: s.streamer === null ? s.streamer : markErrored(s.streamer),
+        safetyNotice: writeFailedNotice('stream'),
+      }));
     });
   }
 }
