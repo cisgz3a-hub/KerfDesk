@@ -15,6 +15,7 @@ import {
 } from '../state/camera-store';
 import type { CameraAdapter } from '../../platform/types';
 import { NetworkCameraView } from './NetworkCameraView';
+import { OverlayControls } from './OverlayControls';
 import { CameraCalibrationWizard } from './wizard/CameraCalibrationWizard';
 import { useCameraWizardStore } from './wizard/camera-wizard-store';
 
@@ -79,6 +80,7 @@ function CameraPanelOpen(): JSX.Element {
           machine camera above does not need it.
         </p>
       )}
+      <OverlayControls />
     </div>
   );
 }

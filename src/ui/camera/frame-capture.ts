@@ -33,3 +33,24 @@ export function liveDetectScale(videoWidth: number): number {
   if (videoWidth <= LIVE_DETECT_TARGET_WIDTH_PX) return 1;
   return LIVE_DETECT_TARGET_WIDTH_PX / videoWidth;
 }
+
+/**
+ * Grab one full-resolution frame from a MediaStream without needing a mounted
+ * <video> (the Update Overlay path). Resolves null when no frame arrives —
+ * e.g. the stream ended — rather than hanging.
+ */
+export function captureStreamFrame(stream: MediaStream): Promise<RgbaImage | null> {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+    const done = (frame: RgbaImage | null): void => {
+      video.srcObject = null;
+      resolve(frame);
+    };
+    video.onloadeddata = () => done(captureVideoFrame(video, 1));
+    video.onerror = () => done(null);
+    void video.play().catch(() => done(null));
+  });
+}

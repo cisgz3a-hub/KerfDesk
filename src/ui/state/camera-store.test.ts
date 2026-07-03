@@ -22,10 +22,24 @@ beforeEach(() => {
     alignment: { kind: 'idle' },
     streamEpoch: 0,
     networkCamera: { kind: 'idle' },
+    overlayVisible: true,
+    overlayOpacityPercent: 50,
+    overlayStill: null,
   });
 });
 
 describe('camera-store', () => {
+  it('overlay prefs default sensibly and the opacity clamps to 0..100', () => {
+    expect(useCameraStore.getState().overlayVisible).toBe(true);
+    expect(useCameraStore.getState().overlayOpacityPercent).toBe(50);
+    useCameraStore.getState().setOverlayOpacityPercent(140);
+    expect(useCameraStore.getState().overlayOpacityPercent).toBe(100);
+    useCameraStore.getState().setOverlayOpacityPercent(-5);
+    expect(useCameraStore.getState().overlayOpacityPercent).toBe(0);
+    useCameraStore.getState().setOverlayVisible(false);
+    expect(useCameraStore.getState().overlayVisible).toBe(false);
+  });
+
   it('togglePanel flips the panel and closePanel always closes it', () => {
     useCameraStore.getState().togglePanel();
     expect(useCameraStore.getState().panelOpen).toBe(true);

@@ -4444,3 +4444,21 @@ as normal, not as a warning state, and should pass a generous `maxIterations`
 (hundreds; a solve is seconds, cost scales with corners not pixels). Individual
 K/D parameters remain only weakly identifiable on planar targets — acceptance is
 judged on the fitted MAPPING (and the A/B view), not parameter closeness.
+
+### Overlay wiring as-built (2026-07-03) — alignment persists; workspace overlay mounts
+
+The beta exported `CameraOverlay` but never mounted it, and the solved
+homography lived only in the ephemeral camera store — F-CAM1's "saved to the
+device profile" promise was doc-vs-code drift. Closed by: a persisted
+`cameraAlignment?: CameraAlignment` on `DeviceProfile` (`camera-alignment.ts`
+normalizer, same untrusted-JSON discipline as `cameraCalibration`; the type
+records the pixel `basis: 'raw' | 'rectified'` because composing a rectified
+frame with a raw-basis homography would silently mis-register), an explicit
+"Save & show on canvas" action in the aligned Falcon view, and
+`WorkspaceCameraOverlay` mounted as a canvas-area sibling that re-computes the
+canvas's own fit-to-bed view from its measured box (Workspace is untouched).
+Overlay sources: a captured still (LightBurn's Update Overlay model, the
+accurate default-to-be once rectified alignment lands) or the continuous live
+video; panel controls cover show/hide + fade + still/live. Material-thickness
+shift compensation and the rectified-basis alignment flow are follow-ups
+(ADR-107 scope).

@@ -7,7 +7,12 @@
 // testable with a fake adapter and never imports platform/web directly.
 
 import { create } from 'zustand';
-import { addAlignmentPoint, beginAlignment, type AlignmentState } from '../../core/camera';
+import {
+  addAlignmentPoint,
+  beginAlignment,
+  type AlignmentState,
+  type RgbaImage,
+} from '../../core/camera';
 import type { Vec2 } from '../../core/scene';
 import type { CameraAdapter, CameraDevice, CameraStream } from '../../platform/types';
 
@@ -39,8 +44,18 @@ export type CameraStore = {
   // The machine-integrated HTTP camera (Falcon A1 Pro) found by auto-detect.
   readonly networkCamera: NetworkCameraState;
 
+  // Workspace overlay preferences (ephemeral; the alignment itself persists
+  // on the device profile). `overlayStill` is a captured frame shown instead
+  // of the live video — LightBurn's "Update Overlay" model.
+  readonly overlayVisible: boolean;
+  readonly overlayOpacityPercent: number;
+  readonly overlayStill: RgbaImage | null;
+
   readonly togglePanel: () => void;
   readonly closePanel: () => void;
+  readonly setOverlayVisible: (on: boolean) => void;
+  readonly setOverlayOpacityPercent: (percent: number) => void;
+  readonly setOverlayStill: (frame: RgbaImage | null) => void;
   readonly detectSupport: (camera: CameraAdapter | undefined) => void;
   readonly detectNetworkCamera: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
@@ -72,8 +87,16 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   streamEpoch: 0,
   networkCamera: { kind: 'idle' },
 
+  overlayVisible: true,
+  overlayOpacityPercent: 50,
+  overlayStill: null,
+
   togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
   closePanel: () => set({ panelOpen: false }),
+  setOverlayVisible: (on) => set({ overlayVisible: on }),
+  setOverlayOpacityPercent: (percent) =>
+    set({ overlayOpacityPercent: Math.max(0, Math.min(100, percent)) }),
+  setOverlayStill: (frame) => set({ overlayStill: frame }),
   detectSupport: (camera) => set({ isSupported: camera?.isSupported() ?? false }),
 
   detectNetworkCamera: async (camera) => {
