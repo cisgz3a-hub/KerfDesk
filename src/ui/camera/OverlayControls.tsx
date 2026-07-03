@@ -6,6 +6,7 @@
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { captureStreamFrame } from './frame-capture';
+import { TraceFromCameraButton } from './TraceFromCameraButton';
 
 export function OverlayControls(): JSX.Element | null {
   const alignment = useStore((s) => s.project.device.cameraAlignment);
@@ -56,6 +57,7 @@ export function OverlayControls(): JSX.Element | null {
         >
           Live
         </button>
+        <TraceFromCameraButton />
       </div>
       <label style={fadeStyle}>
         Fade

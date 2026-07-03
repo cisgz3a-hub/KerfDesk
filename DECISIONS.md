@@ -4511,3 +4511,39 @@ the physical burn-vs-overlay registration — the maintainer's F-CAM4 pass.
 
 Print-and-cut (2-point re-registration of a printed sheet) — the natural v3.5
 follow-on now that marker detection exists; capture-to-trace stays ADR-108.
+
+---
+
+## ADR-108 — Camera Mode v4: capture-to-trace at true bed coordinates
+
+**Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
+
+### Context
+
+ADR-105 reserved v4 for capture-to-trace. The prerequisite geometry all
+exists now: rectification (v2), a persisted basis-tagged alignment (overlay
+wiring), and the marker auto-align (v3). LightBurn's equivalent traces a
+camera capture the user then positions manually; because our warp lands in
+bed coordinates, the trace needs no positioning at all.
+
+### Decision
+
+1. **Warp the aligned frame top-down into bed-mm space** (`warp-to-bed.ts`,
+   pure core): output→input sampling through the INVERSED homography
+   (`invertMat3`, adjugate), reusing the rectifier's bilinear sampler so the
+   two resamplers cannot drift. Off-frame pixels stay transparent.
+2. **Basis discipline is enforced, not assumed** (`trace-from-camera.ts`): a
+   rectified-basis alignment de-fisheyes the capture first and REFUSES to run
+   without a calibration; a raw-basis alignment uses raw pixels. Mixing bases
+   would silently mis-register — the same rule the overlay follows.
+3. **The RasterImage's bounds ARE the bed** (4 px/mm), so the existing trace
+   dialog and pipeline (ADR-100) need zero changes and traced vectors land at
+   the photographed object's true machine coordinates.
+
+### Verification
+
+Core closed loop: render a camera view of the marker bed → auto-align from
+pixels → warp top-down → re-detect the markers in the warped image → they sit
+at their true bed coordinates (< 0.75 mm at 2 px/mm). UI decision tests cover
+the typed failures (no alignment / basis mismatch). NOT verified on hardware:
+a real photographed object traced and burned back in place — the F-CAM5 pass.

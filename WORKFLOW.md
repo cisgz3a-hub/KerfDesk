@@ -2094,3 +2094,19 @@ F-CNC19 tiling.
 - **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
   labels the corners correctly — the origin pair, not the operator, carries
   the orientation.
+
+### F-CAM5. Trace from camera (v4 — ADR-108)
+
+- **Success / trace in place.** With the camera aligned and live, the operator
+  places an object on the bed and presses "Trace from camera": the frame is
+  captured (de-fisheyed if the alignment is lens-corrected), flattened
+  top-down into bed coordinates, and opened in the normal Trace dialog. The
+  traced vectors land exactly where the object physically sits — no manual
+  positioning.
+- **Error / basis mismatch.** If the saved alignment expects lens-corrected
+  frames but the calibration was removed, the capture is refused with a toast
+  (never silently mis-registered).
+- **Empty / no feed or alignment.** The button is disabled without a live
+  feed; without an alignment the overlay row (and the button) is absent.
+- **Edge / encoder failure.** A platform without 2D canvas support fails
+  typed ('could not build the bed image') instead of half-completing.
