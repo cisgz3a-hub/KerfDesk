@@ -4,6 +4,7 @@ import { checkBoxAssembly, type RefereePanel } from './assembly-referee';
 import { validateBoxSpec, type BoxSpec } from './box-spec';
 import { buildPanelClaims, type PanelClaims } from './panel-claims';
 import { panelOutline } from './panel-outline';
+import { applyPanelFit } from './panel-fit';
 
 const REFEREE_RUNS = 100;
 
@@ -76,6 +77,26 @@ describe('assembly referee — every fuzzed nominal box assembles exactly', () =
     const open = { ...CANONICAL, style: 'open-top' as const };
     expect(checkBoxAssembly(generatedPanels(open), open)).toEqual([]);
   });
+
+  // 60 s: 100 fuzz runs can exceed the 5 s default under full-suite load.
+  it('holds uniform play ≈ c with zero interference over the clearance corpus', () => {
+    fc.assert(
+      fc.property(specArb, fc.double({ min: 0.05, max: 0.49, noNaN: true }), (base, c) => {
+        const spec: BoxSpec = { ...base, clearanceMm: c };
+        fc.pre(validateBoxSpec(spec).kind === 'valid');
+        const panels = buildPanelClaims(spec).map((claims): RefereePanel => {
+          const fit = applyPanelFit(panelOutline(claims), {
+            clearanceMm: c,
+            relief: { kind: 'none' },
+          });
+          if (fit.kind !== 'fitted') throw new Error(fit.detail);
+          return { panel: claims.panel, outline: fit.outline };
+        });
+        expect(checkBoxAssembly(panels, spec, { playMm: c })).toEqual([]);
+      }),
+      { numRuns: 100 },
+    );
+  }, 60000);
 });
 
 // Test-of-the-test: the referee must FAIL when the math is deliberately
