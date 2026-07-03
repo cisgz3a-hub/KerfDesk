@@ -1951,6 +1951,63 @@ F-CNC19 tiling.
 1. Programs with no Z words never receive Z commands in the preamble —
    a laser resume re-fires at the recorded XY without touching Z.
 
+### F-CNC28. Watch the live 3D result while designing — ADR-105 G9
+
+#### Success
+1. In CNC mode a docked "3D result" pane sits between the canvas and the
+   layers panel, continuously simulating the CURRENT job: edit a shape,
+   change a depth, swap a bit — the heightfield re-renders (deferred so
+   typing stays smooth). Drag orbits, scroll zooms; depth is true to
+   scale. The collapse button shrinks it to a sliver.
+
+#### Error — no WebGL
+1. The pane shows "3D view unavailable in this browser" instead of
+   crashing.
+
+#### Empty
+1. With no output-enabled CNC content it shows a hint; a job whose cut
+   type cannot produce toolpaths (e.g. pocketing open line art) empties
+   the pane the same way — honest feedback, not an error.
+
+#### Edge — laser mode
+1. The pane never renders in laser mode.
+
+### F-CNC29. Choose the pocket fill method — ADR-105 G10
+
+#### Success
+1. Pocket layers gain a "Fill method" select: Offset rings (default) or
+   Raster X / Raster Y sweeps. Raster insets the region by the bit
+   radius, serpentine-sweeps it at the layer stepover, and runs the
+   finishing wall pass last.
+
+#### Empty
+1. Layers that never set the field keep offset rings — output is
+   byte-identical to pre-ADR-105.
+
+#### Edge — regions the bit cannot enter
+1. Features narrower than the bit produce no sweeps there (same rule as
+   rings); nothing gouges past the inset wall.
+
+### F-CNC30. Insert art from the design library — ADR-105 G11 (machine-agnostic)
+
+#### Success
+1. The tool strip's "Lib" button opens the bundled Design library:
+   categorized line-art (Animals / Nature / Symbols / Home & Food /
+   Hobby & Travel, lucide ISC). Clicking a design inserts it through the
+   normal SVG import pipeline as an engrave-ready vector object.
+
+#### Error — unparseable entry
+1. A failed parse toasts the name; nothing lands on the canvas.
+
+#### Empty
+1. The dialog always has the bundled set; the footer points at Import
+   SVG + CC0 sources (openclipart) for filled/larger artwork.
+
+#### Edge — pocketing library art
+1. Bundled icons are open stroke line art: engrave/on-path cut types
+   apply directly; pocketing requires closed shapes (draw or import
+   filled artwork instead).
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

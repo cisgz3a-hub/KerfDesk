@@ -156,6 +156,9 @@ export type UiState = {
   // Pen-tool in-progress polyline (B6). See PenDraft. Cleared by resetToolMode.
   readonly penDraft: PenDraft | null;
   readonly setPenDraft: (next: PenDraft | null) => void;
+  // ADR-105 G11 — the bundled design library dialog.
+  readonly libraryDialogOpen: boolean;
+  readonly setLibraryDialogOpen: (open: boolean) => void;
   // Temporary Measure tool line. It is UI-only: not saved, not undoable, and
   // never included in preview or emitted G-code.
   readonly measureDraft: MeasureDraft | null;
@@ -242,6 +245,8 @@ export const useUiStore = create<UiState>((set) => ({
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),
   penDraft: null,
+  libraryDialogOpen: false,
+  setLibraryDialogOpen: (open) => set({ libraryDialogOpen: open }),
   setPenDraft: (next) => set({ penDraft: next }),
   measureDraft: null,
   setMeasureDraft: (next) => set({ measureDraft: next }),
