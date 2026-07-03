@@ -203,13 +203,17 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
   const nextInFlight = state.inFlight.slice(1);
   const nextBytes = state.inFlightBytes - head.bytes;
   const completed = state.completed + 1;
+  // A paused stream never promotes to 'done': GRBL acks held-but-parsed
+  // lines during a feed hold, so pausing near the end of a job drains the
+  // queues while the machine still holds unexecuted planner motion. resume()
+  // completes a drained stream instead.
   const nextStatus: StreamerStatus = isTerminal(state.status)
     ? state.status
     : kind === 'alarm'
       ? 'cancelled'
       : kind === 'error'
         ? 'errored'
-        : nextInFlight.length === 0 && state.queued.length === 0
+        : state.status !== 'paused' && nextInFlight.length === 0 && state.queued.length === 0
           ? 'done'
           : state.status;
   return {
@@ -236,6 +240,13 @@ export function pause(state: StreamerState): StreamerState {
 
 export function resume(state: StreamerState): StreamerState {
   if (state.status !== 'paused') return state;
+  // Everything was already delivered and acked during the hold — resuming
+  // has nothing left to send, so the stream completes here. The job lock
+  // still holds until the machine reports Idle (the caller's release path),
+  // because the resumed planner motion is still executing.
+  if (state.inFlight.length === 0 && state.queued.length === 0) {
+    return { ...state, status: 'done' };
+  }
   return { ...state, status: 'streaming' };
 }
 
