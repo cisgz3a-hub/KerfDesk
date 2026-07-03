@@ -40,6 +40,9 @@ const CROPS: ReadonlyArray<Crop> = [
   { name: 'house-left', x0: 150, y0: 280, x1: 430, y1: 480, scale: 3 },
   // The ARCH "A" — reported counter gaps (2026-07-03).
   { name: 'arch-A', x0: 118, y0: 552, x1: 258, y1: 668, scale: 6 },
+  // The HOUSE "O" — a pure curved letter; the cleanest bowl-smoothness check
+  // (reported serif-bowl faceting, 2026-07-04).
+  { name: 'house-O', x0: 620, y0: 552, x1: 770, y1: 668, scale: 8 },
 ];
 
 it('renders Arch House Edge Detection crops + gap/wobble metrics', () => {

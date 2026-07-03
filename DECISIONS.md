@@ -3870,6 +3870,47 @@ browser: all 41 closed rings of the arch logo now return to start
 edge-trace invariant now asserts every closed ring returns to start, the class
 of bug the old flag-trusting metrics missed.
 
+**Amendment (2026-07-04) — even-curvature smoothing (edge/centerline bowls).**
+The maintainer reported curved letter parts (a "B" bowl) tracing as faceted
+polygonal chords. Measured against a VERIFIED reference — the real Roboto "B"
+glyph outline rasterized and traced (`_letter-b-smoothness.test.ts`), scored
+by facet ratio (% of 1px steps kinking ≥14°, corners excluded) — ours was
+1.9% at 100px vs the official potrace binary's 0.5% on the identical bitmap.
+Two experiments proved the faceting was baked into the CHAIN, not the
+DP/Chaikin end-stage: disabling Douglas-Peucker still left 1.5%. Root cause:
+independent per-vertex sub-pixel snapping + only two Taubin passes leave
+pixel-scale curvature noise (the line does not turn evenly like a fitted
+Bézier); the Chaikin output stage then froze a kink at every pinned
+soft-turn vertex. Fix (both halves, `src/core/trace/centerline/`):
+`chain-smoothing.ts` evens the dense chain with corner-anchored Taubin (8
+passes, shrink-free λ/μ, the sharpener's corners + hard turns + endpoints
+pinned) between sharpening and DP; `curve-fit.ts` replaces the Chaikin body
+of `refineChainForOutput` with a centripetal Catmull-Rom resample (corners
+break the spline and stay exact). DP epsilon 0.55→0.45 to give the spline
+control points on tight bowls. Result: 100px facet ratio 1.9% → **0.5%
+(matches the potrace reference)**, 160px 0.9% → 0.2%, 60px 4.1% → 2.6%;
+deviation from the true glyph unchanged (mean ≤0.23px). Verified perceptually
+on the synthetic B and the real logo's "O" (a smooth ellipse) and ARCH HOUSE
+letters. Corner/apex/disc/closure/determinism gates all hold; both Edge
+Detection and Centerline benefit (shared `finalizeChains`). Known residual:
+60px glyphs sit at 2.6% (improved, not yet potrace parity) — a stem/arm
+junction sub-pixel artifact, not bowl faceting.
+
+**Amendment (2026-07-04, second) — apex snapping for Edge Detection.** Edge
+traced sharp convex silhouette tips ~1.8-2.8px short of the true corner (star
+apex 1.80/2.81), while Line Art already reconstructs them (0.66/0.96). Reused
+`potrace-apex.ts` `snapCornersToInk` on Edge's closed rings, with the
+outward-ink guard built from a FILLED source-luma bitmap (`edge-ink-support.ts`
+- Edge's own Canny mask is a hairline and would reject every move). A
+`minRingPerimeterPx` gate (250px) confines recovery to genuine large
+silhouettes; small text (30-185px rings, already well-localised by Canny+ridge)
+is left untouched so its crowded corners do not re-facet. potrace's own apex
+behavior is byte-identical (the gate defaults to 0). Result: Edge star apex
+1.80/2.81 -> 0.96/1.54 (beats the potrace 1.16 binary 0.99/2.03); disc RMS
+0.035 and B-bowl facet 0.2% unchanged (no collateral); verified sharp by eye.
+Edge Detection now sits at or above the potrace reference on every axis it
+shares - curves (best of all presets), corners, bowls, and ring closure.
+
 **Direct 1:1 verification.** `_reference-iou.test.ts` rasterizes OUR
 Line-Art output and the reference potrace 1.16 output on the identical
 bitmap (disc + star, where auto-upscale does not fire) and measures area

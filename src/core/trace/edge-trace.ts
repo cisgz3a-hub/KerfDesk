@@ -11,7 +11,9 @@
 import type { ColoredPath, Polyline, Vec2 } from '../scene';
 import { cannyEdgeField, type CannyField, type CannyOptions } from './canny-edges';
 import { reconnectAlongRidge } from './edge-reconnect';
+import { filledInkSupportBitmap } from './edge-ink-support';
 import { makeRidgeSnapper } from './edge-subpixel';
+import { snapCornersToInk } from './potrace-apex';
 import {
   assembleStrokePaths,
   buildStrokeGraph,
@@ -31,6 +33,14 @@ import type { RawImageData, TraceOptions } from './trace-image';
 const EDGE_COLOR = '#000000';
 const DEFAULT_EDGE_MIN_LENGTH_PX = 3;
 const DEFAULT_EDGE_JOIN_GAP_PX = 0;
+// Apex snapping recovers blunted convex tips only on rings this long or longer.
+// Edge Detection also traces SMALL TEXT (LANGEBAAN glyphs ~30-185px perimeter),
+// which the Canny+ridge path already localises well; snapping their crowded
+// corners just re-facets them. A genuine large silhouette (a 12-tip star traces
+// as one ~900px ring) clears this comfortably, so recovery stays confined to
+// real tips. Smooth curves have no qualifying corners and are unaffected either
+// way, so this only gates which SHARP features get recovered.
+const APEX_SNAP_MIN_RING_PERIMETER_PX = 250;
 // Canny hysteresis drops weak stretches (diagonals especially) well beyond
 // the join knob; a tangent-ALIGNED continuation may bridge up to knob × this.
 const EDGE_ALIGNED_JOIN_FACTOR = 3;
@@ -40,7 +50,21 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
   const edgeSource = medianForEdges(image, options.edgeMedianFilter);
   const field = cannyEdgeField(edgeSource, edgeCannyOptions(options));
   const mask: InkMask = { width: image.width, height: image.height, ink: field.edges };
-  const polylines = chainEdgeMask(mask, options, joinGapPx, field);
+  const rings = chainEdgeMask(mask, options, joinGapPx, field);
+  // Edge traces the SILHOUETTE, so a closed ring's acute convex tips are genuine
+  // drawn points. Canny + thinning blunt them ~2px short (the tip pixel is the
+  // last ink cell), so — like Line Art — reconstruct each tip by extending its
+  // two flanks to their intersection, guarded outward by the FILLED source
+  // silhouette (Edge's own edge map is a hairline and would reject every move).
+  // The perimeter floor confines recovery to genuine large silhouettes: unlike
+  // potrace (well-separated glyph contours), Edge also traces small text whose
+  // crowded corners the Canny+ridge path already localises, so snapping them
+  // just re-facets — the floor leaves them as traced. Snap BEFORE endpoint
+  // closure so a moved tip that IS a ring's start point still closes coincident.
+  const snapped = snapCornersToInk(rings, filledInkSupportBitmap(image), {
+    minRingPerimeterPx: APEX_SNAP_MIN_RING_PERIMETER_PX,
+  });
+  const polylines = closeRingEndpoints(snapped);
   return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];
 }
 
@@ -138,14 +162,13 @@ function chainEdgeMask(
     Math.max(0, options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX),
     blurNoiseFloorPx(options.edgeBlurSigma),
   );
-  const kept = looped.filter(
+  // Returns the filtered rings WITHOUT endpoint closure: the caller snaps convex
+  // tips outward first (a moved tip may be a ring's start point), then runs
+  // closeRingEndpoints so every ring returns to its — possibly moved — start.
+  return looped.filter(
     (pl) =>
       (polylineLength(pl) >= minLengthPx || isWeldedConnector(pl, looped)) && !isSliverLoop(pl),
   );
-  // Corner/aligned closure leaves a closed ring's endpoints a join gap apart;
-  // make every ring explicitly return to its start so the stroke renderer and
-  // the G-code emitter draw/cut the closing edge instead of a visible gap.
-  return closeRingEndpoints(kept);
 }
 
 // A short OPEN chain whose both ends sit ON other geometry is a weld
