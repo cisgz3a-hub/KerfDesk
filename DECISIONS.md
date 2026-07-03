@@ -1146,7 +1146,7 @@ LightBurn's Preview "shades according to power" — darker pixel = more laser po
 
 ## ADR-029 — Convert to Bitmap (vector → raster engrave source)
 
-**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` shipped — Fill All only; A3 Outlines / A4 Use Cut Settings / A5 placement-brightness polish pending) | **Date:** 2026-05-29
+**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings shipped; A5 placement-brightness polish pending) | **Date:** 2026-05-29
 
 ### Context
 
@@ -3293,7 +3293,7 @@ ADR-058 (centerline extraction), ADR-025 (perceptual harness), ADR-026/027
 
 ## ADR-092 — Connect-time Device Setup wizard (manual, draft-commit, guarded firmware sync)
 
-**Status:** Accepted; field-editor extraction (PR-1, `DeviceProfileFields.tsx`) shipped; wizard implementation pending. | **Date:** 2026-06-24
+**Status:** Accepted; shipped (`src/ui/laser/device-setup/DeviceSetupWizard.tsx` + tests; field-editor extraction `DeviceProfileFields.tsx`). | **Date:** 2026-06-24
 
 > Numbering note: the body's previous highest is ADR-057. The active build plan
 > (`.claude/plans/plan-a-full-build-sparkling-kazoo.md`) reserves ADR-054..091 for its

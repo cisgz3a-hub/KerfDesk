@@ -266,7 +266,7 @@ better risk/effort allocation at this stage. **Accepted gap, documented.**
 | Build badge | VERIFIED | Visible in DOM; defines confirmed inline in dist/web/assets/index-*.js |
 | Canvas auto-zoom on import | CLAIMED | Logic tested via the new combinedBBox + zoomToBounds math; not verified on a real import workflow |
 | Cmd+D duplicate | CLAIMED | Tests pin behaviour; no real-use confirmation yet |
-| Cloudflare Pages auto-deploy | CLAIMED | Workflow file exists; the two secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) are not yet set in GitHub, so the first auto-deploy attempt will fail |
+| Cloudflare Pages auto-deploy | VERIFIED (with 2026-07-03 outage, fixed) | Secrets set; `workflow_run`-gated deploys have published for weeks. **Broke 2026-07-03** when the repo was renamed `LaserForge-2.0`→`KerfDesk` — `scripts/assert-correct-repo.mjs` rejected the new identity so every Deploy failed at `guard:repo` and production stalled at `d839c96`. Fixed same day: guard accepts both identities (allowlist) + KerfDesk regression test in `deploy-workflow-gate.test.ts` |
 | Set-origin from head position | DEFERRED — captured in PROJECT.md "Future feature notes" |
 
 ---
@@ -884,3 +884,20 @@ VERIFIED.
 | ADR-105 G10 pocket raster fill (X/Y) | **CLAIMED** | 2026-07-03: sweep containment + axis + wall-last tests; default absent = byte-identical. Air-cut comparison vs offset rings pending (maintainer) |
 | ADR-105 G11 bundled design library (lucide ISC) | **CLAIMED** | 2026-07-03: **live-verified** — dialog categories render, Star inserted through the SVG pipeline. license-check green with the new dependency |
 | Phase K box generator (ADR-106, S0–S6) | **CLAIMED** | 2026-07-03: virtual 3D assembly referee (exact per-edge complementarity + corner single-claimant + size, 100-seed fuzz, negative controls); clearance referee (uniform play == c, zero interference); relief radius bounds; perceptual sheet fixture (laser IoU 1.0000, CNC precision 1.0); seeded benchmark **1063/1063 (100%)** over 54 specs; determinism pinned; suite 3042 green. Geometry-only until cut. **Pending hardware check: cut a 60×40×30 T=3 box (Falcon laser with kerf comp; 4040 router at 0.15 mm clearance + 1/8 in relief) and assemble it.** Full in-app UI walk (menu → dialog → insert) not driven against the live scene (side-effect-free rule); covered by component + insertion tests |
+
+### Camera Mode inventory (ADR-107..110, added 2026-07-03)
+
+Camera Mode shipped after the CNC ledger was written and had no rows here
+(audit gap D7). Convention note: for camera, **VERIFIED means aligned against a
+real overhead/USB camera on a real bed** — none of that has happened, so every
+row is CLAIMED. `src/core/camera/` (35 src / 28 test) is pure math; `src/ui/camera/`
+is the panels/wizard. "live-verified" below = exercised in an isolated
+side-effect-free preview per the git history, not on a machine.
+
+| Feature | Status | Evidence |
+|---|---|---|
+| ADR-107 v1 — manual 4-point homography overlay + workspace wiring (F-CAM1, F-CAM3) | **CLAIMED** | homography/alignment unit tests; persisted-alignment round-trip in `io/project`; overlay show/fade/still/live wired. No real-camera alignment on a bed |
+| ADR-108 v2 — fisheye lens calibration wizard (F-CAM2) | **CLAIMED** | checkerboard detect + focal-sweep + Levenberg–Marquardt unit tests; A/B trust review; persists on device profile. Reprojection quality never checked against a real lens |
+| ADR-109 v3 — automatic marker alignment (F-CAM4) | **CLAIMED** | X-corner detection + origin-pair orientation + degenerate-solve refusal tests. Never run against a burned marker pattern under a live feed |
+| ADR-110 v4 — capture-to-trace at true bed coordinates (F-CAM5) | **CLAIMED** | bed-flatten + basis-mismatch refusal tests; opens the normal Trace dialog. No physical object traced from a real camera |
+| Remembered camera + machine-camera auto-probe (85d8daa) | **CLAIMED** | device-UX persistence tests. Not exercised against real hardware |
