@@ -13,6 +13,8 @@ function mockCamera(overrides?: Partial<CameraAdapter>): CameraAdapter {
 }
 
 beforeEach(() => {
+  // selectCamera persists the preferred device; isolate tests from each other.
+  localStorage.clear();
   useCameraStore.setState({
     panelOpen: false,
     isSupported: false,
@@ -90,6 +92,21 @@ describe('camera-store', () => {
       .getState()
       .refreshCameras(mockCamera({ listCameras: async () => [{ deviceId: 'a', label: 'A' }] }));
     expect(useCameraStore.getState().selectedDeviceId).toBe('a');
+  });
+
+  it('restores the remembered camera when it reappears in the list', async () => {
+    // A previous session picked the overhead camera 'b' (selectCamera saves it).
+    useCameraStore.getState().selectCamera('b');
+    useCameraStore.setState({ selectedDeviceId: null }); // fresh session, no live selection
+    await useCameraStore.getState().refreshCameras(
+      mockCamera({
+        listCameras: async () => [
+          { deviceId: 'a', label: 'Laptop lid' },
+          { deviceId: 'b', label: 'Overhead USB' },
+        ],
+      }),
+    );
+    expect(useCameraStore.getState().selectedDeviceId).toBe('b');
   });
 
   it('goes live and stop() releases the stream', async () => {
