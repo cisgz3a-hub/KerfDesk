@@ -1,5 +1,5 @@
 // layout — deterministic flat-grid arrangement for the generated panel
-// sheet (ADR-105): three columns in stable panel order, rows as tall as
+// sheet (ADR-106): three columns in stable panel order, rows as tall as
 // their tallest panel, partSpacingMm between neighbours. Offsets translate
 // each panel's bounding box, so fitted outlines that are inset from their
 // nominal face rect still sit flush in the grid.

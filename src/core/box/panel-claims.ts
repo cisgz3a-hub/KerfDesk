@@ -1,5 +1,5 @@
 // panel-claims — assigns every edge cell and every T×T×T corner cube of the
-// box to exactly one panel (ADR-105). Each of the 12 cube edges gets ONE
+// box to exactly one panel (ADR-106). Each of the 12 cube edges gets ONE
 // shared alternating sequence (edge-pattern); each of the 8 corner cubes goes
 // to the highest-priority present panel, Z > Y > X. Both mating panels read
 // the same pattern object, so their claims are complementary by construction

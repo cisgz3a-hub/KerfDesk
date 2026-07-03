@@ -102,6 +102,9 @@ export type CncLayerSettings = {
   readonly plungeMmPerMin: number; // Z plunge feed
   readonly spindleRpm: number; // S value; GRBL $30 should equal spindleMaxRpm
   readonly stepoverPercent: number; // pocket ring spacing as % of tool diameter
+  // Pocket clearing strategy (ADR-105 G10). Absent = contour-parallel
+  // offset rings (the original behavior, byte-identical).
+  readonly pocketStrategy?: 'offset' | 'raster-x' | 'raster-y';
   readonly tabsEnabled: boolean; // profile cuts only
   readonly tabHeightMm: number; // material left under a tab
   readonly tabWidthMm: number; // tab length along the path

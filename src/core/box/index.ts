@@ -1,4 +1,4 @@
-// Public API of the box generator module (ADR-105).
+// Public API of the box generator module (ADR-106).
 
 export { generateBox, type BoxPanel, type GenerateBoxResult } from './generate-box';
 export {

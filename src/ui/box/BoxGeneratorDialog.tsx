@@ -1,5 +1,5 @@
 // BoxGeneratorDialog — the Phase K parametric finger-joint box form
-// (ADR-105, F-K1..F-K5): string drafts with calibration-dialog persistence,
+// (ADR-106, F-K1..F-K5): string drafts with calibration-dialog persistence,
 // live validation via the pure core, machine-aware defaults, and a preview
 // that keeps the last valid sheet while the draft is invalid. Generation is
 // disabled unless the core says the spec is valid.

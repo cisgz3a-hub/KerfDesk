@@ -170,7 +170,7 @@ Parametric finger-joint box generator producing cut-ready panels for both
 laser and CNC router modes — the first multi-panel parametric generator
 (Material Test precedent, ADR-044). Claim-model joinery designed against
 the two classic assembly failure classes (corner conflicts; fit
-compensation applied wrong) — see ADR-105. (Phase J stays reserved for
+compensation applied wrong) — see ADR-106. (Phase J stays reserved for
 macOS/Linux desktop, per ADR-104's renumbering note.)
 
 - Pure core `src/core/box/` (spec validation → per-edge finger patterns →
@@ -183,7 +183,7 @@ macOS/Linux desktop, per ADR-104's renumbering note.)
   0.15 mm CNC) and CNC corner-overcut relief (F-CNC26 convention).
 - v1: closed 6-panel + open-top 5-panel, inner/outer dimension toggle.
   Deferred: lids, dividers, engraved panel labels, dogbone/T-bone relief
-  styles (ADR-105 lists each as a staged follow-up).
+  styles (ADR-106 lists each as a staged follow-up).
 - Staged S0–S6, each an individually reviewable CI-green diff: docs →
   math core + virtual 3D assembly referee (property-tested exact joint
   complementarity) → fit/relief → layout/orchestrator → scene insertion →

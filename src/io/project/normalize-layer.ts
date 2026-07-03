@@ -58,6 +58,11 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
 function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, unknown> {
   return {
     ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
+    ...(raw['pocketStrategy'] === 'offset' ||
+    raw['pocketStrategy'] === 'raster-x' ||
+    raw['pocketStrategy'] === 'raster-y'
+      ? { pocketStrategy: raw['pocketStrategy'] }
+      : {}),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     ...(typeof raw['reliefFinishToolId'] === 'string'
       ? { reliefFinishToolId: raw['reliefFinishToolId'] }
