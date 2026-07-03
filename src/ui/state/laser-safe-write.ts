@@ -66,6 +66,9 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
           s.transcript,
           outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, writeSource),
         ),
+        ...(owesTerminalAck(line, writeSource)
+          ? { pendingUntrackedAcks: s.pendingUntrackedAcks + 1 }
+          : {}),
       }));
     } catch (err) {
       const message = serialWriteErrorMessage(err);
@@ -81,6 +84,16 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       throw err instanceof Error ? err : new Error(message);
     }
   };
+}
+
+// Every queued (newline-terminated) write earns exactly one terminal
+// ok/error from the controller, in strict receive order. Job-stream chunks
+// are excluded: their acks belong to the streamer's RX accounting. Realtime
+// bytes (?, !, ~, 0x18, 0x85, overrides) have no newline and no ack. The
+// line handler settles the counter when the terminal ack arrives, and Start
+// gates on it reaching zero.
+function owesTerminalAck(line: string, source: TranscriptSource): boolean {
+  return line.endsWith('\n') && source !== 'job';
 }
 
 function transcriptSourceForWrite(
