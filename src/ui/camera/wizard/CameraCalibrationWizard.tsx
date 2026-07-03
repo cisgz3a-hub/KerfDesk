@@ -1,4 +1,4 @@
-// CameraCalibrationWizard — the lens-calibration dialog (ADR-106 v2.e):
+// CameraCalibrationWizard — the lens-calibration dialog (ADR-107 v2.e):
 // describe the printed board, auto-capture diverse poses with live detection,
 // solve through the focal sweep, and gate Apply behind the A/B perceptual
 // check. State lives in camera-wizard-store; steps are thin renderers.

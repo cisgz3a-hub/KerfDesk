@@ -8,9 +8,10 @@ import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
 import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
+import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
-import { RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
+import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
@@ -55,6 +56,7 @@ export function App(): JSX.Element {
           <RegistrationJigPanel />
           <CameraPanel />
         </div>
+        <Cnc3DPane />
         <CutsLayersPanel />
         <LaserWindow />
       </main>
@@ -62,6 +64,7 @@ export function App(): JSX.Element {
       <Toasts />
       <PwaUpdatePrompt />
       <AddTextDialog />
+      <DesignLibraryDialog />
       <ImportImageDialog />
       <ConfirmSaveDialog />
     </div>

@@ -880,3 +880,6 @@ VERIFIED.
 | H.11/G8 spoilboard surfacing generator | **CLAIMED** | 2026-07-03: coverage/ladder/bracketing/determinism tests. Standalone program — air-run of a generated file pending (maintainer) |
 | H.11/G6 dogbone corner relief | **CLAIMED** | 2026-07-03: area/bounds tests (square 4-corner relief, L-shape reflex untouched, 12-gon refusal). Corner-overcut style PROVISIONAL. Geometry-only |
 | H.11/G7 start-from-line resume | **CLAIMED** | 2026-07-03: modal-replay preamble tests (spindle/feed/depth re-entry, laser Z-silence, G91/range refusals). **Highest-risk of the stretch set on hardware — resume into a real cut pending (maintainer)** |
+| ADR-105 G9 persistent 3D result pane | **CLAIMED** | 2026-07-03: **live-verified** — pane renders in CNC mode, goes live on inserted art, empties on impossible cuts, revives on engrave. UI-only |
+| ADR-105 G10 pocket raster fill (X/Y) | **CLAIMED** | 2026-07-03: sweep containment + axis + wall-last tests; default absent = byte-identical. Air-cut comparison vs offset rings pending (maintainer) |
+| ADR-105 G11 bundled design library (lucide ISC) | **CLAIMED** | 2026-07-03: **live-verified** — dialog categories render, Star inserted through the SVG pipeline. license-check green with the new dependency |

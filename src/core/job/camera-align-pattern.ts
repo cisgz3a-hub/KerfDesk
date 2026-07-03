@@ -1,4 +1,4 @@
-// Camera auto-alignment marker pattern (ADR-107, camera v3): the engraveable
+// Camera auto-alignment marker pattern (ADR-108, camera v3): the engraveable
 // scene for the 2×2 checker patches detectAlignMarkers finds. Five patches —
 // a PAIR at the origin corner (rotation disambiguator) and one per remaining
 // corner — each contributing two diagonal filled squares whose meeting point

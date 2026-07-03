@@ -1,4 +1,4 @@
-// CPU de-fisheye (ADR-106, v2.d) — the WebGL-free fallback and the verifiable
+// CPU de-fisheye (ADR-107, v2.d) — the WebGL-free fallback and the verifiable
 // reference the GPU shader mirrors. For each rectified output pixel it reads the
 // source pixel given by the rectify map and bilinearly samples it. Pure core:
 // operates on RGBA byte buffers, no canvas or DOM. Out-of-frame samples are

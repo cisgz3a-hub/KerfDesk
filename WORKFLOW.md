@@ -1951,6 +1951,63 @@ F-CNC19 tiling.
 1. Programs with no Z words never receive Z commands in the preamble —
    a laser resume re-fires at the recorded XY without touching Z.
 
+### F-CNC28. Watch the live 3D result while designing — ADR-105 G9
+
+#### Success
+1. In CNC mode a docked "3D result" pane sits between the canvas and the
+   layers panel, continuously simulating the CURRENT job: edit a shape,
+   change a depth, swap a bit — the heightfield re-renders (deferred so
+   typing stays smooth). Drag orbits, scroll zooms; depth is true to
+   scale. The collapse button shrinks it to a sliver.
+
+#### Error — no WebGL
+1. The pane shows "3D view unavailable in this browser" instead of
+   crashing.
+
+#### Empty
+1. With no output-enabled CNC content it shows a hint; a job whose cut
+   type cannot produce toolpaths (e.g. pocketing open line art) empties
+   the pane the same way — honest feedback, not an error.
+
+#### Edge — laser mode
+1. The pane never renders in laser mode.
+
+### F-CNC29. Choose the pocket fill method — ADR-105 G10
+
+#### Success
+1. Pocket layers gain a "Fill method" select: Offset rings (default) or
+   Raster X / Raster Y sweeps. Raster insets the region by the bit
+   radius, serpentine-sweeps it at the layer stepover, and runs the
+   finishing wall pass last.
+
+#### Empty
+1. Layers that never set the field keep offset rings — output is
+   byte-identical to pre-ADR-105.
+
+#### Edge — regions the bit cannot enter
+1. Features narrower than the bit produce no sweeps there (same rule as
+   rings); nothing gouges past the inset wall.
+
+### F-CNC30. Insert art from the design library — ADR-105 G11 (machine-agnostic)
+
+#### Success
+1. The tool strip's "Lib" button opens the bundled Design library:
+   categorized line-art (Animals / Nature / Symbols / Home & Food /
+   Hobby & Travel, lucide ISC). Clicking a design inserts it through the
+   normal SVG import pipeline as an engrave-ready vector object.
+
+#### Error — unparseable entry
+1. A failed parse toasts the name; nothing lands on the canvas.
+
+#### Empty
+1. The dialog always has the bundled set; the footer points at Import
+   SVG + CC0 sources (openclipart) for filled/larger artwork.
+
+#### Edge — pocketing library art
+1. Bundled icons are open stroke line art: engrave/on-path cut types
+   apply directly; pocketing requires closed shapes (draw or import
+   filled artwork instead).
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)
@@ -2015,7 +2072,7 @@ F-CNC19 tiling.
 
 ## Camera Mode flows
 
-### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-105)
+### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-106)
 
 - **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
   feed. They engrave the four alignment targets (reusing the registration jig), then drag the
@@ -2031,7 +2088,7 @@ F-CNC19 tiling.
   valid homography), the solve is rejected with "Move the alignment points apart — they can't
   form a rectangle"; the previous calibration, if any, is retained.
 
-### F-CAM2. Camera lens calibration wizard (v2 — ADR-106)
+### F-CAM2. Camera lens calibration wizard (v2 — ADR-107)
 
 - **Success / calibrated.** With the camera live, the operator opens "Calibrate
   lens…" from the Camera panel, describes their printed checkerboard (inner
@@ -2056,7 +2113,7 @@ F-CNC19 tiling.
   mid-session refuses to mix pixel bases and offers Reset; changing the board
   description discards captures taken against the old board.
 
-### F-CAM3. Workspace camera overlay (ADR-105 v1 wiring)
+### F-CAM3. Workspace camera overlay (ADR-106 v1 wiring)
 
 - **Success / overlay on canvas.** After aligning (F-CAM1), the operator presses
   "Save & show on canvas": the alignment persists on the device profile
@@ -2074,7 +2131,7 @@ F-CNC19 tiling.
 - **Edge / reload.** A corrupt persisted alignment is dropped on load (never
   trusted); the overlay simply stays off until re-aligned.
 
-### F-CAM4. Automatic marker alignment (v3 — ADR-107)
+### F-CAM4. Automatic marker alignment (v3 — ADR-108)
 
 - **Success / one-click align.** The operator presses "Add markers to project"
   (the scene is replaced by the five-patch pattern, like the other calibration
@@ -2095,7 +2152,7 @@ F-CNC19 tiling.
   labels the corners correctly — the origin pair, not the operator, carries
   the orientation.
 
-### F-CAM5. Trace from camera (v4 — ADR-108)
+### F-CAM5. Trace from camera (v4 — ADR-109)
 
 - **Success / trace in place.** With the camera aligned and live, the operator
   places an object on the bed and presses "Trace from camera": the frame is

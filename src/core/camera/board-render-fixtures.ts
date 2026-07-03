@@ -1,4 +1,4 @@
-// Synthetic checkerboard IMAGE renderer for the detector harness (ADR-106,
+// Synthetic checkerboard IMAGE renderer for the detector harness (ADR-107,
 // v2.b). calibrate-fixtures.ts projects ideal corner POINTS; the detector needs
 // whole frames, so this renders the pixels a known camera would record of a
 // known board pose via the shared plane renderer, colored by the checker

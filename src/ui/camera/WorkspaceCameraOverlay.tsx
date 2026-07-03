@@ -1,5 +1,5 @@
 // WorkspaceCameraOverlay — the persisted camera→bed alignment projected onto
-// the workspace canvas (ADR-105: the overlay that finally lets the operator
+// the workspace canvas (ADR-106: the overlay that finally lets the operator
 // place artwork over the REAL material). Mounts as a canvas-area sibling
 // (Workspace stays untouched); it measures its own box — which is the canvas's
 // box — and recomputes the same fit-to-bed view the canvas renderer uses, so

@@ -1,4 +1,4 @@
-// Reporting metrics for a solved fisheye calibration (ADR-106, v2.c): the per-corner
+// Reporting metrics for a solved fisheye calibration (ADR-107, v2.c): the per-corner
 // reprojection RMS the operator trusts, and the per-quadrant corner coverage the
 // wizard uses to coach the user toward an even capture. Pure core. Kept apart from
 // calibrate.ts so the orchestrator stays inside the size limit.

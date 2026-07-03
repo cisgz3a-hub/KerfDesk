@@ -1,4 +1,4 @@
-// CameraPanel — a minimal, non-modal preview panel for Camera Mode (ADR-105).
+// CameraPanel — a minimal, non-modal preview panel for Camera Mode (ADR-106).
 // This v1 slice wires the CAPTURE layer end to end so it can be tested on real
 // hardware: pick a camera, start the stream, and see the live feed. It does NOT
 // yet do the 4-point alignment or the warped bed overlay — those follow once the
@@ -30,7 +30,7 @@ export function CameraPanel(): JSX.Element {
         className="lf-btn"
         style={launcherStyle}
         onClick={toggle}
-        title="Open the camera preview (ADR-105)"
+        title="Open the camera preview (ADR-106)"
       >
         Camera
       </button>

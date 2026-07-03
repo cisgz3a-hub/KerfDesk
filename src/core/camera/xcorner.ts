@@ -1,4 +1,4 @@
-// X-corner (checkerboard saddle-point) candidate detection (ADR-106, v2.b).
+// X-corner (checkerboard saddle-point) candidate detection (ADR-107, v2.b).
 //
 // At a checkerboard inner corner the intensity around a small ring alternates
 // dark/light twice per revolution: samples 90° apart are OPPOSITE and samples

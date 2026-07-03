@@ -1,4 +1,4 @@
-// Frame capture for Camera Mode (ADR-106 wizard): copy the current <video>
+// Frame capture for Camera Mode (ADR-107 wizard): copy the current <video>
 // frame into an RgbaImage buffer, optionally downscaled. UI-layer because it
 // needs a DOM canvas; the pixels then flow into the pure detector/rectifier.
 

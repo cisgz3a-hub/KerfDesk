@@ -1,4 +1,4 @@
-// Pose-diversity check (ADR-106, v2.e). A planar calibration cannot separate focal
+// Pose-diversity check (ADR-107, v2.e). A planar calibration cannot separate focal
 // length from camera distance unless the board is seen at genuinely different tilts;
 // five near-identical shots converge to a low-RMS but WRONG K (the focal/depth
 // ambiguity). This pure check measures the angular spread of the solved view

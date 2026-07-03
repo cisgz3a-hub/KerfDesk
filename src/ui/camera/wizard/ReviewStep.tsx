@@ -1,5 +1,5 @@
 // ReviewStep — solve results and the A/B "Apply Calibration?" gate (the
-// OpenPnP-style perceptual check ADR-106 requires): the operator flips between
+// OpenPnP-style perceptual check ADR-107 requires): the operator flips between
 // the raw capture and its de-fisheyed render and applies only if the image
 // actually straightened. Apply persists onto the device profile (undoable).
 

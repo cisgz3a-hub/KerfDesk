@@ -1,4 +1,4 @@
-// Top-down bed warp (ADR-108, camera v4): resample a camera frame into bed
+// Top-down bed warp (ADR-109, camera v4): resample a camera frame into bed
 // millimetre space through the aligned homography, producing the registered
 // image capture-to-trace feeds the trace pipeline. Output→input sampling: for
 // each bed-space output pixel, the INVERSE homography gives the camera pixel

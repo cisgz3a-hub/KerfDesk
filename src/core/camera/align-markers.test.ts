@@ -1,4 +1,4 @@
-// Auto-alignment harness (ADR-107): marker detection and the solved
+// Auto-alignment harness (ADR-108): marker detection and the solved
 // image→bed homography are verified on RENDERED frames — including a camera
 // mounted 180° rotated (the origin pair must disambiguate it) and the
 // pro pipeline where the frame is de-fisheyed before aligning.

@@ -1,4 +1,4 @@
-// Sub-pixel corner refinement (ADR-106, calibration v2.b). At a true
+// Sub-pixel corner refinement (ADR-107, calibration v2.b). At a true
 // checkerboard corner every nearby image gradient is perpendicular to the
 // vector from the corner, so the refined point q solves
 //   (Σ g·gᵀ) q = Σ (g·gᵀ) p   over a Gaussian-weighted window, iterated.

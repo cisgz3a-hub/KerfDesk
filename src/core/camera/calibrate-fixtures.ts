@@ -1,4 +1,4 @@
-// Synthetic forward model for the calibration recovery harness (ADR-106, v2.c).
+// Synthetic forward model for the calibration recovery harness (ADR-107, v2.c).
 // Generates the exact pixels a known camera would record of a known board pose, so
 // calibrate() can be asked to invert them back to the ground-truth K/D. The rotation
 // here is an INDEPENDENT copy of Rodrigues on purpose — sharing rodrigues.ts would

@@ -376,7 +376,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - macOS / Linux desktop builds.
 - Node editing of imported paths.
 - Boolean ops.
-- ~~Camera alignment, overhead camera.~~ **Scoped by ADR-105** (Camera Mode —
+- ~~Camera alignment, overhead camera.~~ **Scoped by ADR-106** (Camera Mode —
   staged v1 manual 4-point overlay → v2 lens calibration → v3 fiducial /
   print-and-cut → v4 capture-to-trace) — no longer out of scope.
 - Rotary attachment.
