@@ -198,11 +198,38 @@ function handleErrorLine(
     state.motionOperation !== null ? { motionOperation: null, frameVerification: null } : {};
   set({
     lastError: code,
-    safetyNotice: controllerErrorNotice(code, controllerErrorContext(state), raw, rejectedLine),
+    ...errorNoticePatch(state, code, raw, rejectedLine),
     ...motionErrorPatch,
   });
   requestRealtimeStopAfterStreamError(state.streamer, refs.driver, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
+}
+
+// Stop (user or auto-stop-after-error) sends realtime reset plus a queued
+// beam-off line; the locked controller bounces that line with error:9. Those
+// echoes of a shutdown the app itself requested must not raise a fresh "the
+// laser may have fired out of place" banner — on a stream that is already
+// terminal the error is expected, and an existing notice is the root cause
+// the operator still needs to read (first notice wins, as in the settle
+// failure path).
+function errorNoticePatch(
+  state: LaserState,
+  code: number | null,
+  raw: string | undefined,
+  rejectedLine: string | undefined,
+): Partial<Pick<LaserState, 'safetyNotice'>> {
+  if (isStoppedStreamErrorEcho(state.streamer)) return {};
+  return {
+    safetyNotice:
+      state.safetyNotice ??
+      controllerErrorNotice(code, controllerErrorContext(state), raw, rejectedLine),
+  };
+}
+
+function isStoppedStreamErrorEcho(streamer: StreamerState | null): boolean {
+  return (
+    streamer !== null && ['cancelled', 'errored', 'disconnected'].includes(streamer.status)
+  );
 }
 
 // Checksum-mode retransmission is not implemented (ADR-094 v1): the sender
@@ -216,13 +243,14 @@ function handleResendLine(
   requestedLine: number,
 ): void {
   const current = get();
-  set({
-    safetyNotice: controllerErrorNotice(
+  set(
+    errorNoticePatch(
+      current,
       null,
-      controllerErrorContext(current),
       `Resend:${requestedLine} — line-number retransmission is not supported`,
+      undefined,
     ),
-  });
+  );
   requestRealtimeStopAfterStreamError(current.streamer, refs.driver, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }
