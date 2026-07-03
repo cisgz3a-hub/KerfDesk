@@ -15,6 +15,7 @@ import {
 } from '../../core/camera';
 import type { Vec2 } from '../../core/scene';
 import type { CameraAdapter, CameraDevice, CameraStream } from '../../platform/types';
+import { loadPreferredCameraId, savePreferredCameraId } from './camera-preference-storage';
 
 export type CameraStreamState =
   | { readonly kind: 'idle' }
@@ -69,6 +70,22 @@ export type CameraStore = {
 
 const ADAPTER_MISSING = 'Camera is not available on this platform';
 
+// Reselection policy on a device-list refresh: keep a still-valid deliberate
+// selection; else restore the remembered camera (the overhead one, not the
+// laptop lid one); else default to the first (drops the pre-permission blank
+// id).
+function nextSelectedDeviceId(
+  current: string | null,
+  cameras: ReadonlyArray<CameraDevice>,
+): string | null {
+  if (current !== null && current !== '' && cameras.some((c) => c.deviceId === current)) {
+    return current;
+  }
+  const preferred = loadPreferredCameraId();
+  if (preferred !== null && cameras.some((c) => c.deviceId === preferred)) return preferred;
+  return cameras[0]?.deviceId ?? null;
+}
+
 function cameraErrorMessage(err: unknown): string {
   if (err instanceof DOMException) {
     return err.message === '' ? err.name : `${err.name}: ${err.message}`;
@@ -115,17 +132,16 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   refreshCameras: async (camera) => {
     if (camera === undefined) return;
     const cameras = await camera.listCameras();
-    set((state) => {
-      const current = state.selectedDeviceId;
-      // Keep a deliberate selection only if it's a real id still in the list;
-      // otherwise default to the first camera (drops the pre-permission blank id).
-      const keep =
-        current !== null && current !== '' && cameras.some((c) => c.deviceId === current);
-      return { cameras, selectedDeviceId: keep ? current : (cameras[0]?.deviceId ?? null) };
-    });
+    set((state) => ({
+      cameras,
+      selectedDeviceId: nextSelectedDeviceId(state.selectedDeviceId, cameras),
+    }));
   },
 
-  selectCamera: (deviceId) => set({ selectedDeviceId: deviceId }),
+  selectCamera: (deviceId) => {
+    savePreferredCameraId(deviceId);
+    set({ selectedDeviceId: deviceId });
+  },
 
   startStream: async (camera) => {
     if (camera === undefined) {

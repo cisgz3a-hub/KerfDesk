@@ -52,8 +52,13 @@ function CameraPanelOpen(): JSX.Element {
   useEffect(() => {
     detectSupport(camera);
     void refreshCameras(camera);
+    // Probe the machine-integrated camera once on open; the button re-probes.
+    if (networkCamera.kind === 'idle') void detectNetworkCamera(camera);
     return () => stopStream();
-  }, [camera, detectSupport, refreshCameras, stopStream]);
+    // networkCamera is deliberately NOT a dependency: the probe fires once per
+    // panel open, not on every probe-state transition.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera, detectSupport, refreshCameras, detectNetworkCamera, stopStream]);
 
   return (
     <div role="dialog" aria-label="Camera preview" style={panelStyle}>
