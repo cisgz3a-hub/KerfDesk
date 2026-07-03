@@ -303,11 +303,32 @@
   font-weight: 600;
 }
 
+/* Dialog children must not flex-shrink: a shrunk step body keeps painting its
+   overflowing content (overflow: visible) straight across the actions row —
+   the Device Setup "Identify machine" grid visibly collided with
+   Cancel/Back/Next at zoom/short viewports. With shrink pinned to 0 the
+   panel's own overflow-y: auto takes over instead. */
+.lf-dialog > * {
+  flex-shrink: 0;
+}
+
 .lf-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--lf-space-4);
   margin-top: var(--lf-space-2);
+  /* Pin the actions row to the panel's visible bottom edge while long content
+     scrolls beneath it. Full-bleed negative margins cover the panel padding so
+     scrolled content cannot peek around the opaque footer band. */
+  position: sticky;
+  bottom: 0;
+  margin-bottom: calc(-1 * var(--lf-space-6));
+  margin-left: calc(-1 * var(--lf-space-6));
+  margin-right: calc(-1 * var(--lf-space-6));
+  padding: var(--lf-space-3) var(--lf-space-6) var(--lf-space-6);
+  background: var(--lf-bg-1);
+  border-top: 1px solid var(--lf-border);
+  border-radius: 0 0 var(--lf-radius-lg) var(--lf-radius-lg);
 }
 
 /* ---------- Panels / rails / cards ---------- */
