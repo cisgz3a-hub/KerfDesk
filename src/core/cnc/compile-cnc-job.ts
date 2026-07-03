@@ -38,7 +38,7 @@ import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
-import { pocketToolpathRings } from './pocket-paths';
+import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
 import { profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarvePasses } from './vcarve-ladder';
@@ -256,7 +256,7 @@ function xyToolpathsForCutType(
     case 'profile-on-path':
       return orderInnerFirst(profileToolpathPolylines(polylines, 'on-path', toolDiameterMm));
     case 'pocket':
-      return pocketToolpathRings(polylines, toolDiameterMm, settings.stepoverPercent);
+      return pocketToolpaths(polylines, settings, toolDiameterMm);
     case 'engrave':
       return polylines.filter((polyline) => polyline.points.length >= 2);
     case 'v-carve':
@@ -395,4 +395,22 @@ function capFeed(feedMmPerMin: number, maxFeed: number): number {
 function capSpindle(spindleRpm: number, spindleMaxRpm: number): number {
   if (!Number.isFinite(spindleRpm) || spindleRpm <= 0) return 0;
   return Math.min(spindleRpm, spindleMaxRpm);
+}
+
+// Pocket clearing strategy dispatch (ADR-105 G10): offset rings unless the
+// layer opted into raster sweeps.
+function pocketToolpaths(
+  polylines: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+  toolDiameterMm: number,
+): ReadonlyArray<Polyline> {
+  if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
+    return pocketToolpathRaster(
+      polylines,
+      toolDiameterMm,
+      settings.stepoverPercent,
+      settings.pocketStrategy === 'raster-x' ? 'x' : 'y',
+    );
+  }
+  return pocketToolpathRings(polylines, toolDiameterMm, settings.stepoverPercent);
 }

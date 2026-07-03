@@ -23,6 +23,7 @@ import {
   VClearToolSelect,
 } from './CncLayerToolFields';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
+import { PocketFillRow } from './PocketFillRow';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
@@ -87,6 +88,7 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
           onCommit={(stepoverPercent) => commit({ stepoverPercent })}
         />
       ) : null}
+      <PocketFillRow layer={layer} settings={settings} onCommit={commit} />
       <CutTypeSections
         layer={layer}
         settings={settings}

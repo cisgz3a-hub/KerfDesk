@@ -29,6 +29,7 @@ export function ToolStrip(): JSX.Element {
   const toolMode = useUiStore((s) => s.toolMode);
   const setToolMode = useUiStore((s) => s.setToolMode);
   const resetToolMode = useUiStore((s) => s.resetToolMode);
+  const setLibraryDialogOpen = useUiStore((s) => s.setLibraryDialogOpen);
   return (
     <aside aria-label="Drawing tools" className="lf-rail" style={stripStyle}>
       {TOOLS.map((tool) => (
@@ -45,6 +46,15 @@ export function ToolStrip(): JSX.Element {
           pressed={isActive(toolMode, tool.mode)}
         />
       ))}
+      <button
+        type="button"
+        aria-label="Open design library"
+        title="Insert ready-made line art from the bundled design library (ADR-105)."
+        onClick={() => setLibraryDialogOpen(true)}
+        style={libraryButtonStyle}
+      >
+        Lib
+      </button>
     </aside>
   );
 }
@@ -55,6 +65,12 @@ function isActive(current: ToolMode, tool: ToolMode): boolean {
   if (current.kind === 'measure') return tool.kind === 'measure';
   return tool.kind === 'draw' && tool.shape === current.shape;
 }
+
+const libraryButtonStyle: React.CSSProperties = {
+  marginTop: 'var(--lf-space-4)',
+  fontSize: 11,
+  padding: '6px 4px',
+};
 
 const stripStyle: React.CSSProperties = {
   display: 'flex',

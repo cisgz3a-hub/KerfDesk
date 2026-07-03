@@ -12,6 +12,7 @@
 // avoid accumulating clipper approximation error across many rings.
 
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
+import { fillHatching } from '../job/fill-hatching';
 import type { Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
 
@@ -56,4 +57,33 @@ export function pocketToolpathRings(
 function clampStepoverPercent(stepoverPercent: number): number {
   if (!Number.isFinite(stepoverPercent)) return MIN_STEPOVER_PERCENT;
   return Math.min(MAX_STEPOVER_PERCENT, Math.max(MIN_STEPOVER_PERCENT, stepoverPercent));
+}
+
+// Raster pocket clearing (ADR-105 G10) — Easel's Fill Method raster X/Y.
+// The region reachable by the bit CENTER is the contour inset by one radius;
+// serpentine sweeps at the stepover spacing clear it, then the inset
+// perimeter runs last as the finishing wall pass.
+export function pocketToolpathRaster(
+  polylines: ReadonlyArray<Polyline>,
+  toolDiameterMm: number,
+  stepoverPercent: number,
+  axis: 'x' | 'y',
+): ReadonlyArray<Polyline> {
+  const contours = polylines.filter(
+    (polyline) =>
+      polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
+  );
+  if (contours.length === 0 || !(toolDiameterMm > 0)) return [];
+  const radius = toolDiameterMm / 2;
+  const stepMm = (clampStepoverPercent(stepoverPercent) / 100) * toolDiameterMm;
+  const wall = offsetClosedPolylinesForKerf(contours, -radius);
+  if (wall.length === 0) return [];
+  const sweeps = fillHatching({
+    polylines: wall,
+    hatchAngleDeg: axis === 'x' ? 0 : 90,
+    hatchSpacingMm: stepMm,
+    fillRule: 'nonzero',
+    bidirectional: true,
+  });
+  return [...sweeps, ...wall];
 }
