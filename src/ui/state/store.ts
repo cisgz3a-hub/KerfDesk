@@ -4,6 +4,7 @@
 // to satisfy ADR-015's function-size rule.
 
 import { create } from 'zustand';
+import type { BoxPanel } from '../../core/box';
 import type { DeviceProfile } from '../../core/devices';
 import {
   createProject,
@@ -217,6 +218,9 @@ export type AppState = ObjectPropertiesActions &
     readonly upsertTextObject: (text: TextObject) => void;
     // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
     readonly drawShape: (shape: ShapeObject) => void;
+    // Phase K (ADR-105): insert a generated box panel sheet — one polyline
+    // shape per panel, one undo step, every panel selected.
+    readonly insertBoxPanels: (panels: ReadonlyArray<BoxPanel>) => void;
     // ADR-057: add (or replace) the registration jig box on the reserved
     // registration layer. Width/height in mm; a new box centers on the bed, a
     // replace keeps the existing box's position and lock state.
