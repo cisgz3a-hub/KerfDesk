@@ -2073,3 +2073,24 @@ F-CNC19 tiling.
   (no still, feed stopped) nothing renders.
 - **Edge / reload.** A corrupt persisted alignment is dropped on load (never
   trusted); the overlay simply stays off until re-aligned.
+
+### F-CAM4. Automatic marker alignment (v3 — ADR-107)
+
+- **Success / one-click align.** The operator presses "Add markers to project"
+  (the scene is replaced by the five-patch pattern, like the other calibration
+  generators), burns it on scrap covering the bed corners, clears the bed of
+  everything else, and presses Auto-align with the camera live. The five
+  X-corners are detected, the origin pair resolves the camera's rotation, the
+  homography solves, and the alignment persists (undoable) — the workspace
+  overlay is immediately registered. With a lens calibration present the
+  capture is de-fisheyed first and the toast says "lens-corrected".
+- **Error / markers not found.** A cluttered bed, missing patches, or poor
+  lighting produce a typed toast telling the operator what to fix; nothing
+  persists. A degenerate solve (markers nearly collinear) is refused the same
+  way.
+- **Empty / no live feed.** Auto-align is disabled until the camera feed runs;
+  the Falcon network camera cannot auto-align (its frames block pixel
+  readback) and keeps the manual 4-corner click flow.
+- **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
+  labels the corners correctly — the origin pair, not the operator, carries
+  the orientation.

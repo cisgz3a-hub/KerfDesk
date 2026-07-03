@@ -14,6 +14,7 @@ import {
   useCameraStore,
 } from '../state/camera-store';
 import type { CameraAdapter } from '../../platform/types';
+import { AutoAlignControls } from './AutoAlignControls';
 import { NetworkCameraView } from './NetworkCameraView';
 import { OverlayControls } from './OverlayControls';
 import { CameraCalibrationWizard } from './wizard/CameraCalibrationWizard';
@@ -80,6 +81,7 @@ function CameraPanelOpen(): JSX.Element {
           machine camera above does not need it.
         </p>
       )}
+      <AutoAlignControls />
       <OverlayControls />
     </div>
   );

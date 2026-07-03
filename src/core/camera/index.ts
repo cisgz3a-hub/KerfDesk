@@ -50,3 +50,5 @@ export {
   solveSession,
 } from './calibration-session';
 export type { CalibrationSession } from './calibration-session';
+export { alignMarkerLayout, detectAlignMarkers, solveMarkerAlignment } from './align-markers';
+export type { AlignMarkerLayout, MarkerDetection, MarkerFailure } from './align-markers';
