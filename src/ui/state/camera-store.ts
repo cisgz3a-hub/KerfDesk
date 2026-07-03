@@ -1,0 +1,143 @@
+// camera-store — ephemeral Zustand store for Camera Mode (ADR-105): the live
+// overhead-camera stream plus the 4-point manual alignment flow. Not project
+// data and not undoable, so it lives outside the project store (like ui-store).
+//
+// I/O actions take the CameraAdapter as an argument (the same dependency-
+// injection pattern as laser-store's connect(adapter)), so the store stays
+// testable with a fake adapter and never imports platform/web directly.
+
+import { create } from 'zustand';
+import { addAlignmentPoint, beginAlignment, type AlignmentState } from '../../core/camera';
+import type { Vec2 } from '../../core/scene';
+import type { CameraAdapter, CameraDevice, CameraStream } from '../../platform/types';
+
+export type CameraStreamState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'starting' }
+  | { readonly kind: 'live'; readonly stream: CameraStream }
+  | { readonly kind: 'denied' }
+  | { readonly kind: 'error'; readonly message: string };
+
+export type NetworkCameraState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'detecting' }
+  | { readonly kind: 'found'; readonly frameUrl: string }
+  | { readonly kind: 'not-found' };
+
+export type CameraStore = {
+  readonly isSupported: boolean;
+  readonly cameras: ReadonlyArray<CameraDevice>;
+  readonly selectedDeviceId: string | null;
+  readonly stream: CameraStreamState;
+  readonly alignment: AlignmentState;
+  // Bumped on every stop/restart so an in-flight openStream that resolves late
+  // can tell it has been superseded and release its now-orphaned stream.
+  readonly streamEpoch: number;
+  // The machine-integrated HTTP camera (Falcon A1 Pro) found by auto-detect.
+  readonly networkCamera: NetworkCameraState;
+
+  readonly detectSupport: (camera: CameraAdapter | undefined) => void;
+  readonly detectNetworkCamera: (camera: CameraAdapter | undefined) => Promise<void>;
+  readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
+  readonly selectCamera: (deviceId: string) => void;
+  readonly startStream: (camera: CameraAdapter | undefined) => Promise<void>;
+  readonly stopStream: () => void;
+  readonly beginAlignment: (targets: ReadonlyArray<Vec2>) => void;
+  readonly addAlignmentPoint: (pixel: Vec2) => void;
+  readonly resetAlignment: () => void;
+};
+
+const ADAPTER_MISSING = 'Camera is not available on this platform';
+
+function cameraErrorMessage(err: unknown): string {
+  if (err instanceof DOMException) {
+    return err.message === '' ? err.name : `${err.name}: ${err.message}`;
+  }
+  if (err instanceof Error && err.message !== '') return err.message;
+  return 'Failed to open the camera';
+}
+
+export const useCameraStore = create<CameraStore>((set, get) => ({
+  isSupported: false,
+  cameras: [],
+  selectedDeviceId: null,
+  stream: { kind: 'idle' },
+  alignment: { kind: 'idle' },
+  streamEpoch: 0,
+  networkCamera: { kind: 'idle' },
+
+  detectSupport: (camera) => set({ isSupported: camera?.isSupported() ?? false }),
+
+  detectNetworkCamera: async (camera) => {
+    if (camera === undefined) {
+      set({ networkCamera: { kind: 'not-found' } });
+      return;
+    }
+    set({ networkCamera: { kind: 'detecting' } });
+    const found = await camera.discoverNetworkCamera();
+    set({
+      networkCamera:
+        found === null ? { kind: 'not-found' } : { kind: 'found', frameUrl: found.frameUrl },
+    });
+  },
+
+  refreshCameras: async (camera) => {
+    if (camera === undefined) return;
+    const cameras = await camera.listCameras();
+    set((state) => {
+      const current = state.selectedDeviceId;
+      // Keep a deliberate selection only if it's a real id still in the list;
+      // otherwise default to the first camera (drops the pre-permission blank id).
+      const keep =
+        current !== null && current !== '' && cameras.some((c) => c.deviceId === current);
+      return { cameras, selectedDeviceId: keep ? current : (cameras[0]?.deviceId ?? null) };
+    });
+  },
+
+  selectCamera: (deviceId) => set({ selectedDeviceId: deviceId }),
+
+  startStream: async (camera) => {
+    if (camera === undefined) {
+      set({ stream: { kind: 'error', message: ADAPTER_MISSING } });
+      return;
+    }
+    get().stopStream(); // stop any current stream and bump the epoch
+    const epoch = get().streamEpoch;
+    set({ stream: { kind: 'starting' } });
+    const deviceId = get().selectedDeviceId ?? undefined;
+    try {
+      const opened = await camera.openStream(deviceId);
+      if (get().streamEpoch !== epoch) {
+        // A newer start/stop superseded us while opening — release the
+        // orphaned stream so the camera doesn't stay on.
+        opened?.stop();
+        return;
+      }
+      if (opened === null) {
+        set({ stream: { kind: 'denied' } });
+        return;
+      }
+      set({ stream: { kind: 'live', stream: opened } });
+      // Permission is granted now, so device labels/ids are finally readable —
+      // refresh the list so the picker can show real names (the overhead USB
+      // camera vs the built-in laptop one).
+      void get().refreshCameras(camera);
+    } catch (err) {
+      if (get().streamEpoch !== epoch) return;
+      set({ stream: { kind: 'error', message: cameraErrorMessage(err) } });
+    }
+  },
+
+  stopStream: () => {
+    const current = get().stream;
+    if (current.kind === 'live') current.stream.stop();
+    set((state) => ({ stream: { kind: 'idle' }, streamEpoch: state.streamEpoch + 1 }));
+  },
+
+  beginAlignment: (targets) => set({ alignment: beginAlignment(targets) }),
+
+  addAlignmentPoint: (pixel) =>
+    set((state) => ({ alignment: addAlignmentPoint(state.alignment, pixel) })),
+
+  resetAlignment: () => set({ alignment: { kind: 'idle' } }),
+}));

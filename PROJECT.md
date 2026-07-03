@@ -376,7 +376,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - macOS / Linux desktop builds.
 - Node editing of imported paths.
 - Boolean ops.
-- Camera alignment, overhead camera.
+- ~~Camera alignment, overhead camera.~~ **Scoped by ADR-105** (Camera Mode —
+  staged v1 manual 4-point overlay → v2 lens calibration → v3 fiducial /
+  print-and-cut → v4 capture-to-trace) — no longer out of scope.
 - Rotary attachment.
 - Auto-focus, Z-axis control beyond initial homing — **laser mode only**.
   Phase H CNC router mode is inherently Z-aware (plunges, depth passes,
