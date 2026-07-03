@@ -38,10 +38,13 @@ function makeAdapter(connection: SerialConnection): PlatformAdapter {
 async function connectWith(connection: FakeConnection): Promise<void> {
   await useLaserStore.getState().connect(makeAdapter(connection));
   connection.emitLine('Grbl 1.1f');
-  await Promise.resolve();
+  // Several microtask hops before the handshake's $$ write lands and starts
+  // the collector — flush fully so the dump below closes it and settles the
+  // write's owed ack (startJob gates on the drain).
+  await flush();
   connection.emitLine('$30=900');
   connection.emitLine('ok');
-  await Promise.resolve();
+  await flush();
 }
 
 async function flush(): Promise<void> {

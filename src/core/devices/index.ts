@@ -51,6 +51,8 @@ export {
 } from './profile-catalog';
 export type { MachineBounds } from './machine-bounds';
 export { machineBoundsForDevice } from './machine-bounds';
+export type { JogAxisSigns } from './jog-direction';
+export { jogAxisSignsForOrigin } from './jog-direction';
 export { toMachineCoords, toSceneCoords } from './origin-transform';
 export type { ScanOffsetPoint } from './scan-offset-profile';
 export { isScanOffsetTable, normalizeScanOffsetTable } from './scan-offset-profile';

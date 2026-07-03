@@ -57,22 +57,60 @@ export function repairJunctionSeams(
 
 /** Snap every open-chain endpoint that sits ON a junction onto the nearest
  *  other polyline within reach — through-paths were straightened away from
- *  the junction point, and the branch must keep touching them. */
+ *  the junction point, and the branch must keep touching them.
+ *
+ *  When `openEndWeldReachPx` is set (edge mode), EVERY open end that stops
+ *  just short of another polyline welds onto it, provided its outward
+ *  tangent points toward the landing spot — Canny drops pixels wherever
+ *  edges meet (gradient direction is ambiguous at junctions), so edge maps
+ *  are full of lines ending a hair before the line they visibly join. The
+ *  tangent gate keeps parallel passers-by unwelded. */
 export function weldBranchEnds(
   polylines: ReadonlyArray<{ points: Vec2[]; closed: boolean; alive: boolean }>,
   junctions: ReadonlyArray<Vec2>,
+  openEndWeldReachPx = 0,
 ): void {
   for (const chain of polylines) {
     if (!chain.alive || chain.closed || chain.points.length < 2) continue;
-    for (const which of ['start', 'end'] as const) {
-      const end = which === 'start' ? chain.points[0] : chain.points.at(-1);
-      if (end === undefined || !isJunctionPoint(end, junctions)) continue;
-      const foot = nearestFootOnOthers(end, chain, polylines);
-      if (foot === null) continue;
-      if (which === 'start') chain.points[0] = foot;
-      else chain.points[chain.points.length - 1] = foot;
-    }
+    weldChainEnd(chain, 'start', polylines, junctions, openEndWeldReachPx);
+    weldChainEnd(chain, 'end', polylines, junctions, openEndWeldReachPx);
   }
+}
+
+function weldChainEnd(
+  chain: { points: Vec2[]; closed: boolean; alive: boolean },
+  which: 'start' | 'end',
+  polylines: ReadonlyArray<{ points: Vec2[]; closed: boolean; alive: boolean }>,
+  junctions: ReadonlyArray<Vec2>,
+  openEndWeldReachPx: number,
+): void {
+  const end = which === 'start' ? chain.points[0] : chain.points.at(-1);
+  if (end === undefined) return;
+  const atJunction = isJunctionPoint(end, junctions);
+  const reach = atJunction ? WELD_REACH_PX : openEndWeldReachPx;
+  if (reach <= 0) return;
+  const foot = nearestFootOnOthers(end, chain, polylines, reach);
+  if (foot === null) return;
+  if (!atJunction && !endApproaches(chain.points, which, foot)) return;
+  if (which === 'start') chain.points[0] = foot;
+  else chain.points[chain.points.length - 1] = foot;
+}
+
+// The end's outward continuation must point toward the weld target — a line
+// merely passing parallel to another must not sideways-snap onto it.
+const MIN_WELD_APPROACH_DOT = 0.2;
+
+function endApproaches(pts: ReadonlyArray<Vec2>, which: 'start' | 'end', foot: Vec2): boolean {
+  const end = which === 'start' ? pts[0] : pts.at(-1);
+  const inner = which === 'start' ? pts[1] : pts.at(-2);
+  if (end === undefined || inner === undefined) return false;
+  const outLen = Math.hypot(end.x - inner.x, end.y - inner.y);
+  const toFootLen = Math.hypot(foot.x - end.x, foot.y - end.y);
+  if (outLen < MATCH_EPS || toFootLen < MATCH_EPS) return true;
+  const dot =
+    ((end.x - inner.x) / outLen) * ((foot.x - end.x) / toFootLen) +
+    ((end.y - inner.y) / outLen) * ((foot.y - end.y) / toFootLen);
+  return dot >= MIN_WELD_APPROACH_DOT;
 }
 
 function isJunctionPoint(p: Vec2, junctions: ReadonlyArray<Vec2>): boolean {
@@ -184,9 +222,10 @@ function nearestFootOnOthers(
   end: Vec2,
   own: { points: Vec2[] },
   polylines: ReadonlyArray<{ points: Vec2[]; closed: boolean; alive: boolean }>,
+  reachPx: number,
 ): Vec2 | null {
   let best: Vec2 | null = null;
-  let bestDist = WELD_REACH_PX;
+  let bestDist = reachPx;
   for (const other of polylines) {
     if (!other.alive || other === own || other.points.length < 2) continue;
     const count = other.points.length + (other.closed ? 0 : -1);
