@@ -4162,3 +4162,108 @@ numbers win.
   this table).
 - ADR-099 is retired unused; the number stays reserved to avoid a third
   meaning. Next free ADR: **105**.
+
+## ADR-105 — Parametric finger-joint box generator: claim-model joinery (2026-07-03)
+
+**Status:** accepted (maintainer-approved build plan, 2026-07-03).
+
+### Context
+
+Operators want cut-ready finger-joint boxes for both laser and CNC
+router modes. A previous attempt failed because the 2D panel math did
+not encode the 3D assembly: panels rotate 90° into place, material
+thickness eats into each mating panel, and the cutting process (laser
+kerf / endmill radius) changes fit. Behavior research on MakerCase
+(reverse-engineering study) and boxes.py (docs only — GPL, no code
+copying per ADR-017) isolates the two classic failure classes this
+design is built around:
+
+1. **Corner conflicts.** Three panels meet at each cube corner; naive
+   per-edge tab math either double-claims the T×T×T corner cube (parts
+   collide — cannot assemble) or never claims it (visible hole).
+   MakerCase's own study lists corner fillers as a known deferred gap.
+2. **Fit compensation applied wrong.** Kerf widening done per-tab
+   instead of as a uniform contour offset, or CNC interior corners left
+   square so square tabs cannot seat (missing relief).
+
+### Decision — own math, built against those two failures
+
+- **One sequence per cube edge.** Each of the 12 cube edges is shared
+  by exactly two panels. Per edge ONE alternating cell sequence is
+  computed — odd cell count `n` = largest odd ≤ span/targetFingerWidth,
+  clamped ≥ 3 (`1` for tiny spans), cell width `f = span/n` — and BOTH
+  panels derive material ownership from that one sequence: A owns
+  exactly what B does not. Complementarity holds by construction;
+  both-tabs / neither-tab is unrepresentable. Odd count ⇒ symmetric ⇒
+  opposite panels stay interchangeable.
+- **Corner rule.** Each of the 8 T×T×T corner cubes has exactly one
+  claimant: global axis priority **Z > Y > X** (top/bottom > front/back
+  > left/right) among *present* panels. Open-top: corner cells that
+  would belong to the missing top fall to the next-priority panel.
+- **Outline walk.** Panel outline = closed rectilinear polygon walked
+  from claims: boundary at the outer face line where a cell is owned,
+  recessed by T where the mate owns it. No holes in v1 (dividers later).
+- **Fit — division of labor (nothing duplicated).** Laser beam width
+  stays in per-layer kerf compensation (`kerf-offset.ts` at compile;
+  nominal = line-to-line press fit — LightBurn parity: kerf lives in
+  cut settings, not the drawing). CNC cutter compensation stays in
+  `profile-paths.ts` (`profile-outside`). The generator bakes exactly
+  two things:
+  1. **Clearance `c`** (signed, + = looser; default 0 laser = press
+     fit, 0.15 mm CNC = glue fit): every panel polygon offset by −c/2
+     via `offsetClosedPolylinesForKerf` — tabs narrow c/2 per side,
+     recesses widen ⇒ total joint play = c, uniformly. Never per-tab
+     arithmetic.
+  2. **CNC corner relief** in the shipped F-CNC26 corner-overcut
+     convention (`dogbone.ts` precedent): a circle of one bit RADIUS
+     centered ON the seat-critical reflex corner vertices, subtracted
+     from the panel. The generator knows which corners mate, so it
+     relieves exactly those (not `dogboneVectorObject`, which unions
+     circles into cutout regions and blankets all sharp corners).
+     **Ordering pinned: clearance offset FIRST, then reliefs at full
+     bit radius** — offsetting after would shrink reliefs below tool
+     diameter. Laser mode: no reliefs.
+- **Modules.** Pure core `src/core/box/` (box-spec, edge-pattern,
+  panel-claims, panel-outline, panel-fit, layout, generate-box) — NOT
+  `core/shapes` (its index is at export capacity). UI `src/ui/box/`
+  (dialog + canvas preview). Insertion wraps panels into ordinary
+  `kind:'shape'` polyline objects via the existing `createPolyline`
+  (ids injected UI-side via `crypto.randomUUID()`, ONE undo step,
+  `ensureLayersForColors`, all inserted panels selected, ungrouped).
+  Compile/preview/emit untouched; zero G-code snapshot churn.
+- **Validation.** Pure `Result`-style union, no throws: dims/T > 0;
+  inner dims stay positive when derived; finger width clamped to
+  [max(2mm, T), span/3]; CNC: `f > toolDiameter` (error) and warn when
+  `f < 2·toolDiameter`; `|c| < min(f, T)/2`. Violations →
+  `{ kind:'invalid', issues }` rendered in the dialog; generation
+  disabled.
+- **v1 scope.** Closed 6-panel + open-top 5-panel; inner dimensions
+  default (what the contents need), outer via toggle. Deferred as
+  staged follow-ups: lids (slide/hinged), dividers, engraved panel
+  labels (needs the io/text pipeline — unreachable from pure core),
+  dogbone/T-bone relief styles (same future-refinement note as
+  `dogbone.ts`).
+
+### Verification (green structural tests ≠ fit — CLAUDE.md rule 2)
+
+1. **Virtual 3D assembly referee** (fast-check, 100 runs, predicates in
+   `src/__fixtures__/property/`): map each derived panel polygon into
+   box coordinates via its placement (this encodes "panels turn
+   sideways"), extract both panels' exact 1D occupancy intervals along
+   each shared edge band — computed from the OUTPUT polygons, not the
+   internal claim model. Assert: nominal ⇒ exactly complementary (zero
+   overlap, zero gap); with clearance ⇒ uniform play ≈ c within 2·10⁻³
+   (clipper rounds to 3 decimals), never interference; each cube corner
+   has exactly one claimant (closed box). Fuzz: W,D,H ∈ [20,600],
+   T ∈ [1,25], finger ∈ [1.5T,5T], open/closed, c ∈ [0,0.5].
+2. **Invariants:** assembled outer bbox == outer dims exactly; every
+   polygon simple and closed; reliefs only at reflex corners, only when
+   CNC, diameter == tool diameter; determinism (same spec ⇒
+   JSON-identical output — core has zero RNG).
+3. **Perceptual fixture** (ADR-025 harness): render the generated sheet
+   for a canonical spec; IoU vs analytic expectation + opt-in PNG
+   artifact for human eyeballing.
+4. **Hardware:** physical fit is NOT software-verifiable — the feature
+   lands CLAIMED per AUDIT.md convention with a named pending check:
+   cut a 60×40×30 mm, T=3 box on the Falcon (laser) / 4040 (router)
+   and assemble it.

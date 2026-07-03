@@ -164,6 +164,33 @@ driver refactor is byte-identical on real hardware, since the Falcon's normal
 Marlin / Smoothieware / Ruida = simulator-verified only, labeled `unverified` in
 catalog evidence and (for .rd) warned on every export.
 
+### Phase K — v0.10 "Box generator" [Approved; staged]
+
+Parametric finger-joint box generator producing cut-ready panels for both
+laser and CNC router modes — the first multi-panel parametric generator
+(Material Test precedent, ADR-044). Claim-model joinery designed against
+the two classic assembly failure classes (corner conflicts; fit
+compensation applied wrong) — see ADR-105. (Phase J stays reserved for
+macOS/Linux desktop, per ADR-104's renumbering note.)
+
+- Pure core `src/core/box/` (spec validation → per-edge finger patterns →
+  panel claims → outline walk → fit/relief → sheet layout); UI dialog +
+  preview in `src/ui/box/`; panels insert as ordinary `kind:'shape'`
+  polyline objects in one undo step. Compile/preview/emit untouched.
+- Fit: laser kerf compensation and CNC cutter compensation stay where
+  they live today (layer cut settings / profile-outside). The generator
+  bakes only joint clearance (uniform contour offset; default 0 laser,
+  0.15 mm CNC) and CNC corner-overcut relief (F-CNC26 convention).
+- v1: closed 6-panel + open-top 5-panel, inner/outer dimension toggle.
+  Deferred: lids, dividers, engraved panel labels, dogbone/T-bone relief
+  styles (ADR-105 lists each as a staged follow-up).
+- Staged S0–S6, each an individually reviewable CI-green diff: docs →
+  math core + virtual 3D assembly referee (property-tested exact joint
+  complementarity) → fit/relief → layout/orchestrator → scene insertion →
+  dialog/preview → wiring + AUDIT. Physical fit lands CLAIMED
+  (WORKFLOW.md Phase K flows, AUDIT.md row) until a real box is cut and
+  assembled.
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
