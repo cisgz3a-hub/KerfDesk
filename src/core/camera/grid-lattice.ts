@@ -1,4 +1,4 @@
-// Checkerboard lattice recovery (ADR-107, v2.b): organize X-corner candidates
+// Checkerboard lattice recovery (ADR-108, v2.b): organize X-corner candidates
 // into the ordered rows×cols inner-corner grid. Strategy: seed at a strong
 // candidate near the cloud's centre, estimate the two local lattice basis
 // vectors from its nearest neighbours, then breadth-first grow integer grid

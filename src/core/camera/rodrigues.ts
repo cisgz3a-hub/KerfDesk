@@ -1,4 +1,4 @@
-// Axis-angle <-> rotation-matrix conversion (Rodrigues), ADR-107 calibration v2.c.
+// Axis-angle <-> rotation-matrix conversion (Rodrigues), ADR-108 calibration v2.c.
 // The LM solver parameterises each view's orientation as a 3-vector rvec whose
 // direction is the rotation axis and whose magnitude is the angle; the forward map
 // builds the matrix, the inverse (SO(3) log map) recovers rvec for the warm-start

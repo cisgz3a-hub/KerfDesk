@@ -1,4 +1,4 @@
-// Live checkerboard detection over a playing <video> (ADR-107 wizard). Every
+// Live checkerboard detection over a playing <video> (ADR-108 wizard). Every
 // tick grabs a downscaled frame, runs the pure detector, and reports corners
 // scaled back to full-resolution camera pixels — the coordinates the solve
 // captures use. Also tracks how many consecutive ticks detected, so

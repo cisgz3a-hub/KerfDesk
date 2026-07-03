@@ -1,4 +1,4 @@
-// De-fisheye rectify map (ADR-107, v2.d). For every pixel of the rectified
+// De-fisheye rectify map (ADR-108, v2.d). For every pixel of the rectified
 // (pinhole) output image, compute which pixel of the distorted source frame to
 // sample. This is the math the WebGL undistort shader runs per fragment, and the
 // CPU fallback for contexts without WebGL. Pure core: math only, no I/O.

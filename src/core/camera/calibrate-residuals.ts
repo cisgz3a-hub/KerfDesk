@@ -1,4 +1,4 @@
-// Reprojection residuals for fisheye calibration (ADR-107, v2.c). Given a flat LM
+// Reprojection residuals for fisheye calibration (ADR-108, v2.c). Given a flat LM
 // parameter vector and a fixed set of board observations, build the constant-length
 // residual vector the minimiser drives to zero: for each view and corner, apply the
 // pose to the planar board point and project through the existing KB fisheye model.

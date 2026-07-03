@@ -1,4 +1,4 @@
-// Robust initial guess for fisheye calibration (ADR-107, v2.c). Levenberg-Marquardt
+// Robust initial guess for fisheye calibration (ADR-108, v2.c). Levenberg-Marquardt
 // needs a seed inside the basin of attraction; under Falcon-class barrel distortion
 // Zhang's pinhole closed-form for K is numerically unsafe (it factorises a negative
 // focal), so we seed K from the caller's device-nominal focal and D=0, and trust a

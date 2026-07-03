@@ -1,4 +1,4 @@
-// Synthetic bed-with-alignment-markers renderer (ADR-108 harness): the frame a
+// Synthetic bed-with-alignment-markers renderer (ADR-109 harness): the frame a
 // known camera records of a bed carrying the engraved marker pattern, so
 // detectAlignMarkers is verified from pixels. Engraving contrast is moderate
 // (dark burn on light material), unlike the printed board's near-black ink.

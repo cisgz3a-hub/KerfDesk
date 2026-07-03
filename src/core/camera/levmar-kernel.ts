@@ -1,4 +1,4 @@
-// Numeric kernels for the Levenberg-Marquardt driver (ADR-107, calibration v2.c):
+// Numeric kernels for the Levenberg-Marquardt driver (ADR-108, calibration v2.c):
 // residual evaluation, the central-difference linearization (cost, gradient,
 // Gauss-Newton Hessian), the damped normal-equation step, and the small vector
 // reductions the driver iterates over. Pure: no clock, RNG, or I/O. Split from

@@ -1,4 +1,4 @@
-// Calibration capture session (ADR-107, v2.e) — the pure state machine the wizard
+// Calibration capture session (ADR-108, v2.e) — the pure state machine the wizard
 // renders. It accumulates board captures, runs the solver once enough are collected,
 // and folds in the trust and pose-diversity assessments so the UI stays a thin
 // renderer of a discriminated-union state. Pure core: no I/O, deterministic.
@@ -15,7 +15,7 @@ import { checkPoseDiversity, type PoseDiversityVerdict } from './pose-diversity'
 
 type SolvedCalibration = Extract<CalibrationResult, { readonly kind: 'ok' }>;
 
-/** Minimum board captures before the wizard offers to solve (ADR-107: ~5 poses). */
+/** Minimum board captures before the wizard offers to solve (ADR-108: ~5 poses). */
 export const MIN_CALIBRATION_VIEWS = 5;
 
 export type CalibrationSession =

@@ -1,4 +1,4 @@
-// Persisted camera→bed alignment (ADR-106 v1, persistence closing the F-CAM1
+// Persisted camera→bed alignment (ADR-107 v1, persistence closing the F-CAM1
 // promise). The solved 4-point homography plus the camera-pixel basis it was
 // solved in, stored on DeviceProfile so the workspace overlay survives reload.
 // `basis` records whether the clicked pixels were raw (distorted) or already

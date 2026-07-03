@@ -1,4 +1,4 @@
-// Shared synthetic plane renderer for camera test fixtures (ADR-107/108):
+// Shared synthetic plane renderer for camera test fixtures (ADR-108/109):
 // renders the frame a known camera records of the z=0 plane, shading each
 // plane point through a caller-supplied function. board-render-fixtures
 // (checkerboard) and marker-render-fixtures (alignment patches) both build on

@@ -126,10 +126,10 @@ export type DeviceProfile = {
   // Bidirectional fill/raster compensation. Empty keeps emitted output
   // unchanged until the operator calibrates a machine-specific table.
   readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
-  // Overhead-camera de-fisheye calibration (ADR-106/107). Absent until the operator
+  // Overhead-camera de-fisheye calibration (ADR-107/108). Absent until the operator
   // runs the calibration wizard; persisted so the rectified overlay survives reload.
   readonly cameraCalibration?: CameraCalibration;
-  // Camera→bed 4-point alignment (ADR-106). Absent until the operator aligns;
+  // Camera→bed 4-point alignment (ADR-107). Absent until the operator aligns;
   // persisted so the workspace camera overlay survives reload.
   readonly cameraAlignment?: CameraAlignment;
   readonly noGoZones: ReadonlyArray<NoGoZone>;

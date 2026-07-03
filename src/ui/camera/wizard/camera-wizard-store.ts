@@ -1,4 +1,4 @@
-// Camera lens-calibration wizard state (ADR-107 v2.e). A thin Zustand shell
+// Camera lens-calibration wizard state (ADR-108 v2.e). A thin Zustand shell
 // around the PURE calibration session: captures accumulate as
 // BoardObservations, the solve runs through the focal sweep, and the review
 // step holds the A/B raw/rectified frames. Ephemeral like the camera store —
@@ -60,7 +60,7 @@ export type CameraWizardStore = {
 // works — the operator enters the true square size).
 const DEFAULT_SPEC: CheckerboardSpec = { rows: 6, cols: 9 };
 const DEFAULT_SPACING_MM = 10;
-// Generous budget per the ADR-107 v2.b note: realistic solves end on the
+// Generous budget per the ADR-108 v2.b note: realistic solves end on the
 // iteration cap while micro-improving; hundreds of iterations cost seconds.
 const SOLVE_MAX_ITERATIONS = 600;
 

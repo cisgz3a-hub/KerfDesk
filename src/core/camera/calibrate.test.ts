@@ -11,7 +11,7 @@ import type { CameraIntrinsics, FisheyeDistortion } from './fisheye';
 const TRUE_K: CameraIntrinsics = { fx: 900, fy: 890, cx: 955, cy: 545 };
 const TRUE_D: FisheyeDistortion = [0.08, -0.01, 0.004, -0.0005];
 const BOARD = makeCheckerboard(7, 5, 25);
-// Five distinct tilts break the planar focal/depth ambiguity (ADR-107 needs ~5).
+// Five distinct tilts break the planar focal/depth ambiguity (ADR-108 needs ~5).
 const POSES = [
   { rvec: [0.02, -0.02, 0] as const, tvec: [0, 0, 600] as const },
   { rvec: [0.45, 0, 0] as const, tvec: [10, -5, 640] as const },

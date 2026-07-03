@@ -4161,8 +4161,9 @@ numbers win.
   messages retain the old numbers (immutable history — read them against
   this table).
 - ADR-099 is retired unused; the number stays reserved to avoid a third
-  meaning. Next free ADR: **105**. *(Update: ADR-105 = Easel-parity pack;
-  the camera merge renumbered its ADRs to 106–109 — next free ADR: **110**.)*
+  meaning. Next free ADR: **105**. *(Running update — published since:
+  ADR-105 Easel-parity pack, ADR-106 box generator, ADR-107..110 Camera
+  Mode v1..v4 — next free ADR: **111**.)*
 
 ## ADR-105 — Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03)
 
@@ -4205,21 +4206,138 @@ everything Easel has and more"). Grounded by
 Unit tests per feature; raster-fill coverage/no-gouge checks; jsdom
 fallback for the pane; license-check green with the new dependency;
 full gate per commit. Hardware remains CLAIMED per ADR-098 §3.
+
+## ADR-106 — Parametric finger-joint box generator: claim-model joinery (2026-07-03)
+
+**Status:** accepted (maintainer-approved build plan, 2026-07-03).
+**Numbering note:** drafted as ADR-105 on the box-generator branch, but
+the Easel-parity pack published 105 on `main` first — published numbers
+win (ADR-104 precedent). Pre-merge commit messages on
+`claude/relaxed-liskov-0df88b` say ADR-105; read them as this ADR.
+
+### Context
+
+Operators want cut-ready finger-joint boxes for both laser and CNC
+router modes. A previous attempt failed because the 2D panel math did
+not encode the 3D assembly: panels rotate 90° into place, material
+thickness eats into each mating panel, and the cutting process (laser
+kerf / endmill radius) changes fit. Behavior research on MakerCase
+(reverse-engineering study) and boxes.py (docs only — GPL, no code
+copying per ADR-017) isolates the two classic failure classes this
+design is built around:
+
+1. **Corner conflicts.** Three panels meet at each cube corner; naive
+   per-edge tab math either double-claims the T×T×T corner cube (parts
+   collide — cannot assemble) or never claims it (visible hole).
+   MakerCase's own study lists corner fillers as a known deferred gap.
+2. **Fit compensation applied wrong.** Kerf widening done per-tab
+   instead of as a uniform contour offset, or CNC interior corners left
+   square so square tabs cannot seat (missing relief).
+
+### Decision — own math, built against those two failures
+
+- **One sequence per cube edge.** Each of the 12 cube edges is shared
+  by exactly two panels. Per edge ONE alternating cell sequence is
+  computed — odd cell count `n` = largest odd ≤ span/targetFingerWidth,
+  clamped ≥ 3 (`1` for tiny spans), cell width `f = span/n` — and BOTH
+  panels derive material ownership from that one sequence: A owns
+  exactly what B does not. Complementarity holds by construction;
+  both-tabs / neither-tab is unrepresentable. Odd count ⇒ symmetric ⇒
+  opposite panels stay interchangeable.
+- **Corner rule.** Each of the 8 T×T×T corner cubes has exactly one
+  claimant: global axis priority **Z > Y > X** (top/bottom > front/back
+  > left/right) among *present* panels. Open-top: corner cells that
+  would belong to the missing top fall to the next-priority panel.
+- **Outline walk.** Panel outline = closed rectilinear polygon walked
+  from claims: boundary at the outer face line where a cell is owned,
+  recessed by T where the mate owns it. No holes in v1 (dividers later).
+- **Fit — division of labor (nothing duplicated).** Laser beam width
+  stays in per-layer kerf compensation (`kerf-offset.ts` at compile;
+  nominal = line-to-line press fit — LightBurn parity: kerf lives in
+  cut settings, not the drawing). CNC cutter compensation stays in
+  `profile-paths.ts` (`profile-outside`). The generator bakes exactly
+  two things:
+  1. **Clearance `c`** (signed, + = looser; default 0 laser = press
+     fit, 0.15 mm CNC = glue fit): every panel polygon offset by −c/4
+     via `offsetClosedPolylinesForKerf`. Derivation (corrected at S2
+     from an earlier −c/2 draft): a uniform inward offset δ narrows
+     every tab by 2δ AND widens the mating recess by 2δ, so joint play
+     = 4δ; the contract is play == c, hence δ = c/4 — tabs narrow c/4
+     per flank, recesses widen c/4 per flank, notch − tab = c exactly,
+     uniformly. Never per-tab arithmetic.
+  2. **CNC corner relief** in the shipped F-CNC26 corner-overcut
+     convention (`dogbone.ts` precedent): a circle of one bit RADIUS
+     centered ON the seat-critical reflex corner vertices, subtracted
+     from the panel. The generator knows which corners mate, so it
+     relieves exactly those (not `dogboneVectorObject`, which unions
+     circles into cutout regions and blankets all sharp corners).
+     **Ordering pinned: clearance offset FIRST, then reliefs at full
+     bit radius** — offsetting after would shrink reliefs below tool
+     diameter. Laser mode: no reliefs.
+- **Modules.** Pure core `src/core/box/` (box-spec, edge-pattern,
+  panel-claims, panel-outline, panel-fit, layout, generate-box) — NOT
+  `core/shapes` (its index is at export capacity). UI `src/ui/box/`
+  (dialog + canvas preview). Insertion wraps panels into ordinary
+  `kind:'shape'` polyline objects via the existing `createPolyline`
+  (ids injected UI-side via `crypto.randomUUID()`, ONE undo step,
+  `ensureLayersForColors`, all inserted panels selected, ungrouped).
+  Compile/preview/emit untouched; zero G-code snapshot churn.
+- **Validation.** Pure `Result`-style union, no throws: dims/T > 0;
+  inner dims stay positive when derived; finger width clamped to
+  [max(2mm, T), span/3]; CNC: `f > toolDiameter` (error) and warn when
+  `f < 2·toolDiameter`; `|c| < min(f, T)/2`. Violations →
+  `{ kind:'invalid', issues }` rendered in the dialog; generation
+  disabled.
+- **v1 scope.** Closed 6-panel + open-top 5-panel; inner dimensions
+  default (what the contents need), outer via toggle. Deferred as
+  staged follow-ups: lids (slide/hinged), dividers, engraved panel
+  labels (needs the io/text pipeline — unreachable from pure core),
+  dogbone/T-bone relief styles (same future-refinement note as
+  `dogbone.ts`).
+
+### Verification (green structural tests ≠ fit — CLAUDE.md rule 2)
+
+1. **Virtual 3D assembly referee** (fast-check, 100 runs, predicates in
+   `src/__fixtures__/property/`): map each derived panel polygon into
+   box coordinates via its placement (this encodes "panels turn
+   sideways"), extract both panels' exact 1D occupancy intervals along
+   each shared edge band — computed from the OUTPUT polygons, not the
+   internal claim model. Assert: nominal ⇒ exactly complementary (zero
+   overlap, zero gap); with clearance ⇒ uniform play ≈ c within 2·10⁻³
+   (clipper rounds to 3 decimals), never interference; each cube corner
+   has exactly one claimant (closed box). Fuzz: W,D,H ∈ [20,600],
+   T ∈ [1,25], finger ∈ [1.5T,5T], open/closed, c ∈ [0,0.5].
+2. **Invariants:** assembled outer bbox == outer dims exactly; every
+   polygon simple and closed; reliefs only at reflex corners, only when
+   CNC, diameter == tool diameter; determinism (same spec ⇒
+   JSON-identical output — core has zero RNG).
+3. **Perceptual fixture** (ADR-025 harness): render the generated sheet
+   for a canonical spec; IoU vs analytic expectation + opt-in PNG
+   artifact for human eyeballing.
+4. **Hardware:** physical fit is NOT software-verifiable — the feature
+   lands CLAIMED per AUDIT.md convention with a named pending check:
+   cut a 60×40×30 mm, T=3 box on the Falcon (laser) / 4040 (router)
+   and assemble it.
+
 ---
 
-## ADR-106 — Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4)
+---
+
+## ADR-107 — Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4)
 
 **Status:** Accepted; staged in small PRs. | **Date:** 2026-06-27
 
 > Numbering note: authored on `claude/camera-mode-v1` as ADR-094/095 (then the next
 > free slots above the build plan's ADR-054..091 reservation). Merged after ADR-104's
 > integration renumbering had assigned 094–104 to the controller/CNC tracks, so —
-> following the ADR-104 precedent — the camera ADRs renumber on merge: v1 = ADR-106,
-> v2 = ADR-107; v3 / v4 reserve ADR-108 / ADR-109. Pre-merge commit messages retain
+> following the ADR-104 precedent — the camera ADRs renumber on merge: v1 = ADR-107,
+> v2 = ADR-108; v3 / v4 reserve ADR-109 / ADR-110. Pre-merge commit messages retain
 > the old numbers (immutable history — read them against this note).
 > Renumbered AGAIN at the main merge: origin/main had published ADR-105
 > (Easel-parity pack) meanwhile — published numbers win (ADR-104) — so the
-> camera ADRs are finally v1=ADR-106, v2=ADR-107, v3=ADR-108, v4=ADR-109.
+> camera ADRs were then v1=106..v4=109 — and renumbered a THIRD time when the
+> Phase K box generator published ADR-106: final numbers v1=ADR-107,
+> v2=ADR-108, v3=ADR-109, v4=ADR-110.
 
 ### Context
 
@@ -4256,8 +4374,8 @@ each a few dozen lines — and hand-rolls to ~150–250 LOC of pure TypeScript.
    `scanningOffsets`; additive normalize in `deserialize-project.ts`; no `schemaVersion` bump).
    In-progress calibration drafts use the existing `localStorage` calibration-draft pattern.
 6. **Staging:** v1 overlay + manual 4-point (this ADR) → v2 Brown–Conrady lens calibration
-   (ADR-107) → v3 fiducial auto-align + 2-point print-and-cut (ADR-108) → v4 capture-to-trace
-   reusing the existing trace pipeline (ADR-109). Each phase ships as its own small PR set.
+   (ADR-108) → v3 fiducial auto-align + 2-point print-and-cut (ADR-109) → v4 capture-to-trace
+   reusing the existing trace pipeline (ADR-110). Each phase ships as its own small PR set.
 
 ### Consequences
 
@@ -4283,18 +4401,18 @@ https / secure context or `getUserMedia` silently fails.
 ### Out of scope for v1
 
 Lens distortion correction (v2), fiducial auto-detection (v3), capture-to-trace (v4), and
-non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-107 / 108 / 109.
+non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-108 / 109 / 110.
 
 ---
 
-## ADR-107 — Camera Mode v2: fisheye lens calibration + de-fisheye render
+## ADR-108 — Camera Mode v2: fisheye lens calibration + de-fisheye render
 
 **Status:** Accepted; staged in small PRs. | **Date:** 2026-06-28
 
 ### Context
 
 The Falcon A1 Pro (like most laser bed cameras) uses a wide-angle lens, so the live feed
-is visibly barrel-bowed. The ADR-106 4-point homography corrects perspective only — it
+is visibly barrel-bowed. The ADR-107 4-point homography corrects perspective only — it
 pins the four corners but cannot remove lens curvature, so straight bed edges stay curved.
 A camera-implementation study (MeerK40t, OpenPnP, LightBurn, Rayforge, LaserWeb4, OpenCV)
 confirmed the universal fix: a lens-distortion model applied to the frame **before** the
@@ -4302,7 +4420,7 @@ homography.
 
 Licensing (ADR-017/018): GPL/AGPL apps (OpenPnP, LaserWeb4) may be **studied** but not
 vendored; only MIT/BSD/Apache code may be copied. OpenCV.js (the build) is excluded on
-bundle size (ADR-106), not licence — and the distortion math is not copyrightable, so the
+bundle size (ADR-107), not licence — and the distortion math is not copyrightable, so the
 equations are clean-roomed in TypeScript from the published Kannala-Brandt model.
 
 ### Decision (maintainer-chosen, 2026-06-28)
@@ -4315,13 +4433,13 @@ equations are clean-roomed in TypeScript from the published Kannala-Brandt model
    centre) with a per-capture reprojection-error score (LightBurn) and per-quadrant
    coverage feedback (Rayforge); fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
    Levenberg-Marquardt minimiser over reprojection error. ChArUco is rejected — its ArUco
-   decode needs an LGPL bundle barred by ADR-106; a plain checkerboard detects clean-room.
+   decode needs an LGPL bundle barred by ADR-107; a plain checkerboard detects clean-room.
 3. **Render: WebGL fragment shader.** The inverse-distortion sampling runs per-pixel on the
    GPU (LaserWeb4 proves `regl` does this < 1 MB, no OpenCV); output→input sampling so a
    rectified output pixel reads the distorted source. Supports live UVC video, not only the
    polled still.
-4. **Order:** capture → de-fisheye → 4-point homography (ADR-106) → overlay. The homography
-   now runs on rectified pixels. K + D persist on the readonly `DeviceProfile` field ADR-106
+4. **Order:** capture → de-fisheye → 4-point homography (ADR-107) → overlay. The homography
+   now runs on rectified pixels. K + D persist on the readonly `DeviceProfile` field ADR-107
    reserved.
 
 ### Staging
@@ -4379,8 +4497,8 @@ Decisions made during the build (deviating from / refining the draft design):
 Shipped pure-core, all verified: `rectify-map.ts` (per-pixel output->input sample point, the
 math the renderer mirrors), `cpu-rectify.ts` (bilinear-sampled de-fisheye over an RGBA buffer),
 `camera-calibration.ts` (the persisted `CameraCalibration` type + an untrusted-JSON normaliser),
-and a new optional `cameraCalibration?: CameraCalibration` on `DeviceProfile` (the ADR-106 #5 /
-ADR-107 #4 "reserved" field — it did NOT exist in code; this closes that doc-vs-code drift),
+and a new optional `cameraCalibration?: CameraCalibration` on `DeviceProfile` (the ADR-107 #5 /
+ADR-108 #4 "reserved" field — it did NOT exist in code; this closes that doc-vs-code drift),
 normalised in `deserialize-project.ts` (override, not merge, so a malformed value is dropped).
 
 **Render refinement (flag for the maintainer).** Decision #3 chose a WebGL fragment shader,
@@ -4504,17 +4622,17 @@ Overlay sources: a captured still (LightBurn's Update Overlay model, the
 accurate default-to-be once rectified alignment lands) or the continuous live
 video; panel controls cover show/hide + fade + still/live. Material-thickness
 shift compensation and the rectified-basis alignment flow are follow-ups
-(ADR-108 scope).
+(ADR-109 scope).
 
 ---
 
-## ADR-108 — Camera Mode v3: automatic marker alignment (no-click homography)
+## ADR-109 — Camera Mode v3: automatic marker alignment (no-click homography)
 
 **Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
 
 ### Context
 
-ADR-106 reserved v3 for "fiducial auto-align," rejecting ArUco decoders on
+ADR-107 reserved v3 for "fiducial auto-align," rejecting ArUco decoders on
 licence (LGPV-bundle) grounds. The v2.b work shipped a proven clean-room
 X-corner detector — which is itself a fiducial detector if the fiducials are
 checker patches. Manual 4-point alignment (clicking bed corners in the frame)
@@ -4553,17 +4671,17 @@ the physical burn-vs-overlay registration — the maintainer's F-CAM4 pass.
 ### Out of scope
 
 Print-and-cut (2-point re-registration of a printed sheet) — the natural v3.5
-follow-on now that marker detection exists; capture-to-trace stays ADR-109.
+follow-on now that marker detection exists; capture-to-trace stays ADR-110.
 
 ---
 
-## ADR-109 — Camera Mode v4: capture-to-trace at true bed coordinates
+## ADR-110 — Camera Mode v4: capture-to-trace at true bed coordinates
 
 **Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
 
 ### Context
 
-ADR-106 reserved v4 for capture-to-trace. The prerequisite geometry all
+ADR-107 reserved v4 for capture-to-trace. The prerequisite geometry all
 exists now: rectification (v2), a persisted basis-tagged alignment (overlay
 wiring), and the marker auto-align (v3). LightBurn's equivalent traces a
 camera capture the user then positions manually; because our warp lands in

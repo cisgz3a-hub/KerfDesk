@@ -1,4 +1,4 @@
-// Grayscale conversion for the checkerboard detector (ADR-107, v2.b). The
+// Grayscale conversion for the checkerboard detector (ADR-108, v2.b). The
 // detector and the sub-pixel refiner both work on a single-channel intensity
 // image; camera frames arrive as RGBA bytes. Pure core: buffers in, buffers out.
 

@@ -1,4 +1,4 @@
-// Persisted camera calibration (ADR-106 reserved field, ADR-107 v2.d). Stored on
+// Persisted camera calibration (ADR-107 reserved field, ADR-108 v2.d). Stored on
 // DeviceProfile so a de-fisheye overlay survives reload. Carries the frame
 // resolution the intrinsics are expressed in — so an apply-time resolution mismatch
 // can warn — plus the reprojection RMS as a coarse trust signal. Pure core; the

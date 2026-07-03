@@ -1,4 +1,4 @@
-// Bed-warp harness (ADR-109): the closed loop with auto-alignment — render a
+// Bed-warp harness (ADR-110): the closed loop with auto-alignment — render a
 // camera view of the marker bed, solve the alignment from pixels, warp the
 // frame top-down, and the markers must sit at their TRUE bed coordinates in
 // the warped image.

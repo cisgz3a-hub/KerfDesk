@@ -1,4 +1,4 @@
-// Checkerboard auto-detection (ADR-107, v2.b — the piece the beta handed off).
+// Checkerboard auto-detection (ADR-108, v2.b — the piece the beta handed off).
 // Finds the printed board's inner-corner grid in a camera frame with no user
 // clicks: X-corner response → candidate peaks → lattice growth → sub-pixel
 // refinement. Output pairs with checkerboardObjectPoints() to form the

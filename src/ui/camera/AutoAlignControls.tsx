@@ -1,5 +1,5 @@
 // AutoAlignControls — one-click camera→bed alignment from engraved markers
-// (ADR-108, camera v3). "Add markers" generates the engraveable pattern into
+// (ADR-109, camera v3). "Add markers" generates the engraveable pattern into
 // the project (replacing the scene, like the other calibration generators);
 // after burning it, "Auto-align" captures a frame, de-fisheyes it when a lens
 // calibration exists, detects the five marker corners, solves the homography,
