@@ -243,7 +243,12 @@ describe('handleLine streamer writes', () => {
     expect(get().safetyNotice).not.toBeNull();
   });
 
-  it('marks the streamer disconnected if an ack-triggered follow-up write fails', async () => {
+  // markErrored, not disconnect: 'disconnected' falls outside isActiveJob,
+  // which unmounts the Stop button and drops the soft-reset stop path while
+  // GRBL may still be executing buffered lines on a live port (the same R-H2
+  // rationale runResumeJob documents). A genuine port loss follows up via
+  // onClose, which owns the disconnect wording.
+  it('marks the streamer errored (Stop stays mounted) if an ack-triggered follow-up write fails', async () => {
     const { refs, set, get } = makeHarness();
     const firstStep = step(
       createStreamer('G1 X1234567890\nG1 X1234567891\nG1 X1234567892\n', {
@@ -259,15 +264,24 @@ describe('handleLine streamer writes', () => {
     await Promise.resolve();
 
     expect(safeWrite).toHaveBeenCalledWith('G1 X1234567892\n', undefined, 'job');
-    expect(get().streamer?.status).toBe('disconnected');
+    expect(get().streamer?.status).toBe('errored');
     expect(get().streamer?.completed).toBe(1);
-    expect(get().streamer?.inFlight.map((item) => item.line)).toEqual(['G1 X1234567891\n']);
+    // The undelivered refill line stays in the in-flight accounting: the
+    // stream is terminal (nothing more is ever sent), acks for the lines that
+    // WERE delivered still absorb correctly, and the never-acked tail is
+    // harmless — while a snapshot rollback would clobber acks that landed
+    // between dispatch and rejection.
+    expect(get().streamer?.inFlight.map((item) => item.line)).toEqual([
+      'G1 X1234567891\n',
+      'G1 X1234567892\n',
+    ]);
     expect(get().streamer?.queued).toEqual([]);
     // P0-3: a follow-up write failure must also raise the operator-facing safety
     // banner - the machine may still be moving from buffered commands.
     expect(get().safetyNotice).toEqual({
-      kind: 'disconnect-during-job',
-      message: expect.stringContaining('still be moving'),
+      kind: 'write-failed',
+      action: 'stream',
+      message: expect.stringContaining('Stop'),
     });
   });
 });
