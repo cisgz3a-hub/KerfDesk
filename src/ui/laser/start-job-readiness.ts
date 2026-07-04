@@ -99,7 +99,10 @@ export function prepareStartJob(
   return {
     ok: true,
     gcode,
-    warnings: [...controller.warnings.map((i) => i.message), ...detectMachineJobWarnings(project)],
+    warnings: [
+      ...controller.warnings.map((i) => i.message),
+      ...detectMachineJobWarnings(project, controllerSettings),
+    ],
   };
 }
 
