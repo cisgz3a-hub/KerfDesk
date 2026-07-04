@@ -14,12 +14,14 @@ export default mergeConfig(
       exclude: ['node_modules/**', 'dist/**', 'release/**'],
       // Camera calibration and perceptual perf tests are CPU-heavy; keep enough
       // headroom that wall-clock assertions measure regressions, not worker contention.
-      // The private-repo CI runner has only 2 vCPUs, so 4 workers oversubscribe it and
-      // starve vitest's main orchestrator process -- it then misses a worker's RPC ack
-      // and fails the whole run with `[vitest-worker]: Timeout calling "onTaskUpdate"`
-      // even though every test passed. Cap to 2 on CI to leave the orchestrator CPU;
-      // dev boxes (more cores) keep 4. Matches the CI-only budget approach in ci-budget.ts.
-      maxWorkers: process.env.CI ? 2 : 4,
+      // The private-repo CI runner has only 2 vCPUs. Workers saturating both cores during
+      // a heavy synchronous burst starve vitest's main orchestrator, which then misses a
+      // worker RPC ack and fails the whole run with `[vitest-worker]: Timeout calling
+      // "onTaskUpdate"` even though every test passes. Measured on this runner: 4 workers
+      // -> two such errors, 2 workers -> one. Use 1 on CI so a full core stays free for the
+      // orchestrator; dev boxes (more cores) keep 4. Matches the CI-only budget approach
+      // in ci-budget.ts. (No test correctness gate is affected -- this is a parallelism knob.)
+      maxWorkers: process.env.CI ? 1 : 4,
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html', 'json'],
