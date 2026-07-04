@@ -50,6 +50,20 @@ function generateButton(host: HTMLElement): HTMLButtonElement {
   return button;
 }
 
+function selectEl(host: HTMLElement, label: string): HTMLSelectElement {
+  const element = host.querySelector(`select[aria-label="${label}"]`);
+  if (!(element instanceof HTMLSelectElement)) throw new Error(`${label} select missing`);
+  return element;
+}
+
+async function setSelect(host: HTMLElement, label: string, value: string): Promise<void> {
+  const element = selectEl(host, label);
+  element.value = value;
+  await act(async () => {
+    Simulate.change(element);
+  });
+}
+
 describe('BoxGeneratorDialog', () => {
   it('generates six laser panels from the defaults', async () => {
     const { host, root, onGenerate } = await renderDialog();
@@ -113,19 +127,24 @@ describe('BoxGeneratorDialog', () => {
     }
   });
 
-  it('hides the relief tool field in laser mode and shows it for CNC', async () => {
+  it('hides the relief tool field until CNC corner relief is turned on', async () => {
     const laser = await renderDialog(LASER);
     try {
       expect(laser.host.querySelector('input[aria-label="Relief tool diameter"]')).toBeNull();
+      expect(laser.host.querySelector('select[aria-label="Corner relief"]')).toBeNull();
     } finally {
       await act(async () => laser.root.unmount());
     }
     const cnc = await renderDialog(CNC);
     try {
-      const tool = input(cnc.host, 'Relief tool diameter');
-      expect(tool.value).toBe('3.175');
+      // Default: corner relief OFF → the select is present but the tool field hides.
+      expect(selectEl(cnc.host, 'Corner relief').value).toBe('off');
+      expect(cnc.host.querySelector('input[aria-label="Relief tool diameter"]')).toBeNull();
       expect(input(cnc.host, 'Thickness').value).toBe('6');
       expect(input(cnc.host, 'Clearance').value).toBe('0.15');
+      // Turn relief on → the tool field appears, prefilled from the active bit.
+      await setSelect(cnc.host, 'Corner relief', 'on');
+      expect(input(cnc.host, 'Relief tool diameter').value).toBe('3.175');
     } finally {
       await act(async () => cnc.root.unmount());
     }
@@ -138,6 +157,8 @@ describe('BoxGeneratorDialog', () => {
       toolDiameterMm: 6,
     });
     try {
+      // The relief-tool warning only applies with dogbones on.
+      await setSelect(host, 'Corner relief', 'on');
       // z-axis cells are 10 mm: larger than 6 but under 12 → warning only.
       expect(host.textContent).toContain('under twice');
       expect(generateButton(host).disabled).toBe(false);

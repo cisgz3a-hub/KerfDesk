@@ -20,10 +20,9 @@ export type BoxDraft = {
   readonly clearance: string;
   readonly partSpacing: string;
   readonly toolDiameter: string;
-  // CNC corner relief (dogbones). 'on' = bit-radius overcuts so tabs seat in a
-  // round-bit slot (Easel/Vectric default); 'off' = sharp finger corners, the
-  // opt-out the operator can pick when they don't want dogbones. Ignored in
-  // laser mode (a kerf has no corner-reach limit).
+  // CNC corner relief (dogbones). 'off' (default) = sharp finger corners; 'on'
+  // = bit-radius overcuts so tabs seat fully in a round-bit slot — opt in when
+  // a joint won't close. Ignored in laser mode (a kerf has no corner limit).
   readonly relief: string;
 };
 
@@ -61,7 +60,7 @@ export function defaultBoxDraft(machine: BoxMachineContext): BoxDraft {
     clearance: machine.kind === 'cnc' ? String(CNC_DEFAULT_CLEARANCE_MM) : '0',
     partSpacing: '8',
     toolDiameter: machine.kind === 'cnc' ? String(machine.toolDiameterMm) : '',
-    relief: 'on',
+    relief: 'off',
   };
 }
 
