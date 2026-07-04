@@ -161,6 +161,15 @@ export async function traceImageToColoredPaths(
 //     so the smallest letters reach a smooth working size instead of a fixed 2x
 //     that still facets a 40px letter.
 // If both fire, take the larger factor.
+//
+// Interpolation is BILINEAR for both. A bicubic (Catmull-Rom / Mitchell-
+// Netravali) small-smooth path was measured on the facet harness (2026-07-04):
+// it smooths the CURVE-dominated glyphs (B@40 3.48%->2.19%/1.75%, S@40
+// 3.98%->3.48%/3.03%, O stays 0.00%) but REGRESSES the corner/straight-dominated
+// E (E@40 2.07%->5.10%/4.64%, E@60 3.04%->4.33%/4.04%) because higher-order
+// ringing at E's dense step edges injects facets and E has no curves to gain.
+// The E residual is corner-bound, not interpolation-staircase-bound, so bicubic
+// is not strictly better and was reverted (targets require E@40 <= 1.8%).
 function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
   const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
   const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
