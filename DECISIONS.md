@@ -4204,3 +4204,70 @@ everything Easel has and more"). Grounded by
 Unit tests per feature; raster-fill coverage/no-gouge checks; jsdom
 fallback for the pane; license-check green with the new dependency;
 full gate per commit. Hardware remains CLAIMED per ADR-098 §3.
+
+## ADR-106 — CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.12, 2026-07-04)
+
+**Status:** accepted (maintainer directive after a real 4040 cut wandered:
+"Is this the easiest for a user to understand? … Can some of it
+automatically be filled in with machine detection?"). Chosen scope: the
+full beginner-mode set (#1–#4). Diagnosis pointed at mechanical/setup
+causes, but the panel made cut-wrecking numbers *easy* — it accepted feed
+1000 / depth-per-pass 1.5 for 6 mm ply on a 1/8" bit with zero guidance.
+The KerfDesk panel is a powerful LightBurn/VCarve-style surface (every
+number exposed, all manual); Easel/Carbide are friendlier because they
+auto-fill feeds from a material, hide advanced fields, and pull limits from
+the controller. This pack adds those affordances without removing any pro
+control.
+
+### Decisions
+
+- **#1 Material picker (layer card).** A "Material" select
+  (`Custom` + `CHIPLOAD_MATERIALS`) at the top of each CNC layer card. On
+  pick, `calculateFeeds()` (ADR-103 chipload engine, unchanged) fills
+  feed / plunge / depth-per-pass from the layer's bit and current RPM,
+  under a **2-flute** one-click assumption; the advanced Feeds calculator
+  keeps full flute/RPM control. `CncLayerSettings.materialKey?: string`
+  records the choice (display/round-trip only — absent = manual "Custom",
+  byte-identical output); normalize validates it against the material set.
+- **#4 Basic/Advanced disclosure.** A persisted `showCncAdvanced` flag
+  (localStorage; default **Basic = false**) gates the advanced field group
+  (feeds, stepover, pocket fill, cut-type tails). Basic keeps Material, Cut
+  type, Bit, Cut depth, Tabs. A one-click **Through cut (= N mm)** button
+  sets cut depth to the stock thickness — disambiguating the
+  cut-depth-vs-stock-thickness pair. The two "Spindle" fields are
+  relabelled: the machine's "Spindle max" is the RPM ceiling (GRBL $30);
+  the layer's "Spindle" is that layer's running speed.
+- **#3a Machine auto-fill.** An opt-in "Machine reports …" banner on the
+  Material & Bit card, shown only when the connected controller's detected
+  `$$` values differ. Apply writes spindle max ($30 → `params.spindleMaxRpm`)
+  and bed size ($130/$131). **Correction to the plan:** bed lands on the
+  shared `project.device` (bedWidth/bedHeight), NOT on `stock` — the stock
+  is the workpiece on the bed, not the machine envelope, and
+  `CncMachineConfig` has no bed field. Never silent; the banner disappears
+  once values match.
+- **#3b Limit advisories.** At Save/Start, `detectCncMachineLimitWarnings`
+  compares the job against the detected limits: stock larger than reported
+  travel, and a layer feed above the reported max rate ($110/$111). Both
+  advisory (not a gate), like the H.2 stock-footprint advisory. Kept a
+  **separate module** from `detectCncStockWarnings` (toolpaths vs stock)
+  for single-responsibility, rather than the plan's "extend" wording. The
+  live snapshot threads through `detectMachineJobWarnings(project,
+  controllerSettings?)` (defaults null → callers unchanged).
+
+### Out of scope
+
+Saving custom materials (a future CNC Material Library reusing a
+`CncLibrary.materialPresets` slice); an inch/mm field toggle (the canvas
+already has one; fields stay mm).
+
+### Verification
+
+Unit tests (material-apply + normalize round-trip; through-cut helper;
+detected-apply thresholds; limit-advisory thresholds) and jsdom component
+tests (material pick fills feeds; Basic hides advanced; detected Apply
+patches params + device, leaves stock untouched). Full gate per commit.
+Perceptual pass in an isolated preview: Basic/Advanced toggle, material
+pick fills safe numbers (not 1000/1.5), injected `controllerSettings` shows
+the Apply banner + stock/feed advisories. Defaults improve, but the
+physical cut stays CLAIMED per ADR-098 §3 — the operator owns clamping,
+work-zero, and the actual feed the machine can survive.
