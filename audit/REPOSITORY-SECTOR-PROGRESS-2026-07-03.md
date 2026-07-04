@@ -201,8 +201,8 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | S05 Core job compilation, preflight, raster/trace, and output | Complete | 3 | None for current delta |
 | S06 IO formats and persistence | Complete | 3 | None for current delta |
 | S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S08 UI application workflows | Active | 1 | Box numeric-input/dogbone toggle changes, probe/device-setup UI changes, and UI canvas-test stderr |
-| S09 Fixtures, perceptual harness, and test assets | Pending delta audit | 0 | New perceptual fixtures, underscore-prefixed audit tests, CI budget helpers, and centerline runner-speed changes |
+| S08 UI application workflows | Complete | 3 | None for current delta |
+| S09 Fixtures, perceptual harness, and test assets | Active | 2 | Direct-diff closure, underscore diagnostic inventory, and remaining perceptual benchmark files |
 
 ### Delta Completed Passes
 
@@ -233,6 +233,10 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | S04 Post-cd5c7f4 Camera-Test Delta Pass 2 | 2026-07-04 | Wizard integration and import-boundary sweep. Camera UI/session slice passed (13 files, 58 tests), and changed camera tests plus CI helper passed (3 files, 18 tests). No new S04 findings; UI canvas stderr is carried forward for S08 scrutiny. |
 | S04 Post-cd5c7f4 Camera-Test Delta Pass 3 | 2026-07-04 | Direct diff and closure. Focused camera/session slice passed (5 files, 28 tests) and `tsc --noEmit` passed. No new findings; S04 camera-test refresh closed after three passes. Move to S08. |
 | S08 Delta Pass 1 | 2026-07-04 | PWA update and CNC material/machine UI. Focused PWA/CNC slice passed (6 files, 29 tests); layer/debounced slice passed (2 files, 26 tests). Found PWA update re-arm gap where `updatefound` clears dismissal storage without invalidating the mounted prompt render. |
+| S08 Delta Pass 2 | 2026-07-04 | Box dogbone, probe setup, and canvas test signal. Focused box/probe/device-setup slice passed (5 files, 35 tests); focused camera/relief canvas slice passed (4 files, 9 tests). Found that canvas/WebGL UI tests pass while emitting jsdom canvas errors and async `act(...)` warnings. |
+| S08 Delta Pass 3 | 2026-07-04 | Direct diff closure and adjacent state actions. Full focused S08 delta bundle passed (13 files, 90 tests), and `tsc --noEmit` passed. No new findings; S08 delta closed with `D-S08-001` and `D-S08-002` open. Move to S09. |
+| S09 Delta Pass 1 | 2026-07-04 | Fixture delta orientation and diagnostic test signal. Release-gated fixture slice passed (4 files, 14 tests); one `TRACE_AUDIT` diagnostic file also reported passed without the env flag. Found that opt-in diagnostics count as passing tests when skipped by their own early return. |
+| S09 Delta Pass 2 | 2026-07-04 | Artifact path and opt-in evidence sweep. Trace artifact and Arch House baseline slice passed (2 files, 16 tests). Found that `_edge-zoom` still hardcodes the removed `audit/fixtures/trace` logo path and fails when run with `TRACE_AUDIT=1`. |
 
 ### Delta Finding Index
 
@@ -253,3 +257,6 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | D-S05-003 | S05 | Low | Open | Canny edge core does not bound threshold ratios or blur sigma |
 | D-S05-004 | S05 | Low | Open | Trace image-adjustment options do not fail closed on non-finite values |
 | D-S08-001 | S08 | Medium | Open | PWA update dismissal re-arm lacks mounted-render invalidation |
+| D-S08-002 | S08 | Medium | Open | UI canvas/WebGL tests pass while emitting jsdom canvas errors and async act warnings |
+| D-S09-001 | S09 | Low | Open | TRACE_AUDIT diagnostics count as passing tests when env flag is absent |
+| D-S09-002 | S09 | Low | Open | _edge-zoom diagnostic hardcodes removed audit fixture path |
