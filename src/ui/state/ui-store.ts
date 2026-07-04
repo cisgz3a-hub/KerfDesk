@@ -14,6 +14,26 @@ export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 16;
 export const ZOOM_STEP = 1.25;
 
+// ADR-106: whether the CNC layer card shows the advanced fields. Beginner
+// default is Basic (false); persisted across sessions so power users flip it
+// once. localStorage-guarded so non-browser test/SSR contexts stay safe.
+const CNC_ADVANCED_KEY = 'laserforge.cnc-advanced.v1';
+function readCncAdvanced(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(CNC_ADVANCED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function writeCncAdvanced(next: boolean): void {
+  try {
+    if (typeof localStorage !== 'undefined')
+      localStorage.setItem(CNC_ADVANCED_KEY, next ? '1' : '0');
+  } catch {
+    /* storage unavailable — session-only, fine */
+  }
+}
+
 // Phase D add-text dialog state. Null = closed; populated with
 // initial field values when opened. `mode` discriminates add vs edit
 // so submit knows whether to create a new object or upsert by id.
@@ -159,6 +179,9 @@ export type UiState = {
   // ADR-105 G11 — the bundled design library dialog.
   readonly libraryDialogOpen: boolean;
   readonly setLibraryDialogOpen: (open: boolean) => void;
+  // ADR-106 — CNC layer card shows advanced fields (Basic default).
+  readonly showCncAdvanced: boolean;
+  readonly setShowCncAdvanced: (next: boolean) => void;
   // Temporary Measure tool line. It is UI-only: not saved, not undoable, and
   // never included in preview or emitted G-code.
   readonly measureDraft: MeasureDraft | null;
@@ -173,6 +196,28 @@ export type UiState = {
   readonly closeRegistrationPanel: () => void;
   readonly setRegistrationPanelPosition: (next: FloatingPanelPosition | null) => void;
 };
+
+// The persisted dialog/view toggles (design-library dialog, CNC Basic/Advanced
+// disclosure). Grouped into a slice so the store factory stays under the
+// function-size cap; each action only needs `set`, and setShowCncAdvanced also
+// writes localStorage so the Basic/Advanced choice survives reloads (ADR-106).
+type UiStateSetter = (partial: Partial<UiState>) => void;
+function uiToggleSlice(
+  set: UiStateSetter,
+): Pick<
+  UiState,
+  'libraryDialogOpen' | 'setLibraryDialogOpen' | 'showCncAdvanced' | 'setShowCncAdvanced'
+> {
+  return {
+    libraryDialogOpen: false,
+    setLibraryDialogOpen: (open) => set({ libraryDialogOpen: open }),
+    showCncAdvanced: readCncAdvanced(),
+    setShowCncAdvanced: (next) => {
+      writeCncAdvanced(next);
+      set({ showCncAdvanced: next });
+    },
+  };
+}
 
 export const useUiStore = create<UiState>((set) => ({
   dragOverlay: false,
@@ -245,8 +290,7 @@ export const useUiStore = create<UiState>((set) => ({
   draftShape: null,
   setDraftShape: (next) => set({ draftShape: next }),
   penDraft: null,
-  libraryDialogOpen: false,
-  setLibraryDialogOpen: (open) => set({ libraryDialogOpen: open }),
+  ...uiToggleSlice(set),
   setPenDraft: (next) => set({ penDraft: next }),
   measureDraft: null,
   setMeasureDraft: (next) => set({ measureDraft: next }),

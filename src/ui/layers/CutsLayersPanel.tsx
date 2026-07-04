@@ -15,6 +15,7 @@ import { CncSetupPanel } from '../machine/CncSetupPanel';
 import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { AddLayerControls } from './AddLayerControls';
+import { CncAdvancedToggle } from './CncAdvancedToggle';
 import { LayerRow } from './LayerRow';
 import { DogboneRow } from './DogboneRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
@@ -43,6 +44,7 @@ export function CutsLayersPanel(): JSX.Element {
       <OffsetPathsRow />
       <DogboneRow />
       <SelectedReliefProperties />
+      <CncAdvancedToggle />
       {hasSelection ? (
         <>
           {showMaterialLibrary ? (

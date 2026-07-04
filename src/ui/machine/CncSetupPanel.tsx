@@ -55,7 +55,7 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         min={1000}
         max={60000}
         step={500}
-        title="Maximum spindle speed. Set GRBL $30 to this value so S maps to RPM."
+        title="The machine's top spindle speed (the RPM ceiling for every layer, and the GRBL $30 value). Each layer sets its own running speed below."
         onCommit={(spindleMaxRpm) => updateCncMachine({ params: { spindleMaxRpm } })}
       />
       <NumberRow
