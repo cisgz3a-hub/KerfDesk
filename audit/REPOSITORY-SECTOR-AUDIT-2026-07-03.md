@@ -16,9 +16,9 @@ Mode: sector audit plus user-approved fix-phase tracking.
 
 ## Current Status
 
-Active sector: None - all sectors complete.
+Active sector: S04 current-state delta audit.
 Completed sectors: S01 Governance, audit history, and product contracts; S02 Tooling, build, release, CI, and static shell; S03 Electron desktop runtime and local bridge; S04 Core domain models, controller/device/material primitives; S05 Core job compilation, preflight, raster/trace, and output; S06 IO formats and persistence; S07 Platform adapters; S08 UI application workflows; S09 Fixtures, perceptual harness, and test assets.
-Current pass: Final full-repo after-fix verification complete.
+Current pass: S01 delta Pass 3 complete; S04 delta Pass 1 next.
 
 ## Findings Summary
 
@@ -3245,3 +3245,143 @@ Final result:
 - Total fixed findings: 77.
 - Remaining open findings: 0 (0 medium, 0 low).
 - Full repo after-fix release gate: passed.
+
+## Current-State Delta Audit - 2026-07-04
+
+Reason for reopening:
+
+- The completed audit/fix ledger closed against the earlier audited baseline.
+- Current `main` is `e31a3b8`, ten commits after `d603c01`.
+- `git diff --name-status d603c01..HEAD` shows changes in S01, S04, S05, S06, S08, and S09.
+- `git ls-files -co --exclude-standard` currently returns 1,679 files.
+- The previous sector map left 71 current files unclassified until this pass refreshed the architecture map.
+
+No product source fixes are made in this delta audit. Audit documentation is updated because it is the requested audit ledger.
+
+### S01 Delta Pass 1 - Current-State Map and Baseline Drift
+
+Scope planned:
+
+- Verify the current repo boundary, branch state, and active commit.
+- Compare the current tree against the previous completed audit/fix baseline.
+- Re-run the sector classifier against current `git ls-files -co --exclude-standard`.
+- Record whether the existing architecture, audit, and progress files still prove completion for the current tree.
+
+Evidence inspected:
+
+- `Get-Location`, `git status -sb`, `git log --oneline -1`, and `git remote -v`.
+- `git log --oneline d603c01..HEAD`.
+- `git diff --name-status d603c01..HEAD`.
+- `git ls-files -co --exclude-standard` and a sector-classification pass.
+- `audit/REPOSITORY-SECTOR-ARCHITECTURE-2026-07-03.md`.
+- `audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`.
+- `audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md`.
+
+Findings:
+
+#### D-S01-001 - Sector map omitted current core/root paths
+
+Severity: Medium.
+
+Evidence:
+
+- Current `git ls-files -co --exclude-standard` returns 1,679 files.
+- The old architecture table still recorded the earlier 1,235-file post-artifact expectation and path memberships from the initial audit.
+- A current classifier using the old patterns left 71 files unclassified, including `HANDOFF-CNC-2026-07-02.md`, `PHASE-H-BUILD.md`, `src/core/box/**`, `src/core/cnc/**`, `src/core/relief/**`, and `src/core/sim/**`.
+- The architecture file has now been refreshed to list all 1,679 current files under S01-S09, with zero unclassified files.
+
+Risk:
+
+The audit could falsely claim full-repo coverage while entire current core areas sit outside the sector taxonomy. That breaks the first requirement of the audit contract: divide the repo into clear sectors and list which files belong to each sector.
+
+No product source fix made. Audit architecture documentation updated.
+
+#### D-S01-002 - Completion ledger did not cover post-baseline commits
+
+Severity: Medium.
+
+Evidence:
+
+- `git log --oneline d603c01..HEAD` lists ten newer commits.
+- `git diff --name-status d603c01..HEAD` shows changed files in docs, CNC material state, trace algorithms, project persistence, UI state/machine setup, and perceptual fixtures.
+- The progress file's completed-sector and final-verification rows were written before these newer commits were present in the current checkout.
+
+Risk:
+
+The previous "all sectors complete" and "remaining open findings: 0" statements are true for their audited baseline, but they are not sufficient proof for current `main`. Without a delta audit, changed sectors could contain new bugs, risks, or unclear architecture that were never reviewed in three-pass sector order.
+
+No product source fix made.
+
+Pass result:
+
+- S01 delta Pass 1 complete.
+- Architecture file refreshed for the current file inventory.
+- S01 remains open for delta Pass 2 and Pass 3 before the audit may move to S04/S05/S06/S08/S09 delta sectors.
+
+### S01 Delta Pass 2 - Governance and Phase-Status Delta
+
+Scope planned:
+
+- Review the S01 documentation changes introduced after the previous audit baseline.
+- Check ADR-112, Phase H project status, workflow text, and audit ledger wording for consistency.
+- Check root handoff/build planning docs now classified under S01.
+
+Evidence inspected:
+
+- `git diff --stat d603c01..HEAD -- AUDIT.md DECISIONS.md PROJECT.md WORKFLOW.md HANDOFF-CNC-2026-07-02.md PHASE-H-BUILD.md`.
+- `git diff --unified=80 d603c01..HEAD -- AUDIT.md DECISIONS.md PROJECT.md WORKFLOW.md`.
+- Targeted `rg` over `AUDIT.md`, `DECISIONS.md`, `PROJECT.md`, `WORKFLOW.md`, `HANDOFF-CNC-2026-07-02.md`, and `PHASE-H-BUILD.md` for ADR-112, project material, hardware labels, pending/deferred wording, and trace-upscale notes.
+- Focused reads around ADR-112 in `DECISIONS.md`, F-CNC35 in `WORKFLOW.md`, H.14 in `PROJECT.md`, and the ADR-112 row in `AUDIT.md`.
+
+Findings:
+
+#### D-S01-003 - Phase H summary header is stale after H.14
+
+Severity: Low.
+
+Evidence:
+
+- `PROJECT.md` now includes `H.14 | Project material picker (ADR-112)` in the Phase H table.
+- `DECISIONS.md` includes `ADR-112 - Project-level CNC material picker`.
+- `WORKFLOW.md` includes `F-CNC35. Set the project material once (Easel-style) - ADR-112`.
+- `AUDIT.md` includes an `ADR-112 project material picker` inventory row.
+- The Phase H section header in `PROJECT.md` still says `Phase H - v0.8 "Router" [Built (G1-G8); hardware passes CLAIMED]`, which no longer summarizes the current H.14 table.
+
+Risk:
+
+The detailed rows are present, but the phase-level summary under-reports the current Phase H scope. A maintainer skimming only the phase header could miss that H.13/H.14 landed or misunderstand the status boundary between the older G1-G8 stretch items and the newer ADR-111/112 beginner-material work.
+
+No fix made.
+
+Pass result:
+
+- S01 delta Pass 2 complete.
+- S01 remains open for one remaining-gap pass before the audit can move to the next changed sector.
+
+### S01 Delta Pass 3 - Remaining-Gap and Ledger-Coverage Pass
+
+Scope planned:
+
+- Recheck all S01 files changed after `d603c01`.
+- Confirm the refreshed sector map has no unclassified current files.
+- Search for obvious stale status and verification wording around ADR-112, Phase H, and root CNC handoff/build notes.
+- Check the audit-doc patch for whitespace errors.
+
+Evidence inspected:
+
+- `git diff --name-only d603c01..HEAD` filtered to S01 paths.
+- Targeted `rg` for `H.14`, `ADR-112`, `F-CNC35`, `Project material`, `project material`, `G1-G8`, and `G1-G8` variants across `PROJECT.md`, `AUDIT.md`, `DECISIONS.md`, and `WORKFLOW.md`.
+- Targeted `rg` for `TODO`, `FIXME`, `TBD`, `not yet`, `pending`, `CLAIMED`, `DEFERRED`, and `VERIFIED` across current S01 docs.
+- `git diff --check -- audit/REPOSITORY-SECTOR-ARCHITECTURE-2026-07-03.md audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`.
+
+Findings:
+
+- No additional S01 delta findings.
+- The broad pending/claimed markers are mostly longstanding hardware-verification honesty labels rather than new contradictions in the post-baseline docs.
+- `D-S01-003` remains open as the only docs/content drift found in the current S01 delta.
+
+Pass result:
+
+- S01 delta Pass 3 complete.
+- S01 delta sector closed after three passes.
+- Move to S04 current-state delta audit.

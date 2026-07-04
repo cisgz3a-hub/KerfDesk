@@ -184,6 +184,38 @@ Branch at audit start: `main`
 
 ## Next Steps
 
-1. Present the completed fixed-finding summary for maintainer review.
-2. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
-3. If the maintainer approves, prepare a clean commit/deploy plan that accounts for the pre-existing dirty worktree.
+1. Continue the 2026-07-04 current-state delta audit opened after `main` advanced beyond the original audited tree.
+2. Finish S04 delta Pass 1 through Pass 3 before moving to S05/S06/S08/S09.
+3. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
+
+## Current-State Delta Audit - 2026-07-04
+
+Reason for reopening: current `main` is at `e31a3b8`, ten commits after the previously completed audit/fix baseline `d603c01`. The new commits touch S01 docs, S04 core CNC/material primitives, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
+
+| Delta Sector | Status | Passes Completed | Major Areas Remaining |
+|---|---|---:|---|
+| S01 Governance, audit history, and product contracts | Complete | 3 | None for current delta |
+| S02 Tooling, build, release, CI, and static shell | Covered by previous audit; no delta files detected | 0 | None for current delta |
+| S03 Electron desktop runtime and local bridge | Covered by previous audit; no delta files detected | 0 | None for current delta |
+| S04 Core domain models, controller/device/material primitives | Active | 0 | New CNC/material and core sector-map coverage |
+| S05 Core job compilation, preflight, raster/trace, and output | Pending delta audit | 0 | New trace smoothing/upscale/apex code |
+| S06 IO formats and persistence | Pending delta audit | 0 | Project material persistence changes |
+| S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
+| S08 UI application workflows | Pending delta audit | 0 | CNC material UI/state changes |
+| S09 Fixtures, perceptual harness, and test assets | Pending delta audit | 0 | New perceptual fixtures and underscore-prefixed audit tests |
+
+### Delta Completed Passes
+
+| Pass | Completed | Summary |
+|---|---|---|
+| S01 Delta Pass 1 | 2026-07-04 | Current-state audit map and baseline-drift pass. Found stale sector-map coverage/counts and prior completion wording that did not cover ten newer commits. Updated the architecture map to classify all 1,679 current files. S01 still needs two more delta passes. |
+| S01 Delta Pass 2 | 2026-07-04 | Governance/docs delta pass over ADR-112, Phase H status docs, and current handoff/build notes. Found stale Phase H summary wording after H.14 landed. S01 still needs one remaining-gap pass. |
+| S01 Delta Pass 3 | 2026-07-04 | Remaining-gap pass over current S01 delta docs, pending/claimed wording, and audit-doc formatting. No additional S01 findings; S01 delta closed after three passes. Move to S04. |
+
+### Delta Finding Index
+
+| ID | Sector | Severity | Status | Short Name |
+|---|---|---|---|---|
+| D-S01-001 | S01 | Medium | Open | Sector map omitted current core/root paths |
+| D-S01-002 | S01 | Medium | Open | Completion ledger did not cover post-baseline commits |
+| D-S01-003 | S01 | Low | Open | Phase H summary header stale after H.14 |
