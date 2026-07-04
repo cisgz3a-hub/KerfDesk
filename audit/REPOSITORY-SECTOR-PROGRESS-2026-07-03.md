@@ -185,23 +185,23 @@ Branch at audit start: `main`
 ## Next Steps
 
 1. Continue the 2026-07-04 current-state delta audit opened after `main` advanced beyond the original audited tree.
-2. Run S02 post-`cd5c7f4` delta Pass 1 over Vitest runner-speed configuration and the new CI budget helper surface.
+2. Run S08 delta Pass 2 over box numeric-input/dogbone toggle changes, probe/device-setup UI changes, and UI canvas-test stderr.
 3. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
 
 ## Current-State Delta Audit - 2026-07-04
 
-Reason for reopening: current `origin/main` is at `cd5c7f4`, twenty-five commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, and runner-speed CI flake fixes. The new commits touch S01 docs, S02 build configuration and Vitest runner-speed configuration, S04 core CNC/material primitives and camera tests, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual/CI fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
+Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, runner-speed CI flake fixes, and the S04 audit-refresh documentation checkpoint. The new commits touch S01 docs, S02 build configuration and Vitest runner-speed configuration, S04 core CNC/material primitives and camera tests, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual/CI fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
 
 | Delta Sector | Status | Passes Completed | Major Areas Remaining |
 |---|---|---:|---|
 | S01 Governance, audit history, and product contracts | Complete | 3 | None for current delta |
-| S02 Tooling, build, release, CI, and static shell | Active refresh | 3 | Vitest runner-speed configuration and CI budget helper surface from `cd5c7f4` |
+| S02 Tooling, build, release, CI, and static shell | Complete | 6 | None for current delta |
 | S03 Electron desktop runtime and local bridge | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S04 Core domain models, controller/device/material primitives | Pending test-only refresh | 6 | Camera calibration/detection test flake changes from `cd5c7f4` |
+| S04 Core domain models, controller/device/material primitives | Complete | 9 | None for current delta |
 | S05 Core job compilation, preflight, raster/trace, and output | Complete | 3 | None for current delta |
 | S06 IO formats and persistence | Complete | 3 | None for current delta |
 | S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S08 UI application workflows | Pending delta audit | 0 | CNC material UI/state changes, PWA update dismissal, box numeric-input/dogbone toggle changes, probe/device-setup catalog UI changes |
+| S08 UI application workflows | Active | 1 | Box numeric-input/dogbone toggle changes, probe/device-setup UI changes, and UI canvas-test stderr |
 | S09 Fixtures, perceptual harness, and test assets | Pending delta audit | 0 | New perceptual fixtures, underscore-prefixed audit tests, CI budget helpers, and centerline runner-speed changes |
 
 ### Delta Completed Passes
@@ -226,6 +226,13 @@ Reason for reopening: current `origin/main` is at `cd5c7f4`, twenty-five commits
 | S04 Post-FF Delta Pass 1 | 2026-07-04 | CNC machine catalog and default bits. Focused CNC/project/state slice passed (7 files, 40 tests). Found that the expanded default CNC tool library lacks a direct invariant test for its documented stable-ID contract. |
 | S04 Post-FF Delta Pass 2 | 2026-07-04 | Catalog application and persistence boundary. Focused CNC state/project/material slice passed (4 files, 21 tests). No new findings; preset application is CNC-only, undoable, dirty, and updates bed plus spindle ceiling without rewriting stock. |
 | S04 Post-FF Delta Pass 3 | 2026-07-04 | Compiler semantics and tool boundary closure. Broad CNC core/project/state slice passed (16 files, 91 tests). No new findings; S04 refresh closed after three supplemental passes with `D-S04-004` still open. Move to S08 was planned before `cd5c7f4`; latest fast-forward reopens S02 first. |
+| S02 Post-cd5c7f4 Delta Pass 1 | 2026-07-04 | Vitest runner-speed configuration. Focused local-mode and `CI=true` slices passed (4 files, 19 tests each), and `tsc --noEmit` passed. Found missing direct policy coverage for the CI-only `maxWorkers` throttle. |
+| S02 Post-cd5c7f4 Delta Pass 2 | 2026-07-04 | Release gate and policy coverage sweep. Deploy/repo policy slice passed (3 files, 17 tests); `pnpm guard:repo`, `pnpm check:file-size`, and focused Prettier check passed. No new findings beyond `D-S02-003`. |
+| S02 Post-cd5c7f4 Delta Pass 3 | 2026-07-04 | Docs and direct-diff closure. Release/PWA/policy slice passed (4 files, 19 tests) and `pnpm build:web` passed with the known `three.module` chunk warning. No new findings; S02 refresh closed with `D-S02-001`, `D-S02-002`, and `D-S02-003` open. Move to S04 camera-test delta. |
+| S04 Post-cd5c7f4 Camera-Test Delta Pass 1 | 2026-07-04 | Changed assertions and core camera slice. Full core camera slice passed (29 files, 159 tests). No new findings; timeout changes only relax CI wall-clock tolerance while camera behavior assertions remain intact. |
+| S04 Post-cd5c7f4 Camera-Test Delta Pass 2 | 2026-07-04 | Wizard integration and import-boundary sweep. Camera UI/session slice passed (13 files, 58 tests), and changed camera tests plus CI helper passed (3 files, 18 tests). No new S04 findings; UI canvas stderr is carried forward for S08 scrutiny. |
+| S04 Post-cd5c7f4 Camera-Test Delta Pass 3 | 2026-07-04 | Direct diff and closure. Focused camera/session slice passed (5 files, 28 tests) and `tsc --noEmit` passed. No new findings; S04 camera-test refresh closed after three passes. Move to S08. |
+| S08 Delta Pass 1 | 2026-07-04 | PWA update and CNC material/machine UI. Focused PWA/CNC slice passed (6 files, 29 tests); layer/debounced slice passed (2 files, 26 tests). Found PWA update re-arm gap where `updatefound` clears dismissal storage without invalidating the mounted prompt render. |
 
 ### Delta Finding Index
 
@@ -236,6 +243,7 @@ Reason for reopening: current `origin/main` is at `cd5c7f4`, twenty-five commits
 | D-S01-003 | S01 | Low | Open | Phase H summary header stale after H.14 |
 | D-S02-001 | S02 | Low | Open | Deterministic build-time metadata lacks direct regression coverage |
 | D-S02-002 | S02 | Low | Open | Production web build still emits Vite chunk-size warning |
+| D-S02-003 | S02 | Low | Open | CI-only Vitest worker throttling lacks direct policy regression coverage |
 | D-S04-001 | S04 | Medium | Open | Surfacing generator lacks core finite-value guards |
 | D-S04-002 | S04 | Medium | Open | Grid/heightmap sizing helpers can return malformed grids for non-finite dimensions |
 | D-S04-003 | S04 | Medium | Open | Material feed seeding can persist non-finite feed values |
@@ -244,3 +252,4 @@ Reason for reopening: current `origin/main` is at `cd5c7f4`, twenty-five commits
 | D-S05-002 | S05 | Low | Open | Trace core accepts malformed RawImageData shape without explicit guard |
 | D-S05-003 | S05 | Low | Open | Canny edge core does not bound threshold ratios or blur sigma |
 | D-S05-004 | S05 | Low | Open | Trace image-adjustment options do not fail closed on non-finite values |
+| D-S08-001 | S08 | Medium | Open | PWA update dismissal re-arm lacks mounted-render invalidation |

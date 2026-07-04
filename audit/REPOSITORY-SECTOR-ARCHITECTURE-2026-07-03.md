@@ -27,7 +27,7 @@ The working tree was dirty before these audit files were created. Existing modif
 
 Ignored and generated folders such as `node_modules/`, `dist/`, `dist-electron/`, `.wrangler/`, `tmp/`, local log files, and `references/` are not part of the primary sector inventory unless a later pass explicitly uses them as evidence. S09 additionally references local `perceptual-artifacts/**` outputs when present, but that directory is ignored and not part of the tracked/non-ignored inventory.
 
-Current-state refresh, 2026-07-04: after the initial audit/fix pass and later fast-forwards, `origin/main` is at `cd5c7f4` and `git ls-files -co --exclude-standard` returns 1,689 files. The sector patterns below were refreshed so current root planning docs and current `src/core/box`, `src/core/cnc`, `src/core/relief`, and `src/core/sim` files are no longer unclassified.
+Current-state refresh, 2026-07-04: after the initial audit/fix pass and later fast-forwards, `origin/main` is at `09047e1` and `git ls-files -co --exclude-standard` returns 1,689 files. The sector patterns below were refreshed so current root planning docs and current `src/core/box`, `src/core/cnc`, `src/core/relief`, and `src/core/sim` files are no longer unclassified.
 
 ## High-Level Architecture
 
