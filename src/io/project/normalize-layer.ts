@@ -1,4 +1,4 @@
-import { CHIPLOAD_MATERIALS } from '../../core/cnc';
+import { isChiploadMaterialKey } from '../../core/cnc';
 import {
   CNC_CUT_TYPES,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -8,7 +8,6 @@ import {
   type LayerOperationSettings,
 } from '../../core/scene';
 
-const CNC_MATERIAL_KEYS = new Set<string>(CHIPLOAD_MATERIALS.map((material) => material.value));
 const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y']);
 
 // Keep a raw string field only when it is one of a known set of values —
@@ -73,7 +72,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
   return {
     ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
     ...enumPassthrough('pocketStrategy', raw['pocketStrategy'], POCKET_STRATEGIES),
-    ...enumPassthrough('materialKey', raw['materialKey'], CNC_MATERIAL_KEYS),
+    ...(isChiploadMaterialKey(raw['materialKey']) ? { materialKey: raw['materialKey'] } : {}),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     ...(typeof raw['reliefFinishToolId'] === 'string'
       ? { reliefFinishToolId: raw['reliefFinishToolId'] }

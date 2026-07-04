@@ -30,6 +30,11 @@ export type CncStock = {
   readonly widthMm: number;
   readonly heightMm: number;
   readonly originOffset: Vec2;
+  // ADR-112: the job's stock material (a ChiploadMaterial key), chosen once in
+  // the Material & Bit panel — Easel's project-level material. Drives the
+  // project material picker that seeds/auto-fills every layer's feeds. Absent =
+  // no project material ("Custom"); display/seed only, never compiled directly.
+  readonly materialKey?: string;
 };
 
 // How a layer's geometry is machined (Easel's "cut type"):
