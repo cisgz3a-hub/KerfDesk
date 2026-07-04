@@ -28,7 +28,10 @@ export function CncToolManager(props: { readonly machine: CncMachineConfig }): J
         {props.machine.tools.map((tool) => (
           <li key={tool.id} style={listItemStyle}>
             <span style={toolNameStyle}>
-              {tool.name} — {tool.diameterMm} mm
+              {/* Default names already carry the mm size; only append it for
+                  custom bits whose name doesn't. */}
+              {tool.name}
+              {tool.name.includes('mm') ? '' : ` — ${tool.diameterMm} mm`}
             </span>
             {customToolIds.has(tool.id) ? (
               <button
