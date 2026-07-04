@@ -1,5 +1,5 @@
 // CncMaterialRow — the beginner-facing "Material" picker on the CNC layer
-// card (ADR-106 G-material). Picking a material auto-fills feed / plunge /
+// card (ADR-111 G-material). Picking a material auto-fills feed / plunge /
 // depth-per-pass from the chipload chart using the layer's own bit and
 // spindle, so a first-timer never types a feed rate — Easel's material-driven
 // "it just works". Full flute/RPM control stays in the (advanced) Feeds

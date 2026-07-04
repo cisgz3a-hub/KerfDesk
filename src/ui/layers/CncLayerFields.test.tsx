@@ -54,7 +54,7 @@ function installProject(layer: Layer, withRelief: boolean): void {
   };
   useStore.setState({ project });
   useStore.getState().setMachineKind('cnc');
-  // Stepover lives in the advanced field group (ADR-106); reveal it.
+  // Stepover lives in the advanced field group (ADR-111); reveal it.
   useUiStore.getState().setShowCncAdvanced(true);
 }
 
@@ -116,7 +116,7 @@ describe('CncLayerFields relief contract', () => {
   });
 });
 
-describe('CncLayerFields Basic/Advanced (ADR-106)', () => {
+describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
   function profileLayer(): Layer {
     return {
       ...createLayer({ id: '#00aa00', color: '#00aa00' }),

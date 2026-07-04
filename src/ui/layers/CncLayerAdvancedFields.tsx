@@ -3,7 +3,7 @@
 // (DepthAndFeedFields), and the cut-type-specific tails (relief rows, v-carve
 // options, H.9 motion polish, tabs — CutTypeSections). Extracted from
 // CncLayerFields so that file stays under the size cap and so a Basic/Advanced
-// toggle can gate this whole group with one conditional (ADR-106).
+// toggle can gate this whole group with one conditional (ADR-111).
 
 import { activeCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
@@ -18,7 +18,7 @@ import { NumberField, Row } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
 
 // The whole advanced field set, gated by one conditional in the parent
-// (ADR-106 Basic/Advanced). Tabs is NOT here — it moved to the Basic group.
+// (ADR-111 Basic/Advanced). Tabs is NOT here — it moved to the Basic group.
 export function CncLayerAdvancedGroup(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;

@@ -6,7 +6,7 @@ import { computeCncDetectedApply } from './cnc-detected-apply';
 const MACHINE = DEFAULT_CNC_MACHINE_CONFIG; // spindleMaxRpm 12000
 const DEVICE = { bedWidth: 400, bedHeight: 400 };
 
-describe('computeCncDetectedApply (ADR-106)', () => {
+describe('computeCncDetectedApply (ADR-111)', () => {
   it('returns null when nothing the machine cares about differs', () => {
     const detected: ControllerSettingsSnapshot = {
       maxPowerS: 12000,

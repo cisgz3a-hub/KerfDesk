@@ -2008,7 +2008,7 @@ F-CNC19 tiling.
    apply directly; pocketing requires closed shapes (draw or import
    filled artwork instead).
 
-### F-CNC31. Auto-fill feeds from a material — ADR-106 #1
+### F-CNC31. Auto-fill feeds from a material — ADR-111 #1
 
 #### Success
 1. Every CNC layer card has a "Material" select at the top (Custom +
@@ -2032,7 +2032,7 @@ F-CNC19 tiling.
    flute count or RPM use the advanced Feeds calculator, which composes
    with H.7 presets.
 
-### F-CNC32. Switch a layer card between Basic and Advanced — ADR-106 #4
+### F-CNC32. Switch a layer card between Basic and Advanced — ADR-111 #4
 
 #### Success
 1. CNC layer cards default to **Basic**: Material, Cut type, Bit, Cut
@@ -2054,7 +2054,7 @@ F-CNC19 tiling.
 1. Fields hidden by Basic keep their values and still drive output (e.g. a
    pocket's stepover); Basic hides complexity, it does not reset it.
 
-### F-CNC33. Fill machine settings from the connected controller — ADR-106 #3a
+### F-CNC33. Fill machine settings from the connected controller — ADR-111 #3a
 
 #### Success
 1. When a controller is connected and its `$$` snapshot differs from the
@@ -2073,7 +2073,7 @@ F-CNC19 tiling.
    workpiece footprint stays whatever the operator set. Spindle max is the
    RPM ceiling; per-layer running speed is unchanged.
 
-### F-CNC34. See stock/feed advisories against machine limits — ADR-106 #3b
+### F-CNC34. See stock/feed advisories against machine limits — ADR-111 #3b
 
 #### Success
 1. At Save G-code and Start, with a controller connected, KerfDesk warns

@@ -1,5 +1,5 @@
 // CncAdvancedToggle — the Basic/Advanced switch for the CNC layer cards
-// (ADR-106). Beginner default is Basic; flipping this reveals the advanced
+// (ADR-111). Beginner default is Basic; flipping this reveals the advanced
 // fields (feeds, stepover, pocket fill, cut-type tails) on every CNC layer
 // card and persists across sessions. CNC-only.
 

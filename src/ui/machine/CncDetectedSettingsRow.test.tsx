@@ -1,5 +1,5 @@
 // CncDetectedSettingsRow — offers to fill the CNC machine from the connected
-// controller's detected settings (ADR-106). Renders nothing until a controller
+// controller's detected settings (ADR-111). Renders nothing until a controller
 // reports differing values; Apply patches the CNC params (spindle) and the
 // shared device (bed), never the stock.
 
@@ -42,7 +42,7 @@ async function render(): Promise<{ readonly host: HTMLDivElement; readonly root:
   return { host, root };
 }
 
-describe('CncDetectedSettingsRow (ADR-106)', () => {
+describe('CncDetectedSettingsRow (ADR-111)', () => {
   it('renders nothing when no controller settings are present', async () => {
     useLaserStore.setState({ controllerSettings: null });
     const { host, root } = await render();

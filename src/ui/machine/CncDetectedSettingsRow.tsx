@@ -1,5 +1,5 @@
 // CncDetectedSettingsRow — an opt-in banner that fills the CNC machine from the
-// connected controller's detected `$$` settings (ADR-106). It renders only when
+// connected controller's detected `$$` settings (ADR-111). It renders only when
 // the controller reported values that differ from the current setup; Apply
 // writes spindle max to the CNC params and bed size to the shared device, then
 // the row disappears because nothing differs any more. Never silent — nothing
