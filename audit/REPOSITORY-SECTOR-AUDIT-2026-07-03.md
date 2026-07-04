@@ -16,9 +16,9 @@ Mode: sector audit plus user-approved fix-phase tracking.
 
 ## Current Status
 
-Active sector: S04 current-state delta audit.
+Active sector: S06 current-state delta audit.
 Completed sectors: S01 Governance, audit history, and product contracts; S02 Tooling, build, release, CI, and static shell; S03 Electron desktop runtime and local bridge; S04 Core domain models, controller/device/material primitives; S05 Core job compilation, preflight, raster/trace, and output; S06 IO formats and persistence; S07 Platform adapters; S08 UI application workflows; S09 Fixtures, perceptual harness, and test assets.
-Current pass: S01 delta Pass 3 complete; S04 delta Pass 1 next.
+Current pass: S05 delta Pass 3 complete; S06 delta Pass 1 next.
 
 ## Findings Summary
 
@@ -3251,7 +3251,7 @@ Final result:
 Reason for reopening:
 
 - The completed audit/fix ledger closed against the earlier audited baseline.
-- Current `main` is `e31a3b8`, ten commits after `d603c01`.
+- Current `main` is `87a2190`, fourteen commits after `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; the later fast-forward added the audit-doc commit plus three S08 box/input commits.
 - `git diff --name-status d603c01..HEAD` shows changes in S01, S04, S05, S06, S08, and S09.
 - `git ls-files -co --exclude-standard` currently returns 1,679 files.
 - The previous sector map left 71 current files unclassified until this pass refreshed the architecture map.
@@ -3385,3 +3385,294 @@ Pass result:
 - S01 delta Pass 3 complete.
 - S01 delta sector closed after three passes.
 - Move to S04 current-state delta audit.
+
+### S04 Delta Pass 1 - Newly Classified Core CNC/Box/Relief/Simulation Orientation
+
+Scope planned:
+
+- Audit the S04 paths newly pulled into the current sector map: `src/core/box/**`, `src/core/cnc/**`, `src/core/relief/**`, and `src/core/sim/**`.
+- Review the post-baseline S04 delta files: `src/core/cnc/feeds-calculator.ts`, `src/core/cnc/feeds-calculator.test.ts`, `src/core/cnc/index.ts`, and `src/core/scene/machine.ts`.
+- Check exported core primitives for finite-value and size-budget invariants, because these folders include preview/simulation allocators and standalone CNC program generators.
+- Run the focused valid-path S04 test slice.
+
+Evidence inspected:
+
+- `git diff --name-only d603c01..HEAD` filtered to S04 paths.
+- `rg --files src/core/box src/core/cnc src/core/relief src/core/sim`.
+- Export scan over `src/core/box`, `src/core/cnc`, `src/core/relief`, and `src/core/sim`.
+- Targeted scan for `TODO`, `FIXME`, `throw new Error`, `NaN`, `Infinity`, casts, and nondeterminism markers in the same folders.
+- Focused reads of `src/core/box/box-spec.ts`, `src/core/box/generate-box.ts`, `src/core/box/panel-fit.ts`, `src/core/cnc/compile-cnc-job.ts`, `src/core/cnc/profile-paths.ts`, `src/core/cnc/pocket-paths.ts`, `src/core/cnc/vcarve-ladder.ts`, `src/core/cnc/vcarve-clearance.ts`, `src/core/cnc/tile-plan.ts`, `src/core/cnc/surfacing.ts`, `src/core/cnc/feeds-calculator.ts`, `src/core/relief/mesh-to-heightmap.ts`, `src/core/relief/heightmap.ts`, `src/core/relief/relief-roughing.ts`, `src/core/relief/relief-finishing.ts`, `src/core/sim/removal-grid.ts`, `src/core/sim/removal-grid-display.ts`, and `src/core/sim/stamp-toolpath.ts`.
+- Cross-checks of UI/IO guards in `src/ui/machine/SurfacingPanel.tsx`, `src/ui/machine/CncSetupPanel.tsx`, `src/ui/workspace/use-cnc-removal-grid.ts`, `src/ui/workspace/Cnc3DPane.tsx`, `src/ui/state/relief-param-actions.ts`, `src/io/project/deserialize-project.ts`, and `src/io/project/project-shape-validator.ts`.
+- Focused test command passed: `pnpm exec vitest run src/core/box src/core/cnc src/core/relief src/core/sim` (28 test files, 170 tests).
+- Focused material-key command passed: `pnpm exec vitest run src/core/cnc/feeds-calculator.test.ts` (1 file, 5 tests).
+
+Findings:
+
+#### D-S04-001 - Surfacing generator lacks core finite-value guards
+
+Severity: Medium.
+
+Evidence:
+
+- `src/core/cnc/surfacing.ts` exports `surfacingRowYs(heightMm, stepMm)` and `buildSurfacingProgram(params)`.
+- `surfacingRowYs` loops with `for (let y = 0; y < heightMm; y += stepMm)` and has no finite/positive guard on either argument.
+- A zero or non-finite `stepMm` can make the row loop non-terminating; an infinite `heightMm` is also non-terminating.
+- Non-finite or negative dimensions can also flow into formatted G-code comments and move commands, for example `fmt(NaN)` and `fmt(Infinity)`.
+- `src/ui/machine/SurfacingPanel.tsx` clamps its own numeric inputs to finite values in `[0.1, 5000]`, but the core generator is exported from `src/core/cnc/index.ts` and its tests cover only valid parameters.
+
+Risk:
+
+The UI path normally masks the issue, but the core API itself can hang or emit invalid standalone surfacing G-code if called from another workflow, test helper, automation, or future import path with bad numeric input. This is a core safety boundary: invalid surfacing dimensions should fail closed instead of relying on every caller to sanitize perfectly.
+
+No fix made.
+
+#### D-S04-002 - Grid/heightmap sizing helpers can return malformed grids for non-finite dimensions
+
+Severity: Medium.
+
+Evidence:
+
+- `src/core/sim/removal-grid.ts` exports `createRemovalGrid` and `coarsenedCellSize`, but `createRemovalGrid` does not require finite positive `widthMm`, `heightMm`, `originX`, `originY`, or `mmPerCell`.
+- A quick runtime probe of the same sizing math showed `widthMm = NaN` or `Infinity` yields `widthCells: NaN`, `mmPerCell: NaN` or `Infinity`, and a zero-length `Float32Array`, while still producing a grid object shape.
+- `src/core/relief/heightmap.ts` has the same finite-value gap in `heightmapCellSize`.
+- `src/core/relief/mesh-to-heightmap.ts` checks `targetWidthMm > 0` and `reliefDepthMm > 0`, but `Infinity > 0` passes; downstream sizing can therefore produce a malformed "ok" heightmap instead of an error.
+- Current UI/import paths mostly clamp or validate these values (`CncSetupPanel`, `relief-param-actions`, `deserialize-project`, and `project-shape-validator`), but the core helpers are exported and have no invalid-dimension tests.
+
+Risk:
+
+Malformed grid objects can make CNC preview, relief preview, or future simulation callers render blank/incorrect output while appearing successful. The 4M-cell ceiling protects huge finite grids, but non-finite dimensions bypass the intended memory/shape invariant.
+
+No fix made.
+
+Pass result:
+
+- S04 delta Pass 1 complete.
+- Valid-path regression coverage for newly classified S04 folders passed.
+- S04 remains open for Pass 2 and Pass 3, with geometry/toolpath semantics and remaining exported-core contracts still to audit.
+
+### S04 Delta Pass 2 - CNC Semantics and Project-Material Boundary Review
+
+Scope planned:
+
+- Recheck CNC compile ordering, tiling, relief rough/finish integration, and material-feed seeding paths.
+- Verify whether the ADR-112 project material path can feed invalid numeric values into CNC layer settings.
+- Cross-check valid-path tests for compile semantics, tiling, relief finish, feed calculation, project material, and CNC project persistence.
+
+Evidence inspected:
+
+- `src/core/cnc/compile-cnc-job.ts` and `src/core/cnc/compile-cnc-job.test.ts`.
+- `src/core/cnc/tile-plan.ts` and `src/core/cnc/tile-plan.test.ts`.
+- `src/core/cnc/compile-cnc-relief.ts` and `src/core/cnc/relief-finishing-compile.test.ts`.
+- `src/core/cnc/feeds-calculator.ts` and `src/core/cnc/feeds-calculator.test.ts`.
+- `src/ui/state/cnc-project-material.ts` and `src/ui/state/cnc-project-material.test.ts`.
+- `src/ui/layers/CncMaterialRow.tsx`.
+- `src/io/project/normalize-layer.ts`, `src/io/project/deserialize-project.ts`, and `src/io/project/project-machine-cnc.test.ts`.
+- `src/io/project/project-scene-integrity-validator.ts` and related duplicate-layer-color tests, to confirm color-keyed layer identity is guarded at import.
+- Focused command passed: `pnpm exec vitest run src/core/cnc/compile-cnc-job.test.ts src/core/cnc/tile-plan.test.ts src/core/cnc/relief-finishing-compile.test.ts src/core/cnc/feeds-calculator.test.ts src/ui/state/cnc-project-material.test.ts src/io/project/project-machine-cnc.test.ts` (6 files, 40 tests).
+
+Findings:
+
+#### D-S04-003 - Material feed seeding can persist non-finite feed values
+
+Severity: Medium.
+
+Evidence:
+
+- `src/core/cnc/feeds-calculator.ts` validates material keys through `isChiploadMaterialKey`, but `calculateFeeds` does not require finite positive `bitDiameterMm`, `flutes`, or `rpm`.
+- `calculateFeeds` multiplies `input.rpm * Math.max(1, Math.round(input.flutes)) * chiploadMm`; `rpm = NaN` yields `NaN` feed/plunge, and `rpm = Infinity` or `flutes = Infinity` yields non-finite feed values.
+- `src/ui/state/cnc-project-material.ts` calls `calculateFeeds` and writes the returned `feedMmPerMin`, `plungeMmPerMin`, and `depthPerPassMm` into every CNC layer when applying a project material.
+- `src/ui/layers/CncMaterialRow.tsx` does the same for the per-layer material picker.
+- Normal UI and .lf2 paths generally clamp or normalize the source fields, but the core feed calculator and pure project-material helper are exported and the tests cover only finite valid inputs.
+
+Risk:
+
+If an invalid in-memory tool or layer setting reaches the material picker path, selecting a material can store non-finite feed/plunge values in project state. The compiler later caps non-finite feeds down to `1` mm/min rather than preserving the intended material preset or failing closed, and a non-finite depth-per-pass can collapse a job into a single full-depth pass. That is a CNC safety/behavior boundary, not only a display issue.
+
+No fix made.
+
+Pass result:
+
+- S04 delta Pass 2 complete.
+- Core compile ordering, tiling, relief finish integration, and valid project-material paths are covered by focused passing tests.
+- S04 remains open for Pass 3 as a remaining-gap pass over box generation, relief/sim edge contracts, and audit-doc consistency.
+
+### S04 Delta Pass 3 - Remaining Box/Relief/Simulation Gap Sweep
+
+Scope planned:
+
+- Recheck box generator validation, panel claims, layout, fit correction, and assembly-referee contracts.
+- Recheck relief and simulation edge contracts not already covered in Pass 1 and Pass 2.
+- Confirm focused tests cover the newly classified S04 folder families well enough to close the sector.
+- Check audit-doc formatting before moving to S05.
+
+Evidence inspected:
+
+- `src/core/box/edge-pattern.ts`, `src/core/box/panel-claims.ts`, `src/core/box/layout.ts`, `src/core/box/panel-fit.ts`, `src/core/box/assembly-referee.ts`, `src/core/box/box-spec.test.ts`, and `src/core/box/generate-box.test.ts`.
+- `src/core/relief/relief-surface-mesh.ts`, `src/core/relief/relief-roughing.ts`, `src/core/relief/relief-finishing.ts`, and their focused tests.
+- `src/core/sim/stamp-toolpath.ts`, `src/core/sim/tool-kernels.ts`, `src/core/sim/removal-grid-display.ts`, and their focused tests.
+- Focused command passed: `pnpm exec vitest run src/core/box src/core/relief src/core/sim` (15 files, 93 tests).
+- Audit-doc formatting check passed after Pass 1 updates: `git diff --check -- audit/REPOSITORY-SECTOR-ARCHITECTURE-2026-07-03.md audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`.
+
+Findings:
+
+- No additional S04 delta findings.
+- Box generation has strong finite-value validation before generation, deterministic layout tests, property/fuzz coverage for panel geometry, and an independent assembly-referee check.
+- Relief and simulation have good valid-path coverage for mesh sampling, roughing, finishing, surface mesh generation, kernels, display downsampling, and toolpath stamping. The remaining weaknesses are the numeric-boundary gaps already recorded in `D-S04-002` and `D-S04-003`.
+
+Pass result:
+
+- S04 delta Pass 3 complete.
+- S04 current-state delta sector closed after three passes.
+- Move to S05 current-state delta audit.
+
+### S05 Delta Pass 1 - Trace Pipeline and Auto-Upscale Orientation
+
+Scope planned:
+
+- Audit the post-baseline S05 delta files under `src/core/trace/**`.
+- Review the current trace orchestration points: preset wiring, trace dispatch, preprocessing, auto-upscale, edge detection, centerline, and potrace entry points.
+- Check whether the new trace smoothing/upscale/apex work preserves bounded valid-path behavior and has clear API contracts at exported helper boundaries.
+- Run focused valid-path trace tests.
+
+Evidence inspected:
+
+- `git diff --name-only d603c01..HEAD` filtered to `src/core/(invariants|job|output|preflight|raster|trace)`.
+- `git diff --stat d603c01..HEAD -- src/core/trace`, showing 39 changed trace files with 3,654 insertions and 216 deletions.
+- `rg --files src/core/trace` and targeted scans for `TODO`, `FIXME`, `NaN`, `Infinity`, casts, throws, logging, clocks, and random usage.
+- Focused reads of `src/core/trace/auto-upscale.ts`, `src/core/trace/trace-image.ts`, `src/core/trace/trace-to-paths.ts`, `src/core/trace/trace-presets.ts`, `src/core/trace/edge-trace.ts`, `src/core/trace/centerline/trace-centerline.ts`, `src/core/trace/preprocess.ts`, `src/core/trace/potrace-bitmap.ts`, and `src/core/trace/index.ts`.
+- Cross-check reads of `src/ui/trace/image-loader.ts`, `src/ui/trace/use-trace-worker-client.ts`, and `src/ui/trace/trace-worker.ts`.
+- Focused command passed: `pnpm exec vitest run src/core/trace/auto-upscale.test.ts src/core/trace/trace-to-paths.test.ts src/core/trace/trace-image.test.ts src/core/trace/edge-trace.test.ts src/core/trace/centerline/centerline.test.ts` (5 test files, 78 tests).
+
+Findings:
+
+#### D-S05-001 - Auto-upscale exported helpers do not validate scale factors
+
+Severity: Low.
+
+Evidence:
+
+- `src/core/trace/auto-upscale.ts` exports `upscaleBy(image, factor)` and `downscaleTracedPaths(paths, factor)`.
+- `upscaleBy` computes `outWidth = image.width * factor`, `outHeight = image.height * factor`, then allocates `new Uint8ClampedArray(outWidth * outHeight * 4)` and divides by `factor` during bilinear sampling.
+- `downscaleTracedPaths` divides every vector coordinate by `factor`.
+- Internal trace dispatch uses `upscaleFactorFor(...)`, which only returns `2` or `3` today, so the surfaced preset path is valid.
+- The helpers are still exported and tested directly, but the direct tests only cover valid positive integer factors.
+
+Risk:
+
+Future direct callers can pass `0`, negative, fractional, `NaN`, or `Infinity` factors and get zero/invalid buffers, allocation exceptions, non-finite traced coordinates, or incoherent image dimensions. The normal import flow does not appear exposed today, but the core helper contract is unclear at an exported API boundary.
+
+No fix made.
+
+#### D-S05-002 - Trace core accepts malformed RawImageData shape without an explicit guard
+
+Severity: Low.
+
+Evidence:
+
+- `src/core/trace/trace-image.ts` defines `RawImageData` as `{ width, height, data }` but does not check that dimensions are finite positive integers or that `data.length === width * height * 4`.
+- `preprocessForTrace`, `medianFilter`, `thresholdToMonochrome`, `thresholdBandToMonochrome`, `alphaToMonochrome`, `sketchTraceToMonochrome`, `inkMask`, centerline mask construction, and potrace bitmap conversion assume the dimension/data-length contract and often use `?? 0` or `?? 255` when channels are missing.
+- `src/ui/trace/image-loader.ts` constructs valid buffers from canvas `ImageData` and applies header decode caps, so the normal UI import path is guarded indirectly.
+- Worker and inline trace entry points still accept `RawImageData` structurally, and current tests cover valid image buffers rather than malformed dimension/data-length pairs.
+
+Risk:
+
+Malformed in-memory inputs can be traced as silently whitened, darkened, truncated, or otherwise corrupted images instead of failing closed with a clear error. That can hide upstream loader or worker-message bugs and makes the pure trace API harder to reuse safely.
+
+No fix made.
+
+Pass result:
+
+- S05 delta Pass 1 complete.
+- The focused trace suite passed for current valid-path behavior.
+- S05 remains open for Pass 2 and Pass 3, with post-baseline trace algorithm internals, apex recovery, smoothing, and benchmark fixture coverage still to audit.
+
+### S05 Delta Pass 2 - Edge, Centerline, Potrace, and Smoothing Internals
+
+Scope planned:
+
+- Audit backend-specific trace internals added or changed after the baseline: Canny edge detection, gradient/ridge reconnection, sub-pixel snapping, apex recovery, potrace dispatch, centerline smoothing/closure, and spatial acceleration.
+- Check whether backend option inputs are bounded at the pure-core level or only by surfaced UI controls.
+- Run the backend-heavy trace test slice.
+
+Evidence inspected:
+
+- `src/core/trace/canny-edges.ts` and `src/core/trace/canny-gradient.ts`.
+- `src/core/trace/edge-trace.ts`, `src/core/trace/edge-reconnect.ts`, `src/core/trace/edge-subpixel.ts`, and `src/core/trace/edge-ink-support.ts`.
+- `src/core/trace/potrace-apex.ts`, `src/core/trace/potrace-trace.ts`, and `src/core/trace/potrace-path-scanner.ts`.
+- `src/core/trace/centerline/stroke-chains.ts`, `src/core/trace/centerline/loop-closure.ts`, `src/core/trace/centerline/chain-smoothing.ts`, `src/core/trace/centerline/curve-fit.ts`, `src/core/trace/centerline/spatial-grid.ts`, and adjacent centerline tests.
+- `src/ui/trace/trace-options.ts` and `src/ui/trace/trace-options.test.ts` to check surfaced edge-control clamping.
+- Focused command passed: `pnpm exec vitest run src/core/trace/canny-edges.test.ts src/core/trace/edge-trace.test.ts src/core/trace/edge-trace-determinism.test.ts src/core/trace/edge-subpixel.test.ts src/core/trace/potrace-apex.test.ts src/core/trace/potrace-trace.test.ts src/core/trace/centerline/chain-smoothing.test.ts src/core/trace/centerline/curve-fit.test.ts src/core/trace/centerline/loop-closure.test.ts src/core/trace/centerline/spatial-grid.test.ts src/core/trace/centerline/thick-blob.test.ts src/core/trace/centerline/centerline.test.ts` (12 test files, 69 tests).
+
+Findings:
+
+#### D-S05-003 - Canny edge core does not bound threshold ratios or blur sigma
+
+Severity: Low.
+
+Evidence:
+
+- `src/core/trace/canny-edges.ts` exports `cannyEdges(image, options)` and `cannyEdgeField(image, options)`.
+- `cannyEdgeField` passes `options.blurSigma` directly to `computeGradient`.
+- `src/core/trace/canny-gradient.ts` builds a Gaussian kernel with `Math.ceil(sigma * 3)` when `blurSigma > 0`; a very large or infinite positive sigma can therefore request an unbounded kernel allocation.
+- `cannyEdgeField` passes `lowThresholdRatio` and `highThresholdRatio` straight into hysteresis. Negative or non-finite threshold ratios can classify all pixels as strong edges, suppress all edges, or return a `lowThreshold` of `NaN`.
+- `src/ui/trace/trace-options.ts` maps surfaced Edge Detection controls through clamped `0..100` sliders, and the built-in `Edge Detection` preset uses finite values, so the normal UI path is bounded.
+- Direct core tests cover valid sensitivity/blur cases, flat images, ridge reconnection, sub-pixel smoothing, apex snapping, and determinism; they do not cover invalid Canny option values.
+
+Risk:
+
+The user-facing trace controls are safe today, but the exported Canny core API can still produce pathological edge maps or allocation failures when reused with bad numeric options. That makes the pure trace layer rely on every direct caller preserving UI-era constraints.
+
+No fix made.
+
+Pass result:
+
+- S05 delta Pass 2 complete.
+- Backend valid-path coverage is strong for Canny, edge ridge reconnection, deterministic spatial-grid acceleration, sub-pixel ridge snapping, potrace apex recovery, centerline loop closure, smoothing, and thick-blob recovery.
+- S05 remains open for one remaining-gap pass over trace benchmarks, preprocessing/raster-prep edges, batch trace, trace-boundary/cropping, and audit-doc consistency.
+
+### S05 Delta Pass 3 - Preprocess, Batch Trace, Boundary, and Closure Sweep
+
+Scope planned:
+
+- Recheck preprocessing, raster-prep image adjustments, trace boundary/crop helpers, batch trace SVG export, and the multi-file trace wrapper.
+- Confirm user-facing trace option and raster adjustment paths still clamp their controls before they reach the core helpers.
+- Note trace benchmark/perceptual harness files for S09, because they live under `src/__fixtures__/perceptual/**` and will be audited in that sector.
+- Run focused support-path tests and close S05 if no major area remains unchecked.
+
+Evidence inspected:
+
+- `src/core/trace/preprocess.ts`, `src/core/trace/preprocess.test.ts`, and `src/core/trace/preprocess-auto-median.test.ts`.
+- `src/core/trace/raster-prep.ts` and `src/core/trace/raster-prep.test.ts`.
+- `src/core/trace/batch-trace.ts`, `src/core/trace/batch-trace.test.ts`, `src/core/trace/paths-to-svg.ts`, `src/core/trace/trace-boundary.ts`, and `src/core/trace/trace-boundary.test.ts`.
+- `src/core/trace/potrace-params.ts`, `src/core/trace/potrace-bitmap.ts`, and their focused tests.
+- `src/ui/commands/multi-file-trace-action.ts` and `src/ui/commands/multi-file-trace-action.test.ts`.
+- `src/ui/state/raster-adjustment-actions.ts`, confirming UI/state raster adjustment patches clamp non-finite values to finite ranges before persistence.
+- `git diff --name-only d603c01..HEAD -- src/core/trace src/ui/trace src/ui/commands src/__fixtures__/perceptual`, confirming perceptual trace benchmark additions are S09-owned.
+- Focused command passed: `pnpm exec vitest run src/core/trace/preprocess.test.ts src/core/trace/preprocess-auto-median.test.ts src/core/trace/raster-prep.test.ts src/core/trace/batch-trace.test.ts src/core/trace/trace-boundary.test.ts src/core/trace/potrace-params.test.ts src/core/trace/potrace-bitmap.test.ts src/ui/commands/multi-file-trace-action.test.ts` (8 test files, 67 tests).
+
+Findings:
+
+#### D-S05-004 - Trace image-adjustment options do not fail closed on non-finite values
+
+Severity: Low.
+
+Evidence:
+
+- `src/core/trace/trace-image.ts` includes optional `brightness`, `contrast`, and `gamma` fields in `TraceOptions`, and `applyImageAdjustments` calls `adjustBrightness`, `adjustContrast`, and `adjustGamma` whenever those fields are present and non-neutral.
+- `src/core/trace/raster-prep.ts` clamps ordinary numeric ranges but does not explicitly handle `NaN` or `Infinity`.
+- `adjustBrightness(image, NaN)` and `adjustContrast(image, NaN)` feed `NaN` into `clampByte`; assigning `NaN` to a `Uint8ClampedArray` channel stores `0`, silently blackening adjusted channels.
+- `adjustGamma(image, NaN)` computes a `NaN` gamma clamp and then also writes `NaN`-derived channel values.
+- The user-facing raster adjustment state path clamps non-finite values in `src/ui/state/raster-adjustment-actions.ts`, and the trace dialog does not currently surface brightness/contrast/gamma controls. Current tests cover valid adjustment ranges and clamping of finite out-of-range gamma values, not non-finite direct core options.
+
+Risk:
+
+The surfaced UI path is guarded, but direct trace callers or future trace-adjustment controls can turn invalid numeric options into corrupted all-black/zeroed preprocessing instead of a clear no-op or validation error. That makes trace output harder to diagnose if a bad option object reaches the worker/core boundary.
+
+No fix made.
+
+Pass result:
+
+- S05 delta Pass 3 complete.
+- S05 current-state delta sector closed after three passes.
+- S05 delta findings are `D-S05-001` through `D-S05-004`, all low severity and all open.
+- Move to S06 current-state delta audit.

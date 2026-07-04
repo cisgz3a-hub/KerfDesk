@@ -185,23 +185,23 @@ Branch at audit start: `main`
 ## Next Steps
 
 1. Continue the 2026-07-04 current-state delta audit opened after `main` advanced beyond the original audited tree.
-2. Finish S04 delta Pass 1 through Pass 3 before moving to S05/S06/S08/S09.
+2. Start S06 delta Pass 1 over project material persistence changes and adjacent project-load validation.
 3. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
 
 ## Current-State Delta Audit - 2026-07-04
 
-Reason for reopening: current `main` is at `e31a3b8`, ten commits after the previously completed audit/fix baseline `d603c01`. The new commits touch S01 docs, S04 core CNC/material primitives, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
+Reason for reopening: current `main` is at `87a2190`, fourteen commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; the later fast-forward added the audit-doc commit plus three S08 box/input commits. The new commits touch S01 docs, S04 core CNC/material primitives, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
 
 | Delta Sector | Status | Passes Completed | Major Areas Remaining |
 |---|---|---:|---|
 | S01 Governance, audit history, and product contracts | Complete | 3 | None for current delta |
 | S02 Tooling, build, release, CI, and static shell | Covered by previous audit; no delta files detected | 0 | None for current delta |
 | S03 Electron desktop runtime and local bridge | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S04 Core domain models, controller/device/material primitives | Active | 0 | New CNC/material and core sector-map coverage |
-| S05 Core job compilation, preflight, raster/trace, and output | Pending delta audit | 0 | New trace smoothing/upscale/apex code |
-| S06 IO formats and persistence | Pending delta audit | 0 | Project material persistence changes |
+| S04 Core domain models, controller/device/material primitives | Complete | 3 | None for current delta |
+| S05 Core job compilation, preflight, raster/trace, and output | Complete | 3 | None for current delta |
+| S06 IO formats and persistence | Active | 0 | Project material persistence changes |
 | S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S08 UI application workflows | Pending delta audit | 0 | CNC material UI/state changes |
+| S08 UI application workflows | Pending delta audit | 0 | CNC material UI/state changes plus box numeric-input/dogbone toggle changes |
 | S09 Fixtures, perceptual harness, and test assets | Pending delta audit | 0 | New perceptual fixtures and underscore-prefixed audit tests |
 
 ### Delta Completed Passes
@@ -211,6 +211,12 @@ Reason for reopening: current `main` is at `e31a3b8`, ten commits after the prev
 | S01 Delta Pass 1 | 2026-07-04 | Current-state audit map and baseline-drift pass. Found stale sector-map coverage/counts and prior completion wording that did not cover ten newer commits. Updated the architecture map to classify all 1,679 current files. S01 still needs two more delta passes. |
 | S01 Delta Pass 2 | 2026-07-04 | Governance/docs delta pass over ADR-112, Phase H status docs, and current handoff/build notes. Found stale Phase H summary wording after H.14 landed. S01 still needs one remaining-gap pass. |
 | S01 Delta Pass 3 | 2026-07-04 | Remaining-gap pass over current S01 delta docs, pending/claimed wording, and audit-doc formatting. No additional S01 findings; S01 delta closed after three passes. Move to S04. |
+| S04 Delta Pass 1 | 2026-07-04 | Newly classified core CNC/box/relief/sim orientation. Focused valid-path S04 slice passed (28 files, 170 tests). Found missing finite-value guards in exported surfacing and grid/heightmap sizing primitives. S04 still needs two more passes. |
+| S04 Delta Pass 2 | 2026-07-04 | CNC semantics and project-material boundary review. Focused compile/tiling/relief/material/persistence slice passed (6 files, 40 tests). Found that material feed seeding can persist non-finite feed values if invalid numeric inputs reach the calculator. S04 still needs one remaining-gap pass. |
+| S04 Delta Pass 3 | 2026-07-04 | Remaining box/relief/simulation gap sweep. Focused box/relief/sim slice passed (15 files, 93 tests). No additional S04 findings; S04 delta closed after three passes. Move to S05. |
+| S05 Delta Pass 1 | 2026-07-04 | Trace pipeline and auto-upscale orientation. Focused trace slice passed (5 files, 78 tests). Found exported auto-upscale scale-factor contract gap and malformed RawImageData guard gap. S05 still needs two more passes. |
+| S05 Delta Pass 2 | 2026-07-04 | Edge, centerline, potrace, and smoothing internals. Backend trace slice passed (12 files, 69 tests). Found exported Canny option-bound gap. S05 still needs one remaining-gap pass. |
+| S05 Delta Pass 3 | 2026-07-04 | Preprocess, batch trace, boundary, and closure sweep. Support trace slice passed (8 files, 67 tests). Found non-finite trace image-adjustment option gap; S05 delta closed after three passes. Move to S06. |
 
 ### Delta Finding Index
 
@@ -219,3 +225,10 @@ Reason for reopening: current `main` is at `e31a3b8`, ten commits after the prev
 | D-S01-001 | S01 | Medium | Open | Sector map omitted current core/root paths |
 | D-S01-002 | S01 | Medium | Open | Completion ledger did not cover post-baseline commits |
 | D-S01-003 | S01 | Low | Open | Phase H summary header stale after H.14 |
+| D-S04-001 | S04 | Medium | Open | Surfacing generator lacks core finite-value guards |
+| D-S04-002 | S04 | Medium | Open | Grid/heightmap sizing helpers can return malformed grids for non-finite dimensions |
+| D-S04-003 | S04 | Medium | Open | Material feed seeding can persist non-finite feed values |
+| D-S05-001 | S05 | Low | Open | Auto-upscale exported helpers do not validate scale factors |
+| D-S05-002 | S05 | Low | Open | Trace core accepts malformed RawImageData shape without explicit guard |
+| D-S05-003 | S05 | Low | Open | Canny edge core does not bound threshold ratios or blur sigma |
+| D-S05-004 | S05 | Low | Open | Trace image-adjustment options do not fail closed on non-finite values |
