@@ -267,6 +267,7 @@ better risk/effort allocation at this stage. **Accepted gap, documented.**
 | Canvas auto-zoom on import | CLAIMED | Logic tested via the new combinedBBox + zoomToBounds math; not verified on a real import workflow |
 | Cmd+D duplicate | CLAIMED | Tests pin behaviour; no real-use confirmation yet |
 | Cloudflare Pages auto-deploy | VERIFIED (with 2026-07-03 outage, fixed) | Secrets set; `workflow_run`-gated deploys have published for weeks. **Broke 2026-07-03** when the repo was renamed `LaserForge-2.0`→`KerfDesk` — `scripts/assert-correct-repo.mjs` rejected the new identity so every Deploy failed at `guard:repo` and production stalled at `d839c96`. Fixed same day: guard accepts both identities (allowlist) + KerfDesk regression test in `deploy-workflow-gate.test.ts` |
+| Windows desktop installer + auto-update (ADR-024) | **CLAIMED** | `electron-updater` wired burn-safe (`electron/auto-update.ts` + 4 tests, never `quitAndInstall`); `release-desktop.yml` builds NSIS on `v*` tags → Cloudflare R2 feed; **built locally to a real 111 MB `…-x64-setup.exe` + valid `latest.yml`**; unsigned v1 (signing scaffolded, ADR-024 §5). Pending: the GitHub release run, R2 bucket hosting, and the Windows 10/11 install → serial-connect → auto-update pass (WORKFLOW.md "Desktop app" flows) |
 | Set-origin from head position | DEFERRED — captured in PROJECT.md "Future feature notes" |
 
 ---

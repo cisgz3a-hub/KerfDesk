@@ -27,6 +27,10 @@ const ALLOWED_LICENSES = new Set([
   'ISC',
   'Unlicense',
   '0BSD',
+  // Permissive, MIT-compatible (Blue Oak Council permissive list; SPDX-recognized;
+  // no copyleft). Pulled transitively by electron-updater → builder-util-runtime →
+  // sax@1.6.0 (ADR-024). Maintainer-approved 2026-07-04.
+  'BlueOak-1.0.0',
   '(MPL-2.0 OR Apache-2.0)',
   'CC-BY-4.0',
   'CC0-1.0',
