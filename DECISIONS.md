@@ -3549,9 +3549,14 @@ direct Web Serial control is a genuine gap.
    live burn. A new SW enters `waiting` (no `skipWaiting`); `PwaUpdatePrompt` shows
    a Reload banner that is **suppressed while the laser is streaming** (mirrors the
    autosave streaming guard). The update applies on the user's Reload, or
-   automatically once all tabs close. (Edge case: an already-`waiting` SW is not
-   re-surfaced on a manual reload — standard workbox-window behavior; it activates
-   on full close.)
+   automatically once all tabs close. (Corrected 2026-07-04: an already-`waiting`
+   SW **is** re-surfaced on every load — workbox-window 7.4.1's `register()`
+   re-fires `waiting` with `wasWaitingBeforeRegister` whenever a matching SW is
+   already waiting. The original claim here was wrong, and a bare `setNeedRefresh(false)`
+   "Later" therefore re-nagged on every reload. Fix: `PwaUpdatePrompt` persists a
+   per-build "Later" dismissal keyed to `__APP_VERSION__` (`pwa-update-dismissal.ts`)
+   and clears it on the next `updatefound`, so the same waiting update stays quiet
+   while a strictly-newer SW still prompts; it still activates on full close.)
 3. **`injectRegister: false`; register via the `virtual:pwa-register/react`
    hook.** A bundled hook is same-origin, satisfying the strict CSP
    (`script-src 'self'`, `public/_headers`) where the inline registration form is
