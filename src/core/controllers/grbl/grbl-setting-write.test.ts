@@ -74,4 +74,28 @@ describe('guarded GRBL setting writes', () => {
       }).kind,
     ).toBe('blocked');
   });
+
+  it('blocks non-canonical JavaScript numeric strings before firmware writes', () => {
+    for (const value of ['1e3', '0x10', '+10', '1.', '.5']) {
+      expect(
+        buildGrblSettingWrite({
+          rows,
+          id: 30,
+          value,
+          confirmation: { commonSettingChecked: true },
+          backupFresh: true,
+        }),
+      ).toEqual({ kind: 'blocked', reason: '$30 value is not valid for a guarded GRBL write.' });
+    }
+
+    expect(
+      buildGrblSettingWrite({
+        rows,
+        id: 32,
+        value: '1.0',
+        confirmation: { commonSettingChecked: true },
+        backupFresh: true,
+      }),
+    ).toEqual({ kind: 'blocked', reason: '$32 value is not valid for a guarded GRBL write.' });
+  });
 });

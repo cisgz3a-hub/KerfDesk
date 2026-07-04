@@ -84,6 +84,39 @@ describe('vector path tools', () => {
     expect(welded.bounds).toEqual({ minX: 0, minY: 0, maxX: 15, maxY: 10 });
   });
 
+  it('preserves common output metadata when welding vector objects', () => {
+    const metadata = {
+      operationOverride: { mode: 'fill' as const, power: 42 },
+      powerScale: 65,
+    };
+    const left: ShapeObject = {
+      ...shapeObject('left', '#222222', square(0, 0, 10)),
+      ...metadata,
+    };
+    const right: ShapeObject = {
+      ...shapeObject('right', '#222222', square(5, 0, 10)),
+      ...metadata,
+    };
+
+    const welded = weldVectorObjects([left, right], 'welded');
+
+    expect(welded.operationOverride).toEqual(metadata.operationOverride);
+    expect(welded.powerScale).toBe(65);
+  });
+
+  it('rejects weld input with mixed output metadata', () => {
+    const left: ShapeObject = {
+      ...shapeObject('left', '#222222', square(0, 0, 10)),
+      powerScale: 50,
+    };
+    const right: ShapeObject = {
+      ...shapeObject('right', '#222222', square(5, 0, 10)),
+      powerScale: 80,
+    };
+
+    expect(() => weldVectorObjects([left, right], 'welded')).toThrow(/matching output metadata/i);
+  });
+
   it('rejects weld input containing open polylines', () => {
     const open: ImportedSvg = {
       kind: 'imported-svg',
@@ -110,3 +143,15 @@ describe('vector path tools', () => {
     expect(() => weldVectorObjects([open], 'welded')).toThrow(/closed vector contours/i);
   });
 });
+
+function shapeObject(id: string, color: string, polyline: ReturnType<typeof square>): ShapeObject {
+  return {
+    kind: 'shape',
+    id,
+    spec: { kind: 'rect', widthMm: 10, heightMm: 10, cornerRadiusMm: 0 },
+    color,
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color, polylines: [polyline] }],
+  };
+}

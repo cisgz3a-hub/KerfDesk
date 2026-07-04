@@ -5,6 +5,7 @@ import {
   buildMultiFileTraceExports,
   runMultiFileTrace,
   type MultiFileTraceFile,
+  writeTraceSvgFileWithPlatform,
 } from './multi-file-trace-action';
 
 const SQUARE_PATH: ColoredPath = {
@@ -108,21 +109,22 @@ describe('buildMultiFileTraceExports', () => {
 });
 
 describe('runMultiFileTrace', () => {
-  it('downloads one SVG per selected source image and reports success', async () => {
+  it('writes one SVG per selected source image and reports success', async () => {
     const pushToast = vi.fn();
-    const download = vi.fn();
+    const writtenFiles: string[] = [];
+    const write = vi.fn(async (file: { readonly filename: string }) => {
+      writtenFiles.push(file.filename);
+      return true;
+    });
 
     await runMultiFileTrace([namedFile('logo.png'), namedFile('logo.png')], pushToast, {
       loadImage: async () => rawImage(2, 2),
       trace: async () => [SQUARE_PATH],
-      download,
+      write,
     });
 
-    expect(download).toHaveBeenCalledTimes(2);
-    expect(download.mock.calls.map(([file]) => file.filename)).toEqual([
-      'logo-trace.svg',
-      'logo-2-trace.svg',
-    ]);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(writtenFiles).toEqual(['logo-trace.svg', 'logo-2-trace.svg']);
     expect(pushToast).toHaveBeenCalledWith('Traced 2 images to SVG.', 'success');
   });
 
@@ -140,96 +142,134 @@ describe('runMultiFileTrace', () => {
 
   it('keeps cancelled file picks silent', async () => {
     const pushToast = vi.fn();
-    const download = vi.fn();
+    const write = vi.fn();
     const loadImage = vi.fn();
 
-    await runMultiFileTrace([], pushToast, { loadImage, download });
+    await runMultiFileTrace([], pushToast, { loadImage, write });
 
     expect(loadImage).not.toHaveBeenCalled();
-    expect(download).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
     expect(pushToast).not.toHaveBeenCalled();
   });
 
-  it('reports trace failures without downloading partial output', async () => {
+  it('keeps cancelled SVG saves silent when no trace export is written', async () => {
     const pushToast = vi.fn();
-    const download = vi.fn();
+    const write = vi.fn(async () => false);
+
+    await runMultiFileTrace([namedFile('logo.png')], pushToast, {
+      loadImage: async () => rawImage(2, 2),
+      trace: async () => [SQUARE_PATH],
+      write,
+    });
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it('reports trace failures without writing partial output', async () => {
+    const pushToast = vi.fn();
+    const write = vi.fn();
 
     await runMultiFileTrace([namedFile('broken.png')], pushToast, {
       loadImage: async () => {
         throw new Error('decode failed');
       },
-      download,
+      write,
     });
 
-    expect(download).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith('Could not trace images: decode failed', 'error');
   });
 
-  it('does not download transparent SVGs when tracing produces no visible paths', async () => {
+  it('does not write transparent SVGs when tracing produces no visible paths', async () => {
     const pushToast = vi.fn();
-    const download = vi.fn();
+    const write = vi.fn();
 
     await runMultiFileTrace([namedFile('empty.png')], pushToast, {
       loadImage: async () => rawImage(2, 2),
       trace: async () => [],
-      download,
+      write,
     });
 
-    expect(download).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
       'Could not trace images: Trace produced no visible paths for empty-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
       'error',
     );
   });
 
-  it('does not download SVGs when trace returns only non-renderable path groups', async () => {
+  it('does not write SVGs when trace returns only non-renderable path groups', async () => {
     const pushToast = vi.fn();
-    const download = vi.fn();
+    const write = vi.fn();
 
     await runMultiFileTrace([namedFile('empty-groups.png')], pushToast, {
       loadImage: async () => rawImage(2, 2),
       trace: async () => [{ color: '#000000', polylines: [] }],
-      download,
+      write,
     });
 
-    expect(download).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
       'Could not trace images: Trace produced no visible paths for empty-groups-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
       'error',
     );
   });
 
-  it('does not download SVGs when trace returns only zero-area geometry', async () => {
+  it('does not write SVGs when trace returns only zero-area geometry', async () => {
     const pushToast = vi.fn();
-    const download = vi.fn();
+    const write = vi.fn();
 
     await runMultiFileTrace([namedFile('transparent.png')], pushToast, {
       loadImage: async () => rawImage(4, 4),
       trace: async () => [ZERO_AREA_PATH],
-      download,
+      write,
     });
 
-    expect(download).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
       'Could not trace images: Trace produced no visible paths for transparent-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
       'error',
     );
   });
 
-  it('does not download blank-looking SVGs when trace returns only white background geometry', async () => {
+  it('does not write blank-looking SVGs when trace returns only white background geometry', async () => {
     const pushToast = vi.fn();
-    const download = vi.fn();
+    const write = vi.fn();
 
     await runMultiFileTrace([namedFile('blank.png')], pushToast, {
       loadImage: async () => rawImage(4, 4),
       trace: async () => [BACKGROUND_PATH],
-      download,
+      write,
     });
 
-    expect(download).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith(
       'Could not trace images: Trace produced no visible paths for blank-trace.svg. Try Trace Image with adjusted threshold or import as Image instead.',
       'error',
     );
+  });
+});
+
+describe('writeTraceSvgFileWithPlatform', () => {
+  it('saves traced SVG output through PlatformAdapter', async () => {
+    const write = vi.fn();
+    const pickFileForSave = vi.fn(async () => ({ displayName: 'logo-trace.svg', write }));
+
+    const saved = await writeTraceSvgFileWithPlatform(
+      {
+        id: 'mock',
+        pickFilesForOpen: async () => [],
+        pickFileForSave,
+        serial: { isSupported: () => false, requestPort: async () => null },
+      },
+      { filename: 'logo-trace.svg', svg: '<svg />', pathCount: 1 },
+    );
+
+    expect(saved).toBe(true);
+    expect(pickFileForSave).toHaveBeenCalledWith({
+      suggestedName: 'logo-trace.svg',
+      extensions: ['.svg'],
+    });
+    expect(write).toHaveBeenCalledWith('<svg />');
   });
 });

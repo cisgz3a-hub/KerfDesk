@@ -298,21 +298,13 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
 
 function focusTestCommand(ctx: AppCommandContext): AppCommand {
   const invoke = guardedCalibrationAction(ctx, 'create a focus test', ctx.focusTest);
-  return ctx.focusTestAvailable
-    ? enabled(
-        'tools.focus-test',
-        'tools',
-        'Focus Test...',
-        'Create a Z-axis focus test pattern',
-        invoke,
-      )
-    : disabled(
-        'tools.focus-test',
-        'tools',
-        'Focus Test...',
-        'Active machine profile needs verified controllable Z-axis support before Focus Test can run.',
-        invoke,
-      );
+  return disabled(
+    'tools.focus-test',
+    'tools',
+    'Focus Test...',
+    'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.',
+    invoke,
+  );
 }
 
 function guardedCalibrationAction(

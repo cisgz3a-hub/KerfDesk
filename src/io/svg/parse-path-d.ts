@@ -7,6 +7,7 @@
 
 import type { Vec2 } from '../../core/scene';
 import { DEFAULT_FLATNESS_MM, flattenArc, flattenCubic, flattenQuadratic } from './flatten-curves';
+import { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 export type SubPath = {
   readonly points: ReadonlyArray<Vec2>;
@@ -30,6 +31,7 @@ type State = {
   // command isn't Q/q or T/t.
   lastQuadraticCtrl: Vec2 | null;
   flatness: number;
+  pointCount: number;
 };
 
 type Token = { readonly cmd: string; readonly args: ReadonlyArray<number> };
@@ -71,6 +73,7 @@ export function parsePathD(
     lastCubicCtrl: null,
     lastQuadraticCtrl: null,
     flatness,
+    pointCount: 0,
   };
   for (const tok of tokens) dispatch(state, tok);
   return state.subpaths.map((sp) => ({ points: sp.points, closed: sp.closed }));
@@ -166,20 +169,38 @@ function dispatch(state: State, tok: Token): void {
 
 function ensureSub(state: State): MutableSubPath {
   if (state.cur !== null) return state.cur;
-  const sub: MutableSubPath = {
-    points: [state.cursor],
-    closed: false,
-    start: state.cursor,
-  };
+  const sub = createSubpath(state, state.cursor);
   state.cur = sub;
   state.subpaths.push(sub);
   return sub;
 }
 
 function startSubpath(state: State, at: Vec2): void {
-  const sub: MutableSubPath = { points: [at], closed: false, start: at };
+  const sub = createSubpath(state, at);
   state.cur = sub;
   state.subpaths.push(sub);
+}
+
+function createSubpath(state: State, at: Vec2): MutableSubPath {
+  reservePathPoints(state, 1);
+  return { points: [at], closed: false, start: at };
+}
+
+function appendPoint(state: State, sub: MutableSubPath, point: Vec2): void {
+  reservePathPoints(state, 1);
+  sub.points.push(point);
+}
+
+function appendPoints(state: State, sub: MutableSubPath, points: ReadonlyArray<Vec2>): void {
+  reservePathPoints(state, points.length);
+  sub.points.push(...points);
+}
+
+function reservePathPoints(state: State, count: number): void {
+  if (state.pointCount + count > SVG_IMPORT_LIMITS.points) {
+    throw new Error(`SVG import exceeds ${SVG_IMPORT_LIMITS.points} point(s)`);
+  }
+  state.pointCount += count;
 }
 
 // Reflects `point` through `pivot`. Used to derive S/s and T/t control points.
@@ -199,7 +220,7 @@ function handleMove(state: State, args: ReadonlyArray<number>, rel: boolean): vo
     const y = (args[k + 1] ?? 0) + (useRel ? state.cursor.y : 0);
     state.cursor = { x, y };
     if (k === 0) startSubpath(state, state.cursor);
-    else ensureSub(state).points.push(state.cursor);
+    else appendPoint(state, ensureSub(state), state.cursor);
   }
   resetSmoothControls(state);
 }
@@ -209,7 +230,7 @@ function handleLine(state: State, args: ReadonlyArray<number>, rel: boolean): vo
     const x = (args[k] ?? 0) + (rel ? state.cursor.x : 0);
     const y = (args[k + 1] ?? 0) + (rel ? state.cursor.y : 0);
     state.cursor = { x, y };
-    ensureSub(state).points.push(state.cursor);
+    appendPoint(state, ensureSub(state), state.cursor);
   }
   resetSmoothControls(state);
 }
@@ -218,7 +239,7 @@ function handleHorizontal(state: State, args: ReadonlyArray<number>, rel: boolea
   for (const arg of args) {
     const x = arg + (rel ? state.cursor.x : 0);
     state.cursor = { x, y: state.cursor.y };
-    ensureSub(state).points.push(state.cursor);
+    appendPoint(state, ensureSub(state), state.cursor);
   }
   resetSmoothControls(state);
 }
@@ -227,7 +248,7 @@ function handleVertical(state: State, args: ReadonlyArray<number>, rel: boolean)
   for (const arg of args) {
     const y = arg + (rel ? state.cursor.y : 0);
     state.cursor = { x: state.cursor.x, y };
-    ensureSub(state).points.push(state.cursor);
+    appendPoint(state, ensureSub(state), state.cursor);
   }
   resetSmoothControls(state);
 }
@@ -243,7 +264,7 @@ function handleCubic(state: State, args: ReadonlyArray<number>, rel: boolean): v
     const end = offset(args[k + 4] ?? 0, args[k + 5] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenCubic(state.cursor, c1, c2, end, state.flatness, out);
-    ensureSub(state).points.push(...out);
+    appendPoints(state, ensureSub(state), out);
     state.cursor = end;
     state.lastCubicCtrl = c2;
     state.lastQuadraticCtrl = null;
@@ -258,7 +279,7 @@ function handleSmoothCubic(state: State, args: ReadonlyArray<number>, rel: boole
     const end = offset(args[k + 2] ?? 0, args[k + 3] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenCubic(state.cursor, c1, c2, end, state.flatness, out);
-    ensureSub(state).points.push(...out);
+    appendPoints(state, ensureSub(state), out);
     state.cursor = end;
     state.lastCubicCtrl = c2;
     state.lastQuadraticCtrl = null;
@@ -271,7 +292,7 @@ function handleQuadratic(state: State, args: ReadonlyArray<number>, rel: boolean
     const end = offset(args[k + 2] ?? 0, args[k + 3] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenQuadratic(state.cursor, c1, end, state.flatness, out);
-    ensureSub(state).points.push(...out);
+    appendPoints(state, ensureSub(state), out);
     state.cursor = end;
     state.lastQuadraticCtrl = c1;
     state.lastCubicCtrl = null;
@@ -287,7 +308,7 @@ function handleSmoothQuadratic(state: State, args: ReadonlyArray<number>, rel: b
     const end = offset(args[k] ?? 0, args[k + 1] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
     flattenQuadratic(state.cursor, c1, end, state.flatness, out);
-    ensureSub(state).points.push(...out);
+    appendPoints(state, ensureSub(state), out);
     state.cursor = end;
     state.lastQuadraticCtrl = c1;
     state.lastCubicCtrl = null;
@@ -310,7 +331,7 @@ function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): voi
       state.flatness,
       out,
     );
-    ensureSub(state).points.push(...out);
+    appendPoints(state, ensureSub(state), out);
     state.cursor = end;
   }
   resetSmoothControls(state);
@@ -319,7 +340,7 @@ function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): voi
 function handleClose(state: State): void {
   const sub = state.cur;
   if (sub === null) return;
-  sub.points.push(sub.start);
+  appendPoint(state, sub, sub.start);
   sub.closed = true;
   state.cursor = sub.start;
   state.cur = null;

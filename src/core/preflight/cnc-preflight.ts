@@ -24,7 +24,7 @@ import {
 } from '../invariants';
 import type { CncMachineConfig, Layer, Project } from '../scene';
 import { DEFAULT_CNC_LAYER_SETTINGS, layerCncTool, type CncLayerSettings } from '../scene';
-import { findNoGoZoneCollisions } from './no-go-zone-preflight';
+import { findNoGoZoneCollisions } from './no-go-zones';
 import type { PreflightIssue, PreflightResult } from './preflight';
 
 export type CncPreflightOptions = {
@@ -155,11 +155,15 @@ function appendNoGoZoneIssues(
 ): void {
   const zones = project.device.noGoZones.filter((zone) => zone.enabled);
   if (zones.length === 0) return;
-  const offset = options.motionOffset ?? { x: 0, y: 0 };
-  for (const collision of findNoGoZoneCollisions(gcode, zones, offset).slice(
-    0,
-    MAX_REPORTED_ISSUES,
-  )) {
+  const collisionOptions =
+    options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset };
+  const collisions = findNoGoZoneCollisions(
+    gcode,
+    zones,
+    machineBoundsForDevice(project.device),
+    collisionOptions,
+  );
+  for (const collision of collisions.slice(0, MAX_REPORTED_ISSUES)) {
     issues.push({
       code: 'no-go-zone-collision',
       message: `Line ${collision.lineNumber}: motion crosses no-go zone "${collision.zone.name}".`,

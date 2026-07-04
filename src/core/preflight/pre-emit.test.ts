@@ -94,6 +94,40 @@ function projectWithRasterSubLayer(opts: { boundsMax: number; linesPerMm: number
   return { ...base, scene: addLayer(addObject(base.scene, raster), layer) };
 }
 
+function projectWithMultipleImageOperations(): Project {
+  const base = createProject();
+  const raster: RasterImage = {
+    kind: 'raster-image',
+    id: 'R1',
+    color: COLOR,
+    source: 'x.png',
+    dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+    pixelWidth: 4,
+    pixelHeight: 4,
+    dither: 'floyd-steinberg',
+    linesPerMm: 10,
+    bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+    transform: IDENTITY_TRANSFORM,
+  };
+  const imageLayer = {
+    ...createLayer({ id: COLOR, color: COLOR, mode: 'image' }),
+    linesPerMm: 1,
+  };
+  const subLayer = createLayerSubLayer(imageLayer, {
+    id: 'image-pass',
+    label: 'Image Pass',
+    settings: {
+      ...captureLayerOperationSettings(imageLayer),
+      mode: 'image',
+      linesPerMm: 25,
+    },
+  });
+  return {
+    ...base,
+    scene: addLayer(addObject(base.scene, raster), { ...imageLayer, subLayers: [subLayer] }),
+  };
+}
+
 describe('runPreEmitPreflight', () => {
   it('passes a modest raster (10x10mm @ 10 lines/mm = 100x100 px)', () => {
     expect(runPreEmitPreflight(projectWithRaster({ boundsMax: 10, linesPerMm: 10 })).ok).toBe(true);
@@ -111,6 +145,18 @@ describe('runPreEmitPreflight', () => {
     );
     expect(result.ok).toBe(false);
     expect(result.issues.some((i) => i.code === 'raster-too-large')).toBe(true);
+  });
+
+  it('checks every matching image operation layer, not only the first one', () => {
+    const result = runPreEmitPreflight(projectWithMultipleImageOperations());
+
+    expect(result.ok).toBe(false);
+    expect(result.issues).toEqual([
+      expect.objectContaining({
+        code: 'raster-too-large',
+        message: expect.stringContaining(`${COLOR}:image-pass image would engrave at 7500x7500 px`),
+      }),
+    ]);
   });
 
   it('budgets pass-through rasters from source pixels before compile', () => {

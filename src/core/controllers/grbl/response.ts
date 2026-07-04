@@ -70,8 +70,9 @@ function matchError(line: string): GrblResponse | null {
 function matchCodedKeyword(prefix: string, build: (code: number) => GrblResponse): Matcher {
   return (line) => {
     if (!line.startsWith(prefix)) return null;
-    const code = Number.parseInt(line.slice(prefix.length), 10);
-    return Number.isFinite(code) ? build(code) : null;
+    const codeText = line.slice(prefix.length);
+    if (!/^\d+$/.test(codeText)) return null;
+    return build(Number.parseInt(codeText, 10));
   };
 }
 

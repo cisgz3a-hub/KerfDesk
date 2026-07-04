@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { isRegisteredHelpTopicId } from '../help/help-topics';
 
 describe('command hover explanations', () => {
   it('gives every raw JSX control a title tooltip or stable help id', () => {
@@ -23,6 +24,11 @@ function controlsMissingHoverHelp(file: string): ReadonlyArray<string> {
         const { line } = ast.getLineAndCharacterOfPosition(node.getStart(ast));
         missing.push(`${relative(process.cwd(), file)}:${line + 1}`);
       }
+      const invalidHelpId = invalidLiteralHelpId(node);
+      if (invalidHelpId !== null) {
+        const { line } = ast.getLineAndCharacterOfPosition(node.getStart(ast));
+        missing.push(`${relative(process.cwd(), file)}:${line + 1} (${invalidHelpId})`);
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -35,6 +41,35 @@ const RAW_CONTROL_TAGS = new Set(['button', 'summary', 'input', 'select', 'texta
 
 function hasHoverHelp(node: ts.JsxOpeningElement | ts.JsxSelfClosingElement): boolean {
   return hasJsxAttribute(node, 'title') || hasJsxAttribute(node, 'data-help-id');
+}
+
+function invalidLiteralHelpId(
+  node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+): string | null {
+  const helpId = jsxStringAttributeValue(node, 'data-help-id');
+  if (helpId === undefined || helpId === null) return null;
+  return isRegisteredHelpTopicId(helpId) ? null : helpId;
+}
+
+function jsxStringAttributeValue(
+  node: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  name: string,
+): string | null | undefined {
+  const attribute = node.attributes.properties.find(
+    (property): property is ts.JsxAttribute =>
+      ts.isJsxAttribute(property) && property.name.getText() === name,
+  );
+  if (attribute === undefined) return undefined;
+  if (attribute.initializer === undefined) return '';
+  if (ts.isStringLiteral(attribute.initializer)) return attribute.initializer.text;
+  if (
+    ts.isJsxExpression(attribute.initializer) &&
+    attribute.initializer.expression !== undefined &&
+    ts.isStringLiteralLike(attribute.initializer.expression)
+  ) {
+    return attribute.initializer.expression.text;
+  }
+  return null;
 }
 
 function hasJsxAttribute(

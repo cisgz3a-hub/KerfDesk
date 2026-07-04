@@ -191,7 +191,8 @@ const MAX_SERIAL_LINE_LENGTH = 64 * 1024;
 // Pure line extractor for the serial read loop: appends `chunk` to `buffer`,
 // pulls out every \n-terminated line (trailing \r stripped), and returns the
 // remaining partial. An over-length partial (no newline in sight) is dropped so
-// the buffer cannot grow without bound. Exported for unit testing.
+// the buffer cannot grow without bound; an over-length newline-terminated record
+// is dropped before it reaches subscribers. Exported for unit testing.
 export function extractSerialLines(
   buffer: string,
   chunk: string,
@@ -200,7 +201,8 @@ export function extractSerialLines(
   const lines: string[] = [];
   let nl = next.indexOf('\n');
   while (nl >= 0) {
-    lines.push(next.slice(0, nl).replace(/\r$/, ''));
+    const line = next.slice(0, nl).replace(/\r$/, '');
+    if (line.length <= MAX_SERIAL_LINE_LENGTH) lines.push(line);
     next = next.slice(nl + 1);
     nl = next.indexOf('\n');
   }

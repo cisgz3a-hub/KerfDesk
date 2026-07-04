@@ -6,8 +6,8 @@ describe('useStore multi-select', () => {
   beforeEach(() => reset());
 
   it('selectObject replaces both primary and additional', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#f00']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0f0']));
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#00ff00']));
     useStore.setState({ additionalSelectedIds: new Set(['O2']) });
     useStore.getState().selectObject('O1');
     expect(useStore.getState().selectedObjectId).toBe('O1');
@@ -15,8 +15,8 @@ describe('useStore multi-select', () => {
   });
 
   it('toggleSelectObject adds a new object to the multi-set', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#f00']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0f0']));
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#00ff00']));
     useStore.getState().selectObject('O1');
     useStore.getState().toggleSelectObject('O2');
     expect(useStore.getState().selectedObjectId).toBe('O1');
@@ -24,7 +24,7 @@ describe('useStore multi-select', () => {
   });
 
   it('toggleSelectObject removes the primary when only primary was selected', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#f00']));
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().selectObject('O1');
     useStore.getState().toggleSelectObject('O1');
     expect(useStore.getState().selectedObjectId).toBeNull();
@@ -32,9 +32,9 @@ describe('useStore multi-select', () => {
   });
 
   it('selectAllObjects puts every object into the selection', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#f00']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0f0']));
-    useStore.getState().importSvgObject(svgObj('O3', ['#00f']));
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#00ff00']));
+    useStore.getState().importSvgObject(svgObj('O3', ['#0000ff']));
     useStore.getState().selectAllObjects();
     const s = useStore.getState();
     expect(s.selectedObjectId).toBe('O1');
@@ -44,8 +44,8 @@ describe('useStore multi-select', () => {
   });
 
   it('removeSceneObject removes from BOTH primary and additional', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#f00']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#0f0']));
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#00ff00']));
     useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
     useStore.getState().removeSceneObject('O2');
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);

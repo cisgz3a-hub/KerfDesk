@@ -446,8 +446,8 @@ function validate(input: EmitRasterInput): void {
   if (input.bounds.maxX <= input.bounds.minX || input.bounds.maxY <= input.bounds.minY) {
     throw new Error('emitRasterGroup: bounds must be positive');
   }
-  if (input.feedMmPerMin <= 0) {
-    throw new Error('emitRasterGroup: feedMmPerMin must be > 0');
+  if (!isPositiveFinite(input.feedMmPerMin)) {
+    throw new Error('emitRasterGroup: feedMmPerMin must be finite and > 0');
   }
   if (input.overscanMm < 0) {
     throw new Error('emitRasterGroup: overscanMm must be >= 0');
@@ -462,9 +462,13 @@ function validate(input: EmitRasterInput): void {
 }
 
 function assertValidControlledTravelFeed(feed: number | undefined): void {
-  if (feed !== undefined && (!Number.isFinite(feed) || feed <= 0)) {
+  if (feed !== undefined && !isPositiveFinite(feed)) {
     throw new Error('emitRasterGroup: controlledLaserOffTravelFeedMmPerMin must be > 0');
   }
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
 
 function normalizedPasses(passes: number | undefined): number {

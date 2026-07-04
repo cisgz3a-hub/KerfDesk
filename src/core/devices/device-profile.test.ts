@@ -113,6 +113,8 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
       zProbePresent: true,
       laserSubProfile: {
         model: 'LASER TREE LT-4LDS-V2',
+        technology: 'diode',
+        metadataConfidence: 'researched',
         opticalPowerW: 20,
         wavelengthNm: 455,
         spotSizeMm: { x: 0.16, y: 0.18 },

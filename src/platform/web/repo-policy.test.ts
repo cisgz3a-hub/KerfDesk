@@ -79,15 +79,30 @@ describe('repository policy enforcement contract', () => {
 
   it('uses one cross-platform file-size backstop in CI and deploy workflows', () => {
     const packageJson = JSON.parse(repoFile('package.json')) as {
-      readonly scripts?: { readonly ['check:file-size']?: string };
+      readonly scripts?: {
+        readonly ['check:file-size']?: string;
+        readonly ['release:check']?: string;
+      };
     };
     const ciWorkflow = repoFile('.github/workflows/ci.yml');
     const deployWorkflow = repoFile('.github/workflows/deploy.yml');
+    const releaseCheck = packageJson.scripts?.['release:check'] ?? '';
 
     expect(packageJson.scripts?.['check:file-size']).toBe(
       'node scripts/check-file-size-policy.mjs',
     );
-    expect(ciWorkflow).toContain('run: pnpm check:file-size');
-    expect(deployWorkflow).toContain('run: pnpm check:file-size');
+    expect(releaseCheck).toContain('pnpm check:file-size');
+    expect(ciWorkflow).toContain('run: pnpm release:check');
+    expect(deployWorkflow).toContain('run: pnpm release:check');
+  });
+
+  it('exposes the local RTSP camera bridge for browser development', () => {
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      readonly scripts?: { readonly ['camera:bridge']?: string };
+    };
+
+    expect(packageJson.scripts?.['camera:bridge']).toBe(
+      'pnpm build:electron-main && node dist-electron/rtsp-camera-bridge-cli.js',
+    );
   });
 });

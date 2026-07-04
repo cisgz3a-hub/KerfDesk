@@ -31,6 +31,12 @@ describe('parseStatusReport — happy paths', () => {
     expect(r?.subState).toBe(1);
   });
 
+  it('does not parse numeric prefixes as substates', () => {
+    const r = parseStatusReport('<Hold:1x|MPos:1.000,2.000,0.000|FS:0,0>');
+    expect(r?.state).toBe('Hold');
+    expect(r?.subState).toBeNull();
+  });
+
   it('parses WPos as an alternative to MPos', () => {
     const r = parseStatusReport('<Idle|WPos:10.000,20.000,0.000|FS:0,0>');
     expect(r?.mPos).toBeNull();

@@ -16,6 +16,10 @@ function emit(project: Project): string {
   return grblStrategy.emit(compileJob(project.scene, project.device), project.device);
 }
 
+const minimalBurnGcode = ['G21', 'G90', 'M3 S0', 'G0 X1 Y1 S0', 'G1 X9 Y9 F100 S50', 'M5'].join(
+  '\n',
+);
+
 const sampleObject: SceneObject = {
   kind: 'imported-svg',
   id: 'O1',
@@ -140,7 +144,7 @@ describe('runPreflight laser-off travel invariant', () => {
     expect(result.ok).toBe(false);
     expect(result.issues).toContainEqual({
       code: 'laser-on-travel',
-      message: 'Line 5: G0 without S0 and no preceding M5 / sticky S0',
+      message: 'Line 5: G0 without S0 and no preceding M5/M107 / sticky S0',
     });
   });
 });
@@ -247,7 +251,16 @@ describe('runPreflight — F-A10 check 4: speed out of range', () => {
       ...createLayer({ id: 'L1', color: '#ff0000' }),
       speed: 0,
     });
-    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    const codes = runPreflight(project, minimalBurnGcode).issues.map((i) => i.code);
+    expect(codes).toContain('speed-out-of-range');
+  });
+
+  it('flags non-finite layer speeds before output can emit FNaN', () => {
+    const project = projectWith({
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      speed: Number.NaN,
+    });
+    const codes = runPreflight(project, minimalBurnGcode).issues.map((i) => i.code);
     expect(codes).toContain('speed-out-of-range');
   });
 });

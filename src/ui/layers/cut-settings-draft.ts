@@ -9,15 +9,23 @@ import {
 import { DITHER_ALGORITHMS, type Layer, type LayerMode } from '../../core/scene';
 
 export type LayerPatch = Partial<Omit<Layer, 'id' | 'color'>>;
+export type CutSettingsLimits = {
+  readonly maxFeed?: number;
+};
 
 const MAX_KERF_OFFSET_MM = 10;
 const MIN_TAB_SIZE_MM = 0.01;
 const MAX_TAB_SIZE_MM = 100;
 const MAX_TABS_PER_SHAPE = 100;
 
-export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
+export function readCutSettingsPatch(
+  data: FormData,
+  layer: Layer,
+  limits: CutSettingsLimits = {},
+): LayerPatch {
   const mode = parseMode(String(data.get('mode') ?? layer.mode));
   const power = numberField(data, 'power', layer.power, 0, 100);
+  const maxFeed = positiveFiniteLimit(limits.maxFeed) ?? Number.POSITIVE_INFINITY;
   const linesPerMm = mode === 'image' ? readImageLinesPerMm(data, layer) : layer.linesPerMm;
   const lineSettings = readLineSettingsPatch(data, layer, mode);
   const fillSettings = readFillSettingsPatch(data, layer, mode);
@@ -28,7 +36,7 @@ export function readCutSettingsPatch(data: FormData, layer: Layer): LayerPatch {
       mode === 'image'
         ? numberField(data, 'minPower', layer.minPower, 0, power)
         : Math.min(layer.minPower, power),
-    speed: numberField(data, 'speed', layer.speed, 1, Number.POSITIVE_INFINITY),
+    speed: numberField(data, 'speed', layer.speed, 1, maxFeed),
     passes: Math.max(
       1,
       Math.floor(numberField(data, 'passes', layer.passes, 1, Number.POSITIVE_INFINITY)),
@@ -154,6 +162,10 @@ function numberField(
   const parsed = Number.parseFloat(String(data.get(name) ?? ''));
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function positiveFiniteLimit(value: number | undefined): number | null {
+  return value !== undefined && Number.isFinite(value) ? Math.max(1, value) : null;
 }
 
 function parseMode(value: string): LayerMode {

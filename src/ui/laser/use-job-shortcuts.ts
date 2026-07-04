@@ -20,10 +20,7 @@ export function installJobShortcuts(target: Window): () => void {
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     if (e.key === '.') {
-      const laser = useLaserStore.getState();
-      if (!isActiveJob(laser.streamer)) return;
-      e.preventDefault();
-      void laser.stopJob().catch(() => undefined);
+      handleStopShortcut(e);
       return;
     }
     if (e.key === 'Enter') {
@@ -41,4 +38,13 @@ export function installJobShortcuts(target: Window): () => void {
 
 export function useJobShortcuts(): void {
   useEffect(() => installJobShortcuts(window), []);
+}
+
+function handleStopShortcut(e: KeyboardEvent): void {
+  const laser = useLaserStore.getState();
+  const activeJob = isActiveJob(laser.streamer);
+  const activeMotion = laser.motionOperation !== null;
+  if (!activeJob && !activeMotion) return;
+  e.preventDefault();
+  void (activeJob ? laser.stopJob() : laser.cancelJog()).catch(() => undefined);
 }

@@ -2,8 +2,10 @@ import type {
   MaterialRecipeConfidence,
   MaterialRecipeOperation,
 } from '../../core/material-library';
+import type { LaserTechnology } from '../../core/devices';
 
 const RECIPE_CONFIDENCES = ['starter', 'calibrated', 'imported', 'unsupported'] as const;
+const LASER_TECHNOLOGIES = ['diode', 'co2', 'fiber', 'unknown'] as const;
 const RECIPE_OPERATIONS = [
   'cut',
   'engrave',
@@ -19,7 +21,9 @@ export type MaterialPresetMatchMetadata = {
   readonly profileId?: string;
   readonly machineFamily?: string;
   readonly laserModel?: string;
+  readonly laserTechnology?: LaserTechnology;
   readonly opticalPowerW?: number;
+  readonly wavelengthNm?: number;
   readonly confidence?: MaterialRecipeConfidence;
   readonly warning?: string;
   readonly calibrationProvenance?: string;
@@ -35,11 +39,11 @@ export function parsePresetMatchMetadata(
   if (strings.kind === 'invalid') return strings;
   const enums = parseMetadataEnums(value, index);
   if (enums.kind === 'invalid') return enums;
-  const opticalPower = parseOpticalPower(value, index);
-  if (opticalPower.kind === 'invalid') return opticalPower;
+  const laserNumbers = parseLaserNumbers(value, index);
+  if (laserNumbers.kind === 'invalid') return laserNumbers;
   return {
     kind: 'ok',
-    metadata: { ...strings.metadata, ...enums.metadata, ...opticalPower.metadata },
+    metadata: { ...strings.metadata, ...enums.metadata, ...laserNumbers.metadata },
   };
 }
 
@@ -74,6 +78,7 @@ function parseMetadataEnums(
   | { readonly kind: 'invalid'; readonly reason: string } {
   let operation: MaterialRecipeOperation | undefined;
   let confidence: MaterialRecipeConfidence | undefined;
+  let laserTechnology: LaserTechnology | undefined;
   if (value['operation'] !== undefined) {
     if (!isRecipeOperation(value['operation'])) return invalidPresetMetadata(index, 'operation');
     operation = value['operation'];
@@ -82,26 +87,37 @@ function parseMetadataEnums(
     if (!isRecipeConfidence(value['confidence'])) return invalidPresetMetadata(index, 'confidence');
     confidence = value['confidence'];
   }
+  if (value['laserTechnology'] !== undefined) {
+    if (!isLaserTechnology(value['laserTechnology'])) {
+      return invalidPresetMetadata(index, 'laserTechnology');
+    }
+    laserTechnology = value['laserTechnology'];
+  }
   return {
     kind: 'ok',
     metadata: {
       ...(operation !== undefined ? { operation } : {}),
       ...(confidence !== undefined ? { confidence } : {}),
+      ...(laserTechnology !== undefined ? { laserTechnology } : {}),
     },
   };
 }
 
-function parseOpticalPower(
+function parseLaserNumbers(
   value: Record<string, unknown>,
   index: number,
 ):
   | { readonly kind: 'ok'; readonly metadata: MaterialPresetMatchMetadata }
   | { readonly kind: 'invalid'; readonly reason: string } {
-  if (value['opticalPowerW'] === undefined) return { kind: 'ok', metadata: {} };
-  if (!isPositiveFinite(value['opticalPowerW'])) {
-    return invalidPresetMetadata(index, 'opticalPowerW');
+  const metadata: { opticalPowerW?: number; wavelengthNm?: number } = {};
+  for (const field of ['opticalPowerW', 'wavelengthNm'] as const) {
+    if (value[field] === undefined) continue;
+    if (!isPositiveFinite(value[field])) {
+      return invalidPresetMetadata(index, field);
+    }
+    metadata[field] = value[field];
   }
-  return { kind: 'ok', metadata: { opticalPowerW: value['opticalPowerW'] } };
+  return { kind: 'ok', metadata };
 }
 
 function invalidPresetMetadata(
@@ -121,6 +137,10 @@ function isPositiveFinite(value: unknown): value is number {
 
 function isRecipeConfidence(value: unknown): value is MaterialRecipeConfidence {
   return RECIPE_CONFIDENCES.some((confidence) => confidence === value);
+}
+
+function isLaserTechnology(value: unknown): value is LaserTechnology {
+  return LASER_TECHNOLOGIES.some((technology) => technology === value);
 }
 
 function isRecipeOperation(value: unknown): value is MaterialRecipeOperation {

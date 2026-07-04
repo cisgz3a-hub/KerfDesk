@@ -61,33 +61,53 @@ const userOriginPlacement = {
 
 function overBudgetRasterProject(): Project {
   const color = '#808080';
-  const raster: RasterImage = {
-    kind: 'raster-image',
-    id: 'huge-image',
-    source: 'huge.png',
-    dataUrl: 'data:image/png;base64,',
-    pixelWidth: 10,
-    pixelHeight: 10,
-    bounds: { minX: 0, minY: 0, maxX: 300, maxY: 300 },
-    transform: IDENTITY_TRANSFORM,
-    color,
-    dither: 'floyd-steinberg',
-    linesPerMm: 25,
-    lumaBase64: '',
-  };
   return {
     ...createProject(),
     scene: {
       ...EMPTY_SCENE,
-      objects: [raster],
-      layers: [
-        {
-          ...createLayer({ id: 'image-layer', color, mode: 'image' }),
-          linesPerMm: 25,
-          power: 10,
-        },
-      ],
+      objects: [overBudgetRaster('huge-image', { minX: 0, minY: 0, maxX: 300, maxY: 300 })],
+      layers: [imageLayer(color)],
     },
+  };
+}
+
+function selectedOverBudgetRasterProject(): Project {
+  const color = '#808080';
+  return {
+    ...createProject(),
+    scene: {
+      ...EMPTY_SCENE,
+      objects: [
+        overBudgetRaster('selected-image', { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        overBudgetRaster('unselected-image', { minX: 330, minY: 0, maxX: 390, maxY: 60 }),
+      ],
+      layers: [imageLayer(color)],
+    },
+  };
+}
+
+function overBudgetRaster(id: string, bounds: RasterImage['bounds']): RasterImage {
+  return {
+    kind: 'raster-image',
+    id,
+    source: `${id}.png`,
+    dataUrl: 'data:image/png;base64,',
+    pixelWidth: 10,
+    pixelHeight: 10,
+    bounds,
+    transform: IDENTITY_TRANSFORM,
+    color: '#808080',
+    dither: 'floyd-steinberg',
+    linesPerMm: 25,
+    lumaBase64: '',
+  };
+}
+
+function imageLayer(color: string): ReturnType<typeof createLayer> {
+  return {
+    ...createLayer({ id: 'image-layer', color, mode: 'image' }),
+    linesPerMm: 25,
+    power: 10,
   };
 }
 
@@ -122,6 +142,51 @@ describe('custom-origin raster budget guard', () => {
     useStore.setState({
       project: overBudgetRasterProject(),
       jobPlacement: userOriginPlacement,
+    });
+    const originalFrame = useLaserStore.getState().frame;
+    const frame = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      frame,
+      streamer: null,
+      statusReport: idleStatus,
+      workOriginActive: true,
+      wcoCache: { x: 100, y: 100, z: 0 },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+      });
+      const frameButton = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Frame',
+      );
+      if (frameButton === undefined) throw new Error('Frame button not rendered');
+
+      await act(async () => {
+        frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 0, maxX: 300, maxY: 300 }, 6000);
+      expect(useToastStore.getState().toasts).toEqual([]);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      useLaserStore.setState({ frame: originalFrame });
+      host.remove();
+    }
+  });
+
+  it('frames selected over-budget raster bounds instead of unrelated selected-output artwork', async () => {
+    useStore.setState({
+      project: selectedOverBudgetRasterProject(),
+      jobPlacement: userOriginPlacement,
+      selectedObjectId: 'selected-image',
+      additionalSelectedIds: new Set(),
+      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
     });
     const originalFrame = useLaserStore.getState().frame;
     const frame = vi.fn(async () => undefined);

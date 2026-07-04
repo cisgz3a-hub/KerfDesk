@@ -15,6 +15,9 @@ describe('project device profile metadata persistence', () => {
     expect(result.project.device.gcodeDialect.dialectId).toBe('neotronics-4040-safe');
     expect(result.project.device.zTravelConfirmed).toBe(false);
     expect(result.project.device.laserSubProfile?.model).toBe('LASER TREE LT-4LDS-V2');
+    expect(result.project.device.laserSubProfile?.technology).toBe('diode');
+    expect(result.project.device.laserSubProfile?.metadataConfidence).toBe('researched');
+    expect(result.project.device.laserSubProfile?.wavelengthNm).toBe(455);
   });
 
   it('backfills old projects without a gcode dialect to the default dynamic GRBL dialect', () => {
@@ -68,6 +71,17 @@ describe('project device profile metadata persistence', () => {
     expect(result.reason).toMatch(/device\.streamingMode|device\.rxBufferBytes/);
   });
 
+  it('rejects unknown loaded device capabilities', () => {
+    const raw = JSON.parse(serializeProject(createProject()));
+    raw.device.capabilities = ['grbl', 'macro-runner'];
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.reason).toMatch(/device\.capabilities/);
+  });
+
   it('replaces legacy Neotronics 4040 frame feed with the safer built-in feed', () => {
     const raw = JSON.parse(serializeProject(createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE)));
     raw.device.framingFeedMmPerMin = 6000;
@@ -118,5 +132,16 @@ describe('project device profile metadata persistence', () => {
     expect(result.kind).toBe('invalid');
     if (result.kind !== 'invalid') return;
     expect(result.reason).toMatch(/device\.zTravelMm|device\.zTravelConfirmed/);
+  });
+
+  it('rejects malformed loaded laser-head metadata', () => {
+    const raw = JSON.parse(serializeProject(createProject(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE)));
+    raw.device.laserSubProfile.technology = 'plasma';
+
+    const result = deserializeProject(JSON.stringify(raw));
+
+    expect(result.kind).toBe('invalid');
+    if (result.kind !== 'invalid') return;
+    expect(result.reason).toMatch(/device\.laserSubProfile/);
   });
 });

@@ -25,4 +25,11 @@ describe('GRBL G-code dialect catalog', () => {
     );
     expect(resolveGrblDialect(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE).requiresS0OnRapid).toBe(true);
   });
+
+  it('defaults only absent dialect selections and rejects explicit unknown ids', () => {
+    expect(resolveGrblDialect({}).id).toBe('grbl-dynamic');
+    expect(() => resolveGrblDialect({ gcodeDialect: { dialectId: 'unknown' } })).toThrow(
+      /Unknown GRBL G-code dialect/,
+    );
+  });
 });

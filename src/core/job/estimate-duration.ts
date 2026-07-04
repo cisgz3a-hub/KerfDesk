@@ -45,6 +45,7 @@ export type JobDurationEstimate = {
 
 const PIXEL_CENTER_OFFSET = 0.5;
 const SWEEP_DIRECTION_PERIOD = 2;
+const RASTER_GAP_RAPID_THRESHOLD_MM = 5;
 
 export function estimateJobDuration(job: Job, device: DeviceProfile): JobDurationEstimate {
   const plannerJob = jobWithCncAsCutGroups(jobWithRasterSweeps(job));
@@ -141,25 +142,27 @@ function rasterActiveSweepSegments(group: RasterGroup): FillGroup['segments'] {
   const segments: FillSegment[] = [];
   let sweepIndex = 0;
   for (let y = 0; y < group.pixelHeight; y += 1) {
-    const span = rasterActiveSpan(group, y);
-    if (span === null) continue;
+    const spans = rasterActiveSpans(group, y, pixelWidthMm);
+    if (spans.length === 0) continue;
     const worldY = group.bounds.minY + (y + PIXEL_CENTER_OFFSET) * pixelHeightMm;
-    const startX = group.bounds.minX + span.firstX * pixelWidthMm;
-    const endX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
     const isReverseSweep = sweepIndex % SWEEP_DIRECTION_PERIOD === 1;
-    segments.push({
-      polyline: isReverseSweep
-        ? [
-            { x: endX, y: worldY },
-            { x: startX, y: worldY },
-          ]
-        : [
-            { x: startX, y: worldY },
-            { x: endX, y: worldY },
-          ],
-      closed: false,
-      reverse: isReverseSweep,
-    });
+    for (const span of spans) {
+      const startX = group.bounds.minX + span.firstX * pixelWidthMm;
+      const endX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
+      segments.push({
+        polyline: isReverseSweep
+          ? [
+              { x: endX, y: worldY },
+              { x: startX, y: worldY },
+            ]
+          : [
+              { x: startX, y: worldY },
+              { x: endX, y: worldY },
+            ],
+        closed: false,
+        reverse: isReverseSweep,
+      });
+    }
     sweepIndex += 1;
   }
   return segments;
@@ -167,24 +170,33 @@ function rasterActiveSweepSegments(group: RasterGroup): FillGroup['segments'] {
 
 type RasterSpan = { readonly firstX: number; readonly lastX: number };
 
-function rasterActiveSpan(group: RasterGroup, y: number): RasterSpan | null {
+function rasterActiveSpans(
+  group: RasterGroup,
+  y: number,
+  pixelWidthMm: number,
+): ReadonlyArray<RasterSpan> {
   const rowStart = y * group.pixelWidth;
+  const spans: RasterSpan[] = [];
   let firstX = -1;
   for (let x = 0; x < group.pixelWidth; x += 1) {
-    if ((group.sValues[rowStart + x] ?? 0) !== 0) {
+    if ((group.sValues[rowStart + x] ?? 0) > 0) {
       firstX = x;
       break;
     }
   }
-  if (firstX === -1) return null;
-  let lastX = group.pixelWidth - 1;
-  for (let x = group.pixelWidth - 1; x >= firstX; x -= 1) {
-    if ((group.sValues[rowStart + x] ?? 0) !== 0) {
-      lastX = x;
-      break;
+  if (firstX === -1) return spans;
+  let lastInk = firstX;
+  for (let x = firstX + 1; x < group.pixelWidth; x += 1) {
+    if ((group.sValues[rowStart + x] ?? 0) <= 0) continue;
+    const gapMm = (x - lastInk - 1) * pixelWidthMm;
+    if (gapMm > RASTER_GAP_RAPID_THRESHOLD_MM) {
+      spans.push({ firstX, lastX: lastInk });
+      firstX = x;
     }
+    lastInk = x;
   }
-  return { firstX, lastX };
+  spans.push({ firstX, lastX: lastInk });
+  return spans;
 }
 
 // Human-readable formatter — "4m 23s" / "47s" / "1h 12m". Co-located with

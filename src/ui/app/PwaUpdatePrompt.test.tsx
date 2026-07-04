@@ -86,6 +86,20 @@ describe('PwaUpdatePrompt', () => {
     expect(host.querySelector(BANNER)).toBeNull();
   });
 
+  it('suppresses the banner while the completed job is waiting for Idle cleanup', async () => {
+    h.swState.needRefresh = true;
+    h.streamer.status = 'done';
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+
+  it('suppresses the banner while an errored job still needs operator handling', async () => {
+    h.swState.needRefresh = true;
+    h.streamer.status = 'errored';
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+
   it('reloads with the new service worker when Reload is clicked', async () => {
     h.swState.needRefresh = true;
     const { host } = await render();

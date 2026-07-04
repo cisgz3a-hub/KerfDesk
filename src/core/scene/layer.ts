@@ -117,13 +117,27 @@ const LAYER_OPERATION_SETTING_KEYS = [
   'dotWidthCorrectionMm',
 ] as const satisfies ReadonlyArray<keyof LayerOperationSettings>;
 
+const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+export function isLayerColor(value: string): boolean {
+  return LAYER_COLOR_RE.test(value);
+}
+
+export function normalizeLayerColor(color: string): string {
+  if (!isLayerColor(color)) {
+    throw new Error(`Invalid layer color: expected #rrggbb hex, got ${color}`);
+  }
+  return color.toLowerCase();
+}
+
 export function createLayer(args: { id: string; color: string; mode?: LayerMode }): Layer {
+  const color = normalizeLayerColor(args.color);
   // mode override (F.2.c): raster-image imports want mode='image'
   // from the moment their layer is auto-created so the user does not
   // have to toggle. Other callers inherit LAYER_DEFAULTS.mode ('line').
   return {
     id: args.id,
-    color: args.color,
+    color,
     ...LAYER_DEFAULTS,
     ...(args.mode !== undefined ? { mode: args.mode } : {}),
   };

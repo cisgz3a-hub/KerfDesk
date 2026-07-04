@@ -53,8 +53,14 @@ describe('Cloudflare production deploy gate', () => {
 
   it('runs repo identity proof and CI gates before Wrangler publishes', () => {
     const workflow = repoFile('.github/workflows/deploy.yml');
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      scripts: Record<string, string>;
+    };
+    const releaseCheck = packageJson.scripts['release:check'];
     const publishIndex = workflow.indexOf('uses: cloudflare/wrangler-action@v3');
     expect(publishIndex).toBeGreaterThanOrEqual(0);
+
+    expect(commandIndex(workflow, 'pnpm release:check')).toBeLessThan(publishIndex);
 
     const requiredBeforePublish = [
       'pnpm guard:repo',
@@ -63,15 +69,15 @@ describe('Cloudflare production deploy gate', () => {
       'pnpm lint:electron',
       'pnpm format:check',
       'pnpm license-check',
+      'pnpm audit:deps',
       'pnpm test',
       'pnpm build:web',
       'pnpm build:electron-main',
+      'pnpm check:file-size',
     ];
 
     for (const command of requiredBeforePublish) {
-      expect(commandIndex(workflow, command), `${command} must run before publish`).toBeLessThan(
-        publishIndex,
-      );
+      expect(releaseCheck, `release:check must include ${command}`).toContain(command);
     }
   });
 

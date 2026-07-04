@@ -1,10 +1,8 @@
 // Scene — the mutable view of what's on the bed. Mutations are pure: every
 // operation returns a fresh Scene (CLAUDE.md "Mutable state — none").
 
-import type { Layer } from './layer';
+import { normalizeLayerColor, type Layer } from './layer';
 import { assertNever, type ColoredPath, type SceneObject } from './scene-object';
-
-const LAYER_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 export type Scene = {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -115,8 +113,4 @@ function recolorPaths(
 ): ReadonlyArray<ColoredPath> {
   if (paths.every((path) => path.color === color)) return paths;
   return paths.map((path) => ({ ...path, color }));
-}
-
-function normalizeLayerColor(color: string): string {
-  return LAYER_COLOR_RE.test(color) ? color.toLowerCase() : color;
 }

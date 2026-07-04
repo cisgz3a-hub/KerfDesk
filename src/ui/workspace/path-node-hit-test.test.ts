@@ -3,6 +3,7 @@ import {
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   addObject,
+  createLayer,
   type ColoredPath,
   type ImportedSvg,
   type RasterImage,
@@ -62,6 +63,20 @@ describe('hitPathNode', () => {
 
     expect(hitPathNode(scene, { x: 20, y: 20 }, 0.25)).toBeNull();
   });
+
+  it('ignores editable nodes on hidden layers', () => {
+    const scene = {
+      ...withObjects(
+        importedSvg('logo', [path([{ x: 0, y: 0 }], '#ff0000'), path([{ x: 100, y: 100 }])]),
+      ),
+      layers: [
+        { ...createLayer({ id: '#ff0000', color: '#ff0000' }), visible: false },
+        createLayer({ id: '#000000', color: '#000000' }),
+      ],
+    };
+
+    expect(hitPathNode(scene, { x: 5, y: 3 }, 1)).toBeNull();
+  });
 });
 
 function withObjects(...objects: ReadonlyArray<SceneObject>): Scene {
@@ -79,8 +94,11 @@ function importedSvg(id: string, paths: ReadonlyArray<ColoredPath>): ImportedSvg
   };
 }
 
-function path(points: ReadonlyArray<{ readonly x: number; readonly y: number }>): ColoredPath {
-  return { color: '#000000', polylines: [{ closed: false, points }] };
+function path(
+  points: ReadonlyArray<{ readonly x: number; readonly y: number }>,
+  color = '#000000',
+): ColoredPath {
+  return { color, polylines: [{ closed: false, points }] };
 }
 
 function rasterImage(id: string): RasterImage {
