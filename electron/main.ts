@@ -41,6 +41,7 @@ import {
 } from 'electron';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import electronUpdater from 'electron-updater';
 import {
   serialPortDialogButtons,
   serialPortIdForDialogResponse,
@@ -60,9 +61,14 @@ import {
   startLocalRtspCameraBridge,
   type RtspCameraBridgeHandle,
 } from './rtsp-camera-bridge.js';
+import { configureAutoUpdater } from './auto-update.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// electron-updater is CommonJS; under Node16 ESM the reliable interop is a
+// default import + destructure (a named ESM import isn't statically detectable).
+const { autoUpdater } = electronUpdater;
 
 const RENDERER_RUNTIME = resolveRendererRuntime({
   devUrl: process.env['LASERFORGE_DEV_URL'],
@@ -390,6 +396,13 @@ void app
     const distRoot = path.join(__dirname, '..', 'dist', 'web');
     protocol.handle('app', makeAppProtocolHandler(distRoot));
     await startCameraBridgeSafely();
+    // Background auto-update against our self-hosted feed (ADR-024). No-op unless
+    // packaged; installs on quit, never mid-burn. Errors (e.g. offline) are logged,
+    // never fatal to startup.
+    configureAutoUpdater(autoUpdater, {
+      isPackaged: app.isPackaged,
+      onError: (error: unknown) => console.warn('Desktop update check failed:', error),
+    });
     return createWindow();
   })
   .catch((err: unknown) => {
