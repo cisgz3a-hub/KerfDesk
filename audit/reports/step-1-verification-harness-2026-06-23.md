@@ -74,7 +74,7 @@ Added:
   - Annulus fill: checks that the emitted/toolpath masks preserve the center hole.
   - Writes artifacts for toolpath and emitted-G-code masks.
 
-## Artifact Evidence
+## Regenerable Local Artifacts
 
 Generated with:
 
@@ -82,7 +82,7 @@ Generated with:
 $env:PERCEPTUAL_ARTIFACTS='1'; pnpm test src/__fixtures__/perceptual/toolpath-rasterize.test.ts
 ```
 
-Ignored proof files:
+These PNGs are ignored local outputs, not durable repository evidence. Regenerate them from the command above when visual inspection is needed:
 
 - `perceptual-artifacts/fill-toolpath-solid-square.png`
 - `perceptual-artifacts/fill-toolpath-annulus.png`
@@ -157,7 +157,7 @@ No accepted Step 1 findings remain.
 - Safety: 10/10
 - UX: 10/10 for developer/operator evidence; no user-facing UI change.
 - Regression coverage: 10/10
-- Real-artifact evidence: 10/10
+- Regenerable visual checks: 10/10
 - Maintainability: 10/10
 - Docs/audit clarity: 10/10
 

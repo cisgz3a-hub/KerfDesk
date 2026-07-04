@@ -187,8 +187,17 @@ function traceInWorker(
       },
     });
     const request: TraceWorkerRequest = { id, image, options };
-    worker.postMessage(request);
+    try {
+      worker.postMessage(request);
+    } catch (err) {
+      rejectAllPendingAndRetireWorker(traceWorkerSendErrorMessage(err));
+    }
   });
+}
+
+function traceWorkerSendErrorMessage(err: unknown): string {
+  const detail = err instanceof Error ? err.message : String(err);
+  return `Trace worker postMessage failed: ${detail}`;
 }
 
 // Higher-level wrapper used by every caller in the trace UI. Adds the

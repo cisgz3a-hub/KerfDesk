@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { IDENTITY_TRANSFORM, type SceneObject, type Transform } from './scene-object';
 import { applyTransform } from './transform';
-import { buildSelectionTransformEdit, selectionMetrics } from './selection-transform';
+import {
+  buildSelectionNudgeEdit,
+  buildSelectionTransformEdit,
+  selectionMetrics,
+} from './selection-transform';
 
 describe('selectionMetrics', () => {
   it('reports the combined transformed bounds for a selection', () => {
@@ -103,6 +107,40 @@ describe('buildSelectionTransformEdit', () => {
     expect(next.transform.rotationDeg).toBe(90);
     expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 6);
     expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 6);
+  });
+
+  it('rejects non-finite numeric edits before writing transforms', () => {
+    const object = objectWithTransform('shape', { ...IDENTITY_TRANSFORM, x: 40, y: 25 });
+
+    expect(
+      buildSelectionTransformEdit([object], {
+        kind: 'position',
+        anchor: 'nw',
+        x: Number.NaN,
+      }),
+    ).toEqual({ kind: 'error', reason: 'invalid-number' });
+
+    expect(
+      buildSelectionTransformEdit([object], {
+        kind: 'resize',
+        anchor: 'c',
+        width: Number.POSITIVE_INFINITY,
+        preserveAspect: true,
+      }),
+    ).toEqual({ kind: 'error', reason: 'invalid-dimension' });
+
+    expect(
+      buildSelectionTransformEdit([object], {
+        kind: 'rotate',
+        anchor: 'c',
+        rotationDeg: Number.NaN,
+      }),
+    ).toEqual({ kind: 'error', reason: 'invalid-number' });
+
+    expect(buildSelectionNudgeEdit([object], Number.NaN, 0)).toEqual({
+      kind: 'error',
+      reason: 'invalid-number',
+    });
   });
 });
 

@@ -5,8 +5,8 @@
 //   * nodeIntegration: false
 //   * sandbox: true
 //   * webSecurity: true
-//   * permission handlers allow only serial / File System Access from the
-//     trusted renderer origin
+//   * permission handlers allow only serial, File System Access, and
+//     video-only media from the trusted renderer origin
 //   * navigation and renderer-created windows are locked to the trusted
 //     renderer origin
 //   * CSP set via session.webRequest.onHeadersReceived (not meta tag -
@@ -55,6 +55,11 @@ import {
   shouldGrantPermissionCheck,
   shouldGrantPermissionRequest,
 } from './trusted-renderer-policy.js';
+import {
+  CAMERA_BRIDGE_PORT,
+  startLocalRtspCameraBridge,
+  type RtspCameraBridgeHandle,
+} from './rtsp-camera-bridge.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,19 +69,21 @@ const RENDERER_RUNTIME = resolveRendererRuntime({
   isPackaged: app.isPackaged,
 });
 const TRUSTED_RENDERER_ORIGINS = RENDERER_RUNTIME.trustedOrigins;
+const CAMERA_BRIDGE_ORIGIN = `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`;
 const CSP_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
   "worker-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${CAMERA_BRIDGE_ORIGIN}`,
   "font-src 'self' data:",
-  "connect-src 'self'",
+  `connect-src 'self' ${CAMERA_BRIDGE_ORIGIN}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",
   "frame-ancestors 'none'",
 ].join('; ');
+let cameraBridge: RtspCameraBridgeHandle | null = null;
 
 type ElectronSerialPort = ElectronSerialPortSummary & {
   readonly vendorId?: string;
@@ -214,12 +221,17 @@ function installPermissionHandlers(ses: Session): void {
     const baseInput = {
       permission: String(permission),
       requestingOrigin,
+      isMainFrame: details.isMainFrame,
       currentUrl: wc?.getURL() ?? '',
     };
     return shouldGrantPermissionCheck(
-      details.embeddingOrigin === undefined
-        ? baseInput
-        : { ...baseInput, embeddingOrigin: details.embeddingOrigin },
+      {
+        ...baseInput,
+        ...(details.mediaType === undefined ? {} : { mediaType: details.mediaType }),
+        ...(details.embeddingOrigin === undefined
+          ? {}
+          : { embeddingOrigin: details.embeddingOrigin }),
+      },
       TRUSTED_RENDERER_ORIGINS,
     );
   });
@@ -230,12 +242,15 @@ function installPermissionHandlers(ses: Session): void {
     );
   });
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
+    const mediaTypes =
+      'mediaTypes' in details && details.mediaTypes !== undefined ? details.mediaTypes : undefined;
     cb(
       shouldGrantPermissionRequest(
         {
           permission: String(permission),
           isMainFrame: details.isMainFrame,
           requestingUrl: details.requestingUrl,
+          ...(mediaTypes === undefined ? {} : { mediaTypes }),
           currentUrl: wc.getURL(),
         },
         TRUSTED_RENDERER_ORIGINS,
@@ -302,13 +317,15 @@ async function createWindow(): Promise<void> {
   //                                - React's `style={{ ... }}` prop emits inline styles
   //                                  on every element. 'unsafe-inline' is required.
   //                                  No third-party stylesheets are allowed.
-  //   img-src 'self' data: blob:   - Vite-bundled images + blob URLs for
-  //                                  image-loader.ts (raster image picker
-  //                                  creates blobs from File objects).
+  //   img-src 'self' data: blob: + local camera bridge
+  //                                - Vite-bundled images, blob URLs for
+  //                                  image-loader.ts, and MJPEG previews from
+  //                                  the loopback RTSP camera bridge.
   //   font-src 'self' data:        - Vite-bundled .ttf files via ?url import.
-  //   connect-src 'self'           - same-origin fetch only (font assets); no
-  //                                  outbound HTTP. Reinforces PROJECT.md
-  //                                  "External services: None."
+  //   connect-src 'self' + local camera bridge
+  //                                - same-origin fetch plus the loopback RTSP
+  //                                  bridge. No remote network service is
+  //                                  allowed by Electron CSP.
   //   object-src 'none'            - block <embed>/<object>/<applet> entirely.
   //   base-uri 'self'              - pin <base> tag to same-origin.
   //   form-action 'none'           - no form submissions anywhere.
@@ -341,6 +358,9 @@ async function createWindow(): Promise<void> {
   // Electron 32 didn't route FileSystemFileHandle.getFile() through
   // these hooks at all; Electron 33+ does. F-2's bump to 42 surfaced
   // the gap.
+  //
+  // Browser camera setup uses Chromium's `media` permission. The policy helper
+  // grants trusted main-frame video-only requests and keeps audio denied.
   installPermissionHandlers(session.defaultSession);
   await loadRenderer(window);
 
@@ -352,14 +372,24 @@ async function createWindow(): Promise<void> {
   window.once('ready-to-show', () => window.show());
 }
 
+async function startCameraBridgeSafely(): Promise<void> {
+  try {
+    cameraBridge = await startLocalRtspCameraBridge();
+  } catch (err) {
+    console.warn('RTSP camera bridge could not start:', err);
+    cameraBridge = null;
+  }
+}
+
 void app
   .whenReady()
-  .then(() => {
+  .then(async () => {
     // Wire the app:// scheme to the dist/web bundle before opening any
     // window. createWindow() will call loadURL('app://app/index.html'),
     // which fails fast if this handler isn't installed yet.
     const distRoot = path.join(__dirname, '..', 'dist', 'web');
     protocol.handle('app', makeAppProtocolHandler(distRoot));
+    await startCameraBridgeSafely();
     return createWindow();
   })
   .catch((err: unknown) => {
@@ -369,6 +399,10 @@ void app
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  void cameraBridge?.close();
 });
 
 app.on('activate', () => {

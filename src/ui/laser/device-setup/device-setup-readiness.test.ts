@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DEVICE_PROFILE,
   GRBL_MACHINE_PROFILE_CATALOG,
+  NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   type DeviceProfile,
 } from '../../../core/devices';
 import { computeSetupReadiness } from './device-setup-readiness';
@@ -47,6 +48,40 @@ describe('computeSetupReadiness', () => {
     expect(
       readiness.items.filter((item) => item.blocking).every((item) => item.status === 'confirmed'),
     ).toBe(true);
+  });
+
+  it('warns without blocking when laser-head metadata is missing', () => {
+    const readiness = computeSetupReadiness(
+      {
+        ...DEFAULT_DEVICE_PROFILE,
+        profileId: 'shop-custom-400',
+        name: 'Shop Custom 400',
+      },
+      null,
+    );
+    const laserHead = readiness.items.find((item) => item.id === 'laser-head');
+
+    expect(readiness.ready).toBe(true);
+    expect(laserHead).toMatchObject({
+      label: 'Laser head',
+      blocking: false,
+      status: 'needs-attention',
+    });
+    expect(laserHead?.detail).toMatch(/generic recipes/i);
+  });
+
+  it('confirms laser-head metadata when power, wavelength, and technology are known', () => {
+    const readiness = computeSetupReadiness(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, null);
+    const laserHead = readiness.items.find((item) => item.id === 'laser-head');
+
+    expect(laserHead).toMatchObject({
+      label: 'Laser head',
+      blocking: false,
+      status: 'confirmed',
+    });
+    expect(laserHead?.detail).toMatch(/diode/i);
+    expect(laserHead?.detail).toMatch(/w/i);
+    expect(laserHead?.detail).toMatch(/nm/i);
   });
 
   it('confirms identity when the operator renames the generic profile', () => {

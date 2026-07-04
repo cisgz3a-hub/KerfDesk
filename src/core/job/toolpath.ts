@@ -61,7 +61,7 @@ function appendGroupSteps(
 ): Vec2 | null {
   switch (group.kind) {
     case 'raster':
-      return appendRasterGroupSteps(steps, prevEnd, group);
+      return appendRasterGroupSteps(steps, prevEnd, group, options.scanningOffsets ?? []);
     case 'fill':
       return appendFillGroupSteps(steps, prevEnd, group, options);
     case 'cut':

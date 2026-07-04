@@ -5,26 +5,28 @@ import {
   isKnownControllerKind,
   type LaserAirAssistHardware,
   type LaserFocusMode,
+  type LaserHeadMetadataConfidence,
+  type LaserTechnology,
   type MachineProfileSource,
   type Origin,
+  PROFILE_CAPABILITIES,
   type ProfileCapability,
   type ProfileEvidenceStatus,
 } from '../../core/devices';
+import { validateCameraProfileShape } from '../../core/camera';
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
-const PROFILE_CAPABILITIES = [
-  'grbl',
-  'wcs',
-  'air-assist',
-  'no-go-zones',
-  'scan-offsets',
-  'verified-origin',
-  'z-axis',
-] as const;
 const PROFILE_EVIDENCE_STATUSES = ['default', 'researched', 'user-imported', 'unverified'] as const;
 const LASER_FOCUS_MODES = ['fixed-lever', 'manual', 'unknown'] as const;
 const LASER_AIR_ASSIST_HARDWARE = ['built-in', 'manual', 'none', 'unknown'] as const;
+const LASER_TECHNOLOGIES = ['diode', 'co2', 'fiber', 'unknown'] as const;
+const LASER_HEAD_METADATA_CONFIDENCES = [
+  'researched',
+  'user-confirmed',
+  'imported',
+  'unverified',
+] as const;
 
 export function validateMachineProfileShape(value: Record<string, unknown>): string | null {
   return (
@@ -34,7 +36,8 @@ export function validateMachineProfileShape(value: Record<string, unknown>): str
     validateProfileOptionalZ(value) ??
     validateProfileCapabilities(value['capabilities']) ??
     validateProfileEvidence(value['evidence']) ??
-    validateLaserSubProfile(value['laserSubProfile'])
+    validateLaserSubProfile(value['laserSubProfile']) ??
+    validateCameraProfile(value['cameraProfile'])
   );
 }
 
@@ -153,18 +156,49 @@ function validateProfileEvidence(value: unknown): string | null {
 function validateLaserSubProfile(value: unknown): string | null {
   if (value === undefined) return null;
   if (!isRecord(value)) return 'profile.laserSubProfile is invalid';
+  return (
+    validateLaserSubProfileIdentity(value) ??
+    validateLaserSubProfileNumbers(value) ??
+    validateLaserSubProfileNotes(value) ??
+    validateLaserSpotSize(value['spotSizeMm'])
+  );
+}
+
+function validateCameraProfile(value: unknown): string | null {
+  if (value === undefined) return null;
+  return validateCameraProfileShape(value, 'profile.cameraProfile');
+}
+
+function validateLaserSubProfileIdentity(value: Record<string, unknown>): string | null {
   if (!isNonEmptyString(value['model'])) return 'profile.laserSubProfile is invalid';
   if (!isLaserFocusMode(value['focusMode'])) return 'profile.laserSubProfile is invalid';
   if (!isLaserAirAssistHardware(value['airAssist'])) return 'profile.laserSubProfile is invalid';
+  if (value['technology'] !== undefined && !isLaserTechnology(value['technology'])) {
+    return 'profile.laserSubProfile is invalid';
+  }
+  if (
+    value['metadataConfidence'] !== undefined &&
+    !isLaserHeadMetadataConfidence(value['metadataConfidence'])
+  ) {
+    return 'profile.laserSubProfile is invalid';
+  }
+  return null;
+}
+
+function validateLaserSubProfileNumbers(value: Record<string, unknown>): string | null {
   for (const field of ['opticalPowerW', 'wavelengthNm', 'focusLengthMm'] as const) {
     if (value[field] !== undefined && !isPositiveFinite(value[field])) {
       return 'profile.laserSubProfile is invalid';
     }
   }
+  return null;
+}
+
+function validateLaserSubProfileNotes(value: Record<string, unknown>): string | null {
   if (value['notes'] !== undefined && typeof value['notes'] !== 'string') {
     return 'profile.laserSubProfile is invalid';
   }
-  return validateLaserSpotSize(value['spotSizeMm']);
+  return null;
 }
 
 function validateLaserSpotSize(value: unknown): string | null {
@@ -209,6 +243,14 @@ function isLaserFocusMode(value: unknown): value is LaserFocusMode {
 
 function isLaserAirAssistHardware(value: unknown): value is LaserAirAssistHardware {
   return LASER_AIR_ASSIST_HARDWARE.some((hardware) => hardware === value);
+}
+
+function isLaserTechnology(value: unknown): value is LaserTechnology {
+  return LASER_TECHNOLOGIES.some((technology) => technology === value);
+}
+
+function isLaserHeadMetadataConfidence(value: unknown): value is LaserHeadMetadataConfidence {
+  return LASER_HEAD_METADATA_CONFIDENCES.some((confidence) => confidence === value);
 }
 
 function isOrigin(value: unknown): value is Origin {

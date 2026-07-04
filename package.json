@@ -5,8 +5,8 @@
   "description": "Focused GRBL CAM application for laser cutters and engravers. Web + Windows desktop from one codebase. Proprietary — All Rights Reserved (see LICENSE).",
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=22.13.0",
+    "pnpm": ">=11.3.0 <12"
   },
   "packageManager": "pnpm@11.3.0",
   "type": "module",
@@ -34,6 +34,7 @@
     "dev:desktop": "pnpm build:electron-main && vite build && electron .",
     "build:desktop": "pnpm build:electron-main && vite build && electron-builder --win --x64",
     "electron:start": "electron .",
+    "camera:bridge": "pnpm build:electron-main && node dist-electron/rtsp-camera-bridge-cli.js",
     "deploy:web": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=master",
     "deploy:web:preview": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
   },

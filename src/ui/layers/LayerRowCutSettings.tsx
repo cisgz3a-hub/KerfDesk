@@ -7,6 +7,7 @@ export function LayerRowCutSettings(props: {
   readonly onClose: () => void;
 }): JSX.Element {
   const { layer, onClose } = props;
+  const maxFeed = useStore((s) => s.project.device.maxFeed);
   const setLayerParam = useStore((s) => s.setLayerParam);
   const makeLayerDefault = useStore((s) => s.makeLayerDefault);
   const makeLayerDefaultForAll = useStore((s) => s.makeLayerDefaultForAll);
@@ -14,6 +15,7 @@ export function LayerRowCutSettings(props: {
   return (
     <CutSettingsDialog
       layer={layer}
+      maxFeed={maxFeed}
       onCancel={onClose}
       onApply={(patch) => {
         setLayerParam(layer.id, patch);

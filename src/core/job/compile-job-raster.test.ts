@@ -117,6 +117,18 @@ describe('compileJob raster image groups', () => {
     expect(Array.from(firstRasterGroup(job)?.sValues ?? [])).toEqual(new Array(50).fill(0));
   });
 
+  it('rejects malformed saved luma instead of burning an all-white fallback', () => {
+    expect(() =>
+      compileJob({ objects: [rasterObject('@@@')], layers: [imageLayer()] }, dev),
+    ).toThrow(/lumaBase64/);
+    expect(() =>
+      compileJob({ objects: [rasterObject('AA==')], layers: [imageLayer()] }, dev),
+    ).toThrow(/lumaBase64/);
+    expect(() =>
+      compileJob({ objects: [rasterObject('AP//AA===')], layers: [imageLayer()] }, dev),
+    ).toThrow(/lumaBase64/);
+  });
+
   it('decodes saved luma without relying on a host atob global', () => {
     const originalAtob = globalThis.atob;
     Object.defineProperty(globalThis, 'atob', {

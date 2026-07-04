@@ -13,6 +13,7 @@ import {
   isRightButtonDoubleClick,
   isStationaryRightPanClick,
   nextTransformForDrag,
+  panOffsetForDrag,
   transformUpdatesForMoveDrag,
   type DragState,
 } from './drag-state';
@@ -120,6 +121,29 @@ describe('nextTransformForDrag scale modifiers', () => {
     expect(centerOf(after)).toEqual(centerOf(before));
     expect(next.scaleX).toBeCloseTo(3);
     expect(next.scaleY).toBeCloseTo(3);
+  });
+});
+
+describe('panOffsetForDrag', () => {
+  it('falls back to the drag start when the canvas CSS scale is not usable', () => {
+    const drag: Extract<DragState, { kind: 'pan' }> = {
+      kind: 'pan',
+      trigger: 'space-left-button',
+      startClientX: 20,
+      startClientY: 30,
+      startPanX: 4,
+      startPanY: -2,
+    };
+
+    expect(
+      panOffsetForDrag({
+        drag,
+        e: { clientX: 120, clientY: 130 },
+        canvas: fakePanCanvas({ width: 100, height: 100, rectWidth: 0 }),
+        project: createProject(),
+        viewState: { zoomFactor: 1, panX: 0, panY: 0 },
+      }),
+    ).toEqual({ panX: 4, panY: -2 });
   });
 });
 
@@ -274,6 +298,24 @@ function canvasRef(): React.RefObject<HTMLCanvasElement> {
       getBoundingClientRect: () => CANVAS_RECT,
     } as HTMLCanvasElement,
   };
+}
+
+function fakePanCanvas(args: {
+  readonly width: number;
+  readonly height: number;
+  readonly rectWidth: number;
+}): HTMLCanvasElement {
+  return {
+    width: args.width,
+    height: args.height,
+    getBoundingClientRect: () =>
+      ({
+        left: 0,
+        top: 0,
+        width: args.rectWidth,
+        height: args.height,
+      }) as DOMRect,
+  } as HTMLCanvasElement;
 }
 
 function mouseEventAtScenePoint(point: {

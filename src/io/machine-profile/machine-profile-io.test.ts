@@ -181,6 +181,18 @@ describe('LaserForge machine profile documents', () => {
       kind: 'invalid',
       reason: 'profile.autofocusCommand must be a string',
     });
+    expect(
+      deserializeProfilePatch({
+        laserSubProfile: {
+          ...profileWithCalibration().laserSubProfile,
+          technology: 'plasma',
+          metadataConfidence: 'guessed',
+        },
+      }),
+    ).toEqual({
+      kind: 'invalid',
+      reason: 'profile.laserSubProfile is invalid',
+    });
   });
 
   it('rejects unsupported formats and newer schemas clearly', () => {

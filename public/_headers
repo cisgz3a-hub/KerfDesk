@@ -10,13 +10,13 @@
 # deployment surfaces stay aligned.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:51731; font-src 'self' data:; connect-src 'self' http://127.0.0.1:51731; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
   # serial=(self) keeps WebSerial available to the top-level document
   # (the laser controls panel) and blocks any iframe from using it.
-  Permissions-Policy: serial=(self), usb=(), geolocation=(), camera=(), microphone=(), interest-cohort=()
+  Permissions-Policy: serial=(self), usb=(), geolocation=(), camera=(self), microphone=(), interest-cohort=()
   # HSTS — Cloudflare proxies all Pages traffic over HTTPS; tell browsers
   # to refuse any future http:// for this origin. Preload list opt-in
   # via the Cloudflare dashboard once you're confident the domain is

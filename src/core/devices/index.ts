@@ -25,8 +25,10 @@ export type {
   HomingConfig,
   AirAssistCommand,
   LaserAirAssistHardware,
+  LaserHeadMetadataConfidence,
   LaserFocusMode,
   LaserSubProfile,
+  LaserTechnology,
   MachineProfileSource,
   NoGoZone,
   Origin,
@@ -39,7 +41,9 @@ export {
   isKnownControllerKind,
   KNOWN_CONTROLLER_KINDS,
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  PROFILE_CAPABILITIES,
 } from './device-profile';
+export type { CameraProfile } from '../camera';
 export type { MachineProfileCatalogEntry } from './profile-catalog';
 export {
   duplicateProfileAsCustom,
@@ -55,7 +59,11 @@ export type { JogAxisSigns } from './jog-direction';
 export { jogAxisSignsForOrigin } from './jog-direction';
 export { toMachineCoords, toSceneCoords } from './origin-transform';
 export type { ScanOffsetPoint } from './scan-offset-profile';
-export { isScanOffsetTable, normalizeScanOffsetTable } from './scan-offset-profile';
+export {
+  isScanOffsetTable,
+  mergeScanOffsetTableBySpeed,
+  normalizeScanOffsetTable,
+} from './scan-offset-profile';
 export type { GrblStreamingMode } from '../grbl-streaming';
 export {
   DEFAULT_GRBL_RX_BUFFER_BYTES,

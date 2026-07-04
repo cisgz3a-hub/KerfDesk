@@ -1,5 +1,6 @@
 import type { DeviceProfile } from '../../core/devices';
 import type { MotionBoundsOffset } from '../../core/invariants';
+import { filterSceneForOutputScope } from '../../core/scene';
 import {
   computeFrameBounds,
   computeJobBounds,
@@ -37,8 +38,9 @@ export function useFrameAction(): () => void {
       pushToast(placement.messages[0] ?? 'Job origin cannot be resolved.', 'error');
       return;
     }
+    const frameScene = filterSceneForOutputScope(project.scene, outputScope);
     const frameBounds = computeFrameBounds(
-      project.scene,
+      frameScene,
       project.device,
       placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
     );

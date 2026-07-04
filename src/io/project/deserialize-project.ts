@@ -11,6 +11,7 @@ import {
   normalizeGrblStreamingMode,
   normalizeScanOffsetTable,
 } from '../../core/devices';
+import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
   type CncTiling,
@@ -227,6 +228,9 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     cameraCalibration: normalizeCameraCalibration(dev['cameraCalibration']),
     cameraAlignment: normalizeCameraAlignment(dev['cameraAlignment']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
+    ...(dev['cameraProfile'] !== undefined
+      ? { cameraProfile: normalizeCameraProfile(dev['cameraProfile'] as CameraProfile) }
+      : {}),
     ...normalizeZTravelPatch(dev),
     ...normalizeControllerPatch(dev),
   };

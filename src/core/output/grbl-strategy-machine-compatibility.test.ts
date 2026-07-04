@@ -82,6 +82,54 @@ const twoSweepFillJob: Job = {
   ],
 };
 
+const tinySensitiveIslandFillJob: Job = {
+  groups: [
+    {
+      kind: 'fill',
+      layerId: 'island',
+      color: '#000000',
+      power: 90,
+      speed: 1500,
+      passes: 1,
+      airAssist: false,
+      fillStyle: 'island',
+      islandMotionPolicy: 'sensitive',
+      overscanMm: 5,
+      segments: [
+        {
+          polyline: [
+            { x: 10, y: 5 },
+            { x: 13, y: 5 },
+          ],
+          closed: false,
+          reverse: false,
+        },
+      ],
+    },
+  ],
+};
+
+type MotionArtifact = {
+  readonly raw: string;
+  readonly f?: number;
+  readonly s?: number;
+};
+
+function parseMotionArtifact(gcode: string): ReadonlyArray<MotionArtifact> {
+  return gcode
+    .split('\n')
+    .filter((line) => /^G[01]\b/.test(line))
+    .map((raw) => {
+      const f = raw.match(/\bF(\d+(?:\.\d+)?)/);
+      const s = raw.match(/\bS(\d+(?:\.\d+)?)/);
+      return {
+        raw,
+        ...(f === null ? {} : { f: Number(f[1]) }),
+        ...(s === null ? {} : { s: Number(s[1]) }),
+      };
+    });
+}
+
 describe('grblStrategy machine compatibility dialects', () => {
   it('keeps the default/Falcon-compatible dialect byte-identical for vector output', () => {
     expect(grblStrategy.emit(singleCutJob, DEFAULT_DEVICE_PROFILE)).toBe(
@@ -180,5 +228,31 @@ describe('grblStrategy machine compatibility dialects', () => {
     expect(out).toContain('G1 X23.000 Y5.000 F800 S0');
     expect(out).toContain('G1 X37.000 Y5.000 F800 S0');
     expect(out).toContain('G1 X53.000 Y5.000 F800 S0');
+  });
+
+  it('keeps sensitive Island Fill runways at burn feed for Neotronics-safe output', () => {
+    const out = grblStrategy.emit(
+      tinySensitiveIslandFillJob,
+      NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+    );
+    const motions = parseMotionArtifact(out);
+    const burnIndex = motions.findIndex((motion) => motion.s === 900);
+    const seek = motions[burnIndex - 2];
+    const leadIn = motions[burnIndex - 1];
+    const burn = motions[burnIndex];
+    const leadOut = motions[burnIndex + 1];
+
+    expect(out).not.toMatch(/^G0\b/m);
+    expect({
+      seek: seek?.raw,
+      leadIn: leadIn?.raw,
+      burn: burn?.raw,
+      leadOut: leadOut?.raw,
+    }).toEqual({
+      seek: 'G1 X5.000 Y5.000 F800 S0',
+      leadIn: 'G1 X10.000 Y5.000 F1500 S0',
+      burn: 'G1 X13.000 Y5.000 F1500 S900',
+      leadOut: 'G1 X18.000 Y5.000 F1500 S0',
+    });
   });
 });

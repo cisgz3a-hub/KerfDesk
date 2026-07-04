@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeView, zoomAtCursorPx } from './view-transform';
+import { createProject } from '../../core/scene';
+import {
+  canvasMouseToScene,
+  clientToCanvasPx,
+  computeView,
+  zoomAtCursorPx,
+} from './view-transform';
 
 describe('computeView', () => {
   it('fits the bed centered with PADDING_PX margin at zoomFactor=1', () => {
@@ -23,6 +29,37 @@ describe('computeView', () => {
     const baseV = computeView(800, 600, 400, 400);
     expect(v.offsetX - baseV.offsetX).toBeCloseTo(10 * baseV.scale);
     expect(v.offsetY - baseV.offsetY).toBeCloseTo(5 * baseV.scale);
+  });
+
+  it('keeps a finite positive scale for tiny canvases and malformed dimensions', () => {
+    const tiny = computeView(20, 20, 400, 400);
+    expect(tiny.scale).toBeGreaterThan(0);
+    expect(Number.isFinite(tiny.scale)).toBe(true);
+
+    const malformed = computeView(Number.NaN, 0, -400, Number.POSITIVE_INFINITY, {
+      zoomFactor: -2,
+      panX: Number.NaN,
+      panY: Number.POSITIVE_INFINITY,
+    });
+    expect(malformed.scale).toBeGreaterThan(0);
+    expect(Number.isFinite(malformed.scale)).toBe(true);
+    expect(Number.isFinite(malformed.offsetX)).toBe(true);
+    expect(Number.isFinite(malformed.offsetY)).toBe(true);
+  });
+});
+
+describe('canvas coordinate conversion guards', () => {
+  it('returns null when mouse-to-scene conversion sees an unmeasurable canvas', () => {
+    const project = createProject();
+    const canvas = fakeCanvas({ width: 100, height: 100, rectWidth: 0, rectHeight: 100 });
+
+    expect(canvasMouseToScene(fakeMouse(20, 20), canvas, project)).toBeNull();
+  });
+
+  it('returns null when client-to-canvas conversion sees an unmeasurable canvas', () => {
+    const canvas = fakeCanvas({ width: 100, height: 100, rectWidth: 100, rectHeight: 0 });
+
+    expect(clientToCanvasPx({ clientX: 20, clientY: 20 }, canvas)).toBeNull();
   });
 });
 
@@ -80,4 +117,49 @@ describe('zoomAtCursorPx', () => {
     });
     expect(next.zoomFactor).toBeCloseTo(1.2 * 1.1);
   });
+
+  it('ignores non-finite or non-positive zoom factors', () => {
+    const view = { zoomFactor: 1.2, panX: 4, panY: -2 };
+    expect(
+      zoomAtCursorPx({
+        cursorPx: { x: 400, y: 300 },
+        factor: Number.NaN,
+        canvas: CANVAS,
+        bed: BED,
+        view,
+      }),
+    ).toEqual(view);
+    expect(
+      zoomAtCursorPx({
+        cursorPx: { x: 400, y: 300 },
+        factor: -1,
+        canvas: CANVAS,
+        bed: BED,
+        view,
+      }),
+    ).toEqual(view);
+  });
 });
+
+function fakeMouse(clientX: number, clientY: number): React.MouseEvent<HTMLCanvasElement> {
+  return { clientX, clientY } as React.MouseEvent<HTMLCanvasElement>;
+}
+
+function fakeCanvas(args: {
+  readonly width: number;
+  readonly height: number;
+  readonly rectWidth: number;
+  readonly rectHeight: number;
+}): HTMLCanvasElement {
+  return {
+    width: args.width,
+    height: args.height,
+    getBoundingClientRect: () =>
+      ({
+        left: 0,
+        top: 0,
+        width: args.rectWidth,
+        height: args.rectHeight,
+      }) as DOMRect,
+  } as HTMLCanvasElement;
+}

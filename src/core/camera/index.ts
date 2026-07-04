@@ -55,3 +55,25 @@ export type { AlignMarkerLayout, MarkerDetection, MarkerFailure } from './align-
 export { invertMat3 } from './mat3';
 export { warpFrameToBed } from './warp-to-bed';
 export type { BedWarpOptions, BedWarpResult } from './warp-to-bed';
+
+export type {
+  CameraAlignment as CameraProfileAlignment,
+  CameraAlignmentPoint,
+  CameraLensCalibration,
+  CameraPoint,
+  CameraProfile,
+  CameraReadiness,
+  CameraResolution,
+  CameraSource,
+} from './camera-profile';
+export {
+  cameraProfileReadiness,
+  DEFAULT_RTSP_CAMERA_URL,
+  effectiveCameraSource,
+  isCameraProfile,
+  normalizeCameraProfile,
+  validateCameraAlignmentShape,
+  validateCameraProfileShape,
+} from './camera-profile';
+export type { CameraHomography, CameraTransformResult } from './camera-transform';
+export { buildCameraTransforms } from './camera-transform';

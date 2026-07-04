@@ -98,6 +98,12 @@ export type JogParams = {
  * with the real-time `\x85` byte without affecting the planner.
  */
 export function buildJogCommand(params: JogParams): string {
+  assertFiniteOptionalAxis(params.dx, 'dx');
+  assertFiniteOptionalAxis(params.dy, 'dy');
+  assertFiniteOptionalAxis(params.dz, 'dz');
+  if (!Number.isFinite(params.feed)) {
+    throw new Error('buildJogCommand: feed must be finite.');
+  }
   const parts: string[] = [];
   parts.push(params.relative === false ? 'G90' : 'G91');
   parts.push('G21'); // mm
@@ -154,4 +160,10 @@ export type RealtimeOverrideByte =
 
 function formatMm(n: number): string {
   return n.toFixed(3);
+}
+
+function assertFiniteOptionalAxis(value: number | undefined, label: string): void {
+  if (value !== undefined && !Number.isFinite(value)) {
+    throw new Error(`buildJogCommand: ${label} must be finite.`);
+  }
 }

@@ -9,6 +9,12 @@
 // formatting: comments stripped, blank lines skipped, trailing-whitespace
 // tolerated. This means they can validate G-code from external tools too, not
 // just GrblStrategy's output.
+import {
+  isGcodeCommand,
+  isGcodeMotionCommand,
+  parseGcodeWord,
+  stripGcodeComment,
+} from './gcode-words';
 
 export type Issue = {
   readonly lineNumber: number;
@@ -34,23 +40,6 @@ type BoundsRect = {
   readonly height: number;
 };
 
-const NUM = String.raw`(-?\d+(?:\.\d+)?)`;
-const X_RE = new RegExp(String.raw`\bX${NUM}`);
-const Y_RE = new RegExp(String.raw`\bY${NUM}`);
-const S_RE = new RegExp(String.raw`\bS${NUM}`);
-
-function parseValue(line: string, re: RegExp): number | null {
-  const m = re.exec(line);
-  if (!m || m[1] === undefined) return null;
-  return Number.parseFloat(m[1]);
-}
-
-function stripComment(line: string): string {
-  const semi = line.indexOf(';');
-  const head = semi >= 0 ? line.slice(0, semi) : line;
-  return head.trim();
-}
-
 // PROJECT.md non-negotiable #3 — Laser-off on travel.
 // A `G0` is safe if any of:
 //   (a) `S0` is on the same line,
@@ -66,20 +55,21 @@ export function findLaserOnTravelIssues(gcode: string): readonly Issue[] {
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
-    const stripped = stripComment(raw);
+    const stripped = stripGcodeComment(raw);
     if (stripped === '') continue;
-    const sVal = parseValue(stripped, S_RE);
+    const sVal = parseGcodeWord(stripped, 'S');
     if (sVal !== null) stickyS = sVal;
-    if (/^M107\b/.test(stripped)) stickyS = 0;
-    if (/^G0\b/.test(stripped)) {
+    if (isGcodeCommand(stripped, 'M107')) stickyS = 0;
+    if (isGcodeCommand(stripped, 'G0')) {
       const okInline = sVal === 0;
-      const okPriorOff = /^M5\b|^M107\b/.test(lastEffective);
+      const okPriorOff =
+        isGcodeCommand(lastEffective, 'M5') || isGcodeCommand(lastEffective, 'M107');
       const okSticky = stickyS === 0;
       if (!okInline && !okPriorOff && !okSticky) {
         issues.push({
           lineNumber: i + 1,
           line: raw,
-          reason: 'G0 without S0 and no preceding M5 / sticky S0',
+          reason: 'G0 without S0 and no preceding M5/M107 / sticky S0',
         });
       }
     }
@@ -108,10 +98,10 @@ export function findOutOfBoundsCoords(
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
-    const stripped = stripComment(raw);
-    if (!/^G[0123]\b/.test(stripped)) continue;
-    const x = parseValue(stripped, X_RE);
-    const y = parseValue(stripped, Y_RE);
+    const stripped = stripGcodeComment(raw);
+    if (!isGcodeMotionCommand(stripped)) continue;
+    const x = parseGcodeWord(stripped, 'X');
+    const y = parseGcodeWord(stripped, 'Y');
     appendAxisBoundsIssue(issues, 'X', x, offset.x, limits.minX, limits.maxX, i + 1, raw);
     appendAxisBoundsIssue(issues, 'Y', y, offset.y, limits.minY, limits.maxY, i + 1, raw);
   }
@@ -147,9 +137,9 @@ export function collectG1SValues(gcode: string): readonly number[] {
   const lines = gcode.split('\n');
   const out: number[] = [];
   for (const raw of lines) {
-    const stripped = stripComment(raw);
-    if (!/^G1\b/.test(stripped)) continue;
-    const s = parseValue(stripped, S_RE);
+    const stripped = stripGcodeComment(raw);
+    if (!isGcodeCommand(stripped, 'G1')) continue;
+    const s = parseGcodeWord(stripped, 'S');
     if (s !== null) out.push(s);
   }
   return out;

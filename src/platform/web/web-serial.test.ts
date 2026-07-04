@@ -57,6 +57,29 @@ afterEach(() => {
 });
 
 describe('webSerial connection cleanup', () => {
+  it('closes stale paired ports before requesting a new port', async () => {
+    const stalePort = new MockPort();
+    installMockSerial(new MockPort(), [stalePort]);
+
+    const ref = await webSerial.requestPort();
+
+    expect(ref).not.toBeNull();
+    expect(stalePort.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes and retries once when open reports the port is already open', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const port = installMockSerial(new MockPort());
+    port.open.mockRejectedValueOnce(new Error('port is already open'));
+
+    const ref = await webSerial.requestPort();
+    if (ref === null) throw new Error('expected port ref');
+    await ref.open({ baudRate: 115200 });
+
+    expect(port.close).toHaveBeenCalledTimes(1);
+    expect(port.open).toHaveBeenCalledTimes(2);
+  });
+
   it('releases reader and writer locks on cable-yank without forgetting the port', async () => {
     const port = installMockSerial(new MockPort());
     const ref = await webSerial.requestPort();
@@ -108,12 +131,12 @@ describe('webSerial connection cleanup', () => {
   });
 });
 
-function installMockSerial(port: MockPort): MockPort {
+function installMockSerial(port: MockPort, pairedPorts: SerialPort[] = []): MockPort {
   Object.defineProperty(navigator, 'serial', {
     configurable: true,
     value: {
       requestPort: vi.fn(async () => port),
-      getPorts: vi.fn(async () => []),
+      getPorts: vi.fn(async () => pairedPorts),
     } satisfies Pick<Serial, 'requestPort' | 'getPorts'>,
   });
   return port;
@@ -187,5 +210,10 @@ describe('extractSerialLines', () => {
     expect(extractSerialLines('', garbage)).toEqual({ lines: [], buffer: '' });
     // A normal short partial is preserved.
     expect(extractSerialLines('', 'short').buffer).toBe('short');
+  });
+
+  it('drops an over-length newline-terminated record before emitting subscribers', () => {
+    const hugeLine = `${'A'.repeat(70_000)}\nok\n`;
+    expect(extractSerialLines('', hugeLine)).toEqual({ lines: ['ok'], buffer: '' });
   });
 });
