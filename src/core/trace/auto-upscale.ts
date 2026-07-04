@@ -25,12 +25,42 @@ const MAX_UPSCALE_SOURCE_PIXELS = 1_500_000;
 // strokes thinner than ~3 px — precisely the range every tracer degrades on.
 const THIN_STROKE_HALF_WIDTH_PX = 1.5;
 
+// Longest source edge below which a source counts as SMALL. Small letters have
+// small-radius curves that quantize into visible polygonal chords (the user's
+// faceted E/B at 40-60px) even when their strokes are a comfortable ~6px — so
+// the thin-stroke gate above never fires. Tuned to 100px from the facet harness
+// (_small-letter-facet.test.ts): 40-60px letters (longest edge <=~80px, badly
+// faceted natively at 5-10%) upscale, while ~90px letters (longest edge ~110px)
+// already trace smooth (<2%) and are EXCLUDED — supersampling them perturbs the
+// Canny/DP fit and regresses some glyphs. Well below the 1024px arch logo, so
+// large art is untouched. NOTE: this is a max-dimension gate, so a very wide
+// banner of small text (>100px wide) is not caught; single/short small imports,
+// the reported case, are.
+const SMALL_SOURCE_EDGE_PX = 100;
+
+// Effective working edge we aim the supersample at. A curve facets while its
+// radius spans only a few pixels; lifting the longest edge toward ~180px puts a
+// small letter's bowls into the smooth regime. The factor is the smallest
+// integer reaching this (capped at 3): at 4x+ the fixed Canny blur sigma
+// becomes proportionally too small and RE-introduces staircasing, so more is
+// worse — verified in the facet sweep.
+const SMALL_SOURCE_TARGET_EDGE_PX = 180;
+
 // Ink classification cutoff on the standard BT.601 luma. A pixel is ink when
 // its luma is below this value; this matches the luma cutoff used across the
 // trace preprocessing chain (trace-image.ts).
 const INK_LUMA_CUTOFF = 128;
 
-const UPSCALE_FACTOR = 2;
+// Supersample factor bounds. 2x is the floor (the original thin-stroke policy);
+// 3x is the ceiling — enough to smooth the smallest letters without an
+// unbounded buffer or exploding downstream point counts.
+const MIN_UPSCALE_FACTOR = 2;
+const MAX_UPSCALE_FACTOR = 3;
+
+// Fixed factor for the original THIN-STROKE trigger. Kept at 2x — the historical
+// value the thin-stroke fixtures/tests were tuned to (e.g. a 3px centerline bar
+// wobbles at 3x). Only the newer small-source trigger uses the adaptive factor.
+export const THIN_STROKE_UPSCALE_FACTOR = MIN_UPSCALE_FACTOR;
 
 // True iff the source is small AND thin-featured, i.e. worth supersampling.
 export function shouldAutoUpscale(image: RawImageData): boolean {
@@ -43,22 +73,50 @@ export function shouldAutoUpscale(image: RawImageData): boolean {
   return area / perimeter < THIN_STROKE_HALF_WIDTH_PX;
 }
 
-// 2x bilinear upscale of the RGBA buffer. Bilinear (not nearest) preserves the
-// anti-aliasing gradients the tracers exploit; nearest would create hard
-// staircases that read as jagged geometry. Each output pixel samples the source
-// at ((x+0.5)/factor - 0.5, (y+0.5)/factor - 0.5) with edge clamping.
-export function upscaleDouble(image: RawImageData): RawImageData {
-  const outWidth = image.width * UPSCALE_FACTOR;
-  const outHeight = image.height * UPSCALE_FACTOR;
+// True iff the source is SMALL (longest edge below the threshold) and carries
+// ink, independent of stroke thickness. This is the companion trigger to
+// shouldAutoUpscale: it catches thick-stroked-but-tiny letters whose curves
+// facet purely because their radius is a handful of pixels. Gated to
+// smooth-wanting presets by the caller (see trace-to-paths.ts) so Sharp's
+// pixel-art notches are never anti-aliased away.
+export function shouldUpscaleSmallSource(image: RawImageData): boolean {
+  if (image.width * image.height > MAX_UPSCALE_SOURCE_PIXELS) return false;
+  if (Math.max(image.width, image.height) >= SMALL_SOURCE_EDGE_PX) return false;
+  return countInk(inkMask(image)) > 0;
+}
+
+// Adaptive supersample factor for the SMALL-SOURCE trigger. Picks the smallest
+// factor in [2, 3] that lifts the longest source edge to
+// ~SMALL_SOURCE_TARGET_EDGE_PX, then backs off if that would push the buffer
+// past the pixel cap. (The thin-stroke trigger stays at the fixed historical 2x
+// — see THIN_STROKE_UPSCALE_FACTOR — so this is only used for small sources.)
+export function computeUpscaleFactor(image: RawImageData): number {
+  const maxDim = Math.max(1, image.width, image.height);
+  const ideal = Math.ceil(SMALL_SOURCE_TARGET_EDGE_PX / maxDim);
+  let factor = Math.max(MIN_UPSCALE_FACTOR, Math.min(MAX_UPSCALE_FACTOR, ideal));
+  const pixels = image.width * image.height;
+  while (factor > MIN_UPSCALE_FACTOR && pixels * factor * factor > MAX_UPSCALE_SOURCE_PIXELS) {
+    factor -= 1;
+  }
+  return factor;
+}
+
+// Bilinear upscale of the RGBA buffer by an integer factor. Bilinear (not
+// nearest) preserves the anti-aliasing gradients the tracers exploit; nearest
+// would create hard staircases that read as jagged geometry. Each output pixel
+// samples the source at ((x+0.5)/factor - 0.5, ...) with edge clamping.
+export function upscaleBy(image: RawImageData, factor: number): RawImageData {
+  const outWidth = image.width * factor;
+  const outHeight = image.height * factor;
   const data = new Uint8ClampedArray(outWidth * outHeight * 4);
   for (let oy = 0; oy < outHeight; oy += 1) {
-    const sy = (oy + 0.5) / UPSCALE_FACTOR - 0.5;
+    const sy = (oy + 0.5) / factor - 0.5;
     const y0 = Math.floor(sy);
     const fy = sy - y0;
     const cy0 = clampCoord(y0, image.height);
     const cy1 = clampCoord(y0 + 1, image.height);
     for (let ox = 0; ox < outWidth; ox += 1) {
-      const sx = (ox + 0.5) / UPSCALE_FACTOR - 0.5;
+      const sx = (ox + 0.5) / factor - 0.5;
       const x0 = Math.floor(sx);
       const fx = sx - x0;
       const cx0 = clampCoord(x0, image.width);
@@ -72,6 +130,11 @@ export function upscaleDouble(image: RawImageData): RawImageData {
     }
   }
   return { width: outWidth, height: outHeight, data };
+}
+
+// 2x convenience wrapper retained for the existing thin-stroke callers/tests.
+export function upscaleDouble(image: RawImageData): RawImageData {
+  return upscaleBy(image, MIN_UPSCALE_FACTOR);
 }
 
 // Scale traced vectors back to source coordinates by dividing every point by

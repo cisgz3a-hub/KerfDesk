@@ -12,7 +12,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ColoredPath } from '../scene';
-import { shouldAutoUpscale, upscaleDouble, downscaleTracedPaths } from './auto-upscale';
+import {
+  shouldAutoUpscale,
+  shouldUpscaleSmallSource,
+  computeUpscaleFactor,
+  upscaleBy,
+  upscaleDouble,
+  downscaleTracedPaths,
+} from './auto-upscale';
 import type { RawImageData } from './trace-image';
 import { TRACE_PRESETS, traceImageToColoredPaths } from './index';
 
@@ -57,6 +64,63 @@ describe('shouldAutoUpscale', () => {
   it('is false when the source exceeds the pixel cap even with a thin stroke', () => {
     // 1300x1300 = 1.69M px > 1.5M cap. Thin stroke would otherwise qualify.
     expect(shouldAutoUpscale(barImage(1300, 1300, 2))).toBe(false);
+  });
+});
+
+describe('shouldUpscaleSmallSource', () => {
+  it('is true for a small source with thick (6px) strokes the thin-stroke gate misses', () => {
+    // 80x80 frame, 6px bar → area/perimeter ~= 3 (> 1.5 thin gate, so
+    // shouldAutoUpscale is false) but longest edge under the small-source
+    // threshold — precisely the faceting regime the new trigger targets.
+    const image = barImage(80, 80, 6);
+    expect(shouldAutoUpscale(image)).toBe(false);
+    expect(shouldUpscaleSmallSource(image)).toBe(true);
+  });
+
+  it('is false for a source at/above the small-source edge threshold', () => {
+    // 110px longest edge is the ~90px-letter regime, which already traces
+    // smooth natively; upscaling it perturbs the Canny/DP fit both ways
+    // (regressing some glyphs), so the trigger deliberately excludes it.
+    expect(shouldUpscaleSmallSource(barImage(110, 110, 8))).toBe(false);
+  });
+
+  it('is false for a large source (1024px) even with thick strokes — the arch stays native', () => {
+    // The arch-house logo is 1024x1024; its ~110px letters already trace
+    // smooth. Upscaling a large source is wasted memory and would perturb the
+    // benchmarks, so the small-source trigger must not fire on it.
+    expect(shouldUpscaleSmallSource(barImage(1024, 1024, 20))).toBe(false);
+  });
+
+  it('is false for an all-white small image (no ink)', () => {
+    expect(shouldUpscaleSmallSource(whiteImage(80, 80))).toBe(false);
+  });
+});
+
+describe('computeUpscaleFactor', () => {
+  it('picks 3x for the very smallest sources so the effective trace reaches the smooth regime', () => {
+    // A ~60px source (like a 40px letter with padding): 2x is still only ~80px
+    // effective and facets; 3x lands its curves near the smooth regime.
+    expect(computeUpscaleFactor(barImage(60, 60, 6))).toBe(3);
+  });
+
+  it('picks 2x for a source whose longest edge already reaches the target at 2x', () => {
+    // 110px longest edge → 2x clears the ~180px working-size target.
+    expect(computeUpscaleFactor(barImage(110, 110, 8))).toBe(2);
+  });
+
+  it('never exceeds the pixel cap after upscaling', () => {
+    const image = barImage(200, 200, 6);
+    const factor = computeUpscaleFactor(image);
+    expect(image.width * factor * (image.height * factor)).toBeLessThanOrEqual(1_500_000);
+  });
+});
+
+describe('upscaleBy', () => {
+  it('scales the dimensions by an arbitrary integer factor', () => {
+    const up = upscaleBy(whiteImage(2, 2), 3);
+    expect(up.width).toBe(6);
+    expect(up.height).toBe(6);
+    expect(up.data.length).toBe(6 * 6 * 4);
   });
 });
 
@@ -188,5 +252,51 @@ describe('traceImageToColoredPaths auto-upscale wiring', () => {
     // tolerance absorbs sub-pixel noise from where ring-closing edges land at
     // the two scales; a real loss (dropped contour) is far larger.
     expect(totalLength(withFlag)).toBeGreaterThanOrEqual(totalLength(withoutFlag) * 0.98);
+  });
+});
+
+describe('Sharp preset never upscales small pixel-art sources', () => {
+  // A small pixel-art glyph with a HARD 2px notch. Blueprint / pixel-art is
+  // Sharp's domain ("every notch matters"); supersampling would anti-alias the
+  // notch edges and re-threshold could round them off. This locks Sharp out of
+  // the small-source upscale path — the CRITICAL fidelity gate.
+  function notchedPixelGlyph(): RawImageData {
+    const image = whiteImage(48, 48);
+    // A filled 24x24 block...
+    for (let y = 12; y < 36; y += 1) {
+      for (let x = 12; x < 36; x += 1) setInk(image, x, y);
+    }
+    // ...with a hard 2px-wide notch cut into the top edge.
+    for (let y = 12; y < 20; y += 1) {
+      for (let x = 23; x < 25; x += 1) {
+        const o = (y * image.width + x) * 4;
+        image.data[o] = 255;
+        image.data[o + 1] = 255;
+        image.data[o + 2] = 255;
+      }
+    }
+    return image;
+  }
+
+  function pointCount(paths: ReadonlyArray<ColoredPath>): number {
+    let total = 0;
+    for (const path of paths) for (const pl of path.polylines) total += pl.points.length;
+    return total;
+  }
+
+  it('produces byte-identical geometry with the smooth-source flag on vs off (no-op for Sharp)', async () => {
+    const image = notchedPixelGlyph();
+    const sharp = TRACE_PRESETS['Sharp'];
+    if (sharp === undefined) throw new Error('Sharp preset missing');
+    // Sharp as shipped does NOT carry upscaleSmallSmoothSources. Forcing it on
+    // vs off must make no difference — the small-source path is gated OFF for
+    // Sharp regardless, so its notch geometry is never blurred by an upscale.
+    const shipped = await traceImageToColoredPaths(image, sharp);
+    const forcedOn = await traceImageToColoredPaths(image, {
+      ...sharp,
+      upscaleSmallSmoothSources: false,
+    });
+    expect(pointCount(shipped)).toBe(pointCount(forcedOn));
+    expect(JSON.stringify(shipped)).toBe(JSON.stringify(forcedOn));
   });
 });

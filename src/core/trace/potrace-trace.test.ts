@@ -122,8 +122,17 @@ describe('traceImageToPotraceColoredPaths', () => {
   it('uses the Potrace backend for Line Art filled-contour tracing', async () => {
     const image = imageFromMask(4, [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0]);
 
-    const direct = traceImageToPotraceColoredPaths(image, straightLineArt);
-    const routed = await traceImageToColoredPaths(image, straightLineArt);
+    // Disable both auto-upscale triggers so this isolates the DISPATCH (does
+    // Line Art reach the Potrace backend?) from the small-source supersample,
+    // which would otherwise transform this 4x4 fixture's coordinates. Upscale
+    // behaviour has its own coverage in auto-upscale.test.ts.
+    const noUpscale: TraceOptions = {
+      ...straightLineArt,
+      autoUpscaleSmallSources: false,
+      upscaleSmallSmoothSources: false,
+    };
+    const direct = traceImageToPotraceColoredPaths(image, noUpscale);
+    const routed = await traceImageToColoredPaths(image, noUpscale);
 
     expect(routed).toEqual(direct);
   });

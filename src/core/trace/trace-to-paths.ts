@@ -22,14 +22,17 @@ import {
   buildImageTracerOptions,
   preprocessForTrace,
 } from './trace-image';
-import { downscaleTracedPaths, shouldAutoUpscale, upscaleDouble } from './auto-upscale';
+import {
+  THIN_STROKE_UPSCALE_FACTOR,
+  computeUpscaleFactor,
+  downscaleTracedPaths,
+  shouldAutoUpscale,
+  shouldUpscaleSmallSource,
+  upscaleBy,
+} from './auto-upscale';
 import { traceCenterlineStrokePaths } from './centerline';
 import { traceImageToEdgePaths } from './edge-trace';
 import { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
-
-// 2x is the supersample factor auto-upscale applies; the traced vectors are
-// divided by the same factor to land back in source coordinates.
-const AUTO_UPSCALE_FACTOR = 2;
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -136,14 +139,34 @@ export async function traceImageToColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
-  // Small thin-featured sources trace poorly at native resolution; supersample
-  // 2x, trace, then scale the vectors back down. The inner dispatch is called
-  // directly so this never re-enters itself and double-upscales.
-  if (options.autoUpscaleSmallSources === true && shouldAutoUpscale(image)) {
-    const upscaled = await dispatchTrace(upscaleDouble(image), options);
-    return downscaleTracedPaths(upscaled, AUTO_UPSCALE_FACTOR);
+  // Small sources trace poorly at native resolution; supersample, trace, then
+  // scale the vectors back down by the SAME factor. The inner dispatch is
+  // called directly so this never re-enters itself and double-upscales.
+  const factor = upscaleFactorFor(image, options);
+  if (factor > 1) {
+    const upscaled = await dispatchTrace(upscaleBy(image, factor), options);
+    return downscaleTracedPaths(upscaled, factor);
   }
   return dispatchTrace(image, options);
+}
+
+// The supersample factor to apply, or 1 (no upscale). Two independent triggers,
+// deliberately with DIFFERENT factors:
+//   * autoUpscaleSmallSources — thin strokes (<~3px), the original mkbitmap
+//     policy; fires on any preset that opts in, at the fixed historical 2x that
+//     its fixtures/tests were tuned to.
+//   * upscaleSmallSmoothSources — small overall size regardless of stroke
+//     thickness; set only on the smooth-wanting presets (Sharp opts out so its
+//     pixel-art notches are never anti-aliased away). Uses the ADAPTIVE factor
+//     so the smallest letters reach a smooth working size instead of a fixed 2x
+//     that still facets a 40px letter.
+// If both fire, take the larger factor.
+function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
+  const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
+  const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
+  const thinFactor = thinStroke ? THIN_STROKE_UPSCALE_FACTOR : 1;
+  const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
+  return Math.max(thinFactor, smallFactor);
 }
 
 // The backend selection shared by both the direct and the upscaled paths.

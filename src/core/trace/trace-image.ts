@@ -166,13 +166,22 @@ export type TraceOptions = {
   // to engrave the dark areas — flipping the image makes that the
   // standard dark-on-light input every tracer assumes.
   readonly invert?: boolean;
-  // autoUpscaleSmallSources: supersample small, thin-featured sources 2x
-  // before tracing, then scale the traced vectors back down. WHY: no tracing
+  // autoUpscaleSmallSources: supersample small, THIN-featured sources before
+  // tracing, then scale the traced vectors back down. WHY: no tracing
   // algorithm works well at very small scales (the official potrace project
   // ships `mkbitmap` for exactly this) — strokes under ~3px fragment Edge
   // Detection and lose detail on the potrace-backed presets. Off by default;
   // the named presets opt in. See auto-upscale.ts.
   readonly autoUpscaleSmallSources?: boolean;
+  // upscaleSmallSmoothSources: supersample any SMALL source (longest edge under
+  // ~260px) before tracing, regardless of stroke thickness, then scale back.
+  // WHY: small letters facet because their curve RADIUS spans only a few pixels
+  // — a 40px "E"/"B" traces as polygonal chords even with comfortable ~6px
+  // strokes, which the thin-stroke gate above misses. Set ONLY on the
+  // smooth-wanting presets (Line Art / Smooth / Edge Detection / Centerline);
+  // Sharp deliberately omits it so its pixel-art notches are never anti-aliased
+  // away. See auto-upscale.ts (shouldUpscaleSmallSource).
+  readonly upscaleSmallSmoothSources?: boolean;
 };
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
