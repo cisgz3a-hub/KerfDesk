@@ -60,49 +60,73 @@ it('renders new-problem audit crops via merged app options', { timeout: 120000 }
   const polylines = traceImageToEdgePaths(image, mergedAppEdgeOptions()).flatMap(
     (p) => p.polylines,
   );
+  writeCropRenders(image, polylines);
+  writeSliverCensus(polylines);
+  writeLumaProbe(image);
+  writeCounterCensus(polylines);
+});
 
+function writeCropRenders(image: RawImageData, polylines: ReadonlyArray<Polyline>): void {
   for (const crop of CROPS) {
     const inBand = polylines.filter((pl) =>
       pl.points.some(
-        (p) => p.x >= crop.band.x0 && p.x <= crop.band.x1 && p.y >= crop.band.y0 && p.y <= crop.band.y1,
+        (p) =>
+          p.x >= crop.band.x0 && p.x <= crop.band.x1 && p.y >= crop.band.y0 && p.y <= crop.band.y1,
       ),
     );
-    writeFileSync(join(OUT_DIR, `${crop.name}.png`), cropRender(image, inBand, crop.band, crop.scale));
+    writeFileSync(
+      join(OUT_DIR, `${crop.name}.png`),
+      cropRender(image, inBand, crop.band, crop.scale),
+    );
   }
+}
 
-  // Census: tiny closed "sliver" loops (small area but real perimeter) anywhere
-  // in the two letter bands — the serif-foot artifact signature.
+// Census: tiny closed "sliver" loops (small area but real perimeter) anywhere
+// in the two letter bands — the serif-foot artifact signature.
+function writeSliverCensus(polylines: ReadonlyArray<Polyline>): void {
   const lines: string[] = ['--- tiny sliver loops (area<=30px2, perim>=12px) in letter bands ---'];
   const bands = [CROPS[0]!.band, CROPS[2]!.band];
   for (const pl of polylines) {
     if (!pl.closed || pl.points.length < 3) continue;
-    if (!pl.points.some((p) => bands.some((b) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1)))
+    if (
+      !pl.points.some((p) =>
+        bands.some((b) => p.x >= b.x0 && p.x <= b.x1 && p.y >= b.y0 && p.y <= b.y1),
+      )
+    )
       continue;
     const area = Math.abs(signedArea(pl.points));
     const perim = perimeter(pl.points);
     if (area <= SLIVER_AREA_MAX_PX2 && perim >= SLIVER_PERIM_MIN_PX) {
       const c = centroid(pl.points);
-      lines.push(`sliver area=${area.toFixed(1)} perim=${perim.toFixed(1)} at (${c.x.toFixed(0)},${c.y.toFixed(0)})`);
+      lines.push(
+        `sliver area=${area.toFixed(1)} perim=${perim.toFixed(1)} at (${c.x.toFixed(0)},${c.y.toFixed(0)})`,
+      );
     }
   }
   writeFileSync(join(OUT_DIR, 'np-slivers.txt'), `${lines.join('\n')}\n`);
+}
 
-  // Source-luma probe: scan DOWN through a HOUSE serif foot into the white
-  // below it. If luma stays ~255 the trace bulge is pure overshoot; a dip
-  // (a faint shadow gradient) means the sensitive Canny is tracing real ink.
+// Source-luma probe: scan DOWN through a HOUSE serif foot into the white
+// below it. If luma stays ~255 the trace bulge is pure overshoot; a dip
+// (a faint shadow gradient) means the sensitive Canny is tracing real ink.
+// CAUTION when reading the output: HOUSE foot ink ends ~y653 (anti-aliased row
+// y654); rows y>=679 in these columns are the LANGEBAAN word below, NOT
+// sub-serif contour. Only y655-676 speaks to overshoot-into-white.
+function writeLumaProbe(image: RawImageData): void {
   const probe: string[] = ['--- source luma scanning down through HOUSE feet ---'];
   for (const col of [500, 560, 620]) {
-    const col2 = col;
     const vals: string[] = [];
     for (let y = 648; y <= 700; y += 4) {
-      vals.push(`${y}:${lumaAt(image, col2, y)}`);
+      vals.push(`${y}:${lumaAt(image, col, y)}`);
     }
-    probe.push(`x=${col2}: ${vals.join(' ')}`);
+    probe.push(`x=${col}: ${vals.join(' ')}`);
   }
   writeFileSync(join(OUT_DIR, 'np-luma-probe.txt'), `${probe.join('\n')}\n`);
+}
 
-  // Per-A counter census: closed loops centred in each A column, split into the
-  // big silhouette vs small interior counter. A complete A shows both.
+// Per-A counter census: closed loops centred in each A column, split into the
+// big silhouette vs small interior counter. A complete A shows both.
+function writeCounterCensus(polylines: ReadonlyArray<Polyline>): void {
   const counter: string[] = ['--- A counter census (closed loops per A column) ---'];
   for (const col of A_COLUMNS) {
     const loops = polylines.filter((pl) => {
@@ -116,7 +140,7 @@ it('renders new-problem audit crops via merged app options', { timeout: 120000 }
     );
   }
   writeFileSync(join(OUT_DIR, 'np-A-counter.txt'), `${counter.join('\n')}\n`);
-});
+}
 
 function lumaAt(image: RawImageData, x: number, y: number): number {
   const o = (y * image.width + x) * 4;
@@ -178,5 +202,9 @@ function cropRender(
     closed: pl.closed,
     points: pl.points.map((p) => ({ x: p.x - band.x0, y: p.y - band.y0 })),
   }));
-  return renderTraceOverlay({ width: w, height: h, data }, [{ color: '#000000', polylines: shifted }], scale);
+  return renderTraceOverlay(
+    { width: w, height: h, data },
+    [{ color: '#000000', polylines: shifted }],
+    scale,
+  );
 }
