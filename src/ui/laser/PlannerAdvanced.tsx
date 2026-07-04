@@ -8,7 +8,11 @@
 // to their specific machine. <details> gives us native expand /
 // collapse with no React state.
 
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { inlineCodeStyle, numInputStyle, Row, unitStyle } from './device-settings-shared';
+
+const MAX_ACCEL = 100000;
+const MAX_JD_MM = 100;
 
 export function PlannerAdvanced(props: {
   readonly accel: number;
@@ -26,27 +30,27 @@ export function PlannerAdvanced(props: {
       </summary>
       <div style={advancedBodyStyle}>
         <Row label="$120 accel">
-          <input
-            type="number"
+          <ClearableNumberField
             min={1}
+            max={MAX_ACCEL}
             step={50}
             value={props.accel}
-            onChange={(e) => props.onAccelChange(Math.max(1, Number(e.target.value) || 0))}
+            onCommit={props.onAccelChange}
             style={numInputStyle}
-            aria-label="Acceleration (mm/s²)"
+            ariaLabel="Acceleration (mm/s²)"
             title="GRBL $120/$121. Higher = faster cornering and shorter estimates. Typical 100-2500 mm/s²."
           />
           <span style={unitStyle}>mm/s²</span>
         </Row>
         <Row label="$11 junction">
-          <input
-            type="number"
+          <ClearableNumberField
             min={0.001}
+            max={MAX_JD_MM}
             step={0.001}
             value={props.jd}
-            onChange={(e) => props.onJdChange(Math.max(0, Number(e.target.value) || 0))}
+            onCommit={props.onJdChange}
             style={numInputStyle}
-            aria-label="Junction deviation (mm)"
+            ariaLabel="Junction deviation (mm)"
             title="GRBL $11. Higher = faster corners but more shake. Grbl default is 0.010 mm."
           />
           <span style={unitStyle}>mm</span>

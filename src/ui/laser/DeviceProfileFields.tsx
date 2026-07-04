@@ -8,7 +8,11 @@
 // Power/air-assist fields live in DeviceProfilePowerFields.tsx.
 
 import type { DeviceProfile, Origin } from '../../core/devices';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
+
+const MAX_BED_MM = 1500;
+const MAX_FEED_MM_PER_MIN = 100000;
 
 const ORIGIN_OPTIONS: ReadonlyArray<{ readonly value: Origin; readonly label: string }> = [
   { value: 'front-left', label: 'Front left' },
@@ -105,25 +109,25 @@ export function BedRows(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
     <Row label="Bed">
-      <input
-        type="number"
+      <ClearableNumberField
         min={10}
+        max={MAX_BED_MM}
         step={1}
         value={device.bedWidth}
-        onChange={(e) => update({ bedWidth: Math.max(10, Number(e.target.value) || 0) })}
+        onCommit={(bedWidth) => update({ bedWidth })}
         style={numInputStyle}
-        aria-label="Bed width (mm)"
+        ariaLabel="Bed width (mm)"
         title="Usable machine bed width in millimeters. Match GRBL $130."
       />
       <span style={timesStyle}>×</span>
-      <input
-        type="number"
+      <ClearableNumberField
         min={10}
+        max={MAX_BED_MM}
         step={1}
         value={device.bedHeight}
-        onChange={(e) => update({ bedHeight: Math.max(10, Number(e.target.value) || 0) })}
+        onCommit={(bedHeight) => update({ bedHeight })}
         style={numInputStyle}
-        aria-label="Bed height (mm)"
+        ariaLabel="Bed height (mm)"
         title="Usable machine bed height in millimeters. Match GRBL $131."
       />
       <span style={unitStyle}>mm</span>
@@ -147,29 +151,27 @@ export function FeedRows(props: DeviceRowsProps): JSX.Element {
   return (
     <>
       <Row label="Max feed">
-        <input
-          type="number"
+        <ClearableNumberField
           min={1}
+          max={MAX_FEED_MM_PER_MIN}
           step={100}
           value={device.maxFeed}
-          onChange={(e) => update({ maxFeed: Math.max(1, Number(e.target.value) || 0) })}
+          onCommit={(maxFeed) => update({ maxFeed })}
           style={numInputStyle}
-          aria-label="Max feed (mm/min)"
+          ariaLabel="Max feed (mm/min)"
           title="Hardware ceiling on commanded feed — the planner clamps every move to this."
         />
         <span style={unitStyle}>mm/min</span>
       </Row>
       <Row label="Frame feed">
-        <input
-          type="number"
+        <ClearableNumberField
           min={1}
+          max={MAX_FEED_MM_PER_MIN}
           step={100}
           value={device.framingFeedMmPerMin}
-          onChange={(e) =>
-            update({ framingFeedMmPerMin: Math.max(1, Number(e.target.value) || 0) })
-          }
+          onCommit={(framingFeedMmPerMin) => update({ framingFeedMmPerMin })}
           style={numInputStyle}
-          aria-label="Framing feed (mm/min)"
+          ariaLabel="Framing feed (mm/min)"
           title="Feed used by the Frame button. Independent of cut/engrave speeds — capped at Max feed at emit time."
         />
         <span style={unitStyle}>mm/min</span>
