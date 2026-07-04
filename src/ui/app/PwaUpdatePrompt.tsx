@@ -5,6 +5,10 @@
 //     NEVER shown while a job is still active, because a reload can abort
 //     motion or hide a terminal job state that still needs operator handling.
 //     `needRefresh` stays true, so the banner appears once the job clears.
+//   * a persisted "Later" — workbox-window re-fires `waiting` for an
+//     already-waiting SW on EVERY load, so without this the banner re-nags on
+//     every reload for an update the user already deferred (see
+//     pwa-update-dismissal). A strictly-newer SW re-arms it via `updatefound`.
 // Toasts are intentionally button-less (see toast-store), so the update prompt
 // is a small banner (lf-banner) rather than a toast.
 
@@ -14,6 +18,11 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
+import {
+  clearDismissedUpdateVersion,
+  loadDismissedUpdateVersion,
+  saveDismissedUpdateVersion,
+} from './pwa-update-dismissal';
 
 export function PwaUpdatePrompt(): JSX.Element | null {
   const pushToast = useToastStore((s) => s.pushToast);
@@ -23,6 +32,12 @@ export function PwaUpdatePrompt(): JSX.Element | null {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
+    onRegisteredSW(_swScriptUrl, registration) {
+      // A strictly-newer service worker fires `updatefound` on the registration;
+      // clear any prior "Later" so an update accepted since then is not swallowed
+      // by the persisted dismissal below.
+      registration?.addEventListener('updatefound', clearDismissedUpdateVersion);
+    },
     onRegisterError(error) {
       // A failed registration means offline mode won't work; surface it rather
       // than fail silently (ADR-060 audit). console is the UI-layer logger here,
@@ -37,7 +52,12 @@ export function PwaUpdatePrompt(): JSX.Element | null {
     setOfflineReady(false);
   }, [offlineReady, pushToast, setOfflineReady]);
 
-  if (!needRefresh || jobActive) return null;
+  // Suppress the banner for an update the user already dismissed. We key the
+  // marker to the running build's version (__APP_VERSION__) because the waiting
+  // SW's own version is not legible client-side — sw.js is unhashed — and the
+  // running bundle stays fixed until the waiting SW activates.
+  const isDismissed = loadDismissedUpdateVersion() === __APP_VERSION__;
+  if (!needRefresh || jobActive || isDismissed) return null;
   return (
     <div
       role="alert"
@@ -58,7 +78,10 @@ export function PwaUpdatePrompt(): JSX.Element | null {
         type="button"
         className="lf-btn lf-btn--ghost"
         title="Keep the current version for now"
-        onClick={() => setNeedRefresh(false)}
+        onClick={() => {
+          saveDismissedUpdateVersion(__APP_VERSION__);
+          setNeedRefresh(false);
+        }}
       >
         Later
       </button>
