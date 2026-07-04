@@ -22,6 +22,14 @@ import {
   buildImageTracerOptions,
   preprocessForTrace,
 } from './trace-image';
+import {
+  THIN_STROKE_UPSCALE_FACTOR,
+  computeUpscaleFactor,
+  downscaleTracedPaths,
+  shouldAutoUpscale,
+  shouldUpscaleSmallSource,
+  upscaleBy,
+} from './auto-upscale';
 import { traceCenterlineStrokePaths } from './centerline';
 import { traceImageToEdgePaths } from './edge-trace';
 import { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
@@ -131,6 +139,54 @@ export async function traceImageToColoredPaths(
   image: RawImageData,
   options: TraceOptions,
 ): Promise<ColoredPath[]> {
+  // Small sources trace poorly at native resolution; supersample, trace, then
+  // scale the vectors back down by the SAME factor. The inner dispatch is
+  // called directly so this never re-enters itself and double-upscales.
+  const factor = upscaleFactorFor(image, options);
+  if (factor > 1) {
+    const upscaled = await dispatchTrace(upscaleBy(image, factor), options);
+    return downscaleTracedPaths(upscaled, factor);
+  }
+  return dispatchTrace(image, options);
+}
+
+// The supersample factor to apply, or 1 (no upscale). Two independent triggers,
+// deliberately with DIFFERENT factors:
+//   * autoUpscaleSmallSources — thin strokes (<~3px), the original mkbitmap
+//     policy; fires on any preset that opts in, at the fixed historical 2x that
+//     its fixtures/tests were tuned to.
+//   * upscaleSmallSmoothSources — small overall size regardless of stroke
+//     thickness; set only on the smooth-wanting presets (Sharp opts out so its
+//     pixel-art notches are never anti-aliased away). Uses the ADAPTIVE factor
+//     so the smallest letters reach a smooth working size instead of a fixed 2x
+//     that still facets a 40px letter.
+// If both fire, take the larger factor.
+//
+// Interpolation is BILINEAR for both — two higher-order kernels were measured on
+// the small-smooth path against the facet harness and BOTH rejected:
+//   * Bicubic (Catmull-Rom / Mitchell-Netravali, 2026-07-04): smooths the
+//     CURVE-dominated glyphs but REGRESSES the corner/straight-dominated E (E@40
+//     2.07%->5.10%/4.64%) via overshoot/ringing at E's dense step edges.
+//   * Monotone cubic (PCHIP / Fritsch-Carlson, 2026-07-04): chosen because it is
+//     provably overshoot-free, so E "could not" ring. It regressed E just as
+//     hard anyway — E@40 2.07%->5.10%, E@60 3.04%->3.38% — while B@40 (3.06%) and
+//     S@40 (4.52%) still missed their improvement targets. The overshoot-free
+//     unit tests passed, which proves the E faceting is NOT interpolation
+//     ringing: it comes from the downstream Canny/DP fit reacting to any smoother
+//     (higher-point-count) upscaled raster, so no interpolation kernel can fix it
+//     from here. Bilinear is the balanced optimum; keep it.
+function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
+  const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
+  const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
+  const thinFactor = thinStroke ? THIN_STROKE_UPSCALE_FACTOR : 1;
+  const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
+  return Math.max(thinFactor, smallFactor);
+}
+
+// The backend selection shared by both the direct and the upscaled paths.
+// Extracted so the public wrapper stays a thin guard and complexity stays
+// under the lint cap.
+async function dispatchTrace(image: RawImageData, options: TraceOptions): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline') return traceCenterlineStrokePaths(image, options);
   if (options.traceMode === 'edge') return traceImageToEdgePaths(image, options);
   if (shouldUsePotraceTraceBackend(options)) return traceImageToPotraceColoredPaths(image, options);

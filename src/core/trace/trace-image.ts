@@ -1,13 +1,12 @@
-// Phase E — raster → SVG-string conversion via imagetracerjs.
+// Trace option types + shared preprocessing chain, plus the LEGACY
+// imagetracerjs SVG-string path.
 //
-// Takes a "RawImageData" (ImageData-shaped: width + height +
-// Uint8ClampedArray of RGBA pixels) plus tracing options, runs
-// imagetracerjs's imagedataToSVG, returns the SVG string.
-//
-// The caller (UI layer or compile pipeline) feeds the resulting
-// SVG string through our existing parseSvg() to get ColoredPath[]
-// in the standard shape. That keeps Phase E free of any new
-// flattening / color-extraction code — same path SVG imports walk.
+// Reality check (2026-07-03): every surfaced preset routes through the
+// clean-room potrace / centerline / edge backends via
+// traceImageToColoredPaths (see index.ts). imagetracerjs is reachable
+// only from non-preset multi-colour options; traceImageToSvgString below
+// is its SVG-string variant, kept for API compatibility and exercised by
+// tests only.
 //
 // imagetracerjs is public-domain (Unlicense) per RESEARCH_LOG and
 // ADR-017 allow-list. Untyped JS lib; wrapped here with a narrow
@@ -23,7 +22,7 @@
 // in, gives string out (asynchronously now, to allow the lazy
 // load; the trace work itself is still synchronous CPU).
 
-import { despeckle, medianFilter, otsuThreshold } from './preprocess';
+import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
 
@@ -121,7 +120,15 @@ export type TraceOptions = {
   // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
   // artefacts without rounding off real edges the way a Gaussian
   // blur would.
-  readonly medianFilter?: boolean;
+  //   - true  → force the median on every pixel.
+  //   - false / undefined → never apply it.
+  //   - 'auto' → apply ONLY when the image carries measurable impulse
+  //     noise (hasImpulseNoise, preprocess.ts). WHY: the median melts
+  //     clean small glyphs — 4-6 px letters trace as blobs — so on crisp
+  //     line art it does pure harm. 'auto' keeps the noise protection for
+  //     scanned/JPEG sources while leaving clean logos untouched, the same
+  //     policy Edge Detection already uses.
+  readonly medianFilter?: boolean | 'auto';
   // despeckleMinPixels: connected-component despeckle applied AFTER
   // thresholding. Any ink region (4-connected, luma<128) with fewer
   // than N pixels gets flipped to white. 0 or undefined disables.
@@ -159,6 +166,22 @@ export type TraceOptions = {
   // to engrave the dark areas — flipping the image makes that the
   // standard dark-on-light input every tracer assumes.
   readonly invert?: boolean;
+  // autoUpscaleSmallSources: supersample small, THIN-featured sources before
+  // tracing, then scale the traced vectors back down. WHY: no tracing
+  // algorithm works well at very small scales (the official potrace project
+  // ships `mkbitmap` for exactly this) — strokes under ~3px fragment Edge
+  // Detection and lose detail on the potrace-backed presets. Off by default;
+  // the named presets opt in. See auto-upscale.ts.
+  readonly autoUpscaleSmallSources?: boolean;
+  // upscaleSmallSmoothSources: supersample any SMALL source (longest edge under
+  // ~260px) before tracing, regardless of stroke thickness, then scale back.
+  // WHY: small letters facet because their curve RADIUS spans only a few pixels
+  // — a 40px "E"/"B" traces as polygonal chords even with comfortable ~6px
+  // strokes, which the thin-stroke gate above misses. Set ONLY on the
+  // smooth-wanting presets (Line Art / Smooth / Edge Detection / Centerline);
+  // Sharp deliberately omits it so its pixel-art notches are never anti-aliased
+  // away. See auto-upscale.ts (shouldUpscaleSmallSource).
+  readonly upscaleSmallSmoothSources?: boolean;
 };
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
@@ -210,7 +233,7 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
     return prepared;
   }
   let prepared = applyImageAdjustments(image, options);
-  if (options.medianFilter === true) {
+  if (shouldApplyMedian(prepared, options.medianFilter)) {
     prepared = medianFilter(prepared);
   }
   prepared = applyThreshold(prepared, options);
@@ -218,6 +241,17 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
     prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
   }
   return prepared;
+}
+
+// Median gate. true forces it, false/undefined skips it, and 'auto' defers
+// to the impulse-noise detector so clean line art keeps its small features
+// while noisy scans still get de-speckled (see medianFilter's doc comment).
+function shouldApplyMedian(
+  image: RawImageData,
+  medianFilterOption: boolean | 'auto' | undefined,
+): boolean {
+  if (medianFilterOption === 'auto') return hasImpulseNoise(image);
+  return medianFilterOption === true;
 }
 
 // Brightness → contrast → gamma → invert. Each is a no-op at its

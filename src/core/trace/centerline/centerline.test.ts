@@ -369,10 +369,14 @@ describe('sharpenChainBends', () => {
     let restored = 0;
     for (const corner of corners) {
       let best = Infinity;
-      for (const p of sharpened) best = Math.min(best, Math.hypot(p.x - corner.x, p.y - corner.y));
+      for (const p of sharpened.points) {
+        best = Math.min(best, Math.hypot(p.x - corner.x, p.y - corner.y));
+      }
       if (best < 0.9) restored += 1;
     }
     expect(restored).toBe(corners.length);
+    // Every rebuilt vertex is reported as a drawn corner for output pinning.
+    expect(sharpened.corners.size).toBe(corners.length);
   });
 });
 
