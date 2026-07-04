@@ -27,7 +27,7 @@ The working tree was dirty before these audit files were created. Existing modif
 
 Ignored and generated folders such as `node_modules/`, `dist/`, `dist-electron/`, `.wrangler/`, `tmp/`, local log files, and `references/` are not part of the primary sector inventory unless a later pass explicitly uses them as evidence. S09 additionally references local `perceptual-artifacts/**` outputs when present, but that directory is ignored and not part of the tracked/non-ignored inventory.
 
-Current-state refresh, 2026-07-04: after the initial audit/fix pass and later fast-forwards, `origin/main` is at `c0f0252` and `git ls-files -co --exclude-standard` returns 1,680 files. The sector patterns below were refreshed so current root planning docs and current `src/core/box`, `src/core/cnc`, `src/core/relief`, and `src/core/sim` files are no longer unclassified.
+Current-state refresh, 2026-07-04: after the initial audit/fix pass and later fast-forwards, `origin/main` is at `cd5c7f4` and `git ls-files -co --exclude-standard` returns 1,689 files. The sector patterns below were refreshed so current root planning docs and current `src/core/box`, `src/core/cnc`, `src/core/relief`, and `src/core/sim` files are no longer unclassified.
 
 ## High-Level Architecture
 
@@ -64,12 +64,12 @@ The sectors below cover every file returned by `git ls-files -co --exclude-stand
 | S01 | Governance, audit history, and product contracts | 231 | `CLAUDE.md`, `PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `AUDIT.md`, `README.md`, `CONTRIBUTING.md`, `LICENSE`, `RESEARCH_LOG.md`, `THIRD_PARTY_NOTICES.md`, `HANDOFF-*.md`, `PHASE-*.md`, `AUDIT-*.md`, `FEATURE-AUDIT-*.md`, `FIXES-*.md`, `LIGHTBURN-*.md`, `MATERIAL-*.md`, `docs/**`, `audit/**` |
 | S02 | Tooling, build, release, CI, and static shell | 24 | `.editorconfig`, `.gitattributes`, `.gitignore`, `.prettierignore`, `.prettierrc`, `.github/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`, `eslint.config.mjs`, `eslint.electron.config.mjs`, `scripts/**`, `public/**`, `index.html` |
 | S03 | Electron desktop runtime and local bridge | 14 | `electron/**`, `electron-builder.yml` |
-| S04 | Core domain models, controller/device/material primitives | 290 | `src/core/app-branding.ts`, `src/core/box/**`, `src/core/camera/**`, `src/core/cnc/**`, `src/core/controllers/**`, `src/core/devices/**`, `src/core/geometry/**`, `src/core/grbl-streaming.ts`, `src/core/material-library/**`, `src/core/relief/**`, `src/core/scene/**`, `src/core/shapes/**`, `src/core/sim/**`, `src/core/text/**`, `src/core/util/**` |
+| S04 | Core domain models, controller/device/material primitives | 292 | `src/core/app-branding.ts`, `src/core/box/**`, `src/core/camera/**`, `src/core/cnc/**`, `src/core/controllers/**`, `src/core/devices/**`, `src/core/geometry/**`, `src/core/grbl-streaming.ts`, `src/core/material-library/**`, `src/core/relief/**`, `src/core/scene/**`, `src/core/shapes/**`, `src/core/sim/**`, `src/core/text/**`, `src/core/util/**` |
 | S05 | Core job compilation, preflight, raster/trace, and output | 219 | `src/core/invariants/**`, `src/core/job/**`, `src/core/output/**`, `src/core/preflight/**`, `src/core/raster/**`, `src/core/trace/**` |
 | S06 | IO formats and persistence | 97 | `src/io/**` |
 | S07 | Platform adapters | 15 | `src/platform/**` |
-| S08 | UI application workflows | 715 | `src/ui/**`, `src/vite-env.d.ts` |
-| S09 | Fixtures, perceptual harness, and test assets | 75 | `src/__fixtures__/**`; local ignored evidence may also appear under `perceptual-artifacts/**` |
+| S08 | UI application workflows | 720 | `src/ui/**`, `src/vite-env.d.ts` |
+| S09 | Fixtures, perceptual harness, and test assets | 77 | `src/__fixtures__/**`; local ignored evidence may also appear under `perceptual-artifacts/**` |
 
 Cross-sector note: the S09 real-logo trace benchmark owns the tracked fixture `src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png`, keeping normal benchmark inputs with the perceptual fixture harness instead of the audit evidence corpus.
 

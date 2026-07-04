@@ -185,24 +185,24 @@ Branch at audit start: `main`
 ## Next Steps
 
 1. Continue the 2026-07-04 current-state delta audit opened after `main` advanced beyond the original audited tree.
-2. Run S06 delta Pass 3 over direct diff review, project import/export edge contracts, and audit-doc consistency.
+2. Run S02 post-`cd5c7f4` delta Pass 1 over Vitest runner-speed configuration and the new CI budget helper surface.
 3. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
 
 ## Current-State Delta Audit - 2026-07-04
 
-Reason for reopening: current `origin/main` is at `c0f0252`, eighteen commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, and deterministic build-time configuration. The new commits touch S01 docs, S02 build configuration, S04 core CNC/material primitives, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
+Reason for reopening: current `origin/main` is at `cd5c7f4`, twenty-five commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, and runner-speed CI flake fixes. The new commits touch S01 docs, S02 build configuration and Vitest runner-speed configuration, S04 core CNC/material primitives and camera tests, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual/CI fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
 
 | Delta Sector | Status | Passes Completed | Major Areas Remaining |
 |---|---|---:|---|
 | S01 Governance, audit history, and product contracts | Complete | 3 | None for current delta |
-| S02 Tooling, build, release, CI, and static shell | Covered by previous audit; no delta files detected | 0 | None for current delta |
+| S02 Tooling, build, release, CI, and static shell | Active refresh | 3 | Vitest runner-speed configuration and CI budget helper surface from `cd5c7f4` |
 | S03 Electron desktop runtime and local bridge | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S04 Core domain models, controller/device/material primitives | Complete | 3 | None for current delta |
+| S04 Core domain models, controller/device/material primitives | Pending test-only refresh | 6 | Camera calibration/detection test flake changes from `cd5c7f4` |
 | S05 Core job compilation, preflight, raster/trace, and output | Complete | 3 | None for current delta |
-| S06 IO formats and persistence | Active | 2 | Direct diff review, project import/export edge contracts, audit-doc consistency |
+| S06 IO formats and persistence | Complete | 3 | None for current delta |
 | S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S08 UI application workflows | Pending delta audit | 0 | CNC material UI/state changes plus box numeric-input/dogbone toggle changes |
-| S09 Fixtures, perceptual harness, and test assets | Pending delta audit | 0 | New perceptual fixtures and underscore-prefixed audit tests |
+| S08 UI application workflows | Pending delta audit | 0 | CNC material UI/state changes, PWA update dismissal, box numeric-input/dogbone toggle changes, probe/device-setup catalog UI changes |
+| S09 Fixtures, perceptual harness, and test assets | Pending delta audit | 0 | New perceptual fixtures, underscore-prefixed audit tests, CI budget helpers, and centerline runner-speed changes |
 
 ### Delta Completed Passes
 
@@ -219,6 +219,13 @@ Reason for reopening: current `origin/main` is at `c0f0252`, eighteen commits af
 | S05 Delta Pass 3 | 2026-07-04 | Preprocess, batch trace, boundary, and closure sweep. Support trace slice passed (8 files, 67 tests). Found non-finite trace image-adjustment option gap; S05 delta closed after three passes. Move to S06. |
 | S06 Delta Pass 1 | 2026-07-04 | Project material persistence orientation. Focused project IO/state slice passed (8 files, 61 tests). No new findings; material keys are filtered to known chipload keys at stock and layer load boundaries. |
 | S06 Delta Pass 2 | 2026-07-04 | Migration, backfill, and adjacent persistence sweep. Broader IO persistence slice passed (25 files, 159 tests). No new findings; migration/backfill and adjacent material/CNC library persistence remained consistent. |
+| S06 Delta Pass 3 | 2026-07-04 | Direct diff and import/export edge closure. Project/material/G-code IO slice passed (29 files, 178 tests). No new findings; shared material-key predicate and deserialize boundary stayed consistent. S06 delta closed after three passes. Move to S02 delta introduced by the latest fast-forward. |
+| S02 Delta Pass 1 | 2026-07-04 | Deterministic build-time configuration. Focused deploy/PWA policy tests passed (2 files, 8 tests) and `pnpm build:web` completed. Found missing direct regression coverage for commit-derived build metadata and a still-present Vite large-chunk warning. |
+| S02 Delta Pass 2 | 2026-07-04 | Release gate and rebuild determinism sweep. Same-commit `dist/web` manifest comparison matched after rebuild; `pnpm guard:repo` and `pnpm check:file-size` passed. No new findings beyond the two Pass 1 S02 risks. |
+| S02 Delta Pass 3 | 2026-07-04 | Docs and static policy closure. Deploy/repo/PWA policy slice passed (3 files, 16 tests). No new findings; S02 delta closed after three passes with `D-S02-001` and `D-S02-002` still open. Move to S08. |
+| S04 Post-FF Delta Pass 1 | 2026-07-04 | CNC machine catalog and default bits. Focused CNC/project/state slice passed (7 files, 40 tests). Found that the expanded default CNC tool library lacks a direct invariant test for its documented stable-ID contract. |
+| S04 Post-FF Delta Pass 2 | 2026-07-04 | Catalog application and persistence boundary. Focused CNC state/project/material slice passed (4 files, 21 tests). No new findings; preset application is CNC-only, undoable, dirty, and updates bed plus spindle ceiling without rewriting stock. |
+| S04 Post-FF Delta Pass 3 | 2026-07-04 | Compiler semantics and tool boundary closure. Broad CNC core/project/state slice passed (16 files, 91 tests). No new findings; S04 refresh closed after three supplemental passes with `D-S04-004` still open. Move to S08 was planned before `cd5c7f4`; latest fast-forward reopens S02 first. |
 
 ### Delta Finding Index
 
@@ -227,9 +234,12 @@ Reason for reopening: current `origin/main` is at `c0f0252`, eighteen commits af
 | D-S01-001 | S01 | Medium | Open | Sector map omitted current core/root paths |
 | D-S01-002 | S01 | Medium | Open | Completion ledger did not cover post-baseline commits |
 | D-S01-003 | S01 | Low | Open | Phase H summary header stale after H.14 |
+| D-S02-001 | S02 | Low | Open | Deterministic build-time metadata lacks direct regression coverage |
+| D-S02-002 | S02 | Low | Open | Production web build still emits Vite chunk-size warning |
 | D-S04-001 | S04 | Medium | Open | Surfacing generator lacks core finite-value guards |
 | D-S04-002 | S04 | Medium | Open | Grid/heightmap sizing helpers can return malformed grids for non-finite dimensions |
 | D-S04-003 | S04 | Medium | Open | Material feed seeding can persist non-finite feed values |
+| D-S04-004 | S04 | Low | Open | Expanded default CNC tool library lacks stable-ID invariant test |
 | D-S05-001 | S05 | Low | Open | Auto-upscale exported helpers do not validate scale factors |
 | D-S05-002 | S05 | Low | Open | Trace core accepts malformed RawImageData shape without explicit guard |
 | D-S05-003 | S05 | Low | Open | Canny edge core does not bound threshold ratios or blur sigma |
