@@ -10,6 +10,7 @@ import {
   type CncTool,
   type Layer,
 } from '../../core/scene';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { feedPresetPatch } from '../state/cnc-library-actions';
 
@@ -155,19 +156,13 @@ function ReliefFinishRow(props: {
           </option>
         ))}
       </select>
-      <input
-        type="number"
+      <ClearableNumberField
         min={0.005}
         max={1}
         step={0.005}
         value={props.settings.reliefScallopMm ?? 0.025}
-        onChange={(e) => {
-          const parsed = Number.parseFloat(e.target.value);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            props.onCommit({ reliefScallopMm: parsed });
-          }
-        }}
-        aria-label={`Relief scallop height for ${props.layer.color}`}
+        onCommit={(mm) => props.onCommit({ reliefScallopMm: mm })}
+        ariaLabel={`Relief scallop height for ${props.layer.color}`}
         title="Scallop height target (mm) — smaller = finer finishing rows, longer job."
         style={scallopInputStyle}
       />
@@ -204,22 +199,20 @@ export function MotionPolishRows(props: {
         <option value="climb">Climb</option>
         <option value="conventional">Conventional</option>
       </select>
-      <input
-        type="number"
+      <ClearableNumberField
         min={0}
         max={45}
         step={0.5}
         value={props.settings.rampEntryDeg ?? 0}
-        onChange={(e) => {
-          const parsed = Number.parseFloat(e.target.value);
-          if (!Number.isFinite(parsed) || parsed <= 0) {
+        onCommit={(deg) => {
+          if (deg <= 0) {
             const { rampEntryDeg: _removed, ...rest } = props.settings;
             props.onCommitSettings(rest);
           } else {
-            props.onCommit({ rampEntryDeg: parsed });
+            props.onCommit({ rampEntryDeg: deg });
           }
         }}
-        aria-label={`Ramp entry angle for ${props.layer.color}`}
+        ariaLabel={`Ramp entry angle for ${props.layer.color}`}
         title="Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default)."
         style={rampInputStyle}
       />
