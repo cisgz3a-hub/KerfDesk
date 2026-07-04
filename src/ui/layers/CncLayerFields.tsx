@@ -4,9 +4,11 @@
 // setLayerParam action as a whole `cnc` patch, so undo/dirty tracking and
 // .lf2 persistence come for free.
 //
-// The heavy field groups live in CncLayerAdvancedFields; shared row/input
-// controls in CncLayerPrimitives. This file holds the always-visible Basic
-// fields (cut type, bit, cut depth) plus the pocket/relief stepover.
+// Basic fields (material, cut type, bit, cut depth, tabs) are always shown;
+// the advanced field set (feeds, stepover, pocket fill, cut-type tails) is
+// gated behind the ui-store Basic/Advanced toggle (ADR-106). Shared row/input
+// controls live in CncLayerPrimitives; the advanced group in
+// CncLayerAdvancedFields.
 
 import {
   CNC_CUT_TYPES,
@@ -17,25 +19,26 @@ import {
   type Layer,
 } from '../../core/scene';
 import { useStore } from '../state';
-import { CutTypeSections, DepthAndFeedFields, StepoverField } from './CncLayerAdvancedFields';
+import { useUiStore } from '../state/ui-store';
+import { CncLayerAdvancedGroup, TabFields } from './CncLayerAdvancedFields';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
 import { CncMaterialRow } from './CncMaterialRow';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
-import { PocketFillRow } from './PocketFillRow';
 
 export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
   const { layer } = props;
   const setLayerParam = useStore((s) => s.setLayerParam);
   const maxFeed = useStore((s) => s.project.device.maxFeed);
-  const spindleMaxRpm = useStore((s) =>
-    s.project.machine?.kind === 'cnc' ? s.project.machine.params.spindleMaxRpm : 24000,
-  );
+  const machine = useStore((s) => s.project.machine);
+  const showAdvanced = useUiStore((s) => s.showCncAdvanced);
   const hasReliefObjects = useLayerHasReliefObjects(layer.color);
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const isCnc = machine?.kind === 'cnc';
+  const spindleMaxRpm = isCnc ? machine.params.spindleMaxRpm : 24000;
+  const stockThicknessMm = isCnc ? machine.stock.thicknessMm : 0;
+  const isProfile = settings.cutType.startsWith('profile');
   const commit = (patch: Partial<CncLayerSettings>): void =>
     setLayerParam(layer.id, { cnc: { ...settings, ...patch } });
-  // Whole-settings commit for edits that REMOVE an optional key (clearing
-  // the per-layer bit override) — a spread patch can't delete.
   const commitSettings = (next: CncLayerSettings): void => setLayerParam(layer.id, { cnc: next });
 
   return (
@@ -67,38 +70,63 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
         onCommit={commit}
         onCommitSettings={commitSettings}
       />
-      <NumberField
+      <CutDepthField
         layer={layer}
+        settings={settings}
+        stockThicknessMm={stockThicknessMm}
+        onCommit={commit}
+      />
+      {isProfile ? <TabFields layer={layer} settings={settings} onCommit={commit} /> : null}
+      {showAdvanced ? (
+        <CncLayerAdvancedGroup
+          layer={layer}
+          settings={settings}
+          maxFeed={maxFeed}
+          spindleMaxRpm={spindleMaxRpm}
+          hasReliefObjects={hasReliefObjects}
+          onCommit={commit}
+          onCommitSettings={commitSettings}
+        />
+      ) : null}
+    </>
+  );
+}
+
+// Cut depth + a one-click "through cut" that sets depth to the stock
+// thickness (the confusing Cut-depth-vs-Stock-thickness pair, ADR-106).
+function CutDepthField(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly stockThicknessMm: number;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+}): JSX.Element {
+  return (
+    <>
+      <NumberField
+        layer={props.layer}
         label="Cut depth"
         unit="mm"
-        value={settings.depthMm}
+        value={props.settings.depthMm}
         min={0.05}
         max={200}
         step={0.5}
         title="Total depth below the stock top. Equal to stock thickness for a through cut."
-        onCommit={(depthMm) => commit({ depthMm })}
+        onCommit={(depthMm) => props.onCommit({ depthMm })}
       />
-      <DepthAndFeedFields
-        layer={layer}
-        settings={settings}
-        maxFeed={maxFeed}
-        spindleMaxRpm={spindleMaxRpm}
-        onCommit={commit}
-      />
-      <StepoverField
-        layer={layer}
-        settings={settings}
-        hasReliefObjects={hasReliefObjects}
-        onCommit={commit}
-      />
-      <PocketFillRow layer={layer} settings={settings} onCommit={commit} />
-      <CutTypeSections
-        layer={layer}
-        settings={settings}
-        hasReliefObjects={hasReliefObjects}
-        onCommit={commit}
-        onCommitSettings={commitSettings}
-      />
+      {props.stockThicknessMm > 0 ? (
+        <Row label="">
+          <button
+            type="button"
+            onClick={() => props.onCommit({ depthMm: props.stockThicknessMm })}
+            title="Set cut depth to the stock thickness for a full through cut."
+            style={throughButtonStyle}
+          >
+            Through cut (= {props.stockThicknessMm} mm)
+          </button>
+        </Row>
+      ) : null}
     </>
   );
 }
+
+const throughButtonStyle: React.CSSProperties = { fontSize: 11, padding: '2px 8px' };

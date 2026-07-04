@@ -15,6 +15,45 @@ import {
 } from './CncLayerToolFields';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField, Row } from './CncLayerPrimitives';
+import { PocketFillRow } from './PocketFillRow';
+
+// The whole advanced field set, gated by one conditional in the parent
+// (ADR-106 Basic/Advanced). Tabs is NOT here — it moved to the Basic group.
+export function CncLayerAdvancedGroup(props: {
+  readonly layer: Layer;
+  readonly settings: CncLayerSettings;
+  readonly maxFeed: number;
+  readonly spindleMaxRpm: number;
+  readonly hasReliefObjects: boolean;
+  readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
+  readonly onCommitSettings: (settings: CncLayerSettings) => void;
+}): JSX.Element {
+  return (
+    <>
+      <DepthAndFeedFields
+        layer={props.layer}
+        settings={props.settings}
+        maxFeed={props.maxFeed}
+        spindleMaxRpm={props.spindleMaxRpm}
+        onCommit={props.onCommit}
+      />
+      <StepoverField
+        layer={props.layer}
+        settings={props.settings}
+        hasReliefObjects={props.hasReliefObjects}
+        onCommit={props.onCommit}
+      />
+      <PocketFillRow layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
+      <CutTypeSections
+        layer={props.layer}
+        settings={props.settings}
+        hasReliefObjects={props.hasReliefObjects}
+        onCommit={props.onCommit}
+        onCommitSettings={props.onCommitSettings}
+      />
+    </>
+  );
+}
 
 export function DepthAndFeedFields(props: {
   readonly layer: Layer;
@@ -67,7 +106,7 @@ export function DepthAndFeedFields(props: {
         min={1000}
         max={spindleMaxRpm}
         step={500}
-        title="Spindle speed for this layer."
+        title="Spindle running speed for this layer's cut (up to the machine's Spindle max in Material & Bit)."
         onCommit={(spindleRpm) => onCommit({ spindleRpm })}
       />
       <FeedPresetRow layer={layer} settings={settings} onCommit={onCommit} />
@@ -141,7 +180,6 @@ export function CutTypeSections(props: {
           onCommitSettings={onCommitSettings}
         />
       ) : null}
-      {isProfile ? <TabFields layer={layer} settings={settings} onCommit={onCommit} /> : null}
     </>
   );
 }
@@ -200,7 +238,9 @@ function VCarveFields(props: {
   );
 }
 
-function TabFields(props: {
+// Holding tabs — a Basic field (rendered by the parent for profile cuts) so
+// beginners keep parts attached without opening Advanced.
+export function TabFields(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
