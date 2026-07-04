@@ -86,9 +86,25 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     onChange: (e) => {
       const nextText = e.target.value;
       setDraft(nextText);
+      // A blank field is a legitimate transient editing state — the operator is
+      // clearing the box to retype. Do NOT schedule a commit: parse('') returns
+      // a fallback number (old value / min / 0), and committing it snaps the
+      // field back under the user, so the whole box can never be erased. Hold
+      // the empty text; committing resumes on the next real keystroke or blur.
+      if (nextText.trim() === '') {
+        debouncerRef.current?.cancel();
+        return;
+      }
       debouncerRef.current?.schedule(parse(nextText));
     },
     onBlur: () => {
+      // Left blank on blur → nothing to commit; restore the last committed
+      // value (LightBurn behavior) rather than writing a fallback number.
+      if (draft.trim() === '') {
+        debouncerRef.current?.cancel();
+        setDraft(format(value));
+        return;
+      }
       const committed = parse(draft);
       debouncerRef.current?.flush(committed);
       // Snap even when the clamped value equals the already-committed value

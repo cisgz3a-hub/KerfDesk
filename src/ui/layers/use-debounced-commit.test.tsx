@@ -126,3 +126,61 @@ describe('useDebouncedCommit clamp feedback (M25)', () => {
     await unmount();
   });
 });
+
+// The operator must be able to erase the whole box to retype; parse('') returns
+// a fallback number (here min 1), and committing it used to snap the field back.
+describe('useDebouncedCommit clear-to-retype', () => {
+  it('holds an empty field and never commits the fallback on clear', async () => {
+    const commit = vi.fn();
+    const unmount = await renderProbe(1500, commit);
+
+    await act(async () => {
+      typeText('');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(probe.current?.displayValue).toBe('');
+
+    await unmount();
+  });
+
+  it('restores the last committed value on blur of an empty field', async () => {
+    const commit = vi.fn();
+    const unmount = await renderProbe(1500, commit);
+
+    await act(async () => {
+      typeText('');
+    });
+    await act(async () => {
+      probe.current?.onBlur();
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(probe.current?.displayValue).toBe('1500');
+
+    await unmount();
+  });
+
+  it('commits the fresh number typed after clearing', async () => {
+    const commit = vi.fn();
+    const unmount = await renderProbe(1500, commit);
+
+    await act(async () => {
+      typeText('');
+    });
+    await act(async () => {
+      typeText('25');
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(400);
+    });
+
+    expect(commit).toHaveBeenCalledWith(25);
+    expect(probe.current?.displayValue).toBe('25');
+
+    await unmount();
+  });
+});
