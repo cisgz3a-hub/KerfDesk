@@ -8,16 +8,26 @@ import type { Dispatch } from 'react';
 import { validateMachineProfile, type DeviceProfile } from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
 
-// The flow is Connect -> Identify -> Confirm -> Safety -> Sync (firmware) ->
-// Review. Each step is a tagged value; the switches below use assertNever so a
-// new step fails to compile until it is handled everywhere.
-export type DeviceSetupStep = 'connect' | 'identify' | 'confirm' | 'safety' | 'firmware' | 'review';
+// The flow is Connect -> Identify -> Confirm -> Safety -> Probe -> Sync
+// (firmware) -> Review. Each step is a tagged value; the switches below use
+// assertNever so a new step fails to compile until it is handled everywhere.
+// 'probe' is a CNC touch-plate work-zero step (F-CNC20); it self-gates to a
+// skip note in laser mode and is always optional.
+export type DeviceSetupStep =
+  | 'connect'
+  | 'identify'
+  | 'confirm'
+  | 'safety'
+  | 'probe'
+  | 'firmware'
+  | 'review';
 
 export const DEVICE_SETUP_STEP_ORDER: ReadonlyArray<DeviceSetupStep> = [
   'connect',
   'identify',
   'confirm',
   'safety',
+  'probe',
   'firmware',
   'review',
 ];
@@ -108,8 +118,10 @@ export function canAdvanceDeviceSetup(state: DeviceSetupState): boolean {
     case 'confirm':
     case 'safety':
       return validateMachineProfile(state.draft).length === 0;
+    case 'probe':
     case 'firmware':
-      // Firmware sync is optional — the operator can always proceed (or skip).
+      // Probing and firmware sync are optional — the operator can always
+      // proceed (or skip).
       return true;
     case 'review':
       return false;

@@ -80,7 +80,7 @@ describe('DeviceSetupWizard', () => {
   it('opens on the connect step', async () => {
     const { host, unmount } = await renderWizard();
     try {
-      expect(host.textContent).toContain('Step 1 of 6');
+      expect(host.textContent).toContain('Step 1 of 7');
       expect(host.textContent).toContain('Connect & read');
     } finally {
       await unmount();
@@ -196,7 +196,7 @@ describe('DeviceSetupWizard', () => {
 
       await act(async () => button(host, 'Apply detected').click());
 
-      expect(host.textContent).toContain('Step 3 of 6');
+      expect(host.textContent).toContain('Step 3 of 7');
       expect(host.textContent).toContain('Confirm settings');
       const bed = host.querySelector('input[aria-label="Bed width (mm)"]');
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
