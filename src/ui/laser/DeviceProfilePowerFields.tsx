@@ -6,7 +6,10 @@
 // renders both directly and hides them in CNC mode (ADR-101 §6).
 
 import type { DeviceProfile } from '../../core/devices';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { numInputStyle, Row } from './device-settings-shared';
+
+const MAX_POWER_S = 100000;
 
 type DeviceRowsProps = {
   readonly device: DeviceProfile;
@@ -19,30 +22,26 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
   return (
     <>
       <Row label="$30 (max S)">
-        <input
-          type="number"
+        <ClearableNumberField
           min={1}
+          max={MAX_POWER_S}
           step={1}
           value={device.maxPowerS}
-          onChange={(e) =>
-            update({ maxPowerS: Math.max(1, Math.floor(Number(e.target.value) || 0)) })
-          }
+          onCommit={(v) => update({ maxPowerS: Math.floor(v) })}
           style={numInputStyle}
-          aria-label="GRBL $30 max power S"
+          ariaLabel="GRBL $30 max power S"
           title="Maximum GRBL spindle/laser S value. Match your controller's $30 setting."
         />
       </Row>
       <Row label="$31 (min S)">
-        <input
-          type="number"
+        <ClearableNumberField
           min={0}
+          max={MAX_POWER_S}
           step={1}
           value={device.minPowerS}
-          onChange={(e) =>
-            update({ minPowerS: Math.max(0, Math.floor(Number(e.target.value) || 0)) })
-          }
+          onCommit={(v) => update({ minPowerS: Math.floor(v) })}
           style={numInputStyle}
-          aria-label="GRBL $31 min power S"
+          ariaLabel="GRBL $31 min power S"
           title="Minimum nonzero spindle/laser S value. Diode lasers usually use 0."
         />
       </Row>
