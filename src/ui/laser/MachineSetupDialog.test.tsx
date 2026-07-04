@@ -89,6 +89,7 @@ describe('MachineSetupDialog', () => {
         'Controller Settings',
         'Firmware Writes',
         'Safety Zones',
+        'Camera',
         'Raster Diagnostics',
         'Import / Export',
       ]) {
@@ -114,6 +115,7 @@ describe('MachineSetupDialog', () => {
       ['Controller Settings', 'control:laser.machine-setup.tab.controller'],
       ['Firmware Writes', 'control:laser.machine-setup.tab.firmware'],
       ['Safety Zones', 'control:laser.machine-setup.tab.zones'],
+      ['Camera', 'control:laser.machine-setup.tab.camera'],
       ['Raster Diagnostics', 'control:laser.machine-setup.tab.raster-diagnostics'],
       ['Import / Export', 'control:laser.machine-setup.tab.import-export'],
     ] as const;
@@ -170,6 +172,63 @@ describe('MachineSetupDialog', () => {
       expect(host.textContent).toContain('Default line intervals: 1');
       expect(host.textContent).toContain('Run Material Test on scrap before production.');
       expect(host.textContent).toContain('Run Interval Test on the same material');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('creates an experimental camera profile and solves bed-corner alignment', async () => {
+    const { host, unmount } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Camera').click());
+
+      expect(host.textContent).toContain('Add a camera profile before alignment');
+      await act(async () => button(host, 'Add camera').click());
+
+      const enabled = host.querySelector('input[aria-label="Enable camera"]');
+      if (!(enabled instanceof HTMLInputElement)) throw new Error('camera enabled input missing');
+      await act(async () => {
+        enabled.checked = true;
+        Simulate.change(enabled);
+      });
+      await act(async () => button(host, 'Use bed corners').click());
+
+      const camera = useStore.getState().project.device.cameraProfile;
+      expect(useStore.getState().project.device.capabilities).toContain('camera');
+      expect(camera?.enabled).toBe(true);
+      expect(camera?.alignment?.points).toHaveLength(4);
+      expect(host.textContent).toContain('Camera alignment ready');
+      expect(host.textContent).toContain('Image-to-machine transform solved');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('lets machine setup switch a camera profile to RTSP source', async () => {
+    const { host, unmount } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Camera').click());
+      await act(async () => button(host, 'Add camera').click());
+
+      const source = host.querySelector('select[aria-label="Camera source"]');
+      if (!(source instanceof HTMLSelectElement)) throw new Error('camera source select missing');
+      await act(async () => {
+        source.value = 'rtsp';
+        Simulate.change(source);
+      });
+
+      const url = host.querySelector('input[aria-label="RTSP camera URL"]');
+      if (!(url instanceof HTMLInputElement)) throw new Error('rtsp url input missing');
+      await act(async () => {
+        url.value = 'rtsp://192.168.10.1:8554/';
+        Simulate.change(url);
+      });
+
+      expect(useStore.getState().project.device.cameraProfile?.source).toEqual({
+        kind: 'rtsp',
+        url: 'rtsp://192.168.10.1:8554/',
+      });
+      expect(host.textContent).toContain('RTSP Bridge Preview');
     } finally {
       await unmount();
     }

@@ -72,6 +72,7 @@ export function weldVectorObjects(
     throw new Error('Weld requires selected closed vector contours.');
   }
   return {
+    ...commonObjectMetadata(objects),
     kind: 'imported-svg',
     id,
     source: 'Welded paths',
@@ -79,6 +80,24 @@ export function weldVectorObjects(
     transform: IDENTITY_TRANSFORM,
     paths: filtered,
   };
+}
+
+export function vectorObjectOutputMetadataCompatible(
+  objects: ReadonlyArray<VectorSceneObject>,
+): boolean {
+  if (objects.length <= 1) return true;
+  const first = objectPowerScale(objects[0] as VectorSceneObject);
+  return objects.slice(1).every((object) => objectMetadataEqual(first, objectPowerScale(object)));
+}
+
+function commonObjectMetadata(
+  objects: ReadonlyArray<VectorSceneObject>,
+): Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'> {
+  const first = objectPowerScale(objects[0] as VectorSceneObject);
+  if (!vectorObjectOutputMetadataCompatible(objects)) {
+    throw new Error('Weld requires selected vector contours with matching output metadata.');
+  }
+  return first;
 }
 
 function materializePolyline(polyline: Polyline, transform: SceneObject['transform']): Polyline {
@@ -110,6 +129,32 @@ function objectPowerScale(
       : { operationOverride: object.operationOverride }),
     ...(object.powerScale === undefined ? {} : { powerScale: object.powerScale }),
   };
+}
+
+function objectMetadataEqual(
+  left: Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'>,
+  right: Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'>,
+): boolean {
+  return (
+    left.locked === right.locked &&
+    Object.is(left.powerScale, right.powerScale) &&
+    operationOverrideEqual(left.operationOverride, right.operationOverride)
+  );
+}
+
+function operationOverrideEqual(
+  left: ImportedSvg['operationOverride'],
+  right: ImportedSvg['operationOverride'],
+): boolean {
+  const leftKeys = Object.keys(left ?? {}).sort();
+  const rightKeys = Object.keys(right ?? {}).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key, index) => {
+      if (key !== rightKeys[index]) return false;
+      return Object.is(left?.[key as keyof typeof left], right?.[key as keyof typeof right]);
+    })
+  );
 }
 
 export function isClosedPolygon(polyline: Polyline): boolean {

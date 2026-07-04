@@ -1,9 +1,9 @@
 // webAdapter — PlatformAdapter backed by the File System Access API.
 //
 // PROJECT.md "Delivery targets" requires Chromium (Chrome, Edge, Brave, Arc),
-// all of which ship the File System Access API. No download-fallback path —
-// if the user denies permission, WORKFLOW.md F-A11 says we re-prompt rather
-// than silently save to IndexedDB.
+// all of which ship the File System Access API. No download-fallback path:
+// unsupported browsers fail clearly instead of creating a second persistence
+// path outside the project/file contract.
 
 import type {
   FileHandle,
@@ -14,6 +14,7 @@ import type {
 } from '../types';
 import { webCamera } from './web-camera';
 import { webSerial } from './web-serial';
+import { createHttpCameraBridge } from './camera-bridge';
 
 type FilePickerAcceptType = {
   description: string;
@@ -41,12 +42,15 @@ async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<Fil
   const out: FileHandle[] = [];
   for (const handle of handles) {
     const file = await handle.getFile();
-    out.push({ name: file.name, text: () => file.text() });
+    out.push({ name: file.name, text: () => file.text(), blob: async () => file });
   }
   return out;
 }
 
 async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null> {
+  if (typeof window.showSaveFilePicker !== 'function') {
+    throw new Error('File System Access API is required to save files in the web app.');
+  }
   let handle: FileSystemFileHandle;
   try {
     handle = await window.showSaveFilePicker({
@@ -61,10 +65,32 @@ async function pickFileForSave(req: FileSaveRequest): Promise<SaveTarget | null>
     displayName: handle.name,
     write: async (data) => {
       const writable = await handle.createWritable();
-      await writable.write(data);
-      await writable.close();
+      await writeAndClose(writable, data);
     },
   };
+}
+
+async function writeAndClose(
+  writable: FileSystemWritableFileStream,
+  data: string | BufferSource | Blob,
+): Promise<void> {
+  let closed = false;
+  try {
+    await writable.write(data);
+    await writable.close();
+    closed = true;
+  } catch (err) {
+    if (!closed) await abortWritable(writable);
+    throw err;
+  }
+}
+
+async function abortWritable(writable: FileSystemWritableFileStream): Promise<void> {
+  try {
+    await writable.abort();
+  } catch {
+    // best-effort cleanup after write/close failure
+  }
 }
 
 export const webAdapter: PlatformAdapter = {
@@ -73,4 +99,5 @@ export const webAdapter: PlatformAdapter = {
   pickFileForSave,
   serial: webSerial,
   camera: webCamera,
+  cameraBridge: createHttpCameraBridge(),
 };

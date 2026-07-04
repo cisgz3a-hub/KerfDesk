@@ -11,8 +11,10 @@
 import type { Vec2 } from '../../core/scene';
 import { ellipseSegmentCount } from '../../core/shapes';
 import { parsePathD, type SubPath } from './parse-path-d';
+import { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 const RECT_CORNER_SEGMENTS = 8;
+const POINT_NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 
 export function elementToSubPaths(el: Element): ReadonlyArray<SubPath> {
   const tag = el.tagName.toLowerCase();
@@ -73,13 +75,21 @@ function lineToSubs(el: Element): ReadonlyArray<SubPath> {
 }
 
 function parsePointsAttr(value: string): ReadonlyArray<Vec2> {
-  const nums = (value.match(/[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g) ?? []).map(Number);
   const points: Vec2[] = [];
-  for (let i = 0; i + 1 < nums.length; i += 2) {
-    const x = nums[i];
-    const y = nums[i + 1];
-    if (x === undefined || y === undefined) continue;
+  let pendingX: number | null = null;
+  for (const match of value.matchAll(POINT_NUMBER_RE)) {
+    const number = Number(match[0]);
+    if (pendingX === null) {
+      pendingX = number;
+      continue;
+    }
+    if (points.length + 1 > SVG_IMPORT_LIMITS.points) {
+      throw new Error(`SVG import exceeds ${SVG_IMPORT_LIMITS.points} point(s)`);
+    }
+    const x = pendingX;
+    const y = number;
     points.push({ x, y });
+    pendingX = null;
   }
   return points;
 }

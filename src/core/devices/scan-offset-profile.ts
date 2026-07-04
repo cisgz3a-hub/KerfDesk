@@ -16,14 +16,35 @@ export function isScanOffsetTable(value: unknown): value is ReadonlyArray<ScanOf
 
 export function normalizeScanOffsetTable(value: unknown): ReadonlyArray<ScanOffsetPoint> {
   if (!Array.isArray(value)) return [];
+  const points = validScanOffsetPoints(value);
+  return hasDuplicateSpeeds(points) ? [] : sortBySpeed(points);
+}
+
+export function mergeScanOffsetTableBySpeed(value: unknown): ReadonlyArray<ScanOffsetPoint> {
+  if (!Array.isArray(value)) return [];
   const bySpeed = new Map<number, ScanOffsetPoint>();
-  for (const point of value.filter(isScanOffsetPoint).map((point) => ({
+  for (const point of validScanOffsetPoints(value)) bySpeed.set(point.speedMmPerMin, point);
+  return sortBySpeed([...bySpeed.values()]);
+}
+
+function validScanOffsetPoints(value: ReadonlyArray<unknown>): ReadonlyArray<ScanOffsetPoint> {
+  return value.filter(isScanOffsetPoint).map((point) => ({
     speedMmPerMin: point.speedMmPerMin,
     offsetMm: point.offsetMm,
-  }))) {
-    bySpeed.set(point.speedMmPerMin, point);
+  }));
+}
+
+function hasDuplicateSpeeds(points: ReadonlyArray<ScanOffsetPoint>): boolean {
+  const seenSpeeds = new Set<number>();
+  for (const point of points) {
+    if (seenSpeeds.has(point.speedMmPerMin)) return true;
+    seenSpeeds.add(point.speedMmPerMin);
   }
-  return [...bySpeed.values()].sort((a, b) => a.speedMmPerMin - b.speedMmPerMin);
+  return false;
+}
+
+function sortBySpeed(points: ReadonlyArray<ScanOffsetPoint>): ReadonlyArray<ScanOffsetPoint> {
+  return [...points].sort((a, b) => a.speedMmPerMin - b.speedMmPerMin);
 }
 
 function isScanOffsetPoint(value: unknown): value is ScanOffsetPoint {

@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CoreText from '../../core/text';
 
@@ -216,4 +217,86 @@ describe('AddTextDialog unknown font safety', () => {
       host.remove();
     }
   });
+
+  it('clamps numeric text fields before rendering and saving', async () => {
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<AddTextDialog />);
+      });
+
+      const textarea = requireTextarea(host);
+      const size = requireInput(host, 'input[aria-label="Text size"]');
+      const lineHeight = requireInput(host, 'input[aria-label="Text line height"]');
+      const letterSpacing = requireInput(host, 'input[aria-label="Text letter spacing"]');
+      expect(size.max).toBe('300');
+      expect(lineHeight.max).toBe('5');
+      expect(letterSpacing.min).toBe('-0.5');
+
+      await act(async () => {
+        textarea.value = 'Hello';
+        Simulate.change(textarea);
+        size.value = '9999';
+        Simulate.change(size);
+        lineHeight.value = '99';
+        Simulate.change(lineHeight);
+        letterSpacing.value = '-99';
+        Simulate.change(letterSpacing);
+      });
+
+      const form = requireForm(host);
+      await act(async () => {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const renderInput = textMocks.textToPolylines.mock.calls[0]?.[0] as
+        | {
+            readonly sizeMm?: number;
+            readonly lineHeight?: number;
+            readonly letterSpacing?: number;
+          }
+        | undefined;
+      expect(renderInput?.sizeMm).toBe(300);
+      expect(renderInput?.lineHeight).toBe(5);
+      expect(renderInput?.letterSpacing).toBe(-0.5);
+
+      expect(
+        useStore.getState().project.scene.objects.find((obj) => obj.kind === 'text'),
+      ).toMatchObject({
+        kind: 'text',
+        sizeMm: 300,
+        lineHeight: 5,
+        letterSpacing: -0.5,
+      });
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
 });
+
+function requireTextarea(host: HTMLElement): HTMLTextAreaElement {
+  const textarea = host.querySelector('textarea');
+  if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Text area not rendered');
+  return textarea;
+}
+
+function requireInput(host: HTMLElement, selector: string): HTMLInputElement {
+  const input = host.querySelector(selector);
+  if (!(input instanceof HTMLInputElement)) throw new Error(`${selector} not rendered`);
+  return input;
+}
+
+function requireForm(host: HTMLElement): HTMLFormElement {
+  const form = host.querySelector('form');
+  if (!(form instanceof HTMLFormElement)) throw new Error('Text form not rendered');
+  return form;
+}

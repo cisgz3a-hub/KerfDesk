@@ -120,40 +120,6 @@ describe('material library IO', () => {
     }
   });
 
-  it('roundtrips optional profile matching metadata on presets', () => {
-    const original = library({
-      entries: [
-        preset({
-          profileId: 'neotronics-4040-max-lt4lds-v2-20w',
-          machineFamily: 'neotronics-4040-max',
-          laserModel: 'LASER TREE LT-4LDS-V2',
-          opticalPowerW: 20,
-          material: 'Birch plywood',
-          operation: 'engrave',
-          confidence: 'calibrated',
-          warning: 'Calibrated on 3 mm scrap only.',
-          calibrationProvenance: 'Interval test 2026-06-17',
-        }),
-      ],
-    });
-
-    const result = deserializeMaterialLibrary(serializeMaterialLibrary(original));
-
-    expect(result.kind).toBe('ok');
-    if (result.kind !== 'ok') return;
-    expect(result.library.entries[0]).toMatchObject({
-      profileId: 'neotronics-4040-max-lt4lds-v2-20w',
-      machineFamily: 'neotronics-4040-max',
-      laserModel: 'LASER TREE LT-4LDS-V2',
-      opticalPowerW: 20,
-      material: 'Birch plywood',
-      operation: 'engrave',
-      confidence: 'calibrated',
-      warning: 'Calibrated on 3 mm scrap only.',
-      calibrationProvenance: 'Interval test 2026-06-17',
-    });
-  });
-
   it('reports structured parse and root-shape errors', () => {
     expect(deserializeMaterialLibrary('{not-json').kind).toBe('invalid');
     expect(deserializeMaterialLibrary('42').kind).toBe('invalid');

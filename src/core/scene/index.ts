@@ -14,8 +14,10 @@ export {
   captureLayerOperationSettings,
   createLayer,
   createLayerSubLayer,
+  isLayerColor,
   layerFromSubLayer,
   layerOperationSettingsEqual,
+  normalizeLayerColor,
   nextLayerSubLayerId,
   outputOperationLayers,
 } from './layer';

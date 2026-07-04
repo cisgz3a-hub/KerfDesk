@@ -22,15 +22,29 @@ import type { ViewTransform } from './view-transform';
 
 type PreviewCanvasCacheEntry = {
   readonly dataUrl: string;
-  readonly canvas: HTMLCanvasElement;
+  readonly canvas: HTMLCanvasElement | null;
+};
+
+type PendingPreviewBuild = {
+  readonly dataUrl: string;
+  readonly cancel: () => void;
+};
+
+export type RasterPreviewBuildScheduler = (work: () => void) => () => void;
+
+type DrawRasterPreviewOptions = {
+  readonly onRasterPreviewReady?: () => void;
+  readonly scheduleBuild?: RasterPreviewBuildScheduler;
 };
 
 const previewCanvasCache = new Map<string, PreviewCanvasCacheEntry>();
+const pendingPreviewBuilds = new Map<string, PendingPreviewBuild>();
 
 export function drawRasterPreview(
   ctx: CanvasRenderingContext2D,
   project: Project,
   view: ViewTransform,
+  options: DrawRasterPreviewOptions = {},
 ): void {
   pruneRasterPreviewCache(liveRasterPreviewDataUrls(project));
   for (const layer of project.scene.layers) {
@@ -46,6 +60,7 @@ export function drawRasterPreview(
           project.device,
           view,
           imageMaskObjectFor(project, obj),
+          options,
         );
       }
     }
@@ -56,6 +71,11 @@ export function pruneRasterPreviewCache(liveDataUrls: ReadonlySet<string>): void
   for (const [key, entry] of previewCanvasCache) {
     if (!liveDataUrls.has(entry.dataUrl)) previewCanvasCache.delete(key);
   }
+  for (const [key, pending] of pendingPreviewBuilds) {
+    if (liveDataUrls.has(pending.dataUrl)) continue;
+    pending.cancel();
+    pendingPreviewBuilds.delete(key);
+  }
 }
 
 function drawOnePreview(
@@ -65,8 +85,9 @@ function drawOnePreview(
   device: DeviceProfile,
   view: ViewTransform,
   maskObject: SceneObject | null,
+  options: DrawRasterPreviewOptions,
 ): void {
-  const canvas = previewCanvasFor(obj, layer, device, maskObject);
+  const canvas = previewCanvasFor(obj, layer, device, maskObject, options);
   if (canvas === null) return;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -79,6 +100,7 @@ function previewCanvasFor(
   layer: Layer,
   device: DeviceProfile,
   maskObject: SceneObject | null,
+  options: DrawRasterPreviewOptions,
 ): HTMLCanvasElement | null {
   const { pixelWidth, pixelHeight } = obj;
   if (pixelWidth <= 0 || pixelHeight <= 0) return null;
@@ -86,6 +108,38 @@ function previewCanvasFor(
   const key = `${obj.dataUrl}|${obj.lumaBase64 ?? ''}|${adjustmentKey(obj)}|${layer.negativeImage ? 'negative' : 'positive'}|${layer.passThrough ? 'pass' : 'resample'}|${layer.ditherAlgorithm}|${layer.minPower}-${layer.power}-${device.maxPowerS}|${layer.linesPerMm}|${width}x${height}|${maskCacheKey(maskObject)}`;
   const cached = previewCanvasCache.get(key);
   if (cached !== undefined) return cached.canvas;
+  schedulePreviewCanvasBuild(key, obj, layer, device, maskObject, options);
+  return previewCanvasCache.get(key)?.canvas ?? null;
+}
+
+function schedulePreviewCanvasBuild(
+  key: string,
+  obj: RasterImage,
+  layer: Layer,
+  device: DeviceProfile,
+  maskObject: SceneObject | null,
+  options: DrawRasterPreviewOptions,
+): void {
+  if (pendingPreviewBuilds.has(key)) return;
+  const scheduleBuild = options.scheduleBuild ?? scheduleRasterPreviewBuild;
+  let completedSynchronously = false;
+  const cancel = scheduleBuild(() => {
+    pendingPreviewBuilds.delete(key);
+    const canvas = buildPreviewCanvas(obj, layer, device, maskObject);
+    previewCanvasCache.set(key, { dataUrl: obj.dataUrl, canvas });
+    if (canvas !== null) options.onRasterPreviewReady?.();
+    completedSynchronously = true;
+  });
+  if (completedSynchronously) return;
+  pendingPreviewBuilds.set(key, { dataUrl: obj.dataUrl, cancel });
+}
+
+function buildPreviewCanvas(
+  obj: RasterImage,
+  layer: Layer,
+  device: DeviceProfile,
+  maskObject: SceneObject | null,
+): HTMLCanvasElement | null {
   const bitmap = buildProcessedRasterBitmap(obj, layer, device, { maskObject });
   if (bitmap.kind === 'too-large') return null;
   const canvas = document.createElement('canvas');
@@ -94,8 +148,12 @@ function previewCanvasFor(
   const octx = canvas.getContext('2d');
   if (octx === null) return null;
   octx.putImageData(new ImageData(bitmap.rgba, bitmap.width, bitmap.height), 0, 0);
-  previewCanvasCache.set(key, { dataUrl: obj.dataUrl, canvas });
   return canvas;
+}
+
+function scheduleRasterPreviewBuild(work: () => void): () => void {
+  const id = window.setTimeout(work, 0);
+  return () => window.clearTimeout(id);
 }
 
 function imageMaskObjectFor(project: Project, obj: RasterImage): SceneObject | null {

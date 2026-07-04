@@ -79,6 +79,25 @@ describe('vector path actions', () => {
     expect(state.dirty).toBe(true);
   });
 
+  it('does not weld selected vectors with mixed output metadata', () => {
+    loadObjects([
+      { ...shapeObject('left', '#222222', squarePath('#222222', 0, 0, 10)), powerScale: 50 },
+      { ...shapeObject('right', '#222222', squarePath('#222222', 5, 0, 10)), powerScale: 80 },
+    ]);
+    useStore.setState({
+      selectedObjectId: 'left',
+      additionalSelectedIds: new Set(['right']),
+      dirty: false,
+    });
+    const before = useStore.getState().project;
+
+    useStore.getState().weldSelection();
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().dirty).toBe(false);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('does not weld when the selection contains open contours', () => {
     loadObjects([
       shapeObject('open', '#333333', {

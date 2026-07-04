@@ -32,6 +32,14 @@ import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { loadFont } from './font-loader';
 import { FontPicker } from './FontPicker';
+import {
+  initialTextLetterSpacing,
+  initialTextLineHeight,
+  initialTextSizeMm,
+  sanitizeTextDialogNumericValues,
+  TextDialogNumericFields,
+  type TextDialogNumericValues,
+} from './TextDialogNumericFields';
 
 export function AddTextDialog(): JSX.Element | null {
   const state = useUiStore((s) => s.textDialog);
@@ -73,13 +81,10 @@ function DialogForm(props: {
   );
 }
 
-type DialogValues = {
+type DialogValues = TextDialogNumericValues & {
   content: string;
   fontKey: string;
-  sizeMm: number;
   alignment: TextAlignment;
-  lineHeight: number;
-  letterSpacing: number;
 };
 
 type DialogFields = {
@@ -99,15 +104,19 @@ function useTextDialogFields(
   const [fontKey, setFontKey] = useState<string>(
     state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY,
   );
-  const [sizeMm, setSizeMm] = useState(state.mode === 'edit' ? state.sizeMm : DEFAULT_TEXT_SIZE_MM);
+  const [sizeMm, setSizeMm] = useState(
+    initialTextSizeMm(state.mode === 'edit' ? state.sizeMm : DEFAULT_TEXT_SIZE_MM),
+  );
   const [alignment, setAlignment] = useState<TextAlignment>(
     state.mode === 'edit' ? state.alignment : DEFAULT_TEXT_ALIGNMENT,
   );
   const [lineHeight, setLineHeight] = useState(
-    state.mode === 'edit' ? state.lineHeight : DEFAULT_TEXT_LINE_HEIGHT,
+    initialTextLineHeight(state.mode === 'edit' ? state.lineHeight : DEFAULT_TEXT_LINE_HEIGHT),
   );
   const [letterSpacing, setLetterSpacing] = useState(
-    state.mode === 'edit' ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING,
+    initialTextLetterSpacing(
+      state.mode === 'edit' ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING,
+    ),
   );
   return {
     values: { content, fontKey, sizeMm, alignment, lineHeight, letterSpacing },
@@ -135,6 +144,7 @@ async function commitText(
     ctx.pushToast('Type some text first.', 'warning');
     return;
   }
+  const safeValues = sanitizeTextDialogNumericValues(v);
   ctx.setSubmitting(true);
   try {
     const knownFontKey = asKnownFontKey(v.fontKey);
@@ -143,10 +153,10 @@ async function commitText(
     const rendered = await textToPolylines({
       fontBuffer: buffer,
       content: normalizedContent,
-      sizeMm: v.sizeMm,
+      sizeMm: safeValues.sizeMm,
       alignment: v.alignment,
-      lineHeight: v.lineHeight,
-      letterSpacing: v.letterSpacing,
+      lineHeight: safeValues.lineHeight,
+      letterSpacing: safeValues.letterSpacing,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
     });
     const obj: TextObject = {
@@ -154,10 +164,10 @@ async function commitText(
       id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
       content: normalizedContent,
       fontKey: knownFontKey,
-      sizeMm: v.sizeMm,
+      sizeMm: safeValues.sizeMm,
       alignment: v.alignment,
-      lineHeight: v.lineHeight,
-      letterSpacing: v.letterSpacing,
+      lineHeight: safeValues.lineHeight,
+      letterSpacing: safeValues.letterSpacing,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
       bounds: rendered.bounds,
       transform: IDENTITY_TRANSFORM,
@@ -197,53 +207,15 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
       <Field label="Font">
         <FontPicker value={values.fontKey} onChange={setFontKey} />
       </Field>
-      <Field label="Size">
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={values.sizeMm}
-          onChange={(e) => setSizeMm(Math.max(1, Number(e.target.value) || 0))}
-          className="lf-input"
-          style={numStyle}
-          aria-label="Text size"
-          title="Text height in millimeters."
-        />
-        <span className="lf-field-unit">mm</span>
-      </Field>
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />
       </Field>
-      <Field label="Line height">
-        <input
-          type="number"
-          min={0.5}
-          max={5}
-          step={0.1}
-          value={values.lineHeight}
-          onChange={(e) => setLineHeight(Math.max(0.5, Number(e.target.value) || 1))}
-          className="lf-input"
-          style={numStyle}
-          aria-label="Text line height"
-          title="Vertical distance between text lines, relative to text size."
-        />
-        <span className="lf-field-unit">× size</span>
-      </Field>
-      <Field label="Spacing">
-        <input
-          type="number"
-          min={-0.5}
-          max={2}
-          step={0.05}
-          value={values.letterSpacing}
-          onChange={(e) => setLetterSpacing(Number(e.target.value) || 0)}
-          className="lf-input"
-          style={numStyle}
-          aria-label="Text letter spacing"
-          title="Letter spacing (tracking). 0 = font's natural spacing. Positive widens, negative tightens."
-        />
-        <span className="lf-field-unit">× size (0 = natural)</span>
-      </Field>
+      <TextDialogNumericFields
+        values={values}
+        setSizeMm={setSizeMm}
+        setLineHeight={setLineHeight}
+        setLetterSpacing={setLetterSpacing}
+      />
     </>
   );
 }
@@ -387,7 +359,6 @@ const textareaStyle: React.CSSProperties = {
   fontSize: 13,
   resize: 'vertical',
 };
-const numStyle: React.CSSProperties = { width: 80 };
 const alignmentStyle: React.CSSProperties = { display: 'flex', gap: 12 };
 const alignmentLabelStyle: React.CSSProperties = {
   display: 'inline-flex',

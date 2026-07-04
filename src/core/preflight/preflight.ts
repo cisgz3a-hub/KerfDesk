@@ -13,6 +13,7 @@
 import {
   assertNever,
   isClosedEnough,
+  outputOperationLayers,
   type Layer,
   type Project,
   type Scene,
@@ -26,8 +27,9 @@ import {
 } from '../invariants';
 import { machineBoundsForDevice, resolveGrblDialect } from '../devices';
 import { DEFAULT_OVERSCAN_MM } from '../job';
+import { findLayerModeMismatchIssues } from './layer-mode-preflight';
 import { findMachineProfilePreflightIssues } from './machine-profile-preflight';
-import { findNoGoZoneCollisions } from './no-go-zone-preflight';
+import { findNoGoZoneCollisions } from './no-go-zones';
 import { findRelativeMotionEnvelopeIssues } from './relative-motion-envelope';
 
 export type PreflightCode =
@@ -83,7 +85,7 @@ export function runPreflight(
   options: PreflightOptions = {},
 ): PreflightResult {
   const issues: PreflightIssue[] = [];
-  const outputLayers = project.scene.layers.filter((l) => l.output);
+  const outputLayers = project.scene.layers.flatMap(outputOperationLayers);
 
   if (outputLayers.length === 0) {
     issues.push({
@@ -96,7 +98,7 @@ export function runPreflight(
     appendLayerIssues(layer, project.device.maxFeed, issues);
   }
 
-  appendModeMismatchIssues(project.scene, outputLayers, issues);
+  issues.push(...findLayerModeMismatchIssues(project.scene.objects, outputLayers));
 
   appendOffsetFillOpenContourIssues(project.scene, outputLayers, issues);
 
@@ -156,8 +158,14 @@ function appendNoGoZoneIssues(
     });
     return;
   }
-  const offset = options.motionOffset ?? { x: 0, y: 0 };
-  const collisions = findNoGoZoneCollisions(gcode, zones, offset);
+  const collisionOptions =
+    options.motionOffset === undefined ? {} : { motionOffset: options.motionOffset };
+  const collisions = findNoGoZoneCollisions(
+    gcode,
+    zones,
+    machineBoundsForDevice(project.device),
+    collisionOptions,
+  );
   for (const collision of collisions.slice(0, MAX_BOUNDS_ISSUES)) {
     issues.push({
       code: 'no-go-zone-collision',
@@ -187,10 +195,10 @@ function appendLayerIssues(layer: Layer, maxFeed: number, issues: PreflightIssue
       message: `Layer ${layer.id} min power ${layer.minPower} exceeds max power ${layer.power}.`,
     });
   }
-  if (layer.speed <= 0 || layer.speed > maxFeed) {
+  if (layerSpeedOutOfRange(layer.speed, maxFeed)) {
     issues.push({
       code: 'speed-out-of-range',
-      message: `Layer ${layer.id} speed ${layer.speed} exceeds device max ${maxFeed}.`,
+      message: `Layer ${layer.id} speed ${layer.speed} is outside 1..${maxFeed}.`,
     });
   }
   if (!Number.isInteger(layer.passes) || layer.passes < 1) {
@@ -201,50 +209,8 @@ function appendLayerIssues(layer: Layer, maxFeed: number, issues: PreflightIssue
   }
 }
 
-// F4: catch objects that compileJob silently drops because their layer's
-// mode won't process them. compile-job.ts only feeds raster images to
-// image-mode layers and only feeds vector paths to line/fill-mode layers;
-// anything assigned (by color) to the wrong mode emits no G-code and no
-// error today. Flag one issue per offending OUTPUT layer so the operator
-// sees "this layer won't engrave what's on it" before writing the file.
-function appendModeMismatchIssues(
-  scene: Scene,
-  outputLayers: ReadonlyArray<Layer>,
-  issues: PreflightIssue[],
-): void {
-  for (const layer of outputLayers) {
-    if (scene.objects.some((obj) => isStrandedOnLayer(obj, layer))) {
-      issues.push({ code: 'layer-mode-mismatch', message: mismatchMessage(layer) });
-    }
-  }
-}
-
-// True when `obj` is assigned to `layer` (by color) but `layer.mode` is the
-// kind compileJob won't emit for that object — so it's silently dropped.
-function isStrandedOnLayer(obj: SceneObject, layer: Layer): boolean {
-  switch (obj.kind) {
-    case 'imported-svg':
-    case 'text':
-    case 'traced-image':
-    case 'shape':
-      // Vectors emit only on line/fill layers; an image layer ignores them.
-      return layer.mode === 'image' && obj.paths.some((p) => p.color === layer.color);
-    case 'raster-image':
-      if (obj.role === 'trace-source') return false;
-      // Rasters emit only on image layers; a line/fill layer ignores them.
-      return layer.mode !== 'image' && obj.color === layer.color;
-    case 'relief':
-      // CNC-only geometry — laser layer modes never mismatch it.
-      return false;
-    default:
-      return assertNever(obj, 'SceneObject');
-  }
-}
-
-function mismatchMessage(layer: Layer): string {
-  return layer.mode === 'image'
-    ? `Layer ${layer.id} is in Image mode but has vector objects assigned; they will not be engraved. Set the layer to Line or Fill, or move the objects to another layer.`
-    : `Layer ${layer.id} is in ${layer.mode === 'fill' ? 'Fill' : 'Line'} mode but has an image assigned; it will not be engraved. Set the layer to Image mode.`;
+function layerSpeedOutOfRange(speed: number, maxFeed: number): boolean {
+  return !Number.isFinite(speed) || speed <= 0 || speed > maxFeed;
 }
 
 function appendOffsetFillOpenContourIssues(
@@ -397,9 +363,8 @@ function appendBoundsIssues(
 }
 
 function maxOutputOverscanMm(scene: Scene): number {
-  const imageColors = new Set(
-    scene.layers.filter((l) => l.output && l.mode === 'image').map((l) => l.color),
-  );
+  const outputLayers = scene.layers.flatMap(outputOperationLayers);
+  const imageColors = new Set(outputLayers.filter((l) => l.mode === 'image').map((l) => l.color));
   const hasImageOutput = scene.objects.some(
     (obj) =>
       obj.kind === 'raster-image' && obj.role !== 'trace-source' && imageColors.has(obj.color),
@@ -407,9 +372,7 @@ function maxOutputOverscanMm(scene: Scene): number {
   const imageOverscan = hasImageOutput ? DEFAULT_OVERSCAN_MM : 0;
   const fillOverscan = Math.max(
     0,
-    ...scene.layers
-      .filter((l) => l.output && l.mode === 'fill')
-      .map((l) => Math.max(0, l.fillOverscanMm)),
+    ...outputLayers.filter((l) => l.mode === 'fill').map((l) => Math.max(0, l.fillOverscanMm)),
   );
   return Math.max(imageOverscan, fillOverscan);
 }

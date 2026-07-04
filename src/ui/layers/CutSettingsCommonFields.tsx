@@ -3,8 +3,12 @@ import type { Layer, LayerMode } from '../../core/scene';
 export function CutSettingsCommonFields(props: {
   readonly layer: Layer;
   readonly mode: LayerMode;
+  readonly maxFeed?: number;
   readonly onModeChange: (mode: LayerMode) => void;
 }): JSX.Element {
+  const speedValue =
+    props.maxFeed === undefined ? props.layer.speed : Math.min(props.layer.speed, props.maxFeed);
+  const speedMax = props.maxFeed === undefined ? {} : { max: props.maxFeed };
   return (
     <>
       <Field label="Mode">
@@ -27,7 +31,7 @@ export function CutSettingsCommonFields(props: {
         <span className="lf-field-unit">%</span>
       </Field>
       <Field label="Speed">
-        <NumberInput name="speed" value={props.layer.speed} min={1} label="speed" />
+        <NumberInput name="speed" value={speedValue} min={1} label="speed" {...speedMax} />
         <span className="lf-field-unit">mm/min</span>
       </Field>
       <Field label="Passes">

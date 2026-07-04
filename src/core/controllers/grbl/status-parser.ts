@@ -153,8 +153,9 @@ function parseState(token: string): { state: GrblState; subState: number | null 
   if (name === undefined || !STATE_SET.has(name)) return null;
   const state = name as GrblState;
   if (sub === undefined) return { state, subState: null };
+  if (!/^\d+$/.test(sub)) return { state, subState: null };
   const subNumber = Number.parseInt(sub, 10);
-  return { state, subState: Number.isFinite(subNumber) ? subNumber : null };
+  return { state, subState: subNumber };
 }
 
 function pickAxisField(

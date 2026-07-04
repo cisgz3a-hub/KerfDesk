@@ -110,11 +110,11 @@ Added regression coverage:
 - `src/core/raster/emit-raster-scan-offset.test.ts`
   - Confirms unidirectional raster G-code remains left-to-right and unshifted when `scanOffsetMm` is non-zero.
 
-Strengthened artifact evidence:
+Strengthened regenerable local artifact path:
 
 - `src/__fixtures__/perceptual/toolpath-rasterize.test.ts`
   - Added cross-hatch fill comparison between intended contour mask, toolpath rasterization, and emitted G-code rasterization.
-  - Generated artifacts:
+  - Optional PNG outputs are ignored by Git and are not durable audit evidence. Regenerate them with the command below when visual inspection is needed:
     - `perceptual-artifacts/fill-toolpath-cross-hatch-square.png`
     - `perceptual-artifacts/fill-gcode-cross-hatch-square.png`
 
@@ -294,7 +294,7 @@ Rubric score is the minimum of all categories:
 - Safety: 10/10
 - UX: 10/10 for the locked slice, because false bounds blocks are removed without widening unsafe behavior.
 - Regression coverage: 10/10
-- Real-artifact evidence: 10/10
+- Regenerable visual checks: 10/10
 - Maintainability: 10/10
 - Docs/audit clarity: 10/10
 

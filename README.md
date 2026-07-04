@@ -2,13 +2,15 @@
 
 > A focused CAM application for **GRBL** laser cutters and engravers. Web app and Windows desktop from one codebase. Proprietary source (ADR-018).
 
-**Status:** Phases A–E shipped (the MVP plus the two post-MVP rounds: text + raster trace), plus Phase F.1 (Fill hatching, shipped 2026-05-28), Phase F.2 (raster image engrave — code shipped through F.2.e, hardware burn F.2.f pending), and Phase F.3 (set work origin — code shipped, hardware verification pending). **Trace pipeline hardened 2026-05-29:** transparent-PNG decode fix, a perceptual-fidelity test harness (ADR-025), and a trace-keeps-source overlay (ADR-026). **Known open gap (next frontier):** imagetracerjs is outline-only, so the outline-vs-centerline limitation remains; see ADR-025 'Scope'. Hardware-verified on a Creality Falcon A1 Pro running GrblHAL 1.1f. Live web build at <https://kerfdesk.com> (published by GitHub Actions after CI succeeds). Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
+**Status:** Phases A-E shipped (the MVP plus text and raster trace), Phase F.1 Fill mode shipped, Phase F.2 raster image engrave is code-complete through F.2.e with the F.2.f hardware burn still pending, Phase F.3 set-work-origin is code-complete with hardware verification pending, Phase F.4 Convert to Bitmap has the Fill All path shipped, Phase F.5 material-library foundations are present, and Phase G drawing tools are in progress. The trace pipeline was hardened on 2026-05-29 with the transparent-PNG decode fix, perceptual-fidelity test harness (ADR-025), and trace-keeps-source overlay (ADR-026). The known trace limitation remains: imagetracerjs is outline-only, so outline-vs-centerline behavior is still documented in ADR-025. Hardware verification is limited to the Falcon/GrblHAL paths recorded in `AUDIT.md`; later raster/image/origin/bitmap/material/drawing workflows still require explicit hardware verification. The production web URL is <https://kerfdesk.com>; GitHub Actions deployment requires configured Cloudflare secrets. Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
+
+**Naming note:** KerfDesk is the user-facing product and release URL. LaserForge 2.0 remains the repository/package/internal project name, and the Cloudflare Pages API project is still named `laserforge` for historical reasons.
 
 ---
 
 ## What it is
 
-KerfDesk takes a 2D vector design (SVG), assigns cut/engrave operations per color layer, previews the toolpath, generates correct G-code, and streams it to your machine. The UX follows the laser-CAM conventions users already know — color-as-layer, a Cuts/Layers window, a Laser window. The scope is deliberately narrow: GRBL only in MVP, Line mode only in MVP, no raster engrave or camera or rotary or text in MVP.
+KerfDesk takes a 2D vector design (SVG), text, traced artwork, raster images, or generated shapes; assigns cut, fill, or image operations per color layer; previews the toolpath; generates correct G-code; and streams it to your machine. The UX follows the laser-CAM conventions users already know — color-as-layer, a Cuts/Layers window, a Laser window. The scope is deliberately narrow: GRBL only for the current controller path, no rotary workflow yet, and hardware verification is tracked feature-by-feature in `AUDIT.md`.
 
 It will be delivered as:
 
@@ -35,16 +37,16 @@ Read in this order:
 
 | Document | What's in it |
 |---|---|
-| **[`PROJECT.md`](./PROJECT.md)** | Product scope, non-negotiables, phase plan A → F. The "what." |
+| **[`PROJECT.md`](./PROJECT.md)** | Product scope, non-negotiables, phase plan A → G. The "what." |
 | **[`WORKFLOW.md`](./WORKFLOW.md)** | Every user flow with success / error / empty / edge states. The "what should happen." |
-| **[`DECISIONS.md`](./DECISIONS.md)** | All architectural decisions with rationale, alternatives, and consequences. 26 ADRs (ADR-001..026; ADR-022–024 are reserved placeholders, not yet written). The "why." |
+| **[`DECISIONS.md`](./DECISIONS.md)** | Current ADR log with rationale, alternatives, and consequences. The "why." |
 | **[`CLAUDE.md`](./CLAUDE.md)** | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. The "how." |
 | **[`RESEARCH_LOG.md`](./RESEARCH_LOG.md)** | Every dependency and external claim with license, version, source, evaluator. The "where it came from." |
 | **[`AUDIT.md`](./AUDIT.md)** | Rolling professional audit. Re-run after each phase; archived snapshots in `AUDIT-YYYY-MM-DD-phase-*.md`. |
 
 ## Build status
 
-Phases A–E shipped, plus Phase F.1 / F.2 / F.3 (see **Status** above). As of the 2026-06-28 local release gate, `pnpm release:check` passes with 2420 tests across 389 files, a clean dependency audit, and a clean license gate. See `AUDIT.md` for current findings, including the non-blocking web bundle chunk warning.
+Phases A-E shipped, plus the Phase F and Phase G work summarized in **Status** above. As of the 2026-07-03 local release gate, `pnpm release:check` passes with 2641 tests across 423 test files, a clean dependency audit, a clean license gate, a clean web build, a clean Electron main build, and a clean file-size backstop. See `AUDIT.md` for the current findings and verification inventory.
 
 ```bash
 pnpm install
@@ -81,12 +83,16 @@ Add both at **Settings → Secrets and variables → Actions → New
 repository secret**. Until both are set the workflow will fail at the
 "Publish to Cloudflare Pages" step (CI itself stays green).
 
-**Current status (2026-06-28): push-to-deploy is active.** The manual deploy
-scripts run `pnpm release:check` before Wrangler publishes. The Cloudflare Pages
-API project name used by Wrangler is still `laserforge`, but its canonical
-production release URL is `https://kerfdesk.com`; `https://laserforge-2fj.pages.dev`
-is the Pages fallback hostname. The older `https://laserforge.pages.dev` address
-belongs to a stale Pages URL and must not be used for release verification.
+**Current repo evidence (2026-07-03):** the deploy workflow is configured and
+the local release gate passes, but this checkout cannot prove that GitHub has
+the two Cloudflare secrets configured. The first push or manual dispatch should
+verify Cloudflare authentication in Actions before treating push-to-deploy as
+operational. The manual deploy scripts run `pnpm release:check` before Wrangler
+publishes. The Cloudflare Pages API project name used by Wrangler is still
+`laserforge`, but its canonical production release URL is `https://kerfdesk.com`;
+`https://laserforge-2fj.pages.dev` is the Pages fallback hostname. The older
+`https://laserforge.pages.dev` address belongs to a stale Pages URL and must not
+be used for release verification.
 
 ## License
 

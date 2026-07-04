@@ -31,7 +31,7 @@ Result: 12 test files passed, 100 tests passed.
 
 Initial pass: the required real fixture was not present:
 
-- Expected: `audit/fixtures/trace/arch-house-langebaan-source.*`
+- Expected: `src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png`
 - Initial cap: `9/10`
 
 Synthetic fixtures may prove the harness and generic logo behavior, but the loop cannot honestly reach 10/10 until the real Arch House/Langebaan source image is added and tested.
@@ -41,7 +41,7 @@ Synthetic fixtures may prove the harness and generic logo behavior, but the loop
 The user supplied the original source PNG on the desktop, then it was copied into the required fixture path:
 
 - Source: `C:\Users\Asus\Desktop\source image\file_00000000966c71fd8c7b2cdc69ca12ab.png`
-- Repo fixture: `audit/fixtures/trace/arch-house-langebaan-source.png`
+- Repo fixture: `src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png`
 
 Line Art acceptance metrics from `src/__fixtures__/perceptual/arch-house-baseline.test.ts`:
 
@@ -55,10 +55,10 @@ Line Art acceptance metrics from `src/__fixtures__/perceptual/arch-house-baselin
 - Point count: `10236`
 - Bounds: `x=118..896.48`, `y=206.102..710.027`
 
-Generated evidence:
+Regenerable local evidence (ignored by Git on the current harness):
 
-- `audit/evidence/trace-artifacts/arch-house-langebaan-line-art.metrics.json`
-- `audit/evidence/trace-artifacts/arch-house-langebaan-line-art.overlay.svg`
+- `perceptual-artifacts/trace-artifacts/arch-house-langebaan-line-art.metrics.json`
+- `perceptual-artifacts/trace-artifacts/arch-house-langebaan-line-art.overlay.svg`
 
 ## Accepted Baseline
 

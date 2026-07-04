@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
@@ -19,6 +19,7 @@ import {
 } from './edge-truth';
 import {
   buildTraceArtifact,
+  DEFAULT_TRACE_ARTIFACT_EVIDENCE_DIR,
   requiredArchHouseFixtureStatus,
   traceArtifactToJson,
   writeTraceArtifactEvidence,
@@ -225,6 +226,15 @@ describe('trace artifact harness', () => {
     }
   });
 
+  it('keeps opt-in trace artifact evidence under the ignored perceptual artifact tree', () => {
+    expect(DEFAULT_TRACE_ARTIFACT_EVIDENCE_DIR).toContain(
+      join('perceptual-artifacts', 'trace-artifacts'),
+    );
+    expect(DEFAULT_TRACE_ARTIFACT_EVIDENCE_DIR).not.toContain(
+      join('audit', 'evidence', 'trace-artifacts'),
+    );
+  });
+
   it('renders Line Art artifacts as filled contours and measures holes/specks', async () => {
     const paths = await traceImageToColoredPaths(HOLLOW_LOGO_TRACE_FIXTURE.image, LINE_ART_OPTIONS);
 
@@ -334,6 +344,22 @@ describe('trace artifact harness', () => {
       expect(status.ratingCap).toBe(9);
       expect(status.path).toBeNull();
       expect(status.expectedPathGlob).toContain('arch-house-langebaan-source');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('does not accept non-PNG files for the required Arch House source fixture', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lf-trace-jpg-fixtures-'));
+    try {
+      writeFileSync(join(dir, 'arch-house-langebaan-source.jpg'), 'not a png');
+
+      const status = requiredArchHouseFixtureStatus(dir);
+
+      expect(status.present).toBe(false);
+      expect(status.ratingCap).toBe(9);
+      expect(status.path).toBeNull();
+      expect(status.expectedPathGlob).toContain('arch-house-langebaan-source.png');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

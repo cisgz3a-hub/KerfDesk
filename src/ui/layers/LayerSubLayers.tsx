@@ -79,6 +79,7 @@ function LayerSubLayerRow(props: {
 }): JSX.Element {
   const { layer, subLayer } = props;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const maxFeed = useStore((state) => state.project.device.maxFeed);
   const updateLayerSubLayer = useStore((state) => state.updateLayerSubLayer);
   const deleteLayerSubLayer = useStore((state) => state.deleteLayerSubLayer);
   const effectiveLayer = layerFromSubLayer(layer, subLayer);
@@ -117,6 +118,7 @@ function LayerSubLayerRow(props: {
       {settingsOpen ? (
         <CutSettingsDialog
           layer={effectiveLayer}
+          maxFeed={maxFeed}
           onCancel={() => setSettingsOpen(false)}
           onApply={(patch) => {
             updateLayerSubLayer(layer.id, subLayer.id, subLayerPatchFromDialog(patch));

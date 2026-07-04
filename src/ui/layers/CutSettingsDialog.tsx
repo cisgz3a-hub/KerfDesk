@@ -12,11 +12,13 @@ import { readCutSettingsPatch, type LayerPatch } from './cut-settings-draft';
 
 type CutSettingsDialogProps = {
   readonly layer: Layer;
+  readonly maxFeed?: number;
   readonly onCancel: () => void;
   readonly onApply: (patch: LayerPatch) => void;
 } & Partial<CutSettingsDefaultHandlers>;
 
 export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
+  const maxFeed = positiveFiniteLimit(props.maxFeed);
   const [mode, setMode] = useState<LayerMode>(props.layer.mode);
   const [dither, setDither] = useState<Layer['ditherAlgorithm']>(props.layer.ditherAlgorithm);
   const [fillLineIntervalMm, setFillLineIntervalMm] = useState(props.layer.hatchSpacingMm);
@@ -25,8 +27,11 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
     event.preventDefault();
     const form = event.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
-    props.onApply(readCutSettingsPatch(new FormData(form), props.layer));
+    props.onApply(
+      readCutSettingsPatch(new FormData(form), props.layer, maxFeed === null ? {} : { maxFeed }),
+    );
   };
+  const maxFeedProps = maxFeed === null ? {} : { maxFeed };
   return (
     <Dialog
       onClose={props.onCancel}
@@ -36,7 +41,12 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       size="md"
     >
       <Header layer={props.layer} />
-      <CutSettingsCommonFields layer={props.layer} mode={mode} onModeChange={setMode} />
+      <CutSettingsCommonFields
+        layer={props.layer}
+        mode={mode}
+        onModeChange={setMode}
+        {...maxFeedProps}
+      />
       {mode === 'fill' ? (
         <CutSettingsFillFields
           layer={props.layer}
@@ -62,6 +72,10 @@ export function CutSettingsDialog(props: CutSettingsDialogProps): JSX.Element {
       </DialogActions>
     </Dialog>
   );
+}
+
+function positiveFiniteLimit(value: number | undefined): number | null {
+  return value !== undefined && Number.isFinite(value) ? Math.max(1, value) : null;
 }
 
 function hasDefaultHandlers(

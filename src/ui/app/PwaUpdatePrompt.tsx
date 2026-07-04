@@ -2,9 +2,9 @@
 // registers the SW (the plugin's injectRegister is off) and surfaces:
 //   * offlineReady — a one-time "ready to work offline" toast.
 //   * needRefresh  — a new version is waiting; we show a Reload banner. It is
-//     NEVER shown while the laser is streaming, because a reload aborts the
-//     live job. `needRefresh` stays true, so the banner appears once the job
-//     ends (mirrors the streaming guard in use-autosave).
+//     NEVER shown while a job is still active, because a reload can abort
+//     motion or hide a terminal job state that still needs operator handling.
+//     `needRefresh` stays true, so the banner appears once the job clears.
 // Toasts are intentionally button-less (see toast-store), so the update prompt
 // is a small banner (lf-banner) rather than a toast.
 
@@ -12,14 +12,12 @@ import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { useLaserStore } from '../state/laser-store';
+import { isActiveJob } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
 
 export function PwaUpdatePrompt(): JSX.Element | null {
   const pushToast = useToastStore((s) => s.pushToast);
-  const isStreaming = useLaserStore(
-    (s) =>
-      s.streamer !== null && (s.streamer.status === 'streaming' || s.streamer.status === 'paused'),
-  );
+  const jobActive = useLaserStore((s) => isActiveJob(s.streamer));
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -39,7 +37,7 @@ export function PwaUpdatePrompt(): JSX.Element | null {
     setOfflineReady(false);
   }, [offlineReady, pushToast, setOfflineReady]);
 
-  if (!needRefresh || isStreaming) return null;
+  if (!needRefresh || jobActive) return null;
   return (
     <div
       role="alert"
