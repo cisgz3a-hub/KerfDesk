@@ -18,7 +18,7 @@ Mode: sector audit plus user-approved fix-phase tracking.
 
 Active sector: S06 current-state delta audit.
 Completed sectors: S01 Governance, audit history, and product contracts; S02 Tooling, build, release, CI, and static shell; S03 Electron desktop runtime and local bridge; S04 Core domain models, controller/device/material primitives; S05 Core job compilation, preflight, raster/trace, and output; S06 IO formats and persistence; S07 Platform adapters; S08 UI application workflows; S09 Fixtures, perceptual harness, and test assets.
-Current pass: S05 delta Pass 3 complete; S06 delta Pass 1 next.
+Current pass: S06 delta Pass 2 complete; S06 delta Pass 3 next.
 
 ## Findings Summary
 
@@ -3251,9 +3251,9 @@ Final result:
 Reason for reopening:
 
 - The completed audit/fix ledger closed against the earlier audited baseline.
-- Current `main` is `87a2190`, fourteen commits after `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; the later fast-forward added the audit-doc commit plus three S08 box/input commits.
-- `git diff --name-status d603c01..HEAD` shows changes in S01, S04, S05, S06, S08, and S09.
-- `git ls-files -co --exclude-standard` currently returns 1,679 files.
+- Current `origin/main` is `c0f0252`, eighteen commits after `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, and deterministic build-time configuration.
+- `git diff --name-status d603c01..origin/main` shows changes in S01, S02, S04, S05, S06, S08, and S09.
+- `git ls-files -co --exclude-standard` currently returns 1,680 files.
 - The previous sector map left 71 current files unclassified until this pass refreshed the architecture map.
 
 No product source fixes are made in this delta audit. Audit documentation is updated because it is the requested audit ledger.
@@ -3285,10 +3285,10 @@ Severity: Medium.
 
 Evidence:
 
-- Current `git ls-files -co --exclude-standard` returns 1,679 files.
+- At S01 delta Pass 1, `git ls-files -co --exclude-standard` returned 1,679 files.
 - The old architecture table still recorded the earlier 1,235-file post-artifact expectation and path memberships from the initial audit.
 - A current classifier using the old patterns left 71 files unclassified, including `HANDOFF-CNC-2026-07-02.md`, `PHASE-H-BUILD.md`, `src/core/box/**`, `src/core/cnc/**`, `src/core/relief/**`, and `src/core/sim/**`.
-- The architecture file has now been refreshed to list all 1,679 current files under S01-S09, with zero unclassified files.
+- The architecture file was refreshed in that pass to list all 1,679 then-current files under S01-S09, with zero unclassified files.
 
 Risk:
 
@@ -3676,3 +3676,65 @@ Pass result:
 - S05 current-state delta sector closed after three passes.
 - S05 delta findings are `D-S05-001` through `D-S05-004`, all low severity and all open.
 - Move to S06 current-state delta audit.
+
+### S06 Delta Pass 1 - Project Material Persistence Orientation
+
+Scope planned:
+
+- Audit the post-baseline S06 delta files: `src/io/project/deserialize-project.ts`, `src/io/project/normalize-layer.ts`, and `src/io/project/project-machine-cnc.test.ts`.
+- Check ADR-112 project stock material persistence and ADR-111 layer material-key persistence.
+- Cross-check the UI/state helper that creates material-key values so IO behavior is evaluated against its primary caller.
+- Run focused project IO and project-material state tests.
+
+Evidence inspected:
+
+- `git diff --name-only d603c01..HEAD -- src/io src/platform`.
+- `git diff --stat d603c01..HEAD -- src/io src/platform`.
+- `src/io/project/deserialize-project.ts`, especially `normalizeMachineValue(...)` and `stock.materialKey` filtering.
+- `src/io/project/normalize-layer.ts`, especially optional CNC layer `materialKey` filtering.
+- `src/io/project/project-machine-cnc.test.ts`.
+- `src/io/project/project-shape-validator.ts`, confirming optional `machine` config is normalized after the core project-shape gate.
+- `src/io/project/serialize-project.ts`.
+- `src/ui/state/cnc-project-material.ts`.
+- Focused command passed: `pnpm exec vitest run src/io/project/project-machine-cnc.test.ts src/io/project/project.test.ts src/io/project/project-security-validation.test.ts src/io/project/project-air-assist.test.ts src/io/project/project-machine-profile.test.ts src/io/project/project-scan-offset.test.ts src/ui/state/cnc-project-material.test.ts src/ui/state/cnc-project-material-action.test.ts` (8 test files, 61 tests).
+
+Findings:
+
+- No new S06 delta findings in Pass 1.
+- The changed stock material persistence path keeps only known chipload material keys and drops unknown stock material keys on deserialize.
+- The changed layer CNC material persistence path keeps only known material keys and drops unknown layer material keys on deserialize.
+- The focused project IO/security tests still pass around machine normalization, layer normalization, project budgets, scan offsets, and project-material store actions.
+
+Pass result:
+
+- S06 delta Pass 1 complete.
+- S06 remains open for Pass 2 and Pass 3, with migration/backfill behavior, serializer/normalizer edge cases, and adjacent import/persistence contracts still to audit.
+
+### S06 Delta Pass 2 - Migration, Backfill, and Adjacent Persistence Sweep
+
+Scope planned:
+
+- Recheck project migrations/backfill behavior and schema-version handling.
+- Recheck project layer shape validation and sub-layer validation around optional fields that normalize later.
+- Sweep adjacent persistence surfaces that can interact with CNC machine/material state: autosave, CNC library persistence, and material library IO.
+- Run a broader IO persistence test slice.
+
+Evidence inspected:
+
+- `src/io/project/migrations.ts`.
+- `src/io/project/project-layer-shape-validator.ts`.
+- `src/io/project/project-layer-validator.ts`.
+- Targeted `rg` over `src/io/project`, `src/io/material-library`, and `src/ui/state` for machine, stock, material key, serialize/deserialize, and migration references.
+- Focused command passed: `pnpm exec vitest run src/io/project src/io/material-library src/ui/state/autosave.test.ts src/ui/state/cnc-library-actions.test.ts src/ui/state/cnc-library-persistence.test.ts src/ui/state/material-library-persistence.test.ts` (25 test files, 159 tests).
+
+Findings:
+
+- No new S06 delta findings in Pass 2.
+- Project migrations remain intentionally empty at schema v1 and the migration dispatch tests pass.
+- Project shape validation continues to enforce required project/layer structure while machine/layer CNC optional details are normalized afterward, matching the existing forgiving-load contract.
+- Adjacent autosave, material library, and CNC library persistence tests pass.
+
+Pass result:
+
+- S06 delta Pass 2 complete.
+- S06 remains open for one remaining-gap pass over direct diff review, project import/export edge contracts, and audit-doc consistency.

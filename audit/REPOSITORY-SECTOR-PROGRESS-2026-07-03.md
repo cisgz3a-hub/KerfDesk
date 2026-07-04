@@ -185,12 +185,12 @@ Branch at audit start: `main`
 ## Next Steps
 
 1. Continue the 2026-07-04 current-state delta audit opened after `main` advanced beyond the original audited tree.
-2. Start S06 delta Pass 1 over project material persistence changes and adjacent project-load validation.
+2. Run S06 delta Pass 3 over direct diff review, project import/export edge contracts, and audit-doc consistency.
 3. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
 
 ## Current-State Delta Audit - 2026-07-04
 
-Reason for reopening: current `main` is at `87a2190`, fourteen commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; the later fast-forward added the audit-doc commit plus three S08 box/input commits. The new commits touch S01 docs, S04 core CNC/material primitives, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
+Reason for reopening: current `origin/main` is at `c0f0252`, eighteen commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, and deterministic build-time configuration. The new commits touch S01 docs, S02 build configuration, S04 core CNC/material primitives, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
 
 | Delta Sector | Status | Passes Completed | Major Areas Remaining |
 |---|---|---:|---|
@@ -199,7 +199,7 @@ Reason for reopening: current `main` is at `87a2190`, fourteen commits after the
 | S03 Electron desktop runtime and local bridge | Covered by previous audit; no delta files detected | 0 | None for current delta |
 | S04 Core domain models, controller/device/material primitives | Complete | 3 | None for current delta |
 | S05 Core job compilation, preflight, raster/trace, and output | Complete | 3 | None for current delta |
-| S06 IO formats and persistence | Active | 0 | Project material persistence changes |
+| S06 IO formats and persistence | Active | 2 | Direct diff review, project import/export edge contracts, audit-doc consistency |
 | S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
 | S08 UI application workflows | Pending delta audit | 0 | CNC material UI/state changes plus box numeric-input/dogbone toggle changes |
 | S09 Fixtures, perceptual harness, and test assets | Pending delta audit | 0 | New perceptual fixtures and underscore-prefixed audit tests |
@@ -208,7 +208,7 @@ Reason for reopening: current `main` is at `87a2190`, fourteen commits after the
 
 | Pass | Completed | Summary |
 |---|---|---|
-| S01 Delta Pass 1 | 2026-07-04 | Current-state audit map and baseline-drift pass. Found stale sector-map coverage/counts and prior completion wording that did not cover ten newer commits. Updated the architecture map to classify all 1,679 current files. S01 still needs two more delta passes. |
+| S01 Delta Pass 1 | 2026-07-04 | Current-state audit map and baseline-drift pass. Found stale sector-map coverage/counts and prior completion wording that did not cover ten newer commits. Updated the architecture map to classify all 1,679 then-current files. S01 still needs two more delta passes. |
 | S01 Delta Pass 2 | 2026-07-04 | Governance/docs delta pass over ADR-112, Phase H status docs, and current handoff/build notes. Found stale Phase H summary wording after H.14 landed. S01 still needs one remaining-gap pass. |
 | S01 Delta Pass 3 | 2026-07-04 | Remaining-gap pass over current S01 delta docs, pending/claimed wording, and audit-doc formatting. No additional S01 findings; S01 delta closed after three passes. Move to S04. |
 | S04 Delta Pass 1 | 2026-07-04 | Newly classified core CNC/box/relief/sim orientation. Focused valid-path S04 slice passed (28 files, 170 tests). Found missing finite-value guards in exported surfacing and grid/heightmap sizing primitives. S04 still needs two more passes. |
@@ -217,6 +217,8 @@ Reason for reopening: current `main` is at `87a2190`, fourteen commits after the
 | S05 Delta Pass 1 | 2026-07-04 | Trace pipeline and auto-upscale orientation. Focused trace slice passed (5 files, 78 tests). Found exported auto-upscale scale-factor contract gap and malformed RawImageData guard gap. S05 still needs two more passes. |
 | S05 Delta Pass 2 | 2026-07-04 | Edge, centerline, potrace, and smoothing internals. Backend trace slice passed (12 files, 69 tests). Found exported Canny option-bound gap. S05 still needs one remaining-gap pass. |
 | S05 Delta Pass 3 | 2026-07-04 | Preprocess, batch trace, boundary, and closure sweep. Support trace slice passed (8 files, 67 tests). Found non-finite trace image-adjustment option gap; S05 delta closed after three passes. Move to S06. |
+| S06 Delta Pass 1 | 2026-07-04 | Project material persistence orientation. Focused project IO/state slice passed (8 files, 61 tests). No new findings; material keys are filtered to known chipload keys at stock and layer load boundaries. |
+| S06 Delta Pass 2 | 2026-07-04 | Migration, backfill, and adjacent persistence sweep. Broader IO persistence slice passed (25 files, 159 tests). No new findings; migration/backfill and adjacent material/CNC library persistence remained consistent. |
 
 ### Delta Finding Index
 
