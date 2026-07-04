@@ -93,6 +93,17 @@ function FitFields(props: {
         onChange={setField('partSpacing')}
       />
       {props.machine.kind === 'cnc' ? (
+        <SelectField
+          label="Corner relief"
+          value={draft.relief === 'off' ? 'off' : 'on'}
+          options={[
+            ['on', 'On (dogbones — tabs seat)'],
+            ['off', 'Off (sharp corners)'],
+          ]}
+          onChange={setField('relief')}
+        />
+      ) : null}
+      {props.machine.kind === 'cnc' && draft.relief !== 'off' ? (
         <MmField
           label="Relief tool diameter"
           value={draft.toolDiameter}

@@ -50,6 +50,25 @@ describe('parseBoxDraft', () => {
     expect(parsed.spec.style).toBe('open-top');
     expect(parsed.spec.relief).toEqual({ kind: 'corner-overcut', toolDiameterMm: 3.175 });
   });
+
+  it('turns corner relief OFF (no dogbones) when relief is off', () => {
+    const draft = { ...defaultBoxDraft(CNC), relief: 'off' };
+    const parsed = parseBoxDraft(draft, CNC);
+    expect(parsed.kind).toBe('spec');
+    if (parsed.kind !== 'spec') return;
+    expect(parsed.spec.relief).toEqual({ kind: 'none' });
+  });
+
+  it('does not require the relief tool when relief is off', () => {
+    // Empty tool diameter is fine when there are no dogbones to size.
+    const draft = { ...defaultBoxDraft(CNC), relief: 'off', toolDiameter: '' };
+    const parsed = parseBoxDraft(draft, CNC);
+    expect(parsed.kind).toBe('spec');
+  });
+
+  it('defaults corner relief on for CNC (dogbones — tabs seat by default)', () => {
+    expect(defaultBoxDraft(CNC).relief).toBe('on');
+  });
 });
 
 describe('BOX_DRAFT_PERSISTED_FIELDS', () => {

@@ -20,6 +20,11 @@ export type BoxDraft = {
   readonly clearance: string;
   readonly partSpacing: string;
   readonly toolDiameter: string;
+  // CNC corner relief (dogbones). 'on' = bit-radius overcuts so tabs seat in a
+  // round-bit slot (Easel/Vectric default); 'off' = sharp finger corners, the
+  // opt-out the operator can pick when they don't want dogbones. Ignored in
+  // laser mode (a kerf has no corner-reach limit).
+  readonly relief: string;
 };
 
 export const BOX_DRAFT_KEY = 'laserforge.box.generatorDraft.v1';
@@ -38,6 +43,7 @@ export const BOX_DRAFT_PERSISTED_FIELDS: ReadonlyArray<keyof BoxDraft> = [
   'fingerWidth',
   'clearance',
   'partSpacing',
+  'relief',
 ];
 
 // CNC glue fit vs laser press fit (ADR-106 fit division of labor).
@@ -55,6 +61,7 @@ export function defaultBoxDraft(machine: BoxMachineContext): BoxDraft {
     clearance: machine.kind === 'cnc' ? String(CNC_DEFAULT_CLEARANCE_MM) : '0',
     partSpacing: '8',
     toolDiameter: machine.kind === 'cnc' ? String(machine.toolDiameterMm) : '',
+    relief: 'on',
   };
 }
 
@@ -71,7 +78,10 @@ export function parseBoxDraft(draft: BoxDraft, machine: BoxMachineContext): BoxD
     ['fingerWidth', draft.fingerWidth],
     ['clearance', draft.clearance],
     ['partSpacing', draft.partSpacing],
-    ...(machine.kind === 'cnc' ? ([['reliefTool', draft.toolDiameter]] as const) : []),
+    // The relief tool diameter is only needed when corner relief is on.
+    ...(machine.kind === 'cnc' && draft.relief !== 'off'
+      ? ([['reliefTool', draft.toolDiameter]] as const)
+      : []),
   ];
   const emptyFields = required.filter(([, value]) => value.trim() === '').map(([field]) => field);
   if (emptyFields.length > 0) return { kind: 'incomplete', emptyFields };
@@ -87,7 +97,7 @@ export function parseBoxDraft(draft: BoxDraft, machine: BoxMachineContext): BoxD
       style: draft.style === 'open-top' ? 'open-top' : 'closed',
       clearanceMm: Number(draft.clearance),
       relief:
-        machine.kind === 'cnc'
+        machine.kind === 'cnc' && draft.relief !== 'off'
           ? { kind: 'corner-overcut', toolDiameterMm: Number(draft.toolDiameter) }
           : { kind: 'none' },
       partSpacingMm: Number(draft.partSpacing),
