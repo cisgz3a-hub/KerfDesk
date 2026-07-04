@@ -1,5 +1,11 @@
 import type { MachineBounds, NoGoZone } from '../devices';
-import type { MotionBoundsOffset } from '../invariants';
+import {
+  isGcodeCommand,
+  isGcodeMotionCommand,
+  parseGcodeWord,
+  stripGcodeComment,
+  type MotionBoundsOffset,
+} from '../invariants';
 
 export type NoGoZoneCollision = {
   readonly lineNumber: number;
@@ -19,10 +25,6 @@ type Rect = {
 };
 type ActiveZone = { readonly zone: NoGoZone; readonly rect: Rect };
 type Axes = { readonly x: number | null; readonly y: number | null };
-
-const NUM = String.raw`(-?\d+(?:\.\d+)?)`;
-const X_RE = new RegExp(String.raw`\bX${NUM}`);
-const Y_RE = new RegExp(String.raw`\bY${NUM}`);
 
 export function findNoGoZoneCollisions(
   gcode: string,
@@ -60,7 +62,7 @@ function nextPoint(
   absolute: boolean,
   offset: MotionBoundsOffset,
 ): Point | null {
-  if (!/^G[0123]\b/.test(line)) return null;
+  if (!isGcodeMotionCommand(line)) return null;
   const axes = parseAxes(line);
   if (axes.x === null && axes.y === null) return null;
   const base = current ?? offset;
@@ -68,8 +70,8 @@ function nextPoint(
 }
 
 function absoluteModeAfterLine(line: string, current: boolean): boolean {
-  if (/^G90\b/.test(line)) return true;
-  if (/^G91\b/.test(line)) return false;
+  if (isGcodeCommand(line, 'G90')) return true;
+  if (isGcodeCommand(line, 'G91')) return false;
   return current;
 }
 
@@ -86,7 +88,7 @@ function appendCollision(
 }
 
 function parseAxes(line: string): Axes {
-  return { x: parseAxis(line, X_RE), y: parseAxis(line, Y_RE) };
+  return { x: parseGcodeWord(line, 'X'), y: parseGcodeWord(line, 'Y') };
 }
 
 function absolutePoint(axes: Axes, base: Point, offset: MotionBoundsOffset): Point {
@@ -167,13 +169,6 @@ function boundsRect(bounds: MachineBounds): Rect {
   };
 }
 
-function parseAxis(line: string, re: RegExp): number | null {
-  const match = re.exec(line);
-  return match?.[1] === undefined ? null : Number.parseFloat(match[1]);
-}
-
 function stripComment(line: string): string {
-  const semi = line.indexOf(';');
-  const head = semi >= 0 ? line.slice(0, semi) : line;
-  return head.trim();
+  return stripGcodeComment(line);
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DeviceProfile, ScanOffsetPoint } from '../../core/devices';
-import { normalizeScanOffsetTable } from '../../core/devices';
+import { mergeScanOffsetTableBySpeed } from '../../core/devices';
 import { useStore } from '../state';
 import {
   buttonRowStyle,
@@ -110,7 +110,7 @@ function MeasuredRow(props: {
 }
 
 function rowsFromProfile(device: DeviceProfile): ReadonlyArray<DraftMeasurement> {
-  const existing = normalizeScanOffsetTable(device.scanningOffsets);
+  const existing = mergeScanOffsetTableBySpeed(device.scanningOffsets);
   if (existing.length > 0) {
     return existing.map((point) => ({
       speed: String(point.speedMmPerMin),
@@ -128,7 +128,7 @@ function defaultSpeeds(maxFeed: number): ReadonlyArray<number> {
 }
 
 function measuredPoints(rows: ReadonlyArray<DraftMeasurement>): ReadonlyArray<ScanOffsetPoint> {
-  return normalizeScanOffsetTable(
+  return mergeScanOffsetTableBySpeed(
     rows.map((row) => ({
       speedMmPerMin: numberFromInput(row.speed),
       offsetMm: numberFromInput(row.offset),

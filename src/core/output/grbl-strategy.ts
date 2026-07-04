@@ -21,6 +21,7 @@ import {
 } from '../devices';
 import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from '../job/fill-overscan';
 import { groupFillSweeps, type FillSpan, type FillSweep } from '../job/fill-sweeps';
+import { isSensitiveIslandFillPolicy } from '../job/island-fill-motion';
 import { offsetForSpeed, shiftAlongTravel } from '../job/scan-offset';
 import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '../job';
 import { emitRasterGroup as emitRasterGroupGcode } from '../raster';
@@ -50,6 +51,25 @@ function travelLine(x: number, y: number, dialect: GrblGcodeDialect): string {
   }
   const base = `G0 X${fmt(x)} Y${fmt(y)}`;
   return dialect.requiresS0OnRapid ? `${base} S0` : base;
+}
+
+function laserOffFeedLine(x: number, y: number, feed: number): string {
+  return `G1 X${fmt(x)} Y${fmt(y)} F${feed} S0`;
+}
+
+function roundedPositiveFeed(speed: number, context: string): number {
+  const feed = Math.round(speed);
+  if (!Number.isFinite(feed) || feed <= 0) {
+    throw new Error(`${context}: speed must be finite and > 0`);
+  }
+  return feed;
+}
+
+function hasControlledLaserOffTravel(dialect: GrblGcodeDialect): boolean {
+  const controlledFeed = dialect.controlledLaserOffTravelFeedMmPerMin;
+  return (
+    typeof controlledFeed === 'number' && Number.isFinite(controlledFeed) && controlledFeed > 0
+  );
 }
 
 function preamble(dialect: GrblGcodeDialect): string {
@@ -93,7 +113,7 @@ function emitSegment(seg: CutSegment, s: number, feed: number, dialect: GrblGcod
 
 function emitGroup(group: CutGroup, device: DeviceProfile, dialect: GrblGcodeDialect): string {
   const s = scaleS(group.power, device.maxPowerS);
-  const feed = Math.round(group.speed);
+  const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
     `; layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes}`,
@@ -113,7 +133,7 @@ function emitFillGroup(group: FillGroup, device: DeviceProfile, dialect: GrblGco
   if ((group.fillStyle ?? 'scanline') === 'offset')
     return emitOffsetFillGroup(group, device, dialect);
   const s = scaleS(group.power, device.maxPowerS);
-  const feed = Math.round(group.speed);
+  const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
     `; fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes} overscan ${fmt(group.overscanMm)} mm`,
@@ -153,7 +173,7 @@ function emitOffsetFillGroup(
   dialect: GrblGcodeDialect,
 ): string {
   const s = scaleS(group.power, device.maxPowerS);
-  const feed = Math.round(group.speed);
+  const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
     `; offset fill layer ${group.layerId} color ${group.color} power ${group.power}% speed ${feed} mm/min passes ${group.passes}`,
@@ -168,10 +188,11 @@ function emitOffsetFillGroup(
   return chunks.join(LINE_END) + LINE_END;
 }
 
-// One scanline as a continuous sweep. Rapid into the optional overscan runway
-// with the laser off (reusing the 1a/1b lead geometry + short-run skip), then a
-// single chain of G1s: each ink span burns at S{s}, each interior gap crosses
-// at S0 (diode dark, head still at feed so it never stops over a hole). G-code
+// One scanline as a continuous sweep. Seek to the optional overscan lead with
+// the laser off (reusing the 1a/1b lead geometry + short-run skip), then keep a
+// single G1 chain: each ink span burns at S{s}, each interior gap crosses
+// at S0 so the head never stops over a hole. Sensitive Island Fill runways on
+// controlled-travel dialects also enter/exit at burn feed with S0. G-code
 // S is modal, so every span re-asserts its value — a missed S0 would fire the
 // beam across a hole, so the per-segment S sequence is asserted exhaustively in
 // the tests.
@@ -197,13 +218,26 @@ function emitFillSweep(
   );
   const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
   if (run === null) return '';
+  const feedMatchedRunway =
+    overscan > 0 &&
+    fillStyle === 'island' &&
+    isSensitiveIslandFillPolicy(islandMotionPolicy) &&
+    hasControlledLaserOffTravel(dialect);
   const lines: string[] = [travelLine(run.leadStart.x, run.leadStart.y, dialect)];
   if (overscan > 0) {
-    lines.push(travelLine(run.burnStart.x, run.burnStart.y, dialect));
+    lines.push(
+      feedMatchedRunway
+        ? laserOffFeedLine(run.burnStart.x, run.burnStart.y, feed)
+        : travelLine(run.burnStart.x, run.burnStart.y, dialect),
+    );
   }
   for (const line of sweepSpanLines(spans, s, feed, dialect)) lines.push(line);
   if (overscan > 0) {
-    lines.push(travelLine(run.leadEnd.x, run.leadEnd.y, dialect));
+    lines.push(
+      feedMatchedRunway
+        ? laserOffFeedLine(run.leadEnd.x, run.leadEnd.y, feed)
+        : travelLine(run.leadEnd.x, run.leadEnd.y, dialect),
+    );
   }
   return lines.join(LINE_END);
 }
@@ -266,16 +300,17 @@ function emitRasterGroupHere(
   device: DeviceProfile,
   dialect: GrblGcodeDialect,
 ): string {
+  const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   return emitRasterGroupGcode({
     sValues: group.sValues,
     width: group.pixelWidth,
     height: group.pixelHeight,
     bounds: group.bounds,
-    feedMmPerMin: group.speed,
+    feedMmPerMin: feed,
     passes: group.passes,
     overscanMm: group.overscanMm,
     dotWidthCorrectionMm: group.dotWidthCorrectionMm,
-    scanOffsetMm: offsetForSpeed(device.scanningOffsets, group.speed),
+    scanOffsetMm: offsetForSpeed(device.scanningOffsets, feed),
     ...(group.bidirectional !== undefined ? { bidirectional: group.bidirectional } : {}),
     laserModeCommand: laserModeWord(dialect.rasterPowerMode),
     ...(dialect.controlledLaserOffTravelFeedMmPerMin !== undefined

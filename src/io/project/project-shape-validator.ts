@@ -4,8 +4,16 @@ import {
   isGrblRxBufferBytes,
   isScanOffsetTable,
 } from '../../core/devices';
+import {
+  optionalCameraProfile,
+  optionalLaserSubProfile,
+  optionalNoGoZones,
+  optionalProfileCapabilities,
+} from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
+import { validateRasterLumaBase64 } from './project-raster-luma-validator';
+import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import {
   firstError,
   isObject,
@@ -20,7 +28,6 @@ import {
   requireCoordinate,
   requireIntegerInRange,
   requireLiteral,
-  requireNonNegativeNumber,
   requireNumber,
   requirePositiveInteger,
   requirePositiveNumber,
@@ -39,6 +46,7 @@ import {
 // gigabytes here first. 256M px is far above any real import (2048-edge cap) or
 // Convert-to-Bitmap source, but fatal to the integer bomb (security audit 2026-06-14).
 const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
+const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 
 // which the G-code bounds-check regex can't read — defeating the bounds
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
@@ -81,6 +89,9 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalGcodeDialect(device, 'device.gcodeDialect'),
     optionalNonNegativeNumber(device, 'device.minPowerS'),
     optionalBoolean(device, 'device.laserModeEnabled'),
+    optionalProfileCapabilities(device, 'device.capabilities'),
+    optionalLaserSubProfile(device, 'device.laserSubProfile'),
+    optionalCameraProfile(device, 'device.cameraProfile'),
     optionalScanOffsetTable(device, 'device.scanningOffsets'),
     optionalNoGoZones(device, 'device.noGoZones'),
     optionalPositiveNumber(device, 'device.zTravelMm'),
@@ -113,9 +124,11 @@ function validateScene(scene: Record<string, unknown>): string | null {
   const objects = scene['objects'];
   if (!Array.isArray(objects) || !Array.isArray(layers)) return null;
   return (
+    validateSceneBudgets(scene) ??
     validateArray(layers, 'scene.layers', validateProjectLayer) ??
     validateArray(objects, 'scene.objects', validateSceneObject) ??
-    optionalSceneGroups(scene, 'scene.groups')
+    optionalSceneGroups(scene, 'scene.groups') ??
+    validateSceneIntegrity(scene)
   );
 }
 
@@ -269,6 +282,14 @@ function validateRasterObject(obj: Record<string, unknown>, path: string): strin
   ) {
     return `invalid \`${path}\`: pixelWidth*pixelHeight exceeds ${MAX_RASTER_SOURCE_PIXELS}`;
   }
+  const lumaBase64 = obj['lumaBase64'];
+  if (
+    typeof pixelWidth === 'number' &&
+    typeof pixelHeight === 'number' &&
+    typeof lumaBase64 === 'string'
+  ) {
+    return validateRasterLumaBase64(lumaBase64, pixelWidth * pixelHeight, path);
+  }
   return null;
 }
 
@@ -419,36 +440,10 @@ function optionalGrblRxBufferBytes(obj: Record<string, unknown>, path: string): 
     : `missing or invalid \`${path}\``;
 }
 
-function optionalNoGoZones(obj: Record<string, unknown>, path: string): string | null {
-  const value = valueAtPath(obj, path);
-  if (value === undefined) return null;
-  if (!Array.isArray(value)) return `missing or invalid \`${path}\``;
-  return validateArray(value, path, validateNoGoZone);
-}
-
-function validateNoGoZone(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
-  return firstError([
-    requireString(value, `${path}.id`),
-    requireString(value, `${path}.name`),
-    requireBoolean(value, `${path}.enabled`),
-    requireNonNegativeNumber(value, `${path}.x`),
-    requireNonNegativeNumber(value, `${path}.y`),
-    requirePositiveNumber(value, `${path}.width`),
-    requirePositiveNumber(value, `${path}.height`),
-  ]);
-}
-
 function requireDither(obj: Record<string, unknown>, path: string): string | null {
   return requireLiteral(obj, path, DITHER_ALGORITHMS);
 }
 
 function requireOrigin(obj: Record<string, unknown>, path: string): string | null {
-  return requireLiteral(obj, path, [
-    'front-left',
-    'front-right',
-    'rear-left',
-    'rear-right',
-    'center',
-  ]);
+  return requireLiteral(obj, path, ORIGINS);
 }

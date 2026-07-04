@@ -24,6 +24,15 @@ describe('trace boundary helpers', () => {
     expect(normalizeTraceBoundary({ x: 1, y: 1, width: 0, height: 2 }, 4, 4)).toBeNull();
   });
 
+  it('rejects non-finite boundaries and image dimensions', () => {
+    expect(normalizeTraceBoundary({ x: Number.NaN, y: 0, width: 2, height: 2 }, 4, 4)).toBeNull();
+    expect(
+      normalizeTraceBoundary({ x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 2 }, 4, 4),
+    ).toBeNull();
+    expect(normalizeTraceBoundary({ x: 0, y: 0, width: 2, height: 2 }, Number.NaN, 4)).toBeNull();
+    expect(normalizeTraceBoundary({ x: 0, y: 0, width: 2, height: 2 }, 4, 0)).toBeNull();
+  });
+
   it('copies the selected RGBA pixels into a cropped RawImageData', () => {
     const image = rgbaImage(3, 2, [10, 20, 30, 40, 50, 60]);
     const cropped = cropRawImageData(image, { x: 1, y: 0, width: 2, height: 2 });

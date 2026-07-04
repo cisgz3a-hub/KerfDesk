@@ -66,7 +66,7 @@ export function PreviewStatsPanel(props: {
           onChange={(e) => setShowPreviewTravel(e.currentTarget.checked)}
           title="Show traversal moves in Preview only."
           aria-label="Show traversal moves in Preview"
-          data-help-id="preview.showTraversalMoves"
+          data-help-id="control:preview.showTraversalMoves"
         />
         Traversal moves
       </label>
@@ -163,12 +163,12 @@ export function PreviewRouteControls(
     <div style={routeControlsStyle} role="group" aria-label="Route preview controls">
       <button
         type="button"
-        className="lf-button"
+        className="lf-btn"
         style={compactButtonStyle}
         disabled={disabled}
         aria-label={previewPlaying ? 'Pause route preview' : 'Play route preview'}
         title={previewPlaying ? 'Pause route preview playback.' : 'Play route preview playback.'}
-        data-help-id="preview.routePlayback"
+        data-help-id="control:preview.routePlayback"
         onClick={() => {
           if (disabled) return;
           if (!previewPlaying && scrubberT >= 1) setScrubberT(0);
@@ -190,12 +190,12 @@ export function PreviewRouteControls(
       ) : null}
       <button
         type="button"
-        className="lf-button"
+        className="lf-btn"
         style={compactButtonStyle}
         disabled={disabled}
         aria-label="Restart route preview"
         title="Restart route preview playback from the beginning."
-        data-help-id="preview.routeRestart"
+        data-help-id="control:preview.routeRestart"
         onClick={() => {
           if (disabled) return;
           setScrubberT(0);
@@ -211,7 +211,7 @@ export function PreviewRouteControls(
           aria-label="Route preview speed"
           disabled={disabled}
           title="Choose how quickly the compressed route preview plays."
-          data-help-id="preview.routeSpeed"
+          data-help-id="control:preview.routeSpeed"
           onChange={(e) => setPreviewPlaybackSpeed(e.currentTarget.value as PreviewPlaybackSpeed)}
         >
           <option value="slow">Slow</option>

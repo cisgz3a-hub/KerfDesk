@@ -33,10 +33,11 @@
 //
 // Pure-core compliant: no clock, no random, no I/O.
 
-import type { DeviceProfile } from '../devices';
+import { resolveGrblDialect, type DeviceProfile, type GrblGcodeDialect } from '../devices';
 import type { Vec2 } from '../scene';
 import { effectiveFillOverscanMm, expandFillHatchWithOverscan } from './fill-overscan';
 import { groupFillSweeps } from './fill-sweeps';
+import { isSensitiveIslandFillPolicy } from './island-fill-motion';
 import type { CutGroup, FillGroup, Job } from './job';
 
 const SECONDS_PER_MINUTE = 60;
@@ -86,6 +87,7 @@ export function estimateWithPlanner(job: Job, device: DeviceProfile): PlannedDur
 function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] {
   const out: Block[] = [];
   let cursor: Vec2 = ORIGIN;
+  const dialect = resolveGrblDialect(device);
   for (const group of job.groups) {
     // F.2.d: planner-aware estimator works on vector blocks (one
     // per polyline edge). Raster groups produce a different motion
@@ -96,7 +98,7 @@ function buildBlocks(job: Job, device: DeviceProfile, travelV: number): Block[] 
     const cutV = groupCutVelocity(group, device);
     cursor =
       group.kind === 'fill' && (group.fillStyle ?? 'scanline') !== 'offset'
-        ? appendFillGroupBlocks(out, cursor, group, cutV, travelV)
+        ? appendFillGroupBlocks(out, cursor, group, cutV, travelV, dialect)
         : appendCutGroupBlocks(out, cursor, group, cutV, travelV);
   }
   appendTravel(out, cursor, ORIGIN, travelV);
@@ -113,6 +115,7 @@ function appendFillGroupBlocks(
   group: FillGroup,
   cutV: number,
   travelV: number,
+  dialect: GrblGcodeDialect,
 ): Vec2 {
   let cursor = initialCursor;
   const sweeps = groupFillSweeps(group.segments);
@@ -125,8 +128,9 @@ function appendFillGroupBlocks(
       // so the burn is a SINGLE cut block from the first span's start to the
       // last span's end — no per-run full stop (ADR-034). The gaps move at feed
       // too, so pricing the whole span as one cut block is accurate for total
-      // time. The overscan runway is laser-off rapid travel; normal short
-      // scanlines may skip it, while Island Fill keeps a capped partial runway.
+      // time. Most overscan runway is laser-off travel; sensitive Island Fill
+      // on controlled-travel dialects prices runway at cut feed to match the
+      // emitted S0 burn-feed lead-in/lead-out.
       const overscan = effectiveFillOverscanMm(
         [first.start, last.end],
         group.overscanMm,
@@ -135,14 +139,28 @@ function appendFillGroupBlocks(
       );
       const run = expandFillHatchWithOverscan([first.start, last.end], overscan);
       if (run === null) continue;
+      const runwayV =
+        overscan > 0 &&
+        group.fillStyle === 'island' &&
+        isSensitiveIslandFillPolicy(group.islandMotionPolicy) &&
+        hasControlledLaserOffTravel(dialect)
+          ? cutV
+          : travelV;
       appendTravel(out, cursor, run.leadStart, travelV);
-      appendTravel(out, run.leadStart, run.burnStart, travelV);
+      appendTravel(out, run.leadStart, run.burnStart, runwayV);
       appendCut(out, run.burnStart, run.burnEnd, cutV);
-      appendTravel(out, run.burnEnd, run.leadEnd, travelV);
+      appendTravel(out, run.burnEnd, run.leadEnd, runwayV);
       cursor = run.leadEnd;
     }
   }
   return cursor;
+}
+
+function hasControlledLaserOffTravel(dialect: GrblGcodeDialect): boolean {
+  const controlledFeed = dialect.controlledLaserOffTravelFeedMmPerMin;
+  return (
+    typeof controlledFeed === 'number' && Number.isFinite(controlledFeed) && controlledFeed > 0
+  );
 }
 
 function appendCutGroupBlocks(

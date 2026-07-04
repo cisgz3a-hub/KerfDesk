@@ -46,6 +46,72 @@ describe('preflight no-go zones', () => {
     expect(result.issues.map((issue) => issue.code)).toContain('no-go-zone-collision');
   });
 
+  it('checks modal relative motion before reporting no-go zone collisions', () => {
+    const project = {
+      ...createProject({
+        ...DEFAULT_DEVICE_PROFILE,
+        noGoZones: [
+          {
+            id: 'rear-clamp',
+            name: 'Rear clamp',
+            enabled: true,
+            x: 120,
+            y: 90,
+            width: 20,
+            height: 20,
+          },
+        ],
+      }),
+      scene: { ...EMPTY_SCENE, layers: [createLayer({ id: 'L1', color: '#ff0000' })] },
+    };
+    const gcode = [
+      'G21',
+      'G90',
+      'M3 S0',
+      'G1 X100 Y100 F1000 S500',
+      'G91',
+      'G1 X30 Y0 S500',
+      'M5',
+    ].join('\n');
+
+    const result = runPreflight(project, gcode);
+
+    expect(result.issues).toContainEqual({
+      code: 'no-go-zone-collision',
+      message: 'Line 6: motion crosses no-go zone "Rear clamp".',
+    });
+  });
+
+  it('parses lowercase relative motion and external numeric word forms', () => {
+    const project = {
+      ...createProject({
+        ...DEFAULT_DEVICE_PROFILE,
+        noGoZones: [
+          {
+            id: 'rear-clamp',
+            name: 'Rear clamp',
+            enabled: true,
+            x: 120,
+            y: 90,
+            width: 20,
+            height: 20,
+          },
+        ],
+      }),
+      scene: { ...EMPTY_SCENE, layers: [createLayer({ id: 'L1', color: '#ff0000' })] },
+    };
+    const gcode = ['g21', 'g90', 'm3 s0', 'g1 x1e2 y100 s500', 'g91', 'g1 x+3e1 y.0 s500'].join(
+      '\n',
+    );
+
+    const result = runPreflight(project, gcode);
+
+    expect(result.issues).toContainEqual({
+      code: 'no-go-zone-collision',
+      message: 'Line 6: motion crosses no-go zone "Rear clamp".',
+    });
+  });
+
   it('ignores disabled zones and zones outside the bed', () => {
     const gcode = ['G21', 'G90', 'M3 S0', 'G1 X10 Y30 F1000 S500', 'G1 X50 Y30 S500', 'M5'].join(
       '\n',

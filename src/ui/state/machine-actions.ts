@@ -18,6 +18,7 @@ import {
   type Project,
 } from '../../core/scene';
 import type { CncLibrary } from './cnc-library-persistence';
+import { projectWithStockMaterial } from './cnc-project-material';
 import { pushUndo } from './scene-mutations';
 
 type MachineState = {
@@ -45,6 +46,9 @@ export type CncMachinePatch = {
 export type MachineActions = {
   readonly setMachineKind: (kind: MachineKind) => void;
   readonly updateCncMachine: (patch: CncMachinePatch) => void;
+  // ADR-112: set (or clear, when null) the project stock material and auto-fill
+  // every layer's feeds from it. One undoable step.
+  readonly applyCncStockMaterial: (materialKey: string | null) => void;
 };
 
 // Library bits the session's tool list doesn't already carry are appended
@@ -100,6 +104,17 @@ export function machineActions(set: MachineSet): MachineActions {
         };
         return {
           project: { ...state.project, machine },
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
+    applyCncStockMaterial: (materialKey) =>
+      set((state) => {
+        const project = projectWithStockMaterial(state.project, materialKey);
+        if (project === state.project) return {};
+        return {
+          project,
           undoStack: pushUndo(state.project, state.undoStack),
           redoStack: [],
           dirty: true,

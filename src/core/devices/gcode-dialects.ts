@@ -128,7 +128,12 @@ export function resolveGrblDialect(device: {
   readonly gcodeDialect?: { readonly dialectId?: string };
 }): GrblGcodeDialect {
   const dialectId = device.gcodeDialect?.dialectId ?? DEFAULT_DIALECT_ID;
-  return GRBL_GCODE_DIALECTS.find((dialect) => dialect.id === dialectId) ?? GRBL_DYNAMIC_DIALECT;
+  if (isMarlinGcodeDialectId(dialectId)) return GRBL_DYNAMIC_DIALECT;
+  const dialect = GRBL_GCODE_DIALECTS.find((candidate) => candidate.id === dialectId);
+  if (dialect === undefined) {
+    throw new Error(`Unknown GRBL G-code dialect: ${dialectId}`);
+  }
+  return dialect;
 }
 
 export function normalizeGcodeDialectSelection(value: unknown): GcodeDialectSelection {

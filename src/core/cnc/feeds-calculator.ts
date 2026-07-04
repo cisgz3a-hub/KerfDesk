@@ -36,6 +36,17 @@ export const CHIPLOAD_MATERIALS: ReadonlyArray<{
   { value: 'aluminum', label: 'Aluminum' },
 ];
 
+const CHIPLOAD_MATERIAL_KEYS: ReadonlySet<string> = new Set(
+  CHIPLOAD_MATERIALS.map((material) => material.value),
+);
+
+// Narrow an arbitrary value to a known chipload material key. Shared by the
+// .lf2 normalizers (layer + stock materialKey) and the project-material picker
+// so a stale/unknown key is rejected instead of reaching calculateFeeds.
+export function isChiploadMaterialKey(value: unknown): value is ChiploadMaterial {
+  return typeof value === 'string' && CHIPLOAD_MATERIAL_KEYS.has(value);
+}
+
 // Diameter bands (mm): ≤1.5, ≤3.175 (1/8"), ≤6.35 (1/4"), larger.
 const BAND_LIMITS_MM = [1.5, 3.175, 6.35] as const;
 

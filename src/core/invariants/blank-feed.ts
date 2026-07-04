@@ -18,27 +18,18 @@
 // random, no I/O.
 
 import type { Issue } from './predicates';
+import {
+  isGcodeCommand,
+  isGcodeMotionCommand,
+  parseGcodeWord,
+  stripGcodeComment,
+} from './gcode-words';
 
 export type BlankFeedIssue = Issue & { readonly distanceMm: number };
 
 export type BlankFeedOptions = { readonly thresholdMm: number };
 
-const NUM = String.raw`(-?\d+(?:\.\d+)?)`;
-const X_RE = new RegExp(String.raw`\bX${NUM}`);
-const Y_RE = new RegExp(String.raw`\bY${NUM}`);
-const S_RE = new RegExp(String.raw`\bS${NUM}`);
 const DISTANCE_EPS_MM = 1e-6;
-
-function parseValue(line: string, re: RegExp): number | null {
-  const m = re.exec(line);
-  if (!m || m[1] === undefined) return null;
-  return Number.parseFloat(m[1]);
-}
-
-function stripComment(line: string): string {
-  const semi = line.indexOf(';');
-  return (semi >= 0 ? line.slice(0, semi) : line).trim();
-}
 
 export function findLongBlankFeedMoves(
   gcode: string,
@@ -56,20 +47,20 @@ export function findLongBlankFeedMoves(
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
-    const stripped = stripComment(raw);
+    const stripped = stripGcodeComment(raw);
     if (stripped === '') continue;
-    const sVal = parseValue(stripped, S_RE);
+    const sVal = parseGcodeWord(stripped, 'S');
     if (sVal !== null) stickyS = sVal;
-    if (!/^G[0-3]\b/.test(stripped)) continue;
+    if (!isGcodeMotionCommand(stripped)) continue;
     const fromX = x;
     const fromY = y;
-    const nx = parseValue(stripped, X_RE);
-    const ny = parseValue(stripped, Y_RE);
+    const nx = parseGcodeWord(stripped, 'X');
+    const ny = parseGcodeWord(stripped, 'Y');
     if (nx !== null) x = nx;
     if (ny !== null) y = ny;
     // Only a G1 (cutting feed) with the laser off is a blank feed. G0 rapids are
     // owned by the laser-on-travel invariant and are the right way to cross gaps.
-    if (!/^G1\b/.test(stripped)) continue;
+    if (!isGcodeCommand(stripped, 'G1')) continue;
     if (stickyS !== 0) continue;
     const distanceMm = Math.hypot(x - fromX, y - fromY);
     if (distanceMm - threshold > DISTANCE_EPS_MM) {

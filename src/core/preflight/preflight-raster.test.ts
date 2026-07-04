@@ -6,6 +6,7 @@ import { compileJob } from '../job';
 import { grblStrategy } from '../output';
 import {
   createLayer,
+  createLayerSubLayer,
   createProject,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
@@ -120,6 +121,50 @@ describe('runPreflight — F4: layer-mode-mismatch (silent compile drop)', () =>
     };
     const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
     expect(codes).not.toContain('layer-mode-mismatch');
+  });
+
+  it('treats an image sub-layer as compatible raster output for the base color', () => {
+    const baseLayer = createLayer({ id: 'L-gray', color: '#808080' });
+    const imageSubLayer = createLayerSubLayer(baseLayer, {
+      id: 'image-op',
+      label: 'Image op',
+      settings: { ...baseLayer, mode: 'image' },
+    });
+    const project: Project = {
+      ...createProject(),
+      scene: {
+        ...EMPTY_SCENE,
+        objects: [{ ...grayRaster, lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==' }],
+        layers: [{ ...baseLayer, subLayers: [imageSubLayer] }],
+      },
+    };
+    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).not.toContain('layer-mode-mismatch');
+  });
+
+  it('checks unsupported raster transforms through image sub-layers', () => {
+    const baseLayer = createLayer({ id: 'L-gray', color: '#808080' });
+    const imageSubLayer = createLayerSubLayer(baseLayer, {
+      id: 'image-op',
+      label: 'Image op',
+      settings: { ...baseLayer, mode: 'image' },
+    });
+    const project: Project = {
+      ...createProject(),
+      scene: {
+        ...EMPTY_SCENE,
+        objects: [
+          {
+            ...grayRaster,
+            lumaBase64: 'AAAAAAAAAAAAAAAAAAAAAA==',
+            transform: { ...IDENTITY_TRANSFORM, rotationDeg: 45 },
+          },
+        ],
+        layers: [{ ...baseLayer, subLayers: [imageSubLayer] }],
+      },
+    };
+    const codes = runPreflight(project, emit(project)).issues.map((i) => i.code);
+    expect(codes).toContain('unsupported-raster-transform');
   });
 
   it('flags a rotated raster image because raster emit is axis-aligned', () => {

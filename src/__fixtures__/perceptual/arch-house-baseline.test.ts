@@ -4,7 +4,6 @@
 // Centerline, so text does not become the broken double-outline artwork the user
 // reported from screenshots.
 
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS, traceImageToColoredPaths } from '../../core/trace';
 import { preprocessForTrace } from '../../core/trace/trace-image';
@@ -12,13 +11,13 @@ import { decodePngFile } from './png-decode';
 import { compareMasks } from './compare';
 import {
   buildTraceArtifact,
+  DEFAULT_TRACE_ARTIFACT_EVIDENCE_DIR,
   requiredArchHouseFixtureStatus,
   writeTraceArtifactEvidence,
 } from './trace-artifact-runner';
 import { rasterizeColoredPaths, type Mask } from './rasterize';
 
 const LINE_ART_OPTIONS = TRACE_PRESETS['Line Art']!;
-const EVIDENCE_DIR = join(process.cwd(), 'audit', 'evidence', 'trace-artifacts');
 const LANGEBAAN_BAND = { x0: 300, y0: 660, x1: 735, y1: 725 };
 
 describe('arch-house real logo Line Art acceptance', () => {
@@ -50,7 +49,7 @@ describe('arch-house real logo Line Art acceptance', () => {
       );
 
       if (process.env.PERCEPTUAL_ARTIFACTS === '1') {
-        const written = writeTraceArtifactEvidence(artifact, EVIDENCE_DIR);
+        const written = writeTraceArtifactEvidence(artifact, DEFAULT_TRACE_ARTIFACT_EVIDENCE_DIR);
         console.log(`[arch-house] evidence: ${written.metricsJsonPath}, ${written.overlaySvgPath}`);
       }
 

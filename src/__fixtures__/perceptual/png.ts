@@ -37,12 +37,20 @@ const FN_BLUE: Rgb = [0, 0, 220];
 export function writePerceptualArtifact(name: string, predicted: Mask, truth: Mask): string | null {
   const flag = process.env[ARTIFACT_ENV];
   if (flag === undefined || flag === '') return null;
+  assertSameMaskDimensions(predicted, truth);
   const composite = buildComparison(predicted, truth);
   const png = encodePng(composite.rgb, composite.width, composite.height);
   mkdirSync(ARTIFACT_DIR, { recursive: true });
   const path = join(ARTIFACT_DIR, `${name}.png`);
   writeFileSync(path, png);
   return path;
+}
+
+function assertSameMaskDimensions(predicted: Mask, truth: Mask): void {
+  if (predicted.width === truth.width && predicted.height === truth.height) return;
+  throw new Error(
+    `mask size mismatch: ${predicted.width}x${predicted.height} vs ${truth.width}x${truth.height}`,
+  );
 }
 
 function buildComparison(

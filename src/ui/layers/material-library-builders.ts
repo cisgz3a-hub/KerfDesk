@@ -68,7 +68,9 @@ function starterPresetMetadata(
   | 'profileId'
   | 'machineFamily'
   | 'laserModel'
+  | 'laserTechnology'
   | 'opticalPowerW'
+  | 'wavelengthNm'
   | 'confidence'
   | 'warning'
   | 'calibrationProvenance'
@@ -77,15 +79,23 @@ function starterPresetMetadata(
     operation: starterPresetOperation(preset),
     ...(profile.profileId !== undefined ? { profileId: profile.profileId } : {}),
     ...(profile.machineFamily !== undefined ? { machineFamily: profile.machineFamily } : {}),
-    ...(profile.laserSubProfile?.model !== undefined
-      ? { laserModel: profile.laserSubProfile.model }
-      : {}),
-    ...(profile.laserSubProfile?.opticalPowerW !== undefined
-      ? { opticalPowerW: profile.laserSubProfile.opticalPowerW }
-      : {}),
+    ...starterLaserMetadata(profile),
     confidence: preset.unsupported === true ? 'unsupported' : 'starter',
     ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
     calibrationProvenance: preset.revision,
+  };
+}
+
+function starterLaserMetadata(
+  profile: DeviceProfile,
+): Pick<MaterialPreset, 'laserModel' | 'laserTechnology' | 'opticalPowerW' | 'wavelengthNm'> {
+  const head = profile.laserSubProfile;
+  if (head === undefined) return {};
+  return {
+    ...(head.model !== undefined ? { laserModel: head.model } : {}),
+    ...(head.technology !== undefined ? { laserTechnology: head.technology } : {}),
+    ...(head.opticalPowerW !== undefined ? { opticalPowerW: head.opticalPowerW } : {}),
+    ...(head.wavelengthNm !== undefined ? { wavelengthNm: head.wavelengthNm } : {}),
   };
 }
 

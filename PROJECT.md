@@ -8,7 +8,9 @@
 
 ## Product goal
 
-LaserForge 2.0 is a focused, LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered as **both a web app and a Windows desktop app from a single codebase**. It takes a 2D vector design (or, post-MVP, text and traced images), assigns cut/engrave operations per color layer, previews the toolpath, generates correct G-code, and streams it to the connected machine.
+LaserForge 2.0 is the internal repository/project name for KerfDesk, a focused LightBurn-style CAM application for **GRBL** laser cutters and engravers, delivered as **both a web app and a Windows desktop app from a single codebase**. KerfDesk takes vector designs, text, traced artwork, raster images, and generated shapes; assigns cut, fill, or image operations per layer; previews the toolpath; generates correct G-code; and streams it to the connected machine.
+
+Naming contract: **KerfDesk** is the user-facing product and release URL. **LaserForge 2.0** remains the repo/package/internal architecture name. The Cloudflare Pages API project is still named `laserforge` for historical reasons.
 
 It deliberately copies LightBurn's UX shape and workflow. It deliberately does not copy LightBurn's feature breadth or controller fan-out.
 
@@ -128,6 +130,9 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.9 | Motion polish: ramp entry, climb/conventional, entry-point rotation, parking parity (helical entry + arc leads deferred — DECISIONS.md) | Built |
 | H.10 | Tiling: indexed tile grid, registration holes, per-tile export | Built |
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
+| H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |
+| H.13 | Beginner-mode UX pack (ADR-111): layer material picker (auto-fills feeds), Basic/Advanced disclosure + through-cut, machine auto-fill from detected `$$`, stock/feed limit advisories | Built |
+| H.14 | Project material picker (ADR-112): Easel-style set-material-once in the Material & Bit panel; auto-fills feeds for every layer and seeds new ones (manual Add, SVG import); per-layer picker still overrides | Built |
 
 
 ### Phase I — v0.9 "Multi-controller" [Merged to main; awaiting remaining hardware passes]
@@ -297,76 +302,103 @@ phase; tracked here so they don't get lost.
 
 ---
 
-## Data model (MVP)
+## Data model (current)
 
 ```
 Project
- ├─ schemaVersion: 1
- ├─ device: DeviceProfile
- │   ├─ name
- │   ├─ bedWidth, bedHeight (mm)
- │   ├─ maxFeed (mm/min)
- │   ├─ maxPowerS ($30 value, e.g. 1000)
- │   ├─ origin: 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center'
- │   └─ homing: { enabled, direction }
- ├─ workspace: { width, height, units: 'mm' }
- └─ scene
-     ├─ objects: SceneObject[]      // discriminated union — see ADR-014
-     └─ layers: Layer[]             // one per unique color
-         ├─ id, color
-         ├─ mode: 'line'            // only mode in MVP
-         ├─ power: 0..100
-         ├─ speed: number            // mm/min
-         ├─ passes: integer ≥ 1
-         ├─ visible: boolean
-         └─ output: boolean
+  schemaVersion
+  device: DeviceProfile
+    name
+    bedWidth, bedHeight (mm)
+    maxFeed (mm/min)
+    maxPowerS ($30 value, e.g. 1000)
+    origin: 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center'
+    homing, airAssist, camera/calibration, no-go/safety metadata
+  workspace: { width, height, units: 'mm' }
+  scene
+    objects: SceneObject[]
+      imported-svg
+      text
+      traced-image
+      raster-image
+      shape
+    layers: Layer[]
+      id, color, name
+      mode: 'line' | 'fill' | 'image'
+      power, speed, passes, visible, output
+      fill settings: hatch angle, spacing, overscan, cross-hatch, offset fill
+      image settings: dither, lines/mm, overscan
+      cut settings: kerf, tabs, pass-through, air assist
+  material libraries and presets
 ```
 
-`SceneObject` is a discriminated union. MVP has one variant (`ImportedSvg`). Phase D adds `TextObject`. Phase E adds `TracedImage`. Verified by Phase A acceptance test.
+`SceneObject` is an extensible discriminated union (ADR-014) and now covers
+imported SVG paths, editable text, traced vector output, raster-image engrave
+sources, and generated shapes. Layers now represent line, fill, and image
+operations, including sub-layer/pass-through settings where applicable.
 
-`Job`, `Plan`, `Output` are pure derivations from `Project`. Never persisted.
+`Job`, `Plan`, `Output`, and emitted G-code are pure derivations from `Project`.
+Compiled jobs currently contain cut/fill-style vector groups and raster groups.
+They are never persisted as project truth.
 
 ---
 
 ## Module layout
 
 ```
+electron/
+  main process, preload, renderer trust/CSP policy tests
 src/
-  core/                          ← pure, no I/O, no platform imports
+  core/                          pure, no I/O, no platform imports
+    camera/                      camera profile, calibration, registration math
+    controllers/                 controller-family detection and capability policy
+    devices/                     DeviceProfile types, defaults, safety metadata
+    geometry/                    transforms, clipping, polygon/path utilities
+    invariants/                  property-test predicates
+    job/                         compile scene/layers into cut, fill, raster groups
+    material-library/            materials, presets, compatibility helpers
+    output/                      G-code strategies and raster/vector emitters
+    preflight/                   bed bounds, power, laser-off, safety checks
+    raster/                      raster budgets, luma, vector-to-bitmap conversion
     scene/                       Scene, Layer, transforms, SceneObject union
-    job/                         JobCompiler (Scene → Job)
-    plan/                        PlanOptimizer (Job → Plan)
-    output/                      OutputStrategy interface + GrblStrategy
-    preflight/                   Bounds, laser-off, power-scale checks
-    devices/                     DeviceProfile types + defaults
-    invariants/                  Property test predicates
-  platform/                      ← only place I/O lives
-    types.ts                     PlatformAdapter interface
-    web/                         File System Access API, WebSerial, drag-drop
-    electron/                    fs, serialport, dialog, ipc
-  ui/                            ← React, imports core + platform via DI
-    app/
-    workspace/                   Canvas2D viewport
-    layers/                      Cuts/Layers window
-    laser/                       Laser window (Phase B+)
-    text/                        Text tool (Phase D)
-    trace/                       Image trace UI (Phase E)
-    preview/
-    common/
+    shapes/                      generated rectangle/ellipse/polygon/polyline paths
+    text/                        font parsing and text-to-path derivation
+    trace/                       trace image/luma/vectorization pipeline
+    util/                        pure shared helpers
   io/
+    gcode/                       G-code file helpers
+    lightburn/                   LightBurn-facing import/export helpers
+    machine-profile/             machine profile serialization and fixtures
+    material-library/            material library serialization/import
+    project/                     .lf2 serializer and migrations
     svg/                         DOMParser + DOMPurify sanitization
-    project/                     .lf2 serializer
-    gcode/                       G-code file write
-    text/                        Text-to-path (Phase D)
-    image/                       Raster decode + trace (Phase E)
-  fonts/                         ← bundled MIT fonts (Phase D)
-  __fixtures__/                  ← shared test resources (folder name chosen to
-    svg/                         not collide with co-located *.test.ts files)
-    gcode-snapshots/             G-code snapshots
-    property/                    fast-check predicates
+  platform/
+    types.ts                     PlatformAdapter interface
+    web/                         File System Access API, WebSerial, drag-drop, deploy policy
+  ui/                            React, imports core + platform via DI
+    a11y/                        accessibility helpers
+    app/                         top-level shell and app wiring
+    calibration/                 camera/registration setup UI
+    commands/                    command routing and keyboard behavior
+    common/                      shared UI helpers
+    help/                        built-in help/reference surfaces
+    kit/                         local component primitives
+    laser/                       Laser window and job controls
+    layers/                      Cuts/Layers window
+    material-library/            material and preset UI
+    raster/                      raster/image controls
+    state/                       app/project state glue
+    text/                        text tool UI
+    theme/                       theme tokens
+    trace/                       image trace UI
+    workspace/                   Canvas2D viewport, overlays, preview renderers
+  __fixtures__/                  shared test resources
+scripts/                         repo guard, release, audit, and policy scripts
+audit/scripts/                   audit-specific helper scripts
 ```
 
-Each subfolder has its own `index.ts` defining the module's public API. ESLint forbids cross-module imports outside `index.ts`.
+Module boundaries are enforced by ESLint and focused public APIs rather than by
+an assumption that every folder must have an `index.ts`.
 
 ---
 

@@ -6,7 +6,7 @@ import {
   type ColoredPath,
   type ImportedSvg,
 } from '../../core/scene';
-import { selectionCanBreakApart } from './selection-command-state';
+import { selectionCanBreakApart, selectionCanWeld } from './selection-command-state';
 
 describe('selection command state', () => {
   it('allows Break Apart for selected imported SVGs with one path and multiple contours', () => {
@@ -23,6 +23,22 @@ describe('selection command state', () => {
 
     expect(selectionCanBreakApart(project, ['compound'])).toBe(true);
   });
+
+  it('does not allow Weld for selected vectors with mixed output metadata', () => {
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: [
+          { ...importedSvg('low-power', squarePath('#000000', 0, 0, 10)), powerScale: 50 },
+          { ...importedSvg('high-power', squarePath('#000000', 5, 0, 10)), powerScale: 80 },
+        ],
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [],
+      },
+    };
+
+    expect(selectionCanWeld(project, ['low-power', 'high-power'])).toBe(false);
+  });
 });
 
 function importedSvg(id: string, path: ColoredPath): ImportedSvg {
@@ -34,6 +50,10 @@ function importedSvg(id: string, path: ColoredPath): ImportedSvg {
     transform: IDENTITY_TRANSFORM,
     paths: [path],
   };
+}
+
+function squarePath(color: string, x: number, y: number, size: number): ColoredPath {
+  return compoundPath(color, [square(x, y, size)]);
 }
 
 function compoundPath(

@@ -171,7 +171,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
 // risk) — non-blocking, since the export itself succeeded. CNC mode has
 // its own advisory set (stock footprint, H.2) via the machine-aware selector.
 function pushPostSaveAdvisories(ctx: SaveGcodeCtx): void {
-  for (const warning of detectMachineJobWarnings(ctx.project)) {
+  for (const warning of detectMachineJobWarnings(ctx.project, ctx.controllerSettings)) {
     ctx.pushToast(warning, 'warning');
   }
   if (ctx.controllerSettings === null && machineKindOf(ctx.project.machine) !== 'cnc') {

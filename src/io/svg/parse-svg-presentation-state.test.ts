@@ -85,4 +85,22 @@ describe('parseSvg presentation state', () => {
     expect(points?.[0]).toEqual({ x: 10, y: 20 });
     expect(points?.[1]).toEqual({ x: 15, y: 20 });
   });
+
+  it('expands safe local <use> references to <symbol> children', () => {
+    const result = parseSvg(
+      args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30">
+  <defs>
+    <symbol id="mark">
+      <path d="M 0 0 L 5 0" stroke="red" fill="none"/>
+    </symbol>
+  </defs>
+  <use href="#mark" x="10" y="20"/>
+</svg>`),
+    );
+
+    const points = result.object?.paths[0]?.polylines[0]?.points;
+    expect(result.object?.paths).toHaveLength(1);
+    expect(points?.[0]).toEqual({ x: 10, y: 20 });
+    expect(points?.[1]).toEqual({ x: 15, y: 20 });
+  });
 });

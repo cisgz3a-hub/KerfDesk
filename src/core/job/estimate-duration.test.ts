@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../devices';
 import type { Vec2 } from '../scene';
 import { estimateJobDuration, formatDuration } from './estimate-duration';
 import type { CutGroup, CutSegment, FillGroup, FillSegment, Job, RasterGroup } from './job';
@@ -12,6 +12,13 @@ import type { CutGroup, CutSegment, FillGroup, FillSegment, Job, RasterGroup } f
 const device = {
   ...DEFAULT_DEVICE_PROFILE,
   maxFeed: 6000, // 6000 mm/min = 100 mm/s
+  accelMmPerSec2: 1000,
+  junctionDeviationMm: 0.01,
+};
+
+const neotronicsDevice = {
+  ...NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+  maxFeed: 6000, // keep the fixture math comparable to device above
   accelMmPerSec2: 1000,
   junctionDeviationMm: 0.01,
 };
@@ -199,6 +206,31 @@ describe('estimateJobDuration', () => {
     expect(sensitive.totalSeconds).toBeGreaterThan(adaptive.totalSeconds);
   });
 
+  it('prices sensitive Island Fill laser-off runways at fill feed', () => {
+    const base: FillGroup = {
+      kind: 'fill',
+      layerId: 'fill',
+      color: '#000',
+      power: 50,
+      speed: 1000,
+      passes: 1,
+      airAssist: false,
+      fillStyle: 'island',
+      islandMotionPolicy: 'sensitive',
+      overscanMm: 5,
+      segments: [fillSeg([10, 0], [13, 0])],
+    };
+    const withoutRunway = estimateJobDuration(
+      { groups: [{ ...base, overscanMm: 0 }] },
+      neotronicsDevice,
+    );
+    const withRunway = estimateJobDuration({ groups: [base] }, neotronicsDevice);
+    const runwaySeconds =
+      withRunway.breakdown.travelSeconds - withoutRunway.breakdown.travelSeconds;
+
+    expect(runwaySeconds).toBeGreaterThan(0.5);
+  });
+
   it('prices a multi-span sweep as one continuous cut block over the envelope (ADR-034)', () => {
     // Three ink spans on one scanline (two holes). The continuous sweep moves at
     // feed across the whole row (ink + S0-blanked gaps), so its cut time equals a
@@ -242,6 +274,38 @@ describe('estimateJobDuration', () => {
 
     expect(r.totalSeconds).toBeGreaterThan(0);
     expect(r.breakdown.cutSeconds).toBeGreaterThan(0);
+  });
+
+  it('prices wide raster white gaps as rapid-separated spans, not one feed sweep', () => {
+    const sparse = estimateJobDuration(
+      {
+        groups: [
+          rasterGroup({
+            pixelWidth: 20,
+            pixelHeight: 1,
+            sValues: new Uint16Array([
+              500, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500,
+            ]),
+          }),
+        ],
+      },
+      device,
+    );
+    const continuous = estimateJobDuration(
+      {
+        groups: [
+          rasterGroup({
+            pixelWidth: 20,
+            pixelHeight: 1,
+            sValues: new Uint16Array(20).fill(500),
+          }),
+        ],
+      },
+      device,
+    );
+
+    expect(sparse.breakdown.cutSeconds).toBeLessThan(continuous.breakdown.cutSeconds);
+    expect(sparse.breakdown.travelSeconds).toBeGreaterThan(continuous.breakdown.travelSeconds);
   });
 
   it('includes raster sweeps in mixed vector and raster jobs', () => {

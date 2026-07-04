@@ -447,6 +447,7 @@ describe('emitRasterGroup — validation', () => {
 
   it('throws on non-positive feed', () => {
     expect(() => emitRasterGroup(makeInput({ feedMmPerMin: 0 }))).toThrow(/feedMmPerMin/);
+    expect(() => emitRasterGroup(makeInput({ feedMmPerMin: Number.NaN }))).toThrow(/feedMmPerMin/);
   });
 
   it('throws on negative overscan', () => {

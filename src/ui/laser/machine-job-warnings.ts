@@ -4,13 +4,25 @@
 // projects get the job-intent warnings (H12). Keeps the machine-kind branch
 // in ONE place so both call sites stay simple.
 
+import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import type { Project } from '../../core/scene';
+import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 
-export function detectMachineJobWarnings(project: Project): ReadonlyArray<string> {
+// controllerSettings is the connected machine's live `$$` snapshot (null when
+// nothing is connected); it feeds the CNC limit advisories (stock vs travel,
+// feed vs max rate) and defaults to null so callers without it are unchanged.
+export function detectMachineJobWarnings(
+  project: Project,
+  controllerSettings: ControllerSettingsSnapshot | null = null,
+): ReadonlyArray<string> {
   return project.machine?.kind === 'cnc'
-    ? [...detectCncStockWarnings(project), ...detectCncRasterWarnings(project)]
+    ? [
+        ...detectCncStockWarnings(project),
+        ...detectCncMachineLimitWarnings(project, controllerSettings),
+        ...detectCncRasterWarnings(project),
+      ]
     : detectJobIntentWarnings(project);
 }

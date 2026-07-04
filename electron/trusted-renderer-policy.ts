@@ -15,6 +15,8 @@ export interface PermissionCheckPolicyInput {
   readonly permission: string;
   readonly requestingOrigin: string;
   readonly embeddingOrigin?: string;
+  readonly isMainFrame?: boolean;
+  readonly mediaType?: 'video' | 'audio' | 'unknown';
   readonly currentUrl: string;
 }
 
@@ -22,6 +24,7 @@ export interface PermissionRequestPolicyInput {
   readonly permission: string;
   readonly isMainFrame: boolean;
   readonly requestingUrl: string;
+  readonly mediaTypes?: ReadonlyArray<'video' | 'audio'>;
   readonly currentUrl: string;
 }
 
@@ -62,7 +65,7 @@ export function shouldGrantPermissionCheck(
   trustedOrigins: ReadonlySet<string>,
 ): boolean {
   return (
-    isAllowedAppPermission(input.permission) &&
+    isAllowedPermissionCheck(input) &&
     isTrustedRendererUrl(input.requestingOrigin, trustedOrigins) &&
     isTrustedRendererUrl(input.currentUrl, trustedOrigins) &&
     isTrustedOptionalEmbeddingOrigin(input.embeddingOrigin, trustedOrigins)
@@ -74,7 +77,7 @@ export function shouldGrantPermissionRequest(
   trustedOrigins: ReadonlySet<string>,
 ): boolean {
   return (
-    isAllowedAppPermission(input.permission) &&
+    isAllowedPermissionRequest(input) &&
     input.isMainFrame &&
     isTrustedRendererUrl(input.requestingUrl, trustedOrigins) &&
     isTrustedRendererUrl(input.currentUrl, trustedOrigins)
@@ -88,7 +91,21 @@ export function shouldGrantDevicePermission(
   return input.deviceType === 'serial' && isTrustedRendererUrl(input.origin, trustedOrigins);
 }
 
-function isAllowedAppPermission(permission: string): boolean {
+function isAllowedPermissionCheck(input: PermissionCheckPolicyInput): boolean {
+  if (input.permission === 'media') {
+    return input.isMainFrame === true && input.mediaType === 'video';
+  }
+  return isAllowedNonMediaAppPermission(input.permission);
+}
+
+function isAllowedPermissionRequest(input: PermissionRequestPolicyInput): boolean {
+  if (input.permission === 'media') {
+    return input.mediaTypes?.length === 1 && input.mediaTypes[0] === 'video';
+  }
+  return isAllowedNonMediaAppPermission(input.permission);
+}
+
+function isAllowedNonMediaAppPermission(permission: string): boolean {
   return permission === 'serial' || permission.startsWith('fileSystem');
 }
 

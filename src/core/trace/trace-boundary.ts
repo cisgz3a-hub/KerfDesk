@@ -13,7 +13,17 @@ export function normalizeTraceBoundary(
   imageWidth: number,
   imageHeight: number,
 ): TraceBoundary | null {
-  if (boundary == null || imageWidth <= 0 || imageHeight <= 0) return null;
+  if (boundary == null || !isPositiveFinite(imageWidth) || !isPositiveFinite(imageHeight)) {
+    return null;
+  }
+  if (
+    !Number.isFinite(boundary.x) ||
+    !Number.isFinite(boundary.y) ||
+    !Number.isFinite(boundary.width) ||
+    !Number.isFinite(boundary.height)
+  ) {
+    return null;
+  }
   const x0 = clamp(Math.round(boundary.x), 0, imageWidth);
   const y0 = clamp(Math.round(boundary.y), 0, imageHeight);
   const x1 = clamp(Math.round(boundary.x + boundary.width), 0, imageWidth);
@@ -67,4 +77,8 @@ export function offsetBounds(bounds: Bounds, offsetX: number, offsetY: number): 
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }

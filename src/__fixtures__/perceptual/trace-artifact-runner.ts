@@ -3,7 +3,13 @@ import { join } from 'node:path';
 import type { ColoredPath, Polyline, Vec2 } from '../../core/scene';
 
 const ARCH_HOUSE_FIXTURE_STEM = 'arch-house-langebaan-source';
-const ARCH_HOUSE_FIXTURE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.json'];
+const ARCH_HOUSE_FIXTURE_EXTENSION = '.png';
+const ARCH_HOUSE_FIXTURE_DIR = join(process.cwd(), 'src', '__fixtures__', 'perceptual', 'assets');
+export const DEFAULT_TRACE_ARTIFACT_EVIDENCE_DIR = join(
+  process.cwd(),
+  'perceptual-artifacts',
+  'trace-artifacts',
+);
 const SMALL_CLOSED_AREA_PX = 4;
 
 export type TraceArtifactMode = 'centerline' | 'edge' | 'filled-contours';
@@ -119,14 +125,15 @@ export function writeTraceArtifactEvidence(
 }
 
 export function requiredArchHouseFixtureStatus(
-  fixturesDir = join(process.cwd(), 'audit', 'fixtures', 'trace'),
+  fixturesDir = ARCH_HOUSE_FIXTURE_DIR,
 ): RequiredTraceFixtureStatus {
-  const expectedPathGlob = join(fixturesDir, `${ARCH_HOUSE_FIXTURE_STEM}.*`);
-  for (const extension of ARCH_HOUSE_FIXTURE_EXTENSIONS) {
-    const path = join(fixturesDir, `${ARCH_HOUSE_FIXTURE_STEM}${extension}`);
-    if (existsSync(path)) {
-      return { present: true, ratingCap: 10, expectedPathGlob, path };
-    }
+  const expectedPathGlob = join(
+    fixturesDir,
+    `${ARCH_HOUSE_FIXTURE_STEM}${ARCH_HOUSE_FIXTURE_EXTENSION}`,
+  );
+  const path = expectedPathGlob;
+  if (existsSync(path)) {
+    return { present: true, ratingCap: 10, expectedPathGlob, path };
   }
   return { present: false, ratingCap: 9, expectedPathGlob, path: null };
 }

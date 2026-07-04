@@ -11,7 +11,10 @@ import {
   parseOptionalDeviceHint,
   type MaterialLibraryDeviceHint,
 } from './material-library-device-hint';
-import { parsePresetMatchMetadata } from './material-preset-metadata';
+import {
+  parsePresetMatchMetadata,
+  type MaterialPresetMatchMetadata,
+} from './material-preset-metadata';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
 export const MATERIAL_LIBRARY_SCHEMA_VERSION = 1;
@@ -29,7 +32,9 @@ export type MaterialPreset = {
   readonly profileId?: string;
   readonly machineFamily?: string;
   readonly laserModel?: string;
+  readonly laserTechnology?: NonNullable<MaterialPresetMatchMetadata['laserTechnology']>;
   readonly opticalPowerW?: number;
+  readonly wavelengthNm?: number;
   readonly confidence?: MaterialRecipeConfidence;
   readonly warning?: string;
   readonly calibrationProvenance?: string;
@@ -299,22 +304,30 @@ function canonicalPreset(preset: MaterialPreset): MaterialPreset {
   return {
     id: preset.id,
     materialName: preset.materialName,
-    ...(preset.material !== undefined ? { material: preset.material } : {}),
     ...(preset.thicknessMm !== undefined ? { thicknessMm: preset.thicknessMm } : {}),
     ...(preset.title !== undefined ? { title: preset.title } : {}),
+    ...canonicalPresetMetadata(preset),
+    description: preset.description,
+    recipe: normalizeMaterialRecipe(preset.recipe),
+    revision: preset.revision,
+  };
+}
+
+function canonicalPresetMetadata(preset: MaterialPreset): MaterialPresetMatchMetadata {
+  return {
+    ...(preset.material !== undefined ? { material: preset.material } : {}),
     ...(preset.operation !== undefined ? { operation: preset.operation } : {}),
     ...(preset.profileId !== undefined ? { profileId: preset.profileId } : {}),
     ...(preset.machineFamily !== undefined ? { machineFamily: preset.machineFamily } : {}),
     ...(preset.laserModel !== undefined ? { laserModel: preset.laserModel } : {}),
+    ...(preset.laserTechnology !== undefined ? { laserTechnology: preset.laserTechnology } : {}),
     ...(preset.opticalPowerW !== undefined ? { opticalPowerW: preset.opticalPowerW } : {}),
+    ...(preset.wavelengthNm !== undefined ? { wavelengthNm: preset.wavelengthNm } : {}),
     ...(preset.confidence !== undefined ? { confidence: preset.confidence } : {}),
     ...(preset.warning !== undefined ? { warning: preset.warning } : {}),
     ...(preset.calibrationProvenance !== undefined
       ? { calibrationProvenance: preset.calibrationProvenance }
       : {}),
-    description: preset.description,
-    recipe: normalizeMaterialRecipe(preset.recipe),
-    revision: preset.revision,
   };
 }
 

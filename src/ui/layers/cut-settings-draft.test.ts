@@ -43,6 +43,15 @@ describe('cut settings draft helpers', () => {
     expect(patch.airAssist).toBe(true);
   });
 
+  it('clamps speed to the supplied active-device max feed', () => {
+    const layer = lineLayer({ speed: 1500 });
+    const patch = readCutSettingsPatch(formData({ mode: 'line', speed: '9000' }), layer, {
+      maxFeed: 1200,
+    });
+
+    expect(patch.speed).toBe(1200);
+  });
+
   it('reads and clamps line-mode kerf compensation in millimeters', () => {
     const layer = lineLayer({ kerfOffsetMm: 0.05 });
 

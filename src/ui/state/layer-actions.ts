@@ -12,6 +12,7 @@ import {
   updateLayer,
 } from '../../core/scene';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
+import { seedLayerFromStockMaterial } from './cnc-project-material';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import { layerSubLayerActions, type LayerSubLayerPatch } from './layer-sub-layer-actions';
 import { pushUndo, type StateSlice } from './scene-mutations';
@@ -79,10 +80,15 @@ export function layerActions(set: LayerActionSet): LayerActions {
         if (normalized === null) return {};
         if (state.project.scene.layers.some((layer) => layer.color === normalized)) return {};
         const defaults = defaultSettingsForColor(state.layerDefaults, normalized);
-        const scene = addLayer(
-          state.project.scene,
-          applyLayerDefaultSettings(createLayer({ id: normalized, color: normalized }), defaults),
+        const base = applyLayerDefaultSettings(
+          createLayer({ id: normalized, color: normalized }),
+          defaults,
         );
+        // Seed the new layer's feeds from the project stock material (ADR-112);
+        // no-op for laser or when no material is chosen.
+        const machine = state.project.machine;
+        const layer = machine?.kind === 'cnc' ? seedLayerFromStockMaterial(base, machine) : base;
+        const scene = addLayer(state.project.scene, layer);
         return mutation(state, { ...state.project, scene });
       }),
     switchIslandFillLayersToScanline: () =>

@@ -81,6 +81,28 @@ describe('CutsLayersPanel cut settings editor', () => {
     }
   });
 
+  it('caps staged cut setting speed to the active device max feed', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        device: { ...state.project.device, maxFeed: 1200 },
+      },
+    }));
+    const { host, unmount } = await renderPanel();
+    try {
+      await openCutSettings(host, '#ff0000');
+      const speed = requireInput(host, 'input[aria-label="Cut settings speed"]');
+      expect(speed.max).toBe('1200');
+      expect(speed.value).toBe('1200');
+      await clickButtonWithText(host, 'OK');
+
+      expect(useStore.getState().project.scene.layers[0]?.speed).toBe(1200);
+    } finally {
+      await unmount();
+    }
+  });
+
   it('cancels staged cut setting edits without mutating the layer', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const { host, unmount } = await renderPanel();

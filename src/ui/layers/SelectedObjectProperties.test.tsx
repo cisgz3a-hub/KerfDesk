@@ -110,4 +110,56 @@ describe('SelectedObjectProperties', () => {
       host.remove();
     }
   });
+
+  it('shows mixed selected artwork operation values until a field is edited', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#000000']));
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: state.project.scene.objects.map((object) =>
+            object.id === 'O2'
+              ? { ...object, operationOverride: { mode: 'fill' as const, power: 55 } }
+              : object,
+          ),
+        },
+      },
+      selectedObjectId: 'O1',
+      additionalSelectedIds: new Set(['O2']),
+    }));
+
+    const { host, root } = await render();
+    try {
+      expect(host.querySelector('[aria-label="Selected artwork mixed settings"]')).not.toBeNull();
+
+      const mode = host.querySelector('select[aria-label="Mode for selected objects"]');
+      if (!(mode instanceof HTMLSelectElement)) throw new Error('selected mode control missing');
+      expect(mode.value).toBe('__mixed__');
+
+      const power = host.querySelector('input[aria-label="Power for selected objects"]');
+      if (!(power instanceof HTMLInputElement)) throw new Error('selected power control missing');
+      expect(power.value).toBe('');
+      expect(power.placeholder).toBe('Mixed');
+
+      await act(async () => {
+        power.value = '60';
+        Simulate.change(power);
+      });
+      await act(async () => {
+        Simulate.blur(power);
+      });
+
+      expect(
+        useStore.getState().project.scene.objects.map((object) => object.operationOverride),
+      ).toEqual([
+        { power: 60, minPower: 0 },
+        { mode: 'fill', power: 60, minPower: 0 },
+      ]);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
 });
