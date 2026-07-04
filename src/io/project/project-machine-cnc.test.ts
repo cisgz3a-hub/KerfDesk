@@ -97,6 +97,27 @@ describe('.lf2 machine / cnc round-trip', () => {
     });
   });
 
+  it('round-trips the project stock material and drops an unknown one (ADR-112)', () => {
+    const project: Project = {
+      ...cncProject(),
+      machine: {
+        ...DEFAULT_CNC_MACHINE_CONFIG,
+        stock: { ...DEFAULT_CNC_MACHINE_CONFIG.stock, materialKey: 'hardwood' },
+      },
+    };
+    const loaded = deserializeOk(serializeProject(project));
+    expect(loaded.machine?.kind === 'cnc' ? loaded.machine.stock.materialKey : null).toBe(
+      'hardwood',
+    );
+
+    const raw = JSON.parse(serializeProject(project)) as Record<string, unknown>;
+    (raw['machine'] as { stock: Record<string, unknown> }).stock['materialKey'] = 'kryptonite';
+    const dropped = deserializeOk(`${JSON.stringify(raw)}\n`);
+    expect(
+      dropped.machine?.kind === 'cnc' ? dropped.machine.stock.materialKey : 'sentinel',
+    ).toBeUndefined();
+  });
+
   it('round-trips a valid materialKey and drops an unknown one (ADR-111)', () => {
     const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
     const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };
