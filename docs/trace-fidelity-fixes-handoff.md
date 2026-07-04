@@ -51,6 +51,34 @@ the serif "smile" bulge in `np-house-H.png` is spline overshoot into empty paper
 not a traced edge (← Defect 2, visually confirmed on `np-house-H.png`: red trace
 arcs below both flat serif bottoms and clips the top serif flares).
 
+**Fine-grained Defect-2 geometry (2026-07-05 verifier pass — trust these numbers):**
+
+- Vertical structure at the H's left foot (x≈493–518): HOUSE foot ink ends at
+  **y653**, one anti-aliased row at **y654**, **y655–676 pure white**, and the
+  LANGEBAAN word starts at **y≈679**. ⚠ TRAP: the luma-probe rows y≥679 (e.g.
+  `x=500 y680:125`) are LANGEBAAN letterform ink — NOT sub-serif contour. A
+  closed loop with area ≈325px², yRange [679,711], x[492.6,515.5] is the
+  LANGEBAAN "L", a different word; it cannot even appear in the `np-house-H`
+  crop (its filter needs a point with y≤675). A first implementation attempt
+  anchored its measurements on that loop and wrongly concluded Fix B was
+  impossible — its "blocked" claim was refuted.
+- The REAL smile is the H outline's own foot bottom: with the resample ON, the
+  mid-foot sample bows to **(505.6, 655.1)** — ≈0.85px perpendicular below its
+  p1→p2 chord (chord ≈y654.25) into white. With `refineChainForOutput` bypassed
+  (identity), the same foot renders as a flat chord **(493.3,654.1)→(518.5,654.4)**
+  hugging the anti-aliased ink edge, and the smile disappears. So the original
+  diagnosis (spline overshoot; disabling resample makes serifs hug) is CORRECT,
+  and 0.85px > ε=0.45 means the mechanism-1 cap binds on exactly this sample.
+- Relevant ε: `SIMPLIFY_EPSILON_PX = 0.45` scaling in
+  `centerline/stroke-chains.ts` `finalizeChains` (edge pipeline uses the 0.45
+  default; centerline scales by `lineTolerance`). Both pipelines reach
+  `refineChainForOutput` via `assembleStrokePaths → finalizeChains` — but
+  VERIFY the edge pipeline's route yourself end-to-end before trusting a unit
+  fix to change the render: the first attempt's cap passed its unit tests while
+  leaving the harness render unchanged, which for a binding 0.45-cap on a
+  0.85px excursion is geometrically impossible — suspect wrong callsite/
+  pipeline plumbing, wrong perpendicular math, or measuring the wrong loop.
+
 Root causes (confirmed by the prior session, mechanism verified against this tree's code):
 
 - **Defect 1**: the ~67px² counter sits at Canny's detection floor at native size.
@@ -98,8 +126,13 @@ mechanisms, in order of preference:
 - Arc-preservation case: a gently-sampled circular arc must still bulge outside its
   chords (deviation strictly > 0 at midpoints) — guards against "fixing" by flattening.
 
-**Acceptance:** new tests pass; `np-house-H.png` serif feet hug the grey (eyeball it);
-ALL §6 gates green. Commit as `fix(trace): ...` (test + fix together).
+**Acceptance:** new tests pass; AND a **numeric render-level check** — in the traced
+output of the real fixture (merged Edge options), the H-foot bottom polyline within
+x∈[493,518] must have no point below its foot chord by more than the cap (the bowed
+sample currently at y=655.1 must rise to ≤ ~654.7); AND `np-house-H.png` serif feet
+hug the grey by eye; AND ALL §6 gates green. The eyeball alone is not acceptance —
+the first attempt misjudged renders by measuring the wrong loop. Commit as
+`fix(trace): ...` (test + fix together).
 
 ## 4. Fix A — region-upscale re-trace ("Enhance region")
 
