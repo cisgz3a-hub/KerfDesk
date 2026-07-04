@@ -59,6 +59,48 @@ export type SerialAdapter = {
   readonly requestPort: () => Promise<SerialPortRef | null>;
 };
 
+// --- Camera (Camera Mode, ADR-107) ---
+
+export type CameraDevice = {
+  readonly deviceId: string;
+  // May be empty until the user has granted camera access once — browsers
+  // hide device labels before the first permission grant.
+  readonly label: string;
+};
+
+export type CameraStream = {
+  // The live MediaStream to attach to a <video> element for the overlay.
+  readonly stream: MediaStream;
+  // Stop every track and release the camera.
+  readonly stop: () => void;
+};
+
+// A machine-integrated HTTP camera (e.g. the Creality Falcon A1 Pro) reached
+// over the laser's RNDIS-over-USB link. It is NOT a UVC webcam — the OS never
+// lists it — so it is polled as still JPEG frames from `frameUrl` rather than
+// streamed. Display-only: an <img> shows it cross-origin over http, but pixel
+// readback and https pages are blocked (mixed content) without a proxy.
+export type NetworkCamera = {
+  // HTTP URL returning one JPEG per GET (poll with a cache-buster to refresh).
+  readonly frameUrl: string;
+};
+
+export type CameraAdapter = {
+  // True when the platform exposes getUserMedia (Chromium browsers / the
+  // Electron renderer) over an https / secure context. UI gates Camera Mode
+  // behind this.
+  readonly isSupported: () => boolean;
+  // Enumerate available video input devices. Resolves to [] when unsupported
+  // or denied; labels may be empty before the first permission grant.
+  readonly listCameras: () => Promise<ReadonlyArray<CameraDevice>>;
+  // Open a live stream for `deviceId` (or the default camera). Resolves to
+  // null when the user denies permission; other errors propagate.
+  readonly openStream: (deviceId?: string) => Promise<CameraStream | null>;
+  // Probe the local RNDIS link for a machine-integrated HTTP camera (Falcon
+  // A1 Pro). Resolves to its frame URL, or null if none is reachable.
+  readonly discoverNetworkCamera: () => Promise<NetworkCamera | null>;
+};
+
 export type PlatformAdapter = {
   readonly id: 'web' | 'electron' | 'mock';
 
@@ -72,4 +114,8 @@ export type PlatformAdapter = {
 
   // Phase B: serial port access for connecting to the laser controller.
   readonly serial: SerialAdapter;
+
+  // Camera Mode (ADR-107): overhead-camera capture. Optional — present on
+  // platforms that expose getUserMedia; UI hides Camera Mode when absent.
+  readonly camera?: CameraAdapter;
 };

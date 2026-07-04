@@ -10,8 +10,8 @@ import {
   handleSaveProject,
 } from '../app/file-actions';
 import { handleOpenGcodePreview } from '../app/gcode-open-action';
-import { handleSaveProcessedBitmap } from '../app/save-processed-bitmap';
 import { currentOutputScope, useStore } from '../state';
+import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -20,22 +20,12 @@ import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
 } from '../common/fill-diagnostics';
-import type {
-  CommandDialogs,
-  CommandSelection,
-  CommandShellCallbacks,
-} from './app-command-context-types';
+import type { CommandDialogs, CommandShellCallbacks } from './app-command-context-types';
 import { buildAppCommands, type AppCommand } from './command-registry';
+import { toolCommandContext } from './tool-command-context';
 import type { AppCommandContext } from './command-types';
 import { selectedImageMaskPair } from './image-mask-command-state';
-import {
-  applyImageMaskAction,
-  cropImageAction,
-  removeImageMaskAction,
-  retraceOriginalAction,
-  traceSourceForTracedImage,
-  traceImageAction,
-} from './image-command-actions';
+import { traceSourceForTracedImage } from './image-command-actions';
 import { hasPreviewableContent } from './previewable-content';
 import {
   selectedObject,
@@ -62,6 +52,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const toolMode = useUiStore((s) => s.toolMode);
   const registrationPanelOpen = useUiStore((s) => s.registrationPanelOpen);
   const toggleRegistrationPanel = useUiStore((s) => s.toggleRegistrationPanel);
+  const cameraPanelOpen = useCameraStore((s) => s.panelOpen);
+  const toggleCameraPanel = useCameraStore((s) => s.togglePanel);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -70,6 +62,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       measureActive: toolMode.kind === 'measure',
       registrationPanelOpen,
       toggleRegistrationPanel,
+      cameraPanelOpen,
+      toggleCameraPanel,
     }),
   );
 }
@@ -112,6 +106,8 @@ function appCommandContext(
     hasSelection: selectedIds.length > 0,
     registrationPanelOpen: dialogs.registrationPanelOpen,
     toggleRegistrationPanel: dialogs.toggleRegistrationPanel,
+    cameraPanelOpen: dialogs.cameraPanelOpen,
+    toggleCameraPanel: dialogs.toggleCameraPanel,
     hasRasterSelection: selected?.kind === 'raster-image',
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
     hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
@@ -227,69 +223,6 @@ function editCommandContext(
   };
 }
 
-function toolCommandContext(
-  callbacks: CommandShellCallbacks,
-  app: ReturnType<typeof useStore.getState>,
-  platform: ReturnType<typeof usePlatform>,
-  dialogs: CommandDialogs,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-  selection: CommandSelection,
-): Pick<
-  AppCommandContext,
-  | 'materialTest'
-  | 'intervalTest'
-  | 'scanOffsetTest'
-  | 'focusTest'
-  | 'optimizationSettings'
-  | 'adjustImage'
-  | 'saveProcessedBitmap'
-  | 'traceImage'
-  | 'retraceOriginal'
-  | 'multiFileTrace'
-  | 'convertSelectionToPath'
-  | 'weldSelection'
-  | 'subtractSelection'
-  | 'intersectSelection'
-  | 'excludeSelection'
-  | 'convertToBitmap'
-  | 'fillSelectionSeparately'
-  | 'closeSelectedOpenFillContours'
-  | 'reviewCloseOpenFillContours'
-  | 'applyImageMask'
-  | 'cropImage'
-  | 'removeImageMask'
-> {
-  return {
-    materialTest: callbacks.requestMaterialTest,
-    intervalTest: callbacks.requestIntervalTest,
-    scanOffsetTest: callbacks.requestScanOffsetTest,
-    focusTest: callbacks.requestFocusTest,
-    optimizationSettings: callbacks.requestOptimizationSettings,
-    adjustImage: callbacks.requestAdjustImage,
-    saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
-    traceImage: traceImageAction(selection.selected, dialogs.openImageDialog),
-    retraceOriginal: retraceOriginalAction(
-      app.project,
-      selection.selected,
-      dialogs.openImageDialog,
-      pushToast,
-    ),
-    multiFileTrace: callbacks.requestMultiFileTrace,
-    convertSelectionToPath: app.convertSelectionToPath,
-    weldSelection: app.weldSelection,
-    subtractSelection: () => app.booleanSelection('subtract'),
-    intersectSelection: () => app.booleanSelection('intersect'),
-    excludeSelection: () => app.booleanSelection('exclude'),
-    convertToBitmap: callbacks.requestConvertToBitmap,
-    fillSelectionSeparately: app.fillSelectionSeparately,
-    closeSelectedOpenFillContours: app.closeSelectedOpenFillContours,
-    reviewCloseOpenFillContours: callbacks.requestCloseOpenFillContoursWithTolerance,
-    applyImageMask: applyImageMaskAction(app, selection.imageMaskPair),
-    cropImage: cropImageAction(app, selection.selected, pushToast),
-    removeImageMask: removeImageMaskAction(app, selection.selected),
-  };
-}
-
 function arrangeCommandContext(
   app: ReturnType<typeof useStore.getState>,
 ): Pick<
@@ -355,20 +288,6 @@ function saveGcodeAction(
         wcoCache: laser.wcoCache,
       },
       controllerSettings: laser.controllerSettings,
-      pushToast,
-    });
-}
-
-function saveProcessedBitmapAction(
-  platform: ReturnType<typeof usePlatform>,
-  app: ReturnType<typeof useStore.getState>,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-): () => void {
-  return () =>
-    void handleSaveProcessedBitmap({
-      platform,
-      project: app.project,
-      selectedObjectId: app.selectedObjectId,
       pushToast,
     });
 }

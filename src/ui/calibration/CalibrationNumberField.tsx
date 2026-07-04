@@ -5,7 +5,10 @@ export function CalibrationNumberField(props: {
   readonly value: string;
   readonly min: number;
   readonly max: number | undefined;
-  readonly step: number | undefined;
+  // 'any' opts out of native step validation for free-form mm fields whose
+  // real validation lives in core code (a numeric step misaligned with min
+  // makes the browser block form submission on legitimate values).
+  readonly step: number | 'any' | undefined;
   readonly onChange: (event: ChangeEvent<HTMLInputElement>) => void;
 }): JSX.Element {
   return (

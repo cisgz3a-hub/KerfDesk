@@ -97,11 +97,11 @@ Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005.
 - **F.1 — Fill** [Shipped]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
 - **F.2 — Image** [F.2.a-e shipped; F.2.f hardware burn pending]. True raster engrave: new `RasterImage` SceneObject variant (PNG data URL + base64 luma); `dither.ts` runs threshold/Floyd-Steinberg/grayscale; `emit-raster.ts` emits M4-mode per-pixel S-modulation G1 sweeps with overscan. Job.groups is now a CutGroup-or-RasterGroup discriminated union; grbl-strategy dispatches per kind. Toolbar `Engrave Image…` opens a file picker; Layer dropdown enables `Image` mode and surfaces Dither + lines/mm fields. ADR-020. Hardware verification checklist in WORKFLOW.md F-F2; not yet burned on Falcon.
 - **F.3 — Set work origin** [Code shipped; hardware verification pending]. Operator jogs the laser head to a workpiece corner and presses *Set origin here* to declare that physical point as work-coord (0, 0). New `OriginRow` in `JobControls.tsx` (Set / Reset buttons), origin readout in `StatusDisplay.tsx`, GRBL command constants (`G92 X0 Y0` / `G92.1`), WCO parsing + caching across status frames in `laser-store`. Pipeline change is zero: GRBL applies the WCS offset to absolute-G90 G-code at run time. ADR-021; WORKFLOW.md F-F3. G92 only — persistent G10 L20 P1 deferred. Bed-bounds preflight remains machine-relative; operator framing after Set Origin is the documented safety check (future ADR-022).
-- **F.4 — Convert to Bitmap** [A1–A2 shipped (Fill All); A3 Outlines / A4 Use Cut Settings / A5 polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
+- **F.4 — Convert to Bitmap** [A1–A4 shipped (Fill All / Outlines / Use Cut Settings + DPI control); A5 placement/brightness polish pending]. Vector→raster: rasterize selected vector objects into a `RasterImage` engrave source, matching LightBurn (Outlines / Fill All / Use Cut Settings render types, DPI control, 50% gray pixels, **source vector deleted**). New pure-core `src/core/raster/rasterize-vector.ts`; additive (no `SceneObject`/schema change). ADR-029; WORKFLOW.md F-F4. Staged: **A1** ✓ pure-core Fill-All luma rasterizer; **A2** ✓ Toolbar `Convert to Bitmap` button → PNG encode + `RasterImage` in-place swap (Fill All only — the render-type picker + DPI control arrive with A3/A4); A3 = Outlines; A4 = Use Cut Settings; A5 = placement/brightness polish. A2 fill+encode fidelity verified in-browser side-effect-free (real PNG round-trips to 200×200 at 254 DPI; ink 50% gray, even-odd hole preserved); live in-app render/placement and a LightBurn side-by-side not yet done.
 
 - **F.5 - Material calibration workflow** [Approved; staged]. Minimal LightBurn-style Material Test and Interval Test generators are now in scope so operators can calibrate speed, power, passes, and image line interval on scrap before burning final work. Start with pure Scene generators that flow through the existing preview/save/start pipeline; UI and hardware verification follow. The native Material Library recipe foundation and deterministic `.lfml.json` IO are now scoped as support infrastructure for those calibrated settings; the in-app multi-library UI — create/edit wizard, Saved Libraries browser, and auto-save persistence — is scoped by ADR-093, while LightBurn `.clb` compatibility, manufacturer profiles, and linked presets ("Link") remain deferred. ADR-044, ADR-045, ADR-093.
 
-### Phase G — v0.7 "Drawing tools" [In progress]
+### Phase G — v0.7 "Drawing tools" [Built (B1–B7); P2 follow-ups pending]
 
 On-canvas parametric shape creation — the first geometry that does NOT enter via import. Closes the largest LightBurn-parity gap (J1 "draw a sign from nothing" was impossible; J3 batch effectively impossible). See ADR-051.
 
@@ -165,6 +165,33 @@ driver refactor is byte-identical on real hardware, since the Falcon's normal
 `grbl-v1.1` profile drives it through the rewritten path unchanged. FluidNC /
 Marlin / Smoothieware / Ruida = simulator-verified only, labeled `unverified` in
 catalog evidence and (for .rd) warned on every export.
+
+### Phase K — v0.10 "Box generator" [Built (S0–S6); hardware fit CLAIMED]
+
+Parametric finger-joint box generator producing cut-ready panels for both
+laser and CNC router modes — the first multi-panel parametric generator
+(Material Test precedent, ADR-044). Claim-model joinery designed against
+the two classic assembly failure classes (corner conflicts; fit
+compensation applied wrong) — see ADR-106. (Phase J stays reserved for
+macOS/Linux desktop, per ADR-104's renumbering note.)
+
+- Pure core `src/core/box/` (spec validation → per-edge finger patterns →
+  panel claims → outline walk → fit/relief → sheet layout); UI dialog +
+  preview in `src/ui/box/`; panels insert as ordinary `kind:'shape'`
+  polyline objects in one undo step. Compile/preview/emit untouched.
+- Fit: laser kerf compensation and CNC cutter compensation stay where
+  they live today (layer cut settings / profile-outside). The generator
+  bakes only joint clearance (uniform contour offset; default 0 laser,
+  0.15 mm CNC) and CNC corner-overcut relief (F-CNC26 convention).
+- v1: closed 6-panel + open-top 5-panel, inner/outer dimension toggle.
+  Deferred: lids, dividers, engraved panel labels, dogbone/T-bone relief
+  styles (ADR-106 lists each as a staged follow-up).
+- Staged S0–S6, each an individually reviewable CI-green diff: docs →
+  math core + virtual 3D assembly referee (property-tested exact joint
+  complementarity) → fit/relief → layout/orchestrator → scene insertion →
+  dialog/preview → wiring + AUDIT. Physical fit lands CLAIMED
+  (WORKFLOW.md Phase K flows, AUDIT.md row) until a real box is cut and
+  assembled.
 
 ### Anything past Phase F
 
@@ -378,7 +405,9 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - macOS / Linux desktop builds.
 - Node editing of imported paths.
 - Boolean ops.
-- Camera alignment, overhead camera.
+- ~~Camera alignment, overhead camera.~~ **Scoped by ADR-107** (Camera Mode —
+  staged v1 manual 4-point overlay → v2 lens calibration → v3 fiducial /
+  print-and-cut → v4 capture-to-trace) — no longer out of scope.
 - Rotary attachment.
 - Auto-focus, Z-axis control beyond initial homing — **laser mode only**.
   Phase H CNC router mode is inherently Z-aware (plunges, depth passes,
@@ -393,13 +422,19 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 - Cloud, accounts, sharing, sync.
 - ~~DXF~~, AI, PDF import. **DXF moved in-scope by Phase H.6 (clean-room
   parser, ADR-098)**; AI and PDF import remain out of scope.
-- Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Narrow
-  Line-mode kerf compensation is scoped by ADR-052, automatic Line-mode
-  hard-skip tabs are scoped by ADR-053, and simple Cross-Hatch fill is scoped by
-  ADR-054. Simple Offset Fill output is scoped by ADR-055; broader
-  boolean/node editing and advanced fill-pattern systems remain out of scope.
-  A narrow ordered sub-layer operation stack for same-color "fill then line"
-  workflows is scoped by ADR-056; Rayforge-style workflow graphs and plugin
+- Manual tabs / bridges, lead-in / lead-out, advanced fill patterns. Several
+  narrow parity features have since shipped and are no longer out of scope:
+  Line-mode kerf compensation (`core/geometry/kerf-offset.ts`, per-layer
+  `kerfOffsetMm`), automatic Line-mode hard-skip tabs
+  (`core/geometry/tabs-bridges.ts`), simple Cross-Hatch fill (per-layer
+  `fillCrossHatch`), and simple Offset Fill output (`core/job/offset-fill.ts`);
+  a narrow ordered sub-layer "fill then line" operation stack is partially in
+  place. **These landed without dedicated ADR headings** — the build plan
+  reserved ADR-054..091 for its tickets, and the earlier citations here of
+  ADR-052 and ADR-053 were wrong (ADR-052 is Scanning-offset compensation,
+  ADR-053 is Verified Origin — neither governs these). Formalizing or retiring
+  those reservations is an open maintainer item. Broader boolean / node editing
+  and advanced fill-pattern systems, Rayforge-style workflow graphs, and plugin
   operation pipelines remain out of scope.
 - Macros, scripting, command palette, plugins, extensions.
 - Variable text (CSV / counter / date).

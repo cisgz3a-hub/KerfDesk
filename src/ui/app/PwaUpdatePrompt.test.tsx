@@ -66,6 +66,10 @@ describe('PwaUpdatePrompt', () => {
     const { host } = await render();
     expect(host.querySelector(BANNER)).not.toBeNull();
     expect(host.querySelector('button')?.textContent).toBe('Reload');
+    // Public branding: the banner copy said "LaserForge" while the rest of
+    // the chrome says KerfDesk.
+    expect(host.textContent).toContain('KerfDesk');
+    expect(host.textContent).not.toContain('LaserForge');
   });
 
   it('suppresses the banner while the laser is streaming', async () => {
