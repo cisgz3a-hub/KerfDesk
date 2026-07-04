@@ -5,6 +5,7 @@
 import { activeCncTool, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
+import { CncDetectedSettingsRow } from './CncDetectedSettingsRow';
 import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 import { CncTilingPanel } from './CncTilingPanel';
 import { SurfacingPanel } from './SurfacingPanel';
@@ -22,6 +23,7 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
   return (
     <section aria-label="Material and bit setup" style={cardStyle}>
       <h3 style={headingStyle}>Material &amp; Bit</h3>
+      <CncDetectedSettingsRow machine={machine} />
       <Row label="Bit">
         <select
           value={tool.id}
@@ -38,56 +40,7 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         </select>
       </Row>
       <CncStockFields machine={machine} />
-      <NumberRow
-        label="Safe Z"
-        unit="mm"
-        value={machine.params.safeZMm}
-        min={0.5}
-        max={50}
-        step={0.5}
-        title="Clearance height above the stock top for rapid moves between cuts."
-        onCommit={(safeZMm) => updateCncMachine({ params: { safeZMm } })}
-      />
-      <NumberRow
-        label="Spindle max"
-        unit="RPM"
-        value={machine.params.spindleMaxRpm}
-        min={1000}
-        max={60000}
-        step={500}
-        title="The machine's top spindle speed (the RPM ceiling for every layer, and the GRBL $30 value). Each layer sets its own running speed below."
-        onCommit={(spindleMaxRpm) => updateCncMachine({ params: { spindleMaxRpm } })}
-      />
-      <NumberRow
-        label="Spin-up delay"
-        unit="s"
-        value={machine.params.spindleSpinupSec}
-        min={0}
-        max={30}
-        step={0.5}
-        title="Dwell after starting the spindle before the first plunge."
-        onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
-      />
-      <NumberRow
-        label="Park X"
-        unit="mm"
-        value={machine.params.parkXMm ?? 0}
-        min={-1500}
-        max={1500}
-        step={1}
-        title="Where the head parks after the job and during bit changes (H.9)."
-        onCommit={(parkXMm) => updateCncMachine({ params: { parkXMm } })}
-      />
-      <NumberRow
-        label="Park Y"
-        unit="mm"
-        value={machine.params.parkYMm ?? 0}
-        min={-1500}
-        max={1500}
-        step={1}
-        title="Where the head parks after the job and during bit changes (H.9)."
-        onCommit={(parkYMm) => updateCncMachine({ params: { parkYMm } })}
-      />
+      <CncMachineParamsFields machine={machine} />
       <CncToolManager machine={machine} />
       <CncMachineProfilesRow />
       <CncTilingPanel machine={machine} />
@@ -153,6 +106,68 @@ function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
         step={1}
         title="Machine-coordinate Y of the stock's near-left corner."
         onCommit={(y) => updateCncMachine({ stock: { originOffset: { ...origin, y } } })}
+      />
+    </>
+  );
+}
+
+// Spindle + motion parameters (safe Z, spindle ceiling/spin-up, park point).
+// Split from CncSetupFields to keep both under the function-size cap after the
+// detected-settings banner landed (ADR-106).
+function CncMachineParamsFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
+  const { machine } = props;
+  const updateCncMachine = useStore((s) => s.updateCncMachine);
+  return (
+    <>
+      <NumberRow
+        label="Safe Z"
+        unit="mm"
+        value={machine.params.safeZMm}
+        min={0.5}
+        max={50}
+        step={0.5}
+        title="Clearance height above the stock top for rapid moves between cuts."
+        onCommit={(safeZMm) => updateCncMachine({ params: { safeZMm } })}
+      />
+      <NumberRow
+        label="Spindle max"
+        unit="RPM"
+        value={machine.params.spindleMaxRpm}
+        min={1000}
+        max={60000}
+        step={500}
+        title="The machine's top spindle speed (the RPM ceiling for every layer, and the GRBL $30 value). Each layer sets its own running speed below."
+        onCommit={(spindleMaxRpm) => updateCncMachine({ params: { spindleMaxRpm } })}
+      />
+      <NumberRow
+        label="Spin-up delay"
+        unit="s"
+        value={machine.params.spindleSpinupSec}
+        min={0}
+        max={30}
+        step={0.5}
+        title="Dwell after starting the spindle before the first plunge."
+        onCommit={(spindleSpinupSec) => updateCncMachine({ params: { spindleSpinupSec } })}
+      />
+      <NumberRow
+        label="Park X"
+        unit="mm"
+        value={machine.params.parkXMm ?? 0}
+        min={-1500}
+        max={1500}
+        step={1}
+        title="Where the head parks after the job and during bit changes (H.9)."
+        onCommit={(parkXMm) => updateCncMachine({ params: { parkXMm } })}
+      />
+      <NumberRow
+        label="Park Y"
+        unit="mm"
+        value={machine.params.parkYMm ?? 0}
+        min={-1500}
+        max={1500}
+        step={1}
+        title="Where the head parks after the job and during bit changes (H.9)."
+        onCommit={(parkYMm) => updateCncMachine({ params: { parkYMm } })}
       />
     </>
   );
