@@ -6,6 +6,7 @@ import { CHIPLOAD_MATERIALS } from '../../core/cnc';
 import { activeCncTool, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
+import { ProbeControls } from '../laser/ProbeControls';
 import { CncDetectedSettingsRow } from './CncDetectedSettingsRow';
 import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
 import { CncMachineCatalogRow } from './CncMachineCatalogRow';
@@ -44,6 +45,15 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
       </Row>
       <CncStockFields machine={machine} />
       <CncMachineParamsFields machine={machine} />
+      <details style={probeDetailsStyle}>
+        <summary
+          style={probeSummaryStyle}
+          title="Zero work coordinates with a touch plate (G38.2)."
+        >
+          Set work zero (probe)
+        </summary>
+        <ProbeControls />
+      </details>
       <CncToolManager machine={machine} />
       <CncMachineCatalogRow />
       <CncMachineProfilesRow />
@@ -272,3 +282,9 @@ const valueStyle: React.CSSProperties = { display: 'flex', alignItems: 'center',
 const selectStyle: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 12, padding: '2px 4px' };
 const inputStyle: React.CSSProperties = { width: 80, padding: '2px 6px' };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: 'var(--lf-text-faint)' };
+const probeDetailsStyle: React.CSSProperties = {
+  borderTop: '1px solid var(--lf-border)',
+  paddingTop: 6,
+  marginTop: 4,
+};
+const probeSummaryStyle: React.CSSProperties = { cursor: 'pointer', fontSize: 12 };
