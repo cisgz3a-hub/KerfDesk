@@ -2,6 +2,7 @@
 // laser-power scale, and coordinate origin. Used by JobCompiler to honor
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
+import type { CameraAlignment, CameraCalibration } from '../camera';
 import type { ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
@@ -125,6 +126,12 @@ export type DeviceProfile = {
   // Bidirectional fill/raster compensation. Empty keeps emitted output
   // unchanged until the operator calibrates a machine-specific table.
   readonly scanningOffsets: ReadonlyArray<ScanOffsetPoint>;
+  // Overhead-camera de-fisheye calibration (ADR-107/108). Absent until the operator
+  // runs the calibration wizard; persisted so the rectified overlay survives reload.
+  readonly cameraCalibration?: CameraCalibration;
+  // Camera→bed 4-point alignment (ADR-107). Absent until the operator aligns;
+  // persisted so the workspace camera overlay survives reload.
+  readonly cameraAlignment?: CameraAlignment;
   readonly noGoZones: ReadonlyArray<NoGoZone>;
   readonly zTravelMm?: number;
   readonly zTravelConfirmed?: boolean;

@@ -10,6 +10,7 @@
 
 import { useEffect } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 
@@ -46,7 +47,7 @@ export function PwaUpdatePrompt(): JSX.Element | null {
       className="lf-banner lf-banner--info"
       style={bannerStyle}
     >
-      <span>A new version of LaserForge is available.</span>
+      <span>A new version of {APP_DISPLAY_NAME} is available.</span>
       <button
         type="button"
         className="lf-btn lf-btn--primary"

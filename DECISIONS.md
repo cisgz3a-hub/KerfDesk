@@ -1146,7 +1146,7 @@ LightBurn's Preview "shades according to power" — darker pixel = more laser po
 
 ## ADR-029 — Convert to Bitmap (vector → raster engrave source)
 
-**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` shipped — Fill All only; A3 Outlines / A4 Use Cut Settings / A5 placement-brightness polish pending) | **Date:** 2026-05-29
+**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings shipped; A5 placement-brightness polish pending) | **Date:** 2026-05-29
 
 ### Context
 
@@ -3293,7 +3293,7 @@ ADR-058 (centerline extraction), ADR-025 (perceptual harness), ADR-026/027
 
 ## ADR-092 — Connect-time Device Setup wizard (manual, draft-commit, guarded firmware sync)
 
-**Status:** Accepted; field-editor extraction (PR-1, `DeviceProfileFields.tsx`) shipped; wizard implementation pending. | **Date:** 2026-06-24
+**Status:** Accepted; shipped (`src/ui/laser/device-setup/DeviceSetupWizard.tsx` + tests; field-editor extraction `DeviceProfileFields.tsx`). | **Date:** 2026-06-24
 
 > Numbering note: the body's previous highest is ADR-057. The active build plan
 > (`.claude/plans/plan-a-full-build-sparkling-kazoo.md`) reserves ADR-054..091 for its
@@ -4161,7 +4161,9 @@ numbers win.
   messages retain the old numbers (immutable history — read them against
   this table).
 - ADR-099 is retired unused; the number stays reserved to avoid a third
-  meaning. Next free ADR: **105**.
+  meaning. Next free ADR: **105**. *(Running update — published since:
+  ADR-105 Easel-parity pack, ADR-106 box generator, ADR-107..110 Camera
+  Mode v1..v4 — next free ADR: **111**.)*
 
 ## ADR-105 — Easel-parity UX pack: persistent 3D pane, pocket raster fill, bundled design library (2026-07-03)
 
@@ -4204,6 +4206,508 @@ everything Easel has and more"). Grounded by
 Unit tests per feature; raster-fill coverage/no-gouge checks; jsdom
 fallback for the pane; license-check green with the new dependency;
 full gate per commit. Hardware remains CLAIMED per ADR-098 §3.
+
+## ADR-106 — Parametric finger-joint box generator: claim-model joinery (2026-07-03)
+
+**Status:** accepted (maintainer-approved build plan, 2026-07-03).
+**Numbering note:** drafted as ADR-105 on the box-generator branch, but
+the Easel-parity pack published 105 on `main` first — published numbers
+win (ADR-104 precedent). Pre-merge commit messages on
+`claude/relaxed-liskov-0df88b` say ADR-105; read them as this ADR.
+
+### Context
+
+Operators want cut-ready finger-joint boxes for both laser and CNC
+router modes. A previous attempt failed because the 2D panel math did
+not encode the 3D assembly: panels rotate 90° into place, material
+thickness eats into each mating panel, and the cutting process (laser
+kerf / endmill radius) changes fit. Behavior research on MakerCase
+(reverse-engineering study) and boxes.py (docs only — GPL, no code
+copying per ADR-017) isolates the two classic failure classes this
+design is built around:
+
+1. **Corner conflicts.** Three panels meet at each cube corner; naive
+   per-edge tab math either double-claims the T×T×T corner cube (parts
+   collide — cannot assemble) or never claims it (visible hole).
+   MakerCase's own study lists corner fillers as a known deferred gap.
+2. **Fit compensation applied wrong.** Kerf widening done per-tab
+   instead of as a uniform contour offset, or CNC interior corners left
+   square so square tabs cannot seat (missing relief).
+
+### Decision — own math, built against those two failures
+
+- **One sequence per cube edge.** Each of the 12 cube edges is shared
+  by exactly two panels. Per edge ONE alternating cell sequence is
+  computed — odd cell count `n` = largest odd ≤ span/targetFingerWidth,
+  clamped ≥ 3 (`1` for tiny spans), cell width `f = span/n` — and BOTH
+  panels derive material ownership from that one sequence: A owns
+  exactly what B does not. Complementarity holds by construction;
+  both-tabs / neither-tab is unrepresentable. Odd count ⇒ symmetric ⇒
+  opposite panels stay interchangeable.
+- **Corner rule.** Each of the 8 T×T×T corner cubes has exactly one
+  claimant: global axis priority **Z > Y > X** (top/bottom > front/back
+  > left/right) among *present* panels. Open-top: corner cells that
+  would belong to the missing top fall to the next-priority panel.
+- **Outline walk.** Panel outline = closed rectilinear polygon walked
+  from claims: boundary at the outer face line where a cell is owned,
+  recessed by T where the mate owns it. No holes in v1 (dividers later).
+- **Fit — division of labor (nothing duplicated).** Laser beam width
+  stays in per-layer kerf compensation (`kerf-offset.ts` at compile;
+  nominal = line-to-line press fit — LightBurn parity: kerf lives in
+  cut settings, not the drawing). CNC cutter compensation stays in
+  `profile-paths.ts` (`profile-outside`). The generator bakes exactly
+  two things:
+  1. **Clearance `c`** (signed, + = looser; default 0 laser = press
+     fit, 0.15 mm CNC = glue fit): every panel polygon offset by −c/4
+     via `offsetClosedPolylinesForKerf`. Derivation (corrected at S2
+     from an earlier −c/2 draft): a uniform inward offset δ narrows
+     every tab by 2δ AND widens the mating recess by 2δ, so joint play
+     = 4δ; the contract is play == c, hence δ = c/4 — tabs narrow c/4
+     per flank, recesses widen c/4 per flank, notch − tab = c exactly,
+     uniformly. Never per-tab arithmetic.
+  2. **CNC corner relief** in the shipped F-CNC26 corner-overcut
+     convention (`dogbone.ts` precedent): a circle of one bit RADIUS
+     centered ON the seat-critical reflex corner vertices, subtracted
+     from the panel. The generator knows which corners mate, so it
+     relieves exactly those (not `dogboneVectorObject`, which unions
+     circles into cutout regions and blankets all sharp corners).
+     **Ordering pinned: clearance offset FIRST, then reliefs at full
+     bit radius** — offsetting after would shrink reliefs below tool
+     diameter. Laser mode: no reliefs.
+- **Modules.** Pure core `src/core/box/` (box-spec, edge-pattern,
+  panel-claims, panel-outline, panel-fit, layout, generate-box) — NOT
+  `core/shapes` (its index is at export capacity). UI `src/ui/box/`
+  (dialog + canvas preview). Insertion wraps panels into ordinary
+  `kind:'shape'` polyline objects via the existing `createPolyline`
+  (ids injected UI-side via `crypto.randomUUID()`, ONE undo step,
+  `ensureLayersForColors`, all inserted panels selected, ungrouped).
+  Compile/preview/emit untouched; zero G-code snapshot churn.
+- **Validation.** Pure `Result`-style union, no throws: dims/T > 0;
+  inner dims stay positive when derived; finger width clamped to
+  [max(2mm, T), span/3]; CNC: `f > toolDiameter` (error) and warn when
+  `f < 2·toolDiameter`; `|c| < min(f, T)/2`. Violations →
+  `{ kind:'invalid', issues }` rendered in the dialog; generation
+  disabled.
+- **v1 scope.** Closed 6-panel + open-top 5-panel; inner dimensions
+  default (what the contents need), outer via toggle. Deferred as
+  staged follow-ups: lids (slide/hinged), dividers, engraved panel
+  labels (needs the io/text pipeline — unreachable from pure core),
+  dogbone/T-bone relief styles (same future-refinement note as
+  `dogbone.ts`).
+
+### Verification (green structural tests ≠ fit — CLAUDE.md rule 2)
+
+1. **Virtual 3D assembly referee** (fast-check, 100 runs, predicates in
+   `src/__fixtures__/property/`): map each derived panel polygon into
+   box coordinates via its placement (this encodes "panels turn
+   sideways"), extract both panels' exact 1D occupancy intervals along
+   each shared edge band — computed from the OUTPUT polygons, not the
+   internal claim model. Assert: nominal ⇒ exactly complementary (zero
+   overlap, zero gap); with clearance ⇒ uniform play ≈ c within 2·10⁻³
+   (clipper rounds to 3 decimals), never interference; each cube corner
+   has exactly one claimant (closed box). Fuzz: W,D,H ∈ [20,600],
+   T ∈ [1,25], finger ∈ [1.5T,5T], open/closed, c ∈ [0,0.5].
+2. **Invariants:** assembled outer bbox == outer dims exactly; every
+   polygon simple and closed; reliefs only at reflex corners, only when
+   CNC, diameter == tool diameter; determinism (same spec ⇒
+   JSON-identical output — core has zero RNG).
+3. **Perceptual fixture** (ADR-025 harness): render the generated sheet
+   for a canonical spec; IoU vs analytic expectation + opt-in PNG
+   artifact for human eyeballing.
+4. **Hardware:** physical fit is NOT software-verifiable — the feature
+   lands CLAIMED per AUDIT.md convention with a named pending check:
+   cut a 60×40×30 mm, T=3 box on the Falcon (laser) / 4040 (router)
+   and assemble it.
+
+---
+
+---
+
+## ADR-107 — Camera Mode: overhead-camera alignment (manual 4-point homography v1; staged v1–v4)
+
+**Status:** Accepted; staged in small PRs. | **Date:** 2026-06-27
+
+> Numbering note: authored on `claude/camera-mode-v1` as ADR-094/095 (then the next
+> free slots above the build plan's ADR-054..091 reservation). Merged after ADR-104's
+> integration renumbering had assigned 094–104 to the controller/CNC tracks, so —
+> following the ADR-104 precedent — the camera ADRs renumber on merge: v1 = ADR-107,
+> v2 = ADR-108; v3 / v4 reserve ADR-109 / ADR-110. Pre-merge commit messages retain
+> the old numbers (immutable history — read them against this note).
+> Renumbered AGAIN at the main merge: origin/main had published ADR-105
+> (Easel-parity pack) meanwhile — published numbers win (ADR-104) — so the
+> camera ADRs were then v1=106..v4=109 — and renumbered a THIRD time when the
+> Phase K box generator published ADR-106: final numbers v1=ADR-107,
+> v2=ADR-108, v3=ADR-109, v4=ADR-110.
+
+### Context
+
+`PROJECT.md` listed "Camera alignment, overhead camera" under Out of scope; the maintainer
+requested it. LightBurn's camera (capture → lens calibration → 4-marker alignment → live
+overlay → print-and-cut → capture-to-trace) is the behavioral reference. Competitor source
+was read directly: MeerK40t `camera.py` (`cv2.getPerspectiveTransform` from four manually
+dragged corners, no RANSAC), Rayforge (capture-to-trace, `findHomography` with an image
+y-down → bed y-up flip), OpenPnP (fiducial detection + intrinsic calibration). An adversarial
+second audit verified the math against that code and found no errors.
+
+The decisive constraint is the < 1 MB compressed web-bundle target (ADR-017): OpenCV.js
+(~8–10 MB WASM) is ~10× the budget. The CV math actually required is small — a 4-point
+homography is an 8×8 linear solve; Brown–Conrady undistort and inverse-homography rectify are
+each a few dozen lines — and hand-rolls to ~150–250 LOC of pure TypeScript.
+
+### Decision
+
+1. **Hand-rolled pure-TS CV in a new `src/core/camera/` module — no OpenCV.js.** Rejected on
+   bundle size, not licence (OpenCV.js is Apache-2.0, which is permitted). RANSAC (v3) injects
+   its RNG per the pure-core no-random rule.
+2. **Capture via a new `CameraAdapter` on `PlatformAdapter`** (`getUserMedia` / enumerate /
+   stream), mirroring the existing `SerialAdapter` contract (`isSupported` / request,
+   AbortError → null). Electron is Chromium, so one web code path serves web and desktop.
+3. **v1 live overlay via CSS `matrix3d`** (the GPU performs the perspective divide; Canvas2D is
+   affine-only and physically cannot warp). `matrix3d` covers the homography only — distortion
+   correction (v2) cannot ride it and its live-undistort tech (WebGL shader / CPU remap /
+   still-path-only) is resolved at v2.
+4. **v1 alignment = manual 4-point homography** (matches LightBurn and MeerK40t: exact 8-DOF,
+   no RANSAC). **Alignment targets are laser-engraved** at known machine coordinates, reusing
+   the registration-jig engrave machinery (ADR-057). Fiducial auto-detection is deferred to v3;
+   `js-aruco` / `js-aruco2` are rejected because their bundles include LGPL-v3 code.
+5. **Calibration persists as a `readonly` optional field on `DeviceProfile`** (sibling of
+   `scanningOffsets`; additive normalize in `deserialize-project.ts`; no `schemaVersion` bump).
+   In-progress calibration drafts use the existing `localStorage` calibration-draft pattern.
+6. **Staging:** v1 overlay + manual 4-point (this ADR) → v2 Brown–Conrady lens calibration
+   (ADR-108) → v3 fiducial auto-align + 2-point print-and-cut (ADR-109) → v4 capture-to-trace
+   reusing the existing trace pipeline (ADR-110). Each phase ships as its own small PR set.
+
+### Consequences
+
+- New pure-core module `src/core/camera/`; new `src/platform/web/web-camera.ts`; new
+  `src/ui/camera/` (overlay + alignment panel) and a camera Zustand slice; one `readonly`
+  field on `DeviceProfile`. No new runtime dependency; v1 bundle impact ~< 10 KB.
+- The camera frame is a UI/IO concern only — core never generates it. The existing
+  `drawBitmapAtTransform` / `view-transform` machinery and the registration-jig drag panel are
+  reused rather than reinvented.
+
+### Verification
+
+Pure-core property and unit tests prove the math (four-correspondence round-trip, degeneracy
+rejection, y-flip consistency) and run in CI. **They do not prove the overlay lands on the
+real bed** — per CLAUDE.md rule 2 (green math ≠ fidelity), accuracy is verified on a physical
+USB camera over a real machine (available to the maintainer): engrave the four targets, align,
+and confirm a placed object burns where the overlay showed it. The y-flip *direction* can only
+be confirmed against a real capture (a self-consistent pure test shares the flip and cannot
+catch a mirror). A golden-image regression fixture (the ADR-025 perceptual harness) built from
+a one-time real capture guards the math thereafter. The zero-install web target requires an
+https / secure context or `getUserMedia` silently fails.
+
+### Out of scope for v1
+
+Lens distortion correction (v2), fiducial auto-detection (v3), capture-to-trace (v4), and
+non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-108 / 109 / 110.
+
+---
+
+## ADR-108 — Camera Mode v2: fisheye lens calibration + de-fisheye render
+
+**Status:** Accepted; staged in small PRs. | **Date:** 2026-06-28
+
+### Context
+
+The Falcon A1 Pro (like most laser bed cameras) uses a wide-angle lens, so the live feed
+is visibly barrel-bowed. The ADR-107 4-point homography corrects perspective only — it
+pins the four corners but cannot remove lens curvature, so straight bed edges stay curved.
+A camera-implementation study (MeerK40t, OpenPnP, LightBurn, Rayforge, LaserWeb4, OpenCV)
+confirmed the universal fix: a lens-distortion model applied to the frame **before** the
+homography.
+
+Licensing (ADR-017/018): GPL/AGPL apps (OpenPnP, LaserWeb4) may be **studied** but not
+vendored; only MIT/BSD/Apache code may be copied. OpenCV.js (the build) is excluded on
+bundle size (ADR-107), not licence — and the distortion math is not copyrightable, so the
+equations are clean-roomed in TypeScript from the published Kannala-Brandt model.
+
+### Decision (maintainer-chosen, 2026-06-28)
+
+1. **Model: Kannala-Brandt fisheye** (θ-polynomial, k1..k4), not Brown-Conrady. It stays
+   well-behaved at the wide field angles where Brown-Conrady's r⁶ term diverges; MeerK40t
+   uses exactly this (`cv2.fisheye`) for the same hardware class. Pure-TS forward
+   (`θ_d = θ(1 + k1θ² + k2θ⁴ + k3θ⁶ + k4θ⁸)`) plus a Newton inverse.
+2. **Calibration: guided board.** Print a checkerboard, capture ~5 poses (4 corners +
+   centre) with a per-capture reprojection-error score (LightBurn) and per-quadrant
+   coverage feedback (Rayforge); fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
+   Levenberg-Marquardt minimiser over reprojection error. ChArUco is rejected — its ArUco
+   decode needs an LGPL bundle barred by ADR-107; a plain checkerboard detects clean-room.
+3. **Render: WebGL fragment shader.** The inverse-distortion sampling runs per-pixel on the
+   GPU (LaserWeb4 proves `regl` does this < 1 MB, no OpenCV); output→input sampling so a
+   rectified output pixel reads the distorted source. Supports live UVC video, not only the
+   polled still.
+4. **Order:** capture → de-fisheye → 4-point homography (ADR-107) → overlay. The homography
+   now runs on rectified pixels. K + D persist on the readonly `DeviceProfile` field ADR-107
+   reserved.
+
+### Staging
+
+v2.a fisheye math (pure core) · v2.b checkerboard detection (pure, `ImageData` in) ·
+v2.c LM intrinsic solver (pure — the highest-risk port) · v2.d WebGL undistort shader ·
+v2.e calibration wizard UI (capture poses, coverage + error score, and an OpenPnP-style
+A/B "Apply Calibration?" toggle). Each is its own small PR.
+
+### Consequences
+
+- New pure-core `src/core/camera/{fisheye,checkerboard-detect,calibrate}.ts`; a new WebGL
+  renderer and calibration wizard in `ui/camera/`. No new runtime dependency; the math is
+  clean-roomed from the published Kannala-Brandt model and OpenCV/glfx equations (referenced,
+  never copied).
+- Once distortion is on, the overlay moves off pure CSS `matrix3d` (which cannot carry lens
+  curvature) to a composited undistort→homography frame.
+
+### Verification
+
+Pure tests prove the math (distort/undistort round-trip; the LM solver recovers a known
+K/D from synthetic board poses). Per CLAUDE.md rule 2, green math is **not** a straight real
+image: an A/B "Apply Calibration?" toggle (OpenPnP) lets the operator **see** the bed edges
+straighten on the real Falcon, and a golden frame guards regressions (ADR-025). Physical
+straightness is hardware-verified, not asserted by a green suite.
+
+### v2.c as-built (2026-06-28)
+
+The LM intrinsic solver shipped as pure-core modules in `src/core/camera/` — all internal
+except the single public entry point `calibrate(views, options?)`: `levmar` + `levmar-kernel`
+(generic central-difference Levenberg-Marquardt with Marquardt damping), `rodrigues`
+(axis-angle ↔ matrix, incl. the near-π log-map branch), `lm-params` (flat parameter packing),
+`calibrate-residuals` (reprojection residuals; behind-camera corners masked inactive, not
+penalised), `init-guess`, `calibrate` + `calibrate-metrics`, and the `calibrate-fixtures`
+synthetic oracle (its own independent Rodrigues so a transposition bug cannot self-cancel).
+
+Decisions made during the build (deviating from / refining the draft design):
+
+- **Init = robust fisheye seed, NOT Zhang's pinhole closed-form.** `B = K⁻ᵀK⁻¹` factorises a
+  negative/imaginary focal under Falcon-class barrel distortion, so K is seeded from the
+  device-nominal focal (`0.7·imageWidth` default, or a measured `options.initialGuess`), D=0,
+  and only the per-view R/t are taken from a homography decomposition (forced `t.z>0`,
+  Gram-Schmidt orthonormalised). The wrong-K basin test confirms LM crosses to truth.
+- **`behind-camera` failure reason dropped.** The `t.z>0`-forcing seed makes a whole-board
+  behind-camera result unreachable; shipping the reason would be dead code. Reachable failures:
+  `too-few-views | too-few-points | rank-deficient | no-convergence`.
+- **Karpathy finding — noise overfits the high-order terms.** Zero-noise synthetic recovery is
+  machine-precision for K and D from both a good and a wrong-K init. But under 0.2px detection
+  noise the reprojection RMS stays low (~0.15px) while the weakly-observed `k3,k4` overfit to
+  absurd values (e.g. k3 ≈ 200). **v2.e must add a coefficient-sanity bound + an RMS gate and
+  prefer more poses/points; a low RMS alone does not mean a usable calibration.**
+
+### v2.d as-built (2026-06-28) — render path refines decision #3
+
+Shipped pure-core, all verified: `rectify-map.ts` (per-pixel output->input sample point, the
+math the renderer mirrors), `cpu-rectify.ts` (bilinear-sampled de-fisheye over an RGBA buffer),
+`camera-calibration.ts` (the persisted `CameraCalibration` type + an untrusted-JSON normaliser),
+and a new optional `cameraCalibration?: CameraCalibration` on `DeviceProfile` (the ADR-107 #5 /
+ADR-108 #4 "reserved" field — it did NOT exist in code; this closes that doc-vs-code drift),
+normalised in `deserialize-project.ts` (override, not merge, so a malformed value is dropped).
+
+**Render refinement (flag for the maintainer).** Decision #3 chose a WebGL fragment shader,
+justified by "supports live UVC video." But the Falcon A1 Pro is a **polled network still**
+(`getCapturePhoto`, ~1.5 s cadence), not 60fps video — so the tested CPU rectify (one pass per
+polled frame) is adequate AND is the no-WebGL fallback the ADR already required. Building an
+unverifiable GPU shader now would violate CLAUDE.md rule 2 (no "works" without perceptual proof).
+**As-built: ship the CPU rectify as the v2 render path; defer the WebGL shader to a live-video
+optimisation if/when a UVC camera is supported.** The maintainer can override this back to
+WebGL-first; recorded here rather than silently swapped.
+
+**Karpathy proof (no hardware needed).** `cpu-rectify.test.ts` distorts a known smooth scene
+through the forward KB model, rectifies it back, and confirms reconstruction to <6 grey levels
+over the interior — proving the de-fisheye *pipeline* straightens curvature. What remains
+hardware-gated is only whether the **real Falcon lens matches the calibrated model**, surfaced by
+the v2.e A/B "Apply Calibration?" toggle on a real captured frame.
+
+**FOV tradeoff.** The rectify uses `outputK === sourceK` (the `outputK` parameter is separate so a
+future widened "new camera matrix" can be slotted in). This trades ~7–8% of peripheral field for a
+border-free overlay — the same default MeerK40t/LightBurn use. The v2.e wizard copy should mention it.
+
+### v2.e as-built (2026-06-28) — trust gates + capture session (pure core); UI handed off
+
+Shipped pure-core, all verified: `calibration-trust.ts` (`assessCalibrationTrust` flags implausible
+KB coefficients `|k|>1`, RMS `>1.5px`, or a near-empty image quadrant — the gate that catches the
+v2.c k3/k4-overfit a low RMS would otherwise hide), `pose-diversity.ts` (`checkPoseDiversity` —
+geodesic rotation spread; rejects the 5-near-identical-shots focal/depth-ambiguity trap),
+`resolution-match.ts` (`frameMatchesCalibration` + `scaleIntrinsicsToFrame` for apply-time frame
+rescaling), and `calibration-session.ts` (the wizard's pure reducer: collect → solve → assess).
+
+**Reduced distortion model.** `CalibrationOptions.distortionModel: 'k1k2' | 'k1k2k3k4'` (default
+full; a string union, not a boolean per CLAUDE.md). `'k1k2'` freezes `k3=k4=0` via a new generic
+`LevMarOptions.fixedIndices` (the param's Jacobian column is zeroed, so the damped step never moves
+it). The wizard should default to `'k1k2'` for low-angular-coverage Falcon captures.
+
+**Two solver behaviour changes (decisions, recorded):**
+- **LM terminates on a damping explosion.** A sustained reject streak drives λ past `LAMBDA_MAX`
+  → the step is negligible → we are at a minimum → `converged: true`. The absolute gradient stop is
+  too tight to catch a nonzero-cost (reduced-model) minimum at pixel scale.
+- **`calibrate()` returns a best-effort fit on non-convergence, not a hard failure** — OpenCV/
+  MeerK40t behaviour, resolving the v2.c audit's concern that `converged:false → 'no-convergence'`
+  wrongly rejects usable fits. `'no-convergence'` now means only a genuinely blown-up (non-finite)
+  LM run. The wizard's trust check, not the solver, judges usability.
+
+**Conditioning finding (honest).** For a narrow-FOV planar board (θ ≈ 0.12 rad here) even `k1,k2`
+are weakly observable and trade off under noise (e.g. k2 → 1.0 while RMS stays ~0.15px) — the same
+Karpathy lesson one order down. This is inherent to narrow-FOV planar calibration, not a solver bug;
+`assessCalibrationTrust` is the backstop. Wider angular coverage (more board tilt/closer board) is
+the real remedy, which the pose-diversity + coverage gates nudge the operator toward.
+
+**Handed off (hardware-gated, NOT built).** The wizard's React UI + live camera/canvas wiring —
+polling Falcon frames, detecting the checkerboard and feeding `BoardObservation`s, rendering
+coverage/RMS/trust, and the A/B "Apply Calibration?" overlay (`rectifyImage`) — needs the
+maintainer's real Falcon to build and verify (CLAUDE.md rule 2 perceptual proof, rule 4 side-effect-
+free). The session/solve/assess/persist (`toCameraCalibration`) and de-fisheye (`rectifyImage`)
+dependencies are all shipped and exported. **One pure piece is deliberately NOT shipped: a
+checkerboard GRID DETECTOR.** `refineCornerSubpixel` only *refines* an already-located corner; finding
+the grid in a real frame (the hardest pure-CV step) is part of the handed-off work, best built and
+tuned against real Falcon captures.
+
+**v2.e audit fixes (post-audit, all gated).** The trust gate now also inspects the intrinsics it
+gates (`intrinsics-implausible`: non-positive/non-finite focal, or a principal point thrown far
+outside the frame) — a degenerate-but-finite K with a low RMS no longer reads "trusted".
+`CalibrationResult.ok` now carries `converged: boolean` + a typed `exit` (`tolerance` |
+`iteration-cap` | `damping-stall`) so the wizard can warn before applying a best-effort fit; the
+LM damping-stall stop is now `converged:false` (a stall is not a tolerance stop). Non-finite
+distortion coefficients are flagged explicitly, `scaleIntrinsicsToFrame` guards non-positive frame
+sizes, and the pose-diversity floor is documented as provisional + overridable.
+
+### v2.b as-built (2026-07-03) — checkerboard auto-detection ships; focal sweep added
+
+The handed-off GRID DETECTOR is now shipped as pure core, closing v2.b: `gray.ts`
+(RGBA→luma), `xcorner.ts` (a clean-room centrosymmetry ring response — 16 taps at
+radius 3; alternation across 90° minus an opposite-sample edge penalty — plus
+non-max suppression), `grid-lattice.ts` (seed at the candidate nearest the cloud
+centroid, basis from its two non-collinear nearest neighbours, then BFS integer-
+lattice growth with second-order local extrapolation, full-window extraction and a
+deterministic orientation), and `detect-checkerboard.ts` (orchestration + sub-pixel
+refinement + `checkerboardObjectPoints`/`toBoardObservation` for the session).
+
+**Verification (per CLAUDE.md rule 2, no hardware needed for this layer).** The
+harness RENDERS frames through the forward KB model (`board-render-fixtures.ts`:
+undistort each pixel to a ray, intersect the board plane, supersampled checker
+shading) and detection runs on pixels alone: 54/54 corners on all seven test poses
+(mean error < 0.4 px, matched bijectively against projected truth), robust to
+sensor-scale noise, typed failures on blank/cut-off frames, and an end-to-end run
+whose detections calibrate back to the true camera. A rendered A/B (distorted grid
+with detections marked vs. de-fisheyed with the AUTO-recovered fit) was visually
+confirmed straight. What remains hardware-gated is only real-Falcon frames
+(lighting, blur, real sensor noise) via the wizard's live view.
+
+**Solver finding (measured) + focal sweep decision.** From the default focal seed
+(0.7·width) on detected corners, LM crawls the flat focal↔k1k2 valley: fx error
+was still ~22% after 300 iterations, ~12% after 800, ~4% after 3000 — while the
+same data seeded near the true focal settles in a few hundred (fx to ~1%). The
+audited solver is left untouched; instead `calibrate-sweep.ts` adds
+`calibrateWithFocalSweep()`: five short probes at fx/width ∈ {0.45, 0.55, 0.7,
+0.9, 1.2}, keep the lowest-RMS basin, polish that seed with the caller's budget.
+`solveSession` now routes through it, and it degrades to exactly one `calibrate()`
+call when the caller supplies a measured focal. Corollary (also measured): the
+step/cost tolerances are tight enough that realistic solves end `iteration-cap`
+while micro-improving — the wizard must treat `iteration-cap` + trusted-gate-pass
+as normal, not as a warning state, and should pass a generous `maxIterations`
+(hundreds; a solve is seconds, cost scales with corners not pixels). Individual
+K/D parameters remain only weakly identifiable on planar targets — acceptance is
+judged on the fitted MAPPING (and the A/B view), not parameter closeness.
+
+### Overlay wiring as-built (2026-07-03) — alignment persists; workspace overlay mounts
+
+The beta exported `CameraOverlay` but never mounted it, and the solved
+homography lived only in the ephemeral camera store — F-CAM1's "saved to the
+device profile" promise was doc-vs-code drift. Closed by: a persisted
+`cameraAlignment?: CameraAlignment` on `DeviceProfile` (`camera-alignment.ts`
+normalizer, same untrusted-JSON discipline as `cameraCalibration`; the type
+records the pixel `basis: 'raw' | 'rectified'` because composing a rectified
+frame with a raw-basis homography would silently mis-register), an explicit
+"Save & show on canvas" action in the aligned Falcon view, and
+`WorkspaceCameraOverlay` mounted as a canvas-area sibling that re-computes the
+canvas's own fit-to-bed view from its measured box (Workspace is untouched).
+Overlay sources: a captured still (LightBurn's Update Overlay model, the
+accurate default-to-be once rectified alignment lands) or the continuous live
+video; panel controls cover show/hide + fade + still/live. Material-thickness
+shift compensation and the rectified-basis alignment flow are follow-ups
+(ADR-109 scope).
+
+---
+
+## ADR-109 — Camera Mode v3: automatic marker alignment (no-click homography)
+
+**Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
+
+### Context
+
+ADR-107 reserved v3 for "fiducial auto-align," rejecting ArUco decoders on
+licence (LGPV-bundle) grounds. The v2.b work shipped a proven clean-room
+X-corner detector — which is itself a fiducial detector if the fiducials are
+checker patches. Manual 4-point alignment (clicking bed corners in the frame)
+remains as the fallback and the Falcon path (its cross-origin frames block
+pixel readback, so no client-side detection is possible there).
+
+### Decision
+
+1. **Markers = five 2×2 checker patches**, engraved at known bed coordinates
+   (`generateCameraAlignPattern`, flowing through the normal generator →
+   preview → burn pipeline). Each patch centre is a literal X-corner for the
+   existing detector. 10 mm cells keep the sub-pixel refinement window inside
+   one cell even at ~1.3 px/mm camera resolution (smaller cells measurably
+   biased the corner by ~1.5 px in the harness).
+2. **The origin target is a patch PAIR** (two patches, 30 mm apart, midpoint =
+   target): the unique tight pair disambiguates camera rotation — including a
+   180°-mounted camera — with zero user input. Detection = top X-corner
+   candidates → the dominant closest pair → remaining three singles → points
+   ordered clockwise from the origin (a physical camera never mirrors, so
+   image-clockwise equals bed-clockwise).
+3. **Rectify before aligning when a lens calibration exists.** The alignment
+   then lives in the rectified basis (`CameraAlignment.basis`), giving
+   distortion-free registration bed-wide; without calibration the raw-basis
+   homography is exact at the four targets and slightly bowed between them.
+
+### Verification
+
+Rendered-frame harness (plane renderer shared with the board fixtures):
+detection finds all four targets in layout order for fronto / tilted / 180°-
+rotated cameras (≤1.5 px vs projected truth); typed failures for a blank bed
+and a missing origin pair; solved homography registers a mid-bed probe to
+< 2 mm raw-basis under a mild lens, and < 0.7 mm bed-wide in the rectified
+flow. NOT verified on real hardware: engraved-marker contrast/lighting and
+the physical burn-vs-overlay registration — the maintainer's F-CAM4 pass.
+
+### Out of scope
+
+Print-and-cut (2-point re-registration of a printed sheet) — the natural v3.5
+follow-on now that marker detection exists; capture-to-trace stays ADR-110.
+
+---
+
+## ADR-110 — Camera Mode v4: capture-to-trace at true bed coordinates
+
+**Status:** Accepted; shipped with tests. | **Date:** 2026-07-03
+
+### Context
+
+ADR-107 reserved v4 for capture-to-trace. The prerequisite geometry all
+exists now: rectification (v2), a persisted basis-tagged alignment (overlay
+wiring), and the marker auto-align (v3). LightBurn's equivalent traces a
+camera capture the user then positions manually; because our warp lands in
+bed coordinates, the trace needs no positioning at all.
+
+### Decision
+
+1. **Warp the aligned frame top-down into bed-mm space** (`warp-to-bed.ts`,
+   pure core): output→input sampling through the INVERSED homography
+   (`invertMat3`, adjugate), reusing the rectifier's bilinear sampler so the
+   two resamplers cannot drift. Off-frame pixels stay transparent.
+2. **Basis discipline is enforced, not assumed** (`trace-from-camera.ts`): a
+   rectified-basis alignment de-fisheyes the capture first and REFUSES to run
+   without a calibration; a raw-basis alignment uses raw pixels. Mixing bases
+   would silently mis-register — the same rule the overlay follows.
+3. **The RasterImage's bounds ARE the bed** (4 px/mm), so the existing trace
+   dialog and pipeline (ADR-100) need zero changes and traced vectors land at
+   the photographed object's true machine coordinates.
+
+### Verification
+
+Core closed loop: render a camera view of the marker bed → auto-align from
+pixels → warp top-down → re-detect the markers in the warped image → they sit
+at their true bed coordinates (< 0.75 mm at 2 px/mm). UI decision tests cover
+the typed failures (no alignment / basis mismatch). NOT verified on hardware:
+a real photographed object traced and burned back in place — the F-CAM5 pass.
 
 ## ADR-111 — CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.13, 2026-07-04)
 

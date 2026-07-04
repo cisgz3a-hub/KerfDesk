@@ -6,6 +6,7 @@ export type CommandShellCallbacks = {
   readonly requestMultiFileTrace: () => void;
   readonly requestConvertToBitmap: () => void;
   readonly requestAdjustImage: () => void;
+  readonly requestBoxGenerator: () => void;
   readonly requestMaterialTest: () => void;
   readonly requestIntervalTest: () => void;
   readonly requestScanOffsetTest: () => void;
@@ -27,6 +28,8 @@ export type CommandDialogs = {
   readonly measureActive: boolean;
   readonly registrationPanelOpen: boolean;
   readonly toggleRegistrationPanel: () => void;
+  readonly cameraPanelOpen: boolean;
+  readonly toggleCameraPanel: () => void;
 };
 
 export type CommandSelection = {

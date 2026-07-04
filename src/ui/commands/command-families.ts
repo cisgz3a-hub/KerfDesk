@@ -2,6 +2,7 @@ import { CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM } from '../common/fill-diagnostics
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { registrationJigCommand } from './registration-command-family';
+import { cameraCommand } from './camera-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 import { vectorBooleanCommands } from './vector-boolean-commands';
 
@@ -72,6 +73,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     },
     enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
     registrationJigCommand(ctx),
+    cameraCommand(ctx),
     ...calibrationToolCommands(ctx),
     enabled(
       'tools.optimization-settings',
@@ -260,6 +262,15 @@ function imageMaskCropCommand(ctx: AppCommandContext): AppCommand {
 
 function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
+    // Additive (inserts panels into the current scene), so no dirty-project
+    // guard — unlike the calibration grids, which replace the scene.
+    enabled(
+      'tools.box-generator',
+      'tools',
+      'Box Generator...',
+      'Generate a finger-joint box as cut-ready panels.',
+      ctx.boxGenerator,
+    ),
     enabled(
       'tools.material-test',
       'tools',

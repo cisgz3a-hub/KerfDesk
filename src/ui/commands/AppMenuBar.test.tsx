@@ -228,6 +228,66 @@ describe('AppMenuBar', () => {
     }
   });
 
+  it('renders separators between Tools menu groups and hides none of the commands', async () => {
+    const tool = (id: AppCommand['id'], label: string): AppCommand => ({
+      id,
+      family: 'tools',
+      label,
+      title: label,
+      enabled: true,
+      invoke: vi.fn(),
+    });
+    const toolCommands: ReadonlyArray<AppCommand> = [
+      tool('tools.measure', 'Measure'),
+      tool('tools.material-test', 'Material Test...'),
+      tool('tools.trace-image', 'Trace Image...'),
+      // A command id MENU_GROUPS does not know about must still render, in
+      // the trailing fallback block. Cast: simulating a future CommandId
+      // that the grouping table has not been taught yet.
+      tool('tools.some-future-tool' as AppCommand['id'], 'Future Tool'),
+    ];
+    const { host, root } = await renderMenu(toolCommands);
+    try {
+      const tools = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'Tools',
+      );
+      if (!(tools instanceof HTMLElement)) throw new Error('Tools menu missing');
+      await act(async () => {
+        tools.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const menu = host.querySelector('.lf-menu');
+      if (!(menu instanceof HTMLElement)) throw new Error('menu missing');
+      // 3 known commands from 3 different blocks + 1 fallback block = 3 rules.
+      expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(3);
+      for (const label of ['Measure', 'Material Test...', 'Trace Image...', 'Future Tool']) {
+        expect(menu.textContent).toContain(label);
+      }
+      // Fallback commands render last.
+      const items = [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent);
+      expect(items[items.length - 1]).toBe('Future Tool');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('renders no separators in a family without a grouping layout', async () => {
+    const { host, root } = await renderMenu(commands());
+    try {
+      const file = [...host.querySelectorAll('summary')].find(
+        (summary) => summary.textContent === 'File',
+      );
+      if (!(file instanceof HTMLElement)) throw new Error('File menu missing');
+      await act(async () => {
+        file.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      const menu = host.querySelector('.lf-menu');
+      expect(menu?.querySelectorAll('[role="separator"]')).toHaveLength(0);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('closes the open top menu when Escape is pressed', async () => {
     const { host, root } = await renderMenu(commands());
     try {

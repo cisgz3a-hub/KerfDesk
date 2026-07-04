@@ -191,8 +191,8 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
-      const hint = [...host.querySelectorAll('span')].find(
-        (span) => span.textContent === 'shortcuts',
+      const hint = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Shortcuts',
       );
       const title = hint?.getAttribute('title') ?? '';
       // Shipped shortcuts the hint used to omit:
@@ -210,6 +210,42 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
     }
   });
 
+  it('opens the Keyboard Shortcuts dialog from the toolbar button', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={[]} machineKind="laser" />);
+      });
+
+      const hint = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Shortcuts',
+      );
+      if (!(hint instanceof HTMLButtonElement)) throw new Error('Shortcuts button missing');
+      await act(async () => {
+        hint.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const dialog = host.querySelector('[role="dialog"]');
+      expect(dialog).not.toBeNull();
+      expect(dialog?.textContent).toContain('Keyboard Shortcuts');
+      expect(dialog?.textContent).toContain('Ctrl+N');
+
+      const close = [...(dialog?.querySelectorAll('button') ?? [])].find(
+        (button) => button.textContent === 'Close',
+      );
+      await act(async () => {
+        close?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('labels the job-control shortcuts with the machine noun in CNC mode (ADR-101 §7)', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -220,12 +256,70 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="cnc" />);
       });
 
-      const hint = [...host.querySelectorAll('span')].find(
-        (span) => span.textContent === 'shortcuts',
+      const hint = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Shortcuts',
       );
       const title = hint?.getAttribute('title') ?? '';
       expect(title).toContain('Router: Ctrl+Enter');
       expect(title).not.toContain('Laser:');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+});
+
+describe('Toolbar separators', () => {
+  const command = (id: AppCommand['id'], label: string): AppCommand => ({
+    id,
+    family: 'file',
+    label,
+    title: label,
+    enabled: true,
+    invoke: vi.fn(),
+  });
+
+  it('renders separators only between non-empty groups plus the two structural ones', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        // file.new and window.toggle-preview live in different toolbar groups.
+        root.render(
+          <Toolbar
+            commands={[command('file.new', 'New'), command('window.toggle-preview', 'Preview')]}
+            machineKind="laser"
+          />,
+        );
+      });
+
+      const separators = host.querySelectorAll('[role="separator"]');
+      // 1 structural (after the badges) + 1 between the two visible groups.
+      expect(separators).toHaveLength(2);
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('renders no group separator and no double separator when only one group is visible', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={[command('file.new', 'New')]} machineKind="laser" />);
+      });
+
+      const separators = [...host.querySelectorAll('[role="separator"]')];
+      expect(separators).toHaveLength(1);
+      // The empty-group bug rendered adjacent separators (a stray "| |").
+      for (const separator of separators) {
+        expect(separator.nextElementSibling?.getAttribute('role')).not.toBe('separator');
+      }
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

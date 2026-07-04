@@ -4,6 +4,7 @@
 // store.ts so the root store stays under the file-size cap; all three share the
 // same "add an object + auto-create layers + select + push undo" shape.
 
+import type { BoxPanel } from '../../core/box';
 import {
   findRegistrationBoxes,
   type Layer,
@@ -12,6 +13,7 @@ import {
   type ShapeObject,
   type TextObject,
 } from '../../core/scene';
+import { applyInsertBoxPanels } from './box-insert-mutation';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
@@ -43,6 +45,7 @@ export function objectInsertActions(
   | 'importSvgObject'
   | 'upsertTextObject'
   | 'drawShape'
+  | 'insertBoxPanels'
   | 'addRegistrationBox'
   | 'addRegistrationCircle'
   | 'removeRegistrationBox'
@@ -73,6 +76,9 @@ export function objectInsertActions(
     },
     drawShape: (shape: ShapeObject) => {
       set((s) => applyDrawShape(s, shape));
+    },
+    insertBoxPanels: (panels: ReadonlyArray<BoxPanel>) => {
+      set((s) => applyInsertBoxPanels(s, panels) ?? s);
     },
     addRegistrationBox: (widthMm: number, heightMm: number) => {
       set((s) => {
