@@ -32,6 +32,16 @@ export const DEFAULT_SPUR_OPTIONS: SpurPruneOptions = {
   maxSpurTipRadiusPx: 1.6,
 };
 
+// Cap the protrusion budget at fat-stroke scale (as junction-condense caps its
+// merge reach). The budget models "how far past the trunk a CORNER wedge can
+// stick out" — bounded by the stroke width at that corner. When thin arms meet
+// a FAT hub (a filled star: 45-px inner-radius blob, 35-px sharp spokes), the
+// junction radius is the blob's, not the arm's, and radiusFactor·junctionRadius
+// balloons to ~72 px — swallowing every real spoke. A corner wedge never
+// protrudes this far; a 12-px+ protrusion is a stroke, so the cap keeps real
+// spokes while corner spurs (protrusion ≲ 6 px) still prune.
+const MAX_SPUR_BUDGET_PX = 12;
+
 type MutableChain = {
   a: number;
   b: number;
@@ -164,7 +174,10 @@ function isArtifactSpur(
   const tipRadius = radiusNearPoint(leafTipPos(chain, degree), distSq, width);
   if (tipRadius > options.maxSpurTipRadiusPx) return false; // real branch cap
   const junctionRadius = radiusNearPoint(junctionEnd.pos, distSq, width);
-  const budget = Math.max(options.minSpurPx, options.radiusFactor * junctionRadius);
+  const budget = Math.min(
+    MAX_SPUR_BUDGET_PX,
+    Math.max(options.minSpurPx, options.radiusFactor * junctionRadius),
+  );
   return length - junctionRadius < budget;
 }
 

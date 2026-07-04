@@ -1,13 +1,16 @@
-// core/trace — Phase E raster vectorization. Two output paths:
-//   - traceImageToSvgString: legacy SVG-string path that feeds parseSvg
-//     for the polyline conversion. Kept for the preview overlay so
-//     existing rendering code stays unchanged.
-//   - traceImageToColoredPaths: tracedata direct path that bypasses
-//     parseSvg's curve-flattening by sampling Q-segments at high
-//     density inline. Used by the import commit so engrave fidelity
-//     matches imagetracerjs's analytic curves.
+// core/trace — raster vectorization. The single entry point the app uses
+// (dialog preview, import commit, batch trace) is traceImageToColoredPaths,
+// which dispatches by options:
+//   - 2-colour fixed-palette options (ALL surfaced presets: Line Art,
+//     Smooth, Sharp) → the clean-room potrace backend (potrace-trace.ts).
+//   - traceMode 'centerline' / 'edge' → the medial-axis and Canny-chain
+//     tracers.
+//   - anything else (multi-colour, no fixed palette — reachable only via
+//     non-preset options) → the legacy imagetracerjs tracedata path.
+// traceImageToSvgString is the legacy SVG-string variant of that last
+// path; no app code calls it today (tests only).
 //
-// Both share the same preprocessing chain (raster-prep image
+// All paths share the same preprocessing chain (raster-prep image
 // adjustments → median → threshold → despeckle).
 
 export type { RawImageData, TraceOptions } from './trace-image';

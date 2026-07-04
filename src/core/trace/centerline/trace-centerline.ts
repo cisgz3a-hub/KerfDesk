@@ -13,6 +13,7 @@ import { buildStrokeGraph } from './stroke-graph';
 import { condenseJunctions } from './junction-condense';
 import { DEFAULT_SPUR_OPTIONS, pruneSpurs } from './spur-pruning';
 import { assembleStrokePaths } from './stroke-chains';
+import { closeRingEndpoints } from './loop-closure';
 
 const CENTERLINE_COLOR = '#000000';
 const INK_LUMA_MAX = 128;
@@ -36,7 +37,10 @@ export function traceCenterlineStrokePaths(
     // the preset default of 1 leaves the tuned epsilon unchanged.
     simplifyTolerance: options.lineTolerance,
   });
-  return polylines.length === 0 ? [] : [{ color: CENTERLINE_COLOR, polylines }];
+  // Rings closed at a corner keep their endpoints a gap apart; make them
+  // return to start so a stroked/engraved closed loop has no seam gap.
+  const closed = closeRingEndpoints(polylines);
+  return closed.length === 0 ? [] : [{ color: CENTERLINE_COLOR, polylines: closed }];
 }
 
 // The shared preprocessing already binarized the image (threshold/Otsu);

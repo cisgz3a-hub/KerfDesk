@@ -132,6 +132,7 @@ Full professional CNC/router mode — LaserForge's own feature surface, not an E
 | H.11 | Market-parity build-out (ADR-103): vector booleans + offset (clipper2), probing wizard (Z + XYZ corner, G38.2), real-time feed/spindle/rapid overrides, general 3D cut preview, feeds & speeds calculator, machine-aware G-code banner | Built (G1–G8) |
 | H.12 | Easel-parity pack (ADR-105): persistent live 3D pane, pocket raster fill (offset/raster-X/raster-Y), bundled local design library | Built |
 | H.13 | Beginner-mode UX pack (ADR-111): layer material picker (auto-fills feeds), Basic/Advanced disclosure + through-cut, machine auto-fill from detected `$$`, stock/feed limit advisories | Built |
+| H.14 | Project material picker (ADR-112): Easel-style set-material-once in the Material & Bit panel; auto-fills feeds for every layer and seeds new ones (manual Add, SVG import); per-layer picker still overrides | Built |
 
 
 ### Phase I — v0.9 "Multi-controller" [Merged to main; awaiting remaining hardware passes]

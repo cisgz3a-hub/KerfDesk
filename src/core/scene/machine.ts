@@ -30,6 +30,11 @@ export type CncStock = {
   readonly widthMm: number;
   readonly heightMm: number;
   readonly originOffset: Vec2;
+  // ADR-112: the job's stock material (a ChiploadMaterial key), chosen once in
+  // the Material & Bit panel — Easel's project-level material. Drives the
+  // project material picker that seeds/auto-fills every layer's feeds. Absent =
+  // no project material ("Custom"); display/seed only, never compiled directly.
+  readonly materialKey?: string;
 };
 
 // How a layer's geometry is machined (Easel's "cut type"):
@@ -150,17 +155,36 @@ export type MachineConfig = LaserMachineConfig | CncMachineConfig;
 
 export const LASER_MACHINE_CONFIG: LaserMachineConfig = { kind: 'laser' };
 
-// Starter bit library — common hobby-router bits (Easel's default carving
-// bits plus common metric end mills). Diameters in mm.
+// Starter bit library — common hobby-router bits. Names are mm-first with the
+// imperial fraction the bit is physically sold by in parens, so an operator can
+// match the bit in hand while the app stays metric. Diameters in mm. Existing
+// ids are STABLE (referenced by .lf2 files, the default toolId, and tests) —
+// only ever append here.
 export const DEFAULT_CNC_TOOLS: ReadonlyArray<CncTool> = [
-  { id: 'em-3175', name: '1/8 in straight end mill', kind: 'end-mill', diameterMm: 3.175 },
-  { id: 'em-1588', name: '1/16 in straight end mill', kind: 'end-mill', diameterMm: 1.588 },
-  { id: 'em-6350', name: '1/4 in straight end mill', kind: 'end-mill', diameterMm: 6.35 },
+  { id: 'em-3175', name: '3.175 mm (1/8") end mill', kind: 'end-mill', diameterMm: 3.175 },
+  { id: 'em-1588', name: '1.588 mm (1/16") end mill', kind: 'end-mill', diameterMm: 1.588 },
+  { id: 'em-6350', name: '6.35 mm (1/4") end mill', kind: 'end-mill', diameterMm: 6.35 },
+  { id: 'em-9525', name: '9.525 mm (3/8") end mill', kind: 'end-mill', diameterMm: 9.525 },
   { id: 'em-1000', name: '1 mm end mill', kind: 'end-mill', diameterMm: 1 },
   { id: 'em-2000', name: '2 mm end mill', kind: 'end-mill', diameterMm: 2 },
-  { id: 'bn-3175', name: '1/8 in ball nose', kind: 'ball-nose', diameterMm: 3.175 },
-  { id: 'vb-30', name: '30° engraving V-bit', kind: 'v-bit', diameterMm: 3.175, tipAngleDeg: 30 },
+  { id: 'em-3000', name: '3 mm end mill', kind: 'end-mill', diameterMm: 3 },
+  { id: 'em-6000', name: '6 mm end mill', kind: 'end-mill', diameterMm: 6 },
+  { id: 'dc-3175', name: '3.175 mm (1/8") downcut end mill', kind: 'end-mill', diameterMm: 3.175 },
+  { id: 'cp-6350', name: '6.35 mm (1/4") compression bit', kind: 'end-mill', diameterMm: 6.35 },
+  { id: 'bn-3175', name: '3.175 mm (1/8") ball nose', kind: 'ball-nose', diameterMm: 3.175 },
+  { id: 'bn-1588', name: '1.588 mm (1/16") ball nose', kind: 'ball-nose', diameterMm: 1.588 },
+  { id: 'bn-6350', name: '6.35 mm (1/4") ball nose', kind: 'ball-nose', diameterMm: 6.35 },
+  { id: 'vb-30', name: '30° V-bit', kind: 'v-bit', diameterMm: 3.175, tipAngleDeg: 30 },
+  { id: 'vb-45', name: '45° V-bit', kind: 'v-bit', diameterMm: 6.35, tipAngleDeg: 45 },
   { id: 'vb-60', name: '60° V-bit', kind: 'v-bit', diameterMm: 6.35, tipAngleDeg: 60 },
+  { id: 'vb-90', name: '90° V-bit', kind: 'v-bit', diameterMm: 12.7, tipAngleDeg: 90 },
+  {
+    id: 'eng-15',
+    name: '15° engraving bit',
+    kind: 'engraving',
+    diameterMm: 3.175,
+    tipAngleDeg: 15,
+  },
 ];
 
 // Footprint defaults sized to the 4040 target machine's 400 × 400 mm bed
@@ -217,7 +241,7 @@ export const DEFAULT_CNC_MACHINE_CONFIG: CncMachineConfig = {
 // with an empty tool list.
 const FALLBACK_TOOL: CncTool = {
   id: 'em-3175',
-  name: '1/8 in straight end mill',
+  name: '3.175 mm (1/8") end mill',
   kind: 'end-mill',
   diameterMm: 3.175,
 };

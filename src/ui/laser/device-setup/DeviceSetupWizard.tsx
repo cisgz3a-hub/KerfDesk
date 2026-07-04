@@ -27,6 +27,7 @@ import {
   type DeviceSetupStep,
 } from './device-setup-flow';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
+import { DeviceSetupProbeStep } from './DeviceSetupProbeStep';
 import { computeSetupReadiness } from './device-setup-readiness';
 import { DeviceSetupReviewStep } from './DeviceSetupReviewStep';
 import { DeviceSetupSafetyStep } from './DeviceSetupSafetyStep';
@@ -36,6 +37,7 @@ const STEP_TITLES: Record<DeviceSetupStep, string> = {
   identify: 'Identify machine',
   confirm: 'Confirm settings',
   safety: 'Homing & options',
+  probe: 'Set work zero (probe)',
   firmware: 'Sync to controller',
   review: 'Review & finish',
 };
@@ -125,6 +127,8 @@ function renderStep(
       return <DeviceSetupConfirmStep state={state} dispatch={dispatch} />;
     case 'safety':
       return <DeviceSetupSafetyStep state={state} dispatch={dispatch} />;
+    case 'probe':
+      return <DeviceSetupProbeStep />;
     case 'firmware':
       return <DeviceSetupFirmwareStep state={state} />;
     case 'review':

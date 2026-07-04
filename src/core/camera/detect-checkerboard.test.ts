@@ -15,6 +15,7 @@ import { calibrateWithFocalSweep } from './calibrate-sweep';
 import { detectCheckerboard, toBoardObservation } from './detect-checkerboard';
 import { type CameraIntrinsics, type FisheyeDistortion, projectFisheye } from './fisheye';
 import type { Vec2 } from '../scene';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 
 // A Falcon-class wide fisheye: board corners reach ~0.6 rad of field angle,
 // where the theta-polynomial separates cleanly from the focal length. (At
@@ -161,7 +162,10 @@ describe('detectCheckerboard on rendered frames', () => {
 
   it(
     'end-to-end: five detected views calibrate back to the true camera',
-    { timeout: 60000 },
+    // The solver is deterministic; this timeout only guards against a hang, so it
+    // is generous on the slow shared CI runner (runs ~15s locally, blew 60s under
+    // CI load). The rmsPx / mapping-disagreement assertions are the real gate.
+    { timeout: ciBudgetMs(60_000, 240_000) },
     () => {
       const observations = POSES.map((pose) => {
         const options = { ...BASE, ...pose };

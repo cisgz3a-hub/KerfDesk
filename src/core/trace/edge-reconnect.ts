@@ -10,6 +10,7 @@
 // this never invents geometry.
 
 import type { Polyline, Vec2 } from '../scene';
+import { SegmentGrid } from './centerline/spatial-grid';
 
 export type RidgeField = {
   readonly ridgeMag: Float32Array;
@@ -47,13 +48,18 @@ export function reconnectAlongRidge(
   while (madeProgress && guard > 0) {
     guard -= 1;
     madeProgress = false;
+    // The grid indexes every chain's segments by chain index. It stays valid
+    // for the whole pass: the first successful attach `break`s out and the
+    // next pass rebuilds. Any chain the grid omits near a walk point cannot
+    // be within ARRIVE_DISTANCE_PX, so it could never have been an arrival.
+    const grid = buildArrivalGrid(chains);
     for (const chain of chains) {
       if (chain.closed || chain.points.length < 2) continue;
-      if (tryReconnectEnd(chain, 'end', chains, field, maxWalkPx)) {
+      if (tryReconnectEnd(chain, 'end', chains, grid, field, maxWalkPx)) {
         madeProgress = true;
         break;
       }
-      if (tryReconnectEnd(chain, 'start', chains, field, maxWalkPx)) {
+      if (tryReconnectEnd(chain, 'start', chains, grid, field, maxWalkPx)) {
         madeProgress = true;
         break;
       }
@@ -68,11 +74,12 @@ function tryReconnectEnd(
   chain: OpenChain,
   which: 'start' | 'end',
   chains: OpenChain[],
+  grid: ArrivalGrid,
   field: RidgeField,
   maxWalkPx: number,
 ): boolean {
   if (which === 'start') chain.points.reverse();
-  const connected = walkAndAttach(chain, chains, field, maxWalkPx);
+  const connected = walkAndAttach(chain, chains, grid, field, maxWalkPx);
   if (which === 'start' && !chain.closed) chain.points.reverse();
   return connected;
 }
@@ -81,6 +88,7 @@ function tryReconnectEnd(
 function walkAndAttach(
   chain: OpenChain,
   chains: OpenChain[],
+  grid: ArrivalGrid,
   field: RidgeField,
   maxWalkPx: number,
 ): boolean {
@@ -99,7 +107,7 @@ function walkAndAttach(
     const next = bestRidgeStep(cur, dir, dir0, field, floor);
     if (next === null) return false; // ridge died — genuine end
     walked.push(next);
-    const hit = findArrival(chain, chains, next);
+    const hit = findArrival(chain, chains, grid, next);
     if (hit !== null) {
       attach(chain, walked, hit);
       return true;
@@ -116,13 +124,51 @@ type Arrival =
   | { readonly kind: 'other'; readonly chain: OpenChain; readonly atStart: boolean }
   | { readonly kind: 'mid'; readonly chain: OpenChain };
 
-function findArrival(own: OpenChain, chains: ReadonlyArray<OpenChain>, p: Vec2): Arrival | null {
+// A segment grid over every chain, tagged by chain index, so arrival tests
+// examine only the chains whose geometry lies near the walk point instead of
+// re-scanning every chain's every segment on each step.
+type ArrivalGrid = { readonly grid: SegmentGrid; readonly indexOf: Map<OpenChain, number> };
+
+function buildArrivalGrid(chains: ReadonlyArray<OpenChain>): ArrivalGrid {
+  const grid = new SegmentGrid(ARRIVE_DISTANCE_PX);
+  const indexOf = new Map<OpenChain, number>();
+  for (let ci = 0; ci < chains.length; ci += 1) {
+    const chain = chains[ci];
+    if (chain === undefined) continue;
+    indexOf.set(chain, ci);
+    if (chain.points.length < 2) continue;
+    const pts = chain.points;
+    const count = pts.length + (chain.closed ? 0 : -1);
+    for (let i = 0; i < count; i += 1) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (a === undefined || b === undefined) continue;
+      grid.insert({ ownerId: ci, segIndex: i, a, b });
+    }
+  }
+  return { grid, indexOf };
+}
+
+function findArrival(
+  own: OpenChain,
+  chains: ReadonlyArray<OpenChain>,
+  arrival: ArrivalGrid,
+  p: Vec2,
+): Arrival | null {
   const ownStart = own.points[0];
   if (ownStart !== undefined && distance(p, ownStart) <= ARRIVE_DISTANCE_PX) {
     return { kind: 'self-close' };
   }
-  for (const other of chains) {
-    if (other === own || other.points.length < 2) continue;
+  // Evaluate candidate chains in original array order (the naive loop returned
+  // the FIRST matching chain): collect nearby owner indices, then sort.
+  const owners = new Set<number>();
+  for (const seg of arrival.grid.query(p, ARRIVE_DISTANCE_PX)) owners.add(seg.ownerId);
+  const ownIndex = arrival.indexOf.get(own);
+  const sorted = [...owners].sort((a, b) => a - b);
+  for (const ci of sorted) {
+    if (ci === ownIndex) continue;
+    const other = chains[ci];
+    if (other === undefined || other === own || other.points.length < 2) continue;
     const hit = arrivalOnChain(other, p);
     if (hit !== null) return hit;
   }

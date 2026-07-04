@@ -2,7 +2,18 @@
 // factors, rounding, and floors.
 
 import { describe, expect, it } from 'vitest';
-import { calculateFeeds, chiploadFor } from './feeds-calculator';
+import { calculateFeeds, chiploadFor, isChiploadMaterialKey } from './feeds-calculator';
+
+describe('isChiploadMaterialKey', () => {
+  it('accepts every known material and rejects everything else', () => {
+    for (const key of ['softwood', 'hardwood', 'plywood-mdf', 'acrylic', 'aluminum']) {
+      expect(isChiploadMaterialKey(key)).toBe(true);
+    }
+    for (const bad of ['unobtainium', '', 'ALUMINUM', undefined, null, 3, {}]) {
+      expect(isChiploadMaterialKey(bad)).toBe(false);
+    }
+  });
+});
 
 describe('chiploadFor', () => {
   it('selects the diameter band, inclusive at the boundary', () => {

@@ -1,40 +1,70 @@
-// Output curve refinement. Douglas-Peucker alone emits sparse polygonal
-// vertices, and the app draws those chords literally — every curve renders
-// as visible flat facets with kinks (the faceted-letters defect). Round the
-// simplified polyline with corner-preserving Chaikin subdivision: vertices
-// that turn harder than the pin threshold are DRAWN corners (the bend
-// sharpener put them there) and stay exact; everything else converges to a
-// smooth quadratic B-spline, matching the visual quality of the sampled
-// curves the potrace-backed presets emit.
+// Output curve refinement. Douglas-Peucker emits sparse polygonal vertices,
+// and the app draws those chords literally — every curve renders as visible
+// flat facets (the faceted-letters defect). The dense chain is already
+// evened toward smooth curvature upstream (chain-smoothing.ts), so the
+// refine step's only job is to REPLACE the chords with a smooth curve that
+// passes through the vertices without kinking at them. A centripetal
+// Catmull-Rom resample does exactly that (curve-fit.ts): moderate turns
+// between vertices become smooth arcs, while genuine corners break the spline
+// and are emitted exactly. Chaikin was rejected here — its chord-quartering
+// leaves a facet at every pinned soft-turn vertex, so it cannot smooth an
+// already-evened curve.
 
 import type { Vec2 } from '../../scene';
+import { fitSmoothCurve } from './curve-fit';
 
-const CORNER_PIN_RAD = (35 * Math.PI) / 180;
-const CHAIKIN_ITERATIONS = 2;
+// Turns at least this sharp are corners: they break the smooth spline so their
+// legs stay straight. Matches the hard-corner threshold used across the
+// sharpener and the dense-chain evening, so a junction weld or loop-closure
+// corner the sharpener never rebuilt is still treated as a corner here.
+const HARD_CORNER_RAD = (60 * Math.PI) / 180;
+// New samples placed inside each spline segment. Four keeps the drawn curve
+// smooth at engraving scale while holding the total point count near the
+// simplified-vertex budget (a smooth curve needs even curvature, not brute
+// density).
+const SAMPLES_PER_SEGMENT = 3;
 const NEAR_POINT_EPS = 1e-9;
+const NO_CORNERS: ReadonlySet<Vec2> = new Set();
 
-type FlaggedPoint = { readonly p: Vec2; readonly anchor: boolean };
-
-/** Round a simplified chain for output. Corners and open-chain endpoints
- *  stay exact; smooth spans subdivide into gentle curves. */
-export function refineChainForOutput(points: ReadonlyArray<Vec2>, closed: boolean): Vec2[] {
+/** Round a simplified chain for output. Drawn corners (marked by the bend
+ *  sharpener, by reference), hard turns, and open-chain endpoints stay exact;
+ *  smooth spans resample into an even-curvature Catmull-Rom curve. */
+export function refineChainForOutput(
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+  drawnCorners: ReadonlySet<Vec2> = NO_CORNERS,
+): Vec2[] {
   if (points.length < 3) return [...points];
-  let flagged = flagAnchors(points, closed);
-  for (let iteration = 0; iteration < CHAIKIN_ITERATIONS; iteration += 1) {
-    flagged = chaikinOnce(flagged, closed);
-  }
-  return flagged.map((f) => f.p);
+  const corners = collectCorners(points, closed, drawnCorners);
+  return fitSmoothCurve(points, closed, corners, SAMPLES_PER_SEGMENT);
 }
 
-function flagAnchors(points: ReadonlyArray<Vec2>, closed: boolean): FlaggedPoint[] {
+// Corners that break the spline: the sharpener's rebuilt vertices plus any
+// hard turn it never saw. Soft and moderate turns are deliberately NOT
+// corners — the upstream evening already made them genuine curve, so letting
+// the spline flow through them is what removes the facets.
+function collectCorners(
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+  drawnCorners: ReadonlySet<Vec2>,
+): ReadonlySet<Vec2> {
+  const corners = new Set<Vec2>();
+  for (let i = 0; i < points.length; i += 1) {
+    const p = points[i];
+    if (p === undefined) continue;
+    if (drawnCorners.has(p) || turnAtIndex(points, i, closed) >= HARD_CORNER_RAD) corners.add(p);
+  }
+  return corners;
+}
+
+function turnAtIndex(points: ReadonlyArray<Vec2>, i: number, closed: boolean): number {
   const n = points.length;
-  return points.map((p, i) => {
-    if (!closed && (i === 0 || i === n - 1)) return { p, anchor: true };
-    const prev = points[(i - 1 + n) % n];
-    const next = points[(i + 1) % n];
-    if (prev === undefined || next === undefined) return { p, anchor: true };
-    return { p, anchor: turnAt(prev, p, next) >= CORNER_PIN_RAD };
-  });
+  if (!closed && (i === 0 || i === n - 1)) return 0;
+  const prev = points[(i - 1 + n) % n];
+  const at = points[i];
+  const next = points[(i + 1) % n];
+  if (prev === undefined || at === undefined || next === undefined) return 0;
+  return turnAt(prev, at, next);
 }
 
 function turnAt(prev: Vec2, at: Vec2, next: Vec2): number {
@@ -45,29 +75,4 @@ function turnAt(prev: Vec2, at: Vec2, next: Vec2): number {
     ((at.x - prev.x) / inLen) * ((next.x - at.x) / outLen) +
     ((at.y - prev.y) / inLen) * ((next.y - at.y) / outLen);
   return Math.acos(Math.max(-1, Math.min(1, dot)));
-}
-
-// One corner-preserving Chaikin pass: each edge contributes its quarter
-// points, except that an anchor vertex is emitted exactly and never cut.
-function chaikinOnce(flagged: ReadonlyArray<FlaggedPoint>, closed: boolean): FlaggedPoint[] {
-  const n = flagged.length;
-  const out: FlaggedPoint[] = [];
-  const edgeCount = closed ? n : n - 1;
-  for (let i = 0; i < edgeCount; i += 1) {
-    const a = flagged[i];
-    const b = flagged[(i + 1) % n];
-    if (a === undefined || b === undefined) continue;
-    if (a.anchor) out.push(a);
-    else out.push({ p: lerp(a.p, b.p, 0.25), anchor: false });
-    if (!b.anchor) out.push({ p: lerp(a.p, b.p, 0.75), anchor: false });
-  }
-  if (!closed) {
-    const last = flagged[n - 1];
-    if (last !== undefined) out.push(last);
-  }
-  return out;
-}
-
-function lerp(a: Vec2, b: Vec2, t: number): Vec2 {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }

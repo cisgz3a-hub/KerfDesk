@@ -214,8 +214,8 @@ describe('cncGrblStrategy tool changes', () => {
     const gcode = emit(scene);
     const m0Count = gcode.split('\n').filter((line) => line === 'M0').length;
     expect(m0Count).toBe(1);
-    expect(gcode).toContain('; tool: 1/8 in straight end mill (load before starting)');
-    expect(gcode).toContain('; tool change: load 1/4 in straight end mill');
+    expect(gcode).toContain('; tool: 3.175 mm (1/8") end mill (load before starting)');
+    expect(gcode).toContain('; tool change: load 6.35 mm (1/4") end mill');
     expect(gcode).toContain('; re-zero Z on the stock top');
     // The change block parks at origin with the spindle off before pausing.
     const lines = gcode.split('\n');

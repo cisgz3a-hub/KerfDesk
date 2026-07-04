@@ -11,8 +11,8 @@ import {
   measureSquareEdgeQuality,
   measureSquarePathEdgeQuality,
 } from './edge-truth';
+import { archHouseEdgeCurveCleanupBenchmark } from './arch-house-edge-benchmark';
 import {
-  archHouseEdgeCurveCleanupBenchmark,
   archHouseLineArtBaselineBenchmark,
   centerlineLandedRegressionBenchmark,
 } from './trace-benchmark-regression-cases';
