@@ -2093,6 +2093,30 @@ F-CNC19 tiling.
 1. The feed check considers only layers set to output; a hidden/off layer
    with an aggressive feed does not raise the advisory.
 
+### F-CNC35. Set the project material once (Easel-style) — ADR-112
+
+#### Success
+1. The Material & Bit panel shows a "Material" dropdown (above Bit) the
+   moment you switch to CNC — no design needed. Pick your stock material and
+   every layer's feed / plunge / depth-per-pass fills from it (each layer's
+   own bit + spindle), in one undoable step.
+2. New layers inherit it: add a layer or import an SVG after choosing the
+   material and the fresh layers come in with those feeds (not the generic
+   1000 / 1.5 default). Set material first, then import — the Easel order.
+
+#### Error — none (bounded select)
+1. Material is a dropdown; feeds floor at safe minimums via the calculator.
+
+#### Empty
+1. The dropdown shows in CNC mode only. "Custom" clears the project material
+   and leaves current feeds untouched for hand-tuning.
+
+#### Edge — per-layer override and other object types
+1. A layer's own Material picker (F-CNC31) overrides the project material for
+   that layer. Text and drawn shapes don't auto-seed (like laser defaults);
+   set their material on the layer card, or re-pick the project material to
+   apply to all.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)
