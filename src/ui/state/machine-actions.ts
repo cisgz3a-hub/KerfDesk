@@ -17,6 +17,7 @@ import {
   type MachineKind,
   type Project,
 } from '../../core/scene';
+import type { CncMachinePreset } from '../../core/cnc';
 import type { CncLibrary } from './cnc-library-persistence';
 import { projectWithStockMaterial } from './cnc-project-material';
 import { pushUndo } from './scene-mutations';
@@ -49,6 +50,9 @@ export type MachineActions = {
   // ADR-112: set (or clear, when null) the project stock material and auto-fill
   // every layer's feeds from it. One undoable step.
   readonly applyCncStockMaterial: (materialKey: string | null) => void;
+  // Load a built-in CNC machine preset: seed the shared device bed and the CNC
+  // spindle ceiling in one undoable step. CNC-only.
+  readonly applyCncMachinePreset: (preset: CncMachinePreset) => void;
 };
 
 // Library bits the session's tool list doesn't already carry are appended
@@ -113,6 +117,30 @@ export function machineActions(set: MachineSet): MachineActions {
       set((state) => {
         const project = projectWithStockMaterial(state.project, materialKey);
         if (project === state.project) return {};
+        return {
+          project,
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      }),
+    applyCncMachinePreset: (preset) =>
+      set((state) => {
+        const machine = state.project.machine;
+        if (machine?.kind !== 'cnc') return {};
+        // Bed lives on the shared device; the spindle ceiling on the CNC params.
+        const project: Project = {
+          ...state.project,
+          device: {
+            ...state.project.device,
+            bedWidth: preset.bedWidthMm,
+            bedHeight: preset.bedHeightMm,
+          },
+          machine: {
+            ...machine,
+            params: { ...machine.params, spindleMaxRpm: preset.spindleMaxRpm },
+          },
+        };
         return {
           project,
           undoStack: pushUndo(state.project, state.undoStack),
