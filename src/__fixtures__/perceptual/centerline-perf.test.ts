@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RawImageData } from '../../core/trace';
 import { TRACE_PRESETS, traceCenterlineStrokePaths } from '../../core/trace';
+import { ciBudgetMs } from '../ci-budget';
 
 const RGBA = 4;
 const BLACK = 0;
@@ -36,7 +37,12 @@ function gridImage(width: number, height: number, stroke: number, spacing: numbe
 
 const CENTERLINE_OPTIONS = TRACE_PRESETS['Centerline']!;
 const WORKER_TIMEOUT_MS = 30_000;
-const REGRESSION_BUDGET_MS = 8_000;
+// A healthy tracer runs this in ~2-4s locally but ~9s on the ~2-4x-slower shared
+// CI runner, so an 8s tripwire fails the build for pure runner speed. Keep 8s
+// locally; allow 15s on CI. A real algorithmic regression (the legacy
+// O(iters×W×H) thinner) blows the 30s worker ceiling on ANY machine, so the
+// `< WORKER_TIMEOUT_MS` assertion below stays the hard correctness gate.
+const REGRESSION_BUDGET_MS = ciBudgetMs(8_000, 15_000);
 
 describe('centerline trace performance on a big image', () => {
   it('traces a ~1.9MP thick-stroke grid within the regression budget', { timeout: 90_000 }, () => {
