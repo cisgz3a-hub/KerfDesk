@@ -5,6 +5,7 @@
 
 import { useState } from 'react';
 import { activeCncTool } from '../../core/scene';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { selectionCanWeld } from '../commands/selection-command-state';
 import { useStore } from '../state';
 
@@ -29,18 +30,14 @@ export function DogboneRow(): JSX.Element | null {
     <section aria-label="Dogbone corners" style={sectionStyle}>
       <span style={labelStyle}>Dogbone</span>
       <span style={controlStyle}>
-        <input
-          type="number"
-          aria-label="Dogbone bit diameter"
+        <ClearableNumberField
+          ariaLabel="Dogbone bit diameter"
           title="Bit diameter used to size the corner overcut circles."
           min={MIN_BIT_MM}
           max={MAX_BIT_MM}
           step={0.01}
           value={bitMm}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (Number.isFinite(v) && v >= MIN_BIT_MM && v <= MAX_BIT_MM) setBitOverrideMm(v);
-          }}
+          onCommit={setBitOverrideMm}
           style={inputStyle}
         />
         <span style={unitStyle}>mm</span>

@@ -12,6 +12,7 @@ import {
 } from '../../core/cnc';
 import { activeCncTool, type CncMachineConfig } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useToastStore } from '../state/toast-store';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
@@ -132,18 +133,14 @@ function Num(props: {
   return (
     <label style={fieldStyle}>
       {props.label}
-      <input
-        type="number"
-        aria-label={`Surfacing ${props.label.toLowerCase()}`}
+      <ClearableNumberField
+        ariaLabel={`Surfacing ${props.label.toLowerCase()}`}
         title={props.title}
         value={props.value}
         min={NUM_MIN}
         max={NUM_MAX}
         step={0.1}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (Number.isFinite(v) && v >= NUM_MIN && v <= NUM_MAX) props.onCommit(v);
-        }}
+        onCommit={props.onCommit}
         style={inputStyle}
       />
     </label>

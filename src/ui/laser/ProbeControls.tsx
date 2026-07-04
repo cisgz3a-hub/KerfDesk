@@ -14,6 +14,7 @@ import {
   type ZProbeParams,
 } from '../../core/controllers/grbl';
 import { activeCncTool } from '../../core/scene';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
@@ -184,20 +185,14 @@ function NumberField(props: {
     <label style={fieldStyle}>
       {props.label}
       <span style={unitWrapStyle}>
-        <input
-          type="number"
-          aria-label={props.label}
+        <ClearableNumberField
+          ariaLabel={props.label}
           title={NUMBER_FIELD_TITLES[props.label] ?? props.label}
           value={props.value}
           min={PROBE_VALUE_MIN_MM}
           max={PROBE_VALUE_MAX_MM}
           step={0.01}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (Number.isFinite(v) && v >= PROBE_VALUE_MIN_MM && v <= PROBE_VALUE_MAX_MM) {
-              props.onCommit(v);
-            }
-          }}
+          onCommit={props.onCommit}
           style={inputStyle}
         />
         mm

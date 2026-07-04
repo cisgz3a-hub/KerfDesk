@@ -5,6 +5,7 @@
 // sources stay (VCarve/Offsetter convention).
 
 import { useState } from 'react';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { selectionCanWeld } from '../commands/selection-command-state';
 
@@ -28,18 +29,14 @@ export function OffsetPathsRow(): JSX.Element | null {
     <section aria-label="Offset paths" style={sectionStyle}>
       <span style={labelStyle}>Offset</span>
       <span style={controlStyle}>
-        <input
-          type="number"
-          aria-label="Offset distance"
+        <ClearableNumberField
+          ariaLabel="Offset distance"
           title="Distance in millimeters between the shape and its offset copy."
           min={MIN_OFFSET_MM}
           max={MAX_OFFSET_MM}
           step={0.1}
           value={distanceMm}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (Number.isFinite(v) && v >= MIN_OFFSET_MM && v <= MAX_OFFSET_MM) setDistanceMm(v);
-          }}
+          onCommit={setDistanceMm}
           style={inputStyle}
         />
         <span style={unitStyle}>mm</span>
