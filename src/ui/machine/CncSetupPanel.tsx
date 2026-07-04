@@ -8,6 +8,7 @@ import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
 import { CncDetectedSettingsRow } from './CncDetectedSettingsRow';
 import { CncMachineProfilesRow, CncToolManager } from './CncLibraryPanels';
+import { CncMachineCatalogRow } from './CncMachineCatalogRow';
 import { CncTilingPanel } from './CncTilingPanel';
 import { SurfacingPanel } from './SurfacingPanel';
 
@@ -44,6 +45,7 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
       <CncStockFields machine={machine} />
       <CncMachineParamsFields machine={machine} />
       <CncToolManager machine={machine} />
+      <CncMachineCatalogRow />
       <CncMachineProfilesRow />
       <CncTilingPanel machine={machine} />
       <SurfacingPanel machine={machine} />
