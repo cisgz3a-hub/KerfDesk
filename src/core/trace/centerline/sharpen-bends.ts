@@ -36,16 +36,26 @@ const MAX_WINDOW_ARM_PX = 12;
 const CLOSED_ARM_LENGTH_DIVISOR = 6;
 const PARALLEL_EPS = 1e-9;
 
+export type SharpenedChain = {
+  readonly points: Vec2[];
+  /** The rebuilt drawn-corner vertices, by object reference. Output
+   *  refinement pins exactly these — they carry dense-chain evidence
+   *  (straight legs, vertex hugging the chain) that no post-simplification
+   *  angle heuristic can recover. */
+  readonly corners: ReadonlySet<Vec2>;
+};
+
 /** Sharpen concentrated bends of a chain. Closed chains are handled by
  *  rotation (a closed polyline is rotation-invariant), so ring corners
- *  sharpen exactly like open-chain corners. Returns a new point list. */
+ *  sharpen exactly like open-chain corners. */
 export function sharpenChainBends(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
   distSq: Float64Array,
   width: number,
-): Vec2[] {
+): SharpenedChain {
   let pts = [...points];
+  const corners = new Set<Vec2>();
   let i = 1;
   // Every closed-chain replacement restarts the scan (the returned array is
   // rotated), so the iteration budget must grow with each replacement — a
@@ -69,6 +79,7 @@ export function sharpenChainBends(
       continue;
     }
     pts = bent.points;
+    corners.add(bent.corner);
     replacementsLeft -= 1;
     if (replacementsLeft <= 0) break;
     guard += pts.length;
@@ -76,10 +87,14 @@ export function sharpenChainBends(
     // unscanned points, so restart. Open arrays keep their prefix; skip ahead.
     i = closed ? 1 : bent.resumeAt;
   }
-  return pts;
+  return { points: pts, corners };
 }
 
-type BendResult = { readonly points: Vec2[]; readonly resumeAt: number };
+type BendResult = {
+  readonly points: Vec2[];
+  readonly resumeAt: number;
+  readonly corner: Vec2;
+};
 
 // Cheap gate: tangent turn across ±QUICK_TANGENT_SPAN points. Smoothing has
 // already flattened the pixel staircase, so only real bends pass this.
@@ -122,7 +137,7 @@ function trySharpenOpen(
   const removedFrom = head.length;
   const removedTo = pts.length - tail.length;
   if (!vertexHugsChain(corner, pts, removedFrom, removedTo, window.maxRadius)) return null;
-  return { points: [...head, corner, ...tail], resumeAt: head.length + 1 };
+  return { points: [...head, corner, ...tail], resumeAt: head.length + 1, corner };
 }
 
 // Max deviation of the leg (the window-length run leading into / out of the

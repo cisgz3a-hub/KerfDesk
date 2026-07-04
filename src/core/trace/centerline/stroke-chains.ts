@@ -10,9 +10,11 @@
 //     the vertex count without moving the line visibly.
 
 import type { Polyline, Vec2 } from '../../scene';
+import { smoothChainCurvature } from './chain-smoothing';
 import { refineChainForOutput } from './curve-refine';
 import type { InkMask } from './distance-field';
 import { bridgeNearbyEnds, pairThroughJunctions, type Chain } from './junction-pairing';
+import { decideLoopClosure, LOOP_TOUCH_GAP_PX, type LoopClosureOptions } from './loop-closure';
 import { pointAtArcDistance, radiusAtPosition } from './polyline-window';
 import { repairJunctionSeams, weldBranchEnds } from './seam-repair';
 import { sharpenChainBends } from './sharpen-bends';
@@ -34,14 +36,16 @@ export type ChainAssemblyOptions = {
    *  drops pixels wherever edges meet, so lines end a hair before the line
    *  they visibly join. Default 0 = junction-anchored welds only. */
   readonly weldOpenEndsPx?: number;
+  /** Sub-pixel refinement applied to every raw chain vertex before
+   *  smoothing (edge mode snaps onto the gradient ridge). */
+  readonly snapPoint?: (p: Vec2) => Vec2;
 };
 
 const TANGENT_PROBE_PX = 3;
 const SMOOTHING_PASSES = 2;
-const SIMPLIFY_EPSILON_PX = 0.55;
+const SIMPLIFY_EPSILON_PX = 0.45;
 const MIN_CHAIN_LENGTH_PX = 1.5;
 const TIP_STEP_PX = 0.5;
-const CLOSE_LOOP_GAP_PX = 1.5;
 
 export function assembleStrokePaths(
   graph: StrokeGraph,
@@ -49,24 +53,14 @@ export function assembleStrokePaths(
   mask: InkMask,
   options: ChainAssemblyOptions,
 ): Polyline[] {
-  const chains: Chain[] = graph.chains.map((c) => ({
-    points: [...c.points],
-    closed: c.closed,
-    alive: true,
-  }));
-  for (const chain of chains) smoothChain(chain);
+  const chains = prepareChains(graph, options.snapPoint);
   pairThroughJunctions(chains, graph);
   const alignedFactor = Math.max(1, options.alignedJoinFactor ?? 1);
   bridgeNearbyEnds(chains, options.joinGapPx, alignedFactor);
-  // Loop closure reach widens only in aligned mode; the strict default keeps
-  // the centerline contract (close only touching ring ends) unchanged.
-  const closeLoopGapPx =
-    alignedFactor > 1
-      ? Math.max(CLOSE_LOOP_GAP_PX, options.joinGapPx * alignedFactor)
-      : CLOSE_LOOP_GAP_PX;
+  const closure = closureOptionsFor(options.joinGapPx, alignedFactor);
   const junctions = graph.nodes.filter((n) => n.kind === 'junction').map((n) => n.pos);
   for (const chain of chains) {
-    closeOrExtend(chain, junctions, distSq, mask, closeLoopGapPx);
+    closeOrExtend(chain, junctions, distSq, mask, closure);
   }
   // Junction centroids dent every through-path (the medial axis genuinely
   // bends toward a T branch): rebuild those seams on ALL chains, then snap
@@ -76,8 +70,51 @@ export function assembleStrokePaths(
     chain.points = repairJunctionSeams(chain.points, chain.closed, junctions, distSq, mask.width);
   }
   weldBranchEnds(chains, junctions, Math.max(0, options.weldOpenEndsPx ?? 0));
+  // Welds move endpoints; a ring whose ends both landed on the same target
+  // may only NOW be closable.
+  for (const chain of chains) {
+    if (chain.alive && !chain.closed) applyLoopClosure(chain, closure);
+  }
   const simplifyEpsilonPx = SIMPLIFY_EPSILON_PX * Math.max(0.1, options.simplifyTolerance ?? 1);
   return finalizeChains(chains, distSq, mask, simplifyEpsilonPx);
+}
+
+// Raw graph chains → snapped (edge mode) and staircase-smoothed chains.
+function prepareChains(graph: StrokeGraph, snapPoint: ((p: Vec2) => Vec2) | undefined): Chain[] {
+  const chains: Chain[] = graph.chains.map((c) => ({
+    points: [...c.points],
+    closed: c.closed,
+    alive: true,
+  }));
+  if (snapPoint !== undefined) {
+    for (const chain of chains) chain.points = chain.points.map(snapPoint);
+  }
+  for (const chain of chains) smoothChain(chain);
+  return chains;
+}
+
+// Loop closure reach widens only in aligned mode; the strict default keeps
+// the centerline contract (close only touching ring ends) unchanged.
+function closureOptionsFor(joinGapPx: number, alignedFactor: number): LoopClosureOptions {
+  if (alignedFactor <= 1) {
+    return {
+      touchGapPx: LOOP_TOUCH_GAP_PX,
+      cornerGapPx: LOOP_TOUCH_GAP_PX,
+      alignedGapPx: LOOP_TOUCH_GAP_PX,
+    };
+  }
+  return {
+    touchGapPx: LOOP_TOUCH_GAP_PX,
+    cornerGapPx: Math.max(LOOP_TOUCH_GAP_PX, joinGapPx),
+    alignedGapPx: Math.max(LOOP_TOUCH_GAP_PX, joinGapPx * alignedFactor),
+  };
+}
+
+function applyLoopClosure(chain: Chain, closure: LoopClosureOptions): void {
+  const decision = decideLoopClosure(chain.points, closure);
+  if (decision.kind === 'open') return;
+  if (decision.dropLastPoint) chain.points.pop();
+  chain.closed = true;
 }
 
 function closeOrExtend(
@@ -85,13 +122,13 @@ function closeOrExtend(
   junctions: ReadonlyArray<Vec2>,
   distSq: Float64Array,
   mask: InkMask,
-  closeLoopGapPx: number,
+  closure: LoopClosureOptions,
 ): void {
   if (!chain.alive || chain.closed) return;
   // Close cycles FIRST — a ring's two ends meet at a junction, and extending
   // them would walk 3 radii through the band in each direction (the "tail on
   // every ring" defect).
-  closeTinyGap(chain, closeLoopGapPx);
+  applyLoopClosure(chain, closure);
   if (chain.closed) return;
   if (isTrueTip(chain, 'start', junctions, distSq, mask.width)) {
     extendTip(chain, 'start', distSq, mask);
@@ -115,10 +152,18 @@ function finalizeChains(
     // vertices before simplification eats the dense points the tangent
     // estimates need.
     const sharpened = sharpenChainBends(chain.points, chain.closed, distSq, mask.width);
-    const simplified = simplify(sharpened, chain.closed, simplifyEpsilonPx);
+    // Even out the residual pixel-scale curvature noise on the DENSE chain
+    // (corners pinned) before Douglas-Peucker samples it — otherwise every
+    // sampled vertex inherits a slightly-wrong tangent and the curve facets
+    // (the angular-bowl defect). Corners stay exact objects for output pinning.
+    const evened = smoothChainCurvature(sharpened.points, chain.closed, sharpened.corners);
+    const simplified = simplify(evened, chain.closed, simplifyEpsilonPx);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
-    result.push({ points: refineChainForOutput(simplified, chain.closed), closed: chain.closed });
+    result.push({
+      points: refineChainForOutput(simplified, chain.closed, sharpened.corners),
+      closed: chain.closed,
+    });
   }
   return result;
 }
@@ -310,41 +355,6 @@ function isInk(p: Vec2, mask: InkMask): boolean {
   const y = Math.round(p.y - 0.5);
   if (x < 0 || y < 0 || x >= mask.width || y >= mask.height) return false;
   return (mask.ink[y * mask.width + x] ?? 0) === 1;
-}
-
-function closeTinyGap(chain: Chain, closeLoopGapPx: number): void {
-  const first = chain.points[0];
-  const last = chain.points.at(-1);
-  if (first === undefined || last === undefined || chain.points.length < 4) return;
-  const gap = Math.hypot(last.x - first.x, last.y - first.y);
-  if (gap > closeLoopGapPx) return;
-  if (gap > CLOSE_LOOP_GAP_PX && !gapClosureIsAligned(chain, gap)) return;
-  if (gap <= CLOSE_LOOP_GAP_PX) chain.points.pop();
-  chain.closed = true;
-}
-
-// A wide closure (aligned mode) must look like a broken ring, not a drawn
-// C: both end tangents continue across the closing chord, and the gap is
-// small next to the loop itself.
-const MIN_CLOSURE_ALIGNMENT = Math.cos((35 * Math.PI) / 180);
-const MAX_CLOSURE_GAP_FRACTION = 0.25;
-
-function gapClosureIsAligned(chain: Chain, gap: number): boolean {
-  const pts = chain.points;
-  const first = pts[0];
-  const last = pts.at(-1);
-  if (first === undefined || last === undefined) return false;
-  if (gap > arcLength(pts) * MAX_CLOSURE_GAP_FRACTION) return false;
-  const startTangent = pointAtArcDistance(pts, true, TANGENT_PROBE_PX);
-  const endTangent = pointAtArcDistance(pts, false, TANGENT_PROBE_PX);
-  if (startTangent === undefined || endTangent === undefined) return false;
-  const chord = { x: (first.x - last.x) / gap, y: (first.y - last.y) / gap };
-  const outOfEnd = normalize(last.x - endTangent.x, last.y - endTangent.y);
-  const intoStart = normalize(startTangent.x - first.x, startTangent.y - first.y);
-  if (outOfEnd === null || intoStart === null) return false;
-  const endForward = outOfEnd.x * chord.x + outOfEnd.y * chord.y;
-  const startForward = intoStart.x * chord.x + intoStart.y * chord.y;
-  return endForward >= MIN_CLOSURE_ALIGNMENT && startForward >= MIN_CLOSURE_ALIGNMENT;
 }
 
 // --- Douglas-Peucker simplification ---

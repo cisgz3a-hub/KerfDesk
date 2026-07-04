@@ -3,6 +3,7 @@ import { makeCheckerboard, projectBoard, pseudoNoise } from './calibrate-fixture
 import { calibrate, type BoardObservation } from './calibrate';
 import { calibrateWithFocalSweep } from './calibrate-sweep';
 import { projectFisheye } from './fisheye';
+import { ciBudgetMs } from '../../__fixtures__/ci-budget';
 
 // A wide fisheye whose true focal (180 = 0.5625×width) sits far from the
 // default 0.7×width seed — the case the sweep exists for.
@@ -53,24 +54,31 @@ function mappingErrorPx(result: ReturnType<typeof calibrate>): number {
 }
 
 describe('calibrateWithFocalSweep', () => {
-  it('recovers the camera where a single default-seeded run stalls', { timeout: 40000 }, () => {
-    const views = observations();
-    const options = {
-      initialGuess: { imageWidth: 320, imageHeight: 240 },
-      distortionModel: 'k1k2',
-      maxIterations: 600,
-    } as const;
-    const single = calibrate(views, options);
-    const swept = calibrateWithFocalSweep(views, options);
-    expect(swept.kind).toBe('ok');
-    if (swept.kind !== 'ok') return;
-    // The sweep must land on a fit whose lens mapping matches the true camera
-    // to sub-pixel across the observed field, and never do worse than the
-    // single run it replaces.
-    expect(mappingErrorPx(swept)).toBeLessThan(1);
-    expect(mappingErrorPx(swept)).toBeLessThanOrEqual(mappingErrorPx(single));
-    expect(Math.abs(swept.intrinsics.fx - K.fx) / K.fx).toBeLessThan(0.03);
-  });
+  // The multi-start is deterministic; this timeout only guards against a hang, so
+  // it is generous on the slow shared CI runner (runs ~13s locally, blew 40s under
+  // CI load). The mappingErrorPx / fx assertions below are the real gate.
+  it(
+    'recovers the camera where a single default-seeded run stalls',
+    { timeout: ciBudgetMs(40_000, 240_000) },
+    () => {
+      const views = observations();
+      const options = {
+        initialGuess: { imageWidth: 320, imageHeight: 240 },
+        distortionModel: 'k1k2',
+        maxIterations: 600,
+      } as const;
+      const single = calibrate(views, options);
+      const swept = calibrateWithFocalSweep(views, options);
+      expect(swept.kind).toBe('ok');
+      if (swept.kind !== 'ok') return;
+      // The sweep must land on a fit whose lens mapping matches the true camera
+      // to sub-pixel across the observed field, and never do worse than the
+      // single run it replaces.
+      expect(mappingErrorPx(swept)).toBeLessThan(1);
+      expect(mappingErrorPx(swept)).toBeLessThanOrEqual(mappingErrorPx(single));
+      expect(Math.abs(swept.intrinsics.fx - K.fx) / K.fx).toBeLessThan(0.03);
+    },
+  );
 
   it('is a single plain run when the caller supplies a measured focal', { timeout: 30000 }, () => {
     const views = observations();

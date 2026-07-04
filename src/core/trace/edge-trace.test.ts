@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { inkDisc, paper, toRawImage } from '../../__fixtures__/perceptual/procedural-ink';
+import { filledStarImage, starOuterTips } from '../../__fixtures__/perceptual/star-fixture';
 import { traceImageToEdgePaths } from './edge-trace';
 import { TRACE_PRESETS } from './trace-presets';
 import type { RawImageData } from './trace-image';
@@ -94,6 +96,23 @@ function separatedSquares(): RawImageData {
   return { width, height, data };
 }
 
+// Nearest traced PATH sample (segments densely resampled) to a target point —
+// the laser burns segments, so fidelity is measured on the drawn path.
+function nearestPathDistance(
+  paths: ReturnType<typeof traceImageToEdgePaths>,
+  target: { x: number; y: number },
+): number {
+  let best = Infinity;
+  for (const path of paths) {
+    for (const polyline of path.polylines) {
+      for (const sample of samplePathAtUnitSteps(polyline)) {
+        best = Math.min(best, Math.hypot(sample.x - target.x, sample.y - target.y));
+      }
+    }
+  }
+  return best;
+}
+
 function plusOfBars(): RawImageData {
   const size = 96;
   const data = new Uint8ClampedArray(size * size * 4);
@@ -187,6 +206,28 @@ function polylineLength(points: ReadonlyArray<{ readonly x: number; readonly y: 
     if (a !== undefined && b !== undefined) total += Math.hypot(a.x - b.x, a.y - b.y);
   }
   return total;
+}
+
+function samplePathAtUnitSteps(polyline: TestPolyline): Array<{ x: number; y: number }> {
+  const first = polyline.points[0];
+  const pts =
+    polyline.closed && first !== undefined ? [...polyline.points, first] : [...polyline.points];
+  const out: Array<{ x: number; y: number }> = [];
+  let carry = 0;
+  for (let i = 0; i + 1 < pts.length; i += 1) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    if (a === undefined || b === undefined) continue;
+    const seg = Math.hypot(b.x - a.x, b.y - a.y);
+    if (seg < 1e-9) continue;
+    let t = carry;
+    while (t < seg) {
+      out.push({ x: a.x + ((b.x - a.x) * t) / seg, y: a.y + ((b.y - a.y) * t) / seg });
+      t += 1;
+    }
+    carry = t - seg;
+  }
+  return out;
 }
 
 describe('traceImageToEdgePaths', () => {
@@ -314,6 +355,70 @@ describe('traceImageToEdgePaths', () => {
 
     expect(polylineCount(filtered)).toBeLessThanOrEqual(polylineCount(loose));
     expect(pointCount(filtered)).toBeGreaterThan(0);
+  });
+
+  // The stroke graph walks the binary Canny mask, so raw chain vertices sit
+  // on the integer pixel lattice; without sub-pixel ridge refinement the
+  // traced circle keeps visible staircase lumps on every turn (the
+  // "not smooth on turns" defect, 2026-07-03). The blurred Sobel ridge
+  // localises the true edge to well under a pixel — the trace must too.
+  it('traces a soft disc edge as one closed loop with sub-pixel smoothness', () => {
+    const luma = paper(180, 180);
+    inkDisc(luma, 90, 90, 60, 2);
+    const lines = traceImageToEdgePaths(toRawImage(luma), EDGE_OPTIONS).flatMap((p) => p.polylines);
+    const longest = lines.reduce<TestPolyline | null>(
+      (best, pl) =>
+        best === null || polylineLength(pl.points) > polylineLength(best.points) ? pl : best,
+      null,
+    );
+    expect(longest).not.toBeNull();
+    if (longest === null) return;
+    expect(longest.closed).toBe(true);
+    // Deviation is measured on the drawn PATH (the laser burns segments, not
+    // vertices), against the circle's mean radius.
+    const samples = samplePathAtUnitSteps(longest);
+    const radii = samples.map((p) => Math.hypot(p.x - 90, p.y - 90));
+    const mean = radii.reduce((sum, r) => sum + r, 0) / radii.length;
+    const rms = Math.sqrt(
+      radii.reduce((sum, r) => sum + (r - mean) * (r - mean), 0) / radii.length,
+    );
+    const maxDev = radii.reduce((max, r) => Math.max(max, Math.abs(r - mean)), 0);
+    expect(rms).toBeLessThanOrEqual(0.12);
+    expect(maxDev).toBeLessThanOrEqual(0.3);
+  });
+
+  // Edge traces the silhouette, so a filled star's convex tips are genuine
+  // drawn points that should REACH the analytic apex. Potrace's polygon stage
+  // blunts them and the Canny/thinning path does too (the tip pixel is the last
+  // ink cell, ~1.8-2.8px short), so — like Line Art (potrace-apex.ts) — the
+  // closed ring's acute tips are reconstructed by extending the two flanks to
+  // their intersection. Each outer tip must land within a pixel and a half.
+  it("snaps a filled star's convex tips to the analytic apex", () => {
+    const paths = traceImageToEdgePaths(filledStarImage(), EDGE_OPTIONS);
+    expect(paths.length).toBeGreaterThan(0);
+    const errors = starOuterTips().map((tip) => nearestPathDistance(paths, tip));
+    const mean = errors.reduce((sum, e) => sum + e, 0) / errors.length;
+    const max = errors.reduce((m, e) => Math.max(m, e), 0);
+    expect(mean).toBeLessThanOrEqual(1.0);
+    expect(max).toBeLessThanOrEqual(1.6);
+  });
+
+  // A closed polyline's closing edge is implicit; the canvas line-stroke
+  // renderer and the G-code emitter draw points AS GIVEN and never synthesise
+  // it, so a ring flagged closed with its ends a join-gap apart engraves a
+  // visible seam gap (the reported ARCH "A" counter breaks). Every closed
+  // ring must return to its start point.
+  it('closes every ring back to its start point (no implicit-seam gap)', () => {
+    for (const image of [plusOfBars(), filledSquare(64, 18, 46), squareWithSmallDot()]) {
+      const lines = traceImageToEdgePaths(image, EDGE_OPTIONS).flatMap((p) => p.polylines);
+      for (const pl of lines) {
+        if (!pl.closed) continue;
+        const first = pl.points[0];
+        const last = pl.points.at(-1);
+        if (first === undefined || last === undefined) continue;
+        expect(Math.hypot(last.x - first.x, last.y - first.y)).toBeLessThanOrEqual(1e-6);
+      }
+    }
   });
 
   it('honors zero edge join gap by not bridging adjacent separate contours', () => {

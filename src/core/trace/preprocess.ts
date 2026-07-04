@@ -47,15 +47,27 @@ function lumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
   return Math.round(LUMA_R * r + LUMA_G * g + LUMA_B * b);
 }
 
+// Maximum 3×3 neighbourhood size; the reusable scratch buffer is sized once.
+const MEDIAN_WINDOW = 9;
+
 // 3×3 median filter. For each pixel, replace its luma with the
 // median of its 3×3 neighbourhood. Output is greyscale (R=G=B). Edge
 // pixels use the available neighbours only (no edge padding tricks —
 // cleaner than introducing artificial values).
+//
+// Performance: the previous implementation allocated a fresh Array and
+// invoked a comparator sort PER PIXEL — ~1M allocations + JS sorts on a
+// 1024² image, which dominated the Smooth preset's runtime. This version
+// is allocation-free: a single reusable scratch buffer holds the samples,
+// interior pixels (the full 9-sample case) use a fixed sorting network that
+// stops as soon as the middle element is known, and border pixels (< 9
+// samples) fall back to an insertion sort over the same buffer. Output is
+// byte-identical to the naive gather-sort-middle median for every input.
 export function medianFilter(image: RawImageData): RawImageData {
   const { width: w, height: h, data } = image;
   const out = new Uint8ClampedArray(w * h * 4);
-  // 9 max neighbours per pixel; sort in place each time.
-  const buf = new Uint8Array(9);
+  // Reused for every pixel — no per-pixel allocation.
+  const buf = new Uint8Array(MEDIAN_WINDOW);
   for (let y = 0; y < h; y += 1) {
     for (let x = 0; x < w; x += 1) {
       let count = 0;
@@ -68,11 +80,7 @@ export function medianFilter(image: RawImageData): RawImageData {
           count += 1;
         }
       }
-      // Partial sort: only need the median (count/2), but JS native
-      // sort over 9 items is fast enough that a full sort beats a
-      // custom partition by readability.
-      const sorted = Array.from(buf.subarray(0, count)).sort((a, b) => a - b);
-      const median = sorted[count >> 1] ?? 0;
+      const median = count === MEDIAN_WINDOW ? median9(buf) : medianByInsertion(buf, count);
       const pi = (y * w + x) * 4;
       out[pi] = median;
       out[pi + 1] = median;
@@ -81,6 +89,110 @@ export function medianFilter(image: RawImageData): RawImageData {
     }
   }
   return { width: w, height: h, data: out };
+}
+
+// Median of the first `count` (< 9) samples in `buf` via in-place insertion
+// sort — cheap for the tiny border neighbourhoods (3, 4, or 6 samples) and
+// allocation-free. Returns buf[count >> 1], matching the naive median's
+// "middle of the sorted list" for these odd/even small counts.
+function medianByInsertion(buf: Uint8Array, count: number): number {
+  for (let i = 1; i < count; i += 1) {
+    const v = buf[i] ?? 0;
+    let j = i - 1;
+    while (j >= 0 && (buf[j] ?? 0) > v) {
+      buf[j + 1] = buf[j] ?? 0;
+      j -= 1;
+    }
+    buf[j + 1] = v;
+  }
+  return buf[count >> 1] ?? 0;
+}
+
+// Median of exactly 9 samples via the classic 19-compare median-of-9 sorting
+// network (Smith, "Implementing median filters in XC4000E FPGAs", 1996). It
+// does NOT fully sort the 9 values — it just guarantees the median lands at
+// index 4 — so it is cheaper than a full sort while producing byte-identical
+// results to "sort all 9, take the middle" for every input.
+function median9(buf: Uint8Array): number {
+  swapSort(buf, 1, 2);
+  swapSort(buf, 4, 5);
+  swapSort(buf, 7, 8);
+  swapSort(buf, 0, 1);
+  swapSort(buf, 3, 4);
+  swapSort(buf, 6, 7);
+  swapSort(buf, 1, 2);
+  swapSort(buf, 4, 5);
+  swapSort(buf, 7, 8);
+  swapSort(buf, 0, 3);
+  swapSort(buf, 5, 8);
+  swapSort(buf, 4, 7);
+  swapSort(buf, 3, 6);
+  swapSort(buf, 1, 4);
+  swapSort(buf, 2, 5);
+  swapSort(buf, 4, 7);
+  swapSort(buf, 4, 2);
+  swapSort(buf, 6, 4);
+  swapSort(buf, 4, 2);
+  return buf[4] ?? 0;
+}
+
+// Compare-and-swap the two buffer slots into ascending order — the single
+// primitive a sorting network is built from.
+function swapSort(buf: Uint8Array, i: number, j: number): void {
+  const a = buf[i] ?? 0;
+  const b = buf[j] ?? 0;
+  if (a > b) {
+    buf[i] = b;
+    buf[j] = a;
+  }
+}
+
+// AUTO median gate: measures salt-and-pepper (impulse) noise as the fraction
+// of pixels the 3×3 median would move by more than IMPULSE_NOISE_LUMA_DELTA
+// luma, and returns whether that fraction clears IMPULSE_NOISE_MIN_RATIO.
+// WHY: a median destroys clean small glyphs — 4-6 px letters trace as melted
+// blobs — so it must only run when the image genuinely carries impulse noise
+// that the median repairs. Both the Edge Detection tracer and the Smooth
+// trace preset gate on this instead of forcing the median unconditionally.
+//
+// Moved here from edge-trace.ts so the two callers share one detector and one
+// set of constants (values unchanged from the original edge implementation).
+const IMPULSE_NOISE_LUMA_DELTA = 40;
+export const IMPULSE_NOISE_MIN_RATIO = 0.004;
+
+export function hasImpulseNoise(image: RawImageData): boolean {
+  const filtered = medianFilter(image);
+  return impulseNoiseRatio(image, filtered) >= IMPULSE_NOISE_MIN_RATIO;
+}
+
+// Fraction of pixels whose luma the median changed by more than the impulse
+// delta. Takes the pre-computed median-filtered image so callers that also
+// need the filtered result (Edge Detection, the 'auto' trace path) do not
+// compute the median twice.
+//
+// Uses UN-rounded luma (not the module's rounded lumaAt) on purpose: the
+// original edge-trace impulse detector compared un-rounded luma, and the
+// > 40 delta test can flip on rounding at the boundary. Preserving the exact
+// arithmetic keeps Edge Detection's AUTO decision bit-identical after the
+// move.
+export function impulseNoiseRatio(image: RawImageData, filtered: RawImageData): number {
+  const pixels = image.width * image.height;
+  if (pixels === 0) return 0;
+  let impulses = 0;
+  for (let i = 0; i < pixels; i += 1) {
+    const a = rawLumaAt(image.data, i * 4);
+    const b = rawLumaAt(filtered.data, i * 4);
+    if (Math.abs(a - b) > IMPULSE_NOISE_LUMA_DELTA) impulses += 1;
+  }
+  return impulses / pixels;
+}
+
+function rawLumaAt(data: Uint8ClampedArray, pixelOffset: number): number {
+  return (
+    LUMA_R * (data[pixelOffset] ?? 0) +
+    LUMA_G * (data[pixelOffset + 1] ?? 0) +
+    LUMA_B * (data[pixelOffset + 2] ?? 0)
+  );
 }
 
 // Otsu's method: returns the luma cutoff that maximises the

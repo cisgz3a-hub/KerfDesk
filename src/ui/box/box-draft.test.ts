@@ -25,8 +25,8 @@ describe('defaultBoxDraft', () => {
 });
 
 describe('parseBoxDraft', () => {
-  it('reports every empty required field, including the CNC tool', () => {
-    const draft = { ...defaultBoxDraft(CNC), width: ' ', toolDiameter: '' };
+  it('reports every empty required field, including the CNC relief tool when on', () => {
+    const draft = { ...defaultBoxDraft(CNC), width: ' ', toolDiameter: '', relief: 'on' };
     const parsed = parseBoxDraft(draft, CNC);
     expect(parsed.kind).toBe('incomplete');
     if (parsed.kind !== 'incomplete') return;
@@ -41,14 +41,35 @@ describe('parseBoxDraft', () => {
     expect(parsed.spec.relief).toEqual({ kind: 'none' });
   });
 
-  it('maps mode, style, and relief into the spec', () => {
-    const draft = { ...defaultBoxDraft(CNC), mode: 'outer', style: 'open-top' };
+  it('maps mode, style, and relief-on into the spec', () => {
+    const draft = { ...defaultBoxDraft(CNC), mode: 'outer', style: 'open-top', relief: 'on' };
     const parsed = parseBoxDraft(draft, CNC);
     expect(parsed.kind).toBe('spec');
     if (parsed.kind !== 'spec') return;
     expect(parsed.spec.dimensionMode).toBe('outer');
     expect(parsed.spec.style).toBe('open-top');
     expect(parsed.spec.relief).toEqual({ kind: 'corner-overcut', toolDiameterMm: 3.175 });
+  });
+
+  it('turns corner relief OFF (no dogbones) when relief is off', () => {
+    const draft = { ...defaultBoxDraft(CNC), relief: 'off' };
+    const parsed = parseBoxDraft(draft, CNC);
+    expect(parsed.kind).toBe('spec');
+    if (parsed.kind !== 'spec') return;
+    expect(parsed.spec.relief).toEqual({ kind: 'none' });
+  });
+
+  it('does not require the relief tool when relief is off', () => {
+    // Empty tool diameter is fine when there are no dogbones to size.
+    const draft = { ...defaultBoxDraft(CNC), relief: 'off', toolDiameter: '' };
+    const parsed = parseBoxDraft(draft, CNC);
+    expect(parsed.kind).toBe('spec');
+  });
+
+  it('defaults corner relief OFF for CNC (sharp corners; dogbones are opt-in)', () => {
+    expect(defaultBoxDraft(CNC).relief).toBe('off');
+    const parsed = parseBoxDraft(defaultBoxDraft(CNC), CNC);
+    expect(parsed.kind === 'spec' ? parsed.spec.relief : null).toEqual({ kind: 'none' });
   });
 });
 

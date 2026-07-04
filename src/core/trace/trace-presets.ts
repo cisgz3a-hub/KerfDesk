@@ -41,6 +41,11 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     smoothness: 1,
     optimize: 0.2,
     despeckleMinPixels: 12,
+    // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
+    // Also supersample small sources regardless of stroke width — small letters
+    // facet from small curve radius even at ~6px strokes. Smooth preset: opts in.
+    upscaleSmallSmoothSources: true,
   },
   Centerline: {
     // For black strokes that should engrave as one path down the
@@ -58,6 +63,15 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     useOtsuThreshold: true,
     despeckleMinPixels: 12,
     centerlineJoinGapPx: 3,
+    // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
+    // NO small-source (whole-size) upscale here, unlike the filled/edge presets.
+    // The small-letter facet defect is a filled/edge CONTOUR problem — curve
+    // chords quantize at small radius. A centerline is a 1px medial skeleton
+    // whose smoothness comes from medial-thinning + curve-fit, not source curve
+    // radius; the upscale→skeletonize→downscale round-trip instead adds sub-pixel
+    // vertical wobble to an otherwise flat centerline (trace-pipeline integration
+    // test). So Centerline opts OUT of upscaleSmallSmoothSources.
   },
   'Edge Detection': {
     // Contrast edge vectorization -> stroked contour vectors around brightness
@@ -83,12 +97,23 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeJoinGapPx: 5,
     // undefined = AUTO median: applied only when impulse noise is detected,
     // so clean art keeps its small features (see edge-trace.ts).
+    // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
+    // Also supersample small sources regardless of stroke width — the reported
+    // faceted 40-60px E/B facet from small curve radius, not thin strokes.
+    upscaleSmallSmoothSources: true,
   },
   Smooth: {
-    // For slightly noisy / hand-drawn line art. Median filter kills
+    // For slightly noisy / hand-drawn line art. The median kills
     // salt-and-pepper noise before threshold; despeckle catches what
     // survives. Blur slider remains for compatibility but the median
     // does most of the work.
+    //
+    // medianFilter is 'auto', NOT true: forcing the median on every input
+    // melts clean small glyphs (the LANGEBAAN defect — 4-6 px letters trace
+    // as blobs) and cost ~2.5s on a 1024² logo for zero benefit on crisp
+    // art. 'auto' runs the median only when impulse noise is actually
+    // present, matching the Edge Detection tracer's policy.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 2,
@@ -97,9 +122,14 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurDelta: 20,
     lineFilter: true,
     fixedPalette: ['#ffffff', '#000000'],
-    medianFilter: true,
+    medianFilter: 'auto',
     useOtsuThreshold: true,
     despeckleMinPixels: 24,
+    // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
+    autoUpscaleSmallSources: true,
+    // Also supersample small sources regardless of stroke width — small letters
+    // facet from small curve radius even at ~6px strokes. Smooth preset: opts in.
+    upscaleSmallSmoothSources: true,
   },
   Sharp: {
     // For pixel-art / blueprint inputs where every notch matters.
@@ -122,5 +152,10 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // while genuine large arcs still fit as curves.
     smoothness: 0.55,
     optimize: 0.15,
+    // NO auto-upscale of any kind (neither autoUpscaleSmallSources nor
+    // upscaleSmallSmoothSources). Sharp is the pixel-fidelity preset: bilinear
+    // supersampling + re-threshold would anti-alias hard 1-2px notches and round
+    // them off — the opposite of "every notch matters". A blueprint's thin lines
+    // are intentional pixel geometry here, not a small-scale tracing artefact.
   },
 };

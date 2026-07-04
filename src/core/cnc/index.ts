@@ -17,10 +17,12 @@ export {
   calculateFeeds,
   CHIPLOAD_MATERIALS,
   chiploadFor,
+  isChiploadMaterialKey,
   type ChiploadMaterial,
   type FeedsCalculatorInput,
   type FeedsCalculatorResult,
 } from './feeds-calculator';
+export { CNC_MACHINE_CATALOG, type CncMachinePreset } from './cnc-machine-catalog';
 export {
   buildSurfacingProgram,
   SURFACING_DEFAULT_DEPTH_PER_PASS_MM,

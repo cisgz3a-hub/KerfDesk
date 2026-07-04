@@ -11,6 +11,9 @@
 
 import type { Vec2 } from '../../scene';
 import { projectOntoSegment, radiusAtPosition, trimArc } from './polyline-window';
+import { SegmentGrid } from './spatial-grid';
+
+type WeldChain = { points: Vec2[]; closed: boolean; alive: boolean };
 
 const MATCH_EPS = 1e-6;
 // Loops that closed during pruning get FULLY smoothed (no pinned ends), so
@@ -66,21 +69,28 @@ export function repairJunctionSeams(
  *  are full of lines ending a hair before the line they visibly join. The
  *  tangent gate keeps parallel passers-by unwelded. */
 export function weldBranchEnds(
-  polylines: ReadonlyArray<{ points: Vec2[]; closed: boolean; alive: boolean }>,
+  polylines: ReadonlyArray<WeldChain>,
   junctions: ReadonlyArray<Vec2>,
   openEndWeldReachPx = 0,
 ): void {
+  // A shared segment grid replaces the per-end full scan of every chain's
+  // every segment. Weld reach is tiny (≤ maxReach), so cells that size span
+  // the query. Welds move endpoints, mutating adjacent segments, so the grid
+  // is marked stale on each successful weld and rebuilt lazily before the
+  // next query — most ends do not weld, so the grid usually stays valid.
+  const maxReach = Math.max(WELD_REACH_PX, openEndWeldReachPx);
+  const foots = new WeldFootFinder(polylines, maxReach);
   for (const chain of polylines) {
     if (!chain.alive || chain.closed || chain.points.length < 2) continue;
-    weldChainEnd(chain, 'start', polylines, junctions, openEndWeldReachPx);
-    weldChainEnd(chain, 'end', polylines, junctions, openEndWeldReachPx);
+    weldChainEnd(chain, 'start', foots, junctions, openEndWeldReachPx);
+    weldChainEnd(chain, 'end', foots, junctions, openEndWeldReachPx);
   }
 }
 
 function weldChainEnd(
-  chain: { points: Vec2[]; closed: boolean; alive: boolean },
+  chain: WeldChain,
   which: 'start' | 'end',
-  polylines: ReadonlyArray<{ points: Vec2[]; closed: boolean; alive: boolean }>,
+  foots: WeldFootFinder,
   junctions: ReadonlyArray<Vec2>,
   openEndWeldReachPx: number,
 ): void {
@@ -89,11 +99,57 @@ function weldChainEnd(
   const atJunction = isJunctionPoint(end, junctions);
   const reach = atJunction ? WELD_REACH_PX : openEndWeldReachPx;
   if (reach <= 0) return;
-  const foot = nearestFootOnOthers(end, chain, polylines, reach);
+  const otherFoot = foots.nearestFootOnOthers(end, chain, reach);
+  const selfFoot = nearestFootOnSelf(end, chain.points, which, reach);
+  const foot = nearerFoot(end, otherFoot, selfFoot);
   if (foot === null) return;
   if (!atJunction && !endApproaches(chain.points, which, foot)) return;
   if (which === 'start') chain.points[0] = foot;
   else chain.points[chain.points.length - 1] = foot;
+  foots.markDirty();
+}
+
+function nearerFoot(end: Vec2, a: Vec2 | null, b: Vec2 | null): Vec2 | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return Math.hypot(a.x - end.x, a.y - end.y) <= Math.hypot(b.x - end.x, b.y - end.y) ? a : b;
+}
+
+// An open end that stops just short of its OWN chain welds onto it (a
+// letter outline whose walk ends alongside an earlier stretch — P/R bowls).
+// The segments adjacent to the end are excluded by arc distance, otherwise
+// every end would trivially "weld" to its own neighbouring segment.
+const SELF_WELD_EXCLUSION_ARC_FACTOR = 3;
+const MIN_SELF_WELD_EXCLUSION_ARC_PX = 6;
+
+function nearestFootOnSelf(
+  end: Vec2,
+  points: ReadonlyArray<Vec2>,
+  which: 'start' | 'end',
+  reachPx: number,
+): Vec2 | null {
+  const exclusionArc = Math.max(
+    MIN_SELF_WELD_EXCLUSION_ARC_PX,
+    reachPx * SELF_WELD_EXCLUSION_ARC_FACTOR,
+  );
+  const ordered = which === 'end' ? [...points].reverse() : points;
+  let best: Vec2 | null = null;
+  let bestDist = reachPx;
+  let cumulativeArc = 0;
+  for (let i = 0; i + 1 < ordered.length; i += 1) {
+    const a = ordered[i];
+    const b = ordered[i + 1];
+    if (a === undefined || b === undefined) continue;
+    cumulativeArc += Math.hypot(b.x - a.x, b.y - a.y);
+    if (cumulativeArc <= exclusionArc) continue;
+    const foot = projectOntoSegment(end, a, b);
+    const d = Math.hypot(foot.x - end.x, foot.y - end.y);
+    if (d < bestDist) {
+      bestDist = d;
+      best = foot;
+    }
+  }
+  return best;
 }
 
 // The end's outward continuation must point toward the weld target — a line
@@ -218,28 +274,71 @@ function stitchClosed(pts: ReadonlyArray<Vec2>, idx: number, radius: number): Ve
   return stitchOpen(rotated, mid, radius);
 }
 
-function nearestFootOnOthers(
-  end: Vec2,
-  own: { points: Vec2[] },
-  polylines: ReadonlyArray<{ points: Vec2[]; closed: boolean; alive: boolean }>,
-  reachPx: number,
-): Vec2 | null {
-  let best: Vec2 | null = null;
-  let bestDist = reachPx;
-  for (const other of polylines) {
-    if (!other.alive || other === own || other.points.length < 2) continue;
-    const count = other.points.length + (other.closed ? 0 : -1);
-    for (let i = 0; i < count; i += 1) {
-      const a = other.points[i];
-      const b = other.points[(i + 1) % other.points.length];
-      if (a === undefined || b === undefined) continue;
-      const foot = projectOntoSegment(end, a, b);
+// Grid-accelerated nearest-foot search over OTHER chains' segments. Replaces
+// the O(ends × all segments) full scan: only segments in cells near the query
+// end are tested. Selection is IDENTICAL to the scan — candidates are ordered
+// by (chain index, segment index) and the first foot achieving the strict
+// minimum wins, exactly as the array-order scan did.
+class WeldFootFinder {
+  private readonly polylines: ReadonlyArray<WeldChain>;
+  private readonly cellSize: number;
+  private grid: SegmentGrid;
+  private dirty = false;
+
+  constructor(polylines: ReadonlyArray<WeldChain>, maxReach: number) {
+    this.polylines = polylines;
+    this.cellSize = maxReach;
+    this.grid = this.build();
+  }
+
+  markDirty(): void {
+    this.dirty = true;
+  }
+
+  nearestFootOnOthers(end: Vec2, own: WeldChain, reachPx: number): Vec2 | null {
+    if (this.dirty) {
+      this.grid = this.build();
+      this.dirty = false;
+    }
+    const ownIndex = this.polylines.indexOf(own);
+    // Dedup segments that span multiple cells, then order by (chain, segment)
+    // so tie-breaking matches the original array-order scan exactly.
+    const seen = new Set<string>();
+    const candidates: Array<{ ci: number; si: number; a: Vec2; b: Vec2 }> = [];
+    for (const seg of this.grid.query(end, reachPx)) {
+      if (seg.ownerId === ownIndex) continue;
+      const key = `${seg.ownerId}:${seg.segIndex}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      candidates.push({ ci: seg.ownerId, si: seg.segIndex, a: seg.a, b: seg.b });
+    }
+    candidates.sort((x, y) => (x.ci !== y.ci ? x.ci - y.ci : x.si - y.si));
+    let best: Vec2 | null = null;
+    let bestDist = reachPx;
+    for (const c of candidates) {
+      const foot = projectOntoSegment(end, c.a, c.b);
       const d = Math.hypot(foot.x - end.x, foot.y - end.y);
       if (d < bestDist) {
         bestDist = d;
         best = foot;
       }
     }
+    return best;
   }
-  return best;
+
+  private build(): SegmentGrid {
+    const grid = new SegmentGrid(this.cellSize);
+    for (let ci = 0; ci < this.polylines.length; ci += 1) {
+      const other = this.polylines[ci];
+      if (other === undefined || !other.alive || other.points.length < 2) continue;
+      const count = other.points.length + (other.closed ? 0 : -1);
+      for (let i = 0; i < count; i += 1) {
+        const a = other.points[i];
+        const b = other.points[(i + 1) % other.points.length];
+        if (a === undefined || b === undefined) continue;
+        grid.insert({ ownerId: ci, segIndex: i, a, b });
+      }
+    }
+    return grid;
+  }
 }
