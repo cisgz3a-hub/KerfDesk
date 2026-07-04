@@ -17,6 +17,7 @@ export {
   calculateFeeds,
   CHIPLOAD_MATERIALS,
   chiploadFor,
+  isChiploadMaterialKey,
   type ChiploadMaterial,
   type FeedsCalculatorInput,
   type FeedsCalculatorResult,

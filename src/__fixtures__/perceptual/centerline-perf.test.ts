@@ -3,7 +3,7 @@
 // Zhang-Suen thinner is O(iterations x W x H) and allocates a neighbour array
 // per ink pixel per pass, so a multi-megapixel image with thick strokes blows
 // the budget. This times the real tracer on a big grid of thick strokes and
-// logs the number; the rework must bring it well under the budget.
+// logs the number; the rework must bring it well under the worker ceiling.
 
 import { describe, expect, it } from 'vitest';
 import type { RawImageData } from '../../core/trace';
@@ -35,10 +35,11 @@ function gridImage(width: number, height: number, stroke: number, spacing: numbe
 }
 
 const CENTERLINE_OPTIONS = TRACE_PRESETS['Centerline']!;
-const BUDGET_MS = 30_000; // the worker ceiling; the rework target is < ~3s
+const WORKER_TIMEOUT_MS = 30_000;
+const REGRESSION_BUDGET_MS = 8_000;
 
 describe('centerline trace performance on a big image', () => {
-  it('traces a ~1.9MP thick-stroke grid within the worker budget', { timeout: 90_000 }, () => {
+  it('traces a ~1.9MP thick-stroke grid within the regression budget', { timeout: 90_000 }, () => {
     const image = gridImage(1600, 1200, 24, 140);
     const start = performance.now();
     const paths = traceCenterlineStrokePaths(image, CENTERLINE_OPTIONS);
@@ -46,6 +47,7 @@ describe('centerline trace performance on a big image', () => {
     console.log(
       `[centerline-perf] 1600x1200 stroke24: ${elapsedMs.toFixed(0)}ms, paths=${paths.length}`,
     );
-    expect(elapsedMs).toBeLessThan(BUDGET_MS);
+    expect(elapsedMs).toBeLessThan(REGRESSION_BUDGET_MS);
+    expect(elapsedMs).toBeLessThan(WORKER_TIMEOUT_MS);
   });
 });

@@ -185,6 +185,42 @@ describe('traceImage (worker client with inline fallback)', () => {
     expect(workers[0]?.terminated).toBe(true);
     expect(workers[1]?.terminated).toBe(false);
   });
+
+  it('rejects and retires the worker when postMessage throws synchronously', async () => {
+    vi.resetModules();
+    let constructed = 0;
+    let terminated = 0;
+    class ThrowingPostMessageWorker {
+      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor() {
+        constructed += 1;
+      }
+
+      postMessage(): void {
+        throw new Error('structured clone failed');
+      }
+
+      terminate(): void {
+        terminated += 1;
+      }
+    }
+    vi.stubGlobal('Worker', ThrowingPostMessageWorker);
+
+    const client = await import('./use-trace-worker-client');
+
+    await expect(client.traceImage(largeImage(), traceOptions)).rejects.toThrow(
+      'postMessage failed',
+    );
+    expect(constructed).toBe(1);
+    expect(terminated).toBe(1);
+
+    await expect(client.traceImage(largeImage(), traceOptions)).rejects.toThrow(
+      'postMessage failed',
+    );
+    expect(constructed).toBe(2);
+    expect(terminated).toBe(2);
+  });
 });
 
 describe('traceImage worker timeout (P2-A)', () => {

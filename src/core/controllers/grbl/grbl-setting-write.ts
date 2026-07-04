@@ -54,12 +54,17 @@ export function buildGrblSettingWrite(
 
 function isValidGrblSettingValue(id: number, value: string): boolean {
   if (value.length === 0) return false;
+  if (!isCanonicalGrblDecimal(value)) return false;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return false;
-  if (id === 32) return parsed === 0 || parsed === 1;
+  if (id === 32) return value === '0' || value === '1';
   if (id === 30) return parsed > 0;
   if (id === 31) return parsed >= 0;
   return parsed >= 0;
+}
+
+function isCanonicalGrblDecimal(value: string): boolean {
+  return /^-?\d+(?:\.\d+)?$/.test(value);
 }
 
 function blocked(reason: string): BuildGrblSettingWriteResult {

@@ -284,6 +284,7 @@ function messageForError(reason: string): string {
   }
   if (reason === 'multi-rotation') return 'Rotate one object at a time in Numeric Edits.';
   if (reason === 'invalid-dimension') return 'Width and height must be greater than 0.';
+  if (reason === 'invalid-number') return 'Numeric values must be finite.';
   return 'Numeric edit could not be applied.';
 }
 

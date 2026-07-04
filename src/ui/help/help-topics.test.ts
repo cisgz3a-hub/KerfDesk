@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { COMMAND_HELP, CONTROL_HELP, TOOL_HELP, controlHelp, helpProps } from './help-topics';
+import {
+  COMMAND_HELP,
+  CONTROL_HELP,
+  TOOL_HELP,
+  controlHelp,
+  helpProps,
+  isRegisteredHelpTopicId,
+} from './help-topics';
 import {
   buildAppCommands,
   COMMAND_FAMILY_ORDER,
@@ -83,6 +90,10 @@ describe('help topics', () => {
       'laser.device-setup.apply-detected',
       'laser.output-scope.cut-selected',
       'laser.output-scope.selection-origin',
+      'preview.showTraversalMoves',
+      'preview.routePlayback',
+      'preview.routeRestart',
+      'preview.routeSpeed',
     ] as const;
 
     const missing = controlIds.filter((id) => CONTROL_HELP[id] === undefined);
@@ -103,6 +114,11 @@ describe('help topics', () => {
     expect(controlHelp('control:laser.console.quick.$I')).toBe(
       CONTROL_HELP['laser.console.quick.$I'].tooltip,
     );
+  });
+
+  it('rejects unregistered raw help ids', () => {
+    expect(isRegisteredHelpTopicId('control:preview.routeSpeed')).toBe(true);
+    expect(isRegisteredHelpTopicId('preview.routeSpeed')).toBe(false);
   });
 });
 

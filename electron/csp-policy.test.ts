@@ -12,4 +12,19 @@ describe('trace worker CSP', () => {
       expect(readRepoFile(path), path).toContain("worker-src 'self' data: blob:");
     }
   });
+
+  it('allows only the local RTSP bridge origin for camera preview fetches in Electron', () => {
+    const main = readRepoFile('electron/main.ts');
+
+    expect(main).toContain('CAMERA_BRIDGE_ORIGIN');
+    expect(main).toContain("img-src 'self' data: blob: ${CAMERA_BRIDGE_ORIGIN}");
+    expect(main).toContain("connect-src 'self' ${CAMERA_BRIDGE_ORIGIN}");
+  });
+
+  it('allows browser camera on the web app without granting microphone access', () => {
+    const headers = readRepoFile('public/_headers');
+
+    expect(headers).toContain('camera=(self)');
+    expect(headers).toContain('microphone=()');
+  });
 });

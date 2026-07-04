@@ -47,4 +47,34 @@ describe('gcodeMetadataHeader', () => {
     expect(header).toContain('; safety: retract to safe Z before travels');
     expect(header).not.toContain('laser mode');
   });
+
+  it('keeps newline and control characters inside comment lines', () => {
+    const header = gcodeMetadataHeader(
+      {
+        appName: 'KerfDesk\nG0 X0',
+        appVersion: '9.9.9\r\nM3 S1000',
+        gitSha: 'abc1234\u0000M5',
+        buildTimeUtc: '2026-06-03T12:00:00.000Z\u2028G1 X10',
+        emitterRevision: 'rev\u007fM30',
+      },
+      { kind: 'laser', maxPowerS: 1000 },
+    );
+
+    for (const char of header) {
+      expect(isAllowedHeaderCharacter(char)).toBe(true);
+    }
+    expect(header).toContain('; KerfDesk G0 X0');
+    expect(header).toContain('; version: 9.9.9  M3 S1000');
+    expect(header).toContain('; commit: abc1234 M5');
+    expect(header).toContain('; built: 2026-06-03T12:00:00.000Z G1 X10');
+    expect(header).toContain('; emitter: rev M30');
+    for (const line of header.split('\n').filter((l) => l.length > 0)) {
+      expect(line.startsWith(';')).toBe(true);
+    }
+  });
 });
+
+function isAllowedHeaderCharacter(value: string): boolean {
+  const code = value.charCodeAt(0);
+  return code === 0x0a || (code >= 0x20 && code !== 0x7f && code !== 0x2028 && code !== 0x2029);
+}

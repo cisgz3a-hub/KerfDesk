@@ -18,6 +18,15 @@ describe('findLongBlankFeedMoves', () => {
     expect(findLongBlankFeedMoves(gcode, { thresholdMm: 5 })).toHaveLength(1);
   });
 
+  it('parses lowercase commands and external numeric word forms', () => {
+    const gcode = ['g1 x.5 y0 s+0', 'g1 x1.0e1 y0'].join('\n');
+
+    const issues = findLongBlankFeedMoves(gcode, { thresholdMm: 5 });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.distanceMm).toBeCloseTo(9.5, 3);
+  });
+
   it('does not flag short blank feed gaps at or below the threshold', () => {
     const gcode = ['G1 X0.000 Y0.000 S0', 'G1 X5.000 Y0.000 S0'].join('\n');
 

@@ -16,6 +16,7 @@ import {
   type ReliefObject,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { resetStore } from '../state/test-helpers';
 import { CncLayerFields } from './CncLayerFields';
 
@@ -53,6 +54,8 @@ function installProject(layer: Layer, withRelief: boolean): void {
   };
   useStore.setState({ project });
   useStore.getState().setMachineKind('cnc');
+  // Stepover lives in the advanced field group (ADR-111); reveal it.
+  useUiStore.getState().setShowCncAdvanced(true);
 }
 
 async function render(layer: Layer): Promise<{
@@ -106,6 +109,60 @@ describe('CncLayerFields relief contract', () => {
     const { host, root } = await render(layer);
     try {
       expect(stepoverInput(host, layer.color)).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+});
+
+describe('CncLayerFields Basic/Advanced (ADR-111)', () => {
+  function profileLayer(): Layer {
+    return {
+      ...createLayer({ id: '#00aa00', color: '#00aa00' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'profile-outside' },
+    };
+  }
+
+  it('Basic hides Feed but keeps Material + Cut depth', async () => {
+    const layer = profileLayer();
+    installProject(layer, false);
+    useUiStore.getState().setShowCncAdvanced(false);
+    const { host, root } = await render(layer);
+    try {
+      expect(host.querySelector(`input[aria-label="Feed for ${layer.color}"]`)).toBeNull();
+      expect(host.querySelector(`select[aria-label="Material for ${layer.color}"]`)).not.toBeNull();
+      expect(host.querySelector(`input[aria-label="Cut depth for ${layer.color}"]`)).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('Advanced reveals Feed', async () => {
+    const layer = profileLayer();
+    installProject(layer, false);
+    useUiStore.getState().setShowCncAdvanced(true);
+    const { host, root } = await render(layer);
+    try {
+      expect(host.querySelector(`input[aria-label="Feed for ${layer.color}"]`)).not.toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('the Through cut button sets depth to the stock thickness', async () => {
+    const layer = profileLayer();
+    installProject(layer, false); // default CNC stock thickness = 6.35 mm
+    const { host, root } = await render(layer);
+    try {
+      const button = [...host.querySelectorAll('button')].find((b) =>
+        b.textContent?.startsWith('Through cut'),
+      );
+      if (button === undefined) throw new Error('Through cut button missing');
+      await act(async () => button.click());
+      expect(useStore.getState().project.scene.layers[0]?.cnc?.depthMm).toBeCloseTo(6.35, 5);
     } finally {
       await act(async () => root.unmount());
       host.remove();

@@ -16,6 +16,7 @@ import {
 import { applyInsertBoxPanels } from './box-insert-mutation';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
+import { seedLayerFromStockMaterial } from './cnc-project-material';
 import { defaultSettingsForColor, type LayerDefaultsState } from './layer-default-actions';
 import type { AppState } from './store';
 import { fitAllObjects } from './viewport-actions';
@@ -128,13 +129,19 @@ function applyLayerDefaultsToFreshLayers<T extends { readonly project: Project }
   defaults: LayerDefaultsState,
 ): T {
   const existing = new Set(previousLayers.map((layer) => layer.id));
+  const machine = result.project.machine;
   let changed = false;
   const layers = result.project.scene.layers.map((layer) => {
     if (existing.has(layer.id)) return layer;
     const settings = defaultSettingsForColor(defaults, layer.color);
-    if (Object.keys(settings).length === 0) return layer;
-    changed = true;
-    return applyLayerDefaultSettings(layer, settings);
+    const withDefaults =
+      Object.keys(settings).length === 0 ? layer : applyLayerDefaultSettings(layer, settings);
+    // Seed fresh CNC layers from the project stock material (ADR-112); no-op
+    // for laser or when no material is chosen.
+    const seeded =
+      machine?.kind === 'cnc' ? seedLayerFromStockMaterial(withDefaults, machine) : withDefaults;
+    if (seeded !== layer) changed = true;
+    return seeded;
   });
   if (!changed) return result;
   return {

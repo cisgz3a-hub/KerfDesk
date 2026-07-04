@@ -92,6 +92,21 @@ describe('PreviewRouteControls', () => {
     expect(host.textContent).toContain('Play');
     expect(host.textContent).toContain('Restart');
     expect(host.textContent).toContain('Speed');
+    expect(
+      host
+        .querySelector<HTMLButtonElement>('button[aria-label="Play route preview"]')
+        ?.classList.contains('lf-btn'),
+    ).toBe(true);
+    expect(
+      host
+        .querySelector<HTMLButtonElement>('button[aria-label="Play route preview"]')
+        ?.classList.contains('lf-button'),
+    ).toBe(false);
+    expect(
+      host
+        .querySelector<HTMLButtonElement>('button[aria-label="Restart route preview"]')
+        ?.classList.contains('lf-btn'),
+    ).toBe(true);
 
     await act(async () => {
       host.querySelector<HTMLButtonElement>('button[aria-label="Play route preview"]')?.click();

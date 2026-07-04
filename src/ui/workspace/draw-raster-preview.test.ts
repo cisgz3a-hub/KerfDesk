@@ -46,7 +46,7 @@ describe('drawRasterPreview', () => {
     const ctx = {} as CanvasRenderingContext2D;
     const view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
 
-    drawRasterPreview(ctx, project, view);
+    drawRasterPreviewSync(ctx, project, view);
 
     expect(createElement).not.toHaveBeenCalled();
   });
@@ -68,9 +68,9 @@ describe('drawRasterPreview', () => {
     const view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
     const projectWithRaster = projectForRaster(burnRaster('data:image/png;base64,preview-cache-a'));
 
-    drawRasterPreview(ctx, projectWithRaster, view);
-    drawRasterPreview(ctx, emptyProject(), view);
-    drawRasterPreview(ctx, projectWithRaster, view);
+    drawRasterPreviewSync(ctx, projectWithRaster, view);
+    drawRasterPreviewSync(ctx, emptyProject(), view);
+    drawRasterPreviewSync(ctx, projectWithRaster, view);
 
     expect(createdCanvases).toHaveLength(2);
   });
@@ -96,7 +96,7 @@ describe('drawRasterPreview', () => {
       }),
     );
 
-    drawRasterPreview(ctx, project, view);
+    drawRasterPreviewSync(ctx, project, view);
 
     expect(createElement).not.toHaveBeenCalled();
   });
@@ -135,7 +135,7 @@ describe('drawRasterPreview', () => {
       scene: { objects: [raster], layers: [layer] },
     };
 
-    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+    drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
     expect(Array.from(capturedImageData?.data ?? [])).toEqual([
       0, 0, 0, 255, 85, 85, 85, 255, 255, 255, 255, 255,
@@ -169,7 +169,7 @@ describe('drawRasterPreview', () => {
       },
     };
 
-    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+    drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
     expect(createdCanvases).toHaveLength(1);
   });
@@ -208,7 +208,7 @@ describe('drawRasterPreview', () => {
       scene: { objects: [raster], layers: [layer] },
     };
 
-    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+    drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
     expect(Array.from(capturedImageData?.data ?? [])).toEqual([255, 255, 255, 255, 0, 0, 0, 255]);
   });
@@ -250,7 +250,7 @@ describe('drawRasterPreview', () => {
       scene: { objects: [raster], layers: [layer] },
     };
 
-    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+    drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
     expect(capturedCanvas).toEqual({ width: 2, height: 1 });
     expect(Array.from(capturedImageData?.data ?? [])).toEqual([0, 0, 0, 255, 255, 255, 255, 255]);
@@ -294,7 +294,7 @@ describe('drawRasterPreview', () => {
       linesPerMm: 1,
     };
     const drawWithLayer = (layer: typeof baseLayer): void => {
-      drawRasterPreview(
+      drawRasterPreviewSync(
         noOpContext(),
         { ...createProject(), scene: { objects: [raster], layers: [layer] } },
         { scale: 1, offsetX: 0, offsetY: 0 },
@@ -348,7 +348,7 @@ describe('drawRasterPreview', () => {
       scene: { objects: [raster], layers: [layer] },
     };
 
-    drawRasterPreview(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
+    drawRasterPreviewSync(noOpContext(), project, { scale: 1, offsetX: 0, offsetY: 0 });
 
     expect(Array.from(capturedImageData?.data ?? [])).toEqual([179, 179, 179, 255]);
   });
@@ -378,6 +378,19 @@ function noOpContext(): CanvasRenderingContext2D {
       },
     },
   ) as CanvasRenderingContext2D;
+}
+
+function drawRasterPreviewSync(
+  ctx: CanvasRenderingContext2D,
+  project: Project,
+  view: ViewTransform,
+): void {
+  drawRasterPreview(ctx, project, view, { scheduleBuild: runImmediately });
+}
+
+function runImmediately(work: () => void): () => void {
+  work();
+  return () => undefined;
 }
 
 function burnRaster(dataUrl: string): RasterImage {

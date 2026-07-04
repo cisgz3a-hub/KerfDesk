@@ -2,6 +2,7 @@
 // structured error describing why it cannot be loaded.
 
 import { normalizeCameraAlignment, normalizeCameraCalibration } from '../../core/camera';
+import { isChiploadMaterialKey } from '../../core/cnc';
 import {
   DEFAULT_DEVICE_PROFILE,
   isKnownControllerKind,
@@ -11,6 +12,7 @@ import {
   normalizeGrblStreamingMode,
   normalizeScanOffsetTable,
 } from '../../core/devices';
+import { normalizeCameraProfile, type CameraProfile } from '../../core/camera';
 import {
   DEFAULT_CNC_MACHINE_CONFIG,
   type CncTiling,
@@ -131,6 +133,8 @@ function normalizeMachineValue(raw: unknown): Record<string, unknown> | undefine
       widthMm: positiveNumberOrDefault(stock['widthMm'], d.stock.widthMm),
       heightMm: positiveNumberOrDefault(stock['heightMm'], d.stock.heightMm),
       originOffset: normalizeStockOriginOffset(stock['originOffset'], d.stock.originOffset),
+      // ADR-112 project material: keep only a known chipload key; drop stale ones.
+      ...(isChiploadMaterialKey(stock['materialKey']) ? { materialKey: stock['materialKey'] } : {}),
     },
     tools,
     toolId,
@@ -227,6 +231,9 @@ function normalizeDevice(dev: Record<string, unknown>): Record<string, unknown> 
     cameraCalibration: normalizeCameraCalibration(dev['cameraCalibration']),
     cameraAlignment: normalizeCameraAlignment(dev['cameraAlignment']),
     noGoZones: Array.isArray(dev['noGoZones']) ? dev['noGoZones'] : [],
+    ...(dev['cameraProfile'] !== undefined
+      ? { cameraProfile: normalizeCameraProfile(dev['cameraProfile'] as CameraProfile) }
+      : {}),
     ...normalizeZTravelPatch(dev),
     ...normalizeControllerPatch(dev),
   };

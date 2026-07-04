@@ -6,6 +6,7 @@
 
 import type { Vec2 } from '../scene';
 import type { RasterGroup } from './job';
+import { offsetForSpeed, type ScanOffsetPoint } from './scan-offset';
 import { appendTravelStep, dist } from './toolpath-math';
 import type { ToolpathStep } from './toolpath-types';
 
@@ -17,10 +18,13 @@ export function appendRasterGroupSteps(
   steps: ToolpathStep[],
   initialPrevEnd: Vec2 | null,
   group: RasterGroup,
+  scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
 ): Vec2 | null {
   if (!hasUsableRasterGeometry(group)) return initialPrevEnd;
   const pixelWidthMm = (group.bounds.maxX - group.bounds.minX) / group.pixelWidth;
   const pixelHeightMm = (group.bounds.maxY - group.bounds.minY) / group.pixelHeight;
+  const scanOffsetMm =
+    group.bidirectionalScanOffsetMm ?? offsetForSpeed(scanningOffsets, group.speed);
   const passes = Math.max(1, Math.floor(group.passes));
   let prevEnd = initialPrevEnd;
   for (let pass = 0; pass < passes; pass += 1) {
@@ -34,11 +38,20 @@ export function appendRasterGroupSteps(
       for (let spanIndex = 0; spanIndex < ordered.length; spanIndex += 1) {
         const span = ordered[spanIndex];
         if (span === undefined) continue;
-        prevEnd = appendRasterSpanSweepSteps(steps, prevEnd, group, span, worldY, reverse, {
-          passIndex: pass,
-          rowIndex: y,
-          spanIndex,
-        });
+        prevEnd = appendRasterSpanSweepSteps(
+          steps,
+          prevEnd,
+          group,
+          span,
+          worldY,
+          reverse,
+          scanOffsetMm,
+          {
+            passIndex: pass,
+            rowIndex: y,
+            spanIndex,
+          },
+        );
       }
       emittedRowCount += 1;
     }
@@ -90,6 +103,7 @@ function appendRasterSpanSweepSteps(
   span: RasterSpan,
   worldY: number,
   reverse: boolean,
+  scanOffsetMm: number,
   sourcePosition: {
     readonly passIndex: number;
     readonly rowIndex: number;
@@ -100,7 +114,7 @@ function appendRasterSpanSweepSteps(
   const activeStartX = group.bounds.minX + span.firstX * pixelWidthMm;
   const activeEndX = group.bounds.minX + (span.lastX + 1) * pixelWidthMm;
   const overscanMm = Math.max(0, group.overscanMm);
-  const rowShiftX = reverse ? -(group.bidirectionalScanOffsetMm ?? 0) : 0;
+  const rowShiftX = reverse ? -scanOffsetMm : 0;
   const leadStart = {
     x: (reverse ? activeEndX + overscanMm : activeStartX - overscanMm) + rowShiftX,
     y: worldY,

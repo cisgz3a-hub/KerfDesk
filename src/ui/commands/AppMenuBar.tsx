@@ -135,7 +135,7 @@ function MenuItem(props: {
 // trailing block — grouping must never hide a command.
 const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<ReadonlyArray<CommandId>>>> = {
   tools: [
-    ['tools.measure', 'tools.add-text', 'tools.registration-jig'],
+    ['tools.measure', 'tools.add-text', 'tools.registration-jig', 'tools.camera'],
     ['tools.material-test', 'tools.interval-test', 'tools.scan-offset-test', 'tools.focus-test'],
     ['tools.optimization-settings'],
     [

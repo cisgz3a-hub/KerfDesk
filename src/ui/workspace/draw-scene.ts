@@ -14,7 +14,7 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
-import { buildPreviewToolpath, drawObjectsFaint, drawPreview } from './draw-preview';
+import { drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
 import { drawSelectedOpenFillContours } from './draw-open-fill-contours';
@@ -104,7 +104,7 @@ export function drawScene(
   drawNoGoZones(ctx, project, view);
   drawOriginMarker(ctx, view);
   if (opts.preview) {
-    drawPreviewFrame(ctx, project, view, opts);
+    drawPreviewModeScene(ctx, project, view, opts);
   } else {
     const simplified = drawObjects(
       ctx,
@@ -139,7 +139,7 @@ export function drawScene(
 
 // Preview-mode frame: faint artwork, raster sim, CNC removal shading, then
 // the route lines on top (matches LightBurn's preview layering).
-function drawPreviewFrame(
+function drawPreviewModeScene(
   ctx: CanvasRenderingContext2D,
   project: Project,
   view: ViewTransform,
@@ -147,21 +147,23 @@ function drawPreviewFrame(
 ): void {
   drawObjectsFaint(ctx, project, view);
   // Raster sim under the vector toolpath: image engrave is the burned
-  // "background", cuts/scans layer on top.
-  drawRasterPreview(ctx, project, view);
+  // "background", cuts/scans layer on top (matches LightBurn preview).
+  drawRasterPreview(
+    ctx,
+    project,
+    view,
+    opts.onRasterBitmapReady === undefined
+      ? {}
+      : { onRasterPreviewReady: opts.onRasterBitmapReady },
+  );
   // CNC material-removal shading under the route lines (H.2).
   if (opts.cncRemovalGrid != null) drawCncRemoval(ctx, opts.cncRemovalGrid, view);
-  drawPreview(
-    ctx,
-    opts.previewToolpath ?? buildPreviewToolpath(project),
-    view,
-    opts.scrubberT ?? 1,
-    {
-      showTravel: opts.previewShowTravel !== false,
-      showFuture: true,
-      showEndpoints: true,
-    },
-  );
+  if (opts.previewToolpath === undefined) return;
+  drawPreview(ctx, opts.previewToolpath, view, opts.scrubberT ?? 1, {
+    showTravel: opts.previewShowTravel !== false,
+    showFuture: true,
+    showEndpoints: true,
+  });
 }
 
 function drawLiveWorkspaceOverlays(

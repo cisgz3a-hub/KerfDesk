@@ -1,3 +1,4 @@
+import { isChiploadMaterialKey } from '../../core/cnc';
 import {
   CNC_CUT_TYPES,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -6,6 +7,18 @@ import {
   captureLayerOperationSettings,
   type LayerOperationSettings,
 } from '../../core/scene';
+
+const POCKET_STRATEGIES = new Set<string>(['offset', 'raster-x', 'raster-y']);
+
+// Keep a raw string field only when it is one of a known set of values —
+// used for the closed-union optional CNC layer keys.
+function enumPassthrough(
+  key: string,
+  value: unknown,
+  allowed: ReadonlySet<string>,
+): Record<string, unknown> {
+  return typeof value === 'string' && allowed.has(value) ? { [key]: value } : {};
+}
 
 export function normalizeLayer(layer: unknown): unknown {
   if (!isObject(layer)) return layer;
@@ -58,11 +71,8 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
 function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, unknown> {
   return {
     ...(typeof raw['toolId'] === 'string' ? { toolId: raw['toolId'] } : {}),
-    ...(raw['pocketStrategy'] === 'offset' ||
-    raw['pocketStrategy'] === 'raster-x' ||
-    raw['pocketStrategy'] === 'raster-y'
-      ? { pocketStrategy: raw['pocketStrategy'] }
-      : {}),
+    ...enumPassthrough('pocketStrategy', raw['pocketStrategy'], POCKET_STRATEGIES),
+    ...(isChiploadMaterialKey(raw['materialKey']) ? { materialKey: raw['materialKey'] } : {}),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     ...(typeof raw['reliefFinishToolId'] === 'string'
       ? { reliefFinishToolId: raw['reliefFinishToolId'] }

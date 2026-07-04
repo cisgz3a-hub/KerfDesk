@@ -8,6 +8,9 @@ export type FileHandle = {
   // Lazily read the file's text content. Cheap to call once; some platforms
   // (web File objects) consume the stream so callers shouldn't call twice.
   readonly text: () => Promise<string>;
+  // Lazily read the original binary payload. Image workflows use this instead
+  // of hidden DOM file inputs so all picker access stays behind PlatformAdapter.
+  readonly blob?: () => Promise<Blob>;
 };
 
 export type SaveTarget = {
@@ -101,6 +104,26 @@ export type CameraAdapter = {
   readonly discoverNetworkCamera: () => Promise<NetworkCamera | null>;
 };
 
+export type CameraBridgeProbeRequest = {
+  readonly url: string;
+};
+
+export type CameraBridgeProbeResult =
+  | {
+      readonly kind: 'ok';
+      readonly url: string;
+      readonly codec?: string;
+      readonly ffmpegAvailable: boolean;
+      readonly previewUrl?: string;
+    }
+  | { readonly kind: 'invalid'; readonly reason: string }
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
+export type CameraBridgeAdapter = {
+  readonly isSupported: () => boolean;
+  readonly probeRtspCamera: (req: CameraBridgeProbeRequest) => Promise<CameraBridgeProbeResult>;
+};
+
 export type PlatformAdapter = {
   readonly id: 'web' | 'electron' | 'mock';
 
@@ -118,4 +141,8 @@ export type PlatformAdapter = {
   // Camera Mode (ADR-107): overhead-camera capture. Optional — present on
   // platforms that expose getUserMedia; UI hides Camera Mode when absent.
   readonly camera?: CameraAdapter;
+
+  // Optional local camera bridge for RTSP/network cameras. Web-only runs can
+  // report unavailable; Electron starts the bridge in the main process.
+  readonly cameraBridge?: CameraBridgeAdapter;
 };

@@ -78,6 +78,30 @@ describe('Electron trusted renderer policy', () => {
     expect(
       shouldGrantPermissionCheck(
         {
+          permission: 'media',
+          requestingOrigin: 'app://app',
+          isMainFrame: true,
+          mediaType: 'video',
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(true);
+    expect(
+      shouldGrantPermissionCheck(
+        {
+          permission: 'media',
+          requestingOrigin: 'app://app',
+          isMainFrame: true,
+          mediaType: 'audio',
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(false);
+    expect(
+      shouldGrantPermissionCheck(
+        {
           permission: 'serial',
           requestingOrigin: 'https://evil.example',
           currentUrl: 'app://app/index.html',
@@ -141,6 +165,30 @@ describe('Electron trusted renderer policy', () => {
         trustedOrigins,
       ),
     ).toBe(true);
+    expect(
+      shouldGrantPermissionRequest(
+        {
+          permission: 'media',
+          isMainFrame: true,
+          requestingUrl: 'app://app/index.html',
+          mediaTypes: ['video'],
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(true);
+    expect(
+      shouldGrantPermissionRequest(
+        {
+          permission: 'media',
+          isMainFrame: true,
+          requestingUrl: 'app://app/index.html',
+          mediaTypes: ['audio'],
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(false);
     expect(
       shouldGrantPermissionRequest(
         {

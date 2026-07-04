@@ -2008,6 +2008,115 @@ F-CNC19 tiling.
    apply directly; pocketing requires closed shapes (draw or import
    filled artwork instead).
 
+### F-CNC31. Auto-fill feeds from a material — ADR-111 #1
+
+#### Success
+1. Every CNC layer card has a "Material" select at the top (Custom +
+   Softwood / Hardwood / Plywood-MDF / Acrylic / Aluminium). Picking one
+   fills feed, plunge, and depth-per-pass in a single undoable patch from
+   the chipload engine, using the layer's own bit and a 2-flute
+   assumption. Cut type, depth, bit, and tabs stay put.
+2. The choice is remembered on the layer (materialKey) and round-trips in
+   the .lf2 file; it is display-only and does not change compiled output.
+
+#### Error — none (bounded)
+1. Material is a select; the engine floors tiny results (feed / per-pass)
+   rather than emitting zeros, same as the advanced Feeds calculator.
+
+#### Empty
+1. The row renders only in CNC mode. "Custom" clears materialKey and
+   leaves the current feeds untouched for hand-tuning.
+
+#### Edge — full flute/RPM control
+1. The one-click fill assumes 2 flutes; operators who need a different
+   flute count or RPM use the advanced Feeds calculator, which composes
+   with H.7 presets.
+
+### F-CNC32. Switch a layer card between Basic and Advanced — ADR-111 #4
+
+#### Success
+1. CNC layer cards default to **Basic**: Material, Cut type, Bit, Cut
+   depth, Tabs — the essentials to cut a part. The Cuts/Layers panel's
+   "Advanced cut settings" checkbox reveals the rest (feeds, stepover,
+   pocket fill, cut-type tails) on every card; the choice persists across
+   sessions.
+2. Cut depth carries a one-click "Through cut (= N mm)" button that sets
+   the depth to the stock thickness — no mental math against the Material
+   & Bit card.
+
+#### Error — none (view toggle only)
+1. Toggling never changes cut settings; it only shows/hides fields.
+
+#### Empty
+1. The toggle and its fields appear only in CNC mode.
+
+#### Edge — a hidden advanced value still applies
+1. Fields hidden by Basic keep their values and still drive output (e.g. a
+   pocket's stepover); Basic hides complexity, it does not reset it.
+
+### F-CNC33. Fill machine settings from the connected controller — ADR-111 #3a
+
+#### Success
+1. When a controller is connected and its `$$` snapshot differs from the
+   current setup, a "Machine reports …" banner appears atop Material &
+   Bit. "Apply" writes the reported spindle max (GRBL $30) to the machine
+   and the reported travel ($130/$131) to the bed, then the banner clears.
+
+#### Error — none (opt-in)
+1. Nothing changes until Apply is clicked; ignoring the banner is safe.
+
+#### Empty
+1. No connection, or reported values that already match, means no banner.
+
+#### Edge — bed vs stock
+1. Travel fills the machine BED (work envelope), never the stock — the
+   workpiece footprint stays whatever the operator set. Spindle max is the
+   RPM ceiling; per-layer running speed is unchanged.
+
+### F-CNC34. See stock/feed advisories against machine limits — ADR-111 #3b
+
+#### Success
+1. At Save G-code and Start, with a controller connected, KerfDesk warns
+   when the job overruns the reported limits: stock larger than the
+   reported travel, or a layer feed above the reported max rate (the
+   controller would clamp it). Advisory only — the export/stream proceeds.
+
+#### Error — none (advisory, not a gate)
+1. These never block Save/Start; bed-bounds violations remain the separate
+   hard preflight error.
+
+#### Empty
+1. No connection (no reported limits) means no limit advisories — only the
+   existing stock-footprint and raster advisories show.
+
+#### Edge — which layers count
+1. The feed check considers only layers set to output; a hidden/off layer
+   with an aggressive feed does not raise the advisory.
+
+### F-CNC35. Set the project material once (Easel-style) — ADR-112
+
+#### Success
+1. The Material & Bit panel shows a "Material" dropdown (above Bit) the
+   moment you switch to CNC — no design needed. Pick your stock material and
+   every layer's feed / plunge / depth-per-pass fills from it (each layer's
+   own bit + spindle), in one undoable step.
+2. New layers inherit it: add a layer or import an SVG after choosing the
+   material and the fresh layers come in with those feeds (not the generic
+   1000 / 1.5 default). Set material first, then import — the Easel order.
+
+#### Error — none (bounded select)
+1. Material is a dropdown; feeds floor at safe minimums via the calculator.
+
+#### Empty
+1. The dropdown shows in CNC mode only. "Custom" clears the project material
+   and leaves current feeds untouched for hand-tuning.
+
+#### Edge — per-layer override and other object types
+1. A layer's own Material picker (F-CNC31) overrides the project material for
+   that layer. Text and drawn shapes don't auto-seed (like laser defaults);
+   set their material on the layer card, or re-pick the project material to
+   apply to all.
+
 ## Phase I flows — multi-controller (ADR-094..097)
 
 (Integrated as Phase I — ADR-104. Flow IDs keep their original F-H prefix.)

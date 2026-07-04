@@ -42,12 +42,19 @@ export function gcodeMetadataHeader(
   metadata: GcodeMetadata,
   assumed: GcodeHeaderAssumptions,
 ): string {
+  const safe = {
+    appName: sanitizeMetadataCommentValue(metadata.appName),
+    appVersion: sanitizeMetadataCommentValue(metadata.appVersion),
+    gitSha: sanitizeMetadataCommentValue(metadata.gitSha),
+    buildTimeUtc: sanitizeMetadataCommentValue(metadata.buildTimeUtc),
+    emitterRevision: sanitizeMetadataCommentValue(metadata.emitterRevision),
+  };
   return [
-    `; ${metadata.appName}`,
-    `; version: ${metadata.appVersion}`,
-    `; commit: ${metadata.gitSha}`,
-    `; built: ${metadata.buildTimeUtc}`,
-    `; emitter: ${metadata.emitterRevision}`,
+    `; ${safe.appName}`,
+    `; version: ${safe.appVersion}`,
+    `; commit: ${safe.gitSha}`,
+    `; built: ${safe.buildTimeUtc}`,
+    `; emitter: ${safe.emitterRevision}`,
     ...assumptionLines(assumed),
     '',
   ].join('\n');
@@ -64,4 +71,15 @@ function assumptionLines(assumed: GcodeHeaderAssumptions): ReadonlyArray<string>
     `; assumes: GRBL $30=${assumed.maxPowerS} (max S), $32=1 (laser mode)`,
     '; safety: G0 carries S0; blank gaps >5mm rapid (G0); fill+raster dynamic power (M4)',
   ];
+}
+
+function sanitizeMetadataCommentValue(value: string): string {
+  return Array.from(value, (char) => (isMetadataLineBreakOrControl(char) ? ' ' : char))
+    .join('')
+    .trim();
+}
+
+function isMetadataLineBreakOrControl(value: string): boolean {
+  const code = value.charCodeAt(0);
+  return code < 0x20 || code === 0x7f || code === 0x2028 || code === 0x2029;
 }

@@ -62,4 +62,15 @@ describe('buildJogCommand', () => {
   it('formats axes to 3 decimal places', () => {
     expect(buildJogCommand({ dx: 0.1234, feed: 1500 })).toContain('X0.123');
   });
+
+  it('rejects non-finite axes and feed before producing firmware text', () => {
+    expect(() => buildJogCommand({ dx: Number.NaN, feed: 1500 })).toThrow(/dx must be finite/);
+    expect(() => buildJogCommand({ dy: Number.POSITIVE_INFINITY, feed: 1500 })).toThrow(
+      /dy must be finite/,
+    );
+    expect(() => buildJogCommand({ dz: Number.NEGATIVE_INFINITY, feed: 1500 })).toThrow(
+      /dz must be finite/,
+    );
+    expect(() => buildJogCommand({ dx: 1, feed: Number.NaN })).toThrow(/feed must be finite/);
+  });
 });

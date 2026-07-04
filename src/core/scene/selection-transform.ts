@@ -44,6 +44,7 @@ export type SelectionTransformError =
   | 'empty-selection'
   | 'degenerate-selection'
   | 'invalid-dimension'
+  | 'invalid-number'
   | 'multi-rotation'
   | 'non-uniform-rotated-selection';
 
@@ -80,6 +81,9 @@ export function buildSelectionNudgeEdit(
   dy: number,
 ): SelectionTransformResult {
   if (objects.length === 0) return { kind: 'error', reason: 'empty-selection' };
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+    return { kind: 'error', reason: 'invalid-number' };
+  }
   return {
     kind: 'ok',
     transforms: objects.map((object) => ({
@@ -115,6 +119,9 @@ function positionSelection(
   edit: Extract<SelectionTransformEdit, { readonly kind: 'position' }>,
 ): SelectionTransformResult {
   const anchor = anchorPointForBBox(bbox, edit.anchor);
+  if (!isOptionalFiniteNumber(edit.x) || !isOptionalFiniteNumber(edit.y)) {
+    return { kind: 'error', reason: 'invalid-number' };
+  }
   const dx = edit.x === undefined ? 0 : edit.x - anchor.x;
   const dy = edit.y === undefined ? 0 : edit.y - anchor.y;
   return {
@@ -135,8 +142,10 @@ function resizeSelection(
     return { kind: 'error', reason: 'degenerate-selection' };
   }
   if (
-    (edit.width !== undefined && edit.width <= MIN_DIMENSION_MM) ||
-    (edit.height !== undefined && edit.height <= MIN_DIMENSION_MM)
+    (edit.width !== undefined &&
+      (!Number.isFinite(edit.width) || edit.width <= MIN_DIMENSION_MM)) ||
+    (edit.height !== undefined &&
+      (!Number.isFinite(edit.height) || edit.height <= MIN_DIMENSION_MM))
   ) {
     return { kind: 'error', reason: 'invalid-dimension' };
   }
@@ -162,6 +171,7 @@ function rotateSelection(
   const object = objects[0];
   if (object === undefined) return { kind: 'error', reason: 'empty-selection' };
   if (objects.length !== 1) return { kind: 'error', reason: 'multi-rotation' };
+  if (!Number.isFinite(edit.rotationDeg)) return { kind: 'error', reason: 'invalid-number' };
   const anchor = anchorPointForBBox(bbox, edit.anchor);
   const deltaDeg = edit.rotationDeg - object.transform.rotationDeg;
   const origin = rotatePoint({ x: object.transform.x, y: object.transform.y }, anchor, deltaDeg);
@@ -273,6 +283,10 @@ function isAxisAlignedRotation(rotationDeg: number): boolean {
 
 function isUniformScale(factors: { readonly x: number; readonly y: number }): boolean {
   return Math.abs(factors.x - factors.y) <= MIN_DIMENSION_MM;
+}
+
+function isOptionalFiniteNumber(value: number | undefined): boolean {
+  return value === undefined || Number.isFinite(value);
 }
 
 function normalizeDeg(deg: number): number {
