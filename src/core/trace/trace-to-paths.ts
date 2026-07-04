@@ -162,14 +162,19 @@ export async function traceImageToColoredPaths(
 //     that still facets a 40px letter.
 // If both fire, take the larger factor.
 //
-// Interpolation is BILINEAR for both. A bicubic (Catmull-Rom / Mitchell-
-// Netravali) small-smooth path was measured on the facet harness (2026-07-04):
-// it smooths the CURVE-dominated glyphs (B@40 3.48%->2.19%/1.75%, S@40
-// 3.98%->3.48%/3.03%, O stays 0.00%) but REGRESSES the corner/straight-dominated
-// E (E@40 2.07%->5.10%/4.64%, E@60 3.04%->4.33%/4.04%) because higher-order
-// ringing at E's dense step edges injects facets and E has no curves to gain.
-// The E residual is corner-bound, not interpolation-staircase-bound, so bicubic
-// is not strictly better and was reverted (targets require E@40 <= 1.8%).
+// Interpolation is BILINEAR for both — two higher-order kernels were measured on
+// the small-smooth path against the facet harness and BOTH rejected:
+//   * Bicubic (Catmull-Rom / Mitchell-Netravali, 2026-07-04): smooths the
+//     CURVE-dominated glyphs but REGRESSES the corner/straight-dominated E (E@40
+//     2.07%->5.10%/4.64%) via overshoot/ringing at E's dense step edges.
+//   * Monotone cubic (PCHIP / Fritsch-Carlson, 2026-07-04): chosen because it is
+//     provably overshoot-free, so E "could not" ring. It regressed E just as
+//     hard anyway — E@40 2.07%->5.10%, E@60 3.04%->3.38% — while B@40 (3.06%) and
+//     S@40 (4.52%) still missed their improvement targets. The overshoot-free
+//     unit tests passed, which proves the E faceting is NOT interpolation
+//     ringing: it comes from the downstream Canny/DP fit reacting to any smoother
+//     (higher-point-count) upscaled raster, so no interpolation kernel can fix it
+//     from here. Bilinear is the balanced optimum; keep it.
 function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
   const thinStroke = options.autoUpscaleSmallSources === true && shouldAutoUpscale(image);
   const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
