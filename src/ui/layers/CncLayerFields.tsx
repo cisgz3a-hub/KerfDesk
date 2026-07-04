@@ -19,6 +19,7 @@ import {
 import { useStore } from '../state';
 import { CutTypeSections, DepthAndFeedFields, StepoverField } from './CncLayerAdvancedFields';
 import { LayerBitSelect, useLayerHasReliefObjects } from './CncLayerToolFields';
+import { CncMaterialRow } from './CncMaterialRow';
 import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
 
@@ -55,6 +56,12 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
         </select>
       </Row>
       <LayerBitSelect
+        layer={layer}
+        settings={settings}
+        onCommit={commit}
+        onCommitSettings={commitSettings}
+      />
+      <CncMaterialRow
         layer={layer}
         settings={settings}
         onCommit={commit}

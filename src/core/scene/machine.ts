@@ -105,6 +105,10 @@ export type CncLayerSettings = {
   // Pocket clearing strategy (ADR-105 G10). Absent = contour-parallel
   // offset rings (the original behavior, byte-identical).
   readonly pocketStrategy?: 'offset' | 'raster-x' | 'raster-y';
+  // ADR-106: the material the feeds were auto-filled from (a ChiploadMaterial
+  // key). Absent = feeds were entered manually ("Custom"). Display/round-trip
+  // only — does not affect compiled output.
+  readonly materialKey?: string;
   readonly tabsEnabled: boolean; // profile cuts only
   readonly tabHeightMm: number; // material left under a tab
   readonly tabWidthMm: number; // tab length along the path
