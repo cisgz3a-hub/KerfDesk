@@ -5,3 +5,10 @@ export { buildStrokeGraph, type StrokeGraph, type StrokeChain } from './stroke-g
 export { condenseJunctions } from './junction-condense';
 export { pruneSpurs, DEFAULT_SPUR_OPTIONS } from './spur-pruning';
 export { assembleStrokePaths } from './stroke-chains';
+export {
+  closePolylineLoops,
+  closeRingEndpoints,
+  LOOP_TOUCH_GAP_PX,
+  type LoopClosureOptions,
+} from './loop-closure';
+export { SegmentGrid, type GridSegment } from './spatial-grid';
