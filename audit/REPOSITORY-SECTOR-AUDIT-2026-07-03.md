@@ -16,9 +16,9 @@ Mode: sector audit plus user-approved fix-phase tracking.
 
 ## Current Status
 
-Active sector: S08 current-state delta audit.
+Active sector: S09 current-state delta audit.
 Completed sectors: S01 Governance, audit history, and product contracts; S02 Tooling, build, release, CI, and static shell; S03 Electron desktop runtime and local bridge; S04 Core domain models, controller/device/material primitives; S05 Core job compilation, preflight, raster/trace, and output; S06 IO formats and persistence; S07 Platform adapters; S08 UI application workflows; S09 Fixtures, perceptual harness, and test assets.
-Current pass: S08 delta Pass 1 complete; S08 delta Pass 2 next.
+Current pass: S09 delta Pass 2 complete; S09 delta Pass 3 next.
 
 ## Findings Summary
 
@@ -108,6 +108,7 @@ Current pass: S08 delta Pass 1 complete; S08 delta Pass 2 next.
 | S08-015 | Low | S08 | Fixed | The hover-help contract accepts unregistered `data-help-id` values, and preview controls already use IDs outside the help registry. |
 | S08-016 | Low | S08 | Fixed | Add/Edit Text numeric inputs can pass non-finite or out-of-contract values into text rendering and scene state. |
 | D-S08-001 | Medium | S08 | Open | PWA update dismissal re-arm clears storage without invalidating the mounted prompt render. |
+| D-S08-002 | Medium | S08 | Open | UI canvas/WebGL tests pass while emitting jsdom canvas errors and async `act(...)` warnings. |
 | S09-001 | Medium | S09 | Fixed | The required Arch House fixture detector accepts non-PNG files even though all real-logo consumers decode the path as PNG. |
 | S09-002 | Low | S09 | Fixed | Perceptual artifact PNGs are ignored local outputs but are referenced like durable audit evidence. |
 | S09-003 | Low | S09 | Fixed | `writePerceptualArtifact(...)` can render a misleading comparison for mismatched mask dimensions. |
@@ -116,6 +117,8 @@ Current pass: S08 delta Pass 1 complete; S08 delta Pass 2 next.
 | S09-006 | Medium | S09 | Fixed | The centerline performance regression test uses the worker timeout as its only budget despite a much lower stated target and current runtime. |
 | S09-007 | Low | S09 | Fixed | The minimal PNG decoder has no dedicated malformed/unsupported-file tests even though it gates the real-logo benchmark fixture. |
 | S09-008 | Low | S09 | Fixed | The emitted-G-code burn rasterizer has no direct parser tests beyond three generated GRBL fill fixtures. |
+| D-S09-001 | Low | S09 | Open | `TRACE_AUDIT` diagnostic tests count as passing tests when the diagnostic environment flag is absent. |
+| D-S09-002 | Low | S09 | Open | `_edge-zoom` TRACE_AUDIT diagnostic still hardcodes the removed `audit/fixtures/trace` logo path. |
 
 ## Pass Log
 
@@ -4267,3 +4270,191 @@ Pass result:
 
 - S08 delta Pass 1 complete.
 - S08 remains open for Pass 2 and Pass 3 over box numeric-input/dogbone toggle changes, probe/device-setup UI changes, and UI canvas-test stderr.
+
+### S08 Delta Pass 2 - Box Dogbone, Probe Setup, and Canvas Test Signal
+
+Scope planned:
+
+- Inspect the box generator dogbone toggle, draft parsing, persisted-draft restore path, and related dialog tests.
+- Inspect the reusable probe controls and Device Setup probe-step integration.
+- Reproduce and classify the UI canvas/WebGL stderr seen during the broader release gate.
+
+Evidence inspected:
+
+- `src/ui/box/box-draft.ts`.
+- `src/ui/box/BoxGeneratorDialog.tsx`.
+- `src/ui/box/BoxGeneratorFields.tsx`.
+- `src/ui/calibration/calibration-draft-storage.ts`.
+- `src/ui/box/box-draft.test.ts`.
+- `src/ui/box/BoxGeneratorDialog.test.tsx`.
+- `src/ui/laser/ProbeControls.tsx`.
+- `src/ui/laser/ProbePanel.test.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupProbeStep.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupProbeStep.test.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupWizard.test.tsx`.
+- `src/ui/laser/device-setup/device-setup-flow.ts`.
+- Focused command passed: `pnpm exec vitest run src/ui/box/box-draft.test.ts src/ui/box/BoxGeneratorDialog.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/laser/device-setup/DeviceSetupProbeStep.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx` (5 test files, 35 tests).
+- Focused command passed: `pnpm exec vitest run src/ui/camera/WorkspaceCameraOverlay.test.tsx src/ui/camera/trace-from-camera.test.ts src/ui/relief-viewer/Relief3DViewerDialog.test.tsx src/ui/relief-viewer/Cut3DPreviewDialog.test.tsx` (4 test files, 9 tests).
+
+#### D-S08-002 - UI canvas/WebGL tests pass while emitting jsdom canvas errors and async `act(...)` warnings
+
+Severity: Medium.
+
+Evidence:
+
+- `BoxGeneratorDialog.test.tsx` passes all 7 tests while every preview render emits `Error: Not implemented: HTMLCanvasElement.prototype.getContext` from `src/ui/box/BoxPreview.tsx`.
+- `trace-from-camera.test.ts` passes while `buildCameraTraceImage(...)` emits the same jsdom canvas `getContext` error from `src/ui/camera/trace-from-camera.ts`.
+- `WorkspaceCameraOverlay.test.tsx` passes while its captured-still projection path emits the same jsdom canvas `getContext` error from `src/ui/camera/WorkspaceCameraOverlay.tsx`.
+- `Relief3DViewerDialog.test.tsx` and `Cut3DPreviewDialog.test.tsx` pass while Three.js emits repeated canvas/WebGL context errors and `THREE.WebGLRenderer: Error creating WebGL context.`.
+- The same focused run also emits React `act(...)` warnings from `ProbeControls`, `DeviceSetupConnectStep`, and the relief-viewer dialog shell while the files still report green.
+
+Risk:
+
+The release gate and focused UI tests can be green while meaningful canvas, camera, preview, and 3D viewer paths are throwing at runtime in the test environment. That makes the test output noisy and lowers confidence that these tests would catch a real preview/canvas regression instead of silently exercising fallback or partially failed render paths.
+
+Recommendation:
+
+Add an explicit canvas/WebGL test harness boundary: either mock the expected 2D/WebGL APIs and assert the drawing/fallback behavior cleanly, or make unexpected `console.error` / React `act(...)` warnings fail the affected tests after known fallbacks are intentionally captured. The aim is not to require real WebGL in jsdom; it is to keep green tests from tolerating unclassified rendering errors.
+
+Findings:
+
+- Opened `D-S08-002` (medium): UI canvas/WebGL tests pass while emitting jsdom canvas errors and async `act(...)` warnings.
+- No box dogbone/default finding was opened in Pass 2; old persisted drafts are merged over fresh defaults, so missing `relief` falls back to `off`, and the dialog tests cover CNC relief off/on visibility and warning behavior.
+- No probe workflow product finding was opened in Pass 2; the shared controls remain CNC-only, Idle-gated at the button, and covered by the probe panel plus Device Setup wizard tests.
+
+Pass result:
+
+- S08 delta Pass 2 complete.
+- S08 remains open for Pass 3 over direct-diff closure, adjacent UI state actions, and any remaining unchecked S08 delta files.
+
+### S08 Delta Pass 3 - Direct Diff Closure and Adjacent State Actions
+
+Scope planned:
+
+- Enumerate every S08 file changed since the audited baseline and close remaining coverage gaps.
+- Inspect the remaining debounced input, project material, machine preset, layer creation, and fresh-import seeding changes.
+- Run the full focused S08 delta test bundle and TypeScript check.
+
+Evidence inspected:
+
+- `git diff --name-status d603c01..HEAD -- src/ui`.
+- `git diff --unified=80 d603c01..HEAD -- src/ui/state/object-insert-actions.ts`.
+- `git diff --unified=80 d603c01..HEAD -- src/ui/state/layer-actions.ts src/ui/state/machine-actions.ts src/ui/layers/use-debounced-commit.ts`.
+- `git diff --unified=80 d603c01..HEAD -- src/ui/machine/CncSetupPanel.tsx src/ui/machine/CncLibraryPanels.tsx src/ui/machine/CncMachineCatalogRow.tsx src/ui/machine/CncSetupPanel.material.test.tsx`.
+- `src/ui/layers/use-debounced-commit.ts` and `src/ui/layers/use-debounced-commit.test.tsx`.
+- `src/ui/state/cnc-project-material.ts`.
+- `src/ui/state/machine-actions.ts`.
+- `src/ui/state/layer-actions.ts`.
+- `src/ui/state/object-insert-actions.ts`.
+- `src/ui/state/cnc-project-material.test.ts`, `src/ui/state/cnc-project-material-action.test.ts`, `src/ui/state/cnc-material-seeding.test.ts`, and `src/ui/state/cnc-machine-preset.test.ts`.
+- `src/ui/machine/CncSetupPanel.tsx`, `src/ui/machine/CncLibraryPanels.tsx`, `src/ui/machine/CncMachineCatalogRow.tsx`, and `src/ui/machine/CncSetupPanel.material.test.tsx`.
+- Focused command passed: `pnpm exec vitest run src/ui/app/PwaUpdatePrompt.test.tsx src/ui/box/box-draft.test.ts src/ui/box/BoxGeneratorDialog.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/laser/device-setup/DeviceSetupProbeStep.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/state/cnc-project-material.test.ts src/ui/state/cnc-project-material-action.test.ts src/ui/state/cnc-material-seeding.test.ts src/ui/state/cnc-machine-preset.test.ts src/ui/state/layer-actions.test.ts` (13 test files, 90 tests).
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+
+Findings:
+
+- No new S08 delta findings in Pass 3.
+- Remaining direct-diff S08 files are covered by Passes 1-3: PWA prompt/dismissal, box dogbone/defaults, probe controls and Device Setup, project material and CNC machine catalog UI/state, debounced commit behavior, and fresh-layer/import material seeding.
+- The S08 delta findings remain `D-S08-001` and `D-S08-002`, both medium severity and open.
+
+Pass result:
+
+- S08 current-state delta sector closed after three passes.
+- Move to S09 current-state delta audit for fixtures, perceptual harness changes, underscore-prefixed audit tests, CI budget helpers, and centerline runner-speed changes.
+
+### S09 Delta Pass 1 - Fixture Delta Orientation and Diagnostic Test Signal
+
+Scope planned:
+
+- Map the S09 files changed since the audited baseline.
+- Inspect the CI budget helper, trace benchmark loop additions, Arch House edge benchmark additions, centerline perf budget changes, shared star fixture, and underscore-prefixed diagnostic tests.
+- Separate release-gated benchmark coverage from opt-in audit diagnostics.
+
+Evidence inspected:
+
+- `git diff --name-status d603c01..HEAD -- src/__fixtures__ audit/fixtures audit/evidence`.
+- `src/__fixtures__/ci-budget.ts` and `src/__fixtures__/ci-budget.test.ts`.
+- `src/__fixtures__/perceptual/trace-benchmark-loop.ts` and `src/__fixtures__/perceptual/trace-benchmark-loop.test.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-benchmark.ts` and `src/__fixtures__/perceptual/arch-house-edge-truth.test.ts`.
+- `src/__fixtures__/perceptual/centerline-perf.test.ts` and `src/__fixtures__/perceptual/star-fixture.ts`.
+- `vitest.config.ts`, confirming the normal test include is `src/**/*.test.{ts,tsx}` plus `electron/**/*.test.ts`, with no special exclusion for underscore-prefixed diagnostics.
+- `rg -n --glob "_*.test.ts" "TRACE_AUDIT|return;|it\(" src/__fixtures__/perceptual`, confirming the underscore diagnostic tests are normal `.test.ts` files that return early unless `TRACE_AUDIT=1`.
+- Focused diagnostic check passed without running the diagnostic body: `pnpm exec vitest run src/__fixtures__/perceptual/_arch-a-scale.test.ts` (1 test file, 1 test, 2ms, no `TRACE_AUDIT` environment flag).
+- Focused release-gated slice passed: `pnpm exec vitest run src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/arch-house-edge-truth.test.ts src/__fixtures__/perceptual/trace-benchmark-loop.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts` (4 test files, 14 tests). The centerline performance gauge logged `4441ms`, below both the local regression budget and the 30s worker ceiling.
+
+#### D-S09-001 - `TRACE_AUDIT` diagnostic tests count as passing tests when the diagnostic environment flag is absent
+
+Severity: Low.
+
+Evidence:
+
+- `vitest.config.ts` includes every `src/**/*.test.{ts,tsx}` file in the normal test run.
+- The new underscore-prefixed diagnostic files under `src/__fixtures__/perceptual` are still named `.test.ts`, and each top-level test body begins with `if (process.env['TRACE_AUDIT'] !== '1') return;`.
+- Running `pnpm exec vitest run src/__fixtures__/perceptual/_arch-a-scale.test.ts` without `TRACE_AUDIT=1` reports `1 passed` even though the diagnostic sweep body exits immediately.
+
+Risk:
+
+Normal `pnpm test` and release-gate output can count audit diagnostics as green tests even when those diagnostics did not execute. That makes the test totals look stronger than the actual exercised coverage and can confuse maintainers about whether opt-in reference/audit comparisons were run.
+
+Recommendation:
+
+Move these diagnostics to a non-`.test.ts` suffix, exclude `src/__fixtures__/perceptual/_*.test.ts` from the default Vitest include, or use a visible skip mechanism when `TRACE_AUDIT` is absent. Add a dedicated documented script for `TRACE_AUDIT=1` audit runs if these diagnostics should remain runnable through Vitest.
+
+Findings:
+
+- Opened `D-S09-001` (low): `TRACE_AUDIT` diagnostic tests count as passing tests when the diagnostic environment flag is absent.
+- No release-gated fixture benchmark finding was opened in Pass 1; the CI helper, trace benchmark loop, Arch House edge metrics, and centerline performance gauge passed their focused tests.
+
+Pass result:
+
+- S09 delta Pass 1 complete.
+- S09 remains open for Pass 2 over artifact paths, generated evidence ownership, and benchmark helper invariants.
+
+### S09 Delta Pass 2 - Artifact Path and Opt-In Evidence Sweep
+
+Scope planned:
+
+- Verify the current real-logo fixture ownership and opt-in artifact output locations.
+- Check ignored/generated evidence paths and stale references to the old audit fixture tree.
+- Run the trace artifact harness and Arch House baseline tests.
+
+Evidence inspected:
+
+- `src/__fixtures__/perceptual/trace-artifact-runner.ts`.
+- `src/__fixtures__/perceptual/trace-artifacts.test.ts`.
+- `.gitignore`.
+- `git diff --unified=80 d603c01..HEAD -- src/__fixtures__/perceptual/trace-artifact-runner.ts src/__fixtures__/perceptual/trace-artifacts.test.ts src/__fixtures__/perceptual/arch-house-baseline.test.ts src/__fixtures__/perceptual/arch-house-edge-quality.test.ts .gitignore`.
+- `rg -n "audit/evidence|audit/fixtures|perceptual-artifacts|trace-audit-artifacts|DEFAULT_TRACE_ARTIFACT|TRACE_ARTIFACT|arch-house-langebaan-source|writeTraceArtifactEvidence|requiredArchHouseFixtureStatus" src/__fixtures__ .gitignore audit docs README.md package.json`.
+- Fixture path check: `Test-Path audit/fixtures/trace/arch-house-langebaan-source.png` returned `False`; `Test-Path src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png` returned `True`; `git ls-files audit/fixtures/trace src/__fixtures__/perceptual/assets` listed only `src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png`.
+- `src/__fixtures__/perceptual/_edge-zoom.test.ts`.
+- Opt-in diagnostic command failed as expected: `$env:TRACE_AUDIT='1'; pnpm exec vitest run src/__fixtures__/perceptual/_edge-zoom.test.ts -t "renders zoomed edge-trace"; Remove-Item Env:TRACE_AUDIT` failed with `ENOENT` opening `audit\fixtures\trace\arch-house-langebaan-source.png`.
+- Focused command passed: `pnpm exec vitest run src/__fixtures__/perceptual/trace-artifacts.test.ts src/__fixtures__/perceptual/arch-house-baseline.test.ts` (2 test files, 16 tests).
+- `git status -sb --ignored trace-audit-artifacts perceptual-artifacts audit/fixtures/trace src/__fixtures__/perceptual/assets` reported only ignored `perceptual-artifacts/`; no tracked `audit/fixtures/trace` fixture remains.
+
+#### D-S09-002 - `_edge-zoom` TRACE_AUDIT diagnostic still hardcodes the removed `audit/fixtures/trace` logo path
+
+Severity: Low.
+
+Evidence:
+
+- The current tracked real-logo fixture is `src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png`; the old `audit/fixtures/trace/arch-house-langebaan-source.png` path is absent.
+- `src/__fixtures__/perceptual/_edge-zoom.test.ts` calls `decodePngFile('audit/fixtures/trace/arch-house-langebaan-source.png')` in all four `TRACE_AUDIT=1` diagnostic tests.
+- Running the first `_edge-zoom` diagnostic with `TRACE_AUDIT=1` fails immediately with `ENOENT` for the old audit fixture path.
+
+Risk:
+
+The normal release-gated benchmark path is healthy, but the standing visual zoom diagnostic cannot be used after the fixture ownership move. That weakens the opt-in trace audit toolkit precisely when a maintainer wants to inspect letter-level edge/centerline regressions.
+
+Recommendation:
+
+Route `_edge-zoom.test.ts` through `requiredArchHouseFixtureStatus()` or the shared fixture asset path, matching the current Arch House benchmark helpers. Pair that with the `D-S09-001` runner-signal cleanup so opt-in diagnostics are visibly skipped or explicitly run.
+
+Findings:
+
+- Opened `D-S09-002` (low): `_edge-zoom` TRACE_AUDIT diagnostic still hardcodes the removed `audit/fixtures/trace` logo path.
+- No new finding on the main trace artifact/evidence path; current tests pin the default trace-artifact output under ignored `perceptual-artifacts/trace-artifacts`, and the active Arch House baseline uses the fixture under `src/__fixtures__/perceptual/assets`.
+
+Pass result:
+
+- S09 delta Pass 2 complete.
+- S09 remains open for Pass 3 over direct-diff closure, underscore diagnostic inventory, and the remaining perceptual benchmark files.
