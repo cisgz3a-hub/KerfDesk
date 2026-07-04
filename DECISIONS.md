@@ -4775,3 +4775,49 @@ pick fills safe numbers (not 1000/1.5), injected `controllerSettings` shows
 the Apply banner + stock/feed advisories. Defaults improve, but the
 physical cut stays CLAIMED per ADR-098 §3 — the operator owns clamping,
 work-zero, and the actual feed the machine can survive.
+
+## ADR-112 — Project-level CNC material picker: set material once for the job (Phase H.14, 2026-07-04)
+
+**Status:** accepted (maintainer follow-up to ADR-111: on the live app, opening
+CNC mode showed only the dense machine "Material & Bit" panel and no material
+picker — the ADR-111 picker is per-layer and invisible until a design is
+imported, and the panel titled "Material & Bit" had no material control at all).
+Chosen fix (maintainer): a project-level picker in that panel, Easel-style.
+
+### Decisions
+
+- **Project material lives on the stock.** `CncStock.materialKey?` — the
+  workpiece's material, chosen once. NOT compiled directly (feeds still live
+  per-layer); display + seed only, round-trips in `.lf2`. Bed/stock separation
+  from ADR-111 §3a holds: this is the material ON the bed, distinct from the
+  per-layer feeds it fills.
+- **Picker in the Material & Bit panel**, above Bit — the two "what am I
+  cutting" selectors together, present the moment you enter CNC mode. Picking a
+  material runs `applyCncStockMaterial`: auto-fills feed/plunge/depth-per-pass
+  for **every** current layer (its own bit + spindle, 2-flute) in one undoable
+  step. "Custom" clears the association and leaves feeds for hand-tuning.
+- **New layers seed** from the project material: manual Add and SVG import both
+  seed via the shared `seedLayerFromStockMaterial`, so the Easel flow (set
+  material → import) brings layers in with safe feeds. Text/drawn-shape inserts
+  do NOT seed — consistent with them not taking laser layer-defaults either; a
+  documented minor follow-up, not a silent gap.
+- **Per-layer override preserved.** The ADR-111 per-layer Material picker still
+  overrides a single layer; the project picker sets the default/bulk.
+- **DRY:** `isChiploadMaterialKey` extracted to `core/cnc` (the layer + stock
+  normalizers and the picker all validate against it).
+
+### Out of scope / follow-ups
+
+Seeding text and drawn-shape inserts; a "mixed" indicator when layers diverge
+from the project material; saving custom material presets (still ADR-111's
+deferred CNC Material Library).
+
+### Verification
+
+Unit: validator table; stock round-trip + drop-unknown; pure apply (layer
+fill/no-op, project set/clear/laser-noop, seed on/off) with feeds computed via
+calculateFeeds (not pinned magic numbers). Store: action fills + dirty + undo;
+seeding on manual Add + SVG import; no-material = no cnc block (byte-identical).
+jsdom: the panel renders the dropdown and picking sets the stock material. Full
+gate per commit. Live browser NOT driven into CNC mode (shares the maintainer's
+scene, CLAUDE.md §4). Physical cut CLAIMED per ADR-098 §3.

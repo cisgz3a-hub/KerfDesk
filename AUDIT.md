@@ -888,6 +888,7 @@ VERIFIED.
 | ADR-111 #4 Basic/Advanced disclosure + through-cut | **CLAIMED** | 2026-07-04: jsdom tests (Basic hides Feed, keeps Material + Cut depth; Advanced reveals Feed; Through-cut sets depth = 6.35 mm stock); persisted flag, view-only. Perceptual toggle pass pending |
 | ADR-111 #3a machine auto-fill from detected `$$` | **CLAIMED** | 2026-07-04: 6 threshold unit tests + jsdom Apply test (patches params.spindleMaxRpm + device bed, leaves stock untouched). NOT verified against a real controller handshake |
 | ADR-111 #3b stock/feed limit advisories | **CLAIMED** | 2026-07-04: 9 threshold unit tests (null/laser silence, width/height overhang, feed-over-max, output-off ignored, absent max-rate, combined); advisory-only, callers without a snapshot byte-identical. NOT verified against a real controller's reported limits |
+| ADR-112 project material picker (set-once, seeds layers) | **CLAIMED** | 2026-07-04: pure apply tests (layer fill/no-op, project set/clear/laser-noop, seed on/off — feeds via calculateFeeds, not pinned) + store action (fills + dirty + undo) + seeding (manual Add + SVG import; no-material = no cnc block, byte-identical) + jsdom (panel dropdown renders Custom+materials, pick sets stock material). Live browser not driven into CNC mode (shares maintainer's scene, CLAUDE.md §4); physical cut CLAIMED |
 
 ### Camera Mode inventory (ADR-107..110, added 2026-07-03)
 
