@@ -2,6 +2,7 @@
 // project machine is CNC. The Easel-style job setup: what stock is on the
 // bed, which bit is in the spindle, and the machine's Z/spindle parameters.
 
+import { CHIPLOAD_MATERIALS } from '../../core/cnc';
 import { activeCncTool, type CncMachineConfig } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
@@ -24,6 +25,7 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
     <section aria-label="Material and bit setup" style={cardStyle}>
       <h3 style={headingStyle}>Material &amp; Bit</h3>
       <CncDetectedSettingsRow machine={machine} />
+      <CncMaterialSelectRow machine={machine} />
       <Row label="Bit">
         <select
           value={tool.id}
@@ -46,6 +48,32 @@ function CncSetupFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
       <CncTilingPanel machine={machine} />
       <SurfacingPanel machine={machine} />
     </section>
+  );
+}
+
+// Project-level material (ADR-112): Easel's "set material once for the job".
+// Picking one auto-fills safe feeds for every layer (and seeds new ones);
+// "Custom" clears the association and leaves feeds for hand-tuning. The
+// per-layer Material picker on each card overrides this for that layer.
+function CncMaterialSelectRow(props: { readonly machine: CncMachineConfig }): JSX.Element {
+  const applyCncStockMaterial = useStore((s) => s.applyCncStockMaterial);
+  return (
+    <Row label="Material">
+      <select
+        value={props.machine.stock.materialKey ?? ''}
+        onChange={(e) => applyCncStockMaterial(e.target.value === '' ? null : e.target.value)}
+        aria-label="Project material"
+        title="Pick your stock material to auto-fill safe feeds for every layer. Choose Custom to set feeds by hand; each layer can still override."
+        style={selectStyle}
+      >
+        <option value="">Custom (manual feeds)</option>
+        {CHIPLOAD_MATERIALS.map((material) => (
+          <option key={material.value} value={material.value}>
+            {material.label}
+          </option>
+        ))}
+      </select>
+    </Row>
   );
 }
 
