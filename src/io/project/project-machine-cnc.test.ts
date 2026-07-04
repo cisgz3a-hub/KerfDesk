@@ -97,6 +97,21 @@ describe('.lf2 machine / cnc round-trip', () => {
     });
   });
 
+  it('round-trips a valid materialKey and drops an unknown one (ADR-106)', () => {
+    const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
+    const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };
+    const layer = scene.layers[0] as Record<string, unknown>;
+    layer['cnc'] = { ...DEFAULT_CNC_LAYER_SETTINGS, materialKey: 'plywood-mdf' };
+    expect(deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc?.materialKey).toBe(
+      'plywood-mdf',
+    );
+
+    layer['cnc'] = { ...DEFAULT_CNC_LAYER_SETTINGS, materialKey: 'unobtainium' };
+    expect(
+      deserializeOk(`${JSON.stringify(raw)}\n`).scene.layers[0]?.cnc?.materialKey,
+    ).toBeUndefined();
+  });
+
   it('replaces a malformed layer cnc block with defaults and drops non-objects', () => {
     const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
     const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };
