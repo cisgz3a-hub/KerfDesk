@@ -1,4 +1,4 @@
-// CncMaterialRow (ADR-106): picking a material auto-fills feeds + records the
+// CncMaterialRow (ADR-111): picking a material auto-fills feeds + records the
 // materialKey; picking Custom clears the key; renders nothing in laser mode.
 
 import { act } from 'react';

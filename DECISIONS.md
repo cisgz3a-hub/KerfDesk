@@ -4205,7 +4205,7 @@ Unit tests per feature; raster-fill coverage/no-gouge checks; jsdom
 fallback for the pane; license-check green with the new dependency;
 full gate per commit. Hardware remains CLAIMED per ADR-098 §3.
 
-## ADR-106 — CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.12, 2026-07-04)
+## ADR-111 — CNC beginner-mode UX pack: material picker, machine auto-fill, limit advisories, Basic/Advanced disclosure (Phase H.13, 2026-07-04)
 
 **Status:** accepted (maintainer directive after a real 4040 cut wandered:
 "Is this the easiest for a user to understand? … Can some of it

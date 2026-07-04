@@ -113,7 +113,7 @@ function CncStockFields(props: { readonly machine: CncMachineConfig }): JSX.Elem
 
 // Spindle + motion parameters (safe Z, spindle ceiling/spin-up, park point).
 // Split from CncSetupFields to keep both under the function-size cap after the
-// detected-settings banner landed (ADR-106).
+// detected-settings banner landed (ADR-111).
 function CncMachineParamsFields(props: { readonly machine: CncMachineConfig }): JSX.Element {
   const { machine } = props;
   const updateCncMachine = useStore((s) => s.updateCncMachine);

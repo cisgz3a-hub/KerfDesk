@@ -97,7 +97,7 @@ describe('.lf2 machine / cnc round-trip', () => {
     });
   });
 
-  it('round-trips a valid materialKey and drops an unknown one (ADR-106)', () => {
+  it('round-trips a valid materialKey and drops an unknown one (ADR-111)', () => {
     const raw = JSON.parse(serializeProject(cncProject())) as Record<string, unknown>;
     const scene = raw['scene'] as { layers: Array<Record<string, unknown>> };
     const layer = scene.layers[0] as Record<string, unknown>;

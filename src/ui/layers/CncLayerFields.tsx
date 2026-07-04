@@ -6,7 +6,7 @@
 //
 // Basic fields (material, cut type, bit, cut depth, tabs) are always shown;
 // the advanced field set (feeds, stepover, pocket fill, cut-type tails) is
-// gated behind the ui-store Basic/Advanced toggle (ADR-106). Shared row/input
+// gated behind the ui-store Basic/Advanced toggle (ADR-111). Shared row/input
 // controls live in CncLayerPrimitives; the advanced group in
 // CncLayerAdvancedFields.
 
@@ -93,7 +93,7 @@ export function CncLayerFields(props: { readonly layer: Layer }): JSX.Element {
 }
 
 // Cut depth + a one-click "through cut" that sets depth to the stock
-// thickness (the confusing Cut-depth-vs-Stock-thickness pair, ADR-106).
+// thickness (the confusing Cut-depth-vs-Stock-thickness pair, ADR-111).
 function CutDepthField(props: {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;

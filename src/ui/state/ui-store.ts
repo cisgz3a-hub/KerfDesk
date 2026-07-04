@@ -14,7 +14,7 @@ export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 16;
 export const ZOOM_STEP = 1.25;
 
-// ADR-106: whether the CNC layer card shows the advanced fields. Beginner
+// ADR-111: whether the CNC layer card shows the advanced fields. Beginner
 // default is Basic (false); persisted across sessions so power users flip it
 // once. localStorage-guarded so non-browser test/SSR contexts stay safe.
 const CNC_ADVANCED_KEY = 'laserforge.cnc-advanced.v1';
@@ -179,7 +179,7 @@ export type UiState = {
   // ADR-105 G11 — the bundled design library dialog.
   readonly libraryDialogOpen: boolean;
   readonly setLibraryDialogOpen: (open: boolean) => void;
-  // ADR-106 — CNC layer card shows advanced fields (Basic default).
+  // ADR-111 — CNC layer card shows advanced fields (Basic default).
   readonly showCncAdvanced: boolean;
   readonly setShowCncAdvanced: (next: boolean) => void;
   // Temporary Measure tool line. It is UI-only: not saved, not undoable, and
@@ -200,7 +200,7 @@ export type UiState = {
 // The persisted dialog/view toggles (design-library dialog, CNC Basic/Advanced
 // disclosure). Grouped into a slice so the store factory stays under the
 // function-size cap; each action only needs `set`, and setShowCncAdvanced also
-// writes localStorage so the Basic/Advanced choice survives reloads (ADR-106).
+// writes localStorage so the Basic/Advanced choice survives reloads (ADR-111).
 type UiStateSetter = (partial: Partial<UiState>) => void;
 function uiToggleSlice(
   set: UiStateSetter,

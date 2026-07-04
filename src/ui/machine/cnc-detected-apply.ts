@@ -1,5 +1,5 @@
 // cnc-detected-apply — decide what the connected controller's detected `$$`
-// settings can fill on the CNC machine (ADR-106). GRBL $30 (max spindle RPM)
+// settings can fill on the CNC machine (ADR-111). GRBL $30 (max spindle RPM)
 // fills the CNC params' spindleMaxRpm; $130/$131 (max travel) fill the shared
 // device bed — NOT the stock, which is the workpiece on the bed, not the
 // machine envelope. Pure so the panel row and its test share one source of

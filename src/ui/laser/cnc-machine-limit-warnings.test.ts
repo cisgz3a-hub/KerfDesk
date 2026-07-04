@@ -35,7 +35,7 @@ function cncProject(args: {
   };
 }
 
-describe('detectCncMachineLimitWarnings (ADR-106)', () => {
+describe('detectCncMachineLimitWarnings (ADR-111)', () => {
   it('is silent when no controller is connected (limits null)', () => {
     expect(detectCncMachineLimitWarnings(cncProject({ stock: { widthMm: 900 } }), null)).toEqual(
       [],
