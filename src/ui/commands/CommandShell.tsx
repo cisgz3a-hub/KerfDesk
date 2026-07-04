@@ -1,4 +1,4 @@
-import { useRef, useState, type RefObject } from 'react';
+import { useState } from 'react';
 import {
   generateIntervalTestGrid,
   generateMaterialTestGrid,
@@ -8,10 +8,11 @@ import {
   type ScanOffsetCalibrationPatternOptions,
 } from '../../core/job';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
+import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
-import { useToastStore } from '../state/toast-store';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
+import { useToastStore, type ToastVariant } from '../state/toast-store';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { ScanOffsetCalibrationDialog } from '../calibration/ScanOffsetCalibrationDialog';
@@ -22,21 +23,21 @@ import {
   type ConvertToBitmapDialogOptions,
 } from '../raster/ConvertToBitmapDialog';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
+import { usePlatform } from '../app/platform-context';
 import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
 import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
-import { runMultiFileTrace, type MultiFileTraceFile } from './multi-file-trace-action';
+import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
+import { pickPlatformImageFile, pickPlatformImageFiles } from './platform-image-files';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 
 export function CommandShell(): JSX.Element {
-  const imageInput = useRef<HTMLInputElement | null>(null);
-  const multiFileTraceInput = useRef<HTMLInputElement | null>(null);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
@@ -53,8 +54,8 @@ export function CommandShell(): JSX.Element {
   const onMultiFileTracePick = useMultiFileTracePickHandler();
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const commands = useAppCommands({
-    requestImportImage: () => imageInput.current?.click(),
-    requestMultiFileTrace: () => multiFileTraceInput.current?.click(),
+    requestImportImage: onImagePick,
+    requestMultiFileTrace: onMultiFileTracePick,
     requestConvertToBitmap: () => setConvertDialogOpen(true),
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
@@ -77,8 +78,6 @@ export function CommandShell(): JSX.Element {
       <Toolbar commands={commands} machineKind={machineKind} />
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
-      <ImageImportInput inputRef={imageInput} onPick={onImagePick} />
-      <MultiFileTraceInput inputRef={multiFileTraceInput} onPick={onMultiFileTracePick} />
       {convertDialogOpen && selectedConvertible !== null ? (
         <ConvertDialog
           convertible={selectedConvertible}
@@ -183,48 +182,6 @@ function ProjectNotesPanel(props: { readonly onClose: () => void }): JSX.Element
         setProjectNotes(next);
         props.onClose();
         pushToast('Updated project notes.', 'success');
-      }}
-    />
-  );
-}
-
-function ImageImportInput(props: {
-  readonly inputRef: RefObject<HTMLInputElement>;
-  readonly onPick: (file: File) => void;
-}): JSX.Element {
-  return (
-    <input
-      ref={props.inputRef}
-      type="file"
-      accept="image/png,image/jpeg"
-      aria-label="Import image file picker"
-      title="Choose a PNG or JPG image to import into the workspace."
-      style={{ display: 'none' }}
-      onChange={(event) => {
-        const file = event.target.files?.[0];
-        if (file !== undefined) props.onPick(file);
-        event.target.value = '';
-      }}
-    />
-  );
-}
-
-function MultiFileTraceInput(props: {
-  readonly inputRef: RefObject<HTMLInputElement>;
-  readonly onPick: (files: ReadonlyArray<MultiFileTraceFile>) => void;
-}): JSX.Element {
-  return (
-    <input
-      ref={props.inputRef}
-      type="file"
-      accept="image/png,image/jpeg"
-      multiple
-      aria-label="Multi-file trace image picker"
-      title="Choose PNG or JPG images to trace into standalone SVG files."
-      style={{ display: 'none' }}
-      onChange={(event) => {
-        props.onPick(Array.from(event.target.files ?? []));
-        event.target.value = '';
       }}
     />
   );
@@ -336,20 +293,51 @@ function AdjustDialog(props: {
   );
 }
 
-function useMultiFileTracePickHandler(): (files: ReadonlyArray<MultiFileTraceFile>) => void {
+function useMultiFileTracePickHandler(): () => void {
+  const platform = usePlatform();
   const pushToast = useToastStore((s) => s.pushToast);
-  return (files) => {
-    void runMultiFileTrace(files, pushToast);
+  return () => {
+    void pickAndRunMultiFileTrace(platform, pushToast);
   };
 }
 
-function useImagePickHandler(): (file: File) => void {
+function useImagePickHandler(): () => void {
+  const platform = usePlatform();
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
-  return (file) => {
-    void importImageFile(file, importRasterImage, pushToast);
+  return () => {
+    void pickPlatformImageFile(platform)
+      .then((file) => {
+        if (file === null) return;
+        return importImageFile(file, importRasterImage, pushToast);
+      })
+      .catch((err: unknown) => {
+        pushToast(`Could not choose image: ${errMsg(err)}`, 'error');
+      });
   };
 }
+
+async function pickAndRunMultiFileTrace(
+  platform: PlatformAdapter,
+  pushToast: PushToast,
+): Promise<void> {
+  let files: ReadonlyArray<File>;
+  try {
+    files = await pickPlatformImageFiles(platform);
+  } catch (err) {
+    pushToast(`Could not choose trace images: ${errMsg(err)}`, 'error');
+    return;
+  }
+  await runMultiFileTrace(files, pushToast, {
+    write: (file) => writeTraceSvgFileWithPlatform(platform, file),
+  });
+}
+
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+type PushToast = (message: string, variant?: ToastVariant) => void;
 
 function useSelectedRaster() {
   const scene = useStore((s) => s.project.scene);

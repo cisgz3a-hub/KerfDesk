@@ -126,4 +126,36 @@ describe('buildToolpath raster preview rows', () => {
       source: cut.source,
     });
   });
+
+  it('applies profile scan-offset calibration to reverse preview rows', () => {
+    const tp = buildToolpath(
+      rasterJob(
+        rasterGroup({
+          pixelWidth: 2,
+          pixelHeight: 2,
+          bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
+          overscanMm: 0,
+          speed: 1000,
+          sValues: new Uint16Array([500, 500, 500, 500]),
+        }),
+      ),
+      { scanningOffsets: [{ speedMmPerMin: 1000, offsetMm: 0.25 }] },
+    );
+    const cuts = tp.steps.filter((step) => step.kind === 'cut');
+
+    expect(cuts[0]).toMatchObject({
+      kind: 'cut',
+      polyline: [
+        { x: 0, y: 0.5 },
+        { x: 2, y: 0.5 },
+      ],
+    });
+    expect(cuts[1]).toMatchObject({
+      kind: 'cut',
+      polyline: [
+        { x: 1.75, y: 1.5 },
+        { x: -0.25, y: 1.5 },
+      ],
+    });
+  });
 });

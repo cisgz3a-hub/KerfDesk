@@ -75,7 +75,7 @@ describe('Scene object operations', () => {
 
   it('assignObjectToLayer rewrites every vector path color without mutating input', () => {
     const withObject = addObject(EMPTY_SCENE, sampleObject);
-    const assigned = assignObjectToLayer(withObject, 'O1', '#00ff00');
+    const assigned = assignObjectToLayer(withObject, 'O1', '#00FF00');
     const obj = assigned.objects[0];
     expect(obj?.kind).toBe('imported-svg');
     if (obj?.kind !== 'imported-svg') throw new Error('expected imported svg');
@@ -87,6 +87,12 @@ describe('Scene object operations', () => {
     const withObject = addObject(EMPTY_SCENE, sampleRaster);
     const assigned = assignObjectToLayer(withObject, 'R1', '#00ff00');
     expect(assigned.objects[0]).toMatchObject({ kind: 'raster-image', color: '#00ff00' });
+  });
+
+  it('rejects invalid target layer colors', () => {
+    const withObject = addObject(EMPTY_SCENE, sampleObject);
+    expect(() => assignObjectToLayer(withObject, 'O1', 'red')).toThrow(/Invalid layer color/);
+    expect(withObject.objects[0]).toBe(sampleObject);
   });
 });
 

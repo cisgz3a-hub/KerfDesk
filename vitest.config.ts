@@ -12,6 +12,9 @@ export default mergeConfig(
       globals: false,
       include: ['src/**/*.test.{ts,tsx}', 'electron/**/*.test.ts'],
       exclude: ['node_modules/**', 'dist/**', 'release/**'],
+      // Camera calibration and perceptual perf tests are CPU-heavy; keep enough
+      // headroom that wall-clock assertions measure regressions, not worker contention.
+      maxWorkers: 4,
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html', 'json'],

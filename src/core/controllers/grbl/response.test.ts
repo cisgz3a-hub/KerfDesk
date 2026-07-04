@@ -28,6 +28,11 @@ describe('classifyResponse', () => {
     expect(classifyResponse('ALARM:9')).toEqual({ kind: 'alarm', code: 9 });
   });
 
+  it('does not invent alarm codes from malformed numeric suffixes', () => {
+    expect(classifyResponse('ALARM:9x')).toEqual({ kind: 'unknown', raw: 'ALARM:9x' });
+    expect(classifyResponse('ALARM:')).toEqual({ kind: 'unknown', raw: 'ALARM:' });
+  });
+
   it('parses status reports via the status-parser', () => {
     const r = classifyResponse('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     expect(r.kind).toBe('status');

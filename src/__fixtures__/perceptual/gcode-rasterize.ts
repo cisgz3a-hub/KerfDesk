@@ -6,6 +6,7 @@
 // ignores rapid/travel moves and only inks G1 motion while M3/M4 is armed with a
 // positive modal S value.
 
+import { parseGcodeWord, stripGcodeComment } from '../../core/invariants';
 import type { Vec2 } from '../../core/scene';
 import { createMask, type Mask } from './rasterize';
 import { rasterizeBurnSegment } from './toolpath-rasterize';
@@ -15,6 +16,7 @@ export type GcodeRasterizeOptions = {
 };
 
 const DEFAULT_BURN_WIDTH_MM = 1;
+const RASTERIZED_WORDS = ['G', 'M', 'S', 'X', 'Y'] as const;
 
 type ParserState = {
   position: Vec2;
@@ -43,7 +45,7 @@ export function rasterizeGcodeBurn(
 }
 
 function applyLine(mask: Mask, state: ParserState, rawLine: string, burnWidthMm: number): void {
-  const words = parseWords(stripComment(rawLine));
+  const words = parseWords(stripGcodeComment(rawLine));
   if (words.size === 0) return;
   applyLaserState(state, words);
   applyMotionMode(state, words);
@@ -92,19 +94,11 @@ function isLaserOnMove(state: ParserState): boolean {
   return state.motion === 'G1' && state.armed && state.s > 0;
 }
 
-function stripComment(line: string): string {
-  return line.replace(/;.*$/, '').trim();
-}
-
 function parseWords(line: string): Map<string, number> {
   const words = new Map<string, number>();
-  const pattern = /([A-Za-z])\s*(-?(?:\d+\.?\d*|\.\d+))/g;
-  for (const match of line.matchAll(pattern)) {
-    const letter = match[1]?.toUpperCase();
-    const rawValue = match[2];
-    if (letter === undefined || rawValue === undefined) continue;
-    const value = Number(rawValue);
-    if (Number.isFinite(value)) words.set(letter, value);
+  for (const word of RASTERIZED_WORDS) {
+    const value = parseGcodeWord(line, word);
+    if (value !== null) words.set(word, value);
   }
   return words;
 }

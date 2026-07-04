@@ -1,5 +1,5 @@
 import type { ScanOffsetPoint } from '../../core/devices';
-import { normalizeScanOffsetTable } from '../../core/devices';
+import { mergeScanOffsetTableBySpeed } from '../../core/devices';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
 
 type ScanOffsetEditorProps = {
@@ -8,7 +8,7 @@ type ScanOffsetEditorProps = {
 };
 
 export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
-  const points = normalizeScanOffsetTable(props.value);
+  const points = mergeScanOffsetTableBySpeed(props.value);
   return (
     <Row label="Scan offset">
       <div
@@ -90,7 +90,7 @@ function ScanOffsetRow(props: {
 
 function addPoint(points: ReadonlyArray<ScanOffsetPoint>): ReadonlyArray<ScanOffsetPoint> {
   const last = points.length > 0 ? (points[points.length - 1]?.speedMmPerMin ?? 0) : 0;
-  return normalizeScanOffsetTable([
+  return mergeScanOffsetTableBySpeed([
     ...points,
     { speedMmPerMin: Math.max(3000, last + 3000), offsetMm: 0 },
   ]);
@@ -101,7 +101,7 @@ function updatePoint(
   index: number,
   patch: Partial<ScanOffsetPoint>,
 ): ReadonlyArray<ScanOffsetPoint> {
-  return normalizeScanOffsetTable(
+  return mergeScanOffsetTableBySpeed(
     points.map((point, current) => (current === index ? { ...point, ...patch } : point)),
   );
 }
@@ -110,7 +110,7 @@ function removePoint(
   points: ReadonlyArray<ScanOffsetPoint>,
   index: number,
 ): ReadonlyArray<ScanOffsetPoint> {
-  return normalizeScanOffsetTable(points.filter((_, current) => current !== index));
+  return mergeScanOffsetTableBySpeed(points.filter((_, current) => current !== index));
 }
 
 function parsePositiveFinite(value: string, fallback: number): number {

@@ -28,26 +28,27 @@ export function runPreEmitPreflight(project: Project): PreflightResult {
   }
   for (const obj of project.scene.objects) {
     if (obj.kind !== 'raster-image' || obj.role === 'trace-source') continue;
-    const layer = project.scene.layers
+    const layers = project.scene.layers
       .flatMap((l) => outputOperationLayers(l))
-      .find(
+      .filter(
         (operationLayer) =>
           operationLayer.color === obj.color &&
           (obj.operationOverride?.mode ?? operationLayer.mode) === 'image',
       );
-    if (layer === undefined) continue;
-    const effectiveLayer = { ...layer, ...(obj.operationOverride ?? {}) };
-    const {
-      pixelWidth: pw,
-      pixelHeight: ph,
-      remedy,
-    } = rasterBudgetDimensions(obj, effectiveLayer, project);
-    const verdict = evaluateRasterBudget(pw, ph);
-    if (verdict.kind === 'too-large') {
-      issues.push({
-        code: 'raster-too-large',
-        message: `Layer ${layer.id} image would engrave at ${pw}x${ph} px (${verdict.reason}). ${remedy}`,
-      });
+    for (const layer of layers) {
+      const effectiveLayer = { ...layer, ...(obj.operationOverride ?? {}) };
+      const {
+        pixelWidth: pw,
+        pixelHeight: ph,
+        remedy,
+      } = rasterBudgetDimensions(obj, effectiveLayer, project);
+      const verdict = evaluateRasterBudget(pw, ph);
+      if (verdict.kind === 'too-large') {
+        issues.push({
+          code: 'raster-too-large',
+          message: `Layer ${layer.id} image would engrave at ${pw}x${ph} px (${verdict.reason}). ${remedy}`,
+        });
+      }
     }
   }
   return { ok: issues.length === 0, issues };

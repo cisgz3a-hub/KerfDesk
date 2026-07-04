@@ -6,6 +6,7 @@ import type { CameraAlignment, CameraCalibration } from '../camera';
 import type { ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
+import type { CameraProfile } from '../camera';
 
 export type Origin = 'front-left' | 'front-right' | 'rear-left' | 'rear-right' | 'center';
 export type AirAssistCommand = 'none' | 'M7' | 'M8';
@@ -37,6 +38,12 @@ export function isKnownControllerKind(value: unknown): value is ControllerKind {
 }
 export type LaserFocusMode = 'fixed-lever' | 'manual' | 'unknown';
 export type LaserAirAssistHardware = 'built-in' | 'manual' | 'none' | 'unknown';
+export type LaserTechnology = 'diode' | 'co2' | 'fiber' | 'unknown';
+export type LaserHeadMetadataConfidence =
+  | 'researched'
+  | 'user-confirmed'
+  | 'imported'
+  | 'unverified';
 export type MachineProfileSource = 'built-in' | 'custom' | 'imported' | 'lightburn';
 export type ProfileCapability =
   | 'grbl'
@@ -45,7 +52,18 @@ export type ProfileCapability =
   | 'no-go-zones'
   | 'scan-offsets'
   | 'verified-origin'
-  | 'z-axis';
+  | 'z-axis'
+  | 'camera';
+export const PROFILE_CAPABILITIES = [
+  'grbl',
+  'wcs',
+  'air-assist',
+  'no-go-zones',
+  'scan-offsets',
+  'verified-origin',
+  'z-axis',
+  'camera',
+] as const satisfies ReadonlyArray<ProfileCapability>;
 export type ProfileEvidenceStatus = 'default' | 'researched' | 'user-imported' | 'unverified';
 
 export type ProfileEvidence = {
@@ -71,6 +89,8 @@ export type HomingConfig = {
 
 export type LaserSubProfile = {
   readonly model: string;
+  readonly technology?: LaserTechnology;
+  readonly metadataConfidence?: LaserHeadMetadataConfidence;
   readonly opticalPowerW?: number;
   readonly wavelengthNm?: number;
   readonly spotSizeMm?: {
@@ -104,6 +124,7 @@ export type DeviceProfile = {
   readonly rxBufferBytes: number;
   readonly gcodeDialect: GcodeDialectSelection;
   readonly laserSubProfile?: LaserSubProfile;
+  readonly cameraProfile?: CameraProfile;
   // Bed dimensions in MILLIMETRES (not cm, not inches). Every consumer
   // — view-transform, draw-scene, origin-transform, grbl-strategy —
   // treats these as mm. G-code output is `G21` (mm). Reference work
@@ -251,6 +272,8 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   zProbePresent: true,
   laserSubProfile: {
     model: 'LASER TREE LT-4LDS-V2',
+    technology: 'diode',
+    metadataConfidence: 'researched',
     opticalPowerW: 20,
     wavelengthNm: 455,
     spotSizeMm: { x: 0.16, y: 0.18 },

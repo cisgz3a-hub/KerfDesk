@@ -143,25 +143,58 @@ function originFlipsRasterY(device: DeviceProfile): boolean {
 }
 
 function decodeBase64Luma(base64: string, expectedLength: number): Uint8Array {
+  const clean = cleanBase64Luma(base64);
+  const dataLength = base64DataLength(clean);
   const out = whiteLuma(expectedLength);
   let outIndex = 0;
   let buffer = 0;
   let bitCount = 0;
-  for (const char of base64) {
-    if (outIndex >= expectedLength || char === '=') break;
-    if (isBase64Whitespace(char)) continue;
-    const value = BASE64_ALPHABET.indexOf(char);
-    if (value === -1) return whiteLuma(expectedLength);
+  for (let index = 0; index < dataLength; index += 1) {
+    const value = BASE64_ALPHABET.indexOf(clean[index] ?? '');
     buffer = (buffer << 6) | value;
     bitCount += 6;
     if (bitCount >= 8) {
       bitCount -= 8;
+      if (outIndex >= expectedLength) {
+        throw new Error('compileRasterGroup: lumaBase64 is malformed');
+      }
       out[outIndex] = (buffer >> bitCount) & 0xff;
       outIndex += 1;
       buffer &= (1 << bitCount) - 1;
     }
   }
+  if (bitCount > 0 && buffer !== 0) {
+    throw new Error('compileRasterGroup: lumaBase64 is malformed');
+  }
+  if (outIndex !== expectedLength) throw new Error('compileRasterGroup: lumaBase64 is malformed');
   return out;
+}
+
+function cleanBase64Luma(base64: string): string {
+  let clean = '';
+  for (const char of base64) {
+    if (isBase64Whitespace(char)) continue;
+    if (char !== '=' && BASE64_ALPHABET.indexOf(char) === -1) {
+      throw new Error('compileRasterGroup: lumaBase64 is malformed');
+    }
+    clean += char;
+  }
+  return clean;
+}
+
+function base64DataLength(clean: string): number {
+  const paddingStart = clean.indexOf('=');
+  if (clean.length % 4 === 1) throw new Error('compileRasterGroup: lumaBase64 is malformed');
+  if (paddingStart === -1) return clean.length;
+  const paddingCount = clean.length - paddingStart;
+  if (
+    paddingCount > 2 ||
+    clean.length % 4 !== 0 ||
+    clean.slice(paddingStart).replaceAll('=', '') !== ''
+  ) {
+    throw new Error('compileRasterGroup: lumaBase64 is malformed');
+  }
+  return paddingStart;
 }
 
 function isBase64Whitespace(char: string): boolean {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSvg } from './parse-svg';
+import { parseSvg, SVG_IMPORT_LIMITS } from './parse-svg';
 
 const args = (svgText: string) => ({ svgText, id: 'O1', source: 'test.svg' });
 
@@ -230,5 +230,26 @@ describe('parseSvg — denial-of-service guards', () => {
   <path d="M 0 0 L 10 10" stroke="#ff0000"/>
 </svg>`;
     expect(() => parseSvg(args(svgText))).not.toThrow();
+  });
+
+  it('rejects SVGs that exceed the imported color-group budget', () => {
+    const lines = Array.from({ length: SVG_IMPORT_LIMITS.coloredPaths + 1 }, (_, index) => {
+      const color = `#${(index + 1).toString(16).padStart(6, '0')}`;
+      return `<line x1="0" y1="${index}" x2="1" y2="${index}" stroke="${color}"/>`;
+    }).join('');
+
+    expect(() =>
+      parseSvg(args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 300">${lines}</svg>`)),
+    ).toThrow(/color group/);
+  });
+
+  it('rejects SVGs with unsupported extreme coordinates', () => {
+    expect(() =>
+      parseSvg(
+        args(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+  <line x1="0" y1="0" x2="1000001" y2="0" stroke="red"/>
+</svg>`),
+      ),
+    ).toThrow(/coordinates/);
   });
 });

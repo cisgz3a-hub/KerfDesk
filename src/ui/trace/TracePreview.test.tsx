@@ -110,6 +110,33 @@ describe('TracePreview source overlay controls', () => {
     }
   });
 
+  it('ignores Boundary drags while the preview frame is collapsed', async () => {
+    const onBoundaryChange = vi.fn();
+    const { host, root } = await renderPreview({
+      imageSize: { width: 100, height: 100 },
+      onBoundaryChange,
+    });
+    try {
+      const frame = host.querySelector('[aria-label="Trace preview"]') as HTMLDivElement | null;
+      expect(frame).not.toBeNull();
+      stubRect(frame!, { left: 0, top: 0, width: 0, height: 100 });
+      await act(async () => {
+        frame?.dispatchEvent(
+          new MouseEvent('mousedown', { clientX: 10, clientY: 20, bubbles: true }),
+        );
+        frame?.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 40, clientY: 60, bubbles: true }),
+        );
+        frame?.dispatchEvent(
+          new MouseEvent('mouseup', { clientX: 40, clientY: 60, bubbles: true }),
+        );
+      });
+      expect(onBoundaryChange).not.toHaveBeenCalled();
+    } finally {
+      await cleanup(root, host);
+    }
+  });
+
   it('clears the active Boundary rectangle', async () => {
     const onBoundaryClear = vi.fn();
     const { host, root } = await renderPreview({

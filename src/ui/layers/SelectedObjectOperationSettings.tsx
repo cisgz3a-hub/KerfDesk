@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import {
   captureLayerOperationSettings,
   sceneObjectPrimaryLayerColor,
@@ -9,7 +10,14 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { LayerImageFields } from './LayerImageFields';
+import {
+  hasMixedFields,
+  mixedOperationFields,
+  type MixedOperationFields,
+} from './selected-operation-mixed';
 import { useDebouncedCommit } from './use-debounced-commit';
+
+const MIXED_SELECT_VALUE = '__mixed__';
 
 export function SelectedObjectOperationSettings(props: {
   readonly objects: ReadonlyArray<SceneObject>;
@@ -31,6 +39,7 @@ export function SelectedObjectOperationSettings(props: {
     <SelectedOperationControls
       settings={context.settings}
       layer={context.layer}
+      mixed={context.mixed}
       maxFeed={maxFeed}
       hasOverride={hasOverride}
       commit={commit}
@@ -42,23 +51,67 @@ export function SelectedObjectOperationSettings(props: {
 function SelectedOperationControls(props: {
   readonly settings: LayerOperationSettings;
   readonly layer: Layer;
+  readonly mixed: MixedOperationFields;
   readonly maxFeed: number;
   readonly hasOverride: boolean;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
   readonly reset: () => void;
 }): JSX.Element {
   const { settings, commit } = props;
+  const hasMixed = hasMixedFields(props.mixed);
   return (
     <>
       <h3 style={subheadingStyle}>Selected Artwork Settings</h3>
+      {hasMixed ? (
+        <p aria-label="Selected artwork mixed settings" style={mixedHintStyle}>
+          Mixed values in selection. Edit a field to apply one value to all selected artwork.
+        </p>
+      ) : null}
+      <BaseOperationFields
+        settings={settings}
+        mixed={props.mixed}
+        maxFeed={props.maxFeed}
+        commit={commit}
+      />
+      {settings.mode === 'fill' && props.mixed.mode !== true ? (
+        <SelectedFillFields settings={settings} mixed={props.mixed} commit={commit} />
+      ) : null}
+      {settings.mode === 'image' ? (
+        <LayerImageFields
+          layer={props.layer}
+          settings={settings}
+          commit={commit}
+          labelContext="selected objects"
+          minPowerMax={settings.power}
+        />
+      ) : null}
+      <ResetSelectedOperationButton hasOverride={props.hasOverride} reset={props.reset} />
+    </>
+  );
+}
+
+function BaseOperationFields(props: {
+  readonly settings: LayerOperationSettings;
+  readonly mixed: MixedOperationFields;
+  readonly maxFeed: number;
+  readonly commit: (patch: Partial<LayerOperationSettings>) => void;
+}): JSX.Element {
+  const { settings, commit } = props;
+  return (
+    <>
       <FieldRow label="Mode">
         <select
-          value={settings.mode}
+          value={props.mixed.mode === true ? MIXED_SELECT_VALUE : settings.mode}
           onChange={(event) => commit({ mode: event.target.value as LayerMode })}
           aria-label="Mode for selected objects"
           title="Override operation mode for the selected artwork only."
           style={selectStyle}
         >
+          {props.mixed.mode === true ? (
+            <option value={MIXED_SELECT_VALUE} disabled>
+              Mixed
+            </option>
+          ) : null}
           <option value="line">Line</option>
           <option value="fill">Fill</option>
           <option value="image">Image</option>
@@ -67,22 +120,19 @@ function SelectedOperationControls(props: {
       <NumberField
         label="Power"
         value={settings.power}
+        mixed={props.mixed.power === true}
         min={0}
         max={100}
         step={1}
         unit="%"
         ariaLabel="Power for selected objects"
-        commit={(power) =>
-          commit({
-            power,
-            minPower: Math.min(settings.minPower, power),
-          })
-        }
+        commit={(power) => commit({ power, minPower: Math.min(settings.minPower, power) })}
         parse={(value) => clamp(numericValue(value, settings.power), 0, 100)}
       />
       <NumberField
         label="Speed"
         value={settings.speed}
+        mixed={props.mixed.speed === true}
         min={1}
         max={props.maxFeed}
         step={1}
@@ -94,23 +144,13 @@ function SelectedOperationControls(props: {
       <NumberField
         label="Passes"
         value={settings.passes}
+        mixed={props.mixed.passes === true}
         min={1}
         step={1}
         ariaLabel="Passes for selected objects"
         commit={(passes) => commit({ passes })}
         parse={(value) => Math.max(1, Math.floor(numericValue(value, settings.passes)))}
       />
-      {settings.mode === 'fill' ? <SelectedFillFields settings={settings} commit={commit} /> : null}
-      {settings.mode === 'image' ? (
-        <LayerImageFields
-          layer={props.layer}
-          settings={settings}
-          commit={commit}
-          labelContext="selected objects"
-          minPowerMax={settings.power}
-        />
-      ) : null}
-      <ResetSelectedOperationButton hasOverride={props.hasOverride} reset={props.reset} />
     </>
   );
 }
@@ -133,6 +173,7 @@ function ResetSelectedOperationButton(props: {
 
 function SelectedFillFields(props: {
   readonly settings: LayerOperationSettings;
+  readonly mixed: MixedOperationFields;
   readonly commit: (patch: Partial<LayerOperationSettings>) => void;
 }): JSX.Element {
   const { settings, commit } = props;
@@ -140,12 +181,17 @@ function SelectedFillFields(props: {
     <>
       <FieldRow label="Style">
         <select
-          value={settings.fillStyle}
+          value={props.mixed.fillStyle === true ? MIXED_SELECT_VALUE : settings.fillStyle}
           onChange={(event) => commit({ fillStyle: parseFillStyle(event.target.value) })}
           aria-label="Fill style for selected objects"
           title="Override fill style for the selected artwork only."
           style={selectStyle}
         >
+          {props.mixed.fillStyle === true ? (
+            <option value={MIXED_SELECT_VALUE} disabled>
+              Mixed
+            </option>
+          ) : null}
           <option value="scanline">Scanline</option>
           <option value="offset">Follow Shape</option>
           <option value="island">Island Fill</option>
@@ -154,6 +200,7 @@ function SelectedFillFields(props: {
       <NumberField
         label="Hatch angle"
         value={settings.hatchAngleDeg}
+        mixed={props.mixed.hatchAngleDeg === true}
         min={0}
         max={180}
         step={5}
@@ -165,6 +212,7 @@ function SelectedFillFields(props: {
       <NumberField
         label="Hatch spacing"
         value={settings.hatchSpacingMm}
+        mixed={props.mixed.hatchSpacingMm === true}
         min={0.05}
         max={10}
         step={0.05}
@@ -176,6 +224,7 @@ function SelectedFillFields(props: {
       <NumberField
         label="Overscan"
         value={settings.fillOverscanMm}
+        mixed={props.mixed.fillOverscanMm === true}
         min={0}
         max={25}
         step={0.5}
@@ -185,10 +234,10 @@ function SelectedFillFields(props: {
         parse={(value) => clamp(numericValue(value, settings.fillOverscanMm), 0, 25)}
       />
       <FieldRow label="Bidirectional">
-        <input
-          type="checkbox"
+        <MixedCheckbox
           checked={settings.fillBidirectional}
-          onChange={(event) => commit({ fillBidirectional: event.target.checked })}
+          mixed={props.mixed.fillBidirectional === true}
+          onChange={(checked) => commit({ fillBidirectional: checked })}
           aria-label="Bidirectional fill for selected objects"
           title="Override bidirectional fill for the selected artwork only."
         />
@@ -200,6 +249,7 @@ function SelectedFillFields(props: {
 function NumberField(props: {
   readonly label: string;
   readonly value: number;
+  readonly mixed?: boolean;
   readonly min: number;
   readonly max?: number;
   readonly step: number;
@@ -208,10 +258,13 @@ function NumberField(props: {
   readonly commit: (value: number) => void;
   readonly parse: (value: string) => number;
 }): JSX.Element {
-  const debounced = useDebouncedCommit<number>({
-    value: props.value,
-    commit: props.commit,
-    parse: props.parse,
+  const debounced = useDebouncedCommit<number | null>({
+    value: props.mixed === true ? null : props.value,
+    commit: (value) => {
+      if (value !== null) props.commit(value);
+    },
+    parse: (value) => (value.trim() === '' ? null : props.parse(value)),
+    format: (value) => (value === null ? '' : String(value)),
   });
   return (
     <FieldRow label={props.label}>
@@ -221,6 +274,7 @@ function NumberField(props: {
         max={props.max}
         step={props.step}
         value={debounced.displayValue}
+        placeholder={props.mixed === true ? 'Mixed' : undefined}
         onChange={debounced.onChange}
         onBlur={debounced.onBlur}
         aria-label={props.ariaLabel}
@@ -229,6 +283,29 @@ function NumberField(props: {
       />
       {props.unit === undefined ? null : <span style={unitStyle}>{props.unit}</span>}
     </FieldRow>
+  );
+}
+
+function MixedCheckbox(props: {
+  readonly checked: boolean;
+  readonly mixed: boolean;
+  readonly onChange: (checked: boolean) => void;
+  readonly 'aria-label': string;
+  readonly title: string;
+}): JSX.Element {
+  const ref = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (ref.current !== null) ref.current.indeterminate = props.mixed;
+  }, [props.mixed]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={props.mixed ? false : props.checked}
+      onChange={(event) => props.onChange(event.target.checked)}
+      aria-label={props['aria-label']}
+      title={props.title}
+    />
   );
 }
 
@@ -247,21 +324,32 @@ function FieldRow(props: {
 type SelectedOperationContext = {
   readonly layer: Layer;
   readonly settings: LayerOperationSettings;
+  readonly mixed: MixedOperationFields;
+};
+
+type EffectiveOperationContext = {
+  readonly layer: Layer;
+  readonly settings: LayerOperationSettings;
 };
 
 function commonEffectiveOperationSettings(
   objects: ReadonlyArray<SceneObject>,
   layers: ReadonlyArray<Layer>,
 ): SelectedOperationContext | null {
-  const first = objects[0] === undefined ? null : effectiveOperationSettings(objects[0], layers);
+  const contexts = objects.map((object) => effectiveOperationSettings(object, layers));
+  const first = contexts[0] ?? null;
   if (first === null) return null;
-  return first;
+  const mixed = mixedOperationFields(
+    first.settings,
+    contexts.map((context) => context?.settings),
+  );
+  return { ...first, mixed };
 }
 
 function effectiveOperationSettings(
   object: SceneObject,
   layers: ReadonlyArray<Layer>,
-): SelectedOperationContext | null {
+): EffectiveOperationContext | null {
   const color = sceneObjectPrimaryLayerColor(object);
   const layer = color === null ? undefined : layers.find((candidate) => candidate.color === color);
   if (layer === undefined) return null;
@@ -287,6 +375,11 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 const subheadingStyle: React.CSSProperties = { fontSize: 13, margin: '12px 0 8px 0' };
+const mixedHintStyle: React.CSSProperties = {
+  margin: '0 0 8px 0',
+  color: 'var(--lf-text-muted)',
+  fontSize: 12,
+};
 const rowStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '92px 1fr',

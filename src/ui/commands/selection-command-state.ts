@@ -1,4 +1,9 @@
 import type { Project } from '../../core/scene';
+import {
+  isVectorPathObject,
+  vectorObjectOutputMetadataCompatible,
+  type VectorSceneObject,
+} from '../../core/geometry/vector-path-tools';
 import { isConvertibleVector } from '../raster/vector-to-bitmap';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
@@ -54,9 +59,14 @@ export function selectionHasUnlockedVectorObject(
 export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<string>): boolean {
   const selected = new Set(selectedIds);
   const objects = project.scene.objects.filter(
-    (object) => selected.has(object.id) && object.locked !== true && isConvertibleVector(object),
+    (object): object is VectorSceneObject =>
+      selected.has(object.id) && object.locked !== true && isVectorPathObject(object),
   );
-  return objects.length > 0 && objects.every(objectHasOnlyClosedContours);
+  return (
+    objects.length > 0 &&
+    vectorObjectOutputMetadataCompatible(objects) &&
+    objects.every(objectHasOnlyClosedContours)
+  );
 }
 
 // ADR-103 G1: booleans need a subject AND at least one clip.

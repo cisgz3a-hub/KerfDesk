@@ -7,19 +7,26 @@ import {
   type MaterialRecipeCandidate,
 } from './material-matching';
 
-function candidate(patch: Partial<MaterialRecipeCandidate> = {}): MaterialRecipeCandidate {
-  return {
+type TestMaterialRecipeCandidate = MaterialRecipeCandidate & {
+  readonly laserTechnology?: 'diode' | 'co2' | 'fiber' | 'unknown';
+  readonly wavelengthNm?: number;
+};
+
+function candidate(patch: Partial<TestMaterialRecipeCandidate> = {}): TestMaterialRecipeCandidate {
+  return compactCandidate({
+    ...patch,
     id: patch.id ?? 'generic',
     material: patch.material ?? 'Birch plywood',
     operation: patch.operation ?? 'engrave',
-    ...(patch.confidence !== undefined ? { confidence: patch.confidence } : {}),
-    ...(patch.warning !== undefined ? { warning: patch.warning } : {}),
-    ...(patch.profileId !== undefined ? { profileId: patch.profileId } : {}),
-    ...(patch.machineFamily !== undefined ? { machineFamily: patch.machineFamily } : {}),
-    ...(patch.laserModel !== undefined ? { laserModel: patch.laserModel } : {}),
-    ...(patch.opticalPowerW !== undefined ? { opticalPowerW: patch.opticalPowerW } : {}),
-    ...(patch.thicknessMm !== undefined ? { thicknessMm: patch.thicknessMm } : {}),
-  };
+  });
+}
+
+function compactCandidate(
+  value: Partial<TestMaterialRecipeCandidate>,
+): TestMaterialRecipeCandidate {
+  return Object.fromEntries(
+    Object.entries(value).filter((entry) => entry[1] !== undefined),
+  ) as TestMaterialRecipeCandidate;
 }
 
 describe('material recipe profile matching', () => {
@@ -43,6 +50,47 @@ describe('material recipe profile matching', () => {
       'power',
       'generic',
     ]);
+  });
+
+  it('matches diode head recipes by technology and wavelength before power-only recipes', () => {
+    const ranked = rankMaterialRecipeCandidates(
+      NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      [
+        candidate({ id: 'generic' }),
+        candidate({ id: 'power', opticalPowerW: 20 }),
+        candidate({
+          id: 'diode-blue-head',
+          laserTechnology: 'diode',
+          wavelengthNm: 450,
+          opticalPowerW: 20,
+        }),
+      ],
+      { material: 'Birch plywood', operation: 'engrave' },
+    );
+
+    expect(ranked.map((match) => match.candidate.id)).toEqual([
+      'diode-blue-head',
+      'power',
+      'generic',
+    ]);
+    expect(ranked[0]?.scope).toBe('laser-head');
+    expect(ranked[0]?.warnings).toContain(
+      'Matched by laser head class. Run a material test before production.',
+    );
+  });
+
+  it('filters incompatible laser head metadata before ranking recipes', () => {
+    const ranked = rankMaterialRecipeCandidates(
+      NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
+      [
+        candidate({ id: 'co2', laserTechnology: 'co2', wavelengthNm: 10600 }),
+        candidate({ id: 'near-ir-diode', laserTechnology: 'diode', wavelengthNm: 980 }),
+        candidate({ id: 'blue-diode', laserTechnology: 'diode', wavelengthNm: 455 }),
+      ],
+      { material: 'Birch plywood', operation: 'engrave' },
+    );
+
+    expect(ranked.map((match) => match.candidate.id)).toEqual(['blue-diode']);
   });
 
   it('filters material, operation, and thickness mismatches before ranking', () => {

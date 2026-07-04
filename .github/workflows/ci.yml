@@ -42,32 +42,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: TypeScript typecheck
-        run: pnpm typecheck
-
-      - name: ESLint
-        run: pnpm lint
-
-      - name: ESLint Electron main
-        run: pnpm lint:electron
-
-      - name: Prettier
-        run: pnpm format:check
-
-      - name: License audit (ADR-008 / ADR-017)
-        run: pnpm license-check
-
-      - name: Dependency vulnerability audit
-        run: pnpm audit:deps
-
-      - name: Vitest (unit + property + snapshot)
-        run: pnpm test
-
-      - name: Build web bundle
-        run: pnpm build:web
-
-      - name: Build Electron main process
-        run: pnpm build:electron-main
-
-      - name: Verify file-size discipline (coarse raw-line backstop)
-        run: pnpm check:file-size
+      - name: Release verification gate
+        run: pnpm release:check

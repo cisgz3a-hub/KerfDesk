@@ -63,4 +63,38 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
     expect(custom.catalogVersion).toBeUndefined();
     expect(custom.scanningOffsets).toEqual([]);
   });
+
+  it('requires camera capability and camera profile metadata to agree', () => {
+    const source = GRBL_MACHINE_PROFILE_CATALOG[0]?.profile;
+    if (source === undefined) throw new Error('catalog profile missing');
+    const cameraProfile = {
+      id: 'bench-camera',
+      name: 'Bench camera',
+      deviceId: 'webcam-1',
+      enabled: false,
+      transparency: 0.35,
+    };
+
+    expect(
+      validateMachineProfile({
+        ...source,
+        capabilities: [...(source.capabilities ?? []), 'camera'],
+      }),
+    ).toContain('camera capability requires cameraProfile');
+
+    expect(
+      validateMachineProfile({
+        ...source,
+        cameraProfile,
+      }),
+    ).toContain('cameraProfile requires camera capability');
+
+    expect(
+      validateMachineProfile({
+        ...source,
+        capabilities: [...(source.capabilities ?? []), 'camera'],
+        cameraProfile,
+      }),
+    ).toEqual([]);
+  });
 });

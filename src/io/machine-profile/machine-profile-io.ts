@@ -10,6 +10,7 @@ import {
   type NoGoZone,
   type Origin,
 } from '../../core/devices';
+import { normalizeCameraProfile } from '../../core/camera';
 import { validateMachineProfileShape } from './machine-profile-shape';
 
 export const MACHINE_PROFILE_FORMAT = 'laserforge-machine-profile';
@@ -278,6 +279,9 @@ function canonicalMachineMetadata(profile: DeviceProfile): Partial<DeviceProfile
     ...(profile.controllerKind !== undefined ? { controllerKind: profile.controllerKind } : {}),
     ...(profile.laserSubProfile !== undefined
       ? { laserSubProfile: { ...profile.laserSubProfile } }
+      : {}),
+    ...(profile.cameraProfile !== undefined
+      ? { cameraProfile: normalizeCameraProfile(profile.cameraProfile) }
       : {}),
   };
 }

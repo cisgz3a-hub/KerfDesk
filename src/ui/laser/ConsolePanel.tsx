@@ -4,7 +4,7 @@ import {
   type ConsoleQuickCommand,
   type ControllerDriver,
 } from '../../core/controllers';
-import { helpProps } from '../help/help-topics';
+import { helpProps, type HelpTopicId } from '../help/help-topics';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { controllerOperationCommandBlockMessage } from '../state/laser-controller-operation';
 import { useLaserStore } from '../state/laser-store';
@@ -283,6 +283,15 @@ function quickDisabled(
   return quick.command !== '?' && activeOperationReason !== null;
 }
 
+const QUICK_COMMAND_HELP_IDS: Readonly<Record<string, HelpTopicId>> = {
+  $X: 'control:laser.console.quick.$X',
+  $$: 'control:laser.console.quick.$$',
+  '$#': 'control:laser.console.quick.$#',
+  $I: 'control:laser.console.quick.$I',
+  $G: 'control:laser.console.quick.$G',
+  '?': 'control:laser.console.quick.?',
+};
+
 function quickHelpProps(
   quick: ConsoleQuickCommand,
   disconnected: boolean,
@@ -291,7 +300,10 @@ function quickHelpProps(
   const disabledReason = disconnected
     ? 'Connect to the laser before sending console commands.'
     : activeOperationReason;
-  return helpProps(`control:laser.console.quick.${quick.command}`, disabledReason ?? undefined);
+  return helpProps(
+    QUICK_COMMAND_HELP_IDS[quick.command] ?? 'control:laser.console',
+    disabledReason ?? undefined,
+  );
 }
 
 function consoleCommandDisabledReason(

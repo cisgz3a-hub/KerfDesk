@@ -42,6 +42,7 @@ export type ControlHelpKey =
   | 'laser.machine-setup.tab.controller'
   | 'laser.machine-setup.tab.firmware'
   | 'laser.machine-setup.tab.zones'
+  | 'laser.machine-setup.tab.camera'
   | 'laser.machine-setup.tab.raster-diagnostics'
   | 'laser.machine-setup.tab.import-export'
   | 'laser.device-setup.launch'
@@ -53,8 +54,12 @@ export type ControlHelpKey =
   | 'laser.device-setup.reread'
   | 'laser.device-setup.apply-detected'
   | 'laser.output-scope.cut-selected'
-  | 'laser.output-scope.selection-origin';
-export type ControlHelpId = `control:${string}`;
+  | 'laser.output-scope.selection-origin'
+  | 'preview.showTraversalMoves'
+  | 'preview.routePlayback'
+  | 'preview.routeRestart'
+  | 'preview.routeSpeed';
+export type ControlHelpId = `control:${ControlHelpKey}`;
 export type HelpTopicId = CommandHelpId | MenuHelpId | ToolHelpId | ControlHelpId;
 
 export type HelpTopic = {
@@ -246,6 +251,11 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     tooltip:
       'Define machine-coordinate no-go zones that preflight checks before frame, start, or export.',
   },
+  'laser.machine-setup.tab.camera': {
+    label: 'Camera',
+    tooltip:
+      'Configure an experimental workspace camera profile and four-point image-to-machine alignment.',
+  },
   'laser.machine-setup.tab.raster-diagnostics': {
     label: 'Raster diagnostics',
     tooltip:
@@ -299,6 +309,23 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     tooltip:
       'Calculate job origin from the selected artwork instead of the whole workspace design.',
   },
+  'preview.showTraversalMoves': {
+    label: 'Traversal moves',
+    tooltip:
+      'Show or hide laser-off traversal moves in the route preview without changing G-code output.',
+  },
+  'preview.routePlayback': {
+    label: 'Route playback',
+    tooltip: 'Play or pause the compressed route preview for the current output path.',
+  },
+  'preview.routeRestart': {
+    label: 'Restart route preview',
+    tooltip: 'Reset route preview playback to the beginning of the current output path.',
+  },
+  'preview.routeSpeed': {
+    label: 'Route preview speed',
+    tooltip: 'Choose how quickly the compressed route preview playback advances.',
+  },
 };
 
 export function commandHelpId(id: CommandId): CommandHelpId {
@@ -322,6 +349,10 @@ export function controlHelp(id: HelpTopicId, disabledReason?: string): string {
   const normal = topic?.tooltip ?? id;
   if (disabledReason === undefined || disabledReason.trim() === '') return normal;
   return `${disabledReason.trim()} ${normal}`;
+}
+
+export function isRegisteredHelpTopicId(id: string): id is HelpTopicId {
+  return topicById(id as HelpTopicId) !== undefined;
 }
 
 export function helpProps(

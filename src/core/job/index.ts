@@ -51,7 +51,12 @@ export { computeRegistrationBoxBounds } from './registration-placement';
 export type { JobDurationEstimate } from './estimate-duration';
 export { estimateJobDuration, formatDuration } from './estimate-duration';
 export { optimizePaths } from './optimize-paths';
-export type { SlicedToolpath, Toolpath, ToolpathDistanceSummary, ToolpathStep } from './toolpath';
+export type {
+  SlicedToolpath,
+  Toolpath,
+  ToolpathDistanceSummary,
+  ToolpathStep,
+} from './toolpath-types';
 export { buildToolpath, sliceToolpath, summarizeToolpathDistances } from './toolpath';
 export type {
   MaterialTestCell,

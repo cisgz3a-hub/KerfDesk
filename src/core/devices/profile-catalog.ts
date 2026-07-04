@@ -3,14 +3,26 @@ import {
   NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE,
   isKnownControllerKind,
   type DeviceProfile,
+  type LaserSubProfile,
   type NoGoZone,
   type ProfileCapability,
   type ProfileEvidence,
 } from './device-profile';
 import { isGrblRxBufferBytes, isGrblStreamingMode } from '../grbl-streaming';
+import { validateCameraProfileShape } from '../camera';
 import { isGcodeDialectSelection } from './gcode-dialects';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
+
+const LASER_TECHNOLOGIES: ReadonlyArray<NonNullable<LaserSubProfile['technology']>> = [
+  'diode',
+  'co2',
+  'fiber',
+  'unknown',
+];
+const LASER_HEAD_METADATA_CONFIDENCES: ReadonlyArray<
+  NonNullable<LaserSubProfile['metadataConfidence']>
+> = ['researched', 'user-confirmed', 'imported', 'unverified'];
 
 export type MachineProfileCatalogEntry = {
   readonly profile: DeviceProfile;
@@ -307,6 +319,9 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
   if (profile.minPowerS > profile.maxPowerS) {
     errors.push('minPowerS must not exceed maxPowerS');
   }
+  appendLaserSubProfileErrors(profile.laserSubProfile, errors);
+  appendCameraCapabilityErrors(profile, errors);
+  appendCameraProfileErrors(profile.cameraProfile, errors);
   for (const zone of profile.noGoZones) appendNoGoZoneErrors(zone, errors);
   return errors;
 }
@@ -334,6 +349,58 @@ function appendNoGoZoneErrors(zone: NoGoZone, errors: string[]): void {
   requireNonNegative(zone.y, `noGoZones.${zone.id}.y`, errors);
   requirePositive(zone.width, `noGoZones.${zone.id}.width`, errors);
   requirePositive(zone.height, `noGoZones.${zone.id}.height`, errors);
+}
+
+function appendLaserSubProfileErrors(
+  laserSubProfile: LaserSubProfile | undefined,
+  errors: string[],
+): void {
+  if (laserSubProfile === undefined) return;
+  requireNonEmpty(laserSubProfile.model, 'laserSubProfile.model', errors);
+  if (
+    laserSubProfile.technology !== undefined &&
+    !LASER_TECHNOLOGIES.includes(laserSubProfile.technology)
+  ) {
+    errors.push('laserSubProfile.technology is invalid');
+  }
+  if (
+    laserSubProfile.metadataConfidence !== undefined &&
+    !LASER_HEAD_METADATA_CONFIDENCES.includes(laserSubProfile.metadataConfidence)
+  ) {
+    errors.push('laserSubProfile.metadataConfidence is invalid');
+  }
+  if (laserSubProfile.opticalPowerW !== undefined) {
+    requirePositive(laserSubProfile.opticalPowerW, 'laserSubProfile.opticalPowerW', errors);
+  }
+  if (laserSubProfile.wavelengthNm !== undefined) {
+    requirePositive(laserSubProfile.wavelengthNm, 'laserSubProfile.wavelengthNm', errors);
+  }
+  if (laserSubProfile.focusLengthMm !== undefined) {
+    requirePositive(laserSubProfile.focusLengthMm, 'laserSubProfile.focusLengthMm', errors);
+  }
+  if (laserSubProfile.spotSizeMm !== undefined) {
+    requirePositive(laserSubProfile.spotSizeMm.x, 'laserSubProfile.spotSizeMm.x', errors);
+    requirePositive(laserSubProfile.spotSizeMm.y, 'laserSubProfile.spotSizeMm.y', errors);
+  }
+}
+
+function appendCameraProfileErrors(
+  cameraProfile: DeviceProfile['cameraProfile'] | undefined,
+  errors: string[],
+): void {
+  if (cameraProfile === undefined) return;
+  const error = validateCameraProfileShape(cameraProfile, 'cameraProfile');
+  if (error !== null) errors.push('cameraProfile is invalid');
+}
+
+function appendCameraCapabilityErrors(profile: DeviceProfile, errors: string[]): void {
+  const hasCameraCapability = profile.capabilities?.includes('camera') === true;
+  if (hasCameraCapability && profile.cameraProfile === undefined) {
+    errors.push('camera capability requires cameraProfile');
+  }
+  if (!hasCameraCapability && profile.cameraProfile !== undefined) {
+    errors.push('cameraProfile requires camera capability');
+  }
 }
 
 function requireNonEmpty(value: unknown, field: string, errors: string[]): void {

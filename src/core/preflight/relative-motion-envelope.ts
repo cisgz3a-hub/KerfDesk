@@ -2,6 +2,7 @@
 // size cap. For jobs placed relative to a user origin the absolute machine
 // position is unknown, so bounds checking degrades to a SPAN check: the job's
 // total X/Y motion extent must fit the bed even at the worst-case placement.
+import { isGcodeMotionCommand, parseGcodeWord, stripGcodeComment } from '../invariants';
 
 export function findRelativeMotionEnvelopeIssues(
   gcode: string,
@@ -37,10 +38,10 @@ function collectRelativeMotionEnvelope(gcode: string): {
   let maxY = Number.NEGATIVE_INFINITY;
   let any = false;
   for (const raw of gcode.split('\n')) {
-    const stripped = raw.split(';', 1)[0]?.trim() ?? '';
-    if (!/^G[0123]\b/.test(stripped)) continue;
-    const x = parseMotionAxis(stripped, 'X');
-    const y = parseMotionAxis(stripped, 'Y');
+    const stripped = stripGcodeComment(raw);
+    if (!isGcodeMotionCommand(stripped)) continue;
+    const x = parseGcodeWord(stripped, 'X');
+    const y = parseGcodeWord(stripped, 'Y');
     if (x !== null) {
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
@@ -53,9 +54,4 @@ function collectRelativeMotionEnvelope(gcode: string): {
     }
   }
   return any ? { minX, minY, maxX, maxY } : null;
-}
-
-function parseMotionAxis(line: string, axis: 'X' | 'Y'): number | null {
-  const match = new RegExp(String.raw`\b${axis}(-?\d+(?:\.\d+)?)`).exec(line);
-  return match?.[1] === undefined ? null : Number.parseFloat(match[1]);
 }

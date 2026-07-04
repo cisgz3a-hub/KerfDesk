@@ -17,7 +17,15 @@ import {
 } from '../../core/scene';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
 import { elementToSubPaths } from './shape-to-polylines';
+import {
+  assertSvgImportPoints,
+  createSvgImportBudget,
+  reserveSvgPolyline,
+  type SvgImportBudget,
+} from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
+
+export { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 export type ParseSvgResult = {
   readonly object: ImportedSvg | null;
@@ -127,6 +135,7 @@ function walkGeometry(
   byColor: Map<string, Polyline[]>,
   counts: { text: number; image: number },
   unitScale: { readonly scaleX: number; readonly scaleY: number },
+  budget: SvgImportBudget,
 ): void {
   // The unit scale seeds the transform stack root so every element's
   // geometry lands in mm (H9), composing with element/group transforms.
@@ -135,7 +144,7 @@ function walkGeometry(
     transform: { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 },
   });
   for (const child of Array.from(svgEl.children)) {
-    walkElement(child, rootState, byColor, counts, 0);
+    walkElement(child, rootState, byColor, counts, budget, 0);
   }
 }
 
@@ -150,6 +159,7 @@ function walkElement(
   parent: PresentationState,
   byColor: Map<string, Polyline[]>,
   counts: { text: number; image: number },
+  budget: SvgImportBudget,
   depth: number,
 ): void {
   if (depth > MAX_WALK_DEPTH) return;
@@ -162,13 +172,13 @@ function walkElement(
   } else if (tag === 'defs' || tag === 'symbol') {
     return;
   } else if (tag === 'use' && !state.hidden) {
-    appendUseGeometry(el, state, byColor, counts, depth);
+    appendUseGeometry(el, state, byColor, counts, budget, depth);
   } else if (!state.hidden) {
-    appendElementGeometry(el, state, byColor);
+    appendElementGeometry(el, state, byColor, budget);
   }
 
   for (const child of Array.from(el.children)) {
-    walkElement(child, state, byColor, counts, depth + 1);
+    walkElement(child, state, byColor, counts, budget, depth + 1);
   }
 }
 
@@ -177,6 +187,7 @@ function appendUseGeometry(
   state: PresentationState,
   byColor: Map<string, Polyline[]>,
   counts: { text: number; image: number },
+  budget: SvgImportBudget,
   depth: number,
 ): void {
   const href = el.getAttribute('href') ?? el.getAttribute('xlink:href');
@@ -188,13 +199,18 @@ function appendUseGeometry(
     ...state,
     transform: multiplyMatrix(state.transform, translate(numAttr(el, 'x'), numAttr(el, 'y'))),
   };
-  walkElement(referenced, placedState, byColor, counts, depth + 1);
+  if (isDefinitionContainer(referenced)) {
+    walkReferencedDefinition(referenced, placedState, byColor, counts, budget, depth + 1);
+    return;
+  }
+  walkElement(referenced, placedState, byColor, counts, budget, depth + 1);
 }
 
 function appendElementGeometry(
   el: Element,
   state: PresentationState,
   byColor: Map<string, Polyline[]>,
+  budget: SvgImportBudget,
 ): void {
   const subs = elementToSubPaths(el);
   if (subs.length === 0) return;
@@ -204,12 +220,34 @@ function appendElementGeometry(
   if (color === '') return;
   const arr = byColor.get(color) ?? [];
   for (const sub of subs) {
+    reserveSvgPolyline(color, sub.points.length, budget);
+    const points = sub.points.map((p) => applyMatrix(state.transform, p));
+    assertSvgImportPoints(points);
     arr.push({
-      points: sub.points.map((p) => applyMatrix(state.transform, p)),
+      points,
       closed: sub.closed,
     });
   }
   byColor.set(color, arr);
+}
+
+function isDefinitionContainer(el: Element): boolean {
+  const tag = el.tagName.toLowerCase();
+  return tag === 'defs' || tag === 'symbol';
+}
+
+function walkReferencedDefinition(
+  el: Element,
+  parent: PresentationState,
+  byColor: Map<string, Polyline[]>,
+  counts: { text: number; image: number },
+  budget: SvgImportBudget,
+  depth: number,
+): void {
+  const state = presentationStateFor(el, parent);
+  for (const child of Array.from(el.children)) {
+    walkElement(child, state, byColor, counts, budget, depth + 1);
+  }
 }
 
 function presentationStateFor(el: Element, parent: PresentationState): PresentationState {
@@ -386,9 +424,14 @@ export function parseSvg(args: { svgText: string; id: string; source: string }):
 
   const unitScale = resolveUnitScale(svgEl);
   const bounds = unitScale.bounds;
+  assertSvgImportPoints([
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+  ]);
   const byColor = new Map<string, Polyline[]>();
   const counts = { text: 0, image: 0 };
-  walkGeometry(svgEl, byColor, counts, unitScale);
+  const budget = createSvgImportBudget();
+  walkGeometry(svgEl, byColor, counts, unitScale, budget);
 
   const paths: ColoredPath[] = [...byColor.entries()].map(([color, polylines]) => ({
     color,

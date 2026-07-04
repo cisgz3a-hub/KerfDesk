@@ -7,6 +7,7 @@ import {
   type RawImageData,
   type TraceOptions,
 } from '../../core/trace';
+import type { PlatformAdapter } from '../../platform/types';
 import { confirmOversizeImport as defaultConfirmOversizeImport } from '../app/import-size-guard';
 import { rasterImportGeometry } from '../common/image-import';
 import type { ToastVariant } from '../state/toast-store';
@@ -24,7 +25,7 @@ export type MultiFileTraceDeps = {
     image: RawImageData,
     options: TraceOptions,
   ) => Promise<ReadonlyArray<ColoredPath>>;
-  readonly download?: (file: BatchTraceSvgFile) => void;
+  readonly write?: (file: BatchTraceSvgFile) => Promise<boolean> | boolean;
   readonly options?: TraceOptions;
   readonly confirmOversizeImport?: (name: string, sizeBytes: number) => boolean;
 };
@@ -80,18 +81,30 @@ export async function runMultiFileTrace(
     const svgFiles = await buildMultiFileTraceExports(files, deps);
     if (svgFiles.length === 0) return;
     assertTraceProducedVisiblePaths(svgFiles);
-    const download = deps.download ?? downloadTraceSvgFile;
+    const write = deps.write ?? missingTraceExportWriter;
+    let written = 0;
     for (const file of svgFiles) {
-      download(file);
+      if (await write(file)) written += 1;
     }
-    pushToast(
-      `Traced ${svgFiles.length} ${svgFiles.length === 1 ? 'image' : 'images'} to SVG.`,
-      'success',
-    );
+    if (written === 0) return;
+    pushToast(`Traced ${written} ${written === 1 ? 'image' : 'images'} to SVG.`, 'success');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     pushToast(`Could not trace images: ${message}`, 'error');
   }
+}
+
+export async function writeTraceSvgFileWithPlatform(
+  platform: PlatformAdapter,
+  file: BatchTraceSvgFile,
+): Promise<boolean> {
+  const target = await platform.pickFileForSave({
+    suggestedName: file.filename,
+    extensions: ['.svg'],
+  });
+  if (target === null) return false;
+  await target.write(file.svg);
+  return true;
 }
 
 function assertTraceProducedVisiblePaths(files: ReadonlyArray<BatchTraceSvgFile>): void {
@@ -103,20 +116,8 @@ function assertTraceProducedVisiblePaths(files: ReadonlyArray<BatchTraceSvgFile>
   );
 }
 
-export function downloadTraceSvgFile(file: BatchTraceSvgFile): void {
-  const blob = new Blob([file.svg], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  try {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = file.filename;
-    link.style.display = 'none';
-    document.body.append(link);
-    link.click();
-    link.remove();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+function missingTraceExportWriter(): never {
+  throw new Error('Trace export writer is not configured.');
 }
 
 async function traceWithWorkerFallback(

@@ -22,6 +22,13 @@ type Header = {
   readonly idat: Uint8Array;
 };
 
+type PngChunk = {
+  readonly type: string;
+  readonly dataOffset: number;
+  readonly dataLength: number;
+  readonly nextOffset: number;
+};
+
 export function decodePngFile(path: string): RawImageData {
   return decodePng(new Uint8Array(readFileSync(path)));
 }
@@ -38,6 +45,10 @@ export function decodePng(bytes: Uint8Array): RawImageData {
     header.colorType === 6 ? RGBA_CHANNELS : header.colorType === 2 ? RGB_CHANNELS : 0;
   if (channels === 0) throw new Error(`PNG colour type ${header.colorType} unsupported (need 2/6)`);
   const raw = new Uint8Array(inflateSync(header.idat));
+  const expectedRawLength = (header.width * channels + 1) * header.height;
+  if (raw.length !== expectedRawLength) {
+    throw new Error(`PNG pixel data length ${raw.length} invalid (expected ${expectedRawLength})`);
+  }
   const pixels = unfilter(raw, header.width, header.height, channels);
   return toRgba(pixels, header.width, header.height, channels);
 }
@@ -51,22 +62,68 @@ function readChunks(bytes: Uint8Array): Header {
   let bitDepth = 0;
   let colorType = 0;
   let interlace = 0;
-  while (off + 8 <= bytes.length) {
-    const len = view.getUint32(off);
-    const type = String.fromCharCode(...bytes.subarray(off + 4, off + 8));
-    const data = off + 8;
-    if (type === 'IHDR') {
-      width = view.getUint32(data);
-      height = view.getUint32(data + 4);
-      bitDepth = bytes[data + 8] ?? 0;
-      colorType = bytes[data + 9] ?? 0;
-      interlace = bytes[data + 12] ?? 0;
-    } else if (type === 'IDAT') {
-      parts.push(bytes.subarray(data, data + len));
-    } else if (type === 'IEND') break;
-    off = data + len + 4;
+  let sawIhdr = false;
+  let sawIdat = false;
+  let sawIend = false;
+  while (off < bytes.length) {
+    const chunk = readChunk(bytes, view, off);
+    if (chunk.type === 'IHDR') {
+      const ihdr = readIhdrChunk(bytes, view, chunk);
+      width = ihdr.width;
+      height = ihdr.height;
+      bitDepth = ihdr.bitDepth;
+      colorType = ihdr.colorType;
+      interlace = ihdr.interlace;
+      sawIhdr = true;
+    } else if (chunk.type === 'IDAT') {
+      parts.push(bytes.subarray(chunk.dataOffset, chunk.dataOffset + chunk.dataLength));
+      sawIdat = true;
+    } else if (chunk.type === 'IEND') {
+      sawIend = true;
+      break;
+    }
+    off = chunk.nextOffset;
   }
+  assertRequiredChunks({ sawIhdr, sawIdat, sawIend, width, height });
   return { width, height, bitDepth, colorType, interlace, idat: concat(parts) };
+}
+
+function readChunk(bytes: Uint8Array, view: DataView, off: number): PngChunk {
+  if (off + 8 > bytes.length) throw new Error('Malformed PNG chunk header');
+  const dataLength = view.getUint32(off);
+  const type = String.fromCharCode(...bytes.subarray(off + 4, off + 8));
+  const dataOffset = off + 8;
+  const chunkEnd = dataOffset + dataLength;
+  const nextOffset = chunkEnd + 4;
+  if (nextOffset > bytes.length) throw new Error(`Malformed PNG ${type} chunk`);
+  return { type, dataOffset, dataLength, nextOffset };
+}
+
+function readIhdrChunk(bytes: Uint8Array, view: DataView, chunk: PngChunk): Omit<Header, 'idat'> {
+  if (chunk.dataLength !== 13) throw new Error('Malformed PNG IHDR chunk');
+  const data = chunk.dataOffset;
+  return {
+    width: view.getUint32(data),
+    height: view.getUint32(data + 4),
+    bitDepth: bytes[data + 8] ?? 0,
+    colorType: bytes[data + 9] ?? 0,
+    interlace: bytes[data + 12] ?? 0,
+  };
+}
+
+function assertRequiredChunks(state: {
+  readonly sawIhdr: boolean;
+  readonly sawIdat: boolean;
+  readonly sawIend: boolean;
+  readonly width: number;
+  readonly height: number;
+}): void {
+  if (!state.sawIhdr) throw new Error('PNG missing IHDR chunk');
+  if (state.width <= 0 || state.height <= 0) {
+    throw new Error(`PNG dimensions invalid: ${state.width}x${state.height}`);
+  }
+  if (!state.sawIdat) throw new Error('PNG missing IDAT chunk');
+  if (!state.sawIend) throw new Error('PNG missing IEND chunk');
 }
 
 function concat(parts: ReadonlyArray<Uint8Array>): Uint8Array {

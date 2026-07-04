@@ -235,6 +235,7 @@ function startBoundaryDrag(
 ): void {
   if (e.button !== 0 || props.imageSize === undefined) return;
   const point = imagePointFromMouse(e, props.imageSize);
+  if (point === null) return;
   dragStartRef.current = point;
   setDraftBoundary({ x: point.x, y: point.y, width: 0, height: 0 });
   e.preventDefault();
@@ -249,6 +250,10 @@ function updateBoundaryDrag(
   const dragStart = dragStartRef.current;
   if (dragStart === null || props.imageSize === undefined) return;
   const point = imagePointFromMouse(e, props.imageSize);
+  if (point === null) {
+    setDraftBoundary(null);
+    return;
+  }
   setDraftBoundary(boundaryFromPoints(dragStart, point));
 }
 
@@ -263,13 +268,14 @@ function finishBoundaryDrag(
     return;
   }
   const point = imagePointFromMouse(e, props.imageSize);
+  dragStartRef.current = null;
+  setDraftBoundary(null);
+  if (point === null) return;
   const boundary = normalizeTraceBoundary(
     boundaryFromPoints(dragStart, point),
     props.imageSize.width,
     props.imageSize.height,
   );
-  dragStartRef.current = null;
-  setDraftBoundary(null);
   if (boundary !== null) props.onBoundaryChange(boundary);
 }
 
@@ -285,9 +291,12 @@ function boundaryFromPoints(a: DragPoint, b: DragPoint): TraceBoundary {
 function imagePointFromMouse(
   e: React.MouseEvent<HTMLDivElement>,
   imageSize: { readonly width: number; readonly height: number },
-): { readonly x: number; readonly y: number } {
+): { readonly x: number; readonly y: number } | null {
   const rect = e.currentTarget.getBoundingClientRect();
+  if (!isPositiveFinite(rect.width) || !isPositiveFinite(rect.height)) return null;
+  if (!isPositiveFinite(imageSize.width) || !isPositiveFinite(imageSize.height)) return null;
   const scale = Math.min(rect.width / imageSize.width, rect.height / imageSize.height);
+  if (!isPositiveFinite(scale)) return null;
   const drawnWidth = imageSize.width * scale;
   const drawnHeight = imageSize.height * scale;
   const left = rect.left + (rect.width - drawnWidth) / 2;
@@ -300,6 +309,10 @@ function imagePointFromMouse(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function isPositiveFinite(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
 
 const SOURCE_NORMAL_OPACITY = 1;

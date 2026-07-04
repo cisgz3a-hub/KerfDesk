@@ -1,4 +1,4 @@
-import type { DeviceProfile } from '../devices';
+import type { DeviceProfile, LaserTechnology } from '../devices';
 
 export type MaterialRecipeOperation =
   | 'cut'
@@ -12,6 +12,7 @@ export type MaterialRecipeMatchScope =
   | 'profile'
   | 'machine-family'
   | 'laser-model'
+  | 'laser-head'
   | 'optical-power'
   | 'generic';
 
@@ -20,7 +21,9 @@ export type MaterialRecipeCandidate = {
   readonly profileId?: string;
   readonly machineFamily?: string;
   readonly laserModel?: string;
+  readonly laserTechnology?: LaserTechnology;
   readonly opticalPowerW?: number;
+  readonly wavelengthNm?: number;
   readonly material?: string;
   readonly thicknessMm?: number;
   readonly operation?: MaterialRecipeOperation;
@@ -76,7 +79,7 @@ function matchCandidate<T extends MaterialRecipeCandidate>(
     scope: scope.scope,
     confidence,
     score,
-    warnings: warningsFor(candidate, confidence),
+    warnings: warningsFor(candidate, confidence, scope.scope),
   };
 }
 
@@ -108,12 +111,37 @@ function scopeScore(
       ? { scope: 'laser-model', score: 200 }
       : null;
   }
+  const headScope = laserHeadScope(device, candidate);
+  if (headScope !== undefined) return headScope;
   if (candidate.opticalPowerW !== undefined) {
     return candidate.opticalPowerW === device.laserSubProfile?.opticalPowerW
       ? { scope: 'optical-power', score: 100 }
       : null;
   }
   return { scope: 'generic', score: 0 };
+}
+
+function laserHeadScope(
+  device: DeviceProfile,
+  candidate: MaterialRecipeCandidate,
+): { readonly scope: MaterialRecipeMatchScope; readonly score: number } | null | undefined {
+  const hasHeadCriteria =
+    candidate.laserTechnology !== undefined || candidate.wavelengthNm !== undefined;
+  if (!hasHeadCriteria) return undefined;
+  const head = device.laserSubProfile;
+  if (head === undefined) return null;
+  if (candidate.laserTechnology !== undefined && candidate.laserTechnology !== head.technology) {
+    return null;
+  }
+  if (candidate.wavelengthNm !== undefined) {
+    if (head.wavelengthNm === undefined) return null;
+    if (!wavelengthCompatible(head.wavelengthNm, candidate.wavelengthNm)) return null;
+  }
+  if (candidate.opticalPowerW !== undefined) {
+    if (head.opticalPowerW === undefined) return null;
+    if (!opticalPowerCompatible(head.opticalPowerW, candidate.opticalPowerW)) return null;
+  }
+  return { scope: 'laser-head', score: 150 };
 }
 
 function confidenceScore(confidence: MaterialRecipeConfidence): number {
@@ -126,13 +154,25 @@ function confidenceScore(confidence: MaterialRecipeConfidence): number {
 function warningsFor(
   candidate: MaterialRecipeCandidate,
   confidence: MaterialRecipeConfidence,
+  scope: MaterialRecipeMatchScope,
 ): ReadonlyArray<string> {
   const warnings: string[] = [];
   if (confidence === 'unsupported') warnings.push('Unsupported recipe.');
+  if (scope === 'laser-head') {
+    warnings.push('Matched by laser head class. Run a material test before production.');
+  }
   if (candidate.warning !== undefined && candidate.warning.trim().length > 0) {
     warnings.push(candidate.warning);
   }
   return warnings;
+}
+
+function wavelengthCompatible(deviceNm: number, recipeNm: number): boolean {
+  return Math.abs(deviceNm - recipeNm) <= 10;
+}
+
+function opticalPowerCompatible(devicePowerW: number, recipePowerW: number): boolean {
+  return Math.abs(devicePowerW - recipePowerW) <= Math.max(1, devicePowerW * 0.15);
 }
 
 function stringMatches(

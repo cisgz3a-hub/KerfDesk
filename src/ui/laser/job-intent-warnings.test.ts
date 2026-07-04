@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Buffer } from 'node:buffer';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import {
   createLayer,
@@ -43,12 +44,16 @@ function projectWith(object: SceneObject, mode: 'line' | 'fill' | 'image'): Proj
   };
 }
 
+function lumaBase64(width: number, height: number): string {
+  return Buffer.from(new Uint8Array(width * height).fill(255)).toString('base64');
+}
+
 const smallRaster: SceneObject = {
   kind: 'raster-image',
   id: 'R1',
   source: 'photo.png',
   dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
-  lumaBase64: 'AP//AA==',
+  lumaBase64: lumaBase64(100, 100),
   pixelWidth: 100,
   pixelHeight: 100,
   // 100 px of stored detail over 50 mm: fine at 10 lines/mm (500 px grid →
@@ -121,7 +126,12 @@ describe('detectJobIntentWarnings', () => {
   });
 
   it('does not warn when the stored resolution covers the burn grid', () => {
-    const denseRaster: SceneObject = { ...smallRaster, pixelWidth: 600, pixelHeight: 600 };
+    const denseRaster: SceneObject = {
+      ...smallRaster,
+      lumaBase64: lumaBase64(600, 600),
+      pixelWidth: 600,
+      pixelHeight: 600,
+    };
     const warnings = detectJobIntentWarnings(projectWith(denseRaster, 'image'));
     expect(warnings.some((w) => w.includes('photo.png'))).toBe(false);
   });

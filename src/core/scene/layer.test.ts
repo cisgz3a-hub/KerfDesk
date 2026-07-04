@@ -42,10 +42,15 @@ describe('createLayer', () => {
     });
   });
 
-  it('preserves the provided id and color', () => {
-    const layer = createLayer({ id: 'custom', color: '#0066cc' });
+  it('preserves the provided id and normalizes uppercase hex colors', () => {
+    const layer = createLayer({ id: 'custom', color: '#0066CC' });
     expect(layer.id).toBe('custom');
     expect(layer.color).toBe('#0066cc');
+  });
+
+  it('rejects invalid layer colors before they become layer keys', () => {
+    expect(() => createLayer({ id: 'bad', color: 'red' })).toThrow(/Invalid layer color/);
+    expect(() => createLayer({ id: 'bad', color: '#12345g' })).toThrow(/Invalid layer color/);
   });
 });
 

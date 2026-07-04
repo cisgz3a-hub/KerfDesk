@@ -99,7 +99,11 @@ function preservedMetadata(existing: MaterialPreset | null): Partial<MaterialPre
     ...(existing.profileId !== undefined ? { profileId: existing.profileId } : {}),
     ...(existing.machineFamily !== undefined ? { machineFamily: existing.machineFamily } : {}),
     ...(existing.laserModel !== undefined ? { laserModel: existing.laserModel } : {}),
+    ...(existing.laserTechnology !== undefined
+      ? { laserTechnology: existing.laserTechnology }
+      : {}),
     ...(existing.opticalPowerW !== undefined ? { opticalPowerW: existing.opticalPowerW } : {}),
+    ...(existing.wavelengthNm !== undefined ? { wavelengthNm: existing.wavelengthNm } : {}),
     ...(existing.confidence !== undefined ? { confidence: existing.confidence } : {}),
     ...(existing.warning !== undefined ? { warning: existing.warning } : {}),
     ...(existing.calibrationProvenance !== undefined

@@ -301,6 +301,12 @@ export function panOffsetForDrag(args: {
     args.project.device.bedHeight,
     args.viewState,
   );
+  if (!Number.isFinite(cssScale) || cssScale <= 0) {
+    return { panX: args.drag.startPanX, panY: args.drag.startPanY };
+  }
+  if (!Number.isFinite(view.scale) || view.scale <= 0) {
+    return { panX: args.drag.startPanX, panY: args.drag.startPanY };
+  }
   const dxMm = (args.e.clientX - args.drag.startClientX) / cssScale / view.scale;
   const dyMm = (args.e.clientY - args.drag.startClientY) / cssScale / view.scale;
   return { panX: args.drag.startPanX + dxMm, panY: args.drag.startPanY + dyMm };

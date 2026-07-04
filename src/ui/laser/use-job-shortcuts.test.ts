@@ -14,6 +14,7 @@ function streamingState(): LaserState['streamer'] {
 }
 
 const realStopJob = useLaserStore.getState().stopJob;
+const realCancelJog = useLaserStore.getState().cancelJog;
 
 function press(key: string, init: KeyboardEventInit = {}): void {
   window.dispatchEvent(
@@ -35,6 +36,8 @@ afterEach(() => {
   patchLaserStore({
     streamer: null,
     stopJob: realStopJob,
+    cancelJog: realCancelJog,
+    motionOperation: null,
     connection: { kind: 'disconnected' },
   });
   useUiStore.setState({ textDialog: null });
@@ -75,6 +78,30 @@ describe('job shortcuts (M22: keyboard Start/Stop)', () => {
 
     press('.');
 
+    expect(stopJob).not.toHaveBeenCalled();
+    uninstall();
+  });
+
+  it('Ctrl+. cancels active frame or jog motion when no stream job is active', () => {
+    const stopJob = vi.fn(async () => undefined);
+    const cancelJog = vi.fn(async () => undefined);
+    patchLaserStore({
+      streamer: null,
+      stopJob,
+      cancelJog,
+      motionOperation: {
+        kind: 'frame',
+        sawControllerBusy: false,
+        idleStatusReports: 0,
+        dispatchComplete: true,
+        pendingLines: [],
+      },
+    });
+    const uninstall = installJobShortcuts(window);
+
+    press('.');
+
+    expect(cancelJog).toHaveBeenCalledTimes(1);
     expect(stopJob).not.toHaveBeenCalled();
     uninstall();
   });
