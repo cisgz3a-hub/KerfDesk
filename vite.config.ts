@@ -13,7 +13,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 // after a deploy that the new version actually loaded. None of these
 // values affect the bundle's behaviour; they're cosmetic readouts.
 //
-// `__BUILD_TIME__` — ISO timestamp of the build, in UTC.
+// `__BUILD_TIME__` — ISO-8601 UTC timestamp of HEAD's commit (NOT wall-clock).
+//   Derived from the commit so rebuilding or re-deploying the SAME commit yields a
+//   byte-identical bundle. A wall-clock `new Date()` here changed the bundle (and
+//   thus sw.js's precache) on every build, so every no-op redeploy / CI re-run
+//   minted a fresh service worker and nagged users with a phantom "update
+//   available" (ADR-060). Falls back to wall-clock only when git history is absent
+//   (local dev — never deployed).
 // `__GIT_SHA__` — short SHA of HEAD at build time. Falls back to
 //   "dev" when git isn't available or the working dir is clean of the
 //   repo (e.g. a CI scratch checkout without history).
@@ -35,6 +41,20 @@ function gitCommitCount(): string | null {
   } catch {
     return null;
   }
+}
+function buildTimeIso(): string {
+  // %cI is HEAD's committer date in strict ISO-8601 (with the commit's own
+  // offset). Re-normalize to UTC via Date so the value is deterministic AND keeps
+  // the historical `…Z` shape. Deterministic given the commit — the whole point.
+  try {
+    const commitIso = execSync('git show -s --format=%cI HEAD', { encoding: 'utf8' }).trim();
+    if (commitIso !== '') return new Date(commitIso).toISOString();
+  } catch {
+    // fall through to the dev fallback below
+  }
+  // Only reached without git history (local dev); such builds are never deployed,
+  // so wall-clock non-determinism here is harmless.
+  return new Date().toISOString();
 }
 function pkgVersion(): string {
   const pkgUrl = new URL('./package.json', import.meta.url);
@@ -85,7 +105,7 @@ export default defineConfig({
   // and file:// (Electron renderer) without rewriting URLs.
   base: './',
   define: {
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __BUILD_TIME__: JSON.stringify(buildTimeIso()),
     __GIT_SHA__: JSON.stringify(gitShortSha()),
     __APP_VERSION__: JSON.stringify(appVersion()),
   },
