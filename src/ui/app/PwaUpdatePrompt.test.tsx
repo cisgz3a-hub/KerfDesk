@@ -11,14 +11,22 @@ const h = vi.hoisted(() => ({
   updateServiceWorker: vi.fn(),
   streamer: { status: null as string | null },
   pushToast: vi.fn(),
+  registration: { addEventListener: vi.fn() },
 }));
 
 vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: () => ({
-    offlineReady: [h.swState.offlineReady, h.setOfflineReady],
-    needRefresh: [h.swState.needRefresh, h.setNeedRefresh],
-    updateServiceWorker: h.updateServiceWorker,
-  }),
+  useRegisterSW: (options?: {
+    onRegisteredSW?: (swScriptUrl: string, registration: unknown) => void;
+  }) => {
+    // Mirror vite-plugin-pwa: invoke onRegisteredSW so the component can wire its
+    // `updatefound` re-arm listener onto the (fake) registration.
+    options?.onRegisteredSW?.('sw.js', h.registration);
+    return {
+      offlineReady: [h.swState.offlineReady, h.setOfflineReady],
+      needRefresh: [h.swState.needRefresh, h.setNeedRefresh],
+      updateServiceWorker: h.updateServiceWorker,
+    };
+  },
 }));
 vi.mock('../state/laser-store', () => ({
   useLaserStore: (sel: (s: { streamer: { status: string } | null }) => unknown) =>
@@ -30,6 +38,7 @@ vi.mock('../state/toast-store', () => ({
 }));
 
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
+import { loadDismissedUpdateVersion, saveDismissedUpdateVersion } from './pwa-update-dismissal';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -53,6 +62,7 @@ beforeEach(() => {
   h.swState.offlineReady = false;
   h.swState.needRefresh = false;
   h.streamer.status = null;
+  localStorage.clear();
   vi.clearAllMocks();
 });
 
@@ -119,5 +129,53 @@ describe('PwaUpdatePrompt', () => {
   it('renders nothing when there is no update', async () => {
     const { host } = await render();
     expect(host.querySelector(BANNER)).toBeNull();
+  });
+
+  it('does not re-nag when the same update was already dismissed with Later', async () => {
+    // Regression: workbox-window re-fires `waiting` for an already-waiting SW on
+    // every load, so a persisted dismissal (keyed to the running build version)
+    // must keep the banner hidden for THIS update instead of nagging each reload.
+    h.swState.needRefresh = true;
+    saveDismissedUpdateVersion(__APP_VERSION__);
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+  });
+
+  it('persists the running build version when Later is clicked', async () => {
+    h.swState.needRefresh = true;
+    const { host } = await render();
+    const later = Array.from(host.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Later',
+    );
+    await act(async () => {
+      later?.click();
+    });
+    expect(loadDismissedUpdateVersion()).toBe(__APP_VERSION__);
+    expect(h.setNeedRefresh).toHaveBeenCalledWith(false);
+  });
+
+  it('still shows the banner when a different (older) version was dismissed', async () => {
+    // A strictly-newer build must not be swallowed by a stale dismissal marker.
+    h.swState.needRefresh = true;
+    saveDismissedUpdateVersion('0.0.0-previously-dismissed');
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).not.toBeNull();
+  });
+
+  it('re-arms the banner when a newer service worker is found (updatefound)', async () => {
+    h.swState.needRefresh = true;
+    saveDismissedUpdateVersion(__APP_VERSION__);
+    const first = await render();
+    expect(first.host.querySelector(BANNER)).toBeNull();
+    // A newer SW installing fires `updatefound` on the registration; the handler
+    // must clear the dismissal so the genuinely-new version surfaces again.
+    const call = h.registration.addEventListener.mock.calls.find((c) => c[0] === 'updatefound');
+    const onUpdateFound = call ? call[1] : undefined;
+    await act(async () => {
+      if (typeof onUpdateFound === 'function') onUpdateFound();
+    });
+    expect(loadDismissedUpdateVersion()).toBeNull();
+    const second = await render();
+    expect(second.host.querySelector(BANNER)).not.toBeNull();
   });
 });
