@@ -96,6 +96,31 @@ describe('machine profiles (F-CNC13)', () => {
     if (reverted?.kind !== 'cnc') throw new Error('cnc machine missing');
     expect(reverted.stock.thicknessMm).toBe(3);
   });
+
+  it('keeps custom bits added after the profile was saved', () => {
+    // Applying a profile used to replace machine.tools wholesale, silently
+    // deleting later-added custom bits; layers referencing them fell back to
+    // the machine bit without a word.
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().saveCncMachineProfile('base');
+    const machine = useStore.getState().project.machine;
+    if (machine?.kind !== 'cnc') throw new Error('cnc machine missing');
+    const custom = {
+      id: 'custom-2mm',
+      name: '2 mm end mill',
+      kind: 'end-mill' as const,
+      diameterMm: 2,
+    };
+    useStore.getState().updateCncMachine({ tools: [...machine.tools, custom] });
+
+    const profile = useStore.getState().cncLibrary.machineProfiles[0];
+    if (profile === undefined) throw new Error('profile missing');
+    useStore.getState().applyCncMachineProfile(profile.id);
+
+    const applied = useStore.getState().project.machine;
+    if (applied?.kind !== 'cnc') throw new Error('cnc machine missing');
+    expect(applied.tools.some((tool) => tool.id === 'custom-2mm')).toBe(true);
+  });
 });
 
 describe('persistence codec', () => {
