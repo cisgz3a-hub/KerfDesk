@@ -21,21 +21,25 @@ export function DesignLibraryDialog(): JSX.Element | null {
   const setOpen = useUiStore((s) => s.setLibraryDialogOpen);
   const importSvgObject = useStore((s) => s.importSvgObject);
   const pushToast = useToastStore((s) => s.pushToast);
-  const [category, setCategory] = useState<LibraryCategory>('Animals');
+  const [category, setCategory] = useState<LibraryCategory>('Icons & Symbols');
   if (!open) return null;
 
   const insert = (item: LibraryEntry): void => {
+    if (item.insert.kind !== 'svg') {
+      pushToast(`Could not insert ${item.title}.`, 'error');
+      return;
+    }
     const result = parseSvg({
-      svgText: item.svgText,
+      svgText: item.insert.svgText,
       id: crypto.randomUUID(),
-      source: `Library: ${item.name}`,
+      source: `Library: ${item.title}`,
     });
     if (result.object === null) {
-      pushToast(`Could not insert ${item.name}.`, 'error');
+      pushToast(`Could not insert ${item.title}.`, 'error');
       return;
     }
     importSvgObject(result.object);
-    pushToast(`${item.name} added to the canvas as line art.`, 'success');
+    pushToast(`${item.title} added to the canvas as line art.`, 'success');
     setOpen(false);
   };
 
@@ -65,20 +69,20 @@ export function DesignLibraryDialog(): JSX.Element | null {
         <div style={gridStyle}>
           {DESIGN_LIBRARY.filter((item) => item.category === category).map((item) => (
             <button
-              key={item.name}
+              key={item.id}
               type="button"
               onClick={() => insert(item)}
-              title={`Insert "${item.name}" onto the canvas.`}
+              title={`Insert "${item.title}" onto the canvas.`}
               style={cellStyle}
             >
               <img
-                src={`data:image/svg+xml;utf8,${encodeURIComponent(item.svgText)}`}
-                alt={item.name}
+                src={`data:image/svg+xml;utf8,${encodeURIComponent(item.previewSvgText)}`}
+                alt={item.title}
                 width={40}
                 height={40}
                 style={iconStyle}
               />
-              <span style={nameStyle}>{item.name}</span>
+              <span style={nameStyle}>{item.title}</span>
             </button>
           ))}
         </div>
