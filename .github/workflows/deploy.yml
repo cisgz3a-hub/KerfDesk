@@ -7,9 +7,8 @@ name: Deploy to Cloudflare Pages
 # (e.g. after editing _headers).
 #
 # Cloudflare Pages serves a "Preview" environment per branch by default;
-# we force --branch=master to hit the production URL (the legacy repo
-# was created with master as the production branch). See note in
-# package.json's deploy:web script.
+# the Pages project production branch is main, matching the GitHub
+# default branch. See note in package.json's deploy:web script.
 on:
   workflow_run:
     workflows: [CI]
@@ -81,4 +80,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist/web --project-name=laserforge --branch=master
+          command: pages deploy dist/web --project-name=laserforge --branch=main
