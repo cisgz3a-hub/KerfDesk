@@ -166,7 +166,62 @@ describe('Trace Image workflow controls', () => {
       expect(text).toContain('Sensitivity');
     });
   });
+
+  it('reveals the boundary-mode toggle only after a region is boxed', async () => {
+    await withTraceDialog(async (host) => {
+      // No boundary yet → the crop/enhance toggle is hidden.
+      expect(boundaryModeSelect(host)).toBeNull();
+
+      const frame = host.querySelector('[aria-label="Trace preview"]') as HTMLDivElement | null;
+      expect(frame).not.toBeNull();
+      stubRect(frame!, { left: 0, top: 0, width: 100, height: 80 });
+      await act(async () => {
+        frame?.dispatchEvent(
+          new MouseEvent('mousedown', { clientX: 10, clientY: 10, bubbles: true }),
+        );
+        frame?.dispatchEvent(
+          new MouseEvent('mousemove', { clientX: 60, clientY: 50, bubbles: true }),
+        );
+        frame?.dispatchEvent(
+          new MouseEvent('mouseup', { clientX: 60, clientY: 50, bubbles: true }),
+        );
+      });
+
+      // A region now exists → the toggle appears, defaulting to Crop.
+      const modeSelect = boundaryModeSelect(host);
+      expect(modeSelect).toBeInstanceOf(HTMLSelectElement);
+      expect(modeSelect?.value).toBe('crop');
+      expect(Array.from(modeSelect?.options ?? []).map((o) => o.value)).toEqual([
+        'crop',
+        'enhance',
+      ]);
+    });
+  });
 });
+
+function boundaryModeSelect(host: HTMLElement): HTMLSelectElement | null {
+  return host.querySelector('select[aria-label="Trace boundary mode"]');
+}
+
+function stubRect(
+  element: HTMLElement,
+  rect: {
+    readonly left: number;
+    readonly top: number;
+    readonly width: number;
+    readonly height: number;
+  },
+): void {
+  element.getBoundingClientRect = () =>
+    ({
+      ...rect,
+      right: rect.left + rect.width,
+      bottom: rect.top + rect.height,
+      x: rect.left,
+      y: rect.top,
+      toJSON: () => undefined,
+    }) as DOMRect;
+}
 
 async function withTraceDialog(run: (host: HTMLElement) => Promise<void>): Promise<void> {
   const { host, root } = await renderTraceDialog();
