@@ -92,7 +92,7 @@ async function saveSurfacingProgram(
   inputs: SurfacingInputs,
 ): Promise<void> {
   const tool = activeCncTool(machine);
-  const program = buildSurfacingProgram({
+  const result = buildSurfacingProgram({
     ...inputs,
     bitDiameterMm: tool.diameterMm,
     depthPerPassMm: SURFACING_DEFAULT_DEPTH_PER_PASS_MM,
@@ -102,6 +102,11 @@ async function saveSurfacingProgram(
     spindleSpinupSec: machine.params.spindleSpinupSec,
     safeZMm: machine.params.safeZMm,
   });
+  if (!result.ok) {
+    pushToast(`Could not save the surfacing program: ${result.reason}`, 'error');
+    return;
+  }
+  const { program } = result;
   try {
     const target = await platform.pickFileForSave({
       suggestedName: 'surfacing.nc',
