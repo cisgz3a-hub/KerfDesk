@@ -58,7 +58,9 @@ import {
 import { dataUrlToFile, loadImageAsRawData } from './image-loader';
 import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
 import { TraceSettingsControls } from './TraceSettingsControls';
-import { traceImageRegion } from './trace-region';
+import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
+import { BoundaryModePicker } from './BoundaryModePicker';
+import { useBoundarySelection } from './use-boundary-selection';
 import { TracePreview } from './TracePreview';
 import { useTracePreview } from './use-trace-preview';
 
@@ -85,7 +87,8 @@ function DialogBody(props: {
   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
   const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(false);
-  const [boundary, setBoundary] = useState<TraceBoundary | null>(null);
+  const { boundary, setBoundary, boundaryMode, setBoundaryMode, clearBoundary } =
+    useBoundarySelection();
   const [busy, setBusy] = useState(false);
   // Layer the LightBurn-style trace settings on top of the preset.
   // Image-level edits stay in Adjust Image, so Trace Image keeps one
@@ -106,7 +109,7 @@ function DialogBody(props: {
     [presetOptions, traceSettings],
   );
   const supportsTraceFillStyle = isFilledContourTraceOptions(options);
-  const preview = useTracePreview(file, options, boundary);
+  const preview = useTracePreview(file, options, boundary, boundaryMode);
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -121,6 +124,7 @@ function DialogBody(props: {
       traceFillStyle: supportsTraceFillStyle ? traceFillStyle : 'scanline',
       deleteSourceAfterTrace,
       boundary,
+      boundaryMode,
       ...(props.replaceTraceId === undefined ? {} : { replaceTraceId: props.replaceTraceId }),
     };
     void commit(traceArgs, {
@@ -152,6 +156,9 @@ function DialogBody(props: {
         seed={seed}
         boundary={boundary}
         setBoundary={setBoundary}
+        onBoundaryClear={clearBoundary}
+        boundaryMode={boundaryMode}
+        onBoundaryModeChange={setBoundaryMode}
       />
       <DeleteImageAfterTraceToggle
         checked={deleteSourceAfterTrace}
@@ -201,16 +208,24 @@ function TracePreviewPanel(props: {
   readonly seed: RasterImage;
   readonly boundary: TraceBoundary | null;
   readonly setBoundary: (boundary: TraceBoundary | null) => void;
+  readonly onBoundaryClear: () => void;
+  readonly boundaryMode: BoundaryMode;
+  readonly onBoundaryModeChange: (mode: BoundaryMode) => void;
 }): JSX.Element {
   return (
-    <TracePreview
-      state={props.preview}
-      sourceDataUrl={props.seed.dataUrl}
-      imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
-      boundary={props.boundary}
-      onBoundaryChange={props.setBoundary}
-      onBoundaryClear={() => props.setBoundary(null)}
-    />
+    <>
+      <TracePreview
+        state={props.preview}
+        sourceDataUrl={props.seed.dataUrl}
+        imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
+        boundary={props.boundary}
+        onBoundaryChange={props.setBoundary}
+        onBoundaryClear={props.onBoundaryClear}
+      />
+      {props.boundary !== null ? (
+        <BoundaryModePicker value={props.boundaryMode} onChange={props.onBoundaryModeChange} />
+      ) : null}
+    </>
   );
 }
 
@@ -224,6 +239,7 @@ export async function commit(
     readonly deleteSourceAfterTrace?: boolean;
     readonly replaceTraceId?: string;
     readonly boundary?: TraceBoundary | null;
+    readonly boundaryMode?: BoundaryMode;
   },
   ctx: {
     readonly traceExistingImage: ReturnType<typeof useStore.getState>['traceExistingImage'];
@@ -241,12 +257,18 @@ export async function commit(
     // tolerance. Curves stay at imagetracerjs's analytic fidelity
     // through to compile. Runs in a Web Worker when one is available,
     // falling back to inline tracing otherwise (see
-    // use-trace-worker-client.ts). traceImageRegion applies any
-    // LightBurn-style Boundary crop, traces that crop through the shared
-    // fallback path, then offsets geometry back into the source-image
-    // coordinate system. That keeps preview, commit, and overlay
-    // registration on the same pixels.
-    const { paths, bounds } = await traceImageRegion(image, args.options, args.boundary ?? null);
+    // use-trace-worker-client.ts). traceImageWithBoundaryMode applies the
+    // dialog's boundary box in the selected mode: 'crop' traces just the
+    // region and offsets it back (LightBurn Boundary crop); 'enhance'
+    // re-traces the region supersampled and patches it into the full trace
+    // (ADR-113). Either way geometry returns in source-image coordinates so
+    // preview, commit, and overlay registration stay on the same pixels.
+    const { paths, bounds } = await traceImageWithBoundaryMode(
+      image,
+      args.options,
+      args.boundary ?? null,
+      args.boundaryMode ?? 'crop',
+    );
     if (paths.length === 0) {
       ctx.pushToast(
         `Tracing ${args.seed.source} produced no paths — try a higher contrast image.`,

@@ -18,7 +18,8 @@ import type { RawImageData } from './trace-image';
 // already-large raster costs a 2x-wide buffer for no benefit — big rasters
 // overwhelmingly have >=3px features, so the thin-stroke heuristic would
 // rarely fire anyway, and when it did the memory cost would not be worth it.
-const MAX_UPSCALE_SOURCE_PIXELS = 1_500_000;
+// Exported for the region-enhance path, which budgets its crop by the same cap.
+export const MAX_UPSCALE_SOURCE_PIXELS = 1_500_000;
 
 // Mean ink stroke half-width proxy below which a source counts as thin. For a
 // long stroke of width w, inkArea / inkPerimeter ~= w/2, so 1.5 targets

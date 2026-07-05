@@ -25,17 +25,26 @@ const NEAR_POINT_EPS = 1e-9;
  * interpolated by a centripetal Catmull-Rom spline; corners break the spline
  * and are emitted exactly. `samplesPerSegment` new points are placed inside
  * each spline segment (1 = midpoint only).
+ *
+ * `deviationCapPx`, when finite, bounds how far any resampled interior sample
+ * may sit perpendicular from its own `p1->p2` chord, on either side. Pass the
+ * Douglas-Peucker tolerance ε used upstream: DP guarantees the dense chain
+ * lies within ε of each simplified chord, so a legitimate arc's sagitta
+ * between simplified vertices is ≤ ε and stays untouched, while a spline that
+ * bows further than ε into empty paper (the serif-foot "smile" overshoot) is
+ * pulled back to the chord ± ε. Omit or pass Infinity to disable the cap.
  */
 export function fitSmoothCurve(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
   corners: ReadonlySet<Vec2>,
   samplesPerSegment: number,
+  deviationCapPx = Infinity,
 ): Vec2[] {
   if (points.length < 3) return [...points];
   const runs = splitAtCorners(points, closed, corners);
   const out: Vec2[] = [];
-  for (const run of runs) appendRun(out, run.points, run.closed, samplesPerSegment);
+  for (const run of runs) appendRun(out, run.points, run.closed, samplesPerSegment, deviationCapPx);
   if (closed && out.length > 0) {
     // `out.length > 0` proves both ends are present; noUncheckedIndexedAccess
     // still types them optional, so assert past the (checked) undefined.
@@ -110,6 +119,7 @@ function appendRun(
   run: ReadonlyArray<Vec2>,
   closed: boolean,
   samplesPerSegment: number,
+  deviationCapPx: number,
 ): void {
   if (run.length < 2) {
     for (const p of run) pushUnique(out, p);
@@ -129,10 +139,35 @@ function appendRun(
     pushUnique(out, p1);
     for (let s = 1; s <= samplesPerSegment; s += 1) {
       const t = s / (samplesPerSegment + 1);
-      out.push(centripetalPoint(p0, p1, p2, p3, t));
+      out.push(capDeviation(centripetalPoint(p0, p1, p2, p3, t), p1, p2, deviationCapPx));
     }
   }
   if (!closed) pushUnique(out, run[n - 1] as Vec2);
+}
+
+// Pull a resampled sample back toward its `a->b` chord when it sits more than
+// `capPx` perpendicular from it, keeping the along-chord component. The spline
+// may smooth (deviation ≤ cap) but may not invent geometry beyond the
+// simplification tolerance — arc or corner alike. Implemented as a radial
+// clamp toward the sample's foot point on the chord line, so the correction
+// direction is toward the chord by construction (a signed-normal formulation
+// here previously moved samples AWAY on one side — the round-1 sign bug).
+function capDeviation(q: Vec2, a: Vec2, b: Vec2, capPx: number): Vec2 {
+  if (!Number.isFinite(capPx)) return q;
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const lenSq = vx * vx + vy * vy;
+  if (lenSq < NEAR_POINT_EPS * NEAR_POINT_EPS) return q;
+  // Foot of the perpendicular from q onto the infinite line a->b.
+  const u = ((q.x - a.x) * vx + (q.y - a.y) * vy) / lenSq;
+  const fx = a.x + u * vx;
+  const fy = a.y + u * vy;
+  const dx = q.x - fx;
+  const dy = q.y - fy;
+  const dist = Math.hypot(dx, dy);
+  if (dist <= capPx) return q;
+  const scale = capPx / dist;
+  return { x: fx + dx * scale, y: fy + dy * scale };
 }
 
 // The control point before segment i. At an open run's first segment there is
