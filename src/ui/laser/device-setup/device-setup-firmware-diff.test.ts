@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../../core/devices';
+import { DEFAULT_CNC_MACHINE_CONFIG } from '../../../core/scene';
 import { settingsMapToRows, type GrblSettingRow } from '../../../core/controllers/grbl';
 import { computeFirmwareDiffs } from './device-setup-firmware-diff';
 
@@ -55,5 +56,41 @@ describe('computeFirmwareDiffs', () => {
     for (const id of [30, 31, 32]) {
       expect(diffs.find((diff) => diff.id === id)?.writable).toBe(true);
     }
+  });
+
+  describe('cnc machines', () => {
+    // On a router setup the wizard must never offer the laser defaults:
+    // $32 desired is 0 (router mode) and $30 desired is the spindle max
+    // RPM — regardless of what the (laser-oriented) device profile says.
+    it('accepts a router-correct controller ($32=0, $30=spindle RPM) as not differing', () => {
+      const diffs = computeFirmwareDiffs(
+        { ...DEFAULT_DEVICE_PROFILE, laserModeEnabled: true, maxPowerS: 1000 },
+        rows({ 30: '12000', 32: '0' }),
+        DEFAULT_CNC_MACHINE_CONFIG,
+      );
+      expect(diffs.find((diff) => diff.id === 32)?.differs).toBe(false);
+      expect(diffs.find((diff) => diff.id === 30)?.differs).toBe(false);
+    });
+
+    it('flags $32=1 on a router with desired 0, never offering $32=1', () => {
+      const diffs = computeFirmwareDiffs(
+        { ...DEFAULT_DEVICE_PROFILE, laserModeEnabled: true },
+        rows({ 32: '1' }),
+        DEFAULT_CNC_MACHINE_CONFIG,
+      );
+      const d32 = diffs.find((diff) => diff.id === 32);
+      expect(d32?.differs).toBe(true);
+      expect(d32?.desired).toBe('0');
+    });
+
+    it('flags a laser-scale $30 on a router with the spindle RPM as desired', () => {
+      const d30 = computeFirmwareDiffs(
+        { ...DEFAULT_DEVICE_PROFILE, maxPowerS: 1000 },
+        rows({ 30: '1000' }),
+        DEFAULT_CNC_MACHINE_CONFIG,
+      ).find((diff) => diff.id === 30);
+      expect(d30?.differs).toBe(true);
+      expect(d30?.desired).toBe('12000');
+    });
   });
 });
