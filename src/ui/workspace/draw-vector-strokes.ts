@@ -2,22 +2,16 @@ import { canvasTheme } from '../theme/canvas-theme';
 import { applyTransform, type Polyline, type SceneObject, type Vec2 } from '../../core/scene';
 import type { ViewTransform } from './view-transform';
 
-// Batched-stroke helper used by line mode and fill preview paths. When
-// stride > 1, this draws every Nth segment as a visual-only simplification
-// so enormous traces do not lock Canvas2D on every redraw.
+// Batched-stroke helper used by line mode and fill preview paths. Display
+// simplification of enormous traces happens upstream (display-polylines.ts
+// decimates vertices); this always strokes the polylines it is given.
 export function strokePolylinesBatched(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
   polylines: ReadonlyArray<Polyline>,
   view: ViewTransform,
-  stride = 1,
-): boolean {
+): void {
   ctx.beginPath();
-  if (stride > 1) {
-    strokeEveryNthSegment(ctx, obj, polylines, view, stride);
-    ctx.stroke();
-    return true;
-  }
   for (const polyline of polylines) {
     for (let i = 0; i < polyline.points.length; i += 1) {
       const raw = polyline.points[i];
@@ -28,7 +22,6 @@ export function strokePolylinesBatched(
     }
   }
   ctx.stroke();
-  return false;
 }
 
 export function fillClosedPolylinesBatched(
@@ -65,39 +58,6 @@ export function drawLargeSceneNotice(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = canvasTheme.noticeText;
   ctx.fillText(msg, x + padX, y + h - padY - 1);
   ctx.restore();
-}
-
-function strokeEveryNthSegment(
-  ctx: CanvasRenderingContext2D,
-  obj: SceneObject,
-  polylines: ReadonlyArray<Polyline>,
-  view: ViewTransform,
-  stride: number,
-): void {
-  let firstGlobalSegment = 0;
-  for (const polyline of polylines) {
-    const segmentCount = Math.max(0, polyline.points.length - 1);
-    const firstLocalSegment = firstSampledLocalSegment(firstGlobalSegment, stride);
-    for (
-      let localSegment = firstLocalSegment;
-      localSegment < segmentCount;
-      localSegment += stride
-    ) {
-      const from = polyline.points[localSegment];
-      const to = polyline.points[localSegment + 1];
-      if (from === undefined || to === undefined) continue;
-      const a = toScreenPoint(from, obj, view);
-      const b = toScreenPoint(to, obj, view);
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-    }
-    firstGlobalSegment += segmentCount;
-  }
-}
-
-function firstSampledLocalSegment(firstGlobalSegment: number, stride: number): number {
-  const remainder = firstGlobalSegment % stride;
-  return remainder === 0 ? 0 : stride - remainder;
 }
 
 function appendPolylinePath(
