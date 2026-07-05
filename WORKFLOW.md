@@ -1122,6 +1122,62 @@ workspace canvas, and a side-by-side pixel comparison against
 LightBurn's own Convert output — both deferred (need a live import or
 a LightBurn session).
 
+### F-F5. Enhance a region of a trace (region-enhance re-trace)
+
+**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05).
+
+**Operator intent.** A small feature inside a large raster (a tiny
+letter counter in a full logo) dropped out of the trace because it
+sits at the tracer's detection floor at native size. Recover it by
+boxing just that feature and re-tracing it supersampled, patched back
+into the full trace — without re-tracing (or upscaling) the whole
+image. This has no LightBurn equivalent (LightBurn's answer is manual
+node-editing); the divergence is maintainer-sanctioned.
+
+**Where in the UI.** Inside the Trace Image dialog (open it via
+**Re-trace Original** on a committed traced image, or a fresh Trace).
+Drag a box on the preview to set a region; a **Boundary** dropdown
+appears under the preview with **Crop region** (default) and **Enhance
+region**. The dropdown is hidden until a region exists, and **Clear
+Boundary** removes the region and resets the mode to Crop.
+
+**Success.** Box the feature → choose **Enhance region**. The preview
+re-runs: the full image is traced, the boxed source region is re-traced
+at 2× and downscaled, and its geometry is patched into the full trace
+(polylines fully inside the region's shrunk interior are replaced;
+everything crossing the box border or in the margin ring survives). The
+preview shows the full trace with the boxed feature recovered. Commit
+(**Trace**) writes the patched paths as the traced image, reusing the
+same overlay registration as any trace.
+
+**Error.** If the re-trace fails (worker error with an image too large
+for the inline fallback, or a decode failure), the preview shows
+"Preview failed: `<message>`" and commit surfaces a "Could not trace"
+error toast; the scene is left unchanged. If the enhanced region
+produces no paths and none survive the merge, commit warns "produced no
+paths — try a higher contrast image" (shared with the plain trace path).
+
+**Empty — no boundary.** With no region boxed, the Boundary dropdown is
+absent and Enhance is unreachable; the dialog traces the whole image
+(the ordinary Trace flow). Enhance is meaningless without a region, so
+there is nothing to show.
+
+**Edge — degenerate / tiny boundary.** A box that normalizes to zero
+area (a click without a drag, or a region fully outside the image) is
+rejected by `normalizeTraceBoundary`; enhance returns the full trace
+unchanged. A box so small that its 2× supersample would still exceed
+the upscale pixel budget traces the crop at 1× (native) instead of 2× —
+no crash, just no supersample gain. A box whose shrunk interior is
+empty (width or height ≤ 2× the edge margin) replaces nothing and the
+full trace passes through untouched.
+
+**Verification status.** Unit + jsdom green (crop delegates unchanged;
+enhance patches the region; the toggle appears only with a boundary).
+**NOT verified perceptually this session** — whether the real logo
+counter is actually recovered in the rendered output is the
+maintainer's perceptual pass (CLAUDE.md §2); green tests are not
+fidelity proof.
+
 ### F-ML1. Material library — save, load, and session persistence
 
 **Superseded (ADR-093, 2026-06-26).** The manual Save... / Load... /

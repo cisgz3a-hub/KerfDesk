@@ -27,7 +27,7 @@ import {
   coloredPathsToSvg,
 } from '../../core/trace';
 import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
-import { traceImageRegion } from './trace-region';
+import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
@@ -52,6 +52,7 @@ export function useTracePreview(
   file: File | null,
   options: TraceOptions,
   boundary?: TraceBoundary | null,
+  boundaryMode: BoundaryMode = 'crop',
 ): TracePreviewState {
   const [state, setState] = useState<TracePreviewState>({ kind: 'idle' });
   const decodedRef = useRef<RawImageData | null>(null);
@@ -69,6 +70,8 @@ export function useTracePreview(
   optionsRef.current = options;
   const boundaryRef = useRef<TraceBoundary | null>(boundary ?? null);
   boundaryRef.current = boundary ?? null;
+  const boundaryModeRef = useRef<BoundaryMode>(boundaryMode);
+  boundaryModeRef.current = boundaryMode;
 
   useEffect(() => {
     if (file === null) {
@@ -93,6 +96,7 @@ export function useTracePreview(
           img,
           options: optionsRef.current,
           boundary: boundaryRef.current,
+          boundaryMode: boundaryModeRef.current,
           sourceHasTransparency,
           isCurrent: () => tokenRef.current === myToken,
           setState,
@@ -127,6 +131,7 @@ export function useTracePreview(
         img,
         options,
         boundary: boundary ?? null,
+        boundaryMode,
         sourceHasTransparency,
         isCurrent: () => tokenRef.current === myToken,
         setState,
@@ -135,7 +140,7 @@ export function useTracePreview(
     return () => {
       window.clearTimeout(timer);
     };
-  }, [options, boundary]);
+  }, [options, boundary, boundaryMode]);
 
   return state;
 }
@@ -144,6 +149,7 @@ export function runTrace(args: {
   readonly img: RawImageData;
   readonly options: TraceOptions;
   readonly boundary?: TraceBoundary | null;
+  readonly boundaryMode?: BoundaryMode;
   readonly sourceHasTransparency?: boolean | undefined;
   readonly isCurrent: () => boolean;
   readonly setState: (next: TracePreviewState) => void;
@@ -154,7 +160,12 @@ export function runTrace(args: {
   // preview's ready/error state (P2-A). Returns the promise so tests can await it.
   return (async () => {
     try {
-      const { paths } = await traceImageRegion(args.img, args.options, args.boundary ?? null);
+      const { paths } = await traceImageWithBoundaryMode(
+        args.img,
+        args.options,
+        args.boundary ?? null,
+        args.boundaryMode ?? 'crop',
+      );
       if (!args.isCurrent()) return;
       const svg = coloredPathsToSvg(paths, args.img.width, args.img.height);
       args.setState({
