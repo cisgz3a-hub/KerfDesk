@@ -1,9 +1,9 @@
 import type { ColoredPath, Polyline } from '../scene';
 import { snapCornersToInk } from './potrace-apex';
-import { lightBurnTraceBitmapFromImage } from './potrace-bitmap';
+import { lightBurnTraceBitmapFromImage, type TraceBitmap } from './potrace-bitmap';
 import { potraceCurveToPolylinePoints, smoothClosedPolygonToPotraceCurve } from './potrace-curve';
 import { optimizePotraceCurve } from './potrace-curve-optimize';
-import { lightBurnTraceSettingsToPotraceParams } from './potrace-params';
+import { lightBurnTraceSettingsToPotraceParams, type PotraceParams } from './potrace-params';
 import { traceBitmapToPotracePaths } from './potrace-path-scanner';
 import {
   adjustPotraceVertices,
@@ -32,6 +32,16 @@ export function traceImageToPotraceColoredPaths(
     thresholdLuma: 128,
     ignoreLessThanPixels: 0,
   });
+  const apexSnapped = potraceBitmapToPolylines(bitmap, params);
+  return apexSnapped.length === 0 ? [] : [{ color: POTRACE_COLOR, polylines: apexSnapped }];
+}
+
+/** The full potrace geometry stage on an already-binarized bitmap: path scan,
+ *  polygon fit, curve smoothing, optional curve optimization, then apex
+ *  snap-back against the same bitmap. Shared by every backend that can
+ *  produce a bilevel ink mask (Line Art / Smooth / Sharp via luma threshold,
+ *  Edge Detection via the local-contrast mask). */
+export function potraceBitmapToPolylines(bitmap: TraceBitmap, params: PotraceParams): Polyline[] {
   const scannedPaths = traceBitmapToPotracePaths(bitmap, {
     turdsize: params.turdSize,
     turnpolicy: params.turnPolicy,
@@ -55,7 +65,5 @@ export function traceImageToPotraceColoredPaths(
 
   // Recover sharp convex tips potrace's polygon stage blunts, snapping corner
   // vertices outward to the true ink apex in the same bitmap potrace scanned.
-  const apexSnapped = snapCornersToInk(polylines, bitmap);
-
-  return apexSnapped.length === 0 ? [] : [{ color: POTRACE_COLOR, polylines: apexSnapped }];
+  return snapCornersToInk(polylines, bitmap);
 }
