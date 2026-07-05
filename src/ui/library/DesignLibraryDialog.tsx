@@ -1,33 +1,59 @@
-// DesignLibraryDialog — the bundled starter art library (ADR-105 G11).
-// Entries insert through the SAME SVG import pipeline as Import SVG…, so
-// they land as normal vector objects (line art — engrave/on-path ready;
-// pocket closed shapes after Convert to Path edits). Previews render as
-// data: images so no markup is injected.
+// DesignLibraryDialog - bundled manufacturing templates and vetted artwork.
+// Entries import through the same SVG pipeline as Import SVG so inserted
+// designs remain normal editable scene objects.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { parseSvg } from '../../io/svg';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import {
-  DESIGN_LIBRARY,
-  LIBRARY_CATEGORIES,
-  type LibraryCategory,
-  type LibraryEntry,
-} from './design-library';
+import { DESIGN_LIBRARY, LIBRARY_CATEGORIES } from './design-library';
+import { filterDesignLibrary, type LibraryFilters } from './design-library-filter';
+import type {
+  LibraryEntry,
+  LibraryEntryKind,
+  LibraryMachineMode,
+  LibraryOperation,
+  LibrarySourceKind,
+} from './design-library-types';
+
+const OPERATIONS: ReadonlyArray<LibraryOperation> = [
+  'line',
+  'fill',
+  'image',
+  'profile',
+  'pocket',
+  'drill',
+  'v-carve',
+  'calibration',
+];
+
+const SOURCE_KINDS: ReadonlyArray<LibrarySourceKind> = ['owned', 'lucide', 'cc0', 'public-domain'];
 
 export function DesignLibraryDialog(): JSX.Element | null {
   const open = useUiStore((s) => s.libraryDialogOpen);
   const setOpen = useUiStore((s) => s.setLibraryDialogOpen);
   const importSvgObject = useStore((s) => s.importSvgObject);
   const pushToast = useToastStore((s) => s.pushToast);
-  const [category, setCategory] = useState<LibraryCategory>('Icons & Symbols');
+  const [filters, setFilters] = useState<LibraryFilters>({
+    category: 'all',
+    machine: 'all',
+    kind: 'all',
+    operation: 'all',
+    sourceKind: 'all',
+    search: '',
+  });
+  const visibleEntries = useMemo(() => filterDesignLibrary(DESIGN_LIBRARY, filters), [filters]);
   if (!open) return null;
 
-  const insert = (item: LibraryEntry): void => {
+  const updateFilter = <K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]): void => {
+    setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const insertEntry = (item: LibraryEntry, batchOffsetIdx = 0): boolean => {
     if (item.insert.kind !== 'svg') {
       pushToast(`Could not insert ${item.title}.`, 'error');
-      return;
+      return false;
     }
     const result = parseSvg({
       svgText: item.insert.svgText,
@@ -36,11 +62,28 @@ export function DesignLibraryDialog(): JSX.Element | null {
     });
     if (result.object === null) {
       pushToast(`Could not insert ${item.title}.`, 'error');
+      return false;
+    }
+    importSvgObject(result.object, batchOffsetIdx);
+    return true;
+  };
+
+  const insertOne = (item: LibraryEntry): void => {
+    if (!insertEntry(item)) return;
+    pushToast(`${item.title} added to the canvas.`, 'success');
+    setOpen(false);
+  };
+
+  const insertVisible = (): void => {
+    let inserted = 0;
+    visibleEntries.forEach((entry, idx) => {
+      if (insertEntry(entry, idx)) inserted += 1;
+    });
+    if (inserted === 0) {
+      pushToast('No visible library entries could be imported.', 'error');
       return;
     }
-    importSvgObject(result.object);
-    pushToast(`${item.title} added to the canvas as line art.`, 'success');
-    setOpen(false);
+    pushToast(`Imported ${inserted} visible library entries.`, 'success');
   };
 
   return (
@@ -52,43 +95,140 @@ export function DesignLibraryDialog(): JSX.Element | null {
             Close
           </button>
         </div>
-        <div style={tabsStyle}>
-          {LIBRARY_CATEGORIES.map((c) => (
+
+        <div style={browserStyle}>
+          <div style={categoryRailStyle}>
             <button
-              key={c}
               type="button"
-              onClick={() => setCategory(c)}
-              aria-pressed={c === category}
-              title={`Show the ${c} designs.`}
-              style={c === category ? activeTabStyle : tabStyle}
+              onClick={() => updateFilter('category', 'all')}
+              aria-pressed={filters.category === 'all'}
+              style={filters.category === 'all' ? activeCategoryStyle : categoryButtonStyle}
             >
-              {c}
+              All
             </button>
-          ))}
-        </div>
-        <div style={gridStyle}>
-          {DESIGN_LIBRARY.filter((item) => item.category === category).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => insert(item)}
-              title={`Insert "${item.title}" onto the canvas.`}
-              style={cellStyle}
-            >
-              <img
-                src={`data:image/svg+xml;utf8,${encodeURIComponent(item.previewSvgText)}`}
-                alt={item.title}
-                width={40}
-                height={40}
-                style={iconStyle}
+            {LIBRARY_CATEGORIES.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => updateFilter('category', category)}
+                aria-pressed={filters.category === category}
+                style={filters.category === category ? activeCategoryStyle : categoryButtonStyle}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+
+          <div style={contentStyle}>
+            <div style={filterBarStyle}>
+              <input
+                aria-label="Search design library"
+                type="search"
+                value={filters.search ?? ''}
+                onInput={(event) => updateFilter('search', event.currentTarget.value)}
+                placeholder="Search"
+                style={searchStyle}
               />
-              <span style={nameStyle}>{item.title}</span>
-            </button>
-          ))}
+              <select
+                aria-label="Machine filter"
+                value={filters.machine ?? 'all'}
+                onChange={(event) =>
+                  updateFilter('machine', event.currentTarget.value as LibraryMachineMode | 'all')
+                }
+              >
+                <option value="all">All machines</option>
+                <option value="laser">Laser</option>
+                <option value="cnc">CNC</option>
+              </select>
+              <select
+                aria-label="Type filter"
+                value={filters.kind ?? 'all'}
+                onChange={(event) =>
+                  updateFilter('kind', event.currentTarget.value as LibraryEntryKind | 'all')
+                }
+              >
+                <option value="all">All types</option>
+                <option value="owned-template">Templates</option>
+                <option value="bundled-artwork">Artwork</option>
+              </select>
+              <select
+                aria-label="Operation filter"
+                value={filters.operation ?? 'all'}
+                onChange={(event) =>
+                  updateFilter('operation', event.currentTarget.value as LibraryOperation | 'all')
+                }
+              >
+                <option value="all">All operations</option>
+                {OPERATIONS.map((operation) => (
+                  <option key={operation} value={operation}>
+                    {operation}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Source filter"
+                value={filters.sourceKind ?? 'all'}
+                onChange={(event) =>
+                  updateFilter('sourceKind', event.currentTarget.value as LibrarySourceKind | 'all')
+                }
+              >
+                <option value="all">All sources</option>
+                {SOURCE_KINDS.map((sourceKind) => (
+                  <option key={sourceKind} value={sourceKind}>
+                    {sourceKind}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={resultBarStyle}>
+              <span>{visibleEntries.length} entries</span>
+              <button
+                type="button"
+                aria-label="Import visible library entries"
+                onClick={insertVisible}
+                disabled={visibleEntries.length === 0}
+              >
+                Import visible
+              </button>
+            </div>
+
+            <div style={gridStyle}>
+              {visibleEntries.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  data-library-card
+                  onClick={() => insertOne(item)}
+                  aria-label={`Insert ${item.title}`}
+                  title={`Insert "${item.title}" onto the canvas.`}
+                  style={cellStyle}
+                >
+                  <img
+                    src={`data:image/svg+xml;utf8,${encodeURIComponent(item.previewSvgText)}`}
+                    alt={item.title}
+                    width={42}
+                    height={42}
+                    style={iconStyle}
+                  />
+                  <span style={nameStyle}>{item.title}</span>
+                  <span style={metaStyle}>{item.subcategory}</span>
+                  <span style={badgeRowStyle}>
+                    <span style={badgeStyle}>
+                      {item.kind === 'owned-template' ? 'Template' : 'Art'}
+                    </span>
+                    <span style={badgeStyle}>{item.machineModes.join('+')}</span>
+                    <span style={badgeStyle}>{item.provenance.sourceKind}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
+
         <p style={footStyle}>
-          Bundled from lucide (ISC) — imports as engraveable line art. Need filled artwork? Import
-          any SVG (CC0 sources like openclipart work great).
+          Owned templates and vetted artwork import as editable vectors. External artwork includes
+          source and license provenance.
         </p>
       </div>
     </div>
@@ -110,7 +250,7 @@ const panelStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 6,
   padding: 12,
-  width: 560,
+  width: 860,
   maxWidth: 'calc(100vw - 48px)',
   maxHeight: 'calc(100vh - 96px)',
   overflowY: 'auto',
@@ -123,32 +263,93 @@ const headerStyle: React.CSSProperties = {
   marginBottom: 8,
 };
 const titleStyle: React.CSSProperties = { fontSize: 14, margin: 0 };
-const tabsStyle: React.CSSProperties = {
-  display: 'flex',
-  gap: 6,
-  flexWrap: 'wrap',
-  marginBottom: 8,
+const browserStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '150px 1fr',
+  gap: 10,
+  minHeight: 420,
 };
-const tabStyle: React.CSSProperties = { padding: '4px 8px' };
-const activeTabStyle: React.CSSProperties = {
-  ...tabStyle,
+const categoryRailStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 5,
+};
+const categoryButtonStyle: React.CSSProperties = {
+  textAlign: 'left',
+  padding: '5px 7px',
+};
+const activeCategoryStyle: React.CSSProperties = {
+  ...categoryButtonStyle,
   background: 'var(--lf-accent)',
   color: 'var(--lf-bg)',
 };
+const contentStyle: React.CSSProperties = {
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+};
+const filterBarStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(120px, 1fr) repeat(4, minmax(104px, max-content))',
+  gap: 6,
+  alignItems: 'center',
+};
+const searchStyle: React.CSSProperties = {
+  minWidth: 0,
+};
+const resultBarStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};
 const gridStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(112px, 1fr))',
   gap: 8,
 };
 const cellStyle: React.CSSProperties = {
+  minHeight: 126,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
+  justifyContent: 'flex-start',
   gap: 4,
   padding: 8,
 };
-const iconStyle: React.CSSProperties = { filter: 'invert(0.8)' };
-const nameStyle: React.CSSProperties = { fontSize: 11 };
+const iconStyle: React.CSSProperties = {
+  width: 42,
+  height: 42,
+  objectFit: 'contain',
+  filter: 'invert(0.8)',
+};
+const nameStyle: React.CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.15,
+  textAlign: 'center',
+};
+const metaStyle: React.CSSProperties = {
+  fontSize: 10,
+  lineHeight: 1.1,
+  color: 'var(--lf-text-muted)',
+  textAlign: 'center',
+};
+const badgeRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  justifyContent: 'center',
+  gap: 3,
+};
+const badgeStyle: React.CSSProperties = {
+  fontSize: 9,
+  lineHeight: 1,
+  padding: '2px 3px',
+  border: '1px solid var(--lf-border)',
+  borderRadius: 3,
+};
 const footStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',
