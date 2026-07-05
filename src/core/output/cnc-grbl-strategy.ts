@@ -143,6 +143,11 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm:
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
   appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);
+  // The operator physically moved Z during the pause (touch-off leaves the
+  // new bit at the stock top), so the tracked height is no longer real.
+  // Forgetting it forces the next appendRetract to emit G0 Z<safe> before
+  // any XY rapid — the same resume discipline every commercial post uses.
+  head.z = null;
 }
 
 function appendSpindleStart(lines: string[], rpm: number, spinupSec: number): void {
