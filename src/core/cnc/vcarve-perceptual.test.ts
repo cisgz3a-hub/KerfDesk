@@ -35,6 +35,11 @@ const MAX_DEPTH = 2;
 const RESOLUTION = 0.25;
 const CELL = 0.2;
 
+function expectGrid(result: ReturnType<typeof computeRemovalGrid>) {
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result.grid;
+}
+
 function vcarveScene(): Scene {
   const square: ImportedSvg = {
     kind: 'imported-svg',
@@ -96,16 +101,18 @@ describe('v-carve — perceptual (analytic pyramid field)', () => {
     const [minX, maxX] = [Math.min(c1.x, c2.x), Math.max(c1.x, c2.x)];
     const [minY, maxY] = [Math.min(c1.y, c2.y), Math.max(c1.y, c2.y)];
 
-    const grid = computeRemovalGrid(
-      toolpath,
-      {
-        originX: minX - 3,
-        originY: minY - 3,
-        widthMm: SIZE + 6,
-        heightMm: SIZE + 6,
-        mmPerCell: CELL,
-      },
-      kernelForTool(VBIT_90, CELL),
+    const grid = expectGrid(
+      computeRemovalGrid(
+        toolpath,
+        {
+          originX: minX - 3,
+          originY: minY - 3,
+          widthMm: SIZE + 6,
+          heightMm: SIZE + 6,
+          mmPerCell: CELL,
+        },
+        kernelForTool(VBIT_90, CELL),
+      ),
     );
 
     // Per-cell tolerance: ring spacing + grid discretization.
