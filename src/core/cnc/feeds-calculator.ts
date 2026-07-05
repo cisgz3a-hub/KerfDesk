@@ -16,6 +16,9 @@ export type FeedsCalculatorInput = {
   readonly bitDiameterMm: number;
   readonly flutes: number;
   readonly rpm: number;
+  // Machine feed ceiling (device.maxFeed). When set, the returned feed and
+  // plunge never exceed it — a suggestion the machine cannot run is useless.
+  readonly maxFeedMmPerMin?: number;
 };
 
 export type FeedsCalculatorResult = {
@@ -95,14 +98,22 @@ export function chiploadFor(material: ChiploadMaterial, bitDiameterMm: number): 
 export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResult {
   const chiploadMm = chiploadFor(input.material, input.bitDiameterMm);
   const rawFeed = input.rpm * Math.max(1, Math.round(input.flutes)) * chiploadMm;
-  const feedMmPerMin = Math.max(
+  const uncappedFeed = Math.max(
     MIN_FEED_MM_PER_MIN,
     Math.round(rawFeed / ROUND_FEED_TO_MM) * ROUND_FEED_TO_MM,
   );
-  const plungeMmPerMin = Math.max(
-    MIN_FEED_MM_PER_MIN / 2,
-    Math.round((feedMmPerMin * PLUNGE_FACTOR[input.material]) / ROUND_FEED_TO_MM) *
-      ROUND_FEED_TO_MM,
+  // Never hand a caller a feed its machine cannot run — committing an
+  // over-max feed just gets rejected by preflight later.
+  const maxFeed = input.maxFeedMmPerMin;
+  const feedMmPerMin =
+    maxFeed !== undefined && maxFeed > 0 ? Math.min(uncappedFeed, maxFeed) : uncappedFeed;
+  const plungeMmPerMin = Math.min(
+    feedMmPerMin,
+    Math.max(
+      MIN_FEED_MM_PER_MIN / 2,
+      Math.round((feedMmPerMin * PLUNGE_FACTOR[input.material]) / ROUND_FEED_TO_MM) *
+        ROUND_FEED_TO_MM,
+    ),
   );
   const depthPerPassMm =
     Math.max(

@@ -25,6 +25,7 @@ export function layerWithCncMaterial(
   layer: Layer,
   machine: CncMachineConfig,
   materialKey: string,
+  maxFeedMmPerMin?: number,
 ): Layer {
   if (!isChiploadMaterialKey(materialKey)) return layer;
   const cnc = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
@@ -33,6 +34,7 @@ export function layerWithCncMaterial(
     bitDiameterMm: layerCncTool(machine, cnc).diameterMm,
     flutes: ASSUMED_FLUTES,
     rpm: cnc.spindleRpm,
+    ...(maxFeedMmPerMin === undefined ? {} : { maxFeedMmPerMin }),
   });
   return {
     ...layer,
@@ -59,7 +61,9 @@ export function projectWithStockMaterial(project: Project, materialKey: string |
   const layers =
     materialKey === null
       ? project.scene.layers
-      : project.scene.layers.map((layer) => layerWithCncMaterial(layer, machine, materialKey));
+      : project.scene.layers.map((layer) =>
+          layerWithCncMaterial(layer, machine, materialKey, project.device.maxFeed),
+        );
   return {
     ...project,
     machine: { ...machine, stock },
