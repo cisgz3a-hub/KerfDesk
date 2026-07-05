@@ -182,11 +182,52 @@ Branch at audit start: `main`
 | S09-007 | S09 | Low | PNG decoder lacks malformed-file tests |
 | S09-008 | S09 | Low | G-code burn rasterizer lacks direct parser tests |
 
+## Delta Fix Phase - 2026-07-05
+
+Maintainer opened the fix phase for all delta findings ("start fixing all the findings"). All 19 delta findings are now fixed and verified in the working tree (not yet committed).
+
+| Fix Pass | Completed | Scope | Result |
+|---|---|---|---|
+| Delta Fix 2026-07-05 | 2026-07-05 | All 19 delta findings D-S01-001..003, D-S02-001..003, D-S04-001..004, D-S05-001..004, D-S08-001..002, D-S09-001..004 | Fixed and verified. Shared `finiteOr`/`finitePositiveOr`/`isFinitePositive` guard module added (`src/core/util/finite.ts`). Full suite green (580 files / 3607 tests passed, 15 diagnostics now visibly skipped), `tsc --noEmit` clean, `pnpm lint` clean, `pnpm check:file-size` pass, `pnpm build:web` clean (no chunk warning). Work executed largely by parallel sector agents; several were cut mid-run by an Anthropic session limit and the tree was recovered/completed directly (finished `_edge-zoom` skip/path wiring, `.gitignore` flag name, and four lint fixes: `jsdom-canvas-setup` as-const + `any`, `trace-image` complexity via `despeckleIfEnabled` extraction, `trace-image.test.ts` over-length split into `trace-image-guards.test.ts`). |
+
+Residual note (D-S08-002): the global jsdom canvas stub (`src/__fixtures__/jsdom-canvas-setup.ts`) eliminates the pervasive `getContext` "Not implemented" flood and stubs `ImageData`/2D draw paths. Two residual, deliberately-classified signals remain and are documented in that file: Three.js logs `WebGLRenderer: Error creating WebGL context` because `webgl` context returns `null` (the intended no-WebGL fallback the 3D viewers exercise), and `canvas.toDataURL` is left to jsdom so PNG-encoding regressions are not hidden. Fully silencing those two is a small optional follow-up (stub `toDataURL`/`toBlob`; assert or suppress the Three fallback) — flagged for maintainer review.
+
+## After-Fix Audit - 2026-07-05
+
+Three independent read-only audit passes reviewed the uncommitted fix diff vs `46889ca` (core S04/S05, tooling/UI S02/S08, fixtures/docs S09/S01 + ledger accuracy). Result: 18 of 19 fixes verified-correct; D-S04-001 has a genuine regression. Full detail in the audit ledger's "After-Fix Audit - 2026-07-05" section.
+
+| ID | Severity | Status | Short Name |
+|---|---|---|---|
+| AF-CORE-001 | High | Fixed | depthLadder dropped MIN_STEP clamp: valid-path G-code change + reintroduced hang |
+| AF-CORE-002 | Medium | Fixed | surfacingRowYs still hangs/OOMs on pathological finite inputs |
+| AF-CORE-003 | Low | Fixed | MIN_STEP_MM reused as feed-rate fallback (F0.050) |
+| AF-CORE-004 | Low | Fixed | Negative rpm still emits M3 S-negative (pre-existing) |
+| AF-CORE-005 | Low | Fixed | coarsenedCellSize overflow at ~1e308 finite dims — MAX_GRID_DIMENSION_MM cap keeps mmPerCell + cell counts finite; 1e308 test added |
+| AF-CORE-006 | Low | Deferred | Canny tests: one vacuous assertion; proper strengthening needs a clamp-equivalence assertion (a naive `< total` bound fails on the legitimate ratio→0 degenerate case) |
+| AF-CORE-007 | Low | Open | RawImageData guard covers preprocessing only, not tracer backends |
+| AF-CORE-008 | Low | Open | trace-image.ts remains over soft counted-line limit |
+| AF-TOOL-001 | Low | Deferred | build-info wall-clock guard spies Date.now, not new Date() (test nicety) |
+| AF-TOOL-002 | Low | Deferred | build-info tests guard module, not vite.config wiring (inherent to extraction) |
+| AF-TOOL-003 | Low | Deferred | PWA updatefound listener accumulates under StrictMode; benign (idempotent clear + no-op setState); refactor risk to D-S08-001 re-arm |
+| AF-TOOL-004 | Info | Deferred | PWA test mock fires onRegisteredSW every render (note-only) |
+| AF-TOOL-005 | Low | Fixed | Canvas proxy stub prospective masking risks (function reads, thenable, 0x0 getImageData) |
+| AF-TOOL-006 | Low | Deferred | build-info.ts name collision + Node-only module in browser-adapter folder (cosmetic rename) |
+| AF-TOOL-007 | Low | Fixed | Two casts in jsdom-canvas-setup lack justifying comments |
+| AF-FIX-001 | Low | Fixed | Second exported polylineLength duplicates centerline-geometry helper |
+
+## After-Fix Findings Disposition - 2026-07-05
+
+Fixed and verified (tsc clean, `pnpm lint` clean, full suite 581 files / 3610 tests pass): AF-CORE-001 (the High regression — depthLadder clamp restored + hang/OOM caps), AF-CORE-002, AF-CORE-003, AF-CORE-004 (all surfacing.ts, with new regression tests), AF-FIX-001 (polylineLength consolidated to centerline-geometry, benchmark-rating re-exports, test-local removed), AF-TOOL-005 (canvas stub: getImageData honors requested dims, then/Symbol excluded), AF-TOOL-007 (cast comments).
+
+Also fixed: AF-CORE-005 — a `MAX_GRID_DIMENSION_MM` (1 km) cap now bounds stock dimensions in createRemovalGrid and coarsenedCellSize so `widthMm*heightMm` can never overflow to Infinity; mmPerCell and the cell counts stay finite and inside the 4M-cell budget. A direct 1e308 test was added (the prior guard test covered only non-finite inputs). tsc/lint/tests green.
+
+Deferred (advisory / judgment / refactor — not defects): AF-CORE-006 (needs a clamp-equivalence assertion, not a naive bound), AF-CORE-007 (guard-scope design decision), AF-CORE-008 (trace-image.ts soft-limit split — separate refactor PR per CLAUDE.md), AF-TOOL-001 (test nicety), AF-TOOL-002/004 (note-only), AF-TOOL-003 (benign StrictMode listener accumulation; refactor risk to the D-S08-001 re-arm), AF-TOOL-006 (cosmetic build-info.ts rename), plus the two D-S08-002 residual canvas signals (toDataURL / Three WebGL fallback).
+
 ## Next Steps
 
-1. Continue the 2026-07-04 current-state delta audit opened after `main` advanced beyond the original audited tree.
-2. Run S08 delta Pass 2 over box numeric-input/dogbone toggle changes, probe/device-setup UI changes, and UI canvas-test stderr.
-3. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
+1. Maintainer disposition on the Partial/Deferred items above — none are defects; each is advisory, a design decision, or a separate refactor.
+2. Run `pnpm release:check` once end-to-end, then commit the fix phase in reviewable chunks.
+3. If `main` advances again, reopen a new delta audit scoped to the commits past `46889ca`.
 
 ## Current-State Delta Audit - 2026-07-04
 
@@ -202,7 +243,7 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | S06 IO formats and persistence | Complete | 3 | None for current delta |
 | S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
 | S08 UI application workflows | Complete | 3 | None for current delta |
-| S09 Fixtures, perceptual harness, and test assets | Active | 2 | Direct-diff closure, underscore diagnostic inventory, and remaining perceptual benchmark files |
+| S09 Fixtures, perceptual harness, and test assets | Complete | 3 | None for current delta |
 
 ### Delta Completed Passes
 
@@ -237,26 +278,29 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | S08 Delta Pass 3 | 2026-07-04 | Direct diff closure and adjacent state actions. Full focused S08 delta bundle passed (13 files, 90 tests), and `tsc --noEmit` passed. No new findings; S08 delta closed with `D-S08-001` and `D-S08-002` open. Move to S09. |
 | S09 Delta Pass 1 | 2026-07-04 | Fixture delta orientation and diagnostic test signal. Release-gated fixture slice passed (4 files, 14 tests); one `TRACE_AUDIT` diagnostic file also reported passed without the env flag. Found that opt-in diagnostics count as passing tests when skipped by their own early return. |
 | S09 Delta Pass 2 | 2026-07-04 | Artifact path and opt-in evidence sweep. Trace artifact and Arch House baseline slice passed (2 files, 16 tests). Found that `_edge-zoom` still hardcodes the removed `audit/fixtures/trace` logo path and fails when run with `TRACE_AUDIT=1`. |
+| S09 Delta Pass 3 | 2026-07-04 | Direct-diff closure, exhaustive opt-in diagnostic inventory, and remaining perceptual file sweep. Direct diff since `09047e1` empty; full flag-off fixture suite passed (31 files, 129 tests). Found `.gitignore` names the wrong opt-in flag (`TRACE_AUDIT_ARTIFACTS` vs `TRACE_AUDIT`) and copy-pasted benchmark rating/finding helpers across three files. S09 delta closed after three passes; the 2026-07-04 current-state delta audit is complete across all sectors. |
 
 ### Delta Finding Index
 
 | ID | Sector | Severity | Status | Short Name |
 |---|---|---|---|---|
-| D-S01-001 | S01 | Medium | Open | Sector map omitted current core/root paths |
-| D-S01-002 | S01 | Medium | Open | Completion ledger did not cover post-baseline commits |
-| D-S01-003 | S01 | Low | Open | Phase H summary header stale after H.14 |
-| D-S02-001 | S02 | Low | Open | Deterministic build-time metadata lacks direct regression coverage |
-| D-S02-002 | S02 | Low | Open | Production web build still emits Vite chunk-size warning |
-| D-S02-003 | S02 | Low | Open | CI-only Vitest worker throttling lacks direct policy regression coverage |
-| D-S04-001 | S04 | Medium | Open | Surfacing generator lacks core finite-value guards |
-| D-S04-002 | S04 | Medium | Open | Grid/heightmap sizing helpers can return malformed grids for non-finite dimensions |
-| D-S04-003 | S04 | Medium | Open | Material feed seeding can persist non-finite feed values |
-| D-S04-004 | S04 | Low | Open | Expanded default CNC tool library lacks stable-ID invariant test |
-| D-S05-001 | S05 | Low | Open | Auto-upscale exported helpers do not validate scale factors |
-| D-S05-002 | S05 | Low | Open | Trace core accepts malformed RawImageData shape without explicit guard |
-| D-S05-003 | S05 | Low | Open | Canny edge core does not bound threshold ratios or blur sigma |
-| D-S05-004 | S05 | Low | Open | Trace image-adjustment options do not fail closed on non-finite values |
-| D-S08-001 | S08 | Medium | Open | PWA update dismissal re-arm lacks mounted-render invalidation |
-| D-S08-002 | S08 | Medium | Open | UI canvas/WebGL tests pass while emitting jsdom canvas errors and async act warnings |
-| D-S09-001 | S09 | Low | Open | TRACE_AUDIT diagnostics count as passing tests when env flag is absent |
-| D-S09-002 | S09 | Low | Open | _edge-zoom diagnostic hardcodes removed audit fixture path |
+| D-S01-001 | S01 | Medium | Fixed | Sector map omitted current core/root paths |
+| D-S01-002 | S01 | Medium | Fixed | Completion ledger did not cover post-baseline commits |
+| D-S01-003 | S01 | Low | Fixed | Phase H summary header stale after H.14 |
+| D-S02-001 | S02 | Low | Fixed | Deterministic build-time metadata lacks direct regression coverage |
+| D-S02-002 | S02 | Low | Fixed | Production web build still emits Vite chunk-size warning |
+| D-S02-003 | S02 | Low | Fixed | CI-only Vitest worker throttling lacks direct policy regression coverage |
+| D-S04-001 | S04 | Medium | Fixed | Surfacing generator lacks core finite-value guards |
+| D-S04-002 | S04 | Medium | Fixed | Grid/heightmap sizing helpers can return malformed grids for non-finite dimensions |
+| D-S04-003 | S04 | Medium | Fixed | Material feed seeding can persist non-finite feed values |
+| D-S04-004 | S04 | Low | Fixed | Expanded default CNC tool library lacks stable-ID invariant test |
+| D-S05-001 | S05 | Low | Fixed | Auto-upscale exported helpers do not validate scale factors |
+| D-S05-002 | S05 | Low | Fixed | Trace core accepts malformed RawImageData shape without explicit guard |
+| D-S05-003 | S05 | Low | Fixed | Canny edge core does not bound threshold ratios or blur sigma |
+| D-S05-004 | S05 | Low | Fixed | Trace image-adjustment options do not fail closed on non-finite values |
+| D-S08-001 | S08 | Medium | Fixed | PWA update dismissal re-arm lacks mounted-render invalidation |
+| D-S08-002 | S08 | Medium | Fixed | UI canvas/WebGL tests pass while emitting jsdom canvas errors and async act warnings |
+| D-S09-001 | S09 | Low | Fixed | TRACE_AUDIT diagnostics count as passing tests when env flag is absent |
+| D-S09-002 | S09 | Low | Fixed | _edge-zoom diagnostic hardcodes removed audit fixture path |
+| D-S09-003 | S09 | Low | Fixed | .gitignore documents wrong trace-audit opt-in flag name |
+| D-S09-004 | S09 | Low | Fixed | Benchmark rating/finding helpers copy-pasted across three files |
