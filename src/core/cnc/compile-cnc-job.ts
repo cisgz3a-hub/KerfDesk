@@ -39,7 +39,7 @@ import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
-import { profileToolpathPolylines } from './profile-paths';
+import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarvePasses } from './vcarve-ladder';
 
@@ -258,7 +258,12 @@ function xyToolpathsForCutType(
     case 'pocket':
       return pocketToolpaths(polylines, settings, toolDiameterMm);
     case 'engrave':
-      return polylines.filter((polyline) => polyline.points.length >= 2);
+      // Same non-finite guard as every other cut type: a NaN vertex would
+      // otherwise survive to the emitter as a literal "G1 XNaN" that the
+      // digit-based preflight word parser cannot see.
+      return polylines.filter(
+        (polyline) => polyline.points.length >= 2 && hasFinitePoints(polyline),
+      );
     case 'v-carve':
     case 'drill':
       // Handled by their dedicated branches upstream — unreachable here.
