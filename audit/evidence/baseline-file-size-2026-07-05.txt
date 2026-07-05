@@ -1,0 +1,2 @@
+$ node scripts/check-file-size-policy.mjs
+File-size raw-line backstop passed: 600 max physical lines across source, Electron, scripts, and root configs.
