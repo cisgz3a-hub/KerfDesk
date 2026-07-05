@@ -9,6 +9,7 @@
 // Pure and deterministic: triangles in file order, max-Z accumulation is
 // order-independent, indexed loops only.
 
+import { isFinitePositive } from '../util';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
 import { meshBounds, FLOATS_PER_TRIANGLE, type TriangleMesh } from './triangle-mesh';
 import { rasterizeTriangleMaxZ, type RasterTarget } from './triangle-raster';
@@ -42,7 +43,7 @@ export function meshToHeightmap(
   if (xExtent < MIN_EXTENT || yExtent < MIN_EXTENT) {
     return { kind: 'error', reason: 'Mesh is flat in X or Y — nothing to carve.' };
   }
-  if (!(options.targetWidthMm > 0) || !(options.reliefDepthMm > 0)) {
+  if (!isFinitePositive(options.targetWidthMm) || !isFinitePositive(options.reliefDepthMm)) {
     return { kind: 'error', reason: 'Target width and relief depth must be positive.' };
   }
 

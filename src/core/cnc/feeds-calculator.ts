@@ -9,6 +9,8 @@
 // of bit diameter / feed. Everything is editable after Apply; nothing here
 // claims to replace listening to the cut.
 
+import { finiteOr } from '../util';
+
 export type ChiploadMaterial = 'softwood' | 'hardwood' | 'plywood-mdf' | 'acrylic' | 'aluminum';
 
 export type FeedsCalculatorInput = {
@@ -93,8 +95,13 @@ export function chiploadFor(material: ChiploadMaterial, bitDiameterMm: number): 
 }
 
 export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResult {
-  const chiploadMm = chiploadFor(input.material, input.bitDiameterMm);
-  const rawFeed = input.rpm * Math.max(1, Math.round(input.flutes)) * chiploadMm;
+  // Fail closed on non-finite machine inputs — Math.max(MIN, NaN) is NaN, so a
+  // single bad rpm/flutes would persist a non-finite feed into the layer.
+  const rpm = finiteOr(input.rpm, 0);
+  const flutes = finiteOr(input.flutes, 1);
+  const bitDiameterMm = finiteOr(input.bitDiameterMm, 0);
+  const chiploadMm = chiploadFor(input.material, bitDiameterMm);
+  const rawFeed = finiteOr(rpm * Math.max(1, Math.round(flutes)) * chiploadMm, 0);
   const feedMmPerMin = Math.max(
     MIN_FEED_MM_PER_MIN,
     Math.round(rawFeed / ROUND_FEED_TO_MM) * ROUND_FEED_TO_MM,
@@ -107,7 +114,7 @@ export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResu
   const depthPerPassMm =
     Math.max(
       ROUND_DEPTH_TO_MM,
-      Math.round((input.bitDiameterMm * DEPTH_FACTOR[input.material]) / ROUND_DEPTH_TO_MM) *
+      Math.round((bitDiameterMm * DEPTH_FACTOR[input.material]) / ROUND_DEPTH_TO_MM) *
         ROUND_DEPTH_TO_MM,
     ) || ROUND_DEPTH_TO_MM;
   return { chiploadMm, feedMmPerMin, plungeMmPerMin, depthPerPassMm };

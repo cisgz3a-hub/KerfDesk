@@ -32,24 +32,29 @@ function readFontBuffer(fileName: string): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-it('measures B-bowl smoothness against the real glyph outline', { timeout: 120000 }, async () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  mkdirSync(REF_DIR, { recursive: true });
-  const fontBuffer = readFontBuffer('Roboto-Regular.ttf');
-  const lines: string[] = [];
-  for (const heightPx of [60, 100, 160]) {
-    const { image, reference } = await rasterizeGlyph(fontBuffer, 'B', heightPx);
-    const traced = traceImageToEdgePaths(image, EDGE).flatMap((p) => p.polylines);
-    lines.push(describe(heightPx, traced, reference));
-    writeFileSync(
-      join(OUT_DIR, `letterB__h${heightPx}__edge.png`),
-      renderTraceOverlay(image, [{ color: '#000000', polylines: traced }], 4),
-    );
-    writeFileSync(join(REF_DIR, `letterB-h${heightPx}.bmp`), encodeBmp24(image));
-    if (heightPx === 100) writeFileSync(join(REF_DIR, 'letterB.bmp'), encodeBmp24(image));
-  }
-  writeFileSync(join(OUT_DIR, 'letterB__metrics.txt'), `${lines.join('\n')}\n`);
-});
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'measures B-bowl smoothness against the real glyph outline',
+  { timeout: 120000 },
+  async () => {
+    mkdirSync(REF_DIR, { recursive: true });
+    const fontBuffer = readFontBuffer('Roboto-Regular.ttf');
+    const lines: string[] = [];
+    for (const heightPx of [60, 100, 160]) {
+      const { image, reference } = await rasterizeGlyph(fontBuffer, 'B', heightPx);
+      const traced = traceImageToEdgePaths(image, EDGE).flatMap((p) => p.polylines);
+      lines.push(describe(heightPx, traced, reference));
+      writeFileSync(
+        join(OUT_DIR, `letterB__h${heightPx}__edge.png`),
+        renderTraceOverlay(image, [{ color: '#000000', polylines: traced }], 4),
+      );
+      writeFileSync(join(REF_DIR, `letterB-h${heightPx}.bmp`), encodeBmp24(image));
+      if (heightPx === 100) writeFileSync(join(REF_DIR, 'letterB.bmp'), encodeBmp24(image));
+    }
+    writeFileSync(join(OUT_DIR, 'letterB__metrics.txt'), `${lines.join('\n')}\n`);
+  },
+);
 
 // Render a glyph outline to a filled bitmap + return the reference outline in
 // image pixel coordinates (densely sampled — the true smooth curve).

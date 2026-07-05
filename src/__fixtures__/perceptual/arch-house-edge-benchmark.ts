@@ -11,6 +11,7 @@ import {
   measureNearlyClosedOpenChains,
   measureTopArchContinuity,
 } from './arch-house-edge-truth';
+import { pushFindingIf, ratingFromFindings } from './benchmark-rating';
 import { decodePngFile } from './png-decode';
 import { buildTraceArtifact, requiredArchHouseFixtureStatus } from './trace-artifact-runner';
 import type { TraceBenchmarkFinding, TraceBenchmarkResult } from './trace-benchmark-loop';
@@ -174,19 +175,4 @@ function missingArchHouseEdgeBenchmark(
     },
     findings,
   };
-}
-
-function pushFindingIf(
-  condition: boolean,
-  findings: TraceBenchmarkFinding[],
-  finding: TraceBenchmarkFinding,
-): void {
-  if (condition) findings.push(finding);
-}
-
-function ratingFromFindings(findings: ReadonlyArray<TraceBenchmarkFinding>): number {
-  if (findings.some((finding) => finding.severity === 'high')) return 6;
-  if (findings.some((finding) => finding.severity === 'medium')) return 8;
-  if (findings.some((finding) => finding.severity === 'low')) return 9;
-  return 10;
 }

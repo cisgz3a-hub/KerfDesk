@@ -61,4 +61,20 @@ describe('calculateFeeds', () => {
     expect(r.plungeMmPerMin).toBeGreaterThanOrEqual(25);
     expect(r.depthPerPassMm).toBeGreaterThanOrEqual(0.1);
   });
+
+  it('keeps outputs finite when rpm/flutes are non-finite (D-S04-003)', () => {
+    for (const bad of [
+      { material: 'softwood', bitDiameterMm: 6.35, flutes: 2, rpm: Number.NaN },
+      { material: 'softwood', bitDiameterMm: 6.35, flutes: 2, rpm: Number.POSITIVE_INFINITY },
+      { material: 'softwood', bitDiameterMm: 6.35, flutes: Number.POSITIVE_INFINITY, rpm: 18000 },
+    ] as const) {
+      const r = calculateFeeds(bad);
+      expect(Number.isFinite(r.feedMmPerMin)).toBe(true);
+      expect(Number.isFinite(r.plungeMmPerMin)).toBe(true);
+      expect(Number.isFinite(r.depthPerPassMm)).toBe(true);
+      expect(r.feedMmPerMin).toBeGreaterThanOrEqual(50);
+      expect(r.plungeMmPerMin).toBeGreaterThanOrEqual(25);
+      expect(r.depthPerPassMm).toBeGreaterThanOrEqual(0.1);
+    }
+  });
 });

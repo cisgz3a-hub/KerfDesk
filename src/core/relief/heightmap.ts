@@ -4,6 +4,8 @@
 // canvas preview (H.4) and the roughing/finishing toolpath generators
 // (H.5/H.8).
 
+import { finitePositiveOr } from '../util';
+
 export type Heightmap = {
   readonly widthCells: number;
   readonly heightCells: number;
@@ -17,10 +19,12 @@ export const DEFAULT_HEIGHTMAP_CELL_MM = 0.2;
 export const MAX_HEIGHTMAP_CELLS = 4_000_000;
 
 export function heightmapCellSize(widthMm: number, heightMm: number, requested: number): number {
-  const safe = Math.max(1e-3, requested);
-  const cells = Math.ceil(widthMm / safe) * Math.ceil(heightMm / safe);
+  const w = finitePositiveOr(widthMm, DEFAULT_HEIGHTMAP_CELL_MM);
+  const h = finitePositiveOr(heightMm, DEFAULT_HEIGHTMAP_CELL_MM);
+  const safe = Math.max(1e-3, finitePositiveOr(requested, DEFAULT_HEIGHTMAP_CELL_MM));
+  const cells = Math.ceil(w / safe) * Math.ceil(h / safe);
   if (cells <= MAX_HEIGHTMAP_CELLS) return safe;
-  return Math.sqrt((widthMm * heightMm) / MAX_HEIGHTMAP_CELLS);
+  return Math.sqrt((w * h) / MAX_HEIGHTMAP_CELLS);
 }
 
 export function heightmapDepthAt(map: Heightmap, cx: number, cy: number): number {
