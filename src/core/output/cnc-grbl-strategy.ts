@@ -249,7 +249,7 @@ function appendPath3dPass(
     lines.push(`G1 Z${startZ} F${plunge}`);
     head.z = startZ;
   }
-  let feedEmitted = false;
+  let modalFeed: number | null = null;
   for (let i = 1; i < pass.points.length; i += 1) {
     const point = pass.points[i];
     if (point === undefined) continue;
@@ -257,8 +257,13 @@ function appendPath3dPass(
     const y = fmt(point.y);
     const z = fmt(point.z);
     if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
-    const feedWord = feedEmitted ? '' : ` F${feed}`;
-    feedEmitted = true;
+    // Pure-vertical segments (a ramp longer than its path ends with a
+    // same-XY descent) ride the plunge feed, never the XY cutting feed; the
+    // cutting feed is re-issued on the next lateral move.
+    const isVertical = x === head.x && y === head.y;
+    const wantFeed = isVertical ? plunge : feed;
+    const feedWord = modalFeed === wantFeed ? '' : ` F${wantFeed}`;
+    modalFeed = wantFeed;
     lines.push(`G1 X${x} Y${y} Z${z}${feedWord}`);
     head.x = x;
     head.y = y;

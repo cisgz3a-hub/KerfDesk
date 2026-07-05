@@ -148,6 +148,30 @@ describe('cncGrblStrategy', () => {
       expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
     });
 
+    it('pure-vertical path3d segments plunge at the PLUNGE feed, then restore the cut feed', () => {
+      // A ramp longer than its path ends with a same-XY descent to depth
+      // (motion-polish short-path arm). That vertical move must not ride the
+      // XY cutting feed — an end mill plunging straight down at 1000 mm/min
+      // instead of 300 breaks bits and burns stock.
+      const short = group({
+        passes: [
+          {
+            kind: 'path3d',
+            points: [
+              { x: 10, y: 10, z: -0.5 },
+              { x: 12, y: 10, z: -1.0 },
+              { x: 12, y: 10, z: -3.0 },
+              { x: 20, y: 10, z: -3.0 },
+            ],
+            closed: false,
+          },
+        ],
+      });
+      const gcode = cncGrblStrategy.emit({ groups: [short] }, dev);
+      expect(gcode).toContain('G1 X12.000 Y10.000 Z-3.000 F300');
+      expect(gcode).toContain('G1 X20.000 Y10.000 Z-3.000 F1000');
+    });
+
     it('skips the retract+rapid when a path3d pass starts at the current XY', () => {
       const chained = group({
         passes: [
