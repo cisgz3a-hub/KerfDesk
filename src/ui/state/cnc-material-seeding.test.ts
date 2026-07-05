@@ -6,12 +6,18 @@ import { calculateFeeds } from '../../core/cnc';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
 
-const HARDWOOD_FEED = calculateFeeds({
-  material: 'hardwood',
-  bitDiameterMm: 3.175,
-  flutes: 2,
-  rpm: 12000,
-}).feedMmPerMin;
+function hardwoodFeed(): number {
+  const feeds = calculateFeeds({
+    material: 'hardwood',
+    bitDiameterMm: 3.175,
+    flutes: 2,
+    rpm: 12000,
+  });
+  if (feeds.kind === 'error') throw new Error(feeds.reason);
+  return feeds.feedMmPerMin;
+}
+
+const HARDWOOD_FEED = hardwoodFeed();
 
 beforeEach(() => {
   resetStore();
