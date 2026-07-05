@@ -81,6 +81,7 @@ describe('grblDriver', () => {
       homing: true,
       console: true,
       firmwareSetupPanel: 'grbl-laser',
+      probing: true,
     });
   });
 

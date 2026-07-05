@@ -40,6 +40,7 @@ export const marlinDriver: ControllerDriver = {
     homing: true,
     console: true,
     firmwareSetupPanel: 'none',
+    probing: false,
   },
   realtime: {
     statusQuery: null,
