@@ -112,7 +112,7 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 - Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
 - OUT of this phase (still out of scope; a future phase + ADR + an ADR-017 polygon-clipping library evaluation): the geometry KERNEL — weld, boolean ops, offset, node editing.
 
-### Phase H — v0.8 "Router" [Built (G1–G8); hardware passes CLAIMED]
+### Phase H — v0.8 "Router" [Built (G1–G8, then H.13–H.14 / ADR-111–112); hardware passes CLAIMED]
 
 Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-098: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. UI separation between laser and CNC modes is governed by ADR-101 (gate-and-hide); the 3D relief viewer's three.js dependency by ADR-102 (UI-only override of ADR-098 §2). Sub-phases (each = individually reviewed diffs; branch shippable after every one). Status column: Built = code + tests landed, hardware pass still CLAIMED per AUDIT.md inventory:
 
