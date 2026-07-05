@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import {
   DEFAULT_CNC_TOOLS,
+  activeCncTool,
   type CncLayerSettings,
   type CncTool,
   type Layer,
@@ -13,6 +14,7 @@ import {
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { feedPresetPatch } from '../state/cnc-library-actions';
+import { materialFeedsPatch } from '../state/cnc-project-material';
 
 export function useCncTools(): ReadonlyArray<CncTool> {
   return useStore((s) =>
@@ -36,6 +38,19 @@ export function LayerBitSelect(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
+  const machine = useStore((s) => s.project.machine);
+  const maxFeed = useStore((s) => s.project.device.maxFeed);
+  // A material-driven layer must recompute its feeds for the NEW bit's
+  // diameter — otherwise the material hint claims feeds that were computed
+  // for the old bit.
+  const feedsForBit = (toolId: string | undefined): Partial<CncLayerSettings> => {
+    const materialKey = props.settings.materialKey;
+    if (machine?.kind !== 'cnc' || materialKey === undefined) return {};
+    const tool =
+      toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
+    if (tool === undefined) return {};
+    return materialFeedsPatch(materialKey, tool, props.settings.spindleRpm, maxFeed) ?? {};
+  };
   return (
     <Row label="Bit">
       <select
@@ -44,9 +59,9 @@ export function LayerBitSelect(props: {
           if (e.target.value === '') {
             // Clearing the override removes the key (exact optional field).
             const { toolId: _removed, ...rest } = props.settings;
-            props.onCommitSettings(rest);
+            props.onCommitSettings({ ...rest, ...feedsForBit(undefined) });
           } else {
-            props.onCommit({ toolId: e.target.value });
+            props.onCommit({ toolId: e.target.value, ...feedsForBit(e.target.value) });
           }
         }}
         aria-label={`Bit for ${props.layer.color}`}
