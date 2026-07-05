@@ -80,3 +80,70 @@ describe('buildSurfacingProgram', () => {
     );
   });
 });
+
+describe('surfacing finite guards (D-S04-001)', () => {
+  it('terminates on an Infinity height, returning a finite row array', () => {
+    const rows = surfacingRowYs(Number.POSITIVE_INFINITY, 10);
+    expect(rows.every((y) => Number.isFinite(y))).toBe(true);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('falls back to the min-step spacing when step is NaN or zero', () => {
+    const nanStep = surfacingRowYs(0.2, Number.NaN);
+    const zeroStep = surfacingRowYs(0.2, 0);
+    // MIN_STEP_MM = 0.05 → 0, 0.05, 0.1, 0.15, then the 0.2 far-edge clamp.
+    expect(nanStep).toEqual(zeroStep);
+    for (let i = 1; i < nanStep.length; i += 1) {
+      const prev = nanStep[i - 1];
+      const curr = nanStep[i];
+      if (prev === undefined || curr === undefined) throw new Error('row missing');
+      expect(curr - prev).toBeLessThanOrEqual(0.05 + 1e-9);
+    }
+    expect(nanStep.at(-1)).toBe(0.2);
+  });
+
+  it('clamps a finite sub-MIN depth-per-pass to MIN_STEP_MM instead of exploding the pass count', () => {
+    // 0.02 mm/pass is below MIN_STEP_MM (0.05); it must clamp to 0.05 and emit
+    // the exact same program as a 0.05 mm pass — not pass through and mint ~25
+    // fine passes. Regression guard for AF-CORE-001, where depthLadder dropped
+    // its Math.max clamp (finitePositiveOr let finite sub-0.05 through).
+    const clamped = buildSurfacingProgram({ ...PARAMS, depthPerPassMm: 0.02, totalDepthMm: 0.5 });
+    const atMin = buildSurfacingProgram({ ...PARAMS, depthPerPassMm: 0.05, totalDepthMm: 0.5 });
+    expect(clamped.passes).toBe(atMin.passes);
+    expect(clamped.lines).toEqual(atMin.lines);
+    // Must NOT be the unclamped fine-pass explosion (~25 passes at 0.02 mm).
+    expect(clamped.passes).toBeLessThan(15);
+  });
+
+  it('does not hang on a tiny finite step — floors it at MIN_STEP_MM (AF-CORE-002)', () => {
+    // 1e-20 is finite-positive, so the old guard let it through; once y/step
+    // exceeds 2^53 the loop never advances. Flooring the step bounds it.
+    const rows = surfacingRowYs(10, 1e-20);
+    expect(rows.length).toBeLessThanOrEqual(10 / 0.05 + 2);
+    expect(rows.every((y) => Number.isFinite(y))).toBe(true);
+  });
+
+  it('caps the row count for a pathological finite height so it cannot OOM', () => {
+    const rows = surfacingRowYs(1e12, 0.05);
+    expect(rows.length).toBeLessThanOrEqual(100_001);
+  });
+
+  it('emits no NaN or Infinity when every param is non-finite', () => {
+    const program = buildSurfacingProgram({
+      widthMm: Number.POSITIVE_INFINITY,
+      heightMm: Number.NaN,
+      bitDiameterMm: Number.NaN,
+      stepoverPct: Number.NaN,
+      depthPerPassMm: Number.NaN,
+      totalDepthMm: Number.POSITIVE_INFINITY,
+      feedMmPerMin: Number.NaN,
+      plungeMmPerMin: Number.NEGATIVE_INFINITY,
+      spindleRpm: Number.NaN,
+      spindleSpinupSec: Number.POSITIVE_INFINITY,
+      safeZMm: Number.NaN,
+    });
+    const text = program.lines.join('\n');
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('Infinity');
+  });
+});

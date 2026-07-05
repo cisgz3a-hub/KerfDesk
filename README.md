@@ -46,7 +46,7 @@ Read in this order:
 
 ## Build status
 
-Phases A-E shipped, plus the Phase F and Phase G work summarized in **Status** above. As of the 2026-07-03 local release gate, `pnpm release:check` passes with 2641 tests across 423 test files, a clean dependency audit, a clean license gate, a clean web build, a clean Electron main build, and a clean file-size backstop. See `AUDIT.md` for the current findings and verification inventory.
+Phases A-E shipped, plus the Phase F and Phase G work summarized in **Status** above. As of the 2026-07-03 local release gate, `pnpm release:check` passes with 2641 tests across 423 test files, a clean dependency audit, a clean license gate, a warning-free web build (chunks within the documented 750 KB budget that covers the three.js relief-preview vendor chunk), a clean Electron main build, and a clean file-size backstop. See `AUDIT.md` for the current findings and verification inventory.
 
 ```bash
 pnpm install

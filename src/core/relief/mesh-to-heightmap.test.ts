@@ -125,4 +125,22 @@ describe('meshToHeightmap', () => {
     const flat: TriangleMesh = { positions: Float32Array.from([0, 0, 0, 0, 0, 1, 0, 0, 2]) };
     expect(meshToHeightmap(flat, { targetWidthMm: 20, reliefDepthMm: 5 }).kind).toBe('error');
   });
+
+  it('rejects non-finite target width or relief depth (D-S04-002)', () => {
+    expect(
+      meshToHeightmap(pyramidMesh(), {
+        targetWidthMm: Number.POSITIVE_INFINITY,
+        reliefDepthMm: 5,
+      }).kind,
+    ).toBe('error');
+    expect(
+      meshToHeightmap(pyramidMesh(), {
+        targetWidthMm: 20,
+        reliefDepthMm: Number.POSITIVE_INFINITY,
+      }).kind,
+    ).toBe('error');
+    expect(
+      meshToHeightmap(pyramidMesh(), { targetWidthMm: 20, reliefDepthMm: Number.NaN }).kind,
+    ).toBe('error');
+  });
 });
