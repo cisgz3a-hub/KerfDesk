@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
   createLayer,
   createProject,
   type CncLayerSettings,
   type Project,
+  type SceneObject,
 } from '../scene';
 import { runCncPreflight } from './cnc-preflight';
 
@@ -34,7 +36,52 @@ function projectWithCnc(cnc: Partial<CncLayerSettings> = {}): Project {
   return { ...base, scene: { ...base.scene, layers: [layer] } };
 }
 
+function squareObject(id: string, color: string, size: number): SceneObject {
+  const points = [
+    { x: 50, y: 50 },
+    { x: 50 + size, y: 50 },
+    { x: 50 + size, y: 50 + size },
+    { x: 50, y: 50 + size },
+  ];
+  return {
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 50, minY: 50, maxX: 50 + size, maxY: 50 + size },
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color, polylines: [{ closed: true, points }] }],
+  };
+}
+
 describe('runCncPreflight', () => {
+  it('flags a layer whose shapes are too narrow for the bit instead of dropping it silently', () => {
+    // Default bit is 3.175 mm: a 2 mm pocket offsets away entirely and used
+    // to vanish from the job with no message while other layers still cut.
+    const base = createProject();
+    const big = {
+      ...createLayer({ id: 'big', color: '#ff0000' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket' as const },
+    };
+    const tiny = {
+      ...createLayer({ id: 'tiny', color: '#0000ff' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'pocket' as const },
+    };
+    const project: Project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        objects: [squareObject('O1', '#ff0000', 40), squareObject('O2', '#0000ff', 2)],
+        layers: [big, tiny],
+      },
+    };
+
+    const result = runCncPreflight(project, config, GOOD_GCODE);
+
+    const dropped = result.issues.filter((issue) => issue.code === 'cnc-layer-empty');
+    expect(dropped).toHaveLength(1);
+    expect(dropped[0]?.message).toContain('tiny');
+  });
+
   it('passes a sane project and safe G-code', () => {
     const result = runCncPreflight(projectWithCnc(), config, GOOD_GCODE);
     expect(result.issues).toEqual([]);
