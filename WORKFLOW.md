@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, and Phase F (F.1 Fill, F.2 Image engrave, F.3 Set work origin) flows fleshed out**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code for all phases through F.3 is shipped — the gap is documentation density, not implementation.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC35), Phase I multi-controller, and Phase K box generator flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
 
 ---
 

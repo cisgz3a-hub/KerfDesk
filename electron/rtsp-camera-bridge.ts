@@ -5,6 +5,23 @@ import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
 
 export const CAMERA_BRIDGE_PORT = 51731;
 
+// Bound concurrent ffmpeg transcodes so a burst of stream requests cannot
+// exhaust the machine (S03-001 DoS hardening).
+const MAX_CONCURRENT_FFMPEG = 4;
+let activeFfmpegCount = 0;
+
+// Reserve a concurrency slot for one ffmpeg transcode; returns an idempotent
+// release. Keeps the streamWithFfmpeg accounting to a single line (S03-001).
+function acquireFfmpegSlot(): () => void {
+  activeFfmpegCount += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeFfmpegCount -= 1;
+  };
+}
+
 export type RtspCameraBridgeHandle = {
   readonly close: () => Promise<void>;
 };
@@ -22,6 +39,13 @@ async function handleBridgeRequest(req: IncomingMessage, res: ServerResponse): P
   setCorsHeaders(req, res);
   if (req.method === 'OPTIONS') {
     res.writeHead(204).end();
+    return;
+  }
+  // S03-001: refuse an untrusted browser Origin BEFORE any side-effecting work.
+  // CORS headers only gate response reads, not the request's ffmpeg/RTSP effects.
+  const origin = req.headers.origin;
+  if (!isAllowedBridgeOrigin(typeof origin === 'string' ? origin : undefined)) {
+    res.writeHead(403).end('Forbidden');
     return;
   }
   if (requestUrl.pathname === '/health') {
@@ -67,6 +91,10 @@ async function handleStream(requestUrl: URL, res: ServerResponse): Promise<void>
     writeJson(res, { kind: 'unavailable', reason: 'FFmpeg is not available on this computer.' });
     return;
   }
+  if (activeFfmpegCount >= MAX_CONCURRENT_FFMPEG) {
+    writeJson(res, { kind: 'unavailable', reason: 'Too many concurrent camera streams.' }, 503);
+    return;
+  }
   streamWithFfmpeg(policy.url, res);
 }
 
@@ -88,6 +116,7 @@ function streamWithFfmpeg(url: URL, res: ServerResponse): void {
     '5',
     'pipe:1',
   ]);
+  const releaseSlot = acquireFfmpegSlot();
   const stderrChunks: Buffer[] = [];
   let clientClosed = false;
   let responseStarted = false;
@@ -136,8 +165,12 @@ function streamWithFfmpeg(url: URL, res: ServerResponse): void {
     cleanup();
     ffmpeg.kill('SIGTERM');
   });
-  ffmpeg.on('error', (err) => failStream(err));
+  ffmpeg.on('error', (err) => {
+    releaseSlot();
+    failStream(err);
+  });
   ffmpeg.on('exit', (code, signal) => {
+    releaseSlot();
     if (settled) return;
     if (code === 0 || signal === 'SIGTERM') {
       settled = true;
@@ -265,6 +298,15 @@ export function cameraBridgeCorsOrigin(origin: string | undefined): string | nul
   if (origin === 'app://app') return origin;
   if (origin === 'http://localhost:5173' || origin === 'http://127.0.0.1:5173') return origin;
   return isTrustedHostedAppOrigin(origin) ? origin : null;
+}
+
+// S03-001 server-side request gate. CORS only stops a browser READING a
+// cross-origin response; the request's side effects (RTSP probe / ffmpeg spawn)
+// still fire. A request with no Origin (same-origin app://app document, or a
+// non-browser local client that already has machine access) is allowed; a
+// browser Origin we do not trust is refused before any work happens.
+export function isAllowedBridgeOrigin(origin: string | undefined): boolean {
+  return origin === undefined || cameraBridgeCorsOrigin(origin) !== null;
 }
 
 function isTrustedHostedAppOrigin(origin: string): boolean {
