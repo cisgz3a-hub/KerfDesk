@@ -51,6 +51,7 @@ export const grblDriver: ControllerDriver = {
     console: true,
     firmwareSetupPanel: 'grbl-laser',
     probing: true,
+    cncJobs: true,
   },
   realtime: {
     statusQuery: RT_STATUS,

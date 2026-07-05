@@ -40,6 +40,7 @@ export const smoothiewareDriver: ControllerDriver = {
     console: true,
     firmwareSetupPanel: 'none',
     probing: false,
+    cncJobs: false,
   },
   realtime: {
     statusQuery: RT_STATUS,
