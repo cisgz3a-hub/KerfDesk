@@ -5063,7 +5063,43 @@ gate per commit. **NOT verified perceptually this session** — the rendered
 recovery of the real logo counter against the source is the maintainer's
 perceptual pass (CLAUDE.md §2); green tests are not fidelity proof.
 
-## ADR-114 — Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05)
+## ADR-114 — Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05)
+
+(ADR-113 is reserved by the trace-fidelity track on its own branch; this entry
+deliberately skips it to avoid a repeat of the ADR-094/ADR-106 collisions.)
+
+**Context.** The 2026-07-05 release audit found the product legally unsellable:
+the repo LICENSE (ADR-018) affirmatively denies everyone the right to *use* the
+software and no EULA, terms surface, or machine-safety disclaimer existed
+anywhere a customer could see. Separately, the bundled Roboto (Apache-2.0) and
+three OFL-1.1 fonts plus all nine production npm packages shipped without the
+license texts their licenses require — THIRD_PARTY_NOTICES.md covered only the
+Rayforge camera adaptation and was not bundled.
+
+**Decision.**
+1. `public/eula.txt` is the customer-facing End User License Agreement: use
+   grant, restrictions, machine-safety warning, warranty disclaimer, liability
+   cap, third-party pointer, termination. It ships in every bundle (vite
+   `public/` → `dist/web`, which electron-builder packs) and the NSIS
+   installer requires acceptance (`nsis.license`). The repo LICENSE (ADR-018)
+   still governs the *source*; the EULA governs the *distributed binary* —
+   they are complementary, not conflicting.
+2. `scripts/generate-third-party-notices.mjs` builds
+   `public/third-party-notices.txt` from real sources — each production
+   dependency's `node_modules` LICENSE verbatim plus each font's name-table
+   copyright record — with the canonical Apache-2.0/OFL-1.1 full texts
+   committed under `scripts/license-texts/` (downloaded from apache.org and
+   openfontlicense.org). `build:web` regenerates it and the generator fails
+   loudly on a missing LICENSE, so a new dependency cannot ship un-attributed.
+3. The About dialog names both files and carries a short safety notice.
+
+**Consequences.** The EULA text is an engineering draft: it must be reviewed
+by a lawyer before the first sale (jurisdiction/governing-law clause is
+deliberately absent). First-run in-app acceptance (web) remains open — the
+web bundle surfaces the EULA via About, not a blocking dialog; revisit when
+the storefront exists.
+
+## ADR-115 — Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05)
 
 **Status:** accepted (maintainer-directed after rejecting ADR-059's letter quality).
 

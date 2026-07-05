@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CNC_MACHINE_CATALOG } from '../../core/cnc';
+import { DEFAULT_CNC_LAYER_SETTINGS, createLayer } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
@@ -29,6 +30,31 @@ describe('applyCncMachinePreset', () => {
 
     useStore.getState().undo();
     expect(useStore.getState().project.device.bedWidth).toBe(beforeBed);
+  });
+
+  it('clamps layer spindle RPMs above the new preset ceiling', () => {
+    // Genmitsu presets cap at 10000 RPM while the layer default is 12000 —
+    // without clamping, preflight rejects every export until the user edits
+    // each layer by hand (Easel clamps to machine limits instead).
+    const preset = CNC_MACHINE_CATALOG.find((candidate) => candidate.id === 'genmitsu-3018');
+    if (preset === undefined) throw new Error('preset missing');
+    const hot = {
+      ...createLayer({ id: 'hot', color: '#ff0000' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: 12000 },
+    };
+    const cool = {
+      ...createLayer({ id: 'cool', color: '#00ff00' }),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: 8000 },
+    };
+    useStore.setState((s) => ({
+      project: { ...s.project, scene: { ...s.project.scene, layers: [hot, cool] } },
+    }));
+
+    useStore.getState().applyCncMachinePreset(preset);
+
+    const layers = useStore.getState().project.scene.layers;
+    expect(layers.find((layer) => layer.id === 'hot')?.cnc?.spindleRpm).toBe(10000);
+    expect(layers.find((layer) => layer.id === 'cool')?.cnc?.spindleRpm).toBe(8000);
   });
 
   it('is a no-op in laser mode', () => {

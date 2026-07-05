@@ -360,5 +360,12 @@ function aboutText(): string {
     `${APP_DISPLAY_NAME} ${__APP_VERSION__}`,
     `Commit ${__GIT_SHA__}`,
     `Built ${__BUILD_TIME__}`,
+    '',
+    'Use is governed by the End User License Agreement (/eula.txt).',
+    'Open-source components: see /third-party-notices.txt.',
+    '',
+    'SAFETY: this software drives laser and CNC machinery. Verify every',
+    'job (preview, simulation, or air run) before cutting, and never',
+    'leave a running machine unattended.',
   ].join('\n');
 }

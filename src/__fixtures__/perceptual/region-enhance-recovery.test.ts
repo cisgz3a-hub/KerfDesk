@@ -2,7 +2,7 @@
 // re-traces a boxed region supersampled and patches it into the full trace.
 // History: under the ADR-059 Canny engine the 2nd "A" of LANGEBAAN's "AA"
 // pair lost its counter at native resolution (census 1 loop instead of 2) and
-// this path was its recovery. The ADR-114 engine keeps the counter natively,
+// this path was its recovery. The ADR-115 engine keeps the counter natively,
 // so today this pins the region-enhance CONTRACT on the real logo: the
 // enhanced region still censuses 2 closed loops per A (the patch must not
 // degrade what the full pass got right), and geometry outside the region is

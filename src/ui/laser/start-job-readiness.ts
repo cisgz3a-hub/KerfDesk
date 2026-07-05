@@ -9,6 +9,7 @@ import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '..
 import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
+  machineKindOf,
   validateOutputScope,
   type OutputScope,
   type Project,
@@ -29,6 +30,8 @@ export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
 export const STATUS_ALARM_START_MESSAGE =
   'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
+export const CNC_REQUIRES_GRBL_MESSAGE =
+  'CNC jobs require a GRBL-family controller (GRBL, grblHAL, FluidNC). The connected firmware does not accept the GRBL CNC dialect — e.g. it reads the G4 spin-up dwell in milliseconds instead of seconds, so the bit would plunge before the spindle is at speed.';
 
 export type StartJobPreparation =
   | {
@@ -55,7 +58,21 @@ export type MachineStartSnapshot = {
   // ADR-094 — how the connected firmware exposes settings. Non-GRBL values
   // relax the $30/$32 readiness proof into an explicit unverified warning.
   readonly settingsCapability?: ReadinessSettingsCapability;
+  // ADR-098 — CNC is GRBL-only. False blocks CNC Start outright (the CNC
+  // emitter's dialect is unsafe on other firmwares); absent = allowed.
+  readonly cncJobsSupported?: boolean;
 };
+
+// Machine-state blockers plus the ADR-098 dialect gate: CNC is GRBL-only —
+// the emitter's dialect (G4 dwell in seconds) is unsafe on firmwares that
+// parse it differently.
+function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): string[] {
+  const issues = [...findMachineStartIssues(machine)];
+  if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
+    issues.push(CNC_REQUIRES_GRBL_MESSAGE);
+  }
+  return issues;
+}
 
 export function prepareStartJob(
   project: Project,
@@ -64,7 +81,7 @@ export function prepareStartJob(
   jobPlacement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
 ): StartJobPreparation {
-  const machineIssues = findMachineStartIssues(machine);
+  const machineIssues = findEarlyStartIssues(project, machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
 
   const placement = resolveJobPlacement(jobPlacement, machine);

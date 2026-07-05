@@ -68,15 +68,19 @@ function emitJob(job: Job, _device: DeviceProfile): string {
   const isMultiTool = new Set(cncGroups.map((group) => group.toolId ?? '')).size > 1;
 
   const lines: string[] = [];
+  const head: Head = { x: null, y: null, z: null };
   lines.push('G21');
   lines.push('G90');
   lines.push('G94');
   if (isMultiTool && firstGroup.toolName !== undefined) {
     lines.push(`; tool: ${firstGroup.toolName} (load before starting)`);
   }
+  // Lift to safe height BEFORE the spindle spins up: after Z touch-off the
+  // bit is resting on the stock top, and starting the spindle there burns
+  // the stock and can grab (Easel's post lifts first, then M3).
+  appendRetract(lines, head, firstGroup.safeZMm);
   appendSpindleStart(lines, firstGroup.spindleRpm, firstGroup.spindleSpinupSec);
 
-  const head: Head = { x: null, y: null, z: null };
   const state: EmitState = {
     isMultiTool,
     currentRpm: firstGroup.spindleRpm,
@@ -143,6 +147,11 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm:
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
   appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);
+  // The operator physically moved Z during the pause (touch-off leaves the
+  // new bit at the stock top), so the tracked height is no longer real.
+  // Forgetting it forces the next appendRetract to emit G0 Z<safe> before
+  // any XY rapid — the same resume discipline every commercial post uses.
+  head.z = null;
 }
 
 function appendSpindleStart(lines: string[], rpm: number, spinupSec: number): void {
@@ -240,7 +249,17 @@ function appendPath3dPass(
     lines.push(`G1 Z${startZ} F${plunge}`);
     head.z = startZ;
   }
-  let feedEmitted = false;
+  appendPath3dCutMoves(lines, head, pass, feed, plunge);
+}
+
+function appendPath3dCutMoves(
+  lines: string[],
+  head: Head,
+  pass: CncPath3dPass,
+  feed: number,
+  plunge: number,
+): void {
+  let modalFeed: number | null = null;
   for (let i = 1; i < pass.points.length; i += 1) {
     const point = pass.points[i];
     if (point === undefined) continue;
@@ -248,8 +267,12 @@ function appendPath3dPass(
     const y = fmt(point.y);
     const z = fmt(point.z);
     if (x === head.x && y === head.y && z === head.z) continue; // zero-length at emit precision
-    const feedWord = feedEmitted ? '' : ` F${feed}`;
-    feedEmitted = true;
+    // Pure-vertical segments (a ramp longer than its path ends with a
+    // same-XY descent) ride the plunge feed, never the XY cutting feed; the
+    // cutting feed is re-issued on the next lateral move.
+    const wantFeed = x === head.x && y === head.y ? plunge : feed;
+    const feedWord = modalFeed === wantFeed ? '' : ` F${wantFeed}`;
+    modalFeed = wantFeed;
     lines.push(`G1 X${x} Y${y} Z${z}${feedWord}`);
     head.x = x;
     head.y = y;

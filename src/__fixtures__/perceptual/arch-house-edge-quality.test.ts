@@ -30,7 +30,7 @@ describe('arch-house real logo Edge Detection quality', () => {
           `${artifact.metrics.pointCount} points, length=${artifact.metrics.totalPolylineLength}`,
       );
 
-      // ADR-114: the mask→potrace engine emits closed contours only (the
+      // ADR-115: the mask→potrace engine emits closed contours only (the
       // LightBurn trace semantic — its tracer is potrace-based too). The old
       // chained backend emitted a mix, and the assertion history flipped with
       // each engine: outline backend pinned open === 0, chain backend pinned

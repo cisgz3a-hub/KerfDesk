@@ -32,14 +32,14 @@ import {
   type Vec2,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
-import { passNeedsTabs, splitPassForTabs } from './cnc-tabs';
+import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
 import { drillPeckPasses } from './drill-peck';
 import { applyRampEntry, enforceCutDirection, parkFields } from './motion-polish';
 import { pocketToolpathRaster, pocketToolpathRings } from './pocket-paths';
-import { profileToolpathPolylines } from './profile-paths';
+import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { vcarveClearanceToolpaths } from './vcarve-clearance';
 import { vcarvePasses } from './vcarve-ladder';
 
@@ -74,6 +74,28 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   // H.7 multi-tool: contiguous per-bit sections (one change per bit),
   // profile-carrying sections last so freed parts are never re-machined.
   return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
+}
+
+// Output layers whose vector shapes exist but compile to zero toolpaths —
+// usually a bit too wide for the geometry (pockets and inside profiles need
+// the bit to fit), or open shapes on a closed-only cut type. Preflight
+// surfaces these so a job never silently omits a layer the user drew.
+export function findDroppedCncLayers(
+  scene: Scene,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): ReadonlyArray<string> {
+  const dropped: string[] = [];
+  for (const layer of scene.layers) {
+    if (!layer.output) continue;
+    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    const polylines = collectLayerPolylines(scene.objects, layer, device);
+    if (polylines.length === 0) continue;
+    const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
+    const group = cncGroupForLayer(layer, settings, polylines, device, config);
+    if (clearance === null && group === null) dropped.push(layer.id);
+  }
+  return dropped;
 }
 
 export function isProfileCutType(cutType: CncCutType): boolean {
@@ -258,7 +280,12 @@ function xyToolpathsForCutType(
     case 'pocket':
       return pocketToolpaths(polylines, settings, toolDiameterMm);
     case 'engrave':
-      return polylines.filter((polyline) => polyline.points.length >= 2);
+      // Same non-finite guard as every other cut type: a NaN vertex would
+      // otherwise survive to the emitter as a literal "G1 XNaN" that the
+      // digit-based preflight word parser cannot see.
+      return polylines.filter(
+        (polyline) => polyline.points.length >= 2 && hasFinitePoints(polyline),
+      );
     case 'v-carve':
     case 'drill':
       // Handled by their dedicated branches upstream — unreachable here.
@@ -283,9 +310,14 @@ function contourMajorPasses(
   toolDiameterMm: number,
 ): CncPass[] {
   const wantsTabs = settings.tabsEnabled && isProfileCutType(settings.cutType);
+  // Tabbed loops need a full-loop pass at EXACTLY the tab top: otherwise tab
+  // height quantizes up to the pass grid, and a single-pass through-cut
+  // never cuts the tab windows at all (full-stock-thickness "tabs").
+  const tabbedDepths = wantsTabs ? depthsWithTabTopPass(depths, settings) : depths;
   const passes: CncPass[] = [];
   for (const toolpath of toolpaths) {
-    for (const zMm of depths) {
+    const ladder = wantsTabs && toolpath.closed ? tabbedDepths : depths;
+    for (const zMm of ladder) {
       const needsTabs =
         wantsTabs && toolpath.closed && passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
       if (needsTabs) {
@@ -296,6 +328,17 @@ function contourMajorPasses(
     }
   }
   return passes;
+}
+
+function depthsWithTabTopPass(
+  depths: ReadonlyArray<number>,
+  settings: CncLayerSettings,
+): ReadonlyArray<number> {
+  const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
+  // Degenerate tab heights (0, or >= depth) leave the ladder untouched.
+  if (tabTop >= -COORD_EPS || tabTop <= -settings.depthMm + COORD_EPS) return depths;
+  if (depths.some((z) => Math.abs(z - tabTop) <= COORD_EPS)) return depths;
+  return [...depths, tabTop].sort((a, b) => b - a);
 }
 
 function appendTabbedPasses(

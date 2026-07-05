@@ -44,7 +44,7 @@ export function archHouseEdgeCurveCleanupBenchmark(): TraceBenchmarkResult {
     message: 'Edge Detection left letter outlines open with a small visible gap.',
     fixHint: 'Close almost-closed loops (corner meetings included) without welding across dashes.',
   });
-  // Recalibrated for the ADR-114 engine (mask → potrace): the ≤12 target was
+  // Recalibrated for the ADR-115 engine (mask → potrace): the ≤12 target was
   // measured against the Canny+spline pipeline, whose evened curvature turned
   // smoothly precisely because it melted small-letter detail (dropped
   // counters, blobby feet). Potrace's polygon-style output measures ~117 on
