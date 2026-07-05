@@ -30,11 +30,13 @@ describe('arch-house real logo Edge Detection quality', () => {
           `${artifact.metrics.pointCount} points, length=${artifact.metrics.totalPolylineLength}`,
       );
 
-      // The chained backend traces every edge as a SINGLE line: edges that
-      // loop come back closed, edges that don't (rooflines, waves, letter
-      // strokes) come back open. The old outline backend could only emit
-      // closed two-sided contours, which is why this once pinned open === 0.
-      expect(artifact.metrics.openPolylineCount).toBeGreaterThan(10);
+      // ADR-114: the mask→potrace engine emits closed contours only (the
+      // LightBurn trace semantic — its tracer is potrace-based too). The old
+      // chained backend emitted a mix, and the assertion history flipped with
+      // each engine: outline backend pinned open === 0, chain backend pinned
+      // open > 10, and the potrace engine pins open === 0 again — by
+      // construction this time (potrace scans region boundaries).
+      expect(artifact.metrics.openPolylineCount).toBe(0);
       expect(artifact.metrics.closedPolylineCount).toBeGreaterThan(10);
       expect(artifact.metrics.smallClosedPolylineCount).toBeLessThanOrEqual(4);
       expect(artifact.metrics.pointCount).toBeLessThan(120_000);

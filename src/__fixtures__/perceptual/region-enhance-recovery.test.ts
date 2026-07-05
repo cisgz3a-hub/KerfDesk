@@ -1,9 +1,11 @@
-// Fix A1 acceptance (docs/trace-fidelity-fixes-handoff.md §4): on the real
-// arch-house logo traced with the app's MERGED Edge options, the 2nd "A" of
-// LANGEBAAN's "AA" pair loses its triangular counter (closed interior loop) at
-// native resolution — the census reads 1 loop instead of 2. Re-tracing just
-// the boxed AA region supersampled via enhanceRegionPaths must recover it:
-// both A's read 2 closed loops, while geometry outside the region is
+// Fix A1 acceptance (docs/trace-fidelity-fixes-handoff.md §4): region-enhance
+// re-traces a boxed region supersampled and patches it into the full trace.
+// History: under the ADR-059 Canny engine the 2nd "A" of LANGEBAAN's "AA"
+// pair lost its counter at native resolution (census 1 loop instead of 2) and
+// this path was its recovery. The ADR-114 engine keeps the counter natively,
+// so today this pins the region-enhance CONTRACT on the real logo: the
+// enhanced region still censuses 2 closed loops per A (the patch must not
+// degrade what the full pass got right), and geometry outside the region is
 // untouched. Skips (like the other fixture-gated suites) when the private
 // logo fixture is absent.
 import { expect, it } from 'vitest';
