@@ -113,6 +113,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
       platform: ctx.platform,
       project: ctx.project,
       savedName: ctx.savedName,
+      ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
       pushToast: ctx.pushToast,
     })
   ) {
