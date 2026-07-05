@@ -35,7 +35,7 @@
     "build:desktop": "pnpm build:electron-main && vite build && electron-builder --win --x64",
     "electron:start": "electron .",
     "camera:bridge": "pnpm build:electron-main && node dist-electron/rtsp-camera-bridge-cli.js",
-    "deploy:web": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=master",
+    "deploy:web": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=main",
     "deploy:web:preview": "pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
   },
   "dependencies": {
