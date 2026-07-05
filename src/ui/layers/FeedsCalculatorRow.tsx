@@ -40,24 +40,7 @@ export function FeedsCalculatorRow(props: {
         Feeds calculator
       </summary>
       <div style={rowStyle}>
-        <label style={fieldStyle}>
-          Material
-          <select
-            aria-label="Chipload material"
-            title="Material family — picks the starting chipload band."
-            value={material}
-            onChange={(e) => {
-              const next = CHIPLOAD_MATERIALS.find((m) => m.value === e.target.value);
-              if (next !== undefined) setMaterial(next.value);
-            }}
-          >
-            {CHIPLOAD_MATERIALS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <MaterialSelect value={material} onPick={setMaterial} />
         <label style={fieldStyle}>
           Flutes
           <select
@@ -93,6 +76,32 @@ export function FeedsCalculatorRow(props: {
         Apply to layer
       </button>
     </details>
+  );
+}
+
+function MaterialSelect(props: {
+  readonly value: ChiploadMaterial;
+  readonly onPick: (material: ChiploadMaterial) => void;
+}): JSX.Element {
+  return (
+    <label style={fieldStyle}>
+      Material
+      <select
+        aria-label="Chipload material"
+        title="Material family — picks the starting chipload band."
+        value={props.value}
+        onChange={(e) => {
+          const next = CHIPLOAD_MATERIALS.find((m) => m.value === e.target.value);
+          if (next !== undefined) props.onPick(next.value);
+        }}
+      >
+        {CHIPLOAD_MATERIALS.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
