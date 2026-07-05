@@ -68,15 +68,19 @@ function emitJob(job: Job, _device: DeviceProfile): string {
   const isMultiTool = new Set(cncGroups.map((group) => group.toolId ?? '')).size > 1;
 
   const lines: string[] = [];
+  const head: Head = { x: null, y: null, z: null };
   lines.push('G21');
   lines.push('G90');
   lines.push('G94');
   if (isMultiTool && firstGroup.toolName !== undefined) {
     lines.push(`; tool: ${firstGroup.toolName} (load before starting)`);
   }
+  // Lift to safe height BEFORE the spindle spins up: after Z touch-off the
+  // bit is resting on the stock top, and starting the spindle there burns
+  // the stock and can grab (Easel's post lifts first, then M3).
+  appendRetract(lines, head, firstGroup.safeZMm);
   appendSpindleStart(lines, firstGroup.spindleRpm, firstGroup.spindleSpinupSec);
 
-  const head: Head = { x: null, y: null, z: null };
   const state: EmitState = {
     isMultiTool,
     currentRpm: firstGroup.spindleRpm,
