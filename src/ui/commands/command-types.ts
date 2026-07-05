@@ -89,7 +89,8 @@ export type CommandId =
   | 'window.fit-view'
   | 'window.project-notes'
   | 'window.undo-history'
-  | 'help.about';
+  | 'help.about'
+  | 'help.connection';
 
 export type AppCommand = {
   readonly id: CommandId;
@@ -211,6 +212,7 @@ export type AppCommandContext = {
   readonly projectNotes: () => void;
   readonly undoHistory: () => void;
   readonly showAbout: () => void;
+  readonly showConnectionHelp: () => void;
 };
 
 export function enabled(

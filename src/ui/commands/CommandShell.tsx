@@ -8,6 +8,7 @@ import {
   type ScanOffsetCalibrationPatternOptions,
 } from '../../core/job';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
+import { CONNECTION_HELP_TEXT } from '../help/connection-help';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
@@ -71,6 +72,7 @@ export function CommandShell(): JSX.Element {
     requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
+    showConnectionHelp: () => jobAwareAlert(CONNECTION_HELP_TEXT),
   });
   return (
     <>

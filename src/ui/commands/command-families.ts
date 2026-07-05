@@ -379,3 +379,13 @@ export function helpCommand(ctx: AppCommandContext): AppCommand {
     ctx.showAbout,
   );
 }
+
+export function connectionHelpCommand(ctx: AppCommandContext): AppCommand {
+  return enabled(
+    'help.connection',
+    'help',
+    "Can't connect? (Troubleshooting)",
+    'Show connection and USB driver troubleshooting steps',
+    ctx.showConnectionHelp,
+  );
+}
