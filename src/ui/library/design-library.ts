@@ -50,6 +50,7 @@ import trophy from 'lucide-static/icons/trophy.svg?raw';
 import turtle from 'lucide-static/icons/turtle.svg?raw';
 import utensils from 'lucide-static/icons/utensils.svg?raw';
 import wine from 'lucide-static/icons/wine.svg?raw';
+import { CC0_LIBRARY_ENTRIES } from './design-library-cc0';
 import type { LibraryCategory, LibraryEntry } from './design-library-types';
 import { OWNED_TEMPLATE_ENTRIES } from './design-library-owned-svg';
 
@@ -164,5 +165,6 @@ const LUCIDE_LIBRARY_ENTRIES: ReadonlyArray<LibraryEntry> = [
 
 export const DESIGN_LIBRARY: ReadonlyArray<LibraryEntry> = [
   ...OWNED_TEMPLATE_ENTRIES,
+  ...CC0_LIBRARY_ENTRIES,
   ...LUCIDE_LIBRARY_ENTRIES,
 ];
