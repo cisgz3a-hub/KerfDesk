@@ -184,13 +184,13 @@ Branch at audit start: `main`
 
 ## Next Steps
 
-1. Continue the 2026-07-04 current-state delta audit opened after `main` advanced beyond the original audited tree.
-2. Run S08 delta Pass 2 over box numeric-input/dogbone toggle changes, probe/device-setup UI changes, and UI canvas-test stderr.
-3. Preserve the audit/fix trace; do not start new fixes unless a new audit finding is opened.
+1. Review the open current-state delta findings before starting any new fixes.
+2. Decide whether to begin a new fix phase for the current-state delta findings.
+3. Preserve the audit/fix trace; do not start new fixes without explicit instruction.
 
 ## Current-State Delta Audit - 2026-07-04
 
-Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, runner-speed CI flake fixes, and the S04 audit-refresh documentation checkpoint. The new commits touch S01 docs, S02 build configuration and Vitest runner-speed configuration, S04 core CNC/material primitives and camera tests, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual/CI fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
+Reason for reopening: current `origin/main` is at `46889ca`, after the previously completed audit/fix baseline `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, runner-speed CI flake fixes, S04 audit-refresh documentation checkpoints, and the post-`d23e2d6` shared NumberField/input migration. The new commits touch S01 docs, S02 build configuration and Vitest runner-speed configuration, S04 core CNC/material primitives and camera tests, S05 trace algorithms, S06 project persistence, S08 UI state/machine workflows, and S09 perceptual/CI fixtures. The prior completed audit remains evidence for the baseline tree, but it does not by itself prove the newer tree has been sector-audited.
 
 | Delta Sector | Status | Passes Completed | Major Areas Remaining |
 |---|---|---:|---|
@@ -201,8 +201,8 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | S05 Core job compilation, preflight, raster/trace, and output | Complete | 3 | None for current delta |
 | S06 IO formats and persistence | Complete | 3 | None for current delta |
 | S07 Platform adapters | Covered by previous audit; no delta files detected | 0 | None for current delta |
-| S08 UI application workflows | Complete | 3 | None for current delta |
-| S09 Fixtures, perceptual harness, and test assets | Active | 2 | Direct-diff closure, underscore diagnostic inventory, and remaining perceptual benchmark files |
+| S08 UI application workflows | Complete | 3 prior delta passes; 3 post-`46889ca` passes | None for current delta |
+| S09 Fixtures, perceptual harness, and test assets | Complete | 3 | None for current delta |
 
 ### Delta Completed Passes
 
@@ -237,6 +237,10 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | S08 Delta Pass 3 | 2026-07-04 | Direct diff closure and adjacent state actions. Full focused S08 delta bundle passed (13 files, 90 tests), and `tsc --noEmit` passed. No new findings; S08 delta closed with `D-S08-001` and `D-S08-002` open. Move to S09. |
 | S09 Delta Pass 1 | 2026-07-04 | Fixture delta orientation and diagnostic test signal. Release-gated fixture slice passed (4 files, 14 tests); one `TRACE_AUDIT` diagnostic file also reported passed without the env flag. Found that opt-in diagnostics count as passing tests when skipped by their own early return. |
 | S09 Delta Pass 2 | 2026-07-04 | Artifact path and opt-in evidence sweep. Trace artifact and Arch House baseline slice passed (2 files, 16 tests). Found that `_edge-zoom` still hardcodes the removed `audit/fixtures/trace` logo path and fails when run with `TRACE_AUDIT=1`. |
+| S09 Delta Pass 3 | 2026-07-05 | Direct diff closure and benchmark helper sweep. Focused fixture/perceptual closure bundle passed (8 files, 44 tests), and `tsc --noEmit` passed. No new S09 findings; S09 delta closed with `D-S09-001` and `D-S09-002` open. Latest post-checkpoint diff only touches S08 UI input files, so reopen S08 for a supplemental current-state delta pass. |
+| S08 Post-46889ca Delta Pass 1 | 2026-07-05 | Shared NumberField orientation. Focused UI slice passed (7 files, 44 tests) with the known React act-warning noise. Found a silent blur-clamp risk for restored above-UI-max values and missing direct integration coverage for most migrated CNC/device numeric rows. |
+| S08 Post-46889ca Delta Pass 2 | 2026-07-05 | Optional rows and local action inputs. Supporting wrapper/hook/core action slice passed (6 files, 28 tests) with the known ProbeControls act-warning noise. Found that Ramp Entry can no longer be cleared to its default by emptying the optional number field. |
+| S08 Post-46889ca Delta Pass 3 | 2026-07-05 | Direct diff closure and ledger consistency. Broad focused S08/UI/CNC support bundle passed (9 files, 52 tests), `tsc --noEmit` passed, and audit-doc diff checks passed. No new findings; S08 supplemental delta closed with `D-S08-003`, `D-S08-004`, and `D-S08-005` open. Current-state delta audit closed. |
 
 ### Delta Finding Index
 
@@ -258,5 +262,8 @@ Reason for reopening: current `origin/main` is at `09047e1`, twenty-six commits 
 | D-S05-004 | S05 | Low | Open | Trace image-adjustment options do not fail closed on non-finite values |
 | D-S08-001 | S08 | Medium | Open | PWA update dismissal re-arm lacks mounted-render invalidation |
 | D-S08-002 | S08 | Medium | Open | UI canvas/WebGL tests pass while emitting jsdom canvas errors and async act warnings |
+| D-S08-003 | S08 | Medium | Open | Shared NumberField can silently clamp restored above-UI-max values on blur |
+| D-S08-004 | S08 | Low | Open | Migrated CNC/device NumberField integrations lack direct regression coverage |
+| D-S08-005 | S08 | Low | Open | Ramp Entry cannot be cleared to default by emptying optional number field |
 | D-S09-001 | S09 | Low | Open | TRACE_AUDIT diagnostics count as passing tests when env flag is absent |
 | D-S09-002 | S09 | Low | Open | _edge-zoom diagnostic hardcodes removed audit fixture path |

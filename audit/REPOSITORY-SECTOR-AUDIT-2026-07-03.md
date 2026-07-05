@@ -16,9 +16,9 @@ Mode: sector audit plus user-approved fix-phase tracking.
 
 ## Current Status
 
-Active sector: S09 current-state delta audit.
+Active sector: Current-state delta audit complete; open findings awaiting review.
 Completed sectors: S01 Governance, audit history, and product contracts; S02 Tooling, build, release, CI, and static shell; S03 Electron desktop runtime and local bridge; S04 Core domain models, controller/device/material primitives; S05 Core job compilation, preflight, raster/trace, and output; S06 IO formats and persistence; S07 Platform adapters; S08 UI application workflows; S09 Fixtures, perceptual harness, and test assets.
-Current pass: S09 delta Pass 2 complete; S09 delta Pass 3 next.
+Current pass: S08 post-`46889ca` delta Pass 3 complete; current-state delta audit closed.
 
 ## Findings Summary
 
@@ -109,6 +109,9 @@ Current pass: S09 delta Pass 2 complete; S09 delta Pass 3 next.
 | S08-016 | Low | S08 | Fixed | Add/Edit Text numeric inputs can pass non-finite or out-of-contract values into text rendering and scene state. |
 | D-S08-001 | Medium | S08 | Open | PWA update dismissal re-arm clears storage without invalidating the mounted prompt render. |
 | D-S08-002 | Medium | S08 | Open | UI canvas/WebGL tests pass while emitting jsdom canvas errors and async `act(...)` warnings. |
+| D-S08-003 | Medium | S08 | Open | Shared `NumberField` can silently clamp restored above-UI-max values on blur. |
+| D-S08-004 | Low | S08 | Open | Most migrated CNC/device `NumberField` integrations lack direct clear/blur/clamp regression coverage. |
+| D-S08-005 | Low | S08 | Open | Ramp Entry can no longer be cleared to its default by emptying the optional number field. |
 | S09-001 | Medium | S09 | Fixed | The required Arch House fixture detector accepts non-PNG files even though all real-logo consumers decode the path as PNG. |
 | S09-002 | Low | S09 | Fixed | Perceptual artifact PNGs are ignored local outputs but are referenced like durable audit evidence. |
 | S09-003 | Low | S09 | Fixed | `writePerceptualArtifact(...)` can render a misleading comparison for mismatched mask dimensions. |
@@ -3269,9 +3272,9 @@ Final result:
 Reason for reopening:
 
 - The completed audit/fix ledger closed against the earlier audited baseline.
-- Current `origin/main` is `09047e1`, twenty-six commits after `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, runner-speed CI flake fixes, and the S04 audit-refresh documentation checkpoint.
+- Current `origin/main` is `46889ca`, after `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, runner-speed CI flake fixes, the S04 audit-refresh documentation checkpoint, S09 fixture/perceptual updates, and the post-`d23e2d6` shared NumberField/input migration.
 - `git diff --name-status d603c01..origin/main` shows changes in S01, S02, S04, S05, S06, S08, and S09.
-- `git ls-files -co --exclude-standard` currently returns 1,689 files.
+- `git ls-files -co --exclude-standard` currently returns 1,691 files.
 - The previous sector map left 71 current files unclassified until this pass refreshed the architecture map.
 
 No product source fixes are made in this delta audit. Audit documentation is updated because it is the requested audit ledger.
@@ -4458,3 +4461,188 @@ Pass result:
 
 - S09 delta Pass 2 complete.
 - S09 remains open for Pass 3 over direct-diff closure, underscore diagnostic inventory, and the remaining perceptual benchmark files.
+
+### S09 Delta Pass 3 - Direct Diff Closure and Benchmark Helper Sweep
+
+Scope planned:
+
+- Close the remaining S09 direct-diff files changed since the audited baseline.
+- Inventory underscore-prefixed `TRACE_AUDIT` diagnostics and stale fixture references.
+- Re-run the release-gated fixture/perceptual benchmark bundle and TypeScript check.
+
+Evidence inspected:
+
+- `git diff --name-status d603c01..HEAD -- src/__fixtures__`.
+- `src/__fixtures__/perceptual/trace-benchmark-regression-cases.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-truth.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-benchmark.ts`.
+- `src/__fixtures__/perceptual/trace-benchmark-loop.ts` and `src/__fixtures__/perceptual/trace-benchmark-loop.test.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-truth.test.ts`.
+- `src/__fixtures__/perceptual/star-fixture.ts`.
+- `src/core/trace/edge-trace.test.ts`, confirming the shared star fixture is exercised by the Edge Detection apex test.
+- `rg -n 'audit/fixtures/trace' --glob '_*.test.ts' -- src/__fixtures__/perceptual`, confirming `_edge-zoom.test.ts` is the remaining underscore diagnostic that still points at the removed audit fixture path.
+- `rg -n 'TRACE_AUDIT|return;|it\(' --glob '_*.test.ts' -- src/__fixtures__/perceptual`, confirming the underscore diagnostics remain normal `.test.ts` files whose bodies return early when `TRACE_AUDIT` is absent.
+- Focused command passed: `pnpm exec vitest run src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/trace-benchmark-loop.test.ts src/__fixtures__/perceptual/arch-house-edge-quality.test.ts src/__fixtures__/perceptual/arch-house-edge-truth.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts src/__fixtures__/perceptual/trace-artifacts.test.ts src/__fixtures__/perceptual/arch-house-baseline.test.ts src/core/trace/edge-trace.test.ts` (8 test files, 44 tests).
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+- Current fast-forward check: `git diff --name-status d23e2d6..HEAD` lists only S08 UI input-field files, so S09 has no newer post-checkpoint file delta after this closure pass.
+
+Findings:
+
+- No new S09 delta findings in Pass 3.
+- The release-gated fixture/perceptual benchmark path remains covered by focused passing tests: CI budget helper, trace benchmark loop, real Arch House Edge Detection and Line Art quality, centerline performance, trace artifacts, and the shared star apex fixture.
+- The remaining S09 delta findings are still `D-S09-001` and `D-S09-002`, both low severity and open.
+
+Pass result:
+
+- S09 current-state delta sector closed after three passes.
+- `origin/main` advanced to `46889ca` after the previous checkpoint. The new post-checkpoint files are S08 UI/input changes, so the audit reopens S08 for a supplemental current-state delta pass over `src/ui/common/NumberField.*` and the migrated CNC/device numeric fields.
+
+### S08 Post-`46889ca` Delta Pass 1 - Shared NumberField Orientation
+
+Scope planned:
+
+- Inspect the new shared clearable `NumberField` wrapper and its tests.
+- Inspect the migrated device profile, device power, planner, probe, CNC layer/tool, offset/dogbone, surfacing, and wizard test changes.
+- Run the focused UI slice that covers the shared hook, the wrapper, and adjacent device/probe/CNC behavior.
+
+Evidence inspected:
+
+- `git diff --name-status d23e2d6..HEAD`.
+- `src/ui/common/NumberField.tsx` and `src/ui/common/NumberField.test.tsx`.
+- `src/ui/layers/use-debounced-commit.ts` and `src/ui/layers/use-debounced-commit.test.tsx`.
+- `src/ui/kit/NumberInput.tsx`.
+- `src/ui/laser/DeviceProfileFields.tsx`.
+- `src/ui/laser/DeviceProfilePowerFields.tsx`.
+- `src/ui/laser/PlannerAdvanced.tsx`.
+- `src/ui/laser/ProbeControls.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupWizard.test.tsx`.
+- `src/ui/layers/CncLayerToolFields.tsx`.
+- `src/ui/layers/DogboneRow.tsx`.
+- `src/ui/layers/OffsetPathsRow.tsx`.
+- `src/ui/machine/SurfacingPanel.tsx`.
+- Existing adjacent test inventory with `rg -n "Dogbone|Offset paths|Relief scallop|Ramp entry|Surfacing|Surface spoilboard|PlannerAdvanced|Acceleration|GRBL \$30|Plate thickness|ProbeControls|Bit diameter" src/ui src/core --glob "*.test.ts" --glob "*.test.tsx"`.
+- Project/device profile persistence validators in `src/io/project/project-shape-validator.ts` and `src/io/machine-profile/machine-profile-shape.ts`.
+- Focused command passed: `pnpm exec vitest run src/ui/common/NumberField.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx src/ui/laser/DeviceSettings.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/state/vector-path-actions.test.ts` (7 test files, 44 tests). The run still emitted the known React `act(...)` warnings covered by `D-S08-002`.
+
+#### D-S08-003 - Shared `NumberField` can silently clamp restored above-UI-max values on blur
+
+Severity: Medium.
+
+Evidence:
+
+- `src/ui/common/NumberField.tsx` parses every nonblank blur through `Math.min(props.max, Math.max(props.min, parsed))` and `useDebouncedCommit.onBlur()` always flushes `parse(draft)` when the field is nonblank.
+- `src/ui/laser/DeviceProfileFields.tsx` now supplies local UI caps such as `MAX_BED_MM = 1500` and `MAX_FEED_MM_PER_MIN = 100000` to the shared wrapper.
+- `src/ui/laser/DeviceProfilePowerFields.tsx` and `src/ui/laser/PlannerAdvanced.tsx` add similar component-local caps for power, acceleration, and junction deviation.
+- Project and machine-profile validators only require positive finite values for bed/feed/profile fields: `src/io/project/project-shape-validator.ts` validates `device.bedWidth`, `device.bedHeight`, and `device.maxFeed` with `requirePositiveNumber(...)`; `src/io/machine-profile/machine-profile-shape.ts` validates the same fields through positive finite checks.
+
+Risk:
+
+A profile or project restored from disk can contain a positive value outside one of the UI-only caps. The field will display that restored value, but simply focusing and blurring the nonblank field can clamp and commit it to the UI cap even if the operator did not edit it. That is a silent data rewrite at the device/profile boundary, and the cap values are not centralized with the import validators or a shared device-profile contract.
+
+Recommendation:
+
+Centralize numeric field bounds in the same device/profile contract used by import/export validation, or make `NumberField` preserve an already-committed out-of-range value until the user actually edits it. Add integration tests for restored above-cap values in the affected device/profile rows before changing behavior.
+
+#### D-S08-004 - Most migrated CNC/device `NumberField` integrations lack direct clear/blur/clamp regression coverage
+
+Severity: Low.
+
+Evidence:
+
+- `src/ui/common/NumberField.test.tsx` covers the generic clear-to-retype behavior, and `src/ui/layers/use-debounced-commit.test.tsx` covers the hook.
+- `src/ui/laser/device-setup/DeviceSetupWizard.test.tsx` was updated so the bed-width wizard edit blurs before Finish.
+- The focused test inventory found no direct UI tests for the migrated `DogboneRow`, `OffsetPathsRow`, `SurfacingPanel`, `ReliefFinishRow`, or `MotionPolishRows` input behavior.
+- `src/ui/laser/DeviceSettings.test.tsx` checks air assist, Z travel, scanning offsets, and mode gating, but it does not directly exercise migrated `BedRows`, `FeedRows`, `$30/$31`, or `PlannerAdvanced` numeric edits.
+- `src/ui/laser/ProbePanel.test.tsx` runs the probe action but does not edit plate thickness, max travel, or bit diameter through the migrated clearable field.
+
+Risk:
+
+The shared wrapper is covered in isolation, but the migrated rows changed event timing from immediate `onChange` to debounced/blur-driven commits. Without direct row-level tests, regressions in labels, bounds, local-state commits, blur-before-action behavior, or store writes can pass even while the generic wrapper tests stay green.
+
+Recommendation:
+
+Add a small integration test matrix for the migrated rows: one store-backed device field, one local-state probe/surfacing field, and one CNC layer row that removes optional settings at zero. The tests should cover clear, retype, blur, clamp, and action/save behavior.
+
+Findings:
+
+- Opened `D-S08-003` (medium): shared `NumberField` can silently clamp restored above-UI-max values on blur.
+- Opened `D-S08-004` (low): most migrated CNC/device `NumberField` integrations lack direct clear/blur/clamp regression coverage.
+- The focused UI slice passed, with the existing `D-S08-002` `act(...)` warning noise still visible in ProbePanel and Device Setup tests.
+
+Pass result:
+
+- S08 post-`46889ca` delta Pass 1 complete.
+- S08 remains open for Pass 2 over direct interaction semantics in the migrated layer/machine rows, optional setting removal behavior, and action buttons that consume local `NumberField` state.
+
+### S08 Post-`46889ca` Delta Pass 2 - Optional Rows and Local Action Inputs
+
+Scope planned:
+
+- Inspect the migrated CNC layer optional-number rows, especially fields that remove optional settings at default values.
+- Inspect local-state action rows whose buttons consume the numeric state immediately: dogbone, offset, surfacing, and probe.
+- Run supporting tests for the wrapper/hook plus the core actions and generators behind those rows.
+
+Evidence inspected:
+
+- `git diff --unified=60 d23e2d6..HEAD -- src/ui/layers/CncLayerToolFields.tsx src/ui/layers/DogboneRow.tsx src/ui/layers/OffsetPathsRow.tsx src/ui/machine/SurfacingPanel.tsx src/ui/laser/ProbeControls.tsx`.
+- `rg -n "debounceMs|<ClearableNumberField|rampEntryDeg|reliefScallopMm|offsetSelection|dogboneSelection|saveSurfacingProgram|Run probe|buildZProbeLines|buildCornerProbeLines" src/ui/common src/ui/layers src/ui/machine src/ui/laser/ProbeControls.tsx`.
+- `src/ui/layers/CncLayerToolFields.tsx`, specifically `MotionPolishRows` and `ReliefFinishRow`.
+- `src/ui/layers/DogboneRow.tsx`, `src/ui/layers/OffsetPathsRow.tsx`, `src/ui/machine/SurfacingPanel.tsx`, and `src/ui/laser/ProbeControls.tsx`.
+- Focused command passed: `pnpm exec vitest run src/ui/common/NumberField.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/core/geometry/dogbone.test.ts src/core/cnc/surfacing.test.ts src/ui/state/vector-path-actions.test.ts src/ui/laser/ProbePanel.test.tsx` (6 test files, 28 tests). The run still emitted the known ProbeControls `act(...)` warning covered by `D-S08-002`.
+
+#### D-S08-005 - Ramp Entry can no longer be cleared to its default by emptying the optional number field
+
+Severity: Low.
+
+Evidence:
+
+- Before the migration, `src/ui/layers/CncLayerToolFields.tsx` parsed `rampEntryDeg` directly in `onChange`; when the input was empty or otherwise non-finite, it removed the `rampEntryDeg` key by calling `onCommitSettings(rest)`.
+- After the migration, `MotionPolishRows` wraps Ramp Entry in `ClearableNumberField` with `min={0}` and only removes `rampEntryDeg` when `onCommit` receives a value `<= 0`.
+- `NumberField` intentionally treats an empty string as a transient edit state and `useDebouncedCommit.onBlur()` restores the last committed value for blank fields instead of calling `onCommit`.
+
+Risk:
+
+The UI still describes `0 = plunge (default)`, but the previous empty-to-clear behavior for this optional field is gone. A user can still type `0`, but deleting the value no longer clears the optional setting; it restores the prior nonzero value on blur. That is a subtle regression from the old field semantics and is not covered by a row-level test.
+
+Recommendation:
+
+For optional numeric settings, either keep using the clearable wrapper but add an explicit "default"/clear affordance, or let callers opt into blank-as-unset behavior. Add a row-level regression test proving the selected behavior for `rampEntryDeg`.
+
+Findings:
+
+- Opened `D-S08-005` (low): Ramp Entry can no longer be cleared to its default by emptying the optional number field.
+- No new product finding was opened for dogbone, offset, surfacing, or probe in Pass 2; however their direct interaction coverage remains part of `D-S08-004`, because the existing tests cover core actions/generators more than the migrated UI handoff.
+
+Pass result:
+
+- S08 post-`46889ca` delta Pass 2 complete.
+- S08 remains open for Pass 3 over final direct-diff closure, device-field edge behavior, and audit-ledger consistency.
+
+### S08 Post-`46889ca` Delta Pass 3 - Direct Diff Closure and Ledger Consistency
+
+Scope planned:
+
+- Close the post-`46889ca` S08 direct-diff file set.
+- Verify the migrated `NumberField` usage inventory against the findings opened in Passes 1 and 2.
+- Re-run the broad focused S08/UI/CNC support bundle and TypeScript check.
+- Check the audit-ledger edits before committing.
+
+Evidence inspected:
+
+- `git diff --name-status d23e2d6..HEAD -- src/ui`, confirming the post-checkpoint delta is limited to `src/ui/common/NumberField.*`, migrated laser/device fields, migrated CNC layer rows, the surfacing panel, and the Device Setup wizard test.
+- `rg -n "NumberField|ClearableNumberField|debounceMs" src/ui/common src/ui/laser/DeviceProfileFields.tsx src/ui/laser/DeviceProfilePowerFields.tsx src/ui/laser/PlannerAdvanced.tsx src/ui/laser/ProbeControls.tsx src/ui/layers/CncLayerToolFields.tsx src/ui/layers/DogboneRow.tsx src/ui/layers/OffsetPathsRow.tsx src/ui/machine/SurfacingPanel.tsx`, confirming the migrated callers use the shared wrapper and do not pass caller-specific debounce timing.
+- `rg -n "D-S08-003|D-S08-004|D-S08-005|S08 Post-46889ca|Current pass|Active sector|S08 UI application workflows|S09 Fixtures" audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`, checking the ledger before closure updates.
+- Focused command passed: `pnpm exec vitest run src/ui/common/NumberField.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx src/ui/laser/DeviceSettings.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/state/vector-path-actions.test.ts src/core/geometry/dogbone.test.ts src/core/cnc/surfacing.test.ts` (9 test files, 52 tests). The run still emitted the known ProbeControls and Device Setup `act(...)` warnings covered by `D-S08-002`.
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+- `git diff --check -- audit/REPOSITORY-SECTOR-ARCHITECTURE-2026-07-03.md audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`.
+
+Findings:
+
+- No new S08 post-`46889ca` findings in Pass 3.
+- The remaining post-`46889ca` S08 findings are still `D-S08-003` (medium), `D-S08-004` (low), and `D-S08-005` (low), all open.
+- The broader current-state delta finding set remains open for user review; no product source fixes were made in this audit pass.
+
+Pass result:
+
+- S08 post-`46889ca` current-state delta sector closed after three supplemental passes.
+- S09 was already closed after three delta passes, and the latest post-checkpoint diff touches only S08 files; the current-state delta audit is now closed.
