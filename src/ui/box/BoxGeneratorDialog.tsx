@@ -44,9 +44,9 @@ export function BoxGeneratorDialog(props: {
       BOX_DRAFT_PERSISTED_FIELDS,
     ),
   );
-  const [lockedAutoFitFields, setLockedAutoFitFields] = useState<
-    ReadonlySet<BoxAutoFitField>
-  >(() => new Set());
+  const [lockedAutoFitFields, setLockedAutoFitFields] = useState<ReadonlySet<BoxAutoFitField>>(
+    () => new Set(),
+  );
   // Keeps the last valid sheet visible while the draft is invalid (F-K1).
   // Render-time ref write is an idempotent cache, safe under StrictMode.
   const lastValidPanels = useRef<ReadonlyArray<BoxPanel> | null>(null);
