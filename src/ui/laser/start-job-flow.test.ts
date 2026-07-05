@@ -105,6 +105,7 @@ describe('runStartJobFlow', () => {
     expect(startJob).toHaveBeenCalledWith(expect.any(String), {
       streamingMode: 'ping-pong',
       rxBufferBytes: 96,
+      machineKind: 'laser',
     });
     expect(jobAwareAlert).not.toHaveBeenCalled();
   });

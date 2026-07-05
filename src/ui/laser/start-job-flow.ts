@@ -10,6 +10,7 @@
 // and a native dialog there would freeze the ack pump and Stop button.
 
 import { buildResumeProgram } from '../../core/controllers/grbl';
+import { machineKindOf } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
@@ -51,6 +52,7 @@ export async function runStartJobFlow(): Promise<void> {
     await laser.startJob(prepared.gcode, {
       streamingMode: project.device.streamingMode,
       rxBufferBytes: project.device.rxBufferBytes,
+      machineKind: machineKindOf(project.machine),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -106,6 +108,7 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     await laser.startJob(resume.lines.join('\n'), {
       streamingMode: project.device.streamingMode,
       rxBufferBytes: project.device.rxBufferBytes,
+      machineKind: machineKindOf(project.machine),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

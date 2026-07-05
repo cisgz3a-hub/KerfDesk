@@ -18,6 +18,7 @@ import {
 } from '../../core/controllers';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { MachineKind } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
@@ -74,6 +75,12 @@ export type ConnectionState =
 export type HomingState = 'unknown' | 'homing' | 'confirmed';
 export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 
+// Streamer options plus the machine kind the job was compiled for, so pause
+// safety can distinguish laser ($32 proof required) from router (must not).
+export type StartJobOptions = CreateStreamerOptions & {
+  readonly machineKind?: MachineKind;
+};
+
 export type LaserState = {
   readonly connection: ConnectionState;
   readonly statusReport: StatusReport | null;
@@ -91,6 +98,11 @@ export type LaserState = {
   readonly motionOperation: LaserMotionOperation | null;
   readonly controllerOperation: LaserControllerOperation | null;
   readonly streamer: StreamerState | null;
+  // Which machine kind the running job was compiled for. Pause safety
+  // differs by kind: lasers need the $32=1 proof before feed hold (the beam
+  // can stay on through a hold at $32=0); routers require $32=0 and hold is
+  // safe with the spindle spinning. null = no job started yet.
+  readonly activeJobMachineKind: MachineKind | null;
   // Queued writes outside the job stream (console, origin, unlock, the
   // handshake $$ …) that still owe a terminal ok/error. GRBL acks in strict
   // receive order, so Start must wait for 0: a stale ok mis-attributed to a
@@ -173,7 +185,7 @@ export type LaserState = {
     },
     feed: number,
   ) => Promise<void>;
-  readonly startJob: (gcode: string, options?: CreateStreamerOptions) => Promise<void>;
+  readonly startJob: (gcode: string, options?: StartJobOptions) => Promise<void>;
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
