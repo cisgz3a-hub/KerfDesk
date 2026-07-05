@@ -225,6 +225,26 @@ describe('cncGrblStrategy tool changes', () => {
     expect(lines.slice(m0Index + 1).some((line) => line.startsWith('M3 S'))).toBe(true);
   });
 
+  it('re-establishes safe Z as the first motion after an M0 tool change', () => {
+    // After M0 the operator re-zeros Z with the new bit, so the program's
+    // physical Z is unknown at resume; the first motion must be a G0 Z lift
+    // to safe height — never a bare XY rapid with the spindle running.
+    const scene = sceneOf(
+      [squareObject('A', '#111111', 10, 30), squareObject('B', '#222222', 60, 30)],
+      [
+        layerWith('#111111', { cutType: 'pocket', toolId: 'em-3175', depthMm: 2 }),
+        layerWith('#222222', { cutType: 'engrave', toolId: 'em-6350', depthMm: 1 }),
+      ],
+    );
+    const lines = emit(scene).split('\n');
+    const m0Index = lines.indexOf('M0');
+    expect(m0Index).toBeGreaterThan(0);
+    const firstMotion = lines
+      .slice(m0Index + 1)
+      .find((line) => line.startsWith('G0') || line.startsWith('G1'));
+    expect(firstMotion).toMatch(/^G0 Z/);
+  });
+
   it('single-bit jobs contain no M0 and no tool comments', () => {
     const scene = sceneOf(
       [squareObject('A', '#111111', 10, 30)],
