@@ -63,6 +63,17 @@ export type MachineStartSnapshot = {
   readonly cncJobsSupported?: boolean;
 };
 
+// Machine-state blockers plus the ADR-098 dialect gate: CNC is GRBL-only —
+// the emitter's dialect (G4 dwell in seconds) is unsafe on firmwares that
+// parse it differently.
+function findEarlyStartIssues(project: Project, machine: MachineStartSnapshot): string[] {
+  const issues = [...findMachineStartIssues(machine)];
+  if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
+    issues.push(CNC_REQUIRES_GRBL_MESSAGE);
+  }
+  return issues;
+}
+
 export function prepareStartJob(
   project: Project,
   controllerSettings: ControllerSettingsSnapshot | null,
@@ -70,12 +81,8 @@ export function prepareStartJob(
   jobPlacement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
 ): StartJobPreparation {
-  const machineIssues = findMachineStartIssues(machine);
+  const machineIssues = findEarlyStartIssues(project, machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
-
-  if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
-    return { ok: false, messages: [CNC_REQUIRES_GRBL_MESSAGE] };
-  }
 
   const placement = resolveJobPlacement(jobPlacement, machine);
   if (!placement.ok) return { ok: false, messages: placement.messages };
