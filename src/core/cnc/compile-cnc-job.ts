@@ -32,7 +32,7 @@ import {
   type Vec2,
 } from '../scene';
 import type { CncGroup, CncPass, Job } from '../job';
-import { passNeedsTabs, splitPassForTabs } from './cnc-tabs';
+import { passNeedsTabs, splitPassForTabs, tabTopZMm } from './cnc-tabs';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
 import { orderGroupsIntoToolSections } from './cnc-tool-sections';
 import { zPassDepths } from './depth-passes';
@@ -288,9 +288,14 @@ function contourMajorPasses(
   toolDiameterMm: number,
 ): CncPass[] {
   const wantsTabs = settings.tabsEnabled && isProfileCutType(settings.cutType);
+  // Tabbed loops need a full-loop pass at EXACTLY the tab top: otherwise tab
+  // height quantizes up to the pass grid, and a single-pass through-cut
+  // never cuts the tab windows at all (full-stock-thickness "tabs").
+  const tabbedDepths = wantsTabs ? depthsWithTabTopPass(depths, settings) : depths;
   const passes: CncPass[] = [];
   for (const toolpath of toolpaths) {
-    for (const zMm of depths) {
+    const ladder = wantsTabs && toolpath.closed ? tabbedDepths : depths;
+    for (const zMm of ladder) {
       const needsTabs =
         wantsTabs && toolpath.closed && passNeedsTabs(zMm, settings.depthMm, settings.tabHeightMm);
       if (needsTabs) {
@@ -301,6 +306,17 @@ function contourMajorPasses(
     }
   }
   return passes;
+}
+
+function depthsWithTabTopPass(
+  depths: ReadonlyArray<number>,
+  settings: CncLayerSettings,
+): ReadonlyArray<number> {
+  const tabTop = tabTopZMm(settings.depthMm, settings.tabHeightMm);
+  // Degenerate tab heights (0, or >= depth) leave the ladder untouched.
+  if (tabTop >= -COORD_EPS || tabTop <= -settings.depthMm + COORD_EPS) return depths;
+  if (depths.some((z) => Math.abs(z - tabTop) <= COORD_EPS)) return depths;
+  return [...depths, tabTop].sort((a, b) => b - a);
 }
 
 function appendTabbedPasses(
