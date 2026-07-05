@@ -47,21 +47,60 @@ export const BOX_DRAFT_PERSISTED_FIELDS: ReadonlyArray<keyof BoxDraft> = [
 
 // CNC glue fit vs laser press fit (ADR-106 fit division of labor).
 const CNC_DEFAULT_CLEARANCE_MM = 0.15;
+const DEFAULT_LASER_THICKNESS_MM = 3;
+const FINGER_WIDTH_TO_THICKNESS = 3;
+const PART_SPACING_TO_THICKNESS = 2;
+const MIN_PART_SPACING_MM = 8;
+
+export type BoxAutoFitField = 'fingerWidth' | 'partSpacing';
 
 export function defaultBoxDraft(machine: BoxMachineContext): BoxDraft {
+  const thicknessMm = defaultMaterialThicknessMm(machine);
+  const autoFit = boxAutoFitDefaults(thicknessMm);
   return {
     width: '60',
     depth: '40',
     height: '30',
     mode: 'inner',
     style: 'closed',
-    thickness: machine.kind === 'cnc' ? String(machine.stockThicknessMm) : '3',
-    fingerWidth: '9',
+    thickness: fmtDraftMm(thicknessMm),
+    fingerWidth: autoFit.fingerWidth,
     clearance: machine.kind === 'cnc' ? String(CNC_DEFAULT_CLEARANCE_MM) : '0',
-    partSpacing: '8',
+    partSpacing: autoFit.partSpacing,
     toolDiameter: machine.kind === 'cnc' ? String(machine.toolDiameterMm) : '',
     relief: 'off',
   };
+}
+
+export function boxDraftWithMaterialThickness(
+  draft: BoxDraft,
+  thickness: string,
+  lockedAutoFitFields: ReadonlySet<BoxAutoFitField>,
+): BoxDraft {
+  const next: BoxDraft = { ...draft, thickness };
+  const thicknessMm = Number(thickness);
+  if (!Number.isFinite(thicknessMm) || thicknessMm <= 0) return next;
+  const autoFit = boxAutoFitDefaults(thicknessMm);
+  return {
+    ...next,
+    fingerWidth: lockedAutoFitFields.has('fingerWidth') ? next.fingerWidth : autoFit.fingerWidth,
+    partSpacing: lockedAutoFitFields.has('partSpacing') ? next.partSpacing : autoFit.partSpacing,
+  };
+}
+
+function defaultMaterialThicknessMm(machine: BoxMachineContext): number {
+  return machine.kind === 'cnc' ? machine.stockThicknessMm : DEFAULT_LASER_THICKNESS_MM;
+}
+
+function boxAutoFitDefaults(thicknessMm: number): Pick<BoxDraft, 'fingerWidth' | 'partSpacing'> {
+  return {
+    fingerWidth: fmtDraftMm(thicknessMm * FINGER_WIDTH_TO_THICKNESS),
+    partSpacing: fmtDraftMm(Math.max(MIN_PART_SPACING_MM, thicknessMm * PART_SPACING_TO_THICKNESS)),
+  };
+}
+
+function fmtDraftMm(value: number): string {
+  return String(Math.round(value * 1000) / 1000);
 }
 
 export type BoxDraftParse =
@@ -108,7 +147,7 @@ export const BOX_FIELD_LABELS: Readonly<Record<BoxSpecField, string>> = {
   width: 'Width',
   depth: 'Depth',
   height: 'Height',
-  thickness: 'Thickness',
+  thickness: 'Material thickness',
   fingerWidth: 'Finger width',
   clearance: 'Clearance',
   reliefTool: 'Relief tool diameter',
