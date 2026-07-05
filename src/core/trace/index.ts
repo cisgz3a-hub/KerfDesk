@@ -36,6 +36,8 @@ export { traceCenterlineStrokePaths } from './centerline';
 export { coloredPathsToSvg } from './paths-to-svg';
 export type { BatchTraceDependencies, BatchTraceImageJob, BatchTraceSvgFile } from './batch-trace';
 export { traceImagesToSvgFiles } from './batch-trace';
+export type { EnhanceRegionArgs, RegionTraceFn } from './region-enhance';
+export { enhanceRegionPaths } from './region-enhance';
 export type { TraceBoundary } from './trace-boundary';
 export {
   cropRawImageData,
