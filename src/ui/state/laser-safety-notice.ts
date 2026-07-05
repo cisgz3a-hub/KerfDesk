@@ -26,6 +26,7 @@ export type LaserSafetyAction =
   | 'origin'
   | 'jog'
   | 'home'
+  | 'air-assist'
   | 'unlock'
   | 'wake'
   | 'console'

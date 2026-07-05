@@ -117,6 +117,7 @@ export function jobActions(
       // resumeJob — use functional set.
       set((s) => ({
         wcoCache: null,
+        airAssistOn: false,
         ...originPatchAfterSoftReset(s),
         streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
       }));
