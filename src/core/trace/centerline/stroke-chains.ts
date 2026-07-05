@@ -161,7 +161,10 @@ function finalizeChains(
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
     result.push({
-      points: refineChainForOutput(simplified, chain.closed, sharpened.corners),
+      // Bound the output resample to the same ε it was simplified with: the
+      // spline may smooth within ε of each chord but must not bow past it into
+      // empty paper (the serif-foot "smile" overshoot).
+      points: refineChainForOutput(simplified, chain.closed, sharpened.corners, simplifyEpsilonPx),
       closed: chain.closed,
     });
   }

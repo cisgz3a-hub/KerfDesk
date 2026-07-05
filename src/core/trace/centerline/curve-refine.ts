@@ -28,15 +28,22 @@ const NO_CORNERS: ReadonlySet<Vec2> = new Set();
 
 /** Round a simplified chain for output. Drawn corners (marked by the bend
  *  sharpener, by reference), hard turns, and open-chain endpoints stay exact;
- *  smooth spans resample into an even-curvature Catmull-Rom curve. */
+ *  smooth spans resample into an even-curvature Catmull-Rom curve.
+ *
+ *  `deviationCapPx` is the Douglas-Peucker tolerance ε the caller simplified
+ *  with. The resample may smooth within ε of each chord but must not bow
+ *  further into empty paper — that bounds the serif-foot overshoot without
+ *  re-faceting discs (a genuine arc's sagitta between simplified vertices is
+ *  ≤ ε). Omit to leave the resample unbounded. */
 export function refineChainForOutput(
   points: ReadonlyArray<Vec2>,
   closed: boolean,
   drawnCorners: ReadonlySet<Vec2> = NO_CORNERS,
+  deviationCapPx = Infinity,
 ): Vec2[] {
   if (points.length < 3) return [...points];
   const corners = collectCorners(points, closed, drawnCorners);
-  return fitSmoothCurve(points, closed, corners, SAMPLES_PER_SEGMENT);
+  return fitSmoothCurve(points, closed, corners, SAMPLES_PER_SEGMENT, deviationCapPx);
 }
 
 // Corners that break the spline: the sharpener's rebuilt vertices plus any

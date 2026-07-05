@@ -84,4 +84,75 @@ describe('fitSmoothCurve', () => {
     const last = out.at(-1) as Vec2;
     expect(Math.hypot(last.x - first.x, last.y - first.y)).toBeGreaterThan(1e-6);
   });
+
+  // Signed perpendicular offset of q from the infinite line through a->b,
+  // positive on the left of a->b. Mirrors the cap's own metric.
+  const perpOffset = (q: Vec2, a: Vec2, b: Vec2): number => {
+    const vx = b.x - a.x;
+    const vy = b.y - a.y;
+    const len = Math.hypot(vx, vy);
+    if (len < 1e-9) return Math.hypot(q.x - a.x, q.y - a.y);
+    return ((q.x - a.x) * vy - (q.y - a.y) * vx) / len;
+  };
+
+  it('caps serif-foot overshoot: mid-foot sample must not bow below the chord beyond the cap', () => {
+    // The real HOUSE H left-foot bottom, taken from the verifier pass: a flat
+    // foot chord p1->p2 with SHALLOW risers (p0/p1 approach ≈20°, p2/p3 ≈22°,
+    // both far below the 60° corner pin, so the spline flows through them just
+    // like the live edge pipeline). Centripetal Catmull-Rom bows the mid-foot
+    // sample DOWN into empty paper — with the resample on it reaches
+    // (505.9, 655.1), ≈0.85px below the chord (≈y654.25). That is the "smile".
+    const p0: Vec2 = { x: 485, y: 651 };
+    const p1: Vec2 = { x: 493.3, y: 654.1 };
+    const p2: Vec2 = { x: 518.5, y: 654.4 };
+    const p3: Vec2 = { x: 527, y: 651 };
+    const points: Vec2[] = [p0, p1, p2, p3];
+    const cap = 0.45;
+    // Below the chord is the −perp side (chord runs left→right, so paper below
+    // is negative perp offset). No sample on the foot may sink more than `cap`.
+    const out = fitSmoothCurve(points, false, NO_CORNERS, 3, cap);
+    let worstBelow = 0;
+    for (const q of out) worstBelow = Math.min(worstBelow, perpOffset(q, p1, p2));
+    expect(-worstBelow).toBeLessThanOrEqual(cap + 1e-6);
+    // And it genuinely overshoots without the cap (guards the fixture is real):
+    // ≈0.85px > 0.45, so the mechanism-1 cap must bind on this exact sample.
+    const uncapped = fitSmoothCurve(points, false, NO_CORNERS, 3);
+    let worstUncapped = 0;
+    for (const q of uncapped) worstUncapped = Math.min(worstUncapped, perpOffset(q, p1, p2));
+    expect(-worstUncapped).toBeGreaterThan(cap);
+  });
+
+  it('preserves legitimate sub-cap arc curvature: cap does not disturb a smooth circle', () => {
+    // A gently-sampled arc's spline deviation from each p1->p2 chord stays well
+    // under ε (a 40px-radius 16-gon's centripetal samples deviate ≲0.03px), so
+    // an ε-tied cap must be a no-op here: the capped curve must equal the
+    // uncapped curve to floating-point tolerance, and must still leave the
+    // input polygon (samples off their control vertices) — never collapse to
+    // the straight chords (the "fixing by flattening" failure).
+    const radius = 40;
+    const control: Vec2[] = [];
+    // 32 steps → chord sagitta r(1−cos(π/32)) ≈ 0.19px, comfortably under the
+    // 0.45 cap, matching what an ε=0.45 Douglas-Peucker pass would leave (its
+    // guarantee: every simplified chord lies within ε of the dense arc).
+    const steps = 32;
+    for (let i = 0; i < steps; i += 1) {
+      const a = (i / steps) * 2 * Math.PI;
+      control.push({ x: radius * Math.cos(a), y: radius * Math.sin(a) });
+    }
+    const uncapped = fitSmoothCurve(control, true, NO_CORNERS, 3);
+    const capped = fitSmoothCurve(control, true, NO_CORNERS, 3, 0.45);
+    expect(capped.length).toBe(uncapped.length);
+    let maxShift = 0;
+    for (let i = 0; i < capped.length; i += 1) {
+      const c = capped[i] as Vec2;
+      const u = uncapped[i] as Vec2;
+      maxShift = Math.max(maxShift, Math.hypot(c.x - u.x, c.y - u.y));
+    }
+    // The cap leaves every legitimate arc sample untouched (so the smoothed
+    // arc keeps its full shape — no flattening).
+    expect(maxShift).toBeLessThan(1e-9);
+    // And it is still a resampled curve, not collapsed to the input polygon:
+    // interior samples were added between control vertices.
+    expect(capped.length).toBeGreaterThan(control.length);
+  });
 });
