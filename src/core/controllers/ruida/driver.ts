@@ -26,6 +26,7 @@ export const ruidaDriver: ControllerDriver = {
     homing: false,
     console: false,
     firmwareSetupPanel: 'none',
+    probing: false,
   },
   realtime: {
     statusQuery: null,

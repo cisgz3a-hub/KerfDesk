@@ -50,6 +50,7 @@ export const grblDriver: ControllerDriver = {
     homing: true,
     console: true,
     firmwareSetupPanel: 'grbl-laser',
+    probing: true,
   },
   realtime: {
     statusQuery: RT_STATUS,

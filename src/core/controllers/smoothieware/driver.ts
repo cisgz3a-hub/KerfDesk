@@ -39,6 +39,7 @@ export const smoothiewareDriver: ControllerDriver = {
     homing: true,
     console: true,
     firmwareSetupPanel: 'none',
+    probing: false,
   },
   realtime: {
     statusQuery: RT_STATUS,

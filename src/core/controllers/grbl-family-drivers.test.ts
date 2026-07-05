@@ -6,7 +6,10 @@ import { describe, expect, it } from 'vitest';
 import { fluidncDriver } from './fluidnc/driver';
 import { grblDriver } from './grbl/driver';
 import { grblHalDriver } from './grblhal/driver';
+import { marlinDriver } from './marlin/driver';
+import { ruidaDriver } from './ruida/driver';
 import { selectControllerDriver } from './select-controller-driver';
+import { smoothiewareDriver } from './smoothieware/driver';
 
 describe('GRBL-family variant drivers', () => {
   it('grblHAL shares the exact GRBL wire vocabulary and capabilities', () => {
@@ -33,5 +36,17 @@ describe('GRBL-family variant drivers', () => {
     expect(selectControllerDriver(undefined)).toBe(grblDriver);
     expect(selectControllerDriver('grblhal')).toBe(grblHalDriver);
     expect(selectControllerDriver('fluidnc')).toBe(fluidncDriver);
+  });
+
+  it('exposes G38.2 probing only on GRBL-grammar firmwares', () => {
+    // The probe runner parses GRBL responses (ok pacing, ALARM:4/5,
+    // <status>); a different grammar could report false success and zero Z
+    // at the wrong height, so non-GRBL drivers must declare probing: false.
+    expect(grblDriver.capabilities.probing).toBe(true);
+    expect(grblHalDriver.capabilities.probing).toBe(true);
+    expect(fluidncDriver.capabilities.probing).toBe(true);
+    expect(marlinDriver.capabilities.probing).toBe(false);
+    expect(smoothiewareDriver.capabilities.probing).toBe(false);
+    expect(ruidaDriver.capabilities.probing).toBe(false);
   });
 });

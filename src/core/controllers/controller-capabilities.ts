@@ -54,4 +54,9 @@ export type ControllerCapabilities = {
   readonly homing: boolean;
   readonly console: boolean;
   readonly firmwareSetupPanel: FirmwareSetupPanel;
+  // G38.2 touch-plate probing. The probe protocol runner speaks the GRBL
+  // response grammar (ok pacing, ALARM:4/5, <status>), so only GRBL-family
+  // firmwares may expose probe UI — a different grammar could report false
+  // success and zero Z at the wrong height.
+  readonly probing: boolean;
 };
