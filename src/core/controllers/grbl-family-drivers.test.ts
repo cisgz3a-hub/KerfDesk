@@ -49,4 +49,15 @@ describe('GRBL-family variant drivers', () => {
     expect(smoothiewareDriver.capabilities.probing).toBe(false);
     expect(ruidaDriver.capabilities.probing).toBe(false);
   });
+
+  it('allows CNC spindle jobs only on GRBL-dialect firmwares (ADR-098)', () => {
+    // The CNC emitter's G4 P dwell is SECONDS; Marlin reads milliseconds, so
+    // streaming CNC to a non-GRBL dialect loses the spindle spin-up time.
+    expect(grblDriver.capabilities.cncJobs).toBe(true);
+    expect(grblHalDriver.capabilities.cncJobs).toBe(true);
+    expect(fluidncDriver.capabilities.cncJobs).toBe(true);
+    expect(marlinDriver.capabilities.cncJobs).toBe(false);
+    expect(smoothiewareDriver.capabilities.cncJobs).toBe(false);
+    expect(ruidaDriver.capabilities.cncJobs).toBe(false);
+  });
 });

@@ -59,4 +59,9 @@ export type ControllerCapabilities = {
   // firmwares may expose probe UI — a different grammar could report false
   // success and zero Z at the wrong height.
   readonly probing: boolean;
+  // CNC spindle jobs (ADR-098: CNC is GRBL-only). The CNC emitter speaks the
+  // GRBL dialect — e.g. G4 P is SECONDS; Marlin reads P as milliseconds, so
+  // a 3 s spin-up dwell would become 3 ms and the bit plunges before the
+  // spindle is at speed.
+  readonly cncJobs: boolean;
 };

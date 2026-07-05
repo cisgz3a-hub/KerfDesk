@@ -9,6 +9,7 @@ import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '..
 import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
 import {
   DEFAULT_OUTPUT_SCOPE,
+  machineKindOf,
   validateOutputScope,
   type OutputScope,
   type Project,
@@ -29,6 +30,8 @@ export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
 export const STATUS_ALARM_START_MESSAGE =
   'Controller reports Alarm. Home ($H) if the machine has homing switches, or Unlock ($X) only after confirming the head is safe.';
+export const CNC_REQUIRES_GRBL_MESSAGE =
+  'CNC jobs require a GRBL-family controller (GRBL, grblHAL, FluidNC). The connected firmware does not accept the GRBL CNC dialect — e.g. it reads the G4 spin-up dwell in milliseconds instead of seconds, so the bit would plunge before the spindle is at speed.';
 
 export type StartJobPreparation =
   | {
@@ -55,6 +58,9 @@ export type MachineStartSnapshot = {
   // ADR-094 — how the connected firmware exposes settings. Non-GRBL values
   // relax the $30/$32 readiness proof into an explicit unverified warning.
   readonly settingsCapability?: ReadinessSettingsCapability;
+  // ADR-098 — CNC is GRBL-only. False blocks CNC Start outright (the CNC
+  // emitter's dialect is unsafe on other firmwares); absent = allowed.
+  readonly cncJobsSupported?: boolean;
 };
 
 export function prepareStartJob(
@@ -66,6 +72,10 @@ export function prepareStartJob(
 ): StartJobPreparation {
   const machineIssues = findMachineStartIssues(machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
+
+  if (machineKindOf(project.machine) === 'cnc' && machine.cncJobsSupported === false) {
+    return { ok: false, messages: [CNC_REQUIRES_GRBL_MESSAGE] };
+  }
 
   const placement = resolveJobPlacement(jobPlacement, machine);
   if (!placement.ok) return { ok: false, messages: placement.messages };
