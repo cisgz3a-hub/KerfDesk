@@ -4995,6 +4995,73 @@ jsdom: the panel renders the dropdown and picking sets the stock material. Full
 gate per commit. Live browser NOT driven into CNC mode (shares the maintainer's
 scene, CLAUDE.md §4). Physical cut CLAIMED per ADR-098 §3.
 
+## ADR-113 — Region-enhance re-trace (dialog boundary mode) (Trace fidelity, 2026-07-05)
+
+**Status:** accepted (maintainer-directed follow-up to the trace-fidelity work).
+
+### Context
+
+Small features inside a large raster sit at the tracer's detection floor: a
+~67px² letter counter in a 1024px logo drops out at native size. The whole-image
+auto-upscale can't rescue it — `shouldUpscaleSmallSource` gates on
+`max(w,h) < SMALL_SOURCE_EDGE_PX = 100` (`auto-upscale.ts`), so a 1024px source
+is never supersampled, and quadrupling a 1024px buffer for one small feature is
+the exact cost that gate exists to avoid. The dialog already had a
+LightBurn-style **Boundary crop** (box a region → the trace contains ONLY that
+region's paths, `traceImageRegion`), reachable from `retraceOriginalAction`
+("Re-trace Original") with the retained source raster.
+
+### Decision
+
+Add a **second boundary mode** rather than a new canvas tool. The boundary box's
+mode is a stringly union `BoundaryMode = 'crop' | 'enhance'` (no boolean flag):
+
+- **`crop`** (default, LightBurn parity): unchanged — delegates to
+  `traceImageRegion`, result is just the region.
+- **`enhance`**: trace the FULL image, re-trace the boxed **source** region
+  supersampled 2×, and patch the re-traced geometry back into the full trace so
+  the small feature is recovered while the rest of the trace survives. The pure
+  merge lives in `core/trace/region-enhance.ts` (`enhanceRegionPaths`); the
+  worker-backed orchestration is `src/ui/trace/region-enhance-trace.ts`
+  (`traceImageWithBoundaryMode`), which injects the app's worker tracer into the
+  pure core.
+
+The **venue is the existing dialog**: it reuses `retraceOriginalAction` and the
+boundary-box UX (drag to box, Clear Boundary), so no new tool, command, or canvas
+surface is introduced. The mode toggle is visible only when a boundary exists;
+clearing the boundary resets the mode to `crop`. Default stays `crop`.
+
+**Why 2×** — mkbitmap's documented sweet spot ("a greyscale image contains more
+detail than a bilevel image at the same resolution"); 3×+ invents detail. Capped
+per `computeRegionUpscaleFactor` at 1× if the 2× crop would exceed
+`MAX_UPSCALE_SOURCE_PIXELS`. **Margin-ring merge rule**: the region is shrunk by
+`REGION_EDGE_MARGIN_PX` before the swap so crop-edge fragments (which hug the
+border) and larger outlines crossing the box both keep their original geometry;
+only polylines fully inside the shrunk interior are dropped/replaced, merged by
+colour key.
+
+### Consequences
+
+- **LightBurn divergence, maintainer-sanctioned.** LightBurn's answer to a
+  dropped small feature is manual node-editing; it has no region-enhance re-trace.
+  The maintainer sanctioned this divergence as a fidelity win, so it is a
+  deliberate choice, not a bug against the LightBurn reference.
+- The full-image trace runs twice in enhance mode (once whole, once on the crop);
+  acceptable because enhance is an opt-in on a user-boxed region, not the default.
+- The core merge is unchanged by this ADR (it landed earlier); this ADR is the
+  UI seam + venue decision only.
+
+### Verification
+
+Unit: `region-enhance-trace.test.ts` (crop delegates unchanged with one trace;
+enhance runs the full trace + supersampled crop trace and patches — a
+region-contained polyline replaced, an outside one survives). Preview:
+`use-trace-preview.test.ts` (enhance mode reaches the preview path; the ready
+state reflects the patched trace). jsdom: `ImportImageDialog.workflow.test.ts`
+(the mode toggle renders only after a region is boxed, defaults to Crop). Full
+gate per commit. **NOT verified perceptually this session** — the rendered
+recovery of the real logo counter against the source is the maintainer's
+perceptual pass (CLAUDE.md §2); green tests are not fidelity proof.
 
 ## ADR-114 — Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05)
 

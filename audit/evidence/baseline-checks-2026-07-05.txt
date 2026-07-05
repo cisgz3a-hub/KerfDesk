@@ -1,0 +1,17 @@
+### typecheck
+$ tsc --noEmit
+EXIT typecheck=0
+### lint
+$ eslint .
+EXIT lint=0
+### lint:electron
+$ eslint --config eslint.electron.config.mjs electron/**/*.ts
+EXIT lintelectron=0
+### license-check
+$ node scripts/check-licenses.mjs
+license-check: 17 production package(s) across 5 license(s) — all allowed.
+EXIT license=0
+### audit:deps
+$ pnpm audit --audit-level=low
+No known vulnerabilities found
+EXIT auditdeps=0
