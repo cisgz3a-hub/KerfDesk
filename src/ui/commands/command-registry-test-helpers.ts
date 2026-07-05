@@ -119,6 +119,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     projectNotes: vi.fn(),
     undoHistory: vi.fn(),
     showAbout: vi.fn(),
+    showConnectionHelp: vi.fn(),
   };
 }
 
