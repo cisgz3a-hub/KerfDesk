@@ -39,12 +39,15 @@ function group(overrides: Partial<CncGroup> = {}): CncGroup {
 describe('cncGrblStrategy', () => {
   it('emits the CNC preamble: units, absolute, feed mode, spindle, dwell', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
-    expect(gcode.startsWith('G21\nG90\nG94\nM3 S12000\nG4 P3.000\n')).toBe(true);
+    // The safe-Z lift comes BEFORE M3: after touch-off the bit rests on the
+    // stock top, and the spindle must not spin up there.
+    expect(gcode.startsWith('G21\nG90\nG94\nG0 Z3.810\nM3 S12000\nG4 P3.000\n')).toBe(true);
   });
 
   it('retracts before XY travel and plunges at the plunge feed', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
-    expect(gcode).toContain('G0 Z3.810\nG0 X10.000 Y10.000\nG1 Z-1.500 F300');
+    expect(gcode).toContain('G0 Z3.810\nM3 S12000');
+    expect(gcode).toContain('G0 X10.000 Y10.000\nG1 Z-1.500 F300');
     expect(gcode).toContain('G1 X30.000 Y10.000 F1000');
   });
 
@@ -129,7 +132,10 @@ describe('cncGrblStrategy', () => {
 
     it('retracts, rapids to the first XY, plunges to the FIRST vertex Z at plunge feed', () => {
       const gcode = cncGrblStrategy.emit({ groups: [ramp] }, dev);
-      expect(gcode).toContain('G0 Z3.810\nG0 X10.000 Y10.000\nG1 Z-0.500 F300');
+      // The safe-Z retract now lives in the preamble (before M3); the pass
+      // itself rapids to XY and plunges to the first vertex Z.
+      expect(gcode).toContain('G0 Z3.810\nM3 S12000');
+      expect(gcode).toContain('G0 X10.000 Y10.000\nG1 Z-0.500 F300');
     });
 
     it('feeds per-vertex XYZ moves with the feed word only on the first', () => {
