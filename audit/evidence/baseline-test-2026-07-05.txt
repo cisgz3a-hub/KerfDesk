@@ -1,0 +1,990 @@
+$ vitest run
+
+[1m[46m RUN [49m[22m [36mv3.2.6 [39m[90mC:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b[39m
+
+ [32m✓[39m src/core/trace/edge-trace.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 393[2mms[22m[39m
+ [32m✓[39m src/core/job/estimate-duration.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/core/trace/trace-image.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 974[2mms[22m[39m
+   [33m[2m✓[22m[39m traceImageToSvgString[2m > [22mend-to-end: trace + parseSvg produces drawable ColoredPath polylines [33m 905[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/ui/state/scene-mutations.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-registry.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m src/ui/state/store.test.ts [2m([22m[2m34 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/core/trace/centerline/centerline.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 122[2mms[22m[39m
+ [32m✓[39m src/ui/layers/CutsLayersPanel.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[32m 293[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/core/raster/emit-raster.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/trace-artifacts.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 247[2mms[22m[39m
+[90mstderr[2m | src/ui/laser/device-setup/DeviceSetupWizard.test.tsx[2m > [22m[2mDeviceSetupWizard[2m > [22m[2mconnects with the draft profile controller kind and baud rate
+[22m[39mWarning: An update to DeviceSetupConnectStep inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at DeviceSetupConnectStep (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\laser\device-setup\DeviceSetupConnectStep.tsx:9:35)
+    at div
+    at div
+    at div
+    at Dialog (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\kit\Dialog.tsx:8:55)
+    at DeviceSetupWizard (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\laser\device-setup\DeviceSetupWizard.tsx:35:52)
+    at PlatformProvider (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\app\platform-context.tsx:7:3)
+
+ [32m✓[39m src/core/job/optimize-paths.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/ui/laser/device-setup/DeviceSetupWizard.test.tsx [2m([22m[2m14 tests[22m[2m)[22m[33m 372[2mms[22m[39m
+ [32m✓[39m src/io/project/project.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-line-handler.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/ui/laser/MachineSetupDialog.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 337[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/property/box-benchmark.test.ts[2m > [22m[2mbox generator benchmark[2m > [22m[2mscores 100% across the full verification battery
+[22m[39m[box-benchmark] seed=0x1057b0c5 corpus=54 specs
+  assembly-exact          54/54    100%
+  assembly-clearance      54/54    100%
+  structure              299/299   100%
+  fit-relief             598/598   100%
+  determinism             54/54    100%
+  sabotage-detection       4/4     100%
+  OVERALL               1063/1063  100%
+
+ [32m✓[39m src/__fixtures__/property/box-benchmark.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 2547[2mms[22m[39m
+   [33m[2m✓[22m[39m box generator benchmark[2m > [22mscores 100% across the full verification battery [33m 2545[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_arch-house-edge-audit.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/preflight/preflight.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/ui/laser/LaserWindow.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 227[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-raster-preview.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/ui/state/layer-actions.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/ui/app/shortcuts.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/core/job/fill-hatching.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 264[2mms[22m[39m
+ [32m✓[39m src/ui/common/Toolbar.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 156[2mms[22m[39m
+ [32m✓[39m src/ui/layers/CutsLayersPanel.cut-settings.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 347[2mms[22m[39m
+ [32m✓[39m src/ui/laser/JobControls.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+ [32m✓[39m src/ui/state/path-node-edit-actions.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-lifecycle.simulator.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+ [32m✓[39m src/ui/app/file-actions.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/core/trace/auto-upscale.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 100[2mms[22m[39m
+ [32m✓[39m src/ui/raster/AdjustImageDialog.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 228[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/streamer.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/io/material-library/material-library-io.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/ui/raster/vector-to-bitmap.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/ui/layers/CutSettingsDialog.fill-density.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 205[2mms[22m[39m
+ [32m✓[39m src/ui/commands/AppMenuBar.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 90[2mms[22m[39m
+ [32m✓[39m src/ui/laser/start-job-readiness.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/io/dxf/parse-dxf.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-fill.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-raster.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/drag-state.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/layers/MaterialLibraryPanel.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 121[2mms[22m[39m
+ [32m✓[39m src/ui/laser/DeviceSettings.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 243[2mms[22m[39m
+ [32m✓[39m src/ui/laser/start-job-placement.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/io/svg/parse-svg.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+ [32m✓[39m src/core/trace/potrace-trace.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_tracer-upgrade-audit.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/edge-curve-quality.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m src/core/trace/trace-to-paths.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+ [32m✓[39m src/core/trace/preprocess.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-motion-operation.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/ui/trace/ImportImageDialog.workflow.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 253[2mms[22m[39m
+ [32m✓[39m src/core/text/text-to-polylines.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 456[2mms[22m[39m
+ [32m✓[39m src/ui/state/registration-box-actions.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-active-job-command-guard.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m src/ui/text/AddTextDialog.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 123[2mms[22m[39m
+ [32m✓[39m src/core/preflight/preflight-raster.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/handles.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-preview.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/ui/state/selection-transform-actions.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/ui/trace/trace-options.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/commands/multi-file-trace-action.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/rasterize.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m src/ui/laser/job-intent-warnings.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 103[2mms[22m[39m
+ [32m✓[39m src/core/job/toolpath.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/trace/use-trace-worker-client.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 297[2mms[22m[39m
+ [32m✓[39m src/ui/commands/WorkspaceContextBar.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 78[2mms[22m[39m
+ [32m✓[39m src/ui/state/scene-clipboard-actions.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_letter-b-smoothness.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/ui/trace/trace-pipeline.integration.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m src/core/job/planner.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/state/material-library-actions.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_new-problems-audit.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/material-library/material-library.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-error-line.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/platform/web/web-serial.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m electron/trusted-renderer-policy.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/cnc/cnc-multi-tool.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/ui/layers/cut-settings-output-parity.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/ui/state/camera-store.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_letter-a-counter.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-lifecycle-marlin.simulator.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/RegistrationJigPanel.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+ [32m✓[39m src/ui/laser/JogPad.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 102[2mms[22m[39m
+ [32m✓[39m src/core/camera/detect-checkerboard.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 7121[2mms[22m[39m
+   [33m[2m✓[22m[39m detectCheckerboard on rendered frames[2m > [22mend-to-end: five detected views calibrate back to the true camera [33m 5999[2mms[22m[39m
+ [32m✓[39m src/ui/state/vector-path-actions.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/ui/layers/LayerRow.double-click.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 206[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy.property.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 132[2mms[22m[39m
+ [32m✓[39m src/core/box/panel-fit.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/core/camera/calibrate.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 334[2mms[22m[39m
+ [32m✓[39m src/ui/trace/ImportImageDialog.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-controller-lifecycle.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_arch-a-scale.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_small-letter-facet.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/ui/laser/MachineSettingsPanel.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 97[2mms[22m[39m
+ [32m✓[39m src/ui/laser/MachineSetupCameraPreview.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mgenerates six laser panels from the defaults
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+ [32m✓[39m src/ui/state/convert-to-bitmap.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mdisables Generate and reports the field for an empty dimension
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mrenders core validation issues live (outer walls eat the interior)
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mhides the relief tool field until CNC corner relief is turned on
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mhides the relief tool field until CNC corner relief is turned on
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mhides the relief tool field until CNC corner relief is turned on
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mwarns without blocking when the finger is under twice the relief tool
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mwarns without blocking when the finger is under twice the relief tool
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mpersists the draft on Generate and restores it next open
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mpersists the draft on Generate and restores it next open
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mpersists the draft on Generate and restores it next open
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+[90mstderr[2m | src/ui/box/BoxGeneratorDialog.test.tsx[2m > [22m[2mBoxGeneratorDialog[2m > [22m[2mcloses on Escape without inserting
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at context2d (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:48:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\box\BoxPreview.tsx:28:17
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3) [90mundefined[39m
+
+ [32m✓[39m src/ui/box/BoxGeneratorDialog.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 192[2mms[22m[39m
+ [32m✓[39m src/ui/material-library/SavedLibrariesDialog.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 111[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-machine-settings.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/core/trace/raster-prep.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/state/autofocus-action.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/laser/DetectedSettingsBanner.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/parse-settings.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/job/toolpath-cnc.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/io/gcode/registration-placement.property.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m src/io/machine-profile/machine-profile-io.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/pen-tool.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/core/trace/centerline/curve-fit.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/raster/rasterize-vector.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/controllers/grbl-simulator.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/ui/app/material-library-file-actions.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/io/gcode/prepare-output.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-origin.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/ui/app/PwaUpdatePrompt.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-lifecycle-smoothie.simulator.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/ui/trace/TracePreview.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 85[2mms[22m[39m
+ [32m✓[39m src/ui/layers/cut-settings-draft.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/box/panel-outline.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 3579[2mms[22m[39m
+   [33m[2m✓[22m[39m panelOutline — structural properties over fuzzed specs[2m > [22memits simple rectilinear rings whose area matches the claims exactly [33m 3566[2mms[22m[39m
+ [32m✓[39m src/io/gcode/emit-gcode.snapshot.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/arch-house-baseline.test.ts[2m > [22m[2march-house real logo Line Art acceptance[2m > [22m[2mtraces the required source fixture as filled logo contours, not edge outlines
+[22m[39m[arch-house] 1024x1024 Line Art: 777ms, 83 closed polylines, 0 open polylines, 51 hole candidates, 11938 points
+
+ [32m✓[39m src/core/sim/stamp-toolpath.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/preview-overlays.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/arch-house-baseline.test.ts[2m > [22m[2march-house real logo Line Art acceptance[2m > [22m[2mkeeps enough traced ink in the bottom LANGEBAAN word band
+[22m[39m[arch-house] LANGEBAAN band ink pixels: 3364
+
+ [32m✓[39m src/__fixtures__/perceptual/trace-benchmark-loop.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 4700[2mms[22m[39m
+   [33m[2m✓[22m[39m trace benchmark loop[2m > [22mrates current trace artifacts against explicit 10/10 benchmarks [33m 1946[2mms[22m[39m
+   [33m[2m✓[22m[39m trace benchmark loop[2m > [22mkeeps curve linking, real Edge Detection, Centerline, and Line Art in the benchmark loop [33m 2749[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy-machine-compatibility.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/arch-house-baseline.test.ts[2m > [22m[2march-house real logo Line Art acceptance[2m > [22m[2mmatches the preprocessed logo mask closely enough to catch visible flooding
+[22m[39m[arch-house] Line Art mask IoU=0.955, precision=0.976, recall=0.978
+
+ [32m✓[39m src/ui/state/material-library-collection.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/trace/potrace-apex.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 119[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/arch-house-baseline.test.ts[2m > [22m[2march-house real logo Line Art acceptance[2m > [22m[2mkeeps LANGEBAAN when Line Art receives an explicit Sketch Trace off override
+[22m[39m[arch-house] LANGEBAAN band ink pixels with sketch off: 3364
+
+ [32m✓[39m src/__fixtures__/perceptual/arch-house-baseline.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 4197[2mms[22m[39m
+   [33m[2m✓[22m[39m arch-house real logo Line Art acceptance[2m > [22mtraces the required source fixture as filled logo contours, not edge outlines [33m 837[2mms[22m[39m
+   [33m[2m✓[22m[39m arch-house real logo Line Art acceptance[2m > [22mkeeps enough traced ink in the bottom LANGEBAAN word band [33m 802[2mms[22m[39m
+   [33m[2m✓[22m[39m arch-house real logo Line Art acceptance[2m > [22mmatches the preprocessed logo mask closely enough to catch visible flooding [33m 1207[2mms[22m[39m
+   [33m[2m✓[22m[39m arch-house real logo Line Art acceptance[2m > [22mkeeps LANGEBAAN when Line Art receives an explicit Sketch Trace off override [33m 1348[2mms[22m[39m
+ [32m✓[39m src/ui/laser/IslandFillRecoveryAction.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m src/core/job/job-bounds.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/state/close-open-fill-contours-actions.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/camera/align-markers.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 3039[2mms[22m[39m
+   [33m[2m✓[22m[39m detectAlignMarkers on rendered frames[2m > [22mfinds all four targets in layout order (fronto camera) [33m 436[2mms[22m[39m
+   [33m[2m✓[22m[39m detectAlignMarkers on rendered frames[2m > [22mdisambiguates a camera mounted 180° rotated [33m 428[2mms[22m[39m
+   [33m[2m✓[22m[39m detectAlignMarkers on rendered frames[2m > [22mhandles a tilted camera mount [33m 426[2mms[22m[39m
+   [33m[2m✓[22m[39m detectAlignMarkers on rendered frames[2m > [22mfails typed when no unambiguous origin pair exists [33m 419[2mms[22m[39m
+   [33m[2m✓[22m[39m solveMarkerAlignment[2m > [22mraw basis: bed positions register to a couple of millimetres [33m 564[2mms[22m[39m
+   [33m[2m✓[22m[39m solveMarkerAlignment[2m > [22mrectified basis: de-fisheyed frames register sub-millimetre bed-wide [33m 713[2mms[22m[39m
+ [32m✓[39m src/core/cnc/compile-cnc-job.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/ui/laser/start-frame-raster-budget.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m src/core/cnc/tile-plan.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-console.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/core/raster/dither.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m src/core/scene/registration-layer.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/preflight/pre-emit.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/scene/hit-test.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_sharp-candidates.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 1[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_edge-zoom.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/trace/centerline/loop-closure.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/laser/device-setup/device-setup-flow.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/trace/centerline/thick-blob.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 64[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-shortcuts-modal-gate.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 149[2mms[22m[39m
+ [32m✓[39m src/core/box/assembly-referee.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 424[2mms[22m[39m
+ [32m✓[39m src/core/camera/levmar.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-line-handler-frame.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/devices/device-profile.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/trace/image-loader.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/ui/laser/use-job-shortcuts.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/use-workspace-drag-hook.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m src/ui/state/ui-store.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/view-transform.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/laser/JobControls-unhomed-origin.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+ [32m✓[39m src/io/project/project-device-profile-metadata.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/core/cnc/motion-polish.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/trace/paths-to-svg.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/controllers/ruida/ruida.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/core/relief/relief-roughing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+ [32m✓[39m src/io/svg/parse-path-d.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/io/gcode/parse-gcode-program.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/layers/SelectedObjectProperties.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_reference-iou.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/io/project/project-machine-cnc.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/ui/trace/region-enhance-trace.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/layers/CncLayerFields.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 149[2mms[22m[39m
+ [32m✓[39m src/ui/laser/live-job-estimate.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/ui/trace/use-trace-preview.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/raster/emit-raster.property.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 82[2mms[22m[39m
+ [32m✓[39m src/ui/state/cnc-library-actions.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/core/job/frame-bounds.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_reference-export.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-shortcuts-streaming-gate.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m src/core/output/cnc-grbl-strategy.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/shapes/shape-from-drag.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/status-parser.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/job/scan-offset.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/core/camera/camera-profile.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/state/autosave.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/box-sheet.test.ts[2m > [22m[2mbox generator — perceptual sheet fidelity[2m > [22m[2mlaser nominal sheet matches the analytic claim mask almost exactly
+[22m[39m[box-sheet] laser IoU=1.0000 precision=1.0000 recall=1.0000
+
+[90mstdout[2m | src/__fixtures__/perceptual/box-sheet.test.ts[2m > [22m[2mbox generator — perceptual sheet fidelity[2m > [22m[2mCNC sheet stays within clearance+relief distance of the nominal mask
+[22m[39m[box-sheet] cnc IoU=0.9693 precision=1.0000 recall=0.9693
+
+ [32m✓[39m src/__fixtures__/perceptual/box-sheet.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m src/core/box/generate-box.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 233[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/preview-scene-frame.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-raster.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-post-job-settle.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/platform/web/deploy-workflow-gate.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 1044[2mms[22m[39m
+   [33m[2m✓[22m[39m Cloudflare production deploy gate[2m > [22mrepo guard accepts the canonical GitHub Actions remote without .git [33m 543[2mms[22m[39m
+   [33m[2m✓[22m[39m Cloudflare production deploy gate[2m > [22mrepo guard accepts the KerfDesk identity after the 2026-07-03 rename [33m 490[2mms[22m[39m
+ [32m✓[39m src/ui/state/material-library-persistence.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/png-decode.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/ui/state/probe-actions.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/core/trace/region-enhance.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-image-mask.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/ui/common/fill-diagnostics.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/layers/use-debounced-commit.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/core/scene/selection-transform.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/platform/web/web-camera.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/core/job/frame-preflight.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/io/svg/malicious-corpus.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-tool.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/laser/ConsolePanel.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m src/core/relief/mesh-to-heightmap.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 253[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/toolpath-rasterize.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/io/project/project-air-assist.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/app/App.mount.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 156[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/arch-house-edge-quality.test.ts[2m > [22m[2march-house real logo Edge Detection quality[2m > [22m[2muses the smooth-trace cleanup lesson to avoid tiny curve debris on the real logo
+[22m[39m[arch-house-edge] 39 closed polylines, 0 tiny closed polylines, 5005 points, length=20098.643
+
+ [32m✓[39m src/ui/app/save-processed-bitmap.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/arch-house-edge-quality.test.ts[2m > [22m[2march-house real logo Edge Detection quality[2m > [22m[2mkeeps the main top arch connected enough to avoid dotted curve fragments
+[22m[39m[arch-house-edge-arch] 10 arch polylines, 1 short, aggregate=1, coverage=0.75, maxGapDeg=24
+
+ [32m✓[39m src/ui/state/fill-selection-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/trace/centerline/chain-smoothing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/arch-house-edge-quality.test.ts[2m > [22m[2march-house real logo Edge Detection quality[2m > [22m[2mdoes not scribble dark color regions into dense line mush
+[22m[39m[arch-house-edge] dark doorway stroke ratio=0.069
+
+ [32m✓[39m src/__fixtures__/perceptual/arch-house-edge-quality.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 2481[2mms[22m[39m
+   [33m[2m✓[22m[39m arch-house real logo Edge Detection quality[2m > [22muses the smooth-trace cleanup lesson to avoid tiny curve debris on the real logo [33m 916[2mms[22m[39m
+   [33m[2m✓[22m[39m arch-house real logo Edge Detection quality[2m > [22mkeeps the main top arch connected enough to avoid dotted curve fragments [33m 799[2mms[22m[39m
+   [33m[2m✓[22m[39m arch-house real logo Edge Detection quality[2m > [22mdoes not scribble dark color regions into dense line mush [33m 764[2mms[22m[39m
+ [32m✓[39m src/ui/help/help-topics.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/ui/laser/MachineSetupImportExport.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32m✓[39m src/core/controllers/marlin/marlin-driver.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/common/StatusBar.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m src/ui/layers/MaterialLibraryPanel.management.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m src/ui/laser/GrblLaserSetupPanel.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 154[2mms[22m[39m
+ [32m✓[39m src/ui/job-placement.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/compare.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/core/cnc/vcarve-ladder.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 163[2mms[22m[39m
+ [32m✓[39m src/io/svg/sanitize.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m src/ui/kit/Button.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m src/core/geometry/vector-path-booleans.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/core/cnc/vcarve-perceptual.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-pause-safety.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/core/scene/scene.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-untracked-ack-guard.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m src/core/geometry/vector-path-tools.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/io/gcode/emit-gcode.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/platform/web/repo-policy.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/io/project/project-security-validation.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/commands/previewable-content.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy-offset-fill.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/trace/batch-trace.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-air-assist-safety.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/io/project/project-power-scale.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/laser/OriginRow.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/ui/raster/processed-bitmap.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/commands/CloseOpenFillContoursDialog.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m src/core/material-library/material-matching.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/scene/layer.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/job/interval-test-grid.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/io/stl/parse-stl.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m src/core/preflight/cnc-preflight.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-grbl-setup.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/ui/laser/device-setup/device-setup-readiness.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/trace/trace-perceptual.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+ [32m✓[39m src/io/svg/shape-to-polylines.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/core/job/material-test-grid.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-line-handler-ov.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/io/project/project-groups.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/job/toolpath-raster.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/relief/relief-finishing.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m src/ui/state/break-apart-actions.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/laser/LaserWindow.device-setup.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 161[2mms[22m[39m
+ [32m✓[39m src/core/box/panel-claims.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/camera/grid-lattice.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/preflight/machine-profile-preflight.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/core/invariants/cnc-depth.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m src/ui/commands/NumericEditsBar.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+ [32m✓[39m src/ui/layers/SelectedReliefProperties.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m src/core/camera/warp-to-bed.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 549[2mms[22m[39m
+   [33m[2m✓[22m[39m warpFrameToBed[2m > [22mclosed loop: auto-aligned markers land at their true bed coordinates [33m 546[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-lock.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/common/ConfirmSaveDialog.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+ [32m✓[39m src/core/preflight/no-go-zones.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/ui/layers/CncMaterialRow.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m src/ui/state/saved-libraries-actions.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/state/cnc-project-material.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/common/image-density.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/app/confirm-discard.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/calibration/IntervalTestDialog.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m src/ui/laser/cnc-machine-limit-warnings.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-home-action.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m src/ui/state/box-insert-mutation.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/ui/calibration/MaterialTestDialog.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+ [32m✓[39m src/core/cnc/pocket-paths.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/ui/state/origin-actions.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/job/fill-sweeps.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/camera/cpu-rectify.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy-air-assist.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/io/gcode/gcode-reimport-parity.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/ui/camera/wizard/camera-wizard-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 454[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-preview.parity.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/raster/ConvertToBitmapDialog.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+ [32m✓[39m src/io/material-library/material-library-laser-head-metadata.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/camera/homography.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/ToolStrip.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+ [32m✓[39m src/io/svg/parse-svg-presentation-state.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-path-node-handles.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-sleep-recovery.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/box/box-spec.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-fill-cache.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | src/ui/laser/ProbePanel.test.tsx[2m > [22m[2mProbePanel[2m > [22m[2mruns the Z sequence through the store probe action
+[22m[39mWarning: An update to ProbeControls inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at ProbeControls (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\laser\ProbeControls.tsx:24:53)
+    at details
+    at ProbePanel (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\laser\ProbePanel.tsx:7:51)
+
+ [32m✓[39m src/ui/laser/ProbePanel.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m src/ui/material-library/wizard/wizard-state.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/driver.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/job/scan-offset-calibration-pattern.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/geometry/dogbone.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/core/scene/transform.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/state/store-multi-select.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/ui/laser/use-job-estimate.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/shapes.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 4349[2mms[22m[39m
+   [33m[2m✓[22m[39m PERCEPTUAL_FIXTURES[2m > [22m'solid-square': source is binary and truth matches its ink [33m 540[2mms[22m[39m
+   [33m[2m✓[22m[39m PERCEPTUAL_FIXTURES[2m > [22m'filled-disc': source is binary and truth matches its ink [33m 524[2mms[22m[39m
+   [33m[2m✓[22m[39m PERCEPTUAL_FIXTURES[2m > [22m'ring-annulus': source is binary and truth matches its ink [33m 528[2mms[22m[39m
+   [33m[2m✓[22m[39m PERCEPTUAL_FIXTURES[2m > [22m'plus-stroke': source is binary and truth matches its ink [33m 1356[2mms[22m[39m
+   [33m[2m✓[22m[39m PERCEPTUAL_FIXTURES[2m > [22m'square-glyph': source is binary and truth matches its ink [33m 1389[2mms[22m[39m
+ [32m✓[39m src/core/camera/calibrate-residuals.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/camera/calibrate-sweep.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 25495[2mms[22m[39m
+   [33m[2m✓[22m[39m calibrateWithFocalSweep[2m > [22mrecovers the camera where a single default-seeded run stalls [33m 19955[2mms[22m[39m
+   [33m[2m✓[22m[39m calibrateWithFocalSweep[2m > [22mis a single plain run when the caller supplies a measured focal [33m 5536[2mms[22m[39m
+ [32m✓[39m src/ui/kit/Dialog.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/core/devices/profile-catalog.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/common/ErrorBoundary.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 72[2mms[22m[39m
+ [32m✓[39m src/ui/app/shortcuts-tools.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/region-enhance-recovery.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 914[2mms[22m[39m
+   [33m[2m✓[22m[39m region-enhance recovers the dropped AA counter on the real logo [33m 913[2mms[22m[39m
+ [32m✓[39m src/io/svg/pipeline.snapshot.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 91[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-import-drag-drop.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/io/machine-profile/machine-profile-camera.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstderr[2m | src/ui/camera/WorkspaceCameraOverlay.test.tsx[2m > [22m[2mWorkspaceCameraOverlay[2m > [22m[2mprojects a captured still through the alignment and view
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\camera\WorkspaceCameraOverlay.tsx:70:28
+    at commitHookEffectListMount (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:24905:3)
+    at flushPassiveEffectsImpl (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\react-dom@18.3.1_react@18.3.1\node_modules\react-dom\cjs\react-dom.development.js:27078:3) [90mundefined[39m
+
+ [32m✓[39m src/ui/camera/WorkspaceCameraOverlay.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m src/ui/a11y/button-hover-contract.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 324[2mms[22m[39m
+   [33m[2m✓[22m[39m command hover explanations[2m > [22mgives every raw JSX control a title tooltip or stable help id [33m 323[2mms[22m[39m
+ [32m✓[39m src/core/output/marlin-strategy.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/job/fill-overscan.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/raster/vector-to-bitmap-worker.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/snapping.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/app/dxf-import-action.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/use-preview-playback.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/io/dxf/dxf-curve-sampling.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/material-library/wizard/MaterialPresetWizard.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 87[2mms[22m[39m
+ [32m✓[39m src/ui/common/use-dialog-a11y.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/preview-status.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/io/gcode/gcode-metadata.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/probe.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-raster-visibility.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/path-node-drag.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/camera/init-guess.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/layers/CutsLayersPanel.numeric-safety.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 101[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/use-canvas-bitmap-size.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m src/ui/laser/export-grbl-settings-backup.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/raster/luma-bitmap.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy-scan-offset.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy.fill-power-mode.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-helpers.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-raster-cache.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-fill-cache.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/path-node-hit-test.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-unload-stop.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/ui/box/box-draft.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/camera/matrix3d.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/ui/state/material-library-management-actions.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/laser/MeasuredScanOffsetApply.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m src/core/shapes/registration-box.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-raster-adjustments.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/io/project/project-camera-profile.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/scene/selection-distribute.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-power-scale.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/ui/machine/CncDetectedSettingsRow.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/_trace-audit-render.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/controllers/smoothieware/smoothieware-driver.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/laser/LaserWindow-alarm-recovery.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m src/ui/state/job-aware-dialogs.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/camera/calibration-trust.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-active-job-wake-lock.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/rotate-handle.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/commands/CommandShell.file-boundary.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 78[2mms[22m[39m
+ [32m✓[39m src/core/preflight/controller-readiness.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/resume-program.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/io/svg/flatten-curves.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy-fill-guards.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/trace/trace-boundary.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-store-streaming-options.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/core/cnc/surfacing.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+[90mstderr[2m | src/ui/laser/OverrideControls.test.tsx[2m > [22m[2mOverrideControls[2m > [22m[2mfires the exact realtime byte per button
+[22m[39mWarning: An update to OverrideControls inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at OverrideControls (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\laser\OverrideControls.tsx:16:58)
+
+ [32m✓[39m src/ui/laser/OverrideControls.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-tabs-bridges.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/invariants/predicates.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/use-preview-toolpath.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/platform/web/camera-bridge.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/state/image-mask-actions.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-vector-path-tools.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-autosave.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/core/devices/origin-transform.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/commands/UndoHistoryDialog.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m src/ui/state/registration-output-actions.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/scene/output-scope.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/laser/start-job-flow.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/core/cnc/profile-paths-text.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 136[2mms[22m[39m
+ [32m✓[39m src/ui/laser/LaserWindow-sleep-recovery.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m src/ui/state/relief-param-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/console-command.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/box/edge-pattern.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/machine/CncSetupPanel.material.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 128[2mms[22m[39m
+ [32m✓[39m src/core/camera/calibration-session.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/centerline-perf.test.ts[2m > [22m[2mcenterline trace performance on a big image[2m > [22m[2mtraces a ~1.9MP thick-stroke grid within the regression budget
+[22m[39m[centerline-perf] 1600x1200 stroke24: 2290ms, paths=1
+
+ [32m✓[39m src/__fixtures__/perceptual/centerline-perf.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 2305[2mms[22m[39m
+   [33m[2m✓[22m[39m centerline trace performance on a big image[2m > [22mtraces a ~1.9MP thick-stroke grid within the regression budget [33m 2303[2mms[22m[39m
+ [32m✓[39m src/ui/state/scene-lock-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/cnc/relief-finishing-compile.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 325[2mms[22m[39m
+ [32m✓[39m src/ui/state/scene-group-actions.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/io/dxf/dxf-spline.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-preview-complexity.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/io/project/project-scan-offset.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/grbl-setting-write.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-vector-strokes.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/shapes/rectangle.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/trace/centerline/spatial-grid.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-object-overrides.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/core/relief/marching-squares.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/ui/camera/wizard/CameraCalibrationWizard.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m src/io/svg/import-perceptual.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m src/io/lightburn/lbdev-import.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+[90mstdout[2m | src/__fixtures__/perceptual/centerline-bar.test.ts[2m > [22m[2mcenterline trace meets the landed regression bar[2m > [22m[2mh-stroke: stays inside its current regression limits
+[22m[39m[centerline-bar] h-stroke {"maxDeviationPx":0.6903364182219462,"meanDeviationPx":0.5951682091109703,"maxGapPx":0.8760491902120955,"meanGapPx":0.5979047058148458,"fragmentCount":1,"expectedStrokeCount":1,"shortFragmentCount":0}
+
+[90mstdout[2m | src/__fixtures__/perceptual/centerline-bar.test.ts[2m > [22m[2mcenterline trace meets the landed regression bar[2m > [22m[2mh-stroke-noisy-spur: stays inside its current regression limits
+[22m[39m[centerline-bar] h-stroke-noisy-spur {"maxDeviationPx":0.6913417161825492,"meanDeviationPx":0.5961735070715789,"maxGapPx":0.8760491902120955,"meanGapPx":0.5979047058148458,"fragmentCount":1,"expectedStrokeCount":1,"shortFragmentCount":0}
+
+[90mstdout[2m | src/__fixtures__/perceptual/centerline-bar.test.ts[2m > [22m[2mcenterline trace meets the landed regression bar[2m > [22m[2mdiagonal-stroke: stays inside its current regression limits
+[22m[39m[centerline-bar] diagonal-stroke {"maxDeviationPx":0.19134171618254409,"meanDeviationPx":0.09574888646515091,"maxGapPx":0.31099600891621776,"meanGapPx":0.09686480853438573,"fragmentCount":1,"expectedStrokeCount":1,"shortFragmentCount":0}
+
+[90mstdout[2m | src/__fixtures__/perceptual/centerline-bar.test.ts[2m > [22m[2mcenterline trace meets the landed regression bar[2m > [22m[2ml-corner: stays inside its current regression limits
+[22m[39m[centerline-bar] l-corner {"maxDeviationPx":0.7603788938943552,"meanDeviationPx":0.6100811420912502,"maxGapPx":0.8760491902120955,"meanGapPx":0.6103140524209697,"fragmentCount":1,"expectedStrokeCount":1,"shortFragmentCount":0}
+
+[90mstdout[2m | src/__fixtures__/perceptual/centerline-bar.test.ts[2m > [22m[2mcenterline trace meets the landed regression bar[2m > [22m[2mcross: stays inside its current regression limits
+[22m[39m[centerline-bar] cross {"maxDeviationPx":0.6903364182219462,"meanDeviationPx":0.5906964230415287,"maxGapPx":0.8760491902120955,"meanGapPx":0.5940237796585931,"fragmentCount":2,"expectedStrokeCount":2,"shortFragmentCount":0}
+
+[90mstdout[2m | src/__fixtures__/perceptual/centerline-bar.test.ts[2m > [22m[2mcenterline trace meets the landed regression bar[2m > [22m[2marc: stays inside its current regression limits
+[22m[39m[centerline-bar] arc {"maxDeviationPx":0.7883643661807932,"meanDeviationPx":0.13279166326124492,"maxGapPx":0.9648310311805065,"meanGapPx":0.14319699929858218,"fragmentCount":1,"expectedStrokeCount":1,"shortFragmentCount":0}
+
+ [32m✓[39m src/__fixtures__/perceptual/centerline-bar.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m src/ui/state/cnc-text-defaults.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/commands.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/grbl-settings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-unsaved-changes-guard.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/invariants/blank-feed.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/trace/preprocess-auto-median.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/cnc/profile-paths.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/state/toast-store.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/state/object-properties-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/io/project/project-relief.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl/response.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/camera/rodrigues.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/raster/emit-raster-scan-offset.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/layers/layer-default-settings.persistence.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/raster/crop-image.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/commands/machine-command-gate.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/ui/laser/device-setup/device-setup-firmware-diff.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/raster/preview-data.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/ui/calibration/ScanOffsetCalibrationDialog.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 51[2mms[22m[39m
+[90mstderr[2m | src/ui/relief-viewer/Relief3DViewerDialog.test.tsx[2m > [22m[2mRelief3DViewerDialog[2m > [22m[2mrenders the dialog frame and falls back gracefully without WebGL
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at getContext (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15178:18)
+    at new WebGLRenderer (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15207:11)
+    at createReliefThreeScene (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\relief-three-scene.ts:34:16)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at buildReliefScene (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Relief3DViewerDialog.tsx:55:12) [90mundefined[39m
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at getContext (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15178:18)
+    at new WebGLRenderer (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15211:11)
+    at createReliefThreeScene (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\relief-three-scene.ts:34:16)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at buildReliefScene (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Relief3DViewerDialog.tsx:55:12) [90mundefined[39m
+THREE.WebGLRenderer: Error creating WebGL context.
+
+[90mstderr[2m | src/ui/relief-viewer/Relief3DViewerDialog.test.tsx[2m > [22m[2mRelief3DViewerDialog[2m > [22m[2mrenders the dialog frame and falls back gracefully without WebGL
+[22m[39mWarning: An update to Viewer3DDialogShell inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Viewer3DDialogShell (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Viewer3DDialogShell.tsx:9:53)
+    at Relief3DViewerDialog (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Relief3DViewerDialog.tsx:10:11)
+
+ [32m✓[39m src/ui/relief-viewer/Relief3DViewerDialog.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 105[2mms[22m[39m
+ [32m✓[39m src/ui/common/NumberField.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m src/ui/state/material-preset-actions.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/commands/ProjectNotesDialog.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-raster-preview-async.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/ui/commands/image-command-actions.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/machine/cnc-detected-apply.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-open-fill-warning.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/platform/web/web-adapter.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/layers/debouncer.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/app/import-toasts.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/camera/rectify-map.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/camera/camera-overlay-transform.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/camera/CameraOverlay.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/selection-marquee.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/cnc/feeds-calculator.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/apply-transform-drag.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/io/project/project-controller-kind.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/laser/cnc-raster-warnings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/job/registration-placement.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/preflight/preflight-relief.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/camera/alignment.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-registration-box.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/laser/JobControls.cnc-mode.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m src/core/scene/selection-align.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/io/project/project-machine-profile.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-layer-defaults-persistence.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/ui/laser/device-setup/device-setup-nudge.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/trace/edge-subpixel.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/trace/trace-image-sketch.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/state/duplicate.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/drag-snap.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-close-open-fill-contours.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/core/camera/fisheye.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/ui/commands/selection-command-state.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/scene/fit-to-bed.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/state/import-actions.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/camera/lm-params.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/arch-house-edge-truth.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/laser/cnc-stock-warnings.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/laser/SafetyNoticeBanner.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32m✓[39m src/ui/state/device-setup-configured-persistence.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-large.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/ui/state/cnc-material-seeding.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-transcript.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/trace/use-trace-worker-client-timeout.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 104[2mms[22m[39m
+ [32m✓[39m src/core/job/fill-hatching.perf.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 364[2mms[22m[39m
+   [33m[2m✓[22m[39m fillHatching — performance (big-image freeze regression)[2m > [22mfills tens of thousands of contours without freezing [33m 362[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-no-go-zones.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/laser/start-job-output-scope.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/camera/xcorner.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/ui/raster/AdjustImageDialog.user-presets.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/app/use-space-pan.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/io/project/project-trace-mode.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/laser/OptimizationSettingsDialog.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 41[2mms[22m[39m
+ [32m✓[39m src/core/trace/potrace-params.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/io/project/project-camera-alignment.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/io/project/project-star-shape.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/laser/JobControls-output-scope.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/core/camera/camera-calibration.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/camera/corner-subpix.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/output/smoothieware-strategy.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/shapes/ellipse.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/io/project/project-image-mask.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/core/camera/mat3.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/ui/common/InstallButton.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m src/ui/common/image-import.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/raster/image-mask.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/trace/edge-trace-determinism.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 60[2mms[22m[39m
+ [32m✓[39m src/core/shapes/create-rectangle.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+[90mstderr[2m | src/ui/camera/trace-from-camera.test.ts[2m > [22m[2mbuildCameraTraceImage[2m > [22m[2mraw basis flows through the warp to the encoder
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at rgbaToPngDataUrl (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\camera\trace-from-camera.ts:98:26)
+    at buildCameraTraceImage (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\camera\trace-from-camera.ts:67:19)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\camera\trace-from-camera.test.ts:51:20
+    at file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/@vitest+runner@3.2.6/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/@vitest+runner@3.2.6/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/@vitest+runner@3.2.6/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>) [90mundefined[39m
+
+ [32m✓[39m src/ui/camera/trace-from-camera.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/core/trace/potrace-bitmap.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+[90mstderr[2m | src/ui/relief-viewer/Cut3DPreviewDialog.test.tsx[2m > [22m[2mCut3DPreviewDialog[2m > [22m[2mrenders the stock-sized dialog and falls back gracefully without WebGL
+[22m[39mError: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at getContext (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15178:18)
+    at new WebGLRenderer (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15207:11)
+    at createReliefThreeScene (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\relief-three-scene.ts:34:16)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Cut3DPreviewDialog.tsx:29:16 [90mundefined[39m
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\browser\not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\nodes\HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\node_modules\.pnpm\jsdom@25.0.1\node_modules\jsdom\lib\jsdom\living\generated\HTMLCanvasElement.js:131:58)
+    at getContext (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15178:18)
+    at new WebGLRenderer (file:///C:/Users/Asus/LaserForge-2.0/.claude/worktrees/gifted-goldstine-28dc0b/node_modules/.pnpm/three@0.180.0/node_modules/three/build/three.module.js:15211:11)
+    at createReliefThreeScene (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\relief-three-scene.ts:34:16)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Cut3DPreviewDialog.tsx:29:16 [90mundefined[39m
+THREE.WebGLRenderer: Error creating WebGL context.
+
+[90mstderr[2m | src/ui/relief-viewer/Cut3DPreviewDialog.test.tsx[2m > [22m[2mCut3DPreviewDialog[2m > [22m[2mrenders the stock-sized dialog and falls back gracefully without WebGL
+[22m[39mWarning: An update to Viewer3DDialogShell inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at Viewer3DDialogShell (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Viewer3DDialogShell.tsx:9:53)
+    at Cut3DPreviewDialog (C:\Users\Asus\LaserForge-2.0\.claude\worktrees\gifted-goldstine-28dc0b\src\ui\relief-viewer\Cut3DPreviewDialog.tsx:10:11)
+
+ [32m✓[39m src/ui/relief-viewer/Cut3DPreviewDialog.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m src/core/controllers/grbl-family-drivers.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/state/laser-connection-actions.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/shapes/polygon.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/state/cnc-project-material-action.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/geometry/tabs-bridges.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/job/camera-align-pattern.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m electron/rtsp-camera-bridge.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/job/job-origin.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/relief/relief-surface-mesh.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/display-polylines.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/io/project/project-notes.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/material-library/neotronics-4040-presets.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/laser/JobControls.progress.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m src/ui/state/draw-shape-mutation.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/scene/scene-object.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/trace/canny-edges.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/ui/state/frame-verification.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/invariants/gcode-words.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/common/ConnectionBadge.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m src/ui/state/store-select-objects.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/ui/state/output-scope-store.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/sim/removal-grid-display.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/job/fill-hatching-nonzero.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/state/cnc-machine-preset.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/gcode-rasterize.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/controllers/detect-controller.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/sim/tool-kernels.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/platform/web/cloudflare-pages-routing.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/io/project/project-object-locking.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/laser/device-setup/DeviceSetupProbeStep.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m src/ui/state/external-gcode-actions.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/platform/web/pwa-precache.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/job/compile-job-raster-mask.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-no-go-zones.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-snap-guides.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/camera/pose-diversity.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-object-overrides.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/use-workspace-drag.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/invariants/cnc-motion.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/scene/project.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/overlays.test.tsx [2m([22m[2m1 test[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/io/project/project-registration-jig.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/ui/state/island-fill-recovery-actions.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/shapes/create-polyline.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/io/project/migrations.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m electron/serial-port-choice.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m electron/rtsp-camera-bridge-policy.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/cnc/depth-passes.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/commands/camera-command-family.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-snap-guides.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/devices/scan-offset-profile.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/devices/jog-direction.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/camera/wizard/capture-novelty.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/raster/raster-budget.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/job/raster-bounds.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/layers/layer-default-settings.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/job/scene-output-bounds.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/camera/resolution-match.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/devices/gcode-dialects.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/camera/linear-solve.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/theme/theme-sync.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/job/toolpath-island-policy.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m electron/source-map-policy.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/shapes/polyline.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/ui/app/import-size-guard.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m electron/csp-policy.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/output/grbl-strategy-raster-calibration.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/state/generated-scene-actions.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-retrace-original.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/measure-tool.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/camera/gray.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/camera/NetworkCameraView.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/ui/state/machine-profile-actions.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/core/job/frame-verification.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/raster/luma-adjust.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-fill-selection.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/core/camera/camera-alignment.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/ui/commands/command-break-apart.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/perceptual/png.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/trace/trace-transparency.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-complexity.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/shapes/star.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/job/fill-hatching-metadata.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/cnc/cnc-machine-catalog.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/material-library/starter-catalog.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/devices/machine-bounds.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/workspace/draw-scene-preview-async.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/core/job/object-power-scale.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m src/core/util/numbers.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/__fixtures__/ci-budget.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/machine/machine-labels.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/state/project-optimization-actions.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/core/trace/potrace-polygon-adjust.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/state/project-notes-actions.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/ui/app/shortcuts-docs.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/core/raster/raster-units.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/platform/web/favicon.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/core/trace/index.test.ts [2m([22m[2m1 test[22m[2m)[22m[32m 4[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m590 passed[39m[22m[90m (590)[39m
+[2m      Tests [22m [1m[32m3594 passed[39m[22m[90m (3594)[39m
+[2m   Start at [22m 18:42:44
+[2m   Duration [22m 257.76s[2m (transform 12.29s, setup 0ms, collect 159.98s, tests 82.61s, environment 545.88s, prepare 75.52s)[22m
+
