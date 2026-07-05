@@ -1,4 +1,4 @@
-// Edge Detection trace (ADR-114, rebuilt): local-contrast ink mask → potrace
+// Edge Detection trace (ADR-115, rebuilt): local-contrast ink mask → potrace
 // geometry.
 //
 // The previous engine (ADR-059) chained the raw Canny edge map through the

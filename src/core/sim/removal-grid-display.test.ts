@@ -2,11 +2,13 @@
 // preservation, and the no-op fast path.
 
 import { describe, expect, it } from 'vitest';
-import { createRemovalGrid } from './removal-grid';
+import { createRemovalGrid, type RemovalGrid } from './removal-grid';
 import { downsampleRemovalGrid } from './removal-grid-display';
 
-function gridWithDepths(widthMm: number, heightMm: number, mmPerCell: number) {
-  return createRemovalGrid({ originX: 0, originY: 0, widthMm, heightMm, mmPerCell });
+function gridWithDepths(widthMm: number, heightMm: number, mmPerCell: number): RemovalGrid {
+  const result = createRemovalGrid({ originX: 0, originY: 0, widthMm, heightMm, mmPerCell });
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result.grid;
 }
 
 describe('downsampleRemovalGrid', () => {

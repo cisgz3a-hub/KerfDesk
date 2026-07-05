@@ -82,7 +82,7 @@ Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `fla
 
 Type text on canvas in selectable bundled fonts; result flows through the existing Line pipeline. See ADR-012.
 
-- Bundled MIT-licensed fonts only.
+- Bundled MIT-compatible fonts only (Apache-2.0 + OFL-1.1; see THIRD_PARTY_NOTICES.md).
 - Text-to-path via `opentype.js` (MIT).
 - Live editing UI: content, font picker with preview, size, alignment, character spacing, line height. (Glyph weld is **not** implemented — it depends on the geometry kernel, anticipated post-Phase-F; do not describe it as shipped.)
 
@@ -251,7 +251,7 @@ phase; tracked here so they don't get lost.
 13. **All invariants property-tested** (ADR-010).
 14. **G-code snapshot-tested** (ADR-010).
 15. **File-size limits enforced** (ADR-015): files ≤ 400 lines hard, ≤ 250 soft; components ≤ 250 hard; functions ≤ 80 hard.
-16. **Co-located tests** (ADR-015): every source file has a `.test.ts` sibling.
+16. **Co-located tests** (ADR-015): tests live beside their source (`Foo.ts` has a `Foo.test.ts`). Not every source file has a sibling and CI does not enforce a strict sibling rule (see CLAUDE.md); PR review rejects untested source changes.
 17. **Single responsibility per file** (CLAUDE.md). One-sentence description without "and."
 18. **Discriminated unions for state** (ADR-010, ADR-014).
 19. **`SceneObject` extensible from day one** (ADR-014).
@@ -279,19 +279,19 @@ phase; tracked here so they don't get lost.
 - **State:** Zustand with strict slices. Discriminated-union actions.
 - **Canvas:** Canvas2D.
 - **Desktop shell:** Electron LTS. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
-- **Platform adapter:** `platform/web/` and `platform/electron/` implement the same `PlatformAdapter` interface.
+- **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the desktop (Electron) side lives in the top-level `electron/` folder (there is no `src/platform/electron/`).
 - **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
 - **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
-- **Text (Phase D):** `opentype.js` (MIT). Bundled MIT fonts.
+- **Text (Phase D):** `opentype.js` (MIT). Bundled MIT-compatible fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script OFL-1.1).
 - **Vectorize (Phase E):** `imagetracerjs` (Unlicense — MIT-compatible).
-- **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property), Playwright (E2E smoke per platform).
+- **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property). E2E smoke (Playwright) is anticipated but not yet adopted (absent from devDependencies and CI).
 - **Build:** Vite → web bundle; Vite + electron-builder → signed Windows `.exe`.
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
   - `license-checker` in CI (license-compliance enforcement).
   - Prettier.
-- **CI:** GitHub Actions. Lint, typecheck, license-check, unit, property, snapshot, build, E2E. PR blocked on red.
+- **CI:** GitHub Actions on `ubuntu-latest`. Lint, typecheck, license-check, unit, property, snapshot, web build, and the Electron main-process compile. PR blocked on red. NOTE: the Windows desktop `.exe` (`build:desktop`, electron-builder) and E2E smoke are NOT run in CI - desktop packaging + E2E/hardware verification are release-manual (S02-001/003).
 - **Repo:** Single Git repo, proprietary license, private from first commit (ADR-018; reversible — see ADR-018 reversal triggers).
 
 ---
@@ -411,7 +411,7 @@ an assumption that every folder must have an `index.ts`.
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
 - **No auto-update from arbitrary URLs.**
-- **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. CVE in a direct dependency blocks releases until patched.
+- **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. A dependency CVE blocks releases until patched. NOTE: the CI `audit:deps` gate (`pnpm audit --audit-level=low`, part of `release:check`) fails on ANY advisory (direct OR transitive) at low+ severity - stricter than "direct only", and time-dependent (a new transitive advisory can block deploys with no code change).
 
 ---
 

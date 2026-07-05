@@ -125,4 +125,17 @@ describe('meshToHeightmap', () => {
     const flat: TriangleMesh = { positions: Float32Array.from([0, 0, 0, 0, 0, 1, 0, 0, 2]) };
     expect(meshToHeightmap(flat, { targetWidthMm: 20, reliefDepthMm: 5 }).kind).toBe('error');
   });
+
+  it('rejects non-finite target dimensions instead of returning an ok empty heightmap', () => {
+    const result = meshToHeightmap(pyramidMesh(), {
+      targetWidthMm: Number.POSITIVE_INFINITY,
+      reliefDepthMm: 5,
+      mmPerCell: 1,
+    });
+
+    expect(result).toEqual({
+      kind: 'error',
+      reason: 'Target width and relief depth must be finite positive numbers.',
+    });
+  });
 });

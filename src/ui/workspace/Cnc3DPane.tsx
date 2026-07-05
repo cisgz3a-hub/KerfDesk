@@ -88,7 +88,7 @@ function useDesignRemovalGrid(
       Math.max(widthMm, heightMm) / PANE_TARGET_CELLS_PER_AXIS,
     );
     const kernel = kernelForTool(activeCncTool(machine), mmPerCell);
-    return computeRemovalGrid(
+    const result = computeRemovalGrid(
       toolpath,
       {
         originX: Math.min(a.x, b.x),
@@ -99,6 +99,7 @@ function useDesignRemovalGrid(
       },
       kernel,
     );
+    return result.kind === 'ok' ? result.grid : null;
   }, [project, outputScope, collapsed]);
 }
 

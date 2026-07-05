@@ -58,7 +58,7 @@ describe('trace benchmark loop', () => {
       expect(archHouseEdge.metrics.maxLongestArchGapDeg).toBeLessThanOrEqual(30);
       // The 2026-07-03 defects: letter outlines left open with small visible
       // gaps, and faceted (lumpy) small-letter curves. The excess-turn target
-      // is recalibrated for the ADR-114 potrace engine (see the rationale in
+      // is recalibrated for the ADR-115 potrace engine (see the rationale in
       // arch-house-edge-benchmark.ts): polygon-style geometry measures ~117
       // where the old spline style measured ≤12 — while rendering every
       // letter legible with every counter present.

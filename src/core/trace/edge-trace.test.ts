@@ -370,7 +370,7 @@ describe('traceImageToEdgePaths', () => {
   });
 
   // The traced circle must stay smooth — no visible staircase lumps (the
-  // "not smooth on turns" defect, 2026-07-03). ADR-114 rebaseline: the
+  // "not smooth on turns" defect, 2026-07-03). ADR-115 rebaseline: the
   // Canny+ridge engine measured RMS ≤0.12px via gradient sub-pixel snapping;
   // the potrace geometry measures 0.135px on the same disc (pixel-lattice
   // scan + curve fit). The 0.015px difference is far below anything a laser

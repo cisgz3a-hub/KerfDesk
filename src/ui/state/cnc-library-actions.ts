@@ -141,7 +141,19 @@ function machineProfileActions(
         if (s.project.machine?.kind !== 'cnc') return s;
         const profile = s.cncLibrary.machineProfiles.find((p) => p.id === profileId);
         if (profile === undefined) return s;
-        const machine: CncMachineConfig = profile.machine;
+        // Bits added after the profile was saved survive the apply — a
+        // wholesale replace silently deleted them and layers referencing
+        // them fell back to the machine bit.
+        const currentTools = s.project.machine.tools;
+        const machine: CncMachineConfig = {
+          ...profile.machine,
+          tools: [
+            ...profile.machine.tools,
+            ...currentTools.filter(
+              (tool) => !profile.machine.tools.some((kept) => kept.id === tool.id),
+            ),
+          ],
+        };
         return {
           project: { ...s.project, machine },
           undoStack: pushUndo(s.project, s.undoStack),

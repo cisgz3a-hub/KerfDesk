@@ -10,7 +10,7 @@
 // keeps solid interiors filled, the local pass adds the faint detail the
 // global threshold drops.
 //
-// Chosen over Canny-loop filling for the Edge Detection rebuild (ADR-114):
+// Chosen over Canny-loop filling for the Edge Detection rebuild (ADR-115):
 // filling enclosed edge loops needs the loops closed, and closing them
 // morphologically consumes small interior holes (letter counters) — the
 // exact detail the edge preset exists to keep. The local-contrast test has

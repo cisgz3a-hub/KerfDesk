@@ -8,7 +8,13 @@ export type ControllerReadinessErrorCode =
   | 'max-power-unknown'
   | 'max-power-mismatch'
   | 'laser-mode-unknown'
-  | 'laser-mode-disabled';
+  | 'laser-mode-disabled'
+  // CNC/router counterparts: a spindle machine must have $32=0 (laser mode
+  // zeroes spindle output during G0 rapids, so plunges start with a bit not
+  // at speed) and $30 equal to the machine's spindle max RPM, not the laser
+  // S scale.
+  | 'laser-mode-enabled'
+  | 'spindle-scale-mismatch';
 
 export type ControllerReadinessWarningCode = 'min-power-nonzero' | 'power-scale-unverified';
 
@@ -39,9 +45,14 @@ export function runControllerReadiness(
   // prove $30/$32 agreement. The power scale then rests on the device
   // profile alone — allowed, but stated plainly (Phase H honesty rule).
   if (settingsCapability !== 'grbl-dollar') {
+    const cncMachine =
+      project.machine !== undefined && project.machine.kind === 'cnc' ? project.machine : null;
     warnings.push({
       code: 'power-scale-unverified',
-      message: `This controller does not report GRBL $-settings, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`,
+      message:
+        cncMachine === null
+          ? `This controller does not report GRBL $-settings, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`
+          : `This controller does not report GRBL $-settings, so the spindle S scale (max RPM ${cncMachine.params.spindleMaxRpm}) comes from the machine profile and is NOT verified against the firmware. Confirm it before cutting.`,
     });
     return { ok: true, errors, warnings };
   }
@@ -55,6 +66,59 @@ export function runControllerReadiness(
     return { ok: false, errors, warnings };
   }
 
+  // Spindle/router machines invert the laser rules: $32 must be OFF and $30
+  // is the spindle's max RPM, not the laser S scale (F-CNC provenance header:
+  // "; assumes: ... $32=0 (router mode)").
+  const machine = project.machine;
+  if (machine !== undefined && machine.kind === 'cnc') {
+    return cncReadiness(machine.params.spindleMaxRpm, controller);
+  }
+  return laserReadiness(project, controller);
+}
+
+type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
+type ReadinessWarnings = Array<ControllerReadinessMessage<ControllerReadinessWarningCode>>;
+
+function cncReadiness(
+  spindleMaxRpm: number,
+  controller: ControllerSettingsSnapshot,
+): ControllerReadinessResult {
+  const errors: ReadinessErrors = [];
+  const warnings: ReadinessWarnings = [];
+  if (controller.maxPowerS === undefined) {
+    errors.push({
+      code: 'max-power-unknown',
+      message:
+        'Controller did not report GRBL $30. KerfDesk cannot prove S values map to spindle RPM.',
+    });
+  } else if (controller.maxPowerS !== spindleMaxRpm) {
+    errors.push({
+      code: 'spindle-scale-mismatch',
+      message: `Controller $30 is ${controller.maxPowerS} but this machine's spindle max RPM is ${spindleMaxRpm}. Set $30=${spindleMaxRpm} (or update the machine profile) so S values map to real RPM.`,
+    });
+  }
+  if (controller.laserModeEnabled === undefined) {
+    errors.push({
+      code: 'laser-mode-unknown',
+      message:
+        'Controller did not report GRBL $32. KerfDesk cannot prove the controller is in router mode.',
+    });
+  } else if (controller.laserModeEnabled) {
+    errors.push({
+      code: 'laser-mode-enabled',
+      message:
+        'Controller reports $32=1 (laser mode). Set $32=0 for spindle work: laser mode cuts spindle power to zero during rapids, so plunges would start with the bit not at speed.',
+    });
+  }
+  return { ok: errors.length === 0, errors, warnings };
+}
+
+function laserReadiness(
+  project: Project,
+  controller: ControllerSettingsSnapshot,
+): ControllerReadinessResult {
+  const errors: ReadinessErrors = [];
+  const warnings: ReadinessWarnings = [];
   if (controller.maxPowerS === undefined) {
     errors.push({
       code: 'max-power-unknown',

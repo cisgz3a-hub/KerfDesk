@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOX_DRAFT_PERSISTED_FIELDS,
+  boxDraftWithMaterialThickness,
   defaultBoxDraft,
   parseBoxDraft,
+  type BoxAutoFitField,
   type BoxMachineContext,
 } from './box-draft';
 
@@ -13,14 +15,38 @@ describe('defaultBoxDraft', () => {
     const draft = defaultBoxDraft({ kind: 'laser' });
     expect(draft.clearance).toBe('0');
     expect(draft.thickness).toBe('3');
+    expect(draft.fingerWidth).toBe('9');
+    expect(draft.partSpacing).toBe('8');
     expect(draft.toolDiameter).toBe('');
   });
 
   it('prefills CNC defaults from the machine: stock, tool, glue fit', () => {
     const draft = defaultBoxDraft(CNC);
     expect(draft.thickness).toBe('6.35');
+    expect(draft.fingerWidth).toBe('19.05');
+    expect(draft.partSpacing).toBe('12.7');
     expect(draft.toolDiameter).toBe('3.175');
     expect(draft.clearance).toBe('0.15');
+  });
+});
+
+describe('boxDraftWithMaterialThickness', () => {
+  it('updates auto-sized fit fields from material thickness', () => {
+    const draft = defaultBoxDraft({ kind: 'laser' });
+    const next = boxDraftWithMaterialThickness(draft, '6', new Set());
+
+    expect(next.thickness).toBe('6');
+    expect(next.fingerWidth).toBe('18');
+    expect(next.partSpacing).toBe('12');
+  });
+
+  it('preserves fit fields the operator already edited', () => {
+    const draft = { ...defaultBoxDraft({ kind: 'laser' }), fingerWidth: '11', partSpacing: '10' };
+    const locked = new Set<BoxAutoFitField>(['fingerWidth', 'partSpacing']);
+    const next = boxDraftWithMaterialThickness(draft, '6', locked);
+
+    expect(next.fingerWidth).toBe('11');
+    expect(next.partSpacing).toBe('10');
   });
 });
 

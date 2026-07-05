@@ -20,7 +20,9 @@ const MACHINE = DEFAULT_CNC_MACHINE_CONFIG; // active bit em-3175 = 3.175 mm, la
 // computed, not hard-coded, so the test verifies the wiring (material, bit,
 // rpm, flutes) rather than pinning magic numbers.
 function expectedFeeds(material: 'hardwood' | 'plywood-mdf') {
-  return calculateFeeds({ material, bitDiameterMm: 3.175, flutes: 2, rpm: 12000 });
+  const feeds = calculateFeeds({ material, bitDiameterMm: 3.175, flutes: 2, rpm: 12000 });
+  if (feeds.kind === 'error') throw new Error(feeds.reason);
+  return feeds;
 }
 
 function cncLayer(id: string): Layer {
@@ -46,6 +48,15 @@ describe('layerWithCncMaterial (ADR-112)', () => {
   it('is a no-op for an unknown material key', () => {
     const layer = cncLayer('#ff0000');
     expect(layerWithCncMaterial(layer, MACHINE, 'kryptonite')).toBe(layer);
+  });
+
+  it('does not persist material feeds when the layer spindle is non-finite', () => {
+    const layer = {
+      ...cncLayer('#ff0000'),
+      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: Number.NaN },
+    };
+
+    expect(layerWithCncMaterial(layer, MACHINE, 'hardwood')).toBe(layer);
   });
 });
 

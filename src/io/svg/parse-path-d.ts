@@ -61,6 +61,21 @@ const COMMAND_LETTERS = new Set([
 
 const NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 
+// A path coordinate must be finite. NUMBER_RE permits an unbounded exponent, so
+// `Number("1e999")` is Infinity; a non-finite coordinate would flow to the
+// G-code emitter as a literal `XInfinity`/`XNaN` word and slip past the
+// out-of-bounds preflight, which cannot parse a non-numeric coordinate (S04-001).
+// Reject at the import boundary, mirroring io/project's `requireCoordinate`
+// finiteness guard on `.lf2` load. Throwing matches this parser's existing
+// SVG_IMPORT_LIMITS point-cap throw (both surface through the import flow).
+function finiteNumber(raw: string): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new Error(`SVG path contains a non-finite coordinate: "${raw}"`);
+  }
+  return value;
+}
+
 export function parsePathD(
   d: string,
   flatness: number = DEFAULT_FLATNESS_MM,
@@ -94,7 +109,9 @@ function tokenize(d: string): ReadonlyArray<Token> {
       // (`a4 4 0 011 7` is valid SVG and standard SVGO output). A greedy
       // number match would read `011` as one number and drop the whole arc.
       const args =
-        ch === 'A' || ch === 'a' ? parseArcArgs(slice) : (slice.match(NUMBER_RE) ?? []).map(Number);
+        ch === 'A' || ch === 'a'
+          ? parseArcArgs(slice)
+          : (slice.match(NUMBER_RE) ?? []).map(finiteNumber);
       out.push({ cmd: ch, args });
       i = j;
     } else {
@@ -126,7 +143,7 @@ function parseArcArgs(slice: string): number[] {
     numberAt.lastIndex = i;
     const match = numberAt.exec(slice);
     if (match === null) break;
-    out.push(Number(match[0]));
+    out.push(finiteNumber(match[0]));
     i = numberAt.lastIndex;
   }
   return out;

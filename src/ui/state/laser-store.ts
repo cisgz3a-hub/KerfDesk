@@ -18,10 +18,12 @@ import {
 } from '../../core/controllers';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
+import type { MachineKind } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
 import { consoleActions, type ConsoleCommandOptions } from './laser-console-actions';
 import type { LaserControllerOperation } from './laser-controller-operation';
+import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
@@ -74,12 +76,22 @@ export type ConnectionState =
 export type HomingState = 'unknown' | 'homing' | 'confirmed';
 export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 
+// Streamer options plus the machine kind the job was compiled for, so pause
+// safety can distinguish laser ($32 proof required) from router (must not).
+export type StartJobOptions = CreateStreamerOptions & {
+  readonly machineKind?: MachineKind;
+};
+
 export type LaserState = {
   readonly connection: ConnectionState;
   readonly statusReport: StatusReport | null;
   readonly alarmCode: number | null;
   readonly lastError: number | null;
   readonly lastWriteError: string | null;
+  // Operator-requested coolant/air state for the manual jog-panel control.
+  // Jobs may still emit their own M7/M8/M9 sequence; Stop/Disconnect force this
+  // false after sending the driver's coolant-off cleanup.
+  readonly airAssistOn: boolean;
   // P0-B: operator-facing safety alert raised when the store cannot guarantee
   // the machine is safe — a failed Stop/Pause/Resume/Disconnect write, or a USB
   // drop mid-job. null = nothing to warn about. Cleared on the next successful
@@ -91,6 +103,11 @@ export type LaserState = {
   readonly motionOperation: LaserMotionOperation | null;
   readonly controllerOperation: LaserControllerOperation | null;
   readonly streamer: StreamerState | null;
+  // Which machine kind the running job was compiled for. Pause safety
+  // differs by kind: lasers need the $32=1 proof before feed hold (the beam
+  // can stay on through a hold at $32=0); routers require $32=0 and hold is
+  // safe with the spindle spinning. null = no job started yet.
+  readonly activeJobMachineKind: MachineKind | null;
   // Queued writes outside the job stream (console, origin, unlock, the
   // handshake $$ …) that still owe a terminal ok/error. GRBL acks in strict
   // receive order, so Start must wait for 0: a stale ok mis-attributed to a
@@ -163,6 +180,7 @@ export type LaserState = {
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
+  readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
   readonly cancelJog: () => Promise<void>;
   readonly frame: (
     bounds: {
@@ -173,7 +191,7 @@ export type LaserState = {
     },
     feed: number,
   ) => Promise<void>;
-  readonly startJob: (gcode: string, options?: CreateStreamerOptions) => Promise<void>;
+  readonly startJob: (gcode: string, options?: StartJobOptions) => Promise<void>;
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
@@ -342,6 +360,59 @@ function jogActions(
   };
 }
 
+function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssistEnabled'> {
+  return {
+    setAirAssistEnabled: async (enabled) => {
+      assertAutofocusIdle(get());
+      assertAirAssistReady(set, get);
+      const command = enabled ? useStore.getState().project.device.airAssistCommand : 'M9';
+      if (command === 'none') {
+        const message =
+          'Air assist is disabled in Machine Setup. Set Air assist to M7 or M8 first.';
+        set({
+          lastWriteError: message,
+          log: pushLog(get(), `[lf2] Air assist command blocked: ${message}`),
+        });
+        throw new Error(message);
+      }
+      await safeWrite(set, get, `${command}\n`, 'air-assist', 'console');
+      set({
+        airAssistOn: enabled,
+        lastWriteError: null,
+        log: pushLog(get(), `[lf2] Air assist ${enabled ? `on (${command})` : 'off (M9)'}.`),
+      });
+    },
+  };
+}
+
+function assertAirAssistReady(set: SetFn, get: GetFn): void {
+  const state = get();
+  const blockedMessage =
+    airAssistCommandBlockMessage(state) ??
+    controllerOperationCommandBlockMessage(state.controllerOperation);
+  if (blockedMessage === null) return;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(state, `[lf2] Air assist command blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
+}
+
+function airAssistCommandBlockMessage(state: LaserState): string | null {
+  const activeJobMessage = activeJobCommandBlockMessage(state);
+  if (activeJobMessage !== null) return activeJobMessage;
+  const motionOperationMessage = motionOperationCommandBlockMessage(state);
+  if (motionOperationMessage !== null) return motionOperationMessage;
+  if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
+  if (state.statusReport === null) {
+    return 'Controller status is not known yet. Wait for an Idle status report before toggling air assist.';
+  }
+  if (state.statusReport.state !== 'Idle') {
+    return `Machine must be Idle before toggling air assist (currently ${state.statusReport.state}).`;
+  }
+  return null;
+}
+
 function cncFrameRetractLine(safeZMm: number, feed: number): string {
   return `$J=G90 G21 Z${safeZMm.toFixed(3)} F${Math.max(1, Math.round(feed))}
 `;
@@ -391,6 +462,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ),
   ...autofocusActions(set, get),
   ...jogActions(set, get),
+  ...airAssistActions(set, get),
   ...probeActions(set, get, refs),
   ...overrideActions((line) => safeWrite(set, get, line)),
   ...jobActions(
