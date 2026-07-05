@@ -46,8 +46,7 @@ export function LayerBitSelect(props: {
   const feedsForBit = (toolId: string | undefined): Partial<CncLayerSettings> => {
     const materialKey = props.settings.materialKey;
     if (machine?.kind !== 'cnc' || materialKey === undefined) return {};
-    const tool =
-      toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
+    const tool = toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
     if (tool === undefined) return {};
     return materialFeedsPatch(materialKey, tool, props.settings.spindleRpm, maxFeed) ?? {};
   };

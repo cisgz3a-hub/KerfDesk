@@ -37,7 +37,11 @@ type DiffedSetting = {
 const DIFFED_SETTINGS: ReadonlyArray<DiffedSetting> = [
   { id: 30, label: 'Max power (S)', desired: (d, cnc) => cnc?.params.spindleMaxRpm ?? d.maxPowerS },
   { id: 31, label: 'Min power (S)', desired: (d) => d.minPowerS },
-  { id: 32, label: 'Laser mode', desired: (d, cnc) => (cnc === null && d.laserModeEnabled ? 1 : 0) },
+  {
+    id: 32,
+    label: 'Laser mode',
+    desired: (d, cnc) => (cnc === null && d.laserModeEnabled ? 1 : 0),
+  },
   { id: 130, label: 'Bed width', desired: (d) => d.bedWidth },
   { id: 131, label: 'Bed height', desired: (d) => d.bedHeight },
 ];
