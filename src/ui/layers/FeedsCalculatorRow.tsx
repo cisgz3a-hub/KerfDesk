@@ -17,13 +17,20 @@ export function FeedsCalculatorRow(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
+  const maxFeed = useStore((s) => s.project.device.maxFeed);
   const [material, setMaterial] = useState<ChiploadMaterial>('plywood-mdf');
   const [flutes, setFlutes] = useState(DEFAULT_FLUTES);
   if (machine?.kind !== 'cnc') return null;
 
   const tool = layerCncTool(machine, props.settings);
   const rpm = props.settings.spindleRpm;
-  const result = calculateFeeds({ material, bitDiameterMm: tool.diameterMm, flutes, rpm });
+  const result = calculateFeeds({
+    material,
+    bitDiameterMm: tool.diameterMm,
+    flutes,
+    rpm,
+    maxFeedMmPerMin: maxFeed,
+  });
   return (
     <details style={boxStyle}>
       <summary

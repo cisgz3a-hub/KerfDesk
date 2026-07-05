@@ -22,6 +22,7 @@ export function CncMaterialRow(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
+  const maxFeed = useStore((s) => s.project.device.maxFeed);
   const { layer, settings, onCommit, onCommitSettings } = props;
   if (machine?.kind !== 'cnc') return null;
   const tool = layerCncTool(machine, settings);
@@ -40,6 +41,7 @@ export function CncMaterialRow(props: {
       bitDiameterMm: tool.diameterMm,
       flutes: ASSUMED_FLUTES,
       rpm: settings.spindleRpm,
+      maxFeedMmPerMin: maxFeed,
     });
     onCommit({
       materialKey: material,

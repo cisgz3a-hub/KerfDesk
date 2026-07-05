@@ -61,4 +61,26 @@ describe('calculateFeeds', () => {
     expect(r.plungeMmPerMin).toBeGreaterThanOrEqual(25);
     expect(r.depthPerPassMm).toBeGreaterThanOrEqual(0.1);
   });
+
+  it('clamps feed and plunge to the machine ceiling when maxFeedMmPerMin is set', () => {
+    // 12,000 RPM × 2 flutes × 0.060 chipload suggests 1440 mm/min — a
+    // suggestion a 1000 mm/min machine cannot run and preflight would
+    // reject. The commit path must receive machine-runnable values.
+    const r = calculateFeeds({
+      material: 'plywood-mdf',
+      bitDiameterMm: 3.175,
+      flutes: 2,
+      rpm: 12000,
+      maxFeedMmPerMin: 1000,
+    });
+    expect(r.feedMmPerMin).toBe(1000);
+    expect(r.plungeMmPerMin).toBeLessThanOrEqual(1000);
+    const unclamped = calculateFeeds({
+      material: 'plywood-mdf',
+      bitDiameterMm: 3.175,
+      flutes: 2,
+      rpm: 12000,
+    });
+    expect(unclamped.feedMmPerMin).toBe(1440);
+  });
 });
