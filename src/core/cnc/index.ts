@@ -31,4 +31,6 @@ export {
   surfacingRowYs,
   type SurfacingParams,
   type SurfacingProgram,
+  type SurfacingProgramResult,
+  type SurfacingRowsResult,
 } from './surfacing';
