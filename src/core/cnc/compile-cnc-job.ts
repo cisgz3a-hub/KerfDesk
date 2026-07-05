@@ -76,6 +76,28 @@ export function compileCncJob(scene: Scene, device: DeviceProfile, config: CncMa
   return { groups: orderGroupsIntoToolSections([...clearingGroups, ...profileGroups]) };
 }
 
+// Output layers whose vector shapes exist but compile to zero toolpaths —
+// usually a bit too wide for the geometry (pockets and inside profiles need
+// the bit to fit), or open shapes on a closed-only cut type. Preflight
+// surfaces these so a job never silently omits a layer the user drew.
+export function findDroppedCncLayers(
+  scene: Scene,
+  device: DeviceProfile,
+  config: CncMachineConfig,
+): ReadonlyArray<string> {
+  const dropped: string[] = [];
+  for (const layer of scene.layers) {
+    if (!layer.output) continue;
+    const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+    const polylines = collectLayerPolylines(scene.objects, layer, device);
+    if (polylines.length === 0) continue;
+    const clearance = vcarveClearanceGroupForLayer(layer, settings, polylines, device, config);
+    const group = cncGroupForLayer(layer, settings, polylines, device, config);
+    if (clearance === null && group === null) dropped.push(layer.id);
+  }
+  return dropped;
+}
+
 export function isProfileCutType(cutType: CncCutType): boolean {
   return (
     cutType === 'profile-outside' || cutType === 'profile-inside' || cutType === 'profile-on-path'
