@@ -36,7 +36,7 @@ function MaterialFields(props: {
   return (
     <div style={materialRowStyle}>
       <MmField
-        label="Material thickness"
+        label="Material thickness (mm)"
         value={draft.thickness}
         min={0.1}
         onChange={setField('thickness')}
