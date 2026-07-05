@@ -93,6 +93,27 @@ describe('laser-store pause safety', () => {
     expect(useLaserStore.getState().lastWriteError).toMatch(/\$32=1/);
   });
 
+  it('allows feed-hold pause for a CNC job with laser mode off ($32=0 is router-correct)', async () => {
+    // Feed hold on a spindle machine is safe (motion holds, spindle keeps
+    // spinning — standard sender behavior); the $32 proof is a laser-only
+    // requirement and must not block router pause.
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({ controllerSettings: { laserModeEnabled: false } });
+    await useLaserStore
+      .getState()
+      .startJob('G21\nG90\nM3 S12000\nG1 X1 F300\nM5\n', { machineKind: 'cnc' });
+    writes.length = 0;
+
+    await useLaserStore.getState().pauseJob();
+
+    expect(writes).toContain(RT_HOLD);
+    expect(useLaserStore.getState().streamer?.status).toBe('paused');
+  });
+
   it('refuses feed-hold pause when GRBL reports laser mode disabled', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {

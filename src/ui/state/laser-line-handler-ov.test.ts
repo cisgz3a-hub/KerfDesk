@@ -25,6 +25,7 @@ function makeLaserState(): LaserState {
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
     homingState: 'unknown',
     log: [],

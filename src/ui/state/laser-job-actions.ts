@@ -70,7 +70,7 @@ export function jobActions(
       }
       const initial = createStreamer(gcode, streamOptions);
       const stepped = step(initial);
-      set({ streamer: stepped.state });
+      set({ streamer: stepped.state, activeJobMachineKind: options.machineKind ?? 'laser' });
       if (stepped.toSend.length === 0) return;
       try {
         await safeWrite(stepped.toSend, 'start');
@@ -89,8 +89,13 @@ export function jobActions(
       // $32 proof there. Firmwares without a hold byte (Marlin) pause
       // stream-side instead: the streamer stops sending and buffered motion
       // drains.
+      // Router jobs are exempt: feed hold with a spindle is standard sender
+      // behavior (motion holds, spindle keeps spinning), and a router must
+      // have $32=0 — demanding the laser proof would block CNC pause outright.
       const requiresLaserModeProof =
-        hold !== null && activeDriver.capabilities.settings === 'grbl-dollar';
+        hold !== null &&
+        activeDriver.capabilities.settings === 'grbl-dollar' &&
+        get().activeJobMachineKind !== 'cnc';
       if (requiresLaserModeProof) assertPauseSafe(set, get);
       if (hold !== null) await safeWrite(hold, 'pause');
       const s = get().streamer;

@@ -195,6 +195,7 @@ export function initialLaserState(): Pick<
   | 'motionOperation'
   | 'controllerOperation'
   | 'streamer'
+  | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
   | 'homingState'
   | 'log'
@@ -224,6 +225,7 @@ export function initialLaserState(): Pick<
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
     homingState: 'unknown',
     log: [],
