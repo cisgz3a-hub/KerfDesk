@@ -182,4 +182,42 @@ describe('compileCncJob', () => {
     );
     expect(compileCncJob(scene, dev, config)).toEqual(compileCncJob(scene, dev, config));
   });
+
+  it('drops engrave polylines with non-finite points instead of compiling NaN passes', () => {
+    // Engrave is the one cut type that takes source polylines verbatim, so it
+    // must apply the same hasFinitePoints guard as profile/pocket/v-carve/drill
+    // — a NaN here would otherwise emit as a literal "G1 XNaN" (invisible to
+    // parseGcodeWord-based preflight scanners).
+    const clean = squareObject('O1', '#ff0000', 20);
+    const corrupt: ImportedSvg = {
+      ...clean,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            ...clean.paths[0]!.polylines,
+            {
+              closed: false,
+              points: [
+                { x: NaN, y: 10 },
+                { x: 30, y: 10 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const scene = sceneWith(
+      [cncLayer('L1', '#ff0000', { cutType: 'engrave', depthMm: 1 })],
+      [corrupt],
+    );
+    const group = onlyGroup(scene);
+    expect(group.passes.length).toBeGreaterThan(0);
+    for (const pass of group.passes) {
+      for (const point of contourPass(pass).polyline) {
+        expect(Number.isFinite(point.x)).toBe(true);
+        expect(Number.isFinite(point.y)).toBe(true);
+      }
+    }
+  });
 });
