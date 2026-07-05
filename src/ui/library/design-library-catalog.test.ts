@@ -30,4 +30,17 @@ describe('design library catalog', () => {
       expect(result.object, entry.id).not.toBeNull();
     }
   });
+
+  it('includes owned laser and CNC manufacturing templates', () => {
+    const ids = new Set(DESIGN_LIBRARY.map((entry) => entry.id));
+    expect(ids).toContain('laser-power-speed-grid');
+    expect(ids).toContain('laser-kerf-comb');
+    expect(ids).toContain('laser-line-interval-test');
+    expect(ids).toContain('cnc-profile-fit-test');
+    expect(ids).toContain('cnc-pocket-depth-test');
+    expect(ids).toContain('cnc-dogbone-corner-test');
+    expect(
+      DESIGN_LIBRARY.filter((entry) => entry.kind === 'owned-template').length,
+    ).toBeGreaterThanOrEqual(16);
+  });
 });

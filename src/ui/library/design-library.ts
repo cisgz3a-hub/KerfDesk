@@ -51,6 +51,7 @@ import turtle from 'lucide-static/icons/turtle.svg?raw';
 import utensils from 'lucide-static/icons/utensils.svg?raw';
 import wine from 'lucide-static/icons/wine.svg?raw';
 import type { LibraryCategory, LibraryEntry } from './design-library-types';
+import { OWNED_TEMPLATE_ENTRIES } from './design-library-owned-svg';
 
 export type { LibraryCategory, LibraryEntry } from './design-library-types';
 
@@ -95,7 +96,7 @@ function lucideEntry(args: {
   };
 }
 
-export const DESIGN_LIBRARY: ReadonlyArray<LibraryEntry> = [
+const LUCIDE_LIBRARY_ENTRIES: ReadonlyArray<LibraryEntry> = [
   lucideEntry({ id: 'bird', title: 'Bird', subcategory: 'Animals', svgText: bird }),
   lucideEntry({ id: 'cat', title: 'Cat', subcategory: 'Animals', svgText: cat }),
   lucideEntry({ id: 'dog', title: 'Dog', subcategory: 'Animals', svgText: dog }),
@@ -159,4 +160,9 @@ export const DESIGN_LIBRARY: ReadonlyArray<LibraryEntry> = [
   lucideEntry({ id: 'trophy', title: 'Trophy', subcategory: 'Hobby & Travel', svgText: trophy }),
   lucideEntry({ id: 'gift', title: 'Gift', subcategory: 'Hobby & Travel', svgText: gift }),
   lucideEntry({ id: 'cake', title: 'Cake', subcategory: 'Hobby & Travel', svgText: cake }),
+];
+
+export const DESIGN_LIBRARY: ReadonlyArray<LibraryEntry> = [
+  ...OWNED_TEMPLATE_ENTRIES,
+  ...LUCIDE_LIBRARY_ENTRIES,
 ];
