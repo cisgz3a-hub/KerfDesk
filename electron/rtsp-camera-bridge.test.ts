@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cameraBridgeCorsOrigin,
   completeRtspDescribeResponse,
+  isAllowedBridgeOrigin,
   rtspProbeIsOk,
 } from './rtsp-camera-bridge';
 
@@ -17,6 +18,16 @@ describe('RTSP camera bridge request policy', () => {
       'https://5e8ad38c.laserforge-2fj.pages.dev',
     );
     expect(cameraBridgeCorsOrigin('https://example.com')).toBeNull();
+  });
+
+  it('gates request side effects server-side by Origin (S03-001)', () => {
+    // CORS only stops a browser reading the response; the request's side effects
+    // (RTSP probe / ffmpeg spawn) still fire. So the server must refuse an
+    // untrusted browser Origin BEFORE doing any work.
+    expect(isAllowedBridgeOrigin(undefined)).toBe(true); // same-origin / non-browser local client
+    expect(isAllowedBridgeOrigin('app://app')).toBe(true);
+    expect(isAllowedBridgeOrigin('https://kerfdesk.com')).toBe(true);
+    expect(isAllowedBridgeOrigin('https://evil.example')).toBe(false); // drive-by page — refused
   });
 
   it('treats only successful RTSP DESCRIBE replies as reachable', () => {

@@ -21,8 +21,10 @@ import {
   BOX_DRAFT_KEY,
   BOX_DRAFT_PERSISTED_FIELDS,
   BOX_FIELD_LABELS,
+  boxDraftWithMaterialThickness,
   defaultBoxDraft,
   parseBoxDraft,
+  type BoxAutoFitField,
   type BoxDraft,
   type BoxDraftParse,
   type BoxMachineContext,
@@ -42,6 +44,9 @@ export function BoxGeneratorDialog(props: {
       BOX_DRAFT_PERSISTED_FIELDS,
     ),
   );
+  const [lockedAutoFitFields, setLockedAutoFitFields] = useState<ReadonlySet<BoxAutoFitField>>(
+    () => new Set(),
+  );
   // Keeps the last valid sheet visible while the draft is invalid (F-K1).
   // Render-time ref write is an idempotent cache, safe under StrictMode.
   const lastValidPanels = useRef<ReadonlyArray<BoxPanel> | null>(null);
@@ -49,7 +54,14 @@ export function BoxGeneratorDialog(props: {
     (field: keyof BoxDraft) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
       const { value } = event.target;
-      setDraft((current) => ({ ...current, [field]: value }));
+      setDraft((current) =>
+        field === 'thickness'
+          ? boxDraftWithMaterialThickness(current, value, lockedAutoFitFields)
+          : { ...current, [field]: value },
+      );
+      if (isAutoFitField(field)) {
+        setLockedAutoFitFields((current) => new Set([...current, field]));
+      }
     };
   const parsed = parseBoxDraft(draft, props.machine);
   const generation = parsed.kind === 'spec' ? generateBox(parsed.spec) : null;
@@ -80,6 +92,10 @@ export function BoxGeneratorDialog(props: {
       </DialogActions>
     </Dialog>
   );
+}
+
+function isAutoFitField(field: keyof BoxDraft): field is BoxAutoFitField {
+  return field === 'fingerWidth' || field === 'partSpacing';
 }
 
 function IssueList(props: {

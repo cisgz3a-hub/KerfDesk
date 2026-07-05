@@ -2,7 +2,14 @@
 // spindle bracketing, and determinism.
 
 import { describe, expect, it } from 'vitest';
-import { buildSurfacingProgram, surfacingRowYs, type SurfacingParams } from './surfacing';
+import {
+  buildSurfacingProgram,
+  surfacingRowYs,
+  type SurfacingParams,
+  type SurfacingProgram,
+  type SurfacingProgramResult,
+  type SurfacingRowsResult,
+} from './surfacing';
 
 const PARAMS: SurfacingParams = {
   widthMm: 100,
@@ -20,7 +27,7 @@ const PARAMS: SurfacingParams = {
 
 describe('surfacingRowYs', () => {
   it('covers 0..height inclusive with the far edge exact', () => {
-    const rows = surfacingRowYs(50, 10.16);
+    const rows = expectSurfacingRows(surfacingRowYs(50, 10.16));
     expect(rows[0]).toBe(0);
     expect(rows.at(-1)).toBe(50);
     for (let i = 1; i < rows.length; i += 1) {
@@ -30,11 +37,18 @@ describe('surfacingRowYs', () => {
       expect(curr - prev).toBeLessThanOrEqual(10.16 + 1e-9);
     }
   });
+
+  it('rejects non-finite row spacing instead of silently accepting it', () => {
+    expect(surfacingRowYs(50, Number.NaN)).toEqual({
+      ok: false,
+      reason: 'Surfacing step must be a positive finite number.',
+    });
+  });
 });
 
 describe('buildSurfacingProgram', () => {
   it('brackets motion with spin-up and M5, ends parked at the origin', () => {
-    const program = buildSurfacingProgram(PARAMS);
+    const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     const lines = program.lines;
     expect(lines).toContain('M3 S12000');
     expect(lines).toContain('G4 P3.000');
@@ -47,7 +61,7 @@ describe('buildSurfacingProgram', () => {
   });
 
   it('ladders depth per pass and clamps the final pass to the total', () => {
-    const program = buildSurfacingProgram(PARAMS);
+    const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     // 0.5, 1.0, then the 1.2 clamp.
     expect(program.passes).toBe(3);
     const plunges = program.lines.filter((line) => line.startsWith('G1 Z-'));
@@ -55,7 +69,7 @@ describe('buildSurfacingProgram', () => {
   });
 
   it('serpentines: alternating X targets, monotonic Y steps', () => {
-    const program = buildSurfacingProgram(PARAMS);
+    const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     const plungeIndex = program.lines.indexOf('G1 Z-0.500 F600.000');
     const retractIndex = program.lines.findIndex(
       (line, index) => index > plungeIndex && line === 'G0 Z5.000',
@@ -75,8 +89,27 @@ describe('buildSurfacingProgram', () => {
   });
 
   it('is byte-deterministic', () => {
-    expect(buildSurfacingProgram(PARAMS).lines.join('\n')).toBe(
-      buildSurfacingProgram(PARAMS).lines.join('\n'),
+    expect(expectSurfacingProgram(buildSurfacingProgram(PARAMS)).lines.join('\n')).toBe(
+      expectSurfacingProgram(buildSurfacingProgram(PARAMS)).lines.join('\n'),
     );
   });
+
+  it('rejects non-finite dimensions before formatting G-code', () => {
+    expect(buildSurfacingProgram({ ...PARAMS, widthMm: Number.NaN })).toEqual({
+      ok: false,
+      reason: 'Surfacing width must be a positive finite number.',
+    });
+  });
 });
+
+function expectSurfacingRows(result: SurfacingRowsResult): ReadonlyArray<number> {
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error(result.reason);
+  return result.rows;
+}
+
+function expectSurfacingProgram(result: SurfacingProgramResult): SurfacingProgram {
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error(result.reason);
+  return result.program;
+}
