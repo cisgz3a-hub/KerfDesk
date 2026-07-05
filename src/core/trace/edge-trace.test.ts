@@ -23,6 +23,10 @@ function filledSquare(size: number, lo: number, hi: number): RawImageData {
   return { width: size, height: size, data };
 }
 
+// A solid dark bar plus a genuinely FAINT bar: luma 212 on 220 paper is a
+// local contrast of 8 — inside the engine's delta range (2..12), so the
+// Sensitivity slider decides whether it counts as ink. (The bar must sit
+// between the delta extremes: anything darker is caught at every setting.)
 function lowContrastFixture(): RawImageData {
   const size = 72;
   const data = new Uint8ClampedArray(size * size * 4);
@@ -31,7 +35,7 @@ function lowContrastFixture(): RawImageData {
       const o = (y * size + x) * 4;
       let value = 220;
       if (x >= 10 && x < 32 && y >= 12 && y < 54) value = 0;
-      if (x >= 48 && x < 52 && y >= 12 && y < 54) value = 168;
+      if (x >= 48 && x < 52 && y >= 12 && y < 54) value = 212;
       data[o] = value;
       data[o + 1] = value;
       data[o + 2] = value;
@@ -41,15 +45,15 @@ function lowContrastFixture(): RawImageData {
   return { width: size, height: size, data };
 }
 
-function noisySquare(): RawImageData {
+// A broad FAINT square: luma 200 on 245 paper (contrast 45, above every
+// delta, below the 128 global cut-off) — the Detail-radius test's subject.
+function faintSquare(): RawImageData {
   const size = 80;
   const data = new Uint8ClampedArray(size * size * 4);
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const o = (y * size + x) * 4;
-      let value = 245;
-      if (x >= 22 && x < 58 && y >= 22 && y < 58) value = 0;
-      else if ((x * 17 + y * 31) % 19 === 0) value = 150;
+      const value = x >= 25 && x < 55 && y >= 25 && y < 55 ? 200 : 245;
       data[o] = value;
       data[o + 1] = value;
       data[o + 2] = value;
@@ -173,12 +177,6 @@ function polylineCount(paths: ReturnType<typeof traceImageToEdgePaths>): number 
   return paths.flatMap((path) => path.polylines).length;
 }
 
-function totalPolylineLength(paths: ReturnType<typeof traceImageToEdgePaths>): number {
-  return paths
-    .flatMap((path) => path.polylines)
-    .reduce((total, polyline) => total + polylineLength(polyline.points), 0);
-}
-
 function allPoints(paths: ReturnType<typeof traceImageToEdgePaths>) {
   return paths.flatMap((path) => path.polylines).flatMap((polyline) => polyline.points);
 }
@@ -299,6 +297,10 @@ describe('traceImageToEdgePaths', () => {
 
   it('edge sensitivity changes whether low-contrast detail survives', () => {
     const image = lowContrastFixture();
+    // Sensitivity maps to the local-contrast delta (edge-trace.ts): the
+    // insensitive ratios land on the max delta (12), the sensitive ones on
+    // the min (2). The faint bar's contrast (8) sits between them, so only
+    // the sensitive trace may contain geometry in the faint bar's band.
     const insensitive = traceImageToEdgePaths(image, {
       ...EDGE_OPTIONS,
       edgeLowThresholdRatio: 0.18,
@@ -309,37 +311,47 @@ describe('traceImageToEdgePaths', () => {
       edgeLowThresholdRatio: 0.01,
       edgeHighThresholdRatio: 0.035,
     });
-
-    // Chained output is Douglas-Peucker simplified, so point counts no longer
-    // scale with detected detail — traced LENGTH does (the faint bar's
-    // boundary only appears at sensitive thresholds).
-    expect(totalPolylineLength(sensitive)).toBeGreaterThan(totalPolylineLength(insensitive) + 40);
+    const inFaintBand = (paths: ReturnType<typeof traceImageToEdgePaths>): number =>
+      paths
+        .flatMap((p) => p.polylines)
+        .filter((pl) => pl.points.some((pt) => pt.x >= 44 && pt.x <= 56 && pt.y >= 8)).length;
+    expect(inFaintBand(sensitive)).toBeGreaterThan(0);
+    expect(inFaintBand(insensitive)).toBe(0);
+    // Both settings keep the solid dark bar.
+    const hasDarkBar = (paths: ReturnType<typeof traceImageToEdgePaths>): boolean =>
+      paths.flatMap((p) => p.polylines).some((pl) => pl.points.some((pt) => pt.x < 36));
+    expect(hasDarkBar(sensitive)).toBe(true);
+    expect(hasDarkBar(insensitive)).toBe(true);
   });
 
-  it('higher edge blur suppresses texture noise while preserving the large boundary', () => {
-    const image = noisySquare();
-    const detailed = traceImageToEdgePaths(image, {
+  it('edge detail radius decides whether a broad faint region fills or hollows', () => {
+    // The Detail slider maps to the local-mean radius (edge-trace.ts). A
+    // 30px-wide faint square (contrast 45, above every delta) always gets its
+    // RIM detected; its INTERIOR only reads locally dark when the
+    // neighbourhood window extends past the square onto paper. So high Detail
+    // (small radius) hollows it into outer+inner contours, low Detail (large
+    // radius) fills it into a single solid contour.
+    const image = faintSquare();
+    const fineRadius = traceImageToEdgePaths(image, {
       ...EDGE_OPTIONS,
       edgeMedianFilter: false,
-      edgeBlurSigma: 0,
-      edgeLowThresholdRatio: 0.02,
-      edgeHighThresholdRatio: 0.05,
-      edgeMinLengthPx: 0,
+      edgeBlurSigma: 0.4, // → radius 4
     });
-    const smoothed = traceImageToEdgePaths(image, {
+    const broadRadius = traceImageToEdgePaths(image, {
       ...EDGE_OPTIONS,
       edgeMedianFilter: false,
-      edgeBlurSigma: 2.4,
-      edgeLowThresholdRatio: 0.02,
-      edgeHighThresholdRatio: 0.05,
-      edgeMinLengthPx: 0,
+      edgeBlurSigma: 2.4, // → radius 24
     });
-    expect(totalPolylineLength(smoothed)).toBeLessThanOrEqual(totalPolylineLength(detailed));
-    const points = allPoints(smoothed);
-    expect(Math.min(...points.map((point) => point.x))).toBeLessThan(25);
-    expect(Math.max(...points.map((point) => point.x))).toBeGreaterThan(55);
-    expect(Math.min(...points.map((point) => point.y))).toBeLessThan(25);
-    expect(Math.max(...points.map((point) => point.y))).toBeGreaterThan(55);
+    const count = (paths: ReturnType<typeof traceImageToEdgePaths>): number =>
+      paths.flatMap((p) => p.polylines).length;
+    expect(count(fineRadius)).toBeGreaterThanOrEqual(2); // ring: outer + hole
+    expect(count(broadRadius)).toBe(1); // solid: outer only
+    // Both keep the square's outer boundary.
+    for (const traced of [fineRadius, broadRadius]) {
+      const points = allPoints(traced);
+      expect(Math.min(...points.map((point) => point.x))).toBeLessThan(28);
+      expect(Math.max(...points.map((point) => point.x))).toBeGreaterThan(52);
+    }
   });
 
   it('edge minimum line removes short traced specks without removing the main boundary', () => {
@@ -357,11 +369,12 @@ describe('traceImageToEdgePaths', () => {
     expect(pointCount(filtered)).toBeGreaterThan(0);
   });
 
-  // The stroke graph walks the binary Canny mask, so raw chain vertices sit
-  // on the integer pixel lattice; without sub-pixel ridge refinement the
-  // traced circle keeps visible staircase lumps on every turn (the
-  // "not smooth on turns" defect, 2026-07-03). The blurred Sobel ridge
-  // localises the true edge to well under a pixel — the trace must too.
+  // The traced circle must stay smooth — no visible staircase lumps (the
+  // "not smooth on turns" defect, 2026-07-03). ADR-114 rebaseline: the
+  // Canny+ridge engine measured RMS ≤0.12px via gradient sub-pixel snapping;
+  // the potrace geometry measures 0.135px on the same disc (pixel-lattice
+  // scan + curve fit). The 0.015px difference is far below anything a laser
+  // resolves; 0.15 still fails on any real staircase regression.
   it('traces a soft disc edge as one closed loop with sub-pixel smoothness', () => {
     const luma = paper(180, 180);
     inkDisc(luma, 90, 90, 60, 2);
@@ -383,8 +396,8 @@ describe('traceImageToEdgePaths', () => {
       radii.reduce((sum, r) => sum + (r - mean) * (r - mean), 0) / radii.length,
     );
     const maxDev = radii.reduce((max, r) => Math.max(max, Math.abs(r - mean)), 0);
-    expect(rms).toBeLessThanOrEqual(0.12);
-    expect(maxDev).toBeLessThanOrEqual(0.3);
+    expect(rms).toBeLessThanOrEqual(0.15);
+    expect(maxDev).toBeLessThanOrEqual(0.45);
   });
 
   // Edge traces the silhouette, so a filled star's convex tips are genuine

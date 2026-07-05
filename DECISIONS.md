@@ -5062,3 +5062,91 @@ state reflects the patched trace). jsdom: `ImportImageDialog.workflow.test.ts`
 gate per commit. **NOT verified perceptually this session** — the rendered
 recovery of the real logo counter against the source is the maintainer's
 perceptual pass (CLAUDE.md §2); green tests are not fidelity proof.
+
+## ADR-114 — Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05)
+
+**Status:** accepted (maintainer-directed after rejecting ADR-059's letter quality).
+
+### Context
+
+The maintainer's perceptual pass on the live app rejected the Canny-chain
+Edge Detection engine (ADR-059): serif letters traced with hooked/curled
+spur artifacts at serif tips, wandering contours cutting across serifs,
+blobby small letters, and a dropped letter counter. Side-by-side renders on
+the same logo pixels showed the failure was NOT detection (Canny finds the
+ink) but GEOMETRY SYNTHESIS: the thin → stroke-graph → junction-weld →
+spur-prune → chain pipeline manufactures the artifact classes, and every
+prior fix (apex snap, spur pruning, weld tuning, spline caps) was
+whack-a-mole against that architecture. The clean-room potrace backend
+(Line Art) traced the same letters cleanly — but its global 128 threshold
+drops faint ink (the LANGEBAAN letters run luma 125-195; a Canny-fill probe
+measured ~88k ink pixels the global threshold misses on this logo).
+
+A Canny-loop-fill mask was prototyped and REJECTED: closing edge loops
+morphologically consumes small interior holes (letter counters) — the exact
+detail at stake. The winning mask is mkbitmap's design (potrace's own
+companion preprocessor): local-contrast thresholding.
+
+### Decision
+
+`traceImageToEdgePaths` becomes: **local-contrast ink mask → shared potrace
+geometry.**
+
+- `local-contrast-mask.ts`: ink = darker than the local box-blur mean by
+  `delta`, unioned with the global 128 threshold (solid interiors read ~0 in
+  a highpass, the union keeps them filled). No morphology — a 3px counter
+  survives any radius.
+- `potrace-trace.ts` exports the extracted `potraceBitmapToPolylines`
+  geometry stage (scan → polygon → curve → optimize → apex snap), now shared
+  by Line Art/Smooth/Sharp AND Edge Detection.
+- The Canny-era option fields remain the public knobs; the engine derives
+  its parameters from them so dialog/presets/merge are untouched:
+  low threshold ratio → delta (0.074 → 6, clamp 2..12), blur sigma → radius
+  (1.2 → 12, clamp 4..32), edgeMinLengthPx → potrace turdSize.
+- **Output is closed contours only** — LightBurn's trace semantic (its
+  tracer is potrace-based). The chain engine's open-stroke output is gone;
+  thin strokes trace as thin outline rings, as LightBurn does.
+- **Seam-invariant fix in `potrace-apex.ts`** (latent Line Art bug exposed
+  by the rebuild): `snapCornersToInk` deduped a ring's closing point and
+  never re-appended it, so every apex-rebuilt ring shipped `closed: true`
+  with first ≠ last — while job compilation documents closed segments as
+  "last equals first by construction" and the emitters draw points as given
+  (cornered shapes engraved with their final edge missing). Snapped rings
+  now re-append the (possibly moved) start vertex.
+
+### Consequences
+
+- The maintainer's reported artifact classes are gone at the engine level:
+  serif feet hug (no smile arcs), no hooks/spurs, and the LANGEBAAN counter
+  census reads 2/2/2 at NATIVE resolution — the defect ADR-113's
+  region-enhance was built to patch no longer occurs on this logo, so
+  region-enhance becomes a general-purpose recovery tool rather than the
+  counter fix.
+- Benchmark recalibrations (documented in arch-house-edge-benchmark.ts):
+  `langebaanExcessTurnPer100Px` target 12 → 135 — the old target measured
+  the spline engine's evened curvature, which turned smoothly precisely
+  because it melted letters; potrace's polygon style measures ~117 while
+  rendering every letter legible. `openPolylineCount` expectation flips
+  > 10 → 0 (all-closed by construction). Disc radial RMS 0.12 → 0.15
+  (measured 0.135; the ridge-snap sub-pixel pass no longer exists; 0.015px
+  is far below laser resolution).
+- Orphaned modules pending a separate cleanup commit: `canny-edges.ts`,
+  `edge-reconnect.ts`, `edge-subpixel.ts`, `edge-ink-support.ts` (no
+  remaining app importers; their tests still pass). The centerline pipeline
+  keeps its chain machinery (its own mode) including the spline deviation
+  cap from the earlier fidelity fix.
+- Known residuals accepted from the render review: small junction notches
+  on ~10px G/E glyphs and occasional ~1px foot ticks — polygon-style output
+  at glyph sizes near the information floor.
+
+### Verification
+
+Test-first on the seam bug (edge ring measured 14px first→last before the
+fix; potrace-apex pins the invariant). Engine contract tests rewritten
+against real semantics (sensitivity gates a contrast-8 bar; Detail radius
+fills vs hollows a broad faint square; disc smoothness rebaselined with
+measured values). Full trace + perceptual suites 328/328; renders of
+np-house-H / np-house-all / np-lang-all read and compared against the
+baseline (serifs hug, letters legible, counters present) — the maintainer
+saw the prototype renders and approved the architecture before
+implementation; the final engine renders await the maintainer's own pass.
