@@ -57,6 +57,7 @@ export function materialFeedsPatch(
     rpm: spindleRpm,
     ...(maxFeedMmPerMin === undefined ? {} : { maxFeedMmPerMin }),
   });
+  if (feeds.kind === 'error') return null;
   return {
     materialKey,
     feedMmPerMin: feeds.feedMmPerMin,
