@@ -25,6 +25,7 @@ import {
   type SceneObject,
   type Transform,
   type Vec2,
+  withClosingPoint,
 } from '../scene';
 import { compileRasterGroupsForLayer } from './compile-job-raster';
 import { memoizedFillHatchingWithMetadata } from './fill-hatching-cache';
@@ -410,7 +411,11 @@ function appendPathSegments(
       if (shouldApplyKerf(polyline, layer)) {
         closedForKerf.push({ points, closed: true });
       } else {
-        out.push({ polyline: points, closed: polyline.closed });
+        // Enforce the CutSegment invariant "a closed segment's last point
+        // equals its first" so the emitter (which walks points and ignores the
+        // `closed` flag) draws the closing edge. DXF entities drop the seam
+        // vertex, which otherwise left the final edge uncut.
+        out.push({ polyline: withClosingPoint(points, polyline.closed), closed: polyline.closed });
       }
     }
     for (const offset of offsetClosedPolylinesForKerf(closedForKerf, layer.kerfOffsetMm)) {
