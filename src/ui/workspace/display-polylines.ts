@@ -39,37 +39,31 @@ export function buildDisplayPolylines(
   const stride = strideForSegmentBudget(segmentCount, budget);
   if (stride === 1) return { polylines, isSimplified: false, segmentCount };
   return {
-    polylines: sampleEveryNthSegment(polylines, stride),
+    polylines: decimatePolylines(polylines, stride),
     isSimplified: true,
     segmentCount,
   };
 }
 
-function sampleEveryNthSegment(
+// Keep every Nth VERTEX of each polyline (always including both endpoints,
+// preserving the closed flag) so an over-budget scene draws coarse but
+// CONNECTED shapes. The previous sampler kept every Nth SEGMENT as its own
+// two-point polyline, which rendered a freshly traced logo as disconnected
+// dashes — indistinguishable from broken geometry (2026-07-05 report).
+function decimatePolylines(
   polylines: ReadonlyArray<Polyline>,
   stride: number,
 ): ReadonlyArray<Polyline> {
-  const sampled: Polyline[] = [];
-  let firstGlobalSegment = 0;
-  for (const polyline of polylines) {
-    const segmentCount = Math.max(0, polyline.points.length - 1);
-    const firstLocalSegment = firstSampledLocalSegment(firstGlobalSegment, stride);
-    for (
-      let localSegment = firstLocalSegment;
-      localSegment < segmentCount;
-      localSegment += stride
-    ) {
-      const from = polyline.points[localSegment];
-      const to = polyline.points[localSegment + 1];
-      if (from === undefined || to === undefined) continue;
-      sampled.push({ closed: false, points: [from, to] });
+  return polylines.map((polyline) => {
+    const points = polyline.points;
+    if (points.length <= 2) return polyline;
+    const kept: Polyline['points'][number][] = [];
+    for (let i = 0; i < points.length; i += stride) {
+      const p = points[i];
+      if (p !== undefined) kept.push(p);
     }
-    firstGlobalSegment += segmentCount;
-  }
-  return sampled;
-}
-
-function firstSampledLocalSegment(firstGlobalSegment: number, stride: number): number {
-  const remainder = firstGlobalSegment % stride;
-  return remainder === 0 ? 0 : stride - remainder;
+    const last = points[points.length - 1];
+    if (last !== undefined && kept[kept.length - 1] !== last) kept.push(last);
+    return { closed: polyline.closed, points: kept };
+  });
 }

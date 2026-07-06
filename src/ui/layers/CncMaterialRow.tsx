@@ -43,6 +43,7 @@ export function CncMaterialRow(props: {
       rpm: settings.spindleRpm,
       maxFeedMmPerMin: maxFeed,
     });
+    if (result.kind === 'error') return;
     onCommit({
       materialKey: material,
       feedMmPerMin: result.feedMmPerMin,

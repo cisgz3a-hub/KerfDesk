@@ -147,7 +147,7 @@ export const BOX_FIELD_LABELS: Readonly<Record<BoxSpecField, string>> = {
   width: 'Width',
   depth: 'Depth',
   height: 'Height',
-  thickness: 'Material thickness',
+  thickness: 'Material thickness (mm)',
   fingerWidth: 'Finger width',
   clearance: 'Clearance',
   reliefTool: 'Relief tool diameter',

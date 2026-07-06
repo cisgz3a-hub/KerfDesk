@@ -107,7 +107,7 @@ describe('BoxGeneratorDialog', () => {
     const { host, root } = await renderDialog();
     try {
       expect(controlLabels(host).slice(0, 4)).toEqual([
-        'Material thickness',
+        'Material thickness (mm)',
         'Width',
         'Depth',
         'Height',
@@ -168,7 +168,7 @@ describe('BoxGeneratorDialog', () => {
       // Default: corner relief OFF → the select is present but the tool field hides.
       expect(selectEl(cnc.host, 'Corner relief').value).toBe('off');
       expect(cnc.host.querySelector('input[aria-label="Relief tool diameter"]')).toBeNull();
-      expect(input(cnc.host, 'Material thickness').value).toBe('6');
+      expect(input(cnc.host, 'Material thickness (mm)').value).toBe('6');
       expect(input(cnc.host, 'Clearance').value).toBe('0.15');
       // Turn relief on → the tool field appears, prefilled from the active bit.
       await setSelect(cnc.host, 'Corner relief', 'on');
@@ -198,7 +198,7 @@ describe('BoxGeneratorDialog', () => {
   it('auto-sizes joinery fields when material thickness changes', async () => {
     const { host, root } = await renderDialog();
     try {
-      await setInput(host, 'Material thickness', '6');
+      await setInput(host, 'Material thickness (mm)', '6');
 
       expect(input(host, 'Finger width').value).toBe('18');
       expect(input(host, 'Part spacing').value).toBe('12');
@@ -213,7 +213,7 @@ describe('BoxGeneratorDialog', () => {
     try {
       await setInput(host, 'Finger width', '11');
       await setInput(host, 'Part spacing', '10');
-      await setInput(host, 'Material thickness', '6');
+      await setInput(host, 'Material thickness (mm)', '6');
 
       expect(input(host, 'Finger width').value).toBe('11');
       expect(input(host, 'Part spacing').value).toBe('10');

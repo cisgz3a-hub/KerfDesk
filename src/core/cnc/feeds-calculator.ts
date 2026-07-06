@@ -21,12 +21,17 @@ export type FeedsCalculatorInput = {
   readonly maxFeedMmPerMin?: number;
 };
 
-export type FeedsCalculatorResult = {
+export type FeedsCalculatorOk = {
+  readonly kind: 'ok';
   readonly chiploadMm: number;
   readonly feedMmPerMin: number;
   readonly plungeMmPerMin: number;
   readonly depthPerPassMm: number;
 };
+
+export type FeedsCalculatorResult =
+  | FeedsCalculatorOk
+  | { readonly kind: 'error'; readonly reason: string };
 
 export const CHIPLOAD_MATERIALS: ReadonlyArray<{
   readonly value: ChiploadMaterial;
@@ -96,6 +101,12 @@ export function chiploadFor(material: ChiploadMaterial, bitDiameterMm: number): 
 }
 
 export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResult {
+  const bitError = positiveFiniteReason('Bit diameter', input.bitDiameterMm);
+  if (bitError !== null) return { kind: 'error', reason: bitError };
+  const flutesError = positiveFiniteReason('Flute count', input.flutes);
+  if (flutesError !== null) return { kind: 'error', reason: flutesError };
+  const rpmError = positiveFiniteReason('RPM', input.rpm);
+  if (rpmError !== null) return { kind: 'error', reason: rpmError };
   const chiploadMm = chiploadFor(input.material, input.bitDiameterMm);
   const rawFeed = input.rpm * Math.max(1, Math.round(input.flutes)) * chiploadMm;
   const uncappedFeed = Math.max(
@@ -121,5 +132,9 @@ export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResu
       Math.round((input.bitDiameterMm * DEPTH_FACTOR[input.material]) / ROUND_DEPTH_TO_MM) *
         ROUND_DEPTH_TO_MM,
     ) || ROUND_DEPTH_TO_MM;
-  return { chiploadMm, feedMmPerMin, plungeMmPerMin, depthPerPassMm };
+  return { kind: 'ok', chiploadMm, feedMmPerMin, plungeMmPerMin, depthPerPassMm };
+}
+
+function positiveFiniteReason(label: string, value: number): string | null {
+  return Number.isFinite(value) && value > 0 ? null : `${label} must be a finite positive number.`;
 }

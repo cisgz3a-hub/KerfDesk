@@ -179,8 +179,11 @@ describe('drawPreview', () => {
   });
 
   it('samples oversized preview cuts without visiting every point on each redraw', () => {
-    const pointCount = 30_001;
-    const readBudget = 22_000;
+    // Per-redraw work must scale with the display budget (120k segments,
+    // ~2 point reads per drawn segment), not with the source size: 300k
+    // source points at stride 3 visit ~100k, well under a full 600k sweep.
+    const pointCount = 300_001;
+    const readBudget = 260_000;
     let pointReads = 0;
     const toolpath: Toolpath = {
       totalLength: 1,
@@ -205,13 +208,15 @@ describe('drawPreview', () => {
 
     drawPreview(ctx, toolpath, view, 1);
 
-    expect(calls.lineTo).toBeLessThan(12_000);
+    expect(calls.lineTo).toBeLessThan(120_000);
     expect(pointReads).toBeLessThan(readBudget);
   });
 
   it('samples many small preview cuts with a global operation budget', () => {
-    const stepCount = 30_000;
-    const readBudget = 22_000;
+    // Visited steps scale with the 120k display budget (stride 3 over 300k
+    // steps ≈ 100k visits), not with the toolpath size.
+    const stepCount = 300_000;
+    const readBudget = 130_000;
     let stepReads = 0;
     const steps = new Proxy(
       Array.from({ length: stepCount }, (_, x) => ({
@@ -238,13 +243,15 @@ describe('drawPreview', () => {
 
     drawPreview(ctx, toolpath, view, 1);
 
-    expect(calls.lineTo).toBeLessThan(12_000);
+    expect(calls.lineTo).toBeLessThan(120_000);
     expect(stepReads).toBeLessThan(readBudget);
   });
 
   it('samples faint source geometry in preview instead of redrawing every source point', () => {
-    const pointCount = 30_001;
-    const readBudget = 22_000;
+    // Decimation visits ~1 point per kept vertex: 300k points at stride 3
+    // reads ~100k — bounded by the display budget, not the source size.
+    const pointCount = 300_001;
+    const readBudget = 130_000;
     let pointReads = 0;
     const project = importedSvgLineProject(
       watchedPoints(pointCount, () => {
@@ -255,7 +262,7 @@ describe('drawPreview', () => {
 
     drawObjectsFaint(ctx, project, view);
 
-    expect(calls.lineTo).toBeLessThan(12_000);
+    expect(calls.lineTo).toBeLessThan(120_000);
     expect(pointReads).toBeLessThan(readBudget);
   });
 

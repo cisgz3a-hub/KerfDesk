@@ -5,7 +5,12 @@
 // see core/cnc/feeds-calculator.ts); every number stays editable after.
 
 import { useState } from 'react';
-import { calculateFeeds, CHIPLOAD_MATERIALS, type ChiploadMaterial } from '../../core/cnc';
+import {
+  calculateFeeds,
+  CHIPLOAD_MATERIALS,
+  type ChiploadMaterial,
+  type FeedsCalculatorResult,
+} from '../../core/cnc';
 import { layerCncTool, type CncLayerSettings, type Layer } from '../../core/scene';
 import { useStore } from '../state';
 
@@ -31,6 +36,7 @@ export function FeedsCalculatorRow(props: {
     rpm,
     maxFeedMmPerMin: maxFeed,
   });
+  const canApply = result.kind === 'ok';
   return (
     <details style={boxStyle}>
       <summary
@@ -56,21 +62,19 @@ export function FeedsCalculatorRow(props: {
           </select>
         </label>
       </div>
-      <p style={resultStyle}>
-        {tool.name} at {rpm.toLocaleString()} RPM → chipload {result.chiploadMm.toFixed(3)} mm: feed{' '}
-        <strong>{result.feedMmPerMin}</strong>, plunge <strong>{result.plungeMmPerMin}</strong>{' '}
-        mm/min, {result.depthPerPassMm.toFixed(1)} mm/pass. Starting points — listen to the cut.
-      </p>
+      <FeedsCalculatorResultText toolName={tool.name} rpm={rpm} result={result} />
       <button
         type="button"
-        onClick={() =>
+        disabled={!canApply}
+        onClick={() => {
+          if (result.kind !== 'ok') return;
           props.onCommit({
             feedMmPerMin: result.feedMmPerMin,
             plungeMmPerMin: result.plungeMmPerMin,
             depthPerPassMm: result.depthPerPassMm,
             spindleRpm: rpm,
-          })
-        }
+          });
+        }}
         title="Write these feeds into the layer (one undo step). Cut type, depth, and tabs stay put."
       >
         Apply to layer
@@ -105,6 +109,22 @@ function MaterialSelect(props: {
   );
 }
 
+function FeedsCalculatorResultText(props: {
+  readonly toolName: string;
+  readonly rpm: number;
+  readonly result: FeedsCalculatorResult;
+}): JSX.Element {
+  const { toolName, rpm, result } = props;
+  if (result.kind === 'error') return <p style={errorStyle}>{result.reason}</p>;
+  return (
+    <p style={resultStyle}>
+      {toolName} at {rpm.toLocaleString()} RPM → chipload {result.chiploadMm.toFixed(3)} mm: feed{' '}
+      <strong>{result.feedMmPerMin}</strong>, plunge <strong>{result.plungeMmPerMin}</strong>{' '}
+      mm/min, {result.depthPerPassMm.toFixed(1)} mm/pass. Starting points — listen to the cut.
+    </p>
+  );
+}
+
 const boxStyle: React.CSSProperties = {
   border: '1px solid var(--lf-border)',
   borderRadius: 4,
@@ -123,5 +143,10 @@ const fieldStyle: React.CSSProperties = {
 const resultStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--lf-text-muted)',
+  margin: '4px 0 6px 0',
+};
+const errorStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--lf-danger)',
   margin: '4px 0 6px 0',
 };

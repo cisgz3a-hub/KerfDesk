@@ -1,6 +1,13 @@
 import type { Polyline } from '../../core/scene';
 
-export const LARGE_SCENE_SEGMENT_THRESHOLD = 10_000;
+// Above this many segments the canvas draws a DECIMATED display copy (see
+// display-polylines.ts). The budget is a parachute for megabyte-scale
+// imports, not a normal-path optimisation: with one beginPath/stroke per
+// colour (the batching that fixed the post-import freeze) Canvas2D strokes
+// ~100k segments per frame comfortably on modest hardware. The old 10k
+// budget tripped on a SINGLE traced logo (~10.3k segments), so the primary
+// use case rendered as simplified confetti.
+export const LARGE_SCENE_SEGMENT_THRESHOLD = 120_000;
 
 export function countPolylineSegments(polylines: ReadonlyArray<Polyline>): number {
   let count = 0;
