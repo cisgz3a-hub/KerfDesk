@@ -10,17 +10,23 @@
 
 import type { Vec2 } from '../../core/scene';
 import { ellipseSegmentCount } from '../../core/shapes';
+import { DEFAULT_FLATNESS_MM } from './flatten-curves';
 import { parsePathD, type SubPath } from './parse-path-d';
 import { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
 const RECT_CORNER_SEGMENTS = 8;
 const POINT_NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 
-export function elementToSubPaths(el: Element): ReadonlyArray<SubPath> {
+// `scale` is the local user→mm distance stretch (from the accumulated import
+// transform). Curve/arc flattening decides its tolerance in mm, so it is divided
+// through here to stay 0.25 mm in scene space instead of 0.25 user units — which
+// on a small-viewBox / large-physical SVG was several mm of faceting (audit C2).
+// The default of 1 keeps every existing caller byte-identical.
+export function elementToSubPaths(el: Element, scale = 1): ReadonlyArray<SubPath> {
   const tag = el.tagName.toLowerCase();
   switch (tag) {
     case 'path':
-      return pathToSubs(el);
+      return pathToSubs(el, scale);
     case 'line':
       return lineToSubs(el);
     case 'polyline':
@@ -30,12 +36,18 @@ export function elementToSubPaths(el: Element): ReadonlyArray<SubPath> {
     case 'rect':
       return rectToSubs(el);
     case 'circle':
-      return circleToSubs(el);
+      return circleToSubs(el, scale);
     case 'ellipse':
-      return ellipseToSubs(el);
+      return ellipseToSubs(el, scale);
     default:
       return [];
   }
+}
+
+// Guard the divisor: a degenerate (zero/NaN) transform falls back to 1 rather
+// than producing an infinite or NaN tolerance.
+function positiveScale(scale: number): number {
+  return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
 function numAttr(el: Element, name: string, fallback = 0): number {
@@ -52,10 +64,10 @@ function optionalNumAttr(el: Element, name: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function pathToSubs(el: Element): ReadonlyArray<SubPath> {
+function pathToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   const d = el.getAttribute('d');
   if (d === null || d.trim() === '') return [];
-  return parsePathD(d);
+  return parsePathD(d, DEFAULT_FLATNESS_MM / positiveScale(scale));
 }
 
 function lineToSubs(el: Element): ReadonlyArray<SubPath> {
@@ -161,8 +173,12 @@ function closePoint(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.y - b.y) < 1e-9;
 }
 
-function arcPolygon(cx: number, cy: number, rx: number, ry: number): SubPath {
-  const segments = ellipseSegmentCount(Math.max(Math.abs(rx), Math.abs(ry)));
+function arcPolygon(cx: number, cy: number, rx: number, ry: number, scale: number): SubPath {
+  // Segment count targets a physical chord tolerance, so choose it from the
+  // radius in mm — a small-viewBox circle blown up to a large physical size
+  // needs more facets than its user-space radius implies (audit C2).
+  const physicalRadius = Math.max(Math.abs(rx), Math.abs(ry)) * positiveScale(scale);
+  const segments = ellipseSegmentCount(physicalRadius);
   const points: Vec2[] = [];
   for (let i = 0; i <= segments; i += 1) {
     const t = (i / segments) * Math.PI * 2;
@@ -171,19 +187,19 @@ function arcPolygon(cx: number, cy: number, rx: number, ry: number): SubPath {
   return { points, closed: true };
 }
 
-function circleToSubs(el: Element): ReadonlyArray<SubPath> {
+function circleToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   const cx = numAttr(el, 'cx');
   const cy = numAttr(el, 'cy');
   const r = numAttr(el, 'r');
   if (r <= 0) return [];
-  return [arcPolygon(cx, cy, r, r)];
+  return [arcPolygon(cx, cy, r, r, scale)];
 }
 
-function ellipseToSubs(el: Element): ReadonlyArray<SubPath> {
+function ellipseToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   const cx = numAttr(el, 'cx');
   const cy = numAttr(el, 'cy');
   const rx = numAttr(el, 'rx');
   const ry = numAttr(el, 'ry');
   if (rx <= 0 || ry <= 0) return [];
-  return [arcPolygon(cx, cy, rx, ry)];
+  return [arcPolygon(cx, cy, rx, ry, scale)];
 }

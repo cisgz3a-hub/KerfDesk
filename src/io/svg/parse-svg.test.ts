@@ -3,6 +3,33 @@ import { parseSvg, SVG_IMPORT_LIMITS } from './parse-svg';
 
 const args = (svgText: string) => ({ svgText, id: 'O1', source: 'test.svg' });
 
+describe('parseSvg — curve flatness respects physical scale (audit C2)', () => {
+  const CURVE_D = 'M2 12 C2 4 22 4 22 12';
+  const pointCount = (svgText: string): number => {
+    const object = parseSvg(args(svgText)).object;
+    if (object === null || object.kind !== 'imported-svg') throw new Error('no geometry');
+    return object.paths.reduce(
+      (sum, path) => sum + path.polylines.reduce((n, pl) => n + pl.points.length, 0),
+      0,
+    );
+  };
+
+  it('subdivides a physically larger curve into more segments', () => {
+    // Same user-space curve; the second SVG scales it 4× larger in mm
+    // (viewBox 24 → 96 mm width). Flattening targets a 0.25 mm chord, so the
+    // larger physical curve must gain segments. The pre-fix flattener applied
+    // the tolerance in USER units, giving both the same (too-coarse for the
+    // large one) point count.
+    const unit = pointCount(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="${CURVE_D}" stroke="#ff0000" fill="none"/></svg>`,
+    );
+    const scaledUp = pointCount(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="96mm" height="96mm"><path d="${CURVE_D}" stroke="#ff0000" fill="none"/></svg>`,
+    );
+    expect(scaledUp).toBeGreaterThan(unit);
+  });
+});
+
 describe('parseSvg — happy path', () => {
   it('produces an ImportedSvg with one color group from a one-color SVG', () => {
     const result = parseSvg(
