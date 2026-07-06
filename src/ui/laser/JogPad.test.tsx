@@ -103,9 +103,9 @@ describe('JogPad accessible labels', () => {
     useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
     const { host, unmount } = await renderJogPad();
 
-    const air = buttonByLabel(host, 'Turn air assist on (M8)');
+    const air = buttonByLabel(host, 'Turn manual air assist on (M8)');
     expect(air).not.toBeNull();
-    expect(air?.textContent).toContain('Air Assist');
+    expect(air?.textContent).toContain('Manual Air');
     expect(air?.textContent).toContain('OFF');
     expect(air?.textContent).toContain('M8');
 
@@ -118,7 +118,7 @@ describe('JogPad accessible labels', () => {
     useStore.getState().updateDeviceProfile({ airAssistCommand: 'M7' });
     const { host, unmount } = await renderJogPad();
 
-    const air = buttonByLabel(host, 'Turn air assist on (M7)');
+    const air = buttonByLabel(host, 'Turn manual air assist on (M7)');
     if (air === null) throw new Error('air assist button missing');
     await act(async () => {
       air.click();
@@ -135,7 +135,7 @@ describe('JogPad accessible labels', () => {
     useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
     const { host, unmount } = await renderJogPad(true);
 
-    const air = buttonByLabel(host, 'Turn air assist on (M8)');
+    const air = buttonByLabel(host, 'Turn manual air assist on (M8)');
     if (air === null) throw new Error('air assist button missing');
     expect(air.disabled).toBe(false);
     await act(async () => {
@@ -152,7 +152,7 @@ describe('JogPad accessible labels', () => {
     useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
     const { host, unmount } = await renderJogPad();
 
-    const air = buttonByLabel(host, 'Turn air assist off (M9)');
+    const air = buttonByLabel(host, 'Turn manual air assist off (M9)');
     expect(air).not.toBeNull();
     expect(air?.getAttribute('aria-pressed')).toBe('true');
     expect(air?.textContent).toContain('ON');
@@ -163,7 +163,7 @@ describe('JogPad accessible labels', () => {
   it('disables the air assist toggle until a device coolant command is configured', async () => {
     const { host, unmount } = await renderJogPad();
 
-    const air = buttonByLabel(host, 'Turn air assist on (not configured)');
+    const air = buttonByLabel(host, 'Turn manual air assist on (not configured)');
     expect(air?.disabled).toBe(true);
     expect(air?.textContent).toContain('Not set');
 

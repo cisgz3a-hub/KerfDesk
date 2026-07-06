@@ -43,7 +43,7 @@ export function readCutSettingsPatch(
     ),
     visible: data.has('visible'),
     output: data.has('output'),
-    airAssist: data.has('airAssist'),
+    airAssist: data.has('airAssist') ? true : layer.airAssist,
     ...lineSettings,
     ...fillSettings,
     ditherAlgorithm: parseDither(String(data.get('ditherAlgorithm') ?? layer.ditherAlgorithm)),

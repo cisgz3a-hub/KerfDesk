@@ -55,15 +55,6 @@ export function CutSettingsCommonFields(props: {
           title="Include or exclude this layer when previewing, framing, exporting, or starting jobs."
         />
       </Field>
-      <Field label="Air">
-        <input
-          name="airAssist"
-          type="checkbox"
-          className="lf-checkbox"
-          defaultChecked={props.layer.airAssist}
-          title="Turn on air assist for this layer when the device profile is configured for M7 or M8."
-        />
-      </Field>
       {props.mode === 'line' ? <LineModeFields layer={props.layer} /> : null}
     </>
   );
