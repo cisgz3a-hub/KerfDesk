@@ -434,6 +434,19 @@ function headerComment(input: EmitRasterInput): string {
   ].join(LINE_END);
 }
 
+// Split out to keep validate() under the cyclomatic-complexity cap. Finite-check
+// BEFORE the ordering compares: `NaN <= minX` is false, so a NaN bound would
+// otherwise slip through and reach fmt(NaN) → "XNaN" in the G-code (audit C4).
+function validateBounds(bounds: EmitRasterInput['bounds']): void {
+  const { minX, minY, maxX, maxY } = bounds;
+  if (![minX, minY, maxX, maxY].every(Number.isFinite)) {
+    throw new Error('emitRasterGroup: bounds must be finite');
+  }
+  if (maxX <= minX || maxY <= minY) {
+    throw new Error('emitRasterGroup: bounds must be positive');
+  }
+}
+
 function validate(input: EmitRasterInput): void {
   if (input.width <= 0 || input.height <= 0) {
     throw new Error(`emitRasterGroup: invalid dimensions ${input.width}×${input.height}`);
@@ -443,13 +456,11 @@ function validate(input: EmitRasterInput): void {
       `emitRasterGroup: sValues length ${input.sValues.length} does not match ${input.width}×${input.height}`,
     );
   }
-  if (input.bounds.maxX <= input.bounds.minX || input.bounds.maxY <= input.bounds.minY) {
-    throw new Error('emitRasterGroup: bounds must be positive');
-  }
+  validateBounds(input.bounds);
   if (!isPositiveFinite(input.feedMmPerMin)) {
     throw new Error('emitRasterGroup: feedMmPerMin must be finite and > 0');
   }
-  if (input.overscanMm < 0) {
+  if (!Number.isFinite(input.overscanMm) || input.overscanMm < 0) {
     throw new Error('emitRasterGroup: overscanMm must be >= 0');
   }
   if ((input.dotWidthCorrectionMm ?? 0) < 0) {
