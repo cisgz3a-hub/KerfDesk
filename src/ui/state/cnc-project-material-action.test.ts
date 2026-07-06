@@ -27,6 +27,7 @@ describe('applyCncStockMaterial (ADR-112)', () => {
       flutes: 2,
       rpm: 12000,
     });
+    if (feeds.kind === 'error') throw new Error(feeds.reason);
     expect(cncStockMaterial()).toBe('hardwood');
     expect(useStore.getState().project.scene.layers[0]?.cnc?.feedMmPerMin).toBe(feeds.feedMmPerMin);
     expect(useStore.getState().dirty).toBe(true);

@@ -103,4 +103,15 @@ describe('ToolStrip', () => {
     expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'star' });
     expect(star?.getAttribute('aria-pressed')).toBe('true');
   });
+
+  it('opens the design library from the tool strip', async () => {
+    const h = await render(<ToolStrip />);
+    const library = h.querySelector('button[aria-label="Open design library"]');
+
+    await act(async () => {
+      library?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(useUiStore.getState().libraryDialogOpen).toBe(true);
+  });
 });
