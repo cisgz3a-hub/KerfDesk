@@ -117,19 +117,30 @@ function applyMWord(state: ModalState, value: number): void {
 }
 
 function buildPreamble(state: ModalState, options: ResumeOptions): ReadonlyArray<string> {
-  const lines: string[] = ['; KerfDesk resume preamble', state.units, 'G90'];
+  const header: string[] = ['; KerfDesk resume preamble', state.units, 'G90'];
+  // Z words mean the program is Z-aware (CNC/router); their absence means laser.
+  // The spindle ORDER differs by machine and is safety-critical: a router spins
+  // up BEFORE it moves (bit at speed before the plunge), but a laser must travel
+  // to the resume point BEFORE the beam is ever armed. Sharing the CNC order on
+  // a laser fired a stationary dot at the parked position and then travelled with
+  // the beam armed, because M3 constant power (and the spin-up G4 dwell) turns the
+  // diode on the instant it is issued (audit C1).
+  const body = state.z !== null ? cncResumeBody(state, options) : laserResumeBody(state);
+  return [...header, ...body];
+}
+
+// CNC/router re-entry: arm + spin up the spindle, retract to safe Z, travel to
+// the resume XY, then feed back down to the recorded depth. Byte-identical to the
+// pre-audit shared preamble for Z-aware programs.
+function cncResumeBody(state: ModalState, options: ResumeOptions): string[] {
+  const lines: string[] = [];
   if (state.spindle !== 'M5' && state.sValue !== null) {
     lines.push(`${state.spindle} S${formatNumber(state.sValue)}`);
     lines.push(`G4 P${options.spindleSpinupSec.toFixed(3)}`);
   }
-  // Z lines only when the program itself is Z-aware — a laser job with no
-  // Z words must not suddenly command the Z axis on resume.
-  if (state.z !== null) lines.push(`G0 Z${formatNumber(options.safeZMm)}`);
-  if (state.x !== null || state.y !== null) {
-    const x = state.x === null ? '' : ` X${formatNumber(state.x)}`;
-    const y = state.y === null ? '' : ` Y${formatNumber(state.y)}`;
-    lines.push(`G0${x}${y}`);
-  }
+  lines.push(`G0 Z${formatNumber(options.safeZMm)}`);
+  const move = positionMove(state);
+  if (move !== null) lines.push(move);
   // Feed back down to the recorded depth so XY-only cut lines that follow
   // resume in the material, not at safe height.
   if (state.z !== null && state.z < options.safeZMm) {
@@ -137,6 +148,29 @@ function buildPreamble(state: ModalState, options: ResumeOptions): ReadonlyArray
   }
   if (state.feed !== null) lines.push(`F${formatNumber(state.feed)}`);
   return lines;
+}
+
+// Laser re-entry: position FIRST with the beam off (no spindle word emitted yet),
+// and only once the head is at the resume point re-arm it — where a burn is
+// expected. No spin-up dwell: a G4 with M3 active fires the stationary beam
+// (audit C1). No Z words: laser jobs must never command the Z axis on resume.
+function laserResumeBody(state: ModalState): string[] {
+  const lines: string[] = [];
+  const move = positionMove(state);
+  if (move !== null) lines.push(move);
+  if (state.spindle !== 'M5' && state.sValue !== null) {
+    lines.push(`${state.spindle} S${formatNumber(state.sValue)}`);
+  }
+  if (state.feed !== null) lines.push(`F${formatNumber(state.feed)}`);
+  return lines;
+}
+
+// The rapid to the resume XY, or null when neither axis was ever set.
+function positionMove(state: ModalState): string | null {
+  if (state.x === null && state.y === null) return null;
+  const x = state.x === null ? '' : ` X${formatNumber(state.x)}`;
+  const y = state.y === null ? '' : ` Y${formatNumber(state.y)}`;
+  return `G0${x}${y}`;
 }
 
 function stripComments(line: string): string {
