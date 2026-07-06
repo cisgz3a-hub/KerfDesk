@@ -5,7 +5,7 @@ export type CommandHelpTopic = {
   readonly tooltip: string;
 };
 
-export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
+export const COMMAND_HELP: Readonly<Partial<Record<CommandId, CommandHelpTopic>>> = {
   'file.new': {
     family: 'file',
     tooltip: 'Create a new blank project.',
@@ -106,11 +106,6 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip:
       'Open the registration jig panel: create a burn-alignment box, center artwork, and pick the burn run.',
-  },
-  'tools.camera': {
-    family: 'tools',
-    tooltip:
-      'Open the camera panel: overhead-camera alignment, lens calibration, workspace overlay, and trace-from-camera.',
   },
   'tools.box-generator': {
     family: 'tools',

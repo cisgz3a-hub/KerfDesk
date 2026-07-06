@@ -306,7 +306,8 @@ function headerToggleAriaLabel(props: {
 }
 
 function headerToggleTitle(field: 'visible' | 'output' | 'airAssist'): string {
-  if (field === 'visible') return 'Show or hide this layer on the workspace without changing output.';
+  if (field === 'visible')
+    return 'Show or hide this layer on the workspace without changing output.';
   if (field === 'output') {
     return 'Include or exclude this layer from preview, frame, export, and job output.';
   }

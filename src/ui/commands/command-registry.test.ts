@@ -51,7 +51,7 @@ describe('buildAppCommands', () => {
     );
 
     for (const command of commands.filter((candidate) => candidate.enabled)) {
-      expect(command.title).toBe(COMMAND_HELP[command.id].tooltip);
+      expect(command.title).toBe(COMMAND_HELP[command.id]?.tooltip);
     }
   });
 

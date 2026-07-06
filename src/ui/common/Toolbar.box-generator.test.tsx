@@ -52,15 +52,13 @@ describe('Toolbar Box Generator', () => {
       expect(labels).not.toContain('Camera');
       expect(
         labels.slice(labels.indexOf('Registration Jig'), labels.indexOf('Registration Jig') + 2),
-      ).toEqual([
-        'Registration Jig',
-        'Box Generator...',
-      ]);
+      ).toEqual(['Registration Jig', 'Box Generator...']);
 
       const boxButton = toolbarButtons.find((button) =>
         button.textContent?.includes('Box Generator'),
       );
-      if (!(boxButton instanceof HTMLButtonElement)) throw new Error('Box Generator button missing');
+      if (!(boxButton instanceof HTMLButtonElement))
+        throw new Error('Box Generator button missing');
       await act(async () => {
         boxButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
