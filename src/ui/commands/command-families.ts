@@ -389,3 +389,13 @@ export function connectionHelpCommand(ctx: AppCommandContext): AppCommand {
     ctx.showConnectionHelp,
   );
 }
+
+export function safetyHelpCommand(ctx: AppCommandContext): AppCommand {
+  return enabled(
+    'help.safety',
+    'help',
+    'Safety & liability',
+    'Show machine-safety and liability information — read before running a job',
+    ctx.showSafety,
+  );
+}

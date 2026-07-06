@@ -299,4 +299,8 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'help',
     tooltip: "Steps to fix a machine that won't connect, including USB driver help.",
   },
+  'help.safety': {
+    family: 'help',
+    tooltip: 'Machine-safety and liability information — read before running a job.',
+  },
 };

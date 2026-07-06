@@ -6,6 +6,7 @@ import {
   connectionHelpCommand,
   fileCommands,
   helpCommand,
+  safetyHelpCommand,
   toolsCommands,
   windowCommands,
 } from './command-families';
@@ -30,6 +31,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       ...laserCommands(ctx),
       ...windowCommands(ctx),
       helpCommand(ctx),
+      safetyHelpCommand(ctx),
       connectionHelpCommand(ctx),
     ],
     ctx.machineKind,

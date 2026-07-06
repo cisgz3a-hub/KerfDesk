@@ -99,6 +99,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     undoHistory: vi.fn(),
     showAbout: vi.fn(),
     showConnectionHelp: vi.fn(),
+    showSafety: vi.fn(),
     canTransformSelection: false,
     canAlignSelection: false,
     alignSelection: vi.fn(),

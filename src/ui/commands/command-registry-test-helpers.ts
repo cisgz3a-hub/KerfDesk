@@ -120,6 +120,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     undoHistory: vi.fn(),
     showAbout: vi.fn(),
     showConnectionHelp: vi.fn(),
+    showSafety: vi.fn(),
   };
 }
 
