@@ -264,6 +264,7 @@ function windowHelpCommandContext(
   | 'undoHistory'
   | 'showAbout'
   | 'showConnectionHelp'
+  | 'showSafety'
 > {
   return {
     togglePreview: app.togglePreview,
@@ -272,6 +273,7 @@ function windowHelpCommandContext(
     undoHistory: callbacks.requestUndoHistory,
     showAbout: callbacks.showAbout,
     showConnectionHelp: callbacks.showConnectionHelp,
+    showSafety: callbacks.showSafety,
   };
 }
 
