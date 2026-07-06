@@ -95,14 +95,14 @@ describe('laser store air assist safety cleanup', () => {
     expect(useLaserStore.getState().airAssistOn).toBe(false);
   });
 
-  it('blocks manual air assist on when Machine Setup has no air command', async () => {
+  it('blocks manual air assist on when Device Profile has no air output command', async () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);
     await connectWith(connection);
 
     write.mockClear();
     await expect(useLaserStore.getState().setAirAssistEnabled(true)).rejects.toThrow(
-      'Air assist is disabled in Machine Setup',
+      'Manual air is disabled because Device Profile > Air output is Disabled',
     );
 
     expect(write).not.toHaveBeenCalled();

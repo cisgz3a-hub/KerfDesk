@@ -143,11 +143,11 @@ function AirAssistControl(props: {
   const commandAvailable = props.command !== 'none';
   const disabled = !commandAvailable;
   const label = props.enabled
-    ? 'Turn air assist off (M9)'
-    : `Turn air assist on (${commandAvailable ? props.command : 'not configured'})`;
+    ? 'Turn manual air assist off (M9)'
+    : `Turn manual air assist on (${commandAvailable ? props.command : 'not configured'})`;
   const title = commandAvailable
-    ? label
-    : 'Set Machine Setup > Air assist to M7 or M8 before using this button.';
+    ? `${label}. Jobs use each layer's Job Air checkbox automatically.`
+    : 'Set Device Profile > Air output to M7 or M8 before using manual air.';
   return (
     <button
       type="button"
@@ -158,7 +158,7 @@ function AirAssistControl(props: {
       title={title}
       style={airAssistButtonStyle(props.enabled, disabled)}
     >
-      <span style={airAssistTitleStyle}>Air Assist</span>
+      <span style={airAssistTitleStyle}>Manual Air</span>
       <span style={airAssistStateStyle}>{props.enabled ? 'ON' : 'OFF'}</span>
       <span style={airAssistCommandStyle}>{commandAvailable ? props.command : 'Not set'}</span>
     </button>

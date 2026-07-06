@@ -147,6 +147,7 @@ export function LayerRow(props: {
         )}
         <HeaderToggle label="Show" layer={layer} field="visible" />
         <HeaderToggle label="Output" layer={layer} field="output" />
+        <JobAirToggle layer={layer} isCncMachine={isCncMachine} />
       </header>
       {isCncMachine ? (
         <CncLayerFields layer={layer} />
@@ -161,6 +162,14 @@ export function LayerRow(props: {
       {settingsOpen ? <LayerRowCutSettings layer={layer} onClose={closeSettings} /> : null}
     </section>
   );
+}
+
+function JobAirToggle(props: {
+  readonly layer: Layer;
+  readonly isCncMachine: boolean;
+}): JSX.Element | null {
+  if (props.isCncMachine) return null;
+  return <HeaderToggle label="Job Air" layer={props.layer} field="airAssist" />;
 }
 
 function layerCardStyle(output: boolean, active: boolean): React.CSSProperties {
@@ -270,7 +279,7 @@ function modeSelectTitle(operationTarget: LayerOperationControlTarget): string {
 function HeaderToggle(props: {
   readonly label: string;
   readonly layer: Layer;
-  readonly field: 'visible' | 'output';
+  readonly field: 'visible' | 'output' | 'airAssist';
 }): JSX.Element {
   const setLayerParam = useStore((s) => s.setLayerParam);
   return (
@@ -279,16 +288,29 @@ function HeaderToggle(props: {
         type="checkbox"
         checked={props.layer[props.field]}
         onChange={(e) => setLayerParam(props.layer.id, { [props.field]: e.target.checked })}
-        aria-label={`${props.label} for ${props.layer.color}`}
-        title={
-          props.field === 'visible'
-            ? 'Show or hide this layer on the workspace without changing output.'
-            : 'Include or exclude this layer from preview, frame, export, and job output.'
-        }
+        aria-label={headerToggleAriaLabel(props)}
+        title={headerToggleTitle(props.field)}
       />
       {props.label}
     </label>
   );
+}
+
+function headerToggleAriaLabel(props: {
+  readonly label: string;
+  readonly layer: Layer;
+  readonly field: 'visible' | 'output' | 'airAssist';
+}): string {
+  if (props.field === 'airAssist') return `Job air assist for ${props.layer.color}`;
+  return `${props.label} for ${props.layer.color}`;
+}
+
+function headerToggleTitle(field: 'visible' | 'output' | 'airAssist'): string {
+  if (field === 'visible') return 'Show or hide this layer on the workspace without changing output.';
+  if (field === 'output') {
+    return 'Include or exclude this layer from preview, frame, export, and job output.';
+  }
+  return 'Automatically emit the configured M7/M8 air-assist command for this layer during jobs. Configure the command in Device Profile > Air output.';
 }
 
 function isInteractiveDoubleClickTarget(target: EventTarget | null): boolean {

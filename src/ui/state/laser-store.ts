@@ -368,10 +368,10 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
       const command = enabled ? useStore.getState().project.device.airAssistCommand : 'M9';
       if (command === 'none') {
         const message =
-          'Air assist is disabled in Machine Setup. Set Air assist to M7 or M8 first.';
+          'Manual air is disabled because Device Profile > Air output is Disabled. Set it to M7 or M8 first.';
         set({
           lastWriteError: message,
-          log: pushLog(get(), `[lf2] Air assist command blocked: ${message}`),
+          log: pushLog(get(), `[lf2] Manual air command blocked: ${message}`),
         });
         throw new Error(message);
       }
@@ -379,7 +379,7 @@ function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssis
       set({
         airAssistOn: enabled,
         lastWriteError: null,
-        log: pushLog(get(), `[lf2] Air assist ${enabled ? `on (${command})` : 'off (M9)'}.`),
+        log: pushLog(get(), `[lf2] Manual air ${enabled ? `on (${command})` : 'off (M9)'}.`),
       });
     },
   };
@@ -393,7 +393,7 @@ function assertAirAssistReady(set: SetFn, get: GetFn): void {
   if (blockedMessage === null) return;
   set({
     lastWriteError: blockedMessage,
-    log: pushLog(state, `[lf2] Air assist command blocked: ${blockedMessage}`),
+    log: pushLog(state, `[lf2] Manual air command blocked: ${blockedMessage}`),
   });
   throw new Error(blockedMessage);
 }
@@ -405,10 +405,10 @@ function airAssistCommandBlockMessage(state: LaserState): string | null {
   if (motionOperationMessage !== null) return motionOperationMessage;
   if (state.connection.kind !== 'connected') return 'Connect to the laser first.';
   if (state.statusReport === null) {
-    return 'Controller status is not known yet. Wait for an Idle status report before toggling air assist.';
+    return 'Controller status is not known yet. Wait for an Idle status report before toggling manual air.';
   }
   if (state.statusReport.state !== 'Idle') {
-    return `Machine must be Idle before toggling air assist (currently ${state.statusReport.state}).`;
+    return `Machine must be Idle before toggling manual air (currently ${state.statusReport.state}).`;
   }
   return null;
 }

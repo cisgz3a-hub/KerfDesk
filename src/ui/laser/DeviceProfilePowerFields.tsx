@@ -69,14 +69,14 @@ export function LaserPowerRows(props: DeviceRowsProps): JSX.Element {
 export function AirAssistRow(props: DeviceRowsProps): JSX.Element {
   const { device, update } = props;
   return (
-    <Row label="Air assist">
+    <Row label="Air output">
       <select
         value={device.airAssistCommand}
         onChange={(e) =>
           update({ airAssistCommand: e.target.value as DeviceProfile['airAssistCommand'] })
         }
-        aria-label="Air assist command"
-        title="Choose the GRBL coolant command wired to your air assist. Leave Disabled unless you have tested the output."
+        aria-label="Air output command"
+        title="Choose the GRBL coolant output wired to air assist for Job Air and Manual Air. Leave Disabled unless you have tested the output."
       >
         <option value="none">Disabled</option>
         <option value="M8">M8 flood coolant</option>
