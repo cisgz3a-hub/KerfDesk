@@ -10,9 +10,18 @@
 // and a native dialog there would freeze the ack pump and Stop button.
 
 import { buildResumeProgram } from '../../core/controllers/grbl';
-import { machineKindOf } from '../../core/scene';
+import {
+  createJobCheckpoint,
+  fingerprintGcode,
+  fingerprintsEqual,
+  markResumeInFlight,
+  rawResumeLine,
+  type JobCheckpoint,
+} from '../../core/recovery';
+import { machineKindOf, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
+import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { prepareStartJob } from './start-job-readiness';
@@ -55,17 +64,54 @@ export async function runStartJobFlow(): Promise<void> {
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
     });
+    // Checkpoint the run only once the stream is actually under way
+    // (ADR-118); a refused start must not overwrite an older recovery
+    // record. useJobCheckpoint advances it from streamer acks.
+    writeJobCheckpoint(
+      createJobCheckpoint({
+        gcode: prepared.gcode,
+        machineKind: machineKindOf(project.machine),
+        nowIso: new Date().toISOString(),
+      }),
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     jobAwareAlert(`Could not start job:\n\n${message}`);
   }
 }
 
-// Resume a stopped/errored job from a chosen 1-based line (ADR-103 G7,
-// F-CNC27). Same readiness gate as a fresh start; the resume preamble
-// rebuilds units/spindle/feed/position and re-enters the cut at the
-// recorded depth before replaying the tail.
+// Resume a stopped/errored job from a chosen 1-based RAW line (ADR-103 G7,
+// F-CNC27) — the manual, ungated path: the operator vouches for the line.
 export async function runStartFromLineFlow(fromLine: number): Promise<void> {
+  const prepared = prepareResume();
+  if (prepared === null) return;
+  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine);
+}
+
+// Resume the checkpointed interrupted job (ADR-118): re-compile the project,
+// REFUSE when its bytes no longer match the checkpoint's fingerprint (an
+// edited project silently renumbers every line), then map the acked-sendable
+// count back to the raw line the stream died at.
+export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promise<void> {
+  const prepared = prepareResume();
+  if (prepared === null) return;
+  if (!fingerprintsEqual(fingerprintGcode(prepared.gcode), checkpoint.fingerprint)) {
+    jobAwareAlert(
+      'Cannot resume the interrupted job:\n\n' +
+        'The current project no longer produces the same G-code as the interrupted run — ' +
+        'it was edited since, so its line numbers no longer match. Re-open the original ' +
+        'project, or use Start from line… manually if you are sure of the line.',
+    );
+    return;
+  }
+  const fromLine = rawResumeLine(prepared.gcode, checkpoint.ackedLines);
+  await streamResumeFromRawLine(prepared.project, prepared.gcode, fromLine);
+}
+
+// Shared resume front half: readiness gate + re-compile. Same gate as a
+// fresh start (minus the settings-capability warning, matching the original
+// Start-from-line behavior).
+function prepareResume(): { readonly project: Project; readonly gcode: string } | null {
   const app = useStore.getState();
   const { project, jobPlacement } = app;
   const laser = useLaserStore.getState();
@@ -90,10 +136,21 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');
     jobAwareAlert(`Cannot resume job:\n\n${lines}`);
-    return;
+    return null;
   }
+  return { project, gcode: prepared.gcode };
+}
+
+// Shared resume back half: build the re-entry program, confirm, suspend
+// checkpoint tracking (the resume run has its own numbering — ADR-118), and
+// stream it.
+async function streamResumeFromRawLine(
+  project: Project,
+  gcode: string,
+  fromLine: number,
+): Promise<void> {
   const machine = project.machine;
-  const resume = buildResumeProgram(prepared.gcode, fromLine, {
+  const resume = buildResumeProgram(gcode, fromLine, {
     safeZMm: machine?.kind === 'cnc' ? machine.params.safeZMm : 0,
     spindleSpinupSec: machine?.kind === 'cnc' ? machine.params.spindleSpinupSec : 0,
     plungeMmPerMin: RESUME_PLUNGE_MM_PER_MIN,
@@ -106,8 +163,12 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
     `Resume from line ${fromLine}?\n\nThe machine will restart the spindle, move to the recorded position at safe height, feed back to depth, and replay the rest of the job. The work zero must be UNCHANGED since the original run.`,
   );
   if (!proceed) return;
+  const checkpoint = readJobCheckpoint();
+  if (checkpoint !== null) {
+    writeJobCheckpoint(markResumeInFlight(checkpoint, new Date().toISOString()));
+  }
   try {
-    await laser.startJob(resume.lines.join('\n'), {
+    await useLaserStore.getState().startJob(resume.lines.join('\n'), {
       streamingMode: project.device.streamingMode,
       rxBufferBytes: project.device.rxBufferBytes,
       machineKind: machineKindOf(project.machine),
