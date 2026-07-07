@@ -27,20 +27,21 @@ import {
   type ConvertToBitmapDialogOptions,
 } from '../raster/ConvertToBitmapDialog';
 import {
-  isConvertibleVector,
-  sourceLabel,
+  bitmapConversionTarget,
+  conversionSourceLabel,
   type ConvertibleVector,
 } from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
-import { convertSelectedVectorToBitmap } from './bitmap-conversion';
+import { convertSelectedVectorsToBitmap } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
 import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
 import { pickPlatformImageFile, pickPlatformImageFiles } from './platform-image-files';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
+import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
 import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
@@ -61,7 +62,7 @@ export function CommandShell(): JSX.Element {
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
-  const selectedConvertible = useSelectedConvertible();
+  const selectedConvertibles = useSelectedConvertibles();
   const selectedRaster = useSelectedRaster();
   const onImagePick = useImagePickHandler();
   const onMultiFileTracePick = useMultiFileTracePickHandler();
@@ -94,8 +95,8 @@ export function CommandShell(): JSX.Element {
       <Toolbar commands={commands} machineKind={machineKind} />
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
-      {convertDialogOpen && selectedConvertible !== null ? (
-        <ConvertDialog convertible={selectedConvertible} onClose={closeConvertBitmapDialog} />
+      {convertDialogOpen && selectedConvertibles.length > 0 ? (
+        <ConvertDialog convertibles={selectedConvertibles} onClose={closeConvertBitmapDialog} />
       ) : null}
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
@@ -259,7 +260,7 @@ function ScanOffsetDialog(props: { readonly onClose: () => void }): JSX.Element 
 }
 
 function ConvertDialog(props: {
-  readonly convertible: ConvertibleVector;
+  readonly convertibles: ReadonlyArray<ConvertibleVector>;
   readonly onClose: () => void;
 }): JSX.Element {
   const layers = useStore((s) => s.project.scene.layers);
@@ -267,19 +268,22 @@ function ConvertDialog(props: {
   const pushToast = useToastStore((s) => s.pushToast);
   const onConvert = (options: ConvertToBitmapDialogOptions): void => {
     props.onClose();
-    void convertSelectedVectorToBitmap(
-      props.convertible,
+    void convertSelectedVectorsToBitmap(
+      props.convertibles,
       layers,
       options,
       convertToBitmap,
       pushToast,
     );
   };
+  // The selection's combined rotation-aware AABB + IDENTITY — exactly the
+  // target the builder rasterizes, so the size estimate always matches.
+  const target = bitmapConversionTarget(props.convertibles);
   return (
     <ConvertToBitmapDialog
-      sourceName={sourceLabel(props.convertible)}
-      bounds={props.convertible.bounds}
-      transform={props.convertible.transform}
+      sourceName={conversionSourceLabel(props.convertibles)}
+      bounds={target.bounds}
+      transform={target.transform}
       onCancel={props.onClose}
       onConvert={onConvert}
     />
@@ -365,12 +369,16 @@ function useSelectedRaster() {
   return selected?.kind === 'raster-image' ? selected : null;
 }
 
-function useSelectedConvertible(): ConvertibleVector | null {
-  const scene = useStore((s) => s.project.scene);
+// The whole convertible selection in scene order — empty unless EVERY
+// selected object is a convertible vector (the command's gate).
+function useSelectedConvertibles(): ReadonlyArray<ConvertibleVector> {
+  const project = useStore((s) => s.project);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
-  if (selectedObjectId === null) return null;
-  const selected = scene.objects.find((object) => object.id === selectedObjectId);
-  return selected !== undefined && isConvertibleVector(selected) ? selected : null;
+  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
+  return selectedConvertibleVectors(
+    project,
+    selectedObjectIds(selectedObjectId, additionalSelectedIds),
+  );
 }
 
 function aboutText(): string {

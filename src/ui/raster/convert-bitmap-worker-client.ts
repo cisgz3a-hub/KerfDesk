@@ -28,13 +28,13 @@ export function canConvertBitmapInline(
 }
 
 export function convertBitmapInWorker(
-  vector: ConvertibleVector,
+  vectors: ReadonlyArray<ConvertibleVector>,
   options: BitmapConversionOptions,
   rasterId: string,
 ): Promise<RasterImage> | null {
   const worker = ensureWorker();
   if (worker === null) return null;
-  return requestBitmap(worker, vector, options, rasterId);
+  return requestBitmap(worker, vectors, options, rasterId);
 }
 
 export function resetConvertBitmapWorkerForTests(): void {
@@ -71,7 +71,7 @@ function handleWorkerMessage(e: MessageEvent<ConvertBitmapWorkerResponse>): void
 
 function requestBitmap(
   worker: Worker,
-  vector: ConvertibleVector,
+  vectors: ReadonlyArray<ConvertibleVector>,
   options: BitmapConversionOptions,
   rasterId: string,
 ): Promise<RasterImage> {
@@ -92,7 +92,7 @@ function requestBitmap(
         reject(err);
       },
     });
-    const request: ConvertBitmapWorkerRequest = { id, rasterId, vector, options };
+    const request: ConvertBitmapWorkerRequest = { id, rasterId, vectors, options };
     try {
       worker.postMessage(request);
     } catch (err) {

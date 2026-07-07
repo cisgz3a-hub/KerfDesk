@@ -1199,8 +1199,18 @@ An audit of the shipped feature (findings fixed the same day) pins the following
 2. **Default Brightness shipped (the A5 brightness half).** The dialog exposes LightBurn's Default Brightness (percent, default 50). Mapping is `floor(255 × pct/100)` — floor, not round, so 50% stays at 127 per (1). LightBurn's own default is 50% (§7.4).
 3. **Conversion DPI range is 127–635, derived, a deliberate divergence.** LightBurn's dialog offers 10–2000 DPI, but LightBurn keeps image resolution and the Image layer's interval independent; our model stamps the conversion DPI onto the created image layer's `linesPerMm` (§6 placement). The legal range therefore derives from the app-wide raster density limits (`MIN/MAX_RASTER_LINES_PER_MM` = 5–25 lines/mm) — outside it, Convert would mint layers the Cuts panel clamps to a different density on the next edit. Revisit if image resolution and layer interval are ever decoupled.
 4. **Size estimates are full-transform.** The dialog's pixel estimate uses the rotated AABB (`transformedBounds`), matching what the builder rasterizes — the original scale-only estimate approved rotated conversions the builder then refused. The bake itself (per the 2026-06-09 transform-bake plan) emits baked bounds + IDENTITY transform, which also sidesteps the raster output path's no-rotation limitation.
-5. **Single-selection gate.** The command (and `Ctrl/Cmd+Shift+B`, now bound — LightBurn's shortcut, §7.4) is enabled only for a selection of exactly one convertible vector. LightBurn converts a whole multi-selection into **one** bitmap; that merge is a scoped follow-up feature, not a gate relaxation — the pre-fix behavior (silently converting only the primary object of a multi-selection) was a defect.
+5. **Single-selection gate.** The command (and `Ctrl/Cmd+Shift+B`, now bound — LightBurn's shortcut, §7.4) is enabled only for a selection of exactly one convertible vector. LightBurn converts a whole multi-selection into **one** bitmap; that merge is a scoped follow-up feature, not a gate relaxation — the pre-fix behavior (silently converting only the primary object of a multi-selection) was a defect. _(Superseded by amendment ii below: the merge shipped.)_
 6. **Menu placement divergence.** LightBurn houses Convert to Bitmap under **Edit**; ours lives under **Tools**, grouped with Convert to Path and the other conversions. Deliberate (one conversions home), per ADR-027 §4.
+
+### Amendment 2026-07-07 (ii) — multi-selection merges into one bitmap
+
+The follow-up from amendment (i) §5 shipped the same day:
+
+1. **The whole selection converts as ONE `RasterImage`** spanning the union of the members' rotation-aware AABBs, LightBurn-faithful. Every source vector is deleted; the swap is a **single undo entry**, and the merged bitmap becomes the sole selection (stale additional-selection ids are cleared).
+2. **Cross-object even-odd.** Fill All rasterizes the concatenated baked contours of the whole selection with one even-odd pass — a shape nested inside _another object's_ shape reads as a hole. This matches LightBurn's "solid fill of areas between outlines" **and** our own Fill mode, which hatches a layer's contours together (`collectFillContoursForLayer`). Use Cut Settings groups per path color across all members, as before.
+3. **Gate: every selected object must be a convertible vector** (`selectedConvertibleVectors`, scene order). A mixed selection (e.g. a raster among vectors) stays disabled rather than converting an ambiguous subset. Same gate for the menu command, toolbar, context bar, and `Ctrl/Cmd+Shift+B`.
+4. **Naming:** a multi-object result is labeled `N objects (bitmap)`; the dialog shows `N objects` and estimates from the combined bounds, so the size preview still matches exactly what the builder produces.
+5. The worker protocol carries the full selection (`vectors`); budget refusal (4 M px) applies to the combined grid, refusing up front in the dialog.
 
 ---
 
