@@ -45,4 +45,36 @@ describe('cannyEdges', () => {
   it('is deterministic for the same input', () => {
     expect(cannyEdges(filledSquare(48, 14, 34))).toEqual(cannyEdges(filledSquare(48, 14, 34)));
   });
+
+  it('clamps a non-finite blurSigma instead of allocating an unbounded kernel', () => {
+    const image = filledSquare(48, 14, 34);
+    // Infinite sigma → Math.ceil(sigma*3) kernel radius would be Infinity
+    // (unbounded alloc / hang). NaN sigma corrupts the kernel. Both must
+    // produce a bounded edge field of the right length without throwing.
+    for (const bad of [Number.POSITIVE_INFINITY, Number.NaN, -5]) {
+      const edges = cannyEdges(image, { blurSigma: bad });
+      expect(edges.length).toBe(48 * 48);
+      expect(countEdges(edges)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('clamps non-finite / out-of-range threshold ratios to a valid edge field', () => {
+    const image = filledSquare(48, 14, 34);
+    for (const bad of [Number.NaN, -1, Number.POSITIVE_INFINITY, 5]) {
+      const edges = cannyEdges(image, { lowThresholdRatio: bad, highThresholdRatio: bad });
+      expect(edges.length).toBe(48 * 48);
+      expect(countEdges(edges)).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('leaves valid-path output unchanged (default options are a bounded case)', () => {
+    // Explicit valid params equal to the defaults must match the no-options call.
+    const image = filledSquare(48, 14, 34);
+    const withExplicit = cannyEdges(image, {
+      blurSigma: 1.2,
+      lowThresholdRatio: 0.08,
+      highThresholdRatio: 0.2,
+    });
+    expect(withExplicit).toEqual(cannyEdges(image));
+  });
 });

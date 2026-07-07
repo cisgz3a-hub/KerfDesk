@@ -8,14 +8,21 @@ import type { Polyline, Vec2 } from '../scene';
 import { validateBoxSpec, type BoxSpec, type BoxSpecIssue } from './box-spec';
 import { buildPanelClaims, type PanelId } from './panel-claims';
 import { panelOutline } from './panel-outline';
-import { applyPanelFit } from './panel-fit';
+import { applyPanelFit, type PanelRings } from './panel-fit';
 import { layoutPanelOffsets, type PanelExtent } from './layout';
+import { dividerLayout, hasDividers } from './divider-layout';
+import { dividerName, dividerPanelRings, wallSlotCutouts } from './divider-panels';
+import { buildSlideLidParts } from './slide-lid-panels';
 
 export type BoxPanel = {
   readonly name: string;
-  readonly panel: PanelId;
+  /** 'divider'/'lid' entries are the ADR-116 V2/V3 loose parts. */
+  readonly panel: PanelId | 'divider' | 'lid';
+  readonly divider?: { readonly axis: 'x' | 'y'; readonly index: number };
   /** Closed outline in sheet mm (layout offset already applied). */
   readonly outline: Polyline;
+  /** Interior cutout rings in sheet mm (ADR-116; empty without dividers). */
+  readonly cutouts: ReadonlyArray<Polyline>;
   /** The layout translation; subtract it to recover the local panel frame. */
   readonly offsetMm: Vec2;
 };
@@ -44,19 +51,46 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
   if (validation.kind === 'invalid') {
     return { kind: 'invalid', issues: validation.issues, warnings: validation.warnings };
   }
-  const fittedPanels: Array<{ panel: PanelId; outline: Polyline }> = [];
-  for (const claims of buildPanelClaims(spec)) {
-    const fit = applyPanelFit(panelOutline(claims), {
+  const dividers = hasDividers(spec) ? dividerLayout(spec) : null;
+  const slots = dividers === null ? null : wallSlotCutouts(dividers, spec);
+  const fittedPanels: Array<
+    { name: string; panel: PanelId | 'divider' | 'lid'; divider?: BoxPanel['divider'] } & PanelRings
+  > = [];
+  for (const part of nominalParts(spec, slots)) {
+    const fit = applyPanelFit(part.rings, {
       clearanceMm: spec.clearanceMm,
       relief: spec.relief,
     });
     if (fit.kind !== 'fitted') {
-      return { kind: 'error', message: `${PANEL_NAMES[claims.panel]} panel: ${fit.detail}.` };
+      return { kind: 'error', message: `${part.name} panel: ${fit.detail}.` };
     }
-    fittedPanels.push({ panel: claims.panel, outline: fit.outline });
+    fittedPanels.push({
+      name: part.name,
+      panel: part.panel,
+      outline: fit.outline,
+      cutouts: fit.cutouts,
+    });
+  }
+  if (dividers !== null) {
+    for (const placement of [...dividers.xDividers, ...dividers.yDividers]) {
+      const fit = applyPanelFit(dividerPanelRings(dividers, placement, spec), {
+        clearanceMm: spec.clearanceMm,
+        relief: spec.relief,
+      });
+      if (fit.kind !== 'fitted') {
+        return { kind: 'error', message: `${dividerName(placement)} panel: ${fit.detail}.` };
+      }
+      fittedPanels.push({
+        name: dividerName(placement),
+        panel: 'divider',
+        divider: { axis: placement.axis, index: placement.index },
+        outline: fit.outline,
+        cutouts: fit.cutouts,
+      });
+    }
   }
   const offsets = layoutPanelOffsets(
-    fittedPanels.map((panel) => outlineExtent(panel.outline)),
+    fittedPanels.map((panel) => ringsExtent(panel)),
     spec.partSpacingMm,
   );
   return {
@@ -64,32 +98,71 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
     panels: fittedPanels.map((panel, index) => {
       const offsetMm = offsets[index] ?? { x: 0, y: 0 };
       return {
-        name: PANEL_NAMES[panel.panel],
+        name: panel.name,
         panel: panel.panel,
+        ...(panel.divider === undefined ? {} : { divider: panel.divider }),
         outline: translate(panel.outline, offsetMm),
+        cutouts: panel.cutouts.map((cutout) => translate(cutout, offsetMm)),
         offsetMm,
       };
     }),
   };
 }
 
-function outlineExtent(outline: Polyline): PanelExtent {
+type NominalPart = {
+  readonly name: string;
+  readonly panel: PanelId | 'divider' | 'lid';
+  readonly rings: PanelRings;
+};
+
+// Walls (with any divider slots) per style: claim-model panels for closed
+// and open-top, the dedicated slide-lid builder otherwise.
+function nominalParts(
+  spec: BoxSpec,
+  slots: ReadonlyMap<PanelId, ReadonlyArray<Polyline>> | null,
+): ReadonlyArray<NominalPart> {
+  if (spec.style === 'slide-lid') {
+    return buildSlideLidParts(spec).map((part) => ({
+      name: part.name,
+      panel: part.panel,
+      rings: {
+        outline: part.rings.outline,
+        cutouts: [
+          ...part.rings.cutouts,
+          ...(part.panel === 'lid' ? [] : (slots?.get(part.panel) ?? [])),
+        ],
+      },
+    }));
+  }
+  return buildPanelClaims(spec).map((claims) => ({
+    name: PANEL_NAMES[claims.panel],
+    panel: claims.panel,
+    rings: {
+      outline: panelOutline(claims),
+      cutouts: slots?.get(claims.panel) ?? [],
+    },
+  }));
+}
+
+function ringsExtent(rings: PanelRings): PanelExtent {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of outline.points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
+  for (const ring of [rings.outline, ...rings.cutouts]) {
+    for (const point of ring.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
   }
   return { minX, minY, maxX, maxY };
 }
 
-function translate(outline: Polyline, offsetMm: Vec2): Polyline {
+function translate(ring: Polyline, offsetMm: Vec2): Polyline {
   return {
-    closed: outline.closed,
-    points: outline.points.map((point) => ({ x: point.x + offsetMm.x, y: point.y + offsetMm.y })),
+    closed: ring.closed,
+    points: ring.points.map((point) => ({ x: point.x + offsetMm.x, y: point.y + offsetMm.y })),
   };
 }

@@ -18,7 +18,7 @@ coverage/
 # Perceptual test harness — opt-in render dumps (PERCEPTUAL_ARTIFACTS=1)
 perceptual-artifacts/
 
-# Trace audit harness — opt-in render dumps (TRACE_AUDIT_ARTIFACTS=1)
+# Trace audit harness — opt-in render dumps (TRACE_AUDIT=1)
 trace-audit-artifacts/
 
 # Trace fixtures — local user assets (logos/photos), not committed

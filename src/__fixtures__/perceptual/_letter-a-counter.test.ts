@@ -92,25 +92,30 @@ const COUNTER = { x0: 74, y0: 60, x1: 146, y1: 148 };
 
 // Traced via the real app entry (traceImageToColoredPaths) so auto-upscale and
 // dispatch match what the user sees.
-it('reproduces + measures A counter closure', { timeout: 120000 }, async () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  mkdirSync(OUT_DIR, { recursive: true });
-  const lines: string[] = [];
-  // Thin outline widths: 1-2px collapse to a single Edge ridge (matching the
-  // reported single-line render) and are the break-prone regime.
-  for (const outlineWidth of [1, 1.5, 2, 3]) {
-    for (const soft of [false, true]) {
-      const image = letterA(9, true, soft, outlineWidth);
-      const options = TRACE_PRESETS['Edge Detection'] as TraceOptions;
-      const paths = await traceImageToColoredPaths(image, options);
-      const polylines = paths.flatMap((path) => path.polylines);
-      const tag = `hollow_w${outlineWidth}_${soft ? 'soft' : 'hard'}_edge`;
-      writeFileSync(join(OUT_DIR, `letterA__${tag}.png`), renderOverlay(image, polylines));
-      lines.push(describe(tag, polylines));
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'reproduces + measures A counter closure',
+  { timeout: 120000 },
+  async () => {
+    mkdirSync(OUT_DIR, { recursive: true });
+    const lines: string[] = [];
+    // Thin outline widths: 1-2px collapse to a single Edge ridge (matching the
+    // reported single-line render) and are the break-prone regime.
+    for (const outlineWidth of [1, 1.5, 2, 3]) {
+      for (const soft of [false, true]) {
+        const image = letterA(9, true, soft, outlineWidth);
+        const options = TRACE_PRESETS['Edge Detection'] as TraceOptions;
+        const paths = await traceImageToColoredPaths(image, options);
+        const polylines = paths.flatMap((path) => path.polylines);
+        const tag = `hollow_w${outlineWidth}_${soft ? 'soft' : 'hard'}_edge`;
+        writeFileSync(join(OUT_DIR, `letterA__${tag}.png`), renderOverlay(image, polylines));
+        lines.push(describe(tag, polylines));
+      }
     }
-  }
-  writeFileSync(join(OUT_DIR, 'letterA__metrics.txt'), `${lines.join('\n')}\n`);
-});
+    writeFileSync(join(OUT_DIR, 'letterA__metrics.txt'), `${lines.join('\n')}\n`);
+  },
+);
 
 function describe(tag: string, polylines: ReadonlyArray<Polyline>): string {
   const closed = polylines.filter((pl) => pl.closed).length;

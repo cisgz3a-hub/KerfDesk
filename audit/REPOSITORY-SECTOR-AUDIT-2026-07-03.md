@@ -4462,39 +4462,142 @@ Pass result:
 - S09 delta Pass 2 complete.
 - S09 remains open for Pass 3 over direct-diff closure, underscore diagnostic inventory, and the remaining perceptual benchmark files.
 
-### S09 Delta Pass 3 - Direct Diff Closure and Benchmark Helper Sweep
+### S09 Delta Pass 3 - Direct Diff Closure, Diagnostic Inventory, and Remaining Perceptual Files
 
 Scope planned:
 
-- Close the remaining S09 direct-diff files changed since the audited baseline.
-- Inventory underscore-prefixed `TRACE_AUDIT` diagnostics and stale fixture references.
-- Re-run the release-gated fixture/perceptual benchmark bundle and TypeScript check.
+- Close the direct diff over `src/__fixtures__` since the audited baseline `09047e1`.
+- Build an exhaustive inventory of underscore-prefixed and env-gated opt-in diagnostic files, checking silent-pass behavior, stale paths, output locations, and Vitest inclusion.
+- Read or usage-map every remaining perceptual benchmark/helper file not yet scrutinized.
+- Run the flag-off fixture suite and record pass counts.
 
 Evidence inspected:
 
-- `git diff --name-status d603c01..HEAD -- src/__fixtures__`.
-- `src/__fixtures__/perceptual/trace-benchmark-regression-cases.ts`.
-- `src/__fixtures__/perceptual/arch-house-edge-truth.ts`.
-- `src/__fixtures__/perceptual/arch-house-edge-benchmark.ts`.
-- `src/__fixtures__/perceptual/trace-benchmark-loop.ts` and `src/__fixtures__/perceptual/trace-benchmark-loop.test.ts`.
-- `src/__fixtures__/perceptual/arch-house-edge-truth.test.ts`.
-- `src/__fixtures__/perceptual/star-fixture.ts`.
-- `src/core/trace/edge-trace.test.ts`, confirming the shared star fixture is exercised by the Edge Detection apex test.
-- `rg -n 'audit/fixtures/trace' --glob '_*.test.ts' -- src/__fixtures__/perceptual`, confirming `_edge-zoom.test.ts` is the remaining underscore diagnostic that still points at the removed audit fixture path.
-- `rg -n 'TRACE_AUDIT|return;|it\(' --glob '_*.test.ts' -- src/__fixtures__/perceptual`, confirming the underscore diagnostics remain normal `.test.ts` files whose bodies return early when `TRACE_AUDIT` is absent.
-- Focused command passed: `pnpm exec vitest run src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/trace-benchmark-loop.test.ts src/__fixtures__/perceptual/arch-house-edge-quality.test.ts src/__fixtures__/perceptual/arch-house-edge-truth.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts src/__fixtures__/perceptual/trace-artifacts.test.ts src/__fixtures__/perceptual/arch-house-baseline.test.ts src/core/trace/edge-trace.test.ts` (8 test files, 44 tests).
-- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
-- Current fast-forward check: `git diff --name-status d23e2d6..HEAD` lists only S08 UI input-field files, so S09 has no newer post-checkpoint file delta after this closure pass.
+- `git diff 09047e1..HEAD -- src/__fixtures__` returned empty; no fixture changes since the audited baseline.
+- Focused command passed without env opt-in flags: `pnpm vitest run src/__fixtures__` (31 test files, 129 tests, 0 failed/skipped), including all 12 underscore diagnostics reporting green without executing their bodies (live confirmation of `D-S09-001`).
+- Diagnostic inventory: 12 `TRACE_AUDIT`-gated files (`_arch-a-scale`, `_arch-house-edge-audit`, `_edge-rough-smoothness`, `_edge-zoom`, `_letter-a-counter`, `_letter-b-smoothness`, `_reference-export`, `_reference-iou`, `_sharp-candidates`, `_small-letter-facet`, `_trace-audit-render`, `_tracer-upgrade-audit`) all silently pass with the flag off and all write only under ignored `trace-audit-artifacts/`; only `_edge-zoom.test.ts` references a stale path (`audit/fixtures/trace/...` at lines 69/82/98/127, already `D-S09-002`). Three additional files (`arch-house-baseline.test.ts`, `box-sheet.test.ts`, `png.ts`) use `PERCEPTUAL_ARTIFACTS` as a write-only evidence side channel; their assertions run unconditionally.
+- `vitest.config.ts` has no exclusion for underscore files; all 12 diagnostics run in every `pnpm test`.
+- Remaining perceptual set read or usage-mapped: `trace-fixtures.ts`, `trace-artifact-runner.ts`, `trace-benchmark-loop.ts` plus test, `trace-benchmark-regression-cases.ts`, `arch-house-edge-benchmark.ts`, `arch-house-baseline.test.ts`, `arch-house-edge-quality.test.ts`, `arch-house-edge-truth.ts`, `trace-artifacts.test.ts`, `centerline-perf.test.ts`, `compare.ts`, `png.ts`, `png-decode.ts`, `rasterize.ts`, `edge-truth.ts`, `box-sheet.test.ts`, `import-fidelity.ts`, `render-overlay.ts`, `procedural-ink.ts`, `star-fixture.ts`, and consumer mapping for `gcode-rasterize`/`toolpath-rasterize`/centerline helpers. No dead helpers; no `.skip`/`.only`/`.todo` anywhere under `src/__fixtures__`; budgets remain meaningful (IoU 0.9-0.99 gates, precision/recall gates, `ciBudgetMs(8s,15s)` plus a hard 30s worker ceiling); `arch-house-baseline.test.ts:29` hard-asserts fixture presence so a deleted PNG cannot silently soften the benchmark.
+- `TRACE_AUDIT=1` was not re-run this pass; the `_edge-zoom` failure is already pinned by `D-S09-002` and opt-in outputs stay under ignored directories.
+
+#### D-S09-003 - `.gitignore` documents the wrong trace-audit opt-in flag name
+
+Severity: Low.
+
+Evidence:
+
+- `.gitignore:21` documents the opt-in flag as `TRACE_AUDIT_ARTIFACTS=1`.
+- Every diagnostic gates on `process.env['TRACE_AUDIT'] !== '1'` (for example `src/__fixtures__/perceptual/_trace-audit-render.test.ts:59`).
+- The ignored directory name itself (`trace-audit-artifacts/`) is correct, so there is no tracked-path pollution.
+
+Risk:
+
+A maintainer following the `.gitignore` comment runs `TRACE_AUDIT_ARTIFACTS=1 pnpm vitest run ...`; every diagnostic silently no-ops (compounding `D-S09-001`), and they either conclude the toolkit is broken or, worse, that the audit ran clean.
+
+Recommendation:
+
+Correct the `.gitignore` comment to name `TRACE_AUDIT=1`, ideally when addressing the `D-S09-001` runner-signal cleanup so the flag has one documented spelling.
+
+#### D-S09-004 - Benchmark rating/finding helpers are copy-pasted across three files
+
+Severity: Low.
+
+Evidence:
+
+- `pushFindingIf` and `ratingFromFindings`/`capFromFindings` are duplicated in `src/__fixtures__/perceptual/trace-benchmark-loop.ts:342-361`, `src/__fixtures__/perceptual/trace-benchmark-regression-cases.ts:250-276`, and `src/__fixtures__/perceptual/arch-house-edge-benchmark.ts:179-192`.
+- `countInk` is duplicated between `arch-house-baseline.test.ts:139` and `trace-benchmark-regression-cases.ts:258`; `polylineLength` appears in three modules.
+- This matches the deferred "helper dedup" follow-up already recorded from the trace rebuild, so it is a known-debt confirmation rather than a novel defect.
+
+Risk:
+
+Severity-to-rating mapping tuned in one copy can diverge from another, producing a benchmark whose overall rating and per-case ratings are computed under different rules while all tests stay green.
+
+Recommendation:
+
+Extract the shared rating/finding helpers into one perceptual benchmark utility module and import it from the loop, regression cases, and edge benchmark.
 
 Findings:
 
-- No new S09 delta findings in Pass 3.
-- The release-gated fixture/perceptual benchmark path remains covered by focused passing tests: CI budget helper, trace benchmark loop, real Arch House Edge Detection and Line Art quality, centerline performance, trace artifacts, and the shared star apex fixture.
-- The remaining S09 delta findings are still `D-S09-001` and `D-S09-002`, both low severity and open.
+- Opened `D-S09-003` (low): `.gitignore` documents the wrong trace-audit opt-in flag name.
+- Opened `D-S09-004` (low): benchmark rating/finding helpers are copy-pasted across three files.
+- No high or medium findings; no stale paths beyond `D-S09-002`; no tracked-path artifact writes; no weak or vacuous budgets in the always-on suite.
+- Not re-audited here because they belong to other sectors' suites: `src/__fixtures__/controllers/**` internals and `property/box-benchmark.test.ts` beyond confirming they pass.
 
 Pass result:
 
 - S09 current-state delta sector closed after three passes.
+- The 2026-07-04 current-state delta audit is complete across all sectors. Open delta findings: D-S01-001..003, D-S02-001..003, D-S04-001..004, D-S05-001..004, D-S08-001..002, D-S09-001..004 (19 total; 6 medium, 13 low). No fixes were made during this audit.
+
+## Delta Fix Phase - 2026-07-05
+
+The maintainer opened the fix phase ("start fixing all the findings"). All 19 delta findings are fixed and verified in the working tree (uncommitted). A shared finite-guard module was added at `src/core/util/finite.ts` (`finiteOr`, `finitePositiveOr`, `isFinitePositive`, with its own test) and reused by the S04/S05 numeric fixes.
+
+Verification (whole-tree): `pnpm exec tsc --noEmit` clean; `pnpm lint` clean; `pnpm check:file-size` pass; `pnpm exec prettier --check` clean on new files; `pnpm build:web` clean with no chunk-size warning; full `pnpm exec vitest run` = 580 files passed / 3607 tests passed, 12 files (15 tests) now visibly skipped instead of vacuously passing. `pnpm release:check` was not re-run as a single command; its component gates were each run and passed.
+
+Per-finding resolution:
+
+- D-S01-001 (sector map) - resolved by the delta audit itself; the architecture map was refreshed to classify all current files. No code change.
+- D-S01-002 (completion ledger coverage) - resolved by the delta audit itself; post-baseline commits were audited sector by sector. No code change.
+- D-S01-003 (Phase H header stale) - `PROJECT.md` Phase H header updated to reflect H.13/H.14 (ADR-111/112) landing on top of G1-G8, keeping the "hardware passes CLAIMED" caveat. CRLF-preserved single-line diff.
+- D-S02-001 (build-time metadata untested) - extracted git build-metadata helpers into `src/platform/web/build-info.ts` with `build-info.test.ts` proving same-commit metadata derives from commit time, not wall clock; `vite.config.ts` imports the helper.
+- D-S02-002 (Vite chunk warning) - `chunkSizeWarningLimit` raised to a documented budget covering the Three.js relief-preview chunk; stale `vite.config.ts` comment and `README.md` "clean web build" wording corrected. `pnpm build:web` now emits no chunk warning.
+- D-S02-003 (CI worker throttle untested) - worker-count decision extracted to `src/__fixtures__/vitest-workers.ts` (`vitestMaxWorkers(env)`) with `vitest-workers.test.ts` pinning CI=1 / local=4; `vitest.config.ts` uses the helper.
+- D-S04-001 (surfacing finite guards) - `src/core/cnc/surfacing.ts` normalizes dimensions/feeds/step and bounds `surfacingRowYs`/`depthLadder` so an Infinite height cannot hang and no `NaN`/`Infinity` reaches emitted G-code. Tests added to `surfacing.test.ts`.
+- D-S04-002 (grid/heightmap sizing) - `src/core/sim/removal-grid.ts` and `src/core/relief/heightmap.ts` guard non-finite dimensions and fail closed to a well-formed minimal grid; `mesh-to-heightmap.ts` rejects non-finite target/depth. New `removal-grid.test.ts` and `heightmap.test.ts`.
+- D-S04-003 (material feed non-finite) - `src/core/cnc/feeds-calculator.ts` sanitizes rpm/flutes/diameter so feed/plunge/depth are always finite and floored. Tests added to `feeds-calculator.test.ts`.
+- D-S04-004 (default tool invariant test) - new `src/core/scene/machine-default-tools.test.ts` pins unique IDs, finite positive diameters, kind-specific angle rules, and default `toolId` membership. Test-only.
+- D-S05-001 (auto-upscale factors) - `src/core/trace/auto-upscale.ts` validates the scale factor is a finite integer >= 1 and returns identity output otherwise. Tests added.
+- D-S05-002 (RawImageData shape) - `src/core/trace/trace-image.ts` adds `isValidRawImageData` and `preprocessForTrace` fails closed (returns input unchanged) on a malformed buffer. Tests in the new `trace-image-guards.test.ts`.
+- D-S05-003 (Canny bounds) - `src/core/trace/canny-edges.ts` clamps blur sigma to a bounded finite range and threshold ratios to finite [0,1]. Tests added.
+- D-S05-004 (non-finite adjustments) - `applyImageAdjustments` treats non-finite brightness/contrast as neutral and non-finite gamma as 1.0 (no silent blackening). Tests in `trace-image-guards.test.ts`.
+- D-S08-001 (PWA re-arm) - `src/ui/app/PwaUpdatePrompt.tsx` tracks the dismissed marker in React state so `updatefound` invalidates the mounted render and a strictly-newer SW re-shows the banner. Test asserts the same mounted component re-shows without a fresh root.
+- D-S08-002 (canvas/WebGL test signal) - global jsdom canvas stub added at `src/__fixtures__/jsdom-canvas-setup.ts` (wired via `vitest.config.ts` setupFiles) removing the pervasive `getContext` "Not implemented" flood and stubbing `ImageData`/2D draw paths. Two residual signals are deliberately classified and documented in that file (Three.js WebGL-unavailable fallback; `toDataURL` left to jsdom to avoid hiding PNG-encoding regressions) - fully silencing them is an optional follow-up.
+- D-S09-001 (diagnostics vacuously green) - the 12 `TRACE_AUDIT` diagnostics now use `it.skipIf(!RUN_TRACE_AUDIT)` and report as skipped, not passed, when the flag is absent.
+- D-S09-002 (`_edge-zoom` stale path) - routed through `requiredArchHouseFixtureStatus()`/the shared fixture asset instead of the removed `audit/fixtures/trace` path.
+- D-S09-003 (`.gitignore` flag name) - corrected the documented opt-in flag to `TRACE_AUDIT=1`. CRLF-preserved single-line diff.
+- D-S09-004 (benchmark helper dedup) - shared rating/finding/geometry helpers extracted to `src/__fixtures__/perceptual/benchmark-rating.ts` and imported by the loop, regression-cases, and edge-benchmark consumers.
+
+Process note: much of the work ran as parallel per-sector fix agents; several were terminated mid-run by an Anthropic session limit, leaving a partially applied, unverified tree. The tree was recovered and completed directly: finishing `_edge-zoom` skip/path wiring, the `.gitignore` flag, and four CI-blocking lint fixes the agents introduced (`jsdom-canvas-setup` as-const + `any`, `trace-image` complexity via a `despeckleIfEnabled` extraction, and splitting the over-length `trace-image.test.ts` into `trace-image-guards.test.ts`). No changes are committed; all remain in the working tree for maintainer review.
+
+## After-Fix Audit - 2026-07-05
+
+Maintainer requested an audit of the fix phase ("audit the fixes"). Three independent read-only audit passes ran over the uncommitted diff vs `46889ca`: core (S04/S05), tooling/UI (S02/S08), and fixtures/docs (S09/S01 + ledger accuracy). Method: `git diff` / `git show HEAD:` before-after comparison per file, valid-path preservation checks against live preset/caller values, test-quality review (would the new tests fail on HEAD?), focused vitest/eslint/tsc slices, and ledger claim spot-checks. No files were modified by the audit.
+
+Verdict: 18 of 19 fixes verified-correct; 1 fix has a genuine regression (D-S04-001). Ledger spot-checks found no overclaims.
+
+### After-fix finding index
+
+| ID | Severity | File | Short description |
+|---|---|---|---|
+| AF-CORE-001 | High | `src/core/cnc/surfacing.ts:100` | `depthLadder` replaced HEAD's `Math.max(MIN_STEP_MM, x)` clamp with `finitePositiveOr(x, MIN_STEP_MM)`: finite sub-0.05mm depth inputs now emit different G-code (0.02mm/pass: 25 passes vs HEAD's 10), and a tiny/denormal finite step reintroduces the hang the fix targeted (`depth += step` no-ops once `depth/step > 2^53`). Fix: `Math.max(MIN_STEP_MM, finiteOr(x, MIN_STEP_MM))`. |
+| AF-CORE-002 | Medium | `src/core/cnc/surfacing.ts:46` | Exported `surfacingRowYs` still non-terminating/OOM for pathological finite inputs (`1e16` height, `1e-20` step); "can't hang" holds only for non-finite inputs. Floor step at `MIN_STEP_MM`; consider a row-count cap. |
+| AF-CORE-003 | Low | `src/core/cnc/surfacing.ts:62` | Feed fallbacks reuse `MIN_STEP_MM` (0.05, a distance) as a feed rate, emitting `F0.050`; name a minimum-feed constant. |
+| AF-CORE-004 | Low | `src/core/cnc/surfacing.ts:64` | Finite negative rpm still emits `M3 S-…` (same as HEAD; residual, not regression). |
+| AF-CORE-005 | Low | `src/core/sim/removal-grid.ts:57` | `coarsenedCellSize` overflow for ~1e308 finite dims can yield `mmPerCell: Infinity` (pathological-finite only; non-finite scope correctly closed). |
+| AF-CORE-006 | Low | `src/core/trace/canny-edges.test.ts` | One vacuous assertion (`count >= 0`); the "valid-path unchanged" test compares new-code-to-new-code so it could not catch a default-shifting clamp. Infinity-sigma case does pin the real hang. |
+| AF-CORE-007 | Low | `src/core/trace/trace-image.ts:235` | Fail-closed guard protects preprocessing only; malformed buffers still flow to tracer backends downstream (matches finding scope; residual noted). |
+| AF-CORE-008 | Low | `src/core/trace/trace-image.ts` | File remains over the 250 soft counted-line limit (319→330; no lint error). |
+| AF-TOOL-001 | Low | `src/platform/web/build-info.test.ts:39` | Wall-clock guard spies `Date.now`, which `new Date()` never calls; only the exact-value test actually pins determinism. Use `vi.setSystemTime`. |
+| AF-TOOL-002 | Low | `vite.config.ts:52` | Unit tests guard the module, not the wiring; re-inlining wall-clock into `define` would stay green (inherent to extraction; note-only). |
+| AF-TOOL-003 | Low | `src/ui/app/PwaUpdatePrompt.tsx:45` | Inline `updatefound` listener never removed on unmount and loses HEAD's same-reference dedup; StrictMode dev double-mount accumulates listeners (benign: idempotent clear + no-op setState). |
+| AF-TOOL-004 | Info | `src/ui/app/PwaUpdatePrompt.test.tsx:17` | Mock invokes `onRegisteredSW` on every render (real hook: once per registration); timing divergence, no current assertion affected. |
+| AF-TOOL-005 | Low | `src/__fixtures__/jsdom-canvas-setup.ts:58` | Prospective masking risks in the 2D proxy: unstubbed property reads return functions, set-trap discards writes, `getImageData` returns 0x0 empty regardless of request, proxy is thenable. Nothing regressed today; risk is future tests passing through impossible states. |
+| AF-TOOL-006 | Low | `src/platform/web/build-info.ts` | Name collides with unrelated `src/ui/app/build-info.ts`; Node-only module in a browser-adapter folder, deep-imported bypassing `index.ts` without in-code justification. Consider rename (`build-metadata.ts`) or header note. |
+| AF-TOOL-007 | Low | `src/__fixtures__/jsdom-canvas-setup.ts:59` | `as ImageData` / `as TextMetrics` casts lack the per-cast justifying comment CLAUDE.md requires. |
+| AF-FIX-001 | Low | `src/__fixtures__/perceptual/benchmark-rating.ts:33` | Extraction mints a second exported `polylineLength` alongside `centerline-geometry.ts:44`'s identical helper (third private copy in `edge-curve-quality.test.ts:237`); consolidate to one home. |
+
+### Verified-correct highlights
+
+- Core: D-S04-002/003/004 and D-S05-001..004 exactly preserve valid-path behavior (feeds algebraically verified; Canny clamps checked against live preset/slider ranges; `despeckleIfEnabled` branch-by-branch identical; `machine.ts` byte-identical). New guard tests genuinely fail on HEAD.
+- Tooling/UI: `build-info.ts` command-for-command equivalent to the HEAD inline logic (safer `execFileSync`); `vitestMaxWorkers` reproduces `process.env.CI ? 1 : 4` truthiness exactly (`''`→4, `'0'`→1); PWA re-arm test is genuinely same-mounted-root and fails on the old implementation; config diffs contain nothing beyond the stated extractions.
+- Fixtures/docs: all 12 diagnostic conversions body-identical with timeouts preserved in correct vitest arg positions; `benchmark-rating.ts` has zero numeric/logic drift (all three HEAD variants were already identical) and all seven consumers deduplicated; `_edge-zoom` matches sibling fixture-resolution pattern; docs diffs each exactly one line with no EOL flips; ledger spot-checks (8 claims) accurate with one harmless understatement.
+
+Audit-run verification: focused core slice 12 files / 89 tests pass; tooling slice 3 files / 26 tests pass; perceptual suite 16 passed / 12 skipped files (95/15 tests); whole-tree `tsc` clean; scoped eslint clean on all audited files. Not verified by this audit: full-tree vitest/lint/build re-run, `TRACE_AUDIT=1` diagnostic execution, and any perceptual/hardware output fidelity.
+
+No fixes were made during this audit; findings await maintainer disposition.
+
+## S08 Post-`46889ca` Current-State Delta (parallel session, merged from `main`)
+
 - `origin/main` advanced to `46889ca` after the previous checkpoint. The new post-checkpoint files are S08 UI/input changes, so the audit reopens S08 for a supplemental current-state delta pass over `src/ui/common/NumberField.*` and the migrated CNC/device numeric fields.
 
 ### S08 Post-`46889ca` Delta Pass 1 - Shared NumberField Orientation

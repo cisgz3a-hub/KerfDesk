@@ -5,8 +5,8 @@
 //   * nodeIntegration: false
 //   * sandbox: true
 //   * webSecurity: true
-//   * permission handlers allow only serial, File System Access, and
-//     video-only media from the trusted renderer origin
+//   * permission handlers allow only serial, File System Access, screen
+//     wake lock, and video-only media from the trusted renderer origin
 //   * navigation and renderer-created windows are locked to the trusted
 //     renderer origin
 //   * CSP set via session.webRequest.onHeadersReceived (not meta tag -
@@ -41,6 +41,7 @@ import {
 } from 'electron';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import electronUpdater from 'electron-updater';
 import {
   serialPortDialogButtons,
   serialPortIdForDialogResponse,
@@ -60,9 +61,14 @@ import {
   startLocalRtspCameraBridge,
   type RtspCameraBridgeHandle,
 } from './rtsp-camera-bridge.js';
+import { configureAutoUpdater } from './auto-update.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// electron-updater is CommonJS; under Node16 ESM the reliable interop is a
+// default import + destructure (a named ESM import isn't statically detectable).
+const { autoUpdater } = electronUpdater;
 
 const RENDERER_RUNTIME = resolveRendererRuntime({
   devUrl: process.env['LASERFORGE_DEV_URL'],
@@ -361,6 +367,12 @@ async function createWindow(): Promise<void> {
   //
   // Browser camera setup uses Chromium's `media` permission. The policy helper
   // grants trusted main-frame video-only requests and keeps audio denied.
+  //
+  // Screen wake lock (ADR-117): useActiveJobWakeLock keeps the display awake
+  // while a job streams so OS sleep can't stall Web Serial mid-burn. Electron
+  // routes navigator.wakeLock.request('screen') through these handlers as
+  // 'screen-wake-lock'; without the allowlist entry the request rejects and
+  // keep-awake silently dies on the desktop build only.
   installPermissionHandlers(session.defaultSession);
   await loadRenderer(window);
 
@@ -390,6 +402,13 @@ void app
     const distRoot = path.join(__dirname, '..', 'dist', 'web');
     protocol.handle('app', makeAppProtocolHandler(distRoot));
     await startCameraBridgeSafely();
+    // Background auto-update against our self-hosted feed (ADR-024). No-op unless
+    // packaged; installs on quit, never mid-burn. Errors (e.g. offline) are logged,
+    // never fatal to startup.
+    configureAutoUpdater(autoUpdater, {
+      isPackaged: app.isPackaged,
+      onError: (error: unknown) => console.warn('Desktop update check failed:', error),
+    });
     return createWindow();
   })
   .catch((err: unknown) => {
