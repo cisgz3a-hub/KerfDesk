@@ -64,7 +64,17 @@ export const PROFILE_CAPABILITIES = [
   'z-axis',
   'camera',
 ] as const satisfies ReadonlyArray<ProfileCapability>;
-export type ProfileEvidenceStatus = 'default' | 'researched' | 'user-imported' | 'unverified';
+export type ProfileEvidenceStatus =
+  | 'default-starter'
+  | 'hardware-verified'
+  | 'simulator-tested'
+  | 'public-spec-starter'
+  | 'experimental'
+  | 'user-imported'
+  // Legacy values remain loadable in older .lf2/.lfmachine files.
+  | 'default'
+  | 'researched'
+  | 'unverified';
 
 export type ProfileEvidence = {
   readonly label: string;
@@ -214,7 +224,7 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'KerfDesk default',
-      status: 'default',
+      status: 'default-starter',
       note: 'Starter GRBL profile. Confirm bed size, homing, and S range before first job.',
     },
   ],
@@ -263,7 +273,7 @@ export const NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'User-provided 4040 profile',
-      status: 'researched',
+      status: 'simulator-tested',
       note: '400x400 XY and LT-4LDS-V2 20W laser metadata captured for the Neotronics 4040 class.',
     },
   ],

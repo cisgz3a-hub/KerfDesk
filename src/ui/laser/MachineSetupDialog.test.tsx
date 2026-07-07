@@ -105,9 +105,7 @@ describe('MachineSetupDialog', () => {
       await act(async () => button(host, 'Profile Catalog').click());
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
 
-      expect(useStore.getState().project.device.profileId).toBe(
-        'creality-falcon-a1-pro-compatible',
-      );
+      expect(useStore.getState().project.device.profileId).toBe('creality-falcon-a1-pro-grblhal');
       expect(useStore.getState().dirty).toBe(true);
     } finally {
       await unmount();
@@ -132,16 +130,22 @@ describe('MachineSetupDialog', () => {
         junctionDeviationMm: 0.01,
         bedWidth: 400,
         bedHeight: 400,
+        minPowerS: 0,
+        maxPowerS: 1000,
       },
       lastSettingsReadAt: 1718600000000,
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const { host, unmount } = await renderDialog();
     try {
       await act(async () => button(host, 'Profile Catalog').click());
+      const firstCard = host.querySelector('article');
+      expect(firstCard?.textContent).toContain('Creality Falcon A1 Pro');
+      expect(firstCard?.textContent).toContain('Suggested match');
+      expect(firstCard?.textContent).toContain('Detected grblHAL firmware.');
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
 
       expect(useStore.getState().project.device).toMatchObject({
-        profileId: 'creality-falcon-a1-pro-compatible',
+        profileId: 'creality-falcon-a1-pro-grblhal',
         controllerKind: 'grblhal',
         maxFeed: 10000,
         framingFeedMmPerMin: 10000,

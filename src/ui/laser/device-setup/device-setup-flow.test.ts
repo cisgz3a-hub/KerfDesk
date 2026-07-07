@@ -98,6 +98,27 @@ describe('deviceSetupReducer draft edits', () => {
     expect(before.presetApplied).toBe(false);
     expect(before.draft.profileId).toBe(PROFILE.profileId);
   });
+
+  it('applies a preset but preserves detected controller identity and current frame feed', () => {
+    const preset = nonDefaultPreset();
+    const before = initDeviceSetup(
+      {
+        ...PROFILE,
+        controllerKind: 'grbl-v1.1',
+        framingFeedMmPerMin: 10000,
+        maxFeed: 10000,
+      },
+      { bedWidth: 400, bedHeight: 400, maxFeed: 10000 },
+      { detectedControllerKind: 'grblhal' },
+    );
+
+    const state = deviceSetupReducer(before, { kind: 'apply-preset', profile: preset });
+
+    expect(state.draft.profileId).toBe(preset.profileId);
+    expect(state.draft.controllerKind).toBe('grblhal');
+    expect(state.draft.framingFeedMmPerMin).toBe(10000);
+    expect(state.draft.maxFeed).toBe(10000);
+  });
 });
 
 describe('canAdvanceDeviceSetup', () => {

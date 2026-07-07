@@ -5,7 +5,11 @@
 // unit-testable in isolation.
 
 import type { Dispatch } from 'react';
-import { validateMachineProfile, type DeviceProfile } from '../../../core/devices';
+import {
+  profileWithControllerFacts,
+  validateMachineProfile,
+  type DeviceProfile,
+} from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
 
 // The flow is Connect -> Identify -> Confirm -> Safety -> Probe -> Sync
@@ -41,6 +45,8 @@ export type DeviceSetupState = {
   // whenever the controller is (re-)read, so apply-preset and readiness overlay
   // current controller truth instead of a stale open-time snapshot.
   readonly detected: Partial<DeviceProfile>;
+  readonly detectedControllerKind: DeviceProfile['controllerKind'] | null;
+  readonly controllerRead: boolean;
   // The working copy every editor mutates; committed on Finish.
   readonly draft: DeviceProfile;
   // True once a catalog preset was applied this session.
@@ -54,7 +60,17 @@ export type DeviceSetupAction =
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
   | { readonly kind: 'apply-preset'; readonly profile: DeviceProfile }
   | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> }
-  | { readonly kind: 'detected-updated'; readonly detected: Partial<DeviceProfile> };
+  | {
+      readonly kind: 'detected-updated';
+      readonly detected: Partial<DeviceProfile>;
+      readonly detectedControllerKind?: DeviceProfile['controllerKind'] | null;
+      readonly controllerRead?: boolean;
+    };
+
+export type DeviceSetupDetectedFacts = {
+  readonly detectedControllerKind?: DeviceProfile['controllerKind'] | null;
+  readonly controllerRead?: boolean;
+};
 
 // Shared props for the wizard step components: the current flow state plus the
 // reducer dispatch. ReviewStep takes only `state` (it makes no edits).
@@ -66,13 +82,23 @@ export type DeviceSetupStepProps = {
 export function initDeviceSetup(
   profile: DeviceProfile,
   detected: Partial<DeviceProfile> | null,
+  facts: DeviceSetupDetectedFacts = {},
 ): DeviceSetupState {
   const safeDetected = detected ?? {};
+  const controllerRead =
+    facts.controllerRead ?? (detected !== null || facts.detectedControllerKind !== undefined);
+  const detectedControllerKind = facts.detectedControllerKind ?? null;
   return {
     step: 'connect',
     baseline: profile,
     detected: safeDetected,
-    draft: { ...profile, ...safeDetected },
+    detectedControllerKind,
+    controllerRead,
+    draft: {
+      ...profile,
+      ...safeDetected,
+      ...(detectedControllerKind === null ? {} : { controllerKind: detectedControllerKind }),
+    },
     presetApplied: false,
   };
 }
@@ -92,18 +118,48 @@ export function deviceSetupReducer(
     case 'accept-detected':
       return { ...state, draft: { ...state.draft, ...action.patch } };
     case 'apply-preset':
-      return {
-        ...state,
-        draft: { ...action.profile, ...state.detected },
-        presetApplied: true,
-      };
+      return applyPreset(state, action.profile);
     case 'detected-updated':
-      // The wizard re-dispatches the live $$ patch on every read; a ref-equal
-      // dispatch (the mount re-sync) is a no-op so it does not force a render.
-      return action.detected === state.detected ? state : { ...state, detected: action.detected };
+      return updateDetectedFacts(state, action);
     default:
       return assertNever(action);
   }
+}
+
+function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSetupState {
+  return {
+    ...state,
+    draft: profileWithControllerFacts({
+      profile,
+      current: state.draft,
+      detectedSettings: state.detected,
+      controllerSettings: state.detected,
+      detectedControllerKind: state.detectedControllerKind,
+      lastSettingsReadAt: state.controllerRead ? 1 : null,
+    }),
+    presetApplied: true,
+  };
+}
+
+function updateDetectedFacts(
+  state: DeviceSetupState,
+  action: Extract<DeviceSetupAction, { readonly kind: 'detected-updated' }>,
+): DeviceSetupState {
+  // The wizard re-dispatches the live $$ patch on every read; a ref-equal
+  // dispatch (the mount re-sync) is a no-op so it does not force a render.
+  if (
+    action.detected === state.detected &&
+    action.detectedControllerKind === undefined &&
+    action.controllerRead === undefined
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    detected: action.detected,
+    detectedControllerKind: action.detectedControllerKind ?? state.detectedControllerKind,
+    controllerRead: action.controllerRead ?? true,
+  };
 }
 
 // Next is allowed on the lead-in steps unconditionally (the operator may
