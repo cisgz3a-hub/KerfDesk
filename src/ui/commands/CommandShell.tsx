@@ -12,6 +12,7 @@ import { CONNECTION_HELP_TEXT } from '../help/connection-help';
 import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
@@ -40,7 +41,11 @@ import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 
 export function CommandShell(): JSX.Element {
-  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  // Convert-to-Bitmap open state lives in the ui-store (not local state) so
+  // the Ctrl/Cmd+Shift+B shortcut in use-shortcuts can open it too.
+  const convertDialogOpen = useUiStore((s) => s.convertBitmapDialogOpen);
+  const openConvertBitmapDialog = useUiStore((s) => s.openConvertBitmapDialog);
+  const closeConvertBitmapDialog = useUiStore((s) => s.closeConvertBitmapDialog);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
@@ -58,7 +63,7 @@ export function CommandShell(): JSX.Element {
   const commands = useAppCommands({
     requestImportImage: onImagePick,
     requestMultiFileTrace: onMultiFileTracePick,
-    requestConvertToBitmap: () => setConvertDialogOpen(true),
+    requestConvertToBitmap: openConvertBitmapDialog,
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
@@ -83,10 +88,7 @@ export function CommandShell(): JSX.Element {
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
       {convertDialogOpen && selectedConvertible !== null ? (
-        <ConvertDialog
-          convertible={selectedConvertible}
-          onClose={() => setConvertDialogOpen(false)}
-        />
+        <ConvertDialog convertible={selectedConvertible} onClose={closeConvertBitmapDialog} />
       ) : null}
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
