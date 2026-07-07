@@ -2,7 +2,17 @@
 // factors, rounding, and floors.
 
 import { describe, expect, it } from 'vitest';
-import { calculateFeeds, chiploadFor, isChiploadMaterialKey } from './feeds-calculator';
+import {
+  calculateFeeds,
+  chiploadFor,
+  isChiploadMaterialKey,
+  type FeedsCalculatorResult,
+} from './feeds-calculator';
+
+function expectCalculatedFeeds(result: FeedsCalculatorResult) {
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result;
+}
 
 describe('isChiploadMaterialKey', () => {
   it('accepts every known material and rejects everything else', () => {
@@ -25,56 +35,98 @@ describe('chiploadFor', () => {
 });
 
 describe('calculateFeeds', () => {
+  it.each([
+    {
+      label: 'bit diameter',
+      input: { material: 'hardwood' as const, bitDiameterMm: Number.NaN, flutes: 2, rpm: 12000 },
+      reason: 'Bit diameter must be a finite positive number.',
+    },
+    {
+      label: 'flutes',
+      input: {
+        material: 'hardwood' as const,
+        bitDiameterMm: 3.175,
+        flutes: Number.POSITIVE_INFINITY,
+        rpm: 12000,
+      },
+      reason: 'Flute count must be a finite positive number.',
+    },
+    {
+      label: 'RPM',
+      input: { material: 'hardwood' as const, bitDiameterMm: 3.175, flutes: 2, rpm: Number.NaN },
+      reason: 'RPM must be a finite positive number.',
+    },
+  ])('rejects non-finite $label instead of returning non-finite feeds', ({ input, reason }) => {
+    expect(calculateFeeds(input)).toEqual({ kind: 'error', reason });
+  });
   it('applies feed = rpm × flutes × chipload, rounded to 10 mm/min', () => {
     // 18000 × 2 × 0.11 = 3960 for a 1/4" bit in plywood.
-    const r = calculateFeeds({
-      material: 'plywood-mdf',
-      bitDiameterMm: 6.35,
-      flutes: 2,
-      rpm: 18000,
-    });
+    const r = expectCalculatedFeeds(
+      calculateFeeds({
+        material: 'plywood-mdf',
+        bitDiameterMm: 6.35,
+        flutes: 2,
+        rpm: 18000,
+      }),
+    );
     expect(r.feedMmPerMin).toBe(3960);
     expect(r.plungeMmPerMin).toBe(1580); // 40%, rounded to 10
     expect(r.depthPerPassMm).toBeCloseTo(3.2, 9); // 0.5 × 6.35 rounded to 0.1
   });
 
   it('aluminum runs far more conservatively than softwood', () => {
-    const wood = calculateFeeds({
-      material: 'softwood',
-      bitDiameterMm: 3.175,
-      flutes: 2,
-      rpm: 12000,
-    });
-    const alu = calculateFeeds({
-      material: 'aluminum',
-      bitDiameterMm: 3.175,
-      flutes: 2,
-      rpm: 12000,
-    });
+    const wood = expectCalculatedFeeds(
+      calculateFeeds({
+        material: 'softwood',
+        bitDiameterMm: 3.175,
+        flutes: 2,
+        rpm: 12000,
+      }),
+    );
+    const alu = expectCalculatedFeeds(
+      calculateFeeds({
+        material: 'aluminum',
+        bitDiameterMm: 3.175,
+        flutes: 2,
+        rpm: 12000,
+      }),
+    );
     expect(alu.feedMmPerMin).toBeLessThan(wood.feedMmPerMin / 2);
     expect(alu.depthPerPassMm).toBeLessThan(wood.depthPerPassMm / 3);
   });
 
   it('floors tiny results instead of emitting zero feeds', () => {
-    const r = calculateFeeds({ material: 'aluminum', bitDiameterMm: 1, flutes: 1, rpm: 1000 });
+    const r = expectCalculatedFeeds(
+      calculateFeeds({ material: 'aluminum', bitDiameterMm: 1, flutes: 1, rpm: 1000 }),
+    );
     expect(r.feedMmPerMin).toBeGreaterThanOrEqual(50);
     expect(r.plungeMmPerMin).toBeGreaterThanOrEqual(25);
     expect(r.depthPerPassMm).toBeGreaterThanOrEqual(0.1);
   });
 
-  it('keeps outputs finite when rpm/flutes are non-finite (D-S04-003)', () => {
-    for (const bad of [
-      { material: 'softwood', bitDiameterMm: 6.35, flutes: 2, rpm: Number.NaN },
-      { material: 'softwood', bitDiameterMm: 6.35, flutes: 2, rpm: Number.POSITIVE_INFINITY },
-      { material: 'softwood', bitDiameterMm: 6.35, flutes: Number.POSITIVE_INFINITY, rpm: 18000 },
-    ] as const) {
-      const r = calculateFeeds(bad);
-      expect(Number.isFinite(r.feedMmPerMin)).toBe(true);
-      expect(Number.isFinite(r.plungeMmPerMin)).toBe(true);
-      expect(Number.isFinite(r.depthPerPassMm)).toBe(true);
-      expect(r.feedMmPerMin).toBeGreaterThanOrEqual(50);
-      expect(r.plungeMmPerMin).toBeGreaterThanOrEqual(25);
-      expect(r.depthPerPassMm).toBeGreaterThanOrEqual(0.1);
-    }
+  it('clamps feed and plunge to the machine ceiling when maxFeedMmPerMin is set', () => {
+    // 12,000 RPM × 2 flutes × 0.060 chipload suggests 1440 mm/min — a
+    // suggestion a 1000 mm/min machine cannot run and preflight would
+    // reject. The commit path must receive machine-runnable values.
+    const r = expectCalculatedFeeds(
+      calculateFeeds({
+        material: 'plywood-mdf',
+        bitDiameterMm: 3.175,
+        flutes: 2,
+        rpm: 12000,
+        maxFeedMmPerMin: 1000,
+      }),
+    );
+    expect(r.feedMmPerMin).toBe(1000);
+    expect(r.plungeMmPerMin).toBeLessThanOrEqual(1000);
+    const unclamped = expectCalculatedFeeds(
+      calculateFeeds({
+        material: 'plywood-mdf',
+        bitDiameterMm: 3.175,
+        flutes: 2,
+        rpm: 12000,
+      }),
+    );
+    expect(unclamped.feedMmPerMin).toBe(1440);
   });
 });

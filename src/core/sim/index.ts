@@ -8,8 +8,14 @@ export {
   DEFAULT_CELL_MM,
   MAX_GRID_CELLS,
   type RemovalGrid,
+  type RemovalGridCellSizeResult,
+  type RemovalGridResult,
   type RemovalGridSpec,
 } from './removal-grid';
 export { kernelForTool, type ToolKernel, type ToolKernelOffset } from './tool-kernels';
-export { computeRemovalGrid, type ComputeRemovalOptions } from './stamp-toolpath';
+export {
+  computeRemovalGrid,
+  type ComputeRemovalGridResult,
+  type ComputeRemovalOptions,
+} from './stamp-toolpath';
 export { downsampleRemovalGrid } from './removal-grid-display';

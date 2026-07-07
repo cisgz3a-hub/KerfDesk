@@ -44,14 +44,14 @@ export function WizardCutSettingsStep(props: { readonly recipe: MaterialRecipe }
           aria-label="Passes"
         />
       </Field>
-      <Field label="Air assist">
+      <Field label="Recipe air">
         <input
           name="airAssist"
           type="checkbox"
           className="lf-checkbox"
           defaultChecked={recipe.airAssist === true}
-          aria-label="Air assist"
-          title="Turn on air assist for this material when the device profile supports M7 / M8."
+          aria-label="Recipe uses air assist"
+          title="Store air-assist intent in this material preset. Applying the preset turns on Job Air for the layer."
         />
       </Field>
     </div>

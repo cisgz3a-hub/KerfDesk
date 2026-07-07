@@ -43,6 +43,11 @@ function jobOf(passes: ReadonlyArray<CncPass>): Job {
 // finish fast; the perceptual test below uses the fine grid.
 const GRID_SPEC = { originX: 0, originY: 0, widthMm: 30, heightMm: 30, mmPerCell: 0.5 };
 
+function expectGrid(result: ReturnType<typeof computeRemovalGrid>) {
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result.grid;
+}
+
 describe('computeRemovalGrid — properties', () => {
   const gridCoord = fc.integer({ min: 500, max: 2500 }).map((n) => n / 100);
   const gridDepth = fc.integer({ min: -500, max: -10 }).map((n) => n / 100);
@@ -63,10 +68,8 @@ describe('computeRemovalGrid — properties', () => {
     fc.assert(
       fc.property(passes, (ps) => {
         const toolpath = buildToolpath(jobOf(ps), { startPoint: { x: 0, y: 0 } });
-        const grid = computeRemovalGrid(
-          toolpath,
-          GRID_SPEC,
-          kernelForTool(FLAT_TOOL, GRID_SPEC.mmPerCell),
+        const grid = expectGrid(
+          computeRemovalGrid(toolpath, GRID_SPEC, kernelForTool(FLAT_TOOL, GRID_SPEC.mmPerCell)),
         );
         const deepestCommanded = Math.min(...ps.map((p) => (p.kind === 'contour' ? p.zMm : 0)));
         let deepestCell = 0;
@@ -84,8 +87,8 @@ describe('computeRemovalGrid — properties', () => {
       fc.property(passes, (ps) => {
         const toolpath = buildToolpath(jobOf(ps), { startPoint: { x: 0, y: 0 } });
         const kernel = kernelForTool(FLAT_TOOL, GRID_SPEC.mmPerCell);
-        const a = computeRemovalGrid(toolpath, GRID_SPEC, kernel);
-        const b = computeRemovalGrid(toolpath, GRID_SPEC, kernel);
+        const a = expectGrid(computeRemovalGrid(toolpath, GRID_SPEC, kernel));
+        const b = expectGrid(computeRemovalGrid(toolpath, GRID_SPEC, kernel));
         let mismatches = 0;
         for (let i = 0; i < a.depth.length; i += 1) {
           if (a.depth[i] !== b.depth[i]) mismatches += 1;
@@ -101,10 +104,12 @@ describe('computeRemovalGrid — properties', () => {
       fc.property(passes, fc.integer({ min: 0, max: 100 }), (ps, pct) => {
         const toolpath = buildToolpath(jobOf(ps), { startPoint: { x: 0, y: 0 } });
         const kernel = kernelForTool(FLAT_TOOL, GRID_SPEC.mmPerCell);
-        const partial = computeRemovalGrid(toolpath, GRID_SPEC, kernel, {
-          uptoLengthMm: (toolpath.totalLength * pct) / 100,
-        });
-        const full = computeRemovalGrid(toolpath, GRID_SPEC, kernel);
+        const partial = expectGrid(
+          computeRemovalGrid(toolpath, GRID_SPEC, kernel, {
+            uptoLengthMm: (toolpath.totalLength * pct) / 100,
+          }),
+        );
+        const full = expectGrid(computeRemovalGrid(toolpath, GRID_SPEC, kernel));
         let violations = 0;
         for (let i = 0; i < full.depth.length; i += 1) {
           if ((partial.depth[i] ?? 0) < (full.depth[i] ?? 0)) violations += 1;
@@ -166,16 +171,18 @@ describe('pocket removal — perceptual', () => {
     const c2 = toMachineCoords({ x: at + size, y: at + size }, device);
     const [minX, maxX] = [Math.min(c1.x, c2.x), Math.max(c1.x, c2.x)];
     const [minY, maxY] = [Math.min(c1.y, c2.y), Math.max(c1.y, c2.y)];
-    const grid = computeRemovalGrid(
-      toolpath,
-      {
-        originX: minX - 5,
-        originY: minY - 5,
-        widthMm: size + 10,
-        heightMm: size + 10,
-        mmPerCell: 0.2,
-      },
-      kernelForTool(tool, 0.2),
+    const grid = expectGrid(
+      computeRemovalGrid(
+        toolpath,
+        {
+          originX: minX - 5,
+          originY: minY - 5,
+          widthMm: size + 10,
+          heightMm: size + 10,
+          mmPerCell: 0.2,
+        },
+        kernelForTool(tool, 0.2),
+      ),
     );
 
     let intersection = 0;

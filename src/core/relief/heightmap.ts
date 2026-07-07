@@ -4,8 +4,6 @@
 // canvas preview (H.4) and the roughing/finishing toolpath generators
 // (H.5/H.8).
 
-import { finitePositiveOr } from '../util';
-
 export type Heightmap = {
   readonly widthCells: number;
   readonly heightCells: number;
@@ -18,16 +16,46 @@ export const DEFAULT_HEIGHTMAP_CELL_MM = 0.2;
 // ~4M cells ≈ 16 MB — larger requests coarsen automatically.
 export const MAX_HEIGHTMAP_CELLS = 4_000_000;
 
-export function heightmapCellSize(widthMm: number, heightMm: number, requested: number): number {
-  const w = finitePositiveOr(widthMm, DEFAULT_HEIGHTMAP_CELL_MM);
-  const h = finitePositiveOr(heightMm, DEFAULT_HEIGHTMAP_CELL_MM);
-  const safe = Math.max(1e-3, finitePositiveOr(requested, DEFAULT_HEIGHTMAP_CELL_MM));
-  const cells = Math.ceil(w / safe) * Math.ceil(h / safe);
-  if (cells <= MAX_HEIGHTMAP_CELLS) return safe;
-  return Math.sqrt((w * h) / MAX_HEIGHTMAP_CELLS);
+export type HeightmapCellSizeResult =
+  | { readonly kind: 'ok'; readonly mmPerCell: number }
+  | { readonly kind: 'error'; readonly reason: string };
+
+export function heightmapCellSize(
+  widthMm: number,
+  heightMm: number,
+  requested: number,
+): HeightmapCellSizeResult {
+  const widthError = validateFinitePositive('Heightmap width', widthMm);
+  if (widthError !== null) return widthError;
+  const heightError = validateFinitePositive('Heightmap height', heightMm);
+  if (heightError !== null) return heightError;
+  const requestedError = validateFinitePositive('Heightmap cell size', requested);
+  if (requestedError !== null) return requestedError;
+  const safe = Math.max(1e-3, requested);
+  const cells = Math.ceil(widthMm / safe) * Math.ceil(heightMm / safe);
+  if (Number.isFinite(cells) && cells <= MAX_HEIGHTMAP_CELLS) {
+    return { kind: 'ok', mmPerCell: safe };
+  }
+  const area = widthMm * heightMm;
+  if (!Number.isFinite(area)) {
+    return { kind: 'error', reason: 'Heightmap dimensions exceed numeric limits.' };
+  }
+  const mmPerCell = Math.sqrt(area / MAX_HEIGHTMAP_CELLS);
+  return Number.isFinite(mmPerCell) && mmPerCell > 0
+    ? { kind: 'ok', mmPerCell }
+    : { kind: 'error', reason: 'Heightmap dimensions exceed numeric limits.' };
 }
 
 export function heightmapDepthAt(map: Heightmap, cx: number, cy: number): number {
   if (cx < 0 || cy < 0 || cx >= map.widthCells || cy >= map.heightCells) return 0;
   return map.depth[cy * map.widthCells + cx] ?? 0;
+}
+
+function validateFinitePositive(
+  label: string,
+  value: number,
+): { readonly kind: 'error'; readonly reason: string } | null {
+  return Number.isFinite(value) && value > 0
+    ? null
+    : { kind: 'error', reason: `${label} must be a finite positive number.` };
 }

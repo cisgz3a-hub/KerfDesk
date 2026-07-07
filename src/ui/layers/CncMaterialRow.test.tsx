@@ -82,6 +82,22 @@ describe('CncMaterialRow', () => {
     }
   });
 
+  it('does not commit material feeds when the layer spindle is non-finite', async () => {
+    installCnc();
+    const onCommit = vi.fn();
+    const onCommitSettings = vi.fn();
+    const settings = { ...DEFAULT_CNC_LAYER_SETTINGS, spindleRpm: Number.NaN };
+    const { host, root } = await render(settings, onCommit, onCommitSettings);
+    try {
+      await act(async () => selectMaterial(host, 'plywood-mdf'));
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(onCommitSettings).not.toHaveBeenCalled();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('clears the material key on Custom via a whole-settings commit', async () => {
     installCnc();
     const onCommit = vi.fn();

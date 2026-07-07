@@ -9,8 +9,6 @@
 // of bit diameter / feed. Everything is editable after Apply; nothing here
 // claims to replace listening to the cut.
 
-import { finiteOr } from '../util';
-
 export type ChiploadMaterial = 'softwood' | 'hardwood' | 'plywood-mdf' | 'acrylic' | 'aluminum';
 
 export type FeedsCalculatorInput = {
@@ -18,14 +16,22 @@ export type FeedsCalculatorInput = {
   readonly bitDiameterMm: number;
   readonly flutes: number;
   readonly rpm: number;
+  // Machine feed ceiling (device.maxFeed). When set, the returned feed and
+  // plunge never exceed it — a suggestion the machine cannot run is useless.
+  readonly maxFeedMmPerMin?: number;
 };
 
-export type FeedsCalculatorResult = {
+export type FeedsCalculatorOk = {
+  readonly kind: 'ok';
   readonly chiploadMm: number;
   readonly feedMmPerMin: number;
   readonly plungeMmPerMin: number;
   readonly depthPerPassMm: number;
 };
+
+export type FeedsCalculatorResult =
+  | FeedsCalculatorOk
+  | { readonly kind: 'error'; readonly reason: string };
 
 export const CHIPLOAD_MATERIALS: ReadonlyArray<{
   readonly value: ChiploadMaterial;
@@ -95,27 +101,40 @@ export function chiploadFor(material: ChiploadMaterial, bitDiameterMm: number): 
 }
 
 export function calculateFeeds(input: FeedsCalculatorInput): FeedsCalculatorResult {
-  // Fail closed on non-finite machine inputs — Math.max(MIN, NaN) is NaN, so a
-  // single bad rpm/flutes would persist a non-finite feed into the layer.
-  const rpm = finiteOr(input.rpm, 0);
-  const flutes = finiteOr(input.flutes, 1);
-  const bitDiameterMm = finiteOr(input.bitDiameterMm, 0);
-  const chiploadMm = chiploadFor(input.material, bitDiameterMm);
-  const rawFeed = finiteOr(rpm * Math.max(1, Math.round(flutes)) * chiploadMm, 0);
-  const feedMmPerMin = Math.max(
+  const bitError = positiveFiniteReason('Bit diameter', input.bitDiameterMm);
+  if (bitError !== null) return { kind: 'error', reason: bitError };
+  const flutesError = positiveFiniteReason('Flute count', input.flutes);
+  if (flutesError !== null) return { kind: 'error', reason: flutesError };
+  const rpmError = positiveFiniteReason('RPM', input.rpm);
+  if (rpmError !== null) return { kind: 'error', reason: rpmError };
+  const chiploadMm = chiploadFor(input.material, input.bitDiameterMm);
+  const rawFeed = input.rpm * Math.max(1, Math.round(input.flutes)) * chiploadMm;
+  const uncappedFeed = Math.max(
     MIN_FEED_MM_PER_MIN,
     Math.round(rawFeed / ROUND_FEED_TO_MM) * ROUND_FEED_TO_MM,
   );
-  const plungeMmPerMin = Math.max(
-    MIN_FEED_MM_PER_MIN / 2,
-    Math.round((feedMmPerMin * PLUNGE_FACTOR[input.material]) / ROUND_FEED_TO_MM) *
-      ROUND_FEED_TO_MM,
+  // Never hand a caller a feed its machine cannot run — committing an
+  // over-max feed just gets rejected by preflight later.
+  const maxFeed = input.maxFeedMmPerMin;
+  const feedMmPerMin =
+    maxFeed !== undefined && maxFeed > 0 ? Math.min(uncappedFeed, maxFeed) : uncappedFeed;
+  const plungeMmPerMin = Math.min(
+    feedMmPerMin,
+    Math.max(
+      MIN_FEED_MM_PER_MIN / 2,
+      Math.round((feedMmPerMin * PLUNGE_FACTOR[input.material]) / ROUND_FEED_TO_MM) *
+        ROUND_FEED_TO_MM,
+    ),
   );
   const depthPerPassMm =
     Math.max(
       ROUND_DEPTH_TO_MM,
-      Math.round((bitDiameterMm * DEPTH_FACTOR[input.material]) / ROUND_DEPTH_TO_MM) *
+      Math.round((input.bitDiameterMm * DEPTH_FACTOR[input.material]) / ROUND_DEPTH_TO_MM) *
         ROUND_DEPTH_TO_MM,
     ) || ROUND_DEPTH_TO_MM;
-  return { chiploadMm, feedMmPerMin, plungeMmPerMin, depthPerPassMm };
+  return { kind: 'ok', chiploadMm, feedMmPerMin, plungeMmPerMin, depthPerPassMm };
+}
+
+function positiveFiniteReason(label: string, value: number): string | null {
+  return Number.isFinite(value) && value > 0 ? null : `${label} must be a finite positive number.`;
 }

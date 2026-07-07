@@ -16,6 +16,18 @@ function commandIndex(source: string, command: string): number {
 }
 
 describe('Cloudflare production deploy gate', () => {
+  it('targets main as the Cloudflare Pages production branch', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+    const packageJson = JSON.parse(repoFile('package.json')) as {
+      scripts: Record<string, string>;
+    };
+
+    expect(workflow).toContain('--branch=main');
+    expect(packageJson.scripts['deploy:web']).toContain('--branch=main');
+    expect(workflow).not.toContain('--branch=master');
+    expect(packageJson.scripts['deploy:web']).not.toContain('--branch=master');
+  });
+
   it('targets the Cloudflare Pages API project that serves the canonical release URL', () => {
     const workflow = repoFile('.github/workflows/deploy.yml');
     const packageJson = JSON.parse(repoFile('package.json')) as {

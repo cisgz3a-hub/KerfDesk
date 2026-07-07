@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { Button } from '../../kit';
+import { useStore } from '../../state';
 import { isActiveJob } from '../../state/laser-store-helpers';
 import { useLaserStore } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
@@ -21,6 +22,7 @@ export function DeviceSetupFirmwareStep({
   const rows = useLaserStore((s) => s.grblSettingsRows);
   const lastReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const connection = useLaserStore((s) => s.connection);
+  const machine = useStore((s) => s.project.machine);
   if (connection.kind !== 'connected') {
     return (
       <section style={sectionStyle}>
@@ -41,7 +43,7 @@ export function DeviceSetupFirmwareStep({
       </section>
     );
   }
-  const diffs = computeFirmwareDiffs(state.draft, rows);
+  const diffs = computeFirmwareDiffs(state.draft, rows, machine);
   const writable = diffs.filter((diff) => diff.differs && diff.writable);
   const infoOnly = diffs.filter((diff) => diff.differs && !diff.writable);
   return (

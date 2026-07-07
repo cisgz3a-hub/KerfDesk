@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   height="540"
+   width="540"
+   version="1.1">
+  <defs>
+  <path id="zwickel"
+      d="M0 0
+      a156,156 0 0,0 0,270
+      a156,156 0 0,0 0,-270
+      " />
+  <mask id="maske">
+   <rect x="-100" y="-100" width="500" height="500" fill="#fff" />
+   <use xlink:href="#zwickel"  fill="#000" />
+   <use xlink:href="#zwickel" x="0" y="0" transform="rotate(30)" fill="#000" />
+   <use xlink:href="#zwickel" x="0" y="0" transform="rotate(60)" fill="#000" />
+  </mask>
+  </defs>
+  <g stroke="none"
+     transform="translate(270,270)" >
+      <use xlink:href="#zwickel" fill="#f00" />
+      <use xlink:href="#zwickel" fill="#f80"
+      transform="rotate(30)" />
+      <use xlink:href="#zwickel" fill="#fc0"
+      transform=" rotate(60)" />
+      <use xlink:href="#zwickel" fill="#8f0"
+      transform=" rotate(90)" />
+      <use xlink:href="#zwickel" fill="#0f0"
+      transform=" rotate(120)" />
+      <use xlink:href="#zwickel" fill="#0f8"
+      transform=" rotate(150)" />
+      <use xlink:href="#zwickel" fill="#0ff"
+      transform=" rotate(180)" />
+      <use xlink:href="#zwickel" fill="#08f"
+      transform=" rotate(210)" />
+      <use xlink:href="#zwickel" fill="#00f"
+      transform="rotate(240)" />
+     <g mask="url(#maske)">
+      <use xlink:href="#zwickel" fill="#80f"
+      transform="rotate(270)" />
+      <use xlink:href="#zwickel" fill="#f0f"
+      transform="rotate(300)" />
+      <use  xlink:href="#zwickel" transform="rotate(-30)" fill="#f08" opacity="1" />
+    </g>
+    <circle r="40" fill="#ff0" />
+
+</g>
+</svg>

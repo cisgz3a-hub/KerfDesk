@@ -115,6 +115,32 @@ describe('compileCncJob', () => {
     expect(new Set(tabbed.map((pass) => contourPass(pass).zMm))).toEqual(new Set([-6]));
   });
 
+  it('inserts a full-loop pass at the exact tab top so tabs are the requested height', () => {
+    // Single-pass through-cut: without a pass at the tab top, the only pass
+    // is tabbed and the "tabs" are full stock thickness (the tab windows are
+    // simply never cut). The ladder must gain a full loop at -(depth-tab).
+    const scene = sceneWith(
+      [
+        cncLayer('L1', '#ff0000', {
+          cutType: 'profile-outside',
+          depthMm: 3,
+          depthPerPassMm: 3,
+          tabsEnabled: true,
+          tabHeightMm: 1,
+          tabWidthMm: 6,
+          tabsPerShape: 4,
+        }),
+      ],
+      [squareObject('O1', '#ff0000', 40)],
+    );
+    const group = onlyGroup(scene);
+    const fullLoops = group.passes.filter((pass) => pass.closed);
+    const tabbed = group.passes.filter((pass) => !pass.closed);
+    expect(fullLoops.map((pass) => contourPass(pass).zMm)).toEqual([-2]);
+    expect(tabbed).toHaveLength(4);
+    expect(new Set(tabbed.map((pass) => contourPass(pass).zMm))).toEqual(new Set([-3]));
+  });
+
   it('compiles v-carve as a clearing group ordered before profiles (H.3)', () => {
     const vbitConfig = { ...config, toolId: 'vb-60' };
     const scene = sceneWith(
@@ -181,5 +207,43 @@ describe('compileCncJob', () => {
       [squareObject('O1', '#ff0000', 25)],
     );
     expect(compileCncJob(scene, dev, config)).toEqual(compileCncJob(scene, dev, config));
+  });
+
+  it('drops engrave polylines with non-finite points instead of compiling NaN passes', () => {
+    // Engrave is the one cut type that takes source polylines verbatim, so it
+    // must apply the same hasFinitePoints guard as profile/pocket/v-carve/drill
+    // — a NaN here would otherwise emit as a literal "G1 XNaN" (invisible to
+    // parseGcodeWord-based preflight scanners).
+    const clean = squareObject('O1', '#ff0000', 20);
+    const corrupt: ImportedSvg = {
+      ...clean,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            ...clean.paths[0]!.polylines,
+            {
+              closed: false,
+              points: [
+                { x: NaN, y: 10 },
+                { x: 30, y: 10 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const scene = sceneWith(
+      [cncLayer('L1', '#ff0000', { cutType: 'engrave', depthMm: 1 })],
+      [corrupt],
+    );
+    const group = onlyGroup(scene);
+    expect(group.passes.length).toBeGreaterThan(0);
+    for (const pass of group.passes) {
+      for (const point of contourPass(pass).polyline) {
+        expect(Number.isFinite(point.x)).toBe(true);
+        expect(Number.isFinite(point.y)).toBe(true);
+      }
+    }
   });
 });

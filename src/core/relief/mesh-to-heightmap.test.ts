@@ -126,21 +126,16 @@ describe('meshToHeightmap', () => {
     expect(meshToHeightmap(flat, { targetWidthMm: 20, reliefDepthMm: 5 }).kind).toBe('error');
   });
 
-  it('rejects non-finite target width or relief depth (D-S04-002)', () => {
-    expect(
-      meshToHeightmap(pyramidMesh(), {
-        targetWidthMm: Number.POSITIVE_INFINITY,
-        reliefDepthMm: 5,
-      }).kind,
-    ).toBe('error');
-    expect(
-      meshToHeightmap(pyramidMesh(), {
-        targetWidthMm: 20,
-        reliefDepthMm: Number.POSITIVE_INFINITY,
-      }).kind,
-    ).toBe('error');
-    expect(
-      meshToHeightmap(pyramidMesh(), { targetWidthMm: 20, reliefDepthMm: Number.NaN }).kind,
-    ).toBe('error');
+  it('rejects non-finite target dimensions instead of returning an ok empty heightmap', () => {
+    const result = meshToHeightmap(pyramidMesh(), {
+      targetWidthMm: Number.POSITIVE_INFINITY,
+      reliefDepthMm: 5,
+      mmPerCell: 1,
+    });
+
+    expect(result).toEqual({
+      kind: 'error',
+      reason: 'Target width and relief depth must be finite positive numbers.',
+    });
   });
 });

@@ -42,13 +42,21 @@ async function buildReliefScene(
 ): Promise<Awaited<ReturnType<typeof createReliefThreeScene>>> {
   try {
     const mmPerCell = Math.max(MIN_DISPLAY_CELL_MM, relief.targetWidthMm / DISPLAY_CELLS_ACROSS);
+    const displayCellSize = heightmapCellSize(
+      relief.targetWidthMm,
+      relief.targetWidthMm,
+      mmPerCell,
+    );
+    if (displayCellSize.kind === 'error') {
+      return { kind: 'no-webgl', reason: displayCellSize.reason };
+    }
     const heightmap = meshToHeightmap(
       { positions: Float32Array.from(relief.meshPositions) },
       {
         targetWidthMm: relief.targetWidthMm,
         reliefDepthMm: relief.reliefDepthMm,
         emptyCells: relief.emptyCells,
-        mmPerCell: heightmapCellSize(relief.targetWidthMm, relief.targetWidthMm, mmPerCell),
+        mmPerCell: displayCellSize.mmPerCell,
       },
     );
     if (heightmap.kind === 'error') return { kind: 'no-webgl', reason: heightmap.reason };

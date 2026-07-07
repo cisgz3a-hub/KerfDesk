@@ -83,6 +83,25 @@ describe('parsePathD — Z close', () => {
   });
 });
 
+describe('parsePathD — non-finite coordinate rejection (S04-001)', () => {
+  it('rejects an out-of-range exponent that Number() turns into Infinity', () => {
+    // Number("1e999") === Infinity. The SVG number grammar allows an unbounded
+    // exponent, so without a guard this Infinity flows to the G-code emitter as
+    // literal `XInfinity` and slips past the out-of-bounds preflight (which
+    // cannot parse a non-numeric coordinate word). Reject at the import boundary.
+    expect(() => parsePathD('M 1e999 0 L 10 10')).toThrow(/non-finite/i);
+  });
+
+  it('rejects a non-finite arc-command coordinate', () => {
+    expect(() => parsePathD('M0 0A1e999 5 0 0 1 10 0')).toThrow(/non-finite/i);
+  });
+
+  it('still accepts ordinary in-range scientific notation', () => {
+    // 1e3 = 1000 is finite and valid SVG; the guard must not reject it.
+    expect(parsePathD('M 1e3 0')[0]?.points[0]).toEqual({ x: 1000, y: 0 });
+  });
+});
+
 describe('parsePathD — curve flattening (De Casteljau subdivision)', () => {
   it('flattens a C command into many intermediate points ending at the segment endpoint', () => {
     const subs = parsePathD('M 0 0 C 10 0 20 10 30 10');

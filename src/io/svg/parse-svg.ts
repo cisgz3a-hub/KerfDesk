@@ -17,6 +17,7 @@ import {
 } from '../../core/scene';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
 import { elementToSubPaths } from './shape-to-polylines';
+import { linearScaleMagnitude } from './transform-scale';
 import {
   assertSvgImportPoints,
   createSvgImportBudget,
@@ -212,7 +213,10 @@ function appendElementGeometry(
   byColor: Map<string, Polyline[]>,
   budget: SvgImportBudget,
 ): void {
-  const subs = elementToSubPaths(el);
+  // Flatten curves/arcs to a scene-mm tolerance, not user-units, by dividing
+  // the mm chord tolerance by this transform's distance stretch (audit C2).
+  const t = state.transform;
+  const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d));
   if (subs.length === 0) return;
   const strokeColor = state.strokeOpacity > 0 ? normalizeColor(state.stroke) : '';
   const fillColor = state.fillOpacity > 0 ? normalizeColor(state.fill) : '';

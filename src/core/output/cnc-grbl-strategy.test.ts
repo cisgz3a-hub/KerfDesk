@@ -39,12 +39,15 @@ function group(overrides: Partial<CncGroup> = {}): CncGroup {
 describe('cncGrblStrategy', () => {
   it('emits the CNC preamble: units, absolute, feed mode, spindle, dwell', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
-    expect(gcode.startsWith('G21\nG90\nG94\nM3 S12000\nG4 P3.000\n')).toBe(true);
+    // The safe-Z lift comes BEFORE M3: after touch-off the bit rests on the
+    // stock top, and the spindle must not spin up there.
+    expect(gcode.startsWith('G21\nG90\nG94\nG0 Z3.810\nM3 S12000\nG4 P3.000\n')).toBe(true);
   });
 
   it('retracts before XY travel and plunges at the plunge feed', () => {
     const gcode = cncGrblStrategy.emit({ groups: [group()] }, dev);
-    expect(gcode).toContain('G0 Z3.810\nG0 X10.000 Y10.000\nG1 Z-1.500 F300');
+    expect(gcode).toContain('G0 Z3.810\nM3 S12000');
+    expect(gcode).toContain('G0 X10.000 Y10.000\nG1 Z-1.500 F300');
     expect(gcode).toContain('G1 X30.000 Y10.000 F1000');
   });
 
@@ -129,7 +132,10 @@ describe('cncGrblStrategy', () => {
 
     it('retracts, rapids to the first XY, plunges to the FIRST vertex Z at plunge feed', () => {
       const gcode = cncGrblStrategy.emit({ groups: [ramp] }, dev);
-      expect(gcode).toContain('G0 Z3.810\nG0 X10.000 Y10.000\nG1 Z-0.500 F300');
+      // The safe-Z retract now lives in the preamble (before M3); the pass
+      // itself rapids to XY and plunges to the first vertex Z.
+      expect(gcode).toContain('G0 Z3.810\nM3 S12000');
+      expect(gcode).toContain('G0 X10.000 Y10.000\nG1 Z-0.500 F300');
     });
 
     it('feeds per-vertex XYZ moves with the feed word only on the first', () => {
@@ -140,6 +146,30 @@ describe('cncGrblStrategy', () => {
     it('in-cut Z changes ride G1, never G0 — the motion invariant holds', () => {
       const gcode = cncGrblStrategy.emit({ groups: [ramp] }, dev);
       expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
+    });
+
+    it('pure-vertical path3d segments plunge at the PLUNGE feed, then restore the cut feed', () => {
+      // A ramp longer than its path ends with a same-XY descent to depth
+      // (motion-polish short-path arm). That vertical move must not ride the
+      // XY cutting feed — an end mill plunging straight down at 1000 mm/min
+      // instead of 300 breaks bits and burns stock.
+      const short = group({
+        passes: [
+          {
+            kind: 'path3d',
+            points: [
+              { x: 10, y: 10, z: -0.5 },
+              { x: 12, y: 10, z: -1.0 },
+              { x: 12, y: 10, z: -3.0 },
+              { x: 20, y: 10, z: -3.0 },
+            ],
+            closed: false,
+          },
+        ],
+      });
+      const gcode = cncGrblStrategy.emit({ groups: [short] }, dev);
+      expect(gcode).toContain('G1 X12.000 Y10.000 Z-3.000 F300');
+      expect(gcode).toContain('G1 X20.000 Y10.000 Z-3.000 F1000');
     });
 
     it('skips the retract+rapid when a path3d pass starts at the current XY', () => {

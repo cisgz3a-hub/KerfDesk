@@ -16,7 +16,15 @@ afterEach(() => {
 });
 
 function grid() {
-  const g = createRemovalGrid({ originX: 0, originY: 0, widthMm: 40, heightMm: 30, mmPerCell: 1 });
+  const result = createRemovalGrid({
+    originX: 0,
+    originY: 0,
+    widthMm: 40,
+    heightMm: 30,
+    mmPerCell: 1,
+  });
+  if (result.kind === 'error') throw new Error(result.reason);
+  const g = result.grid;
   g.depth[0] = -3;
   return g;
 }

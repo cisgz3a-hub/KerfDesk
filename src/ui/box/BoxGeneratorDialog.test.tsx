@@ -56,8 +56,22 @@ function selectEl(host: HTMLElement, label: string): HTMLSelectElement {
   return element;
 }
 
+function controlLabels(host: HTMLElement): ReadonlyArray<string> {
+  return [...host.querySelectorAll('input[aria-label], select[aria-label]')].map(
+    (control) => control.getAttribute('aria-label') ?? '',
+  );
+}
+
 async function setSelect(host: HTMLElement, label: string, value: string): Promise<void> {
   const element = selectEl(host, label);
+  element.value = value;
+  await act(async () => {
+    Simulate.change(element);
+  });
+}
+
+async function setInput(host: HTMLElement, label: string, value: string): Promise<void> {
+  const element = input(host, label);
   element.value = value;
   await act(async () => {
     Simulate.change(element);
@@ -83,6 +97,20 @@ describe('BoxGeneratorDialog', () => {
         'Back',
         'Left',
         'Right',
+      ]);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('asks for material thickness before dimensions', async () => {
+    const { host, root } = await renderDialog();
+    try {
+      expect(controlLabels(host).slice(0, 4)).toEqual([
+        'Material thickness (mm)',
+        'Width',
+        'Depth',
+        'Height',
       ]);
     } finally {
       await act(async () => root.unmount());
@@ -140,7 +168,7 @@ describe('BoxGeneratorDialog', () => {
       // Default: corner relief OFF → the select is present but the tool field hides.
       expect(selectEl(cnc.host, 'Corner relief').value).toBe('off');
       expect(cnc.host.querySelector('input[aria-label="Relief tool diameter"]')).toBeNull();
-      expect(input(cnc.host, 'Thickness').value).toBe('6');
+      expect(input(cnc.host, 'Material thickness (mm)').value).toBe('6');
       expect(input(cnc.host, 'Clearance').value).toBe('0.15');
       // Turn relief on → the tool field appears, prefilled from the active bit.
       await setSelect(cnc.host, 'Corner relief', 'on');
@@ -162,6 +190,33 @@ describe('BoxGeneratorDialog', () => {
       // z-axis cells are 10 mm: larger than 6 but under 12 → warning only.
       expect(host.textContent).toContain('under twice');
       expect(generateButton(host).disabled).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('auto-sizes joinery fields when material thickness changes', async () => {
+    const { host, root } = await renderDialog();
+    try {
+      await setInput(host, 'Material thickness (mm)', '6');
+
+      expect(input(host, 'Finger width').value).toBe('18');
+      expect(input(host, 'Part spacing').value).toBe('12');
+      expect(host.textContent).toContain('Outer 72 × 52 × 42 mm');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
+  it('keeps manually edited joinery fields when material thickness changes later', async () => {
+    const { host, root } = await renderDialog();
+    try {
+      await setInput(host, 'Finger width', '11');
+      await setInput(host, 'Part spacing', '10');
+      await setInput(host, 'Material thickness (mm)', '6');
+
+      expect(input(host, 'Finger width').value).toBe('11');
+      expect(input(host, 'Part spacing').value).toBe('10');
     } finally {
       await act(async () => root.unmount());
     }

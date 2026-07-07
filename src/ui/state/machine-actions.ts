@@ -16,6 +16,7 @@ import {
   type CncTool,
   type MachineKind,
   type Project,
+  type Scene,
 } from '../../core/scene';
 import type { CncMachinePreset } from '../../core/cnc';
 import type { CncLibrary } from './cnc-library-persistence';
@@ -128,9 +129,13 @@ export function machineActions(set: MachineSet): MachineActions {
       set((state) => {
         const machine = state.project.machine;
         if (machine?.kind !== 'cnc') return {};
-        // Bed lives on the shared device; the spindle ceiling on the CNC params.
+        // Bed lives on the shared device; the spindle ceiling on the CNC
+        // params. Layer RPMs above the new ceiling clamp down in the same
+        // step — otherwise preflight rejects every export until each layer
+        // is edited by hand (Easel clamps to machine limits the same way).
         const project: Project = {
           ...state.project,
+          scene: sceneWithSpindleCeiling(state.project.scene, preset.spindleMaxRpm),
           device: {
             ...state.project.device,
             bedWidth: preset.bedWidthMm,
@@ -149,4 +154,17 @@ export function machineActions(set: MachineSet): MachineActions {
         };
       }),
   };
+}
+
+// Clamp layer spindle RPMs to a new machine ceiling, preserving identity
+// when nothing changes so no-op preset applies stay cheap.
+function sceneWithSpindleCeiling(scene: Scene, spindleMaxRpm: number): Scene {
+  let changed = false;
+  const layers = scene.layers.map((layer) => {
+    const cnc = layer.cnc;
+    if (cnc === undefined || cnc.spindleRpm <= spindleMaxRpm) return layer;
+    changed = true;
+    return { ...layer, cnc: { ...cnc, spindleRpm: spindleMaxRpm } };
+  });
+  return changed ? { ...scene, layers } : scene;
 }
