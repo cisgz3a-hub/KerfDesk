@@ -17,7 +17,18 @@ import { validateCameraProfileShape } from '../../core/camera';
 
 const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center'] as const;
 const PROFILE_SOURCES = ['built-in', 'custom', 'imported', 'lightburn'] as const;
-const PROFILE_EVIDENCE_STATUSES = ['default', 'researched', 'user-imported', 'unverified'] as const;
+const PROFILE_EVIDENCE_STATUSES = [
+  'default-starter',
+  'hardware-verified',
+  'simulator-tested',
+  'public-spec-starter',
+  'experimental',
+  'user-imported',
+  // Legacy statuses accepted for older project/profile documents.
+  'default',
+  'researched',
+  'unverified',
+] as const;
 const LASER_FOCUS_MODES = ['fixed-lever', 'manual', 'unknown'] as const;
 const LASER_AIR_ASSIST_HARDWARE = ['built-in', 'manual', 'none', 'unknown'] as const;
 const LASER_TECHNOLOGIES = ['diode', 'co2', 'fiber', 'unknown'] as const;

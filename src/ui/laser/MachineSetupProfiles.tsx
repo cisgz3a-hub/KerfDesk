@@ -1,7 +1,8 @@
 import {
-  GRBL_MACHINE_PROFILE_CATALOG,
-  type DeviceProfile,
-  type MachineProfileCatalogEntry,
+  suggestMachineProfiles,
+  profileConfidenceLabel,
+  profileWithControllerFacts,
+  type MachineProfileSuggestion,
 } from '../../core/devices';
 import { Button } from '../kit';
 import { useStore } from '../state';
@@ -9,6 +10,7 @@ import { useLaserStore } from '../state/laser-store';
 import { DeviceSettings } from './DeviceSettings';
 import {
   badgeStyle,
+  buttonRowStyle,
   cardHeaderStyle,
   cardStyle,
   catalogGridStyle,
@@ -45,16 +47,30 @@ export function OverviewPanel(): JSX.Element {
 }
 
 export function ProfileCatalogPanel(): JSX.Element {
+  const detectedSettings = useLaserStore((s) => s.detectedSettings);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
+  const grblSettingsRows = useLaserStore((s) => s.grblSettingsRows);
+  const suggestions = suggestMachineProfiles({
+    detectedControllerKind,
+    detectedProfilePatch: detectedSettings,
+    controllerSettings,
+    settingsRows: grblSettingsRows,
+  });
   return (
     <div style={catalogGridStyle}>
-      {GRBL_MACHINE_PROFILE_CATALOG.map((entry) => (
-        <CatalogCard key={entry.profile.profileId ?? entry.profile.name} entry={entry} />
+      {suggestions.map((suggestion) => (
+        <CatalogCard key={suggestion.profileId} suggestion={suggestion} />
       ))}
     </div>
   );
 }
 
-function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }): JSX.Element {
+function CatalogCard({
+  suggestion,
+}: {
+  readonly suggestion: MachineProfileSuggestion;
+}): JSX.Element {
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const current = useStore((s) => s.project.device);
   const detectedSettings = useLaserStore((s) => s.detectedSettings);
@@ -62,11 +78,11 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
   const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const activeId = useStore((s) => s.project.device.profileId);
-  const profile = entry.profile;
+  const profile = suggestion.profile;
   const active = activeId === profile.profileId;
   const applyProfile = (): void => {
     replaceDeviceProfile(
-      catalogProfileWithControllerFacts({
+      profileWithControllerFacts({
         profile,
         current,
         detectedSettings,
@@ -80,7 +96,10 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
     <article style={cardStyle}>
       <div style={cardHeaderStyle}>
         <strong>{profile.name}</strong>
-        <span style={badgeStyle}>{profile.profileSource ?? 'built-in'}</span>
+        <span style={buttonRowStyle}>
+          <span style={badgeStyle}>{suggestionConfidenceLabel(suggestion.confidence)}</span>
+          <span style={badgeStyle}>{profileConfidenceLabel(profile)}</span>
+        </span>
       </div>
       <p style={mutedStyle}>
         {profile.bedWidth} x {profile.bedHeight} mm
@@ -89,8 +108,14 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
           : ''}
       </p>
       <ul style={notesStyle}>
-        {entry.reviewNotes.map((note) => (
+        {suggestion.entry.reviewNotes.map((note) => (
           <li key={note}>{note}</li>
+        ))}
+        {suggestion.reasons.slice(0, 2).map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+        {suggestion.warnings.map((warning) => (
+          <li key={warning}>{warning}</li>
         ))}
       </ul>
       <Button variant={active ? 'default' : 'primary'} disabled={active} onClick={applyProfile}>
@@ -100,45 +125,8 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
   );
 }
 
-function catalogProfileWithControllerFacts(args: {
-  readonly profile: DeviceProfile;
-  readonly current: DeviceProfile;
-  readonly detectedSettings: Partial<DeviceProfile> | null;
-  readonly controllerSettings: Partial<DeviceProfile> | null;
-  readonly detectedControllerKind: DeviceProfile['controllerKind'] | null;
-  readonly lastSettingsReadAt: number | null;
-}): DeviceProfile {
-  const controllerRead = args.lastSettingsReadAt !== null;
-  const machinePatch = {
-    ...(controllerRead ? machineReportedProfilePatch(args.current) : {}),
-    ...machineReportedProfilePatch(args.controllerSettings),
-    ...machineReportedProfilePatch(args.detectedSettings),
-  };
-  const controllerKind =
-    args.detectedControllerKind ?? (controllerRead ? args.current.controllerKind : undefined);
-  return {
-    ...args.profile,
-    ...machinePatch,
-    ...(controllerRead ? { framingFeedMmPerMin: args.current.framingFeedMmPerMin } : {}),
-    ...(controllerKind === undefined ? {} : { controllerKind }),
-  };
-}
-
-function machineReportedProfilePatch(
-  source: Partial<DeviceProfile> | null,
-): Partial<DeviceProfile> {
-  if (source === null) return {};
-  return {
-    ...(source.bedWidth === undefined ? {} : { bedWidth: source.bedWidth }),
-    ...(source.bedHeight === undefined ? {} : { bedHeight: source.bedHeight }),
-    ...(source.maxFeed === undefined ? {} : { maxFeed: source.maxFeed }),
-    ...(source.maxPowerS === undefined ? {} : { maxPowerS: source.maxPowerS }),
-    ...(source.minPowerS === undefined ? {} : { minPowerS: source.minPowerS }),
-    ...(source.laserModeEnabled === undefined ? {} : { laserModeEnabled: source.laserModeEnabled }),
-    ...(source.accelMmPerSec2 === undefined ? {} : { accelMmPerSec2: source.accelMmPerSec2 }),
-    ...(source.junctionDeviationMm === undefined
-      ? {}
-      : { junctionDeviationMm: source.junctionDeviationMm }),
-    ...(source.zTravelMm === undefined ? {} : { zTravelMm: source.zTravelMm }),
-  };
+function suggestionConfidenceLabel(confidence: MachineProfileSuggestion['confidence']): string {
+  if (confidence === 'suggested') return 'Suggested match';
+  if (confidence === 'possible') return 'Possible match';
+  return 'Manual choice';
 }

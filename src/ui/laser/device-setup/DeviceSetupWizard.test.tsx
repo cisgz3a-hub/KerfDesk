@@ -15,7 +15,7 @@ import { DeviceSetupWizard } from './DeviceSetupWizard';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const FALCON_ID = 'creality-falcon-a1-pro-compatible';
+const FALCON_ID = 'creality-falcon-a1-pro-grblhal';
 const IDLE_STATUS = {
   state: 'Idle',
   subState: null,
@@ -178,6 +178,46 @@ describe('DeviceSetupWizard', () => {
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
       // Detected 363 must win over the preset's nominal 400.
       expect(bed.value).toBe('363');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('commits detected grblHAL identity and controller-tuned frame feed after choosing Falcon', async () => {
+    useStore.getState().updateDeviceProfile({
+      framingFeedMmPerMin: 10000,
+      maxFeed: 10000,
+      controllerKind: 'grbl-v1.1',
+    });
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      detectedControllerKind: 'grblhal',
+      detectedSettings: {
+        bedWidth: 400,
+        bedHeight: 400,
+        maxFeed: 10000,
+        minPowerS: 0,
+        maxPowerS: 1000,
+      },
+      lastSettingsReadAt: 1718600000000,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, unmount } = await renderWizard();
+    try {
+      await act(async () => button(host, 'Next').click()); // connect -> identify
+      const firstCard = host.querySelector('article');
+      expect(firstCard?.textContent).toContain('Creality Falcon A1 Pro');
+      expect(firstCard?.textContent).toContain('Suggested match');
+      expect(firstCard?.textContent).toContain('Detected grblHAL firmware.');
+      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
+      await advanceUntil(host, 'Finish setup');
+      await act(async () => button(host, 'Finish setup').click());
+
+      expect(useStore.getState().project.device).toMatchObject({
+        profileId: FALCON_ID,
+        controllerKind: 'grblhal',
+        maxFeed: 10000,
+        framingFeedMmPerMin: 10000,
+      });
     } finally {
       await unmount();
     }
