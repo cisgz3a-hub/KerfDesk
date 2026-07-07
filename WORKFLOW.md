@@ -2407,9 +2407,10 @@ F-CNC19 tiling.
 1. Style **Slide lid** produces six panels: bottom, back, slotted left
    and right walls, a front wall shortened to the slot floor, and a
    loose lid with a half-round thumb notch on its leading edge.
-2. The side-wall through-slots run from the front edge to one thickness
-   short of the back wall; the assembled lid slides over the shortened
-   front and stops against the back wall.
+2. The side-wall channels run from the front edge to one thickness
+   inside the wall body; the assembled lid slides over the shortened
+   front and stops against the in-wall post (the captive top strip stays
+   fingered into the back wall).
 3. The lid and its slots are sized with the mandatory play so the lid
    physically slides; laser default clearance rises to 0.2 mm for this
    style (CNC keeps 0.15 mm).

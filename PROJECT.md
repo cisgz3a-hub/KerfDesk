@@ -196,7 +196,7 @@ macOS/Linux desktop, per ADR-104's renumbering note.)
   (WORKFLOW.md Phase K flows, AUDIT.md row) until a real box is cut and
   assembled.
 
-**K.2 — broad-tool pack [Approved; staged V0–V4].** ADR-116: panel
+**K.2 — broad-tool pack [Built (V0–V3); hardware fit CLAIMED].** ADR-116: panel
 cutouts (interior rings; panels re-carrier to named `imported-svg`
 vector objects, closing the v1 name gap), divider grids (through-slot
 tabs + egg-crate cross-laps, complementary by construction), and the

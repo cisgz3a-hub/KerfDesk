@@ -5254,12 +5254,15 @@ ADR-017).
 
 - New style `'slide-lid'`: bottom, back, slotted left/right walls,
   front wall shortened to the slot floor, plus a loose lid panel.
-- Geometry: lid plane occupies z ∈ [OH−T, OH]. Side walls carry a
-  through-slot of height T (widened by play) running from the front
-  edge to T short of the back wall; the lid slides over the shortened
-  front and stops against the full-height back wall. Lid = full inner
-  width + slot engagement on both sides, front edge carries a half-round
-  thumb notch (clipper subtraction, relief-pass pattern).
+- Geometry (refined at V3 build): outer height = inner + 3T — bottom,
+  cavity, lid band, and a captive top strip. The side walls carry a
+  C-channel spliced into their solid front edge at the lid band,
+  stopping one thickness INSIDE the wall body (stopping at the body end
+  would leave a zero-width neck — the fit offset severs it, which is how
+  the referee caught the draft geometry). The lid slides over the
+  shortened front and stops against the in-wall post; lid = full outer
+  width × (outer depth − 2T), leading edge carries a half-round thumb
+  notch built with on-edge-exact endpoints (no clipper).
 - A slide lid must SLIDE: validation requires clearance > 0 for this
   style (defaults stay 0.15 mm CNC; laser default rises to 0.2 mm for
   slide-lid only). The referee gains a mandatory-play check for the
