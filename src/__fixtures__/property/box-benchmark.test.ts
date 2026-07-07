@@ -14,10 +14,12 @@
 //   pnpm exec vitest run src/__fixtures__/property/box-benchmark.test.ts
 
 import { describe, expect, it } from 'vitest';
+import type { Vec2 } from '../../core/scene';
 import { checkBoxAssembly, type RefereePanel } from '../../core/box/assembly-referee';
 import { checkDividerAssembly } from '../../core/box/divider-referee';
 import { buildSlideLidParts } from '../../core/box/slide-lid-panels';
 import { checkSlideLidAssembly } from '../../core/box/slide-lid-referee';
+import { fitCouponClearanceMm, generateFitCoupon, type FitCouponSpec } from '../../core/box/fit-coupon';
 import type { BoxSpec } from '../../core/box/box-spec';
 import { generateBox } from '../../core/box/generate-box';
 import { buildPanelClaims } from '../../core/box/panel-claims';
@@ -58,6 +60,7 @@ describe('box generator benchmark', () => {
         scoreCutouts(),
         scoreDividers(),
         scoreSlideLid(),
+        scoreFitCoupon(),
         scoreSabotageDetection(),
       ];
       const totalPassed = scores.reduce((sum, s) => sum + s.passed, 0);
@@ -322,6 +325,69 @@ function scoreSlideLid(): Score {
   const comboResult = generateBox(combo);
   if (comboResult.kind === 'generated' && comboResult.panels.length === 8) passed += 1;
   return { category: 'slide-lid', passed, total };
+}
+
+// Fit coupon (ADR-118): every rung must measure notch − tab == cᵢ exactly,
+// laser and CNC-relieved variants must generate, and output is
+// deterministic.
+function scoreFitCoupon(): Score {
+  let passed = 0;
+  let total = 0;
+  for (const relief of [
+    { kind: 'none' } as const,
+    { kind: 'corner-overcut', toolDiameterMm: 3.175 } as const,
+  ]) {
+    const coupon: FitCouponSpec = {
+      thicknessMm: 3,
+      fingerWidthMm: 9,
+      startClearanceMm: 0.05,
+      stepClearanceMm: 0.05,
+      rungCount: 6,
+      relief,
+    };
+    total += 1;
+    const result = generateFitCoupon(coupon);
+    if (result.kind === 'generated' && result.parts.length === 2) passed += 1;
+    total += 1;
+    if (JSON.stringify(generateFitCoupon(coupon)) === JSON.stringify(generateFitCoupon(coupon))) {
+      passed += 1;
+    }
+    if (result.kind !== 'generated' || relief.kind !== 'none') continue;
+    // Rung law on the laser (exact) variant.
+    const comb = result.parts[0];
+    const slots = result.parts[1];
+    for (let i = 0; i < coupon.rungCount; i += 1) {
+      total += 1;
+      const c = fitCouponClearanceMm(coupon, i);
+      const tab = nthRun(comb?.rings.outline.points ?? [], 13, i);
+      const notch = nthRun(slots?.rings.outline.points ?? [], 29, i);
+      if (
+        tab !== null &&
+        notch !== null &&
+        Math.abs(notch[1] - notch[0] - (tab[1] - tab[0]) - c) < 1e-9
+      ) {
+        passed += 1;
+      }
+    }
+  }
+  return { category: 'fit-coupon', passed, total };
+}
+
+function nthRun(
+  points: ReadonlyArray<Vec2>,
+  yValue: number,
+  index: number,
+): readonly [number, number] | null {
+  const runs: Array<readonly [number, number]> = [];
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const p = points[i];
+    const q = points[i + 1];
+    if (p === undefined || q === undefined) continue;
+    if (p.y !== yValue || q.y !== yValue || p.x === q.x) continue;
+    runs.push([Math.min(p.x, q.x), Math.max(p.x, q.x)]);
+  }
+  runs.sort((a, b) => a[0] - b[0]);
+  return runs[index] ?? null;
 }
 
 // The referee must catch all four classic failure classes when the math is

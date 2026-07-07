@@ -14,6 +14,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
+import { BoxFitTestHost } from '../box/BoxFitTestHost';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
 import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
@@ -43,6 +44,7 @@ export function CommandShell(): JSX.Element {
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
+  const [boxFitTestOpen, setBoxFitTestOpen] = useState(false);
   const [materialTestDialogOpen, setMaterialTestDialogOpen] = useState(false);
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
@@ -61,6 +63,7 @@ export function CommandShell(): JSX.Element {
     requestConvertToBitmap: () => setConvertDialogOpen(true),
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
+    requestBoxFitTest: () => setBoxFitTestOpen(true),
     requestMaterialTest: () => setMaterialTestDialogOpen(true),
     requestIntervalTest: () => setIntervalTestDialogOpen(true),
     requestScanOffsetTest: () => setScanOffsetTestDialogOpen(true),
@@ -94,6 +97,8 @@ export function CommandShell(): JSX.Element {
       <GeneratorDialogs
         boxOpen={boxGeneratorOpen}
         onBoxClose={() => setBoxGeneratorOpen(false)}
+        fitTestOpen={boxFitTestOpen}
+        onFitTestClose={() => setBoxFitTestOpen(false)}
         materialOpen={materialTestDialogOpen}
         onMaterialClose={() => setMaterialTestDialogOpen(false)}
         intervalOpen={intervalTestDialogOpen}
@@ -118,6 +123,8 @@ export function CommandShell(): JSX.Element {
 function GeneratorDialogs(props: {
   readonly boxOpen: boolean;
   readonly onBoxClose: () => void;
+  readonly fitTestOpen: boolean;
+  readonly onFitTestClose: () => void;
   readonly materialOpen: boolean;
   readonly onMaterialClose: () => void;
   readonly intervalOpen: boolean;
@@ -128,6 +135,7 @@ function GeneratorDialogs(props: {
   return (
     <>
       {props.boxOpen ? <BoxGeneratorHost onClose={props.onBoxClose} /> : null}
+      {props.fitTestOpen ? <BoxFitTestHost onClose={props.onFitTestClose} /> : null}
       {props.materialOpen ? <MaterialDialog onClose={props.onMaterialClose} /> : null}
       {props.intervalOpen ? <IntervalDialog onClose={props.onIntervalClose} /> : null}
       {props.scanOffsetOpen ? <ScanOffsetDialog onClose={props.onScanOffsetClose} /> : null}

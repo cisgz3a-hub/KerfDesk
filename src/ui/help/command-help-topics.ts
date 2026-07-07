@@ -111,6 +111,10 @@ export const COMMAND_HELP: Readonly<Partial<Record<CommandId, CommandHelpTopic>>
     family: 'tools',
     tooltip: 'Generate a finger-joint box as cut-ready panels.',
   },
+  'tools.box-fit-test': {
+    family: 'tools',
+    tooltip: 'Generate fit test strips to calibrate joint clearance.',
+  },
   'tools.material-test': {
     family: 'tools',
     tooltip: 'Create a power and speed grid for finding material settings.',

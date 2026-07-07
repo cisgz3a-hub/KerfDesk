@@ -10,6 +10,7 @@ import {
   generateBox,
   validateBoxSpec,
   type BoxPanel,
+  type BoxSpec,
   type GenerateBoxResult,
 } from '../../core/box';
 import { Button, Dialog, DialogActions } from '../kit';
@@ -31,6 +32,7 @@ import {
   SLIDE_LID_MIN_CLEARANCE_DRAFT,
 } from './box-draft';
 import { BoxGeneratorFields } from './BoxGeneratorFields';
+import { BoxAssembledPreview } from './BoxAssembledPreview';
 import { BoxPreview } from './BoxPreview';
 
 export function BoxGeneratorDialog(props: {
@@ -51,6 +53,8 @@ export function BoxGeneratorDialog(props: {
   // Keeps the last valid sheet visible while the draft is invalid (F-K1).
   // Render-time ref write is an idempotent cache, safe under StrictMode.
   const lastValidPanels = useRef<ReadonlyArray<BoxPanel> | null>(null);
+  const lastValidSpec = useRef<BoxSpec | null>(null);
+  const [view, setView] = useState<'flat' | 'assembled'>('flat');
   const setField =
     (field: keyof BoxDraft) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
@@ -74,6 +78,7 @@ export function BoxGeneratorDialog(props: {
   const generation = parsed.kind === 'spec' ? generateBox(parsed.spec) : null;
   const panels = generation !== null && generation.kind === 'generated' ? generation.panels : null;
   if (panels !== null) lastValidPanels.current = panels;
+  if (panels !== null && parsed.kind === 'spec') lastValidSpec.current = parsed.spec;
   return (
     <Dialog
       onClose={props.onCancel}
@@ -89,7 +94,22 @@ export function BoxGeneratorDialog(props: {
     >
       <BoxGeneratorFields draft={draft} machine={props.machine} setField={setField} />
       <p style={summaryStyle}>{summaryLine(parsed)}</p>
-      <BoxPreview panels={panels ?? lastValidPanels.current} />
+      <div style={viewToggleStyle} role="group" aria-label="Preview view">
+        <Button onClick={() => setView('flat')} aria-pressed={view === 'flat'}>
+          Flat
+        </Button>
+        <Button onClick={() => setView('assembled')} aria-pressed={view === 'assembled'}>
+          Assembled
+        </Button>
+      </div>
+      {view === 'flat' ? (
+        <BoxPreview panels={panels ?? lastValidPanels.current} />
+      ) : (
+        <BoxAssembledPreview
+          panels={panels ?? lastValidPanels.current}
+          spec={parsed.kind === 'spec' && panels !== null ? parsed.spec : lastValidSpec.current}
+        />
+      )}
       <IssueList issues={issueLines(parsed, generation)} warnings={warningLines(parsed)} />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
@@ -160,6 +180,8 @@ function summaryLine(parsed: BoxDraftParse): string {
 function fmt(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
+
+const viewToggleStyle: CSSProperties = { display: 'flex', gap: 4, margin: '0 0 6px' };
 
 const summaryStyle: CSSProperties = {
   fontSize: 12,

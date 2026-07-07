@@ -5455,3 +5455,54 @@ trusted check+request and denied for untrusted origins and subframes.
 NOT verified: the packaged Electron runtime grant, and a real hours-long
 burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
 runs one.
+
+## ADR-118 — Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07)
+
+**Status:** accepted (maintainer: "yes build it" on the ranked
+improvement assessment). Builds on ADR-106/116.
+
+### Context
+
+The generator's joints are referee-proven, but the clearance NUMBER is a
+guess until material is cut — and the flat-sheet preview makes users
+assemble the box in their heads. Both gaps close with existing
+machinery: the calibration-tool family (Material/Interval Test) and the
+generator's own placement model.
+
+### Decision 1 — fit test coupon (Tools → Box Fit Test…)
+
+- Pure core `fit-coupon.ts`: TWO strips. A comb strip carries N tabs on
+  a graduated clearance ladder (default 0.05–0.30 mm, 6 rungs,
+  start/step/count configurable); a slot strip carries the N mating
+  notches. Rung i bakes the production fit law analytically — tab width
+  f − cᵢ/2, notch width f + cᵢ/2, both T deep — so the rung that feels
+  right on the bench IS the number to type into the Box Generator.
+- Rung identification without text: i+1 index nicks (1 mm square)
+  along the strip edge under each rung.
+- CNC mode runs the slot strip through the shared relief pass
+  (corner-overcuts at notch corners, full bit radius); validation reuses
+  the box rules (f > tool, ladder < min(f, T)/2).
+- Inserts as two named vector objects (imported-svg carrier), one undo
+  step, same insertion path as box panels.
+
+### Decision 2 — assembled 3D preview
+
+- Pure core `assembled-layout.ts`: every generated part's 3D frame
+  (origin, u/v basis, normal, slab offset) — walls from the documented
+  drawing convention, dividers from their slabs, the slide lid from its
+  channel band. This is the referee's placement knowledge exposed as a
+  reusable layout (kept in sync by tests, not imports).
+- UI: the Box Generator preview gains a Flat/Assembled toggle. The
+  assembled view is a Canvas2D isometric projection (extruded plates,
+  painter-sorted, even-odd fill so cutouts read as holes) — deliberately
+  NOT three.js: a dialog preview needs no camera, no lazy chunk, and
+  must render under jsdom guards like BoxPreview does.
+
+### Verification
+
+fit-coupon: exact per-rung width law (notch − tab == cᵢ), determinism,
+benchmark category `fit-coupon` (must hold 100% alongside the existing
+nine). assembled-layout: unit-pinned frames for every part kind across
+styles. Preview: component tests (toggle, jsdom-safe render). Hardware
+remains CLAIMED; the coupon exists precisely to make those cuts
+informative.
