@@ -31,6 +31,42 @@ describe('ConvertToBitmapDialog', () => {
     }
   });
 
+  it('keeps a partially typed DPI instead of clamping every keystroke', async () => {
+    const onConvert = vi.fn();
+    const { host, root } = await renderDialog({ bounds: smallBounds, onConvert });
+    try {
+      // Typing "300" starts with "3" — below the DPI minimum. The field must
+      // keep the raw text (clamping happens at submit), or typed entry is
+      // impossible: every first digit would snap to the minimum.
+      change(host, 'input[name="dpi"]', '3');
+      const dpiInput = host.querySelector('input[name="dpi"]');
+      expect(dpiInput instanceof HTMLInputElement && dpiInput.value).toBe('3');
+
+      change(host, 'input[name="dpi"]', '300');
+      await submit(host);
+
+      expect(onConvert).toHaveBeenCalledWith({ renderType: 'fill-all', dpi: 300 });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('clamps an out-of-range typed DPI at submit, not while typing', async () => {
+    const onConvert = vi.fn();
+    const { host, root } = await renderDialog({ bounds: smallBounds, onConvert });
+    try {
+      change(host, 'input[name="dpi"]', '9999');
+      await submit(host);
+      expect(onConvert).toHaveBeenCalledWith(
+        expect.objectContaining({ dpi: 635 }), // MAX_CONVERT_TO_BITMAP_DPI
+      );
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('submits when the operator clicks Convert', async () => {
     const onConvert = vi.fn();
     const { host, root } = await renderDialog({ bounds: smallBounds, onConvert });
