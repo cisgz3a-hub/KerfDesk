@@ -149,6 +149,35 @@ describe('tileJobs clipping', () => {
     expect(pass.points.at(-1)?.z).toBeCloseTo(-2, 9);
   });
 
+  it('clips arc passes as sampled contour pieces per tile', () => {
+    const arc: CncGroup['passes'] = [
+      {
+        kind: 'arc',
+        start: { x: 50, y: 0 },
+        end: { x: 250, y: 0 },
+        center: { x: 150, y: 0 },
+        clockwise: false,
+        zMm: -1.5,
+        closed: false,
+      },
+    ];
+    const tiled = tileJobs({ groups: [groupOf(arc)] }, TILING);
+    expect(tiled.length).toBeGreaterThan(1);
+    for (const { job } of tiled) {
+      const group = job.groups[0];
+      if (group?.kind !== 'cnc') throw new Error('group missing');
+      for (const pass of group.passes) {
+        if (pass.kind !== 'contour') throw new Error('arc should tile as contour fallback');
+        expect(pass.zMm).toBe(-1.5);
+        expect(pass.closed).toBe(false);
+        for (const point of pass.polyline) {
+          expect(point.x).toBeGreaterThanOrEqual(-1e-9);
+          expect(point.x).toBeLessThanOrEqual(TILING.tileWidthMm + 1e-9);
+        }
+      }
+    }
+  });
+
   it('drops tiles with no motion', () => {
     // Line only in the left half of a 2-column grid.
     const tiled = tileJobs(lineJob(0, 95, 150, -1), {

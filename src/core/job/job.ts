@@ -9,6 +9,7 @@
 // Consumers that only operate on vectors (optimizer, planner, estimator's
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
+import { sampleCircularArcPoints } from '../geometry/circular-arc';
 import { assertNever, type CncCutType, type LayerFillStyle, type Vec2 } from '../scene';
 import type { Vec3 } from '../geometry/vec3';
 import type { IslandFillMotionPolicy } from './island-fill-motion';
@@ -78,11 +79,13 @@ export type RasterGroup = {
 // CNC (router/mill) passes. Pre-expanded by core/cnc/compile-cnc-job.ts
 // (depth ramping, tab splitting, pocket rings) so the emitter is a dumb, safe
 // motion printer: retract to safeZMm → rapid XY → plunge at plungeMmPerMin →
-// feed. Two shapes (ADR-098, Phase H.1):
+// feed. Pass shapes:
 //   - contour: one XY polyline at one constant Z depth (profiles, pockets,
 //     engraves, v-carve rings)
 //   - path3d:  per-vertex XYZ motion (relief finishing, ramp entries,
 //     imported .nc toolpaths)
+//   - arc:     one XY circular arc at one constant Z depth (native G2/G3 when
+//     valid, sampled G1 fallback where needed)
 export type CncContourPass = {
   readonly kind: 'contour';
   readonly zMm: number; // cutting depth for this pass; negative below stock top
@@ -97,7 +100,17 @@ export type CncPath3dPass = {
   readonly closed: boolean;
 };
 
-export type CncPass = CncContourPass | CncPath3dPass;
+export type CncArcPass = {
+  readonly kind: 'arc';
+  readonly start: Vec2;
+  readonly end: Vec2;
+  readonly center: Vec2;
+  readonly clockwise: boolean;
+  readonly zMm: number;
+  readonly closed: boolean;
+};
+
+export type CncPass = CncContourPass | CncPath3dPass | CncArcPass;
 
 // XY projection of a pass — for bounds, origin translation, and the 2D
 // preview. Vec3 is structurally assignable to Vec2, so path3d points pass
@@ -108,6 +121,8 @@ export function cncPassXyPoints(pass: CncPass): ReadonlyArray<Vec2> {
       return pass.polyline;
     case 'path3d':
       return pass.points;
+    case 'arc':
+      return sampleCircularArcPoints(pass);
     default:
       return assertNever(pass, 'CncPass');
   }
@@ -121,6 +136,8 @@ export function cncPassEntryDepthMm(pass: CncPass): number {
       return pass.zMm;
     case 'path3d':
       return pass.points[0]?.z ?? 0;
+    case 'arc':
+      return pass.zMm;
     default:
       return assertNever(pass, 'CncPass');
   }
