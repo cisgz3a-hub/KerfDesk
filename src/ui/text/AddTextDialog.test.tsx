@@ -281,6 +281,42 @@ describe('AddTextDialog unknown font safety', () => {
       host.remove();
     }
   });
+
+  it('lets numeric text fields be fully cleared while retyping', async () => {
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<AddTextDialog />);
+      });
+
+      const fields = [
+        requireInput(host, 'input[aria-label="Text size"]'),
+        requireInput(host, 'input[aria-label="Text line height"]'),
+        requireInput(host, 'input[aria-label="Text letter spacing"]'),
+      ];
+
+      for (const input of fields) {
+        const previous = input.value;
+        await act(async () => {
+          input.value = '';
+          Simulate.change(input);
+        });
+        expect(input.value).toBe('');
+
+        await act(async () => Simulate.blur(input));
+        expect(input.value).toBe(previous);
+      }
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
 });
 
 function requireTextarea(host: HTMLElement): HTMLTextAreaElement {

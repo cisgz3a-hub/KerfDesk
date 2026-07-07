@@ -13,3 +13,5 @@ export {
   type BoxSpecValidation,
   type BoxStyle,
 } from './box-spec';
+export { generateFitCoupon, type FitCouponResult, type FitCouponSpec } from './fit-coupon';
+export { framePoint, partFrame, type PartFrame } from './assembled-layout';

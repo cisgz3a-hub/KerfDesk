@@ -2,7 +2,7 @@
 
 > Free, open-source CAM for GRBL laser cutters, engravers, and CNC routers. Design, trace, preview, generate G-code, and stream it to your machine — straight from the browser, or from the Windows desktop app. One codebase, MIT licensed.
 
-**Try it now: <https://kerfdesk.com>** — no install, no account. Works in any Chromium browser (Chrome, Edge, Brave) on Windows, macOS, and Linux, talks to your machine over Web Serial, and installs as an offline-capable PWA.
+**Try it now: <https://kerfdesk.com>** — no install, no account. Cloudflare fallback: <https://laserforge-2fj.pages.dev>. Works in any Chromium browser (Chrome, Edge, Brave) on Windows, macOS, and Linux, talks to your machine over Web Serial, and installs as an offline-capable PWA.
 
 ## Why KerfDesk
 

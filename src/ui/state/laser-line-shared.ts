@@ -5,22 +5,24 @@
 import type { SettingsCollectorState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
+import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
-export type HandlerRefs = ControllerLifecycleRefs & {
-  // Active firmware driver — classification and follow-up command bytes come
-  // from here so this pipeline stays firmware-neutral (ADR-094).
-  driver: ControllerDriver;
-  settingsCollector: SettingsCollectorState;
-  // One-shot callback fired by handleLine the next time any line arrives.
-  // runHandshake sets it before awaiting; handleLine clears it after
-  // calling. Lets the handshake be event-driven instead of busy-polling
-  // get().log.length on a 50 ms loop (R-L2 audit finding).
-  onLineArrived: (() => void) | null;
-  nextTranscriptId?: number;
-};
+export type HandlerRefs = ControllerLifecycleRefs &
+  ResetCleanupRefs & {
+    // Active firmware driver — classification and follow-up command bytes come
+    // from here so this pipeline stays firmware-neutral (ADR-094).
+    driver: ControllerDriver;
+    settingsCollector: SettingsCollectorState;
+    // One-shot callback fired by handleLine the next time any line arrives.
+    // runHandshake sets it before awaiting; handleLine clears it after
+    // calling. Lets the handshake be event-driven instead of busy-polling
+    // get().log.length on a 50 ms loop (R-L2 audit finding).
+    onLineArrived: (() => void) | null;
+    nextTranscriptId?: number;
+  };
 
 export type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),

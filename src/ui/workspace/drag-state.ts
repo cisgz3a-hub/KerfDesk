@@ -6,6 +6,7 @@
 // without rendering.
 
 import {
+  combinedBBox,
   hitTest,
   type Project,
   type SceneObject,
@@ -15,15 +16,18 @@ import {
 } from '../../core/scene';
 import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
+import { hitAabbHandle } from './selection-handles';
 import type { PathNodeDragState } from './path-node-drag';
 import {
   hitRotateHandle,
   hitSelectionRotateHandle,
+  objectRotateAnchor,
   pointerAngleDeg,
   rotateObjectByDrag,
+  rotateObjectRelative,
   selectionRotateAnchor,
 } from './rotate-handle';
-import { canvasMouseToScene, computeView, pxToMmForCanvas } from './view-transform';
+import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 
 export type MoveStartTransform = {
   readonly id: string;
@@ -43,6 +47,14 @@ export type DragState =
       readonly kind: 'scale';
       readonly objectId: string;
       readonly handle: HandleKind;
+    }
+  // Resizing a MULTI-object selection by a combined-box handle (audit C5).
+  // Scales every listed object around the opposite corner/edge via the core
+  // group-resize; handled in apply-transform-drag, never nextTransformForDrag.
+  | {
+      readonly kind: 'selection-scale';
+      readonly handle: HandleKind;
+      readonly selectionIds: ReadonlyArray<string>;
     }
   | {
       readonly kind: 'rotate';
@@ -85,10 +97,21 @@ export function pickHandleDrag(args: {
   readonly selectedObj: SceneObject;
   readonly point: Vec2;
   readonly pxToMm: number;
+  readonly selectionAnchor?: SelectionAnchor;
 }): DragState | null {
   const { selectedObj, point, pxToMm } = args;
   if (hitRotateHandle(selectedObj, point, pxToMm)) {
-    return { kind: 'rotate', objectId: selectedObj.id };
+    // Capture the pivot, the pointer angle, and the object's transform AT the
+    // grab so the rotate is relative to where the drag started — no jump on a
+    // pre-rotated object (audit C2).
+    const anchor = objectRotateAnchor(selectedObj, args.selectionAnchor ?? 'c');
+    return {
+      kind: 'rotate',
+      objectId: selectedObj.id,
+      rotateAnchor: anchor,
+      startPointerAngleDeg: pointerAngleDeg(anchor, point),
+      selectionStartTransforms: [{ id: selectedObj.id, transform: { ...selectedObj.transform } }],
+    };
   }
   const handle = hitHandle(selectedObj, point, pxToMm);
   if (handle !== null) {
@@ -102,7 +125,6 @@ export function pickHandleDrag(args: {
 // to learn the Space modifier to pan with a regular mouse.
 const MIDDLE_BUTTON = 1;
 const RIGHT_BUTTON = 2;
-const CONTEXT_CLICK_TOLERANCE_PX = 4;
 
 // Resolve a mouse-down event to the drag it should initiate. Pure of
 // React — takes side-effect callbacks (selection updates) so the hook in
@@ -116,6 +138,8 @@ export function computeMouseDownDrag(args: {
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
   readonly onShiftClick: (id: string) => void;
   readonly onPlainClick: (id: string | null) => void;
+  // 9-dot rotate/scale pivot from the numeric-edits bar; defaults to center.
+  readonly selectionAnchor?: SelectionAnchor;
 }): DragState | null {
   const {
     e,
@@ -148,17 +172,15 @@ export function computeMouseDownDrag(args: {
   const selectedObjects = selectedObjectsForIds(project.scene.objects, selectedIds);
   const selectedObj = project.scene.objects.find((o) => o.id === selectedObjectId);
   const pxToMm = pxToMmForCanvas(ref.current, project, viewState);
-  const selectionRotateDrag = pickSelectionRotateDrag({
+  const handleDrag = pickHandleOrRotateDrag({
     selectedObjects,
+    selectedObj,
     selectedObjectId,
     point,
     pxToMm,
+    ...(args.selectionAnchor === undefined ? {} : { selectionAnchor: args.selectionAnchor }),
   });
-  if (selectionRotateDrag !== null) return selectionRotateDrag;
-  if (selectedObj !== undefined && selectedObjects.length <= 1) {
-    const handleDrag = pickHandleDrag({ selectedObj, point, pxToMm });
-    if (handleDrag !== null) return handleDrag;
-  }
+  if (handleDrag !== null) return handleDrag;
   const hitId = hitTest(project.scene, point);
   if (hitId === null) {
     return { kind: 'marquee', startScenePoint: point, additive: e.shiftKey };
@@ -222,6 +244,55 @@ function pickSelectionRotateDrag(args: {
   };
 }
 
+// Resolve any handle-based drag from a mouse-down: the multi-selection rotate
+// or scale handles first, then a single object's own scale/rotate handles.
+function pickHandleOrRotateDrag(args: {
+  readonly selectedObjects: ReadonlyArray<SceneObject>;
+  readonly selectedObj: SceneObject | undefined;
+  readonly selectedObjectId: string | null;
+  readonly point: Vec2;
+  readonly pxToMm: number;
+  readonly selectionAnchor?: SelectionAnchor;
+}): DragState | null {
+  const rotate = pickSelectionRotateDrag({
+    selectedObjects: args.selectedObjects,
+    selectedObjectId: args.selectedObjectId,
+    point: args.point,
+    pxToMm: args.pxToMm,
+  });
+  if (rotate !== null) return rotate;
+  const scale = pickSelectionScaleDrag({
+    selectedObjects: args.selectedObjects,
+    point: args.point,
+    pxToMm: args.pxToMm,
+  });
+  if (scale !== null) return scale;
+  if (args.selectedObj === undefined || args.selectedObjects.length > 1) return null;
+  return pickHandleDrag({
+    selectedObj: args.selectedObj,
+    point: args.point,
+    pxToMm: args.pxToMm,
+    ...(args.selectionAnchor === undefined ? {} : { selectionAnchor: args.selectionAnchor }),
+  });
+}
+
+function pickSelectionScaleDrag(args: {
+  readonly selectedObjects: ReadonlyArray<SceneObject>;
+  readonly point: Vec2;
+  readonly pxToMm: number;
+}): Extract<DragState, { kind: 'selection-scale' }> | null {
+  if (args.selectedObjects.length <= 1) return null;
+  const bbox = combinedBBox(args.selectedObjects);
+  if (bbox === null) return null;
+  const handle = hitAabbHandle(bbox, args.point, args.pxToMm);
+  if (handle === null) return null;
+  return {
+    kind: 'selection-scale',
+    handle,
+    selectionIds: args.selectedObjects.map((object) => object.id),
+  };
+}
+
 function uniqueId(id: string, index: number, ids: ReadonlyArray<string>): boolean {
   return ids.indexOf(id) === index;
 }
@@ -257,6 +328,16 @@ export function transformUpdatesForMoveDrag(
   }));
 }
 
+// Snap a move delta onto the nearest 45° axis, preserving its length —
+// the same Shift-constrain shape the pen and measure tools use (audit C4).
+const AXIS_SNAP_RADIANS = Math.PI / 4;
+function constrainMoveDelta(dx: number, dy: number): Vec2 {
+  const distance = Math.hypot(dx, dy);
+  if (distance === 0) return { x: dx, y: dy };
+  const snapped = Math.round(Math.atan2(dy, dx) / AXIS_SNAP_RADIANS) * AXIS_SNAP_RADIANS;
+  return { x: Math.cos(snapped) * distance, y: Math.sin(snapped) * distance };
+}
+
 function panTriggerForMouseDown(
   button: number,
   spaceDown: boolean,
@@ -265,51 +346,6 @@ function panTriggerForMouseDown(
   if (button === MIDDLE_BUTTON) return 'middle-button';
   if (button === RIGHT_BUTTON) return 'right-button';
   return null;
-}
-
-export function isStationaryRightPanClick(
-  drag: Extract<DragState, { kind: 'pan' }>,
-  e: { readonly clientX: number; readonly clientY: number },
-): boolean {
-  if (drag.trigger !== 'right-button') return false;
-  const dx = e.clientX - drag.startClientX;
-  const dy = e.clientY - drag.startClientY;
-  return Math.hypot(dx, dy) <= CONTEXT_CLICK_TOLERANCE_PX;
-}
-
-export function isRightButtonDoubleClick(e: {
-  readonly button: number;
-  readonly detail: number;
-}): boolean {
-  return e.button === RIGHT_BUTTON && e.detail >= 2;
-}
-
-// Convert a pan-drag mousemove into the next (panX, panY) in scene-mm.
-export function panOffsetForDrag(args: {
-  readonly drag: Extract<DragState, { kind: 'pan' }>;
-  readonly e: { readonly clientX: number; readonly clientY: number };
-  readonly canvas: HTMLCanvasElement;
-  readonly project: Project;
-  readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
-}): { readonly panX: number; readonly panY: number } {
-  const rect = args.canvas.getBoundingClientRect();
-  const cssScale = rect.width / args.canvas.width;
-  const view = computeView(
-    args.canvas.width,
-    args.canvas.height,
-    args.project.device.bedWidth,
-    args.project.device.bedHeight,
-    args.viewState,
-  );
-  if (!Number.isFinite(cssScale) || cssScale <= 0) {
-    return { panX: args.drag.startPanX, panY: args.drag.startPanY };
-  }
-  if (!Number.isFinite(view.scale) || view.scale <= 0) {
-    return { panX: args.drag.startPanX, panY: args.drag.startPanY };
-  }
-  const dxMm = (args.e.clientX - args.drag.startClientX) / cssScale / view.scale;
-  const dyMm = (args.e.clientY - args.drag.startClientY) / cssScale / view.scale;
-  return { panX: args.drag.startPanX + dxMm, panY: args.drag.startPanY + dyMm };
 }
 
 // Compute the next transform for a move/scale/rotate drag event. Pan
@@ -323,10 +359,15 @@ export function nextTransformForDrag(
   selectionAnchor?: SelectionAnchor,
 ): Transform {
   if (drag.kind === 'move') {
+    // Shift constrains the move to the nearest 45° axis (audit C4), matching
+    // the Shift-constrain the pen and measure tools already use.
+    const delta = e.shiftKey
+      ? constrainMoveDelta(point.x - drag.startScenePoint.x, point.y - drag.startScenePoint.y)
+      : { x: point.x - drag.startScenePoint.x, y: point.y - drag.startScenePoint.y };
     return {
       ...obj.transform,
-      x: drag.startTx + (point.x - drag.startScenePoint.x),
-      y: drag.startTy + (point.y - drag.startScenePoint.y),
+      x: drag.startTx + delta.x,
+      y: drag.startTy + delta.y,
     };
   }
   if (drag.kind === 'scale') {
@@ -340,10 +381,40 @@ export function nextTransformForDrag(
       ...(useCenterAnchor || selectionAnchor === undefined ? {} : { anchor: selectionAnchor }),
     });
   }
+  return rotateTransformForDrag(drag, obj, point, e.shiftKey, selectionAnchor);
+}
+
+// Relative rotate when the grab reference was captured (audit C2): apply the
+// pointer-angle delta since grab to the grab-time transform. The legacy
+// absolute path stays as a fallback for callers/tests that don't pass one.
+// (path-node drags never reach here — they're handled in the mouse layer.)
+function rotateTransformForDrag(
+  drag: Exclude<DragState, { kind: 'pan' | 'draw' | 'marquee' | 'measure' }>,
+  obj: SceneObject,
+  point: Vec2,
+  snap: boolean,
+  selectionAnchor?: SelectionAnchor,
+): Transform {
+  if (drag.kind === 'rotate') {
+    const start = drag.selectionStartTransforms?.[0];
+    if (
+      drag.rotateAnchor !== undefined &&
+      drag.startPointerAngleDeg !== undefined &&
+      start !== undefined
+    ) {
+      return rotateObjectRelative({
+        startTransform: start.transform,
+        anchor: drag.rotateAnchor,
+        startPointerAngleDeg: drag.startPointerAngleDeg,
+        dragTo: point,
+        snap,
+      });
+    }
+  }
   return rotateObjectByDrag({
     object: obj,
     dragTo: point,
-    snap: e.shiftKey,
+    snap,
     ...(selectionAnchor === undefined ? {} : { anchor: selectionAnchor }),
   });
 }

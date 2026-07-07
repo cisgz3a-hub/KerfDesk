@@ -104,6 +104,7 @@ export function buildJogCommand(params: JogParams): string {
   if (!Number.isFinite(params.feed)) {
     throw new Error('buildJogCommand: feed must be finite.');
   }
+  assertJogHasAxis(params);
   const parts: string[] = [];
   parts.push(params.relative === false ? 'G90' : 'G91');
   parts.push('G21'); // mm
@@ -166,4 +167,13 @@ function assertFiniteOptionalAxis(value: number | undefined, label: string): voi
   if (value !== undefined && !Number.isFinite(value)) {
     throw new Error(`buildJogCommand: ${label} must be finite.`);
   }
+}
+
+/** A jog with no nonzero axis would emit `$J=G91 G21 F…` — no axis word —
+ *  which GRBL rejects with error:16 on the wire. Fail loudly at the caller
+ *  instead (audit F11). Shared by the Marlin/Smoothie builders, whose
+ *  axis-less `G0 F…` would silently do nothing. */
+export function assertJogHasAxis(params: JogParams): void {
+  const moves = [params.dx, params.dy, params.dz].some((v) => typeof v === 'number' && v !== 0);
+  if (!moves) throw new Error('buildJogCommand: at least one axis distance must be nonzero.');
 }

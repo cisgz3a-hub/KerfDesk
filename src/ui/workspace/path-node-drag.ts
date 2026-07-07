@@ -1,5 +1,5 @@
 import type { Project, Vec2 } from '../../core/scene';
-import type { PathNodeRef } from '../state/path-node-edit-actions';
+import { pathNodeRefsEqual, type PathNodeRef } from '../state/path-node-edit-actions';
 import { hitPathNode } from './path-node-hit-test';
 
 export type PathNodeDragState = {
@@ -12,14 +12,27 @@ export function beginPathNodeDrag(args: {
   readonly scenePoint: Vec2;
   readonly pxToMm: number;
   readonly additive?: boolean;
+  readonly selectedPathNodes: ReadonlyArray<PathNodeRef>;
   readonly selectPathNode: (
     ref: PathNodeRef | null,
     options?: { readonly additive?: boolean },
   ) => void;
 }): PathNodeDragState | null {
   const ref = hitPathNode(args.project.scene, args.scenePoint, args.pxToMm);
-  args.selectPathNode(ref, { additive: args.additive === true });
-  return ref === null ? null : { kind: 'path-node', startScenePoint: args.scenePoint };
+  if (ref === null) {
+    args.selectPathNode(null);
+    return null;
+  }
+  // A plain click on a node already in the multi-selection keeps the whole set
+  // and drags it (audit C6) — same rule as dragging an already-selected object.
+  // Shift toggles; a click on an unselected node selects just it.
+  const alreadySelected = args.selectedPathNodes.some((selected) =>
+    pathNodeRefsEqual(selected, ref),
+  );
+  if (args.additive === true || !alreadySelected) {
+    args.selectPathNode(ref, { additive: args.additive === true });
+  }
+  return { kind: 'path-node', startScenePoint: args.scenePoint };
 }
 
 export function updatePathNodeDrag(args: {

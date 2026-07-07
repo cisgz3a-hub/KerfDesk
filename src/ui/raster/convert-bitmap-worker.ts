@@ -18,10 +18,10 @@ import type {
 const PNG_MIME = 'image/png';
 
 self.onmessage = (e: MessageEvent<ConvertBitmapWorkerRequest>): void => {
-  const { id, rasterId, vector, options } = e.data;
+  const { id, rasterId, vectors, options } = e.data;
   void (async (): Promise<void> => {
     try {
-      const raster = await assembleBitmapAsync(vector, encodeRasterInWorker, rasterId, options);
+      const raster = await assembleBitmapAsync(vectors, encodeRasterInWorker, rasterId, options);
       const response: ConvertBitmapWorkerResponse = { id, kind: 'ok', raster };
       self.postMessage(response);
     } catch (err) {

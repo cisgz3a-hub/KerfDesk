@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { applyTransform, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
 import {
   hitRotateHandle,
+  objectRotateAnchor,
+  pointerAngleDeg,
   ROTATE_HANDLE_OFFSET_MM,
+  rotateObjectRelative,
   rotateSelectionByDrag,
   rotateObjectByDrag,
   rotateHandlePosition,
@@ -66,6 +69,55 @@ describe('rotate-handle', () => {
     expect(t.rotationDeg).toBeCloseTo(90);
     expect(afterAnchor.x).toBeCloseTo(beforeAnchor.x, 6);
     expect(afterAnchor.y).toBeCloseTo(beforeAnchor.y, 6);
+  });
+
+  // Audit C2: the relative model must not move a pre-rotated object when the
+  // pointer is still at the grab angle (no jump on grab).
+  it('rotateObjectRelative leaves a pre-rotated object unmoved at the grab angle', () => {
+    const startTransform = { ...IDENTITY_TRANSFORM, rotationDeg: 30 };
+    const anchor = { x: 5, y: 5 };
+    const grab = { x: 5, y: -20 };
+    const t = rotateObjectRelative({
+      startTransform,
+      anchor,
+      startPointerAngleDeg: pointerAngleDeg(anchor, grab),
+      dragTo: grab,
+      snap: false,
+    });
+    expect(t.rotationDeg).toBeCloseTo(30, 6);
+    expect(t.x).toBeCloseTo(0, 6);
+    expect(t.y).toBeCloseTo(0, 6);
+  });
+
+  it('rotateObjectRelative adds the pointer-angle delta to the start rotation', () => {
+    const startTransform = { ...IDENTITY_TRANSFORM, rotationDeg: 30 };
+    const anchor = { x: 0, y: 0 };
+    // grab pointing +x (0°); drag to +y is +90°, so result = 30 + 90 = 120.
+    const t = rotateObjectRelative({
+      startTransform,
+      anchor,
+      startPointerAngleDeg: 0,
+      dragTo: { x: 0, y: 10 },
+      snap: false,
+    });
+    expect(t.rotationDeg).toBeCloseTo(120, 6);
+  });
+
+  it('rotateObjectRelative snaps the resulting absolute angle to 15°', () => {
+    const startTransform = { ...IDENTITY_TRANSFORM, rotationDeg: 7 };
+    const anchor = { x: 0, y: 0 };
+    const t = rotateObjectRelative({
+      startTransform,
+      anchor,
+      startPointerAngleDeg: 0,
+      dragTo: { x: 10, y: 1 }, // ~+5.7°, so 7 + 5.7 ≈ 12.7 → snaps to 15
+      snap: true,
+    });
+    expect(Number.isInteger(t.rotationDeg / 15)).toBe(true);
+  });
+
+  it('objectRotateAnchor returns the bbox center for the default anchor', () => {
+    expect(objectRotateAnchor(obj())).toEqual({ x: 5, y: 5 });
   });
 
   it('rotates every selected start transform around the shared selection center', () => {

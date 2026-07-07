@@ -1,4 +1,5 @@
 import type { NoGoZone } from '../../core/devices';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { Button } from '../kit';
 
@@ -36,6 +37,7 @@ export function SafetyZonesPanel(): JSX.Element {
         <ZoneRow
           key={zone.id}
           zone={zone}
+          index={index}
           onChange={(patch) => updateZones(replaceZone(zones, index, { ...zone, ...patch }))}
           onDelete={() => updateZones(zones.filter((candidate) => candidate.id !== zone.id))}
         />
@@ -46,6 +48,7 @@ export function SafetyZonesPanel(): JSX.Element {
 
 function ZoneRow(props: {
   readonly zone: NoGoZone;
+  readonly index: number;
   readonly onChange: (patch: Partial<NoGoZone>) => void;
   readonly onDelete: () => void;
 }): JSX.Element {
@@ -68,11 +71,27 @@ function ZoneRow(props: {
         aria-label="Safety zone name"
         title="Name for this no-go zone."
       />
-      <NumberInput label="X" value={zone.x} onChange={(x) => props.onChange({ x })} />
-      <NumberInput label="Y" value={zone.y} onChange={(y) => props.onChange({ y })} />
-      <NumberInput label="W" value={zone.width} onChange={(width) => props.onChange({ width })} />
+      <NumberInput
+        label="X"
+        ariaLabel={`Safety zone ${props.index + 1} x`}
+        value={zone.x}
+        onChange={(x) => props.onChange({ x })}
+      />
+      <NumberInput
+        label="Y"
+        ariaLabel={`Safety zone ${props.index + 1} y`}
+        value={zone.y}
+        onChange={(y) => props.onChange({ y })}
+      />
+      <NumberInput
+        label="W"
+        ariaLabel={`Safety zone ${props.index + 1} width`}
+        value={zone.width}
+        onChange={(width) => props.onChange({ width })}
+      />
       <NumberInput
         label="H"
+        ariaLabel={`Safety zone ${props.index + 1} height`}
         value={zone.height}
         onChange={(height) => props.onChange({ height })}
       />
@@ -83,18 +102,23 @@ function ZoneRow(props: {
 
 function NumberInput(props: {
   readonly label: string;
+  readonly ariaLabel: string;
   readonly value: number;
   readonly onChange: (value: number) => void;
 }): JSX.Element {
   return (
     <label style={numberLabelStyle}>
       {props.label}
-      <input
-        type="number"
+      <ClearableNumberField
+        ariaLabel={props.ariaLabel}
         value={props.value}
-        onChange={(event) => props.onChange(Number(event.target.value) || 0)}
+        min={0}
+        max={SAFETY_ZONE_MAX_MM}
+        step={1}
+        onCommit={props.onChange}
         title={`${props.label} coordinate or size in machine millimeters.`}
         style={numberStyle}
+        debounceMs={0}
       />
     </label>
   );
@@ -126,3 +150,4 @@ const rowStyle: React.CSSProperties = {
 const checkStyle: React.CSSProperties = { display: 'inline-flex', gap: 4, alignItems: 'center' };
 const numberLabelStyle: React.CSSProperties = { display: 'grid', gap: 2, fontSize: 11 };
 const numberStyle: React.CSSProperties = { width: 64 };
+const SAFETY_ZONE_MAX_MM = 100000;

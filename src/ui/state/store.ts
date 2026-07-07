@@ -4,7 +4,7 @@
 // to satisfy ADR-015's function-size rule.
 
 import { create } from 'zustand';
-import type { BoxPanel } from '../../core/box';
+import type { InsertablePart } from './box-insert-mutation';
 import type { DeviceProfile } from '../../core/devices';
 import {
   createProject,
@@ -56,6 +56,10 @@ import {
   layerDefaultActions,
   type LayerDefaultsState,
 } from './layer-default-actions';
+import {
+  airAssistDefaultActions,
+  type AirAssistDefaultActions,
+} from './air-assist-default-actions';
 import {
   MATERIAL_LIBRARY_STATE_DEFAULTS,
   currentMaterialLibraryState,
@@ -143,7 +147,8 @@ export type AppState = ObjectPropertiesActions &
   SavedLibrariesActions &
   MaterialPresetActions &
   CncLibraryActions &
-  MachineActions & {
+  MachineActions &
+  AirAssistDefaultActions & {
     readonly project: Project;
     // Last CNC machine setup, kept when toggling back to laser so the
     // choice of bit/stock survives a round-trip within the session.
@@ -210,9 +215,10 @@ export type AppState = ObjectPropertiesActions &
       traced: TracedImage,
       options?: TraceExistingImageOptions,
     ) => void;
-    // ADR-029 Convert to Bitmap: replace a selected vector with the raster
-    // engrave-source rasterized from it (LightBurn discards the original).
-    readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
+    // ADR-029 Convert to Bitmap: replace the selected vector(s) with the one
+    // raster engrave-source rasterized from them (LightBurn discards the
+    // originals; a multi-selection merges into a single bitmap).
+    readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
     // Phase D insert / update text by id; on add it's a new id, on
     // edit it replaces in place (preserves position/transform).
     readonly upsertTextObject: (text: TextObject) => void;
@@ -220,7 +226,7 @@ export type AppState = ObjectPropertiesActions &
     readonly drawShape: (shape: ShapeObject) => void;
     // Phase K (ADR-106): insert a generated box panel sheet — one polyline
     // shape per panel, one undo step, every panel selected.
-    readonly insertBoxPanels: (panels: ReadonlyArray<BoxPanel>) => void;
+    readonly insertBoxPanels: (panels: ReadonlyArray<InsertablePart>) => void;
     // ADR-057: add (or replace) the registration jig box on the reserved
     // registration layer. Width/height in mm; a new box centers on the bed, a
     // replace keeps the existing box's position and lock state.
@@ -293,6 +299,8 @@ export type AppState = ObjectPropertiesActions &
     readonly beginInteraction: () => void;
     readonly setObjectTransform: (id: string, transform: Transform) => void;
     readonly endInteraction: () => void;
+    // Roll a drag back to the pre-interaction snapshot (Esc mid-drag, audit C4).
+    readonly cancelInteraction: () => void;
     readonly applyObjectTransform: (id: string, transform: Transform) => void;
 
     readonly markSaved: (target: SaveTarget) => void;
@@ -416,6 +424,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...cncLibraryActions(set),
   ...layerActions(set),
   ...machineActions(set),
+  ...airAssistDefaultActions(set, get),
   ...fillSelectionActions(set),
   ...vectorPathActions(set),
   ...closeOpenFillContoursActions(set),

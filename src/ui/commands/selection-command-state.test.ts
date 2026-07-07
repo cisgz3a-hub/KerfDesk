@@ -7,9 +7,9 @@ import {
   type ImportedSvg,
 } from '../../core/scene';
 import {
+  selectedConvertibleVectors,
   selectionCanBreakApart,
   selectionCanWeld,
-  selectionIsSingleConvertibleVector,
 } from './selection-command-state';
 
 describe('selection command state', () => {
@@ -44,10 +44,10 @@ describe('selection command state', () => {
     expect(selectionCanWeld(project, ['low-power', 'high-power'])).toBe(false);
   });
 
-  // WORKFLOW F-F4: Convert to Bitmap operates on exactly one vector. With the
-  // command enabled for a multi-selection it silently converted only the
-  // primary object (2026-07-07 audit).
-  it('allows Convert to Bitmap only for a single-vector selection', () => {
+  // ADR-029 amendment ii: Convert to Bitmap merges the whole selection into
+  // one bitmap, so the gate is "every selected object is a convertible
+  // vector" — not just the primary (which once silently converted alone).
+  it('returns the convertible selection only when every member qualifies', () => {
     const project = {
       ...createProject(),
       scene: {
@@ -60,10 +60,34 @@ describe('selection command state', () => {
       },
     };
 
-    expect(selectionIsSingleConvertibleVector(project, ['vec-a'])).toBe(true);
-    expect(selectionIsSingleConvertibleVector(project, ['vec-a', 'vec-b'])).toBe(false);
-    expect(selectionIsSingleConvertibleVector(project, [])).toBe(false);
-    expect(selectionIsSingleConvertibleVector(project, ['missing'])).toBe(false);
+    expect(selectedConvertibleVectors(project, ['vec-a']).map((o) => o.id)).toEqual(['vec-a']);
+    expect(selectedConvertibleVectors(project, ['vec-a', 'vec-b']).map((o) => o.id)).toEqual([
+      'vec-a',
+      'vec-b',
+    ]);
+    expect(selectedConvertibleVectors(project, [])).toEqual([]);
+    // A selected id that is missing (or not a vector) disqualifies the whole
+    // selection — converting an ambiguous subset would silently drop objects.
+    expect(selectedConvertibleVectors(project, ['vec-a', 'missing'])).toEqual([]);
+  });
+
+  it('returns convertibles in scene order regardless of selection order', () => {
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: [
+          importedSvg('vec-a', squarePath('#000000', 0, 0, 10)),
+          importedSvg('vec-b', squarePath('#000000', 5, 0, 10)),
+        ],
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [],
+      },
+    };
+
+    expect(selectedConvertibleVectors(project, ['vec-b', 'vec-a']).map((o) => o.id)).toEqual([
+      'vec-a',
+      'vec-b',
+    ]);
   });
 });
 

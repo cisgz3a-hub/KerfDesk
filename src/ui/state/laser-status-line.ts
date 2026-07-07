@@ -4,6 +4,7 @@
 
 import {
   cancel as cancelStreamer,
+  wipeInFlight,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
@@ -111,7 +112,9 @@ function cancelActiveStreamerPatch(
 ): Partial<Pick<LaserState, 'streamer'>> {
   if (streamer === null) return {};
   if (!['idle', 'streaming', 'paused'].includes(streamer.status)) return {};
-  return { streamer: cancelStreamer(streamer) };
+  // Alarm = the firmware wiped its buffer; in-flight lines will never be
+  // acked, so drop them from the accounting too (audit F1).
+  return { streamer: wipeInFlight(cancelStreamer(streamer)) };
 }
 
 function shouldReleaseStreamerAtIdle(

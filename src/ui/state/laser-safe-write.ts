@@ -61,14 +61,13 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       const writeSource =
         source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
       await conn.write(line);
+      const owedAcks = owedTerminalAcks(line, writeSource);
       set((s) => ({
         transcript: appendTranscript(
           s.transcript,
           outboundTranscriptEntry(refs.nextTranscriptId++, Date.now(), line, writeSource),
         ),
-        ...(owesTerminalAck(line, writeSource)
-          ? { pendingUntrackedAcks: s.pendingUntrackedAcks + 1 }
-          : {}),
+        ...(owedAcks > 0 ? { pendingUntrackedAcks: s.pendingUntrackedAcks + owedAcks } : {}),
       }));
     } catch (err) {
       const message = serialWriteErrorMessage(err);
@@ -86,14 +85,19 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
   };
 }
 
-// Every queued (newline-terminated) write earns exactly one terminal
-// ok/error from the controller, in strict receive order. Job-stream chunks
-// are excluded: their acks belong to the streamer's RX accounting. Realtime
+// Every queued (newline-terminated) LINE earns exactly one terminal
+// ok/error from the controller, in strict receive order — and one write may
+// carry several lines (the Marlin/Smoothie jog payload is G91\nG0…\nG90\n,
+// three acks; audit F3). Count newlines, not writes. Job-stream chunks are
+// excluded: their acks belong to the streamer's RX accounting. Realtime
 // bytes (?, !, ~, 0x18, 0x85, overrides) have no newline and no ack. The
-// line handler settles the counter when the terminal ack arrives, and Start
+// line handler settles the counter as each terminal ack arrives, and Start
 // gates on it reaching zero.
-function owesTerminalAck(line: string, source: TranscriptSource): boolean {
-  return line.endsWith('\n') && source !== 'job';
+function owedTerminalAcks(line: string, source: TranscriptSource): number {
+  if (source === 'job') return 0;
+  let count = 0;
+  for (const ch of line) if (ch === '\n') count += 1;
+  return count;
 }
 
 function transcriptSourceForWrite(

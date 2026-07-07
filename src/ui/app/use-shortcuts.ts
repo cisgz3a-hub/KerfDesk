@@ -9,10 +9,7 @@
 // guard themselves (modifier checks, isEditableTarget, kind-of-event).
 
 import { useEffect, useRef } from 'react';
-import {
-  selectedObjectIds,
-  selectionIsSingleConvertibleVector,
-} from '../commands/selection-command-state';
+import { selectedConvertibleVectors, selectedObjectIds } from '../commands/selection-command-state';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -86,13 +83,13 @@ function useFileEditShortcuts(): void {
 }
 
 // Ctrl/Cmd+Shift+B (LightBurn's Convert to Bitmap binding). Same gate as the
-// Tools command: exactly one convertible vector selected — otherwise the
-// chord is a no-op, mirroring the disabled menu item. State is read at call
-// time so the handler never closes over a stale selection.
+// Tools command: every selected object is a convertible vector — otherwise
+// the chord is a no-op, mirroring the disabled menu item. State is read at
+// call time so the handler never closes over a stale selection.
 function openConvertToBitmap(): void {
   const s = useStore.getState();
   const ids = selectedObjectIds(s.selectedObjectId, s.additionalSelectedIds);
-  if (!selectionIsSingleConvertibleVector(s.project, ids)) return;
+  if (selectedConvertibleVectors(s.project, ids).length === 0) return;
   useUiStore.getState().openConvertBitmapDialog();
 }
 

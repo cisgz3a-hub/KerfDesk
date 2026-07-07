@@ -10,17 +10,21 @@ import { hasUnsettledStreamAcks } from './laser-store-helpers';
 import type { AckOwner, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 
 // Every queued non-job write owes exactly one terminal ok/error, in strict
-// receive order. Settle the pending counter for this line — whichever
-// consumer ends up handling it — so startJob can gate on the drain. When the
-// streamer has no acks outstanding, a pending untracked write owns this ack
-// outright and it must not reach advanceStream: a stale ok fed to a fresh
-// job stream frees RX budget GRBL has not freed (phantom refill past the
-// real buffer).
+// receive order. While the streamer still has unsettled acks, the earliest
+// terminal ack belongs to the stream (job lines hit the wire before any
+// stop-cleanup write), so the untracked ledger must NOT settle on it — one
+// physical ok settling both ledgers made the counter reach zero while a
+// real untracked ack was still in flight, so Start's arming gate opened one
+// ack early and the stale ok phantom-advanced the next job (audit F1). Only
+// an ack the stream cannot own settles the counter; it must then not reach
+// advanceStream either — a stale ok fed to a fresh job stream frees RX
+// budget GRBL has not freed (phantom refill past the real buffer).
 export function settleUntrackedAck(set: SetFn, state: LaserState, clsKind: string): AckOwner {
   const isTerminalAck = clsKind === 'ok' || clsKind === 'error';
   if (!isTerminalAck || state.pendingUntrackedAcks === 0) return 'stream';
+  if (hasUnsettledStreamAcks(state.streamer)) return 'stream';
   set((s) => ({ pendingUntrackedAcks: Math.max(0, s.pendingUntrackedAcks - 1) }));
-  return hasUnsettledStreamAcks(state.streamer) ? 'stream' : 'untracked';
+  return 'untracked';
 }
 
 export function advanceStream(

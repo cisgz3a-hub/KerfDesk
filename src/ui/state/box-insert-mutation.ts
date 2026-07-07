@@ -5,7 +5,6 @@
 // name. All panels land on one cut-layer color (auto-created on demand),
 // every inserted panel is selected, and ONE undo entry removes the sheet.
 
-import type { BoxPanel } from '../../core/box';
 import {
   addObject,
   IDENTITY_TRANSFORM,
@@ -30,9 +29,16 @@ const BOX_PANEL_COLOR = '#000000';
 // replace-by-source semantics cannot trigger on generated panels.
 const BOX_PANEL_SOURCE_PREFIX = 'Box panel: ';
 
+/** Any generated part with a name and rings (box panels, fit coupons). */
+export type InsertablePart = {
+  readonly name: string;
+  readonly outline: Polyline;
+  readonly cutouts: ReadonlyArray<Polyline>;
+};
+
 export function applyInsertBoxPanels(
   s: StateSlice,
-  panels: ReadonlyArray<BoxPanel>,
+  panels: ReadonlyArray<InsertablePart>,
 ): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
   const objects = panels.map(panelObject);
   let scene = s.project.scene;
@@ -50,7 +56,7 @@ export function applyInsertBoxPanels(
   };
 }
 
-function panelObject(panel: BoxPanel): ImportedSvg {
+function panelObject(panel: InsertablePart): ImportedSvg {
   const polylines = [panel.outline, ...panel.cutouts];
   return {
     kind: 'imported-svg',

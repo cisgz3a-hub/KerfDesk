@@ -1,8 +1,8 @@
-// NumberField — a clearable numeric input. Shows your keystrokes (including an
+// NumberField - a clearable numeric input. Shows your keystrokes (including an
 // empty box while you retype), commits a clamped number once a valid one is
 // typed, and restores the last committed value on blur if left blank. Wraps the
 // shared useDebouncedCommit so every ad-hoc numeric input can adopt the same
-// clear-to-retype behaviour instead of re-implementing parse-and-commit — the
+// clear-to-retype behaviour instead of re-implementing parse-and-commit - the
 // source of the "can't erase the box" bug across the app.
 
 import { useDebouncedCommit } from '../layers/use-debounced-commit';
@@ -17,7 +17,7 @@ export function NumberField(props: {
   readonly title?: string;
   readonly onCommit: (value: number) => void;
   readonly style?: React.CSSProperties;
-  // Local-state fields (no store undo) can pass 0 to commit on the next tick.
+  // Local-state fields (no store undo) can pass 0 to commit valid input immediately.
   readonly debounceMs?: number;
 }): JSX.Element {
   const debounced = useDebouncedCommit<number>({

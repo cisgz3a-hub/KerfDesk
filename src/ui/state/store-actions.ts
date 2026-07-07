@@ -208,12 +208,21 @@ export function interactionActions(
   set: Setter,
 ): Pick<
   AppState,
-  'beginInteraction' | 'setObjectTransform' | 'endInteraction' | 'applyObjectTransform'
+  | 'beginInteraction'
+  | 'setObjectTransform'
+  | 'endInteraction'
+  | 'cancelInteraction'
+  | 'applyObjectTransform'
 > {
   return {
     beginInteraction: () => set((s) => ({ pendingUndo: s.project })),
     setObjectTransform: (id, transform) =>
       set((s) => ({ project: applyTransformToScene(s.project, id, transform), dirty: true })),
+    // Esc mid-drag: restore the pre-interaction project snapshot and drop it,
+    // pushing no undo entry (the drag never happened). No-op if nothing was
+    // snapshotted (audit C4).
+    cancelInteraction: () =>
+      set((s) => (s.pendingUndo === null ? {} : { project: s.pendingUndo, pendingUndo: null })),
     endInteraction: () =>
       set((s) => {
         if (s.pendingUndo === null) return s;
