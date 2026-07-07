@@ -5186,3 +5186,74 @@ np-house-H / np-house-all / np-lang-all read and compared against the
 baseline (serifs hug, letters legible, counters present) — the maintainer
 saw the prototype renders and approved the architecture before
 implementation; the final engine renders await the maintainer's own pass.
+
+## ADR-116 — Machine-camera frames ride the loopback bridge: /frame.jpg proxy + server-side discovery (Camera, 2026-07-07)
+
+**Status:** accepted (maintainer-directed: "fix my camera — it has to work like a real camera for a laser machine").
+
+### Context
+
+Camera Mode v1–v4 (ADR-107..110) shipped with two frame paths: getUserMedia
+MediaStreams (USB webcams) and a direct `<img>` poll of the machine camera's
+HTTP snapshot URL (`http://192.168.10.x:8080/media/getCapturePhoto`). The
+maintainer's machine camera hit two walls the synthetic suites never touched:
+
+1. Every pixel-consuming feature — lens calibration, auto-align, update
+   still, trace-from-camera — was gated on `stream.kind === 'live'`, i.e. a
+   MediaStream. A network camera never produces one, so "Calibrate lens…"
+   was permanently disabled ("calibration didn't even work"), and the
+   camera's CORS-less frames taint any canvas regardless.
+2. Both production CSPs (electron/main.ts and public/_headers) allow img-src
+   only from 'self' + http://127.0.0.1:51731 — the direct `<img>` poll and
+   its discovery probe were CSP-blocked in the desktop app and on the
+   deployed site. The machine camera only ever displayed on the bare Vite
+   dev server. All camera surfaces were subsequently hidden (f247a3b).
+
+The RTSP bridge (127.0.0.1:51731) already solves every transport problem for
+one protocol: loopback is exempt from mixed-content blocking, both CSPs
+allow it, it sends CORS headers for trusted app origins (S03-001 gate), and
+the desktop app auto-starts it.
+
+### Decision
+
+Every machine-camera byte rides the bridge; no CSP changes anywhere.
+
+- `GET /frame.jpg?url=…` proxies one camera frame with the bridge's CORS
+  headers, making machine frames pixel-readable in every deployment target.
+  Policy (`camera-frame-proxy-policy.ts`): http/https/rtsp only, loopback or
+  RFC1918 hosts only (shared `private-network-host-policy.ts`), the bridge's
+  own port refused (recursion), `redirect: 'error'` server-side (SSRF).
+  http(s) = plain GET pipe-through — a Falcon-style JPEG camera needs no
+  ffmpeg; rtsp = `ffmpeg -frames:v 1` single JPEG, so still capture never
+  depends on Chromium's MJPEG-in-canvas semantics.
+- `GET /discover` probes the Falcon candidate hosts server-side and returns
+  the camera URL plus its proxied frame URL; the browser-side `Image()`
+  probe stays dev-server-only fallback.
+- `/health` reports `frameProxy: true`; OPTIONS acknowledges Chrome's
+  Private Network Access preflight (`Access-Control-Allow-Private-Network`).
+- The UI consumes frames through an `ActiveCameraSource` discriminated union
+  (usb MediaStream | machine-jpeg | machine-rtsp) with one
+  `captureSourceFrame()` — machine capture is fetch+decode of the proxied
+  frame, never `<img>` scraping. Downstream consumers (calibration wizard,
+  auto-align, still overlay, trace, snapshot) accept any source. (Lands
+  across the FrameSource PRs; this ADR covers the architecture.)
+
+### Consequences
+
+- A JPEG machine camera gets the full feature set with zero installs; RTSP
+  cameras additionally need ffmpeg on PATH (bridge reports availability, UI
+  says so instead of dying).
+- Browser-mode users must run `pnpm camera:bridge`; LaserForge Desktop
+  starts the bridge automatically.
+- The Falcon candidate host list is knowingly duplicated in
+  `camera-frame-proxy.ts` (electron cannot import from src/); update both
+  with `src/platform/web/web-camera.ts` together.
+
+### Verification
+
+Policy accept/reject tables; the real bridge server on an ephemeral port
+against a stub upstream camera (content-type passthrough, JPEG-magic
+fallback, upstream 500/timeout → unavailable, untrusted Origin 403 before
+any upstream request, PNA echo, discovery found/null). Hardware pass against
+the maintainer's live machine camera is tracked per-flow in AUDIT.md
+(CLAIMED until the on-bed checkpoint runs).
