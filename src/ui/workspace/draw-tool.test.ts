@@ -76,7 +76,7 @@ describe('commitDraftShape', () => {
     useUiStore.getState().setToolMode({ kind: 'select' });
   });
 
-  it('commits the current draft and stays armed in the draw tool', () => {
+  it('commits the current draft and returns to the Select tool', () => {
     const drawShape = vi.fn();
     const draft = draftForDrawDrag(DRAG, { x: 10, y: 5 }, twoLayerProject());
     useUiStore.getState().setDraftShape(draft);
@@ -86,9 +86,8 @@ describe('commitDraftShape', () => {
 
     expect(drawShape).toHaveBeenCalledTimes(1);
     expect(useUiStore.getState().draftShape).toBeNull();
-    // Sticky tool: stay in the draw tool for back-to-back shapes (LightBurn
-    // parity + ADR-051 J3). Esc / Select / clicking the active tool exit.
-    expect(useUiStore.getState().toolMode).toEqual({ kind: 'draw', shape: 'rect' });
+    // Drawing a shape returns to Select (maintainer request, 2026-07-07).
+    expect(useUiStore.getState().toolMode).toEqual({ kind: 'select' });
   });
 
   it('does not leave draw mode on a no-op click with no significant draft', () => {
