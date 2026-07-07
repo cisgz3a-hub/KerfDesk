@@ -780,7 +780,7 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 
 ### F-C7. Device Setup wizard (connect-time)
 
-The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092). Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
+The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092), or from the cross-link **Machine Setup → Overview → Run guided setup** (same wizard, same draft-commit; still never auto-opens). The Laser-panel button carries primary emphasis only while the connected machine has not been set up yet (the FU-4 nudge state); once setup is recorded it renders with normal weight. Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
 
 #### Success — connected machine answers `$$`
 1. Operator clicks **Set up device** while connected.
