@@ -5,7 +5,11 @@
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fetchFrameBytes, handleDiscoverRequest } from './camera-frame-proxy';
+import {
+  fetchFrameBytes,
+  fetchFrameBytesQueued,
+  handleDiscoverRequest,
+} from './camera-frame-proxy';
 import { startLocalRtspCameraBridge, type RtspCameraBridgeHandle } from './rtsp-camera-bridge';
 
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
@@ -175,6 +179,40 @@ describe('machine camera discovery', () => {
       probeTimeoutMs: 500,
     });
     expect(body).toEqual({ kind: 'ok', found: null });
+  });
+});
+
+describe('upstream serialization (single-threaded embedded cameras)', () => {
+  it('never lets two requests hit the same host concurrently, but shares identical URLs', async () => {
+    let active = 0;
+    let maxActive = 0;
+    let hits = 0;
+    const upstream = createServer((req, res) => {
+      hits += 1;
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      setTimeout(() => {
+        active -= 1;
+        res.writeHead(200, { 'Content-Type': 'image/jpeg' });
+        res.end(JPEG_BYTES);
+      }, 40);
+    });
+    const port = await listenEphemeral(upstream);
+    const urlA = `http://127.0.0.1:${port}/a`;
+    const urlB = `http://127.0.0.1:${port}/b`;
+
+    // Two identical URLs (shared in-flight) + one different URL (queued).
+    const [a1, a2, b] = await Promise.all([
+      fetchFrameBytesQueued(urlA, 2000),
+      fetchFrameBytesQueued(urlA, 2000),
+      fetchFrameBytesQueued(urlB, 2000),
+    ]);
+    expect(a1.kind).toBe('ok');
+    expect(a2.kind).toBe('ok');
+    expect(b.kind).toBe('ok');
+    expect(maxActive).toBe(1); // serialized per host
+    expect(hits).toBe(2); // the identical pair shared one upstream fetch
+    await closeServer(upstream);
   });
 });
 
