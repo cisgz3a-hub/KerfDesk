@@ -18,6 +18,16 @@ describe('camera-align-wizard-store', () => {
     expect(useCameraAlignWizardStore.getState().step).toEqual({ kind: 'setup', note: null });
   });
 
+  it('minimize toggles and is cleared on open/close', () => {
+    const store = useCameraAlignWizardStore.getState();
+    store.openWizard();
+    expect(useCameraAlignWizardStore.getState().minimized).toBe(false);
+    store.toggleMinimized();
+    expect(useCameraAlignWizardStore.getState().minimized).toBe(true);
+    store.closeWizard();
+    expect(useCameraAlignWizardStore.getState().minimized).toBe(false);
+  });
+
   it('clamps engrave settings to sane bounds (and rejects NaN)', () => {
     const store = useCameraAlignWizardStore.getState();
     store.setPowerPercent(250);

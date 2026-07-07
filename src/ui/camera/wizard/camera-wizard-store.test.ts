@@ -97,4 +97,15 @@ describe('camera-wizard-store', () => {
     useCameraWizardStore.getState().setSpec({ rows: 5, cols: 8 });
     expect(useCameraWizardStore.getState().session.captures).toHaveLength(0);
   });
+
+  it('minimize toggles, opening starts expanded, and closing clears it', () => {
+    expect(useCameraWizardStore.getState().minimized).toBe(false);
+    useCameraWizardStore.getState().toggleMinimized();
+    expect(useCameraWizardStore.getState().minimized).toBe(true);
+    useCameraWizardStore.getState().closeWizard();
+    expect(useCameraWizardStore.getState().minimized).toBe(false);
+    useCameraWizardStore.getState().toggleMinimized();
+    useCameraWizardStore.getState().openWizard();
+    expect(useCameraWizardStore.getState().minimized).toBe(false);
+  });
 });
