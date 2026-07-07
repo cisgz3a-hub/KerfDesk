@@ -25,6 +25,9 @@ export type CaptureRejection = 'not-found' | 'resolution-changed';
 
 export type CameraWizardStore = {
   readonly open: boolean;
+  // Collapsed to a small non-modal panel so the operator can watch the camera
+  // and reach the machine while capturing (F-CAM2 fixed-camera workflow).
+  readonly minimized: boolean;
   readonly step: WizardStep;
   readonly spec: CheckerboardSpec;
   readonly spacingMm: number;
@@ -42,6 +45,7 @@ export type CameraWizardStore = {
 
   readonly openWizard: () => void;
   readonly closeWizard: () => void;
+  readonly toggleMinimized: () => void;
   readonly setSpec: (spec: CheckerboardSpec) => void;
   readonly setSpacingMm: (mm: number) => void;
   readonly setAutoCapture: (on: boolean) => void;
@@ -66,6 +70,7 @@ const SOLVE_MAX_ITERATIONS = 600;
 
 const INITIAL = {
   open: false,
+  minimized: false,
   step: 'setup' as WizardStep,
   spec: DEFAULT_SPEC,
   spacingMm: DEFAULT_SPACING_MM,
@@ -84,7 +89,8 @@ export const useCameraWizardStore = create<CameraWizardStore>((set, get) => ({
   ...INITIAL,
 
   openWizard: () => set({ ...INITIAL, open: true }),
-  closeWizard: () => set({ open: false }),
+  closeWizard: () => set({ open: false, minimized: false }),
+  toggleMinimized: () => set((s) => ({ minimized: !s.minimized })),
   setSpec: (spec) => set({ spec, session: emptySession(), lastRejection: null }),
   setSpacingMm: (mm) => set({ spacingMm: mm }),
   setAutoCapture: (on) => set({ autoCapture: on }),

@@ -23,6 +23,9 @@ export type DetectStatus =
 
 export type CameraAlignWizardStore = {
   readonly open: boolean;
+  // Collapsed to a small non-modal panel so the operator can watch the
+  // machine burn and reach the bed while the wizard stays live (F-CAM9).
+  readonly minimized: boolean;
   readonly step: AlignWizardStep;
   // Engrave settings for the marker burn; editable in setup, clamped sane.
   readonly powerPercent: number;
@@ -30,6 +33,7 @@ export type CameraAlignWizardStore = {
 
   readonly openWizard: () => void;
   readonly closeWizard: () => void;
+  readonly toggleMinimized: () => void;
   readonly setPowerPercent: (value: number) => void;
   readonly setSpeedMmPerMin: (value: number) => void;
   readonly setStep: (step: AlignWizardStep) => void;
@@ -47,12 +51,14 @@ const INITIAL_STEP: AlignWizardStep = { kind: 'setup', note: null };
 
 export const useCameraAlignWizardStore = create<CameraAlignWizardStore>((set) => ({
   open: false,
+  minimized: false,
   step: INITIAL_STEP,
   powerPercent: DEFAULT_POWER_PERCENT,
   speedMmPerMin: DEFAULT_SPEED_MM_PER_MIN,
 
-  openWizard: () => set({ open: true, step: INITIAL_STEP }),
-  closeWizard: () => set({ open: false, step: INITIAL_STEP }),
+  openWizard: () => set({ open: true, minimized: false, step: INITIAL_STEP }),
+  closeWizard: () => set({ open: false, minimized: false, step: INITIAL_STEP }),
+  toggleMinimized: () => set((s) => ({ minimized: !s.minimized })),
   setPowerPercent: (value) =>
     set({ powerPercent: clamp(value, MIN_POWER_PERCENT, MAX_POWER_PERCENT) }),
   setSpeedMmPerMin: (value) =>

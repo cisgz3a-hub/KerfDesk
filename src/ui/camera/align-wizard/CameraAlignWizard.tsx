@@ -4,7 +4,7 @@
 // camera-align-wizard-store; steps are thin renderers.
 
 import { assertNever } from '../../../core/scene';
-import { Dialog } from '../../kit';
+import { CameraWizardFrame } from '../wizard/CameraWizardFrame';
 import { useCameraAlignWizardStore, type AlignWizardStep } from './camera-align-wizard-store';
 import { BurningStep, ClearBedStep, SetupStep } from './AlignWizardSteps';
 import { DetectStep, DoneStep } from './AlignWizardDetectStep';
@@ -20,18 +20,30 @@ const STEP_LABELS: ReadonlyArray<{
 
 export function CameraAlignWizard(): JSX.Element {
   const step = useCameraAlignWizardStore((s) => s.step);
+  const minimized = useCameraAlignWizardStore((s) => s.minimized);
   const closeWizard = useCameraAlignWizardStore((s) => s.closeWizard);
+  const toggleMinimized = useCameraAlignWizardStore((s) => s.toggleMinimized);
   return (
-    <Dialog title="Align camera to bed" size="lg" onClose={closeWizard}>
-      <div style={stepsRowStyle} aria-label="Wizard progress">
-        {STEP_LABELS.map((entry) => (
-          <span key={entry.kind} style={isCurrent(step, entry.kind) ? activeStepStyle : stepStyle}>
-            {entry.label}
-          </span>
-        ))}
-      </div>
+    <CameraWizardFrame
+      title="Align camera to bed"
+      minimized={minimized}
+      onToggleMinimize={toggleMinimized}
+      onExit={closeWizard}
+    >
+      {minimized ? null : (
+        <div style={stepsRowStyle} aria-label="Wizard progress">
+          {STEP_LABELS.map((entry) => (
+            <span
+              key={entry.kind}
+              style={isCurrent(step, entry.kind) ? activeStepStyle : stepStyle}
+            >
+              {entry.label}
+            </span>
+          ))}
+        </div>
+      )}
       <StepBody step={step} />
-    </Dialog>
+    </CameraWizardFrame>
   );
 }
 
