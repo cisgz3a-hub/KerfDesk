@@ -58,6 +58,24 @@ const SHARPEN_MAX_CHAIN_POINTS = 4096;
 // genuine stem corners still break the spline, bowls stay round.
 const SHARPEN_MIN_CHAIN_POINTS = 260;
 const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
+// Neutral Smoothness when the dialog value is absent or non-finite.
+const DEFAULT_SMOOTHNESS = 1;
+
+/** The dialog's Smoothness knob doubles as the wobble-flattening / arc-
+ *  evening strength. Default ON at the conservative 1px amplitude cap — the
+ *  earlier default-off mapping left nominally straight stems visibly wobbly
+ *  on thresholded real sources (maintainer verdict, 2026-07-07). The
+ *  max(0, 6s − 5) ramp keeps Sharp's 0.55 (anything ≤ ~0.83) fully off for
+ *  pixel-fidelity work, reaches the 1px baseline at the neutral default 1,
+ *  and scales to ~3px erase at the slider max 1.33 for rough screenshots and
+ *  scans. Drawn waves above the amplitude cap are never touched (see the
+ *  oscillation gate in flatten-straight-runs.ts). A non-finite Smoothness
+ *  falls back to the default rather than yielding NaN — NaN would silently
+ *  disable BOTH amplitude caps downstream instead of clamping to 0. */
+export function flattenStrengthFromSmoothness(smoothness: number | undefined): number {
+  const s = Number.isFinite(smoothness) ? (smoothness as number) : DEFAULT_SMOOTHNESS;
+  return Math.max(0, 6 * s - 5);
+}
 
 /** Trace filled ink regions as smooth closed outlines (holes stay hollow
  *  via even-odd filling downstream). */
@@ -70,16 +88,7 @@ export function traceImageToContourColoredPaths(
   const polylines = contourPolylinesFromMask(mask, {
     minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0),
     epsilonPx: SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1),
-    // The dialog's Smoothness knob doubles as wobble-flattening strength.
-    // Default ON at the conservative 1px amplitude cap — the earlier
-    // default-off mapping left nominally straight stems visibly wobbly on
-    // thresholded real sources (maintainer verdict, 2026-07-07). The
-    // max(0, 6s − 5) ramp keeps Sharp's 0.55 (anything ≤ ~0.83) fully off
-    // for pixel-fidelity work, reaches the 1px baseline at the neutral
-    // default 1, and scales to ~3px erase at the slider max 1.33 for rough
-    // screenshots and scans. Drawn waves above the amplitude cap are never
-    // touched — see the oscillation gate in flatten-straight-runs.ts.
-    flattenStrength: Math.max(0, 6 * (options.smoothness ?? 1) - 5),
+    flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
   });
   return polylines.length === 0 ? [] : [{ color: CONTOUR_COLOR, polylines }];
 }

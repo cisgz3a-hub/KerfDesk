@@ -19,7 +19,7 @@
 // parameters from them (see the derivation constants below).
 
 import type { ColoredPath } from '../scene';
-import { contourPolylinesFromMask } from './contour-trace';
+import { contourPolylinesFromMask, flattenStrengthFromSmoothness } from './contour-trace';
 import { localContrastInkBitmap } from './local-contrast-mask';
 import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
 import type { RawImageData, TraceOptions } from './trace-image';
@@ -68,7 +68,7 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
       minAreaPx: Math.max(2, Math.round(options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX)),
       epsilonPx: EDGE_SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1),
       // Same Smoothness → flatten-strength ramp as the contour lane.
-      flattenStrength: Math.max(0, 6 * (options.smoothness ?? 1) - 5),
+      flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
     },
   );
   return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];

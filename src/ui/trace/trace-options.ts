@@ -153,8 +153,8 @@ export function hasAggressivePreprocessing(options: TraceOptions): boolean {
 // trace choices. Returns a fresh object and never mutates the caller.
 //
 // fixedPalette is intentionally KEPT (M10, AUDIT-2026-06-10): deleting it
-// switched a two-color preset's zero-paths retry off the potrace backend
-// into imagetracerjs with no palette — whose adaptive quantizer collapses
+// switched a two-color preset's zero-paths retry off the binary contour
+// backend into imagetracerjs with no palette — whose adaptive quantizer collapses
 // to black/black on binary input (samplepalette2 mid-row seeds +
 // colorquantcycles:1 disabling every recovery), committing a full-frame
 // rectangle instead of an honest "no paths". The retry must stay on the
