@@ -38,7 +38,7 @@ import { useCncRemovalGrid } from './use-cnc-removal-grid';
 import type { RemovalGrid } from '../../core/sim';
 import { finishDrawToolOnLeftDoubleClick } from './finish-draw-tool';
 import { useDragMove } from './use-workspace-drag';
-import { clientToCanvasPx, zoomAtCursorPx } from './view-transform';
+import { useWorkspaceWheelZoom } from './use-workspace-wheel';
 import { useJobEstimate } from '../laser/use-job-estimate';
 
 export function Workspace(): JSX.Element {
@@ -54,7 +54,6 @@ export function Workspace(): JSX.Element {
   const showPreviewTravel = useUiStore((s) => s.showPreviewTravel);
   const toolMode = useUiStore((s) => s.toolMode);
   const viewState = useViewState();
-  const { zoomFactor, panX, panY } = viewState;
   const previewToolpath = usePreviewToolpath(project, previewMode);
   usePreviewPlayback(previewMode, previewToolpath);
   const cncRemovalGrid = useCncRemovalGrid(project, previewMode, previewToolpath, scrubberT);
@@ -78,6 +77,7 @@ export function Workspace(): JSX.Element {
   });
 
   const { handlers, dragKind } = useDragMove(ref, project, previewMode, viewState);
+  useWorkspaceWheelZoom(ref);
   useDropPenDraftOnProjectReplace(project);
   const dragOverlay = useUiStore((s) => s.dragOverlay);
   return (
@@ -91,7 +91,6 @@ export function Workspace(): JSX.Element {
         onMouseUp={handlers.onMouseUp}
         onMouseLeave={handlers.onMouseUp}
         onDoubleClick={handleCanvasDoubleClick}
-        onWheel={(e) => onCanvasWheel(e, ref.current, project, { zoomFactor, panX, panY })}
         onContextMenu={suppressCanvasContextMenu}
         style={canvasStyle}
         aria-label={`${APP_DISPLAY_NAME} workspace`}
@@ -147,16 +146,6 @@ function useDropPenDraftOnProjectReplace(project: Project): void {
 
 function suppressCanvasContextMenu(e: React.MouseEvent<HTMLCanvasElement>): void {
   e.preventDefault();
-}
-
-function onCanvasWheel(
-  e: React.WheelEvent<HTMLCanvasElement>,
-  canvas: HTMLCanvasElement | null,
-  project: Project,
-  viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number },
-): void {
-  useUiStore.getState().closeWorkspaceContextBar();
-  handleCanvasWheel(e, canvas, project, viewState);
 }
 
 function WorkspacePreviewOverlays(props: {
@@ -305,36 +294,6 @@ function useWorkspaceDraw(args: {
     selectionMarquee,
     snapGuides,
   ]);
-}
-
-// Wheel-to-zoom anchored at the cursor. Three wheel sources fire
-// here: plain mouse-wheel, Ctrl+wheel (mouse), and trackpad pinch
-// (browsers convert pinch into a wheel event with ctrlKey true). All
-// three zoom at the cursor — the bed-center-anchored zoomBy felt
-// unmoored when the user's attention was in a corner.
-//
-// Module-level so the Workspace function stays under the line cap and
-// the prop reference is stable across renders.
-function handleCanvasWheel(
-  e: React.WheelEvent<HTMLCanvasElement>,
-  canvas: HTMLCanvasElement | null,
-  project: Project,
-  view: { readonly zoomFactor: number; readonly panX: number; readonly panY: number },
-): void {
-  e.preventDefault();
-  if (canvas === null) return;
-  const cursorPx = clientToCanvasPx(e, canvas);
-  if (cursorPx === null) return;
-  const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-  const next = zoomAtCursorPx({
-    cursorPx,
-    factor,
-    canvas: { width: canvas.width, height: canvas.height },
-    bed: { width: project.device.bedWidth, height: project.device.bedHeight },
-    view,
-  });
-  useUiStore.getState().setZoom(next.zoomFactor);
-  useUiStore.getState().setPan(next.panX, next.panY);
 }
 
 // Phase G (B6) — double-click exits sticky shape tools; in pen mode it finishes
