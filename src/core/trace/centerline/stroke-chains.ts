@@ -203,6 +203,15 @@ function closingSegmentLength(points: ReadonlyArray<Vec2>): number {
 const TAUBIN_LAMBDA = 0.5;
 const TAUBIN_MU = -0.53;
 
+/** The same two shrink-free Taubin passes `prepareChains` applies to every
+ *  raw dense chain before the corner/evening stages. Exported for the contour
+ *  tracer, whose boundary chains need the identical pre-conditioning. */
+export function smoothRawChain(points: ReadonlyArray<Vec2>, closed: boolean): Vec2[] {
+  const chain: Chain = { points: [...points], closed, alive: true };
+  smoothChain(chain);
+  return chain.points;
+}
+
 function smoothChain(chain: Chain): void {
   for (let pass = 0; pass < SMOOTHING_PASSES; pass += 1) {
     smoothingStep(chain, TAUBIN_LAMBDA);

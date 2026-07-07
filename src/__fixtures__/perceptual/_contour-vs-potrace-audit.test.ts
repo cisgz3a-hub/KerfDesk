@@ -15,7 +15,7 @@
 import { it } from 'vitest';
 import type { ColoredPath } from '../../core/scene';
 import type { TraceOptions } from '../../core/trace';
-import { TRACE_PRESETS } from '../../core/trace';
+import { TRACE_PRESETS, traceImageToColoredPaths } from '../../core/trace';
 import { traceImageToContourColoredPaths } from '../../core/trace/contour-trace';
 import { traceImageToPotraceColoredPaths } from '../../core/trace/potrace-trace';
 import { preprocessForTrace } from '../../core/trace/trace-image';
@@ -24,7 +24,7 @@ import { writePerceptualArtifact } from './png';
 import { decodePngFile } from './png-decode';
 import { rasterizeColoredPaths, type Mask } from './rasterize';
 import { PERCEPTUAL_FIXTURES } from './shapes';
-import { requiredArchHouseFixtureStatus } from './trace-artifact-runner';
+import { buildTraceArtifact, requiredArchHouseFixtureStatus } from './trace-artifact-runner';
 
 const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
@@ -142,6 +142,101 @@ it.skipIf(!RUN_TRACE_AUDIT)(
     process.stdout.write(`${lines.join('\n')}\n`);
   },
 );
+
+// Solid-O reproduction: the maintainer's in-app test lost the HOUSE "O"
+// counter. Counts hole candidates (closed loops contained in another loop)
+// per backend, both called directly and through the full dispatcher (the
+// app's path, including auto-upscale), to localize where holes die.
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'hole-candidate counts: direct backends vs full dispatcher',
+  { timeout: 240_000 },
+  async () => {
+    const fixture = requiredArchHouseFixtureStatus();
+    if (fixture.path === null) throw new Error(`Missing fixture: ${fixture.expectedPathGlob}`);
+    const image = decodePngFile(fixture.path);
+    const runs: Array<readonly [string, ColoredPath[]]> = [
+      ['potrace-direct', traceImageToPotraceColoredPaths(image, LINE_ART)],
+      ['contour-direct', traceImageToContourColoredPaths(image, LINE_ART)],
+      ['dispatcher    ', await traceImageToColoredPaths(image, LINE_ART)],
+    ];
+    const lines: string[] = ['', 'arch-house hole candidates'];
+    for (const [label, paths] of runs) {
+      const artifact = buildTraceArtifact({
+        name: `contour-audit-holes-${label.trim()}`,
+        mode: 'filled-contours',
+        source: { width: image.width, height: image.height },
+        paths,
+      });
+      lines.push(
+        `  ${label}: holes ${artifact.metrics.holeCandidateCount}  ` +
+          `closed ${artifact.metrics.closedPolylineCount}  ` +
+          `small ${artifact.metrics.smallClosedPolylineCount}`,
+      );
+    }
+    process.stdout.write(`${lines.join('\n')}\n`);
+  },
+);
+
+// Localize the one hole potrace keeps and contour loses: list hole-candidate
+// bounding boxes per backend and print the unmatched ones.
+it.skipIf(!RUN_TRACE_AUDIT)('which hole differs', { timeout: 240_000 }, () => {
+  const fixture = requiredArchHouseFixtureStatus();
+  if (fixture.path === null) throw new Error(`Missing fixture: ${fixture.expectedPathGlob}`);
+  const image = decodePngFile(fixture.path);
+  const potrace = holeBounds(traceImageToPotraceColoredPaths(image, LINE_ART));
+  const contour = holeBounds(traceImageToContourColoredPaths(image, LINE_ART));
+  const unmatched = potrace.filter((p) => !contour.some((c) => boundsClose(p, c, 6)));
+  const extra = contour.filter((c) => !potrace.some((p) => boundsClose(c, p, 6)));
+  process.stdout.write(
+    `\npotrace holes ${potrace.length}, contour holes ${contour.length}\n` +
+      `missing in contour: ${JSON.stringify(unmatched)}\n` +
+      `extra in contour: ${JSON.stringify(extra)}\n`,
+  );
+});
+
+type Bounds = { x0: number; y0: number; x1: number; y1: number };
+
+function holeBounds(paths: ColoredPath[]): Bounds[] {
+  const loops = paths
+    .flatMap((p) => p.polylines)
+    .filter((p) => p.closed)
+    .map((p) => bounds(p.points));
+  return loops
+    .filter((b) => loops.some((outer) => outer !== b && contains(outer, b)))
+    .map((b) => ({
+      x0: Math.round(b.x0),
+      y0: Math.round(b.y0),
+      x1: Math.round(b.x1),
+      y1: Math.round(b.y1),
+    }));
+}
+
+function bounds(points: ReadonlyArray<{ x: number; y: number }>): Bounds {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const p of points) {
+    x0 = Math.min(x0, p.x);
+    y0 = Math.min(y0, p.y);
+    x1 = Math.max(x1, p.x);
+    y1 = Math.max(y1, p.y);
+  }
+  return { x0, y0, x1, y1 };
+}
+
+function contains(outer: Bounds, inner: Bounds): boolean {
+  return inner.x0 > outer.x0 && inner.y0 > outer.y0 && inner.x1 < outer.x1 && inner.y1 < outer.y1;
+}
+
+function boundsClose(a: Bounds, b: Bounds, tolerance: number): boolean {
+  return (
+    Math.abs(a.x0 - b.x0) <= tolerance &&
+    Math.abs(a.y0 - b.y0) <= tolerance &&
+    Math.abs(a.x1 - b.x1) <= tolerance &&
+    Math.abs(a.y1 - b.y1) <= tolerance
+  );
+}
 
 function cropMask(mask: Mask, band: { x0: number; y0: number; x1: number; y1: number }): Mask {
   const width = band.x1 - band.x0;
