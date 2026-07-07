@@ -38,6 +38,13 @@ describe('parseStatusReport — happy paths', () => {
     expect(r?.subState).toBe(0);
   });
 
+  // grblHAL reports `Tool` during an M6 tool change; vanilla GRBL never
+  // does. Unrecognized states drop the whole report (audit F11).
+  it('parses the grblHAL Tool state', () => {
+    const r = parseStatusReport('<Tool|MPos:1.000,2.000,0.000|FS:0,0>');
+    expect(r?.state).toBe('Tool');
+  });
+
   it('parses Door:1 substate', () => {
     const r = parseStatusReport('<Door:1|WPos:0.000,0.000,0.000|FS:0,0>');
     expect(r?.state).toBe('Door');

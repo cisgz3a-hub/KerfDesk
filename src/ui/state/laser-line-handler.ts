@@ -31,15 +31,10 @@ import { frameHitLimitNotice } from './laser-safety-notice';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { advanceStream, settleUntrackedAck } from './laser-stream-ack';
 import type { LaserState } from './laser-store';
+import { pushLog } from './laser-store-helpers';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
-
-const LOG_MAX = 200;
-
-function appendLog(state: LaserState, line: string): ReadonlyArray<string> {
-  return [...state.log, line].slice(-LOG_MAX);
-}
 
 export function handleLine(
   set: SetFn,
@@ -91,7 +86,7 @@ function recordInboundLine(
   line: string,
 ): void {
   set({
-    log: appendLog(state, line),
+    log: pushLog(state, line),
     transcript: appendTranscript(
       state.transcript,
       inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line, cls),
@@ -164,7 +159,7 @@ function handleWelcomeLine(
     detected === refs.driver.kind
       ? {}
       : {
-          log: appendLog(
+          log: pushLog(
             state,
             `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
           ),

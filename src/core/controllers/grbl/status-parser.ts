@@ -28,7 +28,11 @@ export type GrblState =
   | 'Door'
   | 'Check'
   | 'Home'
-  | 'Sleep';
+  | 'Sleep'
+  // grblHAL only: tool-change in progress (M6). Vanilla GRBL v1.1 never
+  // reports it; without this entry a grblHAL Tool report was dropped as an
+  // unclassifiable line (audit F11).
+  | 'Tool';
 
 // Active input pins, decoded from the `Pn:` field. GRBL flags limit switches
 // per axis (X/Y/Z), plus probe (P) and door (D). Other Pn letters (hold/reset/
@@ -88,6 +92,7 @@ const STATE_VALUES: ReadonlyArray<GrblState> = [
   'Check',
   'Home',
   'Sleep',
+  'Tool',
 ];
 
 const STATE_SET = new Set<string>(STATE_VALUES);
