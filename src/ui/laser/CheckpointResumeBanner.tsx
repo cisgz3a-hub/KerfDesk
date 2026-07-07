@@ -30,10 +30,10 @@ export function CheckpointResumeBanner(props: {
       <p style={textStyle}>
         Interrupted {checkpoint.machineKind === 'cnc' ? 'router' : 'laser'} job
         {startedAt === null ? '' : ` from ${startedAt}`}: {checkpoint.ackedLines} of{' '}
-        {checkpoint.sendableLines} motion lines confirmed. Resume re-checks that the project
-        still produces the same G-code, then replays from the first unconfirmed line. If the
-        machine also lost power, a few confirmed lines may not have run — backing up re-burns,
-        skipping leaves gaps.
+        {checkpoint.sendableLines} motion lines confirmed. Resume re-checks that the project still
+        produces the same G-code, then replays from the first unconfirmed line. If the machine also
+        lost power, a few confirmed lines may not have run — backing up re-burns, skipping leaves
+        gaps.
       </p>
       <div style={rowStyle}>
         <button
