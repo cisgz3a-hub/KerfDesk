@@ -19,8 +19,10 @@ import type { PathNodeDragState } from './path-node-drag';
 import {
   hitRotateHandle,
   hitSelectionRotateHandle,
+  objectRotateAnchor,
   pointerAngleDeg,
   rotateObjectByDrag,
+  rotateObjectRelative,
   selectionRotateAnchor,
 } from './rotate-handle';
 import { canvasMouseToScene, computeView, pxToMmForCanvas } from './view-transform';
@@ -85,10 +87,21 @@ export function pickHandleDrag(args: {
   readonly selectedObj: SceneObject;
   readonly point: Vec2;
   readonly pxToMm: number;
+  readonly selectionAnchor?: SelectionAnchor;
 }): DragState | null {
   const { selectedObj, point, pxToMm } = args;
   if (hitRotateHandle(selectedObj, point, pxToMm)) {
-    return { kind: 'rotate', objectId: selectedObj.id };
+    // Capture the pivot, the pointer angle, and the object's transform AT the
+    // grab so the rotate is relative to where the drag started — no jump on a
+    // pre-rotated object (audit C2).
+    const anchor = objectRotateAnchor(selectedObj, args.selectionAnchor ?? 'c');
+    return {
+      kind: 'rotate',
+      objectId: selectedObj.id,
+      rotateAnchor: anchor,
+      startPointerAngleDeg: pointerAngleDeg(anchor, point),
+      selectionStartTransforms: [{ id: selectedObj.id, transform: { ...selectedObj.transform } }],
+    };
   }
   const handle = hitHandle(selectedObj, point, pxToMm);
   if (handle !== null) {
@@ -116,6 +129,8 @@ export function computeMouseDownDrag(args: {
   readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
   readonly onShiftClick: (id: string) => void;
   readonly onPlainClick: (id: string | null) => void;
+  // 9-dot rotate/scale pivot from the numeric-edits bar; defaults to center.
+  readonly selectionAnchor?: SelectionAnchor;
 }): DragState | null {
   const {
     e,
@@ -156,7 +171,12 @@ export function computeMouseDownDrag(args: {
   });
   if (selectionRotateDrag !== null) return selectionRotateDrag;
   if (selectedObj !== undefined && selectedObjects.length <= 1) {
-    const handleDrag = pickHandleDrag({ selectedObj, point, pxToMm });
+    const handleDrag = pickHandleDrag({
+      selectedObj,
+      point,
+      pxToMm,
+      ...(args.selectionAnchor === undefined ? {} : { selectionAnchor: args.selectionAnchor }),
+    });
     if (handleDrag !== null) return handleDrag;
   }
   const hitId = hitTest(project.scene, point);
@@ -339,6 +359,26 @@ export function nextTransformForDrag(
       fromCenter: useCenterAnchor,
       ...(useCenterAnchor || selectionAnchor === undefined ? {} : { anchor: selectionAnchor }),
     });
+  }
+  // Relative rotate when the grab reference was captured (audit C2): apply the
+  // pointer-angle delta since grab to the grab-time transform. The legacy
+  // absolute path stays as a fallback for callers/tests that don't pass one.
+  // (path-node drags never reach here — they're handled in the mouse layer.)
+  if (drag.kind === 'rotate') {
+    const start = drag.selectionStartTransforms?.[0];
+    if (
+      drag.rotateAnchor !== undefined &&
+      drag.startPointerAngleDeg !== undefined &&
+      start !== undefined
+    ) {
+      return rotateObjectRelative({
+        startTransform: start.transform,
+        anchor: drag.rotateAnchor,
+        startPointerAngleDeg: drag.startPointerAngleDeg,
+        dragTo: point,
+        snap: e.shiftKey,
+      });
+    }
   }
   return rotateObjectByDrag({
     object: obj,
