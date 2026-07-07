@@ -30,7 +30,6 @@ describe('JobControls progress display', () => {
       streamer: {
         status: 'done',
         streamingMode: 'char-counted',
-        pollDuringJob: '4hz',
         queued: [],
         inFlight: [],
         inFlightBytes: 0,

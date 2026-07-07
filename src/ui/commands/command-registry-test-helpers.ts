@@ -90,6 +90,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     cameraPanelOpen: false,
     toggleCameraPanel: vi.fn(),
     boxGenerator: vi.fn(),
+    boxFitTest: vi.fn(),
     materialTest: vi.fn(),
     intervalTest: vi.fn(),
     scanOffsetTest: vi.fn(),

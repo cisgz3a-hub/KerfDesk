@@ -766,6 +766,40 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 2. No Move Laser to Selection physical move.
 3. No Set Start Point or node-level start ordering.
 
+### F-B16. Interrupted-job checkpoint and resume (ADR-118)
+
+While a job streams, the app keeps a ~200-byte checkpoint in localStorage:
+a fingerprint of the compiled program plus the GRBL-acked line count
+(updated every 25 acks and on every pause/stop/error/disconnect). Only a
+run that finishes cleanly clears it.
+
+#### Success — resume after a crash
+1. App/tab/PC died mid-job. Operator relaunches; autosave recovery
+   restores the project (F-C3).
+2. The Laser window shows the banner: "Interrupted laser job from
+   <time>: N of M motion lines confirmed."
+3. Operator connects, homes, and confirms the work zero is unchanged
+   (same contract as manual Start-from-line).
+4. **Resume interrupted job** re-compiles the project, verifies the
+   fingerprint matches the interrupted program byte-for-byte, maps the
+   acked count to the raw G-code line, and runs the standard
+   start-from-line replay (safe re-entry preamble, then the tail).
+5. The checkpoint clears when the resume run completes.
+
+#### Error — project changed since the run
+1. Fingerprint mismatch → alert explains the project no longer produces
+   the interrupted program; nothing is streamed. The manual
+   Start-from-line control remains the escape hatch.
+
+#### Edge — controller lost power too
+1. Acked lines may include a buffer's worth GRBL never executed; the
+   banner says so. Backing up re-burns a short stretch; skipping forward
+   leaves gaps — when in doubt, resume earlier via the manual control.
+
+#### Edge — deliberate Stop
+1. Stop keeps the checkpoint (a stopped job is still resumable);
+   **Dismiss** on the banner is the explicit discard.
+
 ---
 
 ## Phase C flows — STUB
@@ -2469,6 +2503,58 @@ F-CNC19 tiling.
 1. When the box is too shallow for the slot band to clear the top edge
    finger cells, validation names the height and thickness in conflict
    rather than emitting overlapping geometry.
+
+### F-K8. Box fit test coupon (ADR-119)
+
+#### Success
+
+1. **Tools → Box Fit Test…** opens a small dialog: material thickness,
+   finger width, ladder start/step/count (defaults 0.05/0.05/6), and in
+   CNC mode the relief tool. Machine-aware defaults follow F-K3.
+2. **Generate** inserts two strips — a tab comb and a slot strip — as
+   one undo step. Rung i carries i+1 index nicks; its joint play is
+   exactly start + i·step, split across tab and notch like production
+   panels.
+3. The operator cuts both strips, presses each rung, and types the
+   winning rung's clearance into the Box Generator.
+
+#### Error — ladder exceeds the joint limit
+
+1. A ladder whose top rung reaches half the finger width (or half the
+   thickness) reports the count/step fields; **Generate** stays
+   disabled.
+
+#### Empty
+
+1. Empty numeric fields report "Enter a value" per F-K1.
+
+#### Edge — CNC relief
+
+1. CNC mode carves corner-overcuts in every notch at full bit radius;
+   validation rejects a tool wider than the finger (F-K2 rule).
+
+### F-K9. Assembled 3D preview (ADR-119)
+
+#### Success
+
+1. The Box Generator preview gains **Flat / Assembled** buttons. The
+   assembled view draws every panel extruded at its true 3D placement in
+   an isometric projection — dividers inside, the slide lid in its
+   channel — and re-renders on every valid edit.
+
+#### Error
+
+1. (None — the toggle only offers views of an already-valid sheet.)
+
+#### Empty
+
+1. While the draft is invalid the assembled view keeps the last valid
+   assembly, exactly like the flat preview (F-K1).
+
+#### Edge — canvas unavailable
+
+1. Without a 2D context (headless/jsdom) the preview renders an empty
+   canvas without crashing, matching BoxPreview's guard.
 
 ## Camera Mode flows
 

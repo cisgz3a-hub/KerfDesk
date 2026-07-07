@@ -46,6 +46,7 @@ export type CommandId =
   | 'tools.registration-jig'
   | 'tools.camera'
   | 'tools.box-generator'
+  | 'tools.box-fit-test'
   | 'tools.material-test'
   | 'tools.interval-test'
   | 'tools.scan-offset-test'
@@ -171,6 +172,7 @@ export type AppCommandContext = {
   readonly cameraPanelOpen: boolean;
   readonly toggleCameraPanel: () => void;
   readonly boxGenerator: () => void;
+  readonly boxFitTest: () => void;
   readonly materialTest: () => void;
   readonly intervalTest: () => void;
   readonly scanOffsetTest: () => void;

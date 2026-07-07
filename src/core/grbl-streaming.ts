@@ -2,7 +2,6 @@ export const DEFAULT_GRBL_RX_BUFFER_BYTES = 120;
 export const MAX_GRBL_RX_BUFFER_BYTES = 4096;
 
 export type GrblStreamingMode = 'char-counted' | 'ping-pong';
-export type GrblPollDuringJob = 'off' | '1hz' | '2hz' | '4hz';
 
 export function isGrblStreamingMode(value: unknown): value is GrblStreamingMode {
   return value === 'char-counted' || value === 'ping-pong';

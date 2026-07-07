@@ -28,7 +28,11 @@ export type GrblState =
   | 'Door'
   | 'Check'
   | 'Home'
-  | 'Sleep';
+  | 'Sleep'
+  // grblHAL only: tool-change in progress (M6). Vanilla GRBL v1.1 never
+  // reports it; without this entry a grblHAL Tool report was dropped as an
+  // unclassifiable line (audit F11).
+  | 'Tool';
 
 // Active input pins, decoded from the `Pn:` field. GRBL flags limit switches
 // per axis (X/Y/Z), plus probe (P) and door (D). Other Pn letters (hold/reset/
@@ -88,6 +92,7 @@ const STATE_VALUES: ReadonlyArray<GrblState> = [
   'Check',
   'Home',
   'Sleep',
+  'Tool',
 ];
 
 const STATE_SET = new Set<string>(STATE_VALUES);
@@ -186,8 +191,13 @@ function pickAxisField(
 
 function pickFsValue(fields: ReadonlyArray<string>, index: 0 | 1): number | null {
   for (const f of fields) {
-    if (!f.startsWith('FS:') && !f.startsWith('F:')) continue;
-    // F:1500 has 1 component (feed only). FS:1500,500 has 2.
+    const isFs = f.startsWith('FS:');
+    if (!isFs && !f.startsWith('F:')) continue;
+    // Only FS: carries spindle. GRBL's F: is feed-only, and Smoothieware's
+    // grbl-mode F: is `F:<feed>,<override%>` — its second component is the
+    // FEED OVERRIDE, not spindle (audit F7; per Smoothieware docs, not
+    // hardware-verified).
+    if (index === 1 && !isFs) return null;
     const body = f.slice(f.indexOf(':') + 1);
     const parts = body.split(',').map(Number);
     const v = parts[index];

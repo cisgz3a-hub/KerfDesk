@@ -38,17 +38,18 @@ describe('classifyMarlinResponse', () => {
 });
 
 describe('Marlin command builders', () => {
-  it('builds a relative jog as G91 / G0 / G90 lines', () => {
-    expect(buildMarlinJogCommand({ dx: 10, feed: 1000 })).toBe('G91\nG0 X10.000 F1000\nG90');
+  it('builds a relative jog as G21 / G91 / G0 / G90 lines', () => {
+    expect(buildMarlinJogCommand({ dx: 10, feed: 1000 })).toBe('G21\nG91\nG0 X10.000 F1000\nG90');
     expect(buildMarlinJogCommand({ dy: -0.1, dz: 1, feed: 500 })).toBe(
-      'G91\nG0 Y-0.100 Z1.000 F500\nG90',
+      'G21\nG91\nG0 Y-0.100 Z1.000 F500\nG90',
     );
   });
 
-  it('builds framing as a G90 lead plus five absolute G0 legs', () => {
+  it('builds framing as G21+G90 leads plus five absolute G0 legs', () => {
     const lines = buildMarlinFrameLines({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 6000);
-    expect(lines[0]).toBe('G90\n');
-    expect(lines.slice(1)).toEqual([
+    expect(lines[0]).toBe('G21\n');
+    expect(lines[1]).toBe('G90\n');
+    expect(lines.slice(2)).toEqual([
       'G0 X0.000 Y0.000 F6000\n',
       'G0 X20.000 Y0.000 F6000\n',
       'G0 X20.000 Y10.000 F6000\n',
@@ -91,7 +92,7 @@ describe('marlinDriver', () => {
       settings: 'none',
       unlock: false,
       sleep: false,
-      wcs: 'none',
+      wcs: 'g92-only',
       homing: true,
     });
     expect(marlinDriver.commands.home).toBe('G28 X Y');

@@ -4,7 +4,6 @@
 // store.ts so the root store stays under the file-size cap; all three share the
 // same "add an object + auto-create layers + select + push undo" shape.
 
-import type { BoxPanel } from '../../core/box';
 import {
   findRegistrationBoxes,
   type Layer,
@@ -13,7 +12,7 @@ import {
   type ShapeObject,
   type TextObject,
 } from '../../core/scene';
-import { applyInsertBoxPanels } from './box-insert-mutation';
+import { applyInsertBoxPanels, type InsertablePart } from './box-insert-mutation';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
 import { seedLayerFromStockMaterial } from './cnc-project-material';
@@ -78,7 +77,7 @@ export function objectInsertActions(
     drawShape: (shape: ShapeObject) => {
       set((s) => applyDrawShape(s, shape));
     },
-    insertBoxPanels: (panels: ReadonlyArray<BoxPanel>) => {
+    insertBoxPanels: (panels: ReadonlyArray<InsertablePart>) => {
       set((s) => applyInsertBoxPanels(s, panels) ?? s);
     },
     addRegistrationBox: (widthMm: number, heightMm: number) => {

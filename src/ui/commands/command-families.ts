@@ -270,6 +270,13 @@ function calibrationToolCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       ctx.boxGenerator,
     ),
     enabled(
+      'tools.box-fit-test',
+      'tools',
+      'Box Fit Test...',
+      'Generate fit test strips to calibrate joint clearance.',
+      ctx.boxFitTest,
+    ),
+    enabled(
       'tools.material-test',
       'tools',
       'Material Test...',

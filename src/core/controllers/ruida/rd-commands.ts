@@ -38,11 +38,15 @@ export function layerMaxPower(layer: number, percent: number): Bytes {
   return [0xc6, 0x32, layer & 0x7f, ...encodePower14(percent)];
 }
 
-/** 0xCA 0x06 <layer> <color*5>: layer display color (BGR packed 7-bit). */
+/** 0xCA 0x06 <layer> <color*5>: layer display color. Public .rd decoders
+ *  read the packed int as blue<<16 | green<<8 | red — red in the LOW byte —
+ *  so the 0xRRGGBB input swaps R and B on the wire (audit F8: the previous
+ *  conversion read the channels swapped and repacked them swapped, a no-op
+ *  that left red in the high byte). NOT hardware-verified. */
 export function layerColor(layer: number, rgb: number): Bytes {
-  const blue = (rgb >> 16) & 0xff;
+  const red = (rgb >> 16) & 0xff;
   const green = (rgb >> 8) & 0xff;
-  const red = rgb & 0xff;
+  const blue = rgb & 0xff;
   const packed = (blue << 16) | (green << 8) | red;
   return [0xca, 0x06, layer & 0x7f, ...encodeCoord35(packed)];
 }

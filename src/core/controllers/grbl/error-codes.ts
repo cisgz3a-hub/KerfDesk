@@ -26,9 +26,11 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
     detail: 'A setting received a negative number where positive was required.',
   },
   {
+    // Official: "Homing cycle failure. Homing is not enabled via settings."
+    // Fires when $H is issued while $22=0 — NOT on a settings write.
     code: 5,
-    title: 'Setting disabled',
-    detail: 'Homing must be enabled before this setting is allowed.',
+    title: 'Homing cycle disabled',
+    detail: 'The homing cycle ($H) was refused because homing is not enabled. Set $22=1 first.',
   },
   {
     code: 6,
@@ -42,7 +44,13 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   },
   { code: 8, title: 'Not idle', detail: 'The command needs the controller to be idle.' },
   { code: 9, title: 'G-code lock', detail: 'Alarm or jog state active — unlock with $X first.' },
-  { code: 10, title: 'Homing not enabled', detail: 'Set $22=1 to enable homing.' },
+  {
+    // Official: "Soft limits cannot be enabled without homing also enabled."
+    // Fires when writing $20=1 while $22=0.
+    code: 10,
+    title: 'Homing not enabled',
+    detail: 'Soft limits ($20=1) cannot be enabled without homing ($22=1) also enabled.',
+  },
   {
     code: 11,
     title: 'Line overflow',
@@ -57,7 +65,14 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   { code: 14, title: 'Build info too long', detail: '$I value exceeds storage.' },
   { code: 15, title: 'Jog target exceeds travel', detail: 'Reduce the jog distance.' },
   { code: 16, title: 'Invalid jog command', detail: 'Jog syntax not recognized.' },
-  { code: 17, title: 'Laser mode disabled', detail: 'Enable $32=1 for laser mode.' },
+  {
+    // Official: "Laser mode requires PWM output." Fires when a $32=1 write is
+    // REJECTED because the firmware build has no variable-spindle PWM —
+    // telling the user to "enable $32=1" was the action that just failed.
+    code: 17,
+    title: 'Laser mode needs PWM',
+    detail: 'Laser mode requires PWM spindle output; this firmware build cannot enable $32=1.',
+  },
   {
     code: 20,
     title: 'Unsupported G-code command',
@@ -84,11 +99,11 @@ const ERRORS: ReadonlyArray<ErrorDescription> = [
   { code: 27, title: 'Invalid line number', detail: 'N-word value out of range.' },
   {
     code: 28,
-    title: 'G-code missing P or L',
-    detail: 'A G10/G28/G30/G92.1 command needs a required value.',
+    title: 'G-code missing a required value word',
+    detail: 'A G-code command is missing a required value word (e.g. G10 without P/L).',
   },
   { code: 29, title: 'Unsupported work coordinate system', detail: 'Only G54-G59 are supported.' },
-  { code: 30, title: 'G53 with non-G0 motion', detail: 'G53 requires G0 or G1 motion only.' },
+  { code: 30, title: 'G53 needs G0 or G1', detail: 'G53 is only allowed with G0 and G1 motion.' },
   {
     code: 31,
     title: 'Axis words without command',

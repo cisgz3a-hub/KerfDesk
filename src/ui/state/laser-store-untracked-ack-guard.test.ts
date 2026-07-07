@@ -139,3 +139,154 @@ describe('untracked-ack start guard', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 });
+
+// Audit F1: one physical ok must never settle BOTH ledgers. While the
+// streamer still has unsettled acks, the earliest terminal ack belongs to
+// the stream (GRBL-family firmwares ack in strict receive order) and the
+// untracked counter must not move — otherwise Start's arming gate opens one
+// ack early and the last stop-cleanup ok phantom-advances the next job.
+describe('stop-path ack attribution', () => {
+  async function connectMarlinWith(connection: FakeConnection): Promise<void> {
+    await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'marlin' });
+    connection.emitLine('start');
+    await flush();
+  }
+
+  // Marlin stop is stream-side: no soft reset exists, so the in-flight job
+  // line AND the M5/M107 beam-off lines all still ack after cancel.
+  it('a stream-owned ok does not settle the untracked ledger (Marlin stop)', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectMarlinWith(connection);
+
+    await useLaserStore
+      .getState()
+      .startJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', { streamingMode: 'ping-pong' });
+    await flush();
+    expect(useLaserStore.getState().streamer?.inFlight).toHaveLength(1);
+
+    await useLaserStore.getState().stopJob();
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+
+    connection.emitLine('ok'); // the in-flight job line — stream-owned
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+    expect(useLaserStore.getState().streamer?.inFlight).toHaveLength(0);
+
+    connection.emitLine('ok'); // M5
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    connection.emitLine('ok'); // M107
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
+  it('a stale stop-cleanup ok cannot advance the next job (Marlin stop)', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectMarlinWith(connection);
+
+    await useLaserStore
+      .getState()
+      .startJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', { streamingMode: 'ping-pong' });
+    await flush();
+    await useLaserStore.getState().stopJob();
+
+    connection.emitLine('ok'); // in-flight job line
+    connection.emitLine('ok'); // M5
+    await flush();
+
+    // M107's ok is still owed. Start must wait for it; once it lands it
+    // belongs to the ledger, never to the new stream.
+    const started = useLaserStore
+      .getState()
+      .startJob('G1 X9 S100\nG1 X8 S100', { streamingMode: 'ping-pong' });
+    await flush();
+    connection.emitLine('ok'); // M107
+    await started;
+    await flush();
+
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    const streamer = useLaserStore.getState().streamer;
+    expect(streamer?.status).toBe('streaming');
+    expect(streamer?.completed).toBe(0);
+    expect(streamer?.inFlight).toHaveLength(1);
+  });
+
+  // GRBL stop: the soft reset wipes the firmware's RX buffer, so the
+  // in-flight lines will never be acked and the streamer drops them at stop
+  // time. The M9 beam-off cleanup is deferred until the boot banner (audit
+  // F2) so its ok can neither be swallowed mid-boot nor orphaned by the
+  // banner's ledger reset.
+  it('GRBL stop defers M9 to the boot banner; its ok settles the ledger, not the stream', async () => {
+    const written: string[] = [];
+    const connection = makeConnection(async (data) => {
+      written.push(data);
+    });
+    await connectWith(connection);
+
+    await useLaserStore.getState().startJob(JOB_GCODE);
+    await flush();
+    expect(useLaserStore.getState().streamer?.inFlight.length).toBeGreaterThan(0);
+
+    await useLaserStore.getState().stopJob();
+    const stopped = useLaserStore.getState().streamer;
+    expect(stopped?.status).toBe('cancelled');
+    expect(stopped?.inFlight).toEqual([]);
+    // M9 is armed, not written: no untracked ack owed yet, nothing to jam.
+    expect(written).not.toContain('M9\n');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+
+    connection.emitLine('Grbl 1.1f'); // boot banner after the soft reset
+    await flush();
+    expect(written).toContain('M9\n');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    connection.emitLine('ok'); // M9 cleanup ack — post-boot, unambiguous
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().streamer?.completed).toBe(0);
+  });
+
+  // Audit F3: the Marlin/Smoothie jog is a multi-line payload (G21, G91,
+  // G0, G90) written in one call — the firmware acks each line, so the
+  // ledger must count every one, or orphan oks drift into the next job's
+  // accounting.
+  it('a multi-line jog payload owes one ack per line (Marlin)', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectMarlinWith(connection);
+    connection.emitLine('X:0.00 Y:0.00 Z:0.00 E:0.00 Count X:0 Y:0 Z:0');
+    await flush();
+    expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
+
+    await useLaserStore.getState().jog({ dx: 5, feed: 600 });
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(4);
+
+    connection.emitLine('ok'); // G21
+    connection.emitLine('ok'); // G91
+    connection.emitLine('ok'); // G0
+    connection.emitLine('ok'); // G90
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
+  // Audit F2: a banner while the stream is live = uncommanded controller
+  // reboot. Buffered motion is gone; the job must end NOW, not when the
+  // stall watchdog gives up 10-90 s later.
+  it('an uncommanded boot banner mid-job errors the stream and raises a notice', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    await useLaserStore.getState().startJob(JOB_GCODE);
+    await flush();
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+
+    connection.emitLine('Grbl 1.1f'); // spontaneous reboot — no Stop was sent
+    await flush();
+
+    const streamer = useLaserStore.getState().streamer;
+    expect(streamer?.status).toBe('errored');
+    expect(streamer?.inFlight).toEqual([]);
+    expect(useLaserStore.getState().safetyNotice?.kind).toBe('controller-reboot');
+  });
+});
