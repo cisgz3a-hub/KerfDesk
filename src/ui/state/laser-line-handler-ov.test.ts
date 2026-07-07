@@ -91,6 +91,7 @@ function makeHarness(): {
       onLineArrived: null,
       controllerCommand: null,
       controllerIdleWait: null,
+      pendingResetCleanup: null,
     },
     set,
     get: () => state,

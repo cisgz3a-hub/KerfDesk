@@ -11,8 +11,15 @@
 // reference (same instance laser-store creates) so the settings-collector
 // state is observable across calls.
 
-import { type GrblPins } from '../../core/controllers/grbl';
+import {
+  markErrored,
+  wipeInFlight,
+  type GrblPins,
+  type StreamerState,
+} from '../../core/controllers/grbl';
 import { detectControllerFromBanner } from '../../core/controllers';
+import { flushResetCleanup } from './laser-reset-cleanup';
+import { controllerRebootNotice } from './laser-safety-notice';
 import { consumeSettingsResponse, type DetectedSettingsResult } from './detected-settings-action';
 import {
   cancelControllerLifecycleRefs,
@@ -24,15 +31,10 @@ import { frameHitLimitNotice } from './laser-safety-notice';
 import { handleStatusLine, originUnknownAfterControllerReset } from './laser-status-line';
 import { advanceStream, settleUntrackedAck } from './laser-stream-ack';
 import type { LaserState } from './laser-store';
+import { pushLog } from './laser-store-helpers';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
-
-const LOG_MAX = 200;
-
-function appendLog(state: LaserState, line: string): ReadonlyArray<string> {
-  return [...state.log, line].slice(-LOG_MAX);
-}
 
 export function handleLine(
   set: SetFn,
@@ -61,7 +63,7 @@ export function handleLine(
   }
   const bannerRaw = bannerCandidateRaw(cls);
   if (bannerRaw !== null) {
-    handleWelcomeLine(set, get, refs, bannerRaw);
+    handleWelcomeLine(set, get, refs, safeWrite, bannerRaw);
     return;
   }
   // Marlin "echo:busy:" — the controller is alive but not ready; explicitly
@@ -84,7 +86,7 @@ function recordInboundLine(
   line: string,
 ): void {
   set({
-    log: appendLog(state, line),
+    log: pushLog(state, line),
     transcript: appendTranscript(
       state.transcript,
       inboundTranscriptEntry(nextTranscriptId(refs), Date.now(), line, cls),
@@ -143,21 +145,57 @@ function bannerCandidateRaw(cls: { readonly kind: string; readonly raw?: string 
 // Welcome banners carry the firmware identity. Record what was detected and
 // warn (log-only) when it disagrees with the profile-selected driver — GRBL
 // family members are wire-compatible, so this is advisory, not a refusal.
-function handleWelcomeLine(set: SetFn, get: GetFn, refs: HandlerRefs, raw: string): void {
+function handleWelcomeLine(
+  set: SetFn,
+  get: GetFn,
+  refs: HandlerRefs,
+  safeWrite: SafeWriteFn,
+  raw: string,
+): void {
   const detected = detectControllerFromBanner(raw);
   if (detected === null) return;
+  const state = get();
   const mismatchLog =
     detected === refs.driver.kind
       ? {}
       : {
-          log: appendLog(
-            get(),
+          log: pushLog(
+            state,
             `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
           ),
         };
   // A banner means the controller (re)booted: replies owed by the previous
   // session will never arrive.
-  set({ detectedControllerKind: detected, pendingUntrackedAcks: 0, ...mismatchLog });
+  set({
+    detectedControllerKind: detected,
+    pendingUntrackedAcks: 0,
+    ...mismatchLog,
+    ...rebootDuringJobPatch(state),
+  });
+  // Beam-off cleanup deferred by a commanded reset (Stop, auto-stop) goes
+  // out NOW, after the ledger reset above — its ack is unambiguous (audit
+  // F2): the controller is fully booted, so the ok cannot be swallowed and
+  // cannot be orphaned by this banner.
+  flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'));
+}
+
+// A banner while the stream is still live can only be an UNCOMMANDED reboot
+// (watchdog reset, power blip): every commanded reset — Stop, wake, the
+// auto-stop after a stream error — cancels or errors the streamer BEFORE its
+// banner can arrive. The reboot discarded all buffered motion, so the job is
+// over: without this the UI showed a live progress bar until the generic
+// stall watchdog fired 10–90 s later (audit F2). 'errored' keeps Stop and
+// recovery mounted; the wiped in-flight lines will never be acked.
+function rebootDuringJobPatch(
+  state: LaserState,
+): Partial<Pick<LaserState, 'streamer' | 'safetyNotice'>> {
+  const streamer: StreamerState | null = state.streamer;
+  if (streamer === null || !['idle', 'streaming', 'paused'].includes(streamer.status)) return {};
+  return {
+    streamer: wipeInFlight(markErrored(streamer)),
+    // First notice wins — an earlier root cause is what the operator needs.
+    safetyNotice: state.safetyNotice ?? controllerRebootNotice(),
+  };
 }
 
 // GRBL ALARM:1 — hard limit triggered (see alarm-codes.ts).
