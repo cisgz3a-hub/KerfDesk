@@ -56,6 +56,7 @@ export {
   createStreamer,
   disconnect,
   findOversizedLine,
+  isSendableGcodeLine,
   markErrored,
   onAck,
   pause,

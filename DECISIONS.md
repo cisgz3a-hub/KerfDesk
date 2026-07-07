@@ -5466,3 +5466,104 @@ trusted check+request and denied for untrusted origins and subframes.
 NOT verified: the packaged Electron runtime grant, and a real hours-long
 burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
 runs one.
+
+## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
+
+**Status:** accepted.
+
+### Context
+
+If the app dies mid-stream (tab crash, OS kill, power blip), the job is
+simply gone from the app's point of view: the operator must guess which
+G-code line the machine stopped at and enter it into Start-from-line by
+hand. The 2026-07-07 trust audit called this out (gap 3b): for a
+multi-hour job, "guess the line" is the difference between salvaging a
+workpiece and scrapping it.
+
+Two existing pillars make a cheap, correct fix possible:
+
+1. **Deterministic G-code (non-negotiable #5).** Start-from-line already
+   RE-COMPILES the program from the current project
+   (`runStartFromLineFlow` → `prepareStartJob` → `prepared.gcode`); byte
+   determinism is what keeps its line numbers valid. A checkpoint
+   therefore never needs to persist the G-code text (raster jobs exceed
+   localStorage quotas) — only a fingerprint of it.
+2. **Autosave recovery (Phase C).** The project itself is already
+   restored after a crash, so re-compilation has its input.
+
+### Decision
+
+- **Pure core module `src/core/recovery/job-checkpoint.ts`:** a
+  `JobCheckpoint` = FNV-1a fingerprint of the streamed text (hash, char
+  count, raw line count) + the acked count + machine kind + ISO
+  timestamps (passed in — core cannot read the clock). Two numbering
+  systems meet here and must not be confused: the streamer's
+  `completed`/`total` count SENDABLE lines (blanks and full-line
+  comments are never streamed — `isSendableGcodeLine`, now exported from
+  the streamer as the single definition), while `buildResumeProgram` and
+  Start-from-line speak RAW file lines. The checkpoint stores the acked
+  SENDABLE count plus the program's sendable total; `rawResumeLine`
+  converts acked-sendable back to the raw line number against the
+  re-compiled text at resume time. Strict `parse` validation and
+  monotonic `advance`.
+- **Write path:** `runStartJobFlow` writes the initial checkpoint right
+  after the stream starts. A `use-job-checkpoint` hook (App-mounted,
+  laser-store-subscribed like ADR-117's wake lock) advances
+  `ackedLines` from `streamer.completed` — every 25 acked lines while
+  streaming, immediately on any status transition (pause, error,
+  disconnect, cancel). The checkpoint is a ~200-byte localStorage
+  record; the hook re-reads it per store fire (microseconds) so there is
+  no cache to go stale.
+- **Clear-on-done only.** A checkpoint survives Stop, error, disconnect,
+  and crash; only a run reaching `done` (all lines acked) clears it —
+  a deliberately stopped job is still resumable, and the banner's
+  Dismiss is the explicit discard.
+- **Resume path is the EXISTING one, gated by the fingerprint.** The
+  recovery banner (Laser window, shown when a checkpoint with progress
+  exists and no job is active) calls `runCheckpointResumeFlow`: it
+  re-compiles, REFUSES when the fingerprint of `prepared.gcode` differs
+  — an edited project silently producing different line numbers is
+  exactly the failure this gate exists to stop — then maps the acked
+  count to the raw resume line and hands off to the shared
+  Start-from-line body. Manual Start-from-line stays ungated (the
+  free-form escape hatch).
+- **Resume runs are not themselves checkpointed (v1).** A resume program
+  (preamble + tail) has its own line numbering; mapping a crash inside
+  it back to original coordinates is deferred. Both resume flows stamp
+  `resumeInFlight` on the stored checkpoint before streaming, and the
+  hook additionally requires the streamer total to equal the
+  checkpoint's sendable count — belt and braces so foreign ack counts
+  can never corrupt the record. If a resume run finishes, the job is
+  done and the checkpoint clears; if it dies, the ORIGINAL checkpoint
+  still stands — stale toward earlier lines, which re-burns a short
+  stretch rather than leaving a gap.
+
+### Consequences
+
+- After a crash: relaunch → autosave restores the project → banner
+  offers "resume from line N" → recompile + fingerprint check → the
+  proven resume preamble (ADR-103 G7) re-enters the cut. No G-code file
+  round-trip, no guessing.
+- `ackedLines` measures GRBL acks (parsed into the RX buffer), not
+  execution. If the CONTROLLER also lost power, up to a buffer's worth
+  of acked lines never ran — the mapped resume line can be a few lines
+  late. The banner says so; the manual Start-from-line control remains
+  the operator-editable escape hatch. Backing up re-burns, skipping
+  forward leaves gaps, so the conservative direction is down. If only
+  the app died, GRBL finished its buffer and the mapped line is exact.
+- Work zero must be unchanged — same contract as manual Start-from-line
+  (the existing confirm says it).
+- localStorage writes on the ack path are throttled (25 lines) and
+  ~200 bytes; failures (quota, private mode) are swallowed — a
+  checkpoint is best-effort protection, never a reason to block a job.
+
+### Verification
+
+Core: fingerprint determinism/sensitivity, parse rejection corpus,
+advance monotonicity, resume-line clamping. Storage: round-trip +
+corrupt-payload clearing. Hook: interval + transition write policy,
+freeze on foreign totals, clear-on-done. Flow: checkpoint written on
+start, fingerprint mismatch refuses with no stream. Banner: render /
+dismiss / hidden-while-active. NOT verified: a real crash + resume on
+hardware — CLAIMED in AUDIT.md until the maintainer kills the app
+mid-burn and resumes.
