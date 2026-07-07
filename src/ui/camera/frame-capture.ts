@@ -30,10 +30,7 @@ export function elementFrameSize(element: LiveCaptureElement): {
  * native). Returns null while the element has no dimensions yet or when the
  * 2D context is unavailable (canvas is device-memory backed and can fail).
  */
-export function captureElementFrame(
-  element: LiveCaptureElement,
-  scale = 1,
-): RgbaImage | null {
+export function captureElementFrame(element: LiveCaptureElement, scale = 1): RgbaImage | null {
   const intrinsic = elementFrameSize(element);
   const width = Math.round(intrinsic.width * scale);
   const height = Math.round(intrinsic.height * scale);

@@ -10,6 +10,7 @@ import { LaserWindow, useJobShortcuts } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
+import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
 import { PwaUpdatePrompt } from './PwaUpdatePrompt';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
@@ -51,7 +52,9 @@ export function App(): JSX.Element {
         <ToolStrip />
         <div style={canvasAreaStyle}>
           <Workspace />
+          <WorkspaceCameraOverlay />
           <RegistrationJigPanel />
+          <CameraPanel />
         </div>
         <Cnc3DPane />
         <CutsLayersPanel />

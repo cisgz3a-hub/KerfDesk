@@ -68,7 +68,9 @@ function MjpegImage(props: {
   readonly url: string;
   readonly onElement?: ((element: LiveCaptureElement | null) => void) | undefined;
 }): JSX.Element {
-  return <CapturableImage src={props.url} alt="Machine camera stream" onElement={props.onElement} />;
+  return (
+    <CapturableImage src={props.url} alt="Machine camera stream" onElement={props.onElement} />
+  );
 }
 
 function CapturableImage(props: {
@@ -83,7 +85,13 @@ function CapturableImage(props: {
     return () => onElement?.(null);
   }, [onElement]);
   return (
-    <img ref={imgRef} crossOrigin="anonymous" src={props.src} alt={props.alt} style={surfaceStyle} />
+    <img
+      ref={imgRef}
+      crossOrigin="anonymous"
+      src={props.src}
+      alt={props.alt}
+      style={surfaceStyle}
+    />
   );
 }
 

@@ -21,3 +21,23 @@ export function savePreferredCameraId(deviceId: string): void {
     // Storage unavailable: the choice simply won't survive reload.
   }
 }
+
+// The last RTSP camera URL is machine-local operator input (ADR-116) — same
+// storage rationale as the preferred deviceId.
+const RTSP_CAMERA_URL_KEY = 'laserforge.camera.rtspUrl.v1';
+
+export function loadRtspCameraUrl(): string | null {
+  try {
+    return localStorage.getItem(RTSP_CAMERA_URL_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function saveRtspCameraUrl(url: string): void {
+  try {
+    localStorage.setItem(RTSP_CAMERA_URL_KEY, url);
+  } catch {
+    // Storage unavailable: the URL simply won't survive reload.
+  }
+}

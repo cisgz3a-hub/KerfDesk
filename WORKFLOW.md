@@ -2441,9 +2441,9 @@ F-CNC19 tiling.
   lighting produce a typed toast telling the operator what to fix; nothing
   persists. A degenerate solve (markers nearly collinear) is refused the same
   way.
-- **Empty / no live feed.** Auto-align is disabled until the camera feed runs;
-  the Falcon network camera cannot auto-align (its frames block pixel
-  readback) and keeps the manual 4-corner click flow.
+- **Empty / no live feed.** Auto-align is disabled until a camera source runs.
+  Machine cameras auto-align exactly like USB ones: their frames arrive
+  through the local bridge's pixel-readable proxy (F-CAM6, ADR-116).
 - **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
   labels the corners correctly — the origin pair, not the operator, carries
   the orientation.
@@ -2463,3 +2463,25 @@ F-CNC19 tiling.
   feed; without an alignment the overlay row (and the button) is absent.
 - **Edge / encoder failure.** A platform without 2D canvas support fails
   typed ('could not build the bed image') instead of half-completing.
+
+### F-CAM6. Machine camera via the local bridge (ADR-116)
+
+- **Success / first-class machine camera.** The operator opens the Camera
+  panel; the bridge probes the machine camera server-side and reports it
+  found. "Use this camera" makes it the active source: the live view polls
+  the bridge's /frame.jpg proxy (pixel-readable in the desktop app, the dev
+  server, and the deployed site — no CSP or CORS exceptions), and lens
+  calibration, auto-align, Update still, and Trace from camera all work
+  exactly as with a USB webcam. RTSP cameras connect by URL from the panel's
+  "RTSP camera…" row (bridge probe -> MJPEG preview + single-frame capture).
+- **Error / bridge missing.** Without the bridge the machine-camera row says
+  how to start it (Desktop starts it automatically; browsers run
+  `pnpm camera:bridge`); an RTSP connect without ffmpeg says FFmpeg is
+  required and stays off. The Diagnostics row shows bridge liveness, frame
+  proxy, ffmpeg, and an on-demand "Test capture" pixel-readability check.
+- **Empty / camera off.** With the laser disconnected or powered off,
+  discovery reports "No machine camera found" with the connect-and-retry
+  hint; nothing else in the panel is blocked.
+- **Edge / untrusted page.** A drive-by web page cannot use the bridge: it
+  refuses untrusted browser Origins before doing any work and only proxies
+  private-network camera URLs (never the public internet, never itself).

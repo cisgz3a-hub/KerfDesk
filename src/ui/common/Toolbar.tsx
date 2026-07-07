@@ -118,7 +118,7 @@ function toolbarTitle(command: AppCommand): string {
 const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['file.new', 'file.open', 'file.save', 'file.save-as'],
   ['file.import-svg', 'file.import-image'],
-  ['tools.add-text', 'tools.registration-jig', 'tools.box-generator'],
+  ['tools.add-text', 'tools.registration-jig', 'tools.camera', 'tools.box-generator'],
   ['tools.trace-image', 'tools.convert-to-bitmap'],
   ['file.save-gcode'],
   // M27: Preview is the operator's primary pre-burn verification surface —

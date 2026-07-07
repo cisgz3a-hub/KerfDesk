@@ -34,9 +34,9 @@ describe('camera frame proxy URL policy', () => {
     expect(
       cameraFrameUrlPolicy(`http://127.0.0.1:${BRIDGE_PORT}/frame.jpg?url=x`, BRIDGE_PORT),
     ).toEqual({ kind: 'invalid', reason: 'Camera frame proxy cannot proxy itself.' });
-    expect(
-      cameraFrameUrlPolicy(`http://localhost:${BRIDGE_PORT}/health`, BRIDGE_PORT).kind,
-    ).toBe('invalid');
+    expect(cameraFrameUrlPolicy(`http://localhost:${BRIDGE_PORT}/health`, BRIDGE_PORT).kind).toBe(
+      'invalid',
+    );
     // Loopback on a different port stays allowed (e.g. a local test camera).
     expect(cameraFrameUrlPolicy('http://127.0.0.1:8080/frame.jpg', BRIDGE_PORT).kind).toBe('ok');
   });
