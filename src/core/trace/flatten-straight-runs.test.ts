@@ -5,7 +5,7 @@ import { flattenStraightRuns } from './flatten-straight-runs';
 const NO_CORNERS: ReadonlySet<Vec2> = new Set();
 
 describe('flattenStraightRuns', () => {
-  it('collapses a long wavy-but-straight run to its chord at strength 1', () => {
+  it('collapses a long wavy-but-straight run onto its fitted line at strength 1', () => {
     // ±0.8px wobble over 40px — the wobbly-stem case.
     const points: Vec2[] = [];
     for (let x = 0; x <= 40; x += 2) {
@@ -13,11 +13,15 @@ describe('flattenStraightRuns', () => {
     }
     const out = flattenStraightRuns(points, false, NO_CORNERS, 1);
     expect(out.length).toBeLessThanOrEqual(Math.ceil(points.length * 0.6));
-    // The flattener only removes vertices — every survivor is an input point
-    // (same object), so it can never invent geometry.
-    for (const p of out) expect(points).toContain(p);
+    // Chain endpoints are pinned by object; interior survivors are either
+    // original vertices or fitted-line replacements — every replacement must
+    // sit near the true line (y = 0), never out at a wobble extreme the way
+    // the old chord-between-noisy-endpoints replacement did.
     expect(out[0]).toBe(points[0]);
     expect(out[out.length - 1]).toBe(points[points.length - 1]);
+    for (const p of out.slice(1, -1)) {
+      if (!points.includes(p)) expect(Math.abs(p.y)).toBeLessThanOrEqual(0.35);
+    }
   });
 
   it('erases larger wobble at higher strength', () => {

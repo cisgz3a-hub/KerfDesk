@@ -1,32 +1,33 @@
-// Edge Detection trace (ADR-115, rebuilt): local-contrast ink mask → potrace
-// geometry.
+// Edge Detection trace: local-contrast ink mask → the own contour finisher.
 //
-// The previous engine (ADR-059) chained the raw Canny edge map through the
-// centerline machinery (thin → stroke graph → junction condense → spur prune
-// → chain assembly). Detection was never its problem — geometry synthesis
-// was: junction welds and spur handling manufactured hooked serif tips,
-// wandering contours, and dropped small counters on exactly the content
-// people trace (letterforms). Side-by-side renders on the real logo showed
-// the potrace geometry tracing the same shapes cleanly, so the engine now
-// composes the two proven halves: a LOCAL-contrast ink mask (mkbitmap's
+// Two engines preceded this one. The Canny-chain engine (ADR-059)
+// manufactured hooked serif tips and wandering contours in its geometry
+// synthesis; ADR-115 replaced that stage with potrace geometry, whose apex
+// snapping in turn stabbed spikes past small-letter feet and drew counters
+// as pointed leaves (maintainer report, 2026-07-07). The geometry stage is
+// now the SAME in-house contour finisher the filled-contours lane uses
+// (contour-trace.ts: mid-crack boundary walk → corner-safe smoothing →
+// straight-run flattening → bounded spline), so both lanes share one
+// quality bar and the tree carries no potrace-derived code. What stays from
+// ADR-115 is the detection half: the LOCAL-contrast ink mask (mkbitmap's
 // design — catches the faint detail a global threshold drops, see
-// local-contrast-mask.ts) handed to the shared potrace contour stage
-// (potrace-trace.ts). Output is therefore closed contours only, matching
-// LightBurn's trace semantics (its tracer is potrace-based too).
+// local-contrast-mask.ts). Output remains closed contours only, matching
+// LightBurn's trace semantics.
 //
 // The Canny-era option fields stay as the public knobs so the dialog,
 // presets, and merge logic are untouched; the engine derives its two mask
 // parameters from them (see the derivation constants below).
 
 import type { ColoredPath } from '../scene';
+import { contourPolylinesFromMask } from './contour-trace';
 import { localContrastInkBitmap } from './local-contrast-mask';
-import { lightBurnTraceSettingsToPotraceParams } from './potrace-params';
-import { potraceBitmapToPolylines } from './potrace-trace';
 import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
 import type { RawImageData, TraceOptions } from './trace-image';
 
 const EDGE_COLOR = '#000000';
 const DEFAULT_EDGE_MIN_LENGTH_PX = 3;
+// Same base simplification epsilon as the contour lane (see contour-trace).
+const EDGE_SIMPLIFY_EPSILON_PX = 0.45;
 
 // Slider → mask-parameter derivations. The dialog's Edge sliders land in
 // TraceOptions as Canny-era fields (src/ui/trace/trace-options.ts):
@@ -57,16 +58,19 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
     radiusPx: maskRadiusPx(options),
     delta: maskDelta(options),
   });
-  const params = lightBurnTraceSettingsToPotraceParams(options);
-  const polylines = potraceBitmapToPolylines(bitmap, {
-    ...params,
-    // The Edge preset's "minimum line" knob maps onto potrace's speckle
-    // suppression: shapes below this area (px²) are dropped before tracing.
-    turdSize: Math.max(
-      params.turdSize,
-      Math.round(options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX),
-    ),
-  });
+  const polylines = contourPolylinesFromMask(
+    { width: bitmap.width, height: bitmap.height, ink: bitmap.data },
+    {
+      // The Edge preset's "minimum line" knob maps onto the finisher's
+      // speckle gate: loops below this area (px²) are dropped — the same
+      // numeric mapping the previous geometry stage used for its
+      // area-based suppression.
+      minAreaPx: Math.max(2, Math.round(options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX)),
+      epsilonPx: EDGE_SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1),
+      // Same Smoothness → flatten-strength ramp as the contour lane.
+      flattenStrength: Math.max(0, 6 * (options.smoothness ?? 1) - 5),
+    },
+  );
   return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];
 }
 
