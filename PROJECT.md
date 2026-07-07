@@ -196,6 +196,16 @@ macOS/Linux desktop, per ADR-104's renumbering note.)
   (WORKFLOW.md Phase K flows, AUDIT.md row) until a real box is cut and
   assembled.
 
+**K.2 — broad-tool pack [Approved; staged V0–V4].** ADR-116: panel
+cutouts (interior rings; panels re-carrier to named `imported-svg`
+vector objects, closing the v1 name gap), divider grids (through-slot
+tabs + egg-crate cross-laps, complementary by construction), and the
+`slide-lid` style (slotted side walls, shortened front, thumb-notch lid,
+mandatory play). Every new junction type extends the assembly referee
+and the seeded benchmark — new categories must score 100% without
+regressing v1. Deferred with names in ADR-116: lip/hinged/living-hinge
+lids, polygon prisms, dovetails, CNC dado 2.5D, T-slot hardware joints.
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:

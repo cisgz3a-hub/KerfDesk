@@ -5186,3 +5186,115 @@ np-house-H / np-house-all / np-lang-all read and compared against the
 baseline (serifs hug, letters legible, counters present) — the maintainer
 saw the prototype renders and approved the architecture before
 implementation; the final engine renders await the maintainer's own pass.
+
+## ADR-116 — Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07)
+
+**Status:** accepted (maintainer directive: "I need my box designer to be
+a full broad tool"). Builds on ADR-106; scope lands here before code.
+
+### Context
+
+The v1 generator ships two styles (closed, open-top) on an engine whose
+hard parts — per-edge complementary sequences, corner-cube arbitration,
+uniform-offset fit, corner-overcut relief, and the virtual assembly
+referee — are style-independent. The single blocker between v1 and the
+broad-tool tier (dividers, lids, hardware mounts) is that a `BoxPanel`
+carries exactly ONE outline ring: ADR-106 said "no holes in v1". This
+ADR adds interior cutouts once, then spends that capability on the two
+most-requested styles. Behavior references: boxes.py docs and MakerCase
+(reverse-engineering study only — boxes.py is GPL, no code copying,
+ADR-017).
+
+### Decision 1 — panel cutouts (the enabling upgrade)
+
+- `BoxPanel` gains `cutouts: ReadonlyArray<Polyline>` (closed interior
+  rings in the same sheet frame as the outline).
+- **Insertion changes carrier:** panels insert as `kind:'imported-svg'`
+  vector objects (the established carrier for baked generated geometry —
+  dogbone/weld precedent), one `ColoredPath` holding outline + cutout
+  rings. This is chosen over per-ring shape objects because (a) even-odd
+  fill semantics make cutouts real holes under Fill mode, (b) compile-time
+  kerf offset is already containment-aware for hole rings
+  (`kerf-offset.ts`), and (c) the `source` field ("Box panel: Front")
+  finally carries panel names into the scene — closing the v1 gap where
+  `SceneObject` has no name field. Undo/selection semantics unchanged
+  (one undo step, all panels selected). The generator's own insert path
+  never routes through `importSvgObject`, so Phase C re-import
+  replace-by-source semantics cannot trigger on generated panels.
+- **Fit generalizes for free:** the −c/4 clearance offset on correctly
+  oriented multi-ring polygons shrinks material and therefore WIDENS
+  every cutout by c/4 per flank — exactly the slot play the joint
+  contract requires. Corner relief extends to cutout rings: every
+  slot corner a mating tab must seat against gets the F-CNC26 overcut
+  at full bit radius, same post-offset ordering.
+- **Referee extension:** slot bands. A junction between a tabbed part
+  and a slotted panel is checked like a cube edge: one shared sequence,
+  exact complementarity at c = 0, uniform play/2 flank gaps otherwise,
+  zero interference always.
+
+### Decision 2 — divider grid
+
+- `BoxSpec` gains `dividersXCount` / `dividersYCount` (0–N, evenly
+  spaced partitions across width / depth; 0 = v1 output, byte-identical).
+- Divider panels stand on the bottom panel (no bottom slots in v2),
+  height = inner height, and carry tabs into **through-slots** in the
+  two walls they meet — through-slots are the standard laser-box
+  aesthetic; half-depth dados are CNC 2.5D work and stay deferred.
+  Tab/slot layout reuses `edge-pattern` over the divider junction height
+  (odd cells, divider owns the odd cells), so complementarity is by
+  construction, exactly like cube edges.
+- Divider×divider intersections use egg-crate cross-laps: X-dividers
+  notched half-height from the top, Y-dividers from the bottom, notch
+  width T (widened by the clearance pass like any recess).
+- Validation: resulting compartment pitch must exceed 2·T and, for CNC,
+  the slot/notch cells must clear the relief tool (same rule family as
+  ADR-106).
+
+### Decision 3 — slide lid
+
+- New style `'slide-lid'`: bottom, back, slotted left/right walls,
+  front wall shortened to the slot floor, plus a loose lid panel.
+- Geometry: lid plane occupies z ∈ [OH−T, OH]. Side walls carry a
+  through-slot of height T (widened by play) running from the front
+  edge to T short of the back wall; the lid slides over the shortened
+  front and stops against the full-height back wall. Lid = full inner
+  width + slot engagement on both sides, front edge carries a half-round
+  thumb notch (clipper subtraction, relief-pass pattern).
+- A slide lid must SLIDE: validation requires clearance > 0 for this
+  style (defaults stay 0.15 mm CNC; laser default rises to 0.2 mm for
+  slide-lid only). The referee gains a mandatory-play check for the
+  lid/slot bands and a lid-clears-front check.
+
+### Staged diffs (each independently reviewable + CI-green)
+
+- **V0 — docs:** this ADR, PROJECT.md Phase K.2 block, WORKFLOW.md
+  F-K6/F-K7 flows.
+- **V1 — cutout infrastructure:** `BoxPanel.cutouts`, multi-ring
+  panel-fit (offset + relief across rings), named `imported-svg`
+  insertion (amend F-K1's carrier wording in the same diff — flows
+  describe shipped behavior), referee slot bands, benchmark category
+  `cutouts`.
+- **V2 — dividers:** divider spec + validation, wall-slot claims,
+  divider outline builder (tabs + cross-laps), dialog fields + preview,
+  referee divider bands, benchmark category `dividers`.
+- **V3 — slide lid:** style + geometry, mandatory-play validation,
+  dialog style option, referee lid checks, benchmark category
+  `slide-lid`.
+- **V4 — closeout:** AUDIT rows (CLAIMED + named hardware checks: cut an
+  organizer with 2×1 dividers and a slide-lid box, assemble and slide),
+  session report, PROJECT status flip.
+
+### Out of scope (each needs its own ADR)
+
+Lift-off lip lids, hinged lids and living-hinge curved boxes, polygon
+prisms (hex/octagon), dovetail/angled fingers, CNC dado/rabbet 2.5D
+joinery, T-slot bolt+nut joints, bottom slots for dividers, engraved
+panel labels (io/text). Named so they are deferred, not forgotten.
+
+### Verification
+
+Same regime as ADR-106: every new junction type gets exact-referee and
+play-referee coverage; the seeded benchmark extends (new categories must
+score 100% and the v1 categories must stay 100% — no style may regress
+another); perceptual fixtures per new style; determinism over the
+enlarged spec space; physical fit stays CLAIMED until the named cuts.
