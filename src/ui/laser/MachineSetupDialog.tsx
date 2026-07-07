@@ -46,7 +46,14 @@ const TABS: ReadonlyArray<{
   },
 ];
 
-export function MachineSetupDialog(props: { readonly onClose: () => void }): JSX.Element {
+export function MachineSetupDialog(props: {
+  readonly onClose: () => void;
+  // Cross-link back to the guided Device Setup wizard (ADR-092), so an
+  // operator who opened this dialog on a fresh machine still finds the guided
+  // path. Optional: only the Laser rail can host the wizard, so only it wires
+  // this; standalone renders simply omit the row.
+  readonly onRunGuidedSetup?: () => void;
+}): JSX.Element {
   const [tab, setTab] = useState<SetupTab>('overview');
   return (
     <Dialog title="Machine Setup" size="xl" onClose={props.onClose}>
@@ -64,7 +71,22 @@ export function MachineSetupDialog(props: { readonly onClose: () => void }): JSX
             </Button>
           ))}
         </nav>
-        <section style={tabPanelStyle}>{renderTab(tab)}</section>
+        <section style={tabPanelStyle}>
+          {tab === 'overview' && props.onRunGuidedSetup !== undefined && (
+            <div style={guidedSetupRowStyle}>
+              <Button
+                onClick={props.onRunGuidedSetup}
+                {...helpProps('control:laser.device-setup.launch')}
+              >
+                Run guided setup
+              </Button>
+              <span style={guidedSetupHintStyle}>
+                New machine? The wizard prefills this profile from what the controller reports.
+              </span>
+            </div>
+          )}
+          {renderTab(tab)}
+        </section>
       </div>
       <DialogActions>
         <Button onClick={props.onClose}>Close</Button>
@@ -105,3 +127,13 @@ const tabListStyle: React.CSSProperties = {
   alignItems: 'stretch',
 };
 const tabPanelStyle: React.CSSProperties = { overflow: 'auto', maxHeight: 560, paddingRight: 4 };
+const guidedSetupRowStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  marginBottom: 12,
+};
+const guidedSetupHintStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+};

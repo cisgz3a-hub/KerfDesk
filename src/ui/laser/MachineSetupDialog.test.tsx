@@ -45,7 +45,10 @@ function platformWithFiles(
   };
 }
 
-async function renderDialog(platform: PlatformAdapter = platformWithFiles([])): Promise<{
+async function renderDialog(
+  platform: PlatformAdapter = platformWithFiles([]),
+  onRunGuidedSetup?: () => void,
+): Promise<{
   readonly host: HTMLDivElement;
   readonly unmount: () => Promise<void>;
 }> {
@@ -56,7 +59,10 @@ async function renderDialog(platform: PlatformAdapter = platformWithFiles([])): 
     root = createRoot(host);
     root.render(
       <PlatformProvider adapter={platform}>
-        <MachineSetupDialog onClose={() => undefined} />
+        <MachineSetupDialog
+          onClose={() => undefined}
+          {...(onRunGuidedSetup === undefined ? {} : { onRunGuidedSetup })}
+        />
       </PlatformProvider>,
     );
   });
@@ -103,6 +109,27 @@ describe('MachineSetupDialog', () => {
         'creality-falcon-a1-pro-compatible',
       );
       expect(useStore.getState().dirty).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('offers the guided setup cross-link on Overview only when a launcher is wired', async () => {
+    const withoutLauncher = await renderDialog();
+    try {
+      expect(withoutLauncher.host.textContent).not.toContain('Run guided setup');
+    } finally {
+      await withoutLauncher.unmount();
+    }
+
+    const onRunGuidedSetup = vi.fn();
+    const { host, unmount } = await renderDialog(platformWithFiles([]), onRunGuidedSetup);
+    try {
+      await act(async () => button(host, 'Run guided setup').click());
+      expect(onRunGuidedSetup).toHaveBeenCalledTimes(1);
+      // The cross-link belongs to Overview only — other tabs stay uncluttered.
+      await act(async () => button(host, 'Safety Zones').click());
+      expect(host.textContent).not.toContain('Run guided setup');
     } finally {
       await unmount();
     }

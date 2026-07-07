@@ -71,7 +71,7 @@ export function DeviceSetupWizard(props: {
     props.onClose();
   };
   return (
-    <Dialog title="Set up device" size="lg" onClose={props.onClose}>
+    <Dialog title="Device Setup" size="lg" onClose={props.onClose}>
       <p style={stepHintStyle}>
         Step {stepNumber} of {DEVICE_SETUP_STEP_ORDER.length} — {STEP_TITLES[state.step]}
       </p>
