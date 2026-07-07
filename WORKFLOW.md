@@ -766,6 +766,40 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 2. No Move Laser to Selection physical move.
 3. No Set Start Point or node-level start ordering.
 
+### F-B16. Interrupted-job checkpoint and resume (ADR-118)
+
+While a job streams, the app keeps a ~200-byte checkpoint in localStorage:
+a fingerprint of the compiled program plus the GRBL-acked line count
+(updated every 25 acks and on every pause/stop/error/disconnect). Only a
+run that finishes cleanly clears it.
+
+#### Success — resume after a crash
+1. App/tab/PC died mid-job. Operator relaunches; autosave recovery
+   restores the project (F-C3).
+2. The Laser window shows the banner: "Interrupted laser job from
+   <time>: N of M motion lines confirmed."
+3. Operator connects, homes, and confirms the work zero is unchanged
+   (same contract as manual Start-from-line).
+4. **Resume interrupted job** re-compiles the project, verifies the
+   fingerprint matches the interrupted program byte-for-byte, maps the
+   acked count to the raw G-code line, and runs the standard
+   start-from-line replay (safe re-entry preamble, then the tail).
+5. The checkpoint clears when the resume run completes.
+
+#### Error — project changed since the run
+1. Fingerprint mismatch → alert explains the project no longer produces
+   the interrupted program; nothing is streamed. The manual
+   Start-from-line control remains the escape hatch.
+
+#### Edge — controller lost power too
+1. Acked lines may include a buffer's worth GRBL never executed; the
+   banner says so. Backing up re-burns a short stretch; skipping forward
+   leaves gaps — when in doubt, resume earlier via the manual control.
+
+#### Edge — deliberate Stop
+1. Stop keeps the checkpoint (a stopped job is still resumable);
+   **Dismiss** on the banner is the explicit discard.
+
 ---
 
 ## Phase C flows — STUB
