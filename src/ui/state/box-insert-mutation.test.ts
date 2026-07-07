@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateBox, type BoxSpec } from '../../core/box';
+import { generateBox, type BoxPanel, type BoxSpec } from '../../core/box';
 import { createProject } from '../../core/scene';
 import { applyInsertBoxPanels } from './box-insert-mutation';
 
@@ -16,7 +16,7 @@ const SPEC: BoxSpec = {
   partSpacingMm: 8,
 };
 
-function generatedPanels() {
+function generatedPanels(): ReadonlyArray<BoxPanel> {
   const result = generateBox(SPEC);
   if (result.kind !== 'generated') throw new Error(result.kind);
   return result.panels;
@@ -27,24 +27,22 @@ function emptySlice() {
 }
 
 describe('applyInsertBoxPanels', () => {
-  it('inserts one closed polyline shape per panel with fresh unique ids', () => {
+  it('inserts one named vector object per panel with fresh unique ids', () => {
     const result = applyInsertBoxPanels(emptySlice(), generatedPanels());
     expect(result).not.toBeNull();
     if (result === null) return;
     const objects = result.project.scene.objects;
     expect(objects).toHaveLength(6);
     expect(new Set(objects.map((o) => o.id)).size).toBe(6);
-    for (const object of objects) {
-      expect(object.kind).toBe('shape');
-      if (object.kind !== 'shape') continue;
-      expect(object.spec.kind).toBe('polyline');
-      if (object.spec.kind !== 'polyline') continue;
-      expect(object.spec.closed).toBe(true);
-      // The spec must not repeat the closing vertex; materialization does.
-      const first = object.spec.points[0];
-      const last = object.spec.points[object.spec.points.length - 1];
-      expect(first).not.toEqual(last);
-    }
+    const sources = objects.map((o) => (o.kind === 'imported-svg' ? o.source : o.kind));
+    expect(sources).toEqual([
+      'Box panel: Bottom',
+      'Box panel: Top',
+      'Box panel: Front',
+      'Box panel: Back',
+      'Box panel: Left',
+      'Box panel: Right',
+    ]);
   });
 
   it('selects every inserted panel and nothing else', () => {
@@ -68,7 +66,6 @@ describe('applyInsertBoxPanels', () => {
     if (secondInsert === null) throw new Error('expected insertion');
     expect(secondInsert.project.scene.objects).toHaveLength(12);
     expect(secondInsert.project.scene.layers.filter((l) => l.color === '#000000')).toHaveLength(1);
-    // Fresh ids each generate — no collisions between the two sheets.
     expect(new Set(secondInsert.project.scene.objects.map((o) => o.id)).size).toBe(12);
   });
 
@@ -85,13 +82,33 @@ describe('applyInsertBoxPanels', () => {
     expect(applyInsertBoxPanels(emptySlice(), [])).toBeNull();
   });
 
-  it('keeps the sheet geometry verbatim in scene coordinates', () => {
+  it('keeps every ring verbatim: outline first, then cutouts (holes)', () => {
     const panels = generatedPanels();
-    const result = applyInsertBoxPanels(emptySlice(), panels);
+    const first = panels[0];
+    if (first === undefined) throw new Error('missing panel');
+    const withCutout: BoxPanel = {
+      ...first,
+      cutouts: [
+        {
+          closed: true,
+          points: [
+            { x: 10, y: 10 },
+            { x: 20, y: 10 },
+            { x: 20, y: 16 },
+            { x: 10, y: 16 },
+            { x: 10, y: 10 },
+          ],
+        },
+      ],
+    };
+    const result = applyInsertBoxPanels(emptySlice(), [withCutout, ...panels.slice(1)]);
     if (result === null) throw new Error('expected insertion');
     const object = result.project.scene.objects[0];
-    if (object?.kind !== 'shape') throw new Error('expected shape');
-    const polyline = object.paths[0]?.polylines[0];
-    expect(polyline?.points).toEqual(panels[0]?.outline.points);
+    if (object?.kind !== 'imported-svg') throw new Error('expected imported-svg');
+    const polylines = object.paths[0]?.polylines;
+    expect(polylines).toHaveLength(2);
+    expect(polylines?.[0]?.points).toEqual(withCutout.outline.points);
+    expect(polylines?.[1]?.points).toEqual(withCutout.cutouts[0]?.points);
+    expect(object.bounds.minX).toBeCloseTo(0, 9);
   });
 });

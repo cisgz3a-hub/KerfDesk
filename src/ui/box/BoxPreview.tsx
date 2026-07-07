@@ -67,12 +67,14 @@ function drawSheet(ctx: CanvasRenderingContext2D, panels: ReadonlyArray<BoxPanel
   ctx.strokeStyle = PANEL_STROKE;
   ctx.lineWidth = 1;
   for (const panel of panels) {
-    ctx.beginPath();
-    panel.outline.points.forEach((point, index) => {
-      if (index === 0) ctx.moveTo(point.x * scale, point.y * scale);
-      else ctx.lineTo(point.x * scale, point.y * scale);
-    });
-    ctx.stroke();
+    for (const ring of [panel.outline, ...panel.cutouts]) {
+      ctx.beginPath();
+      ring.points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x * scale, point.y * scale);
+        else ctx.lineTo(point.x * scale, point.y * scale);
+      });
+      ctx.stroke();
+    }
     drawLabel(ctx, panel, scale);
   }
   ctx.restore();

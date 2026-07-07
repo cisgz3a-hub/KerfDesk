@@ -8,7 +8,7 @@ import type { Polyline, Vec2 } from '../scene';
 import { validateBoxSpec, type BoxSpec, type BoxSpecIssue } from './box-spec';
 import { buildPanelClaims, type PanelId } from './panel-claims';
 import { panelOutline } from './panel-outline';
-import { applyPanelFit } from './panel-fit';
+import { applyPanelFit, type PanelRings } from './panel-fit';
 import { layoutPanelOffsets, type PanelExtent } from './layout';
 
 export type BoxPanel = {
@@ -16,6 +16,8 @@ export type BoxPanel = {
   readonly panel: PanelId;
   /** Closed outline in sheet mm (layout offset already applied). */
   readonly outline: Polyline;
+  /** Interior cutout rings in sheet mm (ADR-116; empty without dividers). */
+  readonly cutouts: ReadonlyArray<Polyline>;
   /** The layout translation; subtract it to recover the local panel frame. */
   readonly offsetMm: Vec2;
 };
@@ -44,19 +46,21 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
   if (validation.kind === 'invalid') {
     return { kind: 'invalid', issues: validation.issues, warnings: validation.warnings };
   }
-  const fittedPanels: Array<{ panel: PanelId; outline: Polyline }> = [];
+  const fittedPanels: Array<{ panel: PanelId } & PanelRings> = [];
   for (const claims of buildPanelClaims(spec)) {
-    const fit = applyPanelFit(panelOutline(claims), {
-      clearanceMm: spec.clearanceMm,
-      relief: spec.relief,
-    });
+    // Cutouts arrive with the divider pack (ADR-116 V2): wall slots join
+    // the nominal rings here, ahead of the shared fit pass.
+    const fit = applyPanelFit(
+      { outline: panelOutline(claims), cutouts: [] },
+      { clearanceMm: spec.clearanceMm, relief: spec.relief },
+    );
     if (fit.kind !== 'fitted') {
       return { kind: 'error', message: `${PANEL_NAMES[claims.panel]} panel: ${fit.detail}.` };
     }
-    fittedPanels.push({ panel: claims.panel, outline: fit.outline });
+    fittedPanels.push({ panel: claims.panel, outline: fit.outline, cutouts: fit.cutouts });
   }
   const offsets = layoutPanelOffsets(
-    fittedPanels.map((panel) => outlineExtent(panel.outline)),
+    fittedPanels.map((panel) => ringsExtent(panel)),
     spec.partSpacingMm,
   );
   return {
@@ -67,29 +71,32 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
         name: PANEL_NAMES[panel.panel],
         panel: panel.panel,
         outline: translate(panel.outline, offsetMm),
+        cutouts: panel.cutouts.map((cutout) => translate(cutout, offsetMm)),
         offsetMm,
       };
     }),
   };
 }
 
-function outlineExtent(outline: Polyline): PanelExtent {
+function ringsExtent(rings: PanelRings): PanelExtent {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of outline.points) {
-    minX = Math.min(minX, point.x);
-    minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x);
-    maxY = Math.max(maxY, point.y);
+  for (const ring of [rings.outline, ...rings.cutouts]) {
+    for (const point of ring.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
   }
   return { minX, minY, maxX, maxY };
 }
 
-function translate(outline: Polyline, offsetMm: Vec2): Polyline {
+function translate(ring: Polyline, offsetMm: Vec2): Polyline {
   return {
-    closed: outline.closed,
-    points: outline.points.map((point) => ({ x: point.x + offsetMm.x, y: point.y + offsetMm.y })),
+    closed: ring.closed,
+    points: ring.points.map((point) => ({ x: point.x + offsetMm.x, y: point.y + offsetMm.y })),
   };
 }
