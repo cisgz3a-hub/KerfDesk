@@ -1,4 +1,5 @@
 import type { Polyline, Vec2 } from '../../core/scene';
+import { polylineLength } from './benchmark-rating';
 import { sampleByArcLength } from './centerline-geometry';
 
 export type ArchContinuityQuality = {
@@ -96,16 +97,6 @@ function pointFallsInArchBand(
 
 function normalizedAngleDeg(point: Vec2, center: Vec2): number {
   return ((Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI + 360) % 360;
-}
-
-function polylineLength(points: ReadonlyArray<Vec2>): number {
-  let total = 0;
-  for (let index = 0; index + 1 < points.length; index += 1) {
-    const a = points[index];
-    const b = points[index + 1];
-    if (a !== undefined && b !== undefined) total += Math.hypot(a.x - b.x, a.y - b.y);
-  }
-  return total;
 }
 
 // --- letter-outline closure and smoothness (the 2026-07-03 defects) ---

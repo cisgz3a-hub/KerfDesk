@@ -6,11 +6,13 @@ import {
   profileSupportsCapability,
   validateMachineProfile,
 } from './profile-catalog';
+import { profileConfidenceLabel } from './profile-confidence';
 
 describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
   it('ships the required built-in GRBL profiles with valid evidence', () => {
     expect(GRBL_MACHINE_PROFILE_CATALOG.map((entry) => entry.profile.profileId)).toEqual([
       'generic-grbl-400x400',
+      'creality-falcon-a1-pro-grblhal',
       'creality-falcon-a1-pro-compatible',
       'neotronics-4040-max-lt4lds-v2-20w',
       'xtool-d1-pro',
@@ -29,15 +31,51 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
     }
   });
 
-  it('marks the brand starter profiles unverified so operators confirm specs', () => {
+  it('ships a specific Falcon A1 Pro grblHAL profile before the broad fallback', () => {
+    const specific = profileCatalogEntryById('creality-falcon-a1-pro-grblhal');
+    const fallback = profileCatalogEntryById('creality-falcon-a1-pro-compatible');
+    if (specific === undefined || fallback === undefined)
+      throw new Error('Falcon profiles missing');
+
+    expect(specific.profile.controllerKind).toBe('grblhal');
+    expect(specific.profile.name).toBe('Creality Falcon A1 Pro (grblHAL)');
+    expect(profileConfidenceLabel(specific.profile)).toBe('Hardware verified');
+    expect(fallback.profile.name).toBe('Creality Falcon-compatible GRBL diode');
+    expect(fallback.profile.profileId).toBe('creality-falcon-a1-pro-compatible');
+  });
+
+  it('marks the brand starter profiles as public-spec starters so operators confirm specs', () => {
     for (const profileId of ['xtool-d1-pro', 'sculpfun-s30', 'ortur-laser-master-3'] as const) {
       const entry = profileCatalogEntryById(profileId);
       if (entry === undefined) throw new Error(`missing catalog profile: ${profileId}`);
       expect(validateMachineProfile(entry.profile)).toEqual([]);
-      expect(entry.profile.evidence?.every((item) => item.status === 'unverified')).toBe(true);
+      expect(entry.profile.evidence?.every((item) => item.status === 'public-spec-starter')).toBe(
+        true,
+      );
+      expect(profileConfidenceLabel(entry.profile)).toBe('Public-spec starter');
       expect(entry.profile.bedWidth).toBeGreaterThan(0);
       expect(entry.profile.bedHeight).toBeGreaterThan(0);
     }
+  });
+
+  it('gives every built-in profile a user-facing confidence label', () => {
+    const labels = GRBL_MACHINE_PROFILE_CATALOG.map((entry) =>
+      profileConfidenceLabel(entry.profile),
+    );
+    expect(labels).toEqual([
+      'Default starter',
+      'Hardware verified',
+      'Simulator tested',
+      'Simulator tested',
+      'Public-spec starter',
+      'Public-spec starter',
+      'Public-spec starter',
+      'Simulator tested',
+      'Simulator tested',
+      'Simulator tested',
+      'Simulator tested',
+      'Experimental',
+    ]);
   });
 
   it('finds catalog entries by id and reports capabilities', () => {

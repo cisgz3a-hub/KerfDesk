@@ -9,6 +9,7 @@
 // guard themselves (modifier checks, isEditableTarget, kind-of-event).
 
 import { useEffect, useRef } from 'react';
+import { selectedConvertibleVectors, selectedObjectIds } from '../commands/selection-command-state';
 import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -78,7 +79,18 @@ function useFileEditShortcuts(): void {
   const fileCtx: FileCtx = { platform, project, jobPlacement, outputScope, machine, controllerSettings, importSvgObject, setProject, newProject, savedName, lastSaveTarget, markSaved, markLoaded, pushToast, confirmDiscard };
   // prettier-ignore
   const editCtx: EditCtx = { undo, redo, selectedObjectId, selectedPathNode, additionalSelectedIds, removeSceneObjects, deleteSelectedPathNodes, selectObject, selectAllObjects, copySelection, cutSelection, pasteClipboard, groupSelection, ungroupSelection, duplicateSelection, resetToolMode };
-  useFileEditShortcutEffect(fileCtx, editCtx, { setToolMode });
+  useFileEditShortcutEffect(fileCtx, editCtx, { setToolMode, openConvertToBitmap });
+}
+
+// Ctrl/Cmd+Shift+B (LightBurn's Convert to Bitmap binding). Same gate as the
+// Tools command: every selected object is a convertible vector — otherwise
+// the chord is a no-op, mirroring the disabled menu item. State is read at
+// call time so the handler never closes over a stale selection.
+function openConvertToBitmap(): void {
+  const s = useStore.getState();
+  const ids = selectedObjectIds(s.selectedObjectId, s.additionalSelectedIds);
+  if (selectedConvertibleVectors(s.project, ids).length === 0) return;
+  useUiStore.getState().openConvertBitmapDialog();
 }
 
 function useFileEditShortcutEffect(fileCtx: FileCtx, editCtx: EditCtx, toolCtx: ToolCtx): void {

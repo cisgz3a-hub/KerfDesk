@@ -15,6 +15,7 @@ import type {
 } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { ImportExportPanel } from './MachineSetupImportExport';
@@ -63,6 +64,13 @@ async function renderPanel(platform: PlatformAdapter): Promise<RenderedPanel> {
 
 afterEach(() => {
   resetStore();
+  useLaserStore.setState({
+    connection: { kind: 'disconnected' },
+    detectedSettings: null,
+    controllerSettings: null,
+    detectedControllerKind: null,
+    lastSettingsReadAt: null,
+  } as Partial<ReturnType<typeof useLaserStore.getState>>);
   useToastStore.setState({ toasts: [] });
 });
 
@@ -131,6 +139,60 @@ describe('Machine Setup import/export panel', () => {
       expect(useToastStore.getState().toasts).toContainEqual(
         expect.objectContaining({ message: 'Machine profile applied.', variant: 'success' }),
       );
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('preserves controller-read facts when applying an imported profile while connected', async () => {
+    useStore.getState().updateDeviceProfile({
+      controllerKind: 'grbl-v1.1',
+      maxFeed: 10000,
+      framingFeedMmPerMin: 10000,
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      detectedControllerKind: 'grblhal',
+      controllerSettings: {
+        maxFeed: 10000,
+        accelMmPerSec2: 2500,
+        junctionDeviationMm: 0.01,
+        bedWidth: 400,
+        bedHeight: 400,
+      },
+      lastSettingsReadAt: 1718600000000,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const text = serializeMachineProfileDocument({
+      format: MACHINE_PROFILE_FORMAT,
+      schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,
+      profile: {
+        ...DEFAULT_DEVICE_PROFILE,
+        name: 'Imported wrong-controller profile',
+        controllerKind: 'marlin',
+        bedWidth: 500,
+        maxFeed: 3000,
+        framingFeedMmPerMin: 3000,
+      },
+      source: { kind: 'custom', label: 'Fixture' },
+      reviewNotes: ['Fixture import.'],
+    });
+    const open = vi.fn(async (_request: FileOpenRequest) => [
+      { name: 'wrong.lfmachine.json', text: async () => text },
+    ]);
+    const { host, unmount } = await renderPanel(platformAdapter({ open }));
+    try {
+      await act(async () => button(host, 'Import KerfDesk profile').click());
+      await act(async () => button(host, 'Apply imported profile').click());
+
+      expect(useStore.getState().project.device).toMatchObject({
+        name: 'Imported wrong-controller profile',
+        controllerKind: 'grblhal',
+        bedWidth: 400,
+        maxFeed: 10000,
+        framingFeedMmPerMin: 10000,
+      });
     } finally {
       await unmount();
     }

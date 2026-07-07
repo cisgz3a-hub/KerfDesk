@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { DeviceProfile } from '../../core/devices';
+import { profileWithControllerFacts, type DeviceProfile } from '../../core/devices';
 import {
   MACHINE_PROFILE_FORMAT,
   MACHINE_PROFILE_SCHEMA_VERSION,
@@ -11,6 +11,7 @@ import { importLightBurnDeviceProfile, type LightBurnDeviceImportReview } from '
 import { usePlatform } from '../app/platform-context';
 import { Button } from '../kit';
 import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import {
   buttonRowStyle,
@@ -32,6 +33,10 @@ export function ImportExportPanel(): JSX.Element {
   const platform = usePlatform();
   const device = useStore((s) => s.project.device);
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
+  const detectedSettings = useLaserStore((s) => s.detectedSettings);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
+  const lastSettingsReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const pushToast = useToastStore((s) => s.pushToast);
   const [review, setReview] = useState<ImportReview | null>(null);
 
@@ -84,7 +89,16 @@ export function ImportExportPanel(): JSX.Element {
         <ImportReviewCard
           review={review}
           onApply={(profile) => {
-            replaceDeviceProfile(profile);
+            replaceDeviceProfile(
+              profileWithControllerFacts({
+                profile,
+                current: device,
+                detectedSettings,
+                controllerSettings,
+                detectedControllerKind,
+                lastSettingsReadAt,
+              }),
+            );
             setReview(null);
             pushToast('Machine profile applied.', 'success');
           }}

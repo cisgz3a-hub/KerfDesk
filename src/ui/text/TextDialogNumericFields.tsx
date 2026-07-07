@@ -3,6 +3,7 @@ import {
   DEFAULT_TEXT_LINE_HEIGHT,
   DEFAULT_TEXT_SIZE_MM,
 } from '../../core/text';
+import { NumberField } from '../common/NumberField';
 
 const TEXT_SIZE_MIN_MM = 1;
 const TEXT_SIZE_MAX_MM = 300;
@@ -58,78 +59,49 @@ export function TextDialogNumericFields(props: {
   return (
     <>
       <Field label="Size">
-        <input
-          type="number"
+        <NumberField
+          ariaLabel="Text size"
+          value={values.sizeMm}
           min={TEXT_SIZE_MIN_MM}
           max={TEXT_SIZE_MAX_MM}
           step={1}
-          value={values.sizeMm}
-          onChange={(e) =>
-            props.setSizeMm(
-              parseNumberInput(e.target.value, values.sizeMm, TEXT_SIZE_MIN_MM, TEXT_SIZE_MAX_MM),
-            )
-          }
-          className="lf-input"
+          onCommit={props.setSizeMm}
           style={numStyle}
-          aria-label="Text size"
           title="Text height in millimeters."
+          debounceMs={0}
         />
         <span className="lf-field-unit">mm</span>
       </Field>
       <Field label="Line height">
-        <input
-          type="number"
+        <NumberField
+          ariaLabel="Text line height"
+          value={values.lineHeight}
           min={TEXT_LINE_HEIGHT_MIN}
           max={TEXT_LINE_HEIGHT_MAX}
           step={0.1}
-          value={values.lineHeight}
-          onChange={(e) =>
-            props.setLineHeight(
-              parseNumberInput(
-                e.target.value,
-                values.lineHeight,
-                TEXT_LINE_HEIGHT_MIN,
-                TEXT_LINE_HEIGHT_MAX,
-              ),
-            )
-          }
-          className="lf-input"
+          onCommit={props.setLineHeight}
           style={numStyle}
-          aria-label="Text line height"
           title="Vertical distance between text lines, relative to text size."
+          debounceMs={0}
         />
         <span className="lf-field-unit">x size</span>
       </Field>
       <Field label="Spacing">
-        <input
-          type="number"
+        <NumberField
+          ariaLabel="Text letter spacing"
+          value={values.letterSpacing}
           min={TEXT_LETTER_SPACING_MIN}
           max={TEXT_LETTER_SPACING_MAX}
           step={0.05}
-          value={values.letterSpacing}
-          onChange={(e) =>
-            props.setLetterSpacing(
-              parseNumberInput(
-                e.target.value,
-                values.letterSpacing,
-                TEXT_LETTER_SPACING_MIN,
-                TEXT_LETTER_SPACING_MAX,
-              ),
-            )
-          }
-          className="lf-input"
+          onCommit={props.setLetterSpacing}
           style={numStyle}
-          aria-label="Text letter spacing"
           title="Letter spacing (tracking). 0 = font's natural spacing. Positive widens, negative tightens."
+          debounceMs={0}
         />
         <span className="lf-field-unit">x size (0 = natural)</span>
       </Field>
     </>
   );
-}
-
-function parseNumberInput(value: string, fallback: number, min: number, max: number): number {
-  return clampFiniteNumber(Number(value), fallback, min, max);
 }
 
 function clampFiniteNumber(value: number, fallback: number, min: number, max: number): number {

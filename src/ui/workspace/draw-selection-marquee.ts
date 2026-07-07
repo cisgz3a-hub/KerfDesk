@@ -16,11 +16,15 @@ export function drawSelectionMarquee(
   const width = Math.abs(x2 - x1);
   const height = Math.abs(y2 - y1);
 
+  // Solid box for an enclosing (left→right) select, dashed for a crossing
+  // (right→left) select, so the direction's meaning is visible (audit C3).
+  const enclosing = marquee.end.x >= marquee.start.x;
+
   ctx.save();
   ctx.fillStyle = canvasTheme.selectionMarqueeFill;
   ctx.strokeStyle = canvasTheme.selection;
   ctx.lineWidth = 1;
-  ctx.setLineDash([5, 3]);
+  ctx.setLineDash(enclosing ? [] : [5, 3]);
   ctx.fillRect(x, y, width, height);
   ctx.strokeRect(x, y, width, height);
   ctx.restore();

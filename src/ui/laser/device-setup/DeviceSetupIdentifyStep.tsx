@@ -4,12 +4,14 @@
 // committed until Finish.
 
 import {
-  GRBL_MACHINE_PROFILE_CATALOG,
-  type MachineProfileCatalogEntry,
+  profileConfidenceLabel,
+  suggestMachineProfiles,
+  type MachineProfileSuggestion,
 } from '../../../core/devices';
 import { Button } from '../../kit';
 import {
   badgeStyle,
+  buttonRowStyle,
   cardHeaderStyle,
   cardStyle,
   catalogGridStyle,
@@ -19,14 +21,20 @@ import {
 import type { DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
+  const suggestions = suggestMachineProfiles({
+    detectedControllerKind: state.detectedControllerKind ?? null,
+    detectedProfilePatch: state.detected,
+    controllerSettings: state.controllerRead ? state.detected : null,
+    settingsRows: [],
+  });
   return (
     <div style={catalogGridStyle}>
-      {GRBL_MACHINE_PROFILE_CATALOG.map((entry) => (
+      {suggestions.map((suggestion) => (
         <PresetCard
-          key={entry.profile.profileId ?? entry.profile.name}
-          entry={entry}
-          active={state.draft.profileId === entry.profile.profileId}
-          onUse={() => dispatch({ kind: 'apply-preset', profile: entry.profile })}
+          key={suggestion.profileId}
+          suggestion={suggestion}
+          active={state.draft.profileId === suggestion.profile.profileId}
+          onUse={() => dispatch({ kind: 'apply-preset', profile: suggestion.profile })}
         />
       ))}
     </div>
@@ -34,16 +42,19 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
 }
 
 function PresetCard(props: {
-  readonly entry: MachineProfileCatalogEntry;
+  readonly suggestion: MachineProfileSuggestion;
   readonly active: boolean;
   readonly onUse: () => void;
 }): JSX.Element {
-  const profile = props.entry.profile;
+  const profile = props.suggestion.profile;
   return (
     <article style={cardStyle}>
       <div style={cardHeaderStyle}>
         <strong>{profile.name}</strong>
-        <span style={badgeStyle}>{profile.profileSource ?? 'built-in'}</span>
+        <span style={buttonRowStyle}>
+          <span style={badgeStyle}>{suggestionConfidenceLabel(props.suggestion.confidence)}</span>
+          <span style={badgeStyle}>{profileConfidenceLabel(profile)}</span>
+        </span>
       </div>
       <p style={mutedStyle}>
         {profile.bedWidth} x {profile.bedHeight} mm
@@ -52,8 +63,14 @@ function PresetCard(props: {
           : ''}
       </p>
       <ul style={notesStyle}>
-        {props.entry.reviewNotes.map((note) => (
+        {props.suggestion.entry.reviewNotes.map((note) => (
           <li key={note}>{note}</li>
+        ))}
+        {props.suggestion.reasons.slice(0, 2).map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+        {props.suggestion.warnings.map((warning) => (
+          <li key={warning}>{warning}</li>
         ))}
       </ul>
       <Button
@@ -68,4 +85,10 @@ function PresetCard(props: {
       </Button>
     </article>
   );
+}
+
+function suggestionConfidenceLabel(confidence: MachineProfileSuggestion['confidence']): string {
+  if (confidence === 'suggested') return 'Suggested match';
+  if (confidence === 'possible') return 'Possible match';
+  return 'Manual choice';
 }

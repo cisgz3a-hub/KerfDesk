@@ -38,6 +38,7 @@ export type ControlHelpKey =
   | 'laser.machine-settings.export'
   | 'laser.machine-settings.export-diagnostic'
   | 'laser.machine-settings.table'
+  | 'laser.machine-setup.launch'
   | 'laser.machine-setup.tab.overview'
   | 'laser.machine-setup.tab.catalog'
   | 'laser.machine-setup.tab.controller'
@@ -231,6 +232,11 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
   'laser.machine-settings.table': {
     label: 'Machine settings table',
     tooltip: 'Review each reported GRBL setting value, unit, and meaning without editing firmware.',
+  },
+  'laser.machine-setup.launch': {
+    label: 'Machine Setup',
+    tooltip:
+      'Open the Machine Setup dialog: profile, catalog, controller settings, firmware writes, safety zones, diagnostics, and import/export.',
   },
   'laser.machine-setup.tab.overview': {
     label: 'Machine overview',

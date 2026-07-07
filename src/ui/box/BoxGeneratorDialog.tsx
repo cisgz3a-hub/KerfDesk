@@ -10,6 +10,7 @@ import {
   generateBox,
   validateBoxSpec,
   type BoxPanel,
+  type BoxSpec,
   type GenerateBoxResult,
 } from '../../core/box';
 import { Button, Dialog, DialogActions } from '../kit';
@@ -28,8 +29,10 @@ import {
   type BoxDraft,
   type BoxDraftParse,
   type BoxMachineContext,
+  SLIDE_LID_MIN_CLEARANCE_DRAFT,
 } from './box-draft';
 import { BoxGeneratorFields } from './BoxGeneratorFields';
+import { BoxAssembledPreview } from './BoxAssembledPreview';
 import { BoxPreview } from './BoxPreview';
 
 export function BoxGeneratorDialog(props: {
@@ -50,15 +53,23 @@ export function BoxGeneratorDialog(props: {
   // Keeps the last valid sheet visible while the draft is invalid (F-K1).
   // Render-time ref write is an idempotent cache, safe under StrictMode.
   const lastValidPanels = useRef<ReadonlyArray<BoxPanel> | null>(null);
+  const lastValidSpec = useRef<BoxSpec | null>(null);
+  const [view, setView] = useState<'flat' | 'assembled'>('flat');
   const setField =
     (field: keyof BoxDraft) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
       const { value } = event.target;
-      setDraft((current) =>
-        field === 'thickness'
-          ? boxDraftWithMaterialThickness(current, value, lockedAutoFitFields)
-          : { ...current, [field]: value },
-      );
+      setDraft((current) => {
+        if (field === 'thickness') {
+          return boxDraftWithMaterialThickness(current, value, lockedAutoFitFields);
+        }
+        // A slide lid cannot slide at zero clearance; lift the draft to the
+        // style's working default when the user has not set one (F-K7).
+        if (field === 'style' && value === 'slide-lid' && Number(current.clearance) === 0) {
+          return { ...current, style: value, clearance: SLIDE_LID_MIN_CLEARANCE_DRAFT };
+        }
+        return { ...current, [field]: value };
+      });
       if (isAutoFitField(field)) {
         setLockedAutoFitFields((current) => new Set([...current, field]));
       }
@@ -67,6 +78,7 @@ export function BoxGeneratorDialog(props: {
   const generation = parsed.kind === 'spec' ? generateBox(parsed.spec) : null;
   const panels = generation !== null && generation.kind === 'generated' ? generation.panels : null;
   if (panels !== null) lastValidPanels.current = panels;
+  if (panels !== null && parsed.kind === 'spec') lastValidSpec.current = parsed.spec;
   return (
     <Dialog
       onClose={props.onCancel}
@@ -82,7 +94,15 @@ export function BoxGeneratorDialog(props: {
     >
       <BoxGeneratorFields draft={draft} machine={props.machine} setField={setField} />
       <p style={summaryStyle}>{summaryLine(parsed)}</p>
-      <BoxPreview panels={panels ?? lastValidPanels.current} />
+      <ViewToggle view={view} onSelect={setView} />
+      {view === 'flat' ? (
+        <BoxPreview panels={panels ?? lastValidPanels.current} />
+      ) : (
+        <BoxAssembledPreview
+          panels={panels ?? lastValidPanels.current}
+          spec={parsed.kind === 'spec' && panels !== null ? parsed.spec : lastValidSpec.current}
+        />
+      )}
       <IssueList issues={issueLines(parsed, generation)} warnings={warningLines(parsed)} />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
@@ -96,6 +116,22 @@ export function BoxGeneratorDialog(props: {
 
 function isAutoFitField(field: keyof BoxDraft): field is BoxAutoFitField {
   return field === 'fingerWidth' || field === 'partSpacing';
+}
+
+function ViewToggle(props: {
+  readonly view: 'flat' | 'assembled';
+  readonly onSelect: (view: 'flat' | 'assembled') => void;
+}): JSX.Element {
+  return (
+    <div style={viewToggleStyle} role="group" aria-label="Preview view">
+      <Button onClick={() => props.onSelect('flat')} aria-pressed={props.view === 'flat'}>
+        Flat
+      </Button>
+      <Button onClick={() => props.onSelect('assembled')} aria-pressed={props.view === 'assembled'}>
+        Assembled
+      </Button>
+    </div>
+  );
 }
 
 function IssueList(props: {
@@ -153,6 +189,8 @@ function summaryLine(parsed: BoxDraftParse): string {
 function fmt(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
+
+const viewToggleStyle: CSSProperties = { display: 'flex', gap: 4, margin: '0 0 6px' };
 
 const summaryStyle: CSSProperties = {
   fontSize: 12,

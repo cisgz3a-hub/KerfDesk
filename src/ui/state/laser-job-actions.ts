@@ -12,10 +12,12 @@ import {
   pause as pauseStreamer,
   resume as resumeStreamer,
   step,
+  wipeInFlight,
   type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
+import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -45,6 +47,7 @@ const START_PENDING_ACK_MESSAGE =
 export function jobActions(
   set: SetFn,
   get: GetFn,
+  refs: ResetCleanupRefs,
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
@@ -83,18 +86,19 @@ export function jobActions(
       const activeDriver = driver();
       const hold = activeDriver.realtime.hold;
       // Realtime feed hold pauses motion instantly but leaves the beam state
-      // to the firmware — only provable safe when $32 laser mode is confirmed,
-      // which only grbl-dollar firmwares can report. Smoothieware ties beam
-      // power to motion in its laser module, so hold is accepted without the
-      // $32 proof there. Firmwares without a hold byte (Marlin) pause
-      // stream-side instead: the streamer stops sending and buffered motion
-      // drains.
-      // Router jobs are exempt: feed hold with a spindle is standard sender
-      // behavior (motion holds, spindle keeps spinning), and a router must
-      // have $32=0 — demanding the laser proof would block CNC pause outright.
+      // to the firmware — only provable safe when $32 laser mode is
+      // confirmed. ADR-096's exemption is for firmwares that CANNOT report
+      // $-settings (settings 'none': Smoothieware ties beam power to motion
+      // in its laser module; Marlin has no hold byte and pauses stream-side).
+      // Firmwares that CAN report — writable ('grbl-dollar') or read-only
+      // ('readonly-dump', FluidNC's $$ compat dump) — keep the strict gate
+      // (audit F6). Router jobs are exempt: feed hold with a spindle is
+      // standard sender behavior (motion holds, spindle keeps spinning), and
+      // a router must have $32=0 — demanding the laser proof would block CNC
+      // pause outright.
       const requiresLaserModeProof =
         hold !== null &&
-        activeDriver.capabilities.settings === 'grbl-dollar' &&
+        activeDriver.capabilities.settings !== 'none' &&
         get().activeJobMachineKind !== 'cnc';
       if (requiresLaserModeProof) assertPauseSafe(set, get);
       if (hold !== null) await safeWrite(hold, 'pause');
@@ -108,24 +112,47 @@ export function jobActions(
     stopJob: async () => {
       const softReset = driver().realtime.softReset;
       if (softReset !== null) await safeWrite(softReset, 'stop');
-      try {
-        for (const line of driver().commands.stopLaserLines) {
-          await safeWrite(`${line}\n`, 'stop');
+      if (softReset === null) {
+        // Stream-side stop (Marlin): no reset, no reboot — the beam-off
+        // lines go out immediately and their acks queue behind the
+        // in-flight job lines in receive order.
+        try {
+          for (const line of driver().commands.stopLaserLines) {
+            await safeWrite(`${line}\n`, 'stop');
+          }
+        } catch {
+          // Coolant cleanup is best effort and may fail if the serial link
+          // is already gone.
         }
-      } catch {
-        // Soft reset is the safety-critical command; coolant cleanup is best
-        // effort and may fail if the serial link is already gone.
       }
       // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
       // cached WCO so the readout doesn't lie about "custom origin"
       // until the next WCO frame arrives. Same race window as
       // resumeJob — use functional set.
+      // A sent soft reset also wiped the firmware's RX buffer: the
+      // in-flight lines will never be acked, so drop them from the
+      // accounting or the beam-off cleanup acks get claimed by the dead
+      // stream (audit F1). Stream-side stops (Marlin) keep in-flight —
+      // the firmware still acks those lines.
       set((s) => ({
         wcoCache: null,
         airAssistOn: false,
         ...originPatchAfterSoftReset(s),
-        streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
+        streamer:
+          s.streamer === null
+            ? s.streamer
+            : softReset !== null
+              ? wipeInFlight(cancelStreamer(s.streamer))
+              : cancelStreamer(s.streamer),
       }));
+      // After a sent reset, the beam-off cleanup is deferred until the boot
+      // banner arrives (audit F2): written now it races the reboot — either
+      // swallowed mid-init (its ack never comes, the counter jams) or acked
+      // after the banner reset the untracked ledger (an orphaned ok). The
+      // soft reset itself already de-energized laser and coolant.
+      if (softReset !== null) {
+        armResetCleanup(refs, safeWrite, driver().commands.stopLaserLines);
+      }
     },
   };
 }

@@ -16,6 +16,7 @@ import {
   writeTraceArtifactEvidence,
 } from './trace-artifact-runner';
 import { rasterizeColoredPaths, type Mask } from './rasterize';
+import { countInk } from './benchmark-rating';
 
 const LINE_ART_OPTIONS = TRACE_PRESETS['Line Art']!;
 const LANGEBAAN_BAND = { x0: 300, y0: 660, x1: 735, y1: 725 };
@@ -135,19 +136,6 @@ describe('arch-house real logo Line Art acceptance', () => {
     },
   );
 });
-
-function countInk(
-  mask: Mask,
-  rect: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number },
-): number {
-  let count = 0;
-  for (let y = rect.y0; y < rect.y1; y += 1) {
-    for (let x = rect.x0; x < rect.x1; x += 1) {
-      count += mask.data[y * mask.width + x] ?? 0;
-    }
-  }
-  return count;
-}
 
 function maskFromMonochrome(image: {
   readonly width: number;

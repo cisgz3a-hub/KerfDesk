@@ -1,29 +1,51 @@
-// box-benchmark — the aggregated ADR-106 verification battery as a single
-// reproducible scorecard. A seeded corpus (no Math.random — bit-identical
-// every run) sweeps the fuzz ranges plus the known hard cases, and every
-// category must score 100%:
+// box-benchmark — the aggregated ADR-106/116 verification battery as a
+// single reproducible scorecard. A seeded corpus (no Math.random —
+// bit-identical every run) sweeps the fuzz ranges plus the known hard
+// cases, and every category must score 100%:
 //   assembly-exact      nominal referee: zero collisions/voids, true to size
 //   assembly-clearance  fitted referee: uniform play == c, zero interference
 //   structure           simple rectilinear rings, area exact vs claims
 //   fit-relief          full-radius overcut at every reflex corner; laser
 //                       output bit-identical at clearance 0
 //   determinism         same spec ⇒ JSON-identical output, twice
+//   cutouts             multi-ring fit invariants (ADR-116 V1)
 //   sabotage-detection  the referee FAILS on all four broken-math classes
 // Run alone for the scorecard:
 //   pnpm exec vitest run src/__fixtures__/property/box-benchmark.test.ts
 
 import { describe, expect, it } from 'vitest';
-import type { Polyline, Vec2 } from '../../core/scene';
+import type { Vec2 } from '../../core/scene';
 import { checkBoxAssembly, type RefereePanel } from '../../core/box/assembly-referee';
-import { validateBoxSpec, type BoxSpec } from '../../core/box/box-spec';
-import { edgePattern } from '../../core/box/edge-pattern';
+import { checkDividerAssembly } from '../../core/box/divider-referee';
+import { buildSlideLidParts } from '../../core/box/slide-lid-panels';
+import { checkSlideLidAssembly } from '../../core/box/slide-lid-referee';
+import {
+  fitCouponClearanceMm,
+  generateFitCoupon,
+  type FitCouponSpec,
+} from '../../core/box/fit-coupon';
+import type { BoxSpec } from '../../core/box/box-spec';
 import { generateBox } from '../../core/box/generate-box';
 import { buildPanelClaims } from '../../core/box/panel-claims';
 import { panelOutline } from '../../core/box/panel-outline';
 import { applyPanelFit } from '../../core/box/panel-fit';
+import {
+  BENCHMARK_SEED,
+  composeDividerInput,
+  areaMatchesClaims,
+  buildCorpus,
+  clearanceFor,
+  isRectilinearSimple,
+  minDistance,
+  rectRing,
+  reliefToolFor,
+  reliefsAtFullRadius,
+  ringSpan,
+  spec,
+  tamperCell,
+  tamperCorner,
+} from './box-benchmark-support';
 
-const SEED = 0x1057b0c5;
-const SWEEP_SPECS = 48;
 const BENCHMARK_TIMEOUT_MS = 120000;
 
 type Score = { readonly category: string; passed: number; total: number };
@@ -39,6 +61,10 @@ describe('box generator benchmark', () => {
         scoreStructure(corpus),
         scoreFitRelief(corpus),
         scoreDeterminism(corpus),
+        scoreCutouts(),
+        scoreDividers(),
+        scoreSlideLid(),
+        scoreFitCoupon(),
         scoreSabotageDetection(),
       ];
       const totalPassed = scores.reduce((sum, s) => sum + s.passed, 0);
@@ -49,7 +75,7 @@ describe('box generator benchmark', () => {
       );
       console.log(
         [
-          `[box-benchmark] seed=0x${SEED.toString(16)} corpus=${corpus.length} specs`,
+          `[box-benchmark] seed=0x${BENCHMARK_SEED.toString(16)} corpus=${corpus.length} specs`,
           ...lines,
           `  ${'OVERALL'.padEnd(20)} ${String(totalPassed).padStart(5)}/${String(total).padEnd(5)} ${totalPassed === total ? '100%' : 'FAIL'}`,
         ].join('\n'),
@@ -65,77 +91,6 @@ describe('box generator benchmark', () => {
   );
 });
 
-// ---------- corpus ----------
-
-function buildCorpus(): ReadonlyArray<BoxSpec> {
-  const rand = mulberry32(SEED);
-  const specs: BoxSpec[] = [];
-  for (let i = 0; i < SWEEP_SPECS; i += 1) {
-    const w = 20 + rand() * 580;
-    const d = 20 + rand() * 580;
-    const h = 20 + rand() * 580;
-    const t = 1 + rand() * Math.min(24, (Math.min(w, d, h) - 2) / 2 - 1);
-    specs.push({
-      widthMm: w,
-      depthMm: d,
-      heightMm: h,
-      dimensionMode: rand() < 0.5 ? 'inner' : 'outer',
-      thicknessMm: t,
-      targetFingerWidthMm: (1.5 + rand() * 3.5) * t,
-      style: rand() < 0.5 ? 'closed' : 'open-top',
-      clearanceMm: 0,
-      relief: { kind: 'none' },
-      partSpacingMm: 8,
-    });
-  }
-  // Known hard cases: n=1 fallback, thin stock, max stock, huge box, slab.
-  specs.push(
-    spec(60, 40, 30, 3, 9, 'closed'),
-    spec(60, 40, 30, 3, 9, 'open-top'),
-    spec(20, 20, 20, 6, 30, 'closed'),
-    spec(600, 600, 600, 25, 40, 'closed'),
-    spec(500, 22, 22, 1, 1.5, 'open-top'),
-    spec(40, 40, 4.5, 1, 5, 'closed'),
-  );
-  return specs.filter((candidate) => validateBoxSpec(candidate).kind === 'valid');
-}
-
-function spec(
-  w: number,
-  d: number,
-  h: number,
-  t: number,
-  finger: number,
-  style: BoxSpec['style'],
-): BoxSpec {
-  return {
-    widthMm: w,
-    depthMm: d,
-    heightMm: h,
-    dimensionMode: 'inner',
-    thicknessMm: t,
-    targetFingerWidthMm: finger,
-    style,
-    clearanceMm: 0,
-    relief: { kind: 'none' },
-    partSpacingMm: 8,
-  };
-}
-
-// Deterministic 32-bit PRNG so the corpus is bit-identical on every run.
-function mulberry32(seed: number): () => number {
-  let state = seed;
-  return () => {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-// ---------- categories ----------
-
 function scoreAssemblyExact(corpus: ReadonlyArray<BoxSpec>): Score {
   let passed = 0;
   for (const candidate of corpus) {
@@ -150,7 +105,10 @@ function scoreAssemblyClearance(corpus: ReadonlyArray<BoxSpec>): Score {
     const c = clearanceFor(candidate);
     const cleared = { ...candidate, clearanceMm: c };
     const panels = localPanels(cleared).map((panel) => {
-      const fit = applyPanelFit(panel.outline, { clearanceMm: c, relief: { kind: 'none' } });
+      const fit = applyPanelFit(
+        { outline: panel.outline, cutouts: [] },
+        { clearanceMm: c, relief: { kind: 'none' } },
+      );
       return fit.kind === 'fitted' ? { panel: panel.panel, outline: fit.outline } : panel;
     });
     if (checkBoxAssembly(panels, cleared, { playMm: c }).length === 0) passed += 1;
@@ -181,14 +139,17 @@ function scoreFitRelief(corpus: ReadonlyArray<BoxSpec>): Score {
       const nominal = panelOutline(claims);
       // Laser identity: clearance 0 + no relief returns the input verbatim.
       total += 1;
-      const laser = applyPanelFit(nominal, { clearanceMm: 0, relief: { kind: 'none' } });
+      const laser = applyPanelFit(
+        { outline: nominal, cutouts: [] },
+        { clearanceMm: 0, relief: { kind: 'none' } },
+      );
       if (laser.kind === 'fitted' && laser.outline === nominal) passed += 1;
       // CNC: every reflex corner carries a full-radius overcut.
       total += 1;
-      const cnc = applyPanelFit(nominal, {
-        clearanceMm: 0,
-        relief: { kind: 'corner-overcut', toolDiameterMm: toolMm },
-      });
+      const cnc = applyPanelFit(
+        { outline: nominal, cutouts: [] },
+        { clearanceMm: 0, relief: { kind: 'corner-overcut', toolDiameterMm: toolMm } },
+      );
       if (cnc.kind === 'fitted' && reliefsAtFullRadius(nominal, cnc.outline, toolMm / 2)) {
         passed += 1;
       }
@@ -200,18 +161,251 @@ function scoreFitRelief(corpus: ReadonlyArray<BoxSpec>): Score {
 function scoreDeterminism(corpus: ReadonlyArray<BoxSpec>): Score {
   let passed = 0;
   for (const candidate of corpus) {
+    const toolMm = reliefToolFor(candidate);
     const cnc: BoxSpec = {
       ...candidate,
       clearanceMm: clearanceFor(candidate),
       relief:
-        reliefToolFor(candidate) === null
-          ? { kind: 'none' }
-          : // Null-checked one line up; re-derive to keep the type narrow.
-            { kind: 'corner-overcut', toolDiameterMm: reliefToolFor(candidate) ?? 1 },
+        toolMm === null ? { kind: 'none' } : { kind: 'corner-overcut', toolDiameterMm: toolMm },
     };
     if (JSON.stringify(generateBox(cnc)) === JSON.stringify(generateBox(cnc))) passed += 1;
   }
   return { category: 'determinism', passed, total: corpus.length };
+}
+
+// Multi-ring fit invariants (ADR-116 V1): synthetic panels with slot
+// cutouts must keep their ring count, widen slots by c/2, carve full-radius
+// overcuts at slot corners, stay bit-identical at c=0, and stay
+// deterministic.
+function scoreCutouts(): Score {
+  const outline = rectRing(0, 0, 120, 80);
+  const slots = [rectRing(20, 30, 28, 50), rectRing(60, 20, 100, 26)];
+  const rings = { outline, cutouts: slots };
+  const toolMm = 3.175;
+  let passed = 0;
+  let total = 0;
+  total += 1;
+  const identity = applyPanelFit(rings, { clearanceMm: 0, relief: { kind: 'none' } });
+  if (
+    identity.kind === 'fitted' &&
+    identity.outline === outline &&
+    identity.cutouts[0] === slots[0]
+  ) {
+    passed += 1;
+  }
+  for (const c of [0.1, 0.2, 0.4]) {
+    total += 1;
+    const fit = applyPanelFit(rings, { clearanceMm: c, relief: { kind: 'none' } });
+    if (fit.kind === 'fitted' && fit.cutouts.length === 2) {
+      const widened = fit.cutouts.every((cutout, i) => {
+        const nominal = slots[i];
+        if (nominal === undefined) return false;
+        const grewX = ringSpan(cutout).x - ringSpan(nominal).x;
+        const grewY = ringSpan(cutout).y - ringSpan(nominal).y;
+        return Math.abs(grewX - c / 2) <= 4e-3 && Math.abs(grewY - c / 2) <= 4e-3;
+      });
+      if (widened) passed += 1;
+    }
+  }
+  total += 1;
+  const relieved = applyPanelFit(rings, {
+    clearanceMm: 0,
+    relief: { kind: 'corner-overcut', toolDiameterMm: toolMm },
+  });
+  if (relieved.kind === 'fitted' && relieved.cutouts.length === 2) {
+    const ok = slots.every((slot, i) => {
+      const hole = relieved.cutouts[i];
+      if (hole === undefined) return false;
+      return slot.points.slice(0, -1).every((corner) => {
+        const d = minDistance(corner, hole);
+        return d >= 0.98 * (toolMm / 2) && d <= toolMm / 2 + 2e-3;
+      });
+    });
+    if (ok) passed += 1;
+  }
+  total += 1;
+  const a = applyPanelFit(rings, {
+    clearanceMm: 0.2,
+    relief: { kind: 'corner-overcut', toolDiameterMm: toolMm },
+  });
+  const b = applyPanelFit(rings, {
+    clearanceMm: 0.2,
+    relief: { kind: 'corner-overcut', toolDiameterMm: toolMm },
+  });
+  if (JSON.stringify(a) === JSON.stringify(b)) passed += 1;
+  return { category: 'cutouts', passed, total };
+}
+
+// Divider grids (ADR-116 V2): exact slot/tab/lap complementarity, the play
+// contract under clearance, determinism, and the 0-divider regression.
+function scoreDividers(): Score {
+  const grids: ReadonlyArray<readonly [number, number]> = [
+    [1, 0],
+    [0, 1],
+    [2, 1],
+    [3, 2],
+  ];
+  let passed = 0;
+  let total = 0;
+  for (const style of ['closed', 'open-top'] as const) {
+    for (const [nx, ny] of grids) {
+      const gridSpec: BoxSpec = {
+        ...spec(120, 90, 40, 3, 9, style),
+        dividersXCount: nx,
+        dividersYCount: ny,
+      };
+      total += 1;
+      if (checkDividerAssembly(composeDividerInput(gridSpec), gridSpec).length === 0) passed += 1;
+      total += 1;
+      const played: BoxSpec = { ...gridSpec, clearanceMm: 0.3 };
+      if (checkDividerAssembly(composeDividerInput(played), played, { playMm: 0.3 }).length === 0) {
+        passed += 1;
+      }
+      total += 1;
+      if (JSON.stringify(generateBox(gridSpec)) === JSON.stringify(generateBox(gridSpec))) {
+        passed += 1;
+      }
+    }
+  }
+  // 0-divider regression: absent fields and explicit zeros are byte-equal.
+  total += 1;
+  const plain = spec(120, 90, 40, 3, 9, 'closed');
+  const zeros: BoxSpec = { ...plain, dividersXCount: 0, dividersYCount: 0 };
+  if (JSON.stringify(generateBox(plain)) === JSON.stringify(generateBox(zeros))) passed += 1;
+  return { category: 'dividers', passed, total };
+}
+
+// Slide-lid style (ADR-116 V3): exact nominal channel/front/lid geometry,
+// the sliding contract on fitted panels, divider composition, and
+// determinism.
+function scoreSlideLid(): Score {
+  let passed = 0;
+  let total = 0;
+  const sizes: ReadonlyArray<readonly [number, number, number, number]> = [
+    [80, 50, 30, 3],
+    [120, 90, 40, 6],
+    [60, 60, 20, 2],
+  ];
+  for (const [w, d, h, t] of sizes) {
+    const lidSpec: BoxSpec = {
+      ...spec(w, d, h, t, 3 * t, 'slide-lid'),
+      clearanceMm: 0.2,
+    };
+    // Nominal builder geometry, exact.
+    total += 1;
+    const parts = buildSlideLidParts(lidSpec).map((part) => ({
+      panel: part.panel,
+      outline: part.rings.outline,
+    }));
+    if (checkSlideLidAssembly(parts, lidSpec).length === 0) passed += 1;
+    // Sliding contract on the generated (fitted) panels.
+    total += 1;
+    const result = generateBox(lidSpec);
+    if (result.kind === 'generated') {
+      const locals = result.panels.map((panel) => ({
+        panel: panel.panel,
+        outline: {
+          closed: panel.outline.closed,
+          points: panel.outline.points.map((point) => ({
+            x: point.x - panel.offsetMm.x,
+            y: point.y - panel.offsetMm.y,
+          })),
+        },
+      }));
+      if (checkSlideLidAssembly(locals, lidSpec, { playMm: 0.2 }).length === 0) passed += 1;
+    }
+    // Determinism.
+    total += 1;
+    if (JSON.stringify(generateBox(lidSpec)) === JSON.stringify(generateBox(lidSpec))) passed += 1;
+  }
+  // Divider composition inside a slide-lid box.
+  total += 1;
+  const combo: BoxSpec = {
+    ...spec(120, 90, 40, 3, 9, 'slide-lid'),
+    clearanceMm: 0.2,
+    dividersXCount: 1,
+    dividersYCount: 1,
+  };
+  const comboResult = generateBox(combo);
+  if (comboResult.kind === 'generated' && comboResult.panels.length === 8) passed += 1;
+  return { category: 'slide-lid', passed, total };
+}
+
+// Fit coupon (ADR-118): every rung must measure notch − tab == cᵢ exactly,
+// laser and CNC-relieved variants must generate, and output is
+// deterministic.
+function scoreFitCoupon(): Score {
+  let passed = 0;
+  let total = 0;
+  for (const relief of [
+    { kind: 'none' } as const,
+    { kind: 'corner-overcut', toolDiameterMm: 3.175 } as const,
+  ]) {
+    const coupon: FitCouponSpec = {
+      thicknessMm: 3,
+      fingerWidthMm: 9,
+      startClearanceMm: 0.05,
+      stepClearanceMm: 0.05,
+      rungCount: 6,
+      relief,
+    };
+    total += 1;
+    const result = generateFitCoupon(coupon);
+    if (result.kind === 'generated' && result.parts.length === 2) passed += 1;
+    total += 1;
+    if (JSON.stringify(generateFitCoupon(coupon)) === JSON.stringify(generateFitCoupon(coupon))) {
+      passed += 1;
+    }
+    if (result.kind !== 'generated' || relief.kind !== 'none') continue;
+    // Rung law on the laser (exact) variant.
+    const law = scoreRungLaw(coupon, result.parts);
+    passed += law.passed;
+    total += law.total;
+  }
+  return { category: 'fit-coupon', passed, total };
+}
+
+function scoreRungLaw(
+  coupon: FitCouponSpec,
+  parts: ReadonlyArray<{
+    readonly rings: { readonly outline: { readonly points: ReadonlyArray<Vec2> } };
+  }>,
+): { passed: number; total: number } {
+  let passed = 0;
+  let total = 0;
+  const comb = parts[0];
+  const slots = parts[1];
+  for (let i = 0; i < coupon.rungCount; i += 1) {
+    total += 1;
+    const c = fitCouponClearanceMm(coupon, i);
+    const tab = nthRun(comb?.rings.outline.points ?? [], 13, i);
+    const notch = nthRun(slots?.rings.outline.points ?? [], 29, i);
+    if (
+      tab !== null &&
+      notch !== null &&
+      Math.abs(notch[1] - notch[0] - (tab[1] - tab[0]) - c) < 1e-9
+    ) {
+      passed += 1;
+    }
+  }
+  return { passed, total };
+}
+
+function nthRun(
+  points: ReadonlyArray<Vec2>,
+  yValue: number,
+  index: number,
+): readonly [number, number] | null {
+  const runs: Array<readonly [number, number]> = [];
+  for (let i = 0; i + 1 < points.length; i += 1) {
+    const p = points[i];
+    const q = points[i + 1];
+    if (p === undefined || q === undefined) continue;
+    if (p.y !== yValue || q.y !== yValue || p.x === q.x) continue;
+    runs.push([Math.min(p.x, q.x), Math.max(p.x, q.x)]);
+  }
+  runs.sort((a, b) => a[0] - b[0]);
+  return runs[index] ?? null;
 }
 
 // The referee must catch all four classic failure classes when the math is
@@ -242,163 +436,9 @@ function scoreSabotageDetection(): Score {
   return { category: 'sabotage-detection', passed, total: checks.length };
 }
 
-// ---------- helpers ----------
-
 function localPanels(candidate: BoxSpec): ReadonlyArray<RefereePanel> {
   return buildPanelClaims(candidate).map((claims) => ({
     panel: claims.panel,
     outline: panelOutline(claims),
   }));
-}
-
-function clearanceFor(candidate: BoxSpec): number {
-  return Math.min(0.4, minCellMm(candidate) / 4, candidate.thicknessMm / 4);
-}
-
-function reliefToolFor(candidate: BoxSpec): number | null {
-  const toolMm = Math.min(3.175, minCellMm(candidate) * 0.6);
-  const withRelief: BoxSpec = {
-    ...candidate,
-    relief: { kind: 'corner-overcut', toolDiameterMm: toolMm },
-  };
-  return validateBoxSpec(withRelief).kind === 'valid' ? toolMm : null;
-}
-
-function minCellMm(candidate: BoxSpec): number {
-  const t2 = 2 * candidate.thicknessMm;
-  const outer =
-    candidate.dimensionMode === 'inner'
-      ? [candidate.widthMm + t2, candidate.depthMm + t2, candidate.heightMm + t2]
-      : [candidate.widthMm, candidate.depthMm, candidate.heightMm];
-  return Math.min(
-    ...outer.map(
-      (fullSpanMm) =>
-        edgePattern({
-          fullSpanMm,
-          thicknessMm: candidate.thicknessMm,
-          targetFingerWidthMm: candidate.targetFingerWidthMm,
-        }).cellWidthMm,
-    ),
-  );
-}
-
-function isRectilinearSimple(ring: ReadonlyArray<Vec2>): boolean {
-  if (ring.length < 4) return false;
-  const seen = new Set<string>();
-  for (let i = 0; i < ring.length; i += 1) {
-    const a = ring[i];
-    const b = ring[(i + 1) % ring.length];
-    const c = ring[(i + 2) % ring.length];
-    if (a === undefined || b === undefined || c === undefined) return false;
-    seen.add(`${a.x},${a.y}`);
-    const abHorizontal = a.y === b.y;
-    if (abHorizontal ? a.x === b.x : a.x !== b.x) return false;
-    if ((b.y === c.y) !== !abHorizontal) return false;
-  }
-  return seen.size === ring.length;
-}
-
-function areaMatchesClaims(
-  ring: ReadonlyArray<Vec2>,
-  claims: ReturnType<typeof buildPanelClaims>[number],
-  candidate: BoxSpec,
-): boolean {
-  let expected = claims.sizeUMm * claims.sizeVMm;
-  for (const side of ['vMin', 'uMax', 'vMax', 'uMin'] as const) {
-    const intervals = claims.sides[side];
-    for (let i = 1; i < intervals.length - 1; i += 1) {
-      const cell = intervals[i];
-      if (cell !== undefined && !cell.owned) {
-        expected -= (cell.toMm - cell.fromMm) * candidate.thicknessMm;
-      }
-    }
-  }
-  for (const side of ['vMin', 'vMax'] as const) {
-    const intervals = claims.sides[side];
-    const first = intervals[0];
-    const last = intervals[intervals.length - 1];
-    if (first !== undefined && !first.owned) expected -= candidate.thicknessMm ** 2;
-    if (last !== undefined && !last.owned) expected -= candidate.thicknessMm ** 2;
-  }
-  return Math.abs(shoelace(ring) - expected) <= 1e-6 * expected;
-}
-
-function shoelace(ring: ReadonlyArray<Vec2>): number {
-  let sum = 0;
-  for (let i = 0; i < ring.length; i += 1) {
-    const a = ring[i];
-    const b = ring[(i + 1) % ring.length];
-    if (a === undefined || b === undefined) continue;
-    sum += a.x * b.y - b.x * a.y;
-  }
-  return sum / 2;
-}
-
-// Every reflex corner of the nominal ring must sit ~one bit radius away
-// from the relieved boundary (24-gon chord bound + clipper rounding).
-function reliefsAtFullRadius(nominal: Polyline, relieved: Polyline, radiusMm: number): boolean {
-  const ring = nominal.points.slice(0, -1);
-  for (let i = 0; i < ring.length; i += 1) {
-    const prev = ring[(i + ring.length - 1) % ring.length];
-    const curr = ring[i];
-    const next = ring[(i + 1) % ring.length];
-    if (prev === undefined || curr === undefined || next === undefined) return false;
-    const cross = (curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x);
-    if (cross >= 0) continue;
-    const distance = minDistance(curr, relieved);
-    if (distance < 0.98 * radiusMm || distance > radiusMm + 2e-3) return false;
-  }
-  return true;
-}
-
-function minDistance(point: Vec2, outline: Polyline): number {
-  let best = Number.POSITIVE_INFINITY;
-  for (let i = 0; i + 1 < outline.points.length; i += 1) {
-    const a = outline.points[i];
-    const b = outline.points[i + 1];
-    if (a === undefined || b === undefined) continue;
-    const abX = b.x - a.x;
-    const abY = b.y - a.y;
-    const lenSq = abX * abX + abY * abY;
-    const t =
-      lenSq === 0
-        ? 0
-        : Math.max(0, Math.min(1, ((point.x - a.x) * abX + (point.y - a.y) * abY) / lenSq));
-    best = Math.min(best, Math.hypot(point.x - (a.x + t * abX), point.y - (a.y + t * abY)));
-  }
-  return best;
-}
-
-function tamperCell(base: BoxSpec, cellIndex: number): ReadonlyArray<string> {
-  const panels = buildPanelClaims(base).map((claims) => {
-    if (claims.panel !== 'front') return { panel: claims.panel, outline: panelOutline(claims) };
-    const tampered = {
-      ...claims,
-      sides: {
-        ...claims.sides,
-        vMin: claims.sides.vMin.map((interval, i) =>
-          i === cellIndex ? { ...interval, owned: !interval.owned } : interval,
-        ),
-      },
-    };
-    return { panel: claims.panel, outline: panelOutline(tampered) };
-  });
-  return checkBoxAssembly(panels, base);
-}
-
-function tamperCorner(base: BoxSpec): ReadonlyArray<string> {
-  const panels = buildPanelClaims(base).map((claims) => {
-    if (claims.panel !== 'front') return { panel: claims.panel, outline: panelOutline(claims) };
-    const tampered = {
-      ...claims,
-      sides: {
-        ...claims.sides,
-        vMin: claims.sides.vMin.map((interval, i) =>
-          i === 0 ? { ...interval, owned: true } : interval,
-        ),
-      },
-    };
-    return { panel: claims.panel, outline: panelOutline(tampered) };
-  });
-  return checkBoxAssembly(panels, base);
 }

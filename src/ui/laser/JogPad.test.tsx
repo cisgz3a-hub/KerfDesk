@@ -160,12 +160,54 @@ describe('JogPad accessible labels', () => {
     await unmount();
   });
 
-  it('disables the air assist toggle until a device coolant command is configured', async () => {
+  it('keeps the air assist setup path clickable until a device coolant command is configured', async () => {
     const { host, unmount } = await renderJogPad();
 
-    const air = buttonByLabel(host, 'Turn manual air assist on (not configured)');
-    expect(air?.disabled).toBe(true);
-    expect(air?.textContent).toContain('Not set');
+    const air = buttonByLabel(host, 'Turn manual air assist on (setup needed)');
+    expect(air?.disabled).toBe(false);
+    expect(air?.textContent).toContain('Setup needed');
+
+    await unmount();
+  });
+
+  it('shows a Proceed warning before using Manual Air to configure missing project air settings', async () => {
+    const setAirAssistEnabled = vi.fn(async () => undefined);
+    useLaserStore.setState({ setAirAssistEnabled });
+    const { host, unmount } = await renderJogPad();
+
+    const air = buttonByLabel(host, 'Turn manual air assist on (setup needed)');
+    if (air === null) throw new Error('air assist setup button missing');
+    expect(air.disabled).toBe(false);
+    await act(async () => {
+      air.click();
+    });
+
+    expect(host.textContent).toContain('Manual Air will update project air-assist settings.');
+    expect(buttonByLabel(host, 'Proceed with air assist setup')).not.toBeNull();
+    expect(setAirAssistEnabled).not.toHaveBeenCalled();
+
+    await unmount();
+  });
+
+  it('applies the warning Proceed action before turning manual air on', async () => {
+    const setAirAssistEnabled = vi.fn(async () => undefined);
+    useLaserStore.setState({ setAirAssistEnabled });
+    const { host, unmount } = await renderJogPad();
+
+    const air = buttonByLabel(host, 'Turn manual air assist on (setup needed)');
+    if (air === null) throw new Error('air assist setup button missing');
+    await act(async () => {
+      air.click();
+    });
+    const proceed = buttonByLabel(host, 'Proceed with air assist setup');
+    if (proceed === null) throw new Error('air assist proceed button missing');
+    await act(async () => {
+      proceed.click();
+    });
+
+    expect(useStore.getState().project.device.airAssistCommand).toBe('M7');
+    expect(useStore.getState().project.scene.layers.every((layer) => layer.airAssist)).toBe(true);
+    expect(setAirAssistEnabled).toHaveBeenCalledWith(true);
 
     await unmount();
   });

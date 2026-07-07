@@ -4,6 +4,7 @@ import type { PathNodeRef } from '../state/path-node-edit-actions';
 import { drawPathNodeHandles } from './draw-path-node-handles';
 import { type Handle, HANDLE_SCREEN_PX, handlesFor, selectionFrameFor } from './handles';
 import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
+import { aabbHandlePoints } from './selection-handles';
 import type { ViewTransform } from './view-transform';
 
 export function drawObjectSelectionOverlay(
@@ -49,6 +50,13 @@ export function drawSelectionSetOverlay(
   strokeSelectionFrame(ctx, selectionFrameForAabb(bbox), view);
   ctx.setLineDash([]);
   drawRotateHandleAt(ctx, rotateHandlePositionForAabb(bbox), bbox.minY, view);
+  // Scale handles on the combined box so the whole selection can be resized by
+  // handle, not only via the numeric W/H fields (audit C5).
+  ctx.fillStyle = canvasTheme.selectionHandleFill;
+  ctx.strokeStyle = canvasTheme.selection;
+  ctx.lineWidth = 1.5;
+  const half = HANDLE_SCREEN_PX / 2;
+  for (const handle of aabbHandlePoints(bbox)) drawSingleHandle(ctx, handle, view, half);
 }
 
 function drawSelectionBox(

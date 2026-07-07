@@ -55,15 +55,20 @@ function arc(cx: number, cy: number, r: number, deg: number): Vec2 {
   return { x: cx + r * Math.cos(a) * 1.6 + 40, y: cy + r * Math.sin(a) };
 }
 
-it('renders trace presets for visual audit', async () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  mkdirSync(OUT_DIR, { recursive: true });
-  for (const fx of fixtures())
-    for (const presetName of PRESETS) {
-      const options = TRACE_PRESETS[presetName] as TraceOptions;
-      const paths = await traceImageToColoredPaths(fx.image, options);
-      const png = renderTraceOverlay(fx.image, paths, SCALE);
-      const slug = presetName.toLowerCase().replace(/\s+/g, '-');
-      writeFileSync(join(OUT_DIR, `${fx.name}__${slug}.png`), png);
-    }
-}, 60000);
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders trace presets for visual audit',
+  async () => {
+    mkdirSync(OUT_DIR, { recursive: true });
+    for (const fx of fixtures())
+      for (const presetName of PRESETS) {
+        const options = TRACE_PRESETS[presetName] as TraceOptions;
+        const paths = await traceImageToColoredPaths(fx.image, options);
+        const png = renderTraceOverlay(fx.image, paths, SCALE);
+        const slug = presetName.toLowerCase().replace(/\s+/g, '-');
+        writeFileSync(join(OUT_DIR, `${fx.name}__${slug}.png`), png);
+      }
+  },
+  60000,
+);

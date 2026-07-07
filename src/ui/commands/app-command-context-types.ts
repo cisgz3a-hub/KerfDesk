@@ -7,6 +7,7 @@ export type CommandShellCallbacks = {
   readonly requestConvertToBitmap: () => void;
   readonly requestAdjustImage: () => void;
   readonly requestBoxGenerator: () => void;
+  readonly requestBoxFitTest: () => void;
   readonly requestMaterialTest: () => void;
   readonly requestIntervalTest: () => void;
   readonly requestScanOffsetTest: () => void;

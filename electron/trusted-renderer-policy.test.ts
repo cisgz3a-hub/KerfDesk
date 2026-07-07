@@ -140,6 +140,28 @@ describe('Electron trusted renderer policy', () => {
         trustedOrigins,
       ),
     ).toBe(false);
+    // screen-wake-lock backs the active-job keep-awake (ADR-117); Electron
+    // routes navigator.wakeLock.request through these handlers.
+    expect(
+      shouldGrantPermissionCheck(
+        {
+          permission: 'screen-wake-lock',
+          requestingOrigin: 'app://app',
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(true);
+    expect(
+      shouldGrantPermissionCheck(
+        {
+          permission: 'screen-wake-lock',
+          requestingOrigin: 'https://evil.example',
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(false);
   });
 
   it('denies permission requests from untrusted URLs and subframes', () => {
@@ -218,6 +240,28 @@ describe('Electron trusted renderer policy', () => {
           isMainFrame: true,
           requestingUrl: 'app://app/index.html',
           currentUrl: 'https://evil.example/',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(false);
+    expect(
+      shouldGrantPermissionRequest(
+        {
+          permission: 'screen-wake-lock',
+          isMainFrame: true,
+          requestingUrl: 'app://app/index.html',
+          currentUrl: 'app://app/index.html',
+        },
+        trustedOrigins,
+      ),
+    ).toBe(true);
+    expect(
+      shouldGrantPermissionRequest(
+        {
+          permission: 'screen-wake-lock',
+          isMainFrame: false,
+          requestingUrl: 'app://app/index.html',
+          currentUrl: 'app://app/index.html',
         },
         trustedOrigins,
       ),

@@ -95,7 +95,12 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
         debouncerRef.current?.cancel();
         return;
       }
-      debouncerRef.current?.schedule(parse(nextText));
+      const parsed = parse(nextText);
+      if (debounceMs <= 0) {
+        debouncerRef.current?.flush(parsed);
+        return;
+      }
+      debouncerRef.current?.schedule(parsed);
     },
     onBlur: () => {
       // Left blank on blur → nothing to commit; restore the last committed

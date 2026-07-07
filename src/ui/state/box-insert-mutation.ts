@@ -1,11 +1,17 @@
 // box-insert-mutation — commit a generated box panel sheet into the scene
-// (ADR-106, F-K1): one polyline ShapeObject per panel, all on one cut-layer
-// color (auto-created on demand), every inserted panel selected, and ONE
-// undo entry so Undo removes the whole sheet in a single step.
+// (ADR-106/116, F-K1): one imported-svg vector object per panel (the baked
+// generated-geometry carrier — dogbone/weld precedent) so cutout rings read
+// as real holes under even-odd fill and the source field carries the panel
+// name. All panels land on one cut-layer color (auto-created on demand),
+// every inserted panel is selected, and ONE undo entry removes the sheet.
 
-import type { BoxPanel } from '../../core/box';
-import { addObject } from '../../core/scene';
-import { createPolyline } from '../../core/shapes';
+import {
+  addObject,
+  IDENTITY_TRANSFORM,
+  type Bounds,
+  type ImportedSvg,
+  type Polyline,
+} from '../../core/scene';
 import {
   ensureLayersForColors,
   pushUndo,
@@ -19,19 +25,22 @@ import {
 // eslint-disable-next-line no-restricted-syntax -- scene DATA: the panels' layer color key (what the laser cuts by), not chrome (ADR-047).
 const BOX_PANEL_COLOR = '#000000';
 
+// Never routed through importSvgObject, so Phase C re-import
+// replace-by-source semantics cannot trigger on generated panels.
+const BOX_PANEL_SOURCE_PREFIX = 'Box panel: ';
+
+/** Any generated part with a name and rings (box panels, fit coupons). */
+export type InsertablePart = {
+  readonly name: string;
+  readonly outline: Polyline;
+  readonly cutouts: ReadonlyArray<Polyline>;
+};
+
 export function applyInsertBoxPanels(
   s: StateSlice,
-  panels: ReadonlyArray<BoxPanel>,
+  panels: ReadonlyArray<InsertablePart>,
 ): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
-  const first = panels[0];
-  if (first === undefined) return null;
-  const objects = panels.map((panel) =>
-    createPolyline({
-      id: crypto.randomUUID(),
-      color: BOX_PANEL_COLOR,
-      spec: { points: ringWithoutClosingPoint(panel), closed: true },
-    }),
-  );
+  const objects = panels.map(panelObject);
   let scene = s.project.scene;
   for (const object of objects) scene = addObject(scene, object);
   scene = ensureLayersForColors(scene, [{ color: BOX_PANEL_COLOR }]);
@@ -47,14 +56,31 @@ export function applyInsertBoxPanels(
   };
 }
 
-// PolylineSpec points must not repeat the first vertex — materialization
-// appends the closing point itself (core/shapes/polyline convention).
-function ringWithoutClosingPoint(panel: BoxPanel): BoxPanel['outline']['points'] {
-  const points = panel.outline.points;
-  const first = points[0];
-  const last = points[points.length - 1];
-  if (first !== undefined && last !== undefined && first.x === last.x && first.y === last.y) {
-    return points.slice(0, -1);
+function panelObject(panel: InsertablePart): ImportedSvg {
+  const polylines = [panel.outline, ...panel.cutouts];
+  return {
+    kind: 'imported-svg',
+    id: crypto.randomUUID(),
+    source: `${BOX_PANEL_SOURCE_PREFIX}${panel.name}`,
+    bounds: ringsBounds(polylines),
+    transform: IDENTITY_TRANSFORM,
+    paths: [{ color: BOX_PANEL_COLOR, polylines }],
+  };
+}
+
+function ringsBounds(polylines: ReadonlyArray<Polyline>): Bounds {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const polyline of polylines) {
+    for (const point of polyline.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
   }
-  return points;
+  if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  return { minX, minY, maxX, maxY };
 }

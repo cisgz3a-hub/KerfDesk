@@ -10,14 +10,14 @@ import { useToastStore } from '../state/toast-store';
 import { CommandShell, type AppCommand } from '../commands';
 
 const bitmapMocks = vi.hoisted(() => ({
-  buildBitmapFromVector: vi.fn(),
+  buildBitmapFromVectors: vi.fn(),
 }));
 
 vi.mock('../raster/vector-to-bitmap', async (importOriginal) => {
   const actual = await importOriginal<typeof VectorToBitmap>();
   return {
     ...actual,
-    buildBitmapFromVector: bitmapMocks.buildBitmapFromVector,
+    buildBitmapFromVectors: bitmapMocks.buildBitmapFromVectors,
   };
 });
 
@@ -94,14 +94,14 @@ function convertedRaster(): RasterImage {
 afterEach(() => {
   useStore.getState().newProject();
   useToastStore.setState({ toasts: [] });
-  bitmapMocks.buildBitmapFromVector.mockReset();
+  bitmapMocks.buildBitmapFromVectors.mockReset();
   vi.restoreAllMocks();
 });
 
 describe('Toolbar Convert to Bitmap', () => {
   it('opens the LightBurn-style options dialog and passes Render Type plus DPI', async () => {
     installVectorProject();
-    bitmapMocks.buildBitmapFromVector.mockResolvedValue(convertedRaster());
+    bitmapMocks.buildBitmapFromVectors.mockResolvedValue(convertedRaster());
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -144,8 +144,8 @@ describe('Toolbar Convert to Bitmap', () => {
         await Promise.resolve();
       });
 
-      expect(bitmapMocks.buildBitmapFromVector).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'vec-1' }),
+      expect(bitmapMocks.buildBitmapFromVectors).toHaveBeenCalledWith(
+        [expect.objectContaining({ id: 'vec-1' })],
         expect.objectContaining({
           renderType: 'use-cut-settings',
           dpi: 127,
@@ -175,6 +175,26 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
 
       expect(host.textContent).toContain('KerfDesk');
       expect(host.textContent).not.toContain('LaserForge');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
+  it('does not render the desktop-download or PWA-install affordances (removed for now)', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={[]} machineKind="laser" />);
+      });
+
+      // Both were toolbar-mounted (ADR-024 / ADR-060) and are temporarily
+      // withdrawn; the components themselves still exist under ui/common.
+      expect(host.textContent).not.toContain('Download for Windows');
+      expect(host.textContent).not.toContain('Install app');
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

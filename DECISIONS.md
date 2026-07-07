@@ -24,6 +24,7 @@
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 
 ---
 
@@ -1146,7 +1147,7 @@ LightBurn's Preview "shades according to power" — darker pixel = more laser po
 
 ## ADR-029 — Convert to Bitmap (vector → raster engrave source)
 
-**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings shipped; A5 placement-brightness polish pending) | **Date:** 2026-05-29
+**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings + A5 Default Brightness shipped; see 2026-07-07 amendment) | **Date:** 2026-05-29
 
 ### Context
 
@@ -1189,6 +1190,27 @@ We already have an even-odd scanline polygon rasterizer — but it is **test-onl
 - **Perceptual gate (CLAUDE.md #2 / ADR-025):** the rasterized bitmap must be eyeballed (or IoU-diffed) against the source vector at the chosen DPI — green property tests are *not* fidelity proof.
 - Does **not** touch the `SceneObject` union (`RasterImage` already exists), the toolpath union, or the `.lf2` schema.
 - Composes cleanly with the `TracedImage`-elimination backlog (#1): "Use Cut Settings" reads layer mode, so it is agnostic to which vector kinds exist.
+
+### Amendment 2026-07-07 — audit fixes, brightness (A5), and pinned divergences
+
+An audit of the shipped feature (findings fixed the same day) pins the following, superseding the original text where they differ:
+
+1. **Ink luma is 127, not §2's 128.** Both boundary behaviors were individually correct — 50% gray ink, and `ditherThreshold` burning strictly below its 128 cutoff — but they composed to zero output: a converted bitmap on a Threshold layer dithered to all-zero S (M7, AUDIT-2026-06-10). 127 keeps the 50% intent within rounding and always burns. Regression-pinned in `rasterize-vector.test.ts`.
+2. **Default Brightness shipped (the A5 brightness half).** The dialog exposes LightBurn's Default Brightness (percent, default 50). Mapping is `floor(255 × pct/100)` — floor, not round, so 50% stays at 127 per (1). LightBurn's own default is 50% (§7.4).
+3. **Conversion DPI range is 127–635, derived, a deliberate divergence.** LightBurn's dialog offers 10–2000 DPI, but LightBurn keeps image resolution and the Image layer's interval independent; our model stamps the conversion DPI onto the created image layer's `linesPerMm` (§6 placement). The legal range therefore derives from the app-wide raster density limits (`MIN/MAX_RASTER_LINES_PER_MM` = 5–25 lines/mm) — outside it, Convert would mint layers the Cuts panel clamps to a different density on the next edit. Revisit if image resolution and layer interval are ever decoupled.
+4. **Size estimates are full-transform.** The dialog's pixel estimate uses the rotated AABB (`transformedBounds`), matching what the builder rasterizes — the original scale-only estimate approved rotated conversions the builder then refused. The bake itself (per the 2026-06-09 transform-bake plan) emits baked bounds + IDENTITY transform, which also sidesteps the raster output path's no-rotation limitation.
+5. **Single-selection gate.** The command (and `Ctrl/Cmd+Shift+B`, now bound — LightBurn's shortcut, §7.4) is enabled only for a selection of exactly one convertible vector. LightBurn converts a whole multi-selection into **one** bitmap; that merge is a scoped follow-up feature, not a gate relaxation — the pre-fix behavior (silently converting only the primary object of a multi-selection) was a defect. _(Superseded by amendment ii below: the merge shipped.)_
+6. **Menu placement divergence.** LightBurn houses Convert to Bitmap under **Edit**; ours lives under **Tools**, grouped with Convert to Path and the other conversions. Deliberate (one conversions home), per ADR-027 §4.
+
+### Amendment 2026-07-07 (ii) — multi-selection merges into one bitmap
+
+The follow-up from amendment (i) §5 shipped the same day:
+
+1. **The whole selection converts as ONE `RasterImage`** spanning the union of the members' rotation-aware AABBs, LightBurn-faithful. Every source vector is deleted; the swap is a **single undo entry**, and the merged bitmap becomes the sole selection (stale additional-selection ids are cleared).
+2. **Cross-object even-odd.** Fill All rasterizes the concatenated baked contours of the whole selection with one even-odd pass — a shape nested inside _another object's_ shape reads as a hole. This matches LightBurn's "solid fill of areas between outlines" **and** our own Fill mode, which hatches a layer's contours together (`collectFillContoursForLayer`). Use Cut Settings groups per path color across all members, as before.
+3. **Gate: every selected object must be a convertible vector** (`selectedConvertibleVectors`, scene order). A mixed selection (e.g. a raster among vectors) stays disabled rather than converting an ambiguous subset. Same gate for the menu command, toolbar, context bar, and `Ctrl/Cmd+Shift+B`.
+4. **Naming:** a multi-object result is labeled `N objects (bitmap)`; the dialog shows `N objects` and estimates from the combined bounds, so the size preview still matches exactly what the builder produces.
+5. The worker protocol carries the full selection (`vectors`); budget refusal (4 M px) applies to the combined grid, refusing up front in the dialog.
 
 ---
 
@@ -3929,6 +3951,96 @@ two vectorizations are indistinguishable except where ours is better.
 
 ---
 
+## ADR-024 — Windows desktop distribution + auto-update mechanism
+
+**Status:** Accepted | **Date:** 2026-07-04
+
+### Context
+
+The Electron desktop shell has existed and been CI-typechecked since Phase A
+(`electron/main.ts`, `electron-builder.yml`, `pnpm build:desktop`), but it was
+never packaged into a distributable installer, never hosted for download, and
+had no update path (`publish: null`). This ADR was reserved from the start
+("before first signed release") and is written now to launch **KerfDesk as a
+downloadable Windows installer alongside the online web app**.
+
+Three constraints shaped it:
+- **Non-negotiable #8** — "No telemetry, no network calls — local-first. Ever."
+  An auto-updater necessarily makes a network call.
+- **Security posture** — "No auto-update from arbitrary URLs," plus the
+  deliberate no-preload / no-`ipcMain` hardening of the Electron shell.
+- **Non-negotiable #9 / burn-safety** — an update must never interrupt a job.
+
+The maintainer chose **full auto-update** (over notify-only) for the desktop app.
+
+### Decision
+
+1. **Distribution.** electron-builder produces an **NSIS x64 installer**
+   (unchanged target; per-user `perMachine:false`, assisted `oneClick:false`),
+   built in CI on annotated **SemVer tags `vX.Y.Z`** (not per-commit). The tag
+   drives the artifact version via `-c.extraMetadata.version=$VERSION` so the
+   installer, `app.getVersion()`, and the update feed agree. Hosted on
+   **Cloudflare R2** (bucket `kerfdesk-downloads`, served at
+   `https://dl.kerfdesk.com/desktop/`), linked from `https://kerfdesk.com/download`.
+   **Not GitHub Releases** — the repo is private (ADR-018); public asset URLs
+   would need a separate public repo or tokens. **Not** bundled into the Pages
+   deploy — keeps the web deploy small and decoupled.
+
+2. **Auto-update = `electron-updater`, main-process, self-hosted.**
+   `electron-builder.yml` `publish: { provider: generic, url:
+   https://dl.kerfdesk.com/desktop }` makes the build emit `latest.yml` +
+   `.blockmap`. In `electron/main.ts` (packaged only, `app.isPackaged`):
+   `autoDownload = true`, `autoInstallOnAppQuit = true`, then
+   `checkForUpdatesAndNotify()` — a background check + OS-native "update ready"
+   notification that installs on the next natural quit. The check runs in the
+   **main process** (Node `net`), so the locked renderer CSP is unchanged and no
+   renderer update-UI is required.
+
+3. **Burn-safety (non-negotiable #9).** The app **never** calls
+   `autoUpdater.quitAndInstall()`. Updates apply only on a user-initiated quit,
+   which cannot happen mid-burn without the operator stopping/closing the app
+   (existing `src/ui/app/use-unload-stop.ts` soft-resets the machine on unload).
+   No mid-stream interruption is possible.
+
+4. **This revises non-negotiable #8's "no network calls."** #8 is amended (this
+   ADR) to permit exactly one call: the desktop updater's check/download against
+   our **own pinned `kerfdesk.com`-family origin**. It transmits **no user data
+   and no telemetry** and is user-disablable; the web app and every CAM/streaming
+   path stay fully offline. The separate posture "no auto-update from
+   **arbitrary** URLs" is **honored** — the feed URL is pinned at build time.
+
+5. **Code signing deferred.** v1 ships **unsigned**: the `/download` page
+   documents the Windows SmartScreen "unknown publisher" step. Auto-update still
+   functions unsigned, and per-user install-on-quit largely avoids UAC. Signing
+   (Azure Trusted Signing ~$10/mo, or an OV/EV cert) slots into the release
+   workflow later behind env-var/secret gating with no code rework; once signed,
+   `electron-updater` verifies the publisher signature, hardening the channel.
+
+6. **Dependency.** `electron-updater` (MIT, electron-builder ecosystem) is added
+   to `dependencies` (it is `require`d by the packaged main process).
+   RESEARCH_LOG.md entry per ADR-017.
+
+### Consequences
+
+- KerfDesk launches as a real downloadable Windows app that keeps itself current
+  while the web app is unchanged.
+- The strict "local-first, no network, ever" posture gains one narrow,
+  self-hosted, no-user-data exception, recorded here and in PROJECT.md #8.
+- The no-preload/no-IPC shell is preserved: `checkForUpdatesAndNotify` + OS
+  notification needs no IPC. An **in-app** "restart to update" banner would need
+  a hardened `contextBridge` and its own ADR — deferred.
+- Green tests never prove the installer runs (CLAUDE.md): a workflow-shape test +
+  an auto-update-config unit test guard structure, but install / serial / update
+  behavior is verified manually on Windows 10 and 11 (WORKFLOW.md desktop flow,
+  AUDIT.md CLAIMED row) before the launch is called done.
+
+### References
+ADR-007 (Windows-only desktop), ADR-011 (platform adapter), ADR-018 (private
+repo → not GitHub Releases), ADR-060 (offline-PWA update model this mirrors),
+ADR-017 (dependency policy), PROJECT.md non-negotiables #8 / #9.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
@@ -3942,8 +4054,9 @@ Setup wizard) is the first.
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
   config grows further).
-- ADR-024 — Update mechanism for Windows desktop (before first signed
-  release).
+- ADR-024 — Update mechanism for Windows desktop. **Written (Accepted
+  2026-07-04) — see the ADR-024 section above.** Full auto-update via a
+  self-hosted `electron-updater` feed on Cloudflare R2; v1 ships unsigned.
 - (Earlier reservations for ADR-019..023 were stale — Phase B / E
   shipped without formal ADRs at those slots. ADR-019 / ADR-020 /
   ADR-021 are the first three slots since reused.)
@@ -5187,119 +5300,409 @@ baseline (serifs hug, letters legible, counters present) — the maintainer
 saw the prototype renders and approved the architecture before
 implementation; the final engine renders await the maintainer's own pass.
 
-## ADR-116 — Machine-camera frames ride the loopback bridge: /frame.jpg proxy + server-side discovery (Camera, 2026-07-07)
+## ADR-116 — Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07)
 
-**Status:** accepted (maintainer-directed: "fix my camera — it has to work like a real camera for a laser machine").
+**Status:** accepted (maintainer directive: "I need my box designer to be
+a full broad tool"). Builds on ADR-106; scope lands here before code.
 
 ### Context
 
-Camera Mode v1–v4 (ADR-107..110) shipped with two frame paths: getUserMedia
-MediaStreams (USB webcams) and a direct `<img>` poll of the machine camera's
-HTTP snapshot URL (`http://192.168.10.x:8080/media/getCapturePhoto`). The
-maintainer's machine camera hit two walls the synthetic suites never touched:
+The v1 generator ships two styles (closed, open-top) on an engine whose
+hard parts — per-edge complementary sequences, corner-cube arbitration,
+uniform-offset fit, corner-overcut relief, and the virtual assembly
+referee — are style-independent. The single blocker between v1 and the
+broad-tool tier (dividers, lids, hardware mounts) is that a `BoxPanel`
+carries exactly ONE outline ring: ADR-106 said "no holes in v1". This
+ADR adds interior cutouts once, then spends that capability on the two
+most-requested styles. Behavior references: boxes.py docs and MakerCase
+(reverse-engineering study only — boxes.py is GPL, no code copying,
+ADR-017).
 
-1. Every pixel-consuming feature — lens calibration, auto-align, update
-   still, trace-from-camera — was gated on `stream.kind === 'live'`, i.e. a
-   MediaStream. A network camera never produces one, so "Calibrate lens…"
-   was permanently disabled ("calibration didn't even work"), and the
-   camera's CORS-less frames taint any canvas regardless.
-2. Both production CSPs (electron/main.ts and public/_headers) allow img-src
-   only from 'self' + http://127.0.0.1:51731 — the direct `<img>` poll and
-   its discovery probe were CSP-blocked in the desktop app and on the
-   deployed site. The machine camera only ever displayed on the bare Vite
-   dev server. All camera surfaces were subsequently hidden (f247a3b).
+### Decision 1 — panel cutouts (the enabling upgrade)
 
-The RTSP bridge (127.0.0.1:51731) already solves every transport problem for
-one protocol: loopback is exempt from mixed-content blocking, both CSPs
-allow it, it sends CORS headers for trusted app origins (S03-001 gate), and
-the desktop app auto-starts it.
+- `BoxPanel` gains `cutouts: ReadonlyArray<Polyline>` (closed interior
+  rings in the same sheet frame as the outline).
+- **Insertion changes carrier:** panels insert as `kind:'imported-svg'`
+  vector objects (the established carrier for baked generated geometry —
+  dogbone/weld precedent), one `ColoredPath` holding outline + cutout
+  rings. This is chosen over per-ring shape objects because (a) even-odd
+  fill semantics make cutouts real holes under Fill mode, (b) compile-time
+  kerf offset is already containment-aware for hole rings
+  (`kerf-offset.ts`), and (c) the `source` field ("Box panel: Front")
+  finally carries panel names into the scene — closing the v1 gap where
+  `SceneObject` has no name field. Undo/selection semantics unchanged
+  (one undo step, all panels selected). The generator's own insert path
+  never routes through `importSvgObject`, so Phase C re-import
+  replace-by-source semantics cannot trigger on generated panels.
+- **Fit generalizes for free:** the −c/4 clearance offset on correctly
+  oriented multi-ring polygons shrinks material and therefore WIDENS
+  every cutout by c/4 per flank — exactly the slot play the joint
+  contract requires. Corner relief extends to cutout rings: every
+  slot corner a mating tab must seat against gets the F-CNC26 overcut
+  at full bit radius, same post-offset ordering.
+- **Referee extension:** slot bands. A junction between a tabbed part
+  and a slotted panel is checked like a cube edge: one shared sequence,
+  exact complementarity at c = 0, uniform play/2 flank gaps otherwise,
+  zero interference always.
+
+### Decision 2 — divider grid
+
+- `BoxSpec` gains `dividersXCount` / `dividersYCount` (0–N, evenly
+  spaced partitions across width / depth; 0 = v1 output, byte-identical).
+- Divider panels stand on the bottom panel (no bottom slots in v2),
+  height = inner height, and carry tabs into **through-slots** in the
+  two walls they meet — through-slots are the standard laser-box
+  aesthetic; half-depth dados are CNC 2.5D work and stay deferred.
+  Tab/slot layout reuses `edge-pattern` over the divider junction height
+  (odd cells, divider owns the odd cells), so complementarity is by
+  construction, exactly like cube edges.
+- Divider×divider intersections use egg-crate cross-laps: X-dividers
+  notched half-height from the top, Y-dividers from the bottom, notch
+  width T (widened by the clearance pass like any recess).
+- Validation: resulting compartment pitch must exceed 2·T and, for CNC,
+  the slot/notch cells must clear the relief tool (same rule family as
+  ADR-106).
+
+### Decision 3 — slide lid
+
+- New style `'slide-lid'`: bottom, back, slotted left/right walls,
+  front wall shortened to the slot floor, plus a loose lid panel.
+- Geometry (refined at V3 build): outer height = inner + 3T — bottom,
+  cavity, lid band, and a captive top strip. The side walls carry a
+  C-channel spliced into their solid front edge at the lid band,
+  stopping one thickness INSIDE the wall body (stopping at the body end
+  would leave a zero-width neck — the fit offset severs it, which is how
+  the referee caught the draft geometry). The lid slides over the
+  shortened front and stops against the in-wall post; lid = full outer
+  width × (outer depth − 2T), leading edge carries a half-round thumb
+  notch built with on-edge-exact endpoints (no clipper).
+- A slide lid must SLIDE: validation requires clearance > 0 for this
+  style (defaults stay 0.15 mm CNC; laser default rises to 0.2 mm for
+  slide-lid only). The referee gains a mandatory-play check for the
+  lid/slot bands and a lid-clears-front check.
+
+### Staged diffs (each independently reviewable + CI-green)
+
+- **V0 — docs:** this ADR, PROJECT.md Phase K.2 block, WORKFLOW.md
+  F-K6/F-K7 flows.
+- **V1 — cutout infrastructure:** `BoxPanel.cutouts`, multi-ring
+  panel-fit (offset + relief across rings), named `imported-svg`
+  insertion (amend F-K1's carrier wording in the same diff — flows
+  describe shipped behavior), referee slot bands, benchmark category
+  `cutouts`.
+- **V2 — dividers:** divider spec + validation, wall-slot claims,
+  divider outline builder (tabs + cross-laps), dialog fields + preview,
+  referee divider bands, benchmark category `dividers`.
+- **V3 — slide lid:** style + geometry, mandatory-play validation,
+  dialog style option, referee lid checks, benchmark category
+  `slide-lid`.
+- **V4 — closeout:** AUDIT rows (CLAIMED + named hardware checks: cut an
+  organizer with 2×1 dividers and a slide-lid box, assemble and slide),
+  session report, PROJECT status flip.
+
+### Out of scope (each needs its own ADR)
+
+Lift-off lip lids, hinged lids and living-hinge curved boxes, polygon
+prisms (hex/octagon), dovetail/angled fingers, CNC dado/rabbet 2.5D
+joinery, T-slot bolt+nut joints, bottom slots for dividers, engraved
+panel labels (io/text). Named so they are deferred, not forgotten.
+
+### Verification
+
+Same regime as ADR-106: every new junction type gets exact-referee and
+play-referee coverage; the seeded benchmark extends (new categories must
+score 100% and the v1 categories must stay 100% — no style may regress
+another); perceptual fixtures per new style; determinism over the
+enlarged spec space; physical fit stays CLAIMED until the named cuts.
+
+## ADR-117 — Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07)
+
+**Status:** accepted. (Renumbered from a draft ADR-116 after the box-generator v2 pack claimed that number on main the same day.)
+
+### Context
+
+A long job streams G-code over Web Serial for hours from a renderer
+process. OS display sleep can throttle or suspend that renderer mid-burn;
+the 5-second stream-stall watchdog detects the freeze but cannot prevent
+it. The 2026-07-07 multi-layer-job trust audit listed missing endurance
+protection as a gap — and the follow-up investigation found the feature
+was already half-shipped, undocumented: `useActiveJobWakeLock` (App-mounted,
+laser-store-subscribed, visibility re-acquire) had landed without an ADR,
+WORKFLOW flow, or AUDIT row, and was **provably dead on the desktop app**:
+Electron routes `navigator.wakeLock.request('screen')` through the session
+permission handlers as the string `'screen-wake-lock'`
+(`shell/common/gin_converters/content_converter.cc`, verified on the
+shipped 42-x-y source), the deny-by-default trusted-renderer policy
+(serial + `fileSystem*` only) rejected it, and the hook's best-effort
+`catch` swallowed the denial silently. The operator had no signal either
+way.
 
 ### Decision
 
-Every machine-camera byte rides the bridge; no CSP changes anywhere.
-
-- `GET /frame.jpg?url=…` proxies one camera frame with the bridge's CORS
-  headers, making machine frames pixel-readable in every deployment target.
-  Policy (`camera-frame-proxy-policy.ts`): http/https/rtsp only, loopback or
-  RFC1918 hosts only (shared `private-network-host-policy.ts`), the bridge's
-  own port refused (recursion), `redirect: 'error'` server-side (SSRF).
-  http(s) = plain GET pipe-through — a Falcon-style JPEG camera needs no
-  ffmpeg; rtsp = `ffmpeg -frames:v 1` single JPEG, so still capture never
-  depends on Chromium's MJPEG-in-canvas semantics.
-- `GET /discover` probes the Falcon candidate hosts server-side and returns
-  the camera URL plus its proxied frame URL; the browser-side `Image()`
-  probe stays dev-server-only fallback.
-- `/health` reports `frameProxy: true`; OPTIONS acknowledges Chrome's
-  Private Network Access preflight (`Access-Control-Allow-Private-Network`).
-- The UI consumes frames through an `ActiveCameraSource` discriminated union
-  (usb MediaStream | machine-jpeg | machine-rtsp) with one
-  `captureSourceFrame()` — machine capture is fetch+decode of the proxied
-  frame, never `<img>` scraping. Downstream consumers (calibration wizard,
-  auto-align, still overlay, trace, snapshot) accept any source. (Lands
-  across the FrameSource PRs; this ADR covers the architecture.)
+- Keep-awake stays a **renderer** concern via the standard Screen Wake
+  Lock API — one implementation serves web and desktop. **No main-process
+  `powerSaveBlocker`**: it would need IPC to track job state, and the
+  security posture's zero-`ipcMain` surface is worth more than the
+  marginal extra blocking strength.
+- `trusted-renderer-policy.ts` allows `'screen-wake-lock'` alongside
+  `serial` and `fileSystem*` — still gated to trusted origins and the
+  main frame; Chromium grants it without a prompt.
+- Lock lifecycle is bound to `isActiveJob` (streaming | paused | done |
+  errored, until the post-job Idle clears the streamer): acquire on
+  activation, re-acquire on `visibilitychange` and UA-initiated release,
+  release on job end and dispose.
+- Failure is non-blocking and **visible once**: a single LaserLog line
+  ("Keep-awake unavailable — the OS may sleep the screen mid-job") on the
+  first denial or missing API, so a marathon burn is never silently
+  trusted to a machine that will sleep. Retries stay quiet.
 
 ### Consequences
 
-- A JPEG machine camera gets the full feature set with zero installs; RTSP
-  cameras additionally need ffmpeg on PATH (bridge reports availability, UI
-  says so instead of dying).
-- Browser-mode users must run `pnpm camera:bridge`; LaserForge Desktop
-  starts the bridge automatically.
-- The Falcon candidate host list is knowingly duplicated in
-  `camera-frame-proxy.ts` (electron cannot import from src/); update both
-  with `src/platform/web/web-camera.ts` together.
+- Desktop keep-awake goes from silently denied to granted; web behavior
+  is unchanged. The permission surface grows by exactly one prompt-free
+  Chromium permission.
+- A screen wake lock keeps the display (and with it, the system) awake on
+  typical setups, but cannot survive a lid close or manual sleep — the
+  log line tells the operator to disable system sleep before long burns.
+  Supervised operation remains the rule for laser jobs regardless.
+- No new dependency, no IPC handlers, no platform-adapter surface: the
+  Wake Lock API is identical in both delivery targets.
 
 ### Verification
 
-Policy accept/reject tables; the real bridge server on an ephemeral port
-against a stub upstream camera (content-type passthrough, JPEG-magic
-fallback, upstream 500/timeout → unavailable, untrusted Origin 403 before
-any upstream request, PNA echo, discovery found/null). Hardware pass against
-the maintainer's live machine camera is tracked per-flow in AUDIT.md
-(CLAIMED until the on-bed checkpoint runs).
+jsdom hook tests pin acquire/release/re-acquire and the one-shot warning
+(denied + missing API); policy tests pin `screen-wake-lock` granted for
+trusted check+request and denied for untrusted origins and subframes.
+NOT verified: the packaged Electron runtime grant, and a real hours-long
+burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
+runs one.
 
-## ADR-118 — Camera-driven positioning and the burn-target alignment wizard (Camera, 2026-07-07)
+## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
 
-**Status:** accepted. (ADR-117 is allocated to the operator-loop pack on a
-parallel branch; camera work takes 118.)
+**Status:** accepted.
 
 ### Context
 
-With machine-camera frames pixel-readable (ADR-116), the remaining gap to a
-"real camera" workflow was operational: alignment required the operator to
-generate a marker scene, run it as a job by hand, and come back to press
-Auto-align — LightBurn's wizard burns its own target — and there was no way
-to act on what the overlay shows (move the head to a photographed object).
+If the app dies mid-stream (tab crash, OS kill, power blip), the job is
+simply gone from the app's point of view: the operator must guess which
+G-code line the machine stopped at and enter it into Start-from-line by
+hand. The 2026-07-07 trust audit called this out (gap 3b): for a
+multi-hour job, "guess the line" is the difference between salvaging a
+workpiece and scrapping it.
+
+Two existing pillars make a cheap, correct fix possible:
+
+1. **Deterministic G-code (non-negotiable #5).** Start-from-line already
+   RE-COMPILES the program from the current project
+   (`runStartFromLineFlow` → `prepareStartJob` → `prepared.gcode`); byte
+   determinism is what keeps its line numbers valid. A checkpoint
+   therefore never needs to persist the G-code text (raster jobs exceed
+   localStorage quotas) — only a fingerprint of it.
+2. **Autosave recovery (Phase C).** The project itself is already
+   restored after a crash, so re-compilation has its input.
 
 ### Decision
 
-- **Bed-alignment wizard (F-CAM9).** One wizard: engrave settings → burn
-  the five-marker pattern via `generateCameraAlignPattern` +
-  `replaceSceneWithGeneratedScene` + the NORMAL `runStartJobFlow` (readiness,
-  preflight, confirmation, streaming — no parallel job pipeline) → watch the
-  streamer finish → clear-bed prompt → detect via the shared `runAutoAlign`
-  helper (capture → optional de-fisheye → marker detect → homography solve →
-  persist). Manual 4-corner alignment stays on the machine-camera preview
-  for display-only setups (deviation from the original plan: deleting
-  NetworkCameraView would have coupled an unrelated restructure into this
-  change).
-- **Click-to-position (F-CAM7).** A crosshair tool maps a workspace click
-  through `toMachineCoords` — the same origin transform G-code emission uses
-  — clamps to the bed, and sends one absolute beam-off jog through the fully
-  gated jog path. Prerequisite fix: all three jog builders dropped
-  zero-valued axis words even in absolute mode (X0/Y0 silently kept the
-  previous coordinate); fixed test-first across GRBL/Smoothie/Marlin.
-- **Snapshot + monitoring (F-CAM8).** `captureSourceFrame` → shared PNG
-  encoder → platform save dialog; compact↔wide panel toggle persisted
-  locally.
+- **Pure core module `src/core/recovery/job-checkpoint.ts`:** a
+  `JobCheckpoint` = FNV-1a fingerprint of the streamed text (hash, char
+  count, raw line count) + the acked count + machine kind + ISO
+  timestamps (passed in — core cannot read the clock). Two numbering
+  systems meet here and must not be confused: the streamer's
+  `completed`/`total` count SENDABLE lines (blanks and full-line
+  comments are never streamed — `isSendableGcodeLine`, now exported from
+  the streamer as the single definition), while `buildResumeProgram` and
+  Start-from-line speak RAW file lines. The checkpoint stores the acked
+  SENDABLE count plus the program's sendable total; `rawResumeLine`
+  converts acked-sendable back to the raw line number against the
+  re-compiled text at resume time. Strict `parse` validation and
+  monotonic `advance`.
+- **Write path:** `runStartJobFlow` writes the initial checkpoint right
+  after the stream starts. A `use-job-checkpoint` hook (App-mounted,
+  laser-store-subscribed like ADR-117's wake lock) advances
+  `ackedLines` from `streamer.completed` — every 25 acked lines while
+  streaming, immediately on any status transition (pause, error,
+  disconnect, cancel). The checkpoint is a ~200-byte localStorage
+  record; the hook re-reads it per store fire (microseconds) so there is
+  no cache to go stale.
+- **Clear-on-done only.** A checkpoint survives Stop, error, disconnect,
+  and crash; only a run reaching `done` (all lines acked) clears it —
+  a deliberately stopped job is still resumable, and the banner's
+  Dismiss is the explicit discard.
+- **Resume path is the EXISTING one, gated by the fingerprint.** The
+  recovery banner (Laser window, shown when a checkpoint with progress
+  exists and no job is active) calls `runCheckpointResumeFlow`: it
+  re-compiles, REFUSES when the fingerprint of `prepared.gcode` differs
+  — an edited project silently producing different line numbers is
+  exactly the failure this gate exists to stop — then maps the acked
+  count to the raw resume line and hands off to the shared
+  Start-from-line body. Manual Start-from-line stays ungated (the
+  free-form escape hatch).
+- **Resume runs are not themselves checkpointed (v1).** A resume program
+  (preamble + tail) has its own line numbering; mapping a crash inside
+  it back to original coordinates is deferred. Both resume flows stamp
+  `resumeInFlight` on the stored checkpoint before streaming, and the
+  hook additionally requires the streamer total to equal the
+  checkpoint's sendable count — belt and braces so foreign ack counts
+  can never corrupt the record. If a resume run finishes, the job is
+  done and the checkpoint clears; if it dies, the ORIGINAL checkpoint
+  still stands — stale toward earlier lines, which re-burns a short
+  stretch rather than leaving a gap.
+
+### Consequences
+
+- After a crash: relaunch → autosave restores the project → banner
+  offers "resume from line N" → recompile + fingerprint check → the
+  proven resume preamble (ADR-103 G7) re-enters the cut. No G-code file
+  round-trip, no guessing.
+- `ackedLines` measures GRBL acks (parsed into the RX buffer), not
+  execution. If the CONTROLLER also lost power, up to a buffer's worth
+  of acked lines never ran — the mapped resume line can be a few lines
+  late. The banner says so; the manual Start-from-line control remains
+  the operator-editable escape hatch. Backing up re-burns, skipping
+  forward leaves gaps, so the conservative direction is down. If only
+  the app died, GRBL finished its buffer and the mapped line is exact.
+- Work zero must be unchanged — same contract as manual Start-from-line
+  (the existing confirm says it).
+- localStorage writes on the ack path are throttled (25 lines) and
+  ~200 bytes; failures (quota, private mode) are swallowed — a
+  checkpoint is best-effort protection, never a reason to block a job.
 
 ### Verification
 
-Wizard store transitions, burn step against an injected job flow (scene
-replaced with the marker layer at the chosen power/speed; started vs
-not-started from the streamer), runAutoAlign failure paths (no frame, blank
-frame) with no persistence on failure; click property test (any click on any
-origin lands inside the machine bed) plus the front-left Y-flip pin; jog
-builders pin X0/Y0 emission. Hardware pass (burn on scrap → wizard completes
-→ overlay registration ≤ ~1 mm; click a burned mark → head lands on it)
-tracked in AUDIT.md as CLAIMED until run on the live machine.
+Core: fingerprint determinism/sensitivity, parse rejection corpus,
+advance monotonicity, resume-line clamping. Storage: round-trip +
+corrupt-payload clearing. Hook: interval + transition write policy,
+freeze on foreign totals, clear-on-done. Flow: checkpoint written on
+start, fingerprint mismatch refuses with no stream. Banner: render /
+dismiss / hidden-while-active. NOT verified: a real crash + resume on
+hardware — CLAIMED in AUDIT.md until the maintainer kills the app
+mid-burn and resumes.
+
+## ADR-119 — Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07)
+
+**Status:** accepted.
+**Numbering note:** drafted as ADR-118, but the interrupted-job
+checkpoint published 118 on `main` first — published numbers win
+(ADR-104 precedent). Pre-merge commit messages say ADR-118; read them
+as this ADR.
+
+**Status detail:** accepted (maintainer: "yes build it" on the ranked
+improvement assessment). Builds on ADR-106/116.
+
+### Context
+
+The generator's joints are referee-proven, but the clearance NUMBER is a
+guess until material is cut — and the flat-sheet preview makes users
+assemble the box in their heads. Both gaps close with existing
+machinery: the calibration-tool family (Material/Interval Test) and the
+generator's own placement model.
+
+### Decision 1 — fit test coupon (Tools → Box Fit Test…)
+
+- Pure core `fit-coupon.ts`: TWO strips. A comb strip carries N tabs on
+  a graduated clearance ladder (default 0.05–0.30 mm, 6 rungs,
+  start/step/count configurable); a slot strip carries the N mating
+  notches. Rung i bakes the production fit law analytically — tab width
+  f − cᵢ/2, notch width f + cᵢ/2, both T deep — so the rung that feels
+  right on the bench IS the number to type into the Box Generator.
+- Rung identification without text: i+1 index nicks (1 mm square)
+  along the strip edge under each rung.
+- CNC mode runs the slot strip through the shared relief pass
+  (corner-overcuts at notch corners, full bit radius); validation reuses
+  the box rules (f > tool, ladder < min(f, T)/2).
+- Inserts as two named vector objects (imported-svg carrier), one undo
+  step, same insertion path as box panels.
+
+### Decision 2 — assembled 3D preview
+
+- Pure core `assembled-layout.ts`: every generated part's 3D frame
+  (origin, u/v basis, normal, slab offset) — walls from the documented
+  drawing convention, dividers from their slabs, the slide lid from its
+  channel band. This is the referee's placement knowledge exposed as a
+  reusable layout (kept in sync by tests, not imports).
+- UI: the Box Generator preview gains a Flat/Assembled toggle. The
+  assembled view is a Canvas2D isometric projection (extruded plates,
+  painter-sorted, even-odd fill so cutouts read as holes) — deliberately
+  NOT three.js: a dialog preview needs no camera, no lazy chunk, and
+  must render under jsdom guards like BoxPreview does.
+
+### Verification
+
+fit-coupon: exact per-rung width law (notch − tab == cᵢ), determinism,
+benchmark category `fit-coupon` (must hold 100% alongside the existing
+nine). assembled-layout: unit-pinned frames for every part kind across
+styles. Preview: component tests (toggle, jsdom-safe render). Hardware
+remains CLAIMED; the coupon exists precisely to make those cuts
+informative.
+
+## ADR-121 - Machine-camera frames ride the loopback bridge: frame proxy and server-side discovery (Camera, 2026-07-07)
+
+**Status:** accepted.
+**Numbering note:** drafted on the camera branch as ADR-116, but `main`
+published ADR-116 through ADR-119 first; published numbers win.
+
+### Context
+
+Camera Mode v1-v4 supported USB cameras and a direct HTTP image poll for
+some machine cameras. The maintainer's machine camera exposed two missing
+pieces: pixel-consuming features were gated on a USB `MediaStream`, and the
+browser/direct-image route was blocked or tainted by CSP and CORS. The local
+RTSP bridge already had the right security shape: loopback origin, CORS for
+trusted app origins, and private-network policy checks.
+
+### Decision
+
+- Machine camera still frames go through the local bridge, not directly
+  through the browser. `GET /frame.jpg?url=...` proxies one http/https/rtsp
+  frame with trusted CORS headers and private-network restrictions.
+- Discovery moves server-side through the bridge, so production CSP does not
+  block camera probing.
+- The UI consumes frames through one source abstraction: USB stream,
+  machine-JPEG, or machine-RTSP. Calibration, auto-align, overlay stills,
+  trace-from-camera, and snapshots all capture through that source path.
+- The frame proxy rejects untrusted origins, recursive bridge URLs, redirects,
+  and non-private targets before fetching upstream camera bytes.
+
+### Verification
+
+Bridge policy tests cover allowed and rejected URLs/origins, frame proxy
+responses, PNA preflight, discovery, and health reporting. UI/source tests
+cover machine-camera activation and pixel-readable capture. Hardware
+verification remains a separate live-machine checkpoint.
+
+## ADR-122 - Camera-driven positioning and burn-target alignment wizard (Camera, 2026-07-07)
+
+**Status:** accepted.
+**Numbering note:** drafted on the camera branch as ADR-118; renumbered here
+because `main` already published ADR-118 and ADR-119.
+
+### Context
+
+Once machine-camera frames are pixel-readable (ADR-121), the camera workflow
+still needs two operator-facing pieces: a guided target-burn alignment flow
+and a way to act on what the overlay shows. LightBurn-style camera setup burns
+its own target and then solves alignment; the app previously required more
+manual orchestration.
+
+### Decision
+
+- Add a bed-alignment wizard that burns the five-marker target through the
+  normal `runStartJobFlow`, watches the job finish, prompts the operator to
+  clear the bed, captures a frame, optionally de-fisheyes it, detects markers,
+  solves the homography, and persists the alignment.
+- Add click-to-position: a crosshair workspace tool maps a canvas click
+  through the same origin transform used by G-code emission, clamps inside the
+  machine bed, and sends one absolute beam-off jog through the existing gated
+  jog path.
+- Keep absolute zero-valued jog words (`X0`, `Y0`, `Z0`) in absolute jog mode
+  for GRBL, Marlin, and Smoothieware; in relative mode zero deltas still mean
+  "do not move this axis."
+- Add snapshot saving and a wider monitoring view using the shared
+  pixel-readable capture path.
+
+### Verification
+
+Tests cover wizard store transitions, burn-step job-flow integration,
+auto-align failure paths, click-to-position origin mapping and gating,
+absolute zero-axis jog command emission, snapshot encoding, and camera panel
+state. Live hardware alignment accuracy remains a separate checkpoint.

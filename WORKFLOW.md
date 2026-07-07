@@ -497,7 +497,12 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `V` — Flip vertical
 
 #### Tools
+- `Cmd/Ctrl+R` - Rectangle
 - `Cmd/Ctrl+E` - Ellipse
+- `Cmd/Ctrl+L` - Line/pen
+- `Alt+M` - Measure
+- `Cmd/Ctrl+Shift+B` - Convert to Bitmap (LightBurn's binding; no-op unless a
+  single convertible vector is selected)
 
 #### View
 - `P` — Toggle preview
@@ -610,6 +615,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
 4. Every `ok` advances the streamer by one line and writes more.
 5. Progress bar reflects `completed / total` lines.
+6. While the job is active the app holds a screen wake lock so OS
+   display-sleep can't suspend the stream (ADR-117; re-acquired on tab
+   visibility changes, released when the job ends). If the platform
+   refuses the lock, one LaserLog line warns the operator to disable
+   system sleep before long burns — the job itself always proceeds.
 
 #### Error — preflight fails
 1. Modal lists the violations. No bytes sent.
@@ -756,6 +766,40 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 2. No Move Laser to Selection physical move.
 3. No Set Start Point or node-level start ordering.
 
+### F-B16. Interrupted-job checkpoint and resume (ADR-118)
+
+While a job streams, the app keeps a ~200-byte checkpoint in localStorage:
+a fingerprint of the compiled program plus the GRBL-acked line count
+(updated every 25 acks and on every pause/stop/error/disconnect). Only a
+run that finishes cleanly clears it.
+
+#### Success — resume after a crash
+1. App/tab/PC died mid-job. Operator relaunches; autosave recovery
+   restores the project (F-C3).
+2. The Laser window shows the banner: "Interrupted laser job from
+   <time>: N of M motion lines confirmed."
+3. Operator connects, homes, and confirms the work zero is unchanged
+   (same contract as manual Start-from-line).
+4. **Resume interrupted job** re-compiles the project, verifies the
+   fingerprint matches the interrupted program byte-for-byte, maps the
+   acked count to the raw G-code line, and runs the standard
+   start-from-line replay (safe re-entry preamble, then the tail).
+5. The checkpoint clears when the resume run completes.
+
+#### Error — project changed since the run
+1. Fingerprint mismatch → alert explains the project no longer produces
+   the interrupted program; nothing is streamed. The manual
+   Start-from-line control remains the escape hatch.
+
+#### Edge — controller lost power too
+1. Acked lines may include a buffer's worth GRBL never executed; the
+   banner says so. Backing up re-burns a short stretch; skipping forward
+   leaves gaps — when in doubt, resume earlier via the manual control.
+
+#### Edge — deliberate Stop
+1. Stop keeps the checkpoint (a stopped job is still resumable);
+   **Dismiss** on the banner is the explicit discard.
+
 ---
 
 ## Phase C flows — STUB
@@ -770,7 +814,7 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 
 ### F-C7. Device Setup wizard (connect-time)
 
-The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092). Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
+The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092), or from the cross-link **Machine Setup → Overview → Run guided setup** (same wizard, same draft-commit; still never auto-opens). The Laser-panel button carries primary emphasis only while the connected machine has not been set up yet (the FU-4 nudge state); once setup is recorded it renders with normal weight. Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
 
 #### Success — connected machine answers `$$`
 1. Operator clicks **Set up device** while connected.
@@ -1074,19 +1118,42 @@ so it burns as a dithered/grayscale image rather than outlines or
 hatch fill. Matches LightBurn's **Convert to Bitmap** (Edit menu /
 `Ctrl+Shift+B` / right-click).
 
-**Where in the UI.** Toolbar **Convert to Bitmap** button, next to
-Trace Image. Enabled only when a single convertible vector is
-selected; disabled (greyed, with a "select a vector first" tooltip)
-otherwise — mirroring LightBurn's greyed menu item. No dialog: A2
-ships **Fill All** only, so the conversion is immediate (hence no
-"…" on the label). The Render Type picker (Outlines / Use Cut
-Settings) and a DPI control arrive with A3/A4.
+**Where in the UI.** Toolbar **Convert to Bitmap…** button (next to
+Trace Image), Tools menu, the workspace right-click context bar, or
+`Cmd/Ctrl+Shift+B` (LightBurn's binding; LightBurn houses the menu
+item under Edit — ours lives under Tools with the other conversions,
+a deliberate divergence recorded in the ADR-029 amendment). Enabled
+when **every selected object is a convertible vector** (one or
+many); disabled (greyed, "Select a vector first.") otherwise —
+including mixed selections with a raster among the vectors,
+mirroring LightBurn's greyed menu item. A multi-selection merges
+into **one** bitmap spanning the selection's combined bounds
+(LightBurn-faithful, ADR-029 amendment ii): Fill All renders
+even-odd across the whole selection — a shape nested inside another
+object's shape becomes a hole, exactly like our Fill layer mode —
+every source vector is deleted, and the whole swap is one undo
+entry. The result is labeled `N objects (bitmap)`.
 
-**What it does.** Rasterizes the selected vector's closed contours
-into a `RasterImage` at the KerfDesk default 254 DPI (= 10
-lines/mm; a KerfDesk choice — LightBurn documents no default),
-every inked pixel at 50% gray on white, carrying the source's own
-bounds + transform so the bitmap lands exactly where the vector was.
+**The dialog** (A3/A4 + A5 brightness): **Render Type** (Fill All /
+Outlines / Use Cut Settings), **DPI** (numeric field + slider,
+127–635; the range derives from the app-wide 5–25 lines/mm raster
+density limits because the conversion DPI becomes the new image
+layer's interval — narrower than LightBurn's 10–2000 by design, see
+ADR-029 amendment), and **Default Brightness** (percent, default
+50% per LightBurn §7.4; 50% maps to luma 127, deliberately one step
+below the Threshold cutoff so converted ink always burns — M7). The
+dialog shows the estimated bitmap pixel size for the current DPI —
+computed from the selection's full transform including rotation —
+and disables Convert when it exceeds the raster budget.
+
+**What it does.** Rasterizes the selected vector into a
+`RasterImage` at the chosen DPI (default 254 = 10 lines/mm, a
+KerfDesk choice — LightBurn documents no default), every inked
+pixel at the chosen brightness on white. The source's transform
+(scale/mirror/rotation) is **baked into the pixels**: the result
+carries the transformed axis-aligned bounds with an IDENTITY
+transform, so it lands exactly where the vector was and stays safe
+for the raster output path (which does not rotate bitmaps).
 **The source vector is deleted** (LightBurn discards the original);
 the swap is one undo entry, so Ctrl+Z restores the vector — replacing
 LightBurn's manual "duplicate first" guidance.
@@ -1094,11 +1161,13 @@ LightBurn's manual "duplicate first" guidance.
 **The four states.**
 
 1. **Success.** A closed-shape SVG / text / trace is selected. Click
-   Convert to Bitmap → the vector is replaced in place by a grayscale
-   bitmap on the image-mode layer (`DEFAULT_RASTER_LAYER_COLOR`), the
-   new bitmap becomes the selection, and a toast confirms "Converted
-   to bitmap: `<name>` (bitmap)". It then engraves through the
-   existing F.2 image path.
+   Convert to Bitmap → the dialog opens (Render Type / DPI /
+   Default Brightness + size estimate) → Convert → the vector is
+   replaced in place by a grayscale bitmap on the image-mode layer
+   (`DEFAULT_RASTER_LAYER_COLOR`, or the next free color if that one
+   is taken at a different density), the new bitmap becomes the
+   selection, and a toast confirms "Converted to bitmap: `<name>`
+   (bitmap)". It then engraves through the existing F.2 image path.
 2. **Empty / nothing convertible.** No selection, or the selection is
    already a `RasterImage` (a bitmap can't be re-converted). Button
    disabled; tooltip prompts selecting a vector.
@@ -1116,11 +1185,15 @@ LightBurn's manual "duplicate first" guidance.
 in a real browser, side-effect-free (CLAUDE.md #4): the pure builder
 rasterizes a square-with-hole to a real PNG that round-trips to
 200×200 px at 254 DPI, ink at 50% gray, the even-odd hole preserved
-white, and the base64 luma byte-matches the PNG. **Not yet verified:**
-the live in-app render/placement of the swapped bitmap on the
-workspace canvas, and a side-by-side pixel comparison against
-LightBurn's own Convert output — both deferred (need a live import or
-a LightBurn session).
+white, and the base64 luma byte-matches the PNG. 2026-07-07 audit
+re-verification (isolated, no live scene): the production rasterizer
+matches the perceptual-harness reference pixel-for-pixel (IoU 1.0000
+on a star + annulus), and rendered PNGs of Fill All / Outlines / a
+rotated + scaled bake were eyeballed correct, bounds matching the
+transform math exactly. **Not yet verified:** the live in-app
+render/placement of the swapped bitmap on the workspace canvas, and
+a side-by-side pixel comparison against LightBurn's own Convert
+output — both deferred (need a live import or a LightBurn session).
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
@@ -2247,13 +2320,14 @@ F-CNC19 tiling.
 2. A live preview pane shows the panel sheet re-laid-out on every valid
    edit; an invalid draft keeps the last valid preview and disables
    **Generate**.
-3. **Generate** inserts one polyline object per panel (6 closed / 5 open
-   top) in the fixed order Bottom/Top/Front/Back/Left/Right (names shown
-   in the dialog preview; scene objects carry no name field), laid out in
-   a flat grid with the requested spacing, all on one auto-created layer
-   color, all selected, as ONE undo step. A toast reports "N panels
-   inserted". The dialog closes; the user assigns cut settings on that
-   layer as usual.
+3. **Generate** inserts one vector object per panel (6 closed / 5 open
+   top) in the fixed order Bottom/Top/Front/Back/Left/Right, each named
+   via its source field ("Box panel: Front", ADR-116) and carrying its
+   outline plus any interior cutout rings (holes under even-odd fill),
+   laid out in a flat grid with the requested spacing, all on one
+   auto-created layer color, all selected, as ONE undo step. A toast
+   reports "N panels inserted". The dialog closes; the user assigns cut
+   settings on that layer as usual.
 4. Laser fit contract: with the layer's kerf compensation set (Line
    mode cut settings, ADR-052), mating edges assemble line-to-line
    (press fit) at clearance 0; positive clearance loosens the joint by
@@ -2366,6 +2440,122 @@ F-CNC19 tiling.
    same layer color; no id collisions (fresh UUIDs), each set is its own
    undo step.
 
+### F-K6. Divider grid (ADR-116)
+
+#### Success
+
+1. The dialog gains **Dividers across width** and **Dividers across
+   depth** count fields (default 0). Any positive count adds evenly
+   spaced divider panels to the sheet, named in the preview
+   ("Divider X1", "Divider Y1", ...).
+2. Dividers stand on the bottom panel at full inner height, carry tabs
+   into through-slots cut in the two walls they meet (one shared
+   alternating sequence per junction — complementary by construction),
+   and cross intersecting dividers with egg-crate half-laps (X notched
+   from the top, Y from the bottom).
+3. Wall slots and cross-laps widen with the clearance pass exactly like
+   edge recesses; in CNC mode every slot corner a tab must seat against
+   carries the corner-overcut relief at full bit radius.
+
+#### Error — compartments too small
+
+1. A divider count that drives the compartment pitch under 2× thickness
+   (or, CNC, drives slot cells under the relief tool) reports the count
+   field with the limiting dimension; **Generate** stays disabled.
+
+#### Empty
+
+1. Both counts 0 produce byte-identical v1 output — no slots, no extra
+   panels.
+
+#### Edge — dividers with open-top style
+
+1. Dividers compose with any style; on open-top the divider top edges
+   finish flush with the wall rim line.
+
+### F-K7. Slide lid (ADR-116)
+
+#### Success
+
+1. Style **Slide lid** produces six panels: bottom, back, slotted left
+   and right walls, a front wall shortened to the slot floor, and a
+   loose lid with a half-round thumb notch on its leading edge.
+2. The side-wall channels run from the front edge to one thickness
+   inside the wall body; the assembled lid slides over the shortened
+   front and stops against the in-wall post (the captive top strip stays
+   fingered into the back wall).
+3. The lid and its slots are sized with the mandatory play so the lid
+   physically slides; laser default clearance rises to 0.2 mm for this
+   style (CNC keeps 0.15 mm).
+
+#### Error — zero clearance
+
+1. Clearance 0 with the slide-lid style reports "A slide lid needs
+   clearance to slide — use 0.2 mm or more."; **Generate** stays
+   disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its six panels.)
+
+#### Edge — shallow box
+
+1. When the box is too shallow for the slot band to clear the top edge
+   finger cells, validation names the height and thickness in conflict
+   rather than emitting overlapping geometry.
+
+### F-K8. Box fit test coupon (ADR-119)
+
+#### Success
+
+1. **Tools → Box Fit Test…** opens a small dialog: material thickness,
+   finger width, ladder start/step/count (defaults 0.05/0.05/6), and in
+   CNC mode the relief tool. Machine-aware defaults follow F-K3.
+2. **Generate** inserts two strips — a tab comb and a slot strip — as
+   one undo step. Rung i carries i+1 index nicks; its joint play is
+   exactly start + i·step, split across tab and notch like production
+   panels.
+3. The operator cuts both strips, presses each rung, and types the
+   winning rung's clearance into the Box Generator.
+
+#### Error — ladder exceeds the joint limit
+
+1. A ladder whose top rung reaches half the finger width (or half the
+   thickness) reports the count/step fields; **Generate** stays
+   disabled.
+
+#### Empty
+
+1. Empty numeric fields report "Enter a value" per F-K1.
+
+#### Edge — CNC relief
+
+1. CNC mode carves corner-overcuts in every notch at full bit radius;
+   validation rejects a tool wider than the finger (F-K2 rule).
+
+### F-K9. Assembled 3D preview (ADR-119)
+
+#### Success
+
+1. The Box Generator preview gains **Flat / Assembled** buttons. The
+   assembled view draws every panel extruded at its true 3D placement in
+   an isometric projection — dividers inside, the slide lid in its
+   channel — and re-renders on every valid edit.
+
+#### Error
+
+1. (None — the toggle only offers views of an already-valid sheet.)
+
+#### Empty
+
+1. While the draft is invalid the assembled view keeps the last valid
+   assembly, exactly like the flat preview (F-K1).
+
+#### Edge — canvas unavailable
+
+1. Without a 2D context (headless/jsdom) the preview renders an empty
+   canvas without crashing, matching BoxPreview's guard.
+
 ## Camera Mode flows
 
 ### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)
@@ -2441,9 +2631,9 @@ F-CNC19 tiling.
   lighting produce a typed toast telling the operator what to fix; nothing
   persists. A degenerate solve (markers nearly collinear) is refused the same
   way.
-- **Empty / no live feed.** Auto-align is disabled until a camera source runs.
-  Machine cameras auto-align exactly like USB ones: their frames arrive
-  through the local bridge's pixel-readable proxy (F-CAM6, ADR-116).
+- **Empty / no live feed.** Auto-align is disabled until an active camera
+  source can produce pixel-readable frames. Machine cameras become eligible
+  when the local bridge frame proxy is available (F-CAM6).
 - **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
   labels the corners correctly — the origin pair, not the operator, carries
   the orientation.
@@ -2464,79 +2654,140 @@ F-CNC19 tiling.
 - **Edge / encoder failure.** A platform without 2D canvas support fails
   typed ('could not build the bed image') instead of half-completing.
 
-### F-CAM6. Machine camera via the local bridge (ADR-116)
+### F-CAM6. Machine camera via the local bridge (ADR-121)
 
 - **Success / first-class machine camera.** The operator opens the Camera
-  panel; the bridge probes the machine camera server-side and reports it
-  found. "Use this camera" makes it the active source: the live view polls
-  the bridge's /frame.jpg proxy (pixel-readable in the desktop app, the dev
-  server, and the deployed site — no CSP or CORS exceptions), and lens
-  calibration, auto-align, Update still, and Trace from camera all work
-  exactly as with a USB webcam. RTSP cameras connect by URL from the panel's
-  "RTSP camera…" row (bridge probe -> MJPEG preview + single-frame capture).
-- **Error / bridge missing.** Without the bridge the machine-camera row says
-  how to start it (Desktop starts it automatically; browsers run
-  `pnpm camera:bridge`); an RTSP connect without ffmpeg says FFmpeg is
-  required and stays off. The Diagnostics row shows bridge liveness, frame
-  proxy, ffmpeg, and an on-demand "Test capture" pixel-readability check.
-- **Empty / camera off.** With the laser disconnected or powered off,
-  discovery reports "No machine camera found" with the connect-and-retry
-  hint; nothing else in the panel is blocked.
-- **Edge / untrusted page.** A drive-by web page cannot use the bridge: it
-  refuses untrusted browser Origins before doing any work and only proxies
-  private-network camera URLs (never the public internet, never itself).
+  panel, the local bridge is healthy, and **Discover machine camera** finds a
+  private-network JPEG or RTSP camera. **Use this camera** makes it the active
+  camera source; calibration, auto-align, overlay updates, trace-from-camera,
+  and snapshots use the same pixel-readable capture path as USB cameras.
+- **Error / bridge unavailable.** If the bridge is not running, discovery and
+  machine-camera capture show an actionable message. Browser users are pointed
+  to the bridge command; the desktop app starts it automatically.
+- **Empty / no camera found.** Discovery completes with no candidate camera;
+  the panel stays usable for USB cameras and manual RTSP entry.
+- **Edge / slow or single-threaded camera.** Frame fetches for the same camera
+  host are serialized and shared while in flight so preview polling and capture
+  do not overload embedded camera servers.
 
-### F-CAM7. Click-to-position the laser head (Move laser here)
+### F-CAM7. Click-to-position the laser head (ADR-122)
 
-- **Success / head under the click.** The operator picks the crosshair "Move
-  laser here" tool and clicks a point on the workspace — typically an object
-  visible in the aligned camera overlay. The click is clamped inside the bed,
-  mapped through the SAME origin transform G-code emission uses (origin
-  honesty), and sent as one absolute, beam-off jog through the fully-gated
-  jog path (cancellable like any jog). Esc returns to the Select tool.
-- **Error / machine not ready.** Disconnected, running, alarmed, or mid-
-  motion machines refuse with the same block reason the JogPad shows, as a
-  toast; nothing is sent.
-- **Empty / nothing to align to.** The tool works without a camera — it is
-  simply "go to this bed point"; the camera overlay just makes the target
-  meaningful.
-- **Edge / click outside the bed.** Clicks beyond the bed edge clamp to the
-  nearest edge point (bounds check) — the head never leaves the work area,
-  and X0/Y0 destinations are emitted explicitly (the zero-axis jog fix).
+- **Success / head under the click.** The operator selects **Move laser here**
+  and clicks a point on the workspace. The click maps through the same origin
+  transform used by emitted G-code, clamps inside the machine bed, and sends
+  one absolute beam-off jog through the normal jog safety gates.
+- **Error / machine not ready.** If the machine is disconnected, busy, alarmed,
+  or otherwise blocked for jogging, no command is sent and the operator sees
+  the same block reason as the Jog Pad.
+- **Empty / no camera overlay.** The tool still moves to workspace
+  coordinates; the camera overlay simply makes the target visually meaningful.
+- **Edge / zero coordinates.** Absolute destinations at X0, Y0, or Z0 keep the
+  zero-valued axis word; only relative zero deltas are omitted.
 
-### F-CAM8. Camera snapshot + monitoring view
+### F-CAM8. Camera snapshot and monitoring view (ADR-122)
 
-- **Success / snapshot saved.** With any camera source live, "Save
-  snapshot..." captures one frame (through the same pixel-readable path as
-  calibration) and writes a PNG via the platform save dialog. "Larger view"
-  widens the panel for watching a running job; the size preference persists
-  locally.
-- **Error / capture or encode fails.** A dead source or unavailable canvas
-  reports a typed toast ("Could not capture a camera frame." / "Could not
-  encode the snapshot PNG."); nothing half-writes.
-- **Empty / no source.** The snapshot button is disabled until a camera
-  source runs; the size toggle always works.
-- **Edge / dialog dismissed.** Cancelling the save picker is silent — the
-  operator changed their mind, not an error.
+- **Success / snapshot saved.** With any active camera source, **Save
+  snapshot...** captures one pixel-readable frame, encodes it as PNG, and sends
+  it through the platform save dialog.
+- **Error / capture or encode failed.** Capture/PNG failures show typed toasts;
+  user-cancelled save dialogs stay quiet.
+- **Empty / no active source.** Snapshot actions are disabled until a camera
+  source is active.
+- **Edge / watching a job.** The camera panel can toggle between compact and
+  wide monitoring widths, with the preference kept locally.
 
-### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-118)
+### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-122)
 
-- **Success / one wizard, aligned bed.** "Align to bed..." opens the wizard:
-  the operator sets engrave power/speed, and "Burn markers" replaces the
-  scene with the five-marker pattern (undoable) and runs the NORMAL start-job
-  flow — readiness checks, preflight, confirmation, streaming. When the job
-  finishes the wizard prompts to clear the bed (markers stay!), then Detect
-  captures, de-fisheyes when calibrated, finds the five X-corners, solves the
-  homography, and persists the alignment. The done step names the basis
-  (lens-corrected or raw).
-- **Error / burn refused or interrupted.** A not-ready machine surfaces the
-  start-flow's own refusal; a cancelled/errored/disconnected stream returns
-  to setup with the reason. Detection failures (markers not found, ambiguous
-  origin, degenerate solve) show the typed hint and nothing persists.
-- **Empty / no controller or no camera.** Without a controller the burn
-  button is disabled ("Markers already burned" still works for a pattern
-  burned earlier); without a live camera source the Detect step points back
-  to the Camera panel.
-- **Edge / operator changes their mind.** Closing the wizard at any step
-  keeps whatever was already true (a saved alignment stays; a replaced scene
-  is one Undo away); reopening starts back at setup.
+- **Success / one wizard, aligned bed.** **Align to bed...** opens a guided
+  wizard: choose marker burn power/speed, burn the five-marker target through
+  the normal Start flow, wait for the stream to finish, clear the bed, capture
+  a frame, detect markers, solve the homography, and persist the alignment.
+- **Error / burn not started or failed.** If readiness, preflight,
+  confirmation, streaming, cancellation, or disconnect stops the burn, the
+  wizard returns to setup with the typed reason and does not persist anything.
+- **Empty / markers already burned.** The operator can skip the burn step and
+  go straight to detection when the target is already on the bed.
+- **Edge / minimized wizard.** The wizard can minimize into a small non-modal
+  panel so the operator can watch the live camera and reach the machine while
+  the capture or burn flow continues.
+
+---
+
+## Desktop app (Windows installer) flows
+
+The desktop app is the same web build wrapped in Electron (ADR-003, ADR-024):
+the `dist/web` bundle runs in Electron's Chromium renderer, so every laser/CNC
+flow above behaves identically. These flows cover only what is *new* on the
+desktop target — getting it, updating it, and proving it works.
+
+### F-DESK1. Download and install (Windows 10/11, 64-bit)
+
+1. In the web app, the operator clicks **Download for Windows** (Toolbar) or
+   opens `https://kerfdesk.com/download`.
+2. The download page links the installer on the Cloudflare R2 feed
+   (`https://dl.kerfdesk.com/desktop/kerfdesk-latest-x64-setup.exe`).
+3. Running the installer (NSIS, per-user, `oneClick:false`) lets the operator
+   choose an install directory, then installs and creates a "LaserForge 2.0"
+   shortcut.
+4. First launch opens the app over the `app://` scheme at bed dimensions — the
+   same as the web app's F-A1.
+
+#### Error — unsigned-build SmartScreen warning (v1, expected)
+1. Until code signing lands (ADR-024 §5), Windows Defender SmartScreen shows
+   "Windows protected your PC" on first run.
+2. The `/download` page documents the bypass: **More info → Run anyway.**
+3. Once signed, the warning disappears with no app change.
+
+#### Empty — no desktop build on macOS / Linux
+1. The download page states the installer is Windows-only and links macOS/Linux
+   users to the web app (ADR-007).
+
+#### Edge — inside the desktop app the download/install affordances vanish
+1. When running under Electron (`adapter.id === 'electron'`), the Toolbar hides
+   both **Download for Windows** and the PWA **Install app** button — you don't
+   download or PWA-install the app from within itself.
+
+### F-DESK2. Auto-update (background, install-on-quit, burn-safe)
+
+1. On each packaged launch, the main process checks the R2 feed's `latest.yml`
+   (`electron/auto-update.ts` → `checkForUpdatesAndNotify`).
+2. A newer version downloads in the background; the OS shows a native "update
+   ready" notification. The current session is never interrupted.
+3. The update installs on the **next quit** (`autoInstallOnAppQuit`), and the
+   app relaunches on the new version.
+
+#### Error — offline or feed unreachable
+1. The check fails silently (logged via `onError`, never fatal). The app runs
+   normally on the installed version.
+
+#### Edge — a job is streaming
+1. Updates NEVER install mid-burn: the app never calls `quitAndInstall`, and a
+   quit can't happen during a running job without the operator stopping it
+   (`use-unload-stop.ts` soft-resets the machine on unload). Non-negotiable #9
+   holds.
+
+### F-DESK3. Release + manual verification checklist (load-bearing)
+
+Cutting a release is `git tag vX.Y.Z && git push --tags`, which runs
+`release-desktop.yml` (build → R2 publish). **Green CI does not prove the
+installer runs** (CLAUDE.md). Before a desktop release is called done, a human
+runs this on real Windows:
+
+- [ ] `pnpm build:desktop` locally (or download the CI artifact) produces
+      `release/<version>/LaserForge-2.0-<version>-x64-setup.exe`.
+- [ ] Installs cleanly on **Windows 10** and **Windows 11**; the shortcut
+      launches the app over `app://app/index.html`.
+- [ ] **Serial (hardware):** a GRBL laser/CNC plugged in appears in the
+      `select-serial-port` picker; connect → jog → frame → stream a small job.
+- [ ] **Files:** a `.lf2` round-trips via the File System Access pickers; G-code
+      export saves.
+- [ ] **Camera (optional):** a USB webcam previews (getUserMedia); an RTSP/IP
+      camera previews only if `ffmpeg` is on PATH (documented optional dep).
+- [ ] **Auto-update:** publish a higher `vX.Y.Z`; a running older install
+      downloads it, notifies, and on quit installs + relaunches on the new
+      version. Confirm **no install occurs while a job streams**.
+- [ ] **Download surface:** `/download` serves the installer on the web; inside
+      the desktop app the Download/Install affordances are hidden.
+
+Until every box is checked on real hardware, the desktop installer stays
+**CLAIMED** (AUDIT.md A8 row).
