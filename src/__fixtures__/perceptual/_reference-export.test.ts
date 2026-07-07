@@ -20,8 +20,9 @@ const OUT_DIR = join(process.cwd(), 'trace-audit-artifacts', 'ref');
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
 const STAR_TIPS = 12;
 
-it('exports preprocessed fixture bitmaps for the reference tracer', () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)('exports preprocessed fixture bitmaps for the reference tracer', () => {
   const fixture = requiredArchHouseFixtureStatus();
   if (fixture.path === null) throw new Error('arch-house fixture missing');
   mkdirSync(OUT_DIR, { recursive: true });

@@ -4,10 +4,11 @@ import {
   traceImageToColoredPaths,
 } from '../../core/trace';
 import { LANGEBAAN_BAND } from './arch-house-edge-truth';
+import { countInk, pushFindingIf, ratingFromFindings } from './benchmark-rating';
 import { measureCenterlineDeviation } from './centerline-deviation';
 import { CENTERLINE_TRUTH_FIXTURES } from './centerline-truth';
 import { decodePngFile } from './png-decode';
-import { rasterizeColoredPaths, type Mask } from './rasterize';
+import { rasterizeColoredPaths } from './rasterize';
 import { buildTraceArtifact, requiredArchHouseFixtureStatus } from './trace-artifact-runner';
 import type { TraceBenchmarkFinding, TraceBenchmarkResult } from './trace-benchmark-loop';
 
@@ -245,32 +246,4 @@ function missingArchHouseBenchmark(
     },
     findings,
   };
-}
-
-function pushFindingIf(
-  condition: boolean,
-  findings: TraceBenchmarkFinding[],
-  finding: TraceBenchmarkFinding,
-): void {
-  if (condition) findings.push(finding);
-}
-
-function countInk(
-  mask: Mask,
-  rect: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number },
-): number {
-  let count = 0;
-  for (let y = rect.y0; y < rect.y1; y += 1) {
-    for (let x = rect.x0; x < rect.x1; x += 1) {
-      count += mask.data[y * mask.width + x] ?? 0;
-    }
-  }
-  return count;
-}
-
-function ratingFromFindings(findings: ReadonlyArray<TraceBenchmarkFinding>): number {
-  if (findings.some((finding) => finding.severity === 'high')) return 6;
-  if (findings.some((finding) => finding.severity === 'medium')) return 8;
-  if (findings.some((finding) => finding.severity === 'low')) return 9;
-  return 10;
 }

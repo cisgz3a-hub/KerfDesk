@@ -122,6 +122,22 @@ describe('upscaleBy', () => {
     expect(up.height).toBe(6);
     expect(up.data.length).toBe(6 * 6 * 4);
   });
+
+  // Contract: factor must be a finite integer >= 1. Invalid factors would
+  // otherwise mint zero-length / non-finite-dimension buffers. Fail closed by
+  // returning the source unchanged (identity, factor-1 semantics).
+  it('returns the source unchanged for invalid factors (0/-1/1.5/NaN/Infinity)', () => {
+    const src = whiteImage(3, 5);
+    for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const out = upscaleBy(src, bad);
+      expect(out).toBe(src);
+    }
+  });
+
+  it('still upscales for valid factors 2 and 3', () => {
+    expect(upscaleBy(whiteImage(2, 2), 2).width).toBe(4);
+    expect(upscaleBy(whiteImage(2, 2), 3).width).toBe(6);
+  });
 });
 
 describe('upscaleDouble', () => {
@@ -180,6 +196,19 @@ describe('downscaleTracedPaths', () => {
     ]);
     expect(out[0]?.polylines[0]?.closed).toBe(true);
     expect(out[0]?.polylines[1]?.closed).toBe(false);
+  });
+
+  // Contract: factor must be a finite integer >= 1. An invalid factor would
+  // divide coordinates into non-finite / wrong-scale values. Fail closed by
+  // returning the paths unchanged.
+  it('returns paths unchanged for invalid factors (0/-1/1.5/NaN/Infinity)', () => {
+    const paths: ColoredPath[] = [
+      { color: '#abcdef', polylines: [{ points: [{ x: 4, y: 8 }], closed: false }] },
+    ];
+    for (const bad of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const out = downscaleTracedPaths(paths, bad);
+      expect(out[0]?.polylines[0]?.points).toEqual([{ x: 4, y: 8 }]);
+    }
   });
 });
 
