@@ -4,6 +4,7 @@ import type { Job } from '../../job';
 import { decodeRdStream } from '../../../__fixtures__/controllers/ruida-decoder';
 import { ruidaDriver } from './driver';
 import { encodeRdJob } from './rd-encoder';
+import { layerColor } from './rd-commands';
 import { decodeCoord35, decodePower14, encodeCoord35, encodePower14 } from './rd-numbers';
 import {
   createRuidaSession,
@@ -39,6 +40,25 @@ const JOB: Job = {
     },
   ],
 };
+
+describe('ruida layer color wire order', () => {
+  // Public .rd decoders (MeerK40t / EduTech reverse engineering; NOT
+  // hardware-verified) read the layer-color int as blue<<16|green<<8|red —
+  // red in the LOW byte. Audit F8: the old conversion read the channels
+  // swapped AND repacked them swapped (a no-op), leaving red in the high
+  // byte on the wire.
+  it('packs #ff0000 (red) with red in the low byte', () => {
+    expect(layerColor(0, 0xff0000)).toEqual([0xca, 0x06, 0, ...encodeCoord35(0x0000ff)]);
+  });
+
+  it('packs #0000ff (blue) with blue in the high byte', () => {
+    expect(layerColor(2, 0x0000ff)).toEqual([0xca, 0x06, 2, ...encodeCoord35(0xff0000)]);
+  });
+
+  it('leaves greys unchanged (symmetric channels)', () => {
+    expect(layerColor(1, 0x808080)).toEqual([0xca, 0x06, 1, ...encodeCoord35(0x808080)]);
+  });
+});
 
 describe('ruida swizzle', () => {
   it('round-trips every byte value', () => {

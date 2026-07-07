@@ -18,7 +18,9 @@ export function SafetyNoticeBanner(): JSX.Element | null {
       ? 'Connection lost mid-job'
       : notice.kind === 'controller-error'
         ? 'Controller rejected a command'
-        : 'Command may not have sent';
+        : notice.kind === 'controller-reboot'
+          ? 'Controller rebooted mid-job'
+          : 'Command may not have sent';
   return (
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>

@@ -38,6 +38,7 @@ import {
 } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
+import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import { overrideActions } from './override-actions';
 import { probeActions } from './laser-probe-actions';
 import type { ProbeResult } from './probe-actions';
@@ -231,7 +232,7 @@ export type LiveRefs = ControllerLifecycleRefs & {
   // M13 ack-watchdog probe: last-seen stream position + when it was first
   // seen unchanged. Lives here (not React state) — only the poll reads it.
   stallProbe: StallProbe;
-};
+} & ResetCleanupRefs;
 
 const refs: LiveRefs = {
   connection: null,
@@ -245,6 +246,7 @@ const refs: LiveRefs = {
   stallProbe: null,
   controllerCommand: null,
   controllerIdleWait: null,
+  pendingResetCleanup: null,
 };
 
 async function safeWrite(
@@ -468,6 +470,7 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...jobActions(
     set,
     get,
+    refs,
     (line, action) => safeWrite(set, get, line, action),
     () => refs.driver,
   ),
