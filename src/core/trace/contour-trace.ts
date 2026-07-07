@@ -7,6 +7,7 @@
 
 import type { ColoredPath, Polyline } from '../scene';
 import {
+  closeRingEndpoints,
   inkMaskFromPrepared,
   refineChainForOutput,
   sharpenChainBends,
@@ -14,9 +15,11 @@ import {
   smoothChainCurvature,
   smoothRawChain,
   squaredDistanceField,
+  type InkMask,
 } from './centerline';
 import { midCrackChain, traceBoundaryLoops } from './contour-boundary';
 import { flattenStraightRuns } from './flatten-straight-runs';
+import { smoothArcNoise } from './smooth-arc-noise';
 import { preprocessForTrace, type RawImageData, type TraceOptions } from './trace-image';
 
 const CONTOUR_COLOR = '#000000';
@@ -31,6 +34,14 @@ const MIN_LOOP_POINTS = 3;
 // this dense-point count the hard-turn pinning in the evening/refine stages
 // handles corners instead (~0.55px rounding, sub-pixel at engrave scale).
 const SHARPEN_MAX_CHAIN_POINTS = 4096;
+// ...and NOT worth its risk on TINY loops (glyph-scale letters): the bend
+// window's arm is comparable to the whole feature there, so the rebuild
+// pins false corners on round bowls and the spline renders them as
+// polygons (the melted LANGEBAAN "B", 12-15 pinned corners on one ~30px
+// letter). Below this dense-point count the sparse-stage hard-turn
+// detection (≥60° in curve-refine/chain-smoothing) owns the corners:
+// genuine stem corners still break the spline, bowls stay round.
+const SHARPEN_MIN_CHAIN_POINTS = 260;
 const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
 
 /** Trace filled ink regions as smooth closed outlines (holes stay hollow
@@ -41,28 +52,51 @@ export function traceImageToContourColoredPaths(
 ): ColoredPath[] {
   const prepared = preprocessForTrace(image, options);
   const mask = inkMaskFromPrepared(prepared);
-  const distSq = squaredDistanceField(mask);
-  const minAreaPx = Math.max(options.ignoreLessThanPixels ?? 0, 0);
-  const finish: LoopFinish = {
-    distSq,
-    width: mask.width,
+  const polylines = contourPolylinesFromMask(mask, {
+    minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0),
     epsilonPx: SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1),
-    // The dialog's Smoothness knob doubles as wobble-flattening strength —
-    // but only PAST its neutral default of 1: at 1 the flattener is off
-    // (measured best on drawn art, where waviness is intentional), and the
-    // slider's upper range maps to erasing up to ~2px of edge wobble for
-    // rough-edged sources like screenshots and scans.
-    flattenStrength: Math.max(0, ((options.smoothness ?? 1) - 1) * 6),
+    // The dialog's Smoothness knob doubles as wobble-flattening strength.
+    // Default ON at the conservative 1px amplitude cap — the earlier
+    // default-off mapping left nominally straight stems visibly wobbly on
+    // thresholded real sources (maintainer verdict, 2026-07-07). The
+    // max(0, 6s − 5) ramp keeps Sharp's 0.55 (anything ≤ ~0.83) fully off
+    // for pixel-fidelity work, reaches the 1px baseline at the neutral
+    // default 1, and scales to ~3px erase at the slider max 1.33 for rough
+    // screenshots and scans. Drawn waves above the amplitude cap are never
+    // touched — see the oscillation gate in flatten-straight-runs.ts.
+    flattenStrength: Math.max(0, 6 * (options.smoothness ?? 1) - 5),
+  });
+  return polylines.length === 0 ? [] : [{ color: CONTOUR_COLOR, polylines }];
+}
+
+export type ContourFinishOptions = {
+  /** Loops (either polarity) below this area in px² are dropped. */
+  readonly minAreaPx: number;
+  /** Douglas-Peucker tolerance and spline deviation cap, px. */
+  readonly epsilonPx: number;
+  /** Wobble-flattening strength (see flatten-straight-runs.ts); 0 = off. */
+  readonly flattenStrength: number;
+};
+
+/** Finish a binary ink mask into smooth closed outlines — the shared
+ *  geometry stage behind the filled-contours lane and (via its own mask
+ *  builder) the Edge Detection lane. */
+export function contourPolylinesFromMask(mask: InkMask, options: ContourFinishOptions): Polyline[] {
+  const finish: LoopFinish = {
+    distSq: squaredDistanceField(mask),
+    width: mask.width,
+    epsilonPx: options.epsilonPx,
+    flattenStrength: options.flattenStrength,
   };
   const polylines: Polyline[] = [];
   for (const loop of traceBoundaryLoops(mask)) {
     // Area-based speckle gate — the boundary walker sees paper holes the ink
     // despeckle never touched, so both loop polarities are filtered here.
-    if (Math.abs(loop.area) < minAreaPx) continue;
+    if (Math.abs(loop.area) < options.minAreaPx) continue;
     const finished = finishLoop(loop.points, finish);
     if (finished !== null) polylines.push(finished);
   }
-  return polylines.length === 0 ? [] : [{ color: CONTOUR_COLOR, polylines }];
+  return polylines;
 }
 
 type LoopFinish = {
@@ -84,11 +118,22 @@ function finishLoop(
   // edges come out wobbly (maintainer-observed on the arch-house H stems).
   const dense = smoothRawChain(midCrackChain(staircase), true);
   const sharpened =
-    dense.length <= SHARPEN_MAX_CHAIN_POINTS
+    dense.length >= SHARPEN_MIN_CHAIN_POINTS && dense.length <= SHARPEN_MAX_CHAIN_POINTS
       ? sharpenChainBends(dense, true, distSq, width)
       : { points: dense, corners: NO_CORNERS };
   const evened = smoothChainCurvature(sharpened.points, true, sharpened.corners);
-  const simplified = simplifyChain(evened, true, epsilonPx);
+  // Mid-wavelength curvature noise (the "small wobble in the O") is evened
+  // on the DENSE chain, where a local moving circle fit has rich statistics
+  // and cannot average away drawn structure the way long-span fits do
+  // (measured: run-level arc replacement cost 10 IoU points on real art).
+  // LARGE loops only — the same size class as the corner rebuild: glyph
+  // bowls at counter scale already render correctly and a ±7px window is a
+  // large fraction of such a feature.
+  const arcSmoothed =
+    dense.length >= SHARPEN_MIN_CHAIN_POINTS
+      ? smoothArcNoise(evened, true, sharpened.corners, finish.flattenStrength)
+      : evened;
+  const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
   // Rough source edges leave long-wavelength waviness that survives both
   // evening and simplification (nominally straight stems trace wobbly);
@@ -100,8 +145,11 @@ function finishLoop(
     finish.flattenStrength,
   );
   if (straightened.length < MIN_LOOP_POINTS) return null;
-  return {
-    points: refineChainForOutput(straightened, true, sharpened.corners, epsilonPx),
-    closed: true,
-  };
+  // Closed rings must RETURN to their start point (ADR-100 third amendment):
+  // renderers and emitters draw points as given and never synthesise the
+  // closing edge, so a ring left "open" engraves with a seam gap.
+  const closed = closeRingEndpoints([
+    { points: refineChainForOutput(straightened, true, sharpened.corners, epsilonPx), closed: true },
+  ]);
+  return closed[0] ?? null;
 }
