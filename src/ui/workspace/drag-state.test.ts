@@ -7,7 +7,7 @@ import {
   type SceneObject,
   type Transform,
 } from '../../core/scene';
-import { ROTATE_HANDLE_OFFSET_MM } from './rotate-handle';
+import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
 import {
   computeMouseDownDrag,
   isRightButtonDoubleClick,
@@ -231,6 +231,40 @@ describe('computeMouseDownDrag multi-selection', () => {
       { id: 'A', x: 0, y: 0 },
       { id: 'B', x: 30, y: 0 },
     ]);
+  });
+
+  it('rotate drag on a pre-rotated single object does not jump (audit C2)', () => {
+    const rotated: SceneObject = {
+      kind: 'imported-svg',
+      id: 'R',
+      source: 'r.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: { ...IDENTITY_TRANSFORM, x: 40, y: 40, rotationDeg: 30 },
+      paths: [],
+    };
+    const handle = rotateHandlePosition(rotated);
+    const drag = computeMouseDownDrag({
+      e: mouseEventAtScenePoint(handle),
+      ref: canvasRef(),
+      project: projectWithObjects([rotated]),
+      selectedObjectId: 'R',
+      additionalSelectedIds: new Set(),
+      viewState: VIEW_STATE,
+      onShiftClick: vi.fn(),
+      onPlainClick: vi.fn(),
+      selectionAnchor: 'c',
+    });
+    expect(drag?.kind).toBe('rotate');
+    // Applying with dragTo == the grab point must keep rotation at 30°, not
+    // snap it toward the pointer direction (~0°, the old absolute bug).
+    const next = nextTransformForDrag(
+      drag as Extract<DragState, { kind: 'rotate' }>,
+      rotated,
+      handle,
+      { shiftKey: false, ctrlKey: false, metaKey: false },
+      'c',
+    );
+    expect(next.rotationDeg).toBeCloseTo(30, 3);
   });
 
   it('applies the dragged-object delta to every selected move start transform', () => {

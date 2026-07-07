@@ -74,6 +74,7 @@ export function useDragMove(
       selectPathNode: deps.selectPathNode,
       toggleSelectObject: deps.toggleSelectObject,
       drawShape: deps.drawShape,
+      selectionAnchor: deps.selectionAnchor,
     });
     if (next === null) return;
     if (next.kind === 'marquee') {
@@ -152,6 +153,7 @@ function beginWorkspaceDrag(args: {
   readonly selectPathNode: ReturnType<typeof useStore.getState>['selectPathNode'];
   readonly toggleSelectObject: (id: string) => void;
   readonly drawShape: (shape: ShapeObject) => void;
+  readonly selectionAnchor: SelectionAnchor;
 }): DragState | null {
   if (args.toolMode.kind === 'node' && args.e.button === 0 && !useUiStore.getState().spaceDown) {
     return beginPathNodeDragForNodeTool(args);
@@ -176,6 +178,7 @@ function beginWorkspaceDrag(args: {
     viewState: args.viewState,
     onShiftClick: args.toggleSelectObject,
     onPlainClick: args.selectObject,
+    selectionAnchor: args.selectionAnchor,
   });
 }
 
