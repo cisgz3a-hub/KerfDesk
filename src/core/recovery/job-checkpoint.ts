@@ -140,6 +140,13 @@ export function parseJobCheckpoint(raw: string): JobCheckpoint | null {
   if (value['schemaVersion'] !== JOB_CHECKPOINT_SCHEMA_VERSION) return null;
   const fingerprint = value['fingerprint'];
   if (!isFingerprint(fingerprint)) return null;
+  return validatedCheckpointBody(value, fingerprint);
+}
+
+function validatedCheckpointBody(
+  value: Record<string, unknown>,
+  fingerprint: GcodeFingerprint,
+): JobCheckpoint | null {
   const sendableLines = value['sendableLines'];
   const ackedLines = value['ackedLines'];
   const resumeInFlight = value['resumeInFlight'];
