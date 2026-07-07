@@ -9,6 +9,10 @@ import { validateBoxSpec, type BoxSpec } from '../../core/box/box-spec';
 import { edgePattern } from '../../core/box/edge-pattern';
 import { buildPanelClaims, type PanelClaims } from '../../core/box/panel-claims';
 import { panelOutline } from '../../core/box/panel-outline';
+import { applyPanelFit } from '../../core/box/panel-fit';
+import { dividerLayout } from '../../core/box/divider-layout';
+import { dividerPanelRings, wallSlotCutouts } from '../../core/box/divider-panels';
+import type { DividerRefereeInput } from '../../core/box/divider-referee';
 
 export const BENCHMARK_SEED = 0x1057b0c5;
 const SWEEP_SPECS = 48;
@@ -254,4 +258,28 @@ export function tamperCorner(base: BoxSpec): ReadonlyArray<string> {
     return { panel: claims.panel, outline: panelOutline(tampered) };
   });
   return checkBoxAssembly(panels, base);
+}
+
+// Orchestrator-mirror composition for the divider referee: local rings
+// through the same fit pass the shipped panels get.
+export function composeDividerInput(spec: BoxSpec): DividerRefereeInput {
+  const layout = dividerLayout(spec);
+  const slots = wallSlotCutouts(layout, spec);
+  const walls = buildPanelClaims(spec).map((claims) => {
+    const fit = applyPanelFit(
+      { outline: panelOutline(claims), cutouts: slots.get(claims.panel) ?? [] },
+      { clearanceMm: spec.clearanceMm, relief: spec.relief },
+    );
+    if (fit.kind !== 'fitted') throw new Error(fit.detail);
+    return { panel: claims.panel, outline: fit.outline, cutouts: fit.cutouts };
+  });
+  const dividers = [...layout.xDividers, ...layout.yDividers].map((placement) => {
+    const fit = applyPanelFit(dividerPanelRings(layout, placement, spec), {
+      clearanceMm: spec.clearanceMm,
+      relief: spec.relief,
+    });
+    if (fit.kind !== 'fitted') throw new Error(fit.detail);
+    return { axis: placement.axis, index: placement.index, outline: fit.outline };
+  });
+  return { walls, dividers };
 }

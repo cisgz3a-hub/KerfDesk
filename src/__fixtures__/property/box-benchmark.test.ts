@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { checkBoxAssembly, type RefereePanel } from '../../core/box/assembly-referee';
+import { checkDividerAssembly } from '../../core/box/divider-referee';
 import type { BoxSpec } from '../../core/box/box-spec';
 import { generateBox } from '../../core/box/generate-box';
 import { buildPanelClaims } from '../../core/box/panel-claims';
@@ -22,6 +23,7 @@ import { panelOutline } from '../../core/box/panel-outline';
 import { applyPanelFit } from '../../core/box/panel-fit';
 import {
   BENCHMARK_SEED,
+  composeDividerInput,
   areaMatchesClaims,
   buildCorpus,
   clearanceFor,
@@ -52,6 +54,7 @@ describe('box generator benchmark', () => {
         scoreFitRelief(corpus),
         scoreDeterminism(corpus),
         scoreCutouts(),
+        scoreDividers(),
         scoreSabotageDetection(),
       ];
       const totalPassed = scores.reduce((sum, s) => sum + s.passed, 0);
@@ -221,6 +224,45 @@ function scoreCutouts(): Score {
   });
   if (JSON.stringify(a) === JSON.stringify(b)) passed += 1;
   return { category: 'cutouts', passed, total };
+}
+
+// Divider grids (ADR-116 V2): exact slot/tab/lap complementarity, the play
+// contract under clearance, determinism, and the 0-divider regression.
+function scoreDividers(): Score {
+  const grids: ReadonlyArray<readonly [number, number]> = [
+    [1, 0],
+    [0, 1],
+    [2, 1],
+    [3, 2],
+  ];
+  let passed = 0;
+  let total = 0;
+  for (const style of ['closed', 'open-top'] as const) {
+    for (const [nx, ny] of grids) {
+      const gridSpec: BoxSpec = {
+        ...spec(120, 90, 40, 3, 9, style),
+        dividersXCount: nx,
+        dividersYCount: ny,
+      };
+      total += 1;
+      if (checkDividerAssembly(composeDividerInput(gridSpec), gridSpec).length === 0) passed += 1;
+      total += 1;
+      const played: BoxSpec = { ...gridSpec, clearanceMm: 0.3 };
+      if (checkDividerAssembly(composeDividerInput(played), played, { playMm: 0.3 }).length === 0) {
+        passed += 1;
+      }
+      total += 1;
+      if (JSON.stringify(generateBox(gridSpec)) === JSON.stringify(generateBox(gridSpec))) {
+        passed += 1;
+      }
+    }
+  }
+  // 0-divider regression: absent fields and explicit zeros are byte-equal.
+  total += 1;
+  const plain = spec(120, 90, 40, 3, 9, 'closed');
+  const zeros: BoxSpec = { ...plain, dividersXCount: 0, dividersYCount: 0 };
+  if (JSON.stringify(generateBox(plain)) === JSON.stringify(generateBox(zeros))) passed += 1;
+  return { category: 'dividers', passed, total };
 }
 
 // The referee must catch all four classic failure classes when the math is
