@@ -30,6 +30,7 @@ export function toolCommandContext(
 ): Pick<
   AppCommandContext,
   | 'boxGenerator'
+  | 'boxFitTest'
   | 'materialTest'
   | 'intervalTest'
   | 'scanOffsetTest'
@@ -55,6 +56,7 @@ export function toolCommandContext(
 > {
   return {
     boxGenerator: callbacks.requestBoxGenerator,
+    boxFitTest: callbacks.requestBoxFitTest,
     materialTest: callbacks.requestMaterialTest,
     intervalTest: callbacks.requestIntervalTest,
     scanOffsetTest: callbacks.requestScanOffsetTest,
