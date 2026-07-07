@@ -214,11 +214,15 @@ describe('stop-path ack attribution', () => {
   });
 
   // GRBL stop: the soft reset wipes the firmware's RX buffer, so the
-  // in-flight lines will never be acked. The streamer must drop them at stop
-  // time or the M9 cleanup ok gets claimed by the dead stream and the
-  // counter never drains.
-  it('GRBL stop wipes in-flight so the M9 ok settles the ledger, not the stream', async () => {
-    const connection = makeConnection(async () => undefined);
+  // in-flight lines will never be acked and the streamer drops them at stop
+  // time. The M9 beam-off cleanup is deferred until the boot banner (audit
+  // F2) so its ok can neither be swallowed mid-boot nor orphaned by the
+  // banner's ledger reset.
+  it('GRBL stop defers M9 to the boot banner; its ok settles the ledger, not the stream', async () => {
+    const written: string[] = [];
+    const connection = makeConnection(async (data) => {
+      written.push(data);
+    });
     await connectWith(connection);
 
     await useLaserStore.getState().startJob(JOB_GCODE);
@@ -229,11 +233,38 @@ describe('stop-path ack attribution', () => {
     const stopped = useLaserStore.getState().streamer;
     expect(stopped?.status).toBe('cancelled');
     expect(stopped?.inFlight).toEqual([]);
+    // M9 is armed, not written: no untracked ack owed yet, nothing to jam.
+    expect(written).not.toContain('M9\n');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+
+    connection.emitLine('Grbl 1.1f'); // boot banner after the soft reset
+    await flush();
+    expect(written).toContain('M9\n');
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
 
-    connection.emitLine('ok'); // M9 cleanup
+    connection.emitLine('ok'); // M9 cleanup ack — post-boot, unambiguous
     await flush();
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     expect(useLaserStore.getState().streamer?.completed).toBe(0);
+  });
+
+  // Audit F2: a banner while the stream is live = uncommanded controller
+  // reboot. Buffered motion is gone; the job must end NOW, not when the
+  // stall watchdog gives up 10-90 s later.
+  it('an uncommanded boot banner mid-job errors the stream and raises a notice', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    await useLaserStore.getState().startJob(JOB_GCODE);
+    await flush();
+    expect(useLaserStore.getState().streamer?.status).toBe('streaming');
+
+    connection.emitLine('Grbl 1.1f'); // spontaneous reboot — no Stop was sent
+    await flush();
+
+    const streamer = useLaserStore.getState().streamer;
+    expect(streamer?.status).toBe('errored');
+    expect(streamer?.inFlight).toEqual([]);
+    expect(useLaserStore.getState().safetyNotice?.kind).toBe('controller-reboot');
   });
 });

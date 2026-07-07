@@ -8,6 +8,7 @@ import { idleCollector, startCollecting } from '../../core/controllers/grbl';
 import { selectControllerDriver } from '../../core/controllers';
 import { cancelControllerLifecycleRefs } from './laser-interactive-command';
 import { handleLine, type HandlerRefs } from './laser-line-handler';
+import { cancelResetCleanup } from './laser-reset-cleanup';
 import {
   streamStalledNotice,
   writeFailedNotice,
@@ -196,6 +197,7 @@ async function runHandshake(
 
 function teardown(refs: LiveRefs): void {
   cancelControllerLifecycleRefs(refs);
+  cancelResetCleanup(refs);
   refs.unsubscribeLine?.();
   refs.unsubscribeClose?.();
   if (refs.pollHandle !== null) clearInterval(refs.pollHandle);
