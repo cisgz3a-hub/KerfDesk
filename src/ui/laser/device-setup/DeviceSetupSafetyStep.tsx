@@ -18,7 +18,7 @@ export function DeviceSetupSafetyStep({ state, dispatch }: DeviceSetupStepProps)
   return (
     <section style={sectionStyle}>
       <p style={hintStyle}>
-        Name this machine and set what $$ cannot report — origin corner, air assist, and homing.
+        Name this machine and set what $$ cannot report — origin corner, air output, and homing.
         Enable $H only if your controller has working homing switches.
       </p>
       <NameRow device={draft} update={update} />

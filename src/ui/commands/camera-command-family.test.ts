@@ -15,15 +15,16 @@ describe('cameraCommand', () => {
     expect(toggleCameraPanel).toHaveBeenCalledTimes(1);
   });
 
-  it('reflects the open state through the active flag (title is the static help tooltip)', () => {
+  it('reflects the open state through the active flag and fallback title', () => {
     const open = cameraCommand(baseCtx({ cameraPanelOpen: true }));
     const closed = cameraCommand(baseCtx({ cameraPanelOpen: false }));
     expect(open.active).toBe(true);
     expect(closed.active).toBe(false);
-    // The registry resolves the tooltip from COMMAND_HELP, so the title is the
-    // same regardless of state (matching tools.registration-jig); surfaces show
-    // the open/closed state via aria-pressed from `active`.
-    expect(open.title).toBe(closed.title);
+    // Camera is intentionally not registered while the feature is hidden. Until
+    // it is restored to the command registry and help map, the dormant command
+    // uses its local fallback title.
+    expect(open.title).toBe('Close the camera panel');
+    expect(closed.title).toContain('Open the camera panel');
     expect(open.title).toContain('camera panel');
   });
 });

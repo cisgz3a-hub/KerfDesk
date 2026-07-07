@@ -28,8 +28,11 @@ describe('draw complexity helpers', () => {
   });
 
   it('returns a sampling stride only after the segment budget is exceeded', () => {
-    expect(strideForSegmentBudget(10_000)).toBe(1);
-    expect(strideForSegmentBudget(10_001)).toBe(2);
-    expect(strideForSegmentBudget(30_000)).toBe(3);
+    expect(strideForSegmentBudget(120_000)).toBe(1);
+    expect(strideForSegmentBudget(120_001)).toBe(2);
+    expect(strideForSegmentBudget(360_000)).toBe(3);
+    // A single traced logo (~10k segments) must render at full fidelity —
+    // the old 10k budget simplified the primary use case.
+    expect(strideForSegmentBudget(10_306)).toBe(1);
   });
 });

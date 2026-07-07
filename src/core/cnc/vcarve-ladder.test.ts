@@ -39,11 +39,26 @@ describe('vcarvePasses', () => {
     const depths = [...new Set(contourDepths(passes))].sort((a, b) => b - a);
     expect(depths[0]).toBeCloseTo(-0.5, 9);
     expect(depths[1]).toBeCloseTo(-1.0, 9);
-    // A 20 mm square's medial axis is 10 mm in: the ladder must reach most
-    // of that depth before offsets vanish.
+    // The 6 mm 90° bit's cutting flank ends at (6/2)/tan(45°) = 3 mm — the
+    // ladder must stop there, not at the 20 mm square's 10 mm medial axis.
     const deepest = Math.min(...depths);
-    expect(deepest).toBeLessThanOrEqual(-9);
-    expect(deepest).toBeGreaterThanOrEqual(-10);
+    expect(deepest).toBeCloseTo(-3, 9);
+  });
+
+  it('clamps the ladder to the bit cone height — deeper V cuts do not physically exist', () => {
+    // maxDepth 10 with a 6 mm 90° bit: cone height is 3 mm; rings past a
+    // 3 mm inset flood the floor at -3, and nothing cuts deeper (the shank
+    // above the flank would rub, and the modeled groove width would be a
+    // lie past the bit diameter).
+    const passes = vcarvePasses([square(0, 20)], {
+      tool: VBIT_90,
+      maxDepthMm: 10,
+      depthPerPassMm: 10,
+      resolutionMm: 0.5,
+    });
+    const depths = contourDepths(passes);
+    expect(depths.every((z) => z >= -3 - 1e-9)).toBe(true);
+    expect(depths.filter((z) => Math.abs(z + 3) < 1e-9).length).toBeGreaterThan(3);
   });
 
   it('clamps to maxDepth and floods the flat floor at δ spacing', () => {

@@ -42,8 +42,8 @@ describe('DeviceSettings air assist command', () => {
       if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
       details.open = true;
 
-      const select = host.querySelector('select[aria-label="Air assist command"]');
-      if (!(select instanceof HTMLSelectElement)) throw new Error('Air assist command missing');
+      const select = host.querySelector('select[aria-label="Air output command"]');
+      if (!(select instanceof HTMLSelectElement)) throw new Error('Air output command missing');
       expect(select.value).toBe('none');
 
       await act(async () => {
@@ -217,7 +217,7 @@ describe('DeviceSettings in CNC mode (ADR-101 §6)', () => {
       if (!(details instanceof HTMLDetailsElement)) throw new Error('Device details missing');
       details.open = true;
 
-      expect(host.querySelector('select[aria-label="Air assist command"]')).toBeNull();
+      expect(host.querySelector('select[aria-label="Air output command"]')).toBeNull();
       expect(host.querySelector('input[aria-label="GRBL $30 max power S"]')).toBeNull();
       expect(host.textContent).not.toContain('Scan offset');
       expect(host.textContent).not.toContain('Auto-focus command');

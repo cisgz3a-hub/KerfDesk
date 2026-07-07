@@ -22,6 +22,43 @@ describe('display polyline cache', () => {
     expect(pointReads).toBeLessThan(readBudget);
   });
 
+  it('decimates an over-budget polyline into ONE connected coarse polyline', () => {
+    // The 2026-07-05 defect: the old sampler emitted every Nth segment as its
+    // own two-point polyline, so a freshly traced logo rendered as
+    // disconnected dashes — indistinguishable from broken geometry.
+    // Decimation must keep each polyline a single connected chain with both
+    // endpoints intact.
+    const cache = createDisplayPolylineCache();
+    const points = Array.from({ length: 9_001 }, (_, x) => ({ x, y: 0 }));
+    const display = cache.get([{ closed: false, points }], 3_000);
+
+    expect(display.isSimplified).toBe(true);
+    expect(display.polylines).toHaveLength(1);
+    const decimated = display.polylines[0];
+    expect(decimated).toBeDefined();
+    if (decimated === undefined) return;
+    expect(decimated.points.length).toBeGreaterThan(2_000);
+    expect(decimated.points[0]).toBe(points[0]);
+    expect(decimated.points.at(-1)).toBe(points.at(-1));
+  });
+
+  it('preserves the closed flag and seam duplicate through decimation', () => {
+    const cache = createDisplayPolylineCache();
+    const ringPoints = Array.from({ length: 6_000 }, (_, i) => ({
+      x: Math.cos((i / 6_000) * 2 * Math.PI),
+      y: Math.sin((i / 6_000) * 2 * Math.PI),
+    }));
+    // Closed rings carry an explicit closing duplicate (job.ts invariant).
+    const withSeam = [...ringPoints, { ...(ringPoints[0] as { x: number; y: number }) }];
+    const display = cache.get([{ closed: true, points: withSeam }], 1_000);
+
+    const decimated = display.polylines[0];
+    expect(decimated).toBeDefined();
+    if (decimated === undefined) return;
+    expect(decimated.closed).toBe(true);
+    expect(decimated.points.at(-1)).toBe(withSeam.at(-1));
+  });
+
   it('reuses the sampled display copy for the same immutable source polylines', () => {
     const cache = createDisplayPolylineCache();
     const pointCount = 30_001;

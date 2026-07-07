@@ -55,6 +55,34 @@ afterEach(() => {
 });
 
 describe('CutsLayersPanel cut settings editor', () => {
+  it('toggles job air assist directly from the layer row', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const { host, unmount } = await renderPanel();
+    try {
+      const air = requireInput(host, 'input[aria-label="Job air assist for #ff0000"]');
+      expect(air.checked).toBe(false);
+
+      await act(async () => {
+        air.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(useStore.getState().project.scene.layers[0]?.airAssist).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('hides job air assist while editing CNC layers', async () => {
+    useStore.getState().setMachineKind('cnc');
+    useStore.getState().createManualLayer('#ff0000');
+    const { host, unmount } = await renderPanel();
+    try {
+      expect(host.querySelector('input[aria-label="Job air assist for #ff0000"]')).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
   it('opens a staged editor and applies changes only after OK', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const { host, unmount } = await renderPanel();
@@ -118,6 +146,22 @@ describe('CutsLayersPanel cut settings editor', () => {
 
       expect(useStore.getState().project.scene.layers[0]?.speed).toBe(1500);
       expect(host.querySelector('[role="dialog"]')).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('does not show job air assist inside the Cut Settings dialog', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { airAssist: true });
+    const { host, unmount } = await renderPanel();
+    try {
+      await openCutSettings(host, '#ff0000');
+
+      expect(host.querySelector('input[name="airAssist"]')).toBeNull();
+      await clickButtonWithText(host, 'OK');
+
+      expect(useStore.getState().project.scene.layers[0]?.airAssist).toBe(true);
     } finally {
       await unmount();
     }

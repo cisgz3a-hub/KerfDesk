@@ -54,4 +54,14 @@ export type ControllerCapabilities = {
   readonly homing: boolean;
   readonly console: boolean;
   readonly firmwareSetupPanel: FirmwareSetupPanel;
+  // G38.2 touch-plate probing. The probe protocol runner speaks the GRBL
+  // response grammar (ok pacing, ALARM:4/5, <status>), so only GRBL-family
+  // firmwares may expose probe UI — a different grammar could report false
+  // success and zero Z at the wrong height.
+  readonly probing: boolean;
+  // CNC spindle jobs (ADR-098: CNC is GRBL-only). The CNC emitter speaks the
+  // GRBL dialect — e.g. G4 P is SECONDS; Marlin reads P as milliseconds, so
+  // a 3 s spin-up dwell would become 3 ms and the bit plunges before the
+  // spindle is at speed.
+  readonly cncJobs: boolean;
 };

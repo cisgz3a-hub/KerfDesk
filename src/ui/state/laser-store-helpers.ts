@@ -92,6 +92,7 @@ export function disconnectStopCommands(
       ...driver.commands.stopLaserLines.map((line) => `${line}\n`),
     ];
   }
+  if (state.airAssistOn) return driver.commands.stopLaserLines.map((line) => `${line}\n`);
   if (state.motionOperation === null) return [];
   const jogCancel = driver.realtime.jogCancel;
   return jogCancel === null ? [] : [jogCancel];
@@ -190,11 +191,13 @@ export function initialLaserState(): Pick<
   | 'lastError'
   | 'lastWriteError'
   | 'safetyNotice'
+  | 'airAssistOn'
   | 'autofocusBusy'
   | 'probeBusy'
   | 'motionOperation'
   | 'controllerOperation'
   | 'streamer'
+  | 'activeJobMachineKind'
   | 'pendingUntrackedAcks'
   | 'homingState'
   | 'log'
@@ -219,11 +222,13 @@ export function initialLaserState(): Pick<
     lastError: null,
     lastWriteError: null,
     safetyNotice: null,
+    airAssistOn: false,
     autofocusBusy: false,
     probeBusy: false,
     motionOperation: null,
     controllerOperation: null,
     streamer: null,
+    activeJobMachineKind: null,
     pendingUntrackedAcks: 0,
     homingState: 'unknown',
     log: [],
@@ -267,6 +272,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     frameVerification: null,
     motionOperation: null,
     controllerOperation: null,
+    airAssistOn: false,
     homingState: 'unknown',
     streamer: stream,
     // Replies owed by the dead controller will never arrive.

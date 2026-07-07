@@ -453,4 +453,17 @@ describe('emitRasterGroup — validation', () => {
   it('throws on negative overscan', () => {
     expect(() => emitRasterGroup(makeInput({ overscanMm: -1 }))).toThrow(/overscanMm/);
   });
+
+  it('throws on non-finite bounds and overscan (NaN would emit "XNaN") (audit C4)', () => {
+    // `NaN <= minX` and `NaN < 0` are both false, so a NaN bound or overscan
+    // slipped past the comparison-only guards and reached fmt(NaN) → "XNaN" in
+    // the G-code, which GRBL rejects mid-job (error 33).
+    expect(() =>
+      emitRasterGroup(makeInput({ bounds: { minX: 0, minY: 0, maxX: Number.NaN, maxY: 2 } })),
+    ).toThrow(/bounds/);
+    expect(() =>
+      emitRasterGroup(makeInput({ bounds: { minX: 0, minY: Number.NaN, maxX: 2, maxY: 2 } })),
+    ).toThrow(/bounds/);
+    expect(() => emitRasterGroup(makeInput({ overscanMm: Number.NaN }))).toThrow(/overscanMm/);
+  });
 });

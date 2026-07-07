@@ -26,6 +26,9 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   shortcutName: LaserForge 2.0
+  # The installer shows the EULA and requires acceptance before install —
+  # the sold desktop build must surface the use grant + safety terms.
+  license: public/eula.txt
 
 # macOS / Linux targets remain commented; ADR-007 keeps them out of MVP.
 # mac:

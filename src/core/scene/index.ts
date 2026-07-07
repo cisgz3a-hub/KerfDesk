@@ -102,7 +102,7 @@ export type {
   SelectionDistributeResult,
 } from './selection-distribute';
 export { buildSelectionDistributeEdit } from './selection-distribute';
-export { isClosedEnough } from './polyline-closure';
+export { isClosedEnough, withClosingPoint } from './polyline-closure';
 export type { OutputScope, OutputScopeValidation } from './output-scope';
 export {
   DEFAULT_OUTPUT_SCOPE,

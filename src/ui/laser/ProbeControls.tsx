@@ -31,6 +31,7 @@ const CORNERS: ReadonlyArray<{ readonly value: ProbeCorner; readonly label: stri
 
 export function ProbeControls(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
+  const probingSupported = useLaserStore((s) => s.capabilities.probing);
   const connection = useLaserStore((s) => s.connection);
   const statusReport = useLaserStore((s) => s.statusReport);
   const probeBusy = useLaserStore((s) => s.probeBusy);
@@ -41,6 +42,17 @@ export function ProbeControls(): JSX.Element | null {
   const [zParams, setZParams] = useState<ZProbeParams>(DEFAULT_Z_PROBE_PARAMS);
   const [bitDiameterMm, setBitDiameterMm] = useState<number | null>(null);
   if (machine?.kind !== 'cnc') return null;
+  if (!probingSupported) {
+    // The probe runner speaks the GRBL response grammar; on firmwares with a
+    // different grammar a cycle could report false success and zero Z at the
+    // wrong height, so the controls are withheld entirely.
+    return (
+      <p style={{ fontSize: 12, color: 'var(--lf-text-faint)' }}>
+        Touch-plate probing is not supported on this controller. Zero the work coordinates manually
+        (jog to the stock top and set Z0).
+      </p>
+    );
+  }
 
   const effectiveBitDiameter = bitDiameterMm ?? activeCncTool(machine).diameterMm;
   const ready = connection.kind === 'connected' && statusReport?.state === 'Idle' && !probeBusy;

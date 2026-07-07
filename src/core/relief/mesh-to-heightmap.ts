@@ -9,7 +9,6 @@
 // Pure and deterministic: triangles in file order, max-Z accumulation is
 // order-independent, indexed loops only.
 
-import { isFinitePositive } from '../util';
 import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
 import { meshBounds, FLOATS_PER_TRIANGLE, type TriangleMesh } from './triangle-mesh';
 import { rasterizeTriangleMaxZ, type RasterTarget } from './triangle-raster';
@@ -43,17 +42,26 @@ export function meshToHeightmap(
   if (xExtent < MIN_EXTENT || yExtent < MIN_EXTENT) {
     return { kind: 'error', reason: 'Mesh is flat in X or Y — nothing to carve.' };
   }
-  if (!isFinitePositive(options.targetWidthMm) || !isFinitePositive(options.reliefDepthMm)) {
-    return { kind: 'error', reason: 'Target width and relief depth must be positive.' };
+  if (!Number.isFinite(xExtent) || !Number.isFinite(yExtent)) {
+    return { kind: 'error', reason: 'Mesh bounds must be finite.' };
+  }
+  if (
+    !Number.isFinite(options.targetWidthMm) ||
+    !Number.isFinite(options.reliefDepthMm) ||
+    options.targetWidthMm <= 0 ||
+    options.reliefDepthMm <= 0
+  ) {
+    return {
+      kind: 'error',
+      reason: 'Target width and relief depth must be finite positive numbers.',
+    };
   }
 
   const widthMm = options.targetWidthMm;
   const heightMm = (yExtent / xExtent) * widthMm;
-  const mmPerCell = heightmapCellSize(
-    widthMm,
-    heightMm,
-    options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM,
-  );
+  const size = heightmapCellSize(widthMm, heightMm, options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM);
+  if (size.kind === 'error') return size;
+  const { mmPerCell } = size;
   const widthCells = Math.max(1, Math.ceil(widthMm / mmPerCell));
   const heightCells = Math.max(1, Math.ceil(heightMm / mmPerCell));
 

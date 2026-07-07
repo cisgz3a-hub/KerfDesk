@@ -18,9 +18,29 @@ export function BoxGeneratorFields(props: {
 }): JSX.Element {
   const { draft, setField } = props;
   return (
-    <div style={gridStyle}>
-      <DimensionFields draft={draft} setField={setField} />
-      <FitFields draft={draft} machine={props.machine} setField={setField} />
+    <div style={fieldStackStyle}>
+      <MaterialFields draft={draft} setField={setField} />
+      <div style={gridStyle}>
+        <DimensionFields draft={draft} setField={setField} />
+        <FitFields draft={draft} machine={props.machine} setField={setField} />
+      </div>
+    </div>
+  );
+}
+
+function MaterialFields(props: {
+  readonly draft: BoxDraft;
+  readonly setField: BoxFieldSetter;
+}): JSX.Element {
+  const { draft, setField } = props;
+  return (
+    <div style={materialRowStyle}>
+      <MmField
+        label="Material thickness (mm)"
+        value={draft.thickness}
+        min={0.1}
+        onChange={setField('thickness')}
+      />
     </div>
   );
 }
@@ -52,12 +72,6 @@ function DimensionFields(props: {
           ['open-top', 'Open top (5 panels)'],
         ]}
         onChange={setField('style')}
-      />
-      <MmField
-        label="Thickness"
-        value={draft.thickness}
-        min={0.1}
-        onChange={setField('thickness')}
       />
     </>
   );
@@ -162,6 +176,18 @@ function SelectField(props: {
     </label>
   );
 }
+
+const fieldStackStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+};
+
+const materialRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(180px, 1fr) 2fr',
+  gap: 8,
+};
 
 const gridStyle: CSSProperties = {
   display: 'grid',
