@@ -126,6 +126,40 @@ export function pointerAngleDeg(anchor: Vec2, point: Vec2): number {
   return (Math.atan2(point.y - anchor.y, point.x - anchor.x) * 180) / Math.PI;
 }
 
+// Pivot point (scene mm) for rotating a single object around the given 9-dot
+// selection anchor. Captured once at grab so the pivot stays fixed through the
+// whole drag (audit C2).
+export function objectRotateAnchor(object: SceneObject, anchor: SelectionAnchor = 'c'): Vec2 {
+  return anchorPoint(object, anchor);
+}
+
+// Relative single-object rotate: apply the pointer-angle delta accumulated
+// SINCE the grab to the object's rotation AT the grab. The old model
+// (rotateObjectByDrag) computed the rotation straight from the pointer
+// direction, so grabbing the handle of an already-rotated object snapped it to
+// the pointer angle — a visible jump (audit C2). `snap` quantizes the
+// resulting absolute angle to ROTATE_SNAP_DEG, matching LightBurn's
+// Shift-rotate. Stateless per frame: reads the grab-time start transform, not
+// the object's current (mid-rotation) transform.
+export function rotateObjectRelative(args: {
+  readonly startTransform: Transform;
+  readonly anchor: Vec2;
+  readonly startPointerAngleDeg: number;
+  readonly dragTo: Vec2;
+  readonly snap: boolean;
+}): Transform {
+  const deltaFromGrab = pointerAngleDeg(args.anchor, args.dragTo) - args.startPointerAngleDeg;
+  let targetDeg = args.startTransform.rotationDeg + deltaFromGrab;
+  if (args.snap) targetDeg = Math.round(targetDeg / ROTATE_SNAP_DEG) * ROTATE_SNAP_DEG;
+  const deltaDeg = targetDeg - args.startTransform.rotationDeg;
+  const origin = rotatePoint(
+    { x: args.startTransform.x, y: args.startTransform.y },
+    args.anchor,
+    deltaDeg,
+  );
+  return { ...args.startTransform, x: origin.x, y: origin.y, rotationDeg: targetDeg };
+}
+
 function bboxCenter(object: SceneObject): Vec2 {
   const b = transformedBBox(object);
   return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };

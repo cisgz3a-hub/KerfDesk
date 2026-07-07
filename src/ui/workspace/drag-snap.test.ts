@@ -30,6 +30,24 @@ describe('transformDragWithSnap', () => {
     expect(result.guides).toContainEqual({ axis: 'x', positionMm: 30, fromMm: 0, toMm: 10 });
   });
 
+  it('bypasses snapping while Ctrl/Cmd is held (audit C4)', () => {
+    const moving = objectAt('moving', 0, 0);
+    const target = objectAt('target', 30, 0);
+
+    const result = transformDragWithSnap({
+      drag: moveDrag(),
+      object: moving,
+      point: { x: 19.2, y: 0 },
+      event: { shiftKey: false, ctrlKey: true, metaKey: false },
+      project: projectWithObjects([moving, target]),
+      snapSettings: { ...DEFAULT_SNAP_SETTINGS, snapToGrid: false },
+    });
+
+    // Without the bypass this would snap to x=20; with Ctrl it stays raw.
+    expect(result.transform.x).toBeCloseTo(19.2);
+    expect(result.guides).toEqual([]);
+  });
+
   it('does not snap scale or rotate drags', () => {
     const moving = objectAt('moving', 0, 0);
 

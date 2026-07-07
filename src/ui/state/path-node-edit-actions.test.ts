@@ -107,6 +107,34 @@ describe('path node edit actions', () => {
     expect(restored?.paths[0]?.polylines[0]?.points[1]).toEqual({ x: 10, y: 0 });
   });
 
+  it('drags every selected node by the primary node delta (C6)', () => {
+    loadObjects([importedSvg('logo', [pathWithPolyline('#000000', false, squarePoints())])]);
+    useStore.getState().selectPathNode({
+      objectId: 'logo',
+      pathIndex: 0,
+      polylineIndex: 0,
+      pointIndex: 1,
+    });
+    // Add node 2; it becomes the primary (last selected).
+    useStore
+      .getState()
+      .selectPathNode(
+        { objectId: 'logo', pathIndex: 0, polylineIndex: 0, pointIndex: 2 },
+        { additive: true },
+      );
+
+    useStore.getState().beginInteraction();
+    // Primary node 2 is at (10,10); dragging it to (13,15) is a (+3,+5) delta.
+    useStore.getState().setSelectedPathNodePositionDuringInteraction({ x: 13, y: 15 });
+    useStore.getState().endInteraction();
+
+    const object = useStore.getState().project.scene.objects[0] as ImportedSvg | undefined;
+    // Both selected nodes moved by the same delta; unselected node 0 stayed put.
+    expect(object?.paths[0]?.polylines[0]?.points[0]).toEqual({ x: 0, y: 0 });
+    expect(object?.paths[0]?.polylines[0]?.points[1]).toEqual({ x: 13, y: 5 });
+    expect(object?.paths[0]?.polylines[0]?.points[2]).toEqual({ x: 13, y: 15 });
+  });
+
   it('converts dragged scene coordinates into local node coordinates for transformed vectors', () => {
     loadObjects([
       {
