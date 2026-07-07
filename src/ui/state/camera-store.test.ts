@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CameraAdapter } from '../../platform/types';
+import type { CameraAdapter, CameraBridgeAdapter } from '../../platform/types';
 import { useCameraStore } from './camera-store';
 
 function mockCamera(overrides?: Partial<CameraAdapter>): CameraAdapter {
@@ -12,6 +12,18 @@ function mockCamera(overrides?: Partial<CameraAdapter>): CameraAdapter {
   };
 }
 
+function mockBridge(overrides?: Partial<CameraBridgeAdapter>): CameraBridgeAdapter {
+  return {
+    isSupported: () => true,
+    probeRtspCamera: async () => ({ kind: 'unavailable', reason: 'not under test' }),
+    discoverMachineCamera: async () => ({ kind: 'not-found' }),
+    proxiedFrameUrl: (cameraUrl) =>
+      `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
+    health: async () => ({ kind: 'ok', ffmpegAvailable: false, frameProxy: true }),
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   // selectCamera persists the preferred device; isolate tests from each other.
   localStorage.clear();
@@ -20,10 +32,10 @@ beforeEach(() => {
     isSupported: false,
     cameras: [],
     selectedDeviceId: null,
-    stream: { kind: 'idle' },
+    sourceState: { kind: 'idle' },
     alignment: { kind: 'idle' },
-    streamEpoch: 0,
-    networkCamera: { kind: 'idle' },
+    sourceEpoch: 0,
+    machineCamera: { kind: 'idle' },
     overlayVisible: true,
     overlayOpacityPercent: 50,
     overlayStill: null,
@@ -109,34 +121,37 @@ describe('camera-store', () => {
     expect(useCameraStore.getState().selectedDeviceId).toBe('b');
   });
 
-  it('goes live and stop() releases the stream', async () => {
+  it('goes live as a USB source and stopSource() releases the stream', async () => {
     const stop = vi.fn();
     // Only the shape webCamera produces is needed; cast the empty MediaStream.
     const opened = { stream: {} as MediaStream, stop };
-    await useCameraStore.getState().startStream(mockCamera({ openStream: async () => opened }));
-    expect(useCameraStore.getState().stream).toEqual({ kind: 'live', stream: opened });
-    useCameraStore.getState().stopStream();
+    await useCameraStore.getState().startUsbSource(mockCamera({ openStream: async () => opened }));
+    expect(useCameraStore.getState().sourceState).toEqual({
+      kind: 'live',
+      source: { kind: 'usb', stream: opened },
+    });
+    useCameraStore.getState().stopSource();
     expect(stop).toHaveBeenCalledTimes(1);
-    expect(useCameraStore.getState().stream.kind).toBe('idle');
+    expect(useCameraStore.getState().sourceState.kind).toBe('idle');
   });
 
   it('reports denied when openStream resolves null', async () => {
-    await useCameraStore.getState().startStream(mockCamera({ openStream: async () => null }));
-    expect(useCameraStore.getState().stream.kind).toBe('denied');
+    await useCameraStore.getState().startUsbSource(mockCamera({ openStream: async () => null }));
+    expect(useCameraStore.getState().sourceState.kind).toBe('denied');
   });
 
   it('reports an error when openStream throws', async () => {
     await useCameraStore
       .getState()
-      .startStream(mockCamera({ openStream: async () => Promise.reject(new Error('busy')) }));
-    const { stream } = useCameraStore.getState();
-    expect(stream.kind).toBe('error');
-    if (stream.kind === 'error') expect(stream.message).toBe('busy');
+      .startUsbSource(mockCamera({ openStream: async () => Promise.reject(new Error('busy')) }));
+    const { sourceState } = useCameraStore.getState();
+    expect(sourceState.kind).toBe('error');
+    if (sourceState.kind === 'error') expect(sourceState.message).toBe('busy');
   });
 
   it('reports an error when no camera adapter is present', async () => {
-    await useCameraStore.getState().startStream(undefined);
-    expect(useCameraStore.getState().stream.kind).toBe('error');
+    await useCameraStore.getState().startUsbSource(undefined);
+    expect(useCameraStore.getState().sourceState.kind).toBe('error');
   });
 
   it('releases an orphaned stream when superseded mid-open (no camera leak)', async () => {
@@ -152,34 +167,84 @@ describe('camera-store', () => {
     const streamB = { stream: {} as MediaStream, stop: stopB };
     const cameraB = mockCamera({ openStream: async () => streamB });
 
-    const startA = useCameraStore.getState().startStream(cameraA); // hangs on pendingA
-    await useCameraStore.getState().startStream(cameraB); // supersedes A -> live B
+    const startA = useCameraStore.getState().startUsbSource(cameraA); // hangs on pendingA
+    await useCameraStore.getState().startUsbSource(cameraB); // supersedes A -> live B
     resolveA(streamA); // A resolves late, after being superseded
     await startA;
 
     expect(stopA).toHaveBeenCalledTimes(1); // orphaned A released, no leak
     expect(stopB).not.toHaveBeenCalled();
-    expect(useCameraStore.getState().stream).toEqual({ kind: 'live', stream: streamB });
+    expect(useCameraStore.getState().sourceState).toEqual({
+      kind: 'live',
+      source: { kind: 'usb', stream: streamB },
+    });
   });
 
-  it('detects a network camera (Falcon) and stores its frame URL', async () => {
-    const camera = mockCamera({
-      discoverNetworkCamera: async () => ({
-        frameUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+  it('discovers the machine camera through the bridge', async () => {
+    const bridge = mockBridge({
+      discoverMachineCamera: async () => ({
+        kind: 'found',
+        cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+        proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
       }),
     });
-    await useCameraStore.getState().detectNetworkCamera(camera);
-    expect(useCameraStore.getState().networkCamera).toEqual({
+    await useCameraStore.getState().detectMachineCamera(bridge);
+    expect(useCameraStore.getState().machineCamera).toEqual({
       kind: 'found',
-      frameUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+      cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+      proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
     });
   });
 
-  it('reports not-found when no network camera responds', async () => {
-    await useCameraStore
-      .getState()
-      .detectNetworkCamera(mockCamera({ discoverNetworkCamera: async () => null }));
-    expect(useCameraStore.getState().networkCamera.kind).toBe('not-found');
+  it('reports not-found and bridge-unavailable distinctly', async () => {
+    await useCameraStore.getState().detectMachineCamera(mockBridge());
+    expect(useCameraStore.getState().machineCamera.kind).toBe('not-found');
+
+    await useCameraStore.getState().detectMachineCamera(
+      mockBridge({
+        discoverMachineCamera: async () => ({ kind: 'unavailable', reason: 'bridge down' }),
+      }),
+    );
+    expect(useCameraStore.getState().machineCamera).toEqual({
+      kind: 'unavailable',
+      reason: 'bridge down',
+    });
+
+    await useCameraStore.getState().detectMachineCamera(undefined);
+    const noBridge = useCameraStore.getState().machineCamera;
+    expect(noBridge.kind).toBe('unavailable');
+    if (noBridge.kind === 'unavailable') {
+      expect(noBridge.reason).toContain('pnpm camera:bridge');
+    }
+  });
+
+  it('activates the discovered machine camera as the live source', async () => {
+    // Activating replaces a running USB stream (and releases it).
+    const stop = vi.fn();
+    const opened = { stream: {} as MediaStream, stop };
+    await useCameraStore.getState().startUsbSource(mockCamera({ openStream: async () => opened }));
+    useCameraStore.setState({
+      machineCamera: {
+        kind: 'found',
+        cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+        proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
+      },
+    });
+    useCameraStore.getState().activateMachineCamera();
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(useCameraStore.getState().sourceState).toEqual({
+      kind: 'live',
+      source: {
+        kind: 'machine-jpeg',
+        frameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
+        cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+      },
+    });
+  });
+
+  it('activateMachineCamera is a no-op until discovery has found a camera', () => {
+    useCameraStore.getState().activateMachineCamera();
+    expect(useCameraStore.getState().sourceState.kind).toBe('idle');
   });
 
   it('drives the alignment flow through to aligned', () => {
