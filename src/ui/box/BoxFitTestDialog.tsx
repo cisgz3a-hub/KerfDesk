@@ -11,43 +11,18 @@ import {
   type FitCouponSpec,
 } from '../../core/box';
 import { Button, Dialog, DialogActions } from '../kit';
-import { CalibrationNumberField } from '../calibration/CalibrationNumberField';
 import {
   persistCalibrationDraft,
   restoreCalibrationDraft,
 } from '../calibration/calibration-draft-storage';
 import type { BoxMachineContext } from './box-draft';
-
-type FitTestDraft = {
-  readonly thickness: string;
-  readonly fingerWidth: string;
-  readonly start: string;
-  readonly step: string;
-  readonly rungs: string;
-  readonly toolDiameter: string;
-};
-
-const FIT_TEST_DRAFT_KEY = 'laserforge.box.fitTestDraft.v1';
-// The tool diameter always mirrors the machine (never persisted).
-const PERSISTED: ReadonlyArray<keyof FitTestDraft> = [
-  'thickness',
-  'fingerWidth',
-  'start',
-  'step',
-  'rungs',
-];
-
-function defaults(machine: BoxMachineContext): FitTestDraft {
-  const thickness = machine.kind === 'cnc' ? machine.stockThicknessMm : 3;
-  return {
-    thickness: String(thickness),
-    fingerWidth: String(thickness * 3),
-    start: '0.05',
-    step: '0.05',
-    rungs: '6',
-    toolDiameter: machine.kind === 'cnc' ? String(machine.toolDiameterMm) : '',
-  };
-}
+import { BoxFitTestFields } from './BoxFitTestFields';
+import {
+  defaultFitTestDraft,
+  FIT_TEST_DRAFT_KEY,
+  FIT_TEST_PERSISTED_FIELDS,
+  type FitTestDraft,
+} from './fit-test-draft';
 
 export type FitCouponParts = Extract<FitCouponResult, { kind: 'generated' }>['parts'];
 
@@ -57,7 +32,11 @@ export function BoxFitTestDialog(props: {
   readonly onGenerate: (parts: FitCouponParts) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(() =>
-    restoreCalibrationDraft(FIT_TEST_DRAFT_KEY, defaults(props.machine), PERSISTED),
+    restoreCalibrationDraft(
+      FIT_TEST_DRAFT_KEY,
+      defaultFitTestDraft(props.machine),
+      FIT_TEST_PERSISTED_FIELDS,
+    ),
   );
   const setField =
     (field: keyof FitTestDraft) =>
@@ -91,76 +70,12 @@ export function BoxFitTestDialog(props: {
       }}
       size="sm"
     >
-      <div style={gridStyle}>
-        <CalibrationNumberField
-          label="Material thickness (mm)"
-          value={draft.thickness}
-          min={0.1}
-          max={undefined}
-          step="any"
-          onChange={setField('thickness')}
-        />
-        <CalibrationNumberField
-          label="Finger width"
-          value={draft.fingerWidth}
-          min={0.5}
-          max={undefined}
-          step="any"
-          onChange={setField('fingerWidth')}
-        />
-        <CalibrationNumberField
-          label="Ladder start"
-          value={draft.start}
-          min={0}
-          max={undefined}
-          step="any"
-          onChange={setField('start')}
-        />
-        <CalibrationNumberField
-          label="Ladder step"
-          value={draft.step}
-          min={0.01}
-          max={undefined}
-          step="any"
-          onChange={setField('step')}
-        />
-        <CalibrationNumberField
-          label="Rungs"
-          value={draft.rungs}
-          min={2}
-          max={12}
-          step={1}
-          onChange={setField('rungs')}
-        />
-        {props.machine.kind === 'cnc' ? (
-          <CalibrationNumberField
-            label="Relief tool diameter"
-            value={draft.toolDiameter}
-            min={0.1}
-            max={undefined}
-            step="any"
-            onChange={setField('toolDiameter')}
-          />
-        ) : null}
-      </div>
+      <BoxFitTestFields draft={draft} machine={props.machine} setField={setField} />
       <p style={hintStyle}>
-        Cut both strips, press each rung together, and enter the best rung’s clearance
-        (start + rung × step, counted from the narrow-margin end) in the Box Generator.
+        Cut both strips, press each rung together, and enter the best rung’s clearance (start + rung
+        × step, counted from the narrow-margin end) in the Box Generator.
       </p>
-      {result.kind === 'invalid' ? (
-        <div role="alert" style={issueBlockStyle}>
-          {result.issues.map((issue) => (
-            <p key={issue.message} style={issueStyle}>
-              {issue.message}
-            </p>
-          ))}
-        </div>
-      ) : null}
-      {result.kind === 'error' ? (
-        <p role="alert" style={issueStyle}>
-          {result.message}
-        </p>
-      ) : null}
+      <FitTestIssues result={result} />
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
         <Button type="submit" variant="primary" disabled={result.kind !== 'generated'}>
@@ -171,7 +86,33 @@ export function BoxFitTestDialog(props: {
   );
 }
 
-const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 };
-const hintStyle: CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)', margin: '8px 0 4px' };
+function FitTestIssues(props: { readonly result: FitCouponResult }): JSX.Element | null {
+  const { result } = props;
+  if (result.kind === 'invalid') {
+    return (
+      <div role="alert" style={issueBlockStyle}>
+        {result.issues.map((issue) => (
+          <p key={issue.message} style={issueStyle}>
+            {issue.message}
+          </p>
+        ))}
+      </div>
+    );
+  }
+  if (result.kind === 'error') {
+    return (
+      <p role="alert" style={issueStyle}>
+        {result.message}
+      </p>
+    );
+  }
+  return null;
+}
+
+const hintStyle: CSSProperties = {
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+  margin: '8px 0 4px',
+};
 const issueBlockStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2 };
 const issueStyle: CSSProperties = { fontSize: 12, color: 'var(--lf-danger-fg)', margin: 0 };

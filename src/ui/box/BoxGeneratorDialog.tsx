@@ -59,17 +59,7 @@ export function BoxGeneratorDialog(props: {
     (field: keyof BoxDraft) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
       const { value } = event.target;
-      setDraft((current) => {
-        if (field === 'thickness') {
-          return boxDraftWithMaterialThickness(current, value, lockedAutoFitFields);
-        }
-        // A slide lid cannot slide at zero clearance; lift the draft to the
-        // style's working default when the user has not set one (F-K7).
-        if (field === 'style' && value === 'slide-lid' && Number(current.clearance) === 0) {
-          return { ...current, style: value, clearance: SLIDE_LID_MIN_CLEARANCE_DRAFT };
-        }
-        return { ...current, [field]: value };
-      });
+      setDraft((current) => draftWithFieldValue(current, field, value, lockedAutoFitFields));
       if (isAutoFitField(field)) {
         setLockedAutoFitFields((current) => new Set([...current, field]));
       }
@@ -123,6 +113,23 @@ export function BoxGeneratorDialog(props: {
 
 function isAutoFitField(field: keyof BoxDraft): field is BoxAutoFitField {
   return field === 'fingerWidth' || field === 'partSpacing';
+}
+
+function draftWithFieldValue(
+  current: BoxDraft,
+  field: keyof BoxDraft,
+  value: string,
+  lockedAutoFitFields: ReadonlySet<BoxAutoFitField>,
+): BoxDraft {
+  if (field === 'thickness') {
+    return boxDraftWithMaterialThickness(current, value, lockedAutoFitFields);
+  }
+  // A slide lid cannot slide at zero clearance; lift the draft to the
+  // style's working default when the user has not set one (F-K7).
+  if (field === 'style' && value === 'slide-lid' && Number(current.clearance) === 0) {
+    return { ...current, style: value, clearance: SLIDE_LID_MIN_CLEARANCE_DRAFT };
+  }
+  return { ...current, [field]: value };
 }
 
 function IssueList(props: {

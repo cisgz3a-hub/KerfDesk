@@ -44,14 +44,19 @@ export function generateFitCoupon(spec: FitCouponSpec): FitCouponResult {
     ['Fit comb', combStrip(spec, 0)],
     ['Fit slots', slotStrip(spec, bodyMm(spec) + spec.thicknessMm + STRIP_GAP_MM)],
   ] as const) {
-    const fit = applyPanelFit({ outline: ring, cutouts: [] }, { clearanceMm: 0, relief: spec.relief });
+    const fit = applyPanelFit(
+      { outline: ring, cutouts: [] },
+      { clearanceMm: 0, relief: spec.relief },
+    );
     if (fit.kind !== 'fitted') return { kind: 'error', message: `${name}: ${fit.detail}.` };
     parts.push({ name, rings: { outline: fit.outline, cutouts: fit.cutouts } });
   }
   return { kind: 'generated', parts };
 }
 
-function validate(spec: FitCouponSpec): BoxSpecIssue[] {
+// Range checks on the raw numbers; the geometric ladder checks in validate
+// only run once these pass.
+function validateNumbers(spec: FitCouponSpec): BoxSpecIssue[] {
   const issues: BoxSpecIssue[] = [];
   for (const [field, value] of [
     ['thickness', spec.thicknessMm],
@@ -66,8 +71,16 @@ function validate(spec: FitCouponSpec): BoxSpecIssue[] {
     issues.push({ field: 'clearance', message: 'Ladder start must be 0 or greater.' });
   }
   if (!Number.isInteger(spec.rungCount) || spec.rungCount < 2 || spec.rungCount > MAX_RUNGS) {
-    issues.push({ field: 'clearance', message: `Rung count must be a whole number from 2 to ${MAX_RUNGS}.` });
+    issues.push({
+      field: 'clearance',
+      message: `Rung count must be a whole number from 2 to ${MAX_RUNGS}.`,
+    });
   }
+  return issues;
+}
+
+function validate(spec: FitCouponSpec): BoxSpecIssue[] {
+  const issues = validateNumbers(spec);
   if (issues.length > 0) return issues;
   const topMm = fitCouponClearanceMm(spec, spec.rungCount - 1);
   const limitMm = Math.min(spec.fingerWidthMm, spec.thicknessMm) / 2;
