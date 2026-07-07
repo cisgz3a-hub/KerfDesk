@@ -75,7 +75,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
   it('deletes the source vector and adds the raster (LightBurn discards the original)', () => {
     const result = applyConvertToBitmap(
       { project: projectWithVector(), undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
     const objects = result.project.scene.objects;
@@ -89,7 +89,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     const raster = bitmapFor(src);
     const result = applyConvertToBitmap(
       { project: projectWithVector(), undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       raster,
     );
     const added = result.project.scene.objects.find((o) => o.kind === 'raster-image');
@@ -101,7 +101,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
   it('selects the new bitmap', () => {
     const result = applyConvertToBitmap(
       { project: projectWithVector(), undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
     expect(result.selectedObjectId).toBe('bmp1');
@@ -110,7 +110,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
   it('ensures an image-mode layer for the raster color', () => {
     const result = applyConvertToBitmap(
       { project: projectWithVector(), undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
     expect(result.project.scene.layers.find((l) => l.color === RASTER_COLOR)?.mode).toBe('image');
@@ -120,7 +120,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     const raster = bitmapFor(importedSvgSource(), 3.2);
     const result = applyConvertToBitmap(
       { project: projectWithVector(), undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       raster,
     );
     expect(result.project.scene.layers.find((l) => l.color === raster.color)?.linesPerMm).toBe(3.2);
@@ -141,7 +141,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     };
     const raster = bitmapFor(source, 3.2);
 
-    const result = applyConvertToBitmap({ project, undoStack: [] }, 'src-vec', raster);
+    const result = applyConvertToBitmap({ project, undoStack: [] }, ['src-vec'], raster);
     const added = result.project.scene.objects.find(
       (o): o is RasterImage => o.kind === 'raster-image' && o.id === raster.id,
     );
@@ -156,7 +156,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
   it("prunes the source vector's now-orphaned color layer", () => {
     const result = applyConvertToBitmap(
       { project: projectWithVector(), undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
     const colors = result.project.scene.layers.map((l) => l.color);
@@ -173,7 +173,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     };
     const result = applyConvertToBitmap(
       { project, undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
     expect(result.project.scene.layers.map((l) => l.color)).toContain(SOURCE_COLOR);
@@ -183,7 +183,7 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     const project = projectWithVector();
     const result = applyConvertToBitmap(
       { project, undoStack: [] },
-      'src-vec',
+      ['src-vec'],
       bitmapFor(importedSvgSource()),
     );
     expect(result.undoStack).toHaveLength(1);
@@ -192,12 +192,40 @@ describe('applyConvertToBitmap (ADR-029)', () => {
     expect(result.dirty).toBe(true);
   });
 
+  // ADR-029 amendment ii: a multi-selection merges into ONE bitmap — every
+  // source vector is deleted in the same single undo entry, and the stale
+  // multi-selection is cleared so Delete/duplicate can't act on ghosts.
+  it('removes every source of a multi-selection merge in one undo entry', () => {
+    const base = projectWithVector();
+    const sibling: ImportedSvg = { ...importedSvgSource(), id: 'src-vec-2' };
+    const project: Project = {
+      ...base,
+      scene: { ...base.scene, objects: [...base.scene.objects, sibling] },
+    };
+
+    const result = applyConvertToBitmap(
+      { project, undoStack: [] },
+      ['src-vec', 'src-vec-2'],
+      bitmapFor(importedSvgSource()),
+    );
+
+    const objects = result.project.scene.objects;
+    expect(objects.filter((o) => o.kind === 'imported-svg')).toHaveLength(0);
+    expect(objects.filter((o) => o.kind === 'raster-image')).toHaveLength(1);
+    expect(result.selectedObjectId).toBe('bmp1');
+    expect(result.additionalSelectedIds.size).toBe(0);
+    expect(result.undoStack).toHaveLength(1);
+    expect(result.undoStack[0]).toBe(project);
+    // Both sources shared one color layer — orphaned after the merge.
+    expect(result.project.scene.layers.map((l) => l.color)).not.toContain(SOURCE_COLOR);
+  });
+
   it('degrades gracefully: missing source → raster still added, nothing removed', () => {
     const project = projectWithVector();
     const before = project.scene.objects.length;
     const result = applyConvertToBitmap(
       { project, undoStack: [] },
-      'no-such-id',
+      ['no-such-id'],
       bitmapFor(importedSvgSource()),
     );
     const objects = result.project.scene.objects;

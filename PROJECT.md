@@ -112,7 +112,7 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 - Staged B1→B7: core/shapes geometry → 'shape' variant → ellipse/polygon → tool-mode + tool strip → draw-on-drag → pen → LightBurn-compatible tool hotkeys (`Ctrl+R` Rectangle, `Ctrl+E` Ellipse, `Ctrl+L` Line/Pen) with Save G-code moved to `Ctrl+Shift+E`. Interactive parametric handles + Convert-to-Path are P2 follow-ups.
 - OUT of this phase (still out of scope; a future phase + ADR + an ADR-017 polygon-clipping library evaluation): the geometry KERNEL — weld, boolean ops, offset, node editing.
 
-### Phase H — v0.8 "Router" [Built (G1–G8); hardware passes CLAIMED]
+### Phase H — v0.8 "Router" [Built (G1–G8, then H.13–H.14 / ADR-111–112); hardware passes CLAIMED]
 
 Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-098: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. UI separation between laser and CNC modes is governed by ADR-101 (gate-and-hide); the 3D relief viewer's three.js dependency by ADR-102 (UI-only override of ADR-098 §2). Sub-phases (each = individually reviewed diffs; branch shippable after every one). Status column: Built = code + tests landed, hardware pass still CLAIMED per AUDIT.md inventory:
 
@@ -196,6 +196,16 @@ macOS/Linux desktop, per ADR-104's renumbering note.)
   (WORKFLOW.md Phase K flows, AUDIT.md row) until a real box is cut and
   assembled.
 
+**K.2 — broad-tool pack [Built (V0–V3); hardware fit CLAIMED].** ADR-116: panel
+cutouts (interior rings; panels re-carrier to named `imported-svg`
+vector objects, closing the v1 name gap), divider grids (through-slot
+tabs + egg-crate cross-laps, complementary by construction), and the
+`slide-lid` style (slotted side walls, shortened front, thumb-notch lid,
+mandatory play). Every new junction type extends the assembly referee
+and the seeded benchmark — new categories must score 100% without
+regressing v1. Deferred with names in ADR-116: lip/hinged/living-hinge
+lids, polygon prisms, dovetails, CNC dado 2.5D, T-slot hardware joints.
+
 ### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
@@ -240,7 +250,7 @@ phase; tracked here so they don't get lost.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
 7. **Power scale honest** — `S` values match the device profile's max-power scale (`$30`). Property-tested.
-8. **No telemetry, no network calls** — local-first. Ever.
+8. **No telemetry, no third-party network calls** — local-first. No analytics, no error-reporting service, no cloud sync; no user data leaves the machine, ever. The **one** permitted network call is the desktop app's self-hosted **auto-update check** against our own pinned `kerfdesk.com` release feed (ADR-024) — it transmits no user data and no telemetry, is confined to that origin, and is disablable. The web app and every CAM/preview/streaming path stay fully offline.
 9. **E-stop reachable always** — Stop button reachable from any window state during a job. No modal can block it.
 
 ### Architectural (anti-shotgun-surgery)
@@ -327,7 +337,7 @@ Project
       mode: 'line' | 'fill' | 'image'
       power, speed, passes, visible, output
       fill settings: hatch angle, spacing, overscan, cross-hatch, offset fill
-      image settings: dither, lines/mm, overscan
+      image settings: dither, lines/mm, dot-width correction; image overscan is a fixed 5 mm default (not per-layer)
       cut settings: kerf, tabs, pass-through, air assist
   material libraries and presets
 ```
@@ -410,7 +420,7 @@ an assumption that every folder must have an `index.ts`.
 - **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial` and any `fileSystem*` permission (needed for the File System Access API in Electron 33+ — see commit `2965bd0`). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
-- **No auto-update from arbitrary URLs.**
+- **No auto-update from arbitrary URLs.** The desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin — never arbitrary (ADR-024). No `quitAndInstall`; updates apply on quit only, never mid-burn.
 - **Dependency CVE monitoring:** GitHub Dependabot enabled on first push. A dependency CVE blocks releases until patched. NOTE: the CI `audit:deps` gate (`pnpm audit --audit-level=low`, part of `release:check`) fails on ANY advisory (direct OR transitive) at low+ severity - stricter than "direct only", and time-dependent (a new transitive advisory can block deploys with no code change).
 
 ---

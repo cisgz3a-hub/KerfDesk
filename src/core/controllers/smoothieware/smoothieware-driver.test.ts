@@ -27,15 +27,16 @@ describe('classifySmoothieResponse', () => {
 
 describe('Smoothie command builders', () => {
   it('builds relative jogs and absolute frame legs', () => {
-    expect(buildSmoothieJogCommand({ dx: 10, feed: 1000 })).toBe('G91\nG0 X10.000 F1000\nG90');
+    expect(buildSmoothieJogCommand({ dx: 10, feed: 1000 })).toBe('G21\nG91\nG0 X10.000 F1000\nG90');
     const lines = buildSmoothieFrameLines({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 6000);
-    expect(lines[0]).toBe('G90\n');
-    expect(lines).toHaveLength(6);
+    expect(lines[0]).toBe('G21\n');
+    expect(lines[1]).toBe('G90\n');
+    expect(lines).toHaveLength(7);
   });
 
   it('keeps zero-valued axis words in absolute mode (X0 is a real destination)', () => {
     expect(buildSmoothieJogCommand({ dx: 0, dy: 50, feed: 1000, relative: false })).toBe(
-      'G90\nG0 X0.000 Y50.000 F1000',
+      'G21\nG90\nG0 X0.000 Y50.000 F1000',
     );
   });
 });

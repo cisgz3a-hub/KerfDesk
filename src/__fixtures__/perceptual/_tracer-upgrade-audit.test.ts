@@ -33,11 +33,12 @@ const STAR_INNER_R = 45;
 
 type FixtureName = 'arch' | 'smalltext' | 'disc' | 'star' | 'photo';
 
-it(
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
   'renders every tracer over the diagnostic battery with metrics',
   { timeout: 600000 },
   async () => {
-    if (process.env['TRACE_AUDIT'] !== '1') return;
     const fixture = requiredArchHouseFixtureStatus();
     if (fixture.path === null) throw new Error('arch-house fixture missing');
     mkdirSync(OUT_DIR, { recursive: true });

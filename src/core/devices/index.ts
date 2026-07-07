@@ -53,8 +53,18 @@ export {
   profileSupportsCapability,
   validateMachineProfile,
 } from './profile-catalog';
+export type { ProfileConfidenceLabel } from './profile-confidence';
+export { profileConfidenceLabel } from './profile-confidence';
 export type { MachineBounds } from './machine-bounds';
 export { machineBoundsForDevice } from './machine-bounds';
+export type { ProfileControllerFactMergeInput } from './profile-application';
+export { profileWithControllerFacts } from './profile-application';
+export type {
+  MachineProfileSuggestion,
+  MachineProfileSuggestionConfidence,
+  MachineProfileSuggestionInput,
+} from './profile-suggestions';
+export { suggestMachineProfiles } from './profile-suggestions';
 export type { JogAxisSigns } from './jog-direction';
 export { jogAxisSignsForOrigin } from './jog-direction';
 export { toMachineCoords, toSceneCoords } from './origin-transform';

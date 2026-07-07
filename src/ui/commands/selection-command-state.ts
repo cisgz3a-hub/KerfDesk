@@ -4,7 +4,7 @@ import {
   vectorObjectOutputMetadataCompatible,
   type VectorSceneObject,
 } from '../../core/geometry/vector-path-tools';
-import { isConvertibleVector } from '../raster/vector-to-bitmap';
+import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {
   if (selectedObjectId === null) return null;
@@ -54,6 +54,24 @@ export function selectionHasUnlockedVectorObject(
   return project.scene.objects.some(
     (object) => selected.has(object.id) && object.locked !== true && isConvertibleVector(object),
   );
+}
+
+// Convert to Bitmap operates on the whole selection, merging it into ONE
+// bitmap like LightBurn (ADR-029 amendment ii). Enabled only when every
+// selected object is a convertible vector — a mixed selection (e.g. a raster
+// among the vectors) stays disabled rather than converting an ambiguous
+// subset. Returns the convertibles in scene order (deterministic render
+// order), or an empty array when the selection doesn't qualify.
+export function selectedConvertibleVectors(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+): ReadonlyArray<ConvertibleVector> {
+  if (selectedIds.length === 0) return [];
+  const selected = new Set(selectedIds);
+  const convertibles = project.scene.objects.filter(
+    (object): object is ConvertibleVector => selected.has(object.id) && isConvertibleVector(object),
+  );
+  return convertibles.length === selectedIds.length ? convertibles : [];
 }
 
 export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<string>): boolean {

@@ -11,6 +11,7 @@ import {
 import { isGrblRxBufferBytes, isGrblStreamingMode } from '../grbl-streaming';
 import { validateCameraProfileShape } from '../camera';
 import { isGcodeDialectSelection } from './gcode-dialects';
+import { FALCON_A1_PRO_GRBLHAL_PROFILE, FALCON_COMPATIBLE_PROFILE } from './falcon-profiles';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
 
@@ -30,25 +31,8 @@ export type MachineProfileCatalogEntry = {
   readonly reviewNotes: ReadonlyArray<string>;
 };
 
-const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
-  ...DEFAULT_DEVICE_PROFILE,
-  profileId: 'creality-falcon-a1-pro-compatible',
-  vendor: 'Creality',
-  model: 'Falcon A1 Pro / Falcon-compatible',
-  name: 'Creality Falcon A1 Pro / Falcon-compatible',
-  machineFamily: 'creality-falcon',
-  capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
-  evidence: [
-    {
-      label: 'KerfDesk Falcon baseline',
-      status: 'researched',
-      note: 'Uses the existing KerfDesk/Falcon-compatible output behavior verified by tests. Confirmed working on a real Falcon A1 Pro through the ADR-094 driver refactor, 2026-07-02.',
-    },
-  ],
-};
-
 // Brand starter profiles. Bed dimensions are commonly-published figures, NOT
-// hardware-verified here, so each carries 'unverified' evidence. The Device
+// hardware-verified here, so each carries public-spec starter evidence. The Device
 // Setup wizard reads the true travel/power from the controller's $$ dump on
 // connect (core/controllers/grbl/parse-settings.ts), so these are named
 // starting points and an offline fallback; the operator confirms first.
@@ -66,7 +50,7 @@ const XTOOL_D1_PRO_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'xTool D1 Pro public specs',
-      status: 'unverified',
+      status: 'public-spec-starter',
       note: 'Work area ~430×390 mm from published specs (xTool lists up to 432×406). Confirm bed size, S range, and homing — KerfDesk reads the real values from $$ on connect.',
     },
   ],
@@ -86,7 +70,7 @@ const SCULPFUN_S30_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'Sculpfun S30 public specs',
-      status: 'unverified',
+      status: 'public-spec-starter',
       note: 'Work area ~410×400 mm from published specs (Pro/Max variants differ). Confirm bed size and S range before the first job; KerfDesk reads the real values from $$ on connect.',
     },
   ],
@@ -106,7 +90,7 @@ const ORTUR_LASER_MASTER_3_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'Ortur Laser Master 3 public specs',
-      status: 'unverified',
+      status: 'public-spec-starter',
       note: 'Work area ~400×400 mm from published specs. Confirm bed size, homing, and S range before the first job; KerfDesk reads the real values from $$ on connect.',
     },
   ],
@@ -126,8 +110,8 @@ const GENERIC_GRBLHAL_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'grblHAL protocol compatibility',
-      status: 'researched',
-      note: 'grblHAL speaks the GRBL v1.1 wire protocol with extended codes. Confirmed working on a Creality Falcon A1 Pro (GrblHAL 1.1f), 2026-07-02. Confirm bed size and S range from $$ on connect.',
+      status: 'simulator-tested',
+      note: 'grblHAL speaks the GRBL v1.1 wire protocol with extended codes. Use a specific hardware profile when one matches; confirm bed size and S range from $$ on connect.',
     },
   ],
 };
@@ -144,7 +128,7 @@ const GENERIC_FLUIDNC_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'FluidNC GRBL-compatible reporting',
-      status: 'unverified',
+      status: 'simulator-tested',
       note: 'FluidNC reports as "Grbl 3.x [FluidNC vX]" and streams like GRBL, but real configuration lives in its YAML config — numeric $ writes are disabled in-app. Simulator-verified only; not hardware-verified.',
     },
   ],
@@ -172,7 +156,7 @@ const GENERIC_MARLIN_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'Marlin LASER_FEATURE conventions',
-      status: 'unverified',
+      status: 'simulator-tested',
       note: 'Marlin builds vary widely (LASER_FEATURE inline vs fan-mosfet wiring, S 0-255 vs 0-100). Simulator-verified only; NOT hardware-verified. Confirm the dialect and S range against your firmware configuration before burning.',
     },
   ],
@@ -197,7 +181,7 @@ const GENERIC_SMOOTHIEWARE_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'Smoothieware laser module conventions',
-      status: 'unverified',
+      status: 'simulator-tested',
       note: 'Fractional S scale (0-1.0) from the Smoothieware laser docs; realtime ?/!/~ supported, halt recovery via M999. Simulator-verified only; NOT hardware-verified. Confirm laser_module_maximum_s_value against your config.',
     },
   ],
@@ -218,7 +202,7 @@ const GENERIC_RUIDA_PROFILE: DeviceProfile = {
   evidence: [
     {
       label: 'Ruida protocol (public reverse-engineering)',
-      status: 'unverified',
+      status: 'experimental',
       note: 'EXPERIMENTAL: .rd encoding follows public research (MeerK40t / EduTech). Output round-trips through this app’s own decoder, but NO file has been accepted by a real Ruida controller yet. Live streaming is not available — export .rd and run from the panel/USB. Verify on scrap with the machine’s own preview first.',
     },
   ],
@@ -228,8 +212,11 @@ export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEn
   entry(DEFAULT_DEVICE_PROFILE, [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
   ]),
+  entry(FALCON_A1_PRO_GRBLHAL_PROFILE, [
+    'Hardware-verified Falcon A1 Pro grblHAL identity. Confirm your controller $$ before cutting.',
+  ]),
   entry(FALCON_COMPATIBLE_PROFILE, [
-    'Falcon-compatible output stays byte-stable against existing KerfDesk tests.',
+    'Broad Falcon-compatible GRBL fallback; use the grblHAL Falcon profile when detected.',
   ]),
   entry(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, [
     'No default 4040 scan-offset table is shipped; calibrate before enabling compensation.',

@@ -19,36 +19,40 @@ const OUT_DIR = join(process.cwd(), 'trace-audit-artifacts');
 // trace so the closure check follows the letter at any working size.
 const A_COUNTER_FULL = { x0: 150, y0: 585, x1: 235, y1: 655 };
 const EDGE = TRACE_PRESETS['Edge Detection'] as TraceOptions;
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
 
-it('sweeps scale + sensitivity for the ARCH A counter', { timeout: 240000 }, async () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  const fixture = requiredArchHouseFixtureStatus();
-  if (fixture.path === null) throw new Error('arch-house fixture missing');
-  mkdirSync(OUT_DIR, { recursive: true });
-  const full = decodePngFile(fixture.path);
-  const lines: string[] = [];
-  for (const scale of [1, 0.75, 0.5, 0.35]) {
-    const image = scale === 1 ? full : bilinearScale(full, scale);
-    const band = scaleBand(A_COUNTER_FULL, scale);
-    for (const sens of ['default', 'low', 'high'] as const) {
-      const options = withSensitivity(EDGE, sens);
-      const paths = await traceImageToColoredPaths(image, options);
-      const polylines = paths.flatMap((p) => p.polylines);
-      const stat = counterClosure(polylines, band);
-      lines.push(
-        `scale=${scale} sens=${sens}: counterChains=${stat.chains} closed=${stat.closed} ` +
-          `open=${stat.open} nearGaps=[${stat.gaps.map((g) => g.toFixed(1)).join(', ')}]`,
-      );
-      if (sens === 'default') {
-        writeFileSync(
-          join(OUT_DIR, `archA__scale${scale}.png`),
-          cropRender(image, polylines, band),
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'sweeps scale + sensitivity for the ARCH A counter',
+  { timeout: 240000 },
+  async () => {
+    const fixture = requiredArchHouseFixtureStatus();
+    if (fixture.path === null) throw new Error('arch-house fixture missing');
+    mkdirSync(OUT_DIR, { recursive: true });
+    const full = decodePngFile(fixture.path);
+    const lines: string[] = [];
+    for (const scale of [1, 0.75, 0.5, 0.35]) {
+      const image = scale === 1 ? full : bilinearScale(full, scale);
+      const band = scaleBand(A_COUNTER_FULL, scale);
+      for (const sens of ['default', 'low', 'high'] as const) {
+        const options = withSensitivity(EDGE, sens);
+        const paths = await traceImageToColoredPaths(image, options);
+        const polylines = paths.flatMap((p) => p.polylines);
+        const stat = counterClosure(polylines, band);
+        lines.push(
+          `scale=${scale} sens=${sens}: counterChains=${stat.chains} closed=${stat.closed} ` +
+            `open=${stat.open} nearGaps=[${stat.gaps.map((g) => g.toFixed(1)).join(', ')}]`,
         );
+        if (sens === 'default') {
+          writeFileSync(
+            join(OUT_DIR, `archA__scale${scale}.png`),
+            cropRender(image, polylines, band),
+          );
+        }
       }
     }
-  }
-  writeFileSync(join(OUT_DIR, 'archA__scale-sweep.txt'), `${lines.join('\n')}\n`);
-});
+    writeFileSync(join(OUT_DIR, 'archA__scale-sweep.txt'), `${lines.join('\n')}\n`);
+  },
+);
 
 function withSensitivity(base: TraceOptions, sens: 'default' | 'low' | 'high'): TraceOptions {
   if (sens === 'default') return base;

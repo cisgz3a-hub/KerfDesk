@@ -57,41 +57,46 @@ const CURVED_LETTERS: ReadonlyArray<{ name: string; band: Band }> = [
 
 type Band = { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number };
 
-it('measures real-logo curved-letter faceting via merged app options', { timeout: 120000 }, () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  const fixture = requiredArchHouseFixtureStatus();
-  if (fixture.path === null) throw new Error('arch-house fixture missing');
-  mkdirSync(REF_DIR, { recursive: true });
-  const image = decodePngFile(fixture.path);
-  const polylines = traceImageToEdgePaths(image, mergedAppEdgeOptions()).flatMap(
-    (p) => p.polylines,
-  );
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
 
-  const lines: string[] = ['--- real-logo curved letters, merged app options ---'];
-  for (const letter of CURVED_LETTERS) {
-    const inBand = polylines.filter((pl) =>
-      pl.points.some(
-        (p) =>
-          p.x >= letter.band.x0 &&
-          p.x <= letter.band.x1 &&
-          p.y >= letter.band.y0 &&
-          p.y <= letter.band.y1,
-      ),
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'measures real-logo curved-letter faceting via merged app options',
+  { timeout: 120000 },
+  () => {
+    const fixture = requiredArchHouseFixtureStatus();
+    if (fixture.path === null) throw new Error('arch-house fixture missing');
+    mkdirSync(REF_DIR, { recursive: true });
+    const image = decodePngFile(fixture.path);
+    const polylines = traceImageToEdgePaths(image, mergedAppEdgeOptions()).flatMap(
+      (p) => p.polylines,
     );
-    lines.push(`${letter.name}: ${facetReport(inBand)}`);
+
+    const lines: string[] = ['--- real-logo curved letters, merged app options ---'];
+    for (const letter of CURVED_LETTERS) {
+      const inBand = polylines.filter((pl) =>
+        pl.points.some(
+          (p) =>
+            p.x >= letter.band.x0 &&
+            p.x <= letter.band.x1 &&
+            p.y >= letter.band.y0 &&
+            p.y <= letter.band.y1,
+        ),
+      );
+      lines.push(`${letter.name}: ${facetReport(inBand)}`);
+      writeFileSync(
+        join(OUT_DIR, `rough__${letter.name}.png`),
+        cropRender(image, inBand, letter.band),
+      );
+    }
+    writeFileSync(join(OUT_DIR, 'rough__metrics.txt'), `${lines.join('\n')}\n`);
+
+    // Export the O crop as a BMP for the reference potrace binary.
     writeFileSync(
-      join(OUT_DIR, `rough__${letter.name}.png`),
-      cropRender(image, inBand, letter.band),
+      join(REF_DIR, 'roughO.bmp'),
+      encodeBmp24(cropImage(image, CURVED_LETTERS[0]!.band)),
     );
-  }
-  writeFileSync(join(OUT_DIR, 'rough__metrics.txt'), `${lines.join('\n')}\n`);
-
-  // Export the O crop as a BMP for the reference potrace binary.
-  writeFileSync(
-    join(REF_DIR, 'roughO.bmp'),
-    encodeBmp24(cropImage(image, CURVED_LETTERS[0]!.band)),
-  );
-});
+  },
+);
 
 function facetReport(polylines: ReadonlyArray<Polyline>): string {
   let steps = 0;

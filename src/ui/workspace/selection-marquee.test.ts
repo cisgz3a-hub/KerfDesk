@@ -38,21 +38,22 @@ function scene(objects: ReadonlyArray<SceneObject>): Scene {
 }
 
 describe('selectObjectsInMarquee', () => {
-  it('returns every object whose transformed bounds intersects the drag box', () => {
-    const selected = selectObjectsInMarquee(
-      scene([objectAt('A', 0, 0), objectAt('B', 20, 0), objectAt('C', 80, 0)]),
-      { x: -5, y: -5 },
-      { x: 25, y: 15 },
-    );
+  // A (0..10) fits fully; B (20..30) straddles the right edge at x=25; C is out.
+  const threeObjects = () =>
+    scene([objectAt('A', 0, 0), objectAt('B', 20, 0), objectAt('C', 80, 0)]);
 
-    expect(selected).toEqual(['A', 'B']);
+  it('enclosing select (drag left→right) keeps only fully-contained objects (C3)', () => {
+    const start: Vec2 = { x: -5, y: -5 };
+    const end: Vec2 = { x: 25, y: 15 };
+
+    expect(selectObjectsInMarquee(threeObjects(), start, end)).toEqual(['A']);
   });
 
-  it('normalizes reverse drag direction', () => {
+  it('crossing select (drag right→left) includes merely-touched objects (C3)', () => {
     const start: Vec2 = { x: 25, y: 15 };
     const end: Vec2 = { x: -5, y: -5 };
 
-    expect(selectObjectsInMarquee(scene([objectAt('A', 0, 0)]), start, end)).toEqual(['A']);
+    expect(selectObjectsInMarquee(threeObjects(), start, end)).toEqual(['A', 'B']);
   });
 
   it('skips locked objects inside the marquee', () => {

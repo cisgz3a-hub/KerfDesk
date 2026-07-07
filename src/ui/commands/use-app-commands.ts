@@ -15,7 +15,6 @@ import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { isConvertibleVector } from '../raster/vector-to-bitmap';
 import {
   selectedCloseableOpenFillContourCount,
   selectedOpenFillContourCount,
@@ -33,6 +32,7 @@ import {
   selectionCanBreakApart,
   selectionCanCombine,
   selectionCanWeld,
+  selectedConvertibleVectors,
   selectionHasUnlockedObject,
   selectionHasUnlockedVectorObject,
   selectionHasVectorObject,
@@ -110,7 +110,7 @@ function appCommandContext(
     toggleCameraPanel: dialogs.toggleCameraPanel,
     hasRasterSelection: selected?.kind === 'raster-image',
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
-    hasConvertibleSelection: selected !== null && isConvertibleVector(selected),
+    hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
     canWeldSelection: selectionCanWeld(app.project, selectedIds),
     canCombineSelection: selectionCanCombine(app.project, selectedIds),

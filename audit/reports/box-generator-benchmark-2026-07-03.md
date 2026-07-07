@@ -67,3 +67,24 @@ material), and full repo gates green: **3042 tests, lint, typecheck**.
 - Kerf-compensated laser output relies on the shipped ADR-052 pipeline
   (unchanged here); the press-fit contract at kerf ≠ 0 is inherited, not
   re-proven.
+
+---
+
+# K.2 broad-tool pack (ADR-116, V0–V3) — addendum, 2026-07-07
+
+Built on top of the v1 generator in four commits (V0 docs, V1 cutouts,
+V2 dividers, V3 slide lid). The benchmark grew three categories and the
+corpus now scores **1104/1104 (100%)**: assembly-exact 54, clearance 54,
+structure 299, fit-relief 598, determinism 54, cutouts 6, dividers 25,
+slide-lid 10, sabotage-detection 4.
+
+Deviations recorded in ADR-116 at build time: the slide-lid channel
+stops one thickness INSIDE the wall body (the drafted to-the-body-end
+channel left a zero-width neck that the fit offset severed — the referee
+caught it); the lid therefore stops against the in-wall post and
+measures outer depth − 2T.
+
+NOT verified: physical cuts (named checks in AUDIT.md — a divider
+organizer and a slide-lid box), and the live in-app walk (component +
+insertion + command suites cover the dialog path; side-effect-free rule
+unchanged).

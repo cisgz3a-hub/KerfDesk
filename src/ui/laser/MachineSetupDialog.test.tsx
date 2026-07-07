@@ -45,7 +45,10 @@ function platformWithFiles(
   };
 }
 
-async function renderDialog(platform: PlatformAdapter = platformWithFiles([])): Promise<{
+async function renderDialog(
+  platform: PlatformAdapter = platformWithFiles([]),
+  onRunGuidedSetup?: () => void,
+): Promise<{
   readonly host: HTMLDivElement;
   readonly unmount: () => Promise<void>;
 }> {
@@ -56,7 +59,10 @@ async function renderDialog(platform: PlatformAdapter = platformWithFiles([])): 
     root = createRoot(host);
     root.render(
       <PlatformProvider adapter={platform}>
-        <MachineSetupDialog onClose={() => undefined} />
+        <MachineSetupDialog
+          onClose={() => undefined}
+          {...(onRunGuidedSetup === undefined ? {} : { onRunGuidedSetup })}
+        />
       </PlatformProvider>,
     );
   });
@@ -99,10 +105,73 @@ describe('MachineSetupDialog', () => {
       await act(async () => button(host, 'Profile Catalog').click());
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
 
-      expect(useStore.getState().project.device.profileId).toBe(
-        'creality-falcon-a1-pro-compatible',
-      );
+      expect(useStore.getState().project.device.profileId).toBe('creality-falcon-a1-pro-grblhal');
       expect(useStore.getState().dirty).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps controller-tuned motion settings when applying a catalog profile after auto-detect', async () => {
+    useStore.getState().updateDeviceProfile({
+      maxFeed: 10000,
+      framingFeedMmPerMin: 10000,
+      accelMmPerSec2: 2500,
+      junctionDeviationMm: 0.01,
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      detectedControllerKind: 'grblhal',
+      controllerSettings: {
+        maxFeed: 10000,
+        accelMmPerSec2: 2500,
+        junctionDeviationMm: 0.01,
+        bedWidth: 400,
+        bedHeight: 400,
+        minPowerS: 0,
+        maxPowerS: 1000,
+      },
+      lastSettingsReadAt: 1718600000000,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, unmount } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Profile Catalog').click());
+      const firstCard = host.querySelector('article');
+      expect(firstCard?.textContent).toContain('Creality Falcon A1 Pro');
+      expect(firstCard?.textContent).toContain('Suggested match');
+      expect(firstCard?.textContent).toContain('Detected grblHAL firmware.');
+      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
+
+      expect(useStore.getState().project.device).toMatchObject({
+        profileId: 'creality-falcon-a1-pro-grblhal',
+        controllerKind: 'grblhal',
+        maxFeed: 10000,
+        framingFeedMmPerMin: 10000,
+        accelMmPerSec2: 2500,
+      });
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('offers the guided setup cross-link on Overview only when a launcher is wired', async () => {
+    const withoutLauncher = await renderDialog();
+    try {
+      expect(withoutLauncher.host.textContent).not.toContain('Run guided setup');
+    } finally {
+      await withoutLauncher.unmount();
+    }
+
+    const onRunGuidedSetup = vi.fn();
+    const { host, unmount } = await renderDialog(platformWithFiles([]), onRunGuidedSetup);
+    try {
+      await act(async () => button(host, 'Run guided setup').click());
+      expect(onRunGuidedSetup).toHaveBeenCalledTimes(1);
+      // The cross-link belongs to Overview only — other tabs stay uncluttered.
+      await act(async () => button(host, 'Safety Zones').click());
+      expect(host.textContent).not.toContain('Run guided setup');
     } finally {
       await unmount();
     }

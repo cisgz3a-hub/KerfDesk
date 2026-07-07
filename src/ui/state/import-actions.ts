@@ -37,7 +37,7 @@ export function imageImportActions(
     traced: TracedImage,
     options?: TraceExistingImageOptions,
   ) => void;
-  readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
+  readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
 } {
   return {
     importRasterImage: (object, batchIdx) => {
@@ -51,11 +51,11 @@ export function imageImportActions(
       set((s) => applyTraceToExisting(s, sourceId, traced, options));
       fitAllObjects(get);
     },
-    // No fitAllObjects: Convert replaces the vector in place (same bounds +
-    // transform), so re-fitting would only jerk the camera. Consistent with the
+    // No fitAllObjects: Convert replaces the vector(s) in place (same combined
+    // bounds), so re-fitting would only jerk the camera. Consistent with the
     // store convention that the import/add paths re-fit, not in-place edits.
-    convertToBitmap: (sourceId, raster) => {
-      set((s) => applyConvertToBitmap(s, sourceId, raster));
+    convertToBitmap: (sourceIds, raster) => {
+      set((s) => applyConvertToBitmap(s, sourceIds, raster));
     },
   };
 }

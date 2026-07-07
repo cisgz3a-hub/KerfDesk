@@ -787,3 +787,37 @@ ADR-017 dependency evaluation for Phase H ("Router", ADR-094):
   openclipart bundling (CC0 but per-file provenance is unauditable at
   scale — kept as the documented IMPORT path instead), The Noun Project
   (not license-compatible).
+
+### electron-updater — adopted for Windows desktop auto-update (2026-07-04, ADR-024)
+
+- **Version:** ^6.8.9 (resolved 6.8.9 at adoption, 2026-07-04). VERIFY no
+  unfixed high/critical CVEs before the release PR merges (`pnpm audit`).
+- **License:** MIT (electron-userland/electron-builder monorepo) — MIT-compatible
+  per ADR-017.
+- **Source:** https://github.com/electron-userland/electron-builder (packages/electron-updater)
+- **Decision affected:** ADR-024; used in `electron/` main process ONLY (never
+  core/ io/ ui/).
+- **Role:** background update check + differential download against our
+  self-hosted generic feed (`https://dl.kerfdesk.com/desktop/latest.yml`),
+  install-on-quit. Runs only when `app.isPackaged`. No `quitAndInstall`
+  (burn-safety, non-negotiable #9). No user data / no telemetry.
+- **Evaluated:** 2026-07-04, Claude Code session
+- **Confidence:** medium — unsigned-Windows + per-user install-on-quit behavior
+  must be hardware-verified (WORKFLOW.md desktop flow) before launch is done.
+- **Re-verify by:** 2027-01-04
+- **Alternatives considered:**
+  - Notify-only self-hosted manifest (renderer fetch) — rejected by the
+    maintainer in favor of full auto-update.
+  - Rolling our own updater — rejected; `electron-updater` is the standard,
+    maintained integration for electron-builder generic feeds.
+- **Notes:**
+  - Prod `dependencies` (required by the packaged main process), not devDeps.
+  - The build emits `latest.yml` + `.blockmap` when `publish` is configured;
+    those plus the `.exe` are the R2 feed.
+  - Once code signing lands, it verifies the publisher signature, hardening the
+    update channel.
+  - Transitive `sax@1.6.0` (via `builder-util-runtime`) is **BlueOak-1.0.0** —
+    a permissive, MIT-compatible license (Blue Oak Council permissive list;
+    no copyleft). Added to the `scripts/check-licenses.mjs` allow-list on
+    adoption (maintainer-approved 2026-07-04), consistent with the existing
+    permissive non-MIT entries (BSL-1.0, CC-BY-4.0, CC0-1.0).

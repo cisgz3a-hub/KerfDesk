@@ -161,8 +161,10 @@ describe('laser lifecycle against the GRBL simulator', () => {
     await pump(5);
     await useLaserStore.getState().stopJob();
     expect(sim.outbound()).toContain('\x18');
-    expect(sim.outbound()).toContain('M9\n');
+    // M9 is deferred until the boot banner after the reset (audit F2).
+    expect(sim.outbound()).not.toContain('M9\n');
     await pump(50);
+    expect(sim.outbound()).toContain('M9\n');
     expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
     expect(useLaserStore.getState().alarmCode).toBe(3);
     await useLaserStore.getState().unlockAlarm();

@@ -5,8 +5,9 @@
 import type { RgbaImage } from '../../core/camera';
 
 /**
- * Synchronous PNG encode via a throwaway canvas; null when the 2D context is
- * unavailable (device-memory backed) so callers surface a typed failure.
+ * Synchronous PNG encode via a throwaway canvas; null when the 2D context or
+ * PNG encoder is unavailable (device-memory backed, or jsdom) so callers
+ * surface a typed failure instead of an uncaught "Not implemented" throw.
  */
 export function rgbaToPngDataUrl(image: RgbaImage): string | null {
   const canvas = document.createElement('canvas');
@@ -19,7 +20,11 @@ export function rgbaToPngDataUrl(image: RgbaImage): string | null {
     0,
     0,
   );
-  return canvas.toDataURL('image/png');
+  try {
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
 }
 
 /** The same encode as a Blob for file saves; null when encoding fails. */

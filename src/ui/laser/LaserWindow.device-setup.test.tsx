@@ -56,6 +56,37 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       expect(host.textContent).not.toContain('set up yet');
+      expect(button(host, 'Set up device').className).not.toContain('lf-btn--primary');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('emphasizes Set up device only while the connected machine needs setup', async () => {
+    useLaserStore.setState({ connection: { kind: 'connected' } } as Partial<
+      ReturnType<typeof useLaserStore.getState>
+    >);
+    const { host, unmount } = await renderLaserWindow();
+    try {
+      expect(button(host, 'Set up device').className).toContain('lf-btn--primary');
+      expect(button(host, 'Machine Setup').className).not.toContain('lf-btn--primary');
+      expect(button(host, 'Machine Setup').dataset.helpId).toBe(
+        'control:laser.machine-setup.launch',
+      );
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('opens the guided wizard from the Machine Setup Overview cross-link', async () => {
+    const { host, unmount } = await renderLaserWindow();
+    try {
+      await act(async () => button(host, 'Machine Setup').click());
+      expect(host.textContent).toContain('Profile Catalog');
+      await act(async () => button(host, 'Run guided setup').click());
+      expect(host.textContent).not.toContain('Profile Catalog');
+      expect(host.textContent).toContain('Step 1 of');
+      expect(host.textContent).toContain('Connect & read');
     } finally {
       await unmount();
     }
@@ -80,9 +111,11 @@ describe('LaserWindow device-setup nudge', () => {
       }
       await act(async () => button(host, 'Finish setup').click());
       expect(host.textContent).not.toContain('set up yet');
+      // Setup recorded — the wizard entry drops its primary emphasis too.
+      expect(button(host, 'Set up device').className).not.toContain('lf-btn--primary');
       // The configured signature is persisted, so a reload re-hydrates it.
       expect(localStorage.getItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY)).toContain(
-        'creality-falcon-a1-pro-compatible',
+        'creality-falcon-a1-pro-grblhal',
       );
     } finally {
       await unmount();

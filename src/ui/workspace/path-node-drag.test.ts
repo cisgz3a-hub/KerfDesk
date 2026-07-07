@@ -20,6 +20,7 @@ describe('beginPathNodeDrag', () => {
       project,
       scenePoint: { x: 10.25, y: 0.2 },
       pxToMm: 0.25,
+      selectedPathNodes: [],
       selectPathNode,
     });
 
@@ -52,6 +53,7 @@ describe('beginPathNodeDrag', () => {
       scenePoint: { x: 10.25, y: 0.2 },
       pxToMm: 0.25,
       additive: true,
+      selectedPathNodes: [],
       selectPathNode,
     });
 
@@ -68,6 +70,27 @@ describe('beginPathNodeDrag', () => {
     );
   });
 
+  it('keeps the multi-node selection when plain-clicking an already-selected node (C6)', () => {
+    const selectPathNode = vi.fn();
+    const project = { ...createProject(), scene: addObject(EMPTY_SCENE, vectorObject()) };
+    const hitRef = { objectId: 'logo', pathIndex: 0, polylineIndex: 0, pointIndex: 1 };
+
+    const drag = beginPathNodeDrag({
+      project,
+      scenePoint: { x: 10.25, y: 0.2 },
+      pxToMm: 0.25,
+      selectedPathNodes: [
+        hitRef,
+        { objectId: 'logo', pathIndex: 0, polylineIndex: 0, pointIndex: 0 },
+      ],
+      selectPathNode,
+    });
+
+    expect(drag).toMatchObject({ kind: 'path-node' });
+    // The set is preserved for the drag — no re-select that would collapse it.
+    expect(selectPathNode).not.toHaveBeenCalled();
+  });
+
   it('clears node selection and does not start a drag when no node is hit', () => {
     const selectPathNode = vi.fn();
     const project = {
@@ -80,10 +103,11 @@ describe('beginPathNodeDrag', () => {
         project,
         scenePoint: { x: 100, y: 100 },
         pxToMm: 0.25,
+        selectedPathNodes: [],
         selectPathNode,
       }),
     ).toBeNull();
-    expect(selectPathNode).toHaveBeenCalledWith(null, { additive: false });
+    expect(selectPathNode).toHaveBeenCalledWith(null);
   });
 
   it('updates the selected node position while a path-node drag is active', () => {
