@@ -55,35 +55,11 @@ export function deletePathsNodes(
   return { paths: nextPaths };
 }
 
-export function editPathsNodeToPoint(
-  paths: ReadonlyArray<ColoredPath>,
-  ref: PathNodeRef,
-  nextPoint: Vec2,
-): { readonly paths: ReadonlyArray<ColoredPath>; readonly point: Vec2 } | null {
-  const path = paths[ref.pathIndex];
-  const polyline = path?.polylines[ref.polylineIndex];
-  const point = polyline?.points[ref.pointIndex];
-  if (path === undefined || polyline === undefined || point === undefined) return null;
-  if (pointsEqual(point, nextPoint)) return null;
-
-  return {
-    point: nextPoint,
-    paths: paths.map((candidatePath, pathIndex) => {
-      if (pathIndex !== ref.pathIndex) return candidatePath;
-      return {
-        ...candidatePath,
-        polylines: candidatePath.polylines.map((candidatePolyline, polylineIndex) => {
-          if (polylineIndex !== ref.polylineIndex) return candidatePolyline;
-          return {
-            ...candidatePolyline,
-            points: candidatePolyline.points.map((candidatePoint, pointIndex) =>
-              pointIndex === ref.pointIndex ? nextPoint : candidatePoint,
-            ),
-          };
-        }),
-      };
-    }),
-  };
+// Current local-space position of a single node, or null if the ref is out of
+// range. Used to turn an absolute drag target into the delta applied to the
+// whole selected-node set (audit C6).
+export function pathNodePoint(paths: ReadonlyArray<ColoredPath>, ref: PathNodeRef): Vec2 | null {
+  return paths[ref.pathIndex]?.polylines[ref.polylineIndex]?.points[ref.pointIndex] ?? null;
 }
 
 export function materializedPolylineToSpecPoints(

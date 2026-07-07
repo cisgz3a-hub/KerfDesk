@@ -235,6 +235,7 @@ function beginPathNodeDragForNodeTool(args: {
     scenePoint: point,
     pxToMm,
     additive: args.e.shiftKey,
+    selectedPathNodes: useStore.getState().selectedPathNodes,
     selectPathNode: args.selectPathNode,
   });
 }

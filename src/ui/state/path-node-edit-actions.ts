@@ -12,9 +12,9 @@ import { pushUndo } from './scene-mutations';
 import {
   boundsForPaths,
   deletePathsNodes,
-  editPathsNodeToPoint,
   editPathsNodesByDelta,
   materializedPolylineToSpecPoints,
+  pathNodePoint,
 } from './path-node-edit-geometry';
 
 export type PathNodeRef = {
@@ -147,6 +147,10 @@ function deleteSelectedPathNodes(state: AppState): AppState | Partial<AppState> 
   };
 }
 
+// Drag the whole selected-node set (audit C6): move the primary node under the
+// pointer and every other selected node by the same local delta. All selected
+// nodes are guaranteed to be in one object (the selection invariant), so a
+// single local delta applies to the whole set.
 function setSelectedPathNodePositionDuringInteraction(
   state: AppState,
   scenePoint: Vec2,
@@ -155,6 +159,7 @@ function setSelectedPathNodePositionDuringInteraction(
   if (ref === null || !Number.isFinite(scenePoint.x) || !Number.isFinite(scenePoint.y)) {
     return state;
   }
+  const refs = activePathNodeRefs(state);
 
   let changed = false;
   const nextProject: Project = {
@@ -163,9 +168,7 @@ function setSelectedPathNodePositionDuringInteraction(
       ...state.project.scene,
       objects: state.project.scene.objects.map((object) => {
         if (object.id !== ref.objectId) return object;
-        const localPoint = scenePointToObjectLocal(scenePoint, object.transform);
-        if (localPoint === null) return object;
-        const edited = editObjectNodeToPoint(object, ref, localPoint);
+        const edited = dragObjectNodesToPrimaryTarget(object, ref, refs, scenePoint);
         if (edited === object) return object;
         changed = true;
         return edited;
@@ -210,14 +213,30 @@ function deleteObjectNodes(object: SceneObject, refs: ReadonlyArray<PathNodeRef>
   return { ...object, paths: edit.paths, bounds };
 }
 
-function editObjectNodeToPoint(object: SceneObject, ref: PathNodeRef, point: Vec2): SceneObject {
+// Move `primaryRef` to `scenePoint` and every ref in `refs` by the same local
+// delta, keeping the selected nodes' relative shape intact while the primary
+// tracks the pointer (audit C6).
+function dragObjectNodesToPrimaryTarget(
+  object: SceneObject,
+  primaryRef: PathNodeRef,
+  refs: ReadonlyArray<PathNodeRef>,
+  scenePoint: Vec2,
+): SceneObject {
   if (object.locked === true) return object;
   if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
     return object;
   }
   if (object.kind === 'shape' && object.spec.kind !== 'polyline') return object;
 
-  const edit = editPathsNodeToPoint(object.paths, ref, point);
+  const target = scenePointToObjectLocal(scenePoint, object.transform);
+  const current = pathNodePoint(object.paths, primaryRef);
+  if (target === null || current === null) return object;
+  const edit = editPathsNodesByDelta(
+    object.paths,
+    refs,
+    target.x - current.x,
+    target.y - current.y,
+  );
   if (edit === null) return object;
   const bounds = boundsForPaths(edit.paths);
   if (object.kind === 'shape') return editPolylineShape(object, edit.paths, bounds);
@@ -282,7 +301,7 @@ function groupPathNodeRefsByObject(
   return byObject;
 }
 
-function pathNodeRefsEqual(a: PathNodeRef, b: PathNodeRef): boolean {
+export function pathNodeRefsEqual(a: PathNodeRef, b: PathNodeRef): boolean {
   return (
     a.objectId === b.objectId &&
     a.pathIndex === b.pathIndex &&
