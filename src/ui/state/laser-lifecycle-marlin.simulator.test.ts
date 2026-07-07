@@ -78,7 +78,11 @@ describe('Marlin lifecycle against the simulator', () => {
     expect(s.connection.kind).toBe('connected');
     expect(s.detectedControllerKind).toBe('marlin');
     expect(s.activeControllerKind).toBe('marlin');
-    expect(s.capabilities).toMatchObject({ realtimePause: false, wcs: 'g92-only', settings: 'none' });
+    expect(s.capabilities).toMatchObject({
+      realtimePause: false,
+      wcs: 'g92-only',
+      settings: 'none',
+    });
     expect(sim.port.openRequests()).toEqual([{ baudRate: 250000 }]);
     expect(sim.outbound().some((w) => w.includes('$$'))).toBe(false);
   });

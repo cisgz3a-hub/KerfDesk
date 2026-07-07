@@ -205,9 +205,9 @@ describe('job checkpoint integration (ADR-118)', () => {
     expect(stored).not.toBeNull();
     if (stored === null) throw new Error('unreachable');
     writeJobCheckpoint(advanceJobCheckpoint(stored, 2, '2026-07-07T02:00:00.000Z'));
-    const startJob = vi.fn<
-      (gcode: string, options?: object) => Promise<void>
-    >(async () => undefined);
+    const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
+      async () => undefined,
+    );
     useLaserStore.setState({ startJob });
 
     const resumed = readJobCheckpoint();
