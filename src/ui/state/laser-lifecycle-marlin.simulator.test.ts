@@ -78,7 +78,7 @@ describe('Marlin lifecycle against the simulator', () => {
     expect(s.connection.kind).toBe('connected');
     expect(s.detectedControllerKind).toBe('marlin');
     expect(s.activeControllerKind).toBe('marlin');
-    expect(s.capabilities).toMatchObject({ realtimePause: false, wcs: 'none', settings: 'none' });
+    expect(s.capabilities).toMatchObject({ realtimePause: false, wcs: 'g92-only', settings: 'none' });
     expect(sim.port.openRequests()).toEqual([{ baudRate: 250000 }]);
     expect(sim.outbound().some((w) => w.includes('$$'))).toBe(false);
   });
@@ -89,10 +89,10 @@ describe('Marlin lifecycle against the simulator', () => {
     expect(useLaserStore.getState().statusReport?.mPos).toEqual({ x: 0, y: 0, z: 0 });
   });
 
-  it('jogs via G91/G0/G90 and clears the operation from M114 idle reports', async () => {
+  it('jogs via G21/G91/G0/G90 and clears the operation from M114 idle reports', async () => {
     const sim = await connectMarlinIdle();
     await useLaserStore.getState().jog({ dx: 10, feed: 1000 });
-    expect(sim.outbound().at(-1)).toBe('G91\nG0 X10.000 F1000\nG90\n');
+    expect(sim.outbound().at(-1)).toBe('G21\nG91\nG0 X10.000 F1000\nG90\n');
     expect(useLaserStore.getState().motionOperation?.kind).toBe('jog');
     await pump(1000);
     expect(useLaserStore.getState().motionOperation).toBeNull();

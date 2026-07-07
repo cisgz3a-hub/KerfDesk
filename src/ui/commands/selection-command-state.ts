@@ -56,6 +56,19 @@ export function selectionHasUnlockedVectorObject(
   );
 }
 
+// Convert to Bitmap operates on exactly one vector (WORKFLOW F-F4). Gating on
+// the primary object alone let a multi-selection through, silently converting
+// only the primary. LightBurn converts the whole selection into one bitmap —
+// that merge is a scoped feature (ADR-029 amendment), not this gate's job.
+export function selectionIsSingleConvertibleVector(
+  project: Project,
+  selectedIds: ReadonlyArray<string>,
+): boolean {
+  if (selectedIds.length !== 1) return false;
+  const object = project.scene.objects.find((candidate) => candidate.id === selectedIds[0]);
+  return object !== undefined && isConvertibleVector(object);
+}
+
 export function selectionCanWeld(project: Project, selectedIds: ReadonlyArray<string>): boolean {
   const selected = new Set(selectedIds);
   const objects = project.scene.objects.filter(

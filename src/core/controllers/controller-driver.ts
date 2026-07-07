@@ -49,7 +49,10 @@ export type ControllerCommands = {
   readonly clearOrigin: string | null;
   readonly setPersistentOriginHere: string | null;
   readonly clearPersistentOrigin: string | null;
-  /** Build one jog line (no trailing newline). */
+  /** Build the jog payload (no trailing newline). May be MULTI-LINE on
+   *  firmwares without a native jog protocol (Marlin/Smoothie emit
+   *  G91\nG0…\nG90) — every line is acked individually, and the write
+   *  layer counts one owed ack per newline (audit F3). */
   readonly buildJog: (params: JogParams) => string;
   /** Build the framing move sequence, each line newline-terminated. */
   readonly buildFrameLines: (bounds: FrameBounds, feed: number) => ReadonlyArray<string>;

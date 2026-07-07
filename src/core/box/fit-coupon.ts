@@ -1,4 +1,4 @@
-// fit-coupon — the Box Fit Test strips (ADR-118): a tab comb and a slot
+// fit-coupon — the Box Fit Test strips (ADR-119): a tab comb and a slot
 // strip on a graduated clearance ladder. Rung i bakes the production fit
 // law analytically — tab width f − cᵢ/2, notch width f + cᵢ/2 — so the rung
 // that presses right on the bench IS the clearance to type into the Box

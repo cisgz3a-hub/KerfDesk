@@ -497,7 +497,12 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `V` — Flip vertical
 
 #### Tools
+- `Cmd/Ctrl+R` - Rectangle
 - `Cmd/Ctrl+E` - Ellipse
+- `Cmd/Ctrl+L` - Line/pen
+- `Alt+M` - Measure
+- `Cmd/Ctrl+Shift+B` - Convert to Bitmap (LightBurn's binding; no-op unless a
+  single convertible vector is selected)
 
 #### View
 - `P` — Toggle preview
@@ -761,6 +766,40 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 2. No Move Laser to Selection physical move.
 3. No Set Start Point or node-level start ordering.
 
+### F-B16. Interrupted-job checkpoint and resume (ADR-118)
+
+While a job streams, the app keeps a ~200-byte checkpoint in localStorage:
+a fingerprint of the compiled program plus the GRBL-acked line count
+(updated every 25 acks and on every pause/stop/error/disconnect). Only a
+run that finishes cleanly clears it.
+
+#### Success — resume after a crash
+1. App/tab/PC died mid-job. Operator relaunches; autosave recovery
+   restores the project (F-C3).
+2. The Laser window shows the banner: "Interrupted laser job from
+   <time>: N of M motion lines confirmed."
+3. Operator connects, homes, and confirms the work zero is unchanged
+   (same contract as manual Start-from-line).
+4. **Resume interrupted job** re-compiles the project, verifies the
+   fingerprint matches the interrupted program byte-for-byte, maps the
+   acked count to the raw G-code line, and runs the standard
+   start-from-line replay (safe re-entry preamble, then the tail).
+5. The checkpoint clears when the resume run completes.
+
+#### Error — project changed since the run
+1. Fingerprint mismatch → alert explains the project no longer produces
+   the interrupted program; nothing is streamed. The manual
+   Start-from-line control remains the escape hatch.
+
+#### Edge — controller lost power too
+1. Acked lines may include a buffer's worth GRBL never executed; the
+   banner says so. Backing up re-burns a short stretch; skipping forward
+   leaves gaps — when in doubt, resume earlier via the manual control.
+
+#### Edge — deliberate Stop
+1. Stop keeps the checkpoint (a stopped job is still resumable);
+   **Dismiss** on the banner is the explicit discard.
+
 ---
 
 ## Phase C flows — STUB
@@ -775,7 +814,7 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 
 ### F-C7. Device Setup wizard (connect-time)
 
-The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092). Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
+The guided alternative to hunting through the Device Profile panel and the seven-tab Machine Setup dialog. Launched manually from a **Set up device** button in the Laser panel (ADR-092), or from the cross-link **Machine Setup → Overview → Run guided setup** (same wizard, same draft-commit; still never auto-opens). The Laser-panel button carries primary emphasis only while the connected machine has not been set up yet (the FU-4 nudge state); once setup is recorded it renders with normal weight. Edits a draft `DeviceProfile` and commits only on **Finish**. Steps: Connect & read → Identify machine → Confirm detected settings → Placement & safety → Sync to controller → Review & finish. Reuses the `$$` detection already run at connect (F-B1) and the guarded firmware writes of F-B14.
 
 #### Success — connected machine answers `$$`
 1. Operator clicks **Set up device** while connected.
@@ -1079,19 +1118,37 @@ so it burns as a dithered/grayscale image rather than outlines or
 hatch fill. Matches LightBurn's **Convert to Bitmap** (Edit menu /
 `Ctrl+Shift+B` / right-click).
 
-**Where in the UI.** Toolbar **Convert to Bitmap** button, next to
-Trace Image. Enabled only when a single convertible vector is
-selected; disabled (greyed, with a "select a vector first" tooltip)
-otherwise — mirroring LightBurn's greyed menu item. No dialog: A2
-ships **Fill All** only, so the conversion is immediate (hence no
-"…" on the label). The Render Type picker (Outlines / Use Cut
-Settings) and a DPI control arrive with A3/A4.
+**Where in the UI.** Toolbar **Convert to Bitmap…** button (next to
+Trace Image), Tools menu, the workspace right-click context bar, or
+`Cmd/Ctrl+Shift+B` (LightBurn's binding; LightBurn houses the menu
+item under Edit — ours lives under Tools with the other conversions,
+a deliberate divergence recorded in the ADR-029 amendment). Enabled
+only when a **single** convertible vector is selected; disabled
+(greyed, "Select a vector first.") otherwise — including
+multi-selections, mirroring LightBurn's greyed menu item. (LightBurn
+converts a whole multi-selection into one bitmap; that merge is a
+scoped follow-up, not silently converting the primary object.)
 
-**What it does.** Rasterizes the selected vector's closed contours
-into a `RasterImage` at the KerfDesk default 254 DPI (= 10
-lines/mm; a KerfDesk choice — LightBurn documents no default),
-every inked pixel at 50% gray on white, carrying the source's own
-bounds + transform so the bitmap lands exactly where the vector was.
+**The dialog** (A3/A4 + A5 brightness): **Render Type** (Fill All /
+Outlines / Use Cut Settings), **DPI** (numeric field + slider,
+127–635; the range derives from the app-wide 5–25 lines/mm raster
+density limits because the conversion DPI becomes the new image
+layer's interval — narrower than LightBurn's 10–2000 by design, see
+ADR-029 amendment), and **Default Brightness** (percent, default
+50% per LightBurn §7.4; 50% maps to luma 127, deliberately one step
+below the Threshold cutoff so converted ink always burns — M7). The
+dialog shows the estimated bitmap pixel size for the current DPI —
+computed from the selection's full transform including rotation —
+and disables Convert when it exceeds the raster budget.
+
+**What it does.** Rasterizes the selected vector into a
+`RasterImage` at the chosen DPI (default 254 = 10 lines/mm, a
+KerfDesk choice — LightBurn documents no default), every inked
+pixel at the chosen brightness on white. The source's transform
+(scale/mirror/rotation) is **baked into the pixels**: the result
+carries the transformed axis-aligned bounds with an IDENTITY
+transform, so it lands exactly where the vector was and stays safe
+for the raster output path (which does not rotate bitmaps).
 **The source vector is deleted** (LightBurn discards the original);
 the swap is one undo entry, so Ctrl+Z restores the vector — replacing
 LightBurn's manual "duplicate first" guidance.
@@ -1099,11 +1156,13 @@ LightBurn's manual "duplicate first" guidance.
 **The four states.**
 
 1. **Success.** A closed-shape SVG / text / trace is selected. Click
-   Convert to Bitmap → the vector is replaced in place by a grayscale
-   bitmap on the image-mode layer (`DEFAULT_RASTER_LAYER_COLOR`), the
-   new bitmap becomes the selection, and a toast confirms "Converted
-   to bitmap: `<name>` (bitmap)". It then engraves through the
-   existing F.2 image path.
+   Convert to Bitmap → the dialog opens (Render Type / DPI /
+   Default Brightness + size estimate) → Convert → the vector is
+   replaced in place by a grayscale bitmap on the image-mode layer
+   (`DEFAULT_RASTER_LAYER_COLOR`, or the next free color if that one
+   is taken at a different density), the new bitmap becomes the
+   selection, and a toast confirms "Converted to bitmap: `<name>`
+   (bitmap)". It then engraves through the existing F.2 image path.
 2. **Empty / nothing convertible.** No selection, or the selection is
    already a `RasterImage` (a bitmap can't be re-converted). Button
    disabled; tooltip prompts selecting a vector.
@@ -1121,11 +1180,15 @@ LightBurn's manual "duplicate first" guidance.
 in a real browser, side-effect-free (CLAUDE.md #4): the pure builder
 rasterizes a square-with-hole to a real PNG that round-trips to
 200×200 px at 254 DPI, ink at 50% gray, the even-odd hole preserved
-white, and the base64 luma byte-matches the PNG. **Not yet verified:**
-the live in-app render/placement of the swapped bitmap on the
-workspace canvas, and a side-by-side pixel comparison against
-LightBurn's own Convert output — both deferred (need a live import or
-a LightBurn session).
+white, and the base64 luma byte-matches the PNG. 2026-07-07 audit
+re-verification (isolated, no live scene): the production rasterizer
+matches the perceptual-harness reference pixel-for-pixel (IoU 1.0000
+on a star + annulus), and rendered PNGs of Fill All / Outlines / a
+rotated + scaled bake were eyeballed correct, bounds matching the
+transform math exactly. **Not yet verified:** the live in-app
+render/placement of the swapped bitmap on the workspace canvas, and
+a side-by-side pixel comparison against LightBurn's own Convert
+output — both deferred (need a live import or a LightBurn session).
 
 ### F-F5. Enhance a region of a trace (region-enhance re-trace)
 
@@ -2436,7 +2499,7 @@ F-CNC19 tiling.
    finger cells, validation names the height and thickness in conflict
    rather than emitting overlapping geometry.
 
-### F-K8. Box fit test coupon (ADR-118)
+### F-K8. Box fit test coupon (ADR-119)
 
 #### Success
 
@@ -2465,7 +2528,7 @@ F-CNC19 tiling.
 1. CNC mode carves corner-overcuts in every notch at full bit radius;
    validation rejects a tool wider than the finger (F-K2 rule).
 
-### F-K9. Assembled 3D preview (ADR-118)
+### F-K9. Assembled 3D preview (ADR-119)
 
 #### Success
 

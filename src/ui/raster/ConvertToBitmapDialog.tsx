@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
+import { DEFAULT_BITMAP_BRIGHTNESS_PERCENT } from '../../core/raster';
 import type { Bounds, Transform } from '../../core/scene';
 import {
   DEFAULT_CONVERT_TO_BITMAP_DPI,
@@ -10,9 +11,13 @@ import {
 } from './bitmap-conversion-plan';
 import { type ConvertToBitmapRenderType } from './vector-to-bitmap';
 
+const MIN_BRIGHTNESS_PERCENT = 0;
+const MAX_BRIGHTNESS_PERCENT = 100;
+
 export type ConvertToBitmapDialogOptions = {
   readonly renderType: ConvertToBitmapRenderType;
   readonly dpi: number;
+  readonly brightnessPercent: number;
 };
 
 export function ConvertToBitmapDialog(props: {
@@ -23,10 +28,17 @@ export function ConvertToBitmapDialog(props: {
   readonly onConvert: (options: ConvertToBitmapDialogOptions) => void;
 }): JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
-  const [dpi, setDpi] = useState(DEFAULT_CONVERT_TO_BITMAP_DPI);
+  // Raw text, NOT a clamped number: clamping every keystroke made typed DPI
+  // entry impossible (any first digit is below the minimum and snapped to it).
+  // The live estimate and the submit normalize; the field never fights back.
+  const [dpiText, setDpiText] = useState(String(DEFAULT_CONVERT_TO_BITMAP_DPI));
   const plan = useMemo(
-    () => estimateBitmapConversion({ bounds: props.bounds, transform: props.transform }, dpi),
-    [dpi, props.bounds, props.transform],
+    () =>
+      estimateBitmapConversion(
+        { bounds: props.bounds, transform: props.transform },
+        parseDpi(dpiText),
+      ),
+    [dpiText, props.bounds, props.transform],
   );
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -51,7 +63,8 @@ export function ConvertToBitmapDialog(props: {
           </span>
         </Field>
         <RenderTypeField />
-        <DpiField dpi={dpi} onChange={setDpi} />
+        <DpiField dpiText={dpiText} normalizedDpi={plan.dpi} onChange={setDpiText} />
+        <BrightnessField />
         <BitmapEstimate plan={plan} />
         <DialogActions>
           <Button onClick={props.onCancel}>Cancel</Button>
@@ -78,6 +91,7 @@ function submitConvert(
   onConvert({
     renderType: parseRenderType(String(data.get('renderType') ?? '')),
     dpi: parseDpi(String(data.get('dpi') ?? '')),
+    brightnessPercent: parseBrightness(String(data.get('brightness') ?? '')),
   });
 }
 
@@ -101,7 +115,13 @@ function RenderTypeField(): JSX.Element {
   );
 }
 
-function DpiField(props: { readonly dpi: number; readonly onChange: (dpi: number) => void }) {
+// Numeric entry + slider, like LightBurn's DPI control pair. The slider
+// tracks the normalized value; the text field keeps whatever is typed.
+function DpiField(props: {
+  readonly dpiText: string;
+  readonly normalizedDpi: number;
+  readonly onChange: (dpiText: string) => void;
+}): JSX.Element {
   return (
     <Field label="DPI">
       <input
@@ -110,12 +130,45 @@ function DpiField(props: { readonly dpi: number; readonly onChange: (dpi: number
         min={MIN_CONVERT_TO_BITMAP_DPI}
         max={MAX_CONVERT_TO_BITMAP_DPI}
         step={1}
-        value={props.dpi}
-        onChange={(event) => props.onChange(parseDpi(event.currentTarget.value))}
+        value={props.dpiText}
+        onChange={(event) => props.onChange(event.currentTarget.value)}
         className="lf-input"
         style={numberStyle}
         aria-label="Convert DPI"
         title="Bitmap resolution for the rasterized vector. Higher DPI creates more pixels."
+      />
+      <input
+        name="dpiSlider"
+        type="range"
+        min={MIN_CONVERT_TO_BITMAP_DPI}
+        max={MAX_CONVERT_TO_BITMAP_DPI}
+        step={1}
+        value={props.normalizedDpi}
+        onChange={(event) => props.onChange(event.currentTarget.value)}
+        style={sliderStyle}
+        aria-label="Convert DPI slider"
+        title="Drag to set the bitmap resolution. Same value as the DPI field."
+      />
+    </Field>
+  );
+}
+
+// LightBurn §7.4 Default Brightness: converted pixels start at this gray
+// level (default 50%). Uncontrolled — read from FormData at submit.
+function BrightnessField(): JSX.Element {
+  return (
+    <Field label="Default Brightness">
+      <input
+        name="brightness"
+        type="number"
+        min={MIN_BRIGHTNESS_PERCENT}
+        max={MAX_BRIGHTNESS_PERCENT}
+        step={1}
+        defaultValue={DEFAULT_BITMAP_BRIGHTNESS_PERCENT}
+        className="lf-input"
+        style={numberStyle}
+        aria-label="Convert default brightness percent"
+        title="Gray level converted pixels start at (percent). 50% matches LightBurn's default; adjust later via Adjust Image."
       />
     </Field>
   );
@@ -133,6 +186,12 @@ function BitmapEstimate(props: { readonly plan: ReturnType<typeof estimateBitmap
 
 function parseDpi(value: string): number {
   return normalizeConvertToBitmapDpi(Number(value));
+}
+
+function parseBrightness(value: string): number {
+  const parsed = Number(value);
+  const finite = Number.isFinite(parsed) ? parsed : DEFAULT_BITMAP_BRIGHTNESS_PERCENT;
+  return Math.max(MIN_BRIGHTNESS_PERCENT, Math.min(MAX_BRIGHTNESS_PERCENT, finite));
 }
 
 function parseRenderType(value: string): ConvertToBitmapRenderType {
@@ -159,6 +218,7 @@ const controlStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
   alignItems: 'center',
+  gap: 8,
 };
 const sourceStyle: React.CSSProperties = {
   maxWidth: 260,
@@ -168,5 +228,6 @@ const sourceStyle: React.CSSProperties = {
 };
 const selectStyle: React.CSSProperties = { flex: 1 };
 const numberStyle: React.CSSProperties = { width: 96 };
+const sliderStyle: React.CSSProperties = { flex: 1, minWidth: 120 };
 const estimateStyle: React.CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)' };
 const errorStyle: React.CSSProperties = { ...estimateStyle, color: 'var(--lf-danger-fg)' };

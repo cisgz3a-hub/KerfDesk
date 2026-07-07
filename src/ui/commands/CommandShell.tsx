@@ -12,6 +12,7 @@ import { CONNECTION_HELP_TEXT } from '../help/connection-help';
 import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
+import { useUiStore } from '../state/ui-store';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { BoxGeneratorHost } from '../box/BoxGeneratorHost';
 import { BoxFitTestHost } from '../box/BoxFitTestHost';
@@ -25,12 +26,16 @@ import {
   ConvertToBitmapDialog,
   type ConvertToBitmapDialogOptions,
 } from '../raster/ConvertToBitmapDialog';
-import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
+import {
+  isConvertibleVector,
+  sourceLabel,
+  type ConvertibleVector,
+} from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
-import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
+import { convertSelectedVectorToBitmap } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
 import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
@@ -41,7 +46,11 @@ import { useAppCommands } from './use-app-commands';
 import { WorkspaceContextBar } from './WorkspaceContextBar';
 
 export function CommandShell(): JSX.Element {
-  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  // Convert-to-Bitmap open state lives in the ui-store (not local state) so
+  // the Ctrl/Cmd+Shift+B shortcut in use-shortcuts can open it too.
+  const convertDialogOpen = useUiStore((s) => s.convertBitmapDialogOpen);
+  const openConvertBitmapDialog = useUiStore((s) => s.openConvertBitmapDialog);
+  const closeConvertBitmapDialog = useUiStore((s) => s.closeConvertBitmapDialog);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
   const [boxFitTestOpen, setBoxFitTestOpen] = useState(false);
@@ -60,7 +69,7 @@ export function CommandShell(): JSX.Element {
   const commands = useAppCommands({
     requestImportImage: onImagePick,
     requestMultiFileTrace: onMultiFileTracePick,
-    requestConvertToBitmap: () => setConvertDialogOpen(true),
+    requestConvertToBitmap: openConvertBitmapDialog,
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
     requestBoxFitTest: () => setBoxFitTestOpen(true),
@@ -86,10 +95,7 @@ export function CommandShell(): JSX.Element {
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
       {convertDialogOpen && selectedConvertible !== null ? (
-        <ConvertDialog
-          convertible={selectedConvertible}
-          onClose={() => setConvertDialogOpen(false)}
-        />
+        <ConvertDialog convertible={selectedConvertible} onClose={closeConvertBitmapDialog} />
       ) : null}
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />

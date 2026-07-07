@@ -1,4 +1,4 @@
-// assembled-layout — every generated part's 3D frame (ADR-118): map a
+// assembled-layout — every generated part's 3D frame (ADR-119): map a
 // panel's local (u, v) rings into box coordinates for the assembled
 // preview. This is the referee's placement knowledge exposed as a layout;
 // the two stay in sync by re-deriving from the documented drawing
