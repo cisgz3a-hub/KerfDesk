@@ -30,8 +30,7 @@ export function OverlayControls(): JSX.Element | null {
   // Machine sources are still-only overlays: their "live" view is a slow
   // poll/MJPEG <img> that cannot ride the workspace warp; LightBurn's model
   // (a frozen Update Overlay still) is the reference behavior anyway.
-  const liveOverlayAvailable =
-    sourceState.kind === 'live' && sourceState.source.kind === 'usb';
+  const liveOverlayAvailable = sourceState.kind === 'live' && sourceState.source.kind === 'usb';
 
   return (
     <div style={sectionStyle}>

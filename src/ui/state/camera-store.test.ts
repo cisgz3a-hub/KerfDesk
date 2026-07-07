@@ -247,6 +247,60 @@ describe('camera-store', () => {
     expect(useCameraStore.getState().sourceState.kind).toBe('idle');
   });
 
+  it('connects an RTSP camera through the bridge probe', async () => {
+    const bridge = mockBridge({
+      probeRtspCamera: async () => ({
+        kind: 'ok',
+        url: 'rtsp://192.168.10.1:8554/',
+        codec: 'H264',
+        ffmpegAvailable: true,
+        previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
+      }),
+    });
+    await useCameraStore.getState().startRtspSource(bridge, 'rtsp://192.168.10.1:8554/');
+    expect(useCameraStore.getState().sourceState).toEqual({
+      kind: 'live',
+      source: {
+        kind: 'machine-rtsp',
+        previewUrl: 'http://127.0.0.1:51731/stream.mjpg?url=x',
+        frameUrl: `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(
+          'rtsp://192.168.10.1:8554/',
+        )}`,
+      },
+    });
+  });
+
+  it('surfaces RTSP failures as actionable errors', async () => {
+    await useCameraStore.getState().startRtspSource(
+      mockBridge({
+        probeRtspCamera: async () => ({
+          kind: 'ok',
+          url: 'rtsp://192.168.10.1:8554/',
+          ffmpegAvailable: false,
+        }),
+      }),
+      'rtsp://192.168.10.1:8554/',
+    );
+    const noFfmpeg = useCameraStore.getState().sourceState;
+    expect(noFfmpeg.kind).toBe('error');
+    if (noFfmpeg.kind === 'error') expect(noFfmpeg.message).toContain('FFmpeg');
+
+    await useCameraStore.getState().startRtspSource(
+      mockBridge({
+        probeRtspCamera: async () => ({ kind: 'invalid', reason: 'Only private RTSP hosts.' }),
+      }),
+      'rtsp://8.8.8.8/live',
+    );
+    const invalid = useCameraStore.getState().sourceState;
+    expect(invalid.kind).toBe('error');
+    if (invalid.kind === 'error') expect(invalid.message).toBe('Only private RTSP hosts.');
+
+    await useCameraStore.getState().startRtspSource(undefined, 'rtsp://192.168.10.1:8554/');
+    const noBridge = useCameraStore.getState().sourceState;
+    expect(noBridge.kind).toBe('error');
+    if (noBridge.kind === 'error') expect(noBridge.message).toContain('pnpm camera:bridge');
+  });
+
   it('drives the alignment flow through to aligned', () => {
     const targets = [
       { x: 0, y: 0 },

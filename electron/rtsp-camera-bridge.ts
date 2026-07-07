@@ -73,7 +73,11 @@ async function handleBridgeRequest(
   res.writeHead(404).end('Not Found');
 }
 
-async function handleProbe(requestUrl: URL, res: ServerResponse, bridgePort: number): Promise<void> {
+async function handleProbe(
+  requestUrl: URL,
+  res: ServerResponse,
+  bridgePort: number,
+): Promise<void> {
   const policy = rtspCameraUrlPolicy(requestUrl.searchParams.get('url') ?? '');
   if (policy.kind !== 'ok') {
     writeJson(res, policy);

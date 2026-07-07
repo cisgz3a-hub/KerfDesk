@@ -8,7 +8,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RgbaImage } from '../../../core/camera';
 import { renderCheckerboardView } from '../../../core/camera/board-render-fixtures';
-import { useLiveDetection, type LiveDetectCapture, type LiveDetectionState } from './use-live-detection';
+import {
+  useLiveDetection,
+  type LiveDetectCapture,
+  type LiveDetectionState,
+} from './use-live-detection';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }

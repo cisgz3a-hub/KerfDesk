@@ -42,7 +42,6 @@ export type ControlHelpKey =
   | 'laser.machine-setup.tab.controller'
   | 'laser.machine-setup.tab.firmware'
   | 'laser.machine-setup.tab.zones'
-  | 'laser.machine-setup.tab.camera'
   | 'laser.machine-setup.tab.raster-diagnostics'
   | 'laser.machine-setup.tab.import-export'
   | 'laser.device-setup.launch'
@@ -250,11 +249,6 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     label: 'Safety zones',
     tooltip:
       'Define machine-coordinate no-go zones that preflight checks before frame, start, or export.',
-  },
-  'laser.machine-setup.tab.camera': {
-    label: 'Camera',
-    tooltip:
-      'Configure an experimental workspace camera profile and four-point image-to-machine alignment.',
   },
   'laser.machine-setup.tab.raster-diagnostics': {
     label: 'Raster diagnostics',
