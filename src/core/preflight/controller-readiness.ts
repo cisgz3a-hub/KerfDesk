@@ -77,7 +77,8 @@ export function runControllerReadiness(
   // Values that WERE reported are still verified strictly — a mismatch or
   // a provably wrong $32 blocks either way. grbl-dollar keeps absent =
   // error: a real GRBL $$ always reports $30/$31/$32.
-  const absentPolicy: AbsentSettingPolicy = settingsCapability === 'readonly-dump' ? 'warn' : 'error';
+  const absentPolicy: AbsentSettingPolicy =
+    settingsCapability === 'readonly-dump' ? 'warn' : 'error';
 
   // Spindle/router machines invert the laser rules: $32 must be OFF and $30
   // is the spindle's max RPM, not the laser S scale (F-CNC provenance header:
