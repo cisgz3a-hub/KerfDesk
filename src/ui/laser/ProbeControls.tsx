@@ -14,6 +14,7 @@ import {
   type ZProbeParams,
 } from '../../core/controllers/grbl';
 import { activeCncTool } from '../../core/scene';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { describeProbeResult } from '../state/probe-actions';
@@ -30,6 +31,7 @@ const CORNERS: ReadonlyArray<{ readonly value: ProbeCorner; readonly label: stri
 
 export function ProbeControls(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
+  const probingSupported = useLaserStore((s) => s.capabilities.probing);
   const connection = useLaserStore((s) => s.connection);
   const statusReport = useLaserStore((s) => s.statusReport);
   const probeBusy = useLaserStore((s) => s.probeBusy);
@@ -40,6 +42,17 @@ export function ProbeControls(): JSX.Element | null {
   const [zParams, setZParams] = useState<ZProbeParams>(DEFAULT_Z_PROBE_PARAMS);
   const [bitDiameterMm, setBitDiameterMm] = useState<number | null>(null);
   if (machine?.kind !== 'cnc') return null;
+  if (!probingSupported) {
+    // The probe runner speaks the GRBL response grammar; on firmwares with a
+    // different grammar a cycle could report false success and zero Z at the
+    // wrong height, so the controls are withheld entirely.
+    return (
+      <p style={{ fontSize: 12, color: 'var(--lf-text-faint)' }}>
+        Touch-plate probing is not supported on this controller. Zero the work coordinates manually
+        (jog to the stock top and set Z0).
+      </p>
+    );
+  }
 
   const effectiveBitDiameter = bitDiameterMm ?? activeCncTool(machine).diameterMm;
   const ready = connection.kind === 'connected' && statusReport?.state === 'Idle' && !probeBusy;
@@ -184,20 +197,14 @@ function NumberField(props: {
     <label style={fieldStyle}>
       {props.label}
       <span style={unitWrapStyle}>
-        <input
-          type="number"
-          aria-label={props.label}
+        <ClearableNumberField
+          ariaLabel={props.label}
           title={NUMBER_FIELD_TITLES[props.label] ?? props.label}
           value={props.value}
           min={PROBE_VALUE_MIN_MM}
           max={PROBE_VALUE_MAX_MM}
           step={0.01}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            if (Number.isFinite(v) && v >= PROBE_VALUE_MIN_MM && v <= PROBE_VALUE_MAX_MM) {
-              props.onCommit(v);
-            }
-          }}
+          onCommit={props.onCommit}
           style={inputStyle}
         />
         mm

@@ -258,7 +258,13 @@ function windowHelpCommandContext(
   app: ReturnType<typeof useStore.getState>,
 ): Pick<
   AppCommandContext,
-  'togglePreview' | 'resetView' | 'projectNotes' | 'undoHistory' | 'showAbout'
+  | 'togglePreview'
+  | 'resetView'
+  | 'projectNotes'
+  | 'undoHistory'
+  | 'showAbout'
+  | 'showConnectionHelp'
+  | 'showSafety'
 > {
   return {
     togglePreview: app.togglePreview,
@@ -266,6 +272,8 @@ function windowHelpCommandContext(
     projectNotes: callbacks.requestProjectNotes,
     undoHistory: callbacks.requestUndoHistory,
     showAbout: callbacks.showAbout,
+    showConnectionHelp: callbacks.showConnectionHelp,
+    showSafety: callbacks.showSafety,
   };
 }
 

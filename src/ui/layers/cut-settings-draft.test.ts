@@ -43,6 +43,23 @@ describe('cut settings draft helpers', () => {
     expect(patch.airAssist).toBe(true);
   });
 
+  it('preserves air assist when the cut settings form omits the layer-row control', () => {
+    const layer = lineLayer({ airAssist: true });
+    const patch = readCutSettingsPatch(
+      formData({
+        mode: 'line',
+        power: '30',
+        speed: '1500',
+        passes: '1',
+        visible: 'on',
+        output: 'on',
+      }),
+      layer,
+    );
+
+    expect(patch.airAssist).toBe(true);
+  });
+
   it('clamps speed to the supplied active-device max feed', () => {
     const layer = lineLayer({ speed: 1500 });
     const patch = readCutSettingsPatch(formData({ mode: 'line', speed: '9000' }), layer, {

@@ -3,6 +3,7 @@ import type { GrblState, StatusReport } from '../../core/controllers/grbl';
 import { NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE } from '../../core/devices';
 import { computeJobBounds, frameBoundsSignature } from '../../core/job';
 import {
+  DEFAULT_CNC_MACHINE_CONFIG,
   DEFAULT_RASTER_LAYER_COLOR,
   createLayer,
   createProject,
@@ -13,7 +14,7 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import { prepareOutput } from '../../io/gcode';
-import { prepareStartJob } from './start-job-readiness';
+import { CNC_REQUIRES_GRBL_MESSAGE, prepareStartJob } from './start-job-readiness';
 
 const idleStatus: StatusReport = {
   state: 'Idle',
@@ -171,6 +172,23 @@ function neotronicsFineDetailFillProject(fillStyle: 'scanline' | 'island'): Proj
 }
 
 describe('prepareStartJob', () => {
+  it('blocks CNC Start on controllers without the GRBL CNC dialect', () => {
+    // The CNC emitter speaks GRBL (G4 P in seconds); Marlin reads P as
+    // milliseconds, so the spin-up dwell would collapse to nothing and the
+    // bit plunges before the spindle is at speed. ADR-098: CNC is GRBL-only.
+    const project: Project = { ...createProject(), machine: DEFAULT_CNC_MACHINE_CONFIG };
+    const result = prepareStartJob(
+      project,
+      { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
+      { ...readyMachine, cncJobsSupported: false },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.messages).toContain(CNC_REQUIRES_GRBL_MESSAGE);
+    }
+  });
+
   it('blocks Start when connected controller $30 differs from project max S', () => {
     const result = prepareStartJob(
       calibratedProject(),

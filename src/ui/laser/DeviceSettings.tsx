@@ -42,7 +42,7 @@ export function DeviceSettings(): JSX.Element {
     <details style={panelStyle}>
       <summary
         style={summaryStyle}
-        title="Choose the local KerfDesk machine profile: bed size, origin, feed limits, power range, homing, focus, and air assist. This does not write firmware settings."
+        title="Choose the local KerfDesk machine profile: bed size, origin, feed limits, power range, homing, focus, and air output. This does not write firmware settings."
       >
         Device Profile
       </summary>

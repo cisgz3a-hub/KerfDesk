@@ -49,6 +49,7 @@ export type PreflightCode =
   | 'registration-both-output'
   | 'selected-output-empty'
   | 'cnc-settings-invalid'
+  | 'cnc-layer-empty'
   | 'cnc-depth-exceeds-stock'
   | 'cnc-overdeep-cut'
   | 'plunged-travel'

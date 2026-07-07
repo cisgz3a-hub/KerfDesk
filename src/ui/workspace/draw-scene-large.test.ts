@@ -61,7 +61,10 @@ function tracedLineProject(segmentCount: number): Project {
 }
 
 describe('drawScene large vector traces', () => {
-  it('samples oversized traces instead of sending every segment to Canvas2D', () => {
+  it('draws a traced-logo-sized scene at full fidelity (no simplification)', () => {
+    // The old 10k budget simplified a SINGLE traced logo (~10.3k segments)
+    // into disconnected dashes — the 2026-07-05 "what is this?" report. A
+    // 30k-segment scene must now draw every segment, with no notice.
     const { ctx, calls } = countingContext();
 
     drawScene(ctx, 800, 600, tracedLineProject(30_000), {
@@ -70,7 +73,28 @@ describe('drawScene large vector traces', () => {
       view: { zoomFactor: 1, panX: 0, panY: 0 },
     });
 
-    expect(calls.lineTo).toBeLessThan(12_000);
+    // The trace contributes exactly 30k lineTo; the bed grid adds a small
+    // constant number on top.
+    expect(calls.lineTo).toBeGreaterThanOrEqual(30_000);
+    expect(calls.lineTo).toBeLessThan(31_000);
+    expect(calls.fillText).not.toContain('Large scene - display simplified for performance');
+  });
+
+  it('decimates a genuinely oversized trace into CONNECTED coarse polylines', () => {
+    const { ctx, calls } = countingContext();
+
+    drawScene(ctx, 800, 600, tracedLineProject(250_000), {
+      selectedId: null,
+      preview: false,
+      view: { zoomFactor: 1, panX: 0, panY: 0 },
+    });
+
+    // stride ceil(250k/120k)=3 keeps every 3rd vertex plus the endpoint:
+    // far fewer lineTo than the raw trace, but each surviving vertex stays
+    // CONNECTED to the next (one open polyline in, one decimated polyline
+    // out → lineTo ≈ kept points - 1, not isolated dash pairs).
+    expect(calls.lineTo).toBeGreaterThan(50_000);
+    expect(calls.lineTo).toBeLessThan(90_000);
     expect(calls.fillText).toContain('Large scene - display simplified for performance');
   });
 });

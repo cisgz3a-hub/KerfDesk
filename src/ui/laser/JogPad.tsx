@@ -26,6 +26,8 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const machineKind = useStore((s) => machineKindOf(s.project.machine));
   const maxFeed = useStore((s) => s.project.device.maxFeed);
   const jog = useLaserStore((s) => s.jog);
+  const airAssistOn = useLaserStore((s) => s.airAssistOn);
+  const setAirAssistEnabled = useLaserStore((s) => s.setAirAssistEnabled);
   const zeroZHere = useLaserStore((s) => s.zeroZHere);
   const feed = Math.min(maxFeed, 3000);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
@@ -68,24 +70,13 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
           ))}
         </select>
       </div>
-      <div style={gridStyle}>
-        <span />
-        <Btn onClick={() => send('y', 1)} disabled={disabled} label={jogLabel('y', 1)}>
-          ↑
-        </Btn>
-        <span />
-        <Btn onClick={() => send('x', -1)} disabled={disabled} label={jogLabel('x', -1)}>
-          ←
-        </Btn>
-        <span />
-        <Btn onClick={() => send('x', 1)} disabled={disabled} label={jogLabel('x', 1)}>
-          →
-        </Btn>
-        <span />
-        <Btn onClick={() => send('y', -1)} disabled={disabled} label={jogLabel('y', -1)}>
-          ↓
-        </Btn>
-        <span />
+      <div style={jogRowStyle}>
+        <JogArrowGrid disabled={disabled} onJog={send} labelFor={jogLabel} />
+        <AirAssistControl
+          command={device.airAssistCommand}
+          enabled={airAssistOn}
+          onToggle={setAirAssistEnabled}
+        />
       </div>
       <FocusJogControls
         device={device}
@@ -97,6 +88,80 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
         onZeroZ={() => void zeroZHere()}
       />
     </div>
+  );
+}
+
+function JogArrowGrid(props: {
+  readonly disabled: boolean;
+  readonly onJog: (axis: 'x' | 'y', physicalDirection: 1 | -1) => void;
+  readonly labelFor: (axis: 'x' | 'y', physicalDirection: 1 | -1) => string;
+}): JSX.Element {
+  return (
+    <div style={gridStyle}>
+      <span />
+      <Btn
+        onClick={() => props.onJog('y', 1)}
+        disabled={props.disabled}
+        label={props.labelFor('y', 1)}
+      >
+        ↑
+      </Btn>
+      <span />
+      <Btn
+        onClick={() => props.onJog('x', -1)}
+        disabled={props.disabled}
+        label={props.labelFor('x', -1)}
+      >
+        ←
+      </Btn>
+      <span />
+      <Btn
+        onClick={() => props.onJog('x', 1)}
+        disabled={props.disabled}
+        label={props.labelFor('x', 1)}
+      >
+        →
+      </Btn>
+      <span />
+      <Btn
+        onClick={() => props.onJog('y', -1)}
+        disabled={props.disabled}
+        label={props.labelFor('y', -1)}
+      >
+        ↓
+      </Btn>
+      <span />
+    </div>
+  );
+}
+
+function AirAssistControl(props: {
+  readonly command: DeviceProfile['airAssistCommand'];
+  readonly enabled: boolean;
+  readonly onToggle: (enabled: boolean) => Promise<void>;
+}): JSX.Element {
+  const commandAvailable = props.command !== 'none';
+  const disabled = !commandAvailable;
+  const label = props.enabled
+    ? 'Turn manual air assist off (M9)'
+    : `Turn manual air assist on (${commandAvailable ? props.command : 'not configured'})`;
+  const title = commandAvailable
+    ? `${label}. Jobs use each layer's Job Air checkbox automatically.`
+    : 'Set Device Profile > Air output to M7 or M8 before using manual air.';
+  return (
+    <button
+      type="button"
+      onClick={() => void props.onToggle(!props.enabled).catch(() => undefined)}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={props.enabled}
+      title={title}
+      style={airAssistButtonStyle(props.enabled, disabled)}
+    >
+      <span style={airAssistTitleStyle}>Manual Air</span>
+      <span style={airAssistStateStyle}>{props.enabled ? 'ON' : 'OFF'}</span>
+      <span style={airAssistCommandStyle}>{commandAvailable ? props.command : 'Not set'}</span>
+    </button>
   );
 }
 
@@ -217,11 +282,62 @@ const focusHintStyle: React.CSSProperties = {
   fontSize: 12,
   lineHeight: 1.3,
 };
+const jogRowStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(116px, 1fr) 104px',
+  alignItems: 'stretch',
+  gap: 8,
+};
 const gridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, 1fr)',
   gap: 4,
   justifyItems: 'center',
+};
+function airAssistButtonStyle(enabled: boolean, disabled: boolean): React.CSSProperties {
+  if (disabled) {
+    return {
+      ...airAssistButtonBaseStyle,
+      borderColor: 'var(--lf-border)',
+      background: 'var(--lf-bg-2)',
+      color: 'var(--lf-text-muted)',
+      cursor: 'not-allowed',
+    };
+  }
+  return {
+    ...airAssistButtonBaseStyle,
+    borderColor: enabled ? 'var(--lf-accent)' : 'var(--lf-border-strong)',
+    background: enabled ? 'var(--lf-accent)' : 'var(--lf-bg-input)',
+    color: enabled ? 'var(--lf-on-fill)' : 'var(--lf-text)',
+    cursor: 'pointer',
+  };
+}
+const airAssistButtonBaseStyle: React.CSSProperties = {
+  minHeight: 116,
+  padding: '8px 6px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  borderWidth: 1,
+  borderStyle: 'solid',
+  borderRadius: 6,
+  textAlign: 'center',
+};
+const airAssistTitleStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  lineHeight: 1.15,
+};
+const airAssistStateStyle: React.CSSProperties = {
+  fontSize: 20,
+  fontWeight: 800,
+  lineHeight: 1,
+};
+const airAssistCommandStyle: React.CSSProperties = {
+  fontSize: 11,
+  lineHeight: 1.2,
 };
 const btnStyle: React.CSSProperties = {
   width: 36,

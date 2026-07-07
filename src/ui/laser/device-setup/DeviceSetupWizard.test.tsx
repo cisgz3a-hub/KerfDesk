@@ -273,6 +273,9 @@ describe('DeviceSetupWizard', () => {
         bed.value = '555';
         Simulate.change(bed);
       });
+      // The clearable field commits on blur (as a real Next-click does), not on
+      // every keystroke — separate act so the draft re-renders before blur.
+      await act(async () => Simulate.blur(bed));
       await advanceUntil(host, 'Finish setup');
       await act(async () => button(host, 'Finish setup').click());
       expect(useStore.getState().project.device.bedWidth).toBe(555);

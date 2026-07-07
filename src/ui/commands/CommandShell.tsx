@@ -8,6 +8,8 @@ import {
   type ScanOffsetCalibrationPatternOptions,
 } from '../../core/job';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
+import { CONNECTION_HELP_TEXT } from '../help/connection-help';
+import { SAFETY_NOTICE_TEXT } from '../help/safety-notice';
 import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
@@ -71,6 +73,8 @@ export function CommandShell(): JSX.Element {
     requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
     showAbout: () => jobAwareAlert(aboutText()),
+    showConnectionHelp: () => jobAwareAlert(CONNECTION_HELP_TEXT),
+    showSafety: () => jobAwareAlert(SAFETY_NOTICE_TEXT),
   });
   return (
     <>
@@ -360,5 +364,12 @@ function aboutText(): string {
     `${APP_DISPLAY_NAME} ${__APP_VERSION__}`,
     `Commit ${__GIT_SHA__}`,
     `Built ${__BUILD_TIME__}`,
+    '',
+    'Use is governed by the End User License Agreement (/eula.txt).',
+    'Open-source components: see /third-party-notices.txt.',
+    '',
+    'SAFETY: this software drives laser and CNC machinery. Verify every',
+    'job (preview, simulation, or air run) before cutting, and never',
+    'leave a running machine unattended.',
   ].join('\n');
 }

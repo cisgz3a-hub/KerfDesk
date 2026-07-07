@@ -6,12 +6,15 @@
 import { useState } from 'react';
 import {
   DEFAULT_CNC_TOOLS,
+  activeCncTool,
   type CncLayerSettings,
   type CncTool,
   type Layer,
 } from '../../core/scene';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useStore } from '../state';
 import { feedPresetPatch } from '../state/cnc-library-actions';
+import { materialFeedsPatch } from '../state/cnc-project-material';
 
 export function useCncTools(): ReadonlyArray<CncTool> {
   return useStore((s) =>
@@ -35,6 +38,18 @@ export function LayerBitSelect(props: {
   readonly onCommitSettings: (settings: CncLayerSettings) => void;
 }): JSX.Element {
   const tools = useCncTools();
+  const machine = useStore((s) => s.project.machine);
+  const maxFeed = useStore((s) => s.project.device.maxFeed);
+  // A material-driven layer must recompute its feeds for the NEW bit's
+  // diameter — otherwise the material hint claims feeds that were computed
+  // for the old bit.
+  const feedsForBit = (toolId: string | undefined): Partial<CncLayerSettings> => {
+    const materialKey = props.settings.materialKey;
+    if (machine?.kind !== 'cnc' || materialKey === undefined) return {};
+    const tool = toolId === undefined ? activeCncTool(machine) : tools.find((t) => t.id === toolId);
+    if (tool === undefined) return {};
+    return materialFeedsPatch(materialKey, tool, props.settings.spindleRpm, maxFeed) ?? {};
+  };
   return (
     <Row label="Bit">
       <select
@@ -43,9 +58,9 @@ export function LayerBitSelect(props: {
           if (e.target.value === '') {
             // Clearing the override removes the key (exact optional field).
             const { toolId: _removed, ...rest } = props.settings;
-            props.onCommitSettings(rest);
+            props.onCommitSettings({ ...rest, ...feedsForBit(undefined) });
           } else {
-            props.onCommit({ toolId: e.target.value });
+            props.onCommit({ toolId: e.target.value, ...feedsForBit(e.target.value) });
           }
         }}
         aria-label={`Bit for ${props.layer.color}`}
@@ -155,19 +170,13 @@ function ReliefFinishRow(props: {
           </option>
         ))}
       </select>
-      <input
-        type="number"
+      <ClearableNumberField
         min={0.005}
         max={1}
         step={0.005}
         value={props.settings.reliefScallopMm ?? 0.025}
-        onChange={(e) => {
-          const parsed = Number.parseFloat(e.target.value);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            props.onCommit({ reliefScallopMm: parsed });
-          }
-        }}
-        aria-label={`Relief scallop height for ${props.layer.color}`}
+        onCommit={(mm) => props.onCommit({ reliefScallopMm: mm })}
+        ariaLabel={`Relief scallop height for ${props.layer.color}`}
         title="Scallop height target (mm) — smaller = finer finishing rows, longer job."
         style={scallopInputStyle}
       />
@@ -204,22 +213,20 @@ export function MotionPolishRows(props: {
         <option value="climb">Climb</option>
         <option value="conventional">Conventional</option>
       </select>
-      <input
-        type="number"
+      <ClearableNumberField
         min={0}
         max={45}
         step={0.5}
         value={props.settings.rampEntryDeg ?? 0}
-        onChange={(e) => {
-          const parsed = Number.parseFloat(e.target.value);
-          if (!Number.isFinite(parsed) || parsed <= 0) {
+        onCommit={(deg) => {
+          if (deg <= 0) {
             const { rampEntryDeg: _removed, ...rest } = props.settings;
             props.onCommitSettings(rest);
           } else {
-            props.onCommit({ rampEntryDeg: parsed });
+            props.onCommit({ rampEntryDeg: deg });
           }
         }}
-        aria-label={`Ramp entry angle for ${props.layer.color}`}
+        ariaLabel={`Ramp entry angle for ${props.layer.color}`}
         title="Descend into cuts along the path at this angle instead of plunging straight down. 0 = plunge (default)."
         style={rampInputStyle}
       />

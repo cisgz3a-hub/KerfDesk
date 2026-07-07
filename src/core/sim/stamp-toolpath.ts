@@ -21,6 +21,7 @@ import {
   gridCellIndex,
   gridCellOfPoint,
   type RemovalGrid,
+  type RemovalGridResult,
   type RemovalGridSpec,
 } from './removal-grid';
 import type { ToolKernel } from './tool-kernels';
@@ -31,13 +32,17 @@ export type ComputeRemovalOptions = {
   readonly uptoLengthMm?: number;
 };
 
+export type ComputeRemovalGridResult = RemovalGridResult;
+
 export function computeRemovalGrid(
   toolpath: Toolpath,
   spec: RemovalGridSpec,
   kernel: ToolKernel,
   options: ComputeRemovalOptions = {},
-): RemovalGrid {
-  const grid = createRemovalGrid(spec);
+): ComputeRemovalGridResult {
+  const result = createRemovalGrid(spec);
+  if (result.kind === 'error') return result;
+  const { grid } = result;
   const limit = options.uptoLengthMm ?? Number.POSITIVE_INFINITY;
   let traversed = 0;
   for (const step of toolpath.steps) {
@@ -46,7 +51,7 @@ export function computeRemovalGrid(
     stampStep(grid, kernel, step, budget);
     traversed += step.length;
   }
-  return grid;
+  return { kind: 'ok', grid };
 }
 
 function stampStep(

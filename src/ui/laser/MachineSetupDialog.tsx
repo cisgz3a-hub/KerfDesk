@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { helpProps, type HelpTopicId } from '../help/help-topics';
 import { Button, Dialog, DialogActions } from '../kit';
 import { ControllerSettingsPanel, FirmwareWritesPanel } from './MachineSetupController';
-import { CameraPanel } from './MachineSetupCamera';
 import { ImportExportPanel } from './MachineSetupImportExport';
 import { OverviewPanel, ProfileCatalogPanel } from './MachineSetupProfiles';
 import { RasterDiagnosticsPanel } from './MachineSetupRasterDiagnostics';
@@ -14,7 +13,6 @@ type SetupTab =
   | 'controller'
   | 'firmware'
   | 'zones'
-  | 'camera'
   | 'raster-diagnostics'
   | 'import-export';
 
@@ -36,11 +34,6 @@ const TABS: ReadonlyArray<{
     helpId: 'control:laser.machine-setup.tab.firmware',
   },
   { id: 'zones', label: 'Safety Zones', helpId: 'control:laser.machine-setup.tab.zones' },
-  {
-    id: 'camera',
-    label: 'Camera',
-    helpId: 'control:laser.machine-setup.tab.camera',
-  },
   {
     id: 'raster-diagnostics',
     label: 'Raster Diagnostics',
@@ -92,8 +85,6 @@ function renderTab(tab: SetupTab): JSX.Element {
       return <FirmwareWritesPanel />;
     case 'zones':
       return <SafetyZonesPanel />;
-    case 'camera':
-      return <CameraPanel />;
     case 'raster-diagnostics':
       return <RasterDiagnosticsPanel />;
     case 'import-export':

@@ -5086,3 +5086,307 @@ seeding on manual Add + SVG import; no-material = no cnc block (byte-identical).
 jsdom: the panel renders the dropdown and picking sets the stock material. Full
 gate per commit. Live browser NOT driven into CNC mode (shares the maintainer's
 scene, CLAUDE.md §4). Physical cut CLAIMED per ADR-098 §3.
+
+## ADR-113 — Region-enhance re-trace (dialog boundary mode) (Trace fidelity, 2026-07-05)
+
+**Status:** accepted (maintainer-directed follow-up to the trace-fidelity work).
+
+### Context
+
+Small features inside a large raster sit at the tracer's detection floor: a
+~67px² letter counter in a 1024px logo drops out at native size. The whole-image
+auto-upscale can't rescue it — `shouldUpscaleSmallSource` gates on
+`max(w,h) < SMALL_SOURCE_EDGE_PX = 100` (`auto-upscale.ts`), so a 1024px source
+is never supersampled, and quadrupling a 1024px buffer for one small feature is
+the exact cost that gate exists to avoid. The dialog already had a
+LightBurn-style **Boundary crop** (box a region → the trace contains ONLY that
+region's paths, `traceImageRegion`), reachable from `retraceOriginalAction`
+("Re-trace Original") with the retained source raster.
+
+### Decision
+
+Add a **second boundary mode** rather than a new canvas tool. The boundary box's
+mode is a stringly union `BoundaryMode = 'crop' | 'enhance'` (no boolean flag):
+
+- **`crop`** (default, LightBurn parity): unchanged — delegates to
+  `traceImageRegion`, result is just the region.
+- **`enhance`**: trace the FULL image, re-trace the boxed **source** region
+  supersampled 2×, and patch the re-traced geometry back into the full trace so
+  the small feature is recovered while the rest of the trace survives. The pure
+  merge lives in `core/trace/region-enhance.ts` (`enhanceRegionPaths`); the
+  worker-backed orchestration is `src/ui/trace/region-enhance-trace.ts`
+  (`traceImageWithBoundaryMode`), which injects the app's worker tracer into the
+  pure core.
+
+The **venue is the existing dialog**: it reuses `retraceOriginalAction` and the
+boundary-box UX (drag to box, Clear Boundary), so no new tool, command, or canvas
+surface is introduced. The mode toggle is visible only when a boundary exists;
+clearing the boundary resets the mode to `crop`. Default stays `crop`.
+
+**Why 2×** — mkbitmap's documented sweet spot ("a greyscale image contains more
+detail than a bilevel image at the same resolution"); 3×+ invents detail. Capped
+per `computeRegionUpscaleFactor` at 1× if the 2× crop would exceed
+`MAX_UPSCALE_SOURCE_PIXELS`. **Margin-ring merge rule**: the region is shrunk by
+`REGION_EDGE_MARGIN_PX` before the swap so crop-edge fragments (which hug the
+border) and larger outlines crossing the box both keep their original geometry;
+only polylines fully inside the shrunk interior are dropped/replaced, merged by
+colour key.
+
+### Consequences
+
+- **LightBurn divergence, maintainer-sanctioned.** LightBurn's answer to a
+  dropped small feature is manual node-editing; it has no region-enhance re-trace.
+  The maintainer sanctioned this divergence as a fidelity win, so it is a
+  deliberate choice, not a bug against the LightBurn reference.
+- The full-image trace runs twice in enhance mode (once whole, once on the crop);
+  acceptable because enhance is an opt-in on a user-boxed region, not the default.
+- The core merge is unchanged by this ADR (it landed earlier); this ADR is the
+  UI seam + venue decision only.
+
+### Verification
+
+Unit: `region-enhance-trace.test.ts` (crop delegates unchanged with one trace;
+enhance runs the full trace + supersampled crop trace and patches — a
+region-contained polyline replaced, an outside one survives). Preview:
+`use-trace-preview.test.ts` (enhance mode reaches the preview path; the ready
+state reflects the patched trace). jsdom: `ImportImageDialog.workflow.test.ts`
+(the mode toggle renders only after a region is boxed, defaults to Crop). Full
+gate per commit. **NOT verified perceptually this session** — the rendered
+recovery of the real logo counter against the source is the maintainer's
+perceptual pass (CLAUDE.md §2); green tests are not fidelity proof.
+
+## ADR-114 — Commercial legal pack: EULA, installer acceptance, shipped third-party notices (2026-07-05)
+
+(ADR-113 is reserved by the trace-fidelity track on its own branch; this entry
+deliberately skips it to avoid a repeat of the ADR-094/ADR-106 collisions.)
+
+**Context.** The 2026-07-05 release audit found the product legally unsellable:
+the repo LICENSE (ADR-018) affirmatively denies everyone the right to *use* the
+software and no EULA, terms surface, or machine-safety disclaimer existed
+anywhere a customer could see. Separately, the bundled Roboto (Apache-2.0) and
+three OFL-1.1 fonts plus all nine production npm packages shipped without the
+license texts their licenses require — THIRD_PARTY_NOTICES.md covered only the
+Rayforge camera adaptation and was not bundled.
+
+**Decision.**
+1. `public/eula.txt` is the customer-facing End User License Agreement: use
+   grant, restrictions, machine-safety warning, warranty disclaimer, liability
+   cap, third-party pointer, termination. It ships in every bundle (vite
+   `public/` → `dist/web`, which electron-builder packs) and the NSIS
+   installer requires acceptance (`nsis.license`). The repo LICENSE (ADR-018)
+   still governs the *source*; the EULA governs the *distributed binary* —
+   they are complementary, not conflicting.
+2. `scripts/generate-third-party-notices.mjs` builds
+   `public/third-party-notices.txt` from real sources — each production
+   dependency's `node_modules` LICENSE verbatim plus each font's name-table
+   copyright record — with the canonical Apache-2.0/OFL-1.1 full texts
+   committed under `scripts/license-texts/` (downloaded from apache.org and
+   openfontlicense.org). `build:web` regenerates it and the generator fails
+   loudly on a missing LICENSE, so a new dependency cannot ship un-attributed.
+3. The About dialog names both files and carries a short safety notice.
+
+**Consequences.** The EULA text is an engineering draft: it must be reviewed
+by a lawyer before the first sale (jurisdiction/governing-law clause is
+deliberately absent). First-run in-app acceptance (web) remains open — the
+web bundle surfaces the EULA via About, not a blocking dialog; revisit when
+the storefront exists.
+
+## ADR-115 — Edge Detection engine: local-contrast mask + potrace geometry (Trace fidelity, 2026-07-05)
+
+**Status:** accepted (maintainer-directed after rejecting ADR-059's letter quality).
+
+### Context
+
+The maintainer's perceptual pass on the live app rejected the Canny-chain
+Edge Detection engine (ADR-059): serif letters traced with hooked/curled
+spur artifacts at serif tips, wandering contours cutting across serifs,
+blobby small letters, and a dropped letter counter. Side-by-side renders on
+the same logo pixels showed the failure was NOT detection (Canny finds the
+ink) but GEOMETRY SYNTHESIS: the thin → stroke-graph → junction-weld →
+spur-prune → chain pipeline manufactures the artifact classes, and every
+prior fix (apex snap, spur pruning, weld tuning, spline caps) was
+whack-a-mole against that architecture. The clean-room potrace backend
+(Line Art) traced the same letters cleanly — but its global 128 threshold
+drops faint ink (the LANGEBAAN letters run luma 125-195; a Canny-fill probe
+measured ~88k ink pixels the global threshold misses on this logo).
+
+A Canny-loop-fill mask was prototyped and REJECTED: closing edge loops
+morphologically consumes small interior holes (letter counters) — the exact
+detail at stake. The winning mask is mkbitmap's design (potrace's own
+companion preprocessor): local-contrast thresholding.
+
+### Decision
+
+`traceImageToEdgePaths` becomes: **local-contrast ink mask → shared potrace
+geometry.**
+
+- `local-contrast-mask.ts`: ink = darker than the local box-blur mean by
+  `delta`, unioned with the global 128 threshold (solid interiors read ~0 in
+  a highpass, the union keeps them filled). No morphology — a 3px counter
+  survives any radius.
+- `potrace-trace.ts` exports the extracted `potraceBitmapToPolylines`
+  geometry stage (scan → polygon → curve → optimize → apex snap), now shared
+  by Line Art/Smooth/Sharp AND Edge Detection.
+- The Canny-era option fields remain the public knobs; the engine derives
+  its parameters from them so dialog/presets/merge are untouched:
+  low threshold ratio → delta (0.074 → 6, clamp 2..12), blur sigma → radius
+  (1.2 → 12, clamp 4..32), edgeMinLengthPx → potrace turdSize.
+- **Output is closed contours only** — LightBurn's trace semantic (its
+  tracer is potrace-based). The chain engine's open-stroke output is gone;
+  thin strokes trace as thin outline rings, as LightBurn does.
+- **Seam-invariant fix in `potrace-apex.ts`** (latent Line Art bug exposed
+  by the rebuild): `snapCornersToInk` deduped a ring's closing point and
+  never re-appended it, so every apex-rebuilt ring shipped `closed: true`
+  with first ≠ last — while job compilation documents closed segments as
+  "last equals first by construction" and the emitters draw points as given
+  (cornered shapes engraved with their final edge missing). Snapped rings
+  now re-append the (possibly moved) start vertex.
+
+### Consequences
+
+- The maintainer's reported artifact classes are gone at the engine level:
+  serif feet hug (no smile arcs), no hooks/spurs, and the LANGEBAAN counter
+  census reads 2/2/2 at NATIVE resolution — the defect ADR-113's
+  region-enhance was built to patch no longer occurs on this logo, so
+  region-enhance becomes a general-purpose recovery tool rather than the
+  counter fix.
+- Benchmark recalibrations (documented in arch-house-edge-benchmark.ts):
+  `langebaanExcessTurnPer100Px` target 12 → 135 — the old target measured
+  the spline engine's evened curvature, which turned smoothly precisely
+  because it melted letters; potrace's polygon style measures ~117 while
+  rendering every letter legible. `openPolylineCount` expectation flips
+  > 10 → 0 (all-closed by construction). Disc radial RMS 0.12 → 0.15
+  (measured 0.135; the ridge-snap sub-pixel pass no longer exists; 0.015px
+  is far below laser resolution).
+- Orphaned modules pending a separate cleanup commit: `canny-edges.ts`,
+  `edge-reconnect.ts`, `edge-subpixel.ts`, `edge-ink-support.ts` (no
+  remaining app importers; their tests still pass). The centerline pipeline
+  keeps its chain machinery (its own mode) including the spline deviation
+  cap from the earlier fidelity fix.
+- Known residuals accepted from the render review: small junction notches
+  on ~10px G/E glyphs and occasional ~1px foot ticks — polygon-style output
+  at glyph sizes near the information floor.
+
+### Verification
+
+Test-first on the seam bug (edge ring measured 14px first→last before the
+fix; potrace-apex pins the invariant). Engine contract tests rewritten
+against real semantics (sensitivity gates a contrast-8 bar; Detail radius
+fills vs hollows a broad faint square; disc smoothness rebaselined with
+measured values). Full trace + perceptual suites 328/328; renders of
+np-house-H / np-house-all / np-lang-all read and compared against the
+baseline (serifs hug, letters legible, counters present) — the maintainer
+saw the prototype renders and approved the architecture before
+implementation; the final engine renders await the maintainer's own pass.
+
+## ADR-116 — Box generator v2: panel cutouts, divider grid, slide lid (2026-07-07)
+
+**Status:** accepted (maintainer directive: "I need my box designer to be
+a full broad tool"). Builds on ADR-106; scope lands here before code.
+
+### Context
+
+The v1 generator ships two styles (closed, open-top) on an engine whose
+hard parts — per-edge complementary sequences, corner-cube arbitration,
+uniform-offset fit, corner-overcut relief, and the virtual assembly
+referee — are style-independent. The single blocker between v1 and the
+broad-tool tier (dividers, lids, hardware mounts) is that a `BoxPanel`
+carries exactly ONE outline ring: ADR-106 said "no holes in v1". This
+ADR adds interior cutouts once, then spends that capability on the two
+most-requested styles. Behavior references: boxes.py docs and MakerCase
+(reverse-engineering study only — boxes.py is GPL, no code copying,
+ADR-017).
+
+### Decision 1 — panel cutouts (the enabling upgrade)
+
+- `BoxPanel` gains `cutouts: ReadonlyArray<Polyline>` (closed interior
+  rings in the same sheet frame as the outline).
+- **Insertion changes carrier:** panels insert as `kind:'imported-svg'`
+  vector objects (the established carrier for baked generated geometry —
+  dogbone/weld precedent), one `ColoredPath` holding outline + cutout
+  rings. This is chosen over per-ring shape objects because (a) even-odd
+  fill semantics make cutouts real holes under Fill mode, (b) compile-time
+  kerf offset is already containment-aware for hole rings
+  (`kerf-offset.ts`), and (c) the `source` field ("Box panel: Front")
+  finally carries panel names into the scene — closing the v1 gap where
+  `SceneObject` has no name field. Undo/selection semantics unchanged
+  (one undo step, all panels selected). The generator's own insert path
+  never routes through `importSvgObject`, so Phase C re-import
+  replace-by-source semantics cannot trigger on generated panels.
+- **Fit generalizes for free:** the −c/4 clearance offset on correctly
+  oriented multi-ring polygons shrinks material and therefore WIDENS
+  every cutout by c/4 per flank — exactly the slot play the joint
+  contract requires. Corner relief extends to cutout rings: every
+  slot corner a mating tab must seat against gets the F-CNC26 overcut
+  at full bit radius, same post-offset ordering.
+- **Referee extension:** slot bands. A junction between a tabbed part
+  and a slotted panel is checked like a cube edge: one shared sequence,
+  exact complementarity at c = 0, uniform play/2 flank gaps otherwise,
+  zero interference always.
+
+### Decision 2 — divider grid
+
+- `BoxSpec` gains `dividersXCount` / `dividersYCount` (0–N, evenly
+  spaced partitions across width / depth; 0 = v1 output, byte-identical).
+- Divider panels stand on the bottom panel (no bottom slots in v2),
+  height = inner height, and carry tabs into **through-slots** in the
+  two walls they meet — through-slots are the standard laser-box
+  aesthetic; half-depth dados are CNC 2.5D work and stay deferred.
+  Tab/slot layout reuses `edge-pattern` over the divider junction height
+  (odd cells, divider owns the odd cells), so complementarity is by
+  construction, exactly like cube edges.
+- Divider×divider intersections use egg-crate cross-laps: X-dividers
+  notched half-height from the top, Y-dividers from the bottom, notch
+  width T (widened by the clearance pass like any recess).
+- Validation: resulting compartment pitch must exceed 2·T and, for CNC,
+  the slot/notch cells must clear the relief tool (same rule family as
+  ADR-106).
+
+### Decision 3 — slide lid
+
+- New style `'slide-lid'`: bottom, back, slotted left/right walls,
+  front wall shortened to the slot floor, plus a loose lid panel.
+- Geometry: lid plane occupies z ∈ [OH−T, OH]. Side walls carry a
+  through-slot of height T (widened by play) running from the front
+  edge to T short of the back wall; the lid slides over the shortened
+  front and stops against the full-height back wall. Lid = full inner
+  width + slot engagement on both sides, front edge carries a half-round
+  thumb notch (clipper subtraction, relief-pass pattern).
+- A slide lid must SLIDE: validation requires clearance > 0 for this
+  style (defaults stay 0.15 mm CNC; laser default rises to 0.2 mm for
+  slide-lid only). The referee gains a mandatory-play check for the
+  lid/slot bands and a lid-clears-front check.
+
+### Staged diffs (each independently reviewable + CI-green)
+
+- **V0 — docs:** this ADR, PROJECT.md Phase K.2 block, WORKFLOW.md
+  F-K6/F-K7 flows.
+- **V1 — cutout infrastructure:** `BoxPanel.cutouts`, multi-ring
+  panel-fit (offset + relief across rings), named `imported-svg`
+  insertion (amend F-K1's carrier wording in the same diff — flows
+  describe shipped behavior), referee slot bands, benchmark category
+  `cutouts`.
+- **V2 — dividers:** divider spec + validation, wall-slot claims,
+  divider outline builder (tabs + cross-laps), dialog fields + preview,
+  referee divider bands, benchmark category `dividers`.
+- **V3 — slide lid:** style + geometry, mandatory-play validation,
+  dialog style option, referee lid checks, benchmark category
+  `slide-lid`.
+- **V4 — closeout:** AUDIT rows (CLAIMED + named hardware checks: cut an
+  organizer with 2×1 dividers and a slide-lid box, assemble and slide),
+  session report, PROJECT status flip.
+
+### Out of scope (each needs its own ADR)
+
+Lift-off lip lids, hinged lids and living-hinge curved boxes, polygon
+prisms (hex/octagon), dovetail/angled fingers, CNC dado/rabbet 2.5D
+joinery, T-slot bolt+nut joints, bottom slots for dividers, engraved
+panel labels (io/text). Named so they are deferred, not forgotten.
+
+### Verification
+
+Same regime as ADR-106: every new junction type gets exact-referee and
+play-referee coverage; the seeded benchmark extends (new categories must
+score 100% and the v1 categories must stay 100% — no style may regress
+another); perceptual fixtures per new style; determinism over the
+enlarged spec space; physical fit stays CLAIMED until the named cuts.

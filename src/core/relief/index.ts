@@ -14,6 +14,7 @@ export {
   heightmapDepthAt,
   MAX_HEIGHTMAP_CELLS,
   type Heightmap,
+  type HeightmapCellSizeResult,
 } from './heightmap';
 export {
   meshToHeightmap,

@@ -26,6 +26,14 @@ export type SurfacingProgram = {
   readonly rowsPerPass: number;
 };
 
+export type SurfacingRowsResult =
+  | { readonly ok: true; readonly rows: ReadonlyArray<number> }
+  | { readonly ok: false; readonly reason: string };
+
+export type SurfacingProgramResult =
+  | { readonly ok: true; readonly program: SurfacingProgram }
+  | { readonly ok: false; readonly reason: string };
+
 export const SURFACING_DEFAULT_STEPOVER_PCT = 40;
 export const SURFACING_DEFAULT_DEPTH_PER_PASS_MM = 0.5;
 export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
@@ -33,6 +41,8 @@ export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
 const MIN_STEPOVER_PCT = 10;
 const MAX_STEPOVER_PCT = 100;
 const MIN_STEP_MM = 0.05;
+const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
+const NON_NEGATIVE_FINITE_REASON = 'must be a non-negative finite number.';
 
 function fmt(value: number): string {
   const text = value.toFixed(3);
@@ -41,17 +51,27 @@ function fmt(value: number): string {
 
 // Row centers 0..heightMm inclusive; the final row lands exactly on the far
 // edge so the whole area is faced even when the height doesn't divide.
-export function surfacingRowYs(heightMm: number, stepMm: number): ReadonlyArray<number> {
+export function surfacingRowYs(heightMm: number, stepMm: number): SurfacingRowsResult {
+  const heightReason = positiveFiniteReason('height', heightMm);
+  if (heightReason !== null) return { ok: false, reason: heightReason };
+  const stepReason = positiveFiniteReason('step', stepMm);
+  if (stepReason !== null) return { ok: false, reason: stepReason };
+
   const rows: number[] = [];
   for (let y = 0; y < heightMm; y += stepMm) rows.push(y);
   rows.push(heightMm);
-  return rows;
+  return { ok: true, rows };
 }
 
-export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram {
+export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgramResult {
+  const paramReason = validateSurfacingParams(params);
+  if (paramReason !== null) return { ok: false, reason: paramReason };
+
   const stepover = Math.min(MAX_STEPOVER_PCT, Math.max(MIN_STEPOVER_PCT, params.stepoverPct));
   const stepMm = Math.max(MIN_STEP_MM, (params.bitDiameterMm * stepover) / 100);
-  const rows = surfacingRowYs(params.heightMm, stepMm);
+  const rowResult = surfacingRowYs(params.heightMm, stepMm);
+  if (!rowResult.ok) return rowResult;
+  const { rows } = rowResult;
   const depths = depthLadder(params.depthPerPassMm, params.totalDepthMm);
   const lines: string[] = [
     '; KerfDesk spoilboard surfacing',
@@ -75,7 +95,7 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   }
   lines.push('M5');
   lines.push('G0 X0.000 Y0.000');
-  return { lines, passes: depths.length, rowsPerPass: rows.length };
+  return { ok: true, program: { lines, passes: depths.length, rowsPerPass: rows.length } };
 }
 
 function depthLadder(perPassMm: number, totalMm: number): ReadonlyArray<number> {
@@ -85,4 +105,32 @@ function depthLadder(perPassMm: number, totalMm: number): ReadonlyArray<number> 
   for (let depth = step; depth < total; depth += step) depths.push(depth);
   depths.push(total);
   return depths;
+}
+
+function validateSurfacingParams(params: SurfacingParams): string | null {
+  return (
+    positiveFiniteReason('width', params.widthMm) ??
+    positiveFiniteReason('height', params.heightMm) ??
+    positiveFiniteReason('bit diameter', params.bitDiameterMm) ??
+    positiveFiniteReason('stepover', params.stepoverPct) ??
+    positiveFiniteReason('depth per pass', params.depthPerPassMm) ??
+    positiveFiniteReason('total depth', params.totalDepthMm) ??
+    positiveFiniteReason('feed', params.feedMmPerMin) ??
+    positiveFiniteReason('plunge feed', params.plungeMmPerMin) ??
+    positiveFiniteReason('spindle RPM', params.spindleRpm) ??
+    nonNegativeFiniteReason('spindle spin-up', params.spindleSpinupSec) ??
+    positiveFiniteReason('safe Z', params.safeZMm)
+  );
+}
+
+function positiveFiniteReason(label: string, value: number): string | null {
+  return Number.isFinite(value) && value > 0
+    ? null
+    : `Surfacing ${label} ${POSITIVE_FINITE_REASON}`;
+}
+
+function nonNegativeFiniteReason(label: string, value: number): string | null {
+  return Number.isFinite(value) && value >= 0
+    ? null
+    : `Surfacing ${label} ${NON_NEGATIVE_FINITE_REASON}`;
 }

@@ -113,4 +113,83 @@ describe('runTrace stale-result guard (P2-A)', () => {
     await runTrace({ img, options, isCurrent: () => false, setState });
     expect(setState).not.toHaveBeenCalled();
   });
+
+  it('reaches the enhance path: preview reflects the region-patched full trace', async () => {
+    // 20x20 opaque raster so the boxed region + its 2x supersample stay under
+    // the upscale budget and the enhance merge runs end-to-end.
+    const enhanceImg: RawImageData = {
+      width: 20,
+      height: 20,
+      data: new Uint8ClampedArray(20 * 20 * 4).fill(0),
+    };
+    const boundary: TraceBoundary = { x: 5, y: 5, width: 10, height: 10 };
+    const pl = (pts: ReadonlyArray<readonly [number, number]>) => ({
+      closed: false,
+      points: pts.map(([x, y]) => ({ x, y })),
+    });
+    // Full trace: one polyline inside the interior [6,6]..[14,14] (replaced) and
+    // one corner outside it (survives).
+    vi.mocked(traceImageWithFallback)
+      .mockResolvedValueOnce({
+        paths: [
+          {
+            color: '#000000',
+            polylines: [
+              pl([
+                [9, 9],
+                [11, 11],
+              ]),
+              pl([
+                [0, 0],
+                [2, 2],
+              ]),
+            ],
+          },
+        ],
+        bounds: { minX: 0, minY: 0, maxX: 19, maxY: 19 },
+      })
+      // Region re-trace on the 20x20 supersample; downscaled /2 + offset (5,5).
+      .mockResolvedValueOnce({
+        paths: [
+          {
+            color: '#000000',
+            polylines: [
+              pl([
+                [6, 6],
+                [10, 10],
+              ]),
+            ],
+          },
+        ],
+        bounds: { minX: 6, minY: 6, maxX: 10, maxY: 10 },
+      });
+
+    const setState = vi.fn();
+    await runTrace({
+      img: enhanceImg,
+      options,
+      boundary,
+      boundaryMode: 'enhance',
+      isCurrent: () => true,
+      setState,
+    });
+
+    const ready = setState.mock.calls[0]?.[0];
+    const previewPolylines = ready.paths.flatMap((p: ColoredPath) => p.polylines);
+    // Outside corner survived; re-traced replacement present ((8,8)->(4,4)->(8,8),
+    // (10,10)->(5,5)->(10,10)) — inside the interior.
+    expect(previewPolylines).toContainEqual(
+      pl([
+        [0, 0],
+        [2, 2],
+      ]),
+    );
+    expect(previewPolylines).toContainEqual(
+      pl([
+        [8, 8],
+        [10, 10],
+      ]),
+    );
+    expect(previewPolylines).toHaveLength(2);
+  });
 });

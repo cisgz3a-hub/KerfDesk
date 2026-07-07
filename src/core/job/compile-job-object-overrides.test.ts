@@ -48,7 +48,9 @@ describe('compileJob object operation overrides', () => {
     );
 
     expect(job.groups.map((group) => group.kind)).toEqual(['cut', 'fill']);
-    expect((job.groups[0] as CutGroup).segments[0]?.polyline).toHaveLength(4);
+    // Four corners plus the closing vertex: a `closed` cut segment returns to
+    // its start so the emitter draws the final edge (withClosingPoint).
+    expect((job.groups[0] as CutGroup).segments[0]?.polyline).toHaveLength(5);
     expect((job.groups[1] as FillGroup).segments.length).toBeGreaterThan(1);
   });
 
