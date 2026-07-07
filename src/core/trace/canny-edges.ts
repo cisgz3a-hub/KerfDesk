@@ -4,6 +4,7 @@
 // traces as a clean line drawing (its edges) instead of a flat brightness
 // silhouette. Clean-room textbook Canny (1986); no GPL/third-party code.
 
+import { finiteOr } from '../util';
 import { type Gradient, computeGradient } from './canny-gradient';
 import type { RawImageData } from './trace-image';
 
@@ -16,6 +17,13 @@ export type CannyOptions = {
 const DEFAULT_BLUR_SIGMA = 1.2;
 const DEFAULT_LOW_RATIO = 0.08;
 const DEFAULT_HIGH_RATIO = 0.2;
+// Upper bound on the blur sigma passed to the gradient stage. computeGradient
+// builds a Gaussian kernel of radius ceil(sigma*3); an Infinite/huge sigma
+// would allocate an unbounded (or hanging) kernel. 32 keeps the kernel bounded
+// (radius 96) while sitting far above every legitimate sigma — the Edge
+// Detection UI maps its Sensitivity slider to at most 2.5 — so valid-path
+// output is untouched. Negative/NaN sigma normalizes to 0 (no blur).
+const MAX_BLUR_SIGMA = 32;
 // Below this peak gradient the image is treated as flat (no edges); guards a
 // zero high-threshold from flagging every pixel as a strong edge.
 const MIN_GRADIENT = 1e-6;
@@ -46,17 +54,17 @@ export function cannyEdges(image: RawImageData, options: CannyOptions = {}): Uin
 }
 
 export function cannyEdgeField(image: RawImageData, options: CannyOptions = {}): CannyField {
-  const gradient = computeGradient(image, options.blurSigma ?? DEFAULT_BLUR_SIGMA);
+  const gradient = computeGradient(image, clampBlurSigma(options.blurSigma ?? DEFAULT_BLUR_SIGMA));
   const thinned = nonMaxSuppress(gradient);
   let max = 0;
   for (const v of thinned) if (v > max) max = v;
-  const lowRatio = options.lowThresholdRatio ?? DEFAULT_LOW_RATIO;
+  const lowRatio = clampRatio(options.lowThresholdRatio ?? DEFAULT_LOW_RATIO);
   const edges = hysteresis(
     thinned,
     gradient.width,
     gradient.height,
     lowRatio,
-    options.highThresholdRatio ?? DEFAULT_HIGH_RATIO,
+    clampRatio(options.highThresholdRatio ?? DEFAULT_HIGH_RATIO),
   );
   return {
     edges,
@@ -173,4 +181,21 @@ function inBounds(x: number, y: number, width: number, height: number): boolean 
 
 function at(arr: Float32Array | Uint8Array, i: number): number {
   return arr[i] ?? 0;
+}
+
+// Normalize the blur sigma to a finite value in [0, MAX_BLUR_SIGMA]. NaN and
+// negatives become 0 (no blur); huge/Infinite values cap at MAX_BLUR_SIGMA so
+// the gradient kernel stays bounded. Legitimate sigmas (<=2.5) pass through.
+function clampBlurSigma(sigma: number): number {
+  const finite = finiteOr(sigma, 0);
+  if (finite < 0) return 0;
+  return Math.min(finite, MAX_BLUR_SIGMA);
+}
+
+// Normalize a threshold ratio to a finite value in [0, 1]. NaN/negative
+// corrupt hysteresis (every or no pixel becomes an edge); >1 is meaningless
+// (ratio of the max gradient). Legitimate ratios (0..~0.5) pass through.
+function clampRatio(ratio: number): number {
+  const finite = finiteOr(ratio, 0);
+  return Math.min(1, Math.max(0, finite));
 }

@@ -12,9 +12,17 @@ import { traceImageToEdgePaths } from '../../core/trace/edge-trace';
 import { traceCenterlineStrokePaths } from '../../core/trace/centerline';
 import { decodePngFile } from './png-decode';
 import { renderTraceOverlay } from './render-overlay';
+import { requiredArchHouseFixtureStatus } from './trace-artifact-runner';
 
 const OUT_DIR = join(process.cwd(), 'trace-audit-artifacts');
 const EDGE_OPTIONS = TRACE_PRESETS['Edge Detection'];
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+function requiredArchHouseImage(): RawImageData {
+  const fixture = requiredArchHouseFixtureStatus();
+  if (fixture.path === null) throw new Error('arch-house fixture missing');
+  return decodePngFile(fixture.path);
+}
 
 type Crop = {
   readonly name: string;
@@ -62,82 +70,94 @@ function cropPaths(paths: ReadonlyArray<ColoredPath>, crop: Crop): ColoredPath[]
   }));
 }
 
-it('renders zoomed edge-trace crops of the arch-house logo', () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  if (EDGE_OPTIONS === undefined) throw new Error('missing preset');
-  mkdirSync(OUT_DIR, { recursive: true });
-  const image = decodePngFile('audit/fixtures/trace/arch-house-langebaan-source.png');
-  const paths = traceImageToEdgePaths(image, EDGE_OPTIONS);
-  for (const crop of CROPS) {
-    const png = renderTraceOverlay(cropImage(image, crop), cropPaths(paths, crop), crop.scale);
-    writeFileSync(join(OUT_DIR, `${crop.name}.png`), png);
-  }
-}, 120000);
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders zoomed edge-trace crops of the arch-house logo',
+  () => {
+    if (EDGE_OPTIONS === undefined) throw new Error('missing preset');
+    mkdirSync(OUT_DIR, { recursive: true });
+    const image = requiredArchHouseImage();
+    const paths = traceImageToEdgePaths(image, EDGE_OPTIONS);
+    for (const crop of CROPS) {
+      const png = renderTraceOverlay(cropImage(image, crop), cropPaths(paths, crop), crop.scale);
+      writeFileSync(join(OUT_DIR, `${crop.name}.png`), png);
+    }
+  },
+  120000,
+);
 
-it('renders zoomed CENTERLINE crops of the arch-house logo', () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  const centerlineOptions = TRACE_PRESETS['Centerline'];
-  if (centerlineOptions === undefined) throw new Error('missing preset');
-  mkdirSync(OUT_DIR, { recursive: true });
-  const image = decodePngFile('audit/fixtures/trace/arch-house-langebaan-source.png');
-  const started = performance.now();
-  const paths = traceCenterlineStrokePaths(image, centerlineOptions);
-  const elapsedMs = Math.round(performance.now() - started);
-  writeFileSync(join(OUT_DIR, 'centerline-arch-timing.txt'), `${elapsedMs} ms\n`);
-  writeFileSync(join(OUT_DIR, 'centerline-arch-full.png'), renderTraceOverlay(image, paths, 1));
-  for (const crop of CROPS) {
-    const png = renderTraceOverlay(cropImage(image, crop), cropPaths(paths, crop), crop.scale);
-    writeFileSync(join(OUT_DIR, `centerline-${crop.name}.png`), png);
-  }
-}, 240000);
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders zoomed CENTERLINE crops of the arch-house logo',
+  () => {
+    const centerlineOptions = TRACE_PRESETS['Centerline'];
+    if (centerlineOptions === undefined) throw new Error('missing preset');
+    mkdirSync(OUT_DIR, { recursive: true });
+    const image = requiredArchHouseImage();
+    const started = performance.now();
+    const paths = traceCenterlineStrokePaths(image, centerlineOptions);
+    const elapsedMs = Math.round(performance.now() - started);
+    writeFileSync(join(OUT_DIR, 'centerline-arch-timing.txt'), `${elapsedMs} ms\n`);
+    writeFileSync(join(OUT_DIR, 'centerline-arch-full.png'), renderTraceOverlay(image, paths, 1));
+    for (const crop of CROPS) {
+      const png = renderTraceOverlay(cropImage(image, crop), cropPaths(paths, crop), crop.scale);
+      writeFileSync(join(OUT_DIR, `centerline-${crop.name}.png`), png);
+    }
+  },
+  240000,
+);
 
-it('renders the ARCH letters crop under knob variants (gap sweep)', () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  if (EDGE_OPTIONS === undefined) throw new Error('missing preset');
-  mkdirSync(OUT_DIR, { recursive: true });
-  const image = decodePngFile('audit/fixtures/trace/arch-house-langebaan-source.png');
-  const crop = CROPS[1];
-  if (crop === undefined) throw new Error('missing crop');
-  const variants: ReadonlyArray<{ name: string; options: typeof EDGE_OPTIONS }> = [
-    { name: 'sweep-preset', options: EDGE_OPTIONS },
-    {
-      name: 'sweep-lowsens',
-      options: { ...EDGE_OPTIONS, edgeLowThresholdRatio: 0.13, edgeHighThresholdRatio: 0.32 },
-    },
-    {
-      name: 'sweep-highdetail',
-      options: { ...EDGE_OPTIONS, edgeBlurSigma: 0.7, edgeJoinGapPx: 2.9 },
-    },
-    {
-      name: 'sweep-lowdetail',
-      options: { ...EDGE_OPTIONS, edgeBlurSigma: 2.0, edgeJoinGapPx: 8.3, edgeMinLengthPx: 12 },
-    },
-  ];
-  for (const variant of variants) {
-    const traced = traceImageToEdgePaths(image, variant.options);
-    const png = renderTraceOverlay(cropImage(image, crop), cropPaths(traced, crop), crop.scale);
-    writeFileSync(join(OUT_DIR, `${variant.name}.png`), png);
-  }
-}, 240000);
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders the ARCH letters crop under knob variants (gap sweep)',
+  () => {
+    if (EDGE_OPTIONS === undefined) throw new Error('missing preset');
+    mkdirSync(OUT_DIR, { recursive: true });
+    const image = requiredArchHouseImage();
+    const crop = CROPS[1];
+    if (crop === undefined) throw new Error('missing crop');
+    const variants: ReadonlyArray<{ name: string; options: typeof EDGE_OPTIONS }> = [
+      { name: 'sweep-preset', options: EDGE_OPTIONS },
+      {
+        name: 'sweep-lowsens',
+        options: { ...EDGE_OPTIONS, edgeLowThresholdRatio: 0.13, edgeHighThresholdRatio: 0.32 },
+      },
+      {
+        name: 'sweep-highdetail',
+        options: { ...EDGE_OPTIONS, edgeBlurSigma: 0.7, edgeJoinGapPx: 2.9 },
+      },
+      {
+        name: 'sweep-lowdetail',
+        options: { ...EDGE_OPTIONS, edgeBlurSigma: 2.0, edgeJoinGapPx: 8.3, edgeMinLengthPx: 12 },
+      },
+    ];
+    for (const variant of variants) {
+      const traced = traceImageToEdgePaths(image, variant.options);
+      const png = renderTraceOverlay(cropImage(image, crop), cropPaths(traced, crop), crop.scale);
+      writeFileSync(join(OUT_DIR, `${variant.name}.png`), png);
+    }
+  },
+  240000,
+);
 
-it('renders raw Canny masks for the LANGEBAAN crop under preprocessing variants', () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  if (EDGE_OPTIONS === undefined) throw new Error('missing preset');
-  mkdirSync(OUT_DIR, { recursive: true });
-  const image = decodePngFile('audit/fixtures/trace/arch-house-langebaan-source.png');
-  const crop = CROPS[0];
-  if (crop === undefined) throw new Error('missing crop');
-  const variants: ReadonlyArray<{ name: string; options: typeof EDGE_OPTIONS }> = [
-    { name: 'mask-preset', options: EDGE_OPTIONS },
-    { name: 'mask-no-median', options: { ...EDGE_OPTIONS, edgeMedianFilter: false } },
-    {
-      name: 'mask-no-median-blur08',
-      options: { ...EDGE_OPTIONS, edgeMedianFilter: false, edgeBlurSigma: 0.8 },
-    },
-  ];
-  for (const variant of variants) {
-    const traced = traceImageToEdgePaths(image, variant.options);
-    const png = renderTraceOverlay(cropImage(image, crop), cropPaths(traced, crop), crop.scale);
-    writeFileSync(join(OUT_DIR, `${variant.name}.png`), png);
-  }
-}, 180000);
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders raw Canny masks for the LANGEBAAN crop under preprocessing variants',
+  () => {
+    if (EDGE_OPTIONS === undefined) throw new Error('missing preset');
+    mkdirSync(OUT_DIR, { recursive: true });
+    const image = requiredArchHouseImage();
+    const crop = CROPS[0];
+    if (crop === undefined) throw new Error('missing crop');
+    const variants: ReadonlyArray<{ name: string; options: typeof EDGE_OPTIONS }> = [
+      { name: 'mask-preset', options: EDGE_OPTIONS },
+      { name: 'mask-no-median', options: { ...EDGE_OPTIONS, edgeMedianFilter: false } },
+      {
+        name: 'mask-no-median-blur08',
+        options: { ...EDGE_OPTIONS, edgeMedianFilter: false, edgeBlurSigma: 0.8 },
+      },
+    ];
+    for (const variant of variants) {
+      const traced = traceImageToEdgePaths(image, variant.options);
+      const png = renderTraceOverlay(cropImage(image, crop), cropPaths(traced, crop), crop.scale);
+      writeFileSync(join(OUT_DIR, `${variant.name}.png`), png);
+    }
+  },
+  180000,
+);

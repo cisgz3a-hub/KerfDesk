@@ -9,6 +9,7 @@ import {
   SEGMENTED_STROKE_CIRCLE_FIXTURE,
   type CircleFixture,
 } from './edge-curve-truth';
+import { polylineLength } from './centerline-geometry';
 
 const EDGE_OPTIONS = TRACE_PRESETS['Edge Detection']!;
 
@@ -232,16 +233,6 @@ function endpointGap(points: ReadonlyArray<Vec2>): number {
   const start = points[0];
   const end = points[points.length - 1];
   return start === undefined || end === undefined ? Number.POSITIVE_INFINITY : distance(start, end);
-}
-
-function polylineLength(points: ReadonlyArray<Vec2>): number {
-  let total = 0;
-  for (let index = 0; index + 1 < points.length; index += 1) {
-    const a = points[index];
-    const b = points[index + 1];
-    if (a !== undefined && b !== undefined) total += distance(a, b);
-  }
-  return total;
 }
 
 function distance(a: Vec2, b: Vec2): number {
