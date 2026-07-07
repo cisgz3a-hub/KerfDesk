@@ -1,15 +1,21 @@
-// Live checkerboard detection over a playing <video> (ADR-108 wizard). Every
-// tick grabs a downscaled frame, runs the pure detector, and reports corners
+// Live checkerboard detection over any camera source (ADR-108 wizard,
+// generalized by ADR-116). Every tick asks the caller-provided capture
+// closure for a downscaled frame, runs the pure detector, and reports corners
 // scaled back to full-resolution camera pixels — the coordinates the solve
 // captures use. Also tracks how many consecutive ticks detected, so
 // auto-capture can require a briefly HELD pose instead of a lucky frame.
 
 import { useEffect, useRef, useState } from 'react';
 import { type CheckerboardSpec, detectCheckerboard, toGrayImage } from '../../../core/camera';
+import type { RgbaImage } from '../../../core/camera';
 import type { Vec2 } from '../../../core/scene';
-import { captureVideoFrame, liveDetectScale } from '../frame-capture';
 
-const DETECT_INTERVAL_MS = 250;
+// A frame grab for one detection tick: the (downscaled) pixels plus the scale
+// they were captured at, so corners can be mapped back to full resolution.
+export type LiveDetectCapture = () => {
+  readonly frame: RgbaImage;
+  readonly scale: number;
+} | null;
 
 export type LiveDetectionState = {
   // Corners in FULL-RESOLUTION camera pixels, or null when not detecting.
@@ -22,43 +28,44 @@ export type LiveDetectionState = {
 
 const IDLE: LiveDetectionState = { corners: null, frameWidth: 0, frameHeight: 0, stableTicks: 0 };
 
-/** Poll `video` while `enabled`, detecting `spec` at a reduced scale. */
+/** Poll `capture` every `intervalMs` while `enabled`, detecting `spec`. */
 export function useLiveDetection(
-  video: HTMLVideoElement | null,
+  capture: LiveDetectCapture | null,
   spec: CheckerboardSpec,
   enabled: boolean,
+  intervalMs: number,
 ): LiveDetectionState {
   const [state, setState] = useState<LiveDetectionState>(IDLE);
   const stableRef = useRef(0);
 
   useEffect(() => {
-    if (!enabled || video === null) {
+    if (!enabled || capture === null) {
       stableRef.current = 0;
       setState(IDLE);
       return undefined;
     }
     const id = setInterval(() => {
-      const next = detectTick(video, spec, stableRef.current);
+      const next = detectTick(capture, spec, stableRef.current);
       stableRef.current = next.stableTicks;
       setState(next);
-    }, DETECT_INTERVAL_MS);
+    }, intervalMs);
     return () => clearInterval(id);
-  }, [video, spec, enabled]);
+  }, [capture, spec, enabled, intervalMs]);
 
   return state;
 }
 
 function detectTick(
-  video: HTMLVideoElement,
+  capture: LiveDetectCapture,
   spec: CheckerboardSpec,
   prevStable: number,
 ): LiveDetectionState {
-  const scale = liveDetectScale(video.videoWidth);
-  const frame = captureVideoFrame(video, scale);
-  if (frame === null) return IDLE;
+  const grabbed = capture();
+  if (grabbed === null) return IDLE;
+  const { frame, scale } = grabbed;
+  const frameWidth = Math.round(frame.width / scale);
+  const frameHeight = Math.round(frame.height / scale);
   const detection = detectCheckerboard(toGrayImage(frame), spec);
-  const frameWidth = video.videoWidth;
-  const frameHeight = video.videoHeight;
   if (detection.kind !== 'ok') {
     return { corners: null, frameWidth, frameHeight, stableTicks: 0 };
   }

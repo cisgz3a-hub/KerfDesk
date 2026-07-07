@@ -1,18 +1,20 @@
-// CameraPanel — a non-modal preview panel for Camera Mode (ADR-107): pick a
-// camera, start the stream, calibrate the lens, align to the bed, and control
-// the workspace overlay. The panel is opened from the top toolbar / Tools menu
+// CameraPanel — a non-modal preview panel for Camera Mode (ADR-107/116): pick
+// a camera (machine-integrated via the bridge, or USB), start it as the
+// active source, calibrate the lens, align to the bed, and control the
+// workspace overlay. The panel is opened from the top toolbar / Tools menu
 // via the `tools.camera` command (like the registration jig); it renders
 // nothing until opened, and its own × button closes it.
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { usePlatform } from '../app';
 import {
-  type CameraStreamState,
-  type NetworkCameraState,
+  type CameraSourceState,
+  type MachineCameraState,
   useCameraStore,
 } from '../state/camera-store';
 import type { CameraAdapter } from '../../platform/types';
 import { AutoAlignControls } from './AutoAlignControls';
+import { CameraSourceView } from './CameraSourceView';
 import { NetworkCameraView } from './NetworkCameraView';
 import { OverlayControls } from './OverlayControls';
 import { CameraCalibrationWizard } from './wizard/CameraCalibrationWizard';
@@ -25,24 +27,26 @@ export function CameraPanel(): JSX.Element | null {
 
 function CameraPanelOpen(): JSX.Element {
   const close = useCameraStore((s) => s.closePanel);
-  const camera = usePlatform().camera;
+  const platform = usePlatform();
+  const camera = platform.camera;
+  const bridge = platform.cameraBridge;
   const isSupported = useCameraStore((s) => s.isSupported);
   const detectSupport = useCameraStore((s) => s.detectSupport);
   const refreshCameras = useCameraStore((s) => s.refreshCameras);
-  const stopStream = useCameraStore((s) => s.stopStream);
-  const networkCamera = useCameraStore((s) => s.networkCamera);
-  const detectNetworkCamera = useCameraStore((s) => s.detectNetworkCamera);
+  const stopSource = useCameraStore((s) => s.stopSource);
+  const machineCamera = useCameraStore((s) => s.machineCamera);
+  const detectMachineCamera = useCameraStore((s) => s.detectMachineCamera);
 
   useEffect(() => {
     detectSupport(camera);
     void refreshCameras(camera);
     // Probe the machine-integrated camera once on open; the button re-probes.
-    if (networkCamera.kind === 'idle') void detectNetworkCamera(camera);
-    return () => stopStream();
-    // networkCamera is deliberately NOT a dependency: the probe fires once per
+    if (machineCamera.kind === 'idle') void detectMachineCamera(bridge);
+    return () => stopSource();
+    // machineCamera is deliberately NOT a dependency: the probe fires once per
     // panel open, not on every probe-state transition.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [camera, detectSupport, refreshCameras, detectNetworkCamera, stopStream]);
+  }, [camera, bridge, detectSupport, refreshCameras, detectMachineCamera, stopSource]);
 
   return (
     <div role="dialog" aria-label="Camera preview" style={panelStyle}>
@@ -58,9 +62,9 @@ function CameraPanelOpen(): JSX.Element {
           ×
         </button>
       </div>
-      <NetworkCameraSection
-        state={networkCamera}
-        onDetect={() => void detectNetworkCamera(camera)}
+      <MachineCameraSection
+        state={machineCamera}
+        onDetect={() => void detectMachineCamera(bridge)}
       />
       {isSupported ? (
         <UsbCameraSection camera={camera} />
@@ -79,18 +83,19 @@ function CameraPanelOpen(): JSX.Element {
 // The UVC/getUserMedia half of the panel: device picker, live feed, and the
 // start/stop control. Split from CameraPanelOpen to respect the function size
 // limit and because it owns a distinct concern (browser webcams, not the
-// machine-integrated network camera above it).
+// machine-integrated camera above it).
 function UsbCameraSection(props: { readonly camera: CameraAdapter | undefined }): JSX.Element {
   const { camera } = props;
   const cameras = useCameraStore((s) => s.cameras);
   const selectedDeviceId = useCameraStore((s) => s.selectedDeviceId);
-  const stream = useCameraStore((s) => s.stream);
+  const sourceState = useCameraStore((s) => s.sourceState);
   const selectCamera = useCameraStore((s) => s.selectCamera);
-  const startStream = useCameraStore((s) => s.startStream);
-  const stopStream = useCameraStore((s) => s.stopStream);
+  const startUsbSource = useCameraStore((s) => s.startUsbSource);
+  const stopSource = useCameraStore((s) => s.stopSource);
   const wizardOpen = useCameraWizardStore((s) => s.open);
   const openWizard = useCameraWizardStore((s) => s.openWizard);
 
+  const usbLive = sourceState.kind === 'live' && sourceState.source.kind === 'usb';
   return (
     <>
       {cameras.length > 1 ? (
@@ -101,8 +106,8 @@ function UsbCameraSection(props: { readonly camera: CameraAdapter | undefined })
           onChange={(e) => {
             selectCamera(e.currentTarget.value);
             // Switch the live feed immediately to the picked camera.
-            if (stream.kind === 'live' || stream.kind === 'starting') {
-              void startStream(camera);
+            if (usbLive || sourceState.kind === 'starting') {
+              void startUsbSource(camera);
             }
           }}
           style={selectStyle}
@@ -114,13 +119,13 @@ function UsbCameraSection(props: { readonly camera: CameraAdapter | undefined })
           ))}
         </select>
       ) : null}
-      {stream.kind === 'live' || stream.kind === 'starting' ? <CameraFeed stream={stream} /> : null}
+      {sourceState.kind === 'live' ? <CameraSourceView source={sourceState.source} /> : null}
       <div style={rowStyle}>
-        {stream.kind === 'live' ? (
+        {usbLive ? (
           <button
             type="button"
             className="lf-btn"
-            onClick={stopStream}
+            onClick={stopSource}
             title="Stop the live camera feed."
           >
             Stop camera
@@ -129,49 +134,38 @@ function UsbCameraSection(props: { readonly camera: CameraAdapter | undefined })
           <button
             type="button"
             className="lf-btn"
-            disabled={stream.kind === 'starting'}
-            onClick={() => void startStream(camera)}
-            title="Start the live camera feed."
+            disabled={sourceState.kind === 'starting'}
+            onClick={() => void startUsbSource(camera)}
+            title="Start the live USB camera feed."
           >
-            {stream.kind === 'starting' ? 'Starting…' : 'Start camera'}
+            {sourceState.kind === 'starting' ? 'Starting…' : 'Start USB camera'}
           </button>
         )}
         <button
           type="button"
           className="lf-btn"
-          disabled={stream.kind !== 'live'}
+          disabled={sourceState.kind !== 'live'}
           onClick={openWizard}
           title="Calibrate the camera lens: print a checkerboard, capture poses, and de-fisheye the feed."
         >
           Calibrate lens…
         </button>
       </div>
-      <StreamNote stream={stream} />
+      <SourceNote sourceState={sourceState} />
       {wizardOpen ? <CameraCalibrationWizard /> : null}
     </>
   );
 }
 
-function CameraFeed(props: { readonly stream: CameraStreamState }): JSX.Element {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const live = props.stream.kind === 'live' ? props.stream.stream.stream : null;
-  useEffect(() => {
-    const video = videoRef.current;
-    if (video === null) return undefined;
-    video.srcObject = live;
-    if (live !== null) void video.play().catch(() => undefined);
-    return () => {
-      video.srcObject = null;
-    };
-  }, [live]);
-  return <video ref={videoRef} autoPlay muted playsInline style={feedStyle} />;
-}
-
-function NetworkCameraSection(props: {
-  readonly state: NetworkCameraState;
+function MachineCameraSection(props: {
+  readonly state: MachineCameraState;
   readonly onDetect: () => void;
 }): JSX.Element {
   const { state } = props;
+  const sourceState = useCameraStore((s) => s.sourceState);
+  const activateMachineCamera = useCameraStore((s) => s.activateMachineCamera);
+  const machineActive =
+    sourceState.kind === 'live' && sourceState.source.kind !== 'usb';
   return (
     <div style={sectionStyle}>
       <div style={rowStyle}>
@@ -184,24 +178,36 @@ function NetworkCameraSection(props: {
         >
           {state.kind === 'detecting' ? 'Detecting…' : 'Detect machine camera'}
         </button>
+        {state.kind === 'found' ? (
+          <button
+            type="button"
+            className="lf-btn lf-btn--primary"
+            disabled={machineActive}
+            onClick={activateMachineCamera}
+            title="Use the machine camera for calibration, alignment, overlay, and trace."
+          >
+            {machineActive ? 'In use' : 'Use this camera'}
+          </button>
+        ) : null}
       </div>
-      {state.kind === 'found' ? <NetworkCameraView frameUrl={state.frameUrl} /> : null}
+      {state.kind === 'found' ? <NetworkCameraView frameUrl={state.proxyFrameUrl} /> : null}
       {state.kind === 'not-found' ? (
         <p style={noteStyle}>
           No machine camera found. Connect the laser by USB, power it on, then retry.
         </p>
       ) : null}
+      {state.kind === 'unavailable' ? <p style={errStyle}>{state.reason}</p> : null}
     </div>
   );
 }
 
-function StreamNote(props: { readonly stream: CameraStreamState }): JSX.Element | null {
-  const { stream } = props;
-  if (stream.kind === 'denied') {
+function SourceNote(props: { readonly sourceState: CameraSourceState }): JSX.Element | null {
+  const { sourceState } = props;
+  if (sourceState.kind === 'denied') {
     return <p style={errStyle}>Permission denied. Allow camera access and press Start again.</p>;
   }
-  if (stream.kind === 'error') {
-    return <p style={errStyle}>{stream.message}</p>;
+  if (sourceState.kind === 'error') {
+    return <p style={errStyle}>{sourceState.message}</p>;
   }
   return null;
 }
@@ -229,20 +235,13 @@ const headerStyle: React.CSSProperties = {
   justifyContent: 'space-between',
 };
 const selectStyle: React.CSSProperties = { width: '100%' };
-const rowStyle: React.CSSProperties = { display: 'flex', gap: 8 };
+const rowStyle: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap' };
 const sectionStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 8,
   paddingBottom: 8,
   borderBottom: '1px solid var(--lf-border)',
-};
-const feedStyle: React.CSSProperties = {
-  width: '100%',
-  aspectRatio: '4 / 3',
-  background: 'var(--lf-bg-2)',
-  borderRadius: 4,
-  objectFit: 'contain',
 };
 const noteStyle: React.CSSProperties = { color: 'var(--lf-text-faint)', margin: 0 };
 const errStyle: React.CSSProperties = { color: 'var(--lf-danger)', margin: 0 };

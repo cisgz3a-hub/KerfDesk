@@ -21,7 +21,7 @@ import { generateCameraAlignPattern } from '../../core/job';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useToastStore } from '../state/toast-store';
-import { captureStreamFrame } from './frame-capture';
+import { captureSourceFrame } from './frame-source';
 
 export function AutoAlignControls(): JSX.Element {
   const bedWidth = useStore((s) => s.project.device.bedWidth);
@@ -30,7 +30,7 @@ export function AutoAlignControls(): JSX.Element {
   const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const pushToast = useToastStore((s) => s.pushToast);
-  const stream = useCameraStore((s) => s.stream);
+  const sourceState = useCameraStore((s) => s.sourceState);
 
   const addMarkers = (): void => {
     const pattern = generateCameraAlignPattern({ bedWidthMm: bedWidth, bedHeightMm: bedHeight });
@@ -39,8 +39,8 @@ export function AutoAlignControls(): JSX.Element {
   };
 
   const autoAlign = async (): Promise<void> => {
-    if (stream.kind !== 'live') return;
-    const raw = await captureStreamFrame(stream.stream.stream);
+    if (sourceState.kind !== 'live') return;
+    const raw = await captureSourceFrame(sourceState.source);
     if (raw === null) {
       pushToast('Could not capture a camera frame.', 'error');
       return;
@@ -85,7 +85,7 @@ export function AutoAlignControls(): JSX.Element {
       <button
         type="button"
         className="lf-btn"
-        disabled={stream.kind !== 'live'}
+        disabled={sourceState.kind !== 'live'}
         onClick={() => void autoAlign()}
         title="Detect the burned markers in the camera view and align automatically."
       >

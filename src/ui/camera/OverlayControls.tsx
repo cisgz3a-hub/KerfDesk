@@ -5,12 +5,12 @@
 
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
-import { captureStreamFrame } from './frame-capture';
+import { captureSourceFrame } from './frame-source';
 import { TraceFromCameraButton } from './TraceFromCameraButton';
 
 export function OverlayControls(): JSX.Element | null {
   const alignment = useStore((s) => s.project.device.cameraAlignment);
-  const stream = useCameraStore((s) => s.stream);
+  const sourceState = useCameraStore((s) => s.sourceState);
   const visible = useCameraStore((s) => s.overlayVisible);
   const setVisible = useCameraStore((s) => s.setOverlayVisible);
   const opacity = useCameraStore((s) => s.overlayOpacityPercent);
@@ -22,10 +22,16 @@ export function OverlayControls(): JSX.Element | null {
   if (alignment === undefined) return null;
 
   const updateStill = async (): Promise<void> => {
-    if (stream.kind !== 'live') return;
-    const frame = await captureStreamFrame(stream.stream.stream);
+    if (sourceState.kind !== 'live') return;
+    const frame = await captureSourceFrame(sourceState.source);
     if (frame !== null) setStill(frame);
   };
+
+  // Machine sources are still-only overlays: their "live" view is a slow
+  // poll/MJPEG <img> that cannot ride the workspace warp; LightBurn's model
+  // (a frozen Update Overlay still) is the reference behavior anyway.
+  const liveOverlayAvailable =
+    sourceState.kind === 'live' && sourceState.source.kind === 'usb';
 
   return (
     <div style={sectionStyle}>
@@ -42,7 +48,7 @@ export function OverlayControls(): JSX.Element | null {
         <button
           type="button"
           className="lf-btn"
-          disabled={stream.kind !== 'live'}
+          disabled={sourceState.kind !== 'live'}
           onClick={() => void updateStill()}
           title="Freeze the current camera frame as the workspace overlay."
         >
@@ -51,9 +57,9 @@ export function OverlayControls(): JSX.Element | null {
         <button
           type="button"
           className="lf-btn"
-          disabled={still === null}
+          disabled={still === null || !liveOverlayAvailable}
           onClick={() => setStill(null)}
-          title="Use the continuous live video as the workspace overlay."
+          title="Use the continuous live video as the workspace overlay (USB cameras)."
         >
           Live
         </button>

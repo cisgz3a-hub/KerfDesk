@@ -54,7 +54,7 @@ beforeEach(() => {
     overlayVisible: true,
     overlayOpacityPercent: 50,
     overlayStill: null,
-    stream: { kind: 'idle' },
+    sourceState: { kind: 'idle' },
   });
 });
 
