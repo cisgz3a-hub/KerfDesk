@@ -119,9 +119,29 @@ export type CameraBridgeProbeResult =
   | { readonly kind: 'invalid'; readonly reason: string }
   | { readonly kind: 'unavailable'; readonly reason: string };
 
+// Machine-camera discovery through the bridge's /discover route (ADR-116).
+// Browser-side probes are CSP-blocked in the desktop app and on the deployed
+// site, so the bridge probes the candidate hosts server-side.
+export type MachineCameraDiscovery =
+  | { readonly kind: 'found'; readonly cameraUrl: string; readonly proxyFrameUrl: string }
+  | { readonly kind: 'not-found' }
+  // Bridge missing or unreachable; `reason` tells the user how to start it.
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
+// Bridge liveness + capabilities, surfaced in the camera diagnostics row.
+export type CameraBridgeHealth =
+  | { readonly kind: 'ok'; readonly ffmpegAvailable: boolean; readonly frameProxy: boolean }
+  | { readonly kind: 'unavailable'; readonly reason: string };
+
 export type CameraBridgeAdapter = {
   readonly isSupported: () => boolean;
   readonly probeRtspCamera: (req: CameraBridgeProbeRequest) => Promise<CameraBridgeProbeResult>;
+  // Probe the machine's snapshot camera server-side via the bridge (ADR-116).
+  readonly discoverMachineCamera: () => Promise<MachineCameraDiscovery>;
+  // Bridge frame-proxy URL for a camera URL. Responses carry CORS for this
+  // app origin, so frames fetched through it are pixel-readable.
+  readonly proxiedFrameUrl: (cameraUrl: string) => string;
+  readonly health: () => Promise<CameraBridgeHealth>;
 };
 
 export type PlatformAdapter = {
