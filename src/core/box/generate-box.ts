@@ -12,11 +12,12 @@ import { applyPanelFit, type PanelRings } from './panel-fit';
 import { layoutPanelOffsets, type PanelExtent } from './layout';
 import { dividerLayout, hasDividers } from './divider-layout';
 import { dividerName, dividerPanelRings, wallSlotCutouts } from './divider-panels';
+import { buildSlideLidParts } from './slide-lid-panels';
 
 export type BoxPanel = {
   readonly name: string;
-  /** 'divider' entries carry their placement in `divider` (ADR-116 V2). */
-  readonly panel: PanelId | 'divider';
+  /** 'divider'/'lid' entries are the ADR-116 V2/V3 loose parts. */
+  readonly panel: PanelId | 'divider' | 'lid';
   readonly divider?: { readonly axis: 'x' | 'y'; readonly index: number };
   /** Closed outline in sheet mm (layout offset already applied). */
   readonly outline: Polyline;
@@ -53,19 +54,19 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
   const dividers = hasDividers(spec) ? dividerLayout(spec) : null;
   const slots = dividers === null ? null : wallSlotCutouts(dividers, spec);
   const fittedPanels: Array<
-    { name: string; panel: PanelId | 'divider'; divider?: BoxPanel['divider'] } & PanelRings
+    { name: string; panel: PanelId | 'divider' | 'lid'; divider?: BoxPanel['divider'] } & PanelRings
   > = [];
-  for (const claims of buildPanelClaims(spec)) {
-    const fit = applyPanelFit(
-      { outline: panelOutline(claims), cutouts: slots?.get(claims.panel) ?? [] },
-      { clearanceMm: spec.clearanceMm, relief: spec.relief },
-    );
+  for (const part of nominalParts(spec, slots)) {
+    const fit = applyPanelFit(part.rings, {
+      clearanceMm: spec.clearanceMm,
+      relief: spec.relief,
+    });
     if (fit.kind !== 'fitted') {
-      return { kind: 'error', message: `${PANEL_NAMES[claims.panel]} panel: ${fit.detail}.` };
+      return { kind: 'error', message: `${part.name} panel: ${fit.detail}.` };
     }
     fittedPanels.push({
-      name: PANEL_NAMES[claims.panel],
-      panel: claims.panel,
+      name: part.name,
+      panel: part.panel,
       outline: fit.outline,
       cutouts: fit.cutouts,
     });
@@ -106,6 +107,41 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
       };
     }),
   };
+}
+
+type NominalPart = {
+  readonly name: string;
+  readonly panel: PanelId | 'divider' | 'lid';
+  readonly rings: PanelRings;
+};
+
+// Walls (with any divider slots) per style: claim-model panels for closed
+// and open-top, the dedicated slide-lid builder otherwise.
+function nominalParts(
+  spec: BoxSpec,
+  slots: ReadonlyMap<PanelId, ReadonlyArray<Polyline>> | null,
+): ReadonlyArray<NominalPart> {
+  if (spec.style === 'slide-lid') {
+    return buildSlideLidParts(spec).map((part) => ({
+      name: part.name,
+      panel: part.panel,
+      rings: {
+        outline: part.rings.outline,
+        cutouts: [
+          ...part.rings.cutouts,
+          ...(part.panel === 'lid' ? [] : (slots?.get(part.panel) ?? [])),
+        ],
+      },
+    }));
+  }
+  return buildPanelClaims(spec).map((claims) => ({
+    name: PANEL_NAMES[claims.panel],
+    panel: claims.panel,
+    rings: {
+      outline: panelOutline(claims),
+      cutouts: slots?.get(claims.panel) ?? [],
+    },
+  }));
 }
 
 function ringsExtent(rings: PanelRings): PanelExtent {

@@ -16,6 +16,8 @@
 import { describe, expect, it } from 'vitest';
 import { checkBoxAssembly, type RefereePanel } from '../../core/box/assembly-referee';
 import { checkDividerAssembly } from '../../core/box/divider-referee';
+import { buildSlideLidParts } from '../../core/box/slide-lid-panels';
+import { checkSlideLidAssembly } from '../../core/box/slide-lid-referee';
 import type { BoxSpec } from '../../core/box/box-spec';
 import { generateBox } from '../../core/box/generate-box';
 import { buildPanelClaims } from '../../core/box/panel-claims';
@@ -55,6 +57,7 @@ describe('box generator benchmark', () => {
         scoreDeterminism(corpus),
         scoreCutouts(),
         scoreDividers(),
+        scoreSlideLid(),
         scoreSabotageDetection(),
       ];
       const totalPassed = scores.reduce((sum, s) => sum + s.passed, 0);
@@ -263,6 +266,62 @@ function scoreDividers(): Score {
   const zeros: BoxSpec = { ...plain, dividersXCount: 0, dividersYCount: 0 };
   if (JSON.stringify(generateBox(plain)) === JSON.stringify(generateBox(zeros))) passed += 1;
   return { category: 'dividers', passed, total };
+}
+
+// Slide-lid style (ADR-116 V3): exact nominal channel/front/lid geometry,
+// the sliding contract on fitted panels, divider composition, and
+// determinism.
+function scoreSlideLid(): Score {
+  let passed = 0;
+  let total = 0;
+  const sizes: ReadonlyArray<readonly [number, number, number, number]> = [
+    [80, 50, 30, 3],
+    [120, 90, 40, 6],
+    [60, 60, 20, 2],
+  ];
+  for (const [w, d, h, t] of sizes) {
+    const lidSpec: BoxSpec = {
+      ...spec(w, d, h, t, 3 * t, 'slide-lid'),
+      clearanceMm: 0.2,
+    };
+    // Nominal builder geometry, exact.
+    total += 1;
+    const parts = buildSlideLidParts(lidSpec).map((part) => ({
+      panel: part.panel,
+      outline: part.rings.outline,
+    }));
+    if (checkSlideLidAssembly(parts, lidSpec).length === 0) passed += 1;
+    // Sliding contract on the generated (fitted) panels.
+    total += 1;
+    const result = generateBox(lidSpec);
+    if (result.kind === 'generated') {
+      const locals = result.panels.map((panel) => ({
+        panel: panel.panel,
+        outline: {
+          closed: panel.outline.closed,
+          points: panel.outline.points.map((point) => ({
+            x: point.x - panel.offsetMm.x,
+            y: point.y - panel.offsetMm.y,
+          })),
+        },
+      }));
+      if (checkSlideLidAssembly(locals, lidSpec, { playMm: 0.2 }).length === 0) passed += 1;
+    }
+    // Determinism.
+    total += 1;
+    if (JSON.stringify(generateBox(lidSpec)) === JSON.stringify(generateBox(lidSpec))) passed += 1;
+  }
+  // Divider composition inside a slide-lid box.
+  total += 1;
+  const combo: BoxSpec = {
+    ...spec(120, 90, 40, 3, 9, 'slide-lid'),
+    clearanceMm: 0.2,
+    dividersXCount: 1,
+    dividersYCount: 1,
+  };
+  const comboResult = generateBox(combo);
+  if (comboResult.kind === 'generated' && comboResult.panels.length === 8) passed += 1;
+  return { category: 'slide-lid', passed, total };
 }
 
 // The referee must catch all four classic failure classes when the math is
