@@ -106,7 +106,18 @@ function isAllowedPermissionRequest(input: PermissionRequestPolicyInput): boolea
 }
 
 function isAllowedNonMediaAppPermission(permission: string): boolean {
-  return permission === 'serial' || permission.startsWith('fileSystem');
+  // 'screen-wake-lock' backs useActiveJobWakeLock (ADR-117): the renderer's
+  // navigator.wakeLock.request('screen') IS routed through the session
+  // permission handlers, arriving as the string 'screen-wake-lock'
+  // (electron/shell/common/gin_converters/content_converter.cc — verified on
+  // the shipped 42-x-y branch). Chromium browsers grant it without a prompt;
+  // denying it here silently disables keep-awake on the desktop app, letting
+  // the OS sleep the display mid-burn while Web Serial is still streaming.
+  return (
+    permission === 'serial' ||
+    permission === 'screen-wake-lock' ||
+    permission.startsWith('fileSystem')
+  );
 }
 
 function isTrustedOptionalEmbeddingOrigin(

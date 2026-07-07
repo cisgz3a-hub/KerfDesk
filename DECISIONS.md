@@ -5390,3 +5390,65 @@ play-referee coverage; the seeded benchmark extends (new categories must
 score 100% and the v1 categories must stay 100% — no style may regress
 another); perceptual fixtures per new style; determinism over the
 enlarged spec space; physical fit stays CLAIMED until the named cuts.
+
+## ADR-117 — Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07)
+
+**Status:** accepted. (Renumbered from a draft ADR-116 after the box-generator v2 pack claimed that number on main the same day.)
+
+### Context
+
+A long job streams G-code over Web Serial for hours from a renderer
+process. OS display sleep can throttle or suspend that renderer mid-burn;
+the 5-second stream-stall watchdog detects the freeze but cannot prevent
+it. The 2026-07-07 multi-layer-job trust audit listed missing endurance
+protection as a gap — and the follow-up investigation found the feature
+was already half-shipped, undocumented: `useActiveJobWakeLock` (App-mounted,
+laser-store-subscribed, visibility re-acquire) had landed without an ADR,
+WORKFLOW flow, or AUDIT row, and was **provably dead on the desktop app**:
+Electron routes `navigator.wakeLock.request('screen')` through the session
+permission handlers as the string `'screen-wake-lock'`
+(`shell/common/gin_converters/content_converter.cc`, verified on the
+shipped 42-x-y source), the deny-by-default trusted-renderer policy
+(serial + `fileSystem*` only) rejected it, and the hook's best-effort
+`catch` swallowed the denial silently. The operator had no signal either
+way.
+
+### Decision
+
+- Keep-awake stays a **renderer** concern via the standard Screen Wake
+  Lock API — one implementation serves web and desktop. **No main-process
+  `powerSaveBlocker`**: it would need IPC to track job state, and the
+  security posture's zero-`ipcMain` surface is worth more than the
+  marginal extra blocking strength.
+- `trusted-renderer-policy.ts` allows `'screen-wake-lock'` alongside
+  `serial` and `fileSystem*` — still gated to trusted origins and the
+  main frame; Chromium grants it without a prompt.
+- Lock lifecycle is bound to `isActiveJob` (streaming | paused | done |
+  errored, until the post-job Idle clears the streamer): acquire on
+  activation, re-acquire on `visibilitychange` and UA-initiated release,
+  release on job end and dispose.
+- Failure is non-blocking and **visible once**: a single LaserLog line
+  ("Keep-awake unavailable — the OS may sleep the screen mid-job") on the
+  first denial or missing API, so a marathon burn is never silently
+  trusted to a machine that will sleep. Retries stay quiet.
+
+### Consequences
+
+- Desktop keep-awake goes from silently denied to granted; web behavior
+  is unchanged. The permission surface grows by exactly one prompt-free
+  Chromium permission.
+- A screen wake lock keeps the display (and with it, the system) awake on
+  typical setups, but cannot survive a lid close or manual sleep — the
+  log line tells the operator to disable system sleep before long burns.
+  Supervised operation remains the rule for laser jobs regardless.
+- No new dependency, no IPC handlers, no platform-adapter surface: the
+  Wake Lock API is identical in both delivery targets.
+
+### Verification
+
+jsdom hook tests pin acquire/release/re-acquire and the one-shot warning
+(denied + missing API); policy tests pin `screen-wake-lock` granted for
+trusted check+request and denied for untrusted origins and subframes.
+NOT verified: the packaged Electron runtime grant, and a real hours-long
+burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
+runs one.

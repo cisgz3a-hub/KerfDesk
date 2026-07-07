@@ -610,6 +610,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
 4. Every `ok` advances the streamer by one line and writes more.
 5. Progress bar reflects `completed / total` lines.
+6. While the job is active the app holds a screen wake lock so OS
+   display-sleep can't suspend the stream (ADR-117; re-acquired on tab
+   visibility changes, released when the job ends). If the platform
+   refuses the lock, one LaserLog line warns the operator to disable
+   system sleep before long burns — the job itself always proceeds.
 
 #### Error — preflight fails
 1. Modal lists the violations. No bytes sent.

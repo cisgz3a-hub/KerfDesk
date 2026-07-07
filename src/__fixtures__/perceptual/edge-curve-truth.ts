@@ -1,5 +1,6 @@
 import type { Polyline, Vec2 } from '../../core/scene';
 import type { RawImageData } from '../../core/trace';
+import { polylineLength } from './benchmark-rating';
 import { sampleByArcLength } from './centerline-geometry';
 
 // Coverage must sample the drawn PATH, not the vertex list — simplified
@@ -119,16 +120,6 @@ function segmentedStrokeCircleFixture(
     }
   }
   return { image: { width: size, height: size, data }, center, radius };
-}
-
-function polylineLength(points: ReadonlyArray<Vec2>): number {
-  let total = 0;
-  for (let index = 0; index + 1 < points.length; index += 1) {
-    const a = points[index];
-    const b = points[index + 1];
-    if (a !== undefined && b !== undefined) total += Math.hypot(a.x - b.x, a.y - b.y);
-  }
-  return total;
 }
 
 function countCovered(values: Uint8Array): number {
