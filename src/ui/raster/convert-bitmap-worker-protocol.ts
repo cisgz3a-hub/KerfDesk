@@ -4,7 +4,8 @@ import type { BitmapConversionOptions, ConvertibleVector } from './bitmap-assemb
 export type ConvertBitmapWorkerRequest = {
   readonly id: number;
   readonly rasterId: string;
-  readonly vector: ConvertibleVector;
+  // The whole selection — a multi-selection merges into one bitmap.
+  readonly vectors: ReadonlyArray<ConvertibleVector>;
   readonly options: BitmapConversionOptions;
 };
 

@@ -7,7 +7,7 @@ import {
   type ImportedSvg,
 } from '../../core/scene';
 import { resetConvertBitmapWorkerForTests } from './convert-bitmap-worker-client';
-import { buildBitmapFromVector } from './vector-to-bitmap';
+import { buildBitmapFromVectors } from './vector-to-bitmap';
 
 const SVG_PATH: ColoredPath = {
   color: '#000000',
@@ -57,7 +57,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('buildBitmapFromVector worker selection', () => {
+describe('buildBitmapFromVectors worker selection', () => {
   it('uses the Convert to Bitmap worker when the browser supports workers', async () => {
     const workerRequests: unknown[] = [];
     class FakeWorker {
@@ -77,9 +77,9 @@ describe('buildBitmapFromVector worker selection', () => {
     }
     vi.stubGlobal('Worker', FakeWorker);
 
-    const result = await buildBitmapFromVector(
+    const result = await buildBitmapFromVectors([
       svgWithBounds({ minX: 0, minY: 0, maxX: 10, maxY: 10 }),
-    );
+    ]);
 
     expect(workerRequests).toHaveLength(1);
     expect(result.dataUrl).toBe('data:image/png;base64,worker');
@@ -90,7 +90,7 @@ describe('buildBitmapFromVector worker selection', () => {
     vi.stubGlobal('Worker', undefined);
 
     await expect(
-      buildBitmapFromVector(svgWithBounds({ minX: 0, minY: 0, maxX: 80, maxY: 80 })),
+      buildBitmapFromVectors([svgWithBounds({ minX: 0, minY: 0, maxX: 80, maxY: 80 })]),
     ).rejects.toThrow('Convert to Bitmap worker is unavailable for this large conversion');
   });
 
@@ -116,8 +116,8 @@ describe('buildBitmapFromVector worker selection', () => {
 
     const source = svgWithBounds({ minX: 0, minY: 0, maxX: 80, maxY: 80 });
 
-    await expect(buildBitmapFromVector(source)).rejects.toThrow('post failed');
-    await expect(buildBitmapFromVector(source)).rejects.toThrow('post failed');
+    await expect(buildBitmapFromVectors([source])).rejects.toThrow('post failed');
+    await expect(buildBitmapFromVectors([source])).rejects.toThrow('post failed');
     expect(workerConstructs).toBe(2);
   });
 });

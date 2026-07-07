@@ -224,7 +224,7 @@ describe('assembleBitmap', () => {
   it('sizes the bitmap from displayed bounds x lines/mm', () => {
     const source = makeSvg();
     const bounds = transformedBBox(source);
-    const result = assembleBitmap(source, fakeEncode, 'new-id');
+    const result = assembleBitmap([source], fakeEncode, 'new-id');
     expect(result.pixelWidth).toBe(Math.round((bounds.maxX - bounds.minX) * 10));
     expect(result.pixelHeight).toBe(Math.round((bounds.maxY - bounds.minY) * 10));
   });
@@ -234,7 +234,7 @@ describe('assembleBitmap', () => {
     const bounds = transformedBBox(source);
     const expectedWidth = Math.round((bounds.maxX - bounds.minX) * 10);
     const expectedHeight = Math.round((bounds.maxY - bounds.minY) * 10);
-    const result = assembleBitmap(source, fakeEncode, 'new-id');
+    const result = assembleBitmap([source], fakeEncode, 'new-id');
     // The echoed fields prove encode saw the physical-size pixel grid.
     expect(result.dataUrl).toBe(`data:fake/${expectedWidth}x${expectedHeight}`);
     expect(result.lumaBase64).toBe(`luma:${expectedWidth * expectedHeight}`);
@@ -242,13 +242,13 @@ describe('assembleBitmap', () => {
 
   it('bakes the source transform into axis-aligned bitmap bounds', () => {
     const source = makeSvg();
-    const result = assembleBitmap(source, fakeEncode, 'new-id');
+    const result = assembleBitmap([source], fakeEncode, 'new-id');
     expect(result.bounds).toEqual(transformedBBox(source));
     expect(result.transform).toEqual(IDENTITY_TRANSFORM);
   });
 
   it('creates a raster that passes the axis-aligned output preflight', () => {
-    const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id');
+    const result = assembleBitmap([makeSvg()], fakeEncode, 'new-id');
     const project = {
       ...createProject(),
       scene: {
@@ -261,7 +261,7 @@ describe('assembleBitmap', () => {
   });
 
   it('uses the injected id and the image-import raster defaults', () => {
-    const result = assembleBitmap(makeSvg(), fakeEncode, 'new-id');
+    const result = assembleBitmap([makeSvg()], fakeEncode, 'new-id');
     expect(result.id).toBe('new-id');
     expect(result.kind).toBe('raster-image');
     expect(result.color).toBe(DEFAULT_RASTER_LAYER_COLOR);
@@ -272,7 +272,7 @@ describe('assembleBitmap', () => {
   it('uses explicit DPI to set the converted bitmap density', () => {
     const source = makeSvg();
     const bounds = transformedBBox(source);
-    const result = assembleBitmap(source, fakeEncode, 'new-id', {
+    const result = assembleBitmap([source], fakeEncode, 'new-id', {
       dpi: 127,
       renderType: 'fill-all',
     });
@@ -286,7 +286,7 @@ describe('assembleBitmap', () => {
     const source = makeOpenSvg();
     const bounds = transformedBBox(source);
     const result = assembleBitmap(
-      source,
+      [source],
       (raster) => {
         encoded = raster;
         return fakeEncode(raster);
@@ -305,7 +305,7 @@ describe('assembleBitmap', () => {
   it('Use Cut Settings renders a line-mode path as an outline', () => {
     let encoded: VectorRaster | null = null;
     assembleBitmap(
-      makeOpenSvg(),
+      [makeOpenSvg()],
       (raster) => {
         encoded = raster;
         return fakeEncode(raster);
@@ -325,7 +325,7 @@ describe('assembleBitmap', () => {
   it('Use Cut Settings fills a fill-mode closed path', () => {
     let encoded: VectorRaster | null = null;
     assembleBitmap(
-      makeMixedSvg(),
+      [makeMixedSvg()],
       (raster) => {
         encoded = raster;
         return fakeEncode(raster);
@@ -348,7 +348,7 @@ describe('assembleBitmap', () => {
   it('rasterizes ink at the requested Default Brightness', () => {
     let encoded: VectorRaster | null = null;
     assembleBitmap(
-      makeMixedSvg(),
+      [makeMixedSvg()],
       (raster) => {
         encoded = raster;
         return fakeEncode(raster);
@@ -364,14 +364,14 @@ describe('assembleBitmap', () => {
   });
 
   it('labels SVG / traced bitmaps from `source` and text from `content`', () => {
-    expect(assembleBitmap(makeSvg(), fakeEncode, 'i').source).toBe('logo.svg (bitmap)');
-    expect(assembleBitmap(makeTraced(), fakeEncode, 'i').source).toBe('photo.png (bitmap)');
-    expect(assembleBitmap(makeText(), fakeEncode, 'i').source).toBe('Hi (bitmap)');
-    expect(assembleBitmap(makeShape(), fakeEncode, 'i').source).toBe('rect shape (bitmap)');
+    expect(assembleBitmap([makeSvg()], fakeEncode, 'i').source).toBe('logo.svg (bitmap)');
+    expect(assembleBitmap([makeTraced()], fakeEncode, 'i').source).toBe('photo.png (bitmap)');
+    expect(assembleBitmap([makeText()], fakeEncode, 'i').source).toBe('Hi (bitmap)');
+    expect(assembleBitmap([makeShape()], fakeEncode, 'i').source).toBe('rect shape (bitmap)');
   });
 
   it('rasterizes drawn shapes as vector artwork', () => {
-    const result = assembleBitmap(makeShape(), fakeEncode, 'shape-bitmap');
+    const result = assembleBitmap([makeShape()], fakeEncode, 'shape-bitmap');
 
     expect(result.id).toBe('shape-bitmap');
     expect(result.pixelWidth).toBeGreaterThan(0);
@@ -380,7 +380,7 @@ describe('assembleBitmap', () => {
 
   it('uses the transformed display size so a fitted large vector can convert', () => {
     const encode = vi.fn(fakeEncode);
-    const result = assembleBitmap(makeHugeFittedSvg(), encode, 'new-id');
+    const result = assembleBitmap([makeHugeFittedSvg()], encode, 'new-id');
 
     expect(result.pixelWidth).toBe(1946);
     expect(result.pixelHeight).toBe(1263);
@@ -392,7 +392,7 @@ describe('assembleBitmap', () => {
   it('rejects physically oversized conversions before encoding', () => {
     const encode = vi.fn(fakeEncode);
 
-    expect(() => assembleBitmap(makeHugeSvg(), encode, 'new-id')).toThrow(
+    expect(() => assembleBitmap([makeHugeSvg()], encode, 'new-id')).toThrow(
       `exceeds the ${MAX_RASTER_PIXELS} px limit`,
     );
     expect(encode).not.toHaveBeenCalled();

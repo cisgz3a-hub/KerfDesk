@@ -210,9 +210,10 @@ export type AppState = ObjectPropertiesActions &
       traced: TracedImage,
       options?: TraceExistingImageOptions,
     ) => void;
-    // ADR-029 Convert to Bitmap: replace a selected vector with the raster
-    // engrave-source rasterized from it (LightBurn discards the original).
-    readonly convertToBitmap: (sourceId: string, raster: RasterImage) => void;
+    // ADR-029 Convert to Bitmap: replace the selected vector(s) with the one
+    // raster engrave-source rasterized from them (LightBurn discards the
+    // originals; a multi-selection merges into a single bitmap).
+    readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
     // Phase D insert / update text by id; on add it's a new id, on
     // edit it replaces in place (preserves position/transform).
     readonly upsertTextObject: (text: TextObject) => void;
