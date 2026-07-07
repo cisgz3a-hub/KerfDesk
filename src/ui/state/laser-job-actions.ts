@@ -17,6 +17,7 @@ import {
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
+import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
@@ -46,6 +47,7 @@ const START_PENDING_ACK_MESSAGE =
 export function jobActions(
   set: SetFn,
   get: GetFn,
+  refs: ResetCleanupRefs,
   safeWrite: SafeWriteFn,
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
@@ -109,13 +111,18 @@ export function jobActions(
     stopJob: async () => {
       const softReset = driver().realtime.softReset;
       if (softReset !== null) await safeWrite(softReset, 'stop');
-      try {
-        for (const line of driver().commands.stopLaserLines) {
-          await safeWrite(`${line}\n`, 'stop');
+      if (softReset === null) {
+        // Stream-side stop (Marlin): no reset, no reboot — the beam-off
+        // lines go out immediately and their acks queue behind the
+        // in-flight job lines in receive order.
+        try {
+          for (const line of driver().commands.stopLaserLines) {
+            await safeWrite(`${line}\n`, 'stop');
+          }
+        } catch {
+          // Coolant cleanup is best effort and may fail if the serial link
+          // is already gone.
         }
-      } catch {
-        // Soft reset is the safety-critical command; coolant cleanup is best
-        // effort and may fail if the serial link is already gone.
       }
       // Soft reset clears G92 in GRBL (alarm 1 reaction). Drop our
       // cached WCO so the readout doesn't lie about "custom origin"
@@ -137,6 +144,14 @@ export function jobActions(
               ? wipeInFlight(cancelStreamer(s.streamer))
               : cancelStreamer(s.streamer),
       }));
+      // After a sent reset, the beam-off cleanup is deferred until the boot
+      // banner arrives (audit F2): written now it races the reboot — either
+      // swallowed mid-init (its ack never comes, the counter jams) or acked
+      // after the banner reset the untracked ledger (an orphaned ok). The
+      // soft reset itself already de-energized laser and coolant.
+      if (softReset !== null) {
+        armResetCleanup(refs, safeWrite, driver().commands.stopLaserLines);
+      }
     },
   };
 }
