@@ -186,8 +186,13 @@ function pickAxisField(
 
 function pickFsValue(fields: ReadonlyArray<string>, index: 0 | 1): number | null {
   for (const f of fields) {
-    if (!f.startsWith('FS:') && !f.startsWith('F:')) continue;
-    // F:1500 has 1 component (feed only). FS:1500,500 has 2.
+    const isFs = f.startsWith('FS:');
+    if (!isFs && !f.startsWith('F:')) continue;
+    // Only FS: carries spindle. GRBL's F: is feed-only, and Smoothieware's
+    // grbl-mode F: is `F:<feed>,<override%>` — its second component is the
+    // FEED OVERRIDE, not spindle (audit F7; per Smoothieware docs, not
+    // hardware-verified).
+    if (index === 1 && !isFs) return null;
     const body = f.slice(f.indexOf(':') + 1);
     const parts = body.split(',').map(Number);
     const v = parts[index];

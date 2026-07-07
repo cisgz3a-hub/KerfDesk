@@ -19,6 +19,19 @@ describe('parseStatusReport — happy paths', () => {
     expect(r?.spindle).toBe(500);
   });
 
+  // Audit F7: Smoothieware's grbl-mode report uses `F:<feed>,<override%>`
+  // (per the Smoothieware docs; not hardware-verified) — the second
+  // component is the FEED OVERRIDE, not spindle. Only `FS:` carries a
+  // spindle value; reading F:'s second component as spindle showed "S: 100"
+  // on the live readout regardless of beam state.
+  it('never reads spindle from a 2-component F: field (Smoothie feed,override)', () => {
+    const r = parseStatusReport(
+      '<Idle|MPos:0.000,0.000,0.000|WPos:0.000,0.000,0.000|F:4000.0,100.0>',
+    );
+    expect(r?.feed).toBe(4000);
+    expect(r?.spindle).toBeNull();
+  });
+
   it('parses Hold:0 substate', () => {
     const r = parseStatusReport('<Hold:0|MPos:1.000,2.000,0.000|FS:0,0>');
     expect(r?.state).toBe('Hold');
