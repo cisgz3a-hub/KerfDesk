@@ -86,18 +86,19 @@ export function jobActions(
       const activeDriver = driver();
       const hold = activeDriver.realtime.hold;
       // Realtime feed hold pauses motion instantly but leaves the beam state
-      // to the firmware — only provable safe when $32 laser mode is confirmed,
-      // which only grbl-dollar firmwares can report. Smoothieware ties beam
-      // power to motion in its laser module, so hold is accepted without the
-      // $32 proof there. Firmwares without a hold byte (Marlin) pause
-      // stream-side instead: the streamer stops sending and buffered motion
-      // drains.
-      // Router jobs are exempt: feed hold with a spindle is standard sender
-      // behavior (motion holds, spindle keeps spinning), and a router must
-      // have $32=0 — demanding the laser proof would block CNC pause outright.
+      // to the firmware — only provable safe when $32 laser mode is
+      // confirmed. ADR-096's exemption is for firmwares that CANNOT report
+      // $-settings (settings 'none': Smoothieware ties beam power to motion
+      // in its laser module; Marlin has no hold byte and pauses stream-side).
+      // Firmwares that CAN report — writable ('grbl-dollar') or read-only
+      // ('readonly-dump', FluidNC's $$ compat dump) — keep the strict gate
+      // (audit F6). Router jobs are exempt: feed hold with a spindle is
+      // standard sender behavior (motion holds, spindle keeps spinning), and
+      // a router must have $32=0 — demanding the laser proof would block CNC
+      // pause outright.
       const requiresLaserModeProof =
         hold !== null &&
-        activeDriver.capabilities.settings === 'grbl-dollar' &&
+        activeDriver.capabilities.settings !== 'none' &&
         get().activeJobMachineKind !== 'cnc';
       if (requiresLaserModeProof) assertPauseSafe(set, get);
       if (hold !== null) await safeWrite(hold, 'pause');
