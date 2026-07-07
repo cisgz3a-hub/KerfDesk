@@ -1089,11 +1089,16 @@ Trace Image), Tools menu, the workspace right-click context bar, or
 `Cmd/Ctrl+Shift+B` (LightBurn's binding; LightBurn houses the menu
 item under Edit — ours lives under Tools with the other conversions,
 a deliberate divergence recorded in the ADR-029 amendment). Enabled
-only when a **single** convertible vector is selected; disabled
-(greyed, "Select a vector first.") otherwise — including
-multi-selections, mirroring LightBurn's greyed menu item. (LightBurn
-converts a whole multi-selection into one bitmap; that merge is a
-scoped follow-up, not silently converting the primary object.)
+when **every selected object is a convertible vector** (one or
+many); disabled (greyed, "Select a vector first.") otherwise —
+including mixed selections with a raster among the vectors,
+mirroring LightBurn's greyed menu item. A multi-selection merges
+into **one** bitmap spanning the selection's combined bounds
+(LightBurn-faithful, ADR-029 amendment ii): Fill All renders
+even-odd across the whole selection — a shape nested inside another
+object's shape becomes a hole, exactly like our Fill layer mode —
+every source vector is deleted, and the whole swap is one undo
+entry. The result is labeled `N objects (bitmap)`.
 
 **The dialog** (A3/A4 + A5 brightness): **Render Type** (Fill All /
 Outlines / Use Cut Settings), **DPI** (numeric field + slider,
