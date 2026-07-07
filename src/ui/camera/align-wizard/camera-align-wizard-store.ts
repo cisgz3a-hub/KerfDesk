@@ -1,0 +1,66 @@
+// camera-align-wizard-store — state machine for the bed-alignment wizard
+// (F-CAM9): burn the five-marker pattern as a real job (or skip if already
+// burned), clear the bed, then detect and solve. Ephemeral like the lens
+// wizard's store; the solved alignment persists on the device profile.
+
+import { create } from 'zustand';
+
+export type AlignWizardStep =
+  // Choose engrave power/speed and burn the pattern, or skip to detect.
+  | { readonly kind: 'setup'; readonly note: string | null }
+  // The marker job is streaming; the wizard watches it finish.
+  | { readonly kind: 'burning' }
+  // Burn done: everything except the burned markers must leave the bed.
+  | { readonly kind: 'clear-bed' }
+  // Capture + detect + solve (runAutoAlign).
+  | { readonly kind: 'detect'; readonly status: DetectStatus }
+  | { readonly kind: 'done'; readonly basis: 'raw' | 'rectified' };
+
+export type DetectStatus =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'running' }
+  | { readonly kind: 'failed'; readonly message: string };
+
+export type CameraAlignWizardStore = {
+  readonly open: boolean;
+  readonly step: AlignWizardStep;
+  // Engrave settings for the marker burn; editable in setup, clamped sane.
+  readonly powerPercent: number;
+  readonly speedMmPerMin: number;
+
+  readonly openWizard: () => void;
+  readonly closeWizard: () => void;
+  readonly setPowerPercent: (value: number) => void;
+  readonly setSpeedMmPerMin: (value: number) => void;
+  readonly setStep: (step: AlignWizardStep) => void;
+};
+
+const MIN_POWER_PERCENT = 1;
+const MAX_POWER_PERCENT = 100;
+const MIN_SPEED_MM_PER_MIN = 100;
+const MAX_SPEED_MM_PER_MIN = 20000;
+// Match the pattern generator's conservative engrave defaults.
+const DEFAULT_POWER_PERCENT = 35;
+const DEFAULT_SPEED_MM_PER_MIN = 3000;
+
+const INITIAL_STEP: AlignWizardStep = { kind: 'setup', note: null };
+
+export const useCameraAlignWizardStore = create<CameraAlignWizardStore>((set) => ({
+  open: false,
+  step: INITIAL_STEP,
+  powerPercent: DEFAULT_POWER_PERCENT,
+  speedMmPerMin: DEFAULT_SPEED_MM_PER_MIN,
+
+  openWizard: () => set({ open: true, step: INITIAL_STEP }),
+  closeWizard: () => set({ open: false, step: INITIAL_STEP }),
+  setPowerPercent: (value) =>
+    set({ powerPercent: clamp(value, MIN_POWER_PERCENT, MAX_POWER_PERCENT) }),
+  setSpeedMmPerMin: (value) =>
+    set({ speedMmPerMin: clamp(value, MIN_SPEED_MM_PER_MIN, MAX_SPEED_MM_PER_MIN) }),
+  setStep: (step) => set({ step }),
+}));
+
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
+}

@@ -2518,3 +2518,25 @@ F-CNC19 tiling.
   source runs; the size toggle always works.
 - **Edge / dialog dismissed.** Cancelling the save picker is silent — the
   operator changed their mind, not an error.
+
+### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-118)
+
+- **Success / one wizard, aligned bed.** "Align to bed..." opens the wizard:
+  the operator sets engrave power/speed, and "Burn markers" replaces the
+  scene with the five-marker pattern (undoable) and runs the NORMAL start-job
+  flow — readiness checks, preflight, confirmation, streaming. When the job
+  finishes the wizard prompts to clear the bed (markers stay!), then Detect
+  captures, de-fisheyes when calibrated, finds the five X-corners, solves the
+  homography, and persists the alignment. The done step names the basis
+  (lens-corrected or raw).
+- **Error / burn refused or interrupted.** A not-ready machine surfaces the
+  start-flow's own refusal; a cancelled/errored/disconnected stream returns
+  to setup with the reason. Detection failures (markers not found, ambiguous
+  origin, degenerate solve) show the typed hint and nothing persists.
+- **Empty / no controller or no camera.** Without a controller the burn
+  button is disabled ("Markers already burned" still works for a pattern
+  burned earlier); without a live camera source the Detect step points back
+  to the Camera panel.
+- **Edge / operator changes their mind.** Closing the wizard at any step
+  keeps whatever was already true (a saved alignment stays; a replaced scene
+  is one Undo away); reopening starts back at setup.

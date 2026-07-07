@@ -5257,3 +5257,49 @@ fallback, upstream 500/timeout → unavailable, untrusted Origin 403 before
 any upstream request, PNA echo, discovery found/null). Hardware pass against
 the maintainer's live machine camera is tracked per-flow in AUDIT.md
 (CLAIMED until the on-bed checkpoint runs).
+
+## ADR-118 — Camera-driven positioning and the burn-target alignment wizard (Camera, 2026-07-07)
+
+**Status:** accepted. (ADR-117 is allocated to the operator-loop pack on a
+parallel branch; camera work takes 118.)
+
+### Context
+
+With machine-camera frames pixel-readable (ADR-116), the remaining gap to a
+"real camera" workflow was operational: alignment required the operator to
+generate a marker scene, run it as a job by hand, and come back to press
+Auto-align — LightBurn's wizard burns its own target — and there was no way
+to act on what the overlay shows (move the head to a photographed object).
+
+### Decision
+
+- **Bed-alignment wizard (F-CAM9).** One wizard: engrave settings → burn
+  the five-marker pattern via `generateCameraAlignPattern` +
+  `replaceSceneWithGeneratedScene` + the NORMAL `runStartJobFlow` (readiness,
+  preflight, confirmation, streaming — no parallel job pipeline) → watch the
+  streamer finish → clear-bed prompt → detect via the shared `runAutoAlign`
+  helper (capture → optional de-fisheye → marker detect → homography solve →
+  persist). Manual 4-corner alignment stays on the machine-camera preview
+  for display-only setups (deviation from the original plan: deleting
+  NetworkCameraView would have coupled an unrelated restructure into this
+  change).
+- **Click-to-position (F-CAM7).** A crosshair tool maps a workspace click
+  through `toMachineCoords` — the same origin transform G-code emission uses
+  — clamps to the bed, and sends one absolute beam-off jog through the fully
+  gated jog path. Prerequisite fix: all three jog builders dropped
+  zero-valued axis words even in absolute mode (X0/Y0 silently kept the
+  previous coordinate); fixed test-first across GRBL/Smoothie/Marlin.
+- **Snapshot + monitoring (F-CAM8).** `captureSourceFrame` → shared PNG
+  encoder → platform save dialog; compact↔wide panel toggle persisted
+  locally.
+
+### Verification
+
+Wizard store transitions, burn step against an injected job flow (scene
+replaced with the marker layer at the chosen power/speed; started vs
+not-started from the streamer), runAutoAlign failure paths (no frame, blank
+frame) with no persistence on failure; click property test (any click on any
+origin lands inside the machine bed) plus the front-left Y-flip pin; jog
+builders pin X0/Y0 emission. Hardware pass (burn on scrap → wizard completes
+→ overlay registration ≤ ~1 mm; click a burned mark → head lands on it)
+tracked in AUDIT.md as CLAIMED until run on the live machine.
