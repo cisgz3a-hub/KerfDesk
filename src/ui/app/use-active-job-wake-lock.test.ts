@@ -33,9 +33,14 @@ async function flush(): Promise<void> {
 }
 
 afterEach(() => {
-  patchStore({ streamer: null });
+  patchStore({ streamer: null, log: [] });
   vi.restoreAllMocks();
 });
+
+function keepAwakeWarnings(): number {
+  return useLaserStore.getState().log.filter((line) => line.includes('Keep-awake unavailable'))
+    .length;
+}
 
 describe('installActiveJobWakeLock', () => {
   it('requests a screen wake lock when a job becomes active', async () => {
@@ -88,6 +93,34 @@ describe('installActiveJobWakeLock', () => {
     await flush();
 
     expect(request).toHaveBeenCalledTimes(2);
+    uninstall();
+  });
+
+  it('logs the keep-awake-unavailable warning once when the request is denied', async () => {
+    const request = vi.fn<(type: 'screen') => Promise<FakeWakeLockSentinel>>(async () => {
+      throw new DOMException('denied', 'NotAllowedError');
+    });
+    const uninstall = installActiveJobWakeLock({ document, navigator: fakeNavigator(request) });
+
+    patchStore({ streamer: streamingState() });
+    await flush();
+    expect(keepAwakeWarnings()).toBe(1);
+
+    // A visibility flap retries the request but must not repeat the warning.
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(request.mock.calls.length).toBeGreaterThan(1);
+    expect(keepAwakeWarnings()).toBe(1);
+    uninstall();
+  });
+
+  it('logs the keep-awake-unavailable warning once when the API is missing', async () => {
+    const uninstall = installActiveJobWakeLock({ document, navigator });
+
+    patchStore({ streamer: streamingState() });
+    await flush();
+
+    expect(keepAwakeWarnings()).toBe(1);
     uninstall();
   });
 });
