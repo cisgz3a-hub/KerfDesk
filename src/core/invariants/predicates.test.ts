@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  collectG1FValues,
   collectG1SValues,
   expectedS,
   findLaserOnTravelIssues,
@@ -89,5 +90,16 @@ describe('collectG1SValues', () => {
 
   it('collects lowercase and exponent S values on G1 lines', () => {
     expect(collectG1SValues('g1 x0 y0 s2.5e2\nG1 X1 Y1 S1.')).toEqual([250, 1]);
+  });
+});
+
+describe('collectG1FValues', () => {
+  it('picks up F values on G1 lines only', () => {
+    const gcode = ['G0 X0 Y0 S0', 'G1 X10 Y10 F1500 S500', 'G1 X20 Y20 S500', 'M5'].join('\n');
+    expect(collectG1FValues(gcode)).toEqual([1500]);
+  });
+
+  it('ignores comment lines carrying feed-like text', () => {
+    expect(collectG1FValues('G0 X0 Y0 S0\n; feed 2500 mm/min\nG1 X1 Y1 F1200 S0')).toEqual([1200]);
   });
 });

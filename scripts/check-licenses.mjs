@@ -27,6 +27,10 @@ const ALLOWED_LICENSES = new Set([
   'ISC',
   'Unlicense',
   '0BSD',
+  // Permissive, MIT-compatible (Blue Oak Council permissive list; SPDX-recognized;
+  // no copyleft). Pulled transitively by electron-updater → builder-util-runtime →
+  // sax@1.6.0 (ADR-024). Maintainer-approved 2026-07-04.
+  'BlueOak-1.0.0',
   // OFL-1.1 (SIL Open Font License) covers the bundled fonts. Those are vendored
   // .ttf assets, not npm packages, so `pnpm licenses list` never surfaces them —
   // this keeps the allow-list consistent with the documented font policy

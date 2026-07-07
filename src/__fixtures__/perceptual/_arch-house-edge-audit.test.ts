@@ -45,25 +45,34 @@ const CROPS: ReadonlyArray<Crop> = [
   { name: 'house-O', x0: 620, y0: 552, x1: 770, y1: 668, scale: 8 },
 ];
 
-it('renders Arch House Edge Detection crops + gap/wobble metrics', () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  const fixture = requiredArchHouseFixtureStatus();
-  if (fixture.path === null) throw new Error('arch-house fixture missing');
-  mkdirSync(OUT_DIR, { recursive: true });
-  const image = decodePngFile(fixture.path);
-  const options = TRACE_PRESETS['Edge Detection'] as TraceOptions;
-  const paths = traceImageToEdgePaths(image, options);
-  const polylines = paths.flatMap((path) => path.polylines);
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
 
-  writeFileSync(join(OUT_DIR, 'arch-edge__full.png'), renderTraceOverlay(image, paths, 1));
-  for (const crop of CROPS) {
-    const cropped = cropImage(image, crop);
-    const shifted = shiftPolylines(polylines, crop);
-    const png = renderTraceOverlay(cropped, [{ color: '#000000', polylines: shifted }], crop.scale);
-    writeFileSync(join(OUT_DIR, `arch-edge__${crop.name}.png`), png);
-  }
-  writeFileSync(join(OUT_DIR, 'arch-edge__metrics.txt'), buildMetricsReport(polylines));
-}, 240000);
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders Arch House Edge Detection crops + gap/wobble metrics',
+  () => {
+    const fixture = requiredArchHouseFixtureStatus();
+    if (fixture.path === null) throw new Error('arch-house fixture missing');
+    mkdirSync(OUT_DIR, { recursive: true });
+    const image = decodePngFile(fixture.path);
+    const options = TRACE_PRESETS['Edge Detection'] as TraceOptions;
+    const paths = traceImageToEdgePaths(image, options);
+    const polylines = paths.flatMap((path) => path.polylines);
+
+    writeFileSync(join(OUT_DIR, 'arch-edge__full.png'), renderTraceOverlay(image, paths, 1));
+    for (const crop of CROPS) {
+      const cropped = cropImage(image, crop);
+      const shifted = shiftPolylines(polylines, crop);
+      const png = renderTraceOverlay(
+        cropped,
+        [{ color: '#000000', polylines: shifted }],
+        crop.scale,
+      );
+      writeFileSync(join(OUT_DIR, `arch-edge__${crop.name}.png`), png);
+    }
+    writeFileSync(join(OUT_DIR, 'arch-edge__metrics.txt'), buildMetricsReport(polylines));
+  },
+  240000,
+);
 
 function cropImage(image: RawImageData, crop: Crop): RawImageData {
   const width = crop.x1 - crop.x0;
