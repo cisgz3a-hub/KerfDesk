@@ -94,14 +94,7 @@ export function BoxGeneratorDialog(props: {
     >
       <BoxGeneratorFields draft={draft} machine={props.machine} setField={setField} />
       <p style={summaryStyle}>{summaryLine(parsed)}</p>
-      <div style={viewToggleStyle} role="group" aria-label="Preview view">
-        <Button onClick={() => setView('flat')} aria-pressed={view === 'flat'}>
-          Flat
-        </Button>
-        <Button onClick={() => setView('assembled')} aria-pressed={view === 'assembled'}>
-          Assembled
-        </Button>
-      </div>
+      <ViewToggle view={view} onSelect={setView} />
       {view === 'flat' ? (
         <BoxPreview panels={panels ?? lastValidPanels.current} />
       ) : (
@@ -123,6 +116,22 @@ export function BoxGeneratorDialog(props: {
 
 function isAutoFitField(field: keyof BoxDraft): field is BoxAutoFitField {
   return field === 'fingerWidth' || field === 'partSpacing';
+}
+
+function ViewToggle(props: {
+  readonly view: 'flat' | 'assembled';
+  readonly onSelect: (view: 'flat' | 'assembled') => void;
+}): JSX.Element {
+  return (
+    <div style={viewToggleStyle} role="group" aria-label="Preview view">
+      <Button onClick={() => props.onSelect('flat')} aria-pressed={props.view === 'flat'}>
+        Flat
+      </Button>
+      <Button onClick={() => props.onSelect('assembled')} aria-pressed={props.view === 'assembled'}>
+        Assembled
+      </Button>
+    </div>
+  );
 }
 
 function IssueList(props: {

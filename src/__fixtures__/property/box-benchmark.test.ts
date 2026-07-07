@@ -19,7 +19,11 @@ import { checkBoxAssembly, type RefereePanel } from '../../core/box/assembly-ref
 import { checkDividerAssembly } from '../../core/box/divider-referee';
 import { buildSlideLidParts } from '../../core/box/slide-lid-panels';
 import { checkSlideLidAssembly } from '../../core/box/slide-lid-referee';
-import { fitCouponClearanceMm, generateFitCoupon, type FitCouponSpec } from '../../core/box/fit-coupon';
+import {
+  fitCouponClearanceMm,
+  generateFitCoupon,
+  type FitCouponSpec,
+} from '../../core/box/fit-coupon';
 import type { BoxSpec } from '../../core/box/box-spec';
 import { generateBox } from '../../core/box/generate-box';
 import { buildPanelClaims } from '../../core/box/panel-claims';
@@ -354,23 +358,37 @@ function scoreFitCoupon(): Score {
     }
     if (result.kind !== 'generated' || relief.kind !== 'none') continue;
     // Rung law on the laser (exact) variant.
-    const comb = result.parts[0];
-    const slots = result.parts[1];
-    for (let i = 0; i < coupon.rungCount; i += 1) {
-      total += 1;
-      const c = fitCouponClearanceMm(coupon, i);
-      const tab = nthRun(comb?.rings.outline.points ?? [], 13, i);
-      const notch = nthRun(slots?.rings.outline.points ?? [], 29, i);
-      if (
-        tab !== null &&
-        notch !== null &&
-        Math.abs(notch[1] - notch[0] - (tab[1] - tab[0]) - c) < 1e-9
-      ) {
-        passed += 1;
-      }
-    }
+    const law = scoreRungLaw(coupon, result.parts);
+    passed += law.passed;
+    total += law.total;
   }
   return { category: 'fit-coupon', passed, total };
+}
+
+function scoreRungLaw(
+  coupon: FitCouponSpec,
+  parts: ReadonlyArray<{
+    readonly rings: { readonly outline: { readonly points: ReadonlyArray<Vec2> } };
+  }>,
+): { passed: number; total: number } {
+  let passed = 0;
+  let total = 0;
+  const comb = parts[0];
+  const slots = parts[1];
+  for (let i = 0; i < coupon.rungCount; i += 1) {
+    total += 1;
+    const c = fitCouponClearanceMm(coupon, i);
+    const tab = nthRun(comb?.rings.outline.points ?? [], 13, i);
+    const notch = nthRun(slots?.rings.outline.points ?? [], 29, i);
+    if (
+      tab !== null &&
+      notch !== null &&
+      Math.abs(notch[1] - notch[0] - (tab[1] - tab[0]) - c) < 1e-9
+    ) {
+      passed += 1;
+    }
+  }
+  return { passed, total };
 }
 
 function nthRun(
