@@ -23,10 +23,17 @@ export function ConvertToBitmapDialog(props: {
   readonly onConvert: (options: ConvertToBitmapDialogOptions) => void;
 }): JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
-  const [dpi, setDpi] = useState(DEFAULT_CONVERT_TO_BITMAP_DPI);
+  // Raw text, NOT a clamped number: clamping every keystroke made typed DPI
+  // entry impossible (any first digit is below the minimum and snapped to it).
+  // The live estimate and the submit normalize; the field never fights back.
+  const [dpiText, setDpiText] = useState(String(DEFAULT_CONVERT_TO_BITMAP_DPI));
   const plan = useMemo(
-    () => estimateBitmapConversion({ bounds: props.bounds, transform: props.transform }, dpi),
-    [dpi, props.bounds, props.transform],
+    () =>
+      estimateBitmapConversion(
+        { bounds: props.bounds, transform: props.transform },
+        parseDpi(dpiText),
+      ),
+    [dpiText, props.bounds, props.transform],
   );
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -51,7 +58,7 @@ export function ConvertToBitmapDialog(props: {
           </span>
         </Field>
         <RenderTypeField />
-        <DpiField dpi={dpi} onChange={setDpi} />
+        <DpiField dpiText={dpiText} onChange={setDpiText} />
         <BitmapEstimate plan={plan} />
         <DialogActions>
           <Button onClick={props.onCancel}>Cancel</Button>
@@ -101,7 +108,11 @@ function RenderTypeField(): JSX.Element {
   );
 }
 
-function DpiField(props: { readonly dpi: number; readonly onChange: (dpi: number) => void }) {
+// The text field keeps whatever is typed; parsing clamps at submit.
+function DpiField(props: {
+  readonly dpiText: string;
+  readonly onChange: (dpiText: string) => void;
+}): JSX.Element {
   return (
     <Field label="DPI">
       <input
@@ -110,8 +121,8 @@ function DpiField(props: { readonly dpi: number; readonly onChange: (dpi: number
         min={MIN_CONVERT_TO_BITMAP_DPI}
         max={MAX_CONVERT_TO_BITMAP_DPI}
         step={1}
-        value={props.dpi}
-        onChange={(event) => props.onChange(parseDpi(event.currentTarget.value))}
+        value={props.dpiText}
+        onChange={(event) => props.onChange(event.currentTarget.value)}
         className="lf-input"
         style={numberStyle}
         aria-label="Convert DPI"
@@ -159,6 +170,7 @@ const controlStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
   alignItems: 'center',
+  gap: 8,
 };
 const sourceStyle: React.CSSProperties = {
   maxWidth: 260,

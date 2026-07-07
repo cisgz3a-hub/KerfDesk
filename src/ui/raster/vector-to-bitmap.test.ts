@@ -292,11 +292,12 @@ describe('assembleBitmap', () => {
         return fakeEncode(raster);
       },
       'new-id',
-      { dpi: 25.4, renderType: 'outlines' },
+      // 127 DPI = MIN_CONVERT_TO_BITMAP_DPI = 5 px/mm.
+      { dpi: 127, renderType: 'outlines' },
     );
 
-    expect(result.pixelWidth).toBe(Math.round(bounds.maxX - bounds.minX));
-    expect(result.pixelHeight).toBe(Math.round(bounds.maxY - bounds.minY));
+    expect(result.pixelWidth).toBe(Math.round((bounds.maxX - bounds.minX) * 5));
+    expect(result.pixelHeight).toBe(Math.round((bounds.maxY - bounds.minY) * 5));
     expect(encoded).not.toBeNull();
     expect(encoded === null ? 0 : inkCount(encoded)).toBeGreaterThan(0);
   });
@@ -311,7 +312,7 @@ describe('assembleBitmap', () => {
       },
       'new-id',
       {
-        dpi: 25.4,
+        dpi: 127,
         renderType: 'use-cut-settings',
         layers: [{ color: '#ff0000', mode: 'line' }],
       },
@@ -331,7 +332,7 @@ describe('assembleBitmap', () => {
       },
       'new-id',
       {
-        dpi: 25.4,
+        dpi: 127,
         renderType: 'use-cut-settings',
         layers: [
           { color: '#ff0000', mode: 'line' },
