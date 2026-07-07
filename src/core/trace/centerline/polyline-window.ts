@@ -32,10 +32,15 @@ export function projectOntoSegment(p: Vec2, a: Vec2, b: Vec2): Vec2 {
   return { x: a.x + t * dx, y: a.y + t * dy };
 }
 
-/** Local stroke radius (distance-field value) at a sub-pixel position. */
+/** Local stroke radius (distance-field value) at a sub-pixel position. The
+ *  cell is clamped to the field on BOTH axes: a point at/past the right or
+ *  bottom border must read the edge cell, not wrap into the next row or
+ *  fall off the end (which `radiusAt`'s `?? 0` would silently report as
+ *  zero radius — a wrong "no stroke here" for a boundary vertex). */
 export function radiusAtPosition(p: Vec2, distSq: Float64Array, width: number): number {
-  const x = Math.max(0, Math.round(p.x - 0.5));
-  const y = Math.max(0, Math.round(p.y - 0.5));
+  const height = width > 0 ? Math.floor(distSq.length / width) : 0;
+  const x = Math.max(0, Math.min(width - 1, Math.round(p.x - 0.5)));
+  const y = Math.max(0, Math.min(height - 1, Math.round(p.y - 0.5)));
   return radiusAt(distSq, y * width + x);
 }
 
