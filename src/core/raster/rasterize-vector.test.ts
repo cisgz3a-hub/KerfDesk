@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Bounds, Polyline } from '../scene';
-import { rasterizeVectorToLuma } from './rasterize-vector';
+import { inkLumaForBrightnessPercent, rasterizeVectorToLuma } from './rasterize-vector';
 
 // 127, not 128 — must stay strictly below ditherThreshold's default cutoff
 // so converted bitmaps actually burn (M7).
@@ -183,6 +183,35 @@ describe('converted-bitmap ink composes with the dither pipeline (M7)', () => {
       { algorithm: 'threshold', sMax: 300, sMin: 0 },
     );
     expect(Array.from(s)).toContain(300);
+  });
+});
+
+// A5 Default Brightness (LightBurn §7.4): converted pixels default to 50%
+// gray but the operator can pick another brightness.
+describe('Default Brightness → ink luma (A5)', () => {
+  it('maps 50% to 127, strictly below the default threshold cutoff (M7)', () => {
+    expect(inkLumaForBrightnessPercent(50)).toBe(127);
+  });
+
+  it('maps the extremes and clamps out-of-range input', () => {
+    expect(inkLumaForBrightnessPercent(0)).toBe(0);
+    expect(inkLumaForBrightnessPercent(100)).toBe(255);
+    expect(inkLumaForBrightnessPercent(-20)).toBe(0);
+    expect(inkLumaForBrightnessPercent(140)).toBe(255);
+    expect(inkLumaForBrightnessPercent(Number.NaN)).toBe(127);
+  });
+
+  it('rasterizes fill and outline ink at the requested luma', () => {
+    const darkInk = inkLumaForBrightnessPercent(70); // floor(255 × 0.7) = 178
+    const r = rasterizeVectorToLuma({
+      polylines: [closedSquare(2, 2, 8, 8)],
+      bounds: bounds(0, 0, 10, 10),
+      dpi: DPI_1PX_PER_MM,
+      inkLuma: darkInk,
+    });
+    expect(darkInk).toBe(178);
+    expect(lumaAt(r, 5, 5)).toBe(178);
+    expect(lumaAt(r, 0, 0)).toBe(BG);
   });
 });
 

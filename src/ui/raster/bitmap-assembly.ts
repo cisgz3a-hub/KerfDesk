@@ -1,7 +1,11 @@
 // Shared Convert-to-Bitmap assembly. Main-thread and worker callers both use
 // this file so Render Type / DPI / source metadata cannot drift.
 
-import { rasterizeVectorToLuma, type VectorRaster } from '../../core/raster';
+import {
+  inkLumaForBrightnessPercent,
+  rasterizeVectorToLuma,
+  type VectorRaster,
+} from '../../core/raster';
 import {
   DEFAULT_RASTER_LAYER_COLOR,
   IDENTITY_TRANSFORM,
@@ -40,6 +44,9 @@ export type BitmapConversionOptions = {
   readonly dpi?: number;
   readonly renderType?: ConvertToBitmapRenderType;
   readonly layers?: ReadonlyArray<BitmapLayerSetting>;
+  // LightBurn's Default Brightness (§7.4): the gray level inked pixels start
+  // at, as a percentage. Omitted → 50% (which maps to luma 127, M7).
+  readonly brightnessPercent?: number;
 };
 
 export function isConvertibleVector(o: SceneObject): o is ConvertibleVector {
@@ -99,6 +106,9 @@ function rasterizeConvertible(
     bounds: baked.bounds,
     pixelWidth: plan.pixelWidth,
     pixelHeight: plan.pixelHeight,
+    ...(options.brightnessPercent !== undefined
+      ? { inkLuma: inkLumaForBrightnessPercent(options.brightnessPercent) }
+      : {}),
   });
   return { bounds: baked.bounds, plan, raster };
 }
@@ -168,7 +178,8 @@ function buildRasterImage(
   };
 }
 
-function sourceLabel(o: ConvertibleVector): string {
+/** Display name for a convertible vector: filename, text content, or shape kind. */
+export function sourceLabel(o: ConvertibleVector): string {
   if ('source' in o) return o.source;
   if ('content' in o) return o.content;
   return `${o.spec.kind} shape`;

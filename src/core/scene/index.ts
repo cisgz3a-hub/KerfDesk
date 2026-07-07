@@ -110,7 +110,7 @@ export {
   validateOutputScope,
 } from './output-scope';
 export type { AABB } from './hit-test';
-export { combinedBBox, hitTest, transformedBBox } from './hit-test';
+export { combinedBBox, hitTest, transformedBBox, transformedBounds } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';
 export { sceneObjectHasVisibleLayer, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
