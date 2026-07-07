@@ -1,7 +1,15 @@
-import type { Project, SelectionAnchor, Transform, Vec2 } from '../../core/scene';
+import {
+  buildSelectionTransformEdit,
+  selectionMetrics,
+  type Project,
+  type SelectionAnchor,
+  type Transform,
+  type Vec2,
+} from '../../core/scene';
 import { transformUpdatesForMoveDrag, type DragState } from './drag-state';
 import { transformDragWithSnap } from './drag-snap';
 import { rotateSelectionByDrag } from './rotate-handle';
+import { selectionResizeEditFromDrag } from './selection-handles';
 import type { SnapGuide, SnapSettings } from './snapping';
 
 type DragEventModifiers = {
@@ -21,6 +29,7 @@ export function applyTransformDrag(args: {
   readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
 }): void {
   const { drag, point } = args;
+  if (drag !== null && point !== null && applySelectionScaleDrag({ ...args, drag, point })) return;
   if (!isTransformDrag(drag) || point === null) {
     args.setSnapGuides([]);
     return;
@@ -69,6 +78,38 @@ function isTransformDrag(
   drag: DragState | null,
 ): drag is Extract<DragState, { kind: 'move' | 'scale' | 'rotate' }> {
   return drag?.kind === 'move' || drag?.kind === 'scale' || drag?.kind === 'rotate';
+}
+
+// Multi-object handle resize (audit C5): scale every listed object about the
+// opposite corner/edge via the core group-resize, the same path the numeric
+// W/H fields use. Applied to the CURRENT objects each frame — factors are
+// target/current, so the size is absolute, not compounding. Shift frees the
+// aspect on corner handles.
+function applySelectionScaleDrag(args: {
+  readonly drag: DragState;
+  readonly point: Vec2;
+  readonly e: DragEventModifiers;
+  readonly project: Project;
+  readonly setObjectTransform: (id: string, transform: Transform) => void;
+  readonly setSnapGuides: (next: ReadonlyArray<SnapGuide>) => void;
+}): boolean {
+  if (args.drag.kind !== 'selection-scale') return false;
+  args.setSnapGuides([]);
+  const ids = new Set(args.drag.selectionIds);
+  const objects = args.project.scene.objects.filter((object) => ids.has(object.id));
+  const metrics = selectionMetrics(objects);
+  if (metrics === null) return true;
+  const edit = selectionResizeEditFromDrag({
+    handle: args.drag.handle,
+    bbox: metrics.bbox,
+    point: args.point,
+    lockAspect: !args.e.shiftKey,
+  });
+  const result = buildSelectionTransformEdit(objects, edit);
+  if (result.kind === 'ok') {
+    for (const update of result.transforms) args.setObjectTransform(update.id, update.transform);
+  }
+  return true;
 }
 
 function applySelectionRotateDrag(args: {

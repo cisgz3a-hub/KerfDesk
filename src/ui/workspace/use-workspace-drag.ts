@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -15,18 +14,15 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
-import {
-  computeMouseDownDrag,
-  isStationaryRightPanClick,
-  type DragState,
-  panOffsetForDrag,
-} from './drag-state';
+import { computeMouseDownDrag, type DragState } from './drag-state';
+import { isStationaryRightPanClick, panOffsetForDrag } from './pan-drag';
 import { applyTransformDrag } from './apply-transform-drag';
 import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
 import { selectObjectsInMarquee } from './selection-marquee';
+import { useEscCancelsDrag } from './use-esc-cancels-drag';
 import type { SnapGuide, SnapSettings } from './snapping';
 import { canvasMouseToScene, pxToMmForCanvas } from './view-transform';
 import { useWorkspaceDragDeps } from './workspace-drag-deps';
@@ -89,8 +85,7 @@ export function useDragMove(
       selectionAnchor: deps.selectionAnchor,
     });
     if (next === null) return;
-    // Capture the pointer so move/up keep coming while the drag runs outside
-    // the canvas (audit C1). Guarded — jsdom lacks setPointerCapture.
+    // Capture so move/up keep coming while the drag runs off-canvas (audit C1).
     capturePointer(ref.current, e.pointerId);
     if (next.kind === 'marquee') {
       deps.setSelectionMarquee({ start: next.startScenePoint, end: next.startScenePoint });
@@ -103,24 +98,7 @@ export function useDragMove(
   };
 
   const handlePointerMove = (e: CanvasPointerEvent): void => {
-    updateWorkspaceDrag({
-      e,
-      ref,
-      drag,
-      project,
-      viewState,
-      toolMode: deps.toolMode,
-      setCursorMm: deps.setCursorMm,
-      setDraftShape: deps.setDraftShape,
-      setMeasureDraft: deps.setMeasureDraft,
-      setSelectionMarquee: deps.setSelectionMarquee,
-      setSelectedPathNodePositionDuringInteraction:
-        deps.setSelectedPathNodePositionDuringInteraction,
-      selectionAnchor: deps.selectionAnchor,
-      snapSettings: deps.snapSettings,
-      setObjectTransform: deps.setObjectTransform,
-      setSnapGuides: deps.setSnapGuides,
-    });
+    runWorkspaceDragMove({ e, ref, drag, project, viewState, deps });
   };
 
   const handlePointerUp = (e: CanvasPointerEvent): void => {
@@ -144,61 +122,9 @@ export function useDragMove(
     });
     setDrag(null);
   };
-
   useEscCancelsDrag(drag, deps, setDrag);
-
   const handlers = dragHandlers(handlePointerDown, handlePointerMove, handlePointerUp);
   return { handlers, dragKind: visibleDragKind(drag) };
-}
-
-// Drag kinds that Esc should cancel in place: transforms roll back via
-// cancelInteraction; a marquee just clears its box. Draw/measure/pen/pan keep
-// the existing global Esc (resetToolMode) behavior.
-const ESC_CANCELABLE_DRAG_KINDS: ReadonlySet<DragState['kind']> = new Set([
-  'move',
-  'scale',
-  'rotate',
-  'path-node',
-  'marquee',
-]);
-
-// Cancel an in-progress transform/marquee drag on Esc (audit C4). Registered
-// in the CAPTURE phase so stopPropagation pre-empts the bubble-phase global
-// shortcut handler — Esc during a drag cancels only the drag, it must not also
-// reset the tool and clear the selection. Only mounted while a cancelable drag
-// is live, so plain Esc (no drag) is untouched.
-function useEscCancelsDrag(
-  drag: DragState | null,
-  deps: ReturnType<typeof useWorkspaceDragDeps>,
-  setDrag: (next: DragState | null) => void,
-): void {
-  const { cancelInteraction, setSelectionMarquee, setMeasureDraft, setDraftShape, setSnapGuides } =
-    deps;
-  const active = drag !== null && ESC_CANCELABLE_DRAG_KINDS.has(drag.kind);
-  useEffect(() => {
-    if (!active) return undefined;
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      e.stopPropagation();
-      cancelInteraction();
-      setSelectionMarquee(null);
-      setMeasureDraft(null);
-      setDraftShape(null);
-      setSnapGuides([]);
-      setDrag(null);
-    };
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [
-    active,
-    cancelInteraction,
-    setSelectionMarquee,
-    setMeasureDraft,
-    setDraftShape,
-    setSnapGuides,
-    setDrag,
-  ]);
 }
 
 function dragHandlers(
@@ -207,6 +133,36 @@ function dragHandlers(
   onPointerUp: DragHandlers['onPointerUp'],
 ): DragHandlers {
   return { onPointerDown, onPointerMove, onPointerUp };
+}
+
+// Pointer-move fan-out, lifted out of useDragMove so that hook stays under the
+// function-line cap. Threads the store deps into the pure drag-update layer.
+function runWorkspaceDragMove(args: {
+  readonly e: CanvasPointerEvent;
+  readonly ref: CanvasRef;
+  readonly drag: DragState | null;
+  readonly project: Project;
+  readonly viewState: WorkspaceViewState;
+  readonly deps: ReturnType<typeof useWorkspaceDragDeps>;
+}): void {
+  const { deps } = args;
+  updateWorkspaceDrag({
+    e: args.e,
+    ref: args.ref,
+    drag: args.drag,
+    project: args.project,
+    viewState: args.viewState,
+    toolMode: deps.toolMode,
+    setCursorMm: deps.setCursorMm,
+    setDraftShape: deps.setDraftShape,
+    setMeasureDraft: deps.setMeasureDraft,
+    setSelectionMarquee: deps.setSelectionMarquee,
+    setSelectedPathNodePositionDuringInteraction: deps.setSelectedPathNodePositionDuringInteraction,
+    selectionAnchor: deps.selectionAnchor,
+    snapSettings: deps.snapSettings,
+    setObjectTransform: deps.setObjectTransform,
+    setSnapGuides: deps.setSnapGuides,
+  });
 }
 
 // Pointer-capture helpers, guarded because jsdom (test env) implements neither
@@ -426,15 +382,9 @@ function commitDrawDraft(args: {
 }
 
 function visibleDragKind(drag: DragState | null): DragMoveResult['dragKind'] {
-  if (
-    drag === null ||
-    drag.kind === 'pan' ||
-    drag.kind === 'draw' ||
-    drag.kind === 'marquee' ||
-    drag.kind === 'measure' ||
-    drag.kind === 'path-node'
-  ) {
-    return null;
-  }
-  return drag.kind;
+  if (drag === null) return null;
+  // A multi-selection resize reads out like a scale.
+  if (drag.kind === 'selection-scale') return 'scale';
+  if (drag.kind === 'move' || drag.kind === 'scale' || drag.kind === 'rotate') return drag.kind;
+  return null;
 }
