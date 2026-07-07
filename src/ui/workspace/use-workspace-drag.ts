@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useState,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -144,8 +145,60 @@ export function useDragMove(
     setDrag(null);
   };
 
+  useEscCancelsDrag(drag, deps, setDrag);
+
   const handlers = dragHandlers(handlePointerDown, handlePointerMove, handlePointerUp);
   return { handlers, dragKind: visibleDragKind(drag) };
+}
+
+// Drag kinds that Esc should cancel in place: transforms roll back via
+// cancelInteraction; a marquee just clears its box. Draw/measure/pen/pan keep
+// the existing global Esc (resetToolMode) behavior.
+const ESC_CANCELABLE_DRAG_KINDS: ReadonlySet<DragState['kind']> = new Set([
+  'move',
+  'scale',
+  'rotate',
+  'path-node',
+  'marquee',
+]);
+
+// Cancel an in-progress transform/marquee drag on Esc (audit C4). Registered
+// in the CAPTURE phase so stopPropagation pre-empts the bubble-phase global
+// shortcut handler — Esc during a drag cancels only the drag, it must not also
+// reset the tool and clear the selection. Only mounted while a cancelable drag
+// is live, so plain Esc (no drag) is untouched.
+function useEscCancelsDrag(
+  drag: DragState | null,
+  deps: ReturnType<typeof useWorkspaceDragDeps>,
+  setDrag: (next: DragState | null) => void,
+): void {
+  const { cancelInteraction, setSelectionMarquee, setMeasureDraft, setDraftShape, setSnapGuides } =
+    deps;
+  const active = drag !== null && ESC_CANCELABLE_DRAG_KINDS.has(drag.kind);
+  useEffect(() => {
+    if (!active) return undefined;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancelInteraction();
+      setSelectionMarquee(null);
+      setMeasureDraft(null);
+      setDraftShape(null);
+      setSnapGuides([]);
+      setDrag(null);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [
+    active,
+    cancelInteraction,
+    setSelectionMarquee,
+    setMeasureDraft,
+    setDraftShape,
+    setSnapGuides,
+    setDrag,
+  ]);
 }
 
 function dragHandlers(
