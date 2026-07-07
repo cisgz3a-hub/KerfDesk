@@ -89,8 +89,11 @@ export function commitDraftShape(drawShape: (shape: ShapeObject) => void): boole
   const draft = useUiStore.getState().draftShape;
   if (draft === null) return false;
   drawShape({ ...draft, id: crypto.randomUUID() });
-  useUiStore.getState().setDraftShape(null);
-  // Stay armed in the draw tool so shapes can be created back-to-back (LightBurn
-  // parity + ADR-051 J3). Esc, Select, or clicking the active tool returns to Select.
+  // Return to the Select tool after drawing a shape (maintainer request,
+  // 2026-07-07): landing back on Select is the expected flow and makes the
+  // just-drawn shape immediately editable. This overrides the earlier sticky
+  // "back-to-back" default — rule 3 lets the maintainer override parity.
+  // resetToolMode also clears the committed draft.
+  useUiStore.getState().resetToolMode();
   return true;
 }
