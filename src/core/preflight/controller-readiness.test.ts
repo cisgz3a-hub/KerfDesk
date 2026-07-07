@@ -90,6 +90,58 @@ describe('runControllerReadiness', () => {
     expect(runControllerReadiness(project, { ...controllerOk, maxPowerS: 255 }).ok).toBe(true);
   });
 
+  // Audit F6: FluidNC ('readonly-dump') DOES report numeric $-settings via
+  // its $$ compat dump — lumping it with Marlin ('none') skipped a
+  // verification the app already had the data for. Reported values are
+  // verified strictly; only ABSENT values downgrade to a warning (a compat
+  // dump is not guaranteed complete, and the app cannot write the fix).
+  describe('readonly-dump firmwares (FluidNC)', () => {
+    it('blocks Start when the reported $30 mismatches the project scale', () => {
+      const result = runControllerReadiness(
+        createProject(),
+        { ...controllerOk, maxPowerS: 255 },
+        'readonly-dump',
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.errors.map((e) => e.code)).toContain('max-power-mismatch');
+    });
+
+    it('blocks Start when the dump reports laser mode disabled', () => {
+      const result = runControllerReadiness(
+        createProject(),
+        { ...controllerOk, laserModeEnabled: false },
+        'readonly-dump',
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.errors.map((e) => e.code)).toContain('laser-mode-disabled');
+    });
+
+    it('warns instead of blocking when the dump omits $30 or $32', () => {
+      const result = runControllerReadiness(createProject(), {}, 'readonly-dump');
+
+      expect(result.ok).toBe(true);
+      expect(result.errors).toEqual([]);
+      expect(result.warnings.map((w) => w.code)).toContain('power-scale-unverified');
+      expect(result.warnings.map((w) => w.code)).toContain('laser-mode-unverified');
+    });
+
+    it('passes cleanly when the dump confirms the scale and laser mode', () => {
+      const result = runControllerReadiness(createProject(), controllerOk, 'readonly-dump');
+
+      expect(result.ok).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it("firmwares with NO settings dump keep ADR-095's warning-only path", () => {
+      const result = runControllerReadiness(createProject(), null, 'none');
+
+      expect(result.ok).toBe(true);
+      expect(result.warnings.map((w) => w.code)).toContain('power-scale-unverified');
+    });
+  });
+
   describe('cnc/router projects', () => {
     // A correctly configured router: $32=0 and $30 = spindle max RPM
     // (12000, DEFAULT_CNC_MACHINE_PARAMS). The laser gate used to block
