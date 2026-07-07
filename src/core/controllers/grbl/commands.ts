@@ -104,18 +104,18 @@ export function buildJogCommand(params: JogParams): string {
   if (!Number.isFinite(params.feed)) {
     throw new Error('buildJogCommand: feed must be finite.');
   }
+  // A zero delta in relative mode means "don't move this axis" and is
+  // dropped; in absolute mode X0/Y0/Z0 is a REAL destination and dropping it
+  // would silently keep the previous coordinate.
+  const absolute = params.relative === false;
+  const includeAxis = (value: number | undefined): value is number =>
+    typeof value === 'number' && (absolute || value !== 0);
   const parts: string[] = [];
-  parts.push(params.relative === false ? 'G90' : 'G91');
+  parts.push(absolute ? 'G90' : 'G91');
   parts.push('G21'); // mm
-  if (typeof params.dx === 'number' && params.dx !== 0) {
-    parts.push(`X${formatMm(params.dx)}`);
-  }
-  if (typeof params.dy === 'number' && params.dy !== 0) {
-    parts.push(`Y${formatMm(params.dy)}`);
-  }
-  if (typeof params.dz === 'number' && params.dz !== 0) {
-    parts.push(`Z${formatMm(params.dz)}`);
-  }
+  if (includeAxis(params.dx)) parts.push(`X${formatMm(params.dx)}`);
+  if (includeAxis(params.dy)) parts.push(`Y${formatMm(params.dy)}`);
+  if (includeAxis(params.dz)) parts.push(`Z${formatMm(params.dz)}`);
   parts.push(`F${Math.max(1, Math.round(params.feed))}`);
   return `$J=${parts.join(' ')}`;
 }
