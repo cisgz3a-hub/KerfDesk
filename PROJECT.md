@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.2 — Proprietary license, private repo (ADR-018 supersedes ADR-008); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.3 — MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -16,7 +16,7 @@ It deliberately copies LightBurn's UX shape and workflow. It deliberately does n
 
 The 1.0 codebase shipped a working app but had a coupling problem: fixes in one module broke others. **2.0 is a clean rewrite designed against shotgun-surgery from day one — pure-function pipeline core, strict module boundaries, enforced file-size limits, snapshot tests on G-code, property tests on invariants.** See ADR-010 and ADR-015.
 
-**The project source code is proprietary (All Rights Reserved — ADR-018).** The dependency policy is unchanged: third-party libraries must be MIT-compatible (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD) per ADR-017. GPL-family licenses are rejected for dependencies. The license posture is reversible — promotion to a permissive license (MIT, Apache-2.0) or source-available (BSL) requires a new ADR superseding ADR-018; the criteria are listed there.
+**The project source code is MIT-licensed (ADR-120, superseding ADR-018).** The dependency policy is unchanged: third-party libraries must be MIT-compatible (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD) per ADR-017. GPL-family licenses are rejected for dependencies — the combined MIT work must stay redistributable under MIT.
 
 ---
 
@@ -114,11 +114,11 @@ On-canvas parametric shape creation — the first geometry that does NOT enter v
 
 ### Phase H — v0.8 "Router" [Built (G1–G8, then H.13–H.14 / ADR-111–112); hardware passes CLAIMED]
 
-Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-098: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. UI separation between laser and CNC modes is governed by ADR-101 (gate-and-hide); the 3D relief viewer's three.js dependency by ADR-102 (UI-only override of ADR-098 §2). Sub-phases (each = individually reviewed diffs; branch shippable after every one). Status column: Built = code + tests landed, hardware pass still CLAIMED per AUDIT.md inventory:
+Full professional CNC/router mode — LaserForge's own feature surface, not an Easel clone. Builds on the CNC MVP from commit `032d476` (mode toggle, profile/pocket/engrave CAM, depth passes, tabs, spindle/Z-aware GRBL, preflight). Scope-gated by ADR-098: all parsers clean-room, clipper2-ts the only geometry dependency, hardware verification on the 4040 via the standing air-cut protocol. UI separation between laser and CNC modes is governed by ADR-101 (gate-and-hide); the 3D relief viewer's three.js dependency by ADR-102 (UI-only override of ADR-098 §2). Sub-phases (each = individually reviewed diffs; branch shippable after every one). Status column: Built = code + tests landed, hardware pass still CLAIMED (pending real-machine verification):
 
 | Sub-phase | Delivers | Status |
 |---|---|---|
-| H.0 | Governance: ADR-098, this table, F-CNC flows, AUDIT checklist | Done |
+| H.0 | Governance: ADR-098, this table, F-CNC flows, verification checklist | Done |
 | H.1 | `CncPass` contour/path3d union (tidy-first) + overdeep-cut invariant | Built |
 | H.2 | Toolpath simulation: stock XY model, Z-aware steps, material-removal grid, depth-shaded preview | Built |
 | H.3 | True V-carving: clipper2 inward offset ladder, `tipAngleDeg` depth law, flat-bottom fallback | Built |
@@ -192,8 +192,8 @@ macOS/Linux desktop, per ADR-104's renumbering note.)
 - Staged S0–S6, each an individually reviewable CI-green diff: docs →
   math core + virtual 3D assembly referee (property-tested exact joint
   complementarity) → fit/relief → layout/orchestrator → scene insertion →
-  dialog/preview → wiring + AUDIT. Physical fit lands CLAIMED
-  (WORKFLOW.md Phase K flows, AUDIT.md row) until a real box is cut and
+  dialog/preview → wiring + verification notes. Physical fit lands CLAIMED
+  (WORKFLOW.md Phase K flows) until a real box is cut and
   assembled.
 
 **K.2 — broad-tool pack [Built (V0–V3); hardware fit CLAIMED].** ADR-116: panel
@@ -302,7 +302,7 @@ phase; tracked here so they don't get lost.
   - `license-checker` in CI (license-compliance enforcement).
   - Prettier.
 - **CI:** GitHub Actions on `ubuntu-latest`. Lint, typecheck, license-check, unit, property, snapshot, web build, and the Electron main-process compile. PR blocked on red. NOTE: the Windows desktop `.exe` (`build:desktop`, electron-builder) and E2E smoke are NOT run in CI - desktop packaging + E2E/hardware verification are release-manual (S02-001/003).
-- **Repo:** Single Git repo, proprietary license, private from first commit (ADR-018; reversible — see ADR-018 reversal triggers).
+- **Repo:** Single Git repo, MIT license, public (ADR-120 supersedes ADR-018's private posture).
 
 ---
 
@@ -474,7 +474,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
   ADR-052 and ADR-053 were wrong (ADR-052 is Scanning-offset compensation,
   ADR-053 is Verified Origin — neither governs these). Formalizing or retiring
   those reservations is an open maintainer item. Broader boolean / node editing
-  and advanced fill-pattern systems, Rayforge-style workflow graphs, and plugin
+  and advanced fill-pattern systems, node/graph-based operation editors, and plugin
   operation pipelines remain out of scope.
 - Macros, scripting, command palette, plugins, extensions.
 - Variable text (CSV / counter / date).
@@ -491,7 +491,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 | `DECISIONS.md` | Architecturally significant decisions with rationale. |
 | `CLAUDE.md` | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. |
 | `RESEARCH_LOG.md` | External claims and library adoptions, with source, version, license, date. |
-| `LICENSE` | Proprietary — All Rights Reserved (ADR-018). |
+| `LICENSE` | MIT (ADR-120). |
 
 External authorities:
 - **GRBL v1.1h wire protocol** — defined in the `gnea/grbl` wiki, which has been archived since Aug 2019. The 1.1h streaming protocol (simple send-response, character-counted buffer) remains the de-facto wire authority; actively maintained protocol-compatible forks are **grblHAL**, **FluidNC**, and **µCNC**.

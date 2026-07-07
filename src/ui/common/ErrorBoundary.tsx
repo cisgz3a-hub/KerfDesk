@@ -14,9 +14,9 @@
 //   * Try again → resets boundary state and re-renders children. If
 //     the underlying issue persists the boundary re-catches.
 //
-// No network, no analytics. Per PROJECT.md "External services: None"
-// and ADR-018 license posture (proprietary). The diagnostic blob is
-// for the user to paste into a bug report — never sent automatically.
+// No network, no analytics. Per PROJECT.md "External services: None".
+// The diagnostic blob is for the user to paste into a bug report —
+// never sent automatically.
 
 import { Component, useState, type ReactNode } from 'react';
 

@@ -2,7 +2,7 @@
 // CNC routers can cause fire, permanent eye injury, toxic fumes, and serious
 // cuts, so this is deliberately blunt. The medium is a text alert
 // (jobAwareAlert) — NO Markdown. The long-form version lives in docs/safety.md;
-// the legally-operative terms live in the accepted EULA (public/eula.txt).
+// the license + safety terms shown at install time live in public/eula.txt.
 // Keep all three in sync when the wording changes.
 
 export const SAFETY_NOTICE_TEXT = [
@@ -33,5 +33,5 @@ export const SAFETY_NOTICE_TEXT = [
   'You are responsible for safe operation and for following your machine',
   "manufacturer's instructions and your local safety regulations.",
   '',
-  'Full guide: docs/safety.md — Licence terms: the EULA (docs / installer).',
+  'Full guide: docs/safety.md — Licence: MIT (see LICENSE / installer notice).',
 ].join('\n');

@@ -37,7 +37,7 @@ function profileCamera(profile: DeviceProfile): CameraProfile {
 }
 
 describe('machine profile camera metadata', () => {
-  it('roundtrips Rayforge-style camera metadata in .lfmachine.json', () => {
+  it('roundtrips camera metadata in .lfmachine.json', () => {
     const text = serializeMachineProfileDocument({
       format: MACHINE_PROFILE_FORMAT,
       schemaVersion: MACHINE_PROFILE_SCHEMA_VERSION,

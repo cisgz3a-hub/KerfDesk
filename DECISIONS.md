@@ -5634,3 +5634,71 @@ nine). assembled-layout: unit-pinned frames for every part kind across
 styles. Preview: component tests (toggle, jsdom-safe render). Hardware
 remains CLAIMED; the coupon exists precisely to make those cuts
 informative.
+
+---
+
+## ADR-120 - MIT license, open-source release (supersedes ADR-018)
+
+**Status:** Accepted | **Date:** 2026-07-07
+
+### Context
+
+ADR-018 made the source proprietary and the repo private while the
+monetization model was undecided, and defined explicit reversal triggers.
+The maintainer has now decided to open-source the project: community
+adoption and contribution matter more than source control at this stage
+(reversal trigger 3), and the zero-install web + desktop combination is
+the product wedge, not source secrecy.
+
+ADR-018's asymmetry argument still holds: public-then-private is not
+reversible. This decision is made deliberately, with the tree cleaned
+for public consumption first: internal audit reports, study notes, and
+session plans removed from the published tree; competitor names removed
+from public-facing copy per the standing neutrality policy.
+
+### Decision
+
+- **License: MIT.** `LICENSE` is the standard MIT text, copyright
+  Johann Stolk. `package.json` declares `"license": "MIT"`.
+- **Repo visibility: public** (the flip itself is a maintainer action on
+  GitHub, executed after the release-blocking item below is resolved).
+- **Dependency policy unchanged** (ADR-017): MIT-compatible licenses only;
+  GPL-family dependencies remain rejected now because the combined MIT
+  work must stay redistributable under MIT, not merely by policy.
+- **EULA (ADR-114) reduced to a distribution notice.** With an MIT source
+  license the restrictive use-grant/no-redistribution clauses are void;
+  `public/eula.txt` becomes a License & Safety Notice (MIT grant reference,
+  machine-safety warning, warranty disclaimer, third-party pointer). The
+  NSIS installer continues to show it for safety-terms visibility.
+- **THIRD_PARTY_NOTICES.md / public/third-party-notices.txt** reworded:
+  first-party code is MIT, third-party components remain under their own
+  licenses.
+
+### Release blocker (must resolve before the visibility flip)
+
+The in-house potrace-style trace backend (`src/core/trace/potrace-*.ts`)
+has unresolved provenance: a 2026-06-10 audit found its internals mirror
+the GPL-2 potrace C implementation's details (helper names, constants,
+pipeline order) with no provenance record, and no ADR has resolved the
+finding since. If that code is derived from the GPL source, it cannot be
+published under MIT. Before the repo goes public the maintainer must
+either (a) replace the backend with a documented clean-room implementation
+from the Selinger 2003 paper, (b) revert the default trace path to the
+Unlicense imagetracerjs backend and remove the potrace-* modules, or
+(c) establish and record that the existing code was independently written.
+
+### Alternatives considered
+
+- **Apache-2.0:** adds a patent grant; heavier text. MIT matches the
+  existing dependency ecosystem and the ADR-008 posture being restored.
+- **AGPL-3.0:** protects against closed hosted forks but deters the
+  hobbyist audience and contradicts the MIT-compatible dependency story.
+- **Source-available (BSL):** not open source; fails the adoption goal.
+
+### Verification
+
+- `LICENSE` reads "MIT License" (this commit).
+- `pnpm license-check` still enforces the ADR-017 dependency allow-list.
+- `public/third-party-notices.txt` regenerated without proprietary wording.
+- The potrace provenance blocker above is tracked as an open item; the
+  visibility flip is gated on it.

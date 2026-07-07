@@ -1,6 +1,5 @@
-// Camera profile/alignment model adapted from Rayforge's MIT-licensed camera
-// configuration workflow (machine-owned camera config, lens metadata, and
-// image-to-world alignment points).
+// Camera profile/alignment model: machine-owned camera config, lens metadata,
+// and image-to-world alignment points.
 
 import { buildCameraTransforms } from './camera-transform';
 
