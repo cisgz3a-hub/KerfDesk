@@ -45,7 +45,6 @@ export type {
   AckResult,
   CreateStreamerOptions,
   OversizedLine,
-  PollDuringJob,
   StepResult,
   StreamerState,
   StreamerStatus,
