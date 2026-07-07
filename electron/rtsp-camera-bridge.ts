@@ -1,26 +1,10 @@
-import { spawn } from 'node:child_process';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
+import { writeJson } from './bridge-json.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
+import { hasFfmpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream.js';
 
 export const CAMERA_BRIDGE_PORT = 51731;
-
-// Bound concurrent ffmpeg transcodes so a burst of stream requests cannot
-// exhaust the machine (S03-001 DoS hardening).
-const MAX_CONCURRENT_FFMPEG = 4;
-let activeFfmpegCount = 0;
-
-// Reserve a concurrency slot for one ffmpeg transcode; returns an idempotent
-// release. Keeps the streamWithFfmpeg accounting to a single line (S03-001).
-function acquireFfmpegSlot(): () => void {
-  activeFfmpegCount += 1;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    activeFfmpegCount -= 1;
-  };
-}
 
 export type RtspCameraBridgeHandle = {
   readonly close: () => Promise<void>;
@@ -91,111 +75,11 @@ async function handleStream(requestUrl: URL, res: ServerResponse): Promise<void>
     writeJson(res, { kind: 'unavailable', reason: 'FFmpeg is not available on this computer.' });
     return;
   }
-  if (activeFfmpegCount >= MAX_CONCURRENT_FFMPEG) {
+  if (!hasFreeFfmpegSlot()) {
     writeJson(res, { kind: 'unavailable', reason: 'Too many concurrent camera streams.' }, 503);
     return;
   }
   streamWithFfmpeg(policy.url, res);
-}
-
-function streamWithFfmpeg(url: URL, res: ServerResponse): void {
-  const ffmpeg = spawn('ffmpeg', [
-    '-hide_banner',
-    '-loglevel',
-    'error',
-    '-rtsp_transport',
-    'tcp',
-    '-i',
-    url.toString(),
-    '-an',
-    '-vf',
-    'fps=10',
-    '-f',
-    'mpjpeg',
-    '-q:v',
-    '5',
-    'pipe:1',
-  ]);
-  const releaseSlot = acquireFfmpegSlot();
-  const stderrChunks: Buffer[] = [];
-  let clientClosed = false;
-  let responseStarted = false;
-  let settled = false;
-
-  const startupTimer = setTimeout(() => {
-    failStream(new Error('FFmpeg did not produce camera preview data.'));
-  }, 10000);
-
-  const cleanup = (): void => {
-    clearTimeout(startupTimer);
-  };
-
-  const failStream = (err: Error): void => {
-    if (settled) return;
-    settled = true;
-    cleanup();
-    ffmpeg.kill('SIGTERM');
-    if (clientClosed) return;
-    if (responseStarted || res.headersSent) {
-      res.destroy(err);
-      return;
-    }
-    writeJson(res, { kind: 'unavailable', reason: err.message }, 502);
-  };
-
-  ffmpeg.stderr.on('data', (chunk: Buffer) => {
-    appendLimitedStderrChunk(stderrChunks, chunk);
-  });
-  ffmpeg.stdout.on('data', (chunk: Buffer) => {
-    if (settled || clientClosed) return;
-    if (!responseStarted) {
-      responseStarted = true;
-      cleanup();
-      writeMjpegResponseHeaders(res);
-    }
-    if (!res.write(chunk)) ffmpeg.stdout.pause();
-  });
-  ffmpeg.stdout.on('end', () => {
-    if (!settled && responseStarted && !clientClosed) res.end();
-  });
-  res.on('drain', () => ffmpeg.stdout.resume());
-  res.on('close', () => {
-    clientClosed = true;
-    settled = true;
-    cleanup();
-    ffmpeg.kill('SIGTERM');
-  });
-  ffmpeg.on('error', (err) => {
-    releaseSlot();
-    failStream(err);
-  });
-  ffmpeg.on('exit', (code, signal) => {
-    releaseSlot();
-    if (settled) return;
-    if (code === 0 || signal === 'SIGTERM') {
-      settled = true;
-      cleanup();
-      if (responseStarted && !clientClosed) res.end();
-      return;
-    }
-    failStream(new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview failed.')));
-  });
-}
-
-function appendLimitedStderrChunk(chunks: Buffer[], chunk: Buffer): void {
-  if (Buffer.concat(chunks).length < 8192) chunks.push(Buffer.from(chunk));
-}
-
-function writeMjpegResponseHeaders(res: ServerResponse): void {
-  res.writeHead(200, {
-    'Content-Type': 'multipart/x-mixed-replace; boundary=ffmpeg',
-    'Cache-Control': 'no-store',
-  });
-}
-
-function ffmpegFailureReason(chunks: ReadonlyArray<Buffer>, fallback: string): string {
-  const stderr = Buffer.concat(chunks).toString('utf8').trim();
-  return stderr.length > 0 ? `${fallback}: ${stderr}` : fallback;
 }
 
 async function probeRtsp(url: URL): Promise<{ readonly codec?: string }> {
@@ -273,17 +157,6 @@ function parseCodec(response: string): string | undefined {
   return match?.[1]?.trim();
 }
 
-let ffmpegAvailable: Promise<boolean> | null = null;
-
-function hasFfmpeg(): Promise<boolean> {
-  ffmpegAvailable ??= new Promise((resolve) => {
-    const ffmpeg = spawn('ffmpeg', ['-version'], { stdio: 'ignore' });
-    ffmpeg.on('error', () => resolve(false));
-    ffmpeg.on('exit', (code) => resolve(code === 0));
-  });
-  return ffmpegAvailable;
-}
-
 function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
   const origin = req.headers.origin;
   const allowedOrigin = cameraBridgeCorsOrigin(typeof origin === 'string' ? origin : undefined);
@@ -321,11 +194,6 @@ function isTrustedHostedAppOrigin(origin: string): boolean {
   } catch {
     return false;
   }
-}
-
-function writeJson(res: ServerResponse, value: unknown, status = 200): void {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-  res.end(JSON.stringify(value));
 }
 
 function handleBridgeError(err: unknown, res: ServerResponse): void {
