@@ -118,8 +118,7 @@ describe('grblStrategy per-layer settings (non-negotiable #7, per layer)', () =>
       fc.property(arbPerLayerJob, (job) => {
         const ids = emitSections(job).map((section) => section.layerId);
         return (
-          ids.length === job.groups.length &&
-          ids.every((id, i) => id === job.groups[i]?.layerId)
+          ids.length === job.groups.length && ids.every((id, i) => id === job.groups[i]?.layerId)
         );
       }),
       { numRuns: FUZZ_RUNS },
