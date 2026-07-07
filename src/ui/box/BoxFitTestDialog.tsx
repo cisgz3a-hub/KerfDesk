@@ -91,61 +91,10 @@ export function BoxFitTestDialog(props: {
       }}
       size="sm"
     >
-      <div style={gridStyle}>
-        <CalibrationNumberField
-          label="Material thickness (mm)"
-          value={draft.thickness}
-          min={0.1}
-          max={undefined}
-          step="any"
-          onChange={setField('thickness')}
-        />
-        <CalibrationNumberField
-          label="Finger width"
-          value={draft.fingerWidth}
-          min={0.5}
-          max={undefined}
-          step="any"
-          onChange={setField('fingerWidth')}
-        />
-        <CalibrationNumberField
-          label="Ladder start"
-          value={draft.start}
-          min={0}
-          max={undefined}
-          step="any"
-          onChange={setField('start')}
-        />
-        <CalibrationNumberField
-          label="Ladder step"
-          value={draft.step}
-          min={0.01}
-          max={undefined}
-          step="any"
-          onChange={setField('step')}
-        />
-        <CalibrationNumberField
-          label="Rungs"
-          value={draft.rungs}
-          min={2}
-          max={12}
-          step={1}
-          onChange={setField('rungs')}
-        />
-        {props.machine.kind === 'cnc' ? (
-          <CalibrationNumberField
-            label="Relief tool diameter"
-            value={draft.toolDiameter}
-            min={0.1}
-            max={undefined}
-            step="any"
-            onChange={setField('toolDiameter')}
-          />
-        ) : null}
-      </div>
+      <FitTestFields draft={draft} isCnc={props.machine.kind === 'cnc'} setField={setField} />
       <p style={hintStyle}>
-        Cut both strips, press each rung together, and enter the best rung’s clearance
-        (start + rung × step, counted from the narrow-margin end) in the Box Generator.
+        Cut both strips, press each rung together, and enter the best rung’s clearance (start + rung
+        × step, counted from the narrow-margin end) in the Box Generator.
       </p>
       {result.kind === 'invalid' ? (
         <div role="alert" style={issueBlockStyle}>
@@ -171,7 +120,73 @@ export function BoxFitTestDialog(props: {
   );
 }
 
+function FitTestFields(props: {
+  readonly draft: FitTestDraft;
+  readonly isCnc: boolean;
+  readonly setField: (field: keyof FitTestDraft) => (event: ChangeEvent<HTMLInputElement>) => void;
+}): JSX.Element {
+  const { draft, setField } = props;
+  return (
+    <div style={gridStyle}>
+      <CalibrationNumberField
+        label="Material thickness (mm)"
+        value={draft.thickness}
+        min={0.1}
+        max={undefined}
+        step="any"
+        onChange={setField('thickness')}
+      />
+      <CalibrationNumberField
+        label="Finger width"
+        value={draft.fingerWidth}
+        min={0.5}
+        max={undefined}
+        step="any"
+        onChange={setField('fingerWidth')}
+      />
+      <CalibrationNumberField
+        label="Ladder start"
+        value={draft.start}
+        min={0}
+        max={undefined}
+        step="any"
+        onChange={setField('start')}
+      />
+      <CalibrationNumberField
+        label="Ladder step"
+        value={draft.step}
+        min={0.01}
+        max={undefined}
+        step="any"
+        onChange={setField('step')}
+      />
+      <CalibrationNumberField
+        label="Rungs"
+        value={draft.rungs}
+        min={2}
+        max={12}
+        step={1}
+        onChange={setField('rungs')}
+      />
+      {props.isCnc ? (
+        <CalibrationNumberField
+          label="Relief tool diameter"
+          value={draft.toolDiameter}
+          min={0.1}
+          max={undefined}
+          step="any"
+          onChange={setField('toolDiameter')}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 };
-const hintStyle: CSSProperties = { fontSize: 12, color: 'var(--lf-text-muted)', margin: '8px 0 4px' };
+const hintStyle: CSSProperties = {
+  fontSize: 12,
+  color: 'var(--lf-text-muted)',
+  margin: '8px 0 4px',
+};
 const issueBlockStyle: CSSProperties = { display: 'flex', flexDirection: 'column', gap: 2 };
 const issueStyle: CSSProperties = { fontSize: 12, color: 'var(--lf-danger-fg)', margin: 0 };

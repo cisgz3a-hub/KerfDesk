@@ -44,7 +44,10 @@ export function generateFitCoupon(spec: FitCouponSpec): FitCouponResult {
     ['Fit comb', combStrip(spec, 0)],
     ['Fit slots', slotStrip(spec, bodyMm(spec) + spec.thicknessMm + STRIP_GAP_MM)],
   ] as const) {
-    const fit = applyPanelFit({ outline: ring, cutouts: [] }, { clearanceMm: 0, relief: spec.relief });
+    const fit = applyPanelFit(
+      { outline: ring, cutouts: [] },
+      { clearanceMm: 0, relief: spec.relief },
+    );
     if (fit.kind !== 'fitted') return { kind: 'error', message: `${name}: ${fit.detail}.` };
     parts.push({ name, rings: { outline: fit.outline, cutouts: fit.cutouts } });
   }
@@ -52,6 +55,26 @@ export function generateFitCoupon(spec: FitCouponSpec): FitCouponResult {
 }
 
 function validate(spec: FitCouponSpec): BoxSpecIssue[] {
+  const issues = collectFieldIssues(spec);
+  if (issues.length > 0) return issues;
+  const topMm = fitCouponClearanceMm(spec, spec.rungCount - 1);
+  const limitMm = Math.min(spec.fingerWidthMm, spec.thicknessMm) / 2;
+  if (topMm >= limitMm) {
+    issues.push({
+      field: 'clearance',
+      message: `The top rung (${round2(topMm)} mm) reaches half the smallest joint dimension (${round2(limitMm)} mm) — shorten the ladder.`,
+    });
+  }
+  if (spec.relief.kind === 'corner-overcut' && spec.relief.toolDiameterMm >= spec.fingerWidthMm) {
+    issues.push({
+      field: 'reliefTool',
+      message: `Finger width ${round2(spec.fingerWidthMm)} mm is not larger than the ${round2(spec.relief.toolDiameterMm)} mm relief tool.`,
+    });
+  }
+  return issues;
+}
+
+function collectFieldIssues(spec: FitCouponSpec): BoxSpecIssue[] {
   const issues: BoxSpecIssue[] = [];
   for (const [field, value] of [
     ['thickness', spec.thicknessMm],
@@ -66,21 +89,9 @@ function validate(spec: FitCouponSpec): BoxSpecIssue[] {
     issues.push({ field: 'clearance', message: 'Ladder start must be 0 or greater.' });
   }
   if (!Number.isInteger(spec.rungCount) || spec.rungCount < 2 || spec.rungCount > MAX_RUNGS) {
-    issues.push({ field: 'clearance', message: `Rung count must be a whole number from 2 to ${MAX_RUNGS}.` });
-  }
-  if (issues.length > 0) return issues;
-  const topMm = fitCouponClearanceMm(spec, spec.rungCount - 1);
-  const limitMm = Math.min(spec.fingerWidthMm, spec.thicknessMm) / 2;
-  if (topMm >= limitMm) {
     issues.push({
       field: 'clearance',
-      message: `The top rung (${round2(topMm)} mm) reaches half the smallest joint dimension (${round2(limitMm)} mm) — shorten the ladder.`,
-    });
-  }
-  if (spec.relief.kind === 'corner-overcut' && spec.relief.toolDiameterMm >= spec.fingerWidthMm) {
-    issues.push({
-      field: 'reliefTool',
-      message: `Finger width ${round2(spec.fingerWidthMm)} mm is not larger than the ${round2(spec.relief.toolDiameterMm)} mm relief tool.`,
+      message: `Rung count must be a whole number from 2 to ${MAX_RUNGS}.`,
     });
   }
   return issues;
