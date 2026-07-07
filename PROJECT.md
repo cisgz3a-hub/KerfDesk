@@ -1,6 +1,6 @@
 # PROJECT.md — LaserForge 2.0
 
-> **Status:** v3.3 — MIT license, open-source release (ADR-118 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
+> **Status:** v3.3 — MIT license, open-source release (ADR-120 supersedes ADR-018); MIT-compatible dependency policy preserved (ADR-017); DOMPurify pinned for Phase A SVG sanitization. Changes from here require a `DECISIONS.md` entry.
 >
 > **Read also:** `WORKFLOW.md` for user flows. `DECISIONS.md` for architecture rationale. `CLAUDE.md` for the operating manual Claude Code reads each session.
 
@@ -16,7 +16,7 @@ It deliberately copies LightBurn's UX shape and workflow. It deliberately does n
 
 The 1.0 codebase shipped a working app but had a coupling problem: fixes in one module broke others. **2.0 is a clean rewrite designed against shotgun-surgery from day one — pure-function pipeline core, strict module boundaries, enforced file-size limits, snapshot tests on G-code, property tests on invariants.** See ADR-010 and ADR-015.
 
-**The project source code is MIT-licensed (ADR-118, superseding ADR-018).** The dependency policy is unchanged: third-party libraries must be MIT-compatible (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD) per ADR-017. GPL-family licenses are rejected for dependencies — the combined MIT work must stay redistributable under MIT.
+**The project source code is MIT-licensed (ADR-120, superseding ADR-018).** The dependency policy is unchanged: third-party libraries must be MIT-compatible (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD) per ADR-017. GPL-family licenses are rejected for dependencies — the combined MIT work must stay redistributable under MIT.
 
 ---
 
@@ -302,7 +302,7 @@ phase; tracked here so they don't get lost.
   - `license-checker` in CI (license-compliance enforcement).
   - Prettier.
 - **CI:** GitHub Actions on `ubuntu-latest`. Lint, typecheck, license-check, unit, property, snapshot, web build, and the Electron main-process compile. PR blocked on red. NOTE: the Windows desktop `.exe` (`build:desktop`, electron-builder) and E2E smoke are NOT run in CI - desktop packaging + E2E/hardware verification are release-manual (S02-001/003).
-- **Repo:** Single Git repo, MIT license, public (ADR-118 supersedes ADR-018's private posture).
+- **Repo:** Single Git repo, MIT license, public (ADR-120 supersedes ADR-018's private posture).
 
 ---
 
@@ -491,7 +491,7 @@ Reject any of these mid-development without a `PROJECT.md` revision and a `DECIS
 | `DECISIONS.md` | Architecturally significant decisions with rationale. |
 | `CLAUDE.md` | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. |
 | `RESEARCH_LOG.md` | External claims and library adoptions, with source, version, license, date. |
-| `LICENSE` | MIT (ADR-118). |
+| `LICENSE` | MIT (ADR-120). |
 
 External authorities:
 - **GRBL v1.1h wire protocol** — defined in the `gnea/grbl` wiki, which has been archived since Aug 2019. The 1.1h streaming protocol (simple send-response, character-counted buffer) remains the de-facto wire authority; actively maintained protocol-compatible forks are **grblHAL**, **FluidNC**, and **µCNC**.

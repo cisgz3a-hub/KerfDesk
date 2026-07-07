@@ -148,8 +148,9 @@ export function finishPen(args: {
   args.drawShape(
     createPolyline({ id: crypto.randomUUID(), color, spec: { points, closed: args.closed } }),
   );
-  useUiStore.getState().setPenDraft(null);
-  // Stay armed in the pen tool for back-to-back polylines (LightBurn parity +
-  // ADR-051 J3); Esc or Select exit. setPenDraft(null) already cleared the draft.
+  // Return to the Select tool after finishing a polyline (maintainer request,
+  // 2026-07-07), matching the drag-drawn shapes — rule 3 lets the maintainer
+  // override the earlier sticky default. resetToolMode also clears the draft.
+  useUiStore.getState().resetToolMode();
   return true;
 }

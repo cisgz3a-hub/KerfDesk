@@ -1,0 +1,132 @@
+import type { AirAssistCommand } from '../../core/devices';
+import {
+  machineKindOf,
+  sceneObjectUsesLayerColor,
+  type Layer,
+  type Project,
+  type Scene,
+  type SceneObject,
+} from '../../core/scene';
+import { pushUndo, type StateSlice } from './scene-mutations';
+
+export const DEFAULT_MANUAL_AIR_COMMAND: AirAssistCommand = 'M7';
+
+export type AirAssistDefaultSyncSummary = {
+  readonly airOutputUnset: boolean;
+  readonly disabledOutputLayerCount: number;
+  readonly disabledObjectOverrideCount: number;
+  readonly needsSync: boolean;
+};
+
+type AirAssistDefaultState = StateSlice;
+
+type AirAssistDefaultMutation =
+  | {
+      readonly project: Project;
+      readonly undoStack: ReadonlyArray<Project>;
+      readonly redoStack: ReadonlyArray<Project>;
+      readonly dirty: true;
+    }
+  | Record<string, never>;
+
+type AirAssistDefaultSet = (fn: (state: AirAssistDefaultState) => AirAssistDefaultMutation) => void;
+
+export type AirAssistDefaultActions = {
+  readonly syncProjectAirAssistDefaults: () => AirAssistDefaultSyncSummary;
+};
+
+export function projectAirAssistDefaultSyncSummary(project: Project): AirAssistDefaultSyncSummary {
+  const outputLayers = outputLaserLayers(project);
+  const outputLayerColors = new Set(outputLayers.map((layer) => layer.color));
+  const disabledOutputLayerCount = outputLayers.filter((layer) => !layer.airAssist).length;
+  const disabledObjectOverrideCount = project.scene.objects.filter((object) =>
+    hasDisabledAirOverrideOnOutputLayer(object, outputLayerColors),
+  ).length;
+  const airOutputUnset = project.device.airAssistCommand === 'none';
+  return {
+    airOutputUnset,
+    disabledOutputLayerCount,
+    disabledObjectOverrideCount,
+    needsSync: airOutputUnset || disabledOutputLayerCount > 0 || disabledObjectOverrideCount > 0,
+  };
+}
+
+export function airAssistDefaultActions(
+  set: AirAssistDefaultSet,
+  get: () => AirAssistDefaultState,
+): AirAssistDefaultActions {
+  return {
+    syncProjectAirAssistDefaults: () => {
+      const summary = projectAirAssistDefaultSyncSummary(get().project);
+      if (!summary.needsSync) return summary;
+      set((state) => {
+        const project = projectWithAirAssistDefaults(state.project);
+        if (project === state.project) return {};
+        return {
+          project,
+          undoStack: pushUndo(state.project, state.undoStack),
+          redoStack: [],
+          dirty: true,
+        };
+      });
+      return summary;
+    },
+  };
+}
+
+function projectWithAirAssistDefaults(project: Project): Project {
+  const device =
+    project.device.airAssistCommand === 'none'
+      ? { ...project.device, airAssistCommand: DEFAULT_MANUAL_AIR_COMMAND }
+      : project.device;
+  const scene = sceneWithAirAssistDefaults(project);
+  if (device === project.device && scene === project.scene) return project;
+  return { ...project, device, scene };
+}
+
+function sceneWithAirAssistDefaults(project: Project): Scene {
+  const outputLayers = outputLaserLayers(project);
+  const outputLayerColors = new Set(outputLayers.map((layer) => layer.color));
+  const layers = mapChanged(project.scene.layers, (layer) =>
+    outputLayerColors.has(layer.color) && !layer.airAssist ? { ...layer, airAssist: true } : layer,
+  );
+  const objects = mapChanged(project.scene.objects, (object) =>
+    objectWithAirAssistOverrideEnabled(object, outputLayerColors),
+  );
+  if (layers === project.scene.layers && objects === project.scene.objects) return project.scene;
+  return { ...project.scene, layers, objects };
+}
+
+function outputLaserLayers(project: Project): ReadonlyArray<Layer> {
+  if (machineKindOf(project.machine) === 'cnc') return [];
+  return project.scene.layers.filter((layer) => layer.output);
+}
+
+function objectWithAirAssistOverrideEnabled(
+  object: SceneObject,
+  outputLayerColors: ReadonlySet<string>,
+): SceneObject {
+  if (!hasDisabledAirOverrideOnOutputLayer(object, outputLayerColors)) return object;
+  return { ...object, operationOverride: { ...object.operationOverride, airAssist: true } };
+}
+
+function hasDisabledAirOverrideOnOutputLayer(
+  object: SceneObject,
+  outputLayerColors: ReadonlySet<string>,
+): boolean {
+  if (object.operationOverride?.airAssist !== false) return false;
+  for (const color of outputLayerColors) {
+    if (sceneObjectUsesLayerColor(object, color)) return true;
+  }
+  return false;
+}
+
+function mapChanged<T>(items: ReadonlyArray<T>, mapItem: (item: T) => T): ReadonlyArray<T> {
+  let changed = false;
+  const next = items.map((item) => {
+    const mapped = mapItem(item);
+    if (mapped !== item) changed = true;
+    return mapped;
+  });
+  return changed ? next : items;
+}

@@ -56,6 +56,10 @@ export type LaserSafetyNotice =
       readonly message: string;
     }
   | {
+      readonly kind: 'controller-reboot';
+      readonly message: string;
+    }
+  | {
       readonly kind: 'frame-limit';
       readonly message: string;
     };
@@ -72,6 +76,20 @@ export const STREAM_STALLED_MESSAGE =
 
 export function streamStalledNotice(): LaserSafetyNotice {
   return { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE };
+}
+
+// Audit F2: a welcome banner while the stream was still live means the
+// controller rebooted UNCOMMANDED (every commanded reset cancels the streamer
+// before its banner can arrive). The reboot discarded all buffered motion, so
+// the job is over — but the head is parked mid-cut and the work is ruined
+// unless re-run from a known origin.
+export const CONTROLLER_REBOOT_DURING_JOB_MESSAGE =
+  'The controller rebooted while a job was streaming (its startup banner arrived mid-job). ' +
+  'The job was aborted and buffered motion is lost. Check the USB cable and controller power, ' +
+  'then re-home before running the job again.';
+
+export function controllerRebootNotice(): LaserSafetyNotice {
+  return { kind: 'controller-reboot', message: CONTROLLER_REBOOT_DURING_JOB_MESSAGE };
 }
 
 export const DISCONNECT_DURING_JOB_MESSAGE =

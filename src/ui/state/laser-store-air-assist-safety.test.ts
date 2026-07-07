@@ -138,8 +138,15 @@ describe('laser store air assist safety cleanup', () => {
     await useLaserStore.getState().stopJob();
 
     expect(writes.join('')).toContain(RT_SOFT_RESET);
-    expect(writes.join('')).toContain('M9\n');
     expect(useLaserStore.getState().airAssistOn).toBe(false);
+
+    // The M9 cleanup is deferred until the post-reset boot banner (audit F2)
+    // so its ack cannot be swallowed mid-boot or orphaned by the banner's
+    // untracked-ledger reset.
+    expect(writes.join('')).not.toContain('M9\n');
+    connection.emitLine('Grbl 1.1f');
+    await flushConnect();
+    expect(writes.join('')).toContain('M9\n');
   });
 
   it('sends soft reset before coolant off when disconnecting an active job', async () => {

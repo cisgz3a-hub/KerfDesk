@@ -23,9 +23,8 @@
 | ADR-015 | 2026-05-26 | Accepted | File-size discipline and anti-god-file enforcement |
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
-| ADR-018 | 2026-05-27 | Superseded | Proprietary license, private repo (supersedes ADR-008; see ADR-118) |
+| ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
-| ADR-118 | 2026-07-07 | Accepted | MIT license, open-source release (supersedes ADR-018) |
 
 ---
 
@@ -40,7 +39,7 @@ LaserForge 2.0 enters a category dominated by LightBurn with credible open-sourc
 Adopt LightBurn's user-facing workflow and naming: workspace with bed dimensions, color-as-layer, Cuts/Layers window, preview in-viewport, Laser window for streaming control, `.lf2` project files analogous to `.lbrn`.
 
 ### Alternatives considered
-- **Other open-source laser tools' workflow models:** rejected — smaller install bases, less familiar to the target audience.
+- **Rayforge model:** rejected — smaller install base.
 - **Invent a new workflow:** rejected — no evidence LightBurn's model is the bottleneck.
 - **Clone LightBurn 1:1:** rejected — feature breadth contradicts ADR-010, ADR-015.
 
@@ -309,7 +308,7 @@ Reviewer answers "what should this UI do?" from `WORKFLOW.md` alone; "why this a
 **Status:** Accepted | **Date:** 2026-05-26
 
 ### Context
-The project source code is MIT-licensed (ADR-118; it was proprietary under ADR-018 when this ADR was written) and uses MIT-compatible dependencies freely (the dep-policy half of the original ADR-008 survived every license-posture change unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
+The project source code is proprietary (ADR-018) but uses MIT-compatible dependencies freely (the dep-policy half of the original ADR-008 survived into ADR-018 unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
 
 It is also the most common cause of project drift. "We can add X because the library is free" is the most common rationalization that leads to scope explosions, dependency bloat, and the exact cascading-bug pattern Q10 warned against. Library availability does not change product scope. The phase plan in `PROJECT.md` is what determines what ships when.
 
@@ -412,7 +411,7 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 ## ADR-018 — Proprietary license, private repo (supersedes ADR-008)
 
-**Status:** Superseded by ADR-118 | **Date:** 2026-05-27
+**Status:** Accepted | **Date:** 2026-05-27
 
 ### Context
 ADR-008 committed the project to MIT and a public repo from the first
@@ -1200,8 +1199,18 @@ An audit of the shipped feature (findings fixed the same day) pins the following
 2. **Default Brightness shipped (the A5 brightness half).** The dialog exposes LightBurn's Default Brightness (percent, default 50). Mapping is `floor(255 × pct/100)` — floor, not round, so 50% stays at 127 per (1). LightBurn's own default is 50% (§7.4).
 3. **Conversion DPI range is 127–635, derived, a deliberate divergence.** LightBurn's dialog offers 10–2000 DPI, but LightBurn keeps image resolution and the Image layer's interval independent; our model stamps the conversion DPI onto the created image layer's `linesPerMm` (§6 placement). The legal range therefore derives from the app-wide raster density limits (`MIN/MAX_RASTER_LINES_PER_MM` = 5–25 lines/mm) — outside it, Convert would mint layers the Cuts panel clamps to a different density on the next edit. Revisit if image resolution and layer interval are ever decoupled.
 4. **Size estimates are full-transform.** The dialog's pixel estimate uses the rotated AABB (`transformedBounds`), matching what the builder rasterizes — the original scale-only estimate approved rotated conversions the builder then refused. The bake itself (per the 2026-06-09 transform-bake plan) emits baked bounds + IDENTITY transform, which also sidesteps the raster output path's no-rotation limitation.
-5. **Single-selection gate.** The command (and `Ctrl/Cmd+Shift+B`, now bound — LightBurn's shortcut, §7.4) is enabled only for a selection of exactly one convertible vector. LightBurn converts a whole multi-selection into **one** bitmap; that merge is a scoped follow-up feature, not a gate relaxation — the pre-fix behavior (silently converting only the primary object of a multi-selection) was a defect.
+5. **Single-selection gate.** The command (and `Ctrl/Cmd+Shift+B`, now bound — LightBurn's shortcut, §7.4) is enabled only for a selection of exactly one convertible vector. LightBurn converts a whole multi-selection into **one** bitmap; that merge is a scoped follow-up feature, not a gate relaxation — the pre-fix behavior (silently converting only the primary object of a multi-selection) was a defect. _(Superseded by amendment ii below: the merge shipped.)_
 6. **Menu placement divergence.** LightBurn houses Convert to Bitmap under **Edit**; ours lives under **Tools**, grouped with Convert to Path and the other conversions. Deliberate (one conversions home), per ADR-027 §4.
+
+### Amendment 2026-07-07 (ii) — multi-selection merges into one bitmap
+
+The follow-up from amendment (i) §5 shipped the same day:
+
+1. **The whole selection converts as ONE `RasterImage`** spanning the union of the members' rotation-aware AABBs, LightBurn-faithful. Every source vector is deleted; the swap is a **single undo entry**, and the merged bitmap becomes the sole selection (stale additional-selection ids are cleared).
+2. **Cross-object even-odd.** Fill All rasterizes the concatenated baked contours of the whole selection with one even-odd pass — a shape nested inside _another object's_ shape reads as a hole. This matches LightBurn's "solid fill of areas between outlines" **and** our own Fill mode, which hatches a layer's contours together (`collectFillContoursForLayer`). Use Cut Settings groups per path color across all members, as before.
+3. **Gate: every selected object must be a convertible vector** (`selectedConvertibleVectors`, scene order). A mixed selection (e.g. a raster among vectors) stays disabled rather than converting an ambiguous subset. Same gate for the menu command, toolbar, context bar, and `Ctrl/Cmd+Shift+B`.
+4. **Naming:** a multi-object result is labeled `N objects (bitmap)`; the dialog shows `N objects` and estimates from the combined bounds, so the size preview still matches exactly what the builder produces.
+5. The worker protocol carries the full selection (`vectors`); budget refusal (4 M px) applies to the combined grid, refusing up front in the dialog.
 
 ---
 
@@ -1370,9 +1379,9 @@ reference:
   returns without engraving.
 - LightBurn documents overscanning as laser-off runway before/after each
   row so the marked span happens at steadier speed.
-- Other open-source raster engravers document the same tradeoff:
-  bidirectional is faster, while unidirectional can be more consistent
-  if the machine has backlash.
+- Rayforge documents the same tradeoff for raster: bidirectional is
+  faster, while unidirectional can be more consistent if the machine has
+  backlash.
 - LightBurn's Scanning Offset Adjustment page documents the calibration
   caveat: at high speeds, bidirectional rows can show ghosted or shifted
   edges if machine response delay or belt stretch is not compensated.
@@ -2812,10 +2821,10 @@ offset that the Falcon hides is large enough on the 4040 to split every vertical
 edge. Unidirectional (ADR-038) fixes it but halves fill throughput. We want the
 zipper gone *and* bidirectional speed kept.
 
-Reference check (recorded in RESEARCH_LOG): a surveyed open-source Rust raster
-core structures bidirectional sweeps as `is_reversed = index % 2` plus an
+Reference check (recorded in RESEARCH_LOG): `barebaric/raygeo` (Rayforge's Rust
+raster core) structures bidirectional sweeps as `is_reversed = index % 2` plus an
 endpoint swap and applies **no** lag compensation — same blind spot we have, and
-nothing is borrowed from it. The serpentine-by-parity idea is the
+it is unlicensed, so nothing is borrowed. The serpentine-by-parity idea is the
 standard unprotectable technique; the implementation here is written fresh
 against our own `Vec2` / sweep types.
 
@@ -4620,10 +4629,10 @@ design is built around:
 
 `PROJECT.md` listed "Camera alignment, overhead camera" under Out of scope; the maintainer
 requested it. LightBurn's camera (capture → lens calibration → 4-marker alignment → live
-overlay → print-and-cut → capture-to-trace) is the behavioral reference. Open-source
-implementations were read directly: MeerK40t `camera.py` (`cv2.getPerspectiveTransform` from
-four manually dragged corners, no RANSAC) and OpenPnP (fiducial detection + intrinsic
-calibration), plus the standard image y-down → bed y-up flip convention. An adversarial
+overlay → print-and-cut → capture-to-trace) is the behavioral reference. Competitor source
+was read directly: MeerK40t `camera.py` (`cv2.getPerspectiveTransform` from four manually
+dragged corners, no RANSAC), Rayforge (capture-to-trace, `findHomography` with an image
+y-down → bed y-up flip), OpenPnP (fiducial detection + intrinsic calibration). An adversarial
 second audit verified the math against that code and found no errors.
 
 The decisive constraint is the < 1 MB compressed web-bundle target (ADR-017): OpenCV.js
@@ -4691,7 +4700,7 @@ non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-108 / 109 
 The Falcon A1 Pro (like most laser bed cameras) uses a wide-angle lens, so the live feed
 is visibly barrel-bowed. The ADR-107 4-point homography corrects perspective only — it
 pins the four corners but cannot remove lens curvature, so straight bed edges stay curved.
-A camera-implementation study (MeerK40t, OpenPnP, LightBurn, LaserWeb4, OpenCV)
+A camera-implementation study (MeerK40t, OpenPnP, LightBurn, Rayforge, LaserWeb4, OpenCV)
 confirmed the universal fix: a lens-distortion model applied to the frame **before** the
 homography.
 
@@ -4707,8 +4716,8 @@ equations are clean-roomed in TypeScript from the published Kannala-Brandt model
    uses exactly this (`cv2.fisheye`) for the same hardware class. Pure-TS forward
    (`θ_d = θ(1 + k1θ² + k2θ⁴ + k3θ⁶ + k4θ⁸)`) plus a Newton inverse.
 2. **Calibration: guided board.** Print a checkerboard, capture ~5 poses (4 corners +
-   centre) with a per-capture reprojection-error score and per-quadrant
-   coverage feedback; fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
+   centre) with a per-capture reprojection-error score (LightBurn) and per-quadrant
+   coverage feedback (Rayforge); fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
    Levenberg-Marquardt minimiser over reprojection error. ChArUco is rejected — its ArUco
    decode needs an LGPL bundle barred by ADR-107; a plain checkerboard detects clean-room.
 3. **Render: WebGL fragment shader.** The inverse-distortion sampling runs per-pixel on the
@@ -5177,8 +5186,8 @@ the repo LICENSE (ADR-018) affirmatively denies everyone the right to *use* the
 software and no EULA, terms surface, or machine-safety disclaimer existed
 anywhere a customer could see. Separately, the bundled Roboto (Apache-2.0) and
 three OFL-1.1 fonts plus all nine production npm packages shipped without the
-license texts their licenses require — THIRD_PARTY_NOTICES.md was incomplete
-and was not bundled.
+license texts their licenses require — THIRD_PARTY_NOTICES.md covered only the
+Rayforge camera adaptation and was not bundled.
 
 **Decision.**
 1. `public/eula.txt` is the customer-facing End User License Agreement: use
@@ -5468,9 +5477,167 @@ NOT verified: the packaged Electron runtime grant, and a real hours-long
 burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
 runs one.
 
+## ADR-118 — Interrupted-job checkpoint: fingerprint-verified resume after a crash (2026-07-07)
+
+**Status:** accepted.
+
+### Context
+
+If the app dies mid-stream (tab crash, OS kill, power blip), the job is
+simply gone from the app's point of view: the operator must guess which
+G-code line the machine stopped at and enter it into Start-from-line by
+hand. The 2026-07-07 trust audit called this out (gap 3b): for a
+multi-hour job, "guess the line" is the difference between salvaging a
+workpiece and scrapping it.
+
+Two existing pillars make a cheap, correct fix possible:
+
+1. **Deterministic G-code (non-negotiable #5).** Start-from-line already
+   RE-COMPILES the program from the current project
+   (`runStartFromLineFlow` → `prepareStartJob` → `prepared.gcode`); byte
+   determinism is what keeps its line numbers valid. A checkpoint
+   therefore never needs to persist the G-code text (raster jobs exceed
+   localStorage quotas) — only a fingerprint of it.
+2. **Autosave recovery (Phase C).** The project itself is already
+   restored after a crash, so re-compilation has its input.
+
+### Decision
+
+- **Pure core module `src/core/recovery/job-checkpoint.ts`:** a
+  `JobCheckpoint` = FNV-1a fingerprint of the streamed text (hash, char
+  count, raw line count) + the acked count + machine kind + ISO
+  timestamps (passed in — core cannot read the clock). Two numbering
+  systems meet here and must not be confused: the streamer's
+  `completed`/`total` count SENDABLE lines (blanks and full-line
+  comments are never streamed — `isSendableGcodeLine`, now exported from
+  the streamer as the single definition), while `buildResumeProgram` and
+  Start-from-line speak RAW file lines. The checkpoint stores the acked
+  SENDABLE count plus the program's sendable total; `rawResumeLine`
+  converts acked-sendable back to the raw line number against the
+  re-compiled text at resume time. Strict `parse` validation and
+  monotonic `advance`.
+- **Write path:** `runStartJobFlow` writes the initial checkpoint right
+  after the stream starts. A `use-job-checkpoint` hook (App-mounted,
+  laser-store-subscribed like ADR-117's wake lock) advances
+  `ackedLines` from `streamer.completed` — every 25 acked lines while
+  streaming, immediately on any status transition (pause, error,
+  disconnect, cancel). The checkpoint is a ~200-byte localStorage
+  record; the hook re-reads it per store fire (microseconds) so there is
+  no cache to go stale.
+- **Clear-on-done only.** A checkpoint survives Stop, error, disconnect,
+  and crash; only a run reaching `done` (all lines acked) clears it —
+  a deliberately stopped job is still resumable, and the banner's
+  Dismiss is the explicit discard.
+- **Resume path is the EXISTING one, gated by the fingerprint.** The
+  recovery banner (Laser window, shown when a checkpoint with progress
+  exists and no job is active) calls `runCheckpointResumeFlow`: it
+  re-compiles, REFUSES when the fingerprint of `prepared.gcode` differs
+  — an edited project silently producing different line numbers is
+  exactly the failure this gate exists to stop — then maps the acked
+  count to the raw resume line and hands off to the shared
+  Start-from-line body. Manual Start-from-line stays ungated (the
+  free-form escape hatch).
+- **Resume runs are not themselves checkpointed (v1).** A resume program
+  (preamble + tail) has its own line numbering; mapping a crash inside
+  it back to original coordinates is deferred. Both resume flows stamp
+  `resumeInFlight` on the stored checkpoint before streaming, and the
+  hook additionally requires the streamer total to equal the
+  checkpoint's sendable count — belt and braces so foreign ack counts
+  can never corrupt the record. If a resume run finishes, the job is
+  done and the checkpoint clears; if it dies, the ORIGINAL checkpoint
+  still stands — stale toward earlier lines, which re-burns a short
+  stretch rather than leaving a gap.
+
+### Consequences
+
+- After a crash: relaunch → autosave restores the project → banner
+  offers "resume from line N" → recompile + fingerprint check → the
+  proven resume preamble (ADR-103 G7) re-enters the cut. No G-code file
+  round-trip, no guessing.
+- `ackedLines` measures GRBL acks (parsed into the RX buffer), not
+  execution. If the CONTROLLER also lost power, up to a buffer's worth
+  of acked lines never ran — the mapped resume line can be a few lines
+  late. The banner says so; the manual Start-from-line control remains
+  the operator-editable escape hatch. Backing up re-burns, skipping
+  forward leaves gaps, so the conservative direction is down. If only
+  the app died, GRBL finished its buffer and the mapped line is exact.
+- Work zero must be unchanged — same contract as manual Start-from-line
+  (the existing confirm says it).
+- localStorage writes on the ack path are throttled (25 lines) and
+  ~200 bytes; failures (quota, private mode) are swallowed — a
+  checkpoint is best-effort protection, never a reason to block a job.
+
+### Verification
+
+Core: fingerprint determinism/sensitivity, parse rejection corpus,
+advance monotonicity, resume-line clamping. Storage: round-trip +
+corrupt-payload clearing. Hook: interval + transition write policy,
+freeze on foreign totals, clear-on-done. Flow: checkpoint written on
+start, fingerprint mismatch refuses with no stream. Banner: render /
+dismiss / hidden-while-active. NOT verified: a real crash + resume on
+hardware — CLAIMED in AUDIT.md until the maintainer kills the app
+mid-burn and resumes.
+
+## ADR-119 — Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07)
+
+**Status:** accepted.
+**Numbering note:** drafted as ADR-118, but the interrupted-job
+checkpoint published 118 on `main` first — published numbers win
+(ADR-104 precedent). Pre-merge commit messages say ADR-118; read them
+as this ADR.
+
+**Status detail:** accepted (maintainer: "yes build it" on the ranked
+improvement assessment). Builds on ADR-106/116.
+
+### Context
+
+The generator's joints are referee-proven, but the clearance NUMBER is a
+guess until material is cut — and the flat-sheet preview makes users
+assemble the box in their heads. Both gaps close with existing
+machinery: the calibration-tool family (Material/Interval Test) and the
+generator's own placement model.
+
+### Decision 1 — fit test coupon (Tools → Box Fit Test…)
+
+- Pure core `fit-coupon.ts`: TWO strips. A comb strip carries N tabs on
+  a graduated clearance ladder (default 0.05–0.30 mm, 6 rungs,
+  start/step/count configurable); a slot strip carries the N mating
+  notches. Rung i bakes the production fit law analytically — tab width
+  f − cᵢ/2, notch width f + cᵢ/2, both T deep — so the rung that feels
+  right on the bench IS the number to type into the Box Generator.
+- Rung identification without text: i+1 index nicks (1 mm square)
+  along the strip edge under each rung.
+- CNC mode runs the slot strip through the shared relief pass
+  (corner-overcuts at notch corners, full bit radius); validation reuses
+  the box rules (f > tool, ladder < min(f, T)/2).
+- Inserts as two named vector objects (imported-svg carrier), one undo
+  step, same insertion path as box panels.
+
+### Decision 2 — assembled 3D preview
+
+- Pure core `assembled-layout.ts`: every generated part's 3D frame
+  (origin, u/v basis, normal, slab offset) — walls from the documented
+  drawing convention, dividers from their slabs, the slide lid from its
+  channel band. This is the referee's placement knowledge exposed as a
+  reusable layout (kept in sync by tests, not imports).
+- UI: the Box Generator preview gains a Flat/Assembled toggle. The
+  assembled view is a Canvas2D isometric projection (extruded plates,
+  painter-sorted, even-odd fill so cutouts read as holes) — deliberately
+  NOT three.js: a dialog preview needs no camera, no lazy chunk, and
+  must render under jsdom guards like BoxPreview does.
+
+### Verification
+
+fit-coupon: exact per-rung width law (notch − tab == cᵢ), determinism,
+benchmark category `fit-coupon` (must hold 100% alongside the existing
+nine). assembled-layout: unit-pinned frames for every part kind across
+styles. Preview: component tests (toggle, jsdom-safe render). Hardware
+remains CLAIMED; the coupon exists precisely to make those cuts
+informative.
+
 ---
 
-## ADR-118 — MIT license, open-source release (supersedes ADR-018)
+## ADR-120 - MIT license, open-source release (supersedes ADR-018)
 
 **Status:** Accepted | **Date:** 2026-07-07
 
@@ -5483,11 +5650,11 @@ adoption and contribution matter more than source control at this stage
 (reversal trigger 3), and the zero-install web + desktop combination is
 the product wedge, not source secrecy.
 
-ADR-018's asymmetry argument still holds — public-then-private is not
-reversible — so this decision is made deliberately, with the tree cleaned
-for public consumption first (internal audit reports, study notes, and
+ADR-018's asymmetry argument still holds: public-then-private is not
+reversible. This decision is made deliberately, with the tree cleaned
+for public consumption first: internal audit reports, study notes, and
 session plans removed from the published tree; competitor names removed
-from public-facing copy per the standing neutrality policy).
+from public-facing copy per the standing neutrality policy.
 
 ### Decision
 
@@ -5496,8 +5663,8 @@ from public-facing copy per the standing neutrality policy).
 - **Repo visibility: public** (the flip itself is a maintainer action on
   GitHub, executed after the release-blocking item below is resolved).
 - **Dependency policy unchanged** (ADR-017): MIT-compatible licenses only;
-  GPL-family dependencies remain rejected — now because the *combined MIT
-  work* must stay redistributable under MIT, not merely by policy.
+  GPL-family dependencies remain rejected now because the combined MIT
+  work must stay redistributable under MIT, not merely by policy.
 - **EULA (ADR-114) reduced to a distribution notice.** With an MIT source
   license the restrictive use-grant/no-redistribution clauses are void;
   `public/eula.txt` becomes a License & Safety Notice (MIT grant reference,

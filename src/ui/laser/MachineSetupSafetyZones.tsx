@@ -1,4 +1,5 @@
 import type { NoGoZone } from '../../core/devices';
+import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { Button } from '../kit';
 import { useStore } from '../state';
 import {
@@ -106,6 +107,8 @@ function ZoneEditor(props: {
   );
 }
 
+const SAFETY_ZONE_MAX_MM = 100000;
+
 function NumberField(props: {
   readonly label: string;
   readonly value: number;
@@ -113,18 +116,16 @@ function NumberField(props: {
   readonly onChange: (value: number) => void;
 }): JSX.Element {
   return (
-    <input
-      type="number"
-      min={props.min ?? 0}
-      step={1}
-      value={props.value}
-      aria-label={props.label}
+    <ClearableNumberField
+      ariaLabel={props.label}
       title={props.label}
-      onChange={(event) => {
-        const value = Number(event.target.value);
-        if (Number.isFinite(value)) props.onChange(Math.max(props.min ?? 0, value));
-      }}
+      value={props.value}
+      min={props.min ?? 0}
+      max={SAFETY_ZONE_MAX_MM}
+      step={1}
+      onCommit={props.onChange}
       style={numberInputStyle}
+      debounceMs={0}
     />
   );
 }
