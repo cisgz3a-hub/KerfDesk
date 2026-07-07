@@ -23,6 +23,7 @@ const TOOLS: ReadonlyArray<Tool> = [
   { mode: { kind: 'draw', shape: 'polygon' }, helpKey: 'polygon', icon: 'pentagon' },
   { mode: { kind: 'draw', shape: 'star' }, helpKey: 'star', icon: 'star' },
   { mode: { kind: 'draw', shape: 'polyline' }, helpKey: 'polyline', icon: 'pen' },
+  { mode: { kind: 'position-laser' }, helpKey: 'position-laser', icon: 'crosshair' },
 ];
 
 export function ToolStrip(): JSX.Element {
@@ -63,6 +64,7 @@ function isActive(current: ToolMode, tool: ToolMode): boolean {
   if (current.kind === 'select') return tool.kind === 'select';
   if (current.kind === 'node') return tool.kind === 'node';
   if (current.kind === 'measure') return tool.kind === 'measure';
+  if (current.kind === 'position-laser') return tool.kind === 'position-laser';
   return tool.kind === 'draw' && tool.shape === current.shape;
 }
 

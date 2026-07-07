@@ -13,7 +13,8 @@ export type ToolHelpKey =
   | 'ellipse'
   | 'polygon'
   | 'star'
-  | 'polyline';
+  | 'polyline'
+  | 'position-laser';
 export type ToolHelpId = `tool:${ToolHelpKey}`;
 export type ControlHelpKey =
   | 'laser.console'
@@ -67,6 +68,11 @@ export type HelpTopic = {
 };
 
 export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
+  'position-laser': {
+    label: 'Move laser here',
+    tooltip:
+      'Click a point on the workspace (or the camera overlay) to move the laser head to that spot. Needs a connected, idle machine; the beam stays off.',
+  },
   select: {
     label: 'Select / transform',
     tooltip: 'Select, move, rotate, and resize existing artwork. Press Esc to return here.',

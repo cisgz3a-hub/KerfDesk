@@ -63,6 +63,10 @@ export type ToolMode =
   | { readonly kind: 'select' }
   | { readonly kind: 'node' }
   | { readonly kind: 'measure' }
+  // Camera/positioning aid (ADR-116 follow-up): the next canvas click jogs
+  // the laser head to that bed point (absolute, beam off). Esc returns to
+  // select like every other mode.
+  | { readonly kind: 'position-laser' }
   | { readonly kind: 'draw'; readonly shape: 'rect' | 'ellipse' | 'polygon' | 'star' | 'polyline' };
 
 // Pen-tool in-progress polyline (ADR-051 B6). Null unless the pen is mid-draw.
