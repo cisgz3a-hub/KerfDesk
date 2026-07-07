@@ -57,6 +57,10 @@ import {
   type LayerDefaultsState,
 } from './layer-default-actions';
 import {
+  airAssistDefaultActions,
+  type AirAssistDefaultActions,
+} from './air-assist-default-actions';
+import {
   MATERIAL_LIBRARY_STATE_DEFAULTS,
   currentMaterialLibraryState,
   materialLibraryActions,
@@ -143,7 +147,8 @@ export type AppState = ObjectPropertiesActions &
   SavedLibrariesActions &
   MaterialPresetActions &
   CncLibraryActions &
-  MachineActions & {
+  MachineActions &
+  AirAssistDefaultActions & {
     readonly project: Project;
     // Last CNC machine setup, kept when toggling back to laser so the
     // choice of bit/stock survives a round-trip within the session.
@@ -419,6 +424,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...cncLibraryActions(set),
   ...layerActions(set),
   ...machineActions(set),
+  ...airAssistDefaultActions(set, get),
   ...fillSelectionActions(set),
   ...vectorPathActions(set),
   ...closeOpenFillContoursActions(set),
