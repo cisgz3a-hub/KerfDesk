@@ -148,15 +148,20 @@ function fixtures(): Array<{ name: string; image: RawImageData }> {
   ];
 }
 
-it('renders Sharp preset candidates for the maintainer to pick', () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  mkdirSync(OUT_DIR, { recursive: true });
-  const sharpOptions = TRACE_PRESETS['Sharp'];
-  if (sharpOptions === undefined) throw new Error('Sharp preset missing');
-  for (const fx of fixtures())
-    for (const candidate of CANDIDATES) {
-      const paths = tracePotraceWithParams(fx.image, sharpOptions, candidate.params);
-      const png = renderTraceOverlay(fx.image, paths, SCALE);
-      writeFileSync(join(OUT_DIR, `${fx.name}__${candidate.name}.png`), png);
-    }
-}, 60000);
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'renders Sharp preset candidates for the maintainer to pick',
+  () => {
+    mkdirSync(OUT_DIR, { recursive: true });
+    const sharpOptions = TRACE_PRESETS['Sharp'];
+    if (sharpOptions === undefined) throw new Error('Sharp preset missing');
+    for (const fx of fixtures())
+      for (const candidate of CANDIDATES) {
+        const paths = tracePotraceWithParams(fx.image, sharpOptions, candidate.params);
+        const png = renderTraceOverlay(fx.image, paths, SCALE);
+        writeFileSync(join(OUT_DIR, `${fx.name}__${candidate.name}.png`), png);
+      }
+  },
+  60000,
+);

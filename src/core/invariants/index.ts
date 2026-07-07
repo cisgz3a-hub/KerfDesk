@@ -1,10 +1,13 @@
 export type { Issue, MotionBoundsOffset, OutOfBoundsCoordOptions } from './predicates';
 export {
+  collectG1FValues,
   collectG1SValues,
   expectedS,
   findLaserOnTravelIssues,
   findOutOfBoundsCoords,
 } from './predicates';
+export type { GcodeLayerSection } from './gcode-sections';
+export { splitGcodeLayerSections } from './gcode-sections';
 export type { BlankFeedIssue, BlankFeedOptions } from './blank-feed';
 export { findLongBlankFeedMoves } from './blank-feed';
 export type { CncMotionIssue } from './cnc-motion';

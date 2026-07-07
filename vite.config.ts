@@ -1,73 +1,17 @@
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+import { appVersion, buildTimeIso, gitShortSha } from './src/platform/web/build-info';
+
 // Vite config for the web build (ADR-003, ADR-009).
 // The Electron build reuses this config via electron-builder's renderer entry
 // (added when the desktop shell lands).
-
-// Build-time identifiers surfaced in the Toolbar so the user can verify
-// after a deploy that the new version actually loaded. None of these
-// values affect the bundle's behaviour; they're cosmetic readouts.
 //
-// `__BUILD_TIME__` — ISO-8601 UTC timestamp of HEAD's commit (NOT wall-clock).
-//   Derived from the commit so rebuilding or re-deploying the SAME commit yields a
-//   byte-identical bundle. A wall-clock `new Date()` here changed the bundle (and
-//   thus sw.js's precache) on every build, so every no-op redeploy / CI re-run
-//   minted a fresh service worker and nagged users with a phantom "update
-//   available" (ADR-060). Falls back to wall-clock only when git history is absent
-//   (local dev — never deployed).
-// `__GIT_SHA__` — short SHA of HEAD at build time. Falls back to
-//   "dev" when git isn't available or the working dir is clean of the
-//   repo (e.g. a CI scratch checkout without history).
-// `__APP_VERSION__` — auto build version: package.json's MAJOR.MINOR (the
-//   release line) plus the git commit count as an always-incrementing patch, so
-//   the badge changes on every commit/deploy without a manual bump. Falls back
-//   to the raw package.json version when git history isn't available. The deploy
-//   build uses fetch-depth: 0 so the count is the real total, not a shallow 1.
-function gitShortSha(): string {
-  try {
-    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
-  } catch {
-    return 'dev';
-  }
-}
-function gitCommitCount(): string | null {
-  try {
-    return execSync('git rev-list --count HEAD', { encoding: 'utf8' }).trim();
-  } catch {
-    return null;
-  }
-}
-function buildTimeIso(): string {
-  // %cI is HEAD's committer date in strict ISO-8601 (with the commit's own
-  // offset). Re-normalize to UTC via Date so the value is deterministic AND keeps
-  // the historical `…Z` shape. Deterministic given the commit — the whole point.
-  try {
-    const commitIso = execSync('git show -s --format=%cI HEAD', { encoding: 'utf8' }).trim();
-    if (commitIso !== '') return new Date(commitIso).toISOString();
-  } catch {
-    // fall through to the dev fallback below
-  }
-  // Only reached without git history (local dev); such builds are never deployed,
-  // so wall-clock non-determinism here is harmless.
-  return new Date().toISOString();
-}
-function pkgVersion(): string {
-  const pkgUrl = new URL('./package.json', import.meta.url);
-  const pkg = JSON.parse(readFileSync(fileURLToPath(pkgUrl), 'utf8')) as { version?: string };
-  return pkg.version ?? '0.0.0';
-}
-function appVersion(): string {
-  const base = pkgVersion();
-  const count = gitCommitCount();
-  if (count === null || count === '') return base;
-  const [major = '0', minor = '0'] = base.split('.');
-  return `${major}.${minor}.${count}`;
-}
+// Build-time identifiers (`__BUILD_TIME__`, `__GIT_SHA__`, `__APP_VERSION__`)
+// are derived from git so re-deploying the SAME commit yields a byte-identical
+// bundle (ADR-060). See src/platform/web/build-info.ts for the derivation and
+// its regression tests (D-S02-001).
 
 export default defineConfig({
   plugins: [
@@ -119,9 +63,14 @@ export default defineConfig({
     // Sentry-class error tracker lands, switch to `'hidden'` and
     // upload the maps server-side.
     sourcemap: false,
-    // Keep individual raw chunks below Vite's 500 KB warning threshold while
-    // the service worker still precaches every emitted asset for offline use.
-    chunkSizeWarningLimit: 500,
+    // Accepted chunk budget: 750 KB. The three.js relief-preview chunk
+    // (three.module) is ~704 KB minified — an irreducible single vendor lib we
+    // load for the CNC/relief 3D preview, so it can't be split below Vite's
+    // 500 KB default. Raising the ceiling to a documented 750 KB budget keeps a
+    // clean, warning-free build while still flagging any NEW oversized chunk.
+    // The service worker still precaches every emitted asset for offline use.
+    // A real three.js code-split is tracked as a separate refactor.
+    chunkSizeWarningLimit: 750,
     rollupOptions: {
       output: {
         manualChunks(id) {

@@ -178,4 +178,21 @@ describe('PwaUpdatePrompt', () => {
     const second = await render();
     expect(second.host.querySelector(BANNER)).not.toBeNull();
   });
+
+  it('re-shows the banner on the ALREADY-MOUNTED component when updatefound fires', async () => {
+    // The mounted-render bug: a suppressed prompt returns null, and clearing the
+    // dismissal in the `updatefound` handler must force THIS mounted instance to
+    // re-render — not merely unhide on some future remount. One render root, no
+    // second render() call.
+    h.swState.needRefresh = true;
+    saveDismissedUpdateVersion(__APP_VERSION__);
+    const { host } = await render();
+    expect(host.querySelector(BANNER)).toBeNull();
+    const call = h.registration.addEventListener.mock.calls.find((c) => c[0] === 'updatefound');
+    const onUpdateFound = call ? call[1] : undefined;
+    await act(async () => {
+      if (typeof onUpdateFound === 'function') onUpdateFound();
+    });
+    expect(host.querySelector(BANNER)).not.toBeNull();
+  });
 });

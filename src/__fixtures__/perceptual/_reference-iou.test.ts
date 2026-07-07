@@ -29,35 +29,40 @@ const STAR_TIPS = 12;
 
 type Fixture = { readonly name: string; readonly image: RawImageData; readonly height: number };
 
-it('measures our-vs-reference IoU on identical bitmaps', { timeout: 240000 }, async () => {
-  if (process.env['TRACE_AUDIT'] !== '1') return;
-  const fixtures: ReadonlyArray<Fixture> = [
-    { name: 'disc', image: discImage(), height: 180 },
-    { name: 'star', image: starImage(), height: 200 },
-  ];
-  const lines: string[] = ['=== our-output vs reference potrace 1.16 (identical bitmap) ==='];
-  for (const fixture of fixtures) {
-    const refPath = join(OUT_DIR, `${fixture.name}.json`);
-    if (!existsSync(refPath)) {
-      lines.push(`${fixture.name}: MISSING ${fixture.name}.json — run potrace step first`);
-      continue;
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
+  'measures our-vs-reference IoU on identical bitmaps',
+  { timeout: 240000 },
+  async () => {
+    const fixtures: ReadonlyArray<Fixture> = [
+      { name: 'disc', image: discImage(), height: 180 },
+      { name: 'star', image: starImage(), height: 200 },
+    ];
+    const lines: string[] = ['=== our-output vs reference potrace 1.16 (identical bitmap) ==='];
+    for (const fixture of fixtures) {
+      const refPath = join(OUT_DIR, `${fixture.name}.json`);
+      if (!existsSync(refPath)) {
+        lines.push(`${fixture.name}: MISSING ${fixture.name}.json — run potrace step first`);
+        continue;
+      }
+      const ours = await traceImageToColoredPaths(fixture.image, LINE_ART);
+      const reference = referenceGeoJsonToColoredPaths(refPath, fixture.height);
+      const w = fixture.image.width * SUPERSAMPLE;
+      const h = fixture.image.height * SUPERSAMPLE;
+      const ourMask = rasterizeColoredPaths(scalePaths(ours, SUPERSAMPLE), w, h);
+      const refMask = rasterizeColoredPaths(scalePaths(reference, SUPERSAMPLE), w, h);
+      const m = compareMasks(ourMask, refMask);
+      lines.push(
+        `${fixture.name}: IoU=${m.iou.toFixed(4)} agreement=${m.agreement.toFixed(5)} ` +
+          `precision=${m.precision.toFixed(4)} recall=${m.recall.toFixed(4)} ` +
+          `mismatchPx=${m.falsePositive + m.falseNegative} of ${w * h}`,
+      );
     }
-    const ours = await traceImageToColoredPaths(fixture.image, LINE_ART);
-    const reference = referenceGeoJsonToColoredPaths(refPath, fixture.height);
-    const w = fixture.image.width * SUPERSAMPLE;
-    const h = fixture.image.height * SUPERSAMPLE;
-    const ourMask = rasterizeColoredPaths(scalePaths(ours, SUPERSAMPLE), w, h);
-    const refMask = rasterizeColoredPaths(scalePaths(reference, SUPERSAMPLE), w, h);
-    const m = compareMasks(ourMask, refMask);
-    lines.push(
-      `${fixture.name}: IoU=${m.iou.toFixed(4)} agreement=${m.agreement.toFixed(5)} ` +
-        `precision=${m.precision.toFixed(4)} recall=${m.recall.toFixed(4)} ` +
-        `mismatchPx=${m.falsePositive + m.falseNegative} of ${w * h}`,
-    );
-  }
-  mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(join(OUT_DIR, 'our-vs-reference-iou.txt'), `${lines.join('\n')}\n`);
-});
+    mkdirSync(OUT_DIR, { recursive: true });
+    writeFileSync(join(OUT_DIR, 'our-vs-reference-iou.txt'), `${lines.join('\n')}\n`);
+  },
+);
 
 // potrace GeoJSON: y-up in image units. Each Polygon has an outer ring then
 // hole rings — map straight to closed polylines (even-odd fill handles holes).

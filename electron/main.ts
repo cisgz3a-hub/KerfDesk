@@ -5,8 +5,8 @@
 //   * nodeIntegration: false
 //   * sandbox: true
 //   * webSecurity: true
-//   * permission handlers allow only serial, File System Access, and
-//     video-only media from the trusted renderer origin
+//   * permission handlers allow only serial, File System Access, screen
+//     wake lock, and video-only media from the trusted renderer origin
 //   * navigation and renderer-created windows are locked to the trusted
 //     renderer origin
 //   * CSP set via session.webRequest.onHeadersReceived (not meta tag -
@@ -367,6 +367,12 @@ async function createWindow(): Promise<void> {
   //
   // Browser camera setup uses Chromium's `media` permission. The policy helper
   // grants trusted main-frame video-only requests and keeps audio denied.
+  //
+  // Screen wake lock (ADR-117): useActiveJobWakeLock keeps the display awake
+  // while a job streams so OS sleep can't stall Web Serial mid-burn. Electron
+  // routes navigator.wakeLock.request('screen') through these handlers as
+  // 'screen-wake-lock'; without the allowlist entry the request rejects and
+  // keep-awake silently dies on the desktop build only.
   installPermissionHandlers(session.defaultSession);
   await loadRenderer(window);
 
