@@ -16,7 +16,10 @@ export type ControllerReadinessErrorCode =
   | 'laser-mode-enabled'
   | 'spindle-scale-mismatch';
 
-export type ControllerReadinessWarningCode = 'min-power-nonzero' | 'power-scale-unverified';
+export type ControllerReadinessWarningCode =
+  | 'min-power-nonzero'
+  | 'power-scale-unverified'
+  | 'laser-mode-unverified';
 
 /** How the connected firmware exposes settings — mirrors
  *  ControllerCapabilities['settings'] without importing the driver layer. */
@@ -41,10 +44,12 @@ export function runControllerReadiness(
   const errors: Array<ControllerReadinessMessage<ControllerReadinessErrorCode>> = [];
   const warnings: Array<ControllerReadinessMessage<ControllerReadinessWarningCode>> = [];
 
-  // Firmwares without a numeric $-settings dump (Marlin, FluidNC) cannot
-  // prove $30/$32 agreement. The power scale then rests on the device
-  // profile alone — allowed, but stated plainly (Phase H honesty rule).
-  if (settingsCapability !== 'grbl-dollar') {
+  // Firmwares with NO numeric $-settings dump at all (Marlin, Smoothie)
+  // cannot prove $30/$32 agreement. The power scale then rests on the device
+  // profile alone — allowed, but stated plainly (Phase H honesty rule,
+  // ADR-095). Firmwares with a READ-ONLY dump (FluidNC) fall through to the
+  // verification below: what they report is checked (audit F6).
+  if (settingsCapability === 'none') {
     const cncMachine =
       project.machine !== undefined && project.machine.kind === 'cnc' ? project.machine : null;
     warnings.push({
@@ -66,31 +71,53 @@ export function runControllerReadiness(
     return { ok: false, errors, warnings };
   }
 
+  // A read-only compat dump (FluidNC's legacy $$ emulation) is not
+  // guaranteed to include every setting and cannot be fixed from the app,
+  // so ABSENT values downgrade to warnings instead of blocking Start.
+  // Values that WERE reported are still verified strictly — a mismatch or
+  // a provably wrong $32 blocks either way. grbl-dollar keeps absent =
+  // error: a real GRBL $$ always reports $30/$31/$32.
+  const absentPolicy: AbsentSettingPolicy =
+    settingsCapability === 'readonly-dump' ? 'warn' : 'error';
+
   // Spindle/router machines invert the laser rules: $32 must be OFF and $30
   // is the spindle's max RPM, not the laser S scale (F-CNC provenance header:
   // "; assumes: ... $32=0 (router mode)").
   const machine = project.machine;
   if (machine !== undefined && machine.kind === 'cnc') {
-    return cncReadiness(machine.params.spindleMaxRpm, controller);
+    return cncReadiness(machine.params.spindleMaxRpm, controller, absentPolicy);
   }
-  return laserReadiness(project, controller);
+  return laserReadiness(project, controller, absentPolicy);
 }
 
 type ReadinessErrors = Array<ControllerReadinessMessage<ControllerReadinessErrorCode>>;
 type ReadinessWarnings = Array<ControllerReadinessMessage<ControllerReadinessWarningCode>>;
 
+// What to do when the dump did not report a setting: 'error' blocks Start
+// (grbl-dollar — a real $$ always reports these), 'warn' states the gap and
+// proceeds (readonly-dump — a compat dump may be incomplete; audit F6).
+type AbsentSettingPolicy = 'error' | 'warn';
+
 function cncReadiness(
   spindleMaxRpm: number,
   controller: ControllerSettingsSnapshot,
+  absentPolicy: AbsentSettingPolicy,
 ): ControllerReadinessResult {
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
   if (controller.maxPowerS === undefined) {
-    errors.push({
-      code: 'max-power-unknown',
-      message:
-        'Controller did not report GRBL $30. KerfDesk cannot prove S values map to spindle RPM.',
-    });
+    if (absentPolicy === 'error') {
+      errors.push({
+        code: 'max-power-unknown',
+        message:
+          'Controller did not report GRBL $30. KerfDesk cannot prove S values map to spindle RPM.',
+      });
+    } else {
+      warnings.push({
+        code: 'power-scale-unverified',
+        message: `The controller's settings dump did not include $30, so the spindle S scale (max RPM ${spindleMaxRpm}) comes from the machine profile and is NOT verified against the firmware. Confirm it before cutting.`,
+      });
+    }
   } else if (controller.maxPowerS !== spindleMaxRpm) {
     errors.push({
       code: 'spindle-scale-mismatch',
@@ -98,11 +125,19 @@ function cncReadiness(
     });
   }
   if (controller.laserModeEnabled === undefined) {
-    errors.push({
-      code: 'laser-mode-unknown',
-      message:
-        'Controller did not report GRBL $32. KerfDesk cannot prove the controller is in router mode.',
-    });
+    if (absentPolicy === 'error') {
+      errors.push({
+        code: 'laser-mode-unknown',
+        message:
+          'Controller did not report GRBL $32. KerfDesk cannot prove the controller is in router mode.',
+      });
+    } else {
+      warnings.push({
+        code: 'laser-mode-unverified',
+        message:
+          "The controller's settings dump did not include $32, so router mode ($32=0) is NOT verified against the firmware. Confirm it before cutting.",
+      });
+    }
   } else if (controller.laserModeEnabled) {
     errors.push({
       code: 'laser-mode-enabled',
@@ -116,15 +151,23 @@ function cncReadiness(
 function laserReadiness(
   project: Project,
   controller: ControllerSettingsSnapshot,
+  absentPolicy: AbsentSettingPolicy,
 ): ControllerReadinessResult {
   const errors: ReadinessErrors = [];
   const warnings: ReadinessWarnings = [];
   if (controller.maxPowerS === undefined) {
-    errors.push({
-      code: 'max-power-unknown',
-      message:
-        'Controller did not report GRBL $30 max S. KerfDesk cannot prove that power percentages map safely.',
-    });
+    if (absentPolicy === 'error') {
+      errors.push({
+        code: 'max-power-unknown',
+        message:
+          'Controller did not report GRBL $30 max S. KerfDesk cannot prove that power percentages map safely.',
+      });
+    } else {
+      warnings.push({
+        code: 'power-scale-unverified',
+        message: `The controller's settings dump did not include $30, so the S power scale (max S ${project.device.maxPowerS}) comes from the device profile and is NOT verified against the firmware. Confirm it before burning at high power.`,
+      });
+    }
   } else if (controller.maxPowerS !== project.device.maxPowerS) {
     errors.push({
       code: 'max-power-mismatch',
@@ -133,11 +176,19 @@ function laserReadiness(
   }
 
   if (controller.laserModeEnabled === undefined) {
-    errors.push({
-      code: 'laser-mode-unknown',
-      message:
-        'Controller did not report GRBL $32 laser mode. KerfDesk cannot prove safe laser-mode behavior.',
-    });
+    if (absentPolicy === 'error') {
+      errors.push({
+        code: 'laser-mode-unknown',
+        message:
+          'Controller did not report GRBL $32 laser mode. KerfDesk cannot prove safe laser-mode behavior.',
+      });
+    } else {
+      warnings.push({
+        code: 'laser-mode-unverified',
+        message:
+          "The controller's settings dump did not include $32, so laser mode is NOT verified against the firmware. Confirm $32=1 in the controller's configuration before burning.",
+      });
+    }
   } else if (!controller.laserModeEnabled) {
     errors.push({
       code: 'laser-mode-disabled',

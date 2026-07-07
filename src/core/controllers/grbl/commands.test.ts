@@ -73,4 +73,11 @@ describe('buildJogCommand', () => {
     );
     expect(() => buildJogCommand({ dx: 1, feed: Number.NaN })).toThrow(/feed must be finite/);
   });
+
+  // Audit F11: an all-zero jog produced `$J=G91 G21 F…` with no axis word —
+  // GRBL rejects it with error:16 on the wire. Fail loudly at the caller.
+  it('rejects a jog with no nonzero axis distance', () => {
+    expect(() => buildJogCommand({ feed: 1500 })).toThrow(/nonzero/);
+    expect(() => buildJogCommand({ dx: 0, dy: 0, feed: 1500 })).toThrow(/nonzero/);
+  });
 });

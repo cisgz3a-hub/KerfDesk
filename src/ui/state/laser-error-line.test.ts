@@ -97,6 +97,7 @@ function makeHarness(): {
       onLineArrived: null,
       controllerCommand: null,
       controllerIdleWait: null,
+      pendingResetCleanup: null,
     },
     set,
     get: () => state,
@@ -167,7 +168,17 @@ describe('handleLine controller error (P0-1)', () => {
     // soft-reset is still sent to drain any already-buffered laser-on motion.
     expect(get().streamer?.status).toBe('errored');
     expect(safeWrite).toHaveBeenNthCalledWith(1, RT_SOFT_RESET, 'stop', 'system');
-    expect(safeWrite).toHaveBeenNthCalledWith(2, `${CMD_COOLANT_OFF}\n`, 'stop', 'system');
+    // The reset wiped the in-flight accounting (audit F1)...
+    expect(get().streamer?.inFlight).toEqual([]);
+    // ...and the M9 beam-off cleanup is deferred until the boot banner
+    // arrives (audit F2), so it is NOT written yet.
+    expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_COOLANT_OFF}\n`)).toBe(
+      false,
+    );
+    handleLine(set, get, refs, safeWrite, 'Grbl 1.1f');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_COOLANT_OFF}\n`)).toBe(true);
     expect(safeWrite.mock.calls.some(([payload]) => payload.startsWith('G1 '))).toBe(false);
     // The code is recorded and the operator is told to check the machine.
     expect(get().lastError).toBe(7);
