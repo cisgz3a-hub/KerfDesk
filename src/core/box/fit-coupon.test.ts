@@ -79,7 +79,10 @@ describe('generateFitCoupon', () => {
   });
 
   it('is deterministic and applies CNC reliefs without severing', () => {
-    const cnc: FitCouponSpec = { ...SPEC, relief: { kind: 'corner-overcut', toolDiameterMm: 3.175 } };
+    const cnc: FitCouponSpec = {
+      ...SPEC,
+      relief: { kind: 'corner-overcut', toolDiameterMm: 3.175 },
+    };
     const a = generateFitCoupon(cnc);
     expect(a.kind).toBe('generated');
     expect(JSON.stringify(a)).toBe(JSON.stringify(generateFitCoupon(cnc)));
