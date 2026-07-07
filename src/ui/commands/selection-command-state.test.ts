@@ -6,7 +6,11 @@ import {
   type ColoredPath,
   type ImportedSvg,
 } from '../../core/scene';
-import { selectionCanBreakApart, selectionCanWeld } from './selection-command-state';
+import {
+  selectionCanBreakApart,
+  selectionCanWeld,
+  selectionIsSingleConvertibleVector,
+} from './selection-command-state';
 
 describe('selection command state', () => {
   it('allows Break Apart for selected imported SVGs with one path and multiple contours', () => {
@@ -38,6 +42,28 @@ describe('selection command state', () => {
     };
 
     expect(selectionCanWeld(project, ['low-power', 'high-power'])).toBe(false);
+  });
+
+  // WORKFLOW F-F4: Convert to Bitmap operates on exactly one vector. With the
+  // command enabled for a multi-selection it silently converted only the
+  // primary object (2026-07-07 audit).
+  it('allows Convert to Bitmap only for a single-vector selection', () => {
+    const project = {
+      ...createProject(),
+      scene: {
+        objects: [
+          importedSvg('vec-a', squarePath('#000000', 0, 0, 10)),
+          importedSvg('vec-b', squarePath('#000000', 5, 0, 10)),
+        ],
+        layers: [createLayer({ id: '#000000', color: '#000000' })],
+        groups: [],
+      },
+    };
+
+    expect(selectionIsSingleConvertibleVector(project, ['vec-a'])).toBe(true);
+    expect(selectionIsSingleConvertibleVector(project, ['vec-a', 'vec-b'])).toBe(false);
+    expect(selectionIsSingleConvertibleVector(project, [])).toBe(false);
+    expect(selectionIsSingleConvertibleVector(project, ['missing'])).toBe(false);
   });
 });
 

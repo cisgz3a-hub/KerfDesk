@@ -1147,7 +1147,7 @@ LightBurn's Preview "shades according to power" — darker pixel = more laser po
 
 ## ADR-029 — Convert to Bitmap (vector → raster engrave source)
 
-**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings shipped; A5 placement-brightness polish pending) | **Date:** 2026-05-29
+**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings + A5 Default Brightness shipped; see 2026-07-07 amendment) | **Date:** 2026-05-29
 
 ### Context
 
@@ -1190,6 +1190,17 @@ We already have an even-odd scanline polygon rasterizer — but it is **test-onl
 - **Perceptual gate (CLAUDE.md #2 / ADR-025):** the rasterized bitmap must be eyeballed (or IoU-diffed) against the source vector at the chosen DPI — green property tests are *not* fidelity proof.
 - Does **not** touch the `SceneObject` union (`RasterImage` already exists), the toolpath union, or the `.lf2` schema.
 - Composes cleanly with the `TracedImage`-elimination backlog (#1): "Use Cut Settings" reads layer mode, so it is agnostic to which vector kinds exist.
+
+### Amendment 2026-07-07 — audit fixes, brightness (A5), and pinned divergences
+
+An audit of the shipped feature (findings fixed the same day) pins the following, superseding the original text where they differ:
+
+1. **Ink luma is 127, not §2's 128.** Both boundary behaviors were individually correct — 50% gray ink, and `ditherThreshold` burning strictly below its 128 cutoff — but they composed to zero output: a converted bitmap on a Threshold layer dithered to all-zero S (M7, AUDIT-2026-06-10). 127 keeps the 50% intent within rounding and always burns. Regression-pinned in `rasterize-vector.test.ts`.
+2. **Default Brightness shipped (the A5 brightness half).** The dialog exposes LightBurn's Default Brightness (percent, default 50). Mapping is `floor(255 × pct/100)` — floor, not round, so 50% stays at 127 per (1). LightBurn's own default is 50% (§7.4).
+3. **Conversion DPI range is 127–635, derived, a deliberate divergence.** LightBurn's dialog offers 10–2000 DPI, but LightBurn keeps image resolution and the Image layer's interval independent; our model stamps the conversion DPI onto the created image layer's `linesPerMm` (§6 placement). The legal range therefore derives from the app-wide raster density limits (`MIN/MAX_RASTER_LINES_PER_MM` = 5–25 lines/mm) — outside it, Convert would mint layers the Cuts panel clamps to a different density on the next edit. Revisit if image resolution and layer interval are ever decoupled.
+4. **Size estimates are full-transform.** The dialog's pixel estimate uses the rotated AABB (`transformedBounds`), matching what the builder rasterizes — the original scale-only estimate approved rotated conversions the builder then refused. The bake itself (per the 2026-06-09 transform-bake plan) emits baked bounds + IDENTITY transform, which also sidesteps the raster output path's no-rotation limitation.
+5. **Single-selection gate.** The command (and `Ctrl/Cmd+Shift+B`, now bound — LightBurn's shortcut, §7.4) is enabled only for a selection of exactly one convertible vector. LightBurn converts a whole multi-selection into **one** bitmap; that merge is a scoped follow-up feature, not a gate relaxation — the pre-fix behavior (silently converting only the primary object of a multi-selection) was a defect.
+6. **Menu placement divergence.** LightBurn houses Convert to Bitmap under **Edit**; ours lives under **Tools**, grouped with Convert to Path and the other conversions. Deliberate (one conversions home), per ADR-027 §4.
 
 ---
 
