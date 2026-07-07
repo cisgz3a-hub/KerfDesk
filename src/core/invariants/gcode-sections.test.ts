@@ -53,9 +53,10 @@ describe('splitGcodeLayerSections', () => {
 
   it('recognizes offset-fill headers', () => {
     const sections = splitGcodeLayerSections(
-      ['; offset fill layer OF1 color #000000 power 20% speed 900 mm/min passes 1', 'G1 X1.000 F900 S200'].join(
-        '\n',
-      ),
+      [
+        '; offset fill layer OF1 color #000000 power 20% speed 900 mm/min passes 1',
+        'G1 X1.000 F900 S200',
+      ].join('\n'),
     );
     expect(sections.map((s) => s.layerId)).toEqual(['OF1']);
   });
