@@ -277,6 +277,16 @@ export function transformUpdatesForMoveDrag(
   }));
 }
 
+// Snap a move delta onto the nearest 45° axis, preserving its length —
+// the same Shift-constrain shape the pen and measure tools use (audit C4).
+const AXIS_SNAP_RADIANS = Math.PI / 4;
+function constrainMoveDelta(dx: number, dy: number): Vec2 {
+  const distance = Math.hypot(dx, dy);
+  if (distance === 0) return { x: dx, y: dy };
+  const snapped = Math.round(Math.atan2(dy, dx) / AXIS_SNAP_RADIANS) * AXIS_SNAP_RADIANS;
+  return { x: Math.cos(snapped) * distance, y: Math.sin(snapped) * distance };
+}
+
 function panTriggerForMouseDown(
   button: number,
   spaceDown: boolean,
@@ -343,10 +353,15 @@ export function nextTransformForDrag(
   selectionAnchor?: SelectionAnchor,
 ): Transform {
   if (drag.kind === 'move') {
+    // Shift constrains the move to the nearest 45° axis (audit C4), matching
+    // the Shift-constrain the pen and measure tools already use.
+    const delta = e.shiftKey
+      ? constrainMoveDelta(point.x - drag.startScenePoint.x, point.y - drag.startScenePoint.y)
+      : { x: point.x - drag.startScenePoint.x, y: point.y - drag.startScenePoint.y };
     return {
       ...obj.transform,
-      x: drag.startTx + (point.x - drag.startScenePoint.x),
-      y: drag.startTy + (point.y - drag.startScenePoint.y),
+      x: drag.startTx + delta.x,
+      y: drag.startTy + delta.y,
     };
   }
   if (drag.kind === 'scale') {

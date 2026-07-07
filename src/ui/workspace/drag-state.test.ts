@@ -59,6 +59,49 @@ function objectWithBounds(): SceneObject {
   };
 }
 
+describe('nextTransformForDrag move modifiers (audit C4)', () => {
+  const moveDrag: Extract<DragState, { kind: 'move' }> = {
+    kind: 'move',
+    objectId: 'O1',
+    startScenePoint: { x: 0, y: 0 },
+    startTx: 0,
+    startTy: 0,
+  };
+
+  it('moves freely without Shift', () => {
+    const next = nextTransformForDrag(
+      moveDrag,
+      objectWithBounds(),
+      { x: 100, y: 10 },
+      resizeEvent({}),
+    );
+    expect(next.x).toBeCloseTo(100);
+    expect(next.y).toBeCloseTo(10);
+  });
+
+  it('Shift locks a mostly-horizontal move to the X axis', () => {
+    const next = nextTransformForDrag(
+      moveDrag,
+      objectWithBounds(),
+      { x: 100, y: 10 },
+      resizeEvent({ shiftKey: true }),
+    );
+    expect(next.y).toBeCloseTo(0);
+    expect(next.x).toBeGreaterThan(99);
+  });
+
+  it('Shift locks a mostly-vertical move to the Y axis', () => {
+    const next = nextTransformForDrag(
+      moveDrag,
+      objectWithBounds(),
+      { x: 10, y: 100 },
+      resizeEvent({ shiftKey: true }),
+    );
+    expect(next.x).toBeCloseTo(0);
+    expect(next.y).toBeGreaterThan(99);
+  });
+});
+
 describe('nextTransformForDrag scale modifiers', () => {
   it('keeps aspect ratio by default when a corner handle is dragged', () => {
     const next = nextTransformForDrag(
