@@ -25,3 +25,10 @@ export function usePlatform(): PlatformAdapter {
   }
   return adapter;
 }
+
+// Non-throwing variant for optional, cosmetic reads — e.g. UI chrome that also
+// renders in unit tests without a PlatformProvider. Returns null when no
+// provider is mounted (treated as "not the desktop app").
+export function usePlatformOptional(): PlatformAdapter | null {
+  return useContext(PlatformContext);
+}

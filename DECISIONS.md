@@ -24,6 +24,7 @@
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 
 ---
 
@@ -3929,6 +3930,96 @@ two vectorizations are indistinguishable except where ours is better.
 
 ---
 
+## ADR-024 — Windows desktop distribution + auto-update mechanism
+
+**Status:** Accepted | **Date:** 2026-07-04
+
+### Context
+
+The Electron desktop shell has existed and been CI-typechecked since Phase A
+(`electron/main.ts`, `electron-builder.yml`, `pnpm build:desktop`), but it was
+never packaged into a distributable installer, never hosted for download, and
+had no update path (`publish: null`). This ADR was reserved from the start
+("before first signed release") and is written now to launch **KerfDesk as a
+downloadable Windows installer alongside the online web app**.
+
+Three constraints shaped it:
+- **Non-negotiable #8** — "No telemetry, no network calls — local-first. Ever."
+  An auto-updater necessarily makes a network call.
+- **Security posture** — "No auto-update from arbitrary URLs," plus the
+  deliberate no-preload / no-`ipcMain` hardening of the Electron shell.
+- **Non-negotiable #9 / burn-safety** — an update must never interrupt a job.
+
+The maintainer chose **full auto-update** (over notify-only) for the desktop app.
+
+### Decision
+
+1. **Distribution.** electron-builder produces an **NSIS x64 installer**
+   (unchanged target; per-user `perMachine:false`, assisted `oneClick:false`),
+   built in CI on annotated **SemVer tags `vX.Y.Z`** (not per-commit). The tag
+   drives the artifact version via `-c.extraMetadata.version=$VERSION` so the
+   installer, `app.getVersion()`, and the update feed agree. Hosted on
+   **Cloudflare R2** (bucket `kerfdesk-downloads`, served at
+   `https://dl.kerfdesk.com/desktop/`), linked from `https://kerfdesk.com/download`.
+   **Not GitHub Releases** — the repo is private (ADR-018); public asset URLs
+   would need a separate public repo or tokens. **Not** bundled into the Pages
+   deploy — keeps the web deploy small and decoupled.
+
+2. **Auto-update = `electron-updater`, main-process, self-hosted.**
+   `electron-builder.yml` `publish: { provider: generic, url:
+   https://dl.kerfdesk.com/desktop }` makes the build emit `latest.yml` +
+   `.blockmap`. In `electron/main.ts` (packaged only, `app.isPackaged`):
+   `autoDownload = true`, `autoInstallOnAppQuit = true`, then
+   `checkForUpdatesAndNotify()` — a background check + OS-native "update ready"
+   notification that installs on the next natural quit. The check runs in the
+   **main process** (Node `net`), so the locked renderer CSP is unchanged and no
+   renderer update-UI is required.
+
+3. **Burn-safety (non-negotiable #9).** The app **never** calls
+   `autoUpdater.quitAndInstall()`. Updates apply only on a user-initiated quit,
+   which cannot happen mid-burn without the operator stopping/closing the app
+   (existing `src/ui/app/use-unload-stop.ts` soft-resets the machine on unload).
+   No mid-stream interruption is possible.
+
+4. **This revises non-negotiable #8's "no network calls."** #8 is amended (this
+   ADR) to permit exactly one call: the desktop updater's check/download against
+   our **own pinned `kerfdesk.com`-family origin**. It transmits **no user data
+   and no telemetry** and is user-disablable; the web app and every CAM/streaming
+   path stay fully offline. The separate posture "no auto-update from
+   **arbitrary** URLs" is **honored** — the feed URL is pinned at build time.
+
+5. **Code signing deferred.** v1 ships **unsigned**: the `/download` page
+   documents the Windows SmartScreen "unknown publisher" step. Auto-update still
+   functions unsigned, and per-user install-on-quit largely avoids UAC. Signing
+   (Azure Trusted Signing ~$10/mo, or an OV/EV cert) slots into the release
+   workflow later behind env-var/secret gating with no code rework; once signed,
+   `electron-updater` verifies the publisher signature, hardening the channel.
+
+6. **Dependency.** `electron-updater` (MIT, electron-builder ecosystem) is added
+   to `dependencies` (it is `require`d by the packaged main process).
+   RESEARCH_LOG.md entry per ADR-017.
+
+### Consequences
+
+- KerfDesk launches as a real downloadable Windows app that keeps itself current
+  while the web app is unchanged.
+- The strict "local-first, no network, ever" posture gains one narrow,
+  self-hosted, no-user-data exception, recorded here and in PROJECT.md #8.
+- The no-preload/no-IPC shell is preserved: `checkForUpdatesAndNotify` + OS
+  notification needs no IPC. An **in-app** "restart to update" banner would need
+  a hardened `contextBridge` and its own ADR — deferred.
+- Green tests never prove the installer runs (CLAUDE.md): a workflow-shape test +
+  an auto-update-config unit test guard structure, but install / serial / update
+  behavior is verified manually on Windows 10 and 11 (WORKFLOW.md desktop flow,
+  AUDIT.md CLAIMED row) before the launch is called done.
+
+### References
+ADR-007 (Windows-only desktop), ADR-011 (platform adapter), ADR-018 (private
+repo → not GitHub Releases), ADR-060 (offline-PWA update model this mirrors),
+ADR-017 (dependency policy), PROJECT.md non-negotiables #8 / #9.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
@@ -3942,8 +4033,9 @@ Setup wizard) is the first.
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
   config grows further).
-- ADR-024 — Update mechanism for Windows desktop (before first signed
-  release).
+- ADR-024 — Update mechanism for Windows desktop. **Written (Accepted
+  2026-07-04) — see the ADR-024 section above.** Full auto-update via a
+  self-hosted `electron-updater` feed on Cloudflare R2; v1 ships unsigned.
 - (Earlier reservations for ADR-019..023 were stale — Phase B / E
   shipped without formal ADRs at those slots. ADR-019 / ADR-020 /
   ADR-021 are the first three slots since reused.)

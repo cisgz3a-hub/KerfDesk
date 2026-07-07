@@ -1,0 +1,139 @@
+name: Release Desktop
+
+# Builds the downloadable Windows installer + the electron-updater feed
+# (ADR-024). This is SEPARATE from ci.yml/deploy.yml (which gate + deploy the
+# web app) so the desktop release never blocks, and is never blocked by, a web
+# deploy.
+#
+# Trigger: an annotated SemVer tag `vX.Y.Z` cuts a release (the tag drives the
+# installer version — see ADR-024 "version reconciliation"). Manual dispatch is
+# for exercising the workflow without cutting a real release; it produces a
+# throwaway-versioned artifact and does NOT publish to the update feed.
+#
+# v1 builds are UNSIGNED (CSC_IDENTITY_AUTO_DISCOVERY: false makes that
+# deterministic — otherwise electron-builder auto-discovers any machine cert).
+# Code signing is added later behind secret-gating (Stage 7 / ADR-024 §5).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build Windows installer (unsigned)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the web bundle's git-derived build badge is real
+          # (vite.config.ts appVersion). The installer version comes from the
+          # tag, not the commit count — see the version step below.
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        # No `with.version` — package.json's packageManager field is the single
+        # source of truth (see ci.yml).
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Derive release version
+        id: version
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.0.0-dispatch.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Release version: ${VERSION}"
+
+      - name: Release verification gate
+        # Same green-gate as the web CI, on Windows. Also builds dist/web and
+        # dist-electron, which electron-builder then packages.
+        run: pnpm release:check
+
+      - name: Build Windows installer + update feed
+        shell: bash
+        # dist/web + dist-electron already exist from release:check; package
+        # them. `-c.extraMetadata.version` overrides package.json's static
+        # 0.1.0 so the .exe, app.getVersion(), and latest.yml all agree.
+        # `--publish never` still emits latest.yml + .blockmap locally; upload
+        # to R2 happens in a later step.
+        run: pnpm exec electron-builder --win --x64 -c.extraMetadata.version="${{ steps.version.outputs.version }}" --publish never
+        env:
+          # Code signing (ADR-024 §5) is OPT-IN via repo secrets and a no-op
+          # until they exist — v1 ships unsigned. When CSC_LINK (a base64 .pfx or
+          # a path) + CSC_KEY_PASSWORD are set, electron-builder signs with them.
+          # When absent, auto-discovery is forced OFF for a deterministic unsigned
+          # build (no accidental machine-cert pickup). Azure Trusted Signing is an
+          # alternative path: it needs a `win.azureSignOptions` block in
+          # electron-builder.yml plus AZURE_* secrets instead of CSC_*.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
+
+      - name: Upload installer + update feed as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kerfdesk-windows-${{ steps.version.outputs.version }}
+          path: |
+            release/${{ steps.version.outputs.version }}/*.exe
+            release/${{ steps.version.outputs.version }}/*.exe.blockmap
+            release/${{ steps.version.outputs.version }}/latest.yml
+          if-no-files-found: error
+
+      # Publish to the self-hosted electron-updater feed on Cloudflare R2
+      # (ADR-024). Tag pushes only — a manual dispatch is a dry run and must not
+      # move the live feed. Requires repo secrets CLOUDFLARE_API_TOKEN (with
+      # R2-write scope) + CLOUDFLARE_ACCOUNT_ID, and an R2 bucket
+      # `kerfdesk-downloads` mapped to https://dl.kerfdesk.com (the publish.url
+      # in electron-builder.yml). The bucket key layout mirrors that URL:
+      # latest.yml + the versioned .exe/.blockmap live under `desktop/`.
+      - name: Publish installer + update feed to Cloudflare R2
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          bucket="kerfdesk-downloads"
+          dir="release/${VERSION}"
+          exe="LaserForge-2.0-${VERSION}-x64-setup.exe"
+          immutable="public, max-age=31536000, immutable"
+
+          # Versioned installer + blockmap are content-addressed → cache forever.
+          pnpm exec wrangler r2 object put "${bucket}/desktop/${exe}" \
+            --file "${dir}/${exe}" --content-type application/octet-stream \
+            --cache-control "${immutable}" --remote
+          pnpm exec wrangler r2 object put "${bucket}/desktop/${exe}.blockmap" \
+            --file "${dir}/${exe}.blockmap" --content-type application/octet-stream \
+            --cache-control "${immutable}" --remote
+
+          # The updater feed moves each release → must revalidate, never cache.
+          pnpm exec wrangler r2 object put "${bucket}/desktop/latest.yml" \
+            --file "${dir}/latest.yml" --content-type text/yaml \
+            --cache-control "no-cache" --remote
+
+          # Stable filename for the /download page's first-time link (also moves
+          # each release, so short cache).
+          pnpm exec wrangler r2 object put "${bucket}/desktop/kerfdesk-latest-x64-setup.exe" \
+            --file "${dir}/${exe}" --content-type application/octet-stream \
+            --cache-control "public, max-age=300" --remote
