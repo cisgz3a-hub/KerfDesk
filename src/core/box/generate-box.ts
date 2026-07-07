@@ -10,10 +10,14 @@ import { buildPanelClaims, type PanelId } from './panel-claims';
 import { panelOutline } from './panel-outline';
 import { applyPanelFit, type PanelRings } from './panel-fit';
 import { layoutPanelOffsets, type PanelExtent } from './layout';
+import { dividerLayout, hasDividers } from './divider-layout';
+import { dividerName, dividerPanelRings, wallSlotCutouts } from './divider-panels';
 
 export type BoxPanel = {
   readonly name: string;
-  readonly panel: PanelId;
+  /** 'divider' entries carry their placement in `divider` (ADR-116 V2). */
+  readonly panel: PanelId | 'divider';
+  readonly divider?: { readonly axis: 'x' | 'y'; readonly index: number };
   /** Closed outline in sheet mm (layout offset already applied). */
   readonly outline: Polyline;
   /** Interior cutout rings in sheet mm (ADR-116; empty without dividers). */
@@ -46,18 +50,43 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
   if (validation.kind === 'invalid') {
     return { kind: 'invalid', issues: validation.issues, warnings: validation.warnings };
   }
-  const fittedPanels: Array<{ panel: PanelId } & PanelRings> = [];
+  const dividers = hasDividers(spec) ? dividerLayout(spec) : null;
+  const slots = dividers === null ? null : wallSlotCutouts(dividers, spec);
+  const fittedPanels: Array<
+    { name: string; panel: PanelId | 'divider'; divider?: BoxPanel['divider'] } & PanelRings
+  > = [];
   for (const claims of buildPanelClaims(spec)) {
-    // Cutouts arrive with the divider pack (ADR-116 V2): wall slots join
-    // the nominal rings here, ahead of the shared fit pass.
     const fit = applyPanelFit(
-      { outline: panelOutline(claims), cutouts: [] },
+      { outline: panelOutline(claims), cutouts: slots?.get(claims.panel) ?? [] },
       { clearanceMm: spec.clearanceMm, relief: spec.relief },
     );
     if (fit.kind !== 'fitted') {
       return { kind: 'error', message: `${PANEL_NAMES[claims.panel]} panel: ${fit.detail}.` };
     }
-    fittedPanels.push({ panel: claims.panel, outline: fit.outline, cutouts: fit.cutouts });
+    fittedPanels.push({
+      name: PANEL_NAMES[claims.panel],
+      panel: claims.panel,
+      outline: fit.outline,
+      cutouts: fit.cutouts,
+    });
+  }
+  if (dividers !== null) {
+    for (const placement of [...dividers.xDividers, ...dividers.yDividers]) {
+      const fit = applyPanelFit(dividerPanelRings(dividers, placement, spec), {
+        clearanceMm: spec.clearanceMm,
+        relief: spec.relief,
+      });
+      if (fit.kind !== 'fitted') {
+        return { kind: 'error', message: `${dividerName(placement)} panel: ${fit.detail}.` };
+      }
+      fittedPanels.push({
+        name: dividerName(placement),
+        panel: 'divider',
+        divider: { axis: placement.axis, index: placement.index },
+        outline: fit.outline,
+        cutouts: fit.cutouts,
+      });
+    }
   }
   const offsets = layoutPanelOffsets(
     fittedPanels.map((panel) => ringsExtent(panel)),
@@ -68,8 +97,9 @@ export function generateBox(spec: BoxSpec): GenerateBoxResult {
     panels: fittedPanels.map((panel, index) => {
       const offsetMm = offsets[index] ?? { x: 0, y: 0 };
       return {
-        name: PANEL_NAMES[panel.panel],
+        name: panel.name,
         panel: panel.panel,
+        ...(panel.divider === undefined ? {} : { divider: panel.divider }),
         outline: translate(panel.outline, offsetMm),
         cutouts: panel.cutouts.map((cutout) => translate(cutout, offsetMm)),
         offsetMm,

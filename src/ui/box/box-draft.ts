@@ -24,6 +24,8 @@ export type BoxDraft = {
   // = bit-radius overcuts so tabs seat fully in a round-bit slot — opt in when
   // a joint won't close. Ignored in laser mode (a kerf has no corner limit).
   readonly relief: string;
+  readonly dividersX: string;
+  readonly dividersY: string;
 };
 
 export const BOX_DRAFT_KEY = 'laserforge.box.generatorDraft.v1';
@@ -43,6 +45,8 @@ export const BOX_DRAFT_PERSISTED_FIELDS: ReadonlyArray<keyof BoxDraft> = [
   'clearance',
   'partSpacing',
   'relief',
+  'dividersX',
+  'dividersY',
 ];
 
 // CNC glue fit vs laser press fit (ADR-106 fit division of labor).
@@ -69,6 +73,8 @@ export function defaultBoxDraft(machine: BoxMachineContext): BoxDraft {
     partSpacing: autoFit.partSpacing,
     toolDiameter: machine.kind === 'cnc' ? String(machine.toolDiameterMm) : '',
     relief: 'off',
+    dividersX: '0',
+    dividersY: '0',
   };
 }
 
@@ -139,6 +145,8 @@ export function parseBoxDraft(draft: BoxDraft, machine: BoxMachineContext): BoxD
           ? { kind: 'corner-overcut', toolDiameterMm: Number(draft.toolDiameter) }
           : { kind: 'none' },
       partSpacingMm: Number(draft.partSpacing),
+      dividersXCount: Number(draft.dividersX),
+      dividersYCount: Number(draft.dividersY),
     },
   };
 }
@@ -152,4 +160,6 @@ export const BOX_FIELD_LABELS: Readonly<Record<BoxSpecField, string>> = {
   clearance: 'Clearance',
   reliefTool: 'Relief tool diameter',
   partSpacing: 'Part spacing',
+  dividersX: 'Dividers across width',
+  dividersY: 'Dividers across depth',
 };

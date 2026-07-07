@@ -27,6 +27,10 @@ export type BoxSpec = {
   /** CNC corner-overcut relief; 'none' for laser (ADR-106 fit division). */
   readonly relief: BoxRelief;
   readonly partSpacingMm: number;
+  /** Dividers partitioning the width (thin slabs in X); absent = 0 (ADR-116). */
+  readonly dividersXCount?: number;
+  /** Dividers partitioning the depth (thin slabs in Y); absent = 0 (ADR-116). */
+  readonly dividersYCount?: number;
 };
 
 export type BoxDims = {
@@ -46,7 +50,9 @@ export type BoxSpecField =
   | 'fingerWidth'
   | 'clearance'
   | 'reliefTool'
-  | 'partSpacing';
+  | 'partSpacing'
+  | 'dividersX'
+  | 'dividersY';
 
 export type BoxSpecIssue = { readonly field: BoxSpecField; readonly message: string };
 
@@ -88,6 +94,8 @@ export function validateBoxSpec(spec: BoxSpec): BoxSpecValidation {
   collectFieldIssues(spec, issues);
   if (issues.length > 0) return { kind: 'invalid', issues, warnings };
   collectInteriorIssues(spec, issues);
+  if (issues.length > 0) return { kind: 'invalid', issues, warnings };
+  collectDividerIssues(spec, issues);
   if (issues.length > 0) return { kind: 'invalid', issues, warnings };
   const minCellMm = minFingerCellMm(spec, deriveBoxDims(spec));
   collectReliefIssues(spec, minCellMm, issues, warnings);
@@ -163,10 +171,53 @@ function collectClearanceIssues(spec: BoxSpec, minCellMm: number, issues: BoxSpe
   }
 }
 
-// The smallest finger cell across the three edge axes bounds both relief
-// feasibility and the clearance the joint can absorb.
+// Divider counts must be whole and small enough that every compartment
+// clears 2T; a divider grid a bit can't relieve is rejected via the shared
+// min-cell rule below (the junction cells join the min).
+function collectDividerIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
+  const dims = deriveBoxDims(spec);
+  for (const [field, count, innerMm] of [
+    ['dividersX', spec.dividersXCount ?? 0, dims.innerWidthMm],
+    ['dividersY', spec.dividersYCount ?? 0, dims.innerDepthMm],
+  ] as const) {
+    if (!Number.isInteger(count) || count < 0) {
+      issues.push({ field, message: 'Divider count must be a whole number of 0 or more.' });
+      continue;
+    }
+    if (count === 0) continue;
+    const pitchMm = (innerMm - count * spec.thicknessMm) / (count + 1);
+    if (pitchMm < 2 * spec.thicknessMm) {
+      issues.push({
+        field,
+        message: `${count} dividers leave ${fmt(pitchMm)} mm compartments — under twice the ${fmt(spec.thicknessMm)} mm thickness.`,
+      });
+    }
+  }
+  collectDividerReliefIssues(spec, issues);
+}
+
+// A relief bit as wide as the stock cannot seat in a T-wide divider slot.
+function collectDividerReliefIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
+  if ((spec.dividersXCount ?? 0) === 0 && (spec.dividersYCount ?? 0) === 0) return;
+  if (spec.relief.kind !== 'corner-overcut') return;
+  if (!Number.isFinite(spec.relief.toolDiameterMm)) return;
+  if (spec.relief.toolDiameterMm < spec.thicknessMm) return;
+  issues.push({
+    field: 'reliefTool',
+    message: `Divider slots are ${fmt(spec.thicknessMm)} mm wide — the ${fmt(spec.relief.toolDiameterMm)} mm relief tool cannot seat in them.`,
+  });
+}
+
+// The smallest finger cell across the three edge axes — plus the divider
+// junction cells when dividers are present — bounds both relief feasibility
+// and the clearance the joint can absorb.
 function minFingerCellMm(spec: BoxSpec, dims: BoxDims): number {
   const spans = [dims.outerWidthMm, dims.outerDepthMm, dims.outerHeightMm];
+  if ((spec.dividersXCount ?? 0) > 0 || (spec.dividersYCount ?? 0) > 0) {
+    const heightSpanMm =
+      spec.style === 'open-top' ? dims.innerHeightMm + spec.thicknessMm : dims.innerHeightMm;
+    spans.push(heightSpanMm + 2 * spec.thicknessMm);
+  }
   return Math.min(
     ...spans.map(
       (fullSpanMm) =>
