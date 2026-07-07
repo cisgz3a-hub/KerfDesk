@@ -4,7 +4,7 @@
 
 import { edgePattern, MIN_FINGER_WIDTH_MM } from './edge-pattern';
 
-export type BoxStyle = 'closed' | 'open-top';
+export type BoxStyle = 'closed' | 'open-top' | 'slide-lid';
 export type BoxDimensionMode = 'inner' | 'outer';
 
 export type BoxRelief =
@@ -64,9 +64,14 @@ export type BoxSpecValidation =
       readonly warnings: ReadonlyArray<BoxSpecIssue>;
     };
 
-/** Derive both dimension sets. Outer = inner + 2T on every axis. */
+/**
+ * Derive both dimension sets. Outer = inner + 2T per axis — except the
+ * slide-lid height, which adds 3T (bottom + lid + captive top strip,
+ * ADR-116 V3) so the entered inner height stays the cavity under the lid.
+ */
 export function deriveBoxDims(spec: BoxSpec): BoxDims {
   const t2 = 2 * spec.thicknessMm;
+  const zExtra = spec.style === 'slide-lid' ? 3 * spec.thicknessMm : t2;
   if (spec.dimensionMode === 'inner') {
     return {
       innerWidthMm: spec.widthMm,
@@ -74,7 +79,7 @@ export function deriveBoxDims(spec: BoxSpec): BoxDims {
       innerHeightMm: spec.heightMm,
       outerWidthMm: spec.widthMm + t2,
       outerDepthMm: spec.depthMm + t2,
-      outerHeightMm: spec.heightMm + t2,
+      outerHeightMm: spec.heightMm + zExtra,
     };
   }
   return {
@@ -83,7 +88,7 @@ export function deriveBoxDims(spec: BoxSpec): BoxDims {
     outerHeightMm: spec.heightMm,
     innerWidthMm: spec.widthMm - t2,
     innerDepthMm: spec.depthMm - t2,
-    innerHeightMm: spec.heightMm - t2,
+    innerHeightMm: spec.heightMm - zExtra,
   };
 }
 
@@ -162,6 +167,13 @@ function collectReliefIssues(
 }
 
 function collectClearanceIssues(spec: BoxSpec, minCellMm: number, issues: BoxSpecIssue[]): void {
+  if (spec.style === 'slide-lid' && spec.clearanceMm <= 0) {
+    issues.push({
+      field: 'clearance',
+      message: 'A slide lid needs clearance to slide — use 0.2 mm or more.',
+    });
+    return;
+  }
   const clearanceLimitMm = Math.min(minCellMm, spec.thicknessMm) / 2;
   if (Math.abs(spec.clearanceMm) >= clearanceLimitMm) {
     issues.push({
