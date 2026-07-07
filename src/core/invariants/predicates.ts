@@ -132,15 +132,26 @@ export function expectedS(powerPercent: number, maxPowerS: number): number {
   return Math.round((powerPercent / 100) * maxPowerS);
 }
 
-// Collect every S value that appears on a G1 motion line.
-export function collectG1SValues(gcode: string): readonly number[] {
+function collectG1WordValues(gcode: string, word: 'S' | 'F'): readonly number[] {
   const lines = gcode.split('\n');
   const out: number[] = [];
   for (const raw of lines) {
     const stripped = stripGcodeComment(raw);
     if (!isGcodeCommand(stripped, 'G1')) continue;
-    const s = parseGcodeWord(stripped, 'S');
-    if (s !== null) out.push(s);
+    const value = parseGcodeWord(stripped, word);
+    if (value !== null) out.push(value);
   }
   return out;
+}
+
+// Collect every S value that appears on a G1 motion line.
+export function collectG1SValues(gcode: string): readonly number[] {
+  return collectG1WordValues(gcode, 'S');
+}
+
+// Collect every F value that appears on a G1 motion line. Backs the per-layer
+// speed-correctness assertions: inside one layer's section every G1 F must be
+// that layer's feed.
+export function collectG1FValues(gcode: string): readonly number[] {
+  return collectG1WordValues(gcode, 'F');
 }
