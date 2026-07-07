@@ -58,7 +58,11 @@ export function createSmoothieSimulator(
   const fmt = (n: number): string => n.toFixed(4);
   const statusLine = (): string => {
     const label = isHalted ? 'Alarm' : machine;
-    return `<${label}|MPos:${fmt(pos.x)},${fmt(pos.y)},${fmt(pos.z)}|WPos:${fmt(pos.x)},${fmt(pos.y)},${fmt(pos.z)}>`;
+    // Smoothie's grbl-mode report appends `F:<feed>,<override%>` — the
+    // second component is the FEED OVERRIDE, not spindle (audit F7; per the
+    // Smoothieware docs, not hardware-verified). The parser must never read
+    // it as an S value.
+    return `<${label}|MPos:${fmt(pos.x)},${fmt(pos.y)},${fmt(pos.z)}|WPos:${fmt(pos.x)},${fmt(pos.y)},${fmt(pos.z)}|F:4000.0,100.0>`;
   };
 
   const finishMotion = (): void => {

@@ -164,6 +164,14 @@ export type UiState = {
     options?: { readonly replaceTraceId?: string },
   ) => void;
   readonly closeImageDialog: () => void;
+  // ADR-029 Convert to Bitmap dialog. Lives here (not CommandShell-local
+  // state) so the Ctrl/Cmd+Shift+B shortcut — LightBurn's binding, wired in
+  // use-shortcuts — can open it. Callers gate opening on a single
+  // convertible-vector selection; CommandShell renders it only while that
+  // selection holds.
+  readonly convertBitmapDialogOpen: boolean;
+  readonly openConvertBitmapDialog: () => void;
+  readonly closeConvertBitmapDialog: () => void;
   // Phase G drawing tool-mode (ADR-051).
   readonly toolMode: ToolMode;
   readonly setToolMode: (next: ToolMode) => void;
@@ -219,6 +227,42 @@ function uiToggleSlice(
   };
 }
 
+// The dialog open/close trio slice (text, trace-image, convert-to-bitmap).
+// Grouped like uiToggleSlice so the store factory stays under the
+// function-size cap; each action only needs `set`.
+function uiDialogSlice(
+  set: UiStateSetter,
+): Pick<
+  UiState,
+  | 'textDialog'
+  | 'openTextDialog'
+  | 'closeTextDialog'
+  | 'imageDialog'
+  | 'openImageDialog'
+  | 'closeImageDialog'
+  | 'convertBitmapDialogOpen'
+  | 'openConvertBitmapDialog'
+  | 'closeConvertBitmapDialog'
+> {
+  return {
+    textDialog: null,
+    openTextDialog: (next) => set({ textDialog: next }),
+    closeTextDialog: () => set({ textDialog: null }),
+    imageDialog: null,
+    openImageDialog: (source, options) =>
+      set({
+        imageDialog:
+          options?.replaceTraceId === undefined
+            ? { source }
+            : { source, replaceTraceId: options.replaceTraceId },
+      }),
+    closeImageDialog: () => set({ imageDialog: null }),
+    convertBitmapDialogOpen: false,
+    openConvertBitmapDialog: () => set({ convertBitmapDialogOpen: true }),
+    closeConvertBitmapDialog: () => set({ convertBitmapDialogOpen: false }),
+  };
+}
+
 export const useUiStore = create<UiState>((set) => ({
   dragOverlay: false,
   setDragOverlay: (next) => set({ dragOverlay: next }),
@@ -261,18 +305,7 @@ export const useUiStore = create<UiState>((set) => ({
   modalDepth: 0,
   registerModal: () => set((s) => ({ modalDepth: s.modalDepth + 1 })),
   unregisterModal: () => set((s) => ({ modalDepth: Math.max(0, s.modalDepth - 1) })),
-  textDialog: null,
-  openTextDialog: (next) => set({ textDialog: next }),
-  closeTextDialog: () => set({ textDialog: null }),
-  imageDialog: null,
-  openImageDialog: (source, options) =>
-    set({
-      imageDialog:
-        options?.replaceTraceId === undefined
-          ? { source }
-          : { source, replaceTraceId: options.replaceTraceId },
-    }),
-  closeImageDialog: () => set({ imageDialog: null }),
+  ...uiDialogSlice(set),
   toolMode: { kind: 'select' },
   // Switching to any non-pen tool discards a half-drawn pen polyline so it can't
   // linger as a ghost (or get appended to on return). Re-selecting the pen keeps

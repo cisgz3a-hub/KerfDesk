@@ -89,6 +89,24 @@ describe('buildResumeProgram', () => {
     expect(emptyTail.kind).toBe('error');
   });
 
+  // Audit F11: G53/G28/G30 change position without touching the tracked
+  // X/Y/Z modal words, so the replayed re-entry would target the wrong
+  // point. KerfDesk's emitters never produce them; imported G-code can.
+  it('refuses programs with G53/G28/G30 before the resume point', () => {
+    const withG53 = 'G21\nG90\nG53 G0 Z-5\nG1 X5 F100\nG1 X6';
+    const g53 = buildResumeProgram(withG53, 5, OPTIONS);
+    expect(g53.kind).toBe('error');
+    if (g53.kind === 'error') expect(g53.reason).toMatch(/G53/);
+
+    const withG28 = 'G21\nG90\nG28 X0\nG1 X5 F100\nG1 X6';
+    const g28 = buildResumeProgram(withG28, 5, OPTIONS);
+    expect(g28.kind).toBe('error');
+    if (g28.kind === 'error') expect(g28.reason).toMatch(/G28/);
+
+    const withG30 = 'G21\nG90\nG30\nG1 X5 F100\nG1 X6';
+    expect(buildResumeProgram(withG30, 5, OPTIONS).kind).toBe('error');
+  });
+
   it('ignores comments and percent markers while scanning', () => {
     const withComments = 'G21\n(header) G90\n; note\nM3 S5000\nG1 X1 Y1 F500\nG1 X2';
     const result = buildResumeProgram(withComments, 6, OPTIONS);

@@ -1,7 +1,6 @@
 import {
   DEFAULT_GRBL_RX_BUFFER_BYTES,
   normalizeGrblRxBufferBytes,
-  type GrblPollDuringJob,
   type GrblStreamingMode,
 } from '../../grbl-streaming';
 
@@ -49,7 +48,6 @@ export type StreamerStatus =
 export type StreamerState = {
   readonly status: StreamerStatus;
   readonly streamingMode: StreamingMode;
-  readonly pollDuringJob: PollDuringJob;
   // Lines remaining to send, each already terminated with '\n'.
   readonly queued: ReadonlyArray<string>;
   // Lines sent but not yet ack'd, head-first.
@@ -64,11 +62,9 @@ export type StreamerState = {
 };
 
 export type StreamingMode = GrblStreamingMode;
-export type PollDuringJob = GrblPollDuringJob;
 export type CreateStreamerOptions = {
   readonly rxBufferBytes?: number;
   readonly streamingMode?: StreamingMode;
-  readonly pollDuringJob?: PollDuringJob;
 };
 
 export type AckKind = 'ok' | 'error' | 'alarm';
@@ -92,7 +88,6 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
   return {
     status: lines.length === 0 ? 'done' : 'idle',
     streamingMode: opts.streamingMode ?? 'char-counted',
-    pollDuringJob: opts.pollDuringJob ?? '4hz',
     queued: lines,
     inFlight: [],
     inFlightBytes: 0,
@@ -102,11 +97,21 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
   };
 }
 
+// The single definition of "sendable": blank lines and full-line comments are
+// never streamed, so `completed`/`total` count ONLY lines this accepts. The
+// job-checkpoint mapper (core/recovery, ADR-118) uses the same predicate to
+// convert an acked-sendable count back to a raw file line number — the two
+// MUST NOT drift.
+export function isSendableGcodeLine(rawLine: string): boolean {
+  const trimmed = rawLine.trim();
+  return trimmed !== '' && !trimmed.startsWith(';');
+}
+
 function splitLines(gcode: string): ReadonlyArray<string> {
   return gcode
     .split('\n')
     .map((l) => l.trim())
-    .filter((l) => l !== '' && !l.startsWith(';'))
+    .filter((l) => isSendableGcodeLine(l))
     .map((l) => `${l}\n`);
 }
 
@@ -200,8 +205,12 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
   if (state.inFlight.length === 0) return { state: ackStatusWithoutLine(state, kind), acked: null };
   const head = state.inFlight[0];
   if (head === undefined) return { state: ackStatusWithoutLine(state, kind), acked: null };
-  const nextInFlight = state.inFlight.slice(1);
-  const nextBytes = state.inFlightBytes - head.bytes;
+  // ALARM:N means the firmware discarded its RX buffer and planner: the
+  // remaining in-flight lines will never be acked. Wipe them all (audit F1)
+  // — keeping them would make the store's ack-attribution layer claim every
+  // later untracked ack ($X unlock, M9 cleanup) for this dead stream.
+  const nextInFlight = kind === 'alarm' ? [] : state.inFlight.slice(1);
+  const nextBytes = kind === 'alarm' ? 0 : state.inFlightBytes - head.bytes;
   const completed = state.completed + 1;
   // A paused stream never promotes to 'done': GRBL acks held-but-parsed
   // lines during a feed hold, so pausing near the end of a job drains the
@@ -271,6 +280,17 @@ export function disconnect(state: StreamerState): StreamerState {
 // HD1-adjacent finding).
 export function markErrored(state: StreamerState): StreamerState {
   return { ...state, status: 'errored', queued: [] };
+}
+
+// Clear in-flight accounting after the firmware provably wiped its receive
+// buffer (soft reset, ALARM) — those lines will never be acked, so leaving
+// them "in flight" makes hasUnsettledStreamAcks claim future untracked acks
+// for a dead stream (audit F1). Status is untouched; compose with cancel()
+// or markErrored() at the call site. NOT for stream-side stops (Marlin):
+// there the firmware still acks the in-flight lines and the accounting must
+// wait for them.
+export function wipeInFlight(state: StreamerState): StreamerState {
+  return { ...state, inFlight: [], inFlightBytes: 0 };
 }
 
 // Progress as a fraction [0, 1].

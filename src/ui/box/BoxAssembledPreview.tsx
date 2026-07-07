@@ -1,5 +1,5 @@
 // BoxAssembledPreview — Canvas2D isometric projection of the generated box
-// in its assembled positions (ADR-118): every part's local rings mapped
+// in its assembled positions (ADR-119): every part's local rings mapped
 // through its 3D frame, extruded plates painter-sorted far-to-near,
 // even-odd fill so cutouts read as holes. Deliberately not three.js: a
 // dialog preview needs no camera and must render under jsdom guards.

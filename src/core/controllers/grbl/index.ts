@@ -45,7 +45,6 @@ export type {
   AckResult,
   CreateStreamerOptions,
   OversizedLine,
-  PollDuringJob,
   StepResult,
   StreamerState,
   StreamerStatus,
@@ -57,12 +56,14 @@ export {
   createStreamer,
   disconnect,
   findOversizedLine,
+  isSendableGcodeLine,
   markErrored,
   onAck,
   pause,
   progress,
   resume,
   step,
+  wipeInFlight,
 } from './streamer';
 
 export type { CornerProbeParams, ProbeCorner, ZProbeParams } from './probe';

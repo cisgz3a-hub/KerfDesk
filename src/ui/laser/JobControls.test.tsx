@@ -248,7 +248,6 @@ describe('JobControls running safety copy', () => {
       streamer: {
         status: 'streaming',
         streamingMode: 'char-counted',
-        pollDuringJob: '4hz',
         queued: [],
         inFlight: [{ line: 'G1 X10 Y10 S500\n', bytes: 16 }],
         inFlightBytes: 16,
@@ -283,7 +282,6 @@ describe('JobControls running safety copy', () => {
       streamer: {
         status: 'errored',
         streamingMode: 'char-counted',
-        pollDuringJob: '4hz',
         queued: [],
         inFlight: [],
         inFlightBytes: 0,
@@ -328,7 +326,6 @@ describe('JobControls running safety copy', () => {
       streamer: {
         status: 'done',
         streamingMode: 'char-counted',
-        pollDuringJob: '4hz',
         queued: [],
         inFlight: [],
         inFlightBytes: 0,

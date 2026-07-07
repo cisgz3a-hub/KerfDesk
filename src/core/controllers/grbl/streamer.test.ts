@@ -10,6 +10,7 @@ import {
   progress,
   resume,
   step,
+  wipeInFlight,
 } from './streamer';
 
 describe('createStreamer', () => {
@@ -212,6 +213,31 @@ describe('onAck — consuming acks', () => {
     state = onAck(state, 'ok').state;
     state = onAck(state, 'ok').state;
     expect(state.status).toBe('cancelled');
+  });
+
+  // Audit F1: ALARM:N means the firmware discarded its RX buffer and planner.
+  // The remaining in-flight lines will never be acked — leaving them in the
+  // accounting makes the store-side ack-attribution layer claim future
+  // untracked acks ($X, M9 cleanup) for the stream forever.
+  it('an alarm ack wipes ALL in-flight accounting, not just the head line', () => {
+    const s = step(createStreamer('G21\nG90\nM5')).state;
+    expect(s.inFlight).toHaveLength(3);
+    const r = onAck(s, 'alarm');
+    expect(r.state.status).toBe('cancelled');
+    expect(r.state.inFlight).toEqual([]);
+    expect(r.state.inFlightBytes).toBe(0);
+    expect(r.state.completed).toBe(1);
+  });
+
+  it('wipeInFlight clears in-flight accounting without changing status', () => {
+    const s = step(createStreamer('G21\nG90')).state;
+    const wiped = wipeInFlight(cancel(s));
+    expect(wiped.status).toBe('cancelled');
+    expect(wiped.inFlight).toEqual([]);
+    expect(wiped.inFlightBytes).toBe(0);
+    const erroredWipe = wipeInFlight(markErrored(s));
+    expect(erroredWipe.status).toBe('errored');
+    expect(erroredWipe.inFlight).toEqual([]);
   });
 
   it('markErrored is terminal, clears the queue, and keeps step() silent', () => {

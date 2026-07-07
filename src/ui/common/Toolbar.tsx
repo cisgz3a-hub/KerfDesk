@@ -7,8 +7,6 @@ import { commandHelpId, controlHelp } from '../help/help-topics';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import type { MachineKind } from '../../core/scene';
 import { ConnectionBadge } from './ConnectionBadge';
-import { DownloadDesktopLink } from './DownloadDesktopLink';
-import { InstallButton } from './InstallButton';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { shortcutHint } from './shortcut-list';
 
@@ -35,8 +33,9 @@ export function Toolbar(props: {
       >
         Shortcuts
       </button>
-      <DownloadDesktopLink />
-      <InstallButton />
+      {/* DownloadDesktopLink and InstallButton are intentionally unmounted for
+          now (maintainer request 2026-07-07); the components and /download.html
+          remain so the affordances can be restored by re-adding them here. */}
       {isShortcutsOpen ? (
         <ShortcutsDialog machineKind={props.machineKind} onClose={() => setShortcutsOpen(false)} />
       ) : null}

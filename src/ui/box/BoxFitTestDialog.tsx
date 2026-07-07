@@ -1,4 +1,4 @@
-// BoxFitTestDialog — the Box Fit Test coupon form (ADR-118, F-K8):
+// BoxFitTestDialog — the Box Fit Test coupon form (ADR-119, F-K8):
 // calibration-dialog conventions, machine-aware defaults, live core
 // validation. Generates the tab comb + slot strip whose winning rung IS
 // the clearance to type into the Box Generator.

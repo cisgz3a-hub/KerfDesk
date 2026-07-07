@@ -181,6 +181,26 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
     }
   });
 
+  it('does not render the desktop-download or PWA-install affordances (removed for now)', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<Toolbar commands={[]} machineKind="laser" />);
+      });
+
+      // Both were toolbar-mounted (ADR-024 / ADR-060) and are temporarily
+      // withdrawn; the components themselves still exist under ui/common.
+      expect(host.textContent).not.toContain('Download for Windows');
+      expect(host.textContent).not.toContain('Install app');
+    } finally {
+      if (root !== null) await act(async () => root?.unmount());
+      host.remove();
+    }
+  });
+
   it('lists every shipped shortcut family, including the late arrivals', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);

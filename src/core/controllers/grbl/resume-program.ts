@@ -105,6 +105,14 @@ function applyWord(state: ModalState, letter: string, value: number): string | n
 
 function applyGWord(state: ModalState, value: number): string | null {
   if (value === 91) return 'relative positioning (G91) — resume needs absolute programs';
+  // Machine-coordinate and predefined-position moves change the position
+  // without updating the tracked X/Y/Z modal words, so the replayed re-entry
+  // would target the wrong point. KerfDesk's own emitters never produce
+  // them; imported external G-code can (audit F11).
+  if (value === 53) return 'machine-coordinate motion (G53) — resume tracks work coordinates only';
+  if (value === 28 || value === 30) {
+    return `predefined-position move (G${value}) — resume cannot track its endpoint`;
+  }
   if (value === 20) state.units = 'G20';
   if (value === 21) state.units = 'G21';
   return null;
