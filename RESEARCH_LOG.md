@@ -4,7 +4,7 @@
 >
 > Entry format below. New rows are added on PR; existing rows are updated with `Re-verified:` lines when re-checked.
 >
-> **Note on license-history references (2026-05-27).** Earlier entries describe the project as "MIT-licensed" and reject GPL deps with phrasing like "would taint MIT license." That was true under ADR-008. **ADR-018 superseded ADR-008**: the project source is now proprietary (private repo, monetization deferred), but the **dependency policy is unchanged** — MIT-compatible only, GPL rejected. The rejections in this log remain valid; only the framing-as-MIT is historical.
+> **Note on license-history references (2026-05-27, updated 2026-07-07).** Earlier entries describe the project as "MIT-licensed" and reject GPL deps with phrasing like "would taint MIT license." That was true under ADR-008, superseded by ADR-018 (proprietary, private, 2026-05-27), which is in turn superseded by **ADR-118 (2026-07-07): the project is MIT-licensed and open source again**. The dependency policy was identical under all three postures — MIT-compatible only, GPL rejected — so every rejection in this log remains valid.
 
 ---
 
@@ -266,13 +266,12 @@ These are not in `package.json`; they are sources of record we rely on for proto
 
 ### Bidirectional raster engraving after overscan runtime regression
 
-- **Version / date:** LightBurn latest docs crawled 2026-06-01; GRBL v1.1 laser-mode docs; Rayforge docs crawled 2026-06-01
-- **License:** n/a for docs; Rayforge is implementation reference only, no code copied.
+- **Version / date:** LightBurn latest docs crawled 2026-06-01; GRBL v1.1 laser-mode docs
+- **License:** n/a for docs; behavior references only, no code copied.
 - **Source URLs:**
   - https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/
   - https://docs.lightburnsoftware.com/legacy/ScanningOffsetAdjustment
   - https://github-wiki-see.page/m/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode
-  - https://rayforge.org/docs/latest/features/overscan.html
 - **Decision affected:** ADR-032; `src/core/raster/emit-raster.ts`
 - **Evaluated:** 2026-06-01 by Codex
 - **Confidence:** high that unidirectional overscanned raster rows are the avoidable runtime cost; medium on hardware backlash risk until user burns a bidirectional test.
@@ -280,7 +279,7 @@ These are not in `package.json`; they are sources of record we rely on for proto
 - **Notes:**
   - LightBurn documents Bi-directional Fill as engraving while sweeping in both directions; disabling it burns in one direction and returns without engraving, which can add significant runtime on long jobs.
   - LightBurn's overscanning guidance still applies in both directions: the laser-off runway is needed before the burn span and after it so the marked area sees steadier speed.
-  - Rayforge documents the same raster tradeoff: bidirectional raster alternates row direction and is faster, while unidirectional is slower but can be more consistent on machines with backlash.
+  - Other open-source raster engravers document the same tradeoff: bidirectional raster alternates row direction and is faster, while unidirectional is slower but can be more consistent on machines with backlash.
   - LightBurn's scanning-offset page documents the risk side: high-speed bidirectional scanning can show ghosted/shifted edges if the machine has response delay or belt stretch, and compensation is a separate calibration problem.
   - Local evidence: `emit-raster.ts` explicitly listed serpentine alternation as deferred and emitted every active row left-to-right. Fill hatches already alternate direction in `fill-hatching.ts`, so the runtime regression target is raster/Image mode, not Fill mode.
 
@@ -292,9 +291,9 @@ These are not in `package.json`; they are sources of record we rely on for proto
 - **Confidence:** medium (competitor landscape moves)
 - **Re-verify by:** 2026-11-26
 - **Findings (paraphrased):**
-  - Open-source GRBL CAM tools active in 2026: Rayforge (MIT, Gtk4/Linux+Windows), LaserGRBL (Windows only), MeerK40t (multi-platform), CNCjs (general G-code sender), gSender (general G-code sender). None ships a web app + Windows desktop combination; this is our differentiator.
+  - Open-source GRBL CAM tools active in 2026: LaserGRBL (Windows only), MeerK40t (multi-platform), CNCjs (general G-code sender), gSender (general G-code sender), plus a Gtk4-based Linux/Windows CAM tool. None ships a web app + Windows desktop combination; this is our differentiator.
   - LightBurn remains dominant in paid space at ~$60.
-  - No competitor combines: web delivery, multi-color layer assignment, GRBL streaming, single-codebase web+desktop. LaserForge 2.0 targets this combination. (Original framing included "MIT license" as a differentiator; superseded by ADR-018 — license is now proprietary while monetization is decided.)
+  - No competitor combines: web delivery, multi-color layer assignment, GRBL streaming, single-codebase web+desktop. LaserForge 2.0 targets this combination. (The "MIT license" differentiator from the original framing is current again per ADR-118.)
 
 ---
 

@@ -23,8 +23,9 @@
 | ADR-015 | 2026-05-26 | Accepted | File-size discipline and anti-god-file enforcement |
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
-| ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-018 | 2026-05-27 | Superseded | Proprietary license, private repo (supersedes ADR-008; see ADR-118) |
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
+| ADR-118 | 2026-07-07 | Accepted | MIT license, open-source release (supersedes ADR-018) |
 
 ---
 
@@ -39,7 +40,7 @@ LaserForge 2.0 enters a category dominated by LightBurn with credible open-sourc
 Adopt LightBurn's user-facing workflow and naming: workspace with bed dimensions, color-as-layer, Cuts/Layers window, preview in-viewport, Laser window for streaming control, `.lf2` project files analogous to `.lbrn`.
 
 ### Alternatives considered
-- **Rayforge model:** rejected — smaller install base.
+- **Other open-source laser tools' workflow models:** rejected — smaller install bases, less familiar to the target audience.
 - **Invent a new workflow:** rejected — no evidence LightBurn's model is the bottleneck.
 - **Clone LightBurn 1:1:** rejected — feature breadth contradicts ADR-010, ADR-015.
 
@@ -308,7 +309,7 @@ Reviewer answers "what should this UI do?" from `WORKFLOW.md` alone; "why this a
 **Status:** Accepted | **Date:** 2026-05-26
 
 ### Context
-The project source code is proprietary (ADR-018) but uses MIT-compatible dependencies freely (the dep-policy half of the original ADR-008 survived into ADR-018 unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
+The project source code is MIT-licensed (ADR-118; it was proprietary under ADR-018 when this ADR was written) and uses MIT-compatible dependencies freely (the dep-policy half of the original ADR-008 survived every license-posture change unchanged). The user has indicated that "if there is proven MIT code for extra features, we can do research and add it." This is a powerful capability — well-maintained libraries reduce bug surface, and proven implementations are often safer than hand-rolled equivalents.
 
 It is also the most common cause of project drift. "We can add X because the library is free" is the most common rationalization that leads to scope explosions, dependency bloat, and the exact cascading-bug pattern Q10 warned against. Library availability does not change product scope. The phase plan in `PROJECT.md` is what determines what ships when.
 
@@ -411,7 +412,7 @@ That's the only new runtime dependency Phase A adds. Everything else in Phase A 
 
 ## ADR-018 — Proprietary license, private repo (supersedes ADR-008)
 
-**Status:** Accepted | **Date:** 2026-05-27
+**Status:** Superseded by ADR-118 | **Date:** 2026-05-27
 
 ### Context
 ADR-008 committed the project to MIT and a public repo from the first
@@ -1369,9 +1370,9 @@ reference:
   returns without engraving.
 - LightBurn documents overscanning as laser-off runway before/after each
   row so the marked span happens at steadier speed.
-- Rayforge documents the same tradeoff for raster: bidirectional is
-  faster, while unidirectional can be more consistent if the machine has
-  backlash.
+- Other open-source raster engravers document the same tradeoff:
+  bidirectional is faster, while unidirectional can be more consistent
+  if the machine has backlash.
 - LightBurn's Scanning Offset Adjustment page documents the calibration
   caveat: at high speeds, bidirectional rows can show ghosted or shifted
   edges if machine response delay or belt stretch is not compensated.
@@ -2811,10 +2812,10 @@ offset that the Falcon hides is large enough on the 4040 to split every vertical
 edge. Unidirectional (ADR-038) fixes it but halves fill throughput. We want the
 zipper gone *and* bidirectional speed kept.
 
-Reference check (recorded in RESEARCH_LOG): `barebaric/raygeo` (Rayforge's Rust
-raster core) structures bidirectional sweeps as `is_reversed = index % 2` plus an
+Reference check (recorded in RESEARCH_LOG): a surveyed open-source Rust raster
+core structures bidirectional sweeps as `is_reversed = index % 2` plus an
 endpoint swap and applies **no** lag compensation — same blind spot we have, and
-it is unlicensed, so nothing is borrowed. The serpentine-by-parity idea is the
+nothing is borrowed from it. The serpentine-by-parity idea is the
 standard unprotectable technique; the implementation here is written fresh
 against our own `Vec2` / sweep types.
 
@@ -4619,10 +4620,10 @@ design is built around:
 
 `PROJECT.md` listed "Camera alignment, overhead camera" under Out of scope; the maintainer
 requested it. LightBurn's camera (capture → lens calibration → 4-marker alignment → live
-overlay → print-and-cut → capture-to-trace) is the behavioral reference. Competitor source
-was read directly: MeerK40t `camera.py` (`cv2.getPerspectiveTransform` from four manually
-dragged corners, no RANSAC), Rayforge (capture-to-trace, `findHomography` with an image
-y-down → bed y-up flip), OpenPnP (fiducial detection + intrinsic calibration). An adversarial
+overlay → print-and-cut → capture-to-trace) is the behavioral reference. Open-source
+implementations were read directly: MeerK40t `camera.py` (`cv2.getPerspectiveTransform` from
+four manually dragged corners, no RANSAC) and OpenPnP (fiducial detection + intrinsic
+calibration), plus the standard image y-down → bed y-up flip convention. An adversarial
 second audit verified the math against that code and found no errors.
 
 The decisive constraint is the < 1 MB compressed web-bundle target (ADR-017): OpenCV.js
@@ -4690,7 +4691,7 @@ non-Chromium (Firefox) `OffscreenCanvas` fallbacks — tracked by ADR-108 / 109 
 The Falcon A1 Pro (like most laser bed cameras) uses a wide-angle lens, so the live feed
 is visibly barrel-bowed. The ADR-107 4-point homography corrects perspective only — it
 pins the four corners but cannot remove lens curvature, so straight bed edges stay curved.
-A camera-implementation study (MeerK40t, OpenPnP, LightBurn, Rayforge, LaserWeb4, OpenCV)
+A camera-implementation study (MeerK40t, OpenPnP, LightBurn, LaserWeb4, OpenCV)
 confirmed the universal fix: a lens-distortion model applied to the frame **before** the
 homography.
 
@@ -4706,8 +4707,8 @@ equations are clean-roomed in TypeScript from the published Kannala-Brandt model
    uses exactly this (`cv2.fisheye`) for the same hardware class. Pure-TS forward
    (`θ_d = θ(1 + k1θ² + k2θ⁴ + k3θ⁶ + k4θ⁸)`) plus a Newton inverse.
 2. **Calibration: guided board.** Print a checkerboard, capture ~5 poses (4 corners +
-   centre) with a per-capture reprojection-error score (LightBurn) and per-quadrant
-   coverage feedback (Rayforge); fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
+   centre) with a per-capture reprojection-error score and per-quadrant
+   coverage feedback; fit K (fx,fy,cx,cy) + D (k1..k4) with an in-TS
    Levenberg-Marquardt minimiser over reprojection error. ChArUco is rejected — its ArUco
    decode needs an LGPL bundle barred by ADR-107; a plain checkerboard detects clean-room.
 3. **Render: WebGL fragment shader.** The inverse-distortion sampling runs per-pixel on the
@@ -5176,8 +5177,8 @@ the repo LICENSE (ADR-018) affirmatively denies everyone the right to *use* the
 software and no EULA, terms surface, or machine-safety disclaimer existed
 anywhere a customer could see. Separately, the bundled Roboto (Apache-2.0) and
 three OFL-1.1 fonts plus all nine production npm packages shipped without the
-license texts their licenses require — THIRD_PARTY_NOTICES.md covered only the
-Rayforge camera adaptation and was not bundled.
+license texts their licenses require — THIRD_PARTY_NOTICES.md was incomplete
+and was not bundled.
 
 **Decision.**
 1. `public/eula.txt` is the customer-facing End User License Agreement: use
@@ -5466,3 +5467,71 @@ trusted check+request and denied for untrusted origins and subframes.
 NOT verified: the packaged Electron runtime grant, and a real hours-long
 burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
 runs one.
+
+---
+
+## ADR-118 — MIT license, open-source release (supersedes ADR-018)
+
+**Status:** Accepted | **Date:** 2026-07-07
+
+### Context
+
+ADR-018 made the source proprietary and the repo private while the
+monetization model was undecided, and defined explicit reversal triggers.
+The maintainer has now decided to open-source the project: community
+adoption and contribution matter more than source control at this stage
+(reversal trigger 3), and the zero-install web + desktop combination is
+the product wedge, not source secrecy.
+
+ADR-018's asymmetry argument still holds — public-then-private is not
+reversible — so this decision is made deliberately, with the tree cleaned
+for public consumption first (internal audit reports, study notes, and
+session plans removed from the published tree; competitor names removed
+from public-facing copy per the standing neutrality policy).
+
+### Decision
+
+- **License: MIT.** `LICENSE` is the standard MIT text, copyright
+  Johann Stolk. `package.json` declares `"license": "MIT"`.
+- **Repo visibility: public** (the flip itself is a maintainer action on
+  GitHub, executed after the release-blocking item below is resolved).
+- **Dependency policy unchanged** (ADR-017): MIT-compatible licenses only;
+  GPL-family dependencies remain rejected — now because the *combined MIT
+  work* must stay redistributable under MIT, not merely by policy.
+- **EULA (ADR-114) reduced to a distribution notice.** With an MIT source
+  license the restrictive use-grant/no-redistribution clauses are void;
+  `public/eula.txt` becomes a License & Safety Notice (MIT grant reference,
+  machine-safety warning, warranty disclaimer, third-party pointer). The
+  NSIS installer continues to show it for safety-terms visibility.
+- **THIRD_PARTY_NOTICES.md / public/third-party-notices.txt** reworded:
+  first-party code is MIT, third-party components remain under their own
+  licenses.
+
+### Release blocker (must resolve before the visibility flip)
+
+The in-house potrace-style trace backend (`src/core/trace/potrace-*.ts`)
+has unresolved provenance: a 2026-06-10 audit found its internals mirror
+the GPL-2 potrace C implementation's details (helper names, constants,
+pipeline order) with no provenance record, and no ADR has resolved the
+finding since. If that code is derived from the GPL source, it cannot be
+published under MIT. Before the repo goes public the maintainer must
+either (a) replace the backend with a documented clean-room implementation
+from the Selinger 2003 paper, (b) revert the default trace path to the
+Unlicense imagetracerjs backend and remove the potrace-* modules, or
+(c) establish and record that the existing code was independently written.
+
+### Alternatives considered
+
+- **Apache-2.0:** adds a patent grant; heavier text. MIT matches the
+  existing dependency ecosystem and the ADR-008 posture being restored.
+- **AGPL-3.0:** protects against closed hosted forks but deters the
+  hobbyist audience and contradicts the MIT-compatible dependency story.
+- **Source-available (BSL):** not open source; fails the adoption goal.
+
+### Verification
+
+- `LICENSE` reads "MIT License" (this commit).
+- `pnpm license-check` still enforces the ADR-017 dependency allow-list.
+- `public/third-party-notices.txt` regenerated without proprietary wording.
+- The potrace provenance blocker above is tracked as an open item; the
+  visibility flip is gated on it.

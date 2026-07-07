@@ -1,24 +1,15 @@
-KerfDesk End User License Agreement
+KerfDesk License & Safety Notice
 
-Copyright (c) 2026 Johann Stolk. All rights reserved.
+Copyright (c) 2026 Johann Stolk
 
-This End User License Agreement ("Agreement") is between you and the
-copyright holder and governs your use of the KerfDesk software, in web
-or desktop form, including updates (the "Software"). By installing or
-using the Software you accept this Agreement. If you do not accept it,
-do not install or use the Software.
+1. LICENSE. The KerfDesk software, in web or desktop form, including
+   updates (the "Software"), is free and open-source software released
+   under the MIT License. You may use, copy, modify, and redistribute it
+   under the MIT License terms, which are reproduced at the end of this
+   notice. The source code is available in the project's public
+   repository.
 
-1. LICENSE GRANT. Subject to this Agreement and, where applicable,
-   payment of the purchase price, you are granted a non-exclusive,
-   non-transferable license to install and use the Software for your
-   own projects, personal or commercial. This is a license, not a sale
-   of the Software itself.
-
-2. RESTRICTIONS. You may not copy (except one backup), modify,
-   redistribute, sell, rent, sublicense, or reverse engineer the
-   Software except where law expressly permits.
-
-3. MACHINE SAFETY — READ CAREFULLY. The Software generates toolpaths
+2. MACHINE SAFETY — READ CAREFULLY. The Software generates toolpaths
    and streams commands to laser cutters, CNC routers, and similar
    machinery that can cause fire, serious injury, and property damage.
    You are solely responsible for safe operation, including: never
@@ -29,23 +20,41 @@ do not install or use the Software.
    safety regulations. The Software's previews, simulations, and
    preflight checks are aids, not guarantees of safe output.
 
-4. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE",
+3. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE",
    WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
    LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
    NON-INFRINGEMENT. NO GUARANTEE IS MADE THAT GENERATED OUTPUT IS
    CORRECT, SAFE, OR SUITED TO YOUR MACHINE OR MATERIAL.
 
-5. LIMITATION OF LIABILITY. TO THE MAXIMUM EXTENT PERMITTED BY LAW,
-   THE COPYRIGHT HOLDER IS NOT LIABLE FOR ANY INDIRECT, INCIDENTAL,
-   SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES — INCLUDING INJURY,
-   FIRE, DAMAGE TO MACHINES OR MATERIALS, OR LOST PROFITS — ARISING
-   FROM USE OF THE SOFTWARE, AND TOTAL LIABILITY IS LIMITED TO THE
-   AMOUNT YOU PAID FOR THE SOFTWARE.
+4. LIMITATION OF LIABILITY. TO THE MAXIMUM EXTENT PERMITTED BY LAW,
+   THE AUTHORS AND COPYRIGHT HOLDERS ARE NOT LIABLE FOR ANY CLAIM,
+   DAMAGES, OR OTHER LIABILITY — INCLUDING INJURY, FIRE, DAMAGE TO
+   MACHINES OR MATERIALS, OR LOST PROFITS — ARISING FROM, OUT OF, OR IN
+   CONNECTION WITH THE SOFTWARE OR ITS USE.
 
-6. THIRD-PARTY COMPONENTS. The Software bundles open-source components
+5. THIRD-PARTY COMPONENTS. The Software bundles open-source components
    under their own licenses; see the accompanying
    third-party-notices.txt for the required notices and license texts.
 
-7. TERMINATION. This Agreement terminates automatically if you breach
-   it; on termination you must stop using and delete the Software.
-   Sections 3 through 6 survive termination.
+----------------------------------------------------------------------
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

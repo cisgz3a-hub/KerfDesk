@@ -982,8 +982,8 @@ Hardware burn on the Falcon (must be confirmed by user):
    staggered vertical edges, lower speed for the job and treat scanning
    offset calibration as the next hardware task.
 
-When this checklist passes, mark F.2.f complete in AUDIT.md A8
-inventory and tag the build as the first Phase F.2 release.
+When this checklist passes, mark F.2.f complete in the hardware
+verification inventory and tag the build as the first Phase F.2 release.
 
 ### F-F3. Set work origin to the current head position (Phase F.3)
 
@@ -1070,7 +1070,7 @@ frames out of 30 and would flicker the readout.
 
 When this checklist passes on the Falcon, promote Phase F.3's
 "Future feature notes" entry in `PROJECT.md` to "Phase F.3 —
-Shipped" and update AUDIT.md's A8 hardware inventory.
+Shipped" and update the hardware verification inventory.
 
 ---
 
@@ -2642,4 +2642,4 @@ runs this on real Windows:
       the desktop app the Download/Install affordances are hidden.
 
 Until every box is checked on real hardware, the desktop installer stays
-**CLAIMED** (AUDIT.md A8 row).
+**CLAIMED** in the hardware verification inventory.
