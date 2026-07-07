@@ -97,11 +97,21 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
   };
 }
 
+// The single definition of "sendable": blank lines and full-line comments are
+// never streamed, so `completed`/`total` count ONLY lines this accepts. The
+// job-checkpoint mapper (core/recovery, ADR-118) uses the same predicate to
+// convert an acked-sendable count back to a raw file line number — the two
+// MUST NOT drift.
+export function isSendableGcodeLine(rawLine: string): boolean {
+  const trimmed = rawLine.trim();
+  return trimmed !== '' && !trimmed.startsWith(';');
+}
+
 function splitLines(gcode: string): ReadonlyArray<string> {
   return gcode
     .split('\n')
     .map((l) => l.trim())
-    .filter((l) => l !== '' && !l.startsWith(';'))
+    .filter((l) => isSendableGcodeLine(l))
     .map((l) => `${l}\n`);
 }
 
