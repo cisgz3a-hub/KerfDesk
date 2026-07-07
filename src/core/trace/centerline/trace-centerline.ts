@@ -48,7 +48,8 @@ export function traceCenterlineStrokePaths(
 // Fully transparent pixels are paper regardless of their hidden RGB —
 // exporters routinely write black under alpha=0, and without this guard a
 // transparent-background PNG traces as one canvas-sized blob.
-function inkMaskFromPrepared(prepared: RawImageData): InkMask {
+// Exported for the contour tracer, which needs the identical ink call.
+export function inkMaskFromPrepared(prepared: RawImageData): InkMask {
   const { width, height, data } = prepared;
   const ink = new Uint8Array(width * height);
   for (let i = 0; i < ink.length; i += 1) {

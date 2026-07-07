@@ -157,7 +157,7 @@ function finalizeChains(
     // sampled vertex inherits a slightly-wrong tangent and the curve facets
     // (the angular-bowl defect). Corners stay exact objects for output pinning.
     const evened = smoothChainCurvature(sharpened.points, chain.closed, sharpened.corners);
-    const simplified = simplify(evened, chain.closed, simplifyEpsilonPx);
+    const simplified = simplifyChain(evened, chain.closed, simplifyEpsilonPx);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
     result.push({
@@ -362,7 +362,13 @@ function isInk(p: Vec2, mask: InkMask): boolean {
 
 // --- Douglas-Peucker simplification ---
 
-function simplify(points: ReadonlyArray<Vec2>, closed: boolean, epsilonPx: number): Vec2[] {
+/** Closed-aware Douglas-Peucker simplification (exported for the contour
+ *  tracer, which finishes boundary chains with the same stage sequence). */
+export function simplifyChain(
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+  epsilonPx: number,
+): Vec2[] {
   if (points.length <= 2) return [...points];
   if (!closed) return douglasPeucker(points, epsilonPx);
   // Closed: anchor at 0 and the farthest point, simplify both halves.
