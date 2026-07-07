@@ -24,6 +24,8 @@ import { USER_ORIGIN_JOB_PLACEMENT } from '../../core/job';
 import {
   createLayer,
   createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type Layer,
@@ -226,5 +228,85 @@ describe('emitGcode production composition — invariants', () => {
     const p = curveProject();
     const want = expectedS(30, p.device.maxPowerS);
     for (const s of collectG1SValues(emitGcode(p).gcode)) expect(s).toBe(want);
+  });
+});
+
+// CNC had NO byte-pinned production output at all: a silent emitter change
+// produced zero snapshot churn. One multi-tool job covers the highest-risk
+// sequences in a single pin — safe-Z-before-M3 preamble, pocket, tabbed
+// profile with the tab-top ladder pass, the M0 tool change with its post-
+// resume Z re-establish, and the final park.
+describe('emitGcode production composition — cnc', () => {
+  function cncSquare(id: string, color: string, at: number, size: number): SceneObject {
+    return {
+      kind: 'imported-svg',
+      id,
+      source: `${id}.svg`,
+      bounds: { minX: at, minY: at, maxX: at + size, maxY: at + size },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color,
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: at, y: at },
+                { x: at + size, y: at },
+                { x: at + size, y: at + size },
+                { x: at, y: at + size },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  function multiToolCncProject(): Project {
+    const base = createProject();
+    return {
+      ...base,
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+      scene: {
+        objects: [cncSquare('P1', '#ff0000', 20, 30), cncSquare('P2', '#0000ff', 70, 40)],
+        layers: [
+          {
+            ...createLayer({ id: 'pocket', color: '#ff0000' }),
+            cnc: {
+              ...DEFAULT_CNC_LAYER_SETTINGS,
+              cutType: 'pocket',
+              toolId: 'em-3175',
+              depthMm: 2,
+              depthPerPassMm: 2,
+            },
+          },
+          {
+            ...createLayer({ id: 'profile', color: '#0000ff' }),
+            cnc: {
+              ...DEFAULT_CNC_LAYER_SETTINGS,
+              cutType: 'profile-outside',
+              toolId: 'em-6350',
+              depthMm: 3,
+              depthPerPassMm: 3,
+              tabsEnabled: true,
+              tabHeightMm: 1,
+              tabWidthMm: 6,
+              tabsPerShape: 4,
+            },
+          },
+        ],
+      },
+    };
+  }
+
+  it('multi-tool pocket + tabbed profile — byte-pinned', () => {
+    const { gcode, preflight } = emitGcode(multiToolCncProject());
+    expect(preflight.ok).toBe(true);
+    expect(gcode).toMatchSnapshot();
+  });
+
+  it('multi-tool CNC job — determinism (two runs byte-identical)', () => {
+    expect(emitGcode(multiToolCncProject()).gcode).toBe(emitGcode(multiToolCncProject()).gcode);
   });
 });

@@ -49,7 +49,7 @@ export function useCncRemovalGrid(
       Math.max(widthMm, heightMm) / UI_TARGET_CELLS_PER_AXIS,
     );
     const kernel = kernelForTool(activeCncTool(cncMachine), mmPerCell);
-    return computeRemovalGrid(
+    const result = computeRemovalGrid(
       toolpath,
       {
         originX: Math.min(a.x, b.x),
@@ -61,5 +61,6 @@ export function useCncRemovalGrid(
       kernel,
       { uptoLengthMm: toolpath.totalLength * quantT },
     );
+    return result.kind === 'ok' ? result.grid : null;
   }, [previewMode, cncMachine, device, toolpath, quantT]);
 }

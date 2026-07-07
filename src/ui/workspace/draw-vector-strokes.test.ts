@@ -41,10 +41,13 @@ function object(): ImportedSvg {
 
 const view: ViewTransform = { scale: 1, offsetX: 0, offsetY: 0 };
 
+// Display simplification of oversized traces happens upstream in
+// display-polylines.ts (see its tests); the stroke helper's contract is to
+// draw exactly the polylines it is given.
 describe('strokePolylinesBatched', () => {
-  it('draws every segment when the stride is one', () => {
+  it('draws every segment it is given', () => {
     const { ctx, calls } = countingContext();
-    const simplified = strokePolylinesBatched(
+    strokePolylinesBatched(
       ctx,
       object(),
       [
@@ -58,47 +61,8 @@ describe('strokePolylinesBatched', () => {
         },
       ],
       view,
-      1,
     );
 
-    expect(simplified).toBe(false);
     expect(calls.lineTo).toBe(2);
-  });
-
-  it('draws every Nth segment when the scene exceeds the visual budget', () => {
-    const { ctx, calls } = countingContext();
-    const points = Array.from({ length: 7 }, (_, x) => ({ x, y: 0 }));
-    const simplified = strokePolylinesBatched(ctx, object(), [{ closed: false, points }], view, 2);
-
-    expect(simplified).toBe(true);
-    expect(calls.lineTo).toBe(3);
-  });
-
-  it('does not visit every source point when drawing a sampled trace', () => {
-    const { ctx, calls } = countingContext();
-    const pointCount = 30_001;
-    const stride = 10;
-    const readBudget = 8_000;
-    let pointReads = 0;
-    const points = new Proxy(
-      Array.from({ length: pointCount }, (_, x) => ({ x, y: 0 })),
-      {
-        get(target, prop, receiver) {
-          if (typeof prop === 'string' && /^\d+$/.test(prop)) pointReads += 1;
-          return Reflect.get(target, prop, receiver);
-        },
-      },
-    );
-    const simplified = strokePolylinesBatched(
-      ctx,
-      object(),
-      [{ closed: false, points }],
-      view,
-      stride,
-    );
-
-    expect(simplified).toBe(true);
-    expect(calls.lineTo).toBe(3_000);
-    expect(pointReads).toBeLessThan(readBudget);
   });
 });

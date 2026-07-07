@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -66,12 +67,65 @@ afterEach(async () => {
     statusReport: null,
     safetyNotice: null,
     streamer: null,
+    airAssistOn: false,
     log: [],
   });
+  useStore.getState().newProject();
   vi.restoreAllMocks();
 });
 
 describe('laser store air assist safety cleanup', () => {
+  it('sends the configured air assist command and M9 from the manual toggle', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    await connectWith(connection);
+
+    write.mockClear();
+    await useLaserStore.getState().setAirAssistEnabled(true);
+    expect(write).toHaveBeenCalledWith('M8\n');
+    expect(useLaserStore.getState().airAssistOn).toBe(true);
+
+    connection.emitLine('ok');
+    await flushConnect();
+    write.mockClear();
+    await useLaserStore.getState().setAirAssistEnabled(false);
+
+    expect(write).toHaveBeenCalledWith('M9\n');
+    expect(useLaserStore.getState().airAssistOn).toBe(false);
+  });
+
+  it('blocks manual air assist on when Device Profile has no air output command', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+
+    write.mockClear();
+    await expect(useLaserStore.getState().setAirAssistEnabled(true)).rejects.toThrow(
+      'Manual air is disabled because Device Profile > Air output is Disabled',
+    );
+
+    expect(write).not.toHaveBeenCalled();
+    expect(useLaserStore.getState().airAssistOn).toBe(false);
+  });
+
+  it('turns manual air assist off before disconnecting an otherwise idle controller', async () => {
+    const close = vi.fn(async () => undefined);
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write, close);
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M7' });
+    await connectWith(connection);
+    await useLaserStore.getState().setAirAssistEnabled(true);
+    connection.emitLine('ok');
+
+    write.mockClear();
+    await useLaserStore.getState().disconnect();
+
+    expect(write).toHaveBeenCalledWith('M9\n');
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(useLaserStore.getState().airAssistOn).toBe(false);
+  });
+
   it('sends coolant off during normal Stop cleanup when serial is alive', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
@@ -85,6 +139,7 @@ describe('laser store air assist safety cleanup', () => {
 
     expect(writes.join('')).toContain(RT_SOFT_RESET);
     expect(writes.join('')).toContain('M9\n');
+    expect(useLaserStore.getState().airAssistOn).toBe(false);
   });
 
   it('sends soft reset before coolant off when disconnecting an active job', async () => {

@@ -50,10 +50,18 @@ export function vcarvePasses(
     (polyline) =>
       polyline.closed && polyline.points.length >= MIN_CLOSED_POINTS && hasFinitePoints(polyline),
   );
-  const maxDepth = options.maxDepthMm;
-  if (contours.length === 0 || !(maxDepth > 0)) return [];
   const delta = vcarveResolutionMm(options.resolutionMm, options.tool.diameterMm);
   const tanHalf = Math.tan(halfAngleRad(options.tool));
+  // The bit's cutting flank ends where the cone reaches the full diameter:
+  // (D/2)/tan(θ/2). Deeper "V" cuts do not physically exist — the shank
+  // would rub and the modeled groove width past the diameter would be a lie
+  // (VCarve's flat-depth limit applies the same cap).
+  const coneHeightMm =
+    Number.isFinite(options.tool.diameterMm) && options.tool.diameterMm > 0
+      ? options.tool.diameterMm / 2 / tanHalf
+      : Number.POSITIVE_INFINITY;
+  const maxDepth = Math.min(options.maxDepthMm, coneHeightMm);
+  if (contours.length === 0 || !(maxDepth > 0)) return [];
 
   const passes: CncContourPass[] = [];
   for (let k = 1; k <= MAX_VCARVE_RINGS; k += 1) {

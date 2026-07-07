@@ -7,8 +7,10 @@ import { calculateFeeds, isChiploadMaterialKey } from '../../core/cnc';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
+  type CncLayerSettings,
   type CncMachineConfig,
   type CncStock,
+  type CncTool,
   type Layer,
   type Project,
 } from '../../core/scene';
@@ -25,24 +27,42 @@ export function layerWithCncMaterial(
   layer: Layer,
   machine: CncMachineConfig,
   materialKey: string,
+  maxFeedMmPerMin?: number,
 ): Layer {
-  if (!isChiploadMaterialKey(materialKey)) return layer;
   const cnc = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  const patch = materialFeedsPatch(
+    materialKey,
+    layerCncTool(machine, cnc),
+    cnc.spindleRpm,
+    maxFeedMmPerMin,
+  );
+  if (patch === null) return layer;
+  return { ...layer, cnc: { ...cnc, ...patch } };
+}
+
+// Material-derived feeds for a specific bit — the single source the material
+// pickers AND bit changes use, so swapping bits can never leave stale
+// material feeds behind. Null for unknown material keys.
+export function materialFeedsPatch(
+  materialKey: string,
+  tool: CncTool,
+  spindleRpm: number,
+  maxFeedMmPerMin?: number,
+): Partial<CncLayerSettings> | null {
+  if (!isChiploadMaterialKey(materialKey)) return null;
   const feeds = calculateFeeds({
     material: materialKey,
-    bitDiameterMm: layerCncTool(machine, cnc).diameterMm,
+    bitDiameterMm: tool.diameterMm,
     flutes: ASSUMED_FLUTES,
-    rpm: cnc.spindleRpm,
+    rpm: spindleRpm,
+    ...(maxFeedMmPerMin === undefined ? {} : { maxFeedMmPerMin }),
   });
+  if (feeds.kind === 'error') return null;
   return {
-    ...layer,
-    cnc: {
-      ...cnc,
-      materialKey,
-      feedMmPerMin: feeds.feedMmPerMin,
-      plungeMmPerMin: feeds.plungeMmPerMin,
-      depthPerPassMm: feeds.depthPerPassMm,
-    },
+    materialKey,
+    feedMmPerMin: feeds.feedMmPerMin,
+    plungeMmPerMin: feeds.plungeMmPerMin,
+    depthPerPassMm: feeds.depthPerPassMm,
   };
 }
 
@@ -59,7 +79,9 @@ export function projectWithStockMaterial(project: Project, materialKey: string |
   const layers =
     materialKey === null
       ? project.scene.layers
-      : project.scene.layers.map((layer) => layerWithCncMaterial(layer, machine, materialKey));
+      : project.scene.layers.map((layer) =>
+          layerWithCncMaterial(layer, machine, materialKey, project.device.maxFeed),
+        );
   return {
     ...project,
     machine: { ...machine, stock },

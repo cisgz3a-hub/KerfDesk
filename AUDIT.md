@@ -18,6 +18,11 @@
 
 ## Repo at a glance
 
+> Snapshot as of 2026-05-28 (Phase F.1). These headline counts are NOT kept
+> current — later dated passes below supersede them (the tree has since grown to
+> 824+ source files / 3594 tests). Treat this table as a point-in-time snapshot,
+> not the live state (noted 2026-07-05 — S01-003).
+
 | Metric | Value | Verdict |
 |---|---|---|
 | Total source LOC | 67 153 across 520 TS/TSX source files | ✅ compact enough for current scope |
@@ -384,11 +389,10 @@ post-validity-check (1×). ✓
   modulepreload
 - ✓ Default assetsInlineLimit (4 KB); the fonts in `dist/web/assets/`
   are above the limit so they're not data-URI'd
-- ✓ Source maps: `sourcemap: true` is set; the `.js.map` is in
-  `dist/web/assets/` and Cloudflare serves it. Acceptable for a private
-  proprietary app whose primary deployment audience is the owner
-  (Cloudflare access logs aren't a leakage concern). Flag for
-  consideration if the URL ever goes public.
+- ✓ Source maps: `sourcemap: false` in `vite.config.ts` (R-H3 fix, below) —
+  no `.js.map` ships, so the proprietary TS source is NOT exposed on the public
+  Cloudflare URL. (This bullet previously read `true` / "acceptable"; that was
+  superseded when R-H3 disabled sourcemaps. Corrected 2026-07-05 — S01-004.)
 
 ### 6. WebSerial spec (wicg.github.io/serial)
 

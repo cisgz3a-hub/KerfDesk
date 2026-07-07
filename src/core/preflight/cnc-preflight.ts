@@ -14,6 +14,7 @@
 //   8. No emitted Z below -(stock + through-cut allowance) — proves the depth
 //      invariant on the final text, not just the settings (findOverdeepCutIssues).
 
+import { findDroppedCncLayers } from '../cnc';
 import { machineBoundsForDevice } from '../devices';
 import {
   DEFAULT_THROUGH_CUT_ALLOWANCE_MM,
@@ -55,6 +56,18 @@ export function runCncPreflight(
   }
   for (const layer of outputLayers) {
     appendCncLayerIssues(layer, project.device.maxFeed, config, issues);
+  }
+  // A layer with shapes but zero toolpaths would be SILENTLY omitted from
+  // the job (bit too wide for the geometry, or open shapes on a closed-only
+  // cut type) — the customer finds out after the cut.
+  for (const layerId of findDroppedCncLayers(project.scene, project.device, config)) {
+    issues.push({
+      code: 'cnc-layer-empty',
+      message:
+        `Layer ${layerId}: its shapes produced no toolpaths — usually the bit is too wide to ` +
+        'fit them (pockets and inside profiles need the bit to fit inside), or a profile/pocket ' +
+        'shape is not closed. Fix the layer or disable its Output.',
+    });
   }
   appendBoundsIssues(project, gcode, options, issues);
   appendNoGoZoneIssues(project, gcode, options, issues);

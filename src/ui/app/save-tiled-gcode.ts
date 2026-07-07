@@ -10,7 +10,7 @@ import { runCncPreflight } from '../../core/preflight';
 import { cncGrblStrategy } from '../../core/output';
 import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
-import type { Project } from '../../core/scene';
+import type { OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
 
@@ -20,6 +20,9 @@ export type SaveTiledGcodeCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
   readonly savedName: string | null;
+  // "Cut selected graphics" applies to tiled exports too — ignoring it would
+  // silently tile the whole scene.
+  readonly outputScope?: OutputScope;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -29,7 +32,10 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   const machine = ctx.project.machine;
   if (machine?.kind !== 'cnc' || machine.tiling === undefined) return false;
 
-  const prepared = prepareOutput(ctx.project);
+  const prepared = prepareOutput(
+    ctx.project,
+    ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope },
+  );
   if (!prepared.ok) {
     const lines = prepared.preflight.issues.map((issue) => `• ${issue.message}`).join('\n');
     jobAwareAlert(`Cannot export tiles:\n\n${lines}`);

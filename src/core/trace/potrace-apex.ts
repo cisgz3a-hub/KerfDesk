@@ -112,6 +112,14 @@ function snapRing(polyline: Polyline, bitmap: TraceBitmap, options: ApexSnapOpti
     return snapVertex(ring, index, bitmap);
   });
 
+  // Re-append the (possibly moved) start vertex: downstream job compilation
+  // documents closed segments as "last point equals the first by
+  // construction" (job.ts) and the emitters draw points as given — a ring
+  // returned without its closing duplicate engraves with its final edge
+  // missing. dedupeClosingPoint stripped it for the cyclic math above.
+  const seam = moved[0];
+  if (seam !== undefined) moved.push({ x: seam.x, y: seam.y });
+
   return { points: moved, closed: true };
 }
 

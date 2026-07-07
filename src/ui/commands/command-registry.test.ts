@@ -28,6 +28,12 @@ describe('buildAppCommands', () => {
     );
   });
 
+  it('does not expose the camera command while the camera feature is disabled', () => {
+    const commands = buildAppCommands(baseCtx());
+
+    expect(commands.map((command) => command.id)).not.toContain('tools.camera');
+  });
+
   it('uses the central help registry for enabled command hover text', () => {
     const commands = buildAppCommands(
       baseCtx({
@@ -45,7 +51,7 @@ describe('buildAppCommands', () => {
     );
 
     for (const command of commands.filter((candidate) => candidate.enabled)) {
-      expect(command.title).toBe(COMMAND_HELP[command.id].tooltip);
+      expect(command.title).toBe(COMMAND_HELP[command.id]?.tooltip);
     }
   });
 

@@ -42,6 +42,26 @@ describe('buildResumeProgram', () => {
     expect(result.lines.at(-1)).toBe('G0 X0.000 Y0.000');
   });
 
+  it('positions the head before arming the laser on a Z-free (laser) resume', () => {
+    // A laser program has no Z words and carries S/F modally. Resuming mid-path
+    // must travel to the resume XY with the beam OFF, then arm — never
+    // arm-then-travel. Under M3 constant power in GRBL laser mode, an early
+    // `M3 S<power>` (and the spin-up G4 dwell) fires a stationary dot at the
+    // parked position and then travels with the beam armed (audit C1).
+    const laser =
+      'G21\nG90\nM3 S0\nG0 X10 Y10 S0\nG1 X20 Y10 F1500 S300\nG1 X20 Y20\nG1 X10 Y20\nM5';
+    const result = buildResumeProgram(laser, 6, OPTIONS); // resume at 'G1 X20 Y20'
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const preamble = result.lines.slice(0, result.preambleCount);
+    const moveIndex = preamble.findIndex((line) => line.startsWith('G0 X'));
+    const armIndex = preamble.findIndex((line) => line.startsWith('M3 S'));
+    expect(moveIndex).toBeGreaterThanOrEqual(0);
+    expect(armIndex).toBeGreaterThan(moveIndex);
+    // No spin-up dwell on a laser resume — a G4 while M3 is active fires the
+    // stationary beam.
+    expect(preamble.some((line) => line.startsWith('G4'))).toBe(false);
+  });
+
   it('leaves the spindle off when it was off at the resume point', () => {
     const result = buildResumeProgram(PROGRAM, 2, OPTIONS);
     if (result.kind !== 'ok') throw new Error(result.reason);

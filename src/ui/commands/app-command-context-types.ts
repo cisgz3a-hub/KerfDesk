@@ -16,6 +16,8 @@ export type CommandShellCallbacks = {
   readonly requestUndoHistory: () => void;
   readonly requestCloseOpenFillContoursWithTolerance: () => void;
   readonly showAbout: () => void;
+  readonly showConnectionHelp: () => void;
+  readonly showSafety: () => void;
 };
 
 export type CommandDialogs = {

@@ -24,6 +24,11 @@ import { parseGcodeProgram } from './parse-gcode-program';
 const GRID_MARGIN_MM = 5;
 const GRID_CELL_MM = 0.5;
 
+function expectGrid(result: ReturnType<typeof computeRemovalGrid>) {
+  if (result.kind === 'error') throw new Error(result.reason);
+  return result.grid;
+}
+
 function squareScene(): Scene {
   const object: ImportedSvg = {
     kind: 'imported-svg',
@@ -78,12 +83,10 @@ describe('.nc re-import parity with the native simulator pipeline', () => {
       mmPerCell: GRID_CELL_MM,
     };
     const kernel = kernelForTool(activeCncTool(machine), gridSpec.mmPerCell);
-    const native = computeRemovalGrid(
-      buildToolpath(job, { startPoint: { x: 0, y: 0 } }),
-      gridSpec,
-      kernel,
+    const native = expectGrid(
+      computeRemovalGrid(buildToolpath(job, { startPoint: { x: 0, y: 0 } }), gridSpec, kernel),
     );
-    const reimported = computeRemovalGrid(parsed.toolpath, gridSpec, kernel);
+    const reimported = expectGrid(computeRemovalGrid(parsed.toolpath, gridSpec, kernel));
 
     let both = 0;
     let either = 0;

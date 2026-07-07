@@ -16,9 +16,9 @@ Mode: sector audit plus user-approved fix-phase tracking.
 
 ## Current Status
 
-Active sector: S02 current-state delta audit refresh.
+Active sector: Current-state delta audit complete; open findings awaiting review.
 Completed sectors: S01 Governance, audit history, and product contracts; S02 Tooling, build, release, CI, and static shell; S03 Electron desktop runtime and local bridge; S04 Core domain models, controller/device/material primitives; S05 Core job compilation, preflight, raster/trace, and output; S06 IO formats and persistence; S07 Platform adapters; S08 UI application workflows; S09 Fixtures, perceptual harness, and test assets.
-Current pass: S04 post-fast-forward delta Pass 3 complete; S02 post-`cd5c7f4` test/config delta Pass 1 next.
+Current pass: S08 post-`46889ca` delta Pass 3 complete; current-state delta audit closed.
 
 ## Findings Summary
 
@@ -43,6 +43,7 @@ Current pass: S04 post-fast-forward delta Pass 3 complete; S02 post-`cd5c7f4` te
 | S02-004 | Medium | S02 | Fixed | Release verification steps are duplicated across `release:check`, CI, and deploy instead of sharing one gate. |
 | D-S02-001 | Low | S02 | Open | Deterministic build-time metadata has no direct regression test. |
 | D-S02-002 | Low | S02 | Open | Production web build still emits a Vite chunk-size warning. |
+| D-S02-003 | Low | S02 | Open | CI-only Vitest worker throttling has no direct policy regression test. |
 | S03-001 | High | S03 | Fixed | RTSP bridge CORS allows the Pages fallback hostname but not canonical `kerfdesk.com`. |
 | S03-002 | High | S03 | Fixed | Electron permission policy does not grant browser camera/media permission even though the UI calls `getUserMedia`. |
 | S03-003 | Medium | S03 | Fixed | RTSP probe waits for socket end, so cameras that keep the connection open can time out after a valid response. |
@@ -106,6 +107,11 @@ Current pass: S04 post-fast-forward delta Pass 3 complete; S02 post-`cd5c7f4` te
 | S08-014 | Low | S08 | Fixed | Preview route playback buttons use an undefined CSS class instead of the shared button chrome. |
 | S08-015 | Low | S08 | Fixed | The hover-help contract accepts unregistered `data-help-id` values, and preview controls already use IDs outside the help registry. |
 | S08-016 | Low | S08 | Fixed | Add/Edit Text numeric inputs can pass non-finite or out-of-contract values into text rendering and scene state. |
+| D-S08-001 | Medium | S08 | Open | PWA update dismissal re-arm clears storage without invalidating the mounted prompt render. |
+| D-S08-002 | Medium | S08 | Open | UI canvas/WebGL tests pass while emitting jsdom canvas errors and async `act(...)` warnings. |
+| D-S08-003 | Medium | S08 | Open | Shared `NumberField` can silently clamp restored above-UI-max values on blur. |
+| D-S08-004 | Low | S08 | Open | Most migrated CNC/device `NumberField` integrations lack direct clear/blur/clamp regression coverage. |
+| D-S08-005 | Low | S08 | Open | Ramp Entry can no longer be cleared to its default by emptying the optional number field. |
 | S09-001 | Medium | S09 | Fixed | The required Arch House fixture detector accepts non-PNG files even though all real-logo consumers decode the path as PNG. |
 | S09-002 | Low | S09 | Fixed | Perceptual artifact PNGs are ignored local outputs but are referenced like durable audit evidence. |
 | S09-003 | Low | S09 | Fixed | `writePerceptualArtifact(...)` can render a misleading comparison for mismatched mask dimensions. |
@@ -114,6 +120,8 @@ Current pass: S04 post-fast-forward delta Pass 3 complete; S02 post-`cd5c7f4` te
 | S09-006 | Medium | S09 | Fixed | The centerline performance regression test uses the worker timeout as its only budget despite a much lower stated target and current runtime. |
 | S09-007 | Low | S09 | Fixed | The minimal PNG decoder has no dedicated malformed/unsupported-file tests even though it gates the real-logo benchmark fixture. |
 | S09-008 | Low | S09 | Fixed | The emitted-G-code burn rasterizer has no direct parser tests beyond three generated GRBL fill fixtures. |
+| D-S09-001 | Low | S09 | Open | `TRACE_AUDIT` diagnostic tests count as passing tests when the diagnostic environment flag is absent. |
+| D-S09-002 | Low | S09 | Open | `_edge-zoom` TRACE_AUDIT diagnostic still hardcodes the removed `audit/fixtures/trace` logo path. |
 
 ## Pass Log
 
@@ -3264,9 +3272,9 @@ Final result:
 Reason for reopening:
 
 - The completed audit/fix ledger closed against the earlier audited baseline.
-- Current `origin/main` is `cd5c7f4`, twenty-five commits after `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, and runner-speed CI flake fixes.
+- Current `origin/main` is `46889ca`, after `d603c01`. At S01 delta Pass 1 the head was `e31a3b8`; later fast-forwards added the audit-doc checkpoint, three S08 box/input commits, PWA update dismissal persistence, deterministic build-time configuration, CNC machine catalog/default-bit changes, probe/device-setup UI changes, runner-speed CI flake fixes, the S04 audit-refresh documentation checkpoint, S09 fixture/perceptual updates, and the post-`d23e2d6` shared NumberField/input migration.
 - `git diff --name-status d603c01..origin/main` shows changes in S01, S02, S04, S05, S06, S08, and S09.
-- `git ls-files -co --exclude-standard` currently returns 1,689 files.
+- `git ls-files -co --exclude-standard` currently returns 1,691 files.
 - The previous sector map left 71 current files unclassified until this pass refreshed the architecture map.
 
 No product source fixes are made in this delta audit. Audit documentation is updated because it is the requested audit ledger.
@@ -4016,3 +4024,625 @@ Pass result:
 - S04 post-fast-forward delta refresh closed after three supplemental passes.
 - S04 delta findings remain open in the audit ledger, but no major S04 audit area remains unchecked for the current tree.
 - Move to S02 current-state delta refresh for the later `cd5c7f4` runner-speed CI test/config changes before S08.
+
+### S02 Post-cd5c7f4 Delta Pass 1 - Vitest Runner-Speed Configuration
+
+Scope planned:
+
+- Inspect the S02 tooling/config delta introduced by `cd5c7f4`.
+- Focus on `vitest.config.ts`, CI-only worker throttling, and the new test-budget helper surface that supports slower shared CI runners.
+- Run focused local-mode and CI-mode test slices plus TypeScript checking.
+
+Evidence inspected:
+
+- `git diff --unified=100 17e11f8..cd5c7f4 -- vitest.config.ts src/__fixtures__/ci-budget.ts src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts src/core/camera/calibrate-sweep.test.ts src/core/camera/detect-checkerboard.test.ts`.
+- `vitest.config.ts`, especially `maxWorkers: process.env.CI ? 1 : 4`.
+- `src/__fixtures__/ci-budget.ts` and `src/__fixtures__/ci-budget.test.ts`.
+- Targeted `rg` over `src/platform/web`, `package.json`, `scripts`, `.github`, `vitest.config.ts`, and the CI budget helper files for `maxWorkers`, `vitest.config`, `onTaskUpdate`, `ciBudgetMs`, `CI runner`, and `release:check`.
+- Focused local-mode command passed: `pnpm exec vitest run src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts src/core/camera/calibrate-sweep.test.ts src/core/camera/detect-checkerboard.test.ts` (4 test files, 19 tests).
+- Focused CI-mode command passed: `$env:CI='true'; pnpm exec vitest run src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts src/core/camera/calibrate-sweep.test.ts src/core/camera/detect-checkerboard.test.ts; Remove-Item Env:CI -ErrorAction SilentlyContinue` (4 test files, 19 tests).
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+
+#### D-S02-003 - CI-only Vitest worker throttling has no direct policy regression test
+
+Evidence:
+
+- `vitest.config.ts` now changes full-suite parallelism from a fixed `maxWorkers: 4` to `maxWorkers: process.env.CI ? 1 : 4` to avoid Vitest worker RPC timeout flakes on the two-vCPU private CI runner.
+- The new `ciBudgetMs(...)` helper is directly unit-tested for unset, non-empty, and empty `CI` values.
+- Targeted search found no equivalent policy/regression test that pins the actual `vitest.config.ts` worker throttle, the intended CI value of `1`, or the intended local value of `4`.
+- `release:check` and the GitHub workflows exercise the config indirectly, but a future accidental config edit would be noticed only when CI runner contention returns.
+
+Risk:
+
+The change fixes an operational release blocker, not product logic. Without a direct guard, a later config cleanup or merge could silently restore excessive CI parallelism, causing flaky `[vitest-worker]: Timeout calling "onTaskUpdate"` failures and blocking the CI-gated auto-deploy even when tests themselves pass.
+
+Recommendation:
+
+Add a small static repo-policy test that reads `vitest.config.ts` or extract the worker-count decision into a tiny testable helper. Pin the CI worker count, local worker count, and the non-empty `CI` contract alongside the existing release/deploy policy tests.
+
+Findings:
+
+- Opened `D-S02-003` (low): CI-only Vitest worker throttling has no direct policy regression test.
+- The current implementation behaves as intended in both local-mode and `CI=true` focused test slices.
+
+Pass result:
+
+- S02 post-`cd5c7f4` delta Pass 1 complete.
+- S02 remains open for Pass 2 and Pass 3 over workflow/release-gate semantics, docs/config consistency, and remaining tooling-policy gaps.
+
+### S02 Post-cd5c7f4 Delta Pass 2 - Release Gate and Policy Coverage Sweep
+
+Scope planned:
+
+- Recheck CI/deploy workflow semantics around the runner-speed configuration.
+- Recheck static policy tests and local guard scripts that protect the release path.
+- Decide whether Pass 1's `D-S02-003` is the only tooling-policy gap introduced by `cd5c7f4`.
+
+Evidence inspected:
+
+- `.github/workflows/ci.yml`.
+- `.github/workflows/deploy.yml`.
+- `src/platform/web/deploy-workflow-gate.test.ts`.
+- `src/platform/web/repo-policy.test.ts`.
+- `scripts/check-file-size-policy.mjs`.
+- `eslint.config.mjs`, especially the pure-core `process` ban and test-file exemptions.
+- `package.json` scripts and engines.
+- Focused command passed: `pnpm exec vitest run src/platform/web/deploy-workflow-gate.test.ts src/platform/web/repo-policy.test.ts src/__fixtures__/ci-budget.test.ts` (3 test files, 17 tests).
+- Focused command passed: `pnpm guard:repo`.
+- Focused command passed: `pnpm check:file-size`.
+- Focused command passed: `pnpm exec prettier --check vitest.config.ts src/__fixtures__/ci-budget.ts src/__fixtures__/ci-budget.test.ts .github/workflows/ci.yml .github/workflows/deploy.yml scripts/check-file-size-policy.mjs`.
+
+Findings:
+
+- No new S02 delta findings in Pass 2.
+- CI and deploy workflows still route through the shared `pnpm release:check` gate.
+- Deploy still checks out the CI-validated `workflow_run.head_sha` before publishing and forces the Cloudflare Pages production branch used by the current project.
+- The file-size backstop explicitly includes `vitest.config.ts`, so the expanded explanatory comment remains within the root-config raw-line policy.
+- The `ciBudgetMs(...)` helper remains isolated to test/fixture code; core production code is still protected from `process` by the pure-core ESLint rule.
+- `D-S02-003` remains the only new S02 finding from the runner-speed delta.
+
+Pass result:
+
+- S02 post-`cd5c7f4` delta Pass 2 complete.
+- S02 remains open for one remaining-gap pass over docs/config consistency, direct diff closure, and audit-doc consistency.
+
+### S02 Post-cd5c7f4 Delta Pass 3 - Docs and Direct-Diff Closure
+
+Scope planned:
+
+- Recheck docs/config consistency around the S02 runner-speed change.
+- Confirm the exact S02 delta from `cd5c7f4`.
+- Re-run the focused release-policy/build checks needed to close S02.
+
+Evidence inspected:
+
+- Targeted `rg` over `README.md`, `AUDIT.md`, `PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `docs/**`, and `audit/**` for CI runner, `maxWorkers`, Vitest, `release:check`, web-build, chunk warning, Cloudflare Pages, and deploy references.
+- `git diff --name-status 17e11f8..cd5c7f4 -- package.json pnpm-lock.yaml vite.config.ts vitest.config.ts tsconfig.json tsconfig.*.json eslint.config.* scripts .github .npmrc index.html public src/platform/web src/__fixtures__/ci-budget.ts src/__fixtures__/ci-budget.test.ts`, confirming the S02/tooling part of `cd5c7f4` is `vitest.config.ts` plus the CI budget helper tests.
+- `git diff --name-status cd5c7f4..HEAD`, confirming post-`cd5c7f4` local changes are audit docs only.
+- Audit-doc whitespace check passed: `git diff --check -- audit/REPOSITORY-SECTOR-ARCHITECTURE-2026-07-03.md audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`.
+- Focused command passed: `pnpm exec vitest run src/platform/web/deploy-workflow-gate.test.ts src/platform/web/repo-policy.test.ts src/platform/web/pwa-precache.test.ts src/__fixtures__/ci-budget.test.ts` (4 test files, 19 tests).
+- Focused command passed: `pnpm build:web`; build completed, generated the PWA service worker, and still emitted the known Vite large-chunk warning for `assets/three.module-*.js` at about 704.87 kB.
+
+Findings:
+
+- No new S02 delta findings in Pass 3.
+- The exact S02/product-tooling delta has been covered across the three supplemental passes.
+- `D-S02-001` remains open for missing direct regression coverage on deterministic build-time metadata.
+- `D-S02-002` remains open; current `pnpm build:web` still emits the `three.module` chunk warning while docs still describe a clean web build.
+- `D-S02-003` remains open for missing direct policy coverage of the CI-only Vitest worker throttle.
+
+Pass result:
+
+- S02 post-`cd5c7f4` delta refresh closed after three supplemental passes.
+- Move to S04 current-state delta test-only refresh for the camera calibration/detection test flake changes from `cd5c7f4`.
+
+### S04 Post-cd5c7f4 Camera-Test Delta Pass 1 - Changed Assertions and Core Camera Slice
+
+Scope planned:
+
+- Inspect the S04 test-only delta in `src/core/camera/calibrate-sweep.test.ts` and `src/core/camera/detect-checkerboard.test.ts`.
+- Verify the timeout changes do not weaken the camera behavior assertions.
+- Re-run the broad core camera test slice.
+
+Evidence inspected:
+
+- `git diff --unified=120 17e11f8..cd5c7f4 -- src/core/camera/calibrate-sweep.test.ts src/core/camera/detect-checkerboard.test.ts src/core/camera/calibrate-sweep.ts src/core/camera/detect-checkerboard.ts src/core/camera/calibrate.ts src/core/camera/calibration-session.ts`.
+- `src/core/camera/calibrate-sweep.test.ts`.
+- `src/core/camera/detect-checkerboard.test.ts`.
+- `src/core/camera/calibrate-sweep.ts`.
+- `src/core/camera/detect-checkerboard.ts`.
+- `src/core/camera/calibrate.ts`.
+- Targeted `rg` over `src/core/camera`, `src/ui/camera`, and `src/ui/laser` for focal-sweep, checkerboard detection, mapping-error assertions, `ciBudgetMs`, timeouts, RMS, and calibration call paths.
+- Focused command passed: `pnpm exec vitest run src/core/camera` (29 test files, 159 tests).
+
+Findings:
+
+- No new S04 delta findings in Pass 1.
+- The `cd5c7f4` S04 changes are test-only and keep the behavioral gates intact: focal recovery, sub-pixel mapping error, RMS/principal-point bounds, typed failures, deterministic detection, noise handling, and full camera-module regression coverage still pass.
+- The changed timeout values are now delegated to the test-only `ciBudgetMs(...)` helper; the production calibration and detection implementations are unchanged in this delta.
+
+Pass result:
+
+- S04 post-`cd5c7f4` camera-test delta Pass 1 complete.
+- S04 remains open for two more passes over UI camera wizard/session integration, test-only import boundaries, and remaining audit-doc consistency.
+
+### S04 Post-cd5c7f4 Camera-Test Delta Pass 2 - Wizard Integration and Import Boundary Sweep
+
+Scope planned:
+
+- Recheck the UI camera wizard/session path that consumes `calibrateWithFocalSweep(...)` and checkerboard detection.
+- Recheck whether the new `ciBudgetMs(...)` helper leaks from test/fixture space into production core/UI code.
+- Run the camera UI/session slice adjacent to the changed camera tests.
+
+Evidence inspected:
+
+- `src/ui/camera/wizard/camera-wizard-store.ts`.
+- `src/ui/camera/wizard/use-live-detection.ts`.
+- `src/ui/camera/wizard/CameraCalibrationWizard.tsx`.
+- `src/core/camera/calibration-session.ts`.
+- `src/core/camera/calibration-trust.ts`.
+- `src/core/camera/index.ts`.
+- Targeted `rg` over `src/core`, `src/ui`, and `src/__fixtures__` for `ciBudgetMs`, `process.env`, fixture imports, camera API imports, focal-sweep calls, session solves, and checkerboard detection.
+- Focused command passed: `pnpm exec vitest run src/ui/camera src/ui/laser/MachineSetupCameraPreview.test.tsx src/ui/laser/MachineSetupCamera.test.tsx src/ui/laser/MachineSetupDialog.test.tsx src/core/camera/calibration-session.test.ts src/core/camera/calibration-trust.test.ts src/core/camera/pose-diversity.test.ts` (13 test files, 58 tests).
+- Focused command passed: `pnpm exec vitest run src/core/camera/calibrate-sweep.test.ts src/core/camera/detect-checkerboard.test.ts src/__fixtures__/ci-budget.test.ts` (3 test files, 18 tests).
+
+Findings:
+
+- No new S04 delta findings in Pass 2.
+- Production core and UI camera code still consume the normal `core/camera` APIs; `ciBudgetMs(...)` remains in test/fixture-only call paths.
+- The wizard/session flow still routes solves through `solveSession(...)`, which calls `calibrateWithFocalSweep(...)`, then applies calibration trust and pose-diversity checks before the UI presents the result.
+- Adjacent UI camera tests passed. The UI slice still emits jsdom canvas `getContext` stderr while passing; that is a UI/test-harness signal to recheck during S08 rather than a new S04 core finding.
+
+Pass result:
+
+- S04 post-`cd5c7f4` camera-test delta Pass 2 complete.
+- S04 remains open for one remaining-gap pass over direct diff closure, camera-test audit consistency, and docs/audit-ledger consistency.
+
+### S04 Post-cd5c7f4 Camera-Test Delta Pass 3 - Direct Diff and Closure
+
+Scope planned:
+
+- Prove the current `cd5c7f4` S04 delta footprint is test-only.
+- Rerun the smallest camera/session slice that exercises the changed timeout-bearing tests and their UI-session consumer.
+- Close S04 if no major S04 areas remain unchecked.
+
+Evidence inspected:
+
+- `git diff --name-status 17e11f8..cd5c7f4 -- src/core/camera src/ui/camera src/ui/laser src/__fixtures__/ci-budget.ts src/__fixtures__/ci-budget.test.ts vitest.config.ts`, confirming S04-owned changes are limited to `src/core/camera/calibrate-sweep.test.ts` and `src/core/camera/detect-checkerboard.test.ts`.
+- Focused command passed: `pnpm exec vitest run src/core/camera/calibrate-sweep.test.ts src/core/camera/detect-checkerboard.test.ts src/core/camera/calibration-session.test.ts src/ui/camera/wizard/camera-wizard-store.test.ts src/ui/camera/wizard/CameraCalibrationWizard.test.tsx` (5 test files, 28 tests).
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+- Audit-doc whitespace check passed: `git diff --check -- audit/REPOSITORY-SECTOR-ARCHITECTURE-2026-07-03.md audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`.
+
+Findings:
+
+- No new S04 delta findings in Pass 3.
+- The later camera-test delta has been covered with three passes; it did not introduce production core changes and did not weaken camera correctness assertions.
+- Existing S04 delta findings remain `D-S04-001`, `D-S04-002`, `D-S04-003`, and `D-S04-004`.
+
+Pass result:
+
+- S04 post-`cd5c7f4` camera-test delta refresh closed after three passes.
+- Move to S08 current-state delta audit for CNC material UI/state changes, PWA update dismissal, box numeric-input/dogbone toggle changes, probe/device-setup catalog UI changes, and UI canvas-test stderr noted during S04 Pass 2.
+
+### S08 Delta Pass 1 - PWA Update and CNC Material/Machine UI
+
+Scope planned:
+
+- Map the current S08 delta files.
+- Inspect the PWA update-dismissal workflow and the CNC material/machine UI/state workflow.
+- Run focused tests for PWA prompt behavior, CNC project-material seeding, CNC machine presets, adjacent layer-seeding hooks, and debounced UI commits.
+
+Evidence inspected:
+
+- `git diff --name-status d603c01..HEAD -- src/ui`.
+- `git diff --unified=80 d603c01..HEAD -- src/ui/app/PwaUpdatePrompt.tsx src/ui/app/PwaUpdatePrompt.test.tsx src/ui/app/pwa-update-dismissal.ts src/ui/machine/CncSetupPanel.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/machine/CncMachineCatalogRow.tsx src/ui/machine/CncLibraryPanels.tsx src/ui/state/cnc-project-material.ts src/ui/state/cnc-project-material.test.ts src/ui/state/cnc-project-material-action.test.ts src/ui/state/cnc-material-seeding.test.ts src/ui/state/cnc-machine-preset.test.ts src/ui/state/machine-actions.ts`.
+- `src/ui/app/PwaUpdatePrompt.tsx`.
+- `src/ui/app/pwa-update-dismissal.ts`.
+- `src/ui/app/PwaUpdatePrompt.test.tsx`.
+- `src/ui/state/cnc-project-material.ts`.
+- `src/ui/state/machine-actions.ts`.
+- `src/ui/machine/CncSetupPanel.tsx`.
+- `src/ui/machine/CncMachineCatalogRow.tsx`.
+- Targeted `rg` over `src/ui`, `src/core`, and `src/io` for PWA dismissal helpers, `updatefound`, project CNC material actions, material seeding, machine preset application, and catalog UI wiring.
+- Focused command passed: `pnpm exec vitest run src/ui/app/PwaUpdatePrompt.test.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/state/cnc-project-material.test.ts src/ui/state/cnc-project-material-action.test.ts src/ui/state/cnc-material-seeding.test.ts src/ui/state/cnc-machine-preset.test.ts` (6 test files, 29 tests).
+- Focused command passed: `pnpm exec vitest run src/ui/state/layer-actions.test.ts src/ui/state/object-insert-actions.test.ts src/ui/layers/use-debounced-commit.test.tsx` (2 test files discovered, 26 tests).
+
+#### D-S08-001 - PWA update dismissal re-arm clears storage without invalidating the mounted prompt render
+
+Evidence:
+
+- `PwaUpdatePrompt` computes `isDismissed` directly during render by comparing `loadDismissedUpdateVersion()` with `__APP_VERSION__`.
+- The `updatefound` listener registered in `onRegisteredSW(...)` calls only `clearDismissedUpdateVersion`; it does not update component state, call `setNeedRefresh(...)`, or otherwise force the mounted prompt to re-render.
+- The regression test for re-arming simulates `updatefound`, then creates a second render and asserts the banner appears in that fresh render. It does not prove that the already-mounted suppressed prompt becomes visible when a newer service worker is found.
+- In a realistic deferred-update session, `needRefresh` can already be true while the prompt returns `null` because the running build version was dismissed. Clearing localStorage alone does not invalidate that rendered `null` state; a later `setNeedRefresh(true)` for the newer waiting worker may also be a no-op if the hook state is already true.
+
+Risk:
+
+A genuinely newer service worker can remain hidden after a prior "Later" dismissal until some unrelated state change or full app reload causes a render. That undermines the intended "strictly-newer SW re-arms the prompt" behavior and can leave users on an older bundle longer than intended.
+
+Recommendation:
+
+Track the dismissed marker in React state or add a small local revision counter that the `updatefound` handler increments after clearing storage. Extend the test to assert the same mounted component shows the banner after `updatefound`, without creating a fresh root.
+
+Findings:
+
+- Opened `D-S08-001` (medium): PWA update dismissal re-arm clears storage without invalidating the mounted prompt render.
+- No CNC material/machine UI finding was opened in Pass 1; focused state/UI tests passed, stock material seeding stays CNC-only and undoable, and machine preset loading is CNC-only and undoable.
+
+Pass result:
+
+- S08 delta Pass 1 complete.
+- S08 remains open for Pass 2 and Pass 3 over box numeric-input/dogbone toggle changes, probe/device-setup UI changes, and UI canvas-test stderr.
+
+### S08 Delta Pass 2 - Box Dogbone, Probe Setup, and Canvas Test Signal
+
+Scope planned:
+
+- Inspect the box generator dogbone toggle, draft parsing, persisted-draft restore path, and related dialog tests.
+- Inspect the reusable probe controls and Device Setup probe-step integration.
+- Reproduce and classify the UI canvas/WebGL stderr seen during the broader release gate.
+
+Evidence inspected:
+
+- `src/ui/box/box-draft.ts`.
+- `src/ui/box/BoxGeneratorDialog.tsx`.
+- `src/ui/box/BoxGeneratorFields.tsx`.
+- `src/ui/calibration/calibration-draft-storage.ts`.
+- `src/ui/box/box-draft.test.ts`.
+- `src/ui/box/BoxGeneratorDialog.test.tsx`.
+- `src/ui/laser/ProbeControls.tsx`.
+- `src/ui/laser/ProbePanel.test.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupProbeStep.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupProbeStep.test.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupWizard.test.tsx`.
+- `src/ui/laser/device-setup/device-setup-flow.ts`.
+- Focused command passed: `pnpm exec vitest run src/ui/box/box-draft.test.ts src/ui/box/BoxGeneratorDialog.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/laser/device-setup/DeviceSetupProbeStep.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx` (5 test files, 35 tests).
+- Focused command passed: `pnpm exec vitest run src/ui/camera/WorkspaceCameraOverlay.test.tsx src/ui/camera/trace-from-camera.test.ts src/ui/relief-viewer/Relief3DViewerDialog.test.tsx src/ui/relief-viewer/Cut3DPreviewDialog.test.tsx` (4 test files, 9 tests).
+
+#### D-S08-002 - UI canvas/WebGL tests pass while emitting jsdom canvas errors and async `act(...)` warnings
+
+Severity: Medium.
+
+Evidence:
+
+- `BoxGeneratorDialog.test.tsx` passes all 7 tests while every preview render emits `Error: Not implemented: HTMLCanvasElement.prototype.getContext` from `src/ui/box/BoxPreview.tsx`.
+- `trace-from-camera.test.ts` passes while `buildCameraTraceImage(...)` emits the same jsdom canvas `getContext` error from `src/ui/camera/trace-from-camera.ts`.
+- `WorkspaceCameraOverlay.test.tsx` passes while its captured-still projection path emits the same jsdom canvas `getContext` error from `src/ui/camera/WorkspaceCameraOverlay.tsx`.
+- `Relief3DViewerDialog.test.tsx` and `Cut3DPreviewDialog.test.tsx` pass while Three.js emits repeated canvas/WebGL context errors and `THREE.WebGLRenderer: Error creating WebGL context.`.
+- The same focused run also emits React `act(...)` warnings from `ProbeControls`, `DeviceSetupConnectStep`, and the relief-viewer dialog shell while the files still report green.
+
+Risk:
+
+The release gate and focused UI tests can be green while meaningful canvas, camera, preview, and 3D viewer paths are throwing at runtime in the test environment. That makes the test output noisy and lowers confidence that these tests would catch a real preview/canvas regression instead of silently exercising fallback or partially failed render paths.
+
+Recommendation:
+
+Add an explicit canvas/WebGL test harness boundary: either mock the expected 2D/WebGL APIs and assert the drawing/fallback behavior cleanly, or make unexpected `console.error` / React `act(...)` warnings fail the affected tests after known fallbacks are intentionally captured. The aim is not to require real WebGL in jsdom; it is to keep green tests from tolerating unclassified rendering errors.
+
+Findings:
+
+- Opened `D-S08-002` (medium): UI canvas/WebGL tests pass while emitting jsdom canvas errors and async `act(...)` warnings.
+- No box dogbone/default finding was opened in Pass 2; old persisted drafts are merged over fresh defaults, so missing `relief` falls back to `off`, and the dialog tests cover CNC relief off/on visibility and warning behavior.
+- No probe workflow product finding was opened in Pass 2; the shared controls remain CNC-only, Idle-gated at the button, and covered by the probe panel plus Device Setup wizard tests.
+
+Pass result:
+
+- S08 delta Pass 2 complete.
+- S08 remains open for Pass 3 over direct-diff closure, adjacent UI state actions, and any remaining unchecked S08 delta files.
+
+### S08 Delta Pass 3 - Direct Diff Closure and Adjacent State Actions
+
+Scope planned:
+
+- Enumerate every S08 file changed since the audited baseline and close remaining coverage gaps.
+- Inspect the remaining debounced input, project material, machine preset, layer creation, and fresh-import seeding changes.
+- Run the full focused S08 delta test bundle and TypeScript check.
+
+Evidence inspected:
+
+- `git diff --name-status d603c01..HEAD -- src/ui`.
+- `git diff --unified=80 d603c01..HEAD -- src/ui/state/object-insert-actions.ts`.
+- `git diff --unified=80 d603c01..HEAD -- src/ui/state/layer-actions.ts src/ui/state/machine-actions.ts src/ui/layers/use-debounced-commit.ts`.
+- `git diff --unified=80 d603c01..HEAD -- src/ui/machine/CncSetupPanel.tsx src/ui/machine/CncLibraryPanels.tsx src/ui/machine/CncMachineCatalogRow.tsx src/ui/machine/CncSetupPanel.material.test.tsx`.
+- `src/ui/layers/use-debounced-commit.ts` and `src/ui/layers/use-debounced-commit.test.tsx`.
+- `src/ui/state/cnc-project-material.ts`.
+- `src/ui/state/machine-actions.ts`.
+- `src/ui/state/layer-actions.ts`.
+- `src/ui/state/object-insert-actions.ts`.
+- `src/ui/state/cnc-project-material.test.ts`, `src/ui/state/cnc-project-material-action.test.ts`, `src/ui/state/cnc-material-seeding.test.ts`, and `src/ui/state/cnc-machine-preset.test.ts`.
+- `src/ui/machine/CncSetupPanel.tsx`, `src/ui/machine/CncLibraryPanels.tsx`, `src/ui/machine/CncMachineCatalogRow.tsx`, and `src/ui/machine/CncSetupPanel.material.test.tsx`.
+- Focused command passed: `pnpm exec vitest run src/ui/app/PwaUpdatePrompt.test.tsx src/ui/box/box-draft.test.ts src/ui/box/BoxGeneratorDialog.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/laser/device-setup/DeviceSetupProbeStep.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/state/cnc-project-material.test.ts src/ui/state/cnc-project-material-action.test.ts src/ui/state/cnc-material-seeding.test.ts src/ui/state/cnc-machine-preset.test.ts src/ui/state/layer-actions.test.ts` (13 test files, 90 tests).
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+
+Findings:
+
+- No new S08 delta findings in Pass 3.
+- Remaining direct-diff S08 files are covered by Passes 1-3: PWA prompt/dismissal, box dogbone/defaults, probe controls and Device Setup, project material and CNC machine catalog UI/state, debounced commit behavior, and fresh-layer/import material seeding.
+- The S08 delta findings remain `D-S08-001` and `D-S08-002`, both medium severity and open.
+
+Pass result:
+
+- S08 current-state delta sector closed after three passes.
+- Move to S09 current-state delta audit for fixtures, perceptual harness changes, underscore-prefixed audit tests, CI budget helpers, and centerline runner-speed changes.
+
+### S09 Delta Pass 1 - Fixture Delta Orientation and Diagnostic Test Signal
+
+Scope planned:
+
+- Map the S09 files changed since the audited baseline.
+- Inspect the CI budget helper, trace benchmark loop additions, Arch House edge benchmark additions, centerline perf budget changes, shared star fixture, and underscore-prefixed diagnostic tests.
+- Separate release-gated benchmark coverage from opt-in audit diagnostics.
+
+Evidence inspected:
+
+- `git diff --name-status d603c01..HEAD -- src/__fixtures__ audit/fixtures audit/evidence`.
+- `src/__fixtures__/ci-budget.ts` and `src/__fixtures__/ci-budget.test.ts`.
+- `src/__fixtures__/perceptual/trace-benchmark-loop.ts` and `src/__fixtures__/perceptual/trace-benchmark-loop.test.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-benchmark.ts` and `src/__fixtures__/perceptual/arch-house-edge-truth.test.ts`.
+- `src/__fixtures__/perceptual/centerline-perf.test.ts` and `src/__fixtures__/perceptual/star-fixture.ts`.
+- `vitest.config.ts`, confirming the normal test include is `src/**/*.test.{ts,tsx}` plus `electron/**/*.test.ts`, with no special exclusion for underscore-prefixed diagnostics.
+- `rg -n --glob "_*.test.ts" "TRACE_AUDIT|return;|it\(" src/__fixtures__/perceptual`, confirming the underscore diagnostic tests are normal `.test.ts` files that return early unless `TRACE_AUDIT=1`.
+- Focused diagnostic check passed without running the diagnostic body: `pnpm exec vitest run src/__fixtures__/perceptual/_arch-a-scale.test.ts` (1 test file, 1 test, 2ms, no `TRACE_AUDIT` environment flag).
+- Focused release-gated slice passed: `pnpm exec vitest run src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/arch-house-edge-truth.test.ts src/__fixtures__/perceptual/trace-benchmark-loop.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts` (4 test files, 14 tests). The centerline performance gauge logged `4441ms`, below both the local regression budget and the 30s worker ceiling.
+
+#### D-S09-001 - `TRACE_AUDIT` diagnostic tests count as passing tests when the diagnostic environment flag is absent
+
+Severity: Low.
+
+Evidence:
+
+- `vitest.config.ts` includes every `src/**/*.test.{ts,tsx}` file in the normal test run.
+- The new underscore-prefixed diagnostic files under `src/__fixtures__/perceptual` are still named `.test.ts`, and each top-level test body begins with `if (process.env['TRACE_AUDIT'] !== '1') return;`.
+- Running `pnpm exec vitest run src/__fixtures__/perceptual/_arch-a-scale.test.ts` without `TRACE_AUDIT=1` reports `1 passed` even though the diagnostic sweep body exits immediately.
+
+Risk:
+
+Normal `pnpm test` and release-gate output can count audit diagnostics as green tests even when those diagnostics did not execute. That makes the test totals look stronger than the actual exercised coverage and can confuse maintainers about whether opt-in reference/audit comparisons were run.
+
+Recommendation:
+
+Move these diagnostics to a non-`.test.ts` suffix, exclude `src/__fixtures__/perceptual/_*.test.ts` from the default Vitest include, or use a visible skip mechanism when `TRACE_AUDIT` is absent. Add a dedicated documented script for `TRACE_AUDIT=1` audit runs if these diagnostics should remain runnable through Vitest.
+
+Findings:
+
+- Opened `D-S09-001` (low): `TRACE_AUDIT` diagnostic tests count as passing tests when the diagnostic environment flag is absent.
+- No release-gated fixture benchmark finding was opened in Pass 1; the CI helper, trace benchmark loop, Arch House edge metrics, and centerline performance gauge passed their focused tests.
+
+Pass result:
+
+- S09 delta Pass 1 complete.
+- S09 remains open for Pass 2 over artifact paths, generated evidence ownership, and benchmark helper invariants.
+
+### S09 Delta Pass 2 - Artifact Path and Opt-In Evidence Sweep
+
+Scope planned:
+
+- Verify the current real-logo fixture ownership and opt-in artifact output locations.
+- Check ignored/generated evidence paths and stale references to the old audit fixture tree.
+- Run the trace artifact harness and Arch House baseline tests.
+
+Evidence inspected:
+
+- `src/__fixtures__/perceptual/trace-artifact-runner.ts`.
+- `src/__fixtures__/perceptual/trace-artifacts.test.ts`.
+- `.gitignore`.
+- `git diff --unified=80 d603c01..HEAD -- src/__fixtures__/perceptual/trace-artifact-runner.ts src/__fixtures__/perceptual/trace-artifacts.test.ts src/__fixtures__/perceptual/arch-house-baseline.test.ts src/__fixtures__/perceptual/arch-house-edge-quality.test.ts .gitignore`.
+- `rg -n "audit/evidence|audit/fixtures|perceptual-artifacts|trace-audit-artifacts|DEFAULT_TRACE_ARTIFACT|TRACE_ARTIFACT|arch-house-langebaan-source|writeTraceArtifactEvidence|requiredArchHouseFixtureStatus" src/__fixtures__ .gitignore audit docs README.md package.json`.
+- Fixture path check: `Test-Path audit/fixtures/trace/arch-house-langebaan-source.png` returned `False`; `Test-Path src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png` returned `True`; `git ls-files audit/fixtures/trace src/__fixtures__/perceptual/assets` listed only `src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png`.
+- `src/__fixtures__/perceptual/_edge-zoom.test.ts`.
+- Opt-in diagnostic command failed as expected: `$env:TRACE_AUDIT='1'; pnpm exec vitest run src/__fixtures__/perceptual/_edge-zoom.test.ts -t "renders zoomed edge-trace"; Remove-Item Env:TRACE_AUDIT` failed with `ENOENT` opening `audit\fixtures\trace\arch-house-langebaan-source.png`.
+- Focused command passed: `pnpm exec vitest run src/__fixtures__/perceptual/trace-artifacts.test.ts src/__fixtures__/perceptual/arch-house-baseline.test.ts` (2 test files, 16 tests).
+- `git status -sb --ignored trace-audit-artifacts perceptual-artifacts audit/fixtures/trace src/__fixtures__/perceptual/assets` reported only ignored `perceptual-artifacts/`; no tracked `audit/fixtures/trace` fixture remains.
+
+#### D-S09-002 - `_edge-zoom` TRACE_AUDIT diagnostic still hardcodes the removed `audit/fixtures/trace` logo path
+
+Severity: Low.
+
+Evidence:
+
+- The current tracked real-logo fixture is `src/__fixtures__/perceptual/assets/arch-house-langebaan-source.png`; the old `audit/fixtures/trace/arch-house-langebaan-source.png` path is absent.
+- `src/__fixtures__/perceptual/_edge-zoom.test.ts` calls `decodePngFile('audit/fixtures/trace/arch-house-langebaan-source.png')` in all four `TRACE_AUDIT=1` diagnostic tests.
+- Running the first `_edge-zoom` diagnostic with `TRACE_AUDIT=1` fails immediately with `ENOENT` for the old audit fixture path.
+
+Risk:
+
+The normal release-gated benchmark path is healthy, but the standing visual zoom diagnostic cannot be used after the fixture ownership move. That weakens the opt-in trace audit toolkit precisely when a maintainer wants to inspect letter-level edge/centerline regressions.
+
+Recommendation:
+
+Route `_edge-zoom.test.ts` through `requiredArchHouseFixtureStatus()` or the shared fixture asset path, matching the current Arch House benchmark helpers. Pair that with the `D-S09-001` runner-signal cleanup so opt-in diagnostics are visibly skipped or explicitly run.
+
+Findings:
+
+- Opened `D-S09-002` (low): `_edge-zoom` TRACE_AUDIT diagnostic still hardcodes the removed `audit/fixtures/trace` logo path.
+- No new finding on the main trace artifact/evidence path; current tests pin the default trace-artifact output under ignored `perceptual-artifacts/trace-artifacts`, and the active Arch House baseline uses the fixture under `src/__fixtures__/perceptual/assets`.
+
+Pass result:
+
+- S09 delta Pass 2 complete.
+- S09 remains open for Pass 3 over direct-diff closure, underscore diagnostic inventory, and the remaining perceptual benchmark files.
+
+### S09 Delta Pass 3 - Direct Diff Closure and Benchmark Helper Sweep
+
+Scope planned:
+
+- Close the remaining S09 direct-diff files changed since the audited baseline.
+- Inventory underscore-prefixed `TRACE_AUDIT` diagnostics and stale fixture references.
+- Re-run the release-gated fixture/perceptual benchmark bundle and TypeScript check.
+
+Evidence inspected:
+
+- `git diff --name-status d603c01..HEAD -- src/__fixtures__`.
+- `src/__fixtures__/perceptual/trace-benchmark-regression-cases.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-truth.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-benchmark.ts`.
+- `src/__fixtures__/perceptual/trace-benchmark-loop.ts` and `src/__fixtures__/perceptual/trace-benchmark-loop.test.ts`.
+- `src/__fixtures__/perceptual/arch-house-edge-truth.test.ts`.
+- `src/__fixtures__/perceptual/star-fixture.ts`.
+- `src/core/trace/edge-trace.test.ts`, confirming the shared star fixture is exercised by the Edge Detection apex test.
+- `rg -n 'audit/fixtures/trace' --glob '_*.test.ts' -- src/__fixtures__/perceptual`, confirming `_edge-zoom.test.ts` is the remaining underscore diagnostic that still points at the removed audit fixture path.
+- `rg -n 'TRACE_AUDIT|return;|it\(' --glob '_*.test.ts' -- src/__fixtures__/perceptual`, confirming the underscore diagnostics remain normal `.test.ts` files whose bodies return early when `TRACE_AUDIT` is absent.
+- Focused command passed: `pnpm exec vitest run src/__fixtures__/ci-budget.test.ts src/__fixtures__/perceptual/trace-benchmark-loop.test.ts src/__fixtures__/perceptual/arch-house-edge-quality.test.ts src/__fixtures__/perceptual/arch-house-edge-truth.test.ts src/__fixtures__/perceptual/centerline-perf.test.ts src/__fixtures__/perceptual/trace-artifacts.test.ts src/__fixtures__/perceptual/arch-house-baseline.test.ts src/core/trace/edge-trace.test.ts` (8 test files, 44 tests).
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+- Current fast-forward check: `git diff --name-status d23e2d6..HEAD` lists only S08 UI input-field files, so S09 has no newer post-checkpoint file delta after this closure pass.
+
+Findings:
+
+- No new S09 delta findings in Pass 3.
+- The release-gated fixture/perceptual benchmark path remains covered by focused passing tests: CI budget helper, trace benchmark loop, real Arch House Edge Detection and Line Art quality, centerline performance, trace artifacts, and the shared star apex fixture.
+- The remaining S09 delta findings are still `D-S09-001` and `D-S09-002`, both low severity and open.
+
+Pass result:
+
+- S09 current-state delta sector closed after three passes.
+- `origin/main` advanced to `46889ca` after the previous checkpoint. The new post-checkpoint files are S08 UI/input changes, so the audit reopens S08 for a supplemental current-state delta pass over `src/ui/common/NumberField.*` and the migrated CNC/device numeric fields.
+
+### S08 Post-`46889ca` Delta Pass 1 - Shared NumberField Orientation
+
+Scope planned:
+
+- Inspect the new shared clearable `NumberField` wrapper and its tests.
+- Inspect the migrated device profile, device power, planner, probe, CNC layer/tool, offset/dogbone, surfacing, and wizard test changes.
+- Run the focused UI slice that covers the shared hook, the wrapper, and adjacent device/probe/CNC behavior.
+
+Evidence inspected:
+
+- `git diff --name-status d23e2d6..HEAD`.
+- `src/ui/common/NumberField.tsx` and `src/ui/common/NumberField.test.tsx`.
+- `src/ui/layers/use-debounced-commit.ts` and `src/ui/layers/use-debounced-commit.test.tsx`.
+- `src/ui/kit/NumberInput.tsx`.
+- `src/ui/laser/DeviceProfileFields.tsx`.
+- `src/ui/laser/DeviceProfilePowerFields.tsx`.
+- `src/ui/laser/PlannerAdvanced.tsx`.
+- `src/ui/laser/ProbeControls.tsx`.
+- `src/ui/laser/device-setup/DeviceSetupWizard.test.tsx`.
+- `src/ui/layers/CncLayerToolFields.tsx`.
+- `src/ui/layers/DogboneRow.tsx`.
+- `src/ui/layers/OffsetPathsRow.tsx`.
+- `src/ui/machine/SurfacingPanel.tsx`.
+- Existing adjacent test inventory with `rg -n "Dogbone|Offset paths|Relief scallop|Ramp entry|Surfacing|Surface spoilboard|PlannerAdvanced|Acceleration|GRBL \$30|Plate thickness|ProbeControls|Bit diameter" src/ui src/core --glob "*.test.ts" --glob "*.test.tsx"`.
+- Project/device profile persistence validators in `src/io/project/project-shape-validator.ts` and `src/io/machine-profile/machine-profile-shape.ts`.
+- Focused command passed: `pnpm exec vitest run src/ui/common/NumberField.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx src/ui/laser/DeviceSettings.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/state/vector-path-actions.test.ts` (7 test files, 44 tests). The run still emitted the known React `act(...)` warnings covered by `D-S08-002`.
+
+#### D-S08-003 - Shared `NumberField` can silently clamp restored above-UI-max values on blur
+
+Severity: Medium.
+
+Evidence:
+
+- `src/ui/common/NumberField.tsx` parses every nonblank blur through `Math.min(props.max, Math.max(props.min, parsed))` and `useDebouncedCommit.onBlur()` always flushes `parse(draft)` when the field is nonblank.
+- `src/ui/laser/DeviceProfileFields.tsx` now supplies local UI caps such as `MAX_BED_MM = 1500` and `MAX_FEED_MM_PER_MIN = 100000` to the shared wrapper.
+- `src/ui/laser/DeviceProfilePowerFields.tsx` and `src/ui/laser/PlannerAdvanced.tsx` add similar component-local caps for power, acceleration, and junction deviation.
+- Project and machine-profile validators only require positive finite values for bed/feed/profile fields: `src/io/project/project-shape-validator.ts` validates `device.bedWidth`, `device.bedHeight`, and `device.maxFeed` with `requirePositiveNumber(...)`; `src/io/machine-profile/machine-profile-shape.ts` validates the same fields through positive finite checks.
+
+Risk:
+
+A profile or project restored from disk can contain a positive value outside one of the UI-only caps. The field will display that restored value, but simply focusing and blurring the nonblank field can clamp and commit it to the UI cap even if the operator did not edit it. That is a silent data rewrite at the device/profile boundary, and the cap values are not centralized with the import validators or a shared device-profile contract.
+
+Recommendation:
+
+Centralize numeric field bounds in the same device/profile contract used by import/export validation, or make `NumberField` preserve an already-committed out-of-range value until the user actually edits it. Add integration tests for restored above-cap values in the affected device/profile rows before changing behavior.
+
+#### D-S08-004 - Most migrated CNC/device `NumberField` integrations lack direct clear/blur/clamp regression coverage
+
+Severity: Low.
+
+Evidence:
+
+- `src/ui/common/NumberField.test.tsx` covers the generic clear-to-retype behavior, and `src/ui/layers/use-debounced-commit.test.tsx` covers the hook.
+- `src/ui/laser/device-setup/DeviceSetupWizard.test.tsx` was updated so the bed-width wizard edit blurs before Finish.
+- The focused test inventory found no direct UI tests for the migrated `DogboneRow`, `OffsetPathsRow`, `SurfacingPanel`, `ReliefFinishRow`, or `MotionPolishRows` input behavior.
+- `src/ui/laser/DeviceSettings.test.tsx` checks air assist, Z travel, scanning offsets, and mode gating, but it does not directly exercise migrated `BedRows`, `FeedRows`, `$30/$31`, or `PlannerAdvanced` numeric edits.
+- `src/ui/laser/ProbePanel.test.tsx` runs the probe action but does not edit plate thickness, max travel, or bit diameter through the migrated clearable field.
+
+Risk:
+
+The shared wrapper is covered in isolation, but the migrated rows changed event timing from immediate `onChange` to debounced/blur-driven commits. Without direct row-level tests, regressions in labels, bounds, local-state commits, blur-before-action behavior, or store writes can pass even while the generic wrapper tests stay green.
+
+Recommendation:
+
+Add a small integration test matrix for the migrated rows: one store-backed device field, one local-state probe/surfacing field, and one CNC layer row that removes optional settings at zero. The tests should cover clear, retype, blur, clamp, and action/save behavior.
+
+Findings:
+
+- Opened `D-S08-003` (medium): shared `NumberField` can silently clamp restored above-UI-max values on blur.
+- Opened `D-S08-004` (low): most migrated CNC/device `NumberField` integrations lack direct clear/blur/clamp regression coverage.
+- The focused UI slice passed, with the existing `D-S08-002` `act(...)` warning noise still visible in ProbePanel and Device Setup tests.
+
+Pass result:
+
+- S08 post-`46889ca` delta Pass 1 complete.
+- S08 remains open for Pass 2 over direct interaction semantics in the migrated layer/machine rows, optional setting removal behavior, and action buttons that consume local `NumberField` state.
+
+### S08 Post-`46889ca` Delta Pass 2 - Optional Rows and Local Action Inputs
+
+Scope planned:
+
+- Inspect the migrated CNC layer optional-number rows, especially fields that remove optional settings at default values.
+- Inspect local-state action rows whose buttons consume the numeric state immediately: dogbone, offset, surfacing, and probe.
+- Run supporting tests for the wrapper/hook plus the core actions and generators behind those rows.
+
+Evidence inspected:
+
+- `git diff --unified=60 d23e2d6..HEAD -- src/ui/layers/CncLayerToolFields.tsx src/ui/layers/DogboneRow.tsx src/ui/layers/OffsetPathsRow.tsx src/ui/machine/SurfacingPanel.tsx src/ui/laser/ProbeControls.tsx`.
+- `rg -n "debounceMs|<ClearableNumberField|rampEntryDeg|reliefScallopMm|offsetSelection|dogboneSelection|saveSurfacingProgram|Run probe|buildZProbeLines|buildCornerProbeLines" src/ui/common src/ui/layers src/ui/machine src/ui/laser/ProbeControls.tsx`.
+- `src/ui/layers/CncLayerToolFields.tsx`, specifically `MotionPolishRows` and `ReliefFinishRow`.
+- `src/ui/layers/DogboneRow.tsx`, `src/ui/layers/OffsetPathsRow.tsx`, `src/ui/machine/SurfacingPanel.tsx`, and `src/ui/laser/ProbeControls.tsx`.
+- Focused command passed: `pnpm exec vitest run src/ui/common/NumberField.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/core/geometry/dogbone.test.ts src/core/cnc/surfacing.test.ts src/ui/state/vector-path-actions.test.ts src/ui/laser/ProbePanel.test.tsx` (6 test files, 28 tests). The run still emitted the known ProbeControls `act(...)` warning covered by `D-S08-002`.
+
+#### D-S08-005 - Ramp Entry can no longer be cleared to its default by emptying the optional number field
+
+Severity: Low.
+
+Evidence:
+
+- Before the migration, `src/ui/layers/CncLayerToolFields.tsx` parsed `rampEntryDeg` directly in `onChange`; when the input was empty or otherwise non-finite, it removed the `rampEntryDeg` key by calling `onCommitSettings(rest)`.
+- After the migration, `MotionPolishRows` wraps Ramp Entry in `ClearableNumberField` with `min={0}` and only removes `rampEntryDeg` when `onCommit` receives a value `<= 0`.
+- `NumberField` intentionally treats an empty string as a transient edit state and `useDebouncedCommit.onBlur()` restores the last committed value for blank fields instead of calling `onCommit`.
+
+Risk:
+
+The UI still describes `0 = plunge (default)`, but the previous empty-to-clear behavior for this optional field is gone. A user can still type `0`, but deleting the value no longer clears the optional setting; it restores the prior nonzero value on blur. That is a subtle regression from the old field semantics and is not covered by a row-level test.
+
+Recommendation:
+
+For optional numeric settings, either keep using the clearable wrapper but add an explicit "default"/clear affordance, or let callers opt into blank-as-unset behavior. Add a row-level regression test proving the selected behavior for `rampEntryDeg`.
+
+Findings:
+
+- Opened `D-S08-005` (low): Ramp Entry can no longer be cleared to its default by emptying the optional number field.
+- No new product finding was opened for dogbone, offset, surfacing, or probe in Pass 2; however their direct interaction coverage remains part of `D-S08-004`, because the existing tests cover core actions/generators more than the migrated UI handoff.
+
+Pass result:
+
+- S08 post-`46889ca` delta Pass 2 complete.
+- S08 remains open for Pass 3 over final direct-diff closure, device-field edge behavior, and audit-ledger consistency.
+
+### S08 Post-`46889ca` Delta Pass 3 - Direct Diff Closure and Ledger Consistency
+
+Scope planned:
+
+- Close the post-`46889ca` S08 direct-diff file set.
+- Verify the migrated `NumberField` usage inventory against the findings opened in Passes 1 and 2.
+- Re-run the broad focused S08/UI/CNC support bundle and TypeScript check.
+- Check the audit-ledger edits before committing.
+
+Evidence inspected:
+
+- `git diff --name-status d23e2d6..HEAD -- src/ui`, confirming the post-checkpoint delta is limited to `src/ui/common/NumberField.*`, migrated laser/device fields, migrated CNC layer rows, the surfacing panel, and the Device Setup wizard test.
+- `rg -n "NumberField|ClearableNumberField|debounceMs" src/ui/common src/ui/laser/DeviceProfileFields.tsx src/ui/laser/DeviceProfilePowerFields.tsx src/ui/laser/PlannerAdvanced.tsx src/ui/laser/ProbeControls.tsx src/ui/layers/CncLayerToolFields.tsx src/ui/layers/DogboneRow.tsx src/ui/layers/OffsetPathsRow.tsx src/ui/machine/SurfacingPanel.tsx`, confirming the migrated callers use the shared wrapper and do not pass caller-specific debounce timing.
+- `rg -n "D-S08-003|D-S08-004|D-S08-005|S08 Post-46889ca|Current pass|Active sector|S08 UI application workflows|S09 Fixtures" audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`, checking the ledger before closure updates.
+- Focused command passed: `pnpm exec vitest run src/ui/common/NumberField.test.tsx src/ui/layers/use-debounced-commit.test.tsx src/ui/laser/device-setup/DeviceSetupWizard.test.tsx src/ui/laser/DeviceSettings.test.tsx src/ui/laser/ProbePanel.test.tsx src/ui/machine/CncSetupPanel.material.test.tsx src/ui/state/vector-path-actions.test.ts src/core/geometry/dogbone.test.ts src/core/cnc/surfacing.test.ts` (9 test files, 52 tests). The run still emitted the known ProbeControls and Device Setup `act(...)` warnings covered by `D-S08-002`.
+- Focused command passed: `pnpm exec tsc --noEmit --pretty false`.
+- `git diff --check -- audit/REPOSITORY-SECTOR-ARCHITECTURE-2026-07-03.md audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md`.
+
+Findings:
+
+- No new S08 post-`46889ca` findings in Pass 3.
+- The remaining post-`46889ca` S08 findings are still `D-S08-003` (medium), `D-S08-004` (low), and `D-S08-005` (low), all open.
+- The broader current-state delta finding set remains open for user review; no product source fixes were made in this audit pass.
+
+Pass result:
+
+- S08 post-`46889ca` current-state delta sector closed after three supplemental passes.
+- S09 was already closed after three delta passes, and the latest post-checkpoint diff touches only S08 files; the current-state delta audit is now closed.

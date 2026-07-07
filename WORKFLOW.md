@@ -2,7 +2,7 @@
 
 > Per developer-brain §6, every flow specifies four states: **success**, **error**, **empty**, **edge**. This file is the source of truth for what the UI does at each step. UI changes that contradict this file require a `WORKFLOW.md` update first.
 >
-> This document has **Phase A, Phase B, and Phase F (F.1 Fill, F.2 Image engrave, F.3 Set work origin) flows fleshed out**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code for all phases through F.3 is shipped — the gap is documentation density, not implementation.
+> This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC35), Phase I multi-controller, and Phase K box generator flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation.
 
 ---
 
@@ -1121,6 +1121,62 @@ the live in-app render/placement of the swapped bitmap on the
 workspace canvas, and a side-by-side pixel comparison against
 LightBurn's own Convert output — both deferred (need a live import or
 a LightBurn session).
+
+### F-F5. Enhance a region of a trace (region-enhance re-trace)
+
+**ADR:** [ADR-113](DECISIONS.md#adr-113--region-enhance-re-trace-dialog-boundary-mode-trace-fidelity-2026-07-05).
+
+**Operator intent.** A small feature inside a large raster (a tiny
+letter counter in a full logo) dropped out of the trace because it
+sits at the tracer's detection floor at native size. Recover it by
+boxing just that feature and re-tracing it supersampled, patched back
+into the full trace — without re-tracing (or upscaling) the whole
+image. This has no LightBurn equivalent (LightBurn's answer is manual
+node-editing); the divergence is maintainer-sanctioned.
+
+**Where in the UI.** Inside the Trace Image dialog (open it via
+**Re-trace Original** on a committed traced image, or a fresh Trace).
+Drag a box on the preview to set a region; a **Boundary** dropdown
+appears under the preview with **Crop region** (default) and **Enhance
+region**. The dropdown is hidden until a region exists, and **Clear
+Boundary** removes the region and resets the mode to Crop.
+
+**Success.** Box the feature → choose **Enhance region**. The preview
+re-runs: the full image is traced, the boxed source region is re-traced
+at 2× and downscaled, and its geometry is patched into the full trace
+(polylines fully inside the region's shrunk interior are replaced;
+everything crossing the box border or in the margin ring survives). The
+preview shows the full trace with the boxed feature recovered. Commit
+(**Trace**) writes the patched paths as the traced image, reusing the
+same overlay registration as any trace.
+
+**Error.** If the re-trace fails (worker error with an image too large
+for the inline fallback, or a decode failure), the preview shows
+"Preview failed: `<message>`" and commit surfaces a "Could not trace"
+error toast; the scene is left unchanged. If the enhanced region
+produces no paths and none survive the merge, commit warns "produced no
+paths — try a higher contrast image" (shared with the plain trace path).
+
+**Empty — no boundary.** With no region boxed, the Boundary dropdown is
+absent and Enhance is unreachable; the dialog traces the whole image
+(the ordinary Trace flow). Enhance is meaningless without a region, so
+there is nothing to show.
+
+**Edge — degenerate / tiny boundary.** A box that normalizes to zero
+area (a click without a drag, or a region fully outside the image) is
+rejected by `normalizeTraceBoundary`; enhance returns the full trace
+unchanged. A box so small that its 2× supersample would still exceed
+the upscale pixel budget traces the crop at 1× (native) instead of 2× —
+no crash, just no supersample gain. A box whose shrunk interior is
+empty (width or height ≤ 2× the edge margin) replaces nothing and the
+full trace passes through untouched.
+
+**Verification status.** Unit + jsdom green (crop delegates unchanged;
+enhance patches the region; the toggle appears only with a boundary).
+**NOT verified perceptually this session** — whether the real logo
+counter is actually recovered in the rendered output is the
+maintainer's perceptual pass (CLAUDE.md §2); green tests are not
+fidelity proof.
 
 ### F-ML1. Material library — save, load, and session persistence
 
@@ -2309,6 +2365,69 @@ F-CNC19 tiling.
 1. Each Generate inserts a fresh, independent panel set offset onto the
    same layer color; no id collisions (fresh UUIDs), each set is its own
    undo step.
+
+### F-K6. Divider grid (ADR-116)
+
+#### Success
+
+1. The dialog gains **Dividers across width** and **Dividers across
+   depth** count fields (default 0). Any positive count adds evenly
+   spaced divider panels to the sheet, named in the preview
+   ("Divider X1", "Divider Y1", ...).
+2. Dividers stand on the bottom panel at full inner height, carry tabs
+   into through-slots cut in the two walls they meet (one shared
+   alternating sequence per junction — complementary by construction),
+   and cross intersecting dividers with egg-crate half-laps (X notched
+   from the top, Y from the bottom).
+3. Wall slots and cross-laps widen with the clearance pass exactly like
+   edge recesses; in CNC mode every slot corner a tab must seat against
+   carries the corner-overcut relief at full bit radius.
+
+#### Error — compartments too small
+
+1. A divider count that drives the compartment pitch under 2× thickness
+   (or, CNC, drives slot cells under the relief tool) reports the count
+   field with the limiting dimension; **Generate** stays disabled.
+
+#### Empty
+
+1. Both counts 0 produce byte-identical v1 output — no slots, no extra
+   panels.
+
+#### Edge — dividers with open-top style
+
+1. Dividers compose with any style; on open-top the divider top edges
+   finish flush with the wall rim line.
+
+### F-K7. Slide lid (ADR-116)
+
+#### Success
+
+1. Style **Slide lid** produces six panels: bottom, back, slotted left
+   and right walls, a front wall shortened to the slot floor, and a
+   loose lid with a half-round thumb notch on its leading edge.
+2. The side-wall through-slots run from the front edge to one thickness
+   short of the back wall; the assembled lid slides over the shortened
+   front and stops against the back wall.
+3. The lid and its slots are sized with the mandatory play so the lid
+   physically slides; laser default clearance rises to 0.2 mm for this
+   style (CNC keeps 0.15 mm).
+
+#### Error — zero clearance
+
+1. Clearance 0 with the slide-lid style reports "A slide lid needs
+   clearance to slide — use 0.2 mm or more."; **Generate** stays
+   disabled.
+
+#### Empty
+
+1. (Not applicable — the style always yields its six panels.)
+
+#### Edge — shallow box
+
+1. When the box is too shallow for the slot band to clear the top edge
+   finger cells, validation names the height and thickness in conflict
+   rather than emitting overlapping geometry.
 
 ## Camera Mode flows
 

@@ -112,6 +112,26 @@ describe('snapCornersToInk (via potrace trace)', () => {
     expect(max).toBeLessThanOrEqual(1.2);
   });
 
+  // Job compilation documents closed segments as "last point equals the first
+  // by construction" (job.ts) and the emitters draw points as given — so a
+  // snapped ring must keep its explicit closing duplicate or the shape
+  // engraves with its final edge missing. The star's corners guarantee the
+  // snapper actually rebuilt this ring (the bug only bit rebuilt rings).
+  it('returns snapped rings with an explicit closing duplicate (first == last)', () => {
+    const paths = traceImageToPotraceColoredPaths(starImage(), LINE_ART);
+    const polylines = paths.flatMap((path) => path.polylines);
+    expect(polylines.length).toBeGreaterThan(0);
+    for (const polyline of polylines) {
+      if (!polyline.closed) continue;
+      const first = polyline.points[0];
+      const last = polyline.points.at(-1);
+      expect(first).toBeDefined();
+      expect(last).toBeDefined();
+      if (first === undefined || last === undefined) continue;
+      expect(Math.hypot(last.x - first.x, last.y - first.y)).toBeLessThanOrEqual(1e-9);
+    }
+  });
+
   // Non-regression: a filled axis-aligned square. Its 90deg corners ARE apex
   // candidates (>= the 50deg threshold), so the snapper considers them — but
   // the ink-marching cap forbids stepping past the ink boundary. Assert no

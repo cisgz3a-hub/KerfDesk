@@ -10,6 +10,7 @@ import { JogPad } from './JogPad';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const originalJog = useLaserStore.getState().jog;
+const originalSetAirAssistEnabled = useLaserStore.getState().setAirAssistEnabled;
 
 // jsdom's selector engine mis-parses '+' inside quoted attribute values, so
 // queries scan getAttribute instead of using querySelector.
@@ -19,7 +20,7 @@ function buttonByLabel(host: HTMLElement, label: string): HTMLButtonElement | nu
   );
 }
 
-async function renderJogPad(): Promise<{
+async function renderJogPad(disabled = false): Promise<{
   readonly host: HTMLDivElement;
   readonly unmount: () => Promise<void>;
 }> {
@@ -28,7 +29,7 @@ async function renderJogPad(): Promise<{
   let root: Root | null = null;
   await act(async () => {
     root = createRoot(host);
-    root.render(<JogPad disabled={false} />);
+    root.render(<JogPad disabled={disabled} />);
   });
   return {
     host,
@@ -40,7 +41,11 @@ async function renderJogPad(): Promise<{
 }
 
 afterEach(() => {
-  useLaserStore.setState({ jog: originalJog });
+  useLaserStore.setState({
+    jog: originalJog,
+    setAirAssistEnabled: originalSetAirAssistEnabled,
+    airAssistOn: false,
+  });
   useStore.getState().newProject();
 });
 
@@ -90,6 +95,77 @@ describe('JogPad accessible labels', () => {
       '50',
       '100',
     ]);
+
+    await unmount();
+  });
+
+  it('renders a visible air assist toggle to the right of the jog arrows', async () => {
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    const { host, unmount } = await renderJogPad();
+
+    const air = buttonByLabel(host, 'Turn manual air assist on (M8)');
+    expect(air).not.toBeNull();
+    expect(air?.textContent).toContain('Manual Air');
+    expect(air?.textContent).toContain('OFF');
+    expect(air?.textContent).toContain('M8');
+
+    await unmount();
+  });
+
+  it('calls the manual air assist action when toggled', async () => {
+    const setAirAssistEnabled = vi.fn(async () => undefined);
+    useLaserStore.setState({ setAirAssistEnabled });
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M7' });
+    const { host, unmount } = await renderJogPad();
+
+    const air = buttonByLabel(host, 'Turn manual air assist on (M7)');
+    if (air === null) throw new Error('air assist button missing');
+    await act(async () => {
+      air.click();
+    });
+
+    expect(setAirAssistEnabled).toHaveBeenCalledWith(true);
+
+    await unmount();
+  });
+
+  it('keeps air assist clickable when jog arrows are disabled', async () => {
+    const setAirAssistEnabled = vi.fn(async () => undefined);
+    useLaserStore.setState({ setAirAssistEnabled });
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    const { host, unmount } = await renderJogPad(true);
+
+    const air = buttonByLabel(host, 'Turn manual air assist on (M8)');
+    if (air === null) throw new Error('air assist button missing');
+    expect(air.disabled).toBe(false);
+    await act(async () => {
+      air.click();
+    });
+
+    expect(setAirAssistEnabled).toHaveBeenCalledWith(true);
+
+    await unmount();
+  });
+
+  it('shows the off action while manual air assist is on', async () => {
+    useLaserStore.setState({ airAssistOn: true });
+    useStore.getState().updateDeviceProfile({ airAssistCommand: 'M8' });
+    const { host, unmount } = await renderJogPad();
+
+    const air = buttonByLabel(host, 'Turn manual air assist off (M9)');
+    expect(air).not.toBeNull();
+    expect(air?.getAttribute('aria-pressed')).toBe('true');
+    expect(air?.textContent).toContain('ON');
+
+    await unmount();
+  });
+
+  it('disables the air assist toggle until a device coolant command is configured', async () => {
+    const { host, unmount } = await renderJogPad();
+
+    const air = buttonByLabel(host, 'Turn manual air assist on (not configured)');
+    expect(air?.disabled).toBe(true);
+    expect(air?.textContent).toContain('Not set');
 
     await unmount();
   });

@@ -4,10 +4,10 @@ exports[`relief roughing — compile pipeline > emits deterministic G-code (snap
 "G21
 G90
 G94
+G0 Z3.810
 M3 S12000
 G4 P3.000
 ; cnc layer L1 relief-rough tool 3.175 mm feed 1000 plunge 300 spindle 12000 rpm passes 8
-G0 Z3.810
 G0 X0.000 Y399.802
 G1 Z-1.500 F300
 G1 X0.198 Y400.000 F1000
