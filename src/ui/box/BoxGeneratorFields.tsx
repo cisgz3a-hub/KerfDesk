@@ -70,6 +70,7 @@ function DimensionFields(props: {
         options={[
           ['closed', 'Closed (6 panels)'],
           ['open-top', 'Open top (5 panels)'],
+          ['slide-lid', 'Slide lid (6 panels)'],
         ]}
         onChange={setField('style')}
       />
@@ -105,6 +106,22 @@ function FitFields(props: {
         max={undefined}
         step={1}
         onChange={setField('partSpacing')}
+      />
+      <CalibrationNumberField
+        label="Dividers across width"
+        value={draft.dividersX}
+        min={0}
+        max={undefined}
+        step={1}
+        onChange={setField('dividersX')}
+      />
+      <CalibrationNumberField
+        label="Dividers across depth"
+        value={draft.dividersY}
+        min={0}
+        max={undefined}
+        step={1}
+        onChange={setField('dividersY')}
       />
       {props.machine.kind === 'cnc' ? (
         <SelectField

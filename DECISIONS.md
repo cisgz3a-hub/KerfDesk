@@ -24,6 +24,7 @@
 | ADR-016 | 2026-05-26 | Accepted | Documentation-as-spec: WORKFLOW.md and CLAUDE.md |
 | ADR-017 | 2026-05-26 | Accepted | Third-party library evaluation policy; DOMPurify pinned for Phase A |
 | ADR-018 | 2026-05-27 | Accepted | Proprietary license, private repo (supersedes ADR-008) |
+| ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 
 ---
 
@@ -1146,7 +1147,7 @@ LightBurn's Preview "shades according to power" — darker pixel = more laser po
 
 ## ADR-029 — Convert to Bitmap (vector → raster engrave source)
 
-**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings shipped; A5 placement-brightness polish pending) | **Date:** 2026-05-29
+**Status:** Accepted (A1 Fill-All rasterizer + A2 UI/PNG/`RasterImage` + A3 Outlines + A4 Use Cut Settings + A5 Default Brightness shipped; see 2026-07-07 amendment) | **Date:** 2026-05-29
 
 ### Context
 
@@ -1189,6 +1190,17 @@ We already have an even-odd scanline polygon rasterizer — but it is **test-onl
 - **Perceptual gate (CLAUDE.md #2 / ADR-025):** the rasterized bitmap must be eyeballed (or IoU-diffed) against the source vector at the chosen DPI — green property tests are *not* fidelity proof.
 - Does **not** touch the `SceneObject` union (`RasterImage` already exists), the toolpath union, or the `.lf2` schema.
 - Composes cleanly with the `TracedImage`-elimination backlog (#1): "Use Cut Settings" reads layer mode, so it is agnostic to which vector kinds exist.
+
+### Amendment 2026-07-07 — audit fixes, brightness (A5), and pinned divergences
+
+An audit of the shipped feature (findings fixed the same day) pins the following, superseding the original text where they differ:
+
+1. **Ink luma is 127, not §2's 128.** Both boundary behaviors were individually correct — 50% gray ink, and `ditherThreshold` burning strictly below its 128 cutoff — but they composed to zero output: a converted bitmap on a Threshold layer dithered to all-zero S (M7, AUDIT-2026-06-10). 127 keeps the 50% intent within rounding and always burns. Regression-pinned in `rasterize-vector.test.ts`.
+2. **Default Brightness shipped (the A5 brightness half).** The dialog exposes LightBurn's Default Brightness (percent, default 50). Mapping is `floor(255 × pct/100)` — floor, not round, so 50% stays at 127 per (1). LightBurn's own default is 50% (§7.4).
+3. **Conversion DPI range is 127–635, derived, a deliberate divergence.** LightBurn's dialog offers 10–2000 DPI, but LightBurn keeps image resolution and the Image layer's interval independent; our model stamps the conversion DPI onto the created image layer's `linesPerMm` (§6 placement). The legal range therefore derives from the app-wide raster density limits (`MIN/MAX_RASTER_LINES_PER_MM` = 5–25 lines/mm) — outside it, Convert would mint layers the Cuts panel clamps to a different density on the next edit. Revisit if image resolution and layer interval are ever decoupled.
+4. **Size estimates are full-transform.** The dialog's pixel estimate uses the rotated AABB (`transformedBounds`), matching what the builder rasterizes — the original scale-only estimate approved rotated conversions the builder then refused. The bake itself (per the 2026-06-09 transform-bake plan) emits baked bounds + IDENTITY transform, which also sidesteps the raster output path's no-rotation limitation.
+5. **Single-selection gate.** The command (and `Ctrl/Cmd+Shift+B`, now bound — LightBurn's shortcut, §7.4) is enabled only for a selection of exactly one convertible vector. LightBurn converts a whole multi-selection into **one** bitmap; that merge is a scoped follow-up feature, not a gate relaxation — the pre-fix behavior (silently converting only the primary object of a multi-selection) was a defect.
+6. **Menu placement divergence.** LightBurn houses Convert to Bitmap under **Edit**; ours lives under **Tools**, grouped with Convert to Path and the other conversions. Deliberate (one conversions home), per ADR-027 §4.
 
 ---
 
@@ -3929,6 +3941,96 @@ two vectorizations are indistinguishable except where ours is better.
 
 ---
 
+## ADR-024 — Windows desktop distribution + auto-update mechanism
+
+**Status:** Accepted | **Date:** 2026-07-04
+
+### Context
+
+The Electron desktop shell has existed and been CI-typechecked since Phase A
+(`electron/main.ts`, `electron-builder.yml`, `pnpm build:desktop`), but it was
+never packaged into a distributable installer, never hosted for download, and
+had no update path (`publish: null`). This ADR was reserved from the start
+("before first signed release") and is written now to launch **KerfDesk as a
+downloadable Windows installer alongside the online web app**.
+
+Three constraints shaped it:
+- **Non-negotiable #8** — "No telemetry, no network calls — local-first. Ever."
+  An auto-updater necessarily makes a network call.
+- **Security posture** — "No auto-update from arbitrary URLs," plus the
+  deliberate no-preload / no-`ipcMain` hardening of the Electron shell.
+- **Non-negotiable #9 / burn-safety** — an update must never interrupt a job.
+
+The maintainer chose **full auto-update** (over notify-only) for the desktop app.
+
+### Decision
+
+1. **Distribution.** electron-builder produces an **NSIS x64 installer**
+   (unchanged target; per-user `perMachine:false`, assisted `oneClick:false`),
+   built in CI on annotated **SemVer tags `vX.Y.Z`** (not per-commit). The tag
+   drives the artifact version via `-c.extraMetadata.version=$VERSION` so the
+   installer, `app.getVersion()`, and the update feed agree. Hosted on
+   **Cloudflare R2** (bucket `kerfdesk-downloads`, served at
+   `https://dl.kerfdesk.com/desktop/`), linked from `https://kerfdesk.com/download`.
+   **Not GitHub Releases** — the repo is private (ADR-018); public asset URLs
+   would need a separate public repo or tokens. **Not** bundled into the Pages
+   deploy — keeps the web deploy small and decoupled.
+
+2. **Auto-update = `electron-updater`, main-process, self-hosted.**
+   `electron-builder.yml` `publish: { provider: generic, url:
+   https://dl.kerfdesk.com/desktop }` makes the build emit `latest.yml` +
+   `.blockmap`. In `electron/main.ts` (packaged only, `app.isPackaged`):
+   `autoDownload = true`, `autoInstallOnAppQuit = true`, then
+   `checkForUpdatesAndNotify()` — a background check + OS-native "update ready"
+   notification that installs on the next natural quit. The check runs in the
+   **main process** (Node `net`), so the locked renderer CSP is unchanged and no
+   renderer update-UI is required.
+
+3. **Burn-safety (non-negotiable #9).** The app **never** calls
+   `autoUpdater.quitAndInstall()`. Updates apply only on a user-initiated quit,
+   which cannot happen mid-burn without the operator stopping/closing the app
+   (existing `src/ui/app/use-unload-stop.ts` soft-resets the machine on unload).
+   No mid-stream interruption is possible.
+
+4. **This revises non-negotiable #8's "no network calls."** #8 is amended (this
+   ADR) to permit exactly one call: the desktop updater's check/download against
+   our **own pinned `kerfdesk.com`-family origin**. It transmits **no user data
+   and no telemetry** and is user-disablable; the web app and every CAM/streaming
+   path stay fully offline. The separate posture "no auto-update from
+   **arbitrary** URLs" is **honored** — the feed URL is pinned at build time.
+
+5. **Code signing deferred.** v1 ships **unsigned**: the `/download` page
+   documents the Windows SmartScreen "unknown publisher" step. Auto-update still
+   functions unsigned, and per-user install-on-quit largely avoids UAC. Signing
+   (Azure Trusted Signing ~$10/mo, or an OV/EV cert) slots into the release
+   workflow later behind env-var/secret gating with no code rework; once signed,
+   `electron-updater` verifies the publisher signature, hardening the channel.
+
+6. **Dependency.** `electron-updater` (MIT, electron-builder ecosystem) is added
+   to `dependencies` (it is `require`d by the packaged main process).
+   RESEARCH_LOG.md entry per ADR-017.
+
+### Consequences
+
+- KerfDesk launches as a real downloadable Windows app that keeps itself current
+  while the web app is unchanged.
+- The strict "local-first, no network, ever" posture gains one narrow,
+  self-hosted, no-user-data exception, recorded here and in PROJECT.md #8.
+- The no-preload/no-IPC shell is preserved: `checkForUpdatesAndNotify` + OS
+  notification needs no IPC. An **in-app** "restart to update" banner would need
+  a hardened `contextBridge` and its own ADR — deferred.
+- Green tests never prove the installer runs (CLAUDE.md): a workflow-shape test +
+  an auto-update-config unit test guard structure, but install / serial / update
+  behavior is verified manually on Windows 10 and 11 (WORKFLOW.md desktop flow,
+  AUDIT.md CLAIMED row) before the launch is called done.
+
+### References
+ADR-007 (Windows-only desktop), ADR-011 (platform adapter), ADR-018 (private
+repo → not GitHub Releases), ADR-060 (offline-PWA update model this mirrors),
+ADR-017 (dependency policy), PROJECT.md non-negotiables #8 / #9.
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
 **Numbering.** The contiguous body runs ADR-001..057 (ADR-057 = Registration Box).
@@ -3942,8 +4044,9 @@ Setup wizard) is the first.
 - ADR-023 — Web-app deployment target (covered ad-hoc in the current
   Cloudflare Pages setup commits; promote to formal ADR if the deploy
   config grows further).
-- ADR-024 — Update mechanism for Windows desktop (before first signed
-  release).
+- ADR-024 — Update mechanism for Windows desktop. **Written (Accepted
+  2026-07-04) — see the ADR-024 section above.** Full auto-update via a
+  self-hosted `electron-updater` feed on Cloudflare R2; v1 ships unsigned.
 - (Earlier reservations for ADR-019..023 were stale — Phase B / E
   shipped without formal ADRs at those slots. ADR-019 / ADR-020 /
   ADR-021 are the first three slots since reused.)
@@ -5254,12 +5357,15 @@ ADR-017).
 
 - New style `'slide-lid'`: bottom, back, slotted left/right walls,
   front wall shortened to the slot floor, plus a loose lid panel.
-- Geometry: lid plane occupies z ∈ [OH−T, OH]. Side walls carry a
-  through-slot of height T (widened by play) running from the front
-  edge to T short of the back wall; the lid slides over the shortened
-  front and stops against the full-height back wall. Lid = full inner
-  width + slot engagement on both sides, front edge carries a half-round
-  thumb notch (clipper subtraction, relief-pass pattern).
+- Geometry (refined at V3 build): outer height = inner + 3T — bottom,
+  cavity, lid band, and a captive top strip. The side walls carry a
+  C-channel spliced into their solid front edge at the lid band,
+  stopping one thickness INSIDE the wall body (stopping at the body end
+  would leave a zero-width neck — the fit offset severs it, which is how
+  the referee caught the draft geometry). The lid slides over the
+  shortened front and stops against the in-wall post; lid = full outer
+  width × (outer depth − 2T), leading edge carries a half-round thumb
+  notch built with on-edge-exact endpoints (no clipper).
 - A slide lid must SLIDE: validation requires clearance > 0 for this
   style (defaults stay 0.15 mm CNC; laser default rises to 0.2 mm for
   slide-lid only). The referee gains a mandatory-play check for the
@@ -5298,3 +5404,65 @@ play-referee coverage; the seeded benchmark extends (new categories must
 score 100% and the v1 categories must stay 100% — no style may regress
 another); perceptual fixtures per new style; determinism over the
 enlarged spec space; physical fit stays CLAIMED until the named cuts.
+
+## ADR-117 — Keep-awake during active jobs: renderer screen wake lock, Electron permission allowlist (2026-07-07)
+
+**Status:** accepted. (Renumbered from a draft ADR-116 after the box-generator v2 pack claimed that number on main the same day.)
+
+### Context
+
+A long job streams G-code over Web Serial for hours from a renderer
+process. OS display sleep can throttle or suspend that renderer mid-burn;
+the 5-second stream-stall watchdog detects the freeze but cannot prevent
+it. The 2026-07-07 multi-layer-job trust audit listed missing endurance
+protection as a gap — and the follow-up investigation found the feature
+was already half-shipped, undocumented: `useActiveJobWakeLock` (App-mounted,
+laser-store-subscribed, visibility re-acquire) had landed without an ADR,
+WORKFLOW flow, or AUDIT row, and was **provably dead on the desktop app**:
+Electron routes `navigator.wakeLock.request('screen')` through the session
+permission handlers as the string `'screen-wake-lock'`
+(`shell/common/gin_converters/content_converter.cc`, verified on the
+shipped 42-x-y source), the deny-by-default trusted-renderer policy
+(serial + `fileSystem*` only) rejected it, and the hook's best-effort
+`catch` swallowed the denial silently. The operator had no signal either
+way.
+
+### Decision
+
+- Keep-awake stays a **renderer** concern via the standard Screen Wake
+  Lock API — one implementation serves web and desktop. **No main-process
+  `powerSaveBlocker`**: it would need IPC to track job state, and the
+  security posture's zero-`ipcMain` surface is worth more than the
+  marginal extra blocking strength.
+- `trusted-renderer-policy.ts` allows `'screen-wake-lock'` alongside
+  `serial` and `fileSystem*` — still gated to trusted origins and the
+  main frame; Chromium grants it without a prompt.
+- Lock lifecycle is bound to `isActiveJob` (streaming | paused | done |
+  errored, until the post-job Idle clears the streamer): acquire on
+  activation, re-acquire on `visibilitychange` and UA-initiated release,
+  release on job end and dispose.
+- Failure is non-blocking and **visible once**: a single LaserLog line
+  ("Keep-awake unavailable — the OS may sleep the screen mid-job") on the
+  first denial or missing API, so a marathon burn is never silently
+  trusted to a machine that will sleep. Retries stay quiet.
+
+### Consequences
+
+- Desktop keep-awake goes from silently denied to granted; web behavior
+  is unchanged. The permission surface grows by exactly one prompt-free
+  Chromium permission.
+- A screen wake lock keeps the display (and with it, the system) awake on
+  typical setups, but cannot survive a lid close or manual sleep — the
+  log line tells the operator to disable system sleep before long burns.
+  Supervised operation remains the rule for laser jobs regardless.
+- No new dependency, no IPC handlers, no platform-adapter surface: the
+  Wake Lock API is identical in both delivery targets.
+
+### Verification
+
+jsdom hook tests pin acquire/release/re-acquire and the one-shot warning
+(denied + missing API); policy tests pin `screen-wake-lock` granted for
+trusted check+request and denied for untrusted origins and subframes.
+NOT verified: the packaged Electron runtime grant, and a real hours-long
+burn with display sleep armed — CLAIMED in AUDIT.md until the maintainer
+runs one.

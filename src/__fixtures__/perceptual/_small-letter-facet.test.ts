@@ -36,11 +36,12 @@ function readFontBuffer(fileName: string): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-it(
+const RUN_TRACE_AUDIT = process.env['TRACE_AUDIT'] === '1';
+
+it.skipIf(!RUN_TRACE_AUDIT)(
   'measures small anti-aliased E/B faceting via merged app options',
   { timeout: 120000 },
   async () => {
-    if (process.env['TRACE_AUDIT'] !== '1') return;
     mkdirSync(OUT_DIR, { recursive: true });
     const font = readFontBuffer('Roboto-Regular.ttf');
     const options = mergedEdgeOptions();

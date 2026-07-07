@@ -28,6 +28,7 @@ import {
   type BoxDraft,
   type BoxDraftParse,
   type BoxMachineContext,
+  SLIDE_LID_MIN_CLEARANCE_DRAFT,
 } from './box-draft';
 import { BoxGeneratorFields } from './BoxGeneratorFields';
 import { BoxPreview } from './BoxPreview';
@@ -54,11 +55,17 @@ export function BoxGeneratorDialog(props: {
     (field: keyof BoxDraft) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
       const { value } = event.target;
-      setDraft((current) =>
-        field === 'thickness'
-          ? boxDraftWithMaterialThickness(current, value, lockedAutoFitFields)
-          : { ...current, [field]: value },
-      );
+      setDraft((current) => {
+        if (field === 'thickness') {
+          return boxDraftWithMaterialThickness(current, value, lockedAutoFitFields);
+        }
+        // A slide lid cannot slide at zero clearance; lift the draft to the
+        // style's working default when the user has not set one (F-K7).
+        if (field === 'style' && value === 'slide-lid' && Number(current.clearance) === 0) {
+          return { ...current, style: value, clearance: SLIDE_LID_MIN_CLEARANCE_DRAFT };
+        }
+        return { ...current, [field]: value };
+      });
       if (isAutoFitField(field)) {
         setLockedAutoFitFields((current) => new Set([...current, field]));
       }

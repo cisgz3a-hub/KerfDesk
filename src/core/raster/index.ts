@@ -23,4 +23,8 @@ export type { ImageMaskInput } from './image-mask';
 export { applyImageMaskToLuma, hasClosedImageMaskGeometry } from './image-mask';
 
 export type { VectorRaster, VectorRasterInput } from './rasterize-vector';
-export { rasterizeVectorToLuma } from './rasterize-vector';
+export {
+  DEFAULT_BITMAP_BRIGHTNESS_PERCENT,
+  inkLumaForBrightnessPercent,
+  rasterizeVectorToLuma,
+} from './rasterize-vector';

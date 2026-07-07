@@ -64,10 +64,12 @@ describe('box generator — perceptual sheet fidelity', () => {
 function masksFor(spec: BoxSpec): { predicted: Mask; truth: Mask } {
   const result = generateBox(spec);
   if (result.kind !== 'generated') throw new Error(`expected generated, got ${result.kind}`);
-  const scaled = result.panels.map((panel) => ({
-    closed: panel.outline.closed,
-    points: panel.outline.points.map((p) => ({ x: p.x * PX_PER_MM, y: p.y * PX_PER_MM })),
-  }));
+  const scaled = result.panels.flatMap((panel) =>
+    [panel.outline, ...panel.cutouts].map((ring) => ({
+      closed: ring.closed,
+      points: ring.points.map((p) => ({ x: p.x * PX_PER_MM, y: p.y * PX_PER_MM })),
+    })),
+  );
   const width = Math.ceil(Math.max(...scaled.flatMap((pl) => pl.points.map((p) => p.x)))) + 2;
   const height = Math.ceil(Math.max(...scaled.flatMap((pl) => pl.points.map((p) => p.y)))) + 2;
   const predicted = rasterizePolylines(scaled, width, height);
