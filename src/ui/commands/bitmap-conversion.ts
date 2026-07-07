@@ -22,9 +22,3 @@ export async function convertSelectedVectorToBitmap(
     pushToast(`Could not convert to bitmap: ${message}`, 'error');
   }
 }
-
-export function sourceLabel(o: ConvertibleVector): string {
-  if ('source' in o) return o.source;
-  if ('content' in o) return o.content;
-  return `${o.spec.kind} shape`;
-}

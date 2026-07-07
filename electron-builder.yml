@@ -36,4 +36,11 @@ nsis:
 # linux:
 #   target: AppImage
 
-publish: null
+# Self-hosted generic update feed on Cloudflare R2 (ADR-024). Configuring a
+# `publish` block makes electron-builder emit `latest.yml` + `.blockmap`;
+# electron-updater reads `latest.yml` from this URL. The CI release job uploads
+# those files plus the `.exe` to the bucket behind this origin. The URL is
+# pinned here at build time — never arbitrary (PROJECT.md security posture).
+publish:
+  provider: generic
+  url: https://dl.kerfdesk.com/desktop

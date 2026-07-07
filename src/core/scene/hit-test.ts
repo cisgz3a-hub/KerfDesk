@@ -7,7 +7,7 @@
 
 import type { Layer, LayerMode } from './layer';
 import type { Scene } from './scene';
-import type { ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
+import type { Bounds, ColoredPath, Polyline, SceneObject, Transform, Vec2 } from './scene-object';
 import { applyTransform } from './transform';
 import { sceneObjectHasVisibleLayerFromMap } from './visibility';
 
@@ -190,13 +190,23 @@ export type AABB = {
 };
 
 export function transformedBBox(obj: SceneObject): AABB {
+  return transformedBounds(obj.bounds, obj.transform);
+}
+
+/**
+ * Axis-aligned bounding box of a bounds rect under a full transform
+ * (scale → mirror → rotate → translate). All four corners go through
+ * applyTransform, so rotation widens the box — unlike scaling the raw
+ * extents, which understates any rotated placement.
+ */
+export function transformedBounds(bounds: Bounds, transform: Transform): AABB {
   const corners: Vec2[] = [
-    { x: obj.bounds.minX, y: obj.bounds.minY },
-    { x: obj.bounds.maxX, y: obj.bounds.minY },
-    { x: obj.bounds.maxX, y: obj.bounds.maxY },
-    { x: obj.bounds.minX, y: obj.bounds.maxY },
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
   ];
-  return aabbOfCorners(corners, obj.transform);
+  return aabbOfCorners(corners, transform);
 }
 
 export function combinedBBox(objects: ReadonlyArray<SceneObject>): AABB | null {

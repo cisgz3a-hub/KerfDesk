@@ -11,6 +11,7 @@ import {
   assembleBitmapAsync,
   bitmapConversionTarget,
   isConvertibleVector,
+  sourceLabel,
   type BitmapConversionOptions,
   type BitmapLayerSetting,
   type ConvertibleVector,
@@ -26,7 +27,13 @@ export {
   assertBitmapConversionFits,
   estimateBitmapConversion,
 } from './bitmap-conversion-plan';
-export { assembleBitmap, assembleBitmapAsync, bitmapConversionTarget, isConvertibleVector };
+export {
+  assembleBitmap,
+  assembleBitmapAsync,
+  bitmapConversionTarget,
+  isConvertibleVector,
+  sourceLabel,
+};
 export type {
   BitmapConversionOptions,
   BitmapLayerSetting,

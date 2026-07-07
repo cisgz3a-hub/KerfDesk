@@ -22,6 +22,7 @@
 // in, gives string out (asynchronously now, to allow the lazy
 // load; the trace work itself is still synchronous CPU).
 
+import { finiteOr } from '../util';
 import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
@@ -56,6 +57,21 @@ export type RawImageData = {
   readonly height: number;
   readonly data: Uint8ClampedArray;
 };
+
+// RGBA channel count per pixel — the multiplier relating dimensions to buffer
+// length.
+const RGBA_CHANNELS = 4;
+
+// Shape guard for a RawImageData: width/height must be finite positive integers
+// and the buffer must hold exactly width*height*4 bytes (one RGBA quad per
+// pixel). Callers that index the buffer rely on this invariant; a malformed
+// shape otherwise reads past the array or sizes a wrong-shape output.
+export function isValidRawImageData(image: RawImageData): boolean {
+  const { width, height, data } = image;
+  if (!Number.isInteger(width) || !Number.isInteger(height)) return false;
+  if (width <= 0 || height <= 0) return false;
+  return data.length === width * height * RGBA_CHANNELS;
+}
 
 export type TraceOptions = {
   // Filled contours preserve source silhouettes for fill engraving.
@@ -216,31 +232,38 @@ export async function traceImageToSvgString(
 // Extracted from traceImageToSvgString so complexity stays under
 // the project cap (12). Pure function — same inputs, same output.
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
+  // Fail closed on a malformed buffer: every downstream stage indexes
+  // data[i..i+3] assuming length === width*height*4, so a short/oversized
+  // buffer or non-integer dims would read past the array or size a wrong-shape
+  // output. Return the input unchanged rather than corrupting it.
+  if (!isValidRawImageData(image)) return image;
   // Trace Transparency keys the mask off alpha. If an image is fully opaque,
   // tracing alpha would turn the whole page black, so fall back to luma trace.
   if (shouldTraceAlphaMask(image, options)) {
-    let prepared = alphaToMonochrome(image, options.cutoffLuma ?? 0, options.thresholdLuma ?? 128);
-    if (shouldDespeckle(options)) {
-      prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
-    }
-    return prepared;
+    const prepared = alphaToMonochrome(
+      image,
+      options.cutoffLuma ?? 0,
+      options.thresholdLuma ?? 128,
+    );
+    return despeckleIfEnabled(prepared, options);
   }
   if (shouldUseSketchTrace(image, options)) {
-    let prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
-    if (shouldDespeckle(options)) {
-      prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
-    }
-    return prepared;
+    const prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
+    return despeckleIfEnabled(prepared, options);
   }
   let prepared = applyImageAdjustments(image, options);
   if (shouldApplyMedian(prepared, options.medianFilter)) {
     prepared = medianFilter(prepared);
   }
   prepared = applyThreshold(prepared, options);
-  if (shouldDespeckle(options)) {
-    prepared = despeckle(prepared, options.despeckleMinPixels ?? 0);
-  }
-  return prepared;
+  return despeckleIfEnabled(prepared, options);
+}
+
+// Despeckle is the shared tail of every preprocessing branch; extracting it
+// keeps preprocessForTrace under the complexity cap and the behavior identical.
+function despeckleIfEnabled(image: RawImageData, options: TraceOptions): RawImageData {
+  if (!shouldDespeckle(options)) return image;
+  return despeckle(image, options.despeckleMinPixels ?? 0);
 }
 
 // Median gate. true forces it, false/undefined skips it, and 'auto' defers
@@ -259,14 +282,21 @@ function shouldApplyMedian(
 // so chaining is cheap when the user hasn't touched a slider.
 function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
   let out = image;
-  if (options.brightness !== undefined && options.brightness !== 0) {
-    out = adjustBrightness(out, options.brightness);
+  // Non-finite brightness/contrast normalize to their neutral 0 (a NaN/Infinity
+  // delta or factor otherwise clamps every channel to 0 — silent blackening);
+  // non-finite gamma normalizes to the neutral 1.0. Guarding at the read point
+  // keeps the raster-prep ops themselves free of trace-specific policy.
+  const brightness = finiteOr(options.brightness ?? 0, 0);
+  const contrast = finiteOr(options.contrast ?? 0, 0);
+  const gamma = finiteOr(options.gamma ?? 1, 1);
+  if (brightness !== 0) {
+    out = adjustBrightness(out, brightness);
   }
-  if (options.contrast !== undefined && options.contrast !== 0) {
-    out = adjustContrast(out, options.contrast);
+  if (contrast !== 0) {
+    out = adjustContrast(out, contrast);
   }
-  if (options.gamma !== undefined && options.gamma !== 1) {
-    out = adjustGamma(out, options.gamma);
+  if (gamma !== 1) {
+    out = adjustGamma(out, gamma);
   }
   if (options.invert === true) {
     out = invertImage(out);

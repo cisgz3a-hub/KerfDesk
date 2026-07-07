@@ -4,7 +4,7 @@
 
 import { edgePattern, MIN_FINGER_WIDTH_MM } from './edge-pattern';
 
-export type BoxStyle = 'closed' | 'open-top';
+export type BoxStyle = 'closed' | 'open-top' | 'slide-lid';
 export type BoxDimensionMode = 'inner' | 'outer';
 
 export type BoxRelief =
@@ -27,6 +27,10 @@ export type BoxSpec = {
   /** CNC corner-overcut relief; 'none' for laser (ADR-106 fit division). */
   readonly relief: BoxRelief;
   readonly partSpacingMm: number;
+  /** Dividers partitioning the width (thin slabs in X); absent = 0 (ADR-116). */
+  readonly dividersXCount?: number;
+  /** Dividers partitioning the depth (thin slabs in Y); absent = 0 (ADR-116). */
+  readonly dividersYCount?: number;
 };
 
 export type BoxDims = {
@@ -46,7 +50,9 @@ export type BoxSpecField =
   | 'fingerWidth'
   | 'clearance'
   | 'reliefTool'
-  | 'partSpacing';
+  | 'partSpacing'
+  | 'dividersX'
+  | 'dividersY';
 
 export type BoxSpecIssue = { readonly field: BoxSpecField; readonly message: string };
 
@@ -58,9 +64,14 @@ export type BoxSpecValidation =
       readonly warnings: ReadonlyArray<BoxSpecIssue>;
     };
 
-/** Derive both dimension sets. Outer = inner + 2T on every axis. */
+/**
+ * Derive both dimension sets. Outer = inner + 2T per axis — except the
+ * slide-lid height, which adds 3T (bottom + lid + captive top strip,
+ * ADR-116 V3) so the entered inner height stays the cavity under the lid.
+ */
 export function deriveBoxDims(spec: BoxSpec): BoxDims {
   const t2 = 2 * spec.thicknessMm;
+  const zExtra = spec.style === 'slide-lid' ? 3 * spec.thicknessMm : t2;
   if (spec.dimensionMode === 'inner') {
     return {
       innerWidthMm: spec.widthMm,
@@ -68,7 +79,7 @@ export function deriveBoxDims(spec: BoxSpec): BoxDims {
       innerHeightMm: spec.heightMm,
       outerWidthMm: spec.widthMm + t2,
       outerDepthMm: spec.depthMm + t2,
-      outerHeightMm: spec.heightMm + t2,
+      outerHeightMm: spec.heightMm + zExtra,
     };
   }
   return {
@@ -77,7 +88,7 @@ export function deriveBoxDims(spec: BoxSpec): BoxDims {
     outerHeightMm: spec.heightMm,
     innerWidthMm: spec.widthMm - t2,
     innerDepthMm: spec.depthMm - t2,
-    innerHeightMm: spec.heightMm - t2,
+    innerHeightMm: spec.heightMm - zExtra,
   };
 }
 
@@ -88,6 +99,8 @@ export function validateBoxSpec(spec: BoxSpec): BoxSpecValidation {
   collectFieldIssues(spec, issues);
   if (issues.length > 0) return { kind: 'invalid', issues, warnings };
   collectInteriorIssues(spec, issues);
+  if (issues.length > 0) return { kind: 'invalid', issues, warnings };
+  collectDividerIssues(spec, issues);
   if (issues.length > 0) return { kind: 'invalid', issues, warnings };
   const minCellMm = minFingerCellMm(spec, deriveBoxDims(spec));
   collectReliefIssues(spec, minCellMm, issues, warnings);
@@ -154,6 +167,13 @@ function collectReliefIssues(
 }
 
 function collectClearanceIssues(spec: BoxSpec, minCellMm: number, issues: BoxSpecIssue[]): void {
+  if (spec.style === 'slide-lid' && spec.clearanceMm <= 0) {
+    issues.push({
+      field: 'clearance',
+      message: 'A slide lid needs clearance to slide — use 0.2 mm or more.',
+    });
+    return;
+  }
   const clearanceLimitMm = Math.min(minCellMm, spec.thicknessMm) / 2;
   if (Math.abs(spec.clearanceMm) >= clearanceLimitMm) {
     issues.push({
@@ -163,10 +183,53 @@ function collectClearanceIssues(spec: BoxSpec, minCellMm: number, issues: BoxSpe
   }
 }
 
-// The smallest finger cell across the three edge axes bounds both relief
-// feasibility and the clearance the joint can absorb.
+// Divider counts must be whole and small enough that every compartment
+// clears 2T; a divider grid a bit can't relieve is rejected via the shared
+// min-cell rule below (the junction cells join the min).
+function collectDividerIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
+  const dims = deriveBoxDims(spec);
+  for (const [field, count, innerMm] of [
+    ['dividersX', spec.dividersXCount ?? 0, dims.innerWidthMm],
+    ['dividersY', spec.dividersYCount ?? 0, dims.innerDepthMm],
+  ] as const) {
+    if (!Number.isInteger(count) || count < 0) {
+      issues.push({ field, message: 'Divider count must be a whole number of 0 or more.' });
+      continue;
+    }
+    if (count === 0) continue;
+    const pitchMm = (innerMm - count * spec.thicknessMm) / (count + 1);
+    if (pitchMm < 2 * spec.thicknessMm) {
+      issues.push({
+        field,
+        message: `${count} dividers leave ${fmt(pitchMm)} mm compartments — under twice the ${fmt(spec.thicknessMm)} mm thickness.`,
+      });
+    }
+  }
+  collectDividerReliefIssues(spec, issues);
+}
+
+// A relief bit as wide as the stock cannot seat in a T-wide divider slot.
+function collectDividerReliefIssues(spec: BoxSpec, issues: BoxSpecIssue[]): void {
+  if ((spec.dividersXCount ?? 0) === 0 && (spec.dividersYCount ?? 0) === 0) return;
+  if (spec.relief.kind !== 'corner-overcut') return;
+  if (!Number.isFinite(spec.relief.toolDiameterMm)) return;
+  if (spec.relief.toolDiameterMm < spec.thicknessMm) return;
+  issues.push({
+    field: 'reliefTool',
+    message: `Divider slots are ${fmt(spec.thicknessMm)} mm wide — the ${fmt(spec.relief.toolDiameterMm)} mm relief tool cannot seat in them.`,
+  });
+}
+
+// The smallest finger cell across the three edge axes — plus the divider
+// junction cells when dividers are present — bounds both relief feasibility
+// and the clearance the joint can absorb.
 function minFingerCellMm(spec: BoxSpec, dims: BoxDims): number {
   const spans = [dims.outerWidthMm, dims.outerDepthMm, dims.outerHeightMm];
+  if ((spec.dividersXCount ?? 0) > 0 || (spec.dividersYCount ?? 0) > 0) {
+    const heightSpanMm =
+      spec.style === 'open-top' ? dims.innerHeightMm + spec.thicknessMm : dims.innerHeightMm;
+    spans.push(heightSpanMm + 2 * spec.thicknessMm);
+  }
   return Math.min(
     ...spans.map(
       (fullSpanMm) =>

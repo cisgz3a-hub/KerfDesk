@@ -294,6 +294,10 @@ export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
 
 export type ToolCtx = {
   readonly setToolMode: (mode: ToolMode) => void;
+  // Ctrl/Cmd+Shift+B — LightBurn's Convert to Bitmap binding (LIGHTBURN-STUDY
+  // §7.4). The callback owns the gate (single convertible vector selected);
+  // the matcher only routes the chord.
+  readonly openConvertToBitmap: () => void;
 };
 
 // Ctrl/Cmd + letter arms a drawing tool, matching LightBurn (ADR-051 B7):
@@ -305,15 +309,29 @@ const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
   l: { kind: 'draw', shape: 'polyline' },
 };
 
+// Alt+M — Measure (no meta, no shift).
+function isMeasureChord(e: KeyboardEvent): boolean {
+  return e.altKey && !hasMeta(e) && !e.shiftKey && e.key.toLowerCase() === 'm';
+}
+
+// Ctrl/Cmd+Shift+B — Convert to Bitmap (LightBurn §7.4).
+function isConvertToBitmapChord(e: KeyboardEvent): boolean {
+  return hasMeta(e) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b';
+}
+
 export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
-  if (e.altKey && !hasMeta(e) && !e.shiftKey && e.key.toLowerCase() === 'm') {
-    if (isEditableTarget(e)) return false;
+  if (isEditableTarget(e)) return false;
+  if (isMeasureChord(e)) {
     e.preventDefault();
     ctx.setToolMode({ kind: 'measure' });
     return true;
   }
+  if (isConvertToBitmapChord(e)) {
+    e.preventDefault();
+    ctx.openConvertToBitmap();
+    return true;
+  }
   if (!hasMeta(e) || e.shiftKey || e.altKey) return false;
-  if (isEditableTarget(e)) return false;
   const mode = TOOL_BINDINGS[e.key.toLowerCase()];
   if (mode === undefined) return false;
   e.preventDefault();

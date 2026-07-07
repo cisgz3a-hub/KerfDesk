@@ -102,11 +102,23 @@ export function computeUpscaleFactor(image: RawImageData): number {
   return factor;
 }
 
+// The factor contract for both supersample helpers: a finite integer >= 1.
+// Internal callers only ever pass 2 or 3; a non-integer / non-finite / <1
+// factor would mint zero-length or non-finite-dimension buffers (upscale) or
+// non-finite coordinates (downscale), so we fail closed on it instead.
+function isValidUpscaleFactor(factor: number): boolean {
+  return Number.isInteger(factor) && factor >= 1;
+}
+
 // Bilinear upscale of the RGBA buffer by an integer factor. Bilinear (not
 // nearest) preserves the anti-aliasing gradients the tracers exploit; nearest
 // would create hard staircases that read as jagged geometry. Each output pixel
 // samples the source at ((x+0.5)/factor - 0.5, ...) with edge clamping.
+//
+// Fails closed on an invalid factor by returning the image unchanged
+// (identity, factor-1 semantics).
 export function upscaleBy(image: RawImageData, factor: number): RawImageData {
+  if (!isValidUpscaleFactor(factor)) return image;
   const outWidth = image.width * factor;
   const outHeight = image.height * factor;
   const data = new Uint8ClampedArray(outWidth * outHeight * 4);
@@ -140,11 +152,13 @@ export function upscaleDouble(image: RawImageData): RawImageData {
 
 // Scale traced vectors back to source coordinates by dividing every point by
 // the upscale factor. Pure coordinate transform — closed flags and colours are
-// carried through untouched.
+// carried through untouched. Fails closed on an invalid factor by returning the
+// paths unchanged (mirrors upscaleBy's identity behaviour).
 export function downscaleTracedPaths(
   paths: ReadonlyArray<ColoredPath>,
   factor: number,
 ): ColoredPath[] {
+  if (!isValidUpscaleFactor(factor)) return paths.map((path) => ({ ...path }));
   return paths.map((path) => ({
     color: path.color,
     polylines: path.polylines.map((pl) => scalePolyline(pl, factor)),

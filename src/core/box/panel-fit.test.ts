@@ -34,11 +34,16 @@ function outlineOf(panel: string): Polyline {
 }
 
 function fitted(outline: Polyline, clearanceMm: number, toolMm?: number): Polyline {
-  const result = applyPanelFit(outline, {
-    clearanceMm,
-    relief:
-      toolMm === undefined ? { kind: 'none' } : { kind: 'corner-overcut', toolDiameterMm: toolMm },
-  });
+  const result = applyPanelFit(
+    { outline, cutouts: [] },
+    {
+      clearanceMm,
+      relief:
+        toolMm === undefined
+          ? { kind: 'none' }
+          : { kind: 'corner-overcut', toolDiameterMm: toolMm },
+    },
+  );
   if (result.kind !== 'fitted') throw new Error(result.detail);
   return result.outline;
 }
@@ -81,7 +86,10 @@ function pointSegmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
 describe('applyPanelFit — clearance', () => {
   it('returns the input bit-identical at clearance 0 with no relief (laser nominal)', () => {
     const outline = outlineOf('bottom');
-    const result = applyPanelFit(outline, { clearanceMm: 0, relief: { kind: 'none' } });
+    const result = applyPanelFit(
+      { outline, cutouts: [] },
+      { clearanceMm: 0, relief: { kind: 'none' } },
+    );
     expect(result.kind).toBe('fitted');
     if (result.kind !== 'fitted') return;
     expect(result.outline).toBe(outline);
@@ -124,10 +132,10 @@ describe('applyPanelFit — clearance', () => {
   });
 
   it('reports a degenerate result instead of emitting a consumed panel', () => {
-    const result = applyPanelFit(outlineOf('bottom'), {
-      clearanceMm: 1e6,
-      relief: { kind: 'none' },
-    });
+    const result = applyPanelFit(
+      { outline: outlineOf('bottom'), cutouts: [] },
+      { clearanceMm: 1e6, relief: { kind: 'none' } },
+    );
     expect(result.kind).toBe('degenerate');
   });
 });
@@ -170,10 +178,10 @@ describe('applyPanelFit — corner relief', () => {
       ],
     };
     // A plain rectangle has no reflex corners: CNC relief is a no-op.
-    const result = applyPanelFit(square, {
-      clearanceMm: 0,
-      relief: { kind: 'corner-overcut', toolDiameterMm: RELIEF_TOOL_MM },
-    });
+    const result = applyPanelFit(
+      { outline: square, cutouts: [] },
+      { clearanceMm: 0, relief: { kind: 'corner-overcut', toolDiameterMm: RELIEF_TOOL_MM } },
+    );
     expect(result.kind).toBe('fitted');
     if (result.kind !== 'fitted') return;
     expect(result.outline).toBe(square);
@@ -187,3 +195,87 @@ describe('applyPanelFit — corner relief', () => {
     expect(cnc.points.length).toBeGreaterThan(nominal.points.length);
   });
 });
+
+describe('applyPanelFit — cutout rings (ADR-116)', () => {
+  const outline = rect(0, 0, 100, 60);
+  const slot = rect(20, 25, 30, 35);
+
+  it('returns rings bit-identical at clearance 0 with no relief', () => {
+    const rings = { outline, cutouts: [slot] };
+    const result = applyPanelFit(rings, { clearanceMm: 0, relief: { kind: 'none' } });
+    expect(result.kind).toBe('fitted');
+    if (result.kind !== 'fitted') return;
+    expect(result.outline).toBe(outline);
+    expect(result.cutouts[0]).toBe(slot);
+  });
+
+  it('widens every cutout by c/2 while the outline shrinks by c/2', () => {
+    const c = 0.4;
+    const result = applyPanelFit(
+      { outline, cutouts: [slot] },
+      { clearanceMm: c, relief: { kind: 'none' } },
+    );
+    expect(result.kind).toBe('fitted');
+    if (result.kind !== 'fitted') return;
+    const outer = span(result.outline);
+    expect(Math.abs(outer.x - (100 - c / 2))).toBeLessThanOrEqual(4e-3);
+    expect(Math.abs(outer.y - (60 - c / 2))).toBeLessThanOrEqual(4e-3);
+    const hole = result.cutouts[0];
+    expect(hole).toBeDefined();
+    if (hole === undefined) return;
+    const holeSpan = span(hole);
+    // A 10 mm slot mating a 10 mm tab: slot +c/2, tab −c/2 ⇒ play c.
+    expect(Math.abs(holeSpan.x - (10 + c / 2))).toBeLessThanOrEqual(4e-3);
+    expect(Math.abs(holeSpan.y - (10 + c / 2))).toBeLessThanOrEqual(4e-3);
+  });
+
+  it('carves a full-radius overcut at every slot corner', () => {
+    const result = applyPanelFit(
+      { outline, cutouts: [slot] },
+      { clearanceMm: 0, relief: { kind: 'corner-overcut', toolDiameterMm: RELIEF_TOOL_MM } },
+    );
+    expect(result.kind).toBe('fitted');
+    if (result.kind !== 'fitted') return;
+    expect(result.cutouts).toHaveLength(1);
+    const hole = result.cutouts[0];
+    if (hole === undefined) return;
+    for (const corner of [
+      { x: 20, y: 25 },
+      { x: 30, y: 25 },
+      { x: 30, y: 35 },
+      { x: 20, y: 35 },
+    ]) {
+      const distance = minDistanceToBoundary(corner, hole);
+      expect(distance).toBeGreaterThanOrEqual(RELIEF_DISTANCE_MIN);
+      expect(distance).toBeLessThanOrEqual(RELIEF_DISTANCE_MAX);
+    }
+  });
+
+  it('reports severed instead of silently dropping a breached cutout', () => {
+    const breaching = rect(95, 25, 105, 35);
+    const result = applyPanelFit(
+      { outline, cutouts: [breaching] },
+      { clearanceMm: 0.2, relief: { kind: 'none' } },
+    );
+    expect(result.kind).toBe('degenerate');
+  });
+});
+
+function rect(x0: number, y0: number, x1: number, y1: number): Polyline {
+  return {
+    closed: true,
+    points: [
+      { x: x0, y: y0 },
+      { x: x1, y: y0 },
+      { x: x1, y: y1 },
+      { x: x0, y: y1 },
+      { x: x0, y: y0 },
+    ],
+  };
+}
+
+function span(ring: Polyline): Vec2 {
+  const xs = ring.points.map((p) => p.x);
+  const ys = ring.points.map((p) => p.y);
+  return { x: Math.max(...xs) - Math.min(...xs), y: Math.max(...ys) - Math.min(...ys) };
+}
