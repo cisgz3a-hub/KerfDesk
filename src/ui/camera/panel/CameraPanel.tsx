@@ -5,8 +5,9 @@
 // toolbar / Tools menu via the `tools.camera` command (like the registration
 // jig); it renders nothing until opened, and its own × button closes it.
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePlatform } from '../../app';
+import { loadCameraPanelWide, saveCameraPanelWide } from '../../state/camera-preference-storage';
 import { useCameraStore } from '../../state/camera-store';
 import { AutoAlignControls } from '../AutoAlignControls';
 import { OverlayControls } from '../OverlayControls';
@@ -14,6 +15,7 @@ import { CameraDiagnostics } from './CameraDiagnostics';
 import { MachineCameraSection } from './MachineCameraSection';
 import { noteStyle } from './panel-styles';
 import { RtspSourceControls } from './RtspSourceControls';
+import { SnapshotControls } from './SnapshotControls';
 import { UsbCameraSection } from './UsbCameraSection';
 
 export function CameraPanel(): JSX.Element | null {
@@ -32,6 +34,13 @@ function CameraPanelOpen(): JSX.Element {
   const stopSource = useCameraStore((s) => s.stopSource);
   const machineCamera = useCameraStore((s) => s.machineCamera);
   const detectMachineCamera = useCameraStore((s) => s.detectMachineCamera);
+  const [wide, setWide] = useState(() => loadCameraPanelWide());
+  const toggleWide = (): void => {
+    setWide((current) => {
+      saveCameraPanelWide(!current);
+      return !current;
+    });
+  };
 
   useEffect(() => {
     detectSupport(camera);
@@ -45,7 +54,11 @@ function CameraPanelOpen(): JSX.Element {
   }, [camera, bridge, detectSupport, refreshCameras, detectMachineCamera, stopSource]);
 
   return (
-    <div role="dialog" aria-label="Camera preview" style={panelStyle}>
+    <div
+      role="dialog"
+      aria-label="Camera preview"
+      style={{ ...panelStyle, width: wide ? WIDE_PANEL_WIDTH_PX : PANEL_WIDTH_PX }}
+    >
       <div style={headerStyle}>
         <strong>Camera</strong>
         <button
@@ -73,17 +86,21 @@ function CameraPanelOpen(): JSX.Element {
       )}
       <AutoAlignControls />
       <OverlayControls />
+      <SnapshotControls wide={wide} onToggleWide={toggleWide} />
       <CameraDiagnostics />
     </div>
   );
 }
+
+// Compact fits beside the layers panel; wide is the F-CAM9 monitoring view.
+const PANEL_WIDTH_PX = 320;
+const WIDE_PANEL_WIDTH_PX = 560;
 
 const panelStyle: React.CSSProperties = {
   position: 'absolute',
   bottom: 12,
   left: 12,
   zIndex: 5,
-  width: 320,
   maxHeight: 'calc(100% - 24px)',
   overflowY: 'auto',
   padding: 10,
