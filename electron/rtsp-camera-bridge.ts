@@ -1,27 +1,45 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
 import { writeJson } from './bridge-json.js';
+import { handleDiscoverRequest, handleFrameRequest } from './camera-frame-proxy.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
 import { hasFfmpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream.js';
 
 export const CAMERA_BRIDGE_PORT = 51731;
 
 export type RtspCameraBridgeHandle = {
+  readonly port: number;
   readonly close: () => Promise<void>;
 };
 
-export async function startLocalRtspCameraBridge(): Promise<RtspCameraBridgeHandle> {
+// `port` is parameterized (0 = ephemeral) so tests can run the real server
+// without colliding on the well-known bridge port; production callers use the
+// default.
+export async function startLocalRtspCameraBridge(
+  port = CAMERA_BRIDGE_PORT,
+): Promise<RtspCameraBridgeHandle> {
   const server = createServer((req, res) => {
-    void handleBridgeRequest(req, res).catch((err: unknown) => handleBridgeError(err, res));
+    void handleBridgeRequest(req, res, boundPort).catch((err: unknown) =>
+      handleBridgeError(err, res),
+    );
   });
-  await listen(server, CAMERA_BRIDGE_PORT);
-  return { close: () => closeServer(server) };
+  const boundPort = await listen(server, port);
+  return { port: boundPort, close: () => closeServer(server) };
 }
 
-async function handleBridgeRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const requestUrl = new URL(req.url ?? '/', `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`);
+async function handleBridgeRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bridgePort: number,
+): Promise<void> {
+  const requestUrl = new URL(req.url ?? '/', `http://127.0.0.1:${bridgePort}`);
   setCorsHeaders(req, res);
   if (req.method === 'OPTIONS') {
+    // Chrome's Private Network Access preflight for public-https → loopback
+    // requests: acknowledge it so the deployed site keeps reaching the bridge.
+    if (req.headers['access-control-request-private-network'] === 'true') {
+      res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    }
     res.writeHead(204).end();
     return;
   }
@@ -33,21 +51,29 @@ async function handleBridgeRequest(req: IncomingMessage, res: ServerResponse): P
     return;
   }
   if (requestUrl.pathname === '/health') {
-    writeJson(res, { kind: 'ok', ffmpegAvailable: await hasFfmpeg() });
+    writeJson(res, { kind: 'ok', ffmpegAvailable: await hasFfmpeg(), frameProxy: true });
     return;
   }
   if (requestUrl.pathname === '/probe') {
-    await handleProbe(requestUrl, res);
+    await handleProbe(requestUrl, res, bridgePort);
     return;
   }
   if (requestUrl.pathname === '/stream.mjpg') {
     await handleStream(requestUrl, res);
     return;
   }
+  if (requestUrl.pathname === '/frame.jpg') {
+    await handleFrameRequest(requestUrl, res, bridgePort);
+    return;
+  }
+  if (requestUrl.pathname === '/discover') {
+    await handleDiscoverRequest(res, { bridgePort });
+    return;
+  }
   res.writeHead(404).end('Not Found');
 }
 
-async function handleProbe(requestUrl: URL, res: ServerResponse): Promise<void> {
+async function handleProbe(requestUrl: URL, res: ServerResponse, bridgePort: number): Promise<void> {
   const policy = rtspCameraUrlPolicy(requestUrl.searchParams.get('url') ?? '');
   if (policy.kind !== 'ok') {
     writeJson(res, policy);
@@ -59,7 +85,7 @@ async function handleProbe(requestUrl: URL, res: ServerResponse): Promise<void> 
     url: policy.url.toString(),
     ...(rtsp.codec !== undefined ? { codec: rtsp.codec } : {}),
     ffmpegAvailable: await hasFfmpeg(),
-    previewUrl: `http://127.0.0.1:${CAMERA_BRIDGE_PORT}/stream.mjpg?url=${encodeURIComponent(
+    previewUrl: `http://127.0.0.1:${bridgePort}/stream.mjpg?url=${encodeURIComponent(
       policy.url.toString(),
     )}`,
   });
@@ -205,12 +231,13 @@ function handleBridgeError(err: unknown, res: ServerResponse): void {
   writeJson(res, { kind: 'unavailable', reason }, 502);
 }
 
-function listen(server: Server, port: number): Promise<void> {
+function listen(server: Server, port: number): Promise<number> {
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => {
       server.off('error', reject);
-      resolve();
+      const address = server.address();
+      resolve(typeof address === 'object' && address !== null ? address.port : port);
     });
   });
 }

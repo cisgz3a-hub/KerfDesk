@@ -129,6 +129,84 @@ export function ffmpegFailureReason(chunks: ReadonlyArray<Buffer>, fallback: str
   return stderr.length > 0 ? `${fallback}: ${stderr}` : fallback;
 }
 
+const SINGLE_FRAME_TIMEOUT_MS = 10000;
+const MAX_SINGLE_FRAME_BYTES = 8 * 1024 * 1024;
+
+export type RtspFrameCaptureResult =
+  | { readonly kind: 'ok'; readonly jpeg: Buffer }
+  | { readonly kind: 'failed'; readonly reason: string };
+
+/**
+ * Decode exactly one JPEG frame from a private-network RTSP camera (ADR-116).
+ * Still capture must not depend on the browser's MJPEG-in-canvas semantics,
+ * so the /frame.jpg route asks ffmpeg for a single image instead.
+ */
+export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> {
+  if (!hasFreeFfmpegSlot()) {
+    return Promise.resolve({ kind: 'failed', reason: 'Too many concurrent camera streams.' });
+  }
+  const releaseSlot = acquireFfmpegSlot();
+  return new Promise((resolve) => {
+    const ffmpeg = spawn('ffmpeg', [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-rtsp_transport',
+      'tcp',
+      '-i',
+      url.toString(),
+      '-an',
+      '-frames:v',
+      '1',
+      '-f',
+      'image2',
+      '-q:v',
+      '4',
+      'pipe:1',
+    ]);
+    const out: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let outBytes = 0;
+    let settled = false;
+    const finish = (result: RtspFrameCaptureResult): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      releaseSlot();
+      resolve(result);
+    };
+    const timer = setTimeout(() => {
+      ffmpeg.kill('SIGTERM');
+      finish({ kind: 'failed', reason: 'FFmpeg did not produce a camera frame in time.' });
+    }, SINGLE_FRAME_TIMEOUT_MS);
+    ffmpeg.stdout.on('data', (chunk: Buffer) => {
+      outBytes += chunk.length;
+      if (outBytes > MAX_SINGLE_FRAME_BYTES) {
+        ffmpeg.kill('SIGTERM');
+        finish({ kind: 'failed', reason: 'Camera frame is too large.' });
+        return;
+      }
+      out.push(Buffer.from(chunk));
+    });
+    ffmpeg.stderr.on('data', (chunk: Buffer) => {
+      appendLimitedStderrChunk(stderrChunks, chunk);
+    });
+    ffmpeg.on('error', (err) => {
+      finish({ kind: 'failed', reason: err.message });
+    });
+    ffmpeg.on('exit', (code) => {
+      if (code === 0 && out.length > 0) {
+        finish({ kind: 'ok', jpeg: Buffer.concat(out) });
+        return;
+      }
+      finish({
+        kind: 'failed',
+        reason: ffmpegFailureReason(stderrChunks, 'FFmpeg could not capture a camera frame.'),
+      });
+    });
+  });
+}
+
 let ffmpegAvailable: Promise<boolean> | null = null;
 
 export function hasFfmpeg(): Promise<boolean> {
