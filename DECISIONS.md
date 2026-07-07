@@ -5674,18 +5674,18 @@ from public-facing copy per the standing neutrality policy.
   first-party code is MIT, third-party components remain under their own
   licenses.
 
-### Release blocker (must resolve before the visibility flip)
+### Release blocker (RESOLVED by ADR-122)
 
 The in-house potrace-style trace backend (`src/core/trace/potrace-*.ts`)
-has unresolved provenance: a 2026-06-10 audit found its internals mirror
+had unresolved provenance: a 2026-06-10 audit found its internals mirror
 the GPL-2 potrace C implementation's details (helper names, constants,
-pipeline order) with no provenance record, and no ADR has resolved the
-finding since. If that code is derived from the GPL source, it cannot be
-published under MIT. Before the repo goes public the maintainer must
-either (a) replace the backend with a documented clean-room implementation
-from the Selinger 2003 paper, (b) revert the default trace path to the
-Unlicense imagetracerjs backend and remove the potrace-* modules, or
-(c) establish and record that the existing code was independently written.
+pipeline order) with no provenance record. If that code was derived from
+the GPL source, it could not be published under MIT. The three exits were
+(a) replace the backend with a documented clean-room implementation,
+(b) revert to the Unlicense imagetracerjs backend, or (c) establish and
+record that the existing code was independently written. **Exit (a) was
+taken: ADR-122 removed every `potrace-*.ts` module and routes all filled
+presets through the in-house contour backend. This blocker is closed.**
 
 ### Alternatives considered
 
@@ -5700,5 +5700,87 @@ Unlicense imagetracerjs backend and remove the potrace-* modules, or
 - `LICENSE` reads "MIT License" (this commit).
 - `pnpm license-check` still enforces the ADR-017 dependency allow-list.
 - `public/third-party-notices.txt` regenerated without proprietary wording.
-- The potrace provenance blocker above is tracked as an open item; the
-  visibility flip is gated on it.
+- The potrace provenance blocker is closed by ADR-122 (the potrace-*
+  modules no longer exist in the tree).
+
+---
+
+## ADR-122 — Own-engine trace: remove the potrace-derived backend (closes the ADR-120 blocker)
+
+**Status:** Accepted | **Date:** 2026-07-08
+
+**Numbering note:** drafted as ADR-122. ADR-120 (MIT release) is the latest
+in the body; a parallel branch drafted ADR-121 (G2/G3 arcs) not yet merged.
+122 is taken to avoid the 121 collision — published numbers win (ADR-104
+precedent); reconcile at integration if 121 lands first.
+
+### Context
+
+ADR-120's one release blocker was `src/core/trace/potrace-*.ts` (~2,369
+lines): a 2026-06-10 audit found the internals mirror the GPL-2 potrace C
+implementation (helper names, constants, pipeline order) with no provenance
+record, so the code could not ship under MIT. ADR-120 listed three exits;
+the maintainer chose (a) — replace it with an in-house backend — and it was
+built and perceptually accepted over three review loops (2026-07-07/08):
+
+1. **Line Art de-wobble** — the flattener defaults on (Smoothness ramp),
+   rewritten to a total-least-squares line fit with a three-gate
+   noise/feature classifier; sharpener tangents use leg chords so boundary
+   noise no longer mints false corners.
+2. **Small-glyph overshoot + Edge reroute** — corner rebuild skips glyph-
+   scale rings; a coverage gate stops the sharpener amputating serifs; Edge
+   Detection was rerouted off the potrace geometry stage onto the shared
+   `contourPolylinesFromMask` finisher.
+3. **Big-letter corners + arc wobble** — a dense-stage moving circle-fit
+   smoother evens mid-wavelength mask noise on large curves.
+
+Each defect class is guarded by an analytic instrument
+(`contour-straightness` / `contour-glyph-fidelity` / `contour-roundness`).
+
+### Decision
+
+- **Delete every `potrace-*.ts` module** (trace, apex, bitmap, curve +
+  optimize, params, path-scanner, polygon family) and their tests, plus the
+  dead `edge-ink-support.ts` and the two potrace comparison harnesses
+  (`_contour-vs-potrace-audit`, `_sharp-candidates`).
+- **All binary filled presets (Line Art, Smooth, Sharp) route to
+  `contour-trace.ts`; Edge Detection shares its finisher.** The dispatch
+  predicate `shouldUsePotraceTraceBackend` is renamed `isBinaryContourPreset`
+  (backend-neutral) and lives in `contour-trace.ts`. This was already the
+  runtime path (the ADR-120-era A/B swap), so production output is unchanged
+  by the deletion.
+- **Two kept symbols move out of the potrace modules:** the LightBurn dialog
+  model (`LightBurnTraceSettings` + `DEFAULT_LIGHTBURN_TRACE_SETTINGS`) to a
+  new `lightburn-trace-settings.ts`, and the `TraceBitmap` bitmap shape to
+  `local-contrast-mask.ts` (its only surviving producer). The potrace
+  parameter converter is deleted with the backend.
+- **imagetracerjs stays** as the multi-colour / no-fixed-palette fallback
+  (Unlicense, ADR-013) — untouched.
+
+### Consequences
+
+- The whole surfaced trace surface is now original / permissively-licensed
+  code; the ADR-120 MIT-release blocker is closed. The Selinger 2003 potrace
+  algorithm is neither used nor referenced by shipped code (the external
+  potrace 1.16 binary remains only in TRACE_AUDIT-gated measurement fixtures,
+  never bundled).
+- Measured on the arch-house logo: contour IoU 0.92, band-IoU 0.94, hole
+  census exact, ~40% faster than the old potrace path. Fidelity is
+  eyeballed against the source (CLAUDE.md #2), not asserted from IoU alone.
+- Known residual: sub-pixel mask-noise ripple on large curves; the named
+  next lever is sub-pixel boundary extraction from the anti-aliased luma.
+- Not verified: a LightBurn side-by-side; the Sharp/Smooth/Centerline live
+  passes were rendered and reviewed but not burned.
+
+### Verification
+
+- Adversarial audit (5 dimensions, then per-finding refutation): 0 blockers,
+  0 majors, 5 minors — all cleared. Provenance dimension confirmed clean-room
+  (standard published math, zero potrace fingerprints in code, no GPL
+  dependency).
+- Routing pin (`trace-to-paths.test.ts`): the three binary presets classify
+  to the contour backend and Line Art dispatches through it end-to-end;
+  centerline/edge/multi-colour do not. Replaces the deleted potrace pin.
+- Full suite green after the deletion; `tsc --noEmit` + lint clean.
+- Perceptual: the five presets rendered through the app dispatcher and
+  reviewed; the three fidelity instruments gate regressions.

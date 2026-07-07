@@ -16,8 +16,17 @@
 // exact detail the edge preset exists to keep. The local-contrast test has
 // no morphology, so a 3px counter survives untouched.
 
-import type { TraceBitmap } from './potrace-bitmap';
 import type { RawImageData } from './trace-image';
+
+/** A bilevel raster: `data[i]` is 1 for foreground ink, 0 for background.
+ *  The neutral bitmap shape the contour finisher consumes as an InkMask;
+ *  defined here (its producer) after potrace's own bitmap module was
+ *  removed (ADR-122). */
+export type TraceBitmap = {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array;
+};
 
 // Same global cut-off the potrace bitmap builder uses (potrace-bitmap.ts
 // thresholdLuma) so the union's backbone matches Line Art's notion of ink.
