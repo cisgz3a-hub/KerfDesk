@@ -1,4 +1,9 @@
-import { useState, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
+import {
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type RefObject,
+} from 'react';
 import {
   hitTest,
   type Project,
@@ -31,6 +36,12 @@ import {
 } from './workspace-drag-updates';
 
 type CanvasMouseEvent = ReactMouseEvent<HTMLCanvasElement>;
+// The canvas binds POINTER events so an in-progress drag can be captured to the
+// element (setPointerCapture) and keep receiving move/up even when the pointer
+// leaves the canvas — the previous mouse-event wiring committed the drag the
+// moment the pointer crossed the edge (audit C1). A PointerEvent carries every
+// MouseEvent field, so the internal drag helpers keep taking CanvasMouseEvent.
+type CanvasPointerEvent = ReactPointerEvent<HTMLCanvasElement>;
 type CanvasRef = RefObject<HTMLCanvasElement | null>;
 type WorkspaceViewState = {
   readonly zoomFactor: number;
@@ -39,9 +50,9 @@ type WorkspaceViewState = {
 };
 
 type DragHandlers = {
-  readonly onMouseDown: (e: CanvasMouseEvent) => void;
-  readonly onMouseMove: (e: CanvasMouseEvent) => void;
-  readonly onMouseUp: (e: CanvasMouseEvent) => void;
+  readonly onPointerDown: (e: CanvasPointerEvent) => void;
+  readonly onPointerMove: (e: CanvasPointerEvent) => void;
+  readonly onPointerUp: (e: CanvasPointerEvent) => void;
 };
 
 type DragMoveResult = {
@@ -58,7 +69,7 @@ export function useDragMove(
   const deps = useWorkspaceDragDeps();
   const [drag, setDrag] = useState<DragState | null>(null);
 
-  const handleMouseDown = (e: CanvasMouseEvent): void => {
+  const handlePointerDown = (e: CanvasPointerEvent): void => {
     useUiStore.getState().closeWorkspaceContextBar();
     deps.setSnapGuides([]);
     if (previewMode) return;
@@ -77,6 +88,9 @@ export function useDragMove(
       selectionAnchor: deps.selectionAnchor,
     });
     if (next === null) return;
+    // Capture the pointer so move/up keep coming while the drag runs outside
+    // the canvas (audit C1). Guarded — jsdom lacks setPointerCapture.
+    capturePointer(ref.current, e.pointerId);
     if (next.kind === 'marquee') {
       deps.setSelectionMarquee({ start: next.startScenePoint, end: next.startScenePoint });
     } else if (next.kind === 'measure') {
@@ -87,7 +101,7 @@ export function useDragMove(
     setDrag(next);
   };
 
-  const handleMouseMove = (e: CanvasMouseEvent): void => {
+  const handlePointerMove = (e: CanvasPointerEvent): void => {
     updateWorkspaceDrag({
       e,
       ref,
@@ -108,7 +122,8 @@ export function useDragMove(
     });
   };
 
-  const handleMouseUp = (e: CanvasMouseEvent): void => {
+  const handlePointerUp = (e: CanvasPointerEvent): void => {
+    releasePointer(ref.current, e.pointerId);
     deps.setCursorMm(null);
     deps.setSnapGuides([]);
     if (drag === null) return;
@@ -129,16 +144,27 @@ export function useDragMove(
     setDrag(null);
   };
 
-  const handlers = dragHandlers(handleMouseDown, handleMouseMove, handleMouseUp);
+  const handlers = dragHandlers(handlePointerDown, handlePointerMove, handlePointerUp);
   return { handlers, dragKind: visibleDragKind(drag) };
 }
 
 function dragHandlers(
-  onMouseDown: DragHandlers['onMouseDown'],
-  onMouseMove: DragHandlers['onMouseMove'],
-  onMouseUp: DragHandlers['onMouseUp'],
+  onPointerDown: DragHandlers['onPointerDown'],
+  onPointerMove: DragHandlers['onPointerMove'],
+  onPointerUp: DragHandlers['onPointerUp'],
 ): DragHandlers {
-  return { onMouseDown, onMouseMove, onMouseUp };
+  return { onPointerDown, onPointerMove, onPointerUp };
+}
+
+// Pointer-capture helpers, guarded because jsdom (test env) implements neither
+// setPointerCapture nor hasPointerCapture. releasePointerCapture throws if the
+// element doesn't hold the capture, so gate on hasPointerCapture.
+function capturePointer(canvas: HTMLCanvasElement | null, pointerId: number): void {
+  canvas?.setPointerCapture?.(pointerId);
+}
+
+function releasePointer(canvas: HTMLCanvasElement | null, pointerId: number): void {
+  if (canvas?.hasPointerCapture?.(pointerId) === true) canvas.releasePointerCapture(pointerId);
 }
 
 function beginWorkspaceDrag(args: {

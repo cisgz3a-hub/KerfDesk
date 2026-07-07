@@ -86,10 +86,10 @@ export function Workspace(): JSX.Element {
         ref={ref}
         width={canvasSize.width}
         height={canvasSize.height}
-        onMouseDown={handlers.onMouseDown}
-        onMouseMove={handlers.onMouseMove}
-        onMouseUp={handlers.onMouseUp}
-        onMouseLeave={handlers.onMouseUp}
+        onPointerDown={handlers.onPointerDown}
+        onPointerMove={handlers.onPointerMove}
+        onPointerUp={handlers.onPointerUp}
+        onPointerCancel={handlers.onPointerUp}
         onDoubleClick={handleCanvasDoubleClick}
         onContextMenu={suppressCanvasContextMenu}
         style={canvasStyle}
