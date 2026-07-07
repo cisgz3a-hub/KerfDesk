@@ -12,6 +12,7 @@ import { useCameraStore } from '../../state/camera-store';
 import { AutoAlignControls } from '../AutoAlignControls';
 import { OverlayControls } from '../OverlayControls';
 import { CameraDiagnostics } from './CameraDiagnostics';
+import { CameraSetupSteps } from './CameraSetupSteps';
 import { MachineCameraSection } from './MachineCameraSection';
 import { noteStyle } from './panel-styles';
 import { RtspSourceControls } from './RtspSourceControls';
@@ -71,6 +72,7 @@ function CameraPanelOpen(): JSX.Element {
           ×
         </button>
       </div>
+      <CameraSetupSteps />
       <MachineCameraSection
         state={machineCamera}
         onDetect={() => void detectMachineCamera(bridge)}
