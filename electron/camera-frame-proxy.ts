@@ -13,8 +13,12 @@ import { writeJson } from './bridge-json.js';
 import { cameraFrameUrlPolicy } from './camera-frame-proxy-policy.js';
 import { captureRtspFrameJpeg, hasFfmpeg } from './rtsp-camera-stream.js';
 
-const HTTP_FRAME_TIMEOUT_MS = 5000;
-const DISCOVER_PROBE_TIMEOUT_MS = 1500;
+// Timeouts sized to the real hardware (ADR-116 hardware pass): the Falcon's
+// embedded server takes 0.8–1.4s per frame, and aborting a request
+// mid-capture wedges it for several seconds — so probes must outwait a slow
+// frame rather than abort into it.
+const HTTP_FRAME_TIMEOUT_MS = 10000;
+const DISCOVER_PROBE_TIMEOUT_MS = 5000;
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 const JPEG_MAGIC = [0xff, 0xd8] as const;
 
@@ -31,6 +35,43 @@ export const MACHINE_CAMERA_FRAME_URL_CANDIDATES: ReadonlyArray<string> = [
 /** Bridge frame-proxy URL for a camera URL, as served by /discover. */
 export function proxiedFrameUrl(cameraUrl: string, bridgePort: number): string {
   return `http://127.0.0.1:${bridgePort}/frame.jpg?url=${encodeURIComponent(cameraUrl)}`;
+}
+
+// Machine snapshot cameras are single-threaded embedded servers: concurrent
+// requests wedge them for seconds (measured live on the Falcon). The bridge
+// is the one choke point every consumer goes through, so it can guarantee
+// the camera only ever sees one connection at a time: fetches are serialized
+// per host, and concurrent requests for the SAME url share one in-flight
+// fetch (the panel's preview poll and a capture ask for identical URLs).
+const upstreamChainByHost = new Map<string, Promise<void>>();
+const inflightByUrl = new Map<string, Promise<FetchFrameResult>>();
+
+export function fetchFrameBytesQueued(url: string, timeoutMs: number): Promise<FetchFrameResult> {
+  const inflight = inflightByUrl.get(url);
+  if (inflight !== undefined) return inflight;
+  const host = hostOf(url);
+  const previous = upstreamChainByHost.get(host) ?? Promise.resolve();
+  const run = previous.then(() => fetchFrameBytes(url, timeoutMs));
+  upstreamChainByHost.set(
+    host,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  inflightByUrl.set(url, run);
+  void run.finally(() => {
+    if (inflightByUrl.get(url) === run) inflightByUrl.delete(url);
+  });
+  return run;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
 }
 
 export async function handleFrameRequest(
@@ -51,7 +92,7 @@ export async function handleFrameRequest(
 }
 
 async function serveHttpFrame(url: URL, res: ServerResponse): Promise<void> {
-  const frame = await fetchFrameBytes(url.toString(), HTTP_FRAME_TIMEOUT_MS);
+  const frame = await fetchFrameBytesQueued(url.toString(), HTTP_FRAME_TIMEOUT_MS);
   if (frame.kind !== 'ok') {
     writeJson(res, { kind: 'unavailable', reason: frame.reason }, 502);
     return;
@@ -128,15 +169,21 @@ export async function handleDiscoverRequest(
 ): Promise<void> {
   const candidates = options.candidates ?? MACHINE_CAMERA_FRAME_URL_CANDIDATES;
   const timeoutMs = options.probeTimeoutMs ?? DISCOVER_PROBE_TIMEOUT_MS;
-  for (const cameraUrl of candidates) {
-    const frame = await fetchFrameBytes(cameraUrl, timeoutMs);
-    if (frame.kind === 'ok') {
-      writeJson(res, {
-        kind: 'ok',
-        found: { cameraUrl, proxyFrameUrl: proxiedFrameUrl(cameraUrl, options.bridgePort) },
-      });
-      return;
-    }
-  }
-  writeJson(res, { kind: 'ok', found: null });
+  // Candidates live on DIFFERENT hosts, so probing them concurrently is safe
+  // (per-host serialization still protects the real camera) and keeps a
+  // machine-off discovery at one probe timeout instead of the sum of four.
+  const probes = await Promise.all(
+    candidates.map(async (cameraUrl) => {
+      const frame = await fetchFrameBytesQueued(cameraUrl, timeoutMs);
+      return frame.kind === 'ok' ? cameraUrl : null;
+    }),
+  );
+  const cameraUrl = probes.find((url) => url !== null) ?? null;
+  writeJson(res, {
+    kind: 'ok',
+    found:
+      cameraUrl === null
+        ? null
+        : { cameraUrl, proxyFrameUrl: proxiedFrameUrl(cameraUrl, options.bridgePort) },
+  });
 }
