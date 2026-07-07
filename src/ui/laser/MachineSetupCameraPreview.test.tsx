@@ -154,6 +154,10 @@ describe('BrowserCameraPreview', () => {
         codec: 'H264',
         ffmpegAvailable: false,
       })),
+      discoverMachineCamera: async () => ({ kind: 'not-found' }),
+      proxiedFrameUrl: (cameraUrl) =>
+        `http://127.0.0.1:51731/frame.jpg?url=${encodeURIComponent(cameraUrl)}`,
+      health: async () => ({ kind: 'ok', ffmpegAvailable: false, frameProxy: true }),
     };
     const { host, unmount } = await renderPreview({
       camera: {
