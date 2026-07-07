@@ -272,6 +272,7 @@ better risk/effort allocation at this stage. **Accepted gap, documented.**
 | Canvas auto-zoom on import | CLAIMED | Logic tested via the new combinedBBox + zoomToBounds math; not verified on a real import workflow |
 | Cmd+D duplicate | CLAIMED | Tests pin behaviour; no real-use confirmation yet |
 | Cloudflare Pages auto-deploy | VERIFIED (with 2026-07-03 outage, fixed) | Secrets set; `workflow_run`-gated deploys have published for weeks. **Broke 2026-07-03** when the repo was renamed `LaserForge-2.0`→`KerfDesk` — `scripts/assert-correct-repo.mjs` rejected the new identity so every Deploy failed at `guard:repo` and production stalled at `d839c96`. Fixed same day: guard accepts both identities (allowlist) + KerfDesk regression test in `deploy-workflow-gate.test.ts` |
+| Keep-awake during jobs (screen wake lock, ADR-117) | **CLAIMED** | 2026-07-07: jsdom hook tests (acquire / release / visibility re-acquire / one-shot unavailable warning); Electron `'screen-wake-lock'` allowlisted in trusted-renderer-policy with policy tests — routing verified against Electron 42-x-y source (content_converter.cc maps WAKE_LOCK_SCREEN → 'screen-wake-lock'), NOT against a packaged run. Real hours-long burn with display sleep armed pending (maintainer) |
 | Set-origin from head position | DEFERRED — captured in PROJECT.md "Future feature notes" |
 
 ---
