@@ -2503,3 +2503,18 @@ F-CNC19 tiling.
 - **Edge / click outside the bed.** Clicks beyond the bed edge clamp to the
   nearest edge point (bounds check) — the head never leaves the work area,
   and X0/Y0 destinations are emitted explicitly (the zero-axis jog fix).
+
+### F-CAM8. Camera snapshot + monitoring view
+
+- **Success / snapshot saved.** With any camera source live, "Save
+  snapshot..." captures one frame (through the same pixel-readable path as
+  calibration) and writes a PNG via the platform save dialog. "Larger view"
+  widens the panel for watching a running job; the size preference persists
+  locally.
+- **Error / capture or encode fails.** A dead source or unavailable canvas
+  reports a typed toast ("Could not capture a camera frame." / "Could not
+  encode the snapshot PNG."); nothing half-writes.
+- **Empty / no source.** The snapshot button is disabled until a camera
+  source runs; the size toggle always works.
+- **Edge / dialog dismissed.** Cancelling the save picker is silent — the
+  operator changed their mind, not an error.

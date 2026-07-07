@@ -41,3 +41,23 @@ export function saveRtspCameraUrl(url: string): void {
     // Storage unavailable: the URL simply won't survive reload.
   }
 }
+
+// Compact vs large (monitoring) camera panel — a viewing preference, so
+// machine-local like the rest (F-CAM9).
+const PANEL_WIDE_KEY = 'laserforge.camera.panelWide.v1';
+
+export function loadCameraPanelWide(): boolean {
+  try {
+    return localStorage.getItem(PANEL_WIDE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function saveCameraPanelWide(wide: boolean): void {
+  try {
+    localStorage.setItem(PANEL_WIDE_KEY, String(wide));
+  } catch {
+    // Storage unavailable: the size simply won't survive reload.
+  }
+}
