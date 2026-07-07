@@ -199,8 +199,23 @@ function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
 export function cameraBridgeCorsOrigin(origin: string | undefined): string | null {
   if (origin === undefined) return null;
   if (origin === 'app://app') return origin;
-  if (origin === 'http://localhost:5173' || origin === 'http://127.0.0.1:5173') return origin;
+  // Any loopback origin, any port: Vite falls back to a random port when 5173
+  // is taken (found live during the ADR-116 hardware pass). The S03-001 threat
+  // model is drive-by REMOTE pages — code already running on this machine's
+  // loopback can reach the cameras without the bridge's help.
+  if (isLoopbackDevOrigin(origin)) return origin;
   return isTrustedHostedAppOrigin(origin) ? origin : null;
+}
+
+function isLoopbackDevOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+    );
+  } catch {
+    return false;
+  }
 }
 
 // S03-001 server-side request gate. CORS only stops a browser READING a
