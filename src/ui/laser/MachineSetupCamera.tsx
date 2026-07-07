@@ -70,8 +70,8 @@ export function CameraPanel(): JSX.Element {
       <section style={sectionStyle}>
         <h3 style={sectionHeadingStyle}>Alignment</h3>
         <p style={mutedStyle}>
-          V1 uses four image-to-machine points, matching Rayforge's calibration model. Use bed
-          corners for a first test, then replace these with measured points later.
+          V1 uses four image-to-machine calibration points. Use bed corners for a first test, then
+          replace these with measured points later.
         </p>
         <Button onClick={() => updateCamera({ alignment: bedCornerAlignment(camera, device) })}>
           Use bed corners

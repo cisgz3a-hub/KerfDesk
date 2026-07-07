@@ -3,12 +3,8 @@ Third-Party Notices
 
 This application bundles the open-source components listed below. Each
 remains under its own license, reproduced here as those licenses require.
-The application's own source code is proprietary (see LICENSE) and is not
-covered by any license in this file.
-
-Camera profile and alignment model concepts were adapted from the
-MIT-licensed Rayforge project's camera workflow (see THIRD_PARTY_NOTICES.md
-in the source repository for details).
+The application's own source code is MIT-licensed (see LICENSE); this file
+covers the bundled third-party components.
 
 == Bundled fonts ==
 
@@ -265,6 +261,29 @@ Apache License
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+--- Package: electron-updater@6.8.9 (MIT) ---
+The MIT License (MIT)
+
+Copyright (c) 2015 Loopline Systems
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 --- Package: imagetracerjs@1.2.6 (Unlicense) ---
 This is free and unencumbered software released into the public domain.

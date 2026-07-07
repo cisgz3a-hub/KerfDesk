@@ -1,113 +1,113 @@
 # KerfDesk
 
-> A focused CAM application for **GRBL** laser cutters and engravers. Web app and Windows desktop from one codebase. Proprietary source (ADR-018).
+> Free, open-source CAM for GRBL laser cutters, engravers, and CNC routers. Design, trace, preview, generate G-code, and stream it to your machine — straight from the browser, or from the Windows desktop app. One codebase, MIT licensed.
 
-**Status:** Phases A-E shipped (the MVP plus text and raster trace), Phase F.1 Fill mode shipped, Phase F.2 raster image engrave is code-complete through F.2.e with the F.2.f hardware burn still pending, Phase F.3 set-work-origin is code-complete with hardware verification pending, Phase F.4 Convert to Bitmap has the Fill All path shipped, Phase F.5 material-library foundations are present, and Phase G drawing tools, Phase H CNC/router mode, Phase I multi-controller support, Camera Mode, and the Phase K box generator are built (code + tests landed; hardware/fidelity passes tracked in AUDIT.md). The trace pipeline was hardened on 2026-05-29 with the transparent-PNG decode fix, perceptual-fidelity test harness (ADR-025), and trace-keeps-source overlay (ADR-026). The known trace limitation remains: imagetracerjs is outline-only, so outline-vs-centerline behavior is still documented in ADR-025. Hardware verification is limited to the Falcon/GrblHAL paths recorded in `AUDIT.md`; later raster/image/origin/bitmap/material/drawing workflows still require explicit hardware verification. The production web URL is <https://kerfdesk.com>; GitHub Actions deployment requires configured Cloudflare secrets. Spec files (`PROJECT.md`, `WORKFLOW.md`, `DECISIONS.md`, `CLAUDE.md`, `RESEARCH_LOG.md`) plus the rolling `AUDIT.md` describe what's built and why; this README is the entry index.
+**Try it now: <https://kerfdesk.com>** — no install, no account. Works in any Chromium browser (Chrome, Edge, Brave) on Windows, macOS, and Linux, talks to your machine over Web Serial, and installs as an offline-capable PWA.
 
-**Naming note:** KerfDesk is the user-facing product and release URL. LaserForge 2.0 remains the repository/package/internal project name, and the Cloudflare Pages API project is still named `laserforge` for historical reasons.
+## Why KerfDesk
 
----
+- **Zero-install.** The full app — canvas, tracing, G-code generation, machine streaming — runs in the browser. Install it as a PWA and it keeps working offline.
+- **The workflow you already know.** Color-as-layer design, a Cuts/Layers panel with per-layer mode / power / speed / passes, a Laser panel for jogging, framing, and streaming.
+- **Local-first and private.** No accounts, no telemetry, no cloud round-trips. Your designs and material libraries live on your machine.
+- **Deterministic, safety-checked G-code.** Same input produces byte-identical output (snapshot-tested in CI), with property-tested invariants like *laser off on every travel move* and *never exceed the machine's power scale*.
 
-## What it is
+## Headline features
 
-KerfDesk takes a 2D vector design (SVG), text, traced artwork, raster images, or generated shapes; assigns cut, fill, or image operations per color layer; previews the toolpath; generates correct G-code; and streams it to your machine. The UX follows the laser-CAM conventions users already know — color-as-layer, a Cuts/Layers window, a Laser window. The scope is deliberately narrow: GRBL only for the current controller path, no rotary workflow yet, and hardware verification is tracked feature-by-feature in `AUDIT.md`.
+### 🎯 Registration Jig — accurate placement without a camera
 
-It will be delivered as:
+Most tools solve "put the artwork exactly on this object" with an overhead camera. KerfDesk has a camera mode too — but the **Registration Jig** solves it with nothing but your laser:
 
-- A **web app** that runs in any Chromium browser (Chrome, Edge, Brave, Arc), uses WebSerial to talk to your laser, and works on macOS, Windows, and Linux.
-- A **Windows desktop app** (Electron) for users who want a real native install.
+1. **Create a jig outline.** Open *Registration Jig* in the toolbar, pick a rectangle or circle, enter the size of your object (coaster, tumbler blank, phone case…), and drag the outline to where the object will sit on the bed.
+2. **Run 1 — burn the outline.** The jig lives on its own reserved layer; the panel disables every other layer's output, so *Start* burns only the box onto your spoilboard or masking paper.
+3. **Place the object** inside the burned outline. It is now at a known position.
+4. **Run 2 — burn the artwork.** Add your design, position it relative to the outline on the canvas (one click centers it), toggle outputs, and start again. Both runs anchor to the same origin, so the artwork lands on the object exactly where it sits on screen.
 
-Both ship from one codebase.
+It works on machines **without homing switches** (paired with hand-set, verified origins) and on homed machines (both runs emit at true absolute positions). The two-run alignment is property-tested, and the jig round-trips through project save/load.
 
-## What it isn't (and won't be in MVP)
+### ✒️ Image tracing — five tuned modes with live preview
 
-- Not a design tool. Use Inkscape or Illustrator.
-- Not a generic G-code sender. Use gSender or LaserGRBL for that.
-- Not a do-everything laser suite. We keep the familiar workflow, not the full feature breadth.
-- Not for Marlin, Smoothie, Ruida, Trocen, or TopWisdom controllers in MVP.
-- Not for raster image engraving in MVP.
-- Not for text in MVP (Phase D adds it).
-- Not for raster-to-vector tracing in MVP (Phase E adds it).
+Import a PNG/JPG and vectorize it with a live, worker-rendered preview:
 
-See [`PROJECT.md`](./PROJECT.md) for the full scope and phase plan.
-
-## Project documents
-
-Read in this order:
-
-| Document | What's in it |
+| Preset | What it's for |
 |---|---|
-| **[`PROJECT.md`](./PROJECT.md)** | Product scope, non-negotiables, phase plan A → G. The "what." |
-| **[`WORKFLOW.md`](./WORKFLOW.md)** | Every user flow with success / error / empty / edge states. The "what should happen." |
-| **[`DECISIONS.md`](./DECISIONS.md)** | Current ADR log with rationale, alternatives, and consequences. The "why." |
-| **[`CLAUDE.md`](./CLAUDE.md)** | Operating manual for Claude Code: file-size limits, naming, anti-patterns, checklists. The "how." |
-| **[`RESEARCH_LOG.md`](./RESEARCH_LOG.md)** | Every dependency and external claim with license, version, source, evaluator. The "where it came from." |
-| **[`AUDIT.md`](./AUDIT.md)** | Rolling professional audit. Re-run after each phase; archived snapshots in `AUDIT-YYYY-MM-DD-phase-*.md`. |
+| **Line Art** | Logos, signs, monochrome drawings — silhouette contours |
+| **Centerline** | Pen strokes and script traced as *one* path down the middle, not a doubled outline |
+| **Edge Detection** | Full-color art — a clean-room Canny edge detector turns every brightness transition into single-stroke vectors |
+| **Smooth** | Hand-drawn or noisy scans (auto median filter + heavier despeckle) |
+| **Sharp** | Pixel art, blueprints, technical drawings — corners stay corners |
 
-## Build status
+Plus direct control of cutoff/threshold, smoothness, optimize, and despeckle; **region enhance** to re-trace a small area supersampled and patch it back in; and the source image stays as an overlay so you can compare the trace against it. Trace fidelity is guarded by a perceptual test harness that diffs rendered output against ground-truth masks — not just "the code ran."
 
-Phases A-E shipped, plus the Phase F and Phase G work summarized in **Status** above. As of the 2026-07-03 local release gate, `pnpm release:check` passes with 3594 tests across 590 test files, a clean dependency audit, a clean license gate, a clean web build, a clean Electron main build, and a clean file-size backstop. See `AUDIT.md` for the current findings and verification inventory.
+### 📦 Box generator — parametric finger-jointed boxes
+
+Generate cut-ready flat-pack boxes from inner or outer dimensions and material thickness:
+
+- **Styles:** closed 6-panel, open-top, and slide-lid (slotted walls + thumb-notch lid).
+- **Dividers:** X/Y grids with egg-crate cross-laps and through-slot tabs.
+- **Panel cutouts** (windows, holes) carried onto their own layers.
+- **Fit compensation:** joint clearance for lasers, corner-overcut relief for CNC — baked into the generated geometry, single source of truth.
+- **Proven joinery:** every finger/slot pair is verified complementary by a property-tested "assembly referee" across a 1,100+ case seeded benchmark. No loose corners, no guessing.
+
+Panels drop into the scene as named, editable shapes, laid out on the sheet with spacing — preview, tweak layers, and cut.
+
+## Everything else
+
+**Design & import** — SVG import (sanitized), DXF import, STL import for CNC relief work, text with bundled fonts, rectangle/ellipse/polygon/pen drawing tools, alignment & distribution, undo/redo, `.lf2` project files, a built-in design library.
+
+**Layers & operations** — color-driven layers with **Line** (vector cut), **Fill** (hatch with angle, interval, cross-hatch, overscan, scanning-offset compensation), and **Image** (raster engrave with threshold / Floyd–Steinberg / grayscale dithering) modes; sub-layer operations (fill then line); per-layer power, speed, passes, kerf offset, and tabs/bridges.
+
+**Preview & estimates** — toolpath preview with travel moves, dithered raster burn simulation, a scrubbable job timeline, and planner-aware time estimates.
+
+**Machine control** — connect over Web Serial (browser) or serial (desktop): jog, home, frame the job's true footprint, pause/resume/stop with real-time GRBL commands, alarm decoding with guided recovery, a console, `$$` settings backup, and a guided device-setup wizard. Keep-awake holds the screen lock during long jobs.
+
+**Materials** — material libraries (`.lfml.json`) with a recipe wizard, auto-save, and generated **Material Test** (power × speed grid) and **Interval Test** patterns to dial in new materials.
+
+**Camera mode** — optional overhead-camera workspace overlay: manual 4-point homography alignment plus fisheye lens calibration (guided checkerboard, in-browser Levenberg–Marquardt fit, WebGL undistort). Handy — but not required, thanks to the registration jig.
+
+**CNC router mode** — a gated second product track: profile/pocket/engrave toolpaths, V-carving, depth passes, tool library, STL relief roughing/finishing with a 3D preview, tiling with registration holes, Z/XYZ corner probing, and feed/spindle overrides.
+
+**Controllers** — GRBL v1.1 and grblHAL are verified on real hardware; Marlin, Smoothieware, and FluidNC are supported and simulator-verified; Ruida has experimental file-only `.rd` export. Device profiles ship for common diode machines, and `.lbdev` device backups import directly.
+
+## Getting started
+
+**Just using it?** Open <https://kerfdesk.com>, plug in your laser, click *Connect*. Install it from the browser menu for offline use. A Windows installer is also built from this repo (`pnpm build:desktop`).
+
+**Hacking on it?**
 
 ```bash
 pnpm install
-pnpm test               # Vitest unit + property + snapshot
-pnpm lint               # ESLint with boundary, react-hooks, file-size rules
-pnpm lint:fix           # autofix lint
-pnpm typecheck          # tsc --noEmit
-pnpm format             # prettier --write .
-pnpm format:check       # prettier --check . (CI gate)
-pnpm license-check      # license allow-list audit (CI gate)
-pnpm dev:web            # Vite dev server, browser build
-pnpm dev:desktop        # Vite + Electron, desktop build
-pnpm build:web          # Static bundle to dist/web (no sourcemaps in prod)
-pnpm build:desktop      # Signed .exe to dist/desktop
-pnpm deploy:web         # Manual deploy of dist/web to Cloudflare Pages (production)
-pnpm deploy:web:preview # Same, but to a per-deploy preview URL
+pnpm dev:web       # Vite dev server (browser)
+pnpm dev:desktop   # Vite + Electron (desktop)
+
+pnpm test          # Vitest: unit + property + snapshot (~3,600 tests)
+pnpm lint          # ESLint incl. module-boundary and file-size rules
+pnpm typecheck     # tsc --noEmit (strict)
+pnpm build:web     # static bundle to dist/web
 ```
 
-### Cloudflare Pages — auto-deploy on push
+Stack: TypeScript (strict), React 18, Zustand, Canvas2D, Vite, Vitest + fast-check, Electron for the desktop shell. The geometry/G-code core (`src/core/`) is pure functions — no DOM, no I/O, no clock — which is what makes the output deterministic and property-testable.
 
-The `.github/workflows/deploy.yml` workflow publishes the bundle to the
-Cloudflare Pages project that serves `https://kerfdesk.com` and
-`https://www.kerfdesk.com` after every successful CI run on `main`. It needs two
-repository secrets to authenticate:
+## Project documentation
 
-1. **`CLOUDFLARE_API_TOKEN`** — create at
-   <https://dash.cloudflare.com/profile/api-tokens> using the
-   **Cloudflare Pages — Edit** template. Scope to the Pages project.
-2. **`CLOUDFLARE_ACCOUNT_ID`** — visible in the URL when you're inside
-   any Cloudflare dashboard page (the long hex string after
-   `dash.cloudflare.com/`).
+| Document | What's in it |
+|---|---|
+| [`PROJECT.md`](./PROJECT.md) | Product scope, non-negotiables, phase plan |
+| [`WORKFLOW.md`](./WORKFLOW.md) | Every user flow with success / error / empty / edge states |
+| [`DECISIONS.md`](./DECISIONS.md) | The full ADR log — every architectural choice and why |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | How changes land: ADR process, tests, Conventional Commits |
+| [`RESEARCH_LOG.md`](./RESEARCH_LOG.md) | Every dependency and external claim, with license and provenance |
+| [`docs/safety.md`](./docs/safety.md) | Machine safety guide — please read it |
 
-Add both at **Settings → Secrets and variables → Actions → New
-repository secret**. Until both are set the workflow will fail at the
-"Publish to Cloudflare Pages" step (CI itself stays green).
+## Safety
 
-**Current repo evidence (2026-07-03):** the deploy workflow is configured and
-the local release gate passes, but this checkout cannot prove that GitHub has
-the two Cloudflare secrets configured. The first push or manual dispatch should
-verify Cloudflare authentication in Actions before treating push-to-deploy as
-operational. The manual deploy scripts run `pnpm release:check` before Wrangler
-publishes. The Cloudflare Pages API project name used by Wrangler is still
-`laserforge`, but its canonical production release URL is `https://kerfdesk.com`;
-`https://laserforge-2fj.pages.dev` is the Pages fallback hostname. The older
-`https://laserforge.pages.dev` address belongs to a stale Pages URL and must not
-be used for release verification.
+KerfDesk drives machines that can cause fire and serious injury. Preview or air-run every job, never leave a running machine unattended, and read [`docs/safety.md`](./docs/safety.md). The software is provided as-is, without warranty of any kind.
 
 ## License
 
-**Proprietary — All Rights Reserved** ([`LICENSE`](./LICENSE)). No permission is granted to use, copy, modify, or redistribute this source code. Viewing it does not grant any rights to use it.
-
-Runtime dependencies remain governed by their own open-source licenses (MIT, BSD-2/3, Apache-2.0, MPL-2.0, ISC, Unlicense, 0BSD); GPL-family dependencies are rejected at PR time. See [ADR-018](./DECISIONS.md#adr-018--proprietary-license-private-repo-supersedes-adr-008) (current posture) and [ADR-017](./DECISIONS.md#adr-017--third-party-library-evaluation-policy-dompurify-pinned-for-phase-a) (dep policy). ADR-008 (the prior MIT/public posture) is superseded.
-
-## Contributing
-
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-
-Architectural changes are gated by the ADR process — see [`DECISIONS.md`](./DECISIONS.md) for the format. Scope changes require a [`PROJECT.md`](./PROJECT.md) revision. The four operating-manual principles from [`CLAUDE.md`](./CLAUDE.md) (think before coding, simplicity first, surgical changes, goal-driven) gate every PR.
+**MIT** — see [`LICENSE`](./LICENSE). Bundled third-party libraries and fonts remain under their own permissive licenses; the required notices ship with the app and are listed in [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md). Dependency licensing is gated in CI (`pnpm license-check`): MIT-compatible only.
 
 ## Acknowledgements
 
-- **CNCjs** — for being the canonical open-source GRBL implementation. Used as a Phase B protocol reference, not as a dependency.
-- **GRBL active forks** — grblHAL, FluidNC, µCNC keep the 1.1h wire protocol alive after `gnea/grbl` was archived (Aug 2019).
-- **DOMPurify** (MPL-2.0 / Apache-2.0), **opentype.js** (MIT), **imagetracerjs** (Unlicense) — the MIT-compatible libraries that let KerfDesk stand on proven security and parsing work rather than reinventing it.
+- **CNCjs** — the canonical open-source GRBL streaming reference.
+- **grblHAL, FluidNC, µCNC** — for keeping the GRBL 1.1 wire protocol alive and evolving.
+- **React, Zustand, three.js, DOMPurify, opentype.js, imagetracerjs, clipper2-ts, Lucide** — the open-source libraries KerfDesk stands on. Full notices in [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).

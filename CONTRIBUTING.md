@@ -1,6 +1,6 @@
-# Contributing to LaserForge 2.0
+# Contributing to KerfDesk (LaserForge 2.0)
 
-LaserForge 2.0 is shipped through Phase K (laser MVP plus text/trace/raster, drawing tools, CNC/router, multi-controller, camera, and box generator) and under active development. CI gates (`.github/workflows/ci.yml`) are live: typecheck, lint, prettier, license-check, vitest, build, file-size discipline. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
+KerfDesk is MIT-licensed (ADR-118); by submitting a contribution you agree it is licensed under the project's MIT license. The project is shipped through Phase K (laser MVP plus text/trace/raster, drawing tools, CNC/router, multi-controller, camera, and box generator) and under active development. CI gates (`.github/workflows/ci.yml`) are live: typecheck, lint, prettier, license-check, vitest, build, file-size discipline. Deploys auto-fire to Cloudflare Pages on green CI (`.github/workflows/deploy.yml`).
 
 ## Before you open a PR
 
