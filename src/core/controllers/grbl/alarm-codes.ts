@@ -81,15 +81,16 @@ export const ALARM_CODES: ReadonlyArray<AlarmDescription> = [
     positionLost: true,
     action: 'Check that the limit switch wiring is correct.',
   },
+  // 10–13 are grblHAL extensions (grblHAL core alarms.h); vanilla GRBL v1.1
+  // stops at 9 and never emits them. Unknown higher codes degrade to
+  // "Alarm N: unknown".
   {
     code: 10,
-    title: 'E-stop asserted',
+    title: 'E-stop asserted (grblHAL)',
     detail: 'The hardware E-stop is active.',
     positionLost: true,
     action: 'Release the E-stop, soft-reset, then $X to unlock.',
   },
-  // 11–13 are grblHAL extensions (grblHAL core alarms.h); vanilla GRBL v1.1
-  // never emits them. Unknown higher codes degrade to "Alarm N: unknown".
   {
     code: 11,
     title: 'Homing required (grblHAL)',

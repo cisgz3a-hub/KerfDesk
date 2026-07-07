@@ -3,7 +3,7 @@
 // `$X` unlock, or `$SLP` sleep. Halt recovery is `M999`.
 
 import type { FrameBounds } from '../controller-driver';
-import type { JogParams } from '../grbl/commands';
+import { assertJogHasAxis, type JogParams } from '../grbl/commands';
 
 /** Home all configured axes (Smoothie's homing cycle). */
 export const SMOOTHIE_CMD_HOME = 'G28.2';
@@ -25,6 +25,7 @@ const fmtFeed = (feed: number): number => Math.max(1, Math.round(feed));
  *  leads every jog so a G20 left behind by a console command or an imported
  *  job cannot scale the move 25.4× (audit F10). */
 export function buildSmoothieJogCommand(params: JogParams): string {
+  assertJogHasAxis(params);
   const axes: string[] = [];
   if (typeof params.dx === 'number' && params.dx !== 0) axes.push(`X${fmt(params.dx)}`);
   if (typeof params.dy === 'number' && params.dy !== 0) axes.push(`Y${fmt(params.dy)}`);

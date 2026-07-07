@@ -2,7 +2,7 @@
 // firmware: everything is a queued G-code/M-code line acked with `ok`.
 
 import type { FrameBounds } from '../controller-driver';
-import type { JogParams } from '../grbl/commands';
+import { assertJogHasAxis, type JogParams } from '../grbl/commands';
 
 /** Home X/Y only — plain G28 also homes Z, which on a laser conversion
  *  without a Z endstop would crash the head into the bed. */
@@ -33,6 +33,7 @@ const fmtFeed = (feed: number): number => Math.max(1, Math.round(feed));
  *  command or an imported job would otherwise scale the move 25.4× (audit
  *  F10) — the GRBL builder asserts units inside `$J=` the same way. */
 export function buildMarlinJogCommand(params: JogParams): string {
+  assertJogHasAxis(params);
   const axes: string[] = [];
   if (typeof params.dx === 'number' && params.dx !== 0) axes.push(`X${fmt(params.dx)}`);
   if (typeof params.dy === 'number' && params.dy !== 0) axes.push(`Y${fmt(params.dy)}`);
