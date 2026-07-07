@@ -7,7 +7,7 @@
 // registration holes drilled in the overlap strip at IDENTICAL stock
 // positions, so dowel pins re-index the stock physically.
 
-import type { CncGroup, CncPass, Job } from '../job';
+import { cncPassXyPoints, type CncGroup, type CncPass, type Job } from '../job';
 import type { CncTiling, Vec2 } from '../scene';
 
 export const REGISTRATION_HOLE_DEPTH_MM = 3;
@@ -105,7 +105,7 @@ function cncJobBounds(job: Job): CncTile['rect'] | null {
   for (const group of job.groups) {
     if (group.kind !== 'cnc') continue;
     for (const pass of group.passes) {
-      const points = pass.kind === 'contour' ? pass.polyline : pass.points;
+      const points = cncPassXyPoints(pass);
       for (const point of points) {
         if (point.x < minX) minX = point.x;
         if (point.y < minY) minY = point.y;
@@ -131,9 +131,19 @@ function clipGroupToTile(group: CncGroup, tile: CncTile): CncGroup | null {
           polyline: piece.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-    } else {
+    } else if (pass.kind === 'path3d') {
       for (const piece of clipPointsToRect([...pass.points], tile.rect, pass.closed)) {
         passes.push({ kind: 'path3d', closed: false, points: piece });
+      }
+    } else {
+      const xyz = cncPassXyPoints(pass).map((point) => ({ x: point.x, y: point.y, z: pass.zMm }));
+      for (const piece of clipPointsToRect(xyz, tile.rect, pass.closed)) {
+        passes.push({
+          kind: 'contour',
+          zMm: pass.zMm,
+          closed: false,
+          polyline: piece.map((point) => ({ x: point.x, y: point.y })),
+        });
       }
     }
   }
@@ -228,6 +238,14 @@ function translatePass(pass: CncPass, tile: CncTile): CncPass {
         x: point.x - tile.rect.minX,
         y: point.y - tile.rect.minY,
       })),
+    };
+  }
+  if (pass.kind === 'arc') {
+    return {
+      ...pass,
+      start: { x: pass.start.x - tile.rect.minX, y: pass.start.y - tile.rect.minY },
+      end: { x: pass.end.x - tile.rect.minX, y: pass.end.y - tile.rect.minY },
+      center: { x: pass.center.x - tile.rect.minX, y: pass.center.y - tile.rect.minY },
     };
   }
   return {

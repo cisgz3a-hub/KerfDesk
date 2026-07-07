@@ -21,7 +21,12 @@
 // down to the next level.
 
 import type { DeviceProfile } from '../devices';
-import type { CncContourPass, CncGroup, CncPass, CncPath3dPass, Job } from '../job';
+import {
+  circularArcGeometry,
+  isCircularArcFullCircle,
+  sampleCircularArcPoints,
+} from '../geometry/circular-arc';
+import type { CncArcPass, CncContourPass, CncGroup, CncPass, CncPath3dPass, Job } from '../job';
 import { assertNever } from '../scene';
 import type { OutputStrategy } from './output-strategy';
 
@@ -187,6 +192,9 @@ function appendPass(
     case 'path3d':
       appendPath3dPass(lines, head, pass, safeZMm, feed, plunge);
       break;
+    case 'arc':
+      appendArcPass(lines, head, pass, safeZMm, feed, plunge);
+      break;
     default:
       assertNever(pass, 'CncPass');
   }
@@ -220,7 +228,60 @@ function appendContourPass(
   appendCutMoves(lines, head, pass, feed);
 }
 
-// path3d: same retract → rapid → plunge discipline as a contour pass, then
+// arc: same retract/rapid/plunge discipline as a contour pass, then a native
+// G2/G3 move when the radius is valid. Invalid arcs fall back to sampled G1
+// motion so output stays controller-safe.
+function appendArcPass(
+  lines: string[],
+  head: Head,
+  pass: CncArcPass,
+  safeZMm: number,
+  feed: number,
+  plunge: number,
+): void {
+  if (!Number.isFinite(pass.zMm)) return;
+  const polyline = sampleCircularArcPoints(pass);
+  const first = polyline[0];
+  if (first === undefined || polyline.length < 2) return;
+  const startX = fmt(first.x);
+  const startY = fmt(first.y);
+  const passZ = fmt(pass.zMm);
+
+  const alreadyAtStartXy = head.x === startX && head.y === startY;
+  if (!alreadyAtStartXy) {
+    appendRetract(lines, head, safeZMm);
+    lines.push(`G0 X${startX} Y${startY}`);
+    head.x = startX;
+    head.y = startY;
+  }
+  if (head.z !== passZ) {
+    lines.push(`G1 Z${passZ} F${plunge}`);
+    head.z = passZ;
+  }
+
+  const geometry = circularArcGeometry(pass);
+  const endX = fmt(pass.end.x);
+  const endY = fmt(pass.end.y);
+  const formattedEndEqualsStart = endX === startX && endY === startY;
+  if (geometry.kind === 'ok' && (!formattedEndEqualsStart || isCircularArcFullCircle(pass))) {
+    const direction = pass.clockwise ? 'G2' : 'G3';
+    const i = fmt(pass.center.x - pass.start.x);
+    const j = fmt(pass.center.y - pass.start.y);
+    lines.push(`${direction} X${endX} Y${endY} I${i} J${j} F${feed}`);
+    head.x = endX;
+    head.y = endY;
+    return;
+  }
+
+  appendCutMoves(
+    lines,
+    head,
+    { kind: 'contour', zMm: pass.zMm, polyline, closed: pass.closed },
+    feed,
+  );
+}
+
+// path3d: same retract/rapid/plunge discipline as a contour pass, then
 // per-vertex XYZ feed moves. Plunge targets the FIRST vertex's Z; every
 // in-cut Z change after that rides a G1 at the cutting feed (never a rapid),
 // so findPlungedTravelIssues holds by construction.

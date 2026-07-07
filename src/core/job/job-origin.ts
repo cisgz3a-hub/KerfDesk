@@ -194,6 +194,13 @@ function translateCncPass(pass: CncPass, dx: number, dy: number): CncPass {
         ...pass,
         points: pass.points.map((point) => ({ x: point.x + dx, y: point.y + dy, z: point.z })),
       };
+    case 'arc':
+      return {
+        ...pass,
+        start: { x: pass.start.x + dx, y: pass.start.y + dy },
+        end: { x: pass.end.x + dx, y: pass.end.y + dy },
+        center: { x: pass.center.x + dx, y: pass.center.y + dy },
+      };
     default:
       return assertNever(pass, 'CncPass');
   }

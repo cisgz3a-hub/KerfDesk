@@ -1,4 +1,5 @@
 export type {
+  CncArcPass,
   CncContourPass,
   CncGroup,
   CncPass,

@@ -5,6 +5,7 @@
 // the retract+travel pair. The emitter-agreement property test in
 // toolpath-cnc.test.ts locks the two together.
 
+import { circularArcLengthMm, sampleCircularArcPoints } from '../geometry/circular-arc';
 import { assertNever, type Vec2 } from '../scene';
 import { cncPassEntryDepthMm, cncPassXyPoints, type CncGroup, type CncPass } from './job';
 import { dist, polylineLength } from './toolpath-math';
@@ -132,6 +133,16 @@ function cutStepForPass(
         groupId: group.layerId,
         passIndex,
       };
+    case 'arc':
+      return {
+        kind: 'cut',
+        color: group.color,
+        polyline: sampleCircularArcPoints(pass),
+        length: circularArcLengthMm(pass),
+        z: { from: pass.zMm, to: pass.zMm },
+        groupId: group.layerId,
+        passIndex,
+      };
     default:
       return assertNever(pass, 'CncPass');
   }
@@ -143,6 +154,8 @@ function passExitZMm(pass: CncPass): number {
       return pass.zMm;
     case 'path3d':
       return pass.points[pass.points.length - 1]?.z ?? 0;
+    case 'arc':
+      return pass.zMm;
     default:
       return assertNever(pass, 'CncPass');
   }

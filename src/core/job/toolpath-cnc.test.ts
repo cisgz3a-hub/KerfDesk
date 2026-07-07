@@ -94,6 +94,27 @@ describe('appendCncGroupSteps (via buildToolpath)', () => {
     expect(cut.length).toBeCloseTo(Math.sqrt(29), 9);
     expect(cut.z).toEqual({ from: -0.5, to: -2.5 });
   });
+
+  it('renders arc passes as sampled cuts with true arc length', () => {
+    const arc: CncPass = {
+      kind: 'arc',
+      start: { x: 10, y: 0 },
+      end: { x: 0, y: 10 },
+      center: { x: 0, y: 0 },
+      clockwise: false,
+      zMm: -1.25,
+      closed: false,
+    };
+    const toolpath = buildToolpath({ groups: [group([arc])] });
+    const cut = toolpath.steps.find((s) => s.kind === 'cut');
+    if (cut?.kind !== 'cut') throw new Error('expected cut');
+
+    expect(cut.polyline.length).toBeGreaterThan(2);
+    expect(cut.polyline[0]).toEqual(arc.start);
+    expect(cut.polyline[cut.polyline.length - 1]).toEqual(arc.end);
+    expect(cut.length).toBeCloseTo((Math.PI * 10) / 2, 9);
+    expect(cut.z).toEqual({ from: -1.25, to: -1.25 });
+  });
 });
 
 // ── Emitter agreement property ──────────────────────────────────────────────
