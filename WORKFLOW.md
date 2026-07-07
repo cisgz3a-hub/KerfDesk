@@ -2485,3 +2485,21 @@ F-CNC19 tiling.
 - **Edge / untrusted page.** A drive-by web page cannot use the bridge: it
   refuses untrusted browser Origins before doing any work and only proxies
   private-network camera URLs (never the public internet, never itself).
+
+### F-CAM7. Click-to-position the laser head (Move laser here)
+
+- **Success / head under the click.** The operator picks the crosshair "Move
+  laser here" tool and clicks a point on the workspace — typically an object
+  visible in the aligned camera overlay. The click is clamped inside the bed,
+  mapped through the SAME origin transform G-code emission uses (origin
+  honesty), and sent as one absolute, beam-off jog through the fully-gated
+  jog path (cancellable like any jog). Esc returns to the Select tool.
+- **Error / machine not ready.** Disconnected, running, alarmed, or mid-
+  motion machines refuse with the same block reason the JogPad shows, as a
+  toast; nothing is sent.
+- **Empty / nothing to align to.** The tool works without a camera — it is
+  simply "go to this bed point"; the camera overlay just makes the target
+  meaningful.
+- **Edge / click outside the bed.** Clicks beyond the bed edge clamp to the
+  nearest edge point (bounds check) — the head never leaves the work area,
+  and X0/Y0 destinations are emitted explicitly (the zero-axis jog fix).
