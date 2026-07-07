@@ -36,7 +36,11 @@ export const marlinDriver: ControllerDriver = {
     settings: 'none',
     unlock: false,
     sleep: false,
-    wcs: 'none',
+    // Marlin supports G92 like Smoothie (audit F9): user-origin workflows
+    // work, matching LightBurn's Marlin behavior. G92.1 (clear) requires a
+    // build without NO_WORKSPACE_OFFSETS — community-verification pending
+    // like the rest of this driver (ADR-095).
+    wcs: 'g92-only',
     homing: true,
     console: true,
     firmwareSetupPanel: 'none',
@@ -58,8 +62,8 @@ export const marlinDriver: ControllerDriver = {
     queuedStatusQuery: MARLIN_CMD_POSITION,
     stopLaserLines: MARLIN_STOP_LASER_LINES,
     settleDwell: MARLIN_CMD_SETTLE,
-    setOriginHere: null,
-    clearOrigin: null,
+    setOriginHere: 'G92 X0 Y0',
+    clearOrigin: 'G92.1',
     setPersistentOriginHere: null,
     clearPersistentOrigin: null,
     buildJog: buildMarlinJogCommand,

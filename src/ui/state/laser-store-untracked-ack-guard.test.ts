@@ -248,9 +248,10 @@ describe('stop-path ack attribution', () => {
     expect(useLaserStore.getState().streamer?.completed).toBe(0);
   });
 
-  // Audit F3: Marlin/Smoothie jog is a three-line payload (G91, G0, G90)
-  // written in one call — the firmware acks each line, so the ledger must
-  // count three, or two orphan oks drift into the next job's accounting.
+  // Audit F3: the Marlin/Smoothie jog is a multi-line payload (G21, G91,
+  // G0, G90) written in one call — the firmware acks each line, so the
+  // ledger must count every one, or orphan oks drift into the next job's
+  // accounting.
   it('a multi-line jog payload owes one ack per line (Marlin)', async () => {
     const connection = makeConnection(async () => undefined);
     await connectMarlinWith(connection);
@@ -259,8 +260,9 @@ describe('stop-path ack attribution', () => {
     expect(useLaserStore.getState().statusReport?.state).toBe('Idle');
 
     await useLaserStore.getState().jog({ dx: 5, feed: 600 });
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(3);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(4);
 
+    connection.emitLine('ok'); // G21
     connection.emitLine('ok'); // G91
     connection.emitLine('ok'); // G0
     connection.emitLine('ok'); // G90

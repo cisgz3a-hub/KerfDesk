@@ -94,10 +94,10 @@ describe('Smoothieware lifecycle against the simulator', () => {
     expect(useLaserStore.getState().statusReport?.mPos).toEqual({ x: 0, y: 0, z: 0 });
   });
 
-  it('jogs via G91/G0/G90 and observes Run→Idle through status reports', async () => {
+  it('jogs via G21/G91/G0/G90 and observes Run→Idle through status reports', async () => {
     const sim = await connectSmoothieIdle({ motionMs: 300 });
     await useLaserStore.getState().jog({ dx: 7, feed: 900 });
-    expect(sim.outbound().at(-1)).toBe('G91\nG0 X7.000 F900\nG90\n');
+    expect(sim.outbound().at(-1)).toBe('G21\nG91\nG0 X7.000 F900\nG90\n');
     await pump(900);
     expect(useLaserStore.getState().motionOperation).toBeNull();
     expect(sim.state().pos.x).toBe(7);
