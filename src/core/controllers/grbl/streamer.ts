@@ -1,7 +1,6 @@
 import {
   DEFAULT_GRBL_RX_BUFFER_BYTES,
   normalizeGrblRxBufferBytes,
-  type GrblPollDuringJob,
   type GrblStreamingMode,
 } from '../../grbl-streaming';
 
@@ -49,7 +48,6 @@ export type StreamerStatus =
 export type StreamerState = {
   readonly status: StreamerStatus;
   readonly streamingMode: StreamingMode;
-  readonly pollDuringJob: PollDuringJob;
   // Lines remaining to send, each already terminated with '\n'.
   readonly queued: ReadonlyArray<string>;
   // Lines sent but not yet ack'd, head-first.
@@ -64,11 +62,9 @@ export type StreamerState = {
 };
 
 export type StreamingMode = GrblStreamingMode;
-export type PollDuringJob = GrblPollDuringJob;
 export type CreateStreamerOptions = {
   readonly rxBufferBytes?: number;
   readonly streamingMode?: StreamingMode;
-  readonly pollDuringJob?: PollDuringJob;
 };
 
 export type AckKind = 'ok' | 'error' | 'alarm';
@@ -92,7 +88,6 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
   return {
     status: lines.length === 0 ? 'done' : 'idle',
     streamingMode: opts.streamingMode ?? 'char-counted',
-    pollDuringJob: opts.pollDuringJob ?? '4hz',
     queued: lines,
     inFlight: [],
     inFlightBytes: 0,
