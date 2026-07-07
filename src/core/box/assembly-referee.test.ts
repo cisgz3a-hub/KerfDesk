@@ -85,10 +85,10 @@ describe('assembly referee — every fuzzed nominal box assembles exactly', () =
         const spec: BoxSpec = { ...base, clearanceMm: c };
         fc.pre(validateBoxSpec(spec).kind === 'valid');
         const panels = buildPanelClaims(spec).map((claims): RefereePanel => {
-          const fit = applyPanelFit(panelOutline(claims), {
-            clearanceMm: c,
-            relief: { kind: 'none' },
-          });
+          const fit = applyPanelFit(
+            { outline: panelOutline(claims), cutouts: [] },
+            { clearanceMm: c, relief: { kind: 'none' } },
+          );
           if (fit.kind !== 'fitted') throw new Error(fit.detail);
           return { panel: claims.panel, outline: fit.outline };
         });

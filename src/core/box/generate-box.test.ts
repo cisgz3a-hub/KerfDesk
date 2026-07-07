@@ -67,10 +67,10 @@ describe('generateBox', () => {
     for (const spec of [CANONICAL, { ...CANONICAL, style: 'open-top' as const }]) {
       const panels = generated(spec);
       const locals = buildPanelClaims(spec).map((claims) => {
-        const fit = applyPanelFit(panelOutline(claims), {
-          clearanceMm: spec.clearanceMm,
-          relief: spec.relief,
-        });
+        const fit = applyPanelFit(
+          { outline: panelOutline(claims), cutouts: [] },
+          { clearanceMm: spec.clearanceMm, relief: spec.relief },
+        );
         if (fit.kind !== 'fitted') throw new Error(fit.detail);
         return { panel: claims.panel, outline: fit.outline };
       });

@@ -2247,13 +2247,14 @@ F-CNC19 tiling.
 2. A live preview pane shows the panel sheet re-laid-out on every valid
    edit; an invalid draft keeps the last valid preview and disables
    **Generate**.
-3. **Generate** inserts one polyline object per panel (6 closed / 5 open
-   top) in the fixed order Bottom/Top/Front/Back/Left/Right (names shown
-   in the dialog preview; scene objects carry no name field), laid out in
-   a flat grid with the requested spacing, all on one auto-created layer
-   color, all selected, as ONE undo step. A toast reports "N panels
-   inserted". The dialog closes; the user assigns cut settings on that
-   layer as usual.
+3. **Generate** inserts one vector object per panel (6 closed / 5 open
+   top) in the fixed order Bottom/Top/Front/Back/Left/Right, each named
+   via its source field ("Box panel: Front", ADR-116) and carrying its
+   outline plus any interior cutout rings (holes under even-odd fill),
+   laid out in a flat grid with the requested spacing, all on one
+   auto-created layer color, all selected, as ONE undo step. A toast
+   reports "N panels inserted". The dialog closes; the user assigns cut
+   settings on that layer as usual.
 4. Laser fit contract: with the layer's kerf compensation set (Line
    mode cut settings, ADR-052), mating edges assemble line-to-line
    (press fit) at clearance 0; positive clearance loosens the joint by
