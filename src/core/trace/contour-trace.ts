@@ -1,9 +1,12 @@
 // Contour (filled-outline) trace backend built on the in-house centerline
-// machinery — an original-code candidate replacement for the potrace-* lane
-// (ADR-120 release blocker): binarize via the shared preprocessing, walk the
-// ink boundary on the corner lattice (contour-boundary.ts), then finish each
+// machinery — the adopted backend for every binary filled preset (Line Art,
+// Smooth, Sharp) and, via its shared finisher, Edge Detection. It replaced
+// the GPL-provenance potrace-derived backend (ADR-122, closing the ADR-120
+// MIT-release blocker): binarize via the shared preprocessing, walk the ink
+// boundary on the corner lattice (contour-boundary.ts), then finish each
 // closed loop with the SAME proven stage sequence the centerline tracer uses
-// (corner rebuild → curvature evening → simplify → bounded spline resample).
+// (corner rebuild → curvature evening → arc/line evening → simplify →
+// bounded spline resample).
 
 import type { ColoredPath, Polyline } from '../scene';
 import {
@@ -23,6 +26,18 @@ import { smoothArcNoise } from './smooth-arc-noise';
 import { preprocessForTrace, type RawImageData, type TraceOptions } from './trace-image';
 
 const CONTOUR_COLOR = '#000000';
+
+/** True for the binary filled-contour presets (Line Art, Smooth, Sharp):
+ *  non-centerline, 2-colour, fixed 2-entry palette. These route to this
+ *  in-house contour backend; everything else falls through to the
+ *  centerline/edge tracers or the imagetracerjs multi-colour path. This is
+ *  the permanent dispatch predicate that replaced the temporary potrace A/B
+ *  gate (ADR-122). */
+export function isBinaryContourPreset(options: TraceOptions): boolean {
+  if (options.traceMode === 'centerline' || options.traceMode === 'edge') return false;
+  if (options.numberOfColors !== 2) return false;
+  return options.fixedPalette?.length === 2;
+}
 // Same base simplification epsilon as the centerline finisher; the
 // TraceOptions lineTolerance contract scales it (higher = fewer vertices).
 const SIMPLIFY_EPSILON_PX = 0.45;

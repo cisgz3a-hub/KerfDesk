@@ -8,7 +8,6 @@ import {
   traceImageToSvgString,
 } from './trace-image';
 import { TRACE_PRESETS } from './trace-presets';
-import { lightBurnTraceSettingsToPotraceParams } from './potrace-params';
 
 type Fixture = {
   readonly width: number;
@@ -336,12 +335,6 @@ describe('traceImageToSvgString', () => {
     expect(lineArt?.ignoreLessThanPixels).toBe(2);
     expect(lineArt?.smoothness).toBe(1);
     expect(lineArt?.optimize).toBe(0.2);
-    expect(lightBurnTraceSettingsToPotraceParams(lineArt)).toMatchObject({
-      turdSize: 2,
-      alphaMax: 1,
-      optCurve: true,
-      optTolerance: 0.2,
-    });
     expect(lineArt?.useOtsuThreshold).toBeUndefined();
   });
 
