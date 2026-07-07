@@ -95,12 +95,8 @@ const header = [
   '',
   'This application bundles the open-source components listed below. Each',
   'remains under its own license, reproduced here as those licenses require.',
-  "The application's own source code is proprietary (see LICENSE) and is not",
-  'covered by any license in this file.',
-  '',
-  'Camera profile and alignment model concepts were adapted from the',
-  "MIT-licensed Rayforge project's camera workflow (see THIRD_PARTY_NOTICES.md",
-  'in the source repository for details).',
+  "The application's own source code is MIT-licensed (see LICENSE); this file",
+  'covers the bundled third-party components.',
 ].join('\n');
 
 const standardTexts = Object.entries(LICENSE_TEXTS)
