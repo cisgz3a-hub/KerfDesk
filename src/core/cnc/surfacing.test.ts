@@ -44,6 +44,14 @@ describe('surfacingRowYs', () => {
       reason: 'Surfacing step must be a positive finite number.',
     });
   });
+
+  it('rejects a pathological finite height instead of exhausting memory', () => {
+    // 1e12 mm at the 0.05 mm minimum step is 2e13 rows — must error, not build.
+    expect(surfacingRowYs(1e12, 0.05)).toEqual({
+      ok: false,
+      reason: 'Surfacing row count exceeds the 100000 limit.',
+    });
+  });
 });
 
 describe('buildSurfacingProgram', () => {
@@ -92,6 +100,13 @@ describe('buildSurfacingProgram', () => {
     expect(expectSurfacingProgram(buildSurfacingProgram(PARAMS)).lines.join('\n')).toBe(
       expectSurfacingProgram(buildSurfacingProgram(PARAMS)).lines.join('\n'),
     );
+  });
+
+  it('rejects a pathological finite total depth instead of exhausting memory', () => {
+    expect(buildSurfacingProgram({ ...PARAMS, depthPerPassMm: 0.05, totalDepthMm: 1e12 })).toEqual({
+      ok: false,
+      reason: 'Surfacing depth pass count exceeds the 100000 limit.',
+    });
   });
 
   it('rejects non-finite dimensions before formatting G-code', () => {

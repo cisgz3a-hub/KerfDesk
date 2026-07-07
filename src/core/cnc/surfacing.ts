@@ -41,6 +41,11 @@ export const SURFACING_DEFAULT_TOTAL_DEPTH_MM = 0.5;
 const MIN_STEPOVER_PCT = 10;
 const MAX_STEPOVER_PCT = 100;
 const MIN_STEP_MM = 0.05;
+// Hard ceiling on serpentine rows / depth passes so a pathological but finite
+// height or total depth (e.g. 1e12 mm) cannot exhaust memory building the
+// arrays. 100k rows is ~a 5 m area at the 0.05 mm minimum step — far beyond
+// any real bed — so no valid job is affected. Checked before allocation.
+const MAX_SURFACING_ITERATIONS = 100_000;
 const POSITIVE_FINITE_REASON = 'must be a positive finite number.';
 const NON_NEGATIVE_FINITE_REASON = 'must be a non-negative finite number.';
 
@@ -56,6 +61,8 @@ export function surfacingRowYs(heightMm: number, stepMm: number): SurfacingRowsR
   if (heightReason !== null) return { ok: false, reason: heightReason };
   const stepReason = positiveFiniteReason('step', stepMm);
   if (stepReason !== null) return { ok: false, reason: stepReason };
+  const capReason = iterationCapReason('row', heightMm, stepMm);
+  if (capReason !== null) return { ok: false, reason: capReason };
 
   const rows: number[] = [];
   for (let y = 0; y < heightMm; y += stepMm) rows.push(y);
@@ -72,7 +79,9 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   const rowResult = surfacingRowYs(params.heightMm, stepMm);
   if (!rowResult.ok) return rowResult;
   const { rows } = rowResult;
-  const depths = depthLadder(params.depthPerPassMm, params.totalDepthMm);
+  const depthResult = depthLadder(params.depthPerPassMm, params.totalDepthMm);
+  if (!depthResult.ok) return depthResult;
+  const { depths } = depthResult;
   const lines: string[] = [
     '; KerfDesk spoilboard surfacing',
     `; area ${fmt(params.widthMm)} x ${fmt(params.heightMm)} mm, bit ${fmt(params.bitDiameterMm)} mm, stepover ${stepover}%`,
@@ -98,13 +107,25 @@ export function buildSurfacingProgram(params: SurfacingParams): SurfacingProgram
   return { ok: true, program: { lines, passes: depths.length, rowsPerPass: rows.length } };
 }
 
-function depthLadder(perPassMm: number, totalMm: number): ReadonlyArray<number> {
+type DepthLadderResult =
+  | { readonly ok: true; readonly depths: ReadonlyArray<number> }
+  | { readonly ok: false; readonly reason: string };
+
+function depthLadder(perPassMm: number, totalMm: number): DepthLadderResult {
   const step = Math.max(MIN_STEP_MM, perPassMm);
   const total = Math.max(MIN_STEP_MM, totalMm);
+  const capReason = iterationCapReason('depth pass', total, step);
+  if (capReason !== null) return { ok: false, reason: capReason };
   const depths: number[] = [];
   for (let depth = step; depth < total; depth += step) depths.push(depth);
   depths.push(total);
-  return depths;
+  return { ok: true, depths };
+}
+
+function iterationCapReason(label: string, spanMm: number, stepMm: number): string | null {
+  return spanMm / stepMm <= MAX_SURFACING_ITERATIONS
+    ? null
+    : `Surfacing ${label} count exceeds the ${MAX_SURFACING_ITERATIONS} limit.`;
 }
 
 function validateSurfacingParams(params: SurfacingParams): string | null {
