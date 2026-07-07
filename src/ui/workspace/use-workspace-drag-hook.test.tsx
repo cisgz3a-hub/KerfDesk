@@ -109,6 +109,30 @@ describe('useDragMove hook event pipeline', () => {
     expect(useStore.getState().pendingUndo).toBeNull();
     expect(useStore.getState().undoStack).toHaveLength(1);
   });
+
+  it('Esc cancels an in-progress move drag and rolls the object back (C4)', async () => {
+    const project = projectWithRectangle();
+    useStore.getState().setProject(project);
+    useStore.getState().selectObject('rect');
+    const { canvas } = await renderHarness();
+
+    await dispatchPointer(canvas, 'pointerdown', clientForScenePoint(project, { x: 50, y: 50 }));
+    await dispatchPointer(canvas, 'pointermove', clientForScenePoint(project, { x: 70, y: 80 }));
+    const midDrag = useStore.getState().project.scene.objects.find((o) => o.id === 'rect');
+    expect(midDrag?.transform.x).toBeCloseTo(40);
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+
+    expect(canvas.dataset.dragKind).toBe('');
+    const rolledBack = useStore.getState().project.scene.objects.find((o) => o.id === 'rect');
+    expect(rolledBack?.transform.x).toBeCloseTo(20);
+    expect(rolledBack?.transform.y).toBeCloseTo(20);
+    // Canceled — no undo entry, snapshot cleared.
+    expect(useStore.getState().pendingUndo).toBeNull();
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
 });
 
 function DragHarness(props: { readonly previewMode?: boolean }): JSX.Element {
