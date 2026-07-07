@@ -114,6 +114,44 @@ describe('MachineSetupDialog', () => {
     }
   });
 
+  it('keeps controller-tuned motion settings when applying a catalog profile after auto-detect', async () => {
+    useStore.getState().updateDeviceProfile({
+      maxFeed: 10000,
+      framingFeedMmPerMin: 10000,
+      accelMmPerSec2: 2500,
+      junctionDeviationMm: 0.01,
+      bedWidth: 400,
+      bedHeight: 400,
+    });
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      detectedControllerKind: 'grblhal',
+      controllerSettings: {
+        maxFeed: 10000,
+        accelMmPerSec2: 2500,
+        junctionDeviationMm: 0.01,
+        bedWidth: 400,
+        bedHeight: 400,
+      },
+      lastSettingsReadAt: 1718600000000,
+    } as Partial<ReturnType<typeof useLaserStore.getState>>);
+    const { host, unmount } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Profile Catalog').click());
+      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
+
+      expect(useStore.getState().project.device).toMatchObject({
+        profileId: 'creality-falcon-a1-pro-compatible',
+        controllerKind: 'grblhal',
+        maxFeed: 10000,
+        framingFeedMmPerMin: 10000,
+        accelMmPerSec2: 2500,
+      });
+    } finally {
+      await unmount();
+    }
+  });
+
   it('offers the guided setup cross-link on Overview only when a launcher is wired', async () => {
     const withoutLauncher = await renderDialog();
     try {
