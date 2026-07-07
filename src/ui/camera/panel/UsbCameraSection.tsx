@@ -47,7 +47,10 @@ export function UsbCameraSection(props: {
           ))}
         </select>
       ) : null}
-      {sourceState.kind === 'live' ? <CameraSourceView source={sourceState.source} /> : null}
+      {/* Machine sources already show in the machine-camera section above —
+          rendering them here too doubled the view AND the polling load on a
+          single-threaded camera (found during the hardware pass). */}
+      {usbLive ? <CameraSourceView source={sourceState.source} /> : null}
       <div style={rowStyle}>
         {usbLive ? (
           <button
