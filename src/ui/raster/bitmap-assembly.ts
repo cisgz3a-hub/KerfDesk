@@ -178,7 +178,8 @@ function buildRasterImage(
   };
 }
 
-function sourceLabel(o: ConvertibleVector): string {
+/** Display name for a convertible vector: filename, text content, or shape kind. */
+export function sourceLabel(o: ConvertibleVector): string {
   if ('source' in o) return o.source;
   if ('content' in o) return o.content;
   return `${o.spec.kind} shape`;

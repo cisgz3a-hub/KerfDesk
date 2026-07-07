@@ -25,12 +25,16 @@ import {
   ConvertToBitmapDialog,
   type ConvertToBitmapDialogOptions,
 } from '../raster/ConvertToBitmapDialog';
-import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
+import {
+  isConvertibleVector,
+  sourceLabel,
+  type ConvertibleVector,
+} from '../raster/vector-to-bitmap';
 import { usePlatform } from '../app/platform-context';
 import { Toolbar } from '../common/Toolbar';
 import { AppMenuBar } from './AppMenuBar';
 import { CloseOpenFillContoursDialog } from './CloseOpenFillContoursDialog';
-import { convertSelectedVectorToBitmap, sourceLabel } from './bitmap-conversion';
+import { convertSelectedVectorToBitmap } from './bitmap-conversion';
 import { importImageFile } from './import-image-action';
 import { runMultiFileTrace, writeTraceSvgFileWithPlatform } from './multi-file-trace-action';
 import { NumericEditsBar } from './NumericEditsBar';
