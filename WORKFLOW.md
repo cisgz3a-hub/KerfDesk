@@ -610,6 +610,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 3. App compiles the project to G-code via `emitGcode`, builds a streamer, and writes the first batch (as much as the RX window allows — default 120 bytes, per-profile `rxBufferBytes`).
 4. Every `ok` advances the streamer by one line and writes more.
 5. Progress bar reflects `completed / total` lines.
+6. While the job is active the app holds a screen wake lock so OS
+   display-sleep can't suspend the stream (ADR-117; re-acquired on tab
+   visibility changes, released when the job ends). If the platform
+   refuses the lock, one LaserLog line warns the operator to disable
+   system sleep before long burns — the job itself always proceeds.
 
 #### Error — preflight fails
 1. Modal lists the violations. No bytes sent.
@@ -2528,3 +2533,84 @@ F-CNC19 tiling.
   feed; without an alignment the overlay row (and the button) is absent.
 - **Edge / encoder failure.** A platform without 2D canvas support fails
   typed ('could not build the bed image') instead of half-completing.
+
+---
+
+## Desktop app (Windows installer) flows
+
+The desktop app is the same web build wrapped in Electron (ADR-003, ADR-024):
+the `dist/web` bundle runs in Electron's Chromium renderer, so every laser/CNC
+flow above behaves identically. These flows cover only what is *new* on the
+desktop target — getting it, updating it, and proving it works.
+
+### F-DESK1. Download and install (Windows 10/11, 64-bit)
+
+1. In the web app, the operator clicks **Download for Windows** (Toolbar) or
+   opens `https://kerfdesk.com/download`.
+2. The download page links the installer on the Cloudflare R2 feed
+   (`https://dl.kerfdesk.com/desktop/kerfdesk-latest-x64-setup.exe`).
+3. Running the installer (NSIS, per-user, `oneClick:false`) lets the operator
+   choose an install directory, then installs and creates a "LaserForge 2.0"
+   shortcut.
+4. First launch opens the app over the `app://` scheme at bed dimensions — the
+   same as the web app's F-A1.
+
+#### Error — unsigned-build SmartScreen warning (v1, expected)
+1. Until code signing lands (ADR-024 §5), Windows Defender SmartScreen shows
+   "Windows protected your PC" on first run.
+2. The `/download` page documents the bypass: **More info → Run anyway.**
+3. Once signed, the warning disappears with no app change.
+
+#### Empty — no desktop build on macOS / Linux
+1. The download page states the installer is Windows-only and links macOS/Linux
+   users to the web app (ADR-007).
+
+#### Edge — inside the desktop app the download/install affordances vanish
+1. When running under Electron (`adapter.id === 'electron'`), the Toolbar hides
+   both **Download for Windows** and the PWA **Install app** button — you don't
+   download or PWA-install the app from within itself.
+
+### F-DESK2. Auto-update (background, install-on-quit, burn-safe)
+
+1. On each packaged launch, the main process checks the R2 feed's `latest.yml`
+   (`electron/auto-update.ts` → `checkForUpdatesAndNotify`).
+2. A newer version downloads in the background; the OS shows a native "update
+   ready" notification. The current session is never interrupted.
+3. The update installs on the **next quit** (`autoInstallOnAppQuit`), and the
+   app relaunches on the new version.
+
+#### Error — offline or feed unreachable
+1. The check fails silently (logged via `onError`, never fatal). The app runs
+   normally on the installed version.
+
+#### Edge — a job is streaming
+1. Updates NEVER install mid-burn: the app never calls `quitAndInstall`, and a
+   quit can't happen during a running job without the operator stopping it
+   (`use-unload-stop.ts` soft-resets the machine on unload). Non-negotiable #9
+   holds.
+
+### F-DESK3. Release + manual verification checklist (load-bearing)
+
+Cutting a release is `git tag vX.Y.Z && git push --tags`, which runs
+`release-desktop.yml` (build → R2 publish). **Green CI does not prove the
+installer runs** (CLAUDE.md). Before a desktop release is called done, a human
+runs this on real Windows:
+
+- [ ] `pnpm build:desktop` locally (or download the CI artifact) produces
+      `release/<version>/LaserForge-2.0-<version>-x64-setup.exe`.
+- [ ] Installs cleanly on **Windows 10** and **Windows 11**; the shortcut
+      launches the app over `app://app/index.html`.
+- [ ] **Serial (hardware):** a GRBL laser/CNC plugged in appears in the
+      `select-serial-port` picker; connect → jog → frame → stream a small job.
+- [ ] **Files:** a `.lf2` round-trips via the File System Access pickers; G-code
+      export saves.
+- [ ] **Camera (optional):** a USB webcam previews (getUserMedia); an RTSP/IP
+      camera previews only if `ffmpeg` is on PATH (documented optional dep).
+- [ ] **Auto-update:** publish a higher `vX.Y.Z`; a running older install
+      downloads it, notifies, and on quit installs + relaunches on the new
+      version. Confirm **no install occurs while a job streams**.
+- [ ] **Download surface:** `/download` serves the installer on the web; inside
+      the desktop app the Download/Install affordances are hidden.
+
+Until every box is checked on real hardware, the desktop installer stays
+**CLAIMED** (AUDIT.md A8 row).
