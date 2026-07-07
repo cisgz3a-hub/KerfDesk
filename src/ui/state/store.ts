@@ -294,6 +294,8 @@ export type AppState = ObjectPropertiesActions &
     readonly beginInteraction: () => void;
     readonly setObjectTransform: (id: string, transform: Transform) => void;
     readonly endInteraction: () => void;
+    // Roll a drag back to the pre-interaction snapshot (Esc mid-drag, audit C4).
+    readonly cancelInteraction: () => void;
     readonly applyObjectTransform: (id: string, transform: Transform) => void;
 
     readonly markSaved: (target: SaveTarget) => void;

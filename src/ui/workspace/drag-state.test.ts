@@ -7,13 +7,10 @@ import {
   type SceneObject,
   type Transform,
 } from '../../core/scene';
-import { ROTATE_HANDLE_OFFSET_MM } from './rotate-handle';
+import { ROTATE_HANDLE_OFFSET_MM, rotateHandlePosition } from './rotate-handle';
 import {
   computeMouseDownDrag,
-  isRightButtonDoubleClick,
-  isStationaryRightPanClick,
   nextTransformForDrag,
-  panOffsetForDrag,
   transformUpdatesForMoveDrag,
   type DragState,
 } from './drag-state';
@@ -58,6 +55,49 @@ function objectWithBounds(): SceneObject {
     paths: [],
   };
 }
+
+describe('nextTransformForDrag move modifiers (audit C4)', () => {
+  const moveDrag: Extract<DragState, { kind: 'move' }> = {
+    kind: 'move',
+    objectId: 'O1',
+    startScenePoint: { x: 0, y: 0 },
+    startTx: 0,
+    startTy: 0,
+  };
+
+  it('moves freely without Shift', () => {
+    const next = nextTransformForDrag(
+      moveDrag,
+      objectWithBounds(),
+      { x: 100, y: 10 },
+      resizeEvent({}),
+    );
+    expect(next.x).toBeCloseTo(100);
+    expect(next.y).toBeCloseTo(10);
+  });
+
+  it('Shift locks a mostly-horizontal move to the X axis', () => {
+    const next = nextTransformForDrag(
+      moveDrag,
+      objectWithBounds(),
+      { x: 100, y: 10 },
+      resizeEvent({ shiftKey: true }),
+    );
+    expect(next.y).toBeCloseTo(0);
+    expect(next.x).toBeGreaterThan(99);
+  });
+
+  it('Shift locks a mostly-vertical move to the Y axis', () => {
+    const next = nextTransformForDrag(
+      moveDrag,
+      objectWithBounds(),
+      { x: 10, y: 100 },
+      resizeEvent({ shiftKey: true }),
+    );
+    expect(next.x).toBeCloseTo(0);
+    expect(next.y).toBeGreaterThan(99);
+  });
+});
 
 describe('nextTransformForDrag scale modifiers', () => {
   it('keeps aspect ratio by default when a corner handle is dragged', () => {
@@ -124,63 +164,6 @@ describe('nextTransformForDrag scale modifiers', () => {
   });
 });
 
-describe('panOffsetForDrag', () => {
-  it('falls back to the drag start when the canvas CSS scale is not usable', () => {
-    const drag: Extract<DragState, { kind: 'pan' }> = {
-      kind: 'pan',
-      trigger: 'space-left-button',
-      startClientX: 20,
-      startClientY: 30,
-      startPanX: 4,
-      startPanY: -2,
-    };
-
-    expect(
-      panOffsetForDrag({
-        drag,
-        e: { clientX: 120, clientY: 130 },
-        canvas: fakePanCanvas({ width: 100, height: 100, rectWidth: 0 }),
-        project: createProject(),
-        viewState: { zoomFactor: 1, panX: 0, panY: 0 },
-      }),
-    ).toEqual({ panX: 4, panY: -2 });
-  });
-});
-
-describe('isStationaryRightPanClick', () => {
-  it('treats a stationary right-button pan candidate as a context click', () => {
-    const drag = panDrag('right-button');
-
-    expect(isStationaryRightPanClick(drag, { clientX: 104, clientY: 100 })).toBe(true);
-  });
-
-  it('keeps right-button drags as panning after the movement threshold', () => {
-    const drag = panDrag('right-button');
-
-    expect(isStationaryRightPanClick(drag, { clientX: 105, clientY: 100 })).toBe(false);
-  });
-
-  it('never opens the context bar for middle-button or Space panning', () => {
-    expect(
-      isStationaryRightPanClick(panDrag('middle-button'), { clientX: 100, clientY: 100 }),
-    ).toBe(false);
-    expect(
-      isStationaryRightPanClick(panDrag('space-left-button'), { clientX: 100, clientY: 100 }),
-    ).toBe(false);
-  });
-});
-
-describe('isRightButtonDoubleClick', () => {
-  it('recognizes the second click of a right-button double-click', () => {
-    expect(isRightButtonDoubleClick({ button: 2, detail: 2 })).toBe(true);
-  });
-
-  it('ignores single right-clicks and non-right double-clicks', () => {
-    expect(isRightButtonDoubleClick({ button: 2, detail: 1 })).toBe(false);
-    expect(isRightButtonDoubleClick({ button: 0, detail: 2 })).toBe(false);
-  });
-});
-
 describe('computeMouseDownDrag multi-selection', () => {
   it('keeps the current multi-selection when dragging an already selected object', () => {
     const plainClick = vi.fn();
@@ -231,6 +214,56 @@ describe('computeMouseDownDrag multi-selection', () => {
       { id: 'A', x: 0, y: 0 },
       { id: 'B', x: 30, y: 0 },
     ]);
+  });
+
+  it('rotate drag on a pre-rotated single object does not jump (audit C2)', () => {
+    const rotated: SceneObject = {
+      kind: 'imported-svg',
+      id: 'R',
+      source: 'r.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: { ...IDENTITY_TRANSFORM, x: 40, y: 40, rotationDeg: 30 },
+      paths: [],
+    };
+    const handle = rotateHandlePosition(rotated);
+    const drag = computeMouseDownDrag({
+      e: mouseEventAtScenePoint(handle),
+      ref: canvasRef(),
+      project: projectWithObjects([rotated]),
+      selectedObjectId: 'R',
+      additionalSelectedIds: new Set(),
+      viewState: VIEW_STATE,
+      onShiftClick: vi.fn(),
+      onPlainClick: vi.fn(),
+      selectionAnchor: 'c',
+    });
+    expect(drag?.kind).toBe('rotate');
+    // Applying with dragTo == the grab point must keep rotation at 30°, not
+    // snap it toward the pointer direction (~0°, the old absolute bug).
+    const next = nextTransformForDrag(
+      drag as Extract<DragState, { kind: 'rotate' }>,
+      rotated,
+      handle,
+      { shiftKey: false, ctrlKey: false, metaKey: false },
+      'c',
+    );
+    expect(next.rotationDeg).toBeCloseTo(30, 3);
+  });
+
+  it('starts a selection-scale drag from a combined-box corner handle (C5)', () => {
+    // Combined box of A(0..10) + B(20..30) is 0..30; its SE corner is (30,10).
+    const drag = computeMouseDownDrag({
+      e: mouseEventAtScenePoint({ x: 30, y: 10 }),
+      ref: canvasRef(),
+      project: projectWithObjects([objectAt('A', 0, 0), objectAt('B', 20, 0)]),
+      selectedObjectId: 'A',
+      additionalSelectedIds: new Set(['B']),
+      viewState: VIEW_STATE,
+      onShiftClick: vi.fn(),
+      onPlainClick: vi.fn(),
+    });
+
+    expect(drag).toMatchObject({ kind: 'selection-scale', handle: 'se', selectionIds: ['A', 'B'] });
   });
 
   it('applies the dragged-object delta to every selected move start transform', () => {
@@ -300,24 +333,6 @@ function canvasRef(): React.RefObject<HTMLCanvasElement> {
   };
 }
 
-function fakePanCanvas(args: {
-  readonly width: number;
-  readonly height: number;
-  readonly rectWidth: number;
-}): HTMLCanvasElement {
-  return {
-    width: args.width,
-    height: args.height,
-    getBoundingClientRect: () =>
-      ({
-        left: 0,
-        top: 0,
-        width: args.rectWidth,
-        height: args.height,
-      }) as DOMRect,
-  } as HTMLCanvasElement;
-}
-
 function mouseEventAtScenePoint(point: {
   readonly x: number;
   readonly y: number;
@@ -350,17 +365,4 @@ function rotateDragSelectionStarts(
     x: entry.transform.x,
     y: entry.transform.y,
   }));
-}
-
-function panDrag(
-  trigger: 'middle-button' | 'right-button' | 'space-left-button',
-): Extract<DragState, { kind: 'pan' }> {
-  return {
-    kind: 'pan',
-    trigger,
-    startClientX: 100,
-    startClientY: 100,
-    startPanX: 0,
-    startPanY: 0,
-  };
 }

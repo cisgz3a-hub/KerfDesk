@@ -45,6 +45,32 @@ describe('applyTransformDrag', () => {
     ]);
     expect(guides).toEqual([]);
   });
+
+  it('resizes a whole selection about the pinned corner via a combined-box handle (C5)', () => {
+    const a = objectAt('a', 0, 0);
+    const b = objectAt('b', 30, 0);
+    const updates: Array<{ readonly id: string; readonly transform: Transform }> = [];
+
+    // Combined box is 0..40; drag the SE handle to (80,20) doubles it about NW.
+    applyTransformDrag({
+      drag: { kind: 'selection-scale', handle: 'se', selectionIds: ['a', 'b'] },
+      point: { x: 80, y: 20 },
+      e: event,
+      project: projectWithObjects([a, b]),
+      selectionAnchor: 'c',
+      snapSettings,
+      setObjectTransform: (id, transform) => updates.push({ id, transform }),
+      setSnapGuides: () => undefined,
+    });
+
+    const byId = new Map(updates.map((u) => [u.id, u.transform]));
+    expect(byId.get('a')?.scaleX).toBeCloseTo(2);
+    expect(byId.get('a')?.scaleY).toBeCloseTo(2);
+    expect(byId.get('a')?.x).toBeCloseTo(0); // NW corner pinned
+    expect(byId.get('a')?.y).toBeCloseTo(0);
+    expect(byId.get('b')?.x).toBeCloseTo(60);
+    expect(byId.get('b')?.scaleX).toBeCloseTo(2);
+  });
 });
 
 function projectWithObjects(objects: ReadonlyArray<SceneObject>): Project {
