@@ -24,7 +24,11 @@ describe('ConvertToBitmapDialog', () => {
 
       await submit(host);
 
-      expect(onConvert).toHaveBeenCalledWith({ renderType: 'outlines', dpi: 127 });
+      expect(onConvert).toHaveBeenCalledWith({
+        renderType: 'outlines',
+        dpi: 127,
+        brightnessPercent: 50,
+      });
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -45,7 +49,11 @@ describe('ConvertToBitmapDialog', () => {
       change(host, 'input[name="dpi"]', '300');
       await submit(host);
 
-      expect(onConvert).toHaveBeenCalledWith({ renderType: 'fill-all', dpi: 300 });
+      expect(onConvert).toHaveBeenCalledWith({
+        renderType: 'fill-all',
+        dpi: 300,
+        brightnessPercent: 50,
+      });
     } finally {
       await act(async () => root.unmount());
       host.remove();
@@ -67,6 +75,35 @@ describe('ConvertToBitmapDialog', () => {
     }
   });
 
+  it('syncs the DPI slider into the numeric field and the submitted options', async () => {
+    const onConvert = vi.fn();
+    const { host, root } = await renderDialog({ bounds: smallBounds, onConvert });
+    try {
+      change(host, 'input[name="dpiSlider"]', '400');
+      const dpiInput = host.querySelector('input[name="dpi"]');
+      expect(dpiInput instanceof HTMLInputElement && dpiInput.value).toBe('400');
+
+      await submit(host);
+      expect(onConvert).toHaveBeenCalledWith(expect.objectContaining({ dpi: 400 }));
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('submits an adjusted Default Brightness', async () => {
+    const onConvert = vi.fn();
+    const { host, root } = await renderDialog({ bounds: smallBounds, onConvert });
+    try {
+      change(host, 'input[name="brightness"]', '70');
+      await submit(host);
+      expect(onConvert).toHaveBeenCalledWith(expect.objectContaining({ brightnessPercent: 70 }));
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('submits when the operator clicks Convert', async () => {
     const onConvert = vi.fn();
     const { host, root } = await renderDialog({ bounds: smallBounds, onConvert });
@@ -75,7 +112,11 @@ describe('ConvertToBitmapDialog', () => {
         Simulate.click(findButton(host, 'Convert'));
       });
 
-      expect(onConvert).toHaveBeenCalledWith({ renderType: 'fill-all', dpi: 254 });
+      expect(onConvert).toHaveBeenCalledWith({
+        renderType: 'fill-all',
+        dpi: 254,
+        brightnessPercent: 50,
+      });
     } finally {
       await act(async () => root.unmount());
       host.remove();

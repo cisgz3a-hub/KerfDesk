@@ -25,14 +25,17 @@
 
 import { isClosedEnough, type Bounds, type Polyline, type Vec2 } from '../scene';
 
-// LightBurn sets every converted pixel to 50% gray; white is unburned
-// material. 127, not 128: ditherThreshold burns strictly BELOW its cutoff
-// (default 128), so exactly-128 ink composed to zero output — a converted
-// bitmap on a Threshold layer silently dithered to all-zero S (M7,
+// LightBurn sets every converted pixel to 50% gray by default; white is
+// unburned material. 127, not 128: ditherThreshold burns strictly BELOW its
+// cutoff (default 128), so exactly-128 ink composed to zero output — a
+// converted bitmap on a Threshold layer silently dithered to all-zero S (M7,
 // AUDIT-2026-06-10). 127 keeps the 50%-gray intent within rounding and
 // stays on the burning side of the default cutoff.
 const INK_LUMA = 127;
 const BACKGROUND_LUMA = 255;
+export const DEFAULT_BITMAP_BRIGHTNESS_PERCENT = 50;
+const MIN_BRIGHTNESS_PERCENT = 0;
+const MAX_BRIGHTNESS_PERCENT = 100;
 const MM_PER_INCH = 25.4;
 // Keep "vertex exactly on the scanline" off the half-open span boundary so
 // adjacent spans don't double-count (matches fill-hatching's SCANLINE_EPS).
@@ -61,6 +64,10 @@ export type VectorRasterInput = {
   readonly dpi?: number;
   readonly pixelWidth?: number;
   readonly pixelHeight?: number;
+  // Luma every inked pixel renders at. Defaults to 50% gray (LightBurn's
+  // Default Brightness default); the dialog's Default Brightness control
+  // maps a percentage here via inkLumaForBrightnessPercent.
+  readonly inkLuma?: number;
 };
 
 export type VectorRaster = {
@@ -79,14 +86,17 @@ export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
   const widthMm = bounds.maxX - bounds.minX;
   const heightMm = bounds.maxY - bounds.minY;
   const { width, height } = rasterDimensions(input, widthMm, heightMm);
-  const luma = new Uint8Array(width * height).fill(BACKGROUND_LUMA);
+  const grid: LumaGrid = {
+    luma: new Uint8Array(width * height).fill(BACKGROUND_LUMA),
+    width,
+    height,
+    ink: clampInkLuma(input.inkLuma ?? INK_LUMA),
+  };
   const fillPolylines = input.fillPolylines ?? (input.renderType === 'outlines' ? [] : polylines);
   const outlinePolylines =
     input.outlinePolylines ?? (input.renderType === 'outlines' ? polylines : []);
   fillEvenOdd(
-    luma,
-    width,
-    height,
+    grid,
     toPixelContours(
       fillPolylines,
       bounds,
@@ -95,9 +105,7 @@ export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
     ),
   );
   strokePolylines(
-    luma,
-    width,
-    height,
+    grid,
     toPixelStrokes(
       outlinePolylines,
       bounds,
@@ -105,8 +113,31 @@ export function rasterizeVectorToLuma(input: VectorRasterInput): VectorRaster {
       scaleForExtent(height, heightMm),
     ),
   );
-  return { luma, width, height };
+  return { luma: grid.luma, width, height };
 }
+
+// The Default Brightness percentage → ink luma mapping (LightBurn §7.4:
+// "every rendered pixel's brightness is set to 50% gray", adjustable).
+// Math.floor, not round: 50% must stay at 127 — strictly below
+// ditherThreshold's default cutoff (M7) — while 255 × 0.5 rounds to 128.
+export function inkLumaForBrightnessPercent(percent: number): number {
+  const finite = Number.isFinite(percent) ? percent : DEFAULT_BITMAP_BRIGHTNESS_PERCENT;
+  const clamped = Math.max(MIN_BRIGHTNESS_PERCENT, Math.min(MAX_BRIGHTNESS_PERCENT, finite));
+  return Math.floor((clamped / MAX_BRIGHTNESS_PERCENT) * BACKGROUND_LUMA);
+}
+
+function clampInkLuma(inkLuma: number): number {
+  const finite = Number.isFinite(inkLuma) ? inkLuma : INK_LUMA;
+  return Math.max(0, Math.min(BACKGROUND_LUMA, Math.floor(finite)));
+}
+
+// The luma buffer plus everything a rasterizing pass needs to write into it.
+type LumaGrid = {
+  readonly luma: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+  readonly ink: number;
+};
 
 function pixelExtent(mm: number, pxPerMm: number): number {
   return Math.max(MIN_PIXEL_DIM, Math.round(mm * pxPerMm));
@@ -183,14 +214,9 @@ function toPixelStrokes(
 }
 
 // One half-open scanline per pixel row, sampled at the row centre (y + 0.5).
-function fillEvenOdd(
-  luma: Uint8Array,
-  width: number,
-  height: number,
-  contours: ReadonlyArray<ReadonlyArray<Vec2>>,
-): void {
+function fillEvenOdd(grid: LumaGrid, contours: ReadonlyArray<ReadonlyArray<Vec2>>): void {
   if (contours.length === 0) return;
-  for (let y = 0; y < height; y += 1) {
+  for (let y = 0; y < grid.height; y += 1) {
     const xs = crossingsAtY(contours, y + 0.5);
     if (xs.length < 2) continue;
     xs.sort((a, b) => a - b);
@@ -198,7 +224,7 @@ function fillEvenOdd(
       const xa = xs[i];
       const xb = xs[i + 1];
       if (xa === undefined || xb === undefined) continue;
-      fillSpan(luma, width, y, xa, xb);
+      fillSpan(grid, y, xa, xb);
     }
   }
 }
@@ -223,46 +249,41 @@ function crossingsAtY(contours: ReadonlyArray<ReadonlyArray<Vec2>>, y: number): 
 }
 
 // Ink every pixel in row y whose centre (x + 0.5) lies in [xa, xb).
-function fillSpan(luma: Uint8Array, width: number, y: number, xa: number, xb: number): void {
+function fillSpan(grid: LumaGrid, y: number, xa: number, xb: number): void {
   const xStart = Math.max(0, Math.ceil(xa - 0.5));
-  const xEnd = Math.min(width - 1, Math.ceil(xb - 0.5) - 1);
-  const rowBase = y * width;
+  const xEnd = Math.min(grid.width - 1, Math.ceil(xb - 0.5) - 1);
+  const rowBase = y * grid.width;
   for (let x = xStart; x <= xEnd; x += 1) {
-    luma[rowBase + x] = INK_LUMA;
+    grid.luma[rowBase + x] = grid.ink;
   }
 }
 
-function strokePolylines(
-  luma: Uint8Array,
-  width: number,
-  height: number,
-  strokes: ReadonlyArray<PixelStroke>,
-): void {
+function strokePolylines(grid: LumaGrid, strokes: ReadonlyArray<PixelStroke>): void {
   for (const stroke of strokes) {
     const { points } = stroke;
     for (let i = 0; i + 1 < points.length; i += 1) {
       const a = points[i];
       const b = points[i + 1];
-      if (a !== undefined && b !== undefined) strokeSegment(luma, width, height, a, b);
+      if (a !== undefined && b !== undefined) strokeSegment(grid, a, b);
     }
     const first = points[0];
     const last = points[points.length - 1];
     if (stroke.closed && first !== undefined && last !== undefined) {
-      strokeSegment(luma, width, height, last, first);
+      strokeSegment(grid, last, first);
     }
   }
 }
 
-function strokeSegment(luma: Uint8Array, width: number, height: number, a: Vec2, b: Vec2): void {
+function strokeSegment(grid: LumaGrid, a: Vec2, b: Vec2): void {
   const minX = Math.max(0, Math.floor(Math.min(a.x, b.x) - OUTLINE_RADIUS_PX));
-  const maxX = Math.min(width - 1, Math.ceil(Math.max(a.x, b.x) + OUTLINE_RADIUS_PX));
+  const maxX = Math.min(grid.width - 1, Math.ceil(Math.max(a.x, b.x) + OUTLINE_RADIUS_PX));
   const minY = Math.max(0, Math.floor(Math.min(a.y, b.y) - OUTLINE_RADIUS_PX));
-  const maxY = Math.min(height - 1, Math.ceil(Math.max(a.y, b.y) + OUTLINE_RADIUS_PX));
+  const maxY = Math.min(grid.height - 1, Math.ceil(Math.max(a.y, b.y) + OUTLINE_RADIUS_PX));
   for (let y = minY; y <= maxY; y += 1) {
-    const rowBase = y * width;
+    const rowBase = y * grid.width;
     for (let x = minX; x <= maxX; x += 1) {
       if (pointSegmentDistanceSq(x + 0.5, y + 0.5, a, b) <= OUTLINE_RADIUS_SQ) {
-        luma[rowBase + x] = INK_LUMA;
+        grid.luma[rowBase + x] = grid.ink;
       }
     }
   }

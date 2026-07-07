@@ -345,6 +345,24 @@ describe('assembleBitmap', () => {
     expect(encoded === null ? 0 : inkCount(encoded)).toBeGreaterThan(36);
   });
 
+  it('rasterizes ink at the requested Default Brightness', () => {
+    let encoded: VectorRaster | null = null;
+    assembleBitmap(
+      makeMixedSvg(),
+      (raster) => {
+        encoded = raster;
+        return fakeEncode(raster);
+      },
+      'new-id',
+      { brightnessPercent: 70 },
+    );
+
+    // floor(255 × 0.7) = 178 — every inked pixel carries the chosen gray.
+    const at70 = encoded === null ? [] : [...(encoded as VectorRaster).luma];
+    expect(at70.filter((v) => v === 178).length).toBeGreaterThan(0);
+    expect(at70.filter((v) => v === 127).length).toBe(0);
+  });
+
   it('labels SVG / traced bitmaps from `source` and text from `content`', () => {
     expect(assembleBitmap(makeSvg(), fakeEncode, 'i').source).toBe('logo.svg (bitmap)');
     expect(assembleBitmap(makeTraced(), fakeEncode, 'i').source).toBe('photo.png (bitmap)');
