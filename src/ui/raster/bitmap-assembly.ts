@@ -58,59 +58,95 @@ export function isConvertibleVector(o: SceneObject): o is ConvertibleVector {
   );
 }
 
-export function bitmapConversionTarget(o: ConvertibleVector): BitmapConversionTarget {
-  return { bounds: transformedBBox(o), transform: IDENTITY_TRANSFORM };
+// Conversion works on the whole selection at once — LightBurn's Convert to
+// Bitmap merges a multi-selection into ONE bitmap (ADR-029 amendment ii).
+export function bitmapConversionTarget(
+  objects: ReadonlyArray<ConvertibleVector>,
+): BitmapConversionTarget {
+  return { bounds: combinedConvertibleBounds(objects), transform: IDENTITY_TRANSFORM };
+}
+
+// Display name for a conversion: the object's own label, or a count for a
+// multi-selection merge.
+export function conversionSourceLabel(objects: ReadonlyArray<ConvertibleVector>): string {
+  const first = objects[0];
+  if (objects.length === 1 && first !== undefined) return sourceLabel(first);
+  return `${objects.length} objects`;
 }
 
 export function assembleBitmap(
-  o: ConvertibleVector,
+  objects: ReadonlyArray<ConvertibleVector>,
   encode: (raster: VectorRaster) => BitmapFields,
   id: string,
   options: BitmapConversionOptions = {},
 ): RasterImage {
-  const { bounds, plan, raster } = rasterizeConvertible(o, options);
+  const { bounds, plan, raster } = rasterizeConvertibles(objects, options);
   const fields = encode(raster);
-  return buildRasterImage(o, id, bounds, plan, raster, fields);
+  return buildRasterImage(objects, id, bounds, plan, raster, fields);
 }
 
 export async function assembleBitmapAsync(
-  o: ConvertibleVector,
+  objects: ReadonlyArray<ConvertibleVector>,
   encode: (raster: VectorRaster) => Promise<BitmapFields>,
   id: string,
   options: BitmapConversionOptions = {},
 ): Promise<RasterImage> {
-  const { bounds, plan, raster } = rasterizeConvertible(o, options);
+  const { bounds, plan, raster } = rasterizeConvertibles(objects, options);
   const fields = await encode(raster);
-  return buildRasterImage(o, id, bounds, plan, raster, fields);
+  return buildRasterImage(objects, id, bounds, plan, raster, fields);
 }
 
-function rasterizeConvertible(
-  o: ConvertibleVector,
+function rasterizeConvertibles(
+  objects: ReadonlyArray<ConvertibleVector>,
   options: BitmapConversionOptions,
 ): {
   readonly bounds: Bounds;
   readonly plan: BitmapConversionPlan;
   readonly raster: VectorRaster;
 } {
-  const baked = bakeConvertibleTransform(o);
-  const plan = estimateBitmapConversion(
-    { bounds: baked.bounds, transform: IDENTITY_TRANSFORM },
-    options.dpi,
-  );
+  // Bake every object into scene space and rasterize the concatenated
+  // contours as ONE even-odd render. Cross-object even-odd is deliberate:
+  // it matches both LightBurn's "areas between outlines" Fill All and our
+  // own Fill mode, which hatches a layer's contours together — a shape
+  // nested inside another object's shape reads as a hole.
+  const baked = objects.map(bakeConvertibleTransform);
+  const bounds = combinedConvertibleBounds(objects);
+  const paths = baked.flatMap((b) => b.paths);
+  const plan = estimateBitmapConversion({ bounds, transform: IDENTITY_TRANSFORM }, options.dpi);
   assertBitmapConversionFits(plan);
-  const { fillPolylines, outlinePolylines } = conversionPolylineGroups(baked.paths, options);
+  const { fillPolylines, outlinePolylines } = conversionPolylineGroups(paths, options);
   const raster = rasterizeVectorToLuma({
-    polylines: baked.paths.flatMap((p) => p.polylines),
+    polylines: paths.flatMap((p) => p.polylines),
     fillPolylines,
     outlinePolylines,
-    bounds: baked.bounds,
+    bounds,
     pixelWidth: plan.pixelWidth,
     pixelHeight: plan.pixelHeight,
     ...(options.brightnessPercent !== undefined
       ? { inkLuma: inkLumaForBrightnessPercent(options.brightnessPercent) }
       : {}),
   });
-  return { bounds: baked.bounds, plan, raster };
+  return { bounds, plan, raster };
+}
+
+// Union of the selection's transformed (rotation-aware) AABBs. Callers gate
+// on a non-empty convertible selection; an empty array degrades to a zero
+// rect, which the raster budget then rejects as invalid.
+function combinedConvertibleBounds(objects: ReadonlyArray<ConvertibleVector>): Bounds {
+  let bounds: Bounds | null = null;
+  for (const o of objects) {
+    const b = transformedBBox(o);
+    bounds =
+      bounds === null
+        ? b
+        : {
+            minX: Math.min(bounds.minX, b.minX),
+            minY: Math.min(bounds.minY, b.minY),
+            maxX: Math.max(bounds.maxX, b.maxX),
+            maxY: Math.max(bounds.maxY, b.maxY),
+          };
+  }
+  return bounds ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 }
 
 function conversionPolylineGroups(
@@ -155,7 +191,7 @@ function bakeConvertibleTransform(o: ConvertibleVector): {
 }
 
 function buildRasterImage(
-  o: ConvertibleVector,
+  objects: ReadonlyArray<ConvertibleVector>,
   id: string,
   bounds: Bounds,
   plan: BitmapConversionPlan,
@@ -165,7 +201,7 @@ function buildRasterImage(
   return {
     kind: 'raster-image',
     id,
-    source: `${sourceLabel(o)}${BITMAP_SOURCE_SUFFIX}`,
+    source: `${conversionSourceLabel(objects)}${BITMAP_SOURCE_SUFFIX}`,
     dataUrl: fields.dataUrl,
     pixelWidth: raster.width,
     pixelHeight: raster.height,

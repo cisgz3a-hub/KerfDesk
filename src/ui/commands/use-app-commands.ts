@@ -32,10 +32,10 @@ import {
   selectionCanBreakApart,
   selectionCanCombine,
   selectionCanWeld,
+  selectedConvertibleVectors,
   selectionHasUnlockedObject,
   selectionHasUnlockedVectorObject,
   selectionHasVectorObject,
-  selectionIsSingleConvertibleVector,
   selectionTouchesGroup,
 } from './selection-command-state';
 
@@ -110,7 +110,7 @@ function appCommandContext(
     toggleCameraPanel: dialogs.toggleCameraPanel,
     hasRasterSelection: selected?.kind === 'raster-image',
     canRetraceOriginal: traceSourceForTracedImage(app.project, selected) !== null,
-    hasConvertibleSelection: selectionIsSingleConvertibleVector(app.project, selectedIds),
+    hasConvertibleSelection: selectedConvertibleVectors(app.project, selectedIds).length > 0,
     canConvertSelectionToPath: selectionHasUnlockedVectorObject(app.project, selectedIds),
     canWeldSelection: selectionCanWeld(app.project, selectedIds),
     canCombineSelection: selectionCanCombine(app.project, selectedIds),
