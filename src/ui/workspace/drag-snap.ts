@@ -33,6 +33,10 @@ export function transformDragWithSnap(args: {
     args.selectionAnchor,
   );
   if (args.drag.kind !== 'move') return { transform, guides: [] };
+  // Ctrl/Cmd temporarily disables snapping for this move (audit C4), matching
+  // LightBurn. (For a scale drag Ctrl means from-center; move has no such
+  // conflict since only move reaches the snapper.)
+  if (args.event.ctrlKey || args.event.metaKey) return { transform, guides: [] };
   return snapMoveTransform({
     project: args.project,
     movingObjectId: args.drag.objectId,
