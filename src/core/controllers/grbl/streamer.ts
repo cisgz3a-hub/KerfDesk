@@ -200,8 +200,12 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
   if (state.inFlight.length === 0) return { state: ackStatusWithoutLine(state, kind), acked: null };
   const head = state.inFlight[0];
   if (head === undefined) return { state: ackStatusWithoutLine(state, kind), acked: null };
-  const nextInFlight = state.inFlight.slice(1);
-  const nextBytes = state.inFlightBytes - head.bytes;
+  // ALARM:N means the firmware discarded its RX buffer and planner: the
+  // remaining in-flight lines will never be acked. Wipe them all (audit F1)
+  // — keeping them would make the store's ack-attribution layer claim every
+  // later untracked ack ($X unlock, M9 cleanup) for this dead stream.
+  const nextInFlight = kind === 'alarm' ? [] : state.inFlight.slice(1);
+  const nextBytes = kind === 'alarm' ? 0 : state.inFlightBytes - head.bytes;
   const completed = state.completed + 1;
   // A paused stream never promotes to 'done': GRBL acks held-but-parsed
   // lines during a feed hold, so pausing near the end of a job drains the
@@ -271,6 +275,17 @@ export function disconnect(state: StreamerState): StreamerState {
 // HD1-adjacent finding).
 export function markErrored(state: StreamerState): StreamerState {
   return { ...state, status: 'errored', queued: [] };
+}
+
+// Clear in-flight accounting after the firmware provably wiped its receive
+// buffer (soft reset, ALARM) — those lines will never be acked, so leaving
+// them "in flight" makes hasUnsettledStreamAcks claim future untracked acks
+// for a dead stream (audit F1). Status is untouched; compose with cancel()
+// or markErrored() at the call site. NOT for stream-side stops (Marlin):
+// there the firmware still acks the in-flight lines and the accounting must
+// wait for them.
+export function wipeInFlight(state: StreamerState): StreamerState {
+  return { ...state, inFlight: [], inFlightBytes: 0 };
 }
 
 // Progress as a fraction [0, 1].

@@ -12,6 +12,7 @@ import {
   pause as pauseStreamer,
   resume as resumeStreamer,
   step,
+  wipeInFlight,
   type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
@@ -120,11 +121,21 @@ export function jobActions(
       // cached WCO so the readout doesn't lie about "custom origin"
       // until the next WCO frame arrives. Same race window as
       // resumeJob — use functional set.
+      // A sent soft reset also wiped the firmware's RX buffer: the
+      // in-flight lines will never be acked, so drop them from the
+      // accounting or the beam-off cleanup acks get claimed by the dead
+      // stream (audit F1). Stream-side stops (Marlin) keep in-flight —
+      // the firmware still acks those lines.
       set((s) => ({
         wcoCache: null,
         airAssistOn: false,
         ...originPatchAfterSoftReset(s),
-        streamer: s.streamer !== null ? cancelStreamer(s.streamer) : s.streamer,
+        streamer:
+          s.streamer === null
+            ? s.streamer
+            : softReset !== null
+              ? wipeInFlight(cancelStreamer(s.streamer))
+              : cancelStreamer(s.streamer),
       }));
     },
   };
