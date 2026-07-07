@@ -63,6 +63,7 @@ export {
   progress,
   resume,
   step,
+  wipeInFlight,
 } from './streamer';
 
 export type { CornerProbeParams, ProbeCorner, ZProbeParams } from './probe';

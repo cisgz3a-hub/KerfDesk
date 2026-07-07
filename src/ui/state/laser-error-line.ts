@@ -2,7 +2,7 @@
 // for the job stream. Split from laser-line-handler when the untracked-ack
 // attribution pushed that file past the 400-line cap.
 
-import type { StreamerState } from '../../core/controllers/grbl';
+import { wipeInFlight, type StreamerState } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import { controllerErrorNotice, type ControllerErrorContext } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
@@ -31,7 +31,7 @@ export function handleErrorLine(
     ...motionErrorPatch,
   });
   if (ackOwner === 'untracked') return;
-  requestRealtimeStopAfterStreamError(state.streamer, refs.driver, safeWrite);
+  requestRealtimeStopAfterStreamError(set, state.streamer, refs.driver, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }
 
@@ -54,7 +54,7 @@ export function handleResendLine(
       undefined,
     ),
   );
-  requestRealtimeStopAfterStreamError(current.streamer, refs.driver, safeWrite);
+  requestRealtimeStopAfterStreamError(set, current.streamer, refs.driver, safeWrite);
   advanceStream(set, get, refs, safeWrite, 'error');
 }
 
@@ -84,6 +84,7 @@ function isStoppedStreamErrorEcho(streamer: StreamerState | null): boolean {
 }
 
 function requestRealtimeStopAfterStreamError(
+  set: SetFn,
   streamer: StreamerState | null,
   driver: ControllerDriver,
   safeWrite: SafeWriteFn,
@@ -92,7 +93,16 @@ function requestRealtimeStopAfterStreamError(
     streamer !== null && ['streaming', 'paused', 'done'].includes(streamer.status);
   if (!streamCanStillHaveBufferedMotion) return;
   const softReset = driver.realtime.softReset;
-  const abort = softReset === null ? Promise.resolve() : safeWrite(softReset, 'stop', 'system');
+  const abort =
+    softReset === null
+      ? Promise.resolve()
+      : safeWrite(softReset, 'stop', 'system').then(() => {
+          // The sent reset wiped the firmware's RX buffer: the errored
+          // stream's remaining in-flight lines will never be acked, so drop
+          // them or the cleanup acks below get claimed by the dead stream
+          // (audit F1). Status stays 'errored' — Stop remains mounted.
+          set((s) => ({ streamer: s.streamer === null ? null : wipeInFlight(s.streamer) }));
+        });
   void abort
     .then(async () => {
       for (const line of driver.commands.stopLaserLines) {

@@ -2,7 +2,7 @@
 // Sleep wake uses GRBL soft reset (Ctrl-X), so it must invalidate any transient
 // origin/frame state just like Stop does.
 
-import { cancel as cancelStreamer } from '../../core/controllers/grbl';
+import { cancel as cancelStreamer, wipeInFlight } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import {
   cancelControllerLifecycleRefs,
@@ -49,7 +49,9 @@ export function controllerRecoveryActions(
           controllerOperation: { kind: 'recovery', phase: 'awaiting-idle', idleReports: 0 },
           homingState: 'unknown',
           lastWriteError: null,
-          streamer: state.streamer === null ? null : cancelStreamer(state.streamer),
+          // The soft reset wiped the firmware's RX buffer — in-flight lines
+          // will never be acked (audit F1).
+          streamer: state.streamer === null ? null : wipeInFlight(cancelStreamer(state.streamer)),
           log: pushLog(state, '[lf2] Sent Ctrl-X soft reset. Waiting for fresh Idle.'),
         }));
         await waitForFreshIdle(refs, { kind: 'recovery', requiredReports: 1 });

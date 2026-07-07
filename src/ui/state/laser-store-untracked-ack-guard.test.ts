@@ -139,3 +139,101 @@ describe('untracked-ack start guard', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
   });
 });
+
+// Audit F1: one physical ok must never settle BOTH ledgers. While the
+// streamer still has unsettled acks, the earliest terminal ack belongs to
+// the stream (GRBL-family firmwares ack in strict receive order) and the
+// untracked counter must not move — otherwise Start's arming gate opens one
+// ack early and the last stop-cleanup ok phantom-advances the next job.
+describe('stop-path ack attribution', () => {
+  async function connectMarlinWith(connection: FakeConnection): Promise<void> {
+    await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'marlin' });
+    connection.emitLine('start');
+    await flush();
+  }
+
+  // Marlin stop is stream-side: no soft reset exists, so the in-flight job
+  // line AND the M5/M107 beam-off lines all still ack after cancel.
+  it('a stream-owned ok does not settle the untracked ledger (Marlin stop)', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectMarlinWith(connection);
+
+    await useLaserStore
+      .getState()
+      .startJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', { streamingMode: 'ping-pong' });
+    await flush();
+    expect(useLaserStore.getState().streamer?.inFlight).toHaveLength(1);
+
+    await useLaserStore.getState().stopJob();
+    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+
+    connection.emitLine('ok'); // the in-flight job line — stream-owned
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+    expect(useLaserStore.getState().streamer?.inFlight).toHaveLength(0);
+
+    connection.emitLine('ok'); // M5
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    connection.emitLine('ok'); // M107
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+  });
+
+  it('a stale stop-cleanup ok cannot advance the next job (Marlin stop)', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectMarlinWith(connection);
+
+    await useLaserStore
+      .getState()
+      .startJob('G1 X1 S100\nG1 X2 S100\nG1 X3 S100', { streamingMode: 'ping-pong' });
+    await flush();
+    await useLaserStore.getState().stopJob();
+
+    connection.emitLine('ok'); // in-flight job line
+    connection.emitLine('ok'); // M5
+    await flush();
+
+    // M107's ok is still owed. Start must wait for it; once it lands it
+    // belongs to the ledger, never to the new stream.
+    const started = useLaserStore
+      .getState()
+      .startJob('G1 X9 S100\nG1 X8 S100', { streamingMode: 'ping-pong' });
+    await flush();
+    connection.emitLine('ok'); // M107
+    await started;
+    await flush();
+
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    const streamer = useLaserStore.getState().streamer;
+    expect(streamer?.status).toBe('streaming');
+    expect(streamer?.completed).toBe(0);
+    expect(streamer?.inFlight).toHaveLength(1);
+  });
+
+  // GRBL stop: the soft reset wipes the firmware's RX buffer, so the
+  // in-flight lines will never be acked. The streamer must drop them at stop
+  // time or the M9 cleanup ok gets claimed by the dead stream and the
+  // counter never drains.
+  it('GRBL stop wipes in-flight so the M9 ok settles the ledger, not the stream', async () => {
+    const connection = makeConnection(async () => undefined);
+    await connectWith(connection);
+
+    await useLaserStore.getState().startJob(JOB_GCODE);
+    await flush();
+    expect(useLaserStore.getState().streamer?.inFlight.length).toBeGreaterThan(0);
+
+    await useLaserStore.getState().stopJob();
+    const stopped = useLaserStore.getState().streamer;
+    expect(stopped?.status).toBe('cancelled');
+    expect(stopped?.inFlight).toEqual([]);
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
+
+    connection.emitLine('ok'); // M9 cleanup
+    await flush();
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().streamer?.completed).toBe(0);
+  });
+});
