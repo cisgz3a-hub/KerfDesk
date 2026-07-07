@@ -174,8 +174,6 @@ function assertFiniteOptionalAxis(value: number | undefined, label: string): voi
  *  instead (audit F11). Shared by the Marlin/Smoothie builders, whose
  *  axis-less `G0 F…` would silently do nothing. */
 export function assertJogHasAxis(params: JogParams): void {
-  const moves = [params.dx, params.dy, params.dz].some(
-    (v) => typeof v === 'number' && v !== 0,
-  );
+  const moves = [params.dx, params.dy, params.dz].some((v) => typeof v === 'number' && v !== 0);
   if (!moves) throw new Error('buildJogCommand: at least one axis distance must be nonzero.');
 }

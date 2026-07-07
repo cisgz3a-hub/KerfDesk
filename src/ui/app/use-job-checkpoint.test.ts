@@ -7,11 +7,9 @@ import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-s
 import { installJobCheckpointTracking } from './use-job-checkpoint';
 
 // 60 sendable lines wrapped in comments/blanks, like real emitted G-code.
-const GCODE = [
-  '; layer test',
-  ...Array.from({ length: 60 }, (_, i) => `G1 X${i} S100`),
-  '',
-].join('\n');
+const GCODE = ['; layer test', ...Array.from({ length: 60 }, (_, i) => `G1 X${i} S100`), ''].join(
+  '\n',
+);
 const OTHER_GCODE = Array.from({ length: 10 }, (_, i) => `G1 Y${i} S50`).join('\n');
 const NOW = '2026-07-07T03:00:00.000Z';
 const LATER = '2026-07-07T04:00:00.000Z';
