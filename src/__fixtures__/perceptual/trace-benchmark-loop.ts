@@ -12,6 +12,7 @@ import {
   measureSquarePathEdgeQuality,
 } from './edge-truth';
 import { archHouseEdgeCurveCleanupBenchmark } from './arch-house-edge-benchmark';
+import { capFromFindings, pushFindingIf, ratingFromFindings } from './benchmark-rating';
 import {
   archHouseLineArtBaselineBenchmark,
   centerlineLandedRegressionBenchmark,
@@ -337,25 +338,4 @@ function buildTraceBenchmarkFixPrompt(
     'Loop instruction: write or update the failing proof first, implement the smallest trace change, rerun the benchmark audit, and repeat until no findings remain.',
   ];
   return `${lines.join('\n')}\n`;
-}
-
-function pushFindingIf(
-  condition: boolean,
-  findings: TraceBenchmarkFinding[],
-  finding: TraceBenchmarkFinding,
-): void {
-  if (condition) findings.push(finding);
-}
-
-function ratingFromFindings(findings: ReadonlyArray<TraceBenchmarkFinding>): number {
-  return capFromFindings(findings);
-}
-
-function capFromFindings(
-  findings: ReadonlyArray<{ readonly severity: TraceBenchmarkSeverity }>,
-): number {
-  if (findings.some((finding) => finding.severity === 'high')) return 6;
-  if (findings.some((finding) => finding.severity === 'medium')) return 8;
-  if (findings.some((finding) => finding.severity === 'low')) return 9;
-  return 10;
 }

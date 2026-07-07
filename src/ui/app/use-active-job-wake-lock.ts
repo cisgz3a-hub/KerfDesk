@@ -1,6 +1,18 @@
+// useActiveJobWakeLock (ADR-117) — hold a screen wake lock while a job is
+// active so OS display-sleep can't suspend the tab / renderer mid-stream.
+// Best-effort: a denied or missing Wake Lock API never blocks the job, but
+// the operator is told once (LaserLog) so a marathon burn isn't trusted to a
+// machine that will sleep. The Electron side needs 'screen-wake-lock' in the
+// trusted-renderer-policy permission allowlist; the web side works wherever
+// Chromium ships the API.
+
 import { useEffect } from 'react';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob } from '../state/laser-store-helpers';
+import { isActiveJob, pushLog } from '../state/laser-store-helpers';
+
+const KEEP_AWAKE_UNAVAILABLE_MESSAGE =
+  '[lf2] Keep-awake unavailable — the OS may sleep the screen mid-job. ' +
+  'Disable system sleep before starting long burns.';
 
 type ScreenWakeLockSentinel = EventTarget & {
   readonly released?: boolean;
@@ -53,6 +65,7 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
   let wanted = false;
   let requesting = false;
   let disposed = false;
+  let warned = false;
   let sentinel: ScreenWakeLockSentinel | null = null;
   const nav = env.navigator as ScreenWakeLockNavigator;
 
@@ -61,9 +74,21 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
     sentinel = null;
   };
 
+  // One line, once per session: the job keeps running either way, but the
+  // operator must know the display may sleep before trusting an hours-long
+  // burn to it. Repeat visibility flaps re-attempt silently.
+  const warnUnavailableOnce = (): void => {
+    if (warned) return;
+    warned = true;
+    useLaserStore.setState((s) => ({ log: pushLog(s, KEEP_AWAKE_UNAVAILABLE_MESSAGE) }));
+  };
+
   const request = async (): Promise<void> => {
     if (disposed || !wanted || requesting || sentinel !== null) return;
-    if (nav.wakeLock === undefined) return;
+    if (nav.wakeLock === undefined) {
+      warnUnavailableOnce();
+      return;
+    }
     if (env.document.visibilityState === 'hidden') return;
     requesting = true;
     try {
@@ -75,9 +100,12 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
       sentinel = next;
       sentinel.addEventListener('release', onRelease);
     } catch {
-      // Wake lock can be denied by the browser or operating system. The
-      // machine stream still runs; this is best-effort protection against
-      // screen sleep interrupting Web Serial.
+      // Wake lock can be denied by the browser or operating system (battery
+      // saver, permission policy — on Electron the trusted-renderer-policy
+      // allowlist must include 'screen-wake-lock'). The machine stream still
+      // runs; this is best-effort protection against screen sleep
+      // interrupting Web Serial.
+      warnUnavailableOnce();
     } finally {
       requesting = false;
     }

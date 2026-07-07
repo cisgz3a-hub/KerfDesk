@@ -12,7 +12,7 @@
 // Toasts are intentionally button-less (see toast-store), so the update prompt
 // is a small banner (lf-banner) rather than a toast.
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { useLaserStore } from '../state/laser-store';
@@ -27,6 +27,11 @@ import {
 export function PwaUpdatePrompt(): JSX.Element | null {
   const pushToast = useToastStore((s) => s.pushToast);
   const jobActive = useLaserStore((s) => isActiveJob(s.streamer));
+  // Bumped by the `updatefound` handler after it clears the persisted dismissal.
+  // The value is unused for logic (storage is the source of truth); its only job
+  // is to re-render THIS mounted instance so a currently-suppressed prompt (which
+  // returned null) recomputes `isDismissed` and shows the banner for the newer SW.
+  const [, setUpdateRevision] = useState(0);
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -35,8 +40,12 @@ export function PwaUpdatePrompt(): JSX.Element | null {
     onRegisteredSW(_swScriptUrl, registration) {
       // A strictly-newer service worker fires `updatefound` on the registration;
       // clear any prior "Later" so an update accepted since then is not swallowed
-      // by the persisted dismissal below.
-      registration?.addEventListener('updatefound', clearDismissedUpdateVersion);
+      // by the persisted dismissal below, then force a re-render so an
+      // already-mounted suppressed prompt re-evaluates and surfaces the banner.
+      registration?.addEventListener('updatefound', () => {
+        clearDismissedUpdateVersion();
+        setUpdateRevision((revision) => revision + 1);
+      });
     },
     onRegisterError(error) {
       // A failed registration means offline mode won't work; surface it rather

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ColoredPath, Polyline, Vec2 } from '../../core/scene';
+import { polylineLength } from './benchmark-rating';
 
 const ARCH_HOUSE_FIXTURE_STEM = 'arch-house-langebaan-source';
 const ARCH_HOUSE_FIXTURE_EXTENSION = '.png';
@@ -173,16 +174,6 @@ function measureTracePaths(paths: ReadonlyArray<ColoredPath>): TraceArtifactMetr
     ).length,
     bounds: bounds === null ? null : roundBounds(bounds),
   };
-}
-
-function polylineLength(points: ReadonlyArray<Vec2>): number {
-  let total = 0;
-  for (let index = 0; index + 1 < points.length; index += 1) {
-    const a = points[index];
-    const b = points[index + 1];
-    if (a !== undefined && b !== undefined) total += Math.hypot(a.x - b.x, a.y - b.y);
-  }
-  return total;
 }
 
 type ClosedPolylineInfo = {

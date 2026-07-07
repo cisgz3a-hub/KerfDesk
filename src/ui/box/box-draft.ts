@@ -24,6 +24,8 @@ export type BoxDraft = {
   // = bit-radius overcuts so tabs seat fully in a round-bit slot — opt in when
   // a joint won't close. Ignored in laser mode (a kerf has no corner limit).
   readonly relief: string;
+  readonly dividersX: string;
+  readonly dividersY: string;
 };
 
 export const BOX_DRAFT_KEY = 'laserforge.box.generatorDraft.v1';
@@ -43,10 +45,14 @@ export const BOX_DRAFT_PERSISTED_FIELDS: ReadonlyArray<keyof BoxDraft> = [
   'clearance',
   'partSpacing',
   'relief',
+  'dividersX',
+  'dividersY',
 ];
 
 // CNC glue fit vs laser press fit (ADR-106 fit division of labor).
 const CNC_DEFAULT_CLEARANCE_MM = 0.15;
+// A slide lid must slide: the laser default rises for that style (F-K7).
+export const SLIDE_LID_MIN_CLEARANCE_DRAFT = '0.2';
 const DEFAULT_LASER_THICKNESS_MM = 3;
 const FINGER_WIDTH_TO_THICKNESS = 3;
 const PART_SPACING_TO_THICKNESS = 2;
@@ -69,6 +75,8 @@ export function defaultBoxDraft(machine: BoxMachineContext): BoxDraft {
     partSpacing: autoFit.partSpacing,
     toolDiameter: machine.kind === 'cnc' ? String(machine.toolDiameterMm) : '',
     relief: 'off',
+    dividersX: '0',
+    dividersY: '0',
   };
 }
 
@@ -132,13 +140,15 @@ export function parseBoxDraft(draft: BoxDraft, machine: BoxMachineContext): BoxD
       dimensionMode: draft.mode === 'outer' ? 'outer' : 'inner',
       thicknessMm: Number(draft.thickness),
       targetFingerWidthMm: Number(draft.fingerWidth),
-      style: draft.style === 'open-top' ? 'open-top' : 'closed',
+      style: draft.style === 'open-top' || draft.style === 'slide-lid' ? draft.style : 'closed',
       clearanceMm: Number(draft.clearance),
       relief:
         machine.kind === 'cnc' && draft.relief !== 'off'
           ? { kind: 'corner-overcut', toolDiameterMm: Number(draft.toolDiameter) }
           : { kind: 'none' },
       partSpacingMm: Number(draft.partSpacing),
+      dividersXCount: Number(draft.dividersX),
+      dividersYCount: Number(draft.dividersY),
     },
   };
 }
@@ -152,4 +162,6 @@ export const BOX_FIELD_LABELS: Readonly<Record<BoxSpecField, string>> = {
   clearance: 'Clearance',
   reliefTool: 'Relief tool diameter',
   partSpacing: 'Part spacing',
+  dividersX: 'Dividers across width',
+  dividersY: 'Dividers across depth',
 };
