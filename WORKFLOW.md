@@ -1190,7 +1190,7 @@ fails, the panel shows an inline error instead of leaving the operator on
    physical board.
 6. Try **Jog head to → Center**: the head should move to the middle of the
    board. Try a corner: the head returns to that corner.
-7. **Capture a new board** resets the panel; re-capturing replaces the
+7. **Remove board** deletes the outline; **Capture a new board** resets the panel; re-capturing replaces the
    outline (only one board at a time).
 
 ---

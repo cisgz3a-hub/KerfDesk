@@ -14,6 +14,7 @@ export function useBoardPlacement() {
   const alignToBox = useStore((s) => s.alignSelectionToRegistrationBox);
   const fitToBoard = useStore((s) => s.fitSelectionToBoard);
   const arrayToBoard = useStore((s) => s.tileSelectionIntoBoard);
+  const removeBoard = useStore((s) => s.removeRegistrationBox);
   const jogToPoint = useLaserStore((s) => s.jogToMachinePosition);
 
   const boxIds = new Set(findRegistrationBoxes(scene).map((b) => b.id));
@@ -28,6 +29,7 @@ export function useBoardPlacement() {
     alignToBox,
     fitToBoard,
     arrayToBoard,
+    removeBoard,
     jogToPoint,
   };
 }

@@ -29,7 +29,7 @@ export function BoardPlacementControls(props: {
   readonly disabled: boolean;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, jogToPoint } =
+  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard, jogToPoint } =
     useBoardPlacement();
   const points = boardMachinePoints(props.corners);
   const measured = bestFitRectangleFromCorners(props.corners);
@@ -76,9 +76,21 @@ export function BoardPlacementControls(props: {
           );
         })}
       </AnchorRow>
-      <Button variant="ghost" onClick={props.onReset}>
-        Capture a new board
-      </Button>
+      <div style={rowStyle}>
+        <Button variant="ghost" onClick={props.onReset}>
+          Capture a new board
+        </Button>
+        <Button
+          variant="danger"
+          title="Delete this board outline"
+          onClick={() => {
+            removeBoard();
+            props.onReset();
+          }}
+        >
+          Remove board
+        </Button>
+      </div>
     </div>
   );
 }
