@@ -1,13 +1,16 @@
-All Rights Reserved
+MIT License
 
 Copyright (c) 2026 Johann Stolk
 
-This software and its source code are proprietary. No license — express or
-implied — is granted to any person to use, copy, modify, merge, publish,
-distribute, sublicense, or sell copies of this software or any portion of
-it, except with the prior written permission of the copyright holder.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Viewing this source code does not grant any rights to use it.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -21,7 +24,8 @@ SOFTWARE.
 
 NOTE ON THIRD-PARTY DEPENDENCIES
 
-This project uses third-party libraries under their own open-source licenses
-(MIT, BSD, Apache-2.0, MPL-2.0, ISC). Those dependencies remain governed by
-their respective upstream licenses; this LICENSE file applies only to the
-first-party source code authored for this project.
+This project uses third-party libraries and fonts under their own open-source
+licenses (MIT, BSD, Apache-2.0, MPL-2.0, ISC, BSL-1.0, OFL-1.1, Unlicense).
+Those components remain governed by their respective upstream licenses; see
+THIRD_PARTY_NOTICES.md. This LICENSE file applies to the first-party source
+code authored for this project.
