@@ -47,7 +47,7 @@ describe('help topics', () => {
 
   it('returns title and data-help-id props for registered controls', () => {
     expect(helpProps('command:file.import-image')).toEqual({
-      title: COMMAND_HELP['file.import-image']?.tooltip,
+      title: COMMAND_HELP['file.import-image'].tooltip,
       'data-help-id': 'command:file.import-image',
     });
   });
@@ -107,7 +107,7 @@ describe('help topics', () => {
     const title = controlHelp('command:tools.trace-image', 'Select an image first.');
 
     expect(title.startsWith('Select an image first.')).toBe(true);
-    expect(title).toContain(COMMAND_HELP['tools.trace-image']?.tooltip);
+    expect(title).toContain(COMMAND_HELP['tools.trace-image'].tooltip);
   });
 
   it('resolves registered control help by id', () => {

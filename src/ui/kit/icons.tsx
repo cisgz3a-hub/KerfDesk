@@ -30,9 +30,16 @@ export type IconName =
   | 'pentagon'
   | 'star'
   | 'ruler'
-  | 'pen';
+  | 'pen'
+  | 'crosshair';
 
 const ICON_PATHS: Readonly<Record<IconName, JSX.Element>> = {
+  crosshair: (
+    <>
+      <circle cx="8" cy="8" r="3" />
+      <path d="M8 1v3M8 12v3M1 8h3M12 8h3" />
+    </>
+  ),
   'arrow-up': <path d="M8 13V3M4 7l4-4 4 4" />,
   'arrow-down': <path d="M8 3v10M4 9l4 4 4-4" />,
   'arrow-left': <path d="M13 8H3M7 4L3 8l4 4" />,

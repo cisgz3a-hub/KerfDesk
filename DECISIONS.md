@@ -5702,3 +5702,77 @@ Unlicense imagetracerjs backend and remove the potrace-* modules, or
 - `public/third-party-notices.txt` regenerated without proprietary wording.
 - The potrace provenance blocker above is tracked as an open item; the
   visibility flip is gated on it.
+
+---
+
+## ADR-121 - Machine-camera frames ride the loopback bridge: frame proxy and server-side discovery (Camera, 2026-07-07)
+
+**Status:** accepted.
+**Numbering note:** drafted on the camera branch as ADR-116, but `main`
+published ADR-116 through ADR-119 first; published numbers win.
+
+### Context
+
+Camera Mode v1-v4 supported USB cameras and a direct HTTP image poll for
+some machine cameras. The maintainer's machine camera exposed two missing
+pieces: pixel-consuming features were gated on a USB `MediaStream`, and the
+browser/direct-image route was blocked or tainted by CSP and CORS. The local
+RTSP bridge already had the right security shape: loopback origin, CORS for
+trusted app origins, and private-network policy checks.
+
+### Decision
+
+- Machine camera still frames go through the local bridge, not directly
+  through the browser. `GET /frame.jpg?url=...` proxies one http/https/rtsp
+  frame with trusted CORS headers and private-network restrictions.
+- Discovery moves server-side through the bridge, so production CSP does not
+  block camera probing.
+- The UI consumes frames through one source abstraction: USB stream,
+  machine-JPEG, or machine-RTSP. Calibration, auto-align, overlay stills,
+  trace-from-camera, and snapshots all capture through that source path.
+- The frame proxy rejects untrusted origins, recursive bridge URLs, redirects,
+  and non-private targets before fetching upstream camera bytes.
+
+### Verification
+
+Bridge policy tests cover allowed and rejected URLs/origins, frame proxy
+responses, PNA preflight, discovery, and health reporting. UI/source tests
+cover machine-camera activation and pixel-readable capture. Hardware
+verification remains a separate live-machine checkpoint.
+
+## ADR-122 - Camera-driven positioning and burn-target alignment wizard (Camera, 2026-07-07)
+
+**Status:** accepted.
+**Numbering note:** drafted on the camera branch as ADR-118; renumbered here
+because `main` already published ADR-118 and ADR-119.
+
+### Context
+
+Once machine-camera frames are pixel-readable (ADR-121), the camera workflow
+still needs two operator-facing pieces: a guided target-burn alignment flow
+and a way to act on what the overlay shows. LightBurn-style camera setup burns
+its own target and then solves alignment; the app previously required more
+manual orchestration.
+
+### Decision
+
+- Add a bed-alignment wizard that burns the five-marker target through the
+  normal `runStartJobFlow`, watches the job finish, prompts the operator to
+  clear the bed, captures a frame, optionally de-fisheyes it, detects markers,
+  solves the homography, and persists the alignment.
+- Add click-to-position: a crosshair workspace tool maps a canvas click
+  through the same origin transform used by G-code emission, clamps inside the
+  machine bed, and sends one absolute beam-off jog through the existing gated
+  jog path.
+- Keep absolute zero-valued jog words (`X0`, `Y0`, `Z0`) in absolute jog mode
+  for GRBL, Marlin, and Smoothieware; in relative mode zero deltas still mean
+  "do not move this axis."
+- Add snapshot saving and a wider monitoring view using the shared
+  pixel-readable capture path.
+
+### Verification
+
+Tests cover wizard store transitions, burn-step job-flow integration,
+auto-align failure paths, click-to-position origin mapping and gating,
+absolute zero-axis jog command emission, snapshot encoding, and camera panel
+state. Live hardware alignment accuracy remains a separate checkpoint.

@@ -33,6 +33,12 @@ describe('Smoothie command builders', () => {
     expect(lines[1]).toBe('G90\n');
     expect(lines).toHaveLength(7);
   });
+
+  it('keeps zero-valued axis words in absolute mode (X0 is a real destination)', () => {
+    expect(buildSmoothieJogCommand({ dx: 0, dy: 50, feed: 1000, relative: false })).toBe(
+      'G21\nG90\nG0 X0.000 Y50.000 F1000',
+    );
+  });
 });
 
 describe('prepareSmoothieConsoleCommand', () => {

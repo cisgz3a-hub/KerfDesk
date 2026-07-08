@@ -25,13 +25,18 @@ const fmtFeed = (feed: number): number => Math.max(1, Math.round(feed));
  *  leads every jog so a G20 left behind by a console command or an imported
  *  job cannot scale the move 25.4× (audit F10). */
 export function buildSmoothieJogCommand(params: JogParams): string {
+  // Zero deltas are dropped in relative mode only — in absolute mode X0/Y0
+  // is a real destination (dropping it would keep the previous coordinate).
+  const absolute = params.relative === false;
+  const includeAxis = (value: number | undefined): value is number =>
+    typeof value === 'number' && (absolute || value !== 0);
   assertJogHasAxis(params);
   const axes: string[] = [];
-  if (typeof params.dx === 'number' && params.dx !== 0) axes.push(`X${fmt(params.dx)}`);
-  if (typeof params.dy === 'number' && params.dy !== 0) axes.push(`Y${fmt(params.dy)}`);
-  if (typeof params.dz === 'number' && params.dz !== 0) axes.push(`Z${fmt(params.dz)}`);
+  if (includeAxis(params.dx)) axes.push(`X${fmt(params.dx)}`);
+  if (includeAxis(params.dy)) axes.push(`Y${fmt(params.dy)}`);
+  if (includeAxis(params.dz)) axes.push(`Z${fmt(params.dz)}`);
   const move = `G0 ${axes.join(' ')} F${fmtFeed(params.feed)}`.replace('  ', ' ');
-  if (params.relative === false) return `G21\nG90\n${move}`;
+  if (absolute) return `G21\nG90\n${move}`;
   return `G21\nG91\n${move}\nG90`;
 }
 

@@ -5,13 +5,23 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PlatformAdapter } from '../../../platform/types';
+import { PlatformProvider } from '../../app/platform-context';
 import { CameraCalibrationWizard } from './CameraCalibrationWizard';
 import { useCameraWizardStore } from './camera-wizard-store';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
+
+// The setup step's checkerboard save goes through the platform file dialog.
+const mockPlatform: PlatformAdapter = {
+  id: 'mock',
+  pickFilesForOpen: vi.fn(async () => []),
+  pickFileForSave: vi.fn(async () => null),
+  serial: { isSupported: () => false, requestPort: vi.fn(async () => null) },
+};
 
 let container: HTMLDivElement;
 let root: Root;
@@ -27,6 +37,16 @@ afterEach(() => {
   container.remove();
 });
 
+function renderWizard(): void {
+  act(() =>
+    root.render(
+      <PlatformProvider adapter={mockPlatform}>
+        <CameraCalibrationWizard />
+      </PlatformProvider>,
+    ),
+  );
+}
+
 function buttonByText(text: string): HTMLButtonElement | null {
   return [...container.querySelectorAll('button')].find((b) => b.textContent === text) ?? null;
 }
@@ -34,7 +54,7 @@ function buttonByText(text: string): HTMLButtonElement | null {
 describe('CameraCalibrationWizard', () => {
   it('opens on the board setup step with the three board fields', () => {
     useCameraWizardStore.getState().openWizard();
-    act(() => root.render(<CameraCalibrationWizard />));
+    renderWizard();
     expect(container.textContent).toContain('Calibrate camera lens');
     expect(container.querySelector('input[aria-label="Inner corners across"]')).not.toBeNull();
     expect(container.querySelector('input[aria-label="Inner corners down"]')).not.toBeNull();
@@ -47,7 +67,7 @@ describe('CameraCalibrationWizard', () => {
   it('capture step without a live stream explains how to start the camera', () => {
     useCameraWizardStore.getState().openWizard();
     act(() => useCameraWizardStore.getState().setStep('capture'));
-    act(() => root.render(<CameraCalibrationWizard />));
+    renderWizard();
     expect(container.textContent).toContain('camera feed is not running');
   });
 
@@ -58,7 +78,7 @@ describe('CameraCalibrationWizard', () => {
       // No captures: the deferred solve resolves to a typed failure.
       useCameraWizardStore.getState().completeSolve();
     });
-    act(() => root.render(<CameraCalibrationWizard />));
+    renderWizard();
     expect(container.textContent).toContain('Calibration failed (too-few-views)');
     expect(buttonByText('Back to capture')).not.toBeNull();
   });

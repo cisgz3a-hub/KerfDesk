@@ -13,7 +13,8 @@ export type ToolHelpKey =
   | 'ellipse'
   | 'polygon'
   | 'star'
-  | 'polyline';
+  | 'polyline'
+  | 'position-laser';
 export type ToolHelpId = `tool:${ToolHelpKey}`;
 export type ControlHelpKey =
   | 'laser.console'
@@ -43,7 +44,6 @@ export type ControlHelpKey =
   | 'laser.machine-setup.tab.controller'
   | 'laser.machine-setup.tab.firmware'
   | 'laser.machine-setup.tab.zones'
-  | 'laser.machine-setup.tab.camera'
   | 'laser.machine-setup.tab.raster-diagnostics'
   | 'laser.machine-setup.tab.import-export'
   | 'laser.device-setup.launch'
@@ -69,6 +69,11 @@ export type HelpTopic = {
 };
 
 export const TOOL_HELP: Readonly<Record<ToolHelpKey, HelpTopic>> = {
+  'position-laser': {
+    label: 'Move laser here',
+    tooltip:
+      'Click a point on the workspace (or the camera overlay) to move the laser head to that spot. Needs a connected, idle machine; the beam stays off.',
+  },
   select: {
     label: 'Select / transform',
     tooltip: 'Select, move, rotate, and resize existing artwork. Press Esc to return here.',
@@ -256,11 +261,6 @@ export const CONTROL_HELP: Readonly<Record<ControlHelpKey, HelpTopic>> = {
     label: 'Safety zones',
     tooltip:
       'Define machine-coordinate no-go zones that preflight checks before frame, start, or export.',
-  },
-  'laser.machine-setup.tab.camera': {
-    label: 'Camera',
-    tooltip:
-      'Configure an experimental workspace camera profile and four-point image-to-machine alignment.',
   },
   'laser.machine-setup.tab.raster-diagnostics': {
     label: 'Raster diagnostics',
