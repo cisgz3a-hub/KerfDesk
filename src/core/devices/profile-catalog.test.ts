@@ -39,9 +39,13 @@ describe('GRBL_MACHINE_PROFILE_CATALOG', () => {
 
     expect(specific.profile.controllerKind).toBe('grblhal');
     expect(specific.profile.name).toBe('Creality Falcon A1 Pro (grblHAL)');
+    expect(specific.profile.maxFeed).toBe(10000);
+    expect(specific.profile.framingFeedMmPerMin).toBe(10000);
     expect(profileConfidenceLabel(specific.profile)).toBe('Hardware verified');
     expect(fallback.profile.name).toBe('Creality Falcon-compatible GRBL diode');
     expect(fallback.profile.profileId).toBe('creality-falcon-a1-pro-compatible');
+    expect(fallback.profile.maxFeed).toBe(10000);
+    expect(fallback.profile.framingFeedMmPerMin).toBe(10000);
   });
 
   it('marks the brand starter profiles as public-spec starters so operators confirm specs', () => {

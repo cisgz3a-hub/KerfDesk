@@ -169,8 +169,9 @@ export type DeviceProfile = {
   readonly zProbePresent?: boolean;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
-  // cut speeds doesn't also slow framing. Capped at maxFeed at
-  // emit time so we never command past the machine's safe rate.
+  // cut speeds doesn't also slow framing. The firmware still enforces its
+  // own $110/$111 max-rate limits, but the app must not collapse this value
+  // back to a low burn/feed setting.
   // 6000 mm/min matches LightBurn's default and most diode-laser
   // jog speeds from the Creality Falcon / xTool class.
   readonly framingFeedMmPerMin: number;

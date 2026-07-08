@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DEVICE_PROFILE,
   GRBL_MACHINE_PROFILE_CATALOG,
+  profileCatalogEntryById,
   type DeviceProfile,
 } from '../../../core/devices';
 import {
@@ -118,6 +119,27 @@ describe('deviceSetupReducer draft edits', () => {
     expect(state.draft.controllerKind).toBe('grblhal');
     expect(state.draft.framingFeedMmPerMin).toBe(10000);
     expect(state.draft.maxFeed).toBe(10000);
+  });
+
+  it('choosing the Falcon profile restores fast framing over a stale low frame feed', () => {
+    const preset = profileCatalogEntryById('creality-falcon-a1-pro-grblhal')?.profile;
+    if (preset === undefined) throw new Error('Falcon profile missing');
+    const before = initDeviceSetup(
+      {
+        ...PROFILE,
+        controllerKind: 'grbl-v1.1',
+        framingFeedMmPerMin: 500,
+        maxFeed: 500,
+      },
+      { bedWidth: 400, bedHeight: 400, maxFeed: 10000 },
+      { detectedControllerKind: 'grblhal', controllerRead: true },
+    );
+
+    const state = deviceSetupReducer(before, { kind: 'apply-preset', profile: preset });
+
+    expect(state.draft.profileId).toBe('creality-falcon-a1-pro-grblhal');
+    expect(state.draft.maxFeed).toBe(10000);
+    expect(state.draft.framingFeedMmPerMin).toBe(10000);
   });
 });
 
