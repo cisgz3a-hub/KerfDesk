@@ -15,7 +15,8 @@ export function CircleBoardPlacementControls(props: {
   readonly disabled: boolean;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, jogToPoint } = useBoardPlacement();
+  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, jogToPoint } =
+    useBoardPlacement();
   const centre = props.corners[0];
 
   return (

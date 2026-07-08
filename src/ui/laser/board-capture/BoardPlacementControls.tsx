@@ -29,7 +29,8 @@ export function BoardPlacementControls(props: {
   readonly disabled: boolean;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, jogToPoint } = useBoardPlacement();
+  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, jogToPoint } =
+    useBoardPlacement();
   const points = boardMachinePoints(props.corners);
   const measured = bestFitRectangleFromCorners(props.corners);
 

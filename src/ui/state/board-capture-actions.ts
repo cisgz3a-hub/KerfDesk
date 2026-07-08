@@ -40,7 +40,8 @@ export function boardCaptureActions(
   return {
     addCapturedBoard,
     // Back-compat: the four-corner / manual-size path is always a rectangle.
-    addCapturedBoardBox: (widthMm, heightMm) => addCapturedBoard({ kind: 'rect', widthMm, heightMm }),
+    addCapturedBoardBox: (widthMm, heightMm) =>
+      addCapturedBoard({ kind: 'rect', widthMm, heightMm }),
   };
 }
 
