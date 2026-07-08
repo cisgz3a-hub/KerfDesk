@@ -4,6 +4,7 @@ import {
   bestFitRectangleFromCorners,
   boardCornersFromOrigin,
   boardMachinePoints,
+  diameterFromCenterEdge,
 } from './board-capture';
 import type { Vec2 } from './scene-object';
 
@@ -132,5 +133,28 @@ describe('boardMachinePoints', () => {
 describe('BOARD_CORNER_COUNT', () => {
   it('is four', () => {
     expect(BOARD_CORNER_COUNT).toBe(4);
+  });
+});
+
+describe('diameterFromCenterEdge', () => {
+  it('doubles the axis-aligned centre-to-edge distance', () => {
+    expect(diameterFromCenterEdge({ x: 100, y: 100 }, { x: 140, y: 100 })).toBeCloseTo(80, 6);
+  });
+
+  it('measures a diagonal rim point (3-4-5 → radius 5)', () => {
+    expect(diameterFromCenterEdge({ x: 0, y: 0 }, { x: 3, y: 4 })).toBeCloseTo(10, 6);
+  });
+
+  it('is direction-independent (edge below the centre)', () => {
+    expect(diameterFromCenterEdge({ x: 100, y: 100 }, { x: 100, y: 60 })).toBeCloseTo(80, 6);
+  });
+
+  it('is zero when the edge sits on the centre (a double-click)', () => {
+    expect(diameterFromCenterEdge({ x: 50, y: 50 }, { x: 50, y: 50 })).toBe(0);
+  });
+
+  it('returns zero for non-finite input instead of NaN', () => {
+    expect(diameterFromCenterEdge({ x: Number.NaN, y: 0 }, { x: 10, y: 0 })).toBe(0);
+    expect(diameterFromCenterEdge({ x: 0, y: 0 }, { x: Number.POSITIVE_INFINITY, y: 0 })).toBe(0);
   });
 });

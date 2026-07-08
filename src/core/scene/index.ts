@@ -95,12 +95,13 @@ export type {
   SelectionAlignResult,
 } from './selection-align';
 export { buildSelectionAlignEdit } from './selection-align';
-export type { BestFitRectangle, BoardAnchor } from './board-capture';
+export type { BestFitRectangle, BoardAnchor, BoardShape, BoardShapeKind } from './board-capture';
 export {
   BOARD_CORNER_COUNT,
   bestFitRectangleFromCorners,
   boardCornersFromOrigin,
   boardMachinePoints,
+  diameterFromCenterEdge,
 } from './board-capture';
 export type { BoxAnchorAlignError, BoxAnchorAlignResult } from './box-anchor-align';
 export { buildBoxAnchorAlign } from './box-anchor-align';
