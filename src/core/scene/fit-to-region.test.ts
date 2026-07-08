@@ -66,10 +66,14 @@ describe('fitObjectToRegion', () => {
     // A 100×100 design rotated 90° must still land centered — fitObjectToBed's
     // scale·center offset would miss this.
     const rotated: Transform = { ...IDENTITY_TRANSFORM, rotationDeg: 90 };
-    const fitted = fitObjectToRegion(obj({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, rotated), BED, {
-      marginFraction: 0.9,
-      grow: true,
-    });
+    const fitted = fitObjectToRegion(
+      obj({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, rotated),
+      BED,
+      {
+        marginFraction: 0.9,
+        grow: true,
+      },
+    );
     const center = applyTransform({ x: 50, y: 50 }, fitted.transform);
     expect(center.x).toBeCloseTo(200);
     expect(center.y).toBeCloseTo(200);
@@ -82,10 +86,14 @@ describe('fitObjectToRegion', () => {
     // = 0.36 → footprint 7.2×36, centered.
     const rotated: Transform = { ...IDENTITY_TRANSFORM, rotationDeg: 90 };
     const region: Bounds = { minX: 0, minY: 0, maxX: 120, maxY: 40 };
-    const fitted = fitObjectToRegion(obj({ minX: 0, minY: 0, maxX: 100, maxY: 20 }, rotated), region, {
-      marginFraction: 0.9,
-      grow: true,
-    });
+    const fitted = fitObjectToRegion(
+      obj({ minX: 0, minY: 0, maxX: 100, maxY: 20 }, rotated),
+      region,
+      {
+        marginFraction: 0.9,
+        grow: true,
+      },
+    );
     const bbox = transformedBBox(fitted);
     expect(bbox.minX).toBeGreaterThanOrEqual(region.minX);
     expect(bbox.maxX).toBeLessThanOrEqual(region.maxX);
