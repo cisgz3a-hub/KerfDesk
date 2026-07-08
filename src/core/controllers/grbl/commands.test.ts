@@ -54,6 +54,20 @@ describe('buildJogCommand', () => {
     );
   });
 
+  it('keeps zero-valued axis words in absolute mode (X0 is a real destination)', () => {
+    // Dropping X0/Y0 in G90 silently keeps the previous coordinate — an
+    // absolute move to a bed edge would land the head at the wrong place
+    // (the click-to-position path moves to arbitrary bed points).
+    expect(buildJogCommand({ dx: 0, dy: 50, feed: 1500, relative: false })).toBe(
+      '$J=G90 G21 X0.000 Y50.000 F1500',
+    );
+    expect(buildJogCommand({ dx: 12, dy: 0, feed: 1500, relative: false })).toBe(
+      '$J=G90 G21 X12.000 Y0.000 F1500',
+    );
+    // Relative jogs still drop zero deltas (a zero delta is "don't move").
+    expect(buildJogCommand({ dx: 0, dy: 5, feed: 1500 })).toBe('$J=G91 G21 Y5.000 F1500');
+  });
+
   it('clamps and rounds the feed to an integer ≥ 1', () => {
     expect(buildJogCommand({ dx: 1, feed: 0 })).toContain('F1');
     expect(buildJogCommand({ dx: 1, feed: 1234.7 })).toContain('F1235');

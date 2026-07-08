@@ -95,21 +95,26 @@ function canvas2dContextStub(canvas: HTMLCanvasElement): CanvasRenderingContext2
   ) as unknown as CanvasRenderingContext2D;
 }
 
-const originalGetContext = HTMLCanvasElement.prototype.getContext;
+const canvasElementCtor = (globalThis as { HTMLCanvasElement?: typeof HTMLCanvasElement })
+  .HTMLCanvasElement;
 
-// The concrete return type is `RenderingContext | null`; the outer cast bridges
-// getContext's overloaded property signature without needing `any`.
-HTMLCanvasElement.prototype.getContext = function getContext(
-  this: HTMLCanvasElement,
-  contextId: string,
-  ...rest: unknown[]
-): RenderingContext | null {
-  if (contextId === TWO_D_CONTEXT_TYPE) return canvas2dContextStub(this);
-  // webgl / webgl2 / experimental-webgl: report unavailable cleanly.
-  if (contextId.includes('webgl')) return null;
-  return (originalGetContext as (...args: unknown[]) => RenderingContext | null).call(
-    this,
-    contextId,
-    ...rest,
-  );
-} as typeof HTMLCanvasElement.prototype.getContext;
+if (canvasElementCtor) {
+  const originalGetContext = canvasElementCtor.prototype.getContext;
+
+  // The concrete return type is `RenderingContext | null`; the outer cast bridges
+  // getContext's overloaded property signature without needing `any`.
+  canvasElementCtor.prototype.getContext = function getContext(
+    this: HTMLCanvasElement,
+    contextId: string,
+    ...rest: unknown[]
+  ): RenderingContext | null {
+    if (contextId === TWO_D_CONTEXT_TYPE) return canvas2dContextStub(this);
+    // webgl / webgl2 / experimental-webgl: report unavailable cleanly.
+    if (contextId.includes('webgl')) return null;
+    return (originalGetContext as (...args: unknown[]) => RenderingContext | null).call(
+      this,
+      contextId,
+      ...rest,
+    );
+  } as typeof canvasElementCtor.prototype.getContext;
+}

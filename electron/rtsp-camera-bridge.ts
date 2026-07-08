@@ -1,43 +1,45 @@
-import { spawn } from 'node:child_process';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
+import { writeJson } from './bridge-json.js';
+import { handleDiscoverRequest, handleFrameRequest } from './camera-frame-proxy.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
+import { hasFfmpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream.js';
 
 export const CAMERA_BRIDGE_PORT = 51731;
 
-// Bound concurrent ffmpeg transcodes so a burst of stream requests cannot
-// exhaust the machine (S03-001 DoS hardening).
-const MAX_CONCURRENT_FFMPEG = 4;
-let activeFfmpegCount = 0;
-
-// Reserve a concurrency slot for one ffmpeg transcode; returns an idempotent
-// release. Keeps the streamWithFfmpeg accounting to a single line (S03-001).
-function acquireFfmpegSlot(): () => void {
-  activeFfmpegCount += 1;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    activeFfmpegCount -= 1;
-  };
-}
-
 export type RtspCameraBridgeHandle = {
+  readonly port: number;
   readonly close: () => Promise<void>;
 };
 
-export async function startLocalRtspCameraBridge(): Promise<RtspCameraBridgeHandle> {
+// `port` is parameterized (0 = ephemeral) so tests can run the real server
+// without colliding on the well-known bridge port; production callers use the
+// default.
+export async function startLocalRtspCameraBridge(
+  port = CAMERA_BRIDGE_PORT,
+): Promise<RtspCameraBridgeHandle> {
   const server = createServer((req, res) => {
-    void handleBridgeRequest(req, res).catch((err: unknown) => handleBridgeError(err, res));
+    void handleBridgeRequest(req, res, boundPort).catch((err: unknown) =>
+      handleBridgeError(err, res),
+    );
   });
-  await listen(server, CAMERA_BRIDGE_PORT);
-  return { close: () => closeServer(server) };
+  const boundPort = await listen(server, port);
+  return { port: boundPort, close: () => closeServer(server) };
 }
 
-async function handleBridgeRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const requestUrl = new URL(req.url ?? '/', `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`);
+async function handleBridgeRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bridgePort: number,
+): Promise<void> {
+  const requestUrl = new URL(req.url ?? '/', `http://127.0.0.1:${bridgePort}`);
   setCorsHeaders(req, res);
   if (req.method === 'OPTIONS') {
+    // Chrome's Private Network Access preflight for public-https → loopback
+    // requests: acknowledge it so the deployed site keeps reaching the bridge.
+    if (req.headers['access-control-request-private-network'] === 'true') {
+      res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    }
     res.writeHead(204).end();
     return;
   }
@@ -49,21 +51,33 @@ async function handleBridgeRequest(req: IncomingMessage, res: ServerResponse): P
     return;
   }
   if (requestUrl.pathname === '/health') {
-    writeJson(res, { kind: 'ok', ffmpegAvailable: await hasFfmpeg() });
+    writeJson(res, { kind: 'ok', ffmpegAvailable: await hasFfmpeg(), frameProxy: true });
     return;
   }
   if (requestUrl.pathname === '/probe') {
-    await handleProbe(requestUrl, res);
+    await handleProbe(requestUrl, res, bridgePort);
     return;
   }
   if (requestUrl.pathname === '/stream.mjpg') {
     await handleStream(requestUrl, res);
     return;
   }
+  if (requestUrl.pathname === '/frame.jpg') {
+    await handleFrameRequest(requestUrl, res, bridgePort);
+    return;
+  }
+  if (requestUrl.pathname === '/discover') {
+    await handleDiscoverRequest(res, { bridgePort });
+    return;
+  }
   res.writeHead(404).end('Not Found');
 }
 
-async function handleProbe(requestUrl: URL, res: ServerResponse): Promise<void> {
+async function handleProbe(
+  requestUrl: URL,
+  res: ServerResponse,
+  bridgePort: number,
+): Promise<void> {
   const policy = rtspCameraUrlPolicy(requestUrl.searchParams.get('url') ?? '');
   if (policy.kind !== 'ok') {
     writeJson(res, policy);
@@ -75,7 +89,7 @@ async function handleProbe(requestUrl: URL, res: ServerResponse): Promise<void> 
     url: policy.url.toString(),
     ...(rtsp.codec !== undefined ? { codec: rtsp.codec } : {}),
     ffmpegAvailable: await hasFfmpeg(),
-    previewUrl: `http://127.0.0.1:${CAMERA_BRIDGE_PORT}/stream.mjpg?url=${encodeURIComponent(
+    previewUrl: `http://127.0.0.1:${bridgePort}/stream.mjpg?url=${encodeURIComponent(
       policy.url.toString(),
     )}`,
   });
@@ -91,111 +105,11 @@ async function handleStream(requestUrl: URL, res: ServerResponse): Promise<void>
     writeJson(res, { kind: 'unavailable', reason: 'FFmpeg is not available on this computer.' });
     return;
   }
-  if (activeFfmpegCount >= MAX_CONCURRENT_FFMPEG) {
+  if (!hasFreeFfmpegSlot()) {
     writeJson(res, { kind: 'unavailable', reason: 'Too many concurrent camera streams.' }, 503);
     return;
   }
   streamWithFfmpeg(policy.url, res);
-}
-
-function streamWithFfmpeg(url: URL, res: ServerResponse): void {
-  const ffmpeg = spawn('ffmpeg', [
-    '-hide_banner',
-    '-loglevel',
-    'error',
-    '-rtsp_transport',
-    'tcp',
-    '-i',
-    url.toString(),
-    '-an',
-    '-vf',
-    'fps=10',
-    '-f',
-    'mpjpeg',
-    '-q:v',
-    '5',
-    'pipe:1',
-  ]);
-  const releaseSlot = acquireFfmpegSlot();
-  const stderrChunks: Buffer[] = [];
-  let clientClosed = false;
-  let responseStarted = false;
-  let settled = false;
-
-  const startupTimer = setTimeout(() => {
-    failStream(new Error('FFmpeg did not produce camera preview data.'));
-  }, 10000);
-
-  const cleanup = (): void => {
-    clearTimeout(startupTimer);
-  };
-
-  const failStream = (err: Error): void => {
-    if (settled) return;
-    settled = true;
-    cleanup();
-    ffmpeg.kill('SIGTERM');
-    if (clientClosed) return;
-    if (responseStarted || res.headersSent) {
-      res.destroy(err);
-      return;
-    }
-    writeJson(res, { kind: 'unavailable', reason: err.message }, 502);
-  };
-
-  ffmpeg.stderr.on('data', (chunk: Buffer) => {
-    appendLimitedStderrChunk(stderrChunks, chunk);
-  });
-  ffmpeg.stdout.on('data', (chunk: Buffer) => {
-    if (settled || clientClosed) return;
-    if (!responseStarted) {
-      responseStarted = true;
-      cleanup();
-      writeMjpegResponseHeaders(res);
-    }
-    if (!res.write(chunk)) ffmpeg.stdout.pause();
-  });
-  ffmpeg.stdout.on('end', () => {
-    if (!settled && responseStarted && !clientClosed) res.end();
-  });
-  res.on('drain', () => ffmpeg.stdout.resume());
-  res.on('close', () => {
-    clientClosed = true;
-    settled = true;
-    cleanup();
-    ffmpeg.kill('SIGTERM');
-  });
-  ffmpeg.on('error', (err) => {
-    releaseSlot();
-    failStream(err);
-  });
-  ffmpeg.on('exit', (code, signal) => {
-    releaseSlot();
-    if (settled) return;
-    if (code === 0 || signal === 'SIGTERM') {
-      settled = true;
-      cleanup();
-      if (responseStarted && !clientClosed) res.end();
-      return;
-    }
-    failStream(new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview failed.')));
-  });
-}
-
-function appendLimitedStderrChunk(chunks: Buffer[], chunk: Buffer): void {
-  if (Buffer.concat(chunks).length < 8192) chunks.push(Buffer.from(chunk));
-}
-
-function writeMjpegResponseHeaders(res: ServerResponse): void {
-  res.writeHead(200, {
-    'Content-Type': 'multipart/x-mixed-replace; boundary=ffmpeg',
-    'Cache-Control': 'no-store',
-  });
-}
-
-function ffmpegFailureReason(chunks: ReadonlyArray<Buffer>, fallback: string): string {
-  const stderr = Buffer.concat(chunks).toString('utf8').trim();
-  return stderr.length > 0 ? `${fallback}: ${stderr}` : fallback;
 }
 
 async function probeRtsp(url: URL): Promise<{ readonly codec?: string }> {
@@ -273,17 +187,6 @@ function parseCodec(response: string): string | undefined {
   return match?.[1]?.trim();
 }
 
-let ffmpegAvailable: Promise<boolean> | null = null;
-
-function hasFfmpeg(): Promise<boolean> {
-  ffmpegAvailable ??= new Promise((resolve) => {
-    const ffmpeg = spawn('ffmpeg', ['-version'], { stdio: 'ignore' });
-    ffmpeg.on('error', () => resolve(false));
-    ffmpeg.on('exit', (code) => resolve(code === 0));
-  });
-  return ffmpegAvailable;
-}
-
 function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
   const origin = req.headers.origin;
   const allowedOrigin = cameraBridgeCorsOrigin(typeof origin === 'string' ? origin : undefined);
@@ -296,8 +199,23 @@ function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
 export function cameraBridgeCorsOrigin(origin: string | undefined): string | null {
   if (origin === undefined) return null;
   if (origin === 'app://app') return origin;
-  if (origin === 'http://localhost:5173' || origin === 'http://127.0.0.1:5173') return origin;
+  // Any loopback origin, any port: Vite falls back to a random port when 5173
+  // is taken (found live during the ADR-116 hardware pass). The S03-001 threat
+  // model is drive-by REMOTE pages — code already running on this machine's
+  // loopback can reach the cameras without the bridge's help.
+  if (isLoopbackDevOrigin(origin)) return origin;
   return isTrustedHostedAppOrigin(origin) ? origin : null;
+}
+
+function isLoopbackDevOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (
+      url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+    );
+  } catch {
+    return false;
+  }
 }
 
 // S03-001 server-side request gate. CORS only stops a browser READING a
@@ -323,11 +241,6 @@ function isTrustedHostedAppOrigin(origin: string): boolean {
   }
 }
 
-function writeJson(res: ServerResponse, value: unknown, status = 200): void {
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-  res.end(JSON.stringify(value));
-}
-
 function handleBridgeError(err: unknown, res: ServerResponse): void {
   if (res.headersSent) {
     res.destroy();
@@ -337,12 +250,13 @@ function handleBridgeError(err: unknown, res: ServerResponse): void {
   writeJson(res, { kind: 'unavailable', reason }, 502);
 }
 
-function listen(server: Server, port: number): Promise<void> {
+function listen(server: Server, port: number): Promise<number> {
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '127.0.0.1', () => {
       server.off('error', reject);
-      resolve();
+      const address = server.address();
+      resolve(typeof address === 'object' && address !== null ? address.port : port);
     });
   });
 }

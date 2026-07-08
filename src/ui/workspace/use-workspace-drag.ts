@@ -21,6 +21,7 @@ import { beginDrawDrag, commitDraftShape } from './draw-tool';
 import type { MeasureDraft } from './measure-tool';
 import { handlePenMouseDown } from './pen-tool';
 import { beginPathNodeDrag } from './path-node-drag';
+import { dispatchPositionLaser } from './position-laser-click';
 import { selectObjectsInMarquee } from './selection-marquee';
 import { useEscCancelsDrag } from './use-esc-cancels-drag';
 import type { SnapGuide, SnapSettings } from './snapping';
@@ -190,19 +191,9 @@ function beginWorkspaceDrag(args: {
   readonly drawShape: (shape: ShapeObject) => void;
   readonly selectionAnchor: SelectionAnchor;
 }): DragState | null {
-  if (args.toolMode.kind === 'node' && args.e.button === 0 && !useUiStore.getState().spaceDown) {
-    return beginPathNodeDragForNodeTool(args);
-  }
-  if (args.toolMode.kind === 'draw' && args.e.button === 0 && !useUiStore.getState().spaceDown) {
-    if (args.toolMode.shape === 'polyline') {
-      handlePenMouseDown(args);
-      return null;
-    }
-    return beginDrawDrag({ ...args, shape: args.toolMode.shape });
-  }
-  if (args.toolMode.kind === 'measure' && args.e.button === 0 && !useUiStore.getState().spaceDown) {
-    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-    return point === null ? null : { kind: 'measure', startScenePoint: point };
+  if (args.e.button === 0 && !useUiStore.getState().spaceDown) {
+    const tool = beginToolDrag(args);
+    if (tool.kind === 'handled') return tool.drag;
   }
   return computeMouseDownDrag({
     e: args.e,
@@ -215,6 +206,44 @@ function beginWorkspaceDrag(args: {
     onPlainClick: args.selectObject,
     selectionAnchor: args.selectionAnchor,
   });
+}
+
+// A primary click routed by the active tool. 'fallthrough' = the select tool
+// (or anything unhandled) — the normal selection/transform mouse-down runs.
+function beginToolDrag(args: {
+  readonly e: CanvasMouseEvent;
+  readonly ref: CanvasRef;
+  readonly project: Project;
+  readonly viewState: WorkspaceViewState;
+  readonly toolMode: ReturnType<typeof useUiStore.getState>['toolMode'];
+  readonly selectPathNode: ReturnType<typeof useStore.getState>['selectPathNode'];
+  readonly drawShape: (shape: ShapeObject) => void;
+}):
+  | { readonly kind: 'handled'; readonly drag: DragState | null }
+  | { readonly kind: 'fallthrough' } {
+  if (args.toolMode.kind === 'node') {
+    return { kind: 'handled', drag: beginPathNodeDragForNodeTool(args) };
+  }
+  if (args.toolMode.kind === 'draw') {
+    if (args.toolMode.shape === 'polyline') {
+      handlePenMouseDown(args);
+      return { kind: 'handled', drag: null };
+    }
+    return { kind: 'handled', drag: beginDrawDrag({ ...args, shape: args.toolMode.shape }) };
+  }
+  if (args.toolMode.kind === 'measure') {
+    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    return {
+      kind: 'handled',
+      drag: point === null ? null : { kind: 'measure', startScenePoint: point },
+    };
+  }
+  if (args.toolMode.kind === 'position-laser') {
+    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    if (point !== null) dispatchPositionLaser(point, args.project.device);
+    return { kind: 'handled', drag: null }; // a positioning click never starts a drag
+  }
+  return { kind: 'fallthrough' };
 }
 
 function beginPathNodeDragForNodeTool(args: {

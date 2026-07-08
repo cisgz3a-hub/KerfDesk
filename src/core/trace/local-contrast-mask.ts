@@ -22,7 +22,7 @@ import type { RawImageData } from './trace-image';
 /** A bilevel raster: `data[i]` is 1 for foreground ink, 0 for background.
  *  The neutral bitmap shape the contour finisher consumes as an InkMask;
  *  defined here (its producer) after potrace's own bitmap module was
- *  removed (ADR-122). */
+ *  removed (ADR-123). */
 export type TraceBitmap = {
   readonly width: number;
   readonly height: number;

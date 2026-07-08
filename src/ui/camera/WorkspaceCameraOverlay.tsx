@@ -22,14 +22,20 @@ export function WorkspaceCameraOverlay(): JSX.Element | null {
   const visible = useCameraStore((s) => s.overlayVisible);
   const opacityPercent = useCameraStore((s) => s.overlayOpacityPercent);
   const still = useCameraStore((s) => s.overlayStill);
-  const stream = useCameraStore((s) => s.stream);
+  const sourceState = useCameraStore((s) => s.sourceState);
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const panX = useUiStore((s) => s.panX);
   const panY = useUiStore((s) => s.panY);
   const [box, boxRef] = useElementSize();
 
   if (alignment === undefined || !visible) return null;
-  const hasSource = still !== null || stream.kind === 'live';
+  // Live overlay needs a MediaStream (USB); machine sources overlay via the
+  // captured still (LightBurn's Update Overlay model).
+  const liveStream =
+    sourceState.kind === 'live' && sourceState.source.kind === 'usb'
+      ? sourceState.source.stream.stream
+      : null;
+  const hasSource = still !== null || liveStream !== null;
   if (!hasSource) return null;
 
   const view =
@@ -44,9 +50,9 @@ export function WorkspaceCameraOverlay(): JSX.Element | null {
           matrix={overlayMatrix3d(alignment.homography, view)}
           opacityPercent={opacityPercent}
         />
-      ) : stream.kind === 'live' ? (
+      ) : liveStream !== null ? (
         <CameraOverlay
-          stream={stream.stream.stream}
+          stream={liveStream}
           homography={alignment.homography}
           view={view}
           opacityPercent={opacityPercent}

@@ -2631,9 +2631,9 @@ F-CNC19 tiling.
   lighting produce a typed toast telling the operator what to fix; nothing
   persists. A degenerate solve (markers nearly collinear) is refused the same
   way.
-- **Empty / no live feed.** Auto-align is disabled until the camera feed runs;
-  the Falcon network camera cannot auto-align (its frames block pixel
-  readback) and keeps the manual 4-corner click flow.
+- **Empty / no live feed.** Auto-align is disabled until an active camera
+  source can produce pixel-readable frames. Machine cameras become eligible
+  when the local bridge frame proxy is available (F-CAM6).
 - **Edge / rotated camera.** A camera mounted 180° (or at an angle) still
   labels the corners correctly — the origin pair, not the operator, carries
   the orientation.
@@ -2653,6 +2653,63 @@ F-CNC19 tiling.
   feed; without an alignment the overlay row (and the button) is absent.
 - **Edge / encoder failure.** A platform without 2D canvas support fails
   typed ('could not build the bed image') instead of half-completing.
+
+### F-CAM6. Machine camera via the local bridge (ADR-121)
+
+- **Success / first-class machine camera.** The operator opens the Camera
+  panel, the local bridge is healthy, and **Discover machine camera** finds a
+  private-network JPEG or RTSP camera. **Use this camera** makes it the active
+  camera source; calibration, auto-align, overlay updates, trace-from-camera,
+  and snapshots use the same pixel-readable capture path as USB cameras.
+- **Error / bridge unavailable.** If the bridge is not running, discovery and
+  machine-camera capture show an actionable message. Browser users are pointed
+  to the bridge command; the desktop app starts it automatically.
+- **Empty / no camera found.** Discovery completes with no candidate camera;
+  the panel stays usable for USB cameras and manual RTSP entry.
+- **Edge / slow or single-threaded camera.** Frame fetches for the same camera
+  host are serialized and shared while in flight so preview polling and capture
+  do not overload embedded camera servers.
+
+### F-CAM7. Click-to-position the laser head (ADR-122)
+
+- **Success / head under the click.** The operator selects **Move laser here**
+  and clicks a point on the workspace. The click maps through the same origin
+  transform used by emitted G-code, clamps inside the machine bed, and sends
+  one absolute beam-off jog through the normal jog safety gates.
+- **Error / machine not ready.** If the machine is disconnected, busy, alarmed,
+  or otherwise blocked for jogging, no command is sent and the operator sees
+  the same block reason as the Jog Pad.
+- **Empty / no camera overlay.** The tool still moves to workspace
+  coordinates; the camera overlay simply makes the target visually meaningful.
+- **Edge / zero coordinates.** Absolute destinations at X0, Y0, or Z0 keep the
+  zero-valued axis word; only relative zero deltas are omitted.
+
+### F-CAM8. Camera snapshot and monitoring view (ADR-122)
+
+- **Success / snapshot saved.** With any active camera source, **Save
+  snapshot...** captures one pixel-readable frame, encodes it as PNG, and sends
+  it through the platform save dialog.
+- **Error / capture or encode failed.** Capture/PNG failures show typed toasts;
+  user-cancelled save dialogs stay quiet.
+- **Empty / no active source.** Snapshot actions are disabled until a camera
+  source is active.
+- **Edge / watching a job.** The camera panel can toggle between compact and
+  wide monitoring widths, with the preference kept locally.
+
+### F-CAM9. Bed-alignment wizard with burn-the-target (ADR-122)
+
+- **Success / one wizard, aligned bed.** **Align to bed...** opens a guided
+  wizard: choose marker burn power/speed, burn the five-marker target through
+  the normal Start flow, wait for the stream to finish, clear the bed, capture
+  a frame, detect markers, solve the homography, and persist the alignment.
+- **Error / burn not started or failed.** If readiness, preflight,
+  confirmation, streaming, cancellation, or disconnect stops the burn, the
+  wizard returns to setup with the typed reason and does not persist anything.
+- **Empty / markers already burned.** The operator can skip the burn step and
+  go straight to detection when the target is already on the bed.
+- **Edge / minimized wizard.** The wizard can minimize into a small non-modal
+  panel so the operator can watch the live camera and reach the machine while
+  the capture or burn flow continues.
 
 ---
 

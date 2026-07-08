@@ -292,7 +292,7 @@ describe('tracedataToColoredPaths', () => {
   });
 });
 
-// Routing pin (replaces the deleted potrace-backend pin, ADR-122): the
+// Routing pin (replaces the deleted potrace-backend pin, ADR-123): the
 // binary filled presets must dispatch to the in-house contour backend, and
 // nothing else may.
 describe('filled-contour backend routing', () => {

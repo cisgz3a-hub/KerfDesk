@@ -45,6 +45,12 @@ describe('Marlin command builders', () => {
     );
   });
 
+  it('keeps zero-valued axis words in absolute mode (X0 is a real destination)', () => {
+    expect(buildMarlinJogCommand({ dx: 0, dy: 50, feed: 1000, relative: false })).toBe(
+      'G21\nG90\nG0 X0.000 Y50.000 F1000',
+    );
+  });
+
   it('builds framing as G21+G90 leads plus five absolute G0 legs', () => {
     const lines = buildMarlinFrameLines({ minX: 0, minY: 0, maxX: 20, maxY: 10 }, 6000);
     expect(lines[0]).toBe('G21\n');

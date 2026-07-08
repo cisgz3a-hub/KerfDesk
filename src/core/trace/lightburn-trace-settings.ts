@@ -3,7 +3,7 @@
 // Optimize, Trace Transparency, Sketch Trace). These map onto TraceOptions
 // at the dialog boundary (src/ui/trace/) and feed every trace backend; they
 // are backend-neutral and were split out of the now-removed potrace
-// parameter module (ADR-122) so the dialog model outlived potrace's
+// parameter module (ADR-123) so the dialog model outlived potrace's
 // deletion.
 
 export type LightBurnTraceSettings = {

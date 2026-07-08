@@ -6,7 +6,7 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { captureStreamFrame } from './frame-capture';
+import { captureSourceFrame } from './frame-source';
 import { buildCameraTraceImage } from './trace-from-camera';
 
 export function TraceFromCameraButton(): JSX.Element {
@@ -14,13 +14,13 @@ export function TraceFromCameraButton(): JSX.Element {
   const calibration = useStore((s) => s.project.device.cameraCalibration);
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
-  const stream = useCameraStore((s) => s.stream);
+  const sourceState = useCameraStore((s) => s.sourceState);
   const openImageDialog = useUiStore((s) => s.openImageDialog);
   const pushToast = useToastStore((s) => s.pushToast);
 
   const traceFromCamera = async (): Promise<void> => {
-    if (stream.kind !== 'live') return;
-    const raw = await captureStreamFrame(stream.stream.stream);
+    if (sourceState.kind !== 'live') return;
+    const raw = await captureSourceFrame(sourceState.source);
     if (raw === null) {
       pushToast('Could not capture a camera frame.', 'error');
       return;
@@ -48,7 +48,7 @@ export function TraceFromCameraButton(): JSX.Element {
     <button
       type="button"
       className="lf-btn"
-      disabled={stream.kind !== 'live'}
+      disabled={sourceState.kind !== 'live'}
       onClick={() => void traceFromCamera()}
       title="Capture the bed, flatten it top-down, and trace it — vectors land at the object's true position."
     >
