@@ -181,7 +181,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
     }
   });
 
-  it('does not render the desktop-download or PWA-install affordances (removed for now)', async () => {
+  it('shows the Install-app button once the browser offers a PWA install prompt', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     let root: Root | null = null;
@@ -191,10 +191,17 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
         root.render(<Toolbar commands={[]} machineKind="laser" />);
       });
 
-      // Both were toolbar-mounted (ADR-024 / ADR-060) and are temporarily
-      // withdrawn; the components themselves still exist under ui/common.
-      expect(host.textContent).not.toContain('Download for Windows');
+      // InstallButton (ADR-060) is mounted but stays hidden until the browser
+      // fires beforeinstallprompt (installable, not already installed).
       expect(host.textContent).not.toContain('Install app');
+      await act(async () => {
+        window.dispatchEvent(new Event('beforeinstallprompt', { cancelable: true }));
+      });
+      expect(host.textContent).toContain('Install app');
+
+      // DownloadDesktopLink (ADR-024) stays unmounted (maintainer request);
+      // the component still exists under ui/common.
+      expect(host.textContent).not.toContain('Download for Windows');
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();

@@ -5,6 +5,7 @@
 // the prompt isn't available (already installed / unsupported browser).
 
 import { useEffect, useState } from 'react';
+import { APP_DISPLAY_NAME } from '../../core/app-branding';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -34,7 +35,7 @@ export function InstallButton(): JSX.Element | null {
     <button
       type="button"
       className="lf-btn"
-      title="Install LaserForge as an app that launches from your taskbar and runs offline"
+      title={`Install ${APP_DISPLAY_NAME} as an app that launches from your taskbar and runs offline`}
       onClick={() => {
         void deferredPrompt.prompt();
         setDeferredPrompt(null);

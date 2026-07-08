@@ -27,10 +27,10 @@ export default defineConfig({
       injectRegister: false,
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'LaserForge 2.0',
-        short_name: 'LaserForge',
+        name: 'KerfDesk',
+        short_name: 'KerfDesk',
         description:
-          'GRBL CAM for laser cutters and engravers — design, trace, and burn, fully offline.',
+          'GRBL CAM for laser cutters, engravers, and CNC routers — design, trace, and burn, fully offline.',
         theme_color: '#2563eb',
         background_color: '#f8fafc',
         display: 'standalone',
