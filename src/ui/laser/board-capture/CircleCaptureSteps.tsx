@@ -4,7 +4,7 @@
 // any rim point and captures it to measure the diameter (2·centre→rim).
 // "Create board outline" draws the locked, centre-anchored circle.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { diameterFromCenterEdge, type Vec2 } from '../../../core/scene';
 import { Button, NumberInput } from '../../kit';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
@@ -59,9 +59,13 @@ function CircleDiameterForm({
   readonly onDraw: (diameterMm: number) => void;
 }): JSX.Element {
   const [typed, setTyped] = useState('');
-  // A measured rim capture pre-fills the field; typing overrides it.
-  const display = typed !== '' ? typed : measured !== null ? measured.toFixed(1) : '';
-  const diameter = Number(display);
+  // A fresh rim measurement wins: adopt it into the field so a value typed FIRST
+  // can't shadow a later, more precise Capture-edge (typing after still overrides,
+  // and the field stays consistent with the "measured" badge).
+  useEffect(() => {
+    if (measured !== null) setTyped(measured.toFixed(1));
+  }, [measured]);
+  const diameter = Number(typed);
   const canDraw = Number.isFinite(diameter) && diameter >= MIN_BOARD_DIMENSION_MM;
 
   return (
@@ -70,7 +74,7 @@ function CircleDiameterForm({
       <div style={rowStyle}>
         <NumberInput
           aria-label="Circle diameter in mm"
-          value={display}
+          value={typed}
           min={MIN_BOARD_DIMENSION_MM}
           step={1}
           style={inputStyle}
@@ -79,7 +83,7 @@ function CircleDiameterForm({
         <span style={mutedStyle}>mm ⌀</span>
         {measured !== null && <span style={mutedStyle}>measured {measured.toFixed(1)}</span>}
       </div>
-      {display !== '' && !canDraw && (
+      {typed !== '' && !canDraw && (
         <p style={warnStyle}>
           That&apos;s too small — type a diameter of at least {MIN_BOARD_DIMENSION_MM} mm.
         </p>

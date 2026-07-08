@@ -293,4 +293,27 @@ describe('BoardCapturePanel', () => {
     expect(box?.spec).toMatchObject({ kind: 'ellipse', widthMm: 90, heightMm: 90 });
     await unmount();
   });
+
+  it('lets a fresh rim measurement override a diameter that was typed first', async () => {
+    useLaserStore.setState({
+      setOriginHere: vi.fn(async () => undefined),
+      connection: { kind: 'connected' },
+      wcoCache: null,
+    });
+    const { host, unmount } = await render();
+
+    await act(async () => buttonByText(host, 'Circle')?.click());
+    await setMachinePosition(100, 100);
+    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    // Type a rough diameter FIRST...
+    await act(async () => setNumberInput(host, 'Circle diameter in mm', '90'));
+    // ...then measure a precise one (60 mm out -> diameter 120). It must win.
+    await setMachinePosition(160, 100);
+    await act(async () => buttonByText(host, 'Capture edge')?.click());
+
+    await act(async () => buttonByText(host, 'Create board outline')?.click());
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(box?.spec).toMatchObject({ kind: 'ellipse', widthMm: 120, heightMm: 120 });
+    await unmount();
+  });
 });
