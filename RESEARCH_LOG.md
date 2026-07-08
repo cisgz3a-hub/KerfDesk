@@ -4,7 +4,7 @@
 >
 > Entry format below. New rows are added on PR; existing rows are updated with `Re-verified:` lines when re-checked.
 >
-> **Note on license-history references (2026-05-27, updated 2026-07-07).** Earlier entries describe the project as "MIT-licensed" and reject GPL deps with phrasing like "would taint MIT license." That was true under ADR-008, superseded by ADR-018 (proprietary, private, 2026-05-27), which is in turn superseded by **ADR-118 (2026-07-07): the project is MIT-licensed and open source again**. The dependency policy was identical under all three postures — MIT-compatible only, GPL rejected — so every rejection in this log remains valid.
+> **Note on license-history references (2026-05-27, updated 2026-07-07).** Earlier entries describe the project as "MIT-licensed" and reject GPL deps with phrasing like "would taint MIT license." That was true under ADR-008, superseded by ADR-018 (proprietary, private, 2026-05-27), which is in turn superseded by **ADR-120 (2026-07-07): the project is MIT-licensed and open source again**. The dependency policy was identical under all three postures — MIT-compatible only, GPL rejected — so every rejection in this log remains valid.
 
 ---
 
@@ -293,7 +293,7 @@ These are not in `package.json`; they are sources of record we rely on for proto
 - **Findings (paraphrased):**
   - Open-source GRBL CAM tools active in 2026: LaserGRBL (Windows only), MeerK40t (multi-platform), CNCjs (general G-code sender), gSender (general G-code sender), plus a Gtk4-based Linux/Windows CAM tool. None ships a web app + Windows desktop combination; this is our differentiator.
   - LightBurn remains dominant in paid space at ~$60.
-  - No competitor combines: web delivery, multi-color layer assignment, GRBL streaming, single-codebase web+desktop. LaserForge 2.0 targets this combination. (The "MIT license" differentiator from the original framing is current again per ADR-118.)
+  - No competitor combines: web delivery, multi-color layer assignment, GRBL streaming, single-codebase web+desktop. LaserForge 2.0 targets this combination. (The "MIT license" differentiator from the original framing is current again per ADR-120.)
 
 ---
 
