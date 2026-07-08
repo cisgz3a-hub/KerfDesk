@@ -19,6 +19,12 @@ You load the page once. It caches itself, so from then on it runs **fully offlin
 - **The workflow you already know.** Colour-as-layer design, a Cuts/Layers panel with per-layer mode / power / speed / passes, and a Laser panel for jogging, framing, and streaming.
 - **Deterministic, safety-checked G-code.** The same input produces byte-identical output (snapshot-tested in CI), with property-tested safety invariants such as *laser off on every travel move* and *never exceed the machine's power scale*.
 
+> ### ⭐ Line your work up perfectly, with no camera
+>
+> This is the part I am proudest of. Lay any board, offcut, or blank anywhere on the bed. KerfDesk's **Place Board** tool works out exactly where it is and how big it is: you jog the head to each corner and tap **Capture**, and it does the rest. Then it centres your design on that board to the millimetre and burns it right where it sits.
+>
+> Every other tool solves this with an overhead camera. Cameras cost money and need calibrating, and a huge number of hobby machines have no homing switches to fall back on either. **Place Board needs neither.** You measure the board by moving to it, and the machine remembers. It is a small idea that removes the most tedious, wasteful part of using a laser or router without a camera: the endless pencil-mark, jog, test-burn, nudge, repeat. [See exactly how it works below.](#placement-without-a-camera)
+
 ---
 
 ## Placement without a camera
