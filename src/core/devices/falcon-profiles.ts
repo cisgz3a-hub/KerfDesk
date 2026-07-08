@@ -8,6 +8,8 @@ export const FALCON_A1_PRO_GRBLHAL_PROFILE: DeviceProfile = {
   name: 'Creality Falcon A1 Pro (grblHAL)',
   machineFamily: 'creality-falcon',
   controllerKind: 'grblhal',
+  maxFeed: 10000,
+  framingFeedMmPerMin: 10000,
   capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
   evidence: [
     {
@@ -26,6 +28,8 @@ export const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
   name: 'Creality Falcon-compatible GRBL diode',
   machineFamily: 'creality-falcon',
   controllerKind: 'grbl-v1.1',
+  maxFeed: 10000,
+  framingFeedMmPerMin: 10000,
   capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
   evidence: [
     {

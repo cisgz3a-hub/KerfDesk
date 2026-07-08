@@ -11,6 +11,10 @@ export type ProfileControllerFactMergeInput = {
 
 export function profileWithControllerFacts(args: ProfileControllerFactMergeInput): DeviceProfile {
   const controllerRead = args.lastSettingsReadAt !== null;
+  const framingFeedMmPerMin = Math.max(
+    args.current.framingFeedMmPerMin,
+    args.profile.framingFeedMmPerMin,
+  );
   const machinePatch = {
     ...(controllerRead ? machineReportedProfilePatch(args.current) : {}),
     ...(controllerRead ? machineReportedProfilePatch(args.controllerSettings) : {}),
@@ -21,7 +25,7 @@ export function profileWithControllerFacts(args: ProfileControllerFactMergeInput
   return {
     ...args.profile,
     ...machinePatch,
-    ...(controllerRead ? { framingFeedMmPerMin: args.current.framingFeedMmPerMin } : {}),
+    ...(controllerRead ? { framingFeedMmPerMin } : {}),
     ...(controllerKind === undefined ? {} : { controllerKind }),
   };
 }
