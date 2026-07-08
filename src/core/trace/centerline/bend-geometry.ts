@@ -79,7 +79,11 @@ export function turnIsConcentrated(pts: ReadonlyArray<Vec2>, i: number, arm: num
 // Net turn between the tangent entering and leaving a ±halfSpan window
 // around index i. Tangents are short chords sampled just outside the window
 // (same noise-averaging rationale as bendVertex's chord anchors).
-export function netTurnAcross(pts: ReadonlyArray<Vec2>, i: number, halfSpan: number): number | null {
+export function netTurnAcross(
+  pts: ReadonlyArray<Vec2>,
+  i: number,
+  halfSpan: number,
+): number | null {
   const before = walkByArc(pts, i, -halfSpan);
   const after = walkByArc(pts, i, halfSpan);
   if (before === null || after === null) return null;
@@ -195,7 +199,10 @@ export function bendWindow(
 
 // Intersect the head's exit tangent with the tail's entry tangent. Null for
 // gentle bends, near-parallel tangents, or a vertex behind either arm.
-export function bendVertex(head: ReadonlyArray<Vec2>, tail: ReadonlyArray<Vec2>): BendVertex | null {
+export function bendVertex(
+  head: ReadonlyArray<Vec2>,
+  tail: ReadonlyArray<Vec2>,
+): BendVertex | null {
   const a1 = chordAnchor(head, 'tail');
   const a2 = head.at(-1);
   const b1 = tail[0];

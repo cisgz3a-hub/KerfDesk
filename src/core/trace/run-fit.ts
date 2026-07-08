@@ -119,12 +119,9 @@ export function quadraticFitFromStats(stats: RunFrameStats, n: number): Quadrati
   const { m1, m2, m3, m4, v0, v1, v2 } = stats;
   const det = n * (m2 * m4 - m3 * m3) - m1 * (m1 * m4 - m2 * m3) + m2 * (m1 * m3 - m2 * m2);
   if (Math.abs(det) < FIT_DEGENERATE_EPS || !Number.isFinite(det)) return null;
-  const a =
-    (v0 * (m2 * m4 - m3 * m3) - m1 * (v1 * m4 - v2 * m3) + m2 * (v1 * m3 - v2 * m2)) / det;
-  const b =
-    (n * (v1 * m4 - v2 * m3) - v0 * (m1 * m4 - m2 * m3) + m2 * (m1 * v2 - m2 * v1)) / det;
-  const c =
-    (n * (m2 * v2 - m3 * v1) - m1 * (m1 * v2 - m2 * v1) + v0 * (m1 * m3 - m2 * m2)) / det;
+  const a = (v0 * (m2 * m4 - m3 * m3) - m1 * (v1 * m4 - v2 * m3) + m2 * (v1 * m3 - v2 * m2)) / det;
+  const b = (n * (v1 * m4 - v2 * m3) - v0 * (m1 * m4 - m2 * m3) + m2 * (m1 * v2 - m2 * v1)) / det;
+  const c = (n * (m2 * v2 - m3 * v1) - m1 * (m1 * v2 - m2 * v1) + v0 * (m1 * m3 - m2 * m2)) / det;
   const residualSumSq = stats.residualSumSq - a * v0 - b * v1 - c * v2;
   if (!Number.isFinite(residualSumSq)) return null;
   return { a, b, c, rms: Math.sqrt(Math.max(0, residualSumSq) / n) };
