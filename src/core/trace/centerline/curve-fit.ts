@@ -92,7 +92,10 @@ function openRunsBetween(points: ReadonlyArray<Vec2>, cornerIdx: ReadonlyArray<n
 }
 
 // Closed chain with corners: walk corner-to-corner around the ring, each run
-// an open arc including both bounding corners.
+// an open arc including both bounding corners. With exactly ONE corner the
+// single run wraps the FULL ring back to the same corner (start === end must
+// not mean zero steps — that collapsed a one-corner ring, e.g. a traced
+// letter-O counter, to a single point that the seam dedupe then emptied).
 function closedRunsBetween(points: ReadonlyArray<Vec2>, cornerIdx: ReadonlyArray<number>): Run[] {
   const n = points.length;
   const runs: Run[] = [];
@@ -102,10 +105,10 @@ function closedRunsBetween(points: ReadonlyArray<Vec2>, cornerIdx: ReadonlyArray
     const arc: Vec2[] = [];
     let i = start;
     // Inclusive of both corners, wrapping around the seam.
-    for (;;) {
+    for (let step = 0; step <= n; step += 1) {
       const p = points[i];
       if (p !== undefined) arc.push(p);
-      if (i === end) break;
+      if (i === end && step > 0) break;
       i = (i + 1) % n;
     }
     runs.push({ points: arc, closed: false });

@@ -31,8 +31,8 @@ import {
   upscaleBy,
 } from './auto-upscale';
 import { traceCenterlineStrokePaths } from './centerline';
+import { isBinaryContourPreset, traceImageToContourColoredPaths } from './contour-trace';
 import { traceImageToEdgePaths } from './edge-trace';
-import { shouldUsePotraceTraceBackend, traceImageToPotraceColoredPaths } from './potrace-trace';
 
 // Number of intermediate points to sample per quadratic Bezier
 // segment. 16 samples produces sub-pixel resolution at typical engrave
@@ -189,7 +189,10 @@ function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
 async function dispatchTrace(image: RawImageData, options: TraceOptions): Promise<ColoredPath[]> {
   if (options.traceMode === 'centerline') return traceCenterlineStrokePaths(image, options);
   if (options.traceMode === 'edge') return traceImageToEdgePaths(image, options);
-  if (shouldUsePotraceTraceBackend(options)) return traceImageToPotraceColoredPaths(image, options);
+  // The binary filled-contours lane (Line Art / Smooth / Sharp) is traced by
+  // the in-house contour backend (ADR-123). imagetracerjs remains only for
+  // the multi-colour, no-fixed-palette path below.
+  if (isBinaryContourPreset(options)) return traceImageToContourColoredPaths(image, options);
   const tracer = await loadTracer();
   const prepared = preprocessForTrace(image, options);
   const td = tracer.imagedataToTracedata(prepared, buildImageTracerOptions(options));

@@ -1,14 +1,15 @@
 // Local-contrast ink mask: a pixel is ink when it is darker than its own
 // neighbourhood, not darker than a global cut-off.
 //
-// This is mkbitmap's design (potrace's companion preprocessor): subtracting
-// the local mean turns a global threshold into a LOCAL contrast test, so
-// faint-but-real strokes (grey letters on white, luma well above 128) are
-// detected on any background level. A pure highpass reads ~0 deep inside
-// large solid regions, which would hollow them out — so the mask is the
-// UNION of the local test and the plain global threshold: the global pass
-// keeps solid interiors filled, the local pass adds the faint detail the
-// global threshold drops.
+// Adaptive (local-mean) thresholding is a textbook binarization technique
+// (Bradley/Roth 2007; Sauvola/Wellner): subtracting the local box-mean
+// turns a global threshold into a LOCAL contrast test, so faint-but-real
+// strokes (grey letters on white, luma well above 128) are detected on any
+// background level. A pure highpass reads ~0 deep inside large solid
+// regions, which would hollow them out — so the mask is the UNION of the
+// local test and the plain global threshold: the global pass keeps solid
+// interiors filled, the local pass adds the faint detail the global
+// threshold drops.
 //
 // Chosen over Canny-loop filling for the Edge Detection rebuild (ADR-115):
 // filling enclosed edge loops needs the loops closed, and closing them
@@ -16,11 +17,21 @@
 // exact detail the edge preset exists to keep. The local-contrast test has
 // no morphology, so a 3px counter survives untouched.
 
-import type { TraceBitmap } from './potrace-bitmap';
 import type { RawImageData } from './trace-image';
 
-// Same global cut-off the potrace bitmap builder uses (potrace-bitmap.ts
-// thresholdLuma) so the union's backbone matches Line Art's notion of ink.
+/** A bilevel raster: `data[i]` is 1 for foreground ink, 0 for background.
+ *  The neutral bitmap shape the contour finisher consumes as an InkMask;
+ *  defined here (its producer) after potrace's own bitmap module was
+ *  removed (ADR-123). */
+export type TraceBitmap = {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8Array;
+};
+
+// The 8-bit luma midpoint — the same global cut-off Line Art's own mask
+// uses, so the union's backbone agrees with the filled-contour lane's
+// notion of ink.
 const GLOBAL_INK_LUMA = 128;
 const OPAQUE_PAPER_LUMA = 255;
 
@@ -64,8 +75,9 @@ function lumaPlane(image: RawImageData): Float32Array {
 }
 
 // Separable box blur with edge-clamped sampling, O(n) per axis via running
-// sums. A box (not Gaussian) matches mkbitmap and keeps the mask exactly
-// reproducible in integer-free float math (deterministic across runs).
+// sums. A box mean (not Gaussian) is the exact local-mean the adaptive
+// threshold wants and keeps the mask reproducible in float math
+// (deterministic across runs).
 function boxBlur(src: Float32Array, width: number, height: number, radius: number): Float32Array {
   const tmp = new Float32Array(src.length);
   const out = new Float32Array(src.length);

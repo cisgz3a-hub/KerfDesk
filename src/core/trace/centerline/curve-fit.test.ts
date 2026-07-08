@@ -155,4 +155,23 @@ describe('fitSmoothCurve', () => {
     // interior samples were added between control vertices.
     expect(capped.length).toBeGreaterThan(control.length);
   });
+
+  it('keeps a closed ring with exactly ONE corner (teardrop) instead of collapsing it', () => {
+    // Regression: a single-corner closed chain used to split into a run from
+    // the corner to itself — zero steps, one point — which the closed-ring
+    // seam dedupe then popped to an EMPTY output. Real inputs hit this: a
+    // traced letter-O counter whose ring carries one detected corner.
+    const corner: Vec2 = { x: 20, y: 0 };
+    const ring: Vec2[] = [corner];
+    const samples = 16;
+    for (let i = 1; i < samples; i += 1) {
+      const angle = (i / samples) * 2 * Math.PI;
+      ring.push({ x: 20 * Math.cos(angle), y: 20 * Math.sin(angle) });
+    }
+    const out = fitSmoothCurve(ring, true, new Set([corner]), 2);
+    // The full ring survives: at least the control vertices, corner included
+    // exactly (same object), and the loop is not degenerate.
+    expect(out.length).toBeGreaterThanOrEqual(ring.length);
+    expect(out).toContain(corner);
+  });
 });
