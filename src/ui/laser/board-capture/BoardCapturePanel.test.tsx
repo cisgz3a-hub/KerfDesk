@@ -244,4 +244,53 @@ describe('BoardCapturePanel', () => {
     expect(host.textContent).toContain('Measured: 120.0 × 80.0 mm');
     await unmount();
   });
+
+  it('captures a circle from the centre + typed diameter, centre-anchored', async () => {
+    const setOriginHere = vi.fn(async () => undefined);
+    useLaserStore.setState({ setOriginHere, connection: { kind: 'connected' }, wcoCache: null });
+    const { host, unmount } = await render();
+
+    await act(async () => buttonByText(host, 'Circle')?.click());
+    await setMachinePosition(100, 100); // the centre
+    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    expect(setOriginHere).toHaveBeenCalledTimes(1);
+
+    await act(async () => setNumberInput(host, 'Circle diameter in mm', '90'));
+    const create = buttonByText(host, 'Create board outline');
+    expect(create?.disabled).toBe(false);
+    await act(async () => create?.click());
+
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(box?.spec).toMatchObject({ kind: 'ellipse', widthMm: 90, heightMm: 90 });
+    expect(box?.locked).toBe(true);
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'center',
+    });
+    expect(host.textContent).toContain('Measured: ⌀ 90.0 mm');
+    await unmount();
+  });
+
+  it('measures a circle diameter by jogging to a rim point', async () => {
+    useLaserStore.setState({
+      setOriginHere: vi.fn(async () => undefined),
+      connection: { kind: 'connected' },
+      wcoCache: null,
+    });
+    const { host, unmount } = await render();
+
+    await act(async () => buttonByText(host, 'Circle')?.click());
+    await setMachinePosition(100, 100); // centre
+    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    await setMachinePosition(145, 100); // rim: 45 mm out -> diameter 90
+    await act(async () => buttonByText(host, 'Capture edge')?.click());
+
+    const create = buttonByText(host, 'Create board outline');
+    expect(create?.disabled).toBe(false); // measured diameter pre-fills the field
+    await act(async () => create?.click());
+
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(box?.spec).toMatchObject({ kind: 'ellipse', widthMm: 90, heightMm: 90 });
+    await unmount();
+  });
 });

@@ -1226,6 +1226,25 @@ design under "fit as many as fit") is capped per axis.
 
 ---
 
+### F-BC3. Place a round (circle) board (ADR-126)
+
+**ADR:** [ADR-126](DECISIONS.md#adr-126---generalize-place-board-to-a-board-shape-union-circle-boards-2026-07-08).
+
+**Operator intent.** Capture a round blank (coaster, medallion) the same way as a rectangle, but a circle has no corners - so capture its CENTRE and give a diameter.
+
+**Where in the UI.** The Place Board panel's Rectangle / Circle toggle (top of the capture phase). Circle mode replaces the four-corner steps with a centre capture + a diameter.
+
+**The happy path.**
+1. Open Place Board; click Circle.
+2. Jog to the CENTRE of the board; Capture centre. This sets the work origin at the centre.
+3. Type the hand-measured diameter, OR jog to any point on the rim and Capture edge to measure it (diameter = twice the centre-to-rim distance; it pre-fills the field).
+4. Create board outline -> a locked circle draws around the origin, anchored at its centre.
+5. Place / Fit / Array artwork exactly as for a rectangle (the circle is found by the same machinery). "Jog head to: Center" returns the head to the captured centre.
+
+**Edge / empty / error.** A diameter below the minimum is blocked. A rim point on the centre (double-click) is ignored. Switching shape clears the in-progress capture. Fit/Array fill the circle's bounding square, so a design's corners may sit outside the arc.
+
+---
+
 ### F-F4. Convert a selected vector to a bitmap (Phase F.4)
 
 **ADR:** [ADR-029](DECISIONS.md#adr-029--convert-to-bitmap-vector--raster-engrave-source).

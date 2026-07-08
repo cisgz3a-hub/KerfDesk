@@ -6090,3 +6090,33 @@ An adversarial review of this diff surfaced four issues, all fixed here:
 - **Re-array cannot silently stack.** After arraying, the whole grid becomes the selection (like Duplicate), which disables Array/Fit (they need exactly one selected design); the operator undoes to re-array. A re-click can no longer drop a second exactly-overlapping grid (a doubled burn).
 - **Count + perf caps.** `MAX_TILE_TOTAL` (500) caps the total copies - a tiny design under "fit as many as fit" could otherwise spawn ~10,000 - and the copies are appended in a single pass rather than an O(n^2) per-object loop.
 - **Finite-gap guard.** A non-finite spacing (e.g. a huge literal parsing to Infinity) is clamped to 0 in both the array form and `tileIntoRegion`, so it cannot write NaN into a copy's transform or the emitted G-code.
+
+## ADR-126 - Generalize Place Board to a board-shape union; circle boards (2026-07-08)
+
+**Status:** accepted (maintainer directive: capture round boards - "origin the middle of the circle and draw a circle with a hand-measured diameter around the laser origin"; chosen scope: a general board-shape system, circle first).
+
+> **Numbering note.** ADR-125 (Fill the board) was the last used; **ADR-126** is the next free (verify at merge).
+
+### Context
+
+Place Board (ADR-124) captured rectangles only - four jogged corners, origin at the bottom-left. Round stock (coasters, medallions) has no corners, and its natural origin is the CENTRE. Rather than special-case a circle, generalize the captured board to a shape union so future shapes (rounded-rect, polygon) slot in cleanly.
+
+### Decision 1 - a BoardShape discriminated union in core
+
+`BoardShape = { kind:'rect'; widthMm; heightMm } | { kind:'circle'; diameterMm }` (`core/scene/board-capture.ts`), matched with `assertNever`. The capture-in-progress reducer gains `shapeKind` + a resolved `shape`; `corners` is shape-relative (rect: up to four corners; circle: `[centre]` or `[centre, rim]`).
+
+### Decision 2 - circle origin is the centre; size by typing or jog-to-edge
+
+The operator jogs to the CENTRE and Captures, which sets the G92 work origin there (anchor `'center'`, already a valid placement). Then they type the hand-measured diameter, or jog to any rim point and capture it - `diameterFromCenterEdge(centre, rim) = 2*|rim - centre|` (pure) measures it without a ruler. So a circle is one jog + one number, simpler than the rectangle's four corners.
+
+### Decision 3 - reuse: circles need no downstream change
+
+`createRegistrationCircle` (an ellipse on the registration layer) already exists. Crucially, `findRegistrationBoxes` keys on `kind:'shape' && color`, NOT `spec.kind`, so it already finds the circle - meaning Fit/Array (ADR-125), align, lock, remove, and the burn placement all work on a circle board with ZERO change. The store action `addCapturedBoard(shape)` dispatches rect vs circle (locked outline, kept out of the burn, shape-appropriate anchor); `addCapturedBoardBox` is the rectangle back-compat wrapper.
+
+### Decision 4 - shape-aware UI
+
+A Rectangle / Circle toggle at the top of the Place Board panel (switching clears the in-progress capture). The capture phase and the placement controls branch by shape: a circle shows a single Centre anchor (align + jog) and a diameter readout instead of the rectangle's four corners.
+
+### Consequences
+
+Round boards work end-to-end (verified by panel integration tests: toggle -> capture centre -> type/measure diameter -> a locked, centre-anchored ellipse). The shape union makes further shapes additive. Fit/Array measure the circle by its bounding SQUARE, so a design's corners can overhang the arc - an optional inscribed-square fit is a deferred fast-follow. NOT verified: on-machine capture / G92 / burn (hardware CLAIMED); no live perceptual render (rule #4 - the dev server shares the maintainer's scene).
