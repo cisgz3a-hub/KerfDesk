@@ -157,7 +157,7 @@ function finalizeChains(
     // sampled vertex inherits a slightly-wrong tangent and the curve facets
     // (the angular-bowl defect). Corners stay exact objects for output pinning.
     const evened = smoothChainCurvature(sharpened.points, chain.closed, sharpened.corners);
-    const simplified = simplify(evened, chain.closed, simplifyEpsilonPx);
+    const simplified = simplifyChain(evened, chain.closed, simplifyEpsilonPx);
     if (simplified.length < 2) continue;
     if (!chain.closed && arcLength(simplified) < MIN_CHAIN_LENGTH_PX) continue;
     result.push({
@@ -202,6 +202,15 @@ function closingSegmentLength(points: ReadonlyArray<Vec2>): number {
 // killing the pixel staircase without eroding feature area.
 const TAUBIN_LAMBDA = 0.5;
 const TAUBIN_MU = -0.53;
+
+/** The same two shrink-free Taubin passes `prepareChains` applies to every
+ *  raw dense chain before the corner/evening stages. Exported for the contour
+ *  tracer, whose boundary chains need the identical pre-conditioning. */
+export function smoothRawChain(points: ReadonlyArray<Vec2>, closed: boolean): Vec2[] {
+  const chain: Chain = { points: [...points], closed, alive: true };
+  smoothChain(chain);
+  return chain.points;
+}
 
 function smoothChain(chain: Chain): void {
   for (let pass = 0; pass < SMOOTHING_PASSES; pass += 1) {
@@ -362,7 +371,13 @@ function isInk(p: Vec2, mask: InkMask): boolean {
 
 // --- Douglas-Peucker simplification ---
 
-function simplify(points: ReadonlyArray<Vec2>, closed: boolean, epsilonPx: number): Vec2[] {
+/** Closed-aware Douglas-Peucker simplification (exported for the contour
+ *  tracer, which finishes boundary chains with the same stage sequence). */
+export function simplifyChain(
+  points: ReadonlyArray<Vec2>,
+  closed: boolean,
+  epsilonPx: number,
+): Vec2[] {
   if (points.length <= 2) return [...points];
   if (!closed) return douglasPeucker(points, epsilonPx);
   // Closed: anchor at 0 and the farthest point, simplify both halves.

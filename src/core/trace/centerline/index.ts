@@ -1,5 +1,9 @@
-export { traceCenterlineStrokePaths } from './trace-centerline';
+export { traceCenterlineStrokePaths, inkMaskFromPrepared } from './trace-centerline';
 export { squaredDistanceField, radiusAt, type InkMask } from './distance-field';
+export { sharpenChainBends, type SharpenedChain } from './sharpen-bends';
+export { smoothChainCurvature } from './chain-smoothing';
+export { refineChainForOutput } from './curve-refine';
+export { simplifyChain, smoothRawChain } from './stroke-chains';
 export { thinToMedialAxis } from './medial-thinning';
 export { buildStrokeGraph, type StrokeGraph, type StrokeChain } from './stroke-graph';
 export { condenseJunctions } from './junction-condense';

@@ -1,9 +1,8 @@
 // Shared filled-star fixture for trace apex-fidelity tests. A 12-tip star,
-// outer radius 80, inner radius 45, centered at (100,100) in a 200x200 image —
-// the canonical fixture the apex spec targets (potrace-apex.test.ts and the
-// tracer upgrade audit build the identical star). Its outer tips subtend ~27deg,
-// sharp enough that rasterization + polygonization blunt them, so tracers that
-// do not reconstruct the apex land ~2-3px short.
+// outer radius 80, inner radius 45, centered at (100,100) in a 200x200 image.
+// Its outer tips subtend ~27deg, sharp enough that rasterization +
+// polygonization blunt them, so tracers that do not reconstruct the apex
+// land ~2-3px short (the edge-trace apex-snap test uses this fixture).
 
 import type { RawImageData } from '../../core/trace/trace-image';
 import type { Vec2 } from '../../core/scene';

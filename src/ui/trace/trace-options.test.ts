@@ -188,17 +188,17 @@ describe('relaxAggressivePreprocessing', () => {
     expect((relaxed as Record<string, unknown>)['useOtsuThreshold']).toBeUndefined();
     expect((relaxed as Record<string, unknown>)['despeckleMinPixels']).toBeUndefined();
     // Deleting fixedPalette used to switch Line Art's zero-paths retry from
-    // the potrace backend into imagetracerjs with NO palette — whose
+    // the contour backend into imagetracerjs with NO palette — whose
     // samplepalette2 seeds collapse to black/black on binary input
     // (colorquantcycles:1 disables every recovery), committing a full-frame
     // rectangle instead of an honest "no paths" (the IoU-0.25 degeneracy).
     expect(relaxed.fixedPalette).toEqual(LINE_ART.fixedPalette);
   });
 
-  it('keeps the retry on the potrace backend for two-color presets (M10)', async () => {
-    const { shouldUsePotraceTraceBackend } = await import('../../core/trace');
-    expect(shouldUsePotraceTraceBackend(LINE_ART)).toBe(true);
-    expect(shouldUsePotraceTraceBackend(relaxAggressivePreprocessing(LINE_ART))).toBe(true);
+  it('keeps the retry on the contour backend for two-color presets (M10)', async () => {
+    const { isBinaryContourPreset } = await import('../../core/trace');
+    expect(isBinaryContourPreset(LINE_ART)).toBe(true);
+    expect(isBinaryContourPreset(relaxAggressivePreprocessing(LINE_ART))).toBe(true);
   });
 
   it('forces pathOmit to 0 so the retry keeps every path imagetracerjs emits', () => {

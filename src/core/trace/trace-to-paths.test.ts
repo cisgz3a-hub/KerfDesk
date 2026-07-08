@@ -12,11 +12,15 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { isBinaryContourPreset, traceImageToContourColoredPaths } from './contour-trace';
+import type { RawImageData, TraceOptions } from './trace-image';
+import { TRACE_PRESETS } from './trace-presets';
 import {
   type PaletteEntry,
   type TraceData,
   type TracePath,
   type TraceSegmentL,
+  traceImageToColoredPaths,
   tracedataToColoredPaths,
 } from './trace-to-paths';
 
@@ -285,6 +289,45 @@ describe('tracedataToColoredPaths', () => {
     expect(points[8]?.x).toBeCloseTo(5, 6);
     expect(points[8]?.y).toBeCloseTo(5, 6);
     expect(points[32]).toEqual({ x: 0, y: 0 });
+  });
+});
+
+// Routing pin (replaces the deleted potrace-backend pin, ADR-123): the
+// binary filled presets must dispatch to the in-house contour backend, and
+// nothing else may.
+describe('filled-contour backend routing', () => {
+  it('classifies the binary filled presets, and only those', () => {
+    for (const name of ['Line Art', 'Smooth', 'Sharp']) {
+      expect(isBinaryContourPreset(TRACE_PRESETS[name] as TraceOptions)).toBe(true);
+    }
+    expect(isBinaryContourPreset(TRACE_PRESETS['Centerline'] as TraceOptions)).toBe(false);
+    expect(isBinaryContourPreset(TRACE_PRESETS['Edge Detection'] as TraceOptions)).toBe(false);
+    // A multi-colour, no-fixed-palette option falls through to imagetracerjs.
+    expect(isBinaryContourPreset({ numberOfColors: 8 } as TraceOptions)).toBe(false);
+  });
+
+  it('dispatches Line Art through the contour backend end-to-end', async () => {
+    // A 128×128 solid black disc on white: ≥ the small-source upscale edge
+    // and thick-featured, so neither auto-upscale trigger fires and the
+    // dispatcher sees the same pixels as the direct backend.
+    const size = 128;
+    const data = new Uint8ClampedArray(size * size * 4);
+    for (let y = 0; y < size; y += 1)
+      for (let x = 0; x < size; x += 1) {
+        const inDisc = Math.hypot(x + 0.5 - size / 2, y + 0.5 - size / 2) <= 45;
+        const v = inDisc ? 0 : 255;
+        const o = (y * size + x) * 4;
+        data[o] = v;
+        data[o + 1] = v;
+        data[o + 2] = v;
+        data[o + 3] = 255;
+      }
+    const image: RawImageData = { width: size, height: size, data };
+    const lineArt = TRACE_PRESETS['Line Art'] as TraceOptions;
+    const routed = await traceImageToColoredPaths(image, lineArt);
+    expect(routed).toEqual(traceImageToContourColoredPaths(image, lineArt));
+    // ...and it is genuinely the contour output, not an accidental empty.
+    expect(routed.flatMap((p) => p.polylines).length).toBeGreaterThan(0);
   });
 });
 
