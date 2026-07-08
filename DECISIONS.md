@@ -1271,7 +1271,7 @@ Separately and *not solved here*: imagetracerjs is outline-only (a pen stroke â†
 
 The first real logo burn after the trace/fill fixes produced correct
 geometry and smooth motion, but showed visible darker marks at the sides
-of filled regions. The burn photo (`<redacted-path>\Downloads\191275.jpg`)
+of filled regions. The burn photo (a local hardware test capture)
 matches the standard Fill/Image endpoint-overburn failure: hatch lines
 start and stop at the object boundary while the gantry is accelerating or
 decelerating.

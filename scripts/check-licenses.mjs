@@ -8,10 +8,9 @@
 // reads pnpm's own lockfile-resolved store, so every installed production
 // package is covered.
 //
-// Scope note: this gate covers npm PACKAGES only. Vendored source (e.g.
-// the in-house potrace-style trace backend — see the ADR-118 release
-// blocker) is structurally outside any package-license scan and requires
-// source provenance review — a green run here must not be cited as
+// Scope note: this gate covers npm PACKAGES only. First-party/vendored
+// source is structurally outside any package-license scan and requires
+// separate provenance review — a green run here must not be cited as
 // clearing it.
 
 import { execSync } from 'node:child_process';
