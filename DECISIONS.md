@@ -5981,6 +5981,18 @@ registration-jig pattern (toolbar toggle + `App.tsx`-rendered floating panel
 across machine kinds (works for CNC stock placement too), unlike the
 laser-only registration jig.
 
+### Manual-size path (amendment 2026-07-08)
+
+For operators who already know their material's exact dimensions, capturing
+all four corners is busywork. After the bottom-left corner is captured (which
+sets the origin), the panel offers a `ManualSizeForm`: type width × height and
+draw. The origin is already correct, so it reuses `addCapturedBoardBox(w, h)`
+verbatim and synthesizes the other three corners from the origin + size
+(`boardCornersFromOrigin`) so the committed phase (measured readout,
+jog-to-corner) behaves identically to a four-corner capture. The synthesis
+assumes machine +X = width, +Y = height (the same front-left baseline as the
+rest of the feature); the ≥ 3 mm guard is shared (`constants.ts`).
+
 ### Limitations (stated, not hidden)
 
 Axis-aligned rectangle only: a physically-rotated board yields an

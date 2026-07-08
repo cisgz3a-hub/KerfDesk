@@ -79,6 +79,28 @@ export function boardMachinePoints(
   };
 }
 
+/**
+ * The four corners of an axis-aligned width × height board whose bottom-left
+ * corner sits at `origin` (machine mm): BL, BR, TR, TL. Used by the manual-size
+ * path — the operator captures only the bottom-left corner (which sets the work
+ * origin), types the size, and this synthesizes the other three so the rest of
+ * the flow (outline, jog-to-corner) behaves exactly like a four-corner capture.
+ * Assumes machine +X spans the board's width and +Y its height (the front-left
+ * origin the feature is built around).
+ */
+export function boardCornersFromOrigin(
+  origin: Vec2,
+  widthMm: number,
+  heightMm: number,
+): ReadonlyArray<Vec2> {
+  return [
+    origin,
+    { x: origin.x + widthMm, y: origin.y },
+    { x: origin.x + widthMm, y: origin.y + heightMm },
+    { x: origin.x, y: origin.y + heightMm },
+  ];
+}
+
 function allFinite(points: ReadonlyArray<Vec2>): boolean {
   return points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
 }

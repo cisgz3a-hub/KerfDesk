@@ -57,6 +57,24 @@ describe('boardCaptureReducer', () => {
     );
   });
 
+  it('commit-manual replaces corners with the synthesized four and commits', () => {
+    const one = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'capture', point: P(10, 10) });
+    const four = [P(10, 10), P(110, 10), P(110, 70), P(10, 70)];
+    const committed = boardCaptureReducer(one, { type: 'commit-manual', corners: four });
+    expect(committed.committed).toBe(true);
+    expect(committed.corners).toEqual(four);
+  });
+
+  it('commit-manual is a no-op without exactly four corners or once committed', () => {
+    const one = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'capture', point: P(10, 10) });
+    expect(boardCaptureReducer(one, { type: 'commit-manual', corners: [P(0, 0)] })).toBe(one);
+    const four = [P(0, 0), P(1, 0), P(1, 1), P(0, 1)];
+    const committed = boardCaptureReducer(one, { type: 'commit-manual', corners: four });
+    expect(boardCaptureReducer(committed, { type: 'commit-manual', corners: four })).toBe(
+      committed,
+    );
+  });
+
   it('reset returns to the initial state', () => {
     expect(boardCaptureReducer(withCorners(3), { type: 'reset' })).toEqual(INITIAL_BOARD_CAPTURE);
   });
