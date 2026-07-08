@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOARD_CORNER_COUNT,
   bestFitRectangleFromCorners,
+  boardCornersFromOrigin,
   boardMachinePoints,
 } from './board-capture';
 import type { Vec2 } from './scene-object';
@@ -90,6 +91,24 @@ describe('bestFitRectangleFromCorners', () => {
     expect(bestFitRectangleFromCorners([])).toBeNull();
     expect(bestFitRectangleFromCorners([BL, BR, TR])).toBeNull();
     expect(bestFitRectangleFromCorners([BL, BR, TR, TL, BL])).toBeNull();
+  });
+});
+
+describe('boardCornersFromOrigin', () => {
+  it('synthesizes a perfect axis-aligned board from the bottom-left origin + size', () => {
+    const corners = boardCornersFromOrigin({ x: 200, y: 150 }, 120, 80);
+    // BL, BR, TR, TL from the origin.
+    expect(corners).toEqual([
+      { x: 200, y: 150 },
+      { x: 320, y: 150 },
+      { x: 320, y: 230 },
+      { x: 200, y: 230 },
+    ]);
+    // Feeds the same pipeline: exact size, zero off-square (a clean rectangle).
+    const rect = bestFitRectangleFromCorners(corners);
+    expect(rect?.widthMm).toBeCloseTo(120, 6);
+    expect(rect?.heightMm).toBeCloseTo(80, 6);
+    expect(rect?.offSquareMm).toBeCloseTo(0, 6);
   });
 });
 

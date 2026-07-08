@@ -6,7 +6,11 @@
 // registration box) centred on the canvas so artwork can be positioned on it.
 
 import { useRef, useState } from 'react';
-import { bestFitRectangleFromCorners, BOARD_CORNER_COUNT } from '../../../core/scene';
+import {
+  bestFitRectangleFromCorners,
+  boardCornersFromOrigin,
+  BOARD_CORNER_COUNT,
+} from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
@@ -67,6 +71,16 @@ export function BoardCapturePanel(): JSX.Element | null {
     capture.commit();
   };
 
+  // Manual-size path: the origin is already set at the captured bottom-left
+  // corner, so draw the outline at the typed size and synthesize the other three
+  // corners (so jog-to-corner works like a full capture).
+  const handleManualFinish = (widthMm: number, heightMm: number): void => {
+    const origin = capture.state.corners[0];
+    if (origin === undefined) return;
+    addCapturedBoardBox(widthMm, heightMm);
+    capture.commitManual(boardCornersFromOrigin(origin, widthMm, heightMm));
+  };
+
   if (!open) return null;
   return (
     <section aria-label="Place board" className="lf-chip" style={panelStyle}>
@@ -98,6 +112,7 @@ export function BoardCapturePanel(): JSX.Element | null {
           onCapture={() => void handleCapture().catch(() => undefined)}
           onUndo={capture.undo}
           onFinish={handleFinish}
+          onManualSize={handleManualFinish}
           onReset={capture.reset}
         />
       )}

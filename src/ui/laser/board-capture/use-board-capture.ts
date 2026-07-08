@@ -21,6 +21,9 @@ export type BoardCaptureAction =
   | { readonly type: 'capture'; readonly point: Vec2 }
   | { readonly type: 'undo' }
   | { readonly type: 'commit' }
+  // Manual-size path: replace the (single captured) corner set with the four
+  // corners synthesized from the origin + typed size, and commit in one step.
+  | { readonly type: 'commit-manual'; readonly corners: ReadonlyArray<Vec2> }
   | { readonly type: 'reset' };
 
 export const INITIAL_BOARD_CAPTURE: BoardCaptureState = { corners: [], committed: false };
@@ -30,22 +33,14 @@ export function boardCaptureReducer(
   action: BoardCaptureAction,
 ): BoardCaptureState {
   switch (action.type) {
-    case 'capture': {
-      if (state.committed || state.corners.length >= BOARD_CORNER_COUNT) return state;
-      // Reject a re-capture at (essentially) the previous corner — the
-      // signature of a double-click, which would corrupt the rectangle.
-      const last = state.corners[state.corners.length - 1];
-      if (last !== undefined && distanceMm(last, action.point) < MIN_CORNER_SEPARATION_MM) {
-        return state;
-      }
-      return { ...state, corners: [...state.corners, action.point] };
-    }
+    case 'capture':
+      return applyCapture(state, action.point);
     case 'undo':
-      if (state.committed || state.corners.length === 0) return state;
-      return { ...state, corners: state.corners.slice(0, -1) };
+      return applyUndo(state);
     case 'commit':
-      if (state.corners.length !== BOARD_CORNER_COUNT) return state;
-      return { ...state, committed: true };
+      return state.corners.length === BOARD_CORNER_COUNT ? { ...state, committed: true } : state;
+    case 'commit-manual':
+      return applyCommitManual(state, action.corners);
     case 'reset':
       return INITIAL_BOARD_CAPTURE;
     default:
@@ -53,11 +48,34 @@ export function boardCaptureReducer(
   }
 }
 
+function applyCapture(state: BoardCaptureState, point: Vec2): BoardCaptureState {
+  if (state.committed || state.corners.length >= BOARD_CORNER_COUNT) return state;
+  // Reject a re-capture at (essentially) the previous corner — the signature of
+  // a double-click, which would corrupt the rectangle.
+  const last = state.corners[state.corners.length - 1];
+  if (last !== undefined && distanceMm(last, point) < MIN_CORNER_SEPARATION_MM) return state;
+  return { ...state, corners: [...state.corners, point] };
+}
+
+function applyUndo(state: BoardCaptureState): BoardCaptureState {
+  if (state.committed || state.corners.length === 0) return state;
+  return { ...state, corners: state.corners.slice(0, -1) };
+}
+
+function applyCommitManual(
+  state: BoardCaptureState,
+  corners: ReadonlyArray<Vec2>,
+): BoardCaptureState {
+  if (state.committed || corners.length !== BOARD_CORNER_COUNT) return state;
+  return { corners, committed: true };
+}
+
 export type BoardCapture = {
   readonly state: BoardCaptureState;
   readonly capture: (point: Vec2) => void;
   readonly undo: () => void;
   readonly commit: () => void;
+  readonly commitManual: (corners: ReadonlyArray<Vec2>) => void;
   readonly reset: () => void;
 };
 
@@ -72,6 +90,7 @@ export function useBoardCapture(): BoardCapture {
     capture: (point) => dispatch({ type: 'capture', point }),
     undo: () => dispatch({ type: 'undo' }),
     commit: () => dispatch({ type: 'commit' }),
+    commitManual: (corners) => dispatch({ type: 'commit-manual', corners }),
     reset: () => dispatch({ type: 'reset' }),
   };
 }

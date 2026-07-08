@@ -6,15 +6,13 @@
 
 import { BOARD_CORNER_COUNT, type BestFitRectangle, type Vec2 } from '../../../core/scene';
 import { Button } from '../../kit';
+import { MIN_BOARD_DIMENSION_MM } from './constants';
+import { ManualSizeForm } from './ManualSizeForm';
 
 // Above this the captured corners aren't a clean rectangle square to the bed
 // (board rotated, or a corner mis-captured), so the drawn axis-aligned outline
 // won't match the real board.
 const OFF_SQUARE_WARN_MM = 5;
-// Below this in either dimension the capture is degenerate (e.g. corners not
-// moved). createRegistrationBox would silently clamp it to 1mm, so block the
-// commit instead of drawing a box that doesn't match the readout.
-const MIN_BOARD_DIMENSION_MM = 3;
 
 export function BoardCaptureSteps(props: {
   readonly corners: ReadonlyArray<Vec2>;
@@ -24,6 +22,7 @@ export function BoardCaptureSteps(props: {
   readonly onCapture: () => void;
   readonly onUndo: () => void;
   readonly onFinish: () => void;
+  readonly onManualSize: (widthMm: number, heightMm: number) => void;
   readonly onReset: () => void;
 }): JSX.Element {
   const count = props.corners.length;
@@ -57,6 +56,7 @@ export function BoardCaptureSteps(props: {
       {allCaptured && props.rect !== null && (
         <MeasuredBoard rect={props.rect} onFinish={props.onFinish} />
       )}
+      {count >= 1 && !allCaptured && <ManualSizeForm onDraw={props.onManualSize} />}
     </div>
   );
 }
