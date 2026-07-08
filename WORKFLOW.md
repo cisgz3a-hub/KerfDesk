@@ -1195,6 +1195,37 @@ fails, the panel shows an inline error instead of leaving the operator on
 
 ---
 
+### F-BC2. Fill the placed board — auto-fit + array (ADR-125)
+
+**ADR:** [ADR-125](DECISIONS.md#adr-125--fill-the-board-auto-fit--array-artwork-onto-the-placed-board-2026-07-08).
+
+**Operator intent.** After placing a board (F-BC1), *fill* it: scale one design
+to fill the outline, or tile copies across it — turning one coaster/keychain into
+a whole production sheet.
+
+**Where in the UI.** The **Place Board** panel's post-capture controls (below
+"Place artwork"): a **Fill board → Fit to board** button, and an array form
+(**Fit as many as fit**, or **rows × cols**, with an mm spacing gap) → **Array on
+board**. Both are enabled only with a placed board and **exactly one** design
+selected.
+
+**The happy path.**
+1. Place a board (F-BC1); add and select one design.
+2. **Fit to board** → the design scales to fill the outline with a ~10% margin,
+   centered (rotation-safe: a rotated design still centers).
+3. Or set the array: leave **Fit as many as fit** checked to auto-count how many
+   fit, or uncheck it and type **rows × cols**; set the **mm spacing**.
+4. **Array on board** → copies tile the board, the block centered, as one undo
+   step. Copies inherit the design's layer/settings.
+5. Undo restores the single design. After arraying, the whole grid is selected, so Array/Fit disable until you undo (or reselect one design) - this stops a re-click from silently stacking a doubled burn.
+
+**Edge / empty / error.** No board, or zero/several designs selected → both
+controls are disabled ("Select exactly one design…"). A design larger than the
+board tiles as a single centered copy. A runaway count (huge rows, or a tiny
+design under "fit as many as fit") is capped per axis.
+
+---
+
 ### F-F4. Convert a selected vector to a bitmap (Phase F.4)
 
 **ADR:** [ADR-029](DECISIONS.md#adr-029--convert-to-bitmap-vector--raster-engrave-source).

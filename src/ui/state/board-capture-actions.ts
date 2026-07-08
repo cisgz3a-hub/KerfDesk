@@ -33,7 +33,15 @@ export function boardCaptureActions(set: Setter): Pick<AppState, 'addCapturedBoa
         // preserving any prior box position (unlike addRegistrationBox's resize).
         const { bedWidth, bedHeight } = s.project.device;
         const position = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
-        const box = createRegistrationBox({ widthMm, heightMm, x: position.x, y: position.y });
+        // The captured board sits at the physical board's measured position, tied
+        // to the G92 work origin at its bottom-left corner. Lock it so a stray drag
+        // can't shift the outline off registration — moving it would silently break
+        // centering, Fit/Array, and the burn placement. (The ADR-057 jig stays
+        // movable + manually lockable; only the captured board auto-locks.)
+        const box = {
+          ...createRegistrationBox({ widthMm, heightMm, x: position.x, y: position.y }),
+          locked: true,
+        };
         const added = applyAddRegistrationBox(s, box);
         // Guide, not a jig: keep the outline out of the burn. Next Start burns
         // only the artwork (once the operator adds and positions it).

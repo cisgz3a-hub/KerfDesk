@@ -38,6 +38,12 @@ describe('addCapturedBoardBox', () => {
     expect(state.dirty).toBe(true);
   });
 
+  it('locks the captured board so it cannot be dragged off registration', () => {
+    useStore.getState().addCapturedBoardBox(120, 80);
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(box?.locked).toBe(true);
+  });
+
   it('keeps the outline out of the burn (box output off) — material is already placed', () => {
     useStore.getState().addCapturedBoardBox(120, 80);
     const layer = useStore

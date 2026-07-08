@@ -97,6 +97,7 @@ import {
   type RegistrationOutputActions,
 } from './registration-output-actions';
 import { boardCaptureActions } from './board-capture-actions';
+import { boardTileActions, type BoardTileActions } from './board-tile-actions';
 import {
   pathNodeEditActions,
   type PathNodeEditActions,
@@ -149,6 +150,7 @@ export type AppState = ObjectPropertiesActions &
   MaterialPresetActions &
   CncLibraryActions &
   MachineActions &
+  BoardTileActions &
   AirAssistDefaultActions & {
     readonly project: Project;
     // Last CNC machine setup, kept when toggling back to laser so the
@@ -448,6 +450,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...selectionTransformActions(set),
   ...registrationOutputActions(set),
   ...boardCaptureActions(set),
+  ...boardTileActions(set),
   ...pathNodeEditActions(set),
   ...objectDeleteActions(set),
   ...sceneActions(set),

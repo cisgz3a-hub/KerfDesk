@@ -6019,3 +6019,74 @@ measured size rests on the exact geometry unit tests, not a rendered-pixel
 comparison. Also NOT verified: on-machine jog-to-corner, real G92 behavior,
 and the physical burn landing on the board — hardware remains CLAIMED; the
 operator confirms via the WORKFLOW checklist.
+
+### Amendment (2026-07-08) — lock the captured board
+
+The captured board is created **locked** (`addCapturedBoardBox` sets `locked: true`), unlike the ADR-057 jig, which is operator-positioned and stays movable. Its on-canvas position encodes the physical board's measured location relative to the G92 work origin, so a stray drag would silently break centering, the ADR-125 Fill/Array, and the burn placement. Locking makes it unselectable and undraggable (the hit-test, marquee, snapping, and selection-transform paths all skip locked objects) while it still renders and compiles; "Capture a new board" still replaces it (the box is found by color, not selection).
+
+## ADR-125 — Fill the board: auto-fit + array artwork onto the placed board (2026-07-08)
+
+**Status:** accepted (maintainer directive: expand Place Board — chosen from the
+expansion brainstorm: A1 auto-fit + A2 array/step-and-repeat; the material and
+camera themes were deferred).
+
+> **Numbering note.** ADR-124 (Capture Board Corners) was the last used number;
+> **ADR-125** is the next free, verified against DECISIONS.md at authoring.
+
+### Context
+
+Place Board (ADR-124) turns a physical board into a canvas region — the ADR-057
+registration box — tied to the work origin, but the operator could only position
+*one* design on it (center / corner-snap). For production (a sheet of coasters, a
+row of keychains) they want to *fill* the board: scale one design to fill it, or
+tile many copies. Both act on the placed board's region and the current selection.
+
+### Decision 1 — auto-fit is fit-to-region, generalizing fit-to-bed
+
+`fitObjectToRegion` (`core/scene/fit-to-region.ts`) generalizes the existing
+`fitObjectToBed`: fit-to-bed already scales-to-fit-and-centers against the bed
+`(0,0,bedW,bedH)` with a fixed 10% margin, capped at scale 1 (never grows).
+fit-to-region takes any rectangle (the board's scene-space bounds, via
+`transformedBBox` of the registration box), a caller-supplied margin, and a
+`grow` flag; auto-fit passes `grow: true` so a small design scales *up* to fill.
+Centering is rotation-safe (it maps the local center through the scaled
+transform), fixing a latent fit-to-bed limitation. The store action
+`fitSelectionToBoard` fits the *one* selected design; multi-select is a no-op
+(fitting several would pile them on top of each other).
+
+### Decision 2 — array is pure geometry (offsets) + a store tiler
+
+`tileIntoRegion` (`core/scene/tile-into-region.ts`) is pure: given the design's
+scene footprint (`cell`), the board `region`, and a layout — explicit `rows × cols`
+or `fill` (auto-count how many fit) — it returns one translation offset per grid
+slot, the block centered in the region. The store action `tileSelectionIntoBoard`
+moves the original into slot 0 and adds a fresh copy (`crypto.randomUUID`, matching
+the duplicate action's id minting) per remaining slot, as one undoable edit; copies
+inherit the source layer. `MAX_TILE_PER_AXIS` caps a typo (9999 rows) or a 0.1 mm
+design from spawning millions of objects. Single-design only, like auto-fit.
+
+### Decision 3 — both live in the post-capture placement panel
+
+Both are gated on a placed board **and** exactly one selected design, in
+`BoardPlacementControls` (the panel that already hosts align/jog), grouped under
+"Fill board" (Fit to board button) and the array form (`BoardArrayForm`:
+fit-as-many-as-fit, or rows × cols, with a spacing gap).
+
+### Consequences
+
+Turns Place Board from "position one design" into "run a production sheet."
+**Not covered** (outlined in the expansion brainstorm, deferred): nesting
+*different* parts (bin-pack), board→material presets, caliper mode, camera board
+detection. **Verified:** pure-geometry unit tests + store-action tests (fill
+scale, centering, rotation-safety, grid/fill counts, guards). **NOT** perceptually
+rendered in the live app at authoring time — the maintainer's canvas eyeball is
+the fidelity gate (green tests assert geometry, not that it *looks* right).
+
+### Amendment (2026-07-08) - review-driven fixes
+
+An adversarial review of this diff surfaced four issues, all fixed here:
+
+- **Rotation-safe fit, not just centering.** `fitObjectToRegion` now scales by the design's rotated footprint (its unit-scale AABB) instead of its intrinsic W x H, so a rotated design fills the board without overflowing it - and without burning off the physical material. (Centering was already rotation-safe.)
+- **Re-array cannot silently stack.** After arraying, the whole grid becomes the selection (like Duplicate), which disables Array/Fit (they need exactly one selected design); the operator undoes to re-array. A re-click can no longer drop a second exactly-overlapping grid (a doubled burn).
+- **Count + perf caps.** `MAX_TILE_TOTAL` (500) caps the total copies - a tiny design under "fit as many as fit" could otherwise spawn ~10,000 - and the copies are appended in a single pass rather than an O(n^2) per-object loop.
+- **Finite-gap guard.** A non-finite spacing (e.g. a huge literal parsing to Infinity) is clamped to 0 in both the array form and `tileIntoRegion`, so it cannot write NaN into a copy's transform or the emitted G-code.
