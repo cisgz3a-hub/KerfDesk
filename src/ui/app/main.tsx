@@ -35,3 +35,38 @@ createRoot(rootElement).render(
     </ErrorBoundary>
   </StrictMode>,
 );
+
+// The startup splash (index.html) is a full black loading screen with the
+// KerfDesk banner. It paints immediately from static HTML, covering the page
+// while the bundle loads. Here we hold it until the workspace CANVAS has
+// painted, a short beat, then fade the whole screen OUT — background and
+// banner together — to reveal the app. A hard max-wait dismisses it even if
+// the canvas never appears. (Timing this from an inline <script> would be
+// blocked by the CSP anyway.)
+const SPLASH_HOLD_MS = 700;
+const SPLASH_FADE_MS = 700;
+const SPLASH_MAX_WAIT_MS = 5000;
+const SPLASH_HIDDEN_CLASS = 'app-splash--hidden';
+const splashStartedAt = performance.now();
+
+function fadeOutSplash(): void {
+  const splash = document.getElementById('app-splash');
+  if (splash === null) return;
+  splash.classList.add(SPLASH_HIDDEN_CLASS);
+  const remove = (): void => splash.remove();
+  splash.addEventListener('transitionend', remove, { once: true });
+  // Fallback: reduced-motion (no transition) or a missed transitionend.
+  window.setTimeout(remove, SPLASH_FADE_MS);
+}
+
+function dismissWhenBoardReady(): void {
+  const boardPainted = document.querySelector('#app-root canvas') !== null;
+  const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
+  if (boardPainted || timedOut) {
+    window.setTimeout(fadeOutSplash, SPLASH_HOLD_MS);
+    return;
+  }
+  requestAnimationFrame(dismissWhenBoardReady);
+}
+
+requestAnimationFrame(dismissWhenBoardReady);

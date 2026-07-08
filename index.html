@@ -5,7 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Fetch the splash art at top priority during HTML parse so it fills the
+         card's dark placeholder as early as possible. -->
+    <link rel="preload" as="image" href="/splash.jpg" />
     <title>KerfDesk</title>
+    <!-- Startup splash. Static in the HTML so it paints on first parse (the
+         real "loading" moment, before the JS bundle runs); main.tsx fades it
+         out once React has mounted, with a minimum on-screen time so it never
+         just flashes. It is a loading indicator only — pointer-events:none,
+         auto-dismissed — so it never blocks the workspace (WORKFLOW.md F-A1).
+         Inline <style> is permitted by the CSP (style-src 'unsafe-inline');
+         the removal cannot be an inline <script> (script-src 'self'). -->
+    <style>
+      /* Startup splash: a full black loading screen with the KerfDesk banner
+         centered on it. It paints immediately from static HTML (before the JS
+         bundle) so it covers the page — no flash of blank content. The banner
+         art is near-black, so it sits seamlessly on the black screen. main.tsx
+         fades the whole screen out once the workspace has painted, revealing
+         the app. */
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #000000;
+        pointer-events: none;
+        transition: opacity 450ms ease;
+      }
+      #app-splash.app-splash--hidden {
+        opacity: 0;
+      }
+      #app-splash .app-splash__banner {
+        max-width: 60vw;
+        max-height: 62vh;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-splash {
+          transition: none;
+        }
+      }
+    </style>
     <!-- CSP is intentionally NOT set via a meta tag here.
          * Web deploy: set CSP via HTTP response headers at the hosting
            platform (Cloudflare Pages / Netlify / Vercel rule file). The meta
@@ -19,6 +60,9 @@
   </head>
   <body>
     <div id="app-root"></div>
+    <div id="app-splash" role="status" aria-label="Loading KerfDesk workspace">
+      <img class="app-splash__banner" src="/splash.jpg" alt="KerfDesk — Laser &amp; CNC Software" />
+    </div>
     <script type="module" src="/src/ui/app/main.tsx"></script>
   </body>
 </html>
