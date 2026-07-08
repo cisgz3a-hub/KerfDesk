@@ -9,23 +9,45 @@ import type { RgbaImage } from '../../core/camera';
 // preview-rate budget. Full-resolution capture is used for the solve itself.
 export const LIVE_DETECT_TARGET_WIDTH_PX = 480;
 
+// A live surface the detection loop can grab frames from: the wizard's
+// <video> (USB) or the machine camera's <img> (bridge-proxied, so drawing it
+// to a canvas does not taint — the bridge sends CORS for this origin).
+export type LiveCaptureElement = HTMLVideoElement | HTMLImageElement;
+
+/** The element's intrinsic frame size (0×0 while nothing has loaded yet). */
+export function elementFrameSize(element: LiveCaptureElement): {
+  readonly width: number;
+  readonly height: number;
+} {
+  if (element instanceof HTMLVideoElement) {
+    return { width: element.videoWidth, height: element.videoHeight };
+  }
+  return { width: element.naturalWidth, height: element.naturalHeight };
+}
+
 /**
- * Copy the video's current frame into an RGBA buffer at `scale` (1 = native).
- * Returns null while the stream has no dimensions yet or when the 2D context
- * is unavailable (canvas is device-memory backed and can fail).
+ * Copy the element's current frame into an RGBA buffer at `scale` (1 =
+ * native). Returns null while the element has no dimensions yet or when the
+ * 2D context is unavailable (canvas is device-memory backed and can fail).
  */
-export function captureVideoFrame(video: HTMLVideoElement, scale = 1): RgbaImage | null {
-  const width = Math.round(video.videoWidth * scale);
-  const height = Math.round(video.videoHeight * scale);
+export function captureElementFrame(element: LiveCaptureElement, scale = 1): RgbaImage | null {
+  const intrinsic = elementFrameSize(element);
+  const width = Math.round(intrinsic.width * scale);
+  const height = Math.round(intrinsic.height * scale);
   if (width <= 0 || height <= 0) return null;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (context === null) return null;
-  context.drawImage(video, 0, 0, width, height);
+  context.drawImage(element, 0, 0, width, height);
   const image = context.getImageData(0, 0, width, height);
   return { data: image.data, width: image.width, height: image.height };
+}
+
+/** Copy the video's current frame into an RGBA buffer at `scale` (1 = native). */
+export function captureVideoFrame(video: HTMLVideoElement, scale = 1): RgbaImage | null {
+  return captureElementFrame(video, scale);
 }
 
 /** The downscale factor that brings `videoWidth` to the live-detect budget. */

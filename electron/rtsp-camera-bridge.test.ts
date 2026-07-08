@@ -10,6 +10,12 @@ describe('RTSP camera bridge request policy', () => {
   it('allows LaserForge app origins and rejects unrelated websites', () => {
     expect(cameraBridgeCorsOrigin('app://app')).toBe('app://app');
     expect(cameraBridgeCorsOrigin('http://localhost:5173')).toBe('http://localhost:5173');
+    // Any loopback port: Vite falls back to a random port when 5173 is taken.
+    expect(cameraBridgeCorsOrigin('http://localhost:55585')).toBe('http://localhost:55585');
+    expect(cameraBridgeCorsOrigin('http://127.0.0.1:4000')).toBe('http://127.0.0.1:4000');
+    // Loopback must still be http and truly loopback.
+    expect(cameraBridgeCorsOrigin('http://evil-localhost.example')).toBeNull();
+    expect(cameraBridgeCorsOrigin('http://192.168.2.171:5173')).toBeNull();
     expect(cameraBridgeCorsOrigin('https://kerfdesk.com')).toBe('https://kerfdesk.com');
     expect(cameraBridgeCorsOrigin('https://laserforge-2fj.pages.dev')).toBe(
       'https://laserforge-2fj.pages.dev',

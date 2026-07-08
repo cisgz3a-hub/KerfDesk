@@ -1,9 +1,11 @@
-// SetupStep — the calibration wizard's board description. Any printed
-// checkerboard works; the operator enters its INNER-corner grid and the
-// measured square size, then proceeds to capture.
+// SetupStep — the calibration wizard's board description. Print (or save) a
+// print-ready board (SVG sized in true millimetres, with a 100 mm scale bar)
+// right here; any printed checkerboard works — the operator enters its
+// INNER-corner grid and the measured square size, then proceeds to capture.
 
 import { Button, Field, NumberInput } from '../../kit';
 import { useCameraWizardStore } from './camera-wizard-store';
+import { BoardActions } from './BoardActions';
 
 const MIN_GRID = 3;
 const MAX_GRID = 25;
@@ -21,10 +23,10 @@ export function SetupStep(): JSX.Element {
   return (
     <div style={columnStyle}>
       <p style={copyStyle}>
-        Print a checkerboard on stiff paper (a standard 9×6 board works well) and measure one
-        square. Counts below are <strong>inner corners</strong> — where four squares meet — not
-        squares.
+        Print the checkerboard below (or use any you have), mounted flat on stiff backing. Counts
+        are <strong>inner corners</strong> — where four squares meet — not squares.
       </p>
+      <BoardActions spec={spec} spacingMm={spacingMm} />
       <Field label="Corners across" labelWidth="md">
         <NumberInput
           aria-label="Inner corners across"
@@ -57,8 +59,9 @@ export function SetupStep(): JSX.Element {
         />
       </Field>
       <p style={hintStyle}>
-        You will hold the board in front of the camera at several angles; capture is automatic when
-        a new pose is detected.
+        Fixed machine camera? Move the BOARD, not the camera: place it on the bed, close the lid,
+        hold still a few seconds (capture is automatic), then reposition and tilt it for the next
+        pose.
       </p>
       <div style={navStyle}>
         <Button variant="primary" onClick={() => setStep('capture')}>

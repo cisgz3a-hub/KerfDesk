@@ -13,6 +13,7 @@ import {
   type RgbaImage,
 } from '../../core/camera';
 import { DEFAULT_RASTER_LAYER_COLOR, IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
+import { rgbaToPngDataUrl } from './png-encode';
 import { extractLumaBase64 } from '../trace/image-loader';
 
 // 4 px/mm ≈ 102 dpi: plenty for outline tracing without a huge warp buffer.
@@ -87,25 +88,4 @@ export function buildCameraTraceImage(args: {
       }),
     },
   };
-}
-
-// Synchronous PNG encode via a throwaway canvas; null when the 2D context or
-// PNG encoder is unavailable (device-memory backed, or jsdom) so callers
-// surface a typed failure instead of an uncaught "Not implemented" throw.
-function rgbaToPngDataUrl(image: RgbaImage): string | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
-  const context = canvas.getContext('2d');
-  if (context === null) return null;
-  context.putImageData(
-    new ImageData(new Uint8ClampedArray(image.data), image.width, image.height),
-    0,
-    0,
-  );
-  try {
-    return canvas.toDataURL('image/png');
-  } catch {
-    return null;
-  }
 }

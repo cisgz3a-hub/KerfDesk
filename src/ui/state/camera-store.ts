@@ -1,10 +1,11 @@
-// camera-store — ephemeral Zustand store for Camera Mode (ADR-107): the live
-// overhead-camera stream plus the 4-point manual alignment flow. Not project
-// data and not undoable, so it lives outside the project store (like ui-store).
+// camera-store — ephemeral Zustand store for Camera Mode (ADR-107/116): the
+// active camera source (USB stream or bridge-proxied machine camera) plus the
+// 4-point manual alignment flow. Not project data and not undoable, so it
+// lives outside the project store (like ui-store).
 //
-// I/O actions take the CameraAdapter as an argument (the same dependency-
+// I/O actions take the platform adapters as arguments (the same dependency-
 // injection pattern as laser-store's connect(adapter)), so the store stays
-// testable with a fake adapter and never imports platform/web directly.
+// testable with fakes and never imports platform/web directly.
 
 import { create } from 'zustand';
 import {
@@ -14,36 +15,32 @@ import {
   type RgbaImage,
 } from '../../core/camera';
 import type { Vec2 } from '../../core/scene';
-import type { CameraAdapter, CameraDevice, CameraStream } from '../../platform/types';
+import type { CameraAdapter, CameraDevice } from '../../platform/types';
+import {
+  createCameraSourceActions,
+  type CameraSourceActions,
+  type CameraSourceState,
+  type MachineCameraState,
+} from './camera-source-actions';
 import { loadPreferredCameraId, savePreferredCameraId } from './camera-preference-storage';
 
-export type CameraStreamState =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'starting' }
-  | { readonly kind: 'live'; readonly stream: CameraStream }
-  | { readonly kind: 'denied' }
-  | { readonly kind: 'error'; readonly message: string };
+export type { CameraSourceState, MachineCameraState } from './camera-source-actions';
 
-export type NetworkCameraState =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'detecting' }
-  | { readonly kind: 'found'; readonly frameUrl: string }
-  | { readonly kind: 'not-found' };
-
-export type CameraStore = {
+export type CameraStore = CameraSourceActions & {
   // Camera panel visibility — floating, NON-modal like the registration jig
   // panel. Lives here (not ui-store) so all Camera Mode state is one slice.
   readonly panelOpen: boolean;
   readonly isSupported: boolean;
   readonly cameras: ReadonlyArray<CameraDevice>;
   readonly selectedDeviceId: string | null;
-  readonly stream: CameraStreamState;
+  // The active source every camera consumer captures through (ADR-116).
+  readonly sourceState: CameraSourceState;
   readonly alignment: AlignmentState;
-  // Bumped on every stop/restart so an in-flight openStream that resolves late
-  // can tell it has been superseded and release its now-orphaned stream.
-  readonly streamEpoch: number;
-  // The machine-integrated HTTP camera (Falcon A1 Pro) found by auto-detect.
-  readonly networkCamera: NetworkCameraState;
+  // Bumped on every stop/restart so an in-flight start that resolves late can
+  // tell it has been superseded and release its now-orphaned stream.
+  readonly sourceEpoch: number;
+  // The machine-integrated camera found by the bridge's server-side probe.
+  readonly machineCamera: MachineCameraState;
 
   // Workspace overlay preferences (ephemeral; the alignment itself persists
   // on the device profile). `overlayStill` is a captured frame shown instead
@@ -58,17 +55,12 @@ export type CameraStore = {
   readonly setOverlayOpacityPercent: (percent: number) => void;
   readonly setOverlayStill: (frame: RgbaImage | null) => void;
   readonly detectSupport: (camera: CameraAdapter | undefined) => void;
-  readonly detectNetworkCamera: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly refreshCameras: (camera: CameraAdapter | undefined) => Promise<void>;
   readonly selectCamera: (deviceId: string) => void;
-  readonly startStream: (camera: CameraAdapter | undefined) => Promise<void>;
-  readonly stopStream: () => void;
   readonly beginAlignment: (targets: ReadonlyArray<Vec2>) => void;
   readonly addAlignmentPoint: (pixel: Vec2) => void;
   readonly resetAlignment: () => void;
 };
-
-const ADAPTER_MISSING = 'Camera is not available on this platform';
 
 // Reselection policy on a device-list refresh: keep a still-valid deliberate
 // selection; else restore the remembered camera (the overhead one, not the
@@ -86,23 +78,17 @@ function nextSelectedDeviceId(
   return cameras[0]?.deviceId ?? null;
 }
 
-function cameraErrorMessage(err: unknown): string {
-  if (err instanceof DOMException) {
-    return err.message === '' ? err.name : `${err.name}: ${err.message}`;
-  }
-  if (err instanceof Error && err.message !== '') return err.message;
-  return 'Failed to open the camera';
-}
-
 export const useCameraStore = create<CameraStore>((set, get) => ({
+  ...createCameraSourceActions(set, get),
+
   panelOpen: false,
   isSupported: false,
   cameras: [],
   selectedDeviceId: null,
-  stream: { kind: 'idle' },
+  sourceState: { kind: 'idle' },
   alignment: { kind: 'idle' },
-  streamEpoch: 0,
-  networkCamera: { kind: 'idle' },
+  sourceEpoch: 0,
+  machineCamera: { kind: 'idle' },
 
   overlayVisible: true,
   overlayOpacityPercent: 50,
@@ -116,19 +102,6 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   setOverlayStill: (frame) => set({ overlayStill: frame }),
   detectSupport: (camera) => set({ isSupported: camera?.isSupported() ?? false }),
 
-  detectNetworkCamera: async (camera) => {
-    if (camera === undefined) {
-      set({ networkCamera: { kind: 'not-found' } });
-      return;
-    }
-    set({ networkCamera: { kind: 'detecting' } });
-    const found = await camera.discoverNetworkCamera();
-    set({
-      networkCamera:
-        found === null ? { kind: 'not-found' } : { kind: 'found', frameUrl: found.frameUrl },
-    });
-  },
-
   refreshCameras: async (camera) => {
     if (camera === undefined) return;
     const cameras = await camera.listCameras();
@@ -141,44 +114,6 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
   selectCamera: (deviceId) => {
     savePreferredCameraId(deviceId);
     set({ selectedDeviceId: deviceId });
-  },
-
-  startStream: async (camera) => {
-    if (camera === undefined) {
-      set({ stream: { kind: 'error', message: ADAPTER_MISSING } });
-      return;
-    }
-    get().stopStream(); // stop any current stream and bump the epoch
-    const epoch = get().streamEpoch;
-    set({ stream: { kind: 'starting' } });
-    const deviceId = get().selectedDeviceId ?? undefined;
-    try {
-      const opened = await camera.openStream(deviceId);
-      if (get().streamEpoch !== epoch) {
-        // A newer start/stop superseded us while opening — release the
-        // orphaned stream so the camera doesn't stay on.
-        opened?.stop();
-        return;
-      }
-      if (opened === null) {
-        set({ stream: { kind: 'denied' } });
-        return;
-      }
-      set({ stream: { kind: 'live', stream: opened } });
-      // Permission is granted now, so device labels/ids are finally readable —
-      // refresh the list so the picker can show real names (the overhead USB
-      // camera vs the built-in laptop one).
-      void get().refreshCameras(camera);
-    } catch (err) {
-      if (get().streamEpoch !== epoch) return;
-      set({ stream: { kind: 'error', message: cameraErrorMessage(err) } });
-    }
-  },
-
-  stopStream: () => {
-    const current = get().stream;
-    if (current.kind === 'live') current.stream.stop();
-    set((state) => ({ stream: { kind: 'idle' }, streamEpoch: state.streamEpoch + 1 }));
   },
 
   beginAlignment: (targets) => set({ alignment: beginAlignment(targets) }),
