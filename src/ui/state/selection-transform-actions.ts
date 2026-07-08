@@ -1,5 +1,6 @@
 import {
   type BoardAnchor,
+  boardFitRegion,
   buildBoxAnchorAlign,
   buildSelectionAlignEdit,
   buildSelectionDistributeEdit,
@@ -8,7 +9,6 @@ import {
   findRegistrationBoxes,
   fitObjectToRegion,
   sceneObjectHasVisibleLayer,
-  transformedBBox,
   type Project,
   type Scene,
   type SceneObject,
@@ -95,7 +95,7 @@ function applyFitSelectionToBoardToState(state: AppState): AppState | Partial<Ap
   );
   const target = objects[0];
   if (target === undefined || objects.length !== 1) return state;
-  const fitted = fitObjectToRegion(target, transformedBBox(box), {
+  const fitted = fitObjectToRegion(target, boardFitRegion(box), {
     marginFraction: BOARD_FIT_MARGIN_FRACTION,
     grow: true,
   });

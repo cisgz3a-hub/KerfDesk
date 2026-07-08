@@ -148,4 +148,21 @@ describe('tileSelectionIntoBoard', () => {
     expect(designCount(box)).toBe(2); // A and B untouched, no copies
     expect(useStore.getState().undoStack).toHaveLength(0);
   });
+
+  it('tiles a design into a circle board using its inscribed square region', () => {
+    useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
+    useStore.getState().addCapturedBoard({ kind: 'circle', diameterMm: 100 });
+    const box = boardId();
+    useStore.setState({
+      selectedObjectId: 'A',
+      additionalSelectedIds: new Set(),
+      undoStack: [],
+      dirty: false,
+    });
+
+    useStore.getState().tileSelectionIntoBoard({ kind: 'fill', gapXMm: 0, gapYMm: 0 });
+
+    // Inscribed square ~70.71 mm / 10 mm design -> 7 per axis = 49 copies.
+    expect(designCount(box)).toBe(49);
+  });
 });

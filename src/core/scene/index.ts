@@ -121,6 +121,7 @@ export {
 } from './output-scope';
 export type { AABB } from './hit-test';
 export { combinedBBox, hitTest, transformedBBox, transformedBounds } from './hit-test';
+export { boardFitRegion } from './board-fit-region';
 export { fitObjectToBed } from './fit-to-bed';
 export { fitObjectToRegion, type FitToRegionOptions } from './fit-to-region';
 export {
