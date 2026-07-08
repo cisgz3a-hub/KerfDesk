@@ -385,10 +385,16 @@ describe('estimateJobDuration', () => {
         // geometry scaling and can move the planner result by a few
         // milliseconds in either direction.
         fc.double({ min: 1.001, max: 10, noNaN: true }),
+        // Coordinates on a 1 µm grid across a realistic 0–100 mm span. The raw
+        // fc.double([0,100]) range also samples DENORMAL values (~1e-322 mm),
+        // where a segment's unit direction is pure floating-point noise and
+        // does not scale linearly — "scale up" is numerically undefined there,
+        // so the invariant cannot hold regardless of the planner. A µm grid
+        // keeps the geometry meaningful (no laser resolves below this).
         fc.array(
           fc.tuple(
-            fc.double({ min: 0, max: 100, noNaN: true }),
-            fc.double({ min: 0, max: 100, noNaN: true }),
+            fc.integer({ min: 0, max: 100_000 }).map((n) => n / 1000),
+            fc.integer({ min: 0, max: 100_000 }).map((n) => n / 1000),
           ),
           { minLength: 2, maxLength: 8 },
         ),

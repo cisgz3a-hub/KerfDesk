@@ -171,6 +171,21 @@ describe('junctionVelocity', () => {
     const travel = { ...cutBlock(1, 0), kind: 'travel' as const };
     expect(junctionVelocity(cutBlock(1, 0), travel, accel, jd)).toBe(0);
   });
+
+  it('rises monotonically as the turn opens from a reversal toward straight', () => {
+    // The cornering cap must FALL as a turn sharpens toward a reversal and
+    // RISE as it opens toward straight. The prior √((1 − cosθ)/2) form had
+    // this inverted — gentle turns were throttled to ~0 while near-reversals
+    // were let through near full speed. The 0°/90°/180° endpoints it was
+    // tested against all agree with the correct formula, so only a mid-range
+    // ordering check catches the regression.
+    const gentle = junctionVelocity(cutBlock(1, 0), cutBlock(1, 0.1), accel, jd); // ~6° turn
+    const ninety = junctionVelocity(cutBlock(1, 0), cutBlock(0, 1), accel, jd); // 90° turn
+    const sharp = junctionVelocity(cutBlock(1, 0), cutBlock(-1, 0.1), accel, jd); // ~169° turn
+    expect(gentle).toBeGreaterThan(ninety);
+    expect(ninety).toBeGreaterThan(sharp);
+    expect(sharp).toBeGreaterThan(0);
+  });
 });
 
 describe('blockTime', () => {
