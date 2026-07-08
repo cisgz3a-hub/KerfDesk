@@ -115,6 +115,64 @@ describe('cncGrblStrategy', () => {
     expect(cncGrblStrategy.emit(laserJob, dev)).toBe('');
   });
 
+  describe('arc passes', () => {
+    it('emits native G2/G3 arcs with I/J center offsets at the cut feed', () => {
+      const gcode = cncGrblStrategy.emit(
+        {
+          groups: [
+            group({
+              passes: [
+                {
+                  kind: 'arc',
+                  start: { x: 10, y: 10 },
+                  end: { x: 20, y: 20 },
+                  center: { x: 10, y: 20 },
+                  clockwise: false,
+                  zMm: -1.5,
+                  closed: false,
+                },
+              ],
+            }),
+          ],
+        },
+        dev,
+      );
+
+      expect(gcode).toContain(
+        'G0 X10.000 Y10.000\nG1 Z-1.500 F300\nG3 X20.000 Y20.000 I0.000 J10.000 F1000',
+      );
+      expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
+    });
+
+    it('falls back to linear G1 motion for arcs that cannot be emitted safely as native arcs', () => {
+      const gcode = cncGrblStrategy.emit(
+        {
+          groups: [
+            group({
+              passes: [
+                {
+                  kind: 'arc',
+                  start: { x: 10, y: 10 },
+                  end: { x: 20, y: 10 },
+                  center: { x: 10, y: 10 },
+                  clockwise: true,
+                  zMm: -1,
+                  closed: false,
+                },
+              ],
+            }),
+          ],
+        },
+        dev,
+      );
+
+      expect(gcode).not.toMatch(/^G2\b/m);
+      expect(gcode).not.toMatch(/^G3\b/m);
+      expect(gcode).toContain('G1 X20.000 Y10.000 F1000');
+      expect(findPlungedTravelIssues(gcode, { safeZMm: 3.81 })).toEqual([]);
+    });
+  });
+
   describe('path3d passes (Phase H.1)', () => {
     const ramp = group({
       passes: [
