@@ -54,7 +54,12 @@ export function circularArcLengthMm(arc: CircularArc2d): number {
 export function sampleCircularArcPoints(arc: CircularArc2d): Vec2[] {
   const geometry = circularArcGeometry(arc);
   if (geometry.kind === 'invalid') return linePoints(arc.start, arc.end);
-  const points = sampleArcPoints(arc.center, geometry.radiusMm, geometry.startRad, geometry.sweepRad);
+  const points = sampleArcPoints(
+    arc.center,
+    geometry.radiusMm,
+    geometry.startRad,
+    geometry.sweepRad,
+  );
   if (points.length < 2) return linePoints(arc.start, arc.end);
   points[0] = arc.start;
   points[points.length - 1] = arc.end;
