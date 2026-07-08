@@ -1130,6 +1130,13 @@ board and **Create board outline**; once created it shows **Place artwork**
 (Center + four corners) and **Jog head to** (Center + four corners) plus
 **Capture a new board**.
 
+**Manual size (know your dimensions?).** After capturing the bottom-left
+corner (which sets the origin), the panel also shows a **type the board size**
+form: enter width × height and **Draw board at this size** instead of jogging
+to the other three corners. The outline draws from the captured corner at that
+size — the same result as a four-corner capture, faster for material you've
+already measured. Blocked below 3 mm like the measured path.
+
 **Why button-jog only.** GRBL is open-loop — pushing the head by hand does
 not update the reported position, so a hand-jog capture would record the
 last *commanded* point, not where the head is. Capture is always via the

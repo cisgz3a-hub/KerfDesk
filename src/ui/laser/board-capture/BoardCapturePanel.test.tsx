@@ -30,6 +30,15 @@ function buttonByText(host: HTMLElement, text: string): HTMLButtonElement | null
   return [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === text) ?? null;
 }
 
+// Set a controlled <input> value the way React's onChange listens for it.
+function setNumberInput(host: HTMLElement, label: string, value: string): void {
+  const el = host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+  if (el === null) throw new Error(`input "${label}" missing`);
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  setter?.call(el, value);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 async function setMachinePosition(x: number, y: number): Promise<void> {
   await act(async () => {
     useLaserStore.setState({ statusReport: idleAt(x, y) });
@@ -200,6 +209,39 @@ describe('BoardCapturePanel', () => {
 
     expect(host.textContent).toContain('too small to be a board');
     expect(buttonByText(host, 'Create board outline')?.disabled).toBe(true);
+    await unmount();
+  });
+
+  it('draws the board from the first corner + typed size (manual path)', async () => {
+    useLaserStore.setState({
+      setOriginHere: vi.fn(async () => undefined),
+      connection: { kind: 'connected' },
+      wcoCache: null,
+    });
+    const { host, unmount } = await render();
+
+    // Capture only the bottom-left corner (sets the origin).
+    await setMachinePosition(50, 30);
+    await act(async () => buttonByText(host, 'Capture corner')?.click());
+
+    // The Draw button is gated until both dimensions are valid.
+    expect(buttonByText(host, 'Draw board at this size')?.disabled).toBe(true);
+    await act(async () => {
+      setNumberInput(host, 'Board width in mm', '120');
+      setNumberInput(host, 'Board height in mm', '80');
+    });
+    const draw = buttonByText(host, 'Draw board at this size');
+    expect(draw?.disabled).toBe(false);
+    await act(async () => draw?.click());
+
+    const box = findRegistrationBoxes(useStore.getState().project.scene)[0];
+    expect(box?.spec).toMatchObject({ kind: 'rect', widthMm: 120, heightMm: 80 });
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'front-left',
+    });
+    // Committed phase, with the typed size echoed for a ruler check.
+    expect(host.textContent).toContain('Measured: 120.0 × 80.0 mm');
     await unmount();
   });
 });
