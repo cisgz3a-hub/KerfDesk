@@ -1,0 +1,1 @@
+export { BoardCapturePanel } from './BoardCapturePanel';

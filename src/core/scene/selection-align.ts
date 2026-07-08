@@ -54,7 +54,9 @@ function alignObjectToReference(
   };
 }
 
-function alignDelta(
+// Exported so box-anchor alignment (board-capture, ADR-124) can compose an
+// X-kind and a Y-kind into a corner snap without duplicating the min/max math.
+export function alignDelta(
   objectBox: AABB,
   referenceBox: AABB,
   kind: SelectionAlignKind,

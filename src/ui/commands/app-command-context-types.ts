@@ -31,6 +31,8 @@ export type CommandDialogs = {
   readonly measureActive: boolean;
   readonly registrationPanelOpen: boolean;
   readonly toggleRegistrationPanel: () => void;
+  readonly boardCapturePanelOpen: boolean;
+  readonly toggleBoardCapturePanel: () => void;
   readonly cameraPanelOpen: boolean;
   readonly toggleCameraPanel: () => void;
 };

@@ -7,6 +7,7 @@ import { CutsLayersPanel } from '../layers';
 import { ConfirmSaveDialog, StatusBar, Toasts } from '../common';
 import { CommandShell } from '../commands';
 import { LaserWindow, useJobShortcuts } from '../laser';
+import { BoardCapturePanel } from '../laser/board-capture';
 import { AddTextDialog } from '../text/AddTextDialog';
 import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
@@ -57,6 +58,7 @@ export function App(): JSX.Element {
           <WorkspaceCameraOverlay />
           <RegistrationJigPanel />
           <CameraPanel />
+          <BoardCapturePanel />
         </div>
         <Cnc3DPane />
         <CutsLayersPanel />

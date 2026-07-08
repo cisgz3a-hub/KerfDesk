@@ -27,15 +27,11 @@ import { controllerOperationCommandBlockMessage } from './laser-controller-opera
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
 import { grblSettingsActions } from './grbl-settings-actions';
-import { runHomeAction } from './laser-home-action';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
 import { jobActions } from './laser-job-actions';
-import {
-  markMotionOperationDispatched,
-  startMotionOperation,
-  type LaserMotionOperation,
-} from './laser-motion-operation';
+import { jogActions } from './laser-jog-actions';
+import { type LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
 import { originActions } from './laser-origin-actions';
 import type { ResetCleanupRefs } from './laser-reset-cleanup';
@@ -53,7 +49,6 @@ import {
   activeJobCommandBlockMessage,
   assertAutofocusIdle,
   initialLaserState,
-  jogFrameCommandBlockMessage,
   motionOperationCommandBlockMessage,
   pushLog,
   type StallProbe,
@@ -181,6 +176,10 @@ export type LaserState = {
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   readonly clearTranscript: () => void;
   readonly jog: (params: JogParams) => Promise<void>;
+  // ADR-124 — jog the head to a captured board point (a corner or the centre),
+  // given as a machine coordinate. Computed as a relative delta from the current
+  // machine position so it reuses `jog`'s guards and works for the (0,0) corner.
+  readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
   readonly cancelJog: () => Promise<void>;
   readonly frame: (
@@ -297,71 +296,6 @@ function autofocusActions(set: SetFn, get: GetFn): Pick<LaserState, 'autofocus' 
   };
 }
 
-function jogActions(
-  set: SetFn,
-  get: GetFn,
-): Pick<LaserState, 'home' | 'jog' | 'cancelJog' | 'frame'> {
-  return {
-    home: async () => {
-      await runHomeAction(
-        set,
-        get,
-        refs,
-        (line, action, source) => safeWrite(set, get, line, action, source),
-        refs.driver,
-      );
-    },
-    jog: async (params) => {
-      assertAutofocusIdle(get());
-      assertJogFrameReady(set, get);
-      set({ motionOperation: startMotionOperation('jog') });
-      try {
-        await safeWrite(set, get, `${refs.driver.commands.buildJog(params)}\n`, 'jog');
-        set((s) => ({
-          motionOperation: markMotionOperationDispatched(s.motionOperation, 'jog'),
-        }));
-      } catch (err) {
-        set({ motionOperation: null });
-        throw err;
-      }
-    },
-    cancelJog: async () => {
-      const jogCancel = refs.driver.realtime.jogCancel;
-      if (jogCancel === null) {
-        set({ motionOperation: null, frameVerification: null });
-        return;
-      }
-      await safeWrite(set, get, jogCancel, 'jog').finally(() =>
-        set({ motionOperation: null, frameVerification: null }),
-      );
-    },
-    frame: async (bounds, feed) => {
-      assertAutofocusIdle(get());
-      assertJogFrameReady(set, get);
-      // CNC projects retract to the configured safe height before the XY
-      // perimeter trace (the bit would otherwise drag through stock). CNC is
-      // GRBL-only (ADR-098), so the GRBL jog literal is safe here; laser
-      // projects keep the driver's Z-silent perimeter.
-      const machine = useStore.getState().project.machine;
-      const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
-      const frameLines = refs.driver.commands.buildFrameLines(bounds, feed);
-      const [firstLine, ...pendingLines] =
-        safeZMm === undefined ? frameLines : [cncFrameRetractLine(safeZMm, feed), ...frameLines];
-      if (firstLine === undefined) return;
-      set({ motionOperation: startMotionOperation('frame', pendingLines) });
-      try {
-        await safeWrite(set, get, firstLine, 'frame');
-        set((s) => ({
-          motionOperation: markMotionOperationDispatched(s.motionOperation, 'frame'),
-        }));
-      } catch (err) {
-        set({ motionOperation: null });
-        throw err;
-      }
-    },
-  };
-}
-
 function airAssistActions(set: SetFn, get: GetFn): Pick<LaserState, 'setAirAssistEnabled'> {
   return {
     setAirAssistEnabled: async (enabled) => {
@@ -415,21 +349,6 @@ function airAssistCommandBlockMessage(state: LaserState): string | null {
   return null;
 }
 
-function cncFrameRetractLine(safeZMm: number, feed: number): string {
-  return `$J=G90 G21 Z${safeZMm.toFixed(3)} F${Math.max(1, Math.round(feed))}
-`;
-}
-
-function assertJogFrameReady(set: SetFn, get: GetFn): void {
-  const blockedMessage = jogFrameCommandBlockMessage(get());
-  if (blockedMessage === null) return;
-  set({
-    lastWriteError: blockedMessage,
-    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
-  });
-  throw new Error(blockedMessage);
-}
-
 function assertNoMotionOperation(set: SetFn, get: GetFn): void {
   const blockedMessage = motionOperationCommandBlockMessage(get());
   if (blockedMessage === null) return;
@@ -463,7 +382,9 @@ export const useLaserStore = create<LaserState>((set, get) => ({
     safeWrite(set, get, line, action, source),
   ),
   ...autofocusActions(set, get),
-  ...jogActions(set, get),
+  ...jogActions(set, get, refs, (line, action, source) =>
+    safeWrite(set, get, line, action, source),
+  ),
   ...airAssistActions(set, get),
   ...probeActions(set, get, refs),
   ...overrideActions((line) => safeWrite(set, get, line)),

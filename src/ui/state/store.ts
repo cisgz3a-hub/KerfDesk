@@ -96,6 +96,7 @@ import {
   registrationOutputActions,
   type RegistrationOutputActions,
 } from './registration-output-actions';
+import { boardCaptureActions } from './board-capture-actions';
 import {
   pathNodeEditActions,
   type PathNodeEditActions,
@@ -234,6 +235,10 @@ export type AppState = ObjectPropertiesActions &
     // ADR-057: add (or replace) a circular registration jig outline for round
     // blanks. Diameter in mm; replacement keeps position and lock state.
     readonly addRegistrationCircle: (diameterMm: number) => void;
+    // ADR-124: commit a captured board — build the registration box from the
+    // measured width/height, center it, keep the outline out of the burn, and
+    // switch placement to user-origin so the next Start lands on the real board.
+    readonly addCapturedBoardBox: (widthMm: number, heightMm: number) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.
     readonly removeRegistrationBox: () => void;
@@ -442,6 +447,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectNotesActions(set),
   ...selectionTransformActions(set),
   ...registrationOutputActions(set),
+  ...boardCaptureActions(set),
   ...pathNodeEditActions(set),
   ...objectDeleteActions(set),
   ...sceneActions(set),

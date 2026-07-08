@@ -236,6 +236,13 @@ phase; tracked here so they don't get lost.
   shipped Phase E Trace (higher scrutiny). Separable from §8.6 #1 (eliminate
   `TracedImage`). Staged B1→B4. *Phase assignment + build order pending
   maintainer decision (2026-05-29).*
+- **Capture Board Corners** (jog to each corner of a placed board → draw its
+  outline on the canvas at exact size, set the origin at the bottom-left corner,
+  center/corner-snap artwork onto it) — built 2026-07-08 under **ADR-124** as a
+  capture front-end onto the ADR-057 Registration Box. A physical-placement aid
+  alongside Set Origin (ADR-021), Verified Origin (ADR-053), and the Registration
+  Box (ADR-057). Hardware still CLAIMED; rotated-rect / N-point polygon capture
+  is a documented follow-up.
 
 ---
 

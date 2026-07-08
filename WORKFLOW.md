@@ -1108,6 +1108,86 @@ Shipped" and update the hardware verification inventory.
 
 ---
 
+### F-BC1. Capture a placed board's corners (ADR-124)
+
+**ADR:** [ADR-124](DECISIONS.md#adr-124--capture-board-corners-build-the-registration-box-from-jogged-machine-coordinates-2026-07-08).
+
+**Operator intent.** Place a board anywhere on the bed, jog the head to
+each corner and press Capture, and have the app draw the board's outline
+on the canvas at its exact size, set the work origin at the bottom-left
+corner, and let artwork be centered (or corner-snapped) onto it. Solves
+"burn on a board I just placed, centered" without a camera.
+
+**Where in the UI.** A **Place Board** toolbar button (Tools group, next to
+Registration Jig) toggles a NON-modal floating panel pinned to the top-left
+of the canvas — the same pattern as the registration jig, so canvas mouse
+handling and the Laser panel's jog controls keep working while it is open
+(the operator jogs on the right, captures in the panel). It guides the
+operator (bottom-left first — that corner becomes the origin — then the
+other corners in any order), shows the live head position, and offers
+Capture / Undo last / Start over. After four corners it shows the measured
+board and **Create board outline**; once created it shows **Place artwork**
+(Center + four corners) and **Jog head to** (Center + four corners) plus
+**Capture a new board**.
+
+**Why button-jog only.** GRBL is open-loop — pushing the head by hand does
+not update the reported position, so a hand-jog capture would record the
+last *commanded* point, not where the head is. Capture is always via the
+jog controls.
+
+**The four states.**
+
+1. **Success.** Connected, Idle, board on the bed. Jog to the bottom-left
+   corner → Capture (sends `G92 X0 Y0`; the `Origin:` row flips to
+   custom). Jog to the remaining three corners — **in any order/direction** —
+   → Capture each (width/height come from the bounding box, so the outline's
+   size and orientation don't depend on which way you go around). Create board
+   outline → a dashed rectangle appears centered on the canvas at the
+   measured size, labeled `W × H mm` (check it against a ruler); placement
+   switches to User Origin. Add artwork, select
+   it, **Center** → it snaps to the board's middle; Start burns it centered
+   on the physical board.
+2. **No connection / not Idle.** The Capture button is disabled (same gate
+   as the JogPad: connected + Idle + no job/motion) and a "Connect the
+   machine to capture a board" hint shows. No position is recorded.
+3. **No live position.** Capture is disabled until a status report with a
+   machine position arrives; "Jog head to" reports "needs a live machine
+   position" rather than sending an axis-less jog.
+4. **Off-square / rotated / too-small board.** The outline is drawn
+   axis-aligned, so if the four corners don't form a clean rectangle square
+   to the bed — the board is rotated, or a corner was mis-captured — an
+   "aren't a clean rectangle square to the bed (off by N mm)" warning shows;
+   the operator can straighten the board and recapture, or continue if it
+   looks right. If the captured extent is under 3 mm in either dimension it's
+   treated as a mis-capture: the warning says it's too small and **Create
+   board outline** is disabled until Start over.
+
+**Accidental input.** A double-click on Capture is deduped — a second press
+at the same (stationary-head) position is ignored, so a corner can't be
+recorded twice and silently corrupt the rectangle. If the work-origin write
+fails, the panel shows an inline error instead of leaving the operator on
+"Corner 1" with no feedback.
+
+**Hardware verification checklist (user-driven — hardware CLAIMED).**
+
+1. Connect → Idle. Click the **Place Board** toolbar button to open the panel.
+2. Jog to the board's bottom-left corner; Capture. The `Origin:` row flips
+   to `X… Y… (custom)` within a few seconds; the step advances to corner 2.
+3. Capture the other three corners in any order. The measured size should
+   match the board (both dimensions and orientation) within eyeball
+   tolerance (±~1 mm).
+4. Create board outline → a dashed rectangle of that size appears centered
+   on the canvas.
+5. Add artwork, select it, **Center** → it lands in the middle of the
+   outline. Run a low-power/S=0 test: it should trace centered on the
+   physical board.
+6. Try **Jog head to → Center**: the head should move to the middle of the
+   board. Try a corner: the head returns to that corner.
+7. **Capture a new board** resets the panel; re-capturing replaces the
+   outline (only one board at a time).
+
+---
+
 ### F-F4. Convert a selected vector to a bitmap (Phase F.4)
 
 **ADR:** [ADR-029](DECISIONS.md#adr-029--convert-to-bitmap-vector--raster-engrave-source).

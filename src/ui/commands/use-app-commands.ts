@@ -52,6 +52,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const toolMode = useUiStore((s) => s.toolMode);
   const registrationPanelOpen = useUiStore((s) => s.registrationPanelOpen);
   const toggleRegistrationPanel = useUiStore((s) => s.toggleRegistrationPanel);
+  const boardCapturePanelOpen = useUiStore((s) => s.boardCapturePanelOpen);
+  const toggleBoardCapturePanel = useUiStore((s) => s.toggleBoardCapturePanel);
   const cameraPanelOpen = useCameraStore((s) => s.panelOpen);
   const toggleCameraPanel = useCameraStore((s) => s.togglePanel);
   return buildAppCommands(
@@ -62,6 +64,8 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       measureActive: toolMode.kind === 'measure',
       registrationPanelOpen,
       toggleRegistrationPanel,
+      boardCapturePanelOpen,
+      toggleBoardCapturePanel,
       cameraPanelOpen,
       toggleCameraPanel,
     }),
@@ -106,6 +110,8 @@ function appCommandContext(
     hasSelection: selectedIds.length > 0,
     registrationPanelOpen: dialogs.registrationPanelOpen,
     toggleRegistrationPanel: dialogs.toggleRegistrationPanel,
+    boardCapturePanelOpen: dialogs.boardCapturePanelOpen,
+    toggleBoardCapturePanel: dialogs.toggleBoardCapturePanel,
     cameraPanelOpen: dialogs.cameraPanelOpen,
     toggleCameraPanel: dialogs.toggleCameraPanel,
     hasRasterSelection: selected?.kind === 'raster-image',
