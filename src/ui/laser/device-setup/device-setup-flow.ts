@@ -5,7 +5,12 @@
 // unit-testable in isolation.
 
 import type { Dispatch } from 'react';
-import { validateMachineProfile, type DeviceProfile } from '../../../core/devices';
+import {
+  profileWithControllerFacts,
+  validateMachineProfile,
+  type ControllerKind,
+  type DeviceProfile,
+} from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
 
 // The flow is Connect -> Identify -> Confirm -> Safety -> Probe -> Sync
@@ -41,6 +46,9 @@ export type DeviceSetupState = {
   // whenever the controller is (re-)read, so apply-preset and readiness overlay
   // current controller truth instead of a stale open-time snapshot.
   readonly detected: Partial<DeviceProfile>;
+  // Firmware identity is read separately from numeric settings. It must remain
+  // controller-authoritative when a catalog profile is only used as identity.
+  readonly detectedControllerKind: ControllerKind | null;
   // The working copy every editor mutates; committed on Finish.
   readonly draft: DeviceProfile;
   // True once a catalog preset was applied this session.
@@ -54,7 +62,11 @@ export type DeviceSetupAction =
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
   | { readonly kind: 'apply-preset'; readonly profile: DeviceProfile }
   | { readonly kind: 'accept-detected'; readonly patch: Partial<DeviceProfile> }
-  | { readonly kind: 'detected-updated'; readonly detected: Partial<DeviceProfile> };
+  | { readonly kind: 'detected-updated'; readonly detected: Partial<DeviceProfile> }
+  | {
+      readonly kind: 'detected-controller-kind-updated';
+      readonly detectedControllerKind: ControllerKind | null;
+    };
 
 // Shared props for the wizard step components: the current flow state plus the
 // reducer dispatch. ReviewStep takes only `state` (it makes no edits).
@@ -66,13 +78,23 @@ export type DeviceSetupStepProps = {
 export function initDeviceSetup(
   profile: DeviceProfile,
   detected: Partial<DeviceProfile> | null,
+  detectedControllerKind: ControllerKind | null = null,
 ): DeviceSetupState {
   const safeDetected = detected ?? {};
+  const hasControllerRead = detectedControllerKind !== null || Object.keys(safeDetected).length > 0;
   return {
     step: 'connect',
     baseline: profile,
     detected: safeDetected,
-    draft: { ...profile, ...safeDetected },
+    detectedControllerKind,
+    draft: profileWithControllerFacts({
+      profile,
+      current: profile,
+      detectedSettings: safeDetected,
+      controllerSettings: null,
+      detectedControllerKind,
+      hasControllerRead,
+    }),
     presetApplied: false,
   };
 }
@@ -94,13 +116,24 @@ export function deviceSetupReducer(
     case 'apply-preset':
       return {
         ...state,
-        draft: { ...action.profile, ...state.detected },
+        draft: profileWithControllerFacts({
+          profile: action.profile,
+          current: state.draft,
+          detectedSettings: state.detected,
+          controllerSettings: null,
+          detectedControllerKind: state.detectedControllerKind,
+          hasControllerRead: hasStateControllerRead(state),
+        }),
         presetApplied: true,
       };
     case 'detected-updated':
       // The wizard re-dispatches the live $$ patch on every read; a ref-equal
       // dispatch (the mount re-sync) is a no-op so it does not force a render.
       return action.detected === state.detected ? state : { ...state, detected: action.detected };
+    case 'detected-controller-kind-updated':
+      return action.detectedControllerKind === state.detectedControllerKind
+        ? state
+        : { ...state, detectedControllerKind: action.detectedControllerKind };
     default:
       return assertNever(action);
   }
@@ -142,4 +175,8 @@ function adjacentStep(step: DeviceSetupStep, delta: number): DeviceSetupStep {
   const index = DEVICE_SETUP_STEP_ORDER.indexOf(step);
   const clamped = Math.min(DEVICE_SETUP_STEP_ORDER.length - 1, Math.max(0, index + delta));
   return DEVICE_SETUP_STEP_ORDER[clamped] ?? step;
+}
+
+function hasStateControllerRead(state: DeviceSetupState): boolean {
+  return state.detectedControllerKind !== null || Object.keys(state.detected).length > 0;
 }

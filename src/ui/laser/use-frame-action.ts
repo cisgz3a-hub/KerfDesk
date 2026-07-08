@@ -99,7 +99,7 @@ function dispatchFrameIfSafe(
     pushToast(motionIssue, 'error');
     return;
   }
-  const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
+  const feed = project.device.framingFeedMmPerMin;
   const isVerifiedOrigin = placement.jobOrigin?.startFrom === 'verified-origin';
   void frame(bounds, feed)
     .then(() => {

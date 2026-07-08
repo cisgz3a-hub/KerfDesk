@@ -44,15 +44,24 @@ export {
   PROFILE_CAPABILITIES,
 } from './device-profile';
 export type { CameraProfile } from '../camera';
-export type { MachineProfileCatalogEntry } from './profile-catalog';
+export type { MachineProfileCatalogEntry, MachineProfileConfidence } from './profile-catalog';
 export {
   duplicateProfileAsCustom,
   GRBL_MACHINE_PROFILE_CATALOG,
   PROFILE_CATALOG_VERSION,
+  profileConfidenceLabel,
   profileCatalogEntryById,
   profileSupportsCapability,
   validateMachineProfile,
 } from './profile-catalog';
+export type { ProfileControllerFactsInput } from './profile-overlays';
+export { machineReportedProfilePatch, profileWithControllerFacts } from './profile-overlays';
+export type {
+  MachineProfileSuggestion,
+  MachineProfileSuggestionInput,
+  MachineProfileSuggestionRank,
+} from './profile-suggestions';
+export { suggestMachineProfiles } from './profile-suggestions';
 export type { MachineBounds } from './machine-bounds';
 export { machineBoundsForDevice } from './machine-bounds';
 export type { JogAxisSigns } from './jog-direction';

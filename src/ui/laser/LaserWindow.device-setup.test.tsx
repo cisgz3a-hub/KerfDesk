@@ -115,7 +115,7 @@ describe('LaserWindow device-setup nudge', () => {
       expect(button(host, 'Set up device').className).not.toContain('lf-btn--primary');
       // The configured signature is persisted, so a reload re-hydrates it.
       expect(localStorage.getItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY)).toContain(
-        'creality-falcon-a1-pro-compatible',
+        'creality-falcon-a1-pro-grblhal',
       );
     } finally {
       await unmount();

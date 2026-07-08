@@ -89,13 +89,19 @@ function AirAssistSetupWarning(props: {
         <span>{airSetupSummaryText(props.summary)}</span>
       </div>
       <div style={airSetupWarningActionStyle}>
-        <button type="button" onClick={props.onCancel} aria-label="Cancel air assist setup">
+        <button
+          type="button"
+          onClick={props.onCancel}
+          aria-label="Cancel air assist setup"
+          title="Leave project air-assist settings unchanged."
+        >
           Cancel
         </button>
         <button
           type="button"
           onClick={props.onProceed}
           aria-label="Proceed with air assist setup"
+          title="Apply the required air-assist defaults, then turn manual air on."
           style={airSetupProceedButtonStyle}
         >
           Proceed

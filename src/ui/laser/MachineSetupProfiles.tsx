@@ -1,7 +1,13 @@
 import {
   GRBL_MACHINE_PROFILE_CATALOG,
+  profileConfidenceLabel,
+  profileSupportsCapability,
+  profileWithControllerFacts,
+  suggestMachineProfiles,
+  type ControllerKind,
   type DeviceProfile,
   type MachineProfileCatalogEntry,
+  type MachineProfileSuggestion,
 } from '../../core/devices';
 import { Button } from '../kit';
 import { useStore } from '../state';
@@ -45,16 +51,40 @@ export function OverviewPanel(): JSX.Element {
 }
 
 export function ProfileCatalogPanel(): JSX.Element {
+  const detectedSettings = useLaserStore((s) => s.detectedSettings);
+  const controllerSettings = useLaserStore((s) => s.controllerSettings);
+  const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
+  const suggestions = suggestMachineProfiles({
+    detectedControllerKind,
+    detectedSettings,
+    controllerSettings,
+  });
+  const suggestionByProfileId = new Map(
+    suggestions.map((suggestion) => [suggestion.profileId, suggestion]),
+  );
+  const entries = hasSuggestionFacts(detectedControllerKind, detectedSettings, controllerSettings)
+    ? suggestions.map((suggestion) => suggestion.entry)
+    : GRBL_MACHINE_PROFILE_CATALOG;
   return (
     <div style={catalogGridStyle}>
-      {GRBL_MACHINE_PROFILE_CATALOG.map((entry) => (
-        <CatalogCard key={entry.profile.profileId ?? entry.profile.name} entry={entry} />
+      {entries.map((entry) => (
+        <CatalogCard
+          key={entry.profile.profileId ?? entry.profile.name}
+          entry={entry}
+          suggestion={suggestionByProfileId.get(entry.profile.profileId)}
+        />
       ))}
     </div>
   );
 }
 
-function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }): JSX.Element {
+function CatalogCard({
+  entry,
+  suggestion,
+}: {
+  readonly entry: MachineProfileCatalogEntry;
+  readonly suggestion: MachineProfileSuggestion | undefined;
+}): JSX.Element {
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const current = useStore((s) => s.project.device);
   const detectedSettings = useLaserStore((s) => s.detectedSettings);
@@ -66,13 +96,13 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
   const active = activeId === profile.profileId;
   const applyProfile = (): void => {
     replaceDeviceProfile(
-      catalogProfileWithControllerFacts({
+      profileWithControllerFacts({
         profile,
         current,
         detectedSettings,
         controllerSettings,
         detectedControllerKind,
-        lastSettingsReadAt,
+        hasControllerRead: lastSettingsReadAt !== null,
       }),
     );
   };
@@ -80,7 +110,7 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
     <article style={cardStyle}>
       <div style={cardHeaderStyle}>
         <strong>{profile.name}</strong>
-        <span style={badgeStyle}>{profile.profileSource ?? 'built-in'}</span>
+        <span style={badgeStyle}>{profileConfidenceLabel(entry.confidence)}</span>
       </div>
       <p style={mutedStyle}>
         {profile.bedWidth} x {profile.bedHeight} mm
@@ -88,7 +118,18 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
           ? `, ${profile.laserSubProfile.opticalPowerW}W`
           : ''}
       </p>
+      <p style={mutedStyle}>Air-assist hardware: {airHardwareLabel(profile)}</p>
+      <p style={mutedStyle}>Software air output: {airOutputLabel(profile.airAssistCommand)}</p>
+      {suggestion !== undefined && suggestion.rank !== 'manual-only' ? (
+        <p style={mutedStyle}>Profile match: {suggestionRankLabel(suggestion.rank)}</p>
+      ) : null}
       <ul style={notesStyle}>
+        {suggestion?.reasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+        {suggestion?.warnings.map((warning) => (
+          <li key={warning}>{warning}</li>
+        ))}
         {entry.reviewNotes.map((note) => (
           <li key={note}>{note}</li>
         ))}
@@ -100,45 +141,38 @@ function CatalogCard({ entry }: { readonly entry: MachineProfileCatalogEntry }):
   );
 }
 
-function catalogProfileWithControllerFacts(args: {
-  readonly profile: DeviceProfile;
-  readonly current: DeviceProfile;
-  readonly detectedSettings: Partial<DeviceProfile> | null;
-  readonly controllerSettings: Partial<DeviceProfile> | null;
-  readonly detectedControllerKind: DeviceProfile['controllerKind'] | null;
-  readonly lastSettingsReadAt: number | null;
-}): DeviceProfile {
-  const controllerRead = args.lastSettingsReadAt !== null;
-  const machinePatch = {
-    ...(controllerRead ? machineReportedProfilePatch(args.current) : {}),
-    ...machineReportedProfilePatch(args.controllerSettings),
-    ...machineReportedProfilePatch(args.detectedSettings),
-  };
-  const controllerKind =
-    args.detectedControllerKind ?? (controllerRead ? args.current.controllerKind : undefined);
-  return {
-    ...args.profile,
-    ...machinePatch,
-    ...(controllerRead ? { framingFeedMmPerMin: args.current.framingFeedMmPerMin } : {}),
-    ...(controllerKind === undefined ? {} : { controllerKind }),
-  };
+function hasSuggestionFacts(
+  detectedControllerKind: ControllerKind | null,
+  detectedSettings: Partial<DeviceProfile> | null,
+  controllerSettings: Partial<DeviceProfile> | null,
+): boolean {
+  return (
+    detectedControllerKind !== null ||
+    hasDetectedProfilePatch(detectedSettings) ||
+    hasDetectedProfilePatch(controllerSettings)
+  );
 }
 
-function machineReportedProfilePatch(
-  source: Partial<DeviceProfile> | null,
-): Partial<DeviceProfile> {
-  if (source === null) return {};
-  return {
-    ...(source.bedWidth === undefined ? {} : { bedWidth: source.bedWidth }),
-    ...(source.bedHeight === undefined ? {} : { bedHeight: source.bedHeight }),
-    ...(source.maxFeed === undefined ? {} : { maxFeed: source.maxFeed }),
-    ...(source.maxPowerS === undefined ? {} : { maxPowerS: source.maxPowerS }),
-    ...(source.minPowerS === undefined ? {} : { minPowerS: source.minPowerS }),
-    ...(source.laserModeEnabled === undefined ? {} : { laserModeEnabled: source.laserModeEnabled }),
-    ...(source.accelMmPerSec2 === undefined ? {} : { accelMmPerSec2: source.accelMmPerSec2 }),
-    ...(source.junctionDeviationMm === undefined
-      ? {}
-      : { junctionDeviationMm: source.junctionDeviationMm }),
-    ...(source.zTravelMm === undefined ? {} : { zTravelMm: source.zTravelMm }),
-  };
+function hasDetectedProfilePatch(source: Partial<DeviceProfile> | null): boolean {
+  if (source === null) return false;
+  return Object.keys(source).length > 0;
+}
+
+function airHardwareLabel(profile: DeviceProfile): string {
+  return profileSupportsCapability(profile, 'air-assist') ? 'Supported' : 'Not listed';
+}
+
+function airOutputLabel(command: DeviceProfile['airAssistCommand']): string {
+  return command === 'none' ? 'Disabled' : `Enabled (${command})`;
+}
+
+function suggestionRankLabel(rank: MachineProfileSuggestion['rank']): string {
+  switch (rank) {
+    case 'suggested':
+      return 'Suggested';
+    case 'possible':
+      return 'Possible';
+    case 'manual-only':
+      return 'Manual only';
+  }
 }

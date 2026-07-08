@@ -15,7 +15,7 @@ import { DeviceSetupWizard } from './DeviceSetupWizard';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const FALCON_ID = 'creality-falcon-a1-pro-compatible';
+const FALCON_ID = 'creality-falcon-a1-pro-grblhal';
 const IDLE_STATUS = {
   state: 'Idle',
   subState: null,
@@ -69,6 +69,7 @@ afterEach(() => {
   resetStore();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
+    detectedControllerKind: null,
     detectedSettings: null,
     statusReport: null,
     grblSettingsRows: [],
@@ -178,6 +179,28 @@ describe('DeviceSetupWizard', () => {
       if (!(bed instanceof HTMLInputElement)) throw new Error('bed width input missing');
       // Detected 363 must win over the preset's nominal 400.
       expect(bed.value).toBe('363');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('commits detected controller kind when a profile is chosen after auto-detect', async () => {
+    const { host, unmount } = await renderWizard();
+    try {
+      await act(async () => {
+        useLaserStore.setState({
+          connection: { kind: 'connected' },
+          detectedControllerKind: 'grblhal',
+          detectedSettings: { bedWidth: 400, bedHeight: 400, maxPowerS: 1000 },
+          lastSettingsReadAt: 1,
+        } as Partial<ReturnType<typeof useLaserStore.getState>>);
+      });
+      await act(async () => button(host, 'Next').click()); // connect -> identify
+      await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
+      await advanceUntil(host, 'Finish setup');
+      await act(async () => button(host, 'Finish setup').click());
+
+      expect(useStore.getState().project.device.controllerKind).toBe('grblhal');
     } finally {
       await unmount();
     }

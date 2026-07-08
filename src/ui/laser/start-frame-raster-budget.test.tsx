@@ -224,4 +224,54 @@ describe('custom-origin raster budget guard', () => {
       host.remove();
     }
   });
+
+  it('keeps Falcon framing feed independent from a low burn/feed ceiling', async () => {
+    useStore.setState({
+      project: {
+        ...overBudgetRasterProject(),
+        device: {
+          ...overBudgetRasterProject().device,
+          profileId: 'creality-falcon-a1-pro-grblhal',
+          name: 'Creality Falcon A1 Pro (grblHAL)',
+          maxFeed: 1000,
+          framingFeedMmPerMin: 10000,
+        },
+      },
+      jobPlacement: userOriginPlacement,
+    });
+    const originalFrame = useLaserStore.getState().frame;
+    const frame = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      frame,
+      streamer: null,
+      statusReport: idleStatus,
+      workOriginActive: true,
+      wcoCache: { x: 100, y: 100, z: 0 },
+    });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
+      await act(async () => {
+        root = createRoot(host);
+        root.render(<JobControls disabled={false} onStartJob={() => undefined} />);
+      });
+      const frameButton = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Frame',
+      );
+      if (frameButton === undefined) throw new Error('Frame button not rendered');
+
+      await act(async () => {
+        frameButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      expect(frame).toHaveBeenCalledWith({ minX: 0, minY: 0, maxX: 300, maxY: 300 }, 10000);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      useLaserStore.setState({ frame: originalFrame });
+      host.remove();
+    }
+  });
 });

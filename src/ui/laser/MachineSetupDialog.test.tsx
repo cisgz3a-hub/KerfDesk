@@ -105,10 +105,21 @@ describe('MachineSetupDialog', () => {
       await act(async () => button(host, 'Profile Catalog').click());
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
 
-      expect(useStore.getState().project.device.profileId).toBe(
-        'creality-falcon-a1-pro-compatible',
-      );
+      expect(useStore.getState().project.device.profileId).toBe('creality-falcon-a1-pro-grblhal');
       expect(useStore.getState().dirty).toBe(true);
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('shows profile confidence and separates air hardware from enabled output', async () => {
+    const { host, unmount } = await renderDialog();
+    try {
+      await act(async () => button(host, 'Profile Catalog').click());
+
+      expect(host.textContent).toContain('Hardware verified');
+      expect(host.textContent).toContain('Air-assist hardware: Supported');
+      expect(host.textContent).toContain('Software air output: Disabled');
     } finally {
       await unmount();
     }
@@ -141,7 +152,7 @@ describe('MachineSetupDialog', () => {
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
 
       expect(useStore.getState().project.device).toMatchObject({
-        profileId: 'creality-falcon-a1-pro-compatible',
+        profileId: 'creality-falcon-a1-pro-grblhal',
         controllerKind: 'grblhal',
         maxFeed: 10000,
         framingFeedMmPerMin: 10000,

@@ -49,9 +49,10 @@ export function DeviceSetupWizard(props: {
   const device = useStore((s) => s.project.device);
   const replaceDeviceProfile = useStore((s) => s.replaceDeviceProfile);
   const detected = useLaserStore((s) => s.detectedSettings);
+  const detectedControllerKind = useLaserStore((s) => s.detectedControllerKind);
   const lastReadAt = useLaserStore((s) => s.lastSettingsReadAt);
   const [state, dispatch] = useReducer(deviceSetupReducer, device, (seed) =>
-    initDeviceSetup(seed, detected),
+    initDeviceSetup(seed, detected, detectedControllerKind),
   );
   // Keep the reducer's detected value in sync with the live controller read, so
   // apply-preset and the readiness gate use current $$ values even when the
@@ -61,6 +62,11 @@ export function DeviceSetupWizard(props: {
   useEffect(() => {
     if (detected !== null) dispatch({ kind: 'detected-updated', detected });
   }, [detected, lastReadAt]);
+  useEffect(() => {
+    if (detectedControllerKind !== null) {
+      dispatch({ kind: 'detected-controller-kind-updated', detectedControllerKind });
+    }
+  }, [detectedControllerKind, lastReadAt]);
   // Readiness scores against state.detected (kept in sync by the effect above),
   // so the footer's Finish gate matches the committed draft.
   const ready = computeSetupReadiness(state.draft, state.detected).ready;

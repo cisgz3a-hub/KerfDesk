@@ -98,6 +98,40 @@ describe('deviceSetupReducer draft edits', () => {
     expect(before.presetApplied).toBe(false);
     expect(before.draft.profileId).toBe(PROFILE.profileId);
   });
+
+  it('applies a preset but keeps the detected controller kind layered on top', () => {
+    const preset = GRBL_MACHINE_PROFILE_CATALOG.find(
+      (candidate) => candidate.profile.profileId === 'creality-falcon-a1-pro-compatible',
+    )?.profile;
+    if (preset === undefined) throw new Error('Falcon fallback profile missing');
+    const before = initDeviceSetup(PROFILE, { bedWidth: 400, bedHeight: 400 }, 'grblhal');
+
+    const state = deviceSetupReducer(before, { kind: 'apply-preset', profile: preset });
+
+    expect(state.draft.profileId).toBe('creality-falcon-a1-pro-compatible');
+    expect(state.draft.controllerKind).toBe('grblhal');
+  });
+
+  it('choosing the Falcon profile restores fast framing over a stale low frame feed', () => {
+    const preset = GRBL_MACHINE_PROFILE_CATALOG.find(
+      (candidate) => candidate.profile.profileId === 'creality-falcon-a1-pro-grblhal',
+    )?.profile;
+    if (preset === undefined) throw new Error('Falcon grblHAL profile missing');
+
+    const before = initDeviceSetup(
+      {
+        ...PROFILE,
+        framingFeedMmPerMin: 500,
+      },
+      { bedWidth: 400, bedHeight: 400, maxPowerS: 1000 },
+      'grblhal',
+    );
+
+    const state = deviceSetupReducer(before, { kind: 'apply-preset', profile: preset });
+
+    expect(state.draft.profileId).toBe('creality-falcon-a1-pro-grblhal');
+    expect(state.draft.framingFeedMmPerMin).toBe(10000);
+  });
 });
 
 describe('canAdvanceDeviceSetup', () => {

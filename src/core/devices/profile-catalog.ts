@@ -11,6 +11,10 @@ import {
 import { isGrblRxBufferBytes, isGrblStreamingMode } from '../grbl-streaming';
 import { validateCameraProfileShape } from '../camera';
 import { isGcodeDialectSelection } from './gcode-dialects';
+import {
+  CREALITY_FALCON_A1_PRO_GRBLHAL_PROFILE,
+  FALCON_COMPATIBLE_PROFILE,
+} from './profile-catalog-falcon';
 
 export const PROFILE_CATALOG_VERSION = '2026-06-17';
 
@@ -26,26 +30,17 @@ const LASER_HEAD_METADATA_CONFIDENCES: ReadonlyArray<
 
 export type MachineProfileCatalogEntry = {
   readonly profile: DeviceProfile;
+  readonly confidence: MachineProfileConfidence;
   readonly evidence: ReadonlyArray<ProfileEvidence>;
   readonly reviewNotes: ReadonlyArray<string>;
 };
 
-const FALCON_COMPATIBLE_PROFILE: DeviceProfile = {
-  ...DEFAULT_DEVICE_PROFILE,
-  profileId: 'creality-falcon-a1-pro-compatible',
-  vendor: 'Creality',
-  model: 'Falcon A1 Pro / Falcon-compatible',
-  name: 'Creality Falcon A1 Pro / Falcon-compatible',
-  machineFamily: 'creality-falcon',
-  capabilities: ['grbl', 'wcs', 'air-assist', 'verified-origin', 'scan-offsets', 'no-go-zones'],
-  evidence: [
-    {
-      label: 'KerfDesk Falcon baseline',
-      status: 'researched',
-      note: 'Uses the existing KerfDesk/Falcon-compatible output behavior verified by tests. Confirmed working on a real Falcon A1 Pro through the ADR-094 driver refactor, 2026-07-02.',
-    },
-  ],
-};
+export type MachineProfileConfidence =
+  | 'hardware-verified'
+  | 'simulator-tested'
+  | 'public-spec-starter'
+  | 'experimental'
+  | 'default-starter';
 
 // Brand starter profiles. Bed dimensions are commonly-published figures, NOT
 // hardware-verified here, so each carries 'unverified' evidence. The Device
@@ -225,37 +220,40 @@ const GENERIC_RUIDA_PROFILE: DeviceProfile = {
 };
 
 export const GRBL_MACHINE_PROFILE_CATALOG: ReadonlyArray<MachineProfileCatalogEntry> = [
-  entry(DEFAULT_DEVICE_PROFILE, [
+  entry(DEFAULT_DEVICE_PROFILE, 'default-starter', [
     'Starter profile. Confirm work area, homing, and laser S range before first job.',
   ]),
-  entry(FALCON_COMPATIBLE_PROFILE, [
-    'Falcon-compatible output stays byte-stable against existing KerfDesk tests.',
+  entry(CREALITY_FALCON_A1_PRO_GRBLHAL_PROFILE, 'hardware-verified', [
+    'Specific Falcon A1 Pro grblHAL profile. Controller-read $$ values override these defaults.',
   ]),
-  entry(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, [
+  entry(FALCON_COMPATIBLE_PROFILE, 'simulator-tested', [
+    'Broad Falcon-compatible fallback. Prefer a detected controller-specific profile when available.',
+  ]),
+  entry(NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE, 'public-spec-starter', [
     'No default 4040 scan-offset table is shipped; calibrate before enabling compensation.',
   ]),
-  entry(XTOOL_D1_PRO_PROFILE, [
+  entry(XTOOL_D1_PRO_PROFILE, 'public-spec-starter', [
     'Work area from public specs; KerfDesk confirms the real bed size from $$ on connect.',
   ]),
-  entry(SCULPFUN_S30_PROFILE, [
+  entry(SCULPFUN_S30_PROFILE, 'public-spec-starter', [
     'Work area from public specs; confirm bed size and S range before the first job.',
   ]),
-  entry(ORTUR_LASER_MASTER_3_PROFILE, [
+  entry(ORTUR_LASER_MASTER_3_PROFILE, 'public-spec-starter', [
     'Work area from public specs; confirm bed size, homing, and S range before the first job.',
   ]),
-  entry(GENERIC_GRBLHAL_PROFILE, [
+  entry(GENERIC_GRBLHAL_PROFILE, 'simulator-tested', [
     'grblHAL is wire-compatible with the GRBL driver; extended alarm codes 11-13 are decoded.',
   ]),
-  entry(GENERIC_FLUIDNC_PROFILE, [
+  entry(GENERIC_FLUIDNC_PROFILE, 'simulator-tested', [
     'FluidNC numeric $ setting writes are blocked in-app (configuration lives in its YAML config).',
   ]),
-  entry(GENERIC_MARLIN_PROFILE, [
+  entry(GENERIC_MARLIN_PROFILE, 'simulator-tested', [
     'Marlin: ping-pong streaming, no realtime pause/stop bytes, S 0-255, dialect must match the firmware build (inline vs fan).',
   ]),
-  entry(GENERIC_SMOOTHIEWARE_PROFILE, [
+  entry(GENERIC_SMOOTHIEWARE_PROFILE, 'simulator-tested', [
     'Smoothieware: fractional S power (0-1.0), realtime ?/!/~, M999 halt recovery, no $$/$J.',
   ]),
-  entry(GENERIC_RUIDA_PROFILE, [
+  entry(GENERIC_RUIDA_PROFILE, 'experimental', [
     'Ruida: file-export only (.rd); encoder is EXPERIMENTAL and not accepted by real hardware yet.',
   ]),
 ];
@@ -269,6 +267,21 @@ export function profileSupportsCapability(
   capability: ProfileCapability,
 ): boolean {
   return profile.capabilities?.includes(capability) === true;
+}
+
+export function profileConfidenceLabel(confidence: MachineProfileConfidence): string {
+  switch (confidence) {
+    case 'hardware-verified':
+      return 'Hardware verified';
+    case 'simulator-tested':
+      return 'Simulator tested';
+    case 'public-spec-starter':
+      return 'Public-spec starter';
+    case 'experimental':
+      return 'Experimental';
+    case 'default-starter':
+      return 'Default starter';
+  }
 }
 
 export function duplicateProfileAsCustom(
@@ -328,6 +341,7 @@ export function validateMachineProfile(profile: DeviceProfile): ReadonlyArray<st
 
 function entry(
   profile: DeviceProfile,
+  confidence: MachineProfileConfidence,
   reviewNotes: ReadonlyArray<string>,
 ): MachineProfileCatalogEntry {
   const builtInProfile = {
@@ -337,6 +351,7 @@ function entry(
   };
   return {
     profile: builtInProfile,
+    confidence,
     evidence: builtInProfile.evidence ?? [],
     reviewNotes,
   };

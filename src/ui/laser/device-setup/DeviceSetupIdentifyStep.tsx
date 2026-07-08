@@ -5,7 +5,13 @@
 
 import {
   GRBL_MACHINE_PROFILE_CATALOG,
+  profileConfidenceLabel,
+  profileSupportsCapability,
+  suggestMachineProfiles,
+  type ControllerKind,
+  type DeviceProfile,
   type MachineProfileCatalogEntry,
+  type MachineProfileSuggestion,
 } from '../../../core/devices';
 import { Button } from '../../kit';
 import {
@@ -19,12 +25,24 @@ import {
 import type { DeviceSetupStepProps } from './device-setup-flow';
 
 export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProps): JSX.Element {
+  const suggestions = suggestMachineProfiles({
+    detectedControllerKind: state.detectedControllerKind,
+    detectedSettings: state.detected,
+    controllerSettings: null,
+  });
+  const suggestionByProfileId = new Map(
+    suggestions.map((suggestion) => [suggestion.profileId, suggestion]),
+  );
+  const entries = hasSuggestionFacts(state.detectedControllerKind, state.detected)
+    ? suggestions.map((suggestion) => suggestion.entry)
+    : GRBL_MACHINE_PROFILE_CATALOG;
   return (
     <div style={catalogGridStyle}>
-      {GRBL_MACHINE_PROFILE_CATALOG.map((entry) => (
+      {entries.map((entry) => (
         <PresetCard
           key={entry.profile.profileId ?? entry.profile.name}
           entry={entry}
+          suggestion={suggestionByProfileId.get(entry.profile.profileId)}
           active={state.draft.profileId === entry.profile.profileId}
           onUse={() => dispatch({ kind: 'apply-preset', profile: entry.profile })}
         />
@@ -35,6 +53,7 @@ export function DeviceSetupIdentifyStep({ state, dispatch }: DeviceSetupStepProp
 
 function PresetCard(props: {
   readonly entry: MachineProfileCatalogEntry;
+  readonly suggestion: MachineProfileSuggestion | undefined;
   readonly active: boolean;
   readonly onUse: () => void;
 }): JSX.Element {
@@ -43,7 +62,7 @@ function PresetCard(props: {
     <article style={cardStyle}>
       <div style={cardHeaderStyle}>
         <strong>{profile.name}</strong>
-        <span style={badgeStyle}>{profile.profileSource ?? 'built-in'}</span>
+        <span style={badgeStyle}>{profileConfidenceLabel(props.entry.confidence)}</span>
       </div>
       <p style={mutedStyle}>
         {profile.bedWidth} x {profile.bedHeight} mm
@@ -51,7 +70,18 @@ function PresetCard(props: {
           ? `, ${profile.laserSubProfile.opticalPowerW}W`
           : ''}
       </p>
+      <p style={mutedStyle}>Air-assist hardware: {airHardwareLabel(profile)}</p>
+      <p style={mutedStyle}>Software air output: {airOutputLabel(profile.airAssistCommand)}</p>
+      {props.suggestion !== undefined && props.suggestion.rank !== 'manual-only' ? (
+        <p style={mutedStyle}>Profile match: {suggestionRankLabel(props.suggestion.rank)}</p>
+      ) : null}
       <ul style={notesStyle}>
+        {props.suggestion?.reasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+        {props.suggestion?.warnings.map((warning) => (
+          <li key={warning}>{warning}</li>
+        ))}
         {props.entry.reviewNotes.map((note) => (
           <li key={note}>{note}</li>
         ))}
@@ -68,4 +98,30 @@ function PresetCard(props: {
       </Button>
     </article>
   );
+}
+
+function hasSuggestionFacts(
+  detectedControllerKind: ControllerKind | null,
+  detectedSettings: Partial<DeviceProfile>,
+): boolean {
+  return detectedControllerKind !== null || Object.keys(detectedSettings).length > 0;
+}
+
+function airHardwareLabel(profile: DeviceProfile): string {
+  return profileSupportsCapability(profile, 'air-assist') ? 'Supported' : 'Not listed';
+}
+
+function airOutputLabel(command: DeviceProfile['airAssistCommand']): string {
+  return command === 'none' ? 'Disabled' : `Enabled (${command})`;
+}
+
+function suggestionRankLabel(rank: MachineProfileSuggestion['rank']): string {
+  switch (rank) {
+    case 'suggested':
+      return 'Suggested';
+    case 'possible':
+      return 'Possible';
+    case 'manual-only':
+      return 'Manual only';
+  }
 }
