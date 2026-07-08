@@ -26,12 +26,7 @@
 // run endpoint projects onto its own fitted line.
 
 import type { Vec2 } from '../scene';
-import {
-  fitLineThroughRun,
-  quadraticFitFromStats,
-  runFrameStats,
-  type FitLine,
-} from './run-fit';
+import { fitLineThroughRun, quadraticFitFromStats, runFrameStats, type FitLine } from './run-fit';
 
 // A run must be at least this long to flatten — protects small-glyph detail:
 // a 1px amplitude cap is heavy-handed on a 10px letter stem (measured on the

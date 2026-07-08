@@ -173,7 +173,10 @@ function finishLoop(
   // renderers and emitters draw points as given and never synthesise the
   // closing edge, so a ring left "open" engraves with a seam gap.
   const closed = closeRingEndpoints([
-    { points: refineChainForOutput(straightened, true, sharpened.corners, epsilonPx), closed: true },
+    {
+      points: refineChainForOutput(straightened, true, sharpened.corners, epsilonPx),
+      closed: true,
+    },
   ]);
   return closed[0] ?? null;
 }

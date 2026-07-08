@@ -176,10 +176,16 @@ function attemptBend(
   const legStart = head.at(-1);
   const legEnd = tail[0];
   if (legStart === undefined || legEnd === undefined) return null;
-  if (!replacementCoversRemoved(pts, removedFrom, removedTo, legStart, bend.vertex, legEnd, maxOffset)) {
+  if (
+    !replacementCoversRemoved(pts, removedFrom, removedTo, legStart, bend.vertex, legEnd, maxOffset)
+  ) {
     return null;
   }
-  return { points: [...head, bend.vertex, ...tail], resumeAt: head.length + 1, corner: bend.vertex };
+  return {
+    points: [...head, bend.vertex, ...tail],
+    resumeAt: head.length + 1,
+    corner: bend.vertex,
+  };
 }
 
 // A rebuild may only remove NOISE, never geometry: every point the window
