@@ -1,7 +1,7 @@
 // Contour (filled-outline) trace backend built on the in-house centerline
 // machinery — the adopted backend for every binary filled preset (Line Art,
 // Smooth, Sharp) and, via its shared finisher, Edge Detection. It replaced
-// the GPL-provenance potrace-derived backend (ADR-122, closing the ADR-120
+// the GPL-provenance potrace-derived backend (ADR-123, closing the ADR-120
 // MIT-release blocker): binarize via the shared preprocessing, walk the ink
 // boundary on the corner lattice (contour-boundary.ts), then finish each
 // closed loop with the SAME proven stage sequence the centerline tracer uses
@@ -32,7 +32,7 @@ const CONTOUR_COLOR = '#000000';
  *  in-house contour backend; everything else falls through to the
  *  centerline/edge tracers or the imagetracerjs multi-colour path. This is
  *  the permanent dispatch predicate that replaced the temporary potrace A/B
- *  gate (ADR-122). */
+ *  gate (ADR-123). */
 export function isBinaryContourPreset(options: TraceOptions): boolean {
   if (options.traceMode === 'centerline' || options.traceMode === 'edge') return false;
   if (options.numberOfColors !== 2) return false;

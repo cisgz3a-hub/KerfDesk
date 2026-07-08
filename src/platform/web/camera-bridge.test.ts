@@ -62,6 +62,96 @@ describe('web RTSP camera bridge client', () => {
     });
   });
 
+  it('maps /discover results to found / not-found / unavailable', async () => {
+    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          kind: 'ok',
+          found: {
+            cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+            proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    expect(await bridge.discoverMachineCamera()).toEqual({
+      kind: 'found',
+      cameraUrl: 'http://192.168.10.1:8080/media/getCapturePhoto',
+      proxyFrameUrl: 'http://127.0.0.1:51731/frame.jpg?url=x',
+    });
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ kind: 'ok', found: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    expect(await bridge.discoverMachineCamera()).toEqual({ kind: 'not-found' });
+
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('failed to fetch'));
+    const unavailable = await bridge.discoverMachineCamera();
+    expect(unavailable.kind).toBe('unavailable');
+    if (unavailable.kind === 'unavailable') {
+      expect(unavailable.reason).toContain('pnpm camera:bridge');
+    }
+  });
+
+  it('rejects malformed /discover JSON instead of trusting a cast', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ kind: 'ok', found: { cameraUrl: 42 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
+    expect(await bridge.discoverMachineCamera()).toEqual({
+      kind: 'unavailable',
+      reason: 'The local camera bridge returned an invalid response.',
+    });
+  });
+
+  it('builds pixel-readable proxied frame URLs', () => {
+    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
+    expect(bridge.proxiedFrameUrl('http://192.168.10.1:8080/media/getCapturePhoto?a=b')).toBe(
+      'http://127.0.0.1:51731/frame.jpg?url=http%3A%2F%2F192.168.10.1%3A8080%2Fmedia%2FgetCapturePhoto%3Fa%3Db',
+    );
+  });
+
+  it('reports bridge health including the frame proxy capability', async () => {
+    const bridge = createHttpCameraBridge('http://127.0.0.1:51731');
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ kind: 'ok', ffmpegAvailable: false, frameProxy: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    expect(await bridge.health()).toEqual({
+      kind: 'ok',
+      ffmpegAvailable: false,
+      frameProxy: true,
+    });
+
+    // A pre-ADR-116 desktop bridge without the proxy reports frameProxy false.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ kind: 'ok', ffmpegAvailable: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    expect(await bridge.health()).toEqual({
+      kind: 'ok',
+      ffmpegAvailable: true,
+      frameProxy: false,
+    });
+
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('failed to fetch'));
+    expect((await bridge.health()).kind).toBe('unavailable');
+  });
+
   it('passes through valid invalid/unavailable bridge statuses', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(

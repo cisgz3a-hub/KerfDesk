@@ -190,7 +190,7 @@ async function dispatchTrace(image: RawImageData, options: TraceOptions): Promis
   if (options.traceMode === 'centerline') return traceCenterlineStrokePaths(image, options);
   if (options.traceMode === 'edge') return traceImageToEdgePaths(image, options);
   // The binary filled-contours lane (Line Art / Smooth / Sharp) is traced by
-  // the in-house contour backend (ADR-122). imagetracerjs remains only for
+  // the in-house contour backend (ADR-123). imagetracerjs remains only for
   // the multi-colour, no-fixed-palette path below.
   if (isBinaryContourPreset(options)) return traceImageToContourColoredPaths(image, options);
   const tracer = await loadTracer();

@@ -12,7 +12,7 @@
 // path; no app code calls it today (tests only).
 //
 // The whole pipeline is original / permissively-licensed code — the
-// potrace-derived backend was removed (ADR-122). All paths share the same
+// potrace-derived backend was removed (ADR-123). All paths share the same
 // preprocessing chain (raster-prep image adjustments → median → threshold →
 // despeckle).
 
