@@ -49,10 +49,11 @@ describe('Toolbar Box Generator', () => {
         ...host.querySelectorAll('header[aria-label="Toolbar"] button'),
       ].filter((button) => button.textContent !== 'Shortcuts');
       const labels = toolbarButtons.map((button) => button.textContent?.trim() ?? '');
-      // Camera sits between Registration Jig and Box Generator (ADR-116).
+      // Camera (ADR-116) and Place Board (ADR-124) sit between Registration Jig
+      // and Box Generator.
       expect(
-        labels.slice(labels.indexOf('Registration Jig'), labels.indexOf('Registration Jig') + 3),
-      ).toEqual(['Registration Jig', 'Camera', 'Box Generator...']);
+        labels.slice(labels.indexOf('Registration Jig'), labels.indexOf('Registration Jig') + 4),
+      ).toEqual(['Registration Jig', 'Camera', 'Place Board', 'Box Generator...']);
 
       const boxButton = toolbarButtons.find((button) =>
         button.textContent?.includes('Box Generator'),

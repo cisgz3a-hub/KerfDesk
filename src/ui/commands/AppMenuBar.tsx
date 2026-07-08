@@ -140,6 +140,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<ReadonlyArray<Com
       'tools.add-text',
       'tools.registration-jig',
       'tools.camera',
+      'tools.place-board',
       'tools.box-generator',
     ],
     ['tools.material-test', 'tools.interval-test', 'tools.scan-offset-test', 'tools.focus-test'],

@@ -3,6 +3,7 @@ import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { disabled, enabled, type AppCommand, type AppCommandContext } from './command-types';
 import { registrationJigCommand } from './registration-command-family';
 import { cameraCommand } from './camera-command-family';
+import { placeBoardCommand } from './board-capture-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 import { vectorBooleanCommands } from './vector-boolean-commands';
 
@@ -74,6 +75,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     enabled('tools.add-text', 'tools', 'Text...', 'Add text to the scene', ctx.addText),
     registrationJigCommand(ctx),
     cameraCommand(ctx),
+    placeBoardCommand(ctx),
     ...calibrationToolCommands(ctx),
     enabled(
       'tools.optimization-settings',

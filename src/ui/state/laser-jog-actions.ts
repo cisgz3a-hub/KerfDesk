@@ -1,0 +1,120 @@
+// laser-jog-actions — Home / Jog / Frame motion actions, extracted from
+// laser-store.ts when the board-capture "jog to point" action (ADR-124) pushed
+// the store past the ADR-015 size cap. Same factory shape as laser-job-actions /
+// laser-origin-actions: receives the store's set/get, the live refs (for the
+// active driver), and the connection-bound safe write. Type-only LaserState /
+// LiveRefs import — no runtime cycle.
+
+import { inferCurrentMachinePosition } from './infer-machine-position';
+import { runHomeAction } from './laser-home-action';
+import { markMotionOperationDispatched, startMotionOperation } from './laser-motion-operation';
+import { type LaserSafetyAction } from './laser-safety-notice';
+import { assertAutofocusIdle, jogFrameCommandBlockMessage, pushLog } from './laser-store-helpers';
+import { useStore } from './store';
+import type { LaserState, LiveRefs } from './laser-store';
+import type { TranscriptSource } from './laser-transcript';
+
+type SetFn = (
+  partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
+) => void;
+type GetFn = () => LaserState;
+type SafeWriteFn = (
+  line: string,
+  action?: LaserSafetyAction,
+  source?: TranscriptSource,
+) => Promise<void>;
+
+// Below this XY delta (mm) a "jog to point" is treated as already-there: GRBL
+// would round it away, and an all-zero jog is rejected as a no-axis command.
+const JOG_TO_POINT_EPSILON_MM = 1e-3;
+
+export function jogActions(
+  set: SetFn,
+  get: GetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+): Pick<LaserState, 'home' | 'jog' | 'jogToMachinePosition' | 'cancelJog' | 'frame'> {
+  return {
+    home: async () => {
+      await runHomeAction(set, get, refs, safeWrite, refs.driver);
+    },
+    jogToMachinePosition: async (x, y, feed) => {
+      const current = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
+      if (current === null) {
+        const message =
+          'Jog to point needs a live machine position. Wait for an Idle status report.';
+        set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
+        throw new Error(message);
+      }
+      const dx = x - current.x;
+      const dy = y - current.y;
+      // Already there (within a step GRBL would round to zero): nothing to do,
+      // and an all-zero jog would be rejected as a no-axis command.
+      if (Math.abs(dx) < JOG_TO_POINT_EPSILON_MM && Math.abs(dy) < JOG_TO_POINT_EPSILON_MM) return;
+      await get().jog({ dx, dy, feed });
+    },
+    jog: async (params) => {
+      assertAutofocusIdle(get());
+      assertJogFrameReady(set, get);
+      set({ motionOperation: startMotionOperation('jog') });
+      try {
+        await safeWrite(`${refs.driver.commands.buildJog(params)}\n`, 'jog');
+        set((s) => ({
+          motionOperation: markMotionOperationDispatched(s.motionOperation, 'jog'),
+        }));
+      } catch (err) {
+        set({ motionOperation: null });
+        throw err;
+      }
+    },
+    cancelJog: async () => {
+      const jogCancel = refs.driver.realtime.jogCancel;
+      if (jogCancel === null) {
+        set({ motionOperation: null, frameVerification: null });
+        return;
+      }
+      await safeWrite(jogCancel, 'jog').finally(() =>
+        set({ motionOperation: null, frameVerification: null }),
+      );
+    },
+    frame: async (bounds, feed) => {
+      assertAutofocusIdle(get());
+      assertJogFrameReady(set, get);
+      // CNC projects retract to the configured safe height before the XY
+      // perimeter trace (the bit would otherwise drag through stock). CNC is
+      // GRBL-only (ADR-098), so the GRBL jog literal is safe here; laser
+      // projects keep the driver's Z-silent perimeter.
+      const machine = useStore.getState().project.machine;
+      const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
+      const frameLines = refs.driver.commands.buildFrameLines(bounds, feed);
+      const [firstLine, ...pendingLines] =
+        safeZMm === undefined ? frameLines : [cncFrameRetractLine(safeZMm, feed), ...frameLines];
+      if (firstLine === undefined) return;
+      set({ motionOperation: startMotionOperation('frame', pendingLines) });
+      try {
+        await safeWrite(firstLine, 'frame');
+        set((s) => ({
+          motionOperation: markMotionOperationDispatched(s.motionOperation, 'frame'),
+        }));
+      } catch (err) {
+        set({ motionOperation: null });
+        throw err;
+      }
+    },
+  };
+}
+
+function cncFrameRetractLine(safeZMm: number, feed: number): string {
+  return `$J=G90 G21 Z${safeZMm.toFixed(3)} F${Math.max(1, Math.round(feed))}
+`;
+}
+
+function assertJogFrameReady(set: SetFn, get: GetFn): void {
+  const blockedMessage = jogFrameCommandBlockMessage(get());
+  if (blockedMessage === null) return;
+  set({
+    lastWriteError: blockedMessage,
+    log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
+  });
+  throw new Error(blockedMessage);
+}

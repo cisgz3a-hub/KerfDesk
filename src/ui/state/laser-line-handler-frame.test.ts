@@ -45,6 +45,7 @@ function makeLaserState(): LaserState {
     unlockAlarm: async () => undefined,
     wakeController: async () => undefined,
     jog: async () => undefined,
+    jogToMachinePosition: async () => undefined,
     setAirAssistEnabled: async () => undefined,
     cancelJog: async () => undefined,
     frame: async () => undefined,

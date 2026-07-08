@@ -5857,3 +5857,153 @@ Each defect class is guarded by an analytic instrument
 - Full suite green after the deletion; `tsc --noEmit` + lint clean.
 - Perceptual: the five presets rendered through the app dispatcher and
   reviewed; the three fidelity instruments gate regressions.
+
+## ADR-124 — Capture Board Corners: build the registration box from jogged machine coordinates (2026-07-08)
+
+**Status:** accepted (maintainer directive: "jog the head to each corner,
+press a button, remember the coordinates … draw the shape on canvas with
+exact size so I can center artwork on a placed board"). Scope lands here
+before code.
+
+> **Numbering note.** Drafted as ADR-122, but the camera and trace-engine
+> merges to main landed ADR-116–123 first (ADR-122 = potrace-backend removal,
+> ADR-123). Renumbered to **ADR-124** — the next free number above main's
+> body — when this feature was rebased onto main for merge, following the
+> ADR-092/093/123 numbering-note convention.
+
+### Context
+
+The operator places a board (wood/acrylic offcut) somewhere on the bed and
+wants to burn on it — usually centered. Today nothing tells the app where
+that board physically sits or how big it is, so lining artwork up with a
+placed board is guesswork. LightBurn solves this with a camera; the
+camera-free path (ADR-057 Registration Box) is close but inverted — it
+burns an outline first, then you place material inside it.
+
+This ADR is the other direction: material is already placed, so **capture**
+its corners by jogging the head to each one and recording the machine
+coordinate. Manual hand-jogging cannot work: GRBL is open-loop (no
+encoders), so pushing the head by hand does not update the reported
+position — capture is always button-jog.
+
+### Decision 1 — reuse the registration box; add a capture front-end
+
+The captured board **is** an ADR-057 registration box (reserved
+`REGISTRATION_LAYER_COLOR`), built from jogged corners instead of typed
+width/height. That inherits, for free: distinct dashed rendering
+(draw-scene), box-anchored placement (`computeRegistrationBoxBounds` →
+`prepareOutput`), the artwork-centering machinery, and save/load. The
+feature is a new *creation path*, not a new scene concept.
+
+The operator captures four corners. Width and height come from the
+axis-aligned **bounding box** of the four points
+(`bestFitRectangleFromCorners`), so the result is **independent of capture
+order/direction** — up-the-left-side and across-the-bottom both give the
+same size and, crucially, the same orientation. (The original
+edge-length-averaging was order-dependent: capturing the reverse direction
+silently swapped width and height, drawing a horizontal board vertical —
+found in live hardware use, ADR-124 amendment 2026-07-08.) Only the *first*
+corner is special: it must be the bottom-left, because it sets the origin
+(Decision 2); the other three are any order. An off-square diagnostic (the
+largest distance from each **bounding-box corner** to its nearest captured
+point) warns when the board is rotated on the bed, a corner was mis-captured,
+or a corner was skipped and another repeated — measuring box-corner →
+nearest-point, not the reverse, so a skipped/duplicated corner (which leaves
+a box corner unclaimed) is caught rather than scoring zero. The outline is
+drawn axis-aligned, so a large value means the drawn size/orientation won't
+match the real board. Inputs are finite-guarded (non-finite → null).
+
+**Known limitation.** The work origin is set at the *first* captured corner
+(G92), which is order-dependent, while the geometry is now order-independent —
+so capturing a corner other than the bottom-left first silently sets the
+origin at the wrong corner with no geometric feedback (the burn would then be
+misplaced, but the frame/Start bounds preflight catches an off-bed job). The
+"bottom-left first" guidance is the primary mitigation; an origin-aware
+first-corner check would need the device origin (deferred).
+
+### Decision 2 — bottom-left sets the origin; box is drawn centered
+
+Capturing the bottom-left corner calls the existing `setOriginHere` (G92
+X0 Y0), so that physical corner becomes work (0,0). The box is drawn
+**centered on the canvas** (reusing `registrationBoxDefaultPosition`) — a
+convenient work area, not the board's true bed position — and job placement
+is switched to **user-origin / front-left**. The box's front-left then
+anchors to the work origin, so artwork centered on the on-canvas box burns
+centered on the real board wherever it sits. This is the exact "no-homing
+machine: Set Origin + Frame first" path ADR-057's help already describes,
+and it works on machines without homing (the common case for this user
+base). The `wcoCache` is inferred immediately by `setOriginHere`, so
+user-origin placement is valid with no wait for a later WCO frame.
+
+Registration output is forced to **artwork-only** on capture: the material
+is already placed, so the outline is a guide, never burned.
+
+The outline is labeled on the canvas with its measured `W × H mm`
+(`draw-registration-dimensions.ts`, screen-space text from the box's drawn
+bounds) and the size is repeated in the panel, so the operator can compare
+what the laser measured against a physical ruler.
+
+### Decision 3 — placement helpers reuse the align + jog machinery
+
+"Center / corner the artwork" reuses selection alignment against the box:
+`buildBoxAnchorAlign` composes a horizontal and vertical single-axis
+`alignDelta` (exported from selection-align) into a corner snap, wired as
+`alignSelectionToRegistrationBox(anchor)` beside the existing
+`centerSelectionInRegistrationBox`. "Jog head to" a board point reuses the
+guarded `jog` action via a new `jogToMachinePosition`, computed as a
+relative delta from the current machine position (so it works for the
+(0,0) corner and needs no absolute-jog builder). Motion actions
+(home/jog/frame) moved to `laser-jog-actions.ts` when this pushed the
+store past the ADR-015 size cap — a mechanical split matching
+laser-job-actions / laser-origin-actions.
+
+### Robustness (capture input; hardened during the ADR-124 self-audit)
+
+Width/height derive from the bounding box, so capture order/direction can't
+swap them (amendment above); the off-square diagnostic flags a rotated or
+mis-captured board. A double-click is deduped — a capture within 1 mm of the
+previous corner is ignored (a stationary-head double-click would otherwise
+record a corner twice and corrupt the rectangle), backed by an in-flight
+guard so the first-corner G92 fires once. "Create board outline" is blocked
+below 3 mm in either dimension (a degenerate capture would otherwise be
+silently clamped to 1 mm by `sanitizeSize`). A failed origin write surfaces
+an in-panel error instead of leaving the operator on "Corner 1" with no
+feedback.
+
+### UI entry point (amendment 2026-07-08)
+
+The panel moved from an inline section in the Laser controls column to a
+**Place Board** toolbar command (Tools group, beside Registration Jig) that
+toggles a NON-modal floating panel top-left of the canvas — the ADR-057
+registration-jig pattern (toolbar toggle + `App.tsx`-rendered floating panel
++ ui-store open flag). The panel reads its own connected/Idle gate
+(`useCaptureGating`) rather than a prop from `LaserWindow`. Kept ungated
+across machine kinds (works for CNC stock placement too), unlike the
+laser-only registration jig.
+
+### Limitations (stated, not hidden)
+
+Axis-aligned rectangle only: a physically-rotated board yields an
+axis-aligned W×H box (size correct, orientation not), flagged by the
+rotation warning. X/Y only, Z ignored. Requires connected + Idle + a live
+machine position. Corner eyeballing is ±~0.5–1 mm. True rotated-rect /
+N-point polygon capture is a documented follow-up.
+
+### Verification
+
+Pure core (`bestFitRectangleFromCorners` incl. the shear/rotation
+diagnostics, `boardMachinePoints`, `buildBoxAnchorAlign`) and store actions
+(`addCapturedBoardBox`, `alignSelectionToRegistrationBox`,
+`jogToMachinePosition`) are unit-tested. A React panel test — driving the
+capture flow with status frames injected into the laser store (NOT the GRBL
+simulator) — asserts G92 on the bottom-left corner, the measured box size,
+user-origin placement, the double-click guard (one origin write, one
+corner), and the too-small-board block. The canvas size label is a
+draw-scene text-capture test. **The perceptual render was NOT performed:**
+the live preview was unavailable (its port held by the maintainer's own dev
+server) and injecting a box into the live scene would break the
+side-effect-free rule, so correctness of an axis-aligned rectangle at a
+measured size rests on the exact geometry unit tests, not a rendered-pixel
+comparison. Also NOT verified: on-machine jog-to-corner, real G92 behavior,
+and the physical burn landing on the board — hardware remains CLAIMED; the
+operator confirms via the WORKFLOW checklist.

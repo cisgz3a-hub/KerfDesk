@@ -44,6 +44,7 @@ export type CommandId =
   | 'tools.measure'
   | 'tools.add-text'
   | 'tools.registration-jig'
+  | 'tools.place-board'
   | 'tools.camera'
   | 'tools.box-generator'
   | 'tools.box-fit-test'
@@ -169,6 +170,8 @@ export type AppCommandContext = {
   readonly addText: () => void;
   readonly registrationPanelOpen: boolean;
   readonly toggleRegistrationPanel: () => void;
+  readonly boardCapturePanelOpen: boolean;
+  readonly toggleBoardCapturePanel: () => void;
   readonly cameraPanelOpen: boolean;
   readonly toggleCameraPanel: () => void;
   readonly boxGenerator: () => void;

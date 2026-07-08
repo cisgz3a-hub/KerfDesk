@@ -18,6 +18,7 @@ import { drawObjectsFaint, drawPreview } from './draw-preview';
 import { drawMeasurement } from './draw-measurement';
 import { drawNoGoZones } from './draw-no-go-zones';
 import { drawSelectedOpenFillContours } from './draw-open-fill-contours';
+import { drawRegistrationBoxDimensions } from './draw-registration-dimensions';
 import { drawPenDraft } from './draw-pen-preview';
 import { type PenDraft, type SelectionMarquee } from '../state/ui-store';
 import type { MeasureDraft } from './measure-tool';
@@ -129,6 +130,8 @@ export function drawScene(
       opts.selectedId,
       opts.additionalSelectedIds ?? EMPTY_SELECTION,
     );
+    // ADR-124: label the captured-board / jig outline with its measured size.
+    drawRegistrationBoxDimensions(ctx, project, view);
     drawLiveWorkspaceOverlays(ctx, opts, view);
   }
   if (!opts.preview) drawSnapGuides(ctx, opts.snapGuides ?? [], view);

@@ -112,6 +112,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     tooltip:
       'Open the camera panel: machine or USB camera, lens calibration, bed alignment, workspace overlay, and trace-from-camera.',
   },
+  'tools.place-board': {
+    family: 'tools',
+    tooltip:
+      'Open the board-capture panel: jog to each corner of a placed board to draw it on the canvas at its real size and set the origin.',
+  },
   'tools.box-generator': {
     family: 'tools',
     tooltip: 'Generate a finger-joint box as cut-ready panels.',

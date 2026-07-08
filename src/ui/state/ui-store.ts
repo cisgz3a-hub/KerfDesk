@@ -207,6 +207,11 @@ export type UiState = {
   readonly openRegistrationPanel: () => void;
   readonly closeRegistrationPanel: () => void;
   readonly setRegistrationPanelPosition: (next: FloatingPanelPosition | null) => void;
+  // ADR-124 Capture Board Corners panel — same NON-modal floating pattern as the
+  // registration jig, toggled from the toolbar (top-left of the canvas).
+  readonly boardCapturePanelOpen: boolean;
+  readonly toggleBoardCapturePanel: () => void;
+  readonly closeBoardCapturePanel: () => void;
 };
 
 // The persisted dialog/view toggles (design-library dialog, CNC Basic/Advanced
@@ -337,6 +342,9 @@ export const useUiStore = create<UiState>((set) => ({
   openRegistrationPanel: () => set({ registrationPanelOpen: true }),
   closeRegistrationPanel: () => set({ registrationPanelOpen: false }),
   setRegistrationPanelPosition: (next) => set({ registrationPanelPosition: next }),
+  boardCapturePanelOpen: false,
+  toggleBoardCapturePanel: () => set((s) => ({ boardCapturePanelOpen: !s.boardCapturePanelOpen })),
+  closeBoardCapturePanel: () => set({ boardCapturePanelOpen: false }),
 }));
 
 export function isModalOpen(
