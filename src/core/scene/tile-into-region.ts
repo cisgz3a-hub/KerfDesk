@@ -41,8 +41,14 @@ export function tileIntoRegion(
 
   const gapX = finiteNonNeg(layout.gapXMm);
   const gapY = finiteNonNeg(layout.gapYMm);
-  let cols = clampCount(layout.kind === 'fill' ? fitCount(regionW, cellW, gapX) : layout.cols);
-  let rows = clampCount(layout.kind === 'fill' ? fitCount(regionH, cellH, gapY) : layout.rows);
+  const maxColsThatFit = fitCount(regionW, cellW, gapX);
+  const maxRowsThatFit = fitCount(regionH, cellH, gapY);
+  let cols = clampCount(
+    layout.kind === 'fill' ? maxColsThatFit : Math.min(layout.cols, maxColsThatFit),
+  );
+  let rows = clampCount(
+    layout.kind === 'fill' ? maxRowsThatFit : Math.min(layout.rows, maxRowsThatFit),
+  );
   if (cols * rows > MAX_TILE_TOTAL) {
     // Scale the grid down proportionally so a runaway count can't freeze the scene.
     const shrink = Math.sqrt(MAX_TILE_TOTAL / (cols * rows));

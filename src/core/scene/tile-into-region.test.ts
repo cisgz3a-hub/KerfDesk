@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_TILE_PER_AXIS, MAX_TILE_TOTAL, tileIntoRegion, type TileLayout } from './tile-into-region';
+import {
+  MAX_TILE_PER_AXIS,
+  MAX_TILE_TOTAL,
+  tileIntoRegion,
+  type TileLayout,
+} from './tile-into-region';
 import type { Bounds } from './scene-object';
 
 const CELL: Bounds = { minX: 0, minY: 0, maxX: 10, maxY: 10 }; // 10×10 design at the origin
@@ -48,6 +53,17 @@ describe('tileIntoRegion', () => {
     expect(offsets[0]).toEqual({ dx: 45, dy: 45 }); // (100 - 10) / 2
   });
 
+  it('clamps an explicit grid to the maximum rows and columns that fit', () => {
+    const offsets = tileIntoRegion(CELL, REGION, grid(20, 20));
+
+    expect(offsets).toHaveLength(100);
+    expect(offsets[0]).toEqual({ dx: 0, dy: 0 });
+    const last = offsets.at(-1);
+    if (last === undefined) throw new Error('expected at least one tile');
+    expect(last.dx + (CELL.maxX - CELL.minX)).toBeLessThanOrEqual(REGION.maxX);
+    expect(last.dy + (CELL.maxY - CELL.minY)).toBeLessThanOrEqual(REGION.maxY);
+  });
+
   it('returns offsets relative to the design current position', () => {
     const cell: Bounds = { minX: 20, minY: 20, maxX: 30, maxY: 30 }; // sits at (20,20)
     const offsets = tileIntoRegion(cell, REGION, grid(1, 1));
@@ -63,7 +79,8 @@ describe('tileIntoRegion', () => {
   });
 
   it('caps a runaway count at MAX_TILE_PER_AXIS', () => {
-    const offsets = tileIntoRegion(CELL, REGION, grid(9999, 1));
+    const tallRegion: Bounds = { minX: 0, minY: 0, maxX: 100, maxY: 2000 };
+    const offsets = tileIntoRegion(CELL, tallRegion, grid(9999, 1));
     expect(offsets).toHaveLength(MAX_TILE_PER_AXIS);
   });
 
