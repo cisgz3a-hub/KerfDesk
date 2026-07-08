@@ -2,7 +2,7 @@ import type { LibraryEntry } from './design-library-types';
 
 const OWNED_PROVENANCE = {
   sourceKind: 'owned',
-  license: 'KerfDesk proprietary asset',
+  license: 'KerfDesk first-party asset (MIT)',
   notice: 'Authored for KerfDesk/LaserForge in this repository.',
 } as const;
 

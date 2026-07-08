@@ -3,7 +3,7 @@
 KerfDesk (repo: LaserForge 2.0) bundles the third-party software and fonts listed
 below and reproduces their required copyright and permission notices here, as their
 licenses (MIT, ISC, Apache-2.0, MPL-2.0, BSL-1.0, OFL-1.1, Unlicense) require of a
-distribution. The first-party source is proprietary — see `LICENSE`.
+distribution. The first-party source is MIT-licensed — see `LICENSE`.
 
 The `pnpm licenses list --prod` output is the authoritative, always-current list of
 every production package and its license; the JS libraries' full license texts are
@@ -56,16 +56,3 @@ copyright notice and license to accompany the font in any distribution.
 > Maintainer follow-up (recommended for belt-and-suspenders): verify the exact
 > copyright strings against each `.ttf`'s `name` table and, ideally, ship the
 > verbatim `OFL.txt` / Apache `LICENSE` files alongside the fonts.
-
----
-
-## Rayforge
-
-Parts of the camera profile and alignment model in `src/core/camera/` are adapted from
-Rayforge's MIT-licensed camera workflow. The implementation in this repository is
-TypeScript/browser-native LaserForge code; Rayforge's Python/OpenCV runtime code was
-used as a reference for model shape and calibration workflow only.
-
-Source reviewed locally from `C:\Users\Asus\Rayforge` at commit `bd7dd8ab` on July 1, 2026.
-
-License: MIT. See Rayforge's upstream license for the full terms.

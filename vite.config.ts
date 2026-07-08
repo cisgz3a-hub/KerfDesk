@@ -56,10 +56,8 @@ export default defineConfig({
   build: {
     outDir: 'dist/web',
     target: 'es2022',
-    // No sourcemaps in production builds. The repo is proprietary
-    // (ADR-018) and the production URL is public — shipping the
-    // .js.map would expose the full TS source incl. planning
-    // comments and vendor-quirk notes (R-H3 audit finding). When a
+    // No sourcemaps in production builds: they add ~MBs to the deploy
+    // for no user benefit (the source is on GitHub — ADR-118). When a
     // Sentry-class error tracker lands, switch to `'hidden'` and
     // upload the maps server-side.
     sourcemap: false,
