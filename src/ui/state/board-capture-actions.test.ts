@@ -77,6 +77,35 @@ describe('addCapturedBoardBox', () => {
   });
 });
 
+describe('addCapturedBoard (circle)', () => {
+  beforeEach(() => resetStore());
+
+  it('creates a locked circle (ellipse) board centered on the bed, center anchor, output off', () => {
+    useStore.getState().addCapturedBoard({ kind: 'circle', diameterMm: 90 });
+    const state = useStore.getState();
+    const box = findRegistrationBoxes(state.project.scene)[0];
+    expect(box?.spec).toMatchObject({ kind: 'ellipse', widthMm: 90, heightMm: 90 });
+    expect(box?.locked).toBe(true);
+    // centered on the bed (bbox top-left at (bed - d) / 2)
+    expect(box?.transform.x).toBe((state.project.device.bedWidth - 90) / 2);
+    expect(box?.transform.y).toBe((state.project.device.bedHeight - 90) / 2);
+    // circle origin is the centre -> center anchor
+    expect(state.jobPlacement).toEqual({ startFrom: 'user-origin', anchor: 'center' });
+    expect(state.project.scene.layers.find((l) => l.id === REGISTRATION_LAYER_ID)?.output).toBe(
+      false,
+    );
+    expect(state.dirty).toBe(true);
+  });
+
+  it('routes a rect shape to front-left placement (the addCapturedBoardBox wrapper path)', () => {
+    useStore.getState().addCapturedBoard({ kind: 'rect', widthMm: 120, heightMm: 80 });
+    expect(useStore.getState().jobPlacement).toEqual({
+      startFrom: 'user-origin',
+      anchor: 'front-left',
+    });
+  });
+});
+
 describe('alignSelectionToRegistrationBox', () => {
   beforeEach(() => resetStore());
 

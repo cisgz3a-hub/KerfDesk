@@ -8,6 +8,7 @@ import type { InsertablePart } from './box-insert-mutation';
 import type { DeviceProfile } from '../../core/devices';
 import {
   createProject,
+  type BoardShape,
   type Layer,
   type LayerMoveDirection,
   type OutputScope,
@@ -237,9 +238,11 @@ export type AppState = ObjectPropertiesActions &
     // ADR-057: add (or replace) a circular registration jig outline for round
     // blanks. Diameter in mm; replacement keeps position and lock state.
     readonly addRegistrationCircle: (diameterMm: number) => void;
-    // ADR-124: commit a captured board — build the registration box from the
-    // measured width/height, center it, keep the outline out of the burn, and
-    // switch placement to user-origin so the next Start lands on the real board.
+    // ADR-124 / ADR-126: commit a captured board — build the registration outline
+    // (rect or circle) from the measured size, center + lock it, keep it out of
+    // the burn, and switch placement to user-origin so the next Start lands on the
+    // real board. addCapturedBoardBox is the rectangle back-compat wrapper.
+    readonly addCapturedBoard: (shape: BoardShape) => void;
     readonly addCapturedBoardBox: (widthMm: number, heightMm: number) => void;
     // ADR-057: delete the jig box(es) and the reserved registration layer. No-op
     // when no jig is present.

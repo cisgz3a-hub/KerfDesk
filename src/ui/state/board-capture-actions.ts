@@ -1,12 +1,12 @@
-// board-capture-actions — commit a captured board (ADR-124). Builds the
-// registration box from the operator's measured width/height, centers it on the
-// bed, and configures the burn so the next Start lands the artwork on the real
-// board: box output OFF (the material is already placed, so the outline is a
-// guide, not a jig to burn) and job placement switched to user-origin/front-left
-// (anchoring every run to the box front-left = the G92 work origin the capture
-// flow set at the physical bottom-left corner).
+// board-capture-actions — commit a captured board (ADR-124, generalized to a
+// board-shape union in ADR-126). Builds a registration outline (rectangle or
+// circle) from the operator's measured size, centers it fresh on the bed, locks
+// it, keeps the outline out of the burn, and anchors the next Start to the work
+// origin — a rectangle's front-left (the G92 origin at the physical bottom-left
+// corner) or a circle's centre (the G92 origin at the physical centre).
 
-import { createRegistrationBox } from '../../core/shapes';
+import { assertNever, type BoardShape, type ShapeObject } from '../../core/scene';
+import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import {
   applyAddRegistrationBox,
@@ -17,46 +17,86 @@ import type { AppState } from './store';
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
-// Anchor every run to the board's front-left corner = the G92 work origin the
-// capture flow set at the physical bottom-left corner.
-const CAPTURED_BOARD_PLACEMENT: JobPlacementSettings = {
+// Anchor every run to the board's registration origin. Rectangle: front-left =
+// the G92 origin the capture set at the physical bottom-left corner. Circle:
+// centre = the G92 origin the capture set at the physical centre.
+const CAPTURED_RECT_PLACEMENT: JobPlacementSettings = {
   ...DEFAULT_JOB_PLACEMENT,
   startFrom: 'user-origin',
   anchor: 'front-left',
 };
+const CAPTURED_CIRCLE_PLACEMENT: JobPlacementSettings = {
+  ...DEFAULT_JOB_PLACEMENT,
+  startFrom: 'user-origin',
+  anchor: 'center',
+};
 
-export function boardCaptureActions(set: Setter): Pick<AppState, 'addCapturedBoardBox'> {
+export function boardCaptureActions(
+  set: Setter,
+): Pick<AppState, 'addCapturedBoard' | 'addCapturedBoardBox'> {
+  const addCapturedBoard = (shape: BoardShape): void => {
+    set((s) => commitCapturedBoard(s, buildBoardOutline(s, shape), placementFor(shape)));
+  };
   return {
-    addCapturedBoardBox: (widthMm: number, heightMm: number) => {
-      set((s) => {
-        // A capture is always a brand-new board, so center it fresh rather than
-        // preserving any prior box position (unlike addRegistrationBox's resize).
-        const { bedWidth, bedHeight } = s.project.device;
-        const position = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
-        // The captured board sits at the physical board's measured position, tied
-        // to the G92 work origin at its bottom-left corner. Lock it so a stray drag
-        // can't shift the outline off registration — moving it would silently break
-        // centering, Fit/Array, and the burn placement. (The ADR-057 jig stays
-        // movable + manually lockable; only the captured board auto-locks.)
-        const box = {
-          ...createRegistrationBox({ widthMm, heightMm, x: position.x, y: position.y }),
-          locked: true,
-        };
-        const added = applyAddRegistrationBox(s, box);
-        // Guide, not a jig: keep the outline out of the burn. Next Start burns
-        // only the artwork (once the operator adds and positions it).
-        const scene = applyRegistrationOutputToScene(added.project.scene, 'artwork');
-        return {
-          ...added,
-          project: { ...added.project, scene },
-          jobPlacement: CAPTURED_BOARD_PLACEMENT,
-          // Forcing artwork scope directly (not via setRegistrationOutput) must
-          // still honor its invariant — artwork scope owns no saved snapshot —
-          // or a stale one from a prior "burn box only" toggle could later
-          // clobber the artwork layers' output.
-          registrationArtworkOutputSnapshot: null,
-        };
-      });
-    },
+    addCapturedBoard,
+    // Back-compat: the four-corner / manual-size path is always a rectangle.
+    addCapturedBoardBox: (widthMm, heightMm) => addCapturedBoard({ kind: 'rect', widthMm, heightMm }),
+  };
+}
+
+// Build the locked registration outline for the captured shape, centered fresh on
+// the bed (a capture is always a brand-new board, so no prior position is kept).
+// Locked so a stray drag can't shift it off registration — its canvas position
+// encodes the physical work origin.
+function buildBoardOutline(s: AppState, shape: BoardShape): ShapeObject {
+  const { bedWidth, bedHeight } = s.project.device;
+  switch (shape.kind) {
+    case 'rect': {
+      const { widthMm, heightMm } = shape;
+      const at = registrationBoxDefaultPosition(bedWidth, bedHeight, widthMm, heightMm);
+      return locked(createRegistrationBox({ widthMm, heightMm, x: at.x, y: at.y }));
+    }
+    case 'circle': {
+      const { diameterMm } = shape;
+      const at = registrationBoxDefaultPosition(bedWidth, bedHeight, diameterMm, diameterMm);
+      return locked(createRegistrationCircle({ diameterMm, x: at.x, y: at.y }));
+    }
+    default:
+      return assertNever(shape, 'BoardShape');
+  }
+}
+
+function placementFor(shape: BoardShape): JobPlacementSettings {
+  switch (shape.kind) {
+    case 'rect':
+      return CAPTURED_RECT_PLACEMENT;
+    case 'circle':
+      return CAPTURED_CIRCLE_PLACEMENT;
+    default:
+      return assertNever(shape, 'BoardShape');
+  }
+}
+
+function locked(box: ShapeObject): ShapeObject {
+  return { ...box, locked: true };
+}
+
+// Add the outline as the single registration box, force its output OFF (guide,
+// not a jig — the material is already placed), and anchor the next Start to the
+// work origin. Clearing registrationArtworkOutputSnapshot honors the artwork-
+// scope invariant (no saved snapshot) so a stale "burn box only" toggle can't
+// later clobber the artwork layers' output.
+function commitCapturedBoard(
+  s: AppState,
+  box: ShapeObject,
+  placement: JobPlacementSettings,
+): AppState | Partial<AppState> {
+  const added = applyAddRegistrationBox(s, box);
+  const scene = applyRegistrationOutputToScene(added.project.scene, 'artwork');
+  return {
+    ...added,
+    project: { ...added.project, scene },
+    jobPlacement: placement,
+    registrationArtworkOutputSnapshot: null,
   };
 }
