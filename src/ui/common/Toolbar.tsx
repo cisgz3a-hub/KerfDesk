@@ -7,6 +7,7 @@ import { commandHelpId, controlHelp } from '../help/help-topics';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import type { MachineKind } from '../../core/scene';
 import { ConnectionBadge } from './ConnectionBadge';
+import { InstallButton } from './InstallButton';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { shortcutHint } from './shortcut-list';
 
@@ -33,9 +34,11 @@ export function Toolbar(props: {
       >
         Shortcuts
       </button>
-      {/* DownloadDesktopLink and InstallButton are intentionally unmounted for
-          now (maintainer request 2026-07-07); the components and /download.html
-          remain so the affordances can be restored by re-adding them here. */}
+      {/* InstallButton renders only when the browser offers a PWA install
+          prompt (beforeinstallprompt), so it stays hidden until installable
+          and disappears once installed. DownloadDesktopLink remains unmounted
+          (maintainer request 2026-07-07); it can be restored the same way. */}
+      <InstallButton />
       {isShortcutsOpen ? (
         <ShortcutsDialog machineKind={props.machineKind} onClose={() => setShortcutsOpen(false)} />
       ) : null}
