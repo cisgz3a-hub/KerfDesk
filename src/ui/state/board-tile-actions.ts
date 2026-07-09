@@ -5,6 +5,7 @@
 // and adds a fresh copy for every remaining slot as one undoable edit.
 
 import {
+  boardFitRegion,
   findRegistrationBoxes,
   sceneObjectHasVisibleLayer,
   type SceneObject,
@@ -40,7 +41,7 @@ function applyTileSelectionIntoBoard(
 
   const [firstSlot, ...copySlots] = tileIntoRegion(
     transformedBBox(target),
-    transformedBBox(box),
+    boardFitRegion(box),
     layout,
   );
   if (firstSlot === undefined) return state;

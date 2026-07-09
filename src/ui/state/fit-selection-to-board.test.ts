@@ -100,6 +100,26 @@ describe('fitSelectionToBoard', () => {
     expect(after.project.scene.objects[0]?.transform).toEqual(before);
     expect(after.undoStack).toHaveLength(0);
   });
+
+  it('fits a design to a circle board into its inscribed square (stays inside the arc)', () => {
+    useStore.getState().importSvgObject(svgObj('A', ['#ff0000']));
+    useStore.getState().addCapturedBoard({ kind: 'circle', diameterMm: 100 });
+    useStore.setState({
+      selectedObjectId: 'A',
+      additionalSelectedIds: new Set(),
+      undoStack: [],
+      dirty: false,
+    });
+
+    useStore.getState().fitSelectionToBoard();
+
+    const art = useStore.getState().project.scene.objects.find((o) => o.id === 'A');
+    // Fills 90% of the inscribed square (side 100/√2), NOT 90% of the 100 mm bbox,
+    // so the design stays inside the arc rather than overhanging the corners.
+    const expectedScale = (0.9 * (100 / Math.SQRT2)) / ART_SIDE_MM;
+    expect(art?.transform.scaleX).toBeCloseTo(expectedScale);
+    expect((art?.transform.scaleX ?? 0) * ART_SIDE_MM).toBeLessThan(100);
+  });
 });
 
 function transformedCenter(object: SceneObject): { readonly x: number; readonly y: number } {

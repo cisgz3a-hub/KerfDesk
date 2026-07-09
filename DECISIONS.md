@@ -6120,3 +6120,7 @@ A Rectangle / Circle toggle at the top of the Place Board panel (switching clear
 ### Consequences
 
 Round boards work end-to-end (verified by panel integration tests: toggle -> capture centre -> type/measure diameter -> a locked, centre-anchored ellipse). The shape union makes further shapes additive. Fit/Array measure the circle by its bounding SQUARE, so a design's corners can overhang the arc - an optional inscribed-square fit is a deferred fast-follow. NOT verified: on-machine capture / G92 / burn (hardware CLAIMED); no live perceptual render (rule #4 - the dev server shares the maintainer's scene).
+
+### Amendment (2026-07-08) - inscribed-square fit for circles (PR 5)
+
+Supersedes the "bounding square" note above. Fit/Array now fill a circle board's centered INSCRIBED SQUARE (side = diameter / sqrt(2)) instead of its bounding square, so a design stays inside the arc rather than overhanging the corners. A new pure helper `boardFitRegion(box)` (core/scene) returns the inscribed square for an ellipse box and the full bounds for a rectangle; `fitSelectionToBoard` and `tileSelectionIntoBoard` feed it to `fitObjectToRegion` / `tileIntoRegion`. Rectangle behavior is unchanged.

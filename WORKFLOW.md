@@ -1241,7 +1241,7 @@ design under "fit as many as fit") is capped per axis.
 4. Create board outline -> a locked circle draws around the origin, anchored at its centre.
 5. Place / Fit / Array artwork exactly as for a rectangle (the circle is found by the same machinery). "Jog head to: Center" returns the head to the captured centre.
 
-**Edge / empty / error.** A diameter below the minimum is blocked. A rim point on the centre (double-click) is ignored. Switching shape clears the in-progress capture. Fit/Array fill the circle's bounding square, so a design's corners may sit outside the arc.
+**Edge / empty / error.** A diameter below the minimum is blocked. A rim point on the centre (double-click) is ignored. Switching shape clears the in-progress capture. Fit/Array fill the circle's inscribed square, so a design stays inside the arc.
 
 ---
 
