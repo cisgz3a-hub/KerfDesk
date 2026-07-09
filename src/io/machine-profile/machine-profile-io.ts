@@ -12,6 +12,8 @@ import {
 } from '../../core/devices';
 import { normalizeCameraProfile } from '../../core/camera';
 import { validateMachineProfileShape } from './machine-profile-shape';
+import { optionalRotarySetup } from '../project/project-device-profile-validator';
+import { firstError } from '../project/project-shape-primitives';
 
 export const MACHINE_PROFILE_FORMAT = 'laserforge-machine-profile';
 export const MACHINE_PROFILE_SCHEMA_VERSION = 1;
@@ -151,6 +153,12 @@ function parseProfile(
   if (profileShapeError !== null) return { kind: 'invalid', reason: profileShapeError };
   const noGoZones = parseNoGoZones(value['noGoZones']);
   if (noGoZones.kind === 'invalid') return noGoZones;
+  // The machine-profile shape validator predates rotary; validate it here so a
+  // junk-typed rotary (e.g. mmPerRotation as a string) rejects instead of
+  // silently disabling scaling while the dialog shows it enabled (review R10).
+  // Reuse the .lf2 validators — io imports io.
+  const optionalFieldError = firstError([optionalRotarySetup(value, 'rotary')]);
+  if (optionalFieldError !== null) return { kind: 'invalid', reason: optionalFieldError };
 
   const profile = canonicalProfile({
     ...validatedDeviceProfile(value),
@@ -249,6 +257,7 @@ function canonicalProfile(profile: DeviceProfile): DeviceProfile {
     airAssistCommand: profile.airAssistCommand,
     scanningOffsets: normalizeScanOffsetTable(profile.scanningOffsets),
     noGoZones: profile.noGoZones.map((zone) => ({ ...zone })),
+    ...(profile.rotary !== undefined ? { rotary: { ...profile.rotary } } : {}),
     origin: profile.origin,
     homing: { ...profile.homing },
     autofocusCommand: profile.autofocusCommand,
