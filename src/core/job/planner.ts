@@ -276,12 +276,17 @@ export function junctionVelocity(prev: Block, next: Block, accel: number, jd: nu
   const cosTheta = prev.direction.x * next.direction.x + prev.direction.y * next.direction.y;
   // Clamp to handle float noise just outside [-1, 1].
   const clamped = Math.min(1, Math.max(-1, cosTheta));
-  // sin(θ/2) = √((1 − cos θ) / 2). At θ=0 (straight): sin = 0 → v_j → ∞
-  // (returns Infinity, caller mins against target). At θ=π (reverse):
-  // sin = 1 → division by zero → must stop, return 0.
-  const sinHalf = Math.sqrt((1 - clamped) / 2);
-  if (sinHalf <= 0) return Number.POSITIVE_INFINITY;
-  if (sinHalf >= 1) return 0;
+  // Sonny Jeon's junction-deviation half-angle. θ is the DEVIATION angle
+  // (0 = straight, π = reversal); GRBL derives sin(θ/2) from the NEGATED
+  // dot product, so sin(θ/2) = √((1 + cosTheta) / 2) with cosTheta = prev·next:
+  //   straight (cosTheta = +1) → sin = 1 → v_j → ∞ (caller mins against target)
+  //   reversal (cosTheta = −1) → sin = 0 → v_j = 0 (must stop)
+  // The √((1 − cosTheta)/2) form is inverted: it collapses to ~0 velocity on
+  // gentle turns and BLOWS UP toward ∞ on near-reversals, so float noise that
+  // nudged a 180° corner off exactly −1 removed the required full stop.
+  const sinHalf = Math.sqrt((1 + clamped) / 2);
+  if (sinHalf >= 1) return Number.POSITIVE_INFINITY; // straight
+  if (sinHalf <= 0) return 0; // reversal
   return Math.sqrt((accel * jd * sinHalf) / (1 - sinHalf));
 }
 
