@@ -9,6 +9,7 @@ import {
   optionalLaserSubProfile,
   optionalNoGoZones,
   optionalProfileCapabilities,
+  optionalRotarySetup,
 } from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
@@ -100,6 +101,7 @@ function validateDevice(device: Record<string, unknown>): string | null {
     optionalPositiveNumber(device, 'device.framingFeedMmPerMin'),
     optionalPositiveNumber(device, 'device.accelMmPerSec2'),
     optionalPositiveNumber(device, 'device.junctionDeviationMm'),
+    optionalRotarySetup(device, 'device.rotary'),
   ]);
 }
 

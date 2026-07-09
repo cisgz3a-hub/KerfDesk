@@ -54,6 +54,8 @@ export type PreflightCode =
   | 'cnc-overdeep-cut'
   | 'plunged-travel'
   | 'relief-needs-cnc'
+  // ADR-127: image engraves are refused while the rotary is enabled (v1).
+  | 'rotary-raster-unsupported'
   | 'empty-output';
 
 export type PreflightIssue = {
@@ -69,6 +71,9 @@ export type PreflightResult = {
 export type PreflightOptions = {
   readonly motionOffset?: MotionBoundsOffset | undefined;
   readonly coordinateMode?: 'machine' | 'relative-origin';
+  // Rotary (ADR-127): the Y limit is one object revolution, not the bed —
+  // overrides the height used by the bounds checks when set.
+  readonly boundsHeightOverrideMm?: number;
 };
 
 const MAX_BOUNDS_ISSUES = 5;
@@ -327,7 +332,10 @@ function appendBoundsIssues(
   issues: PreflightIssue[],
   options: PreflightOptions,
 ): void {
-  const machineBounds = machineBoundsForDevice(project.device);
+  const machineBounds = boundsWithHeightOverride(
+    machineBoundsForDevice(project.device),
+    options.boundsHeightOverrideMm,
+  );
   if (options.coordinateMode === 'relative-origin' && options.motionOffset === undefined) {
     const envelopeIssues = findRelativeMotionEnvelopeIssues(gcode, {
       width: machineBounds.width,
@@ -338,7 +346,7 @@ function appendBoundsIssues(
     }
     return;
   }
-  const oob = findOutOfBoundsCoords(gcode, machineBoundsForDevice(project.device), {
+  const oob = findOutOfBoundsCoords(gcode, machineBounds, {
     motionOffset: options.motionOffset,
   });
   for (const issue of oob.slice(0, MAX_BOUNDS_ISSUES)) {
@@ -361,6 +369,17 @@ function appendBoundsIssues(
         `${overscanMm} mm inside the left/right edges.`,
     });
   }
+}
+
+// Rotary wrap limit (ADR-127): Y spans [0, override] regardless of the
+// origin convention — the rotary axis has no rear rail, one revolution is
+// the whole coordinate space.
+function boundsWithHeightOverride(
+  bounds: ReturnType<typeof machineBoundsForDevice>,
+  overrideMm: number | undefined,
+): ReturnType<typeof machineBoundsForDevice> {
+  if (overrideMm === undefined || !Number.isFinite(overrideMm) || overrideMm <= 0) return bounds;
+  return { ...bounds, height: overrideMm, minY: 0, maxY: overrideMm };
 }
 
 function maxOutputOverscanMm(scene: Scene): number {

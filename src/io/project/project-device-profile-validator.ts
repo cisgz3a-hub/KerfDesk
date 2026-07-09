@@ -3,6 +3,7 @@ import { PROFILE_CAPABILITIES, type ProfileCapability } from '../../core/devices
 import {
   firstError,
   isObject,
+  optionalBoolean,
   optionalLiteral,
   optionalPositiveNumber,
   optionalString,
@@ -60,6 +61,19 @@ export function optionalLaserSubProfile(obj: Record<string, unknown>, path: stri
 export function optionalCameraProfile(obj: Record<string, unknown>, path: string): string | null {
   const value = valueAtPath(obj, path);
   return value === undefined ? null : validateCameraProfileShape(value, path);
+}
+
+export function optionalRotarySetup(obj: Record<string, unknown>, path: string): string | null {
+  const value = valueAtPath(obj, path);
+  if (value === undefined) return null;
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  return firstError([
+    requireBoolean(value, `${path}.enabled`),
+    requireLiteral(value, `${path}.type`, ['roller', 'chuck']),
+    requirePositiveNumber(value, `${path}.mmPerRotation`),
+    requirePositiveNumber(value, `${path}.objectDiameterMm`),
+    optionalBoolean(value, `${path}.reverseAxis`),
+  ]);
 }
 
 function optionalLaserSpotSize(obj: Record<string, unknown>, path: string): string | null {

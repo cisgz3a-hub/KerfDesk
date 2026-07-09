@@ -3,6 +3,7 @@
 // PROJECT.md non-negotiables #1 (bounds), #2 (origin), #7 (power-scale).
 
 import type { CameraAlignment, CameraCalibration } from '../camera';
+import type { RotarySetup } from './rotary';
 import type { ScanOffsetPoint } from './scan-offset-profile';
 import type { GcodeDialectSelection } from './gcode-dialects';
 import { DEFAULT_GRBL_RX_BUFFER_BYTES, type GrblStreamingMode } from '../grbl-streaming';
@@ -167,6 +168,9 @@ export type DeviceProfile = {
   readonly zTravelMm?: number;
   readonly zTravelConfirmed?: boolean;
   readonly zProbePresent?: boolean;
+  // Rotary attachment (ADR-127). Absent = no rotary configured; scaling
+  // applies only while `rotary.enabled` — disabled output is byte-identical.
+  readonly rotary?: RotarySetup;
   // Feed used by the Frame button (jog around the job bounding box).
   // Separate from `maxFeed` so a user who lowers maxFeed to constrain
   // cut speeds doesn't also slow framing. The firmware still enforces its

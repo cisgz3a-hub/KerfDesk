@@ -6124,3 +6124,39 @@ Round boards work end-to-end (verified by panel integration tests: toggle -> cap
 ### Amendment (2026-07-08) - inscribed-square fit for circles (PR 5)
 
 Supersedes the "bounding square" note above. Fit/Array now fill a circle board's centered INSCRIBED SQUARE (side = diameter / sqrt(2)) instead of its bounding square, so a design stays inside the arc rather than overhanging the corners. A new pure helper `boardFitRegion(box)` (core/scene) returns the inscribed square for an ellipse box and the full bounds for a rectangle; `fitSelectionToBoard` and `tileSelectionIntoBoard` feed it to `fitObjectToRegion` / `tileIntoRegion`. Rectangle behavior is unchanged.
+
+
+## ADR-127 - Rotary axis engine: one machine-space job for chuck/roller Y-scaling (Phase N, 2026-07-09)
+
+Context. Cylindrical engraving (mugs, tumblers, pens) needs the design Y to drive
+a rotary axis instead of the flat-bed Y motor, mapping surface distance to
+rotation. The mapping must be applied consistently everywhere the job is measured
+- emit, framing, time estimate, placement preflight, and Ruida .rd - or they
+disagree with the streamed motion.
+
+Decision. A rotary attachment is an optional `RotarySetup` on the device profile
+(persisted in .lf2 and machine profiles). `core/job/rotary-job.ts` (machineSpaceJob)
+is the SINGLE source of truth: it scales + rebases Y for a rotary job and is the
+identity for non-rotary jobs; every downstream consumer routes through it.
+- Chuck: surface mm scaled by mmPerRotation / (pi * objectDiameterMm). Roller: 1:1.
+- Both rebase Y to 0 - rotation is relative; a flat-bed Y position is meaningless
+  on a cylinder. reverseAxis mirrors within the wrap window for inverted gearing.
+- Scale is applied AFTER prepareOutput so the on-canvas preview stays surface-true;
+  only emitted motion is scaled.
+- Bounds preflight swaps bed height for the one-revolution wrap limit
+  (boundsHeightOverrideMm); a job taller than one revolution is refused.
+- Image/raster engraving is refused while rotary is enabled
+  (rotary-raster-unsupported) - v1 is vectors-only.
+
+Scope of THIS change. Engine only: the rotary math and its wiring through
+emit/.rd/preflight/estimate/framing plus the .lf2 + machine-profile round-trip.
+The Rotary Setup dialog and command wiring are a deliberate follow-up so this
+lands as a small, reviewable, UI-free slice.
+
+Consequences.
+- Determinism (#5): disabled/absent rotary is byte-identical to current output
+  (asserted in the emit-gcode-rotary tests).
+- HARDWARE-GATED / CLAIMED: the Y-scale factor, reverse-mirror sign, and wrap
+  limit are structurally unit-tested but have never run on a physical rotary. A
+  wrong calibration silently distorts the burn and no automated test can catch
+  it. Ships CLAIMED until a maintainer rotary bench pass.
