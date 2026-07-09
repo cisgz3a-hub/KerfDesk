@@ -9,11 +9,13 @@ import {
   boardMachinePoints,
   findRegistrationBoxes,
   type BoardAnchor,
+  type TileLayout,
   type Vec2,
 } from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
+import { BoardArrayForm } from './BoardArrayForm';
 
 const ANCHORS: ReadonlyArray<{ readonly anchor: BoardAnchor; readonly label: string }> = [
   { anchor: 'center', label: 'Center' },
@@ -33,12 +35,18 @@ export function BoardPlacementControls(props: {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const alignToBox = useStore((s) => s.alignSelectionToRegistrationBox);
+  const fitToBoard = useStore((s) => s.fitSelectionToBoard);
+  const arrayToBoard = useStore((s) => s.tileSelectionIntoBoard);
   const jogToPoint = useLaserStore((s) => s.jogToMachinePosition);
 
   const boxIds = new Set(findRegistrationBoxes(scene).map((b) => b.id));
-  const canAlign =
-    boxIds.size > 0 &&
-    [selectedObjectId, ...additionalSelectedIds].some((id) => id !== null && !boxIds.has(id));
+  const nonBoxSelectedCount = [selectedObjectId, ...additionalSelectedIds].filter(
+    (id): id is string => id !== null && !boxIds.has(id),
+  ).length;
+  const canAlign = boxIds.size > 0 && nonBoxSelectedCount > 0;
+  // Fit scales one design to fill the whole board; fitting several would pile
+  // them all on top of each other, so it needs exactly one selected design.
+  const canFit = boxIds.size > 0 && nonBoxSelectedCount === 1;
   const points = boardMachinePoints(props.corners);
   const measured = bestFitRectangleFromCorners(props.corners);
 
@@ -65,6 +73,7 @@ export function BoardPlacementControls(props: {
           </Button>
         ))}
       </AnchorRow>
+      <FillBoardControls canFit={canFit} onFit={fitToBoard} onArray={arrayToBoard} />
       <AnchorRow label="Jog head to">
         {ANCHORS.map(({ anchor, label }) => {
           const point = points?.[anchor];
@@ -87,6 +96,34 @@ export function BoardPlacementControls(props: {
         Capture a new board
       </Button>
     </div>
+  );
+}
+
+// The "fill the board" operations — scale one design to fill it (A1) or tile
+// copies across it (A2). Both need exactly one selected design, so they share
+// the `canFit` gate.
+function FillBoardControls(props: {
+  readonly canFit: boolean;
+  readonly onFit: () => void;
+  readonly onArray: (layout: TileLayout) => void;
+}): JSX.Element {
+  return (
+    <>
+      <AnchorRow label="Fill board">
+        <Button
+          disabled={!props.canFit}
+          title={
+            props.canFit
+              ? 'Scale the selected design to fill the board'
+              : 'Select exactly one design to fit to the board'
+          }
+          onClick={props.onFit}
+        >
+          Fit to board
+        </Button>
+      </AnchorRow>
+      <BoardArrayForm disabled={!props.canFit} onArray={props.onArray} />
+    </>
   );
 }
 

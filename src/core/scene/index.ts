@@ -121,6 +121,13 @@ export {
 export type { AABB } from './hit-test';
 export { combinedBBox, hitTest, transformedBBox, transformedBounds } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';
+export { fitObjectToRegion, type FitToRegionOptions } from './fit-to-region';
+export {
+  MAX_TILE_PER_AXIS,
+  tileIntoRegion,
+  type TileLayout,
+  type TileOffset,
+} from './tile-into-region';
 export { sceneObjectHasVisibleLayer, sceneObjectHasVisibleLayerFromMap } from './visibility';
 
 export type { Scene, SceneGroup } from './scene';

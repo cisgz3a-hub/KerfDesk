@@ -6,7 +6,9 @@ import {
   buildSelectionFlipEdit,
   buildSelectionNudgeEdit,
   findRegistrationBoxes,
+  fitObjectToRegion,
   sceneObjectHasVisibleLayer,
+  transformedBBox,
   type Project,
   type Scene,
   type SceneObject,
@@ -36,6 +38,9 @@ export type SelectionTransformActions = {
   // captured-board outline — the registration box the operator built from jogged
   // corners. Same reference-box semantics as centering.
   readonly alignSelectionToRegistrationBox: (anchor: BoardAnchor) => void;
+  // ADR-125 A1: scale + center the single selected design so it fills the placed
+  // board (the registration box) with a margin.
+  readonly fitSelectionToBoard: () => void;
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
@@ -52,6 +57,7 @@ export function selectionTransformActions(set: Setter): SelectionTransformAction
       set((state) => applyAnchorToRegistrationBoxToState(state, 'center')),
     alignSelectionToRegistrationBox: (anchor) =>
       set((state) => applyAnchorToRegistrationBoxToState(state, anchor)),
+    fitSelectionToBoard: () => set((state) => applyFitSelectionToBoardToState(state)),
   };
 }
 
@@ -72,6 +78,28 @@ function applyAnchorToRegistrationBoxToState(
   const result = buildBoxAnchorAlign(objects, box.id, anchor);
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
+}
+
+// ADR-125 A1: scale + center the single selected design so it fills the placed
+// board (the registration box) with a 10% margin. Single-object only — fitting
+// several designs would pile them all onto the board, so multi-select is a
+// no-op (the UI disables Fit-to-board unless exactly one design is selected).
+const BOARD_FIT_MARGIN_FRACTION = 0.9;
+
+function applyFitSelectionToBoardToState(state: AppState): AppState | Partial<AppState> {
+  const box = findRegistrationBoxes(state.project.scene)[0];
+  if (box === undefined) return state;
+  const objects = selectedObjects(
+    state.project.scene,
+    selectedObjectIds(state).filter((id) => id !== box.id),
+  );
+  const target = objects[0];
+  if (target === undefined || objects.length !== 1) return state;
+  const fitted = fitObjectToRegion(target, transformedBBox(box), {
+    marginFraction: BOARD_FIT_MARGIN_FRACTION,
+    grow: true,
+  });
+  return applySelectionTransformsToState(state, [{ id: target.id, transform: fitted.transform }]);
 }
 
 function applySelectionAlignToState(
