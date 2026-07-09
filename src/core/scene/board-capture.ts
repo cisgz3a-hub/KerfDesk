@@ -20,6 +20,17 @@ export type BoardAnchor = 'center' | 'top-left' | 'top-right' | 'bottom-left' | 
 
 export const BOARD_CORNER_COUNT = 4;
 
+// The shape of a captured board (ADR-126). A rectangle comes from the four-corner
+// (or one-corner + typed size) capture; a circle comes from a single centre
+// capture plus a diameter (typed, or measured by jogging to a rim point).
+// Extensible — future variants (rounded-rect, polygon) add a `kind` arm wherever
+// it is matched (each ending in assertNever), gated by an ADR.
+export type BoardShape =
+  | { readonly kind: 'rect'; readonly widthMm: number; readonly heightMm: number }
+  | { readonly kind: 'circle'; readonly diameterMm: number };
+
+export type BoardShapeKind = BoardShape['kind'];
+
 export type BestFitRectangle = {
   // Machine-X and machine-Y extents of the captured corners — the board's size
   // and orientation as it sits on the bed. Order-independent.
@@ -101,8 +112,23 @@ export function boardCornersFromOrigin(
   ];
 }
 
+/**
+ * The diameter of a circular board from its captured centre and any point on the
+ * rim: 2·|edge − centre| (machine mm). The operator jogs to the centre (which
+ * sets the work origin), then to any edge, measuring the size without a ruler.
+ * Returns 0 for non-finite inputs (no throw); callers clamp to a minimum size.
+ */
+export function diameterFromCenterEdge(center: Vec2, edge: Vec2): number {
+  if (!isFiniteVec(center) || !isFiniteVec(edge)) return 0;
+  return 2 * Math.hypot(edge.x - center.x, edge.y - center.y);
+}
+
 function allFinite(points: ReadonlyArray<Vec2>): boolean {
-  return points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  return points.every(isFiniteVec);
+}
+
+function isFiniteVec(p: Vec2): boolean {
+  return Number.isFinite(p.x) && Number.isFinite(p.y);
 }
 
 function boundingBox(points: ReadonlyArray<Vec2>): Aabb {

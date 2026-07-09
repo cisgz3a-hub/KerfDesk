@@ -78,4 +78,51 @@ describe('boardCaptureReducer', () => {
   it('reset returns to the initial state', () => {
     expect(boardCaptureReducer(withCorners(3), { type: 'reset' })).toEqual(INITIAL_BOARD_CAPTURE);
   });
+
+  it('set-shape switches the shape and clears in-progress corners', () => {
+    const circle = boardCaptureReducer(withCorners(2), { type: 'set-shape', shapeKind: 'circle' });
+    expect(circle.shapeKind).toBe('circle');
+    expect(circle.corners).toHaveLength(0);
+    expect(circle.committed).toBe(false);
+  });
+
+  it('set-shape is a no-op once committed', () => {
+    const committed = boardCaptureReducer(withCorners(4), { type: 'commit' });
+    expect(boardCaptureReducer(committed, { type: 'set-shape', shapeKind: 'circle' })).toBe(
+      committed,
+    );
+  });
+
+  it('a circle captures at most the centre + one rim point', () => {
+    let s = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'set-shape', shapeKind: 'circle' });
+    s = boardCaptureReducer(s, { type: 'capture', point: P(100, 100) }); // centre
+    s = boardCaptureReducer(s, { type: 'capture', point: P(140, 100) }); // rim
+    expect(s.corners).toHaveLength(2);
+    expect(boardCaptureReducer(s, { type: 'capture', point: P(200, 200) })).toBe(s); // capped at 2
+  });
+
+  it('commit-circle records the diameter + shape once the centre is captured', () => {
+    let s = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'set-shape', shapeKind: 'circle' });
+    s = boardCaptureReducer(s, { type: 'capture', point: P(100, 100) });
+    const committed = boardCaptureReducer(s, { type: 'commit-circle', diameterMm: 90 });
+    expect(committed.committed).toBe(true);
+    expect(committed.shape).toEqual({ kind: 'circle', diameterMm: 90 });
+  });
+
+  it('commit-circle is a no-op without a centre, on a rect, or once committed', () => {
+    const circleEmpty = boardCaptureReducer(INITIAL_BOARD_CAPTURE, {
+      type: 'set-shape',
+      shapeKind: 'circle',
+    });
+    expect(boardCaptureReducer(circleEmpty, { type: 'commit-circle', diameterMm: 90 })).toBe(
+      circleEmpty,
+    );
+    const rectOne = boardCaptureReducer(INITIAL_BOARD_CAPTURE, { type: 'capture', point: P(0, 0) });
+    expect(boardCaptureReducer(rectOne, { type: 'commit-circle', diameterMm: 90 })).toBe(rectOne);
+    const centered = boardCaptureReducer(circleEmpty, { type: 'capture', point: P(10, 10) });
+    const committed = boardCaptureReducer(centered, { type: 'commit-circle', diameterMm: 90 });
+    expect(boardCaptureReducer(committed, { type: 'commit-circle', diameterMm: 50 })).toBe(
+      committed,
+    );
+  });
 });

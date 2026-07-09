@@ -1,24 +1,20 @@
-// BoardCapturePanel — "Place Board" assistant (ADR-124). A NON-modal floating
-// panel (top-left of the canvas), toggled from the toolbar's Place Board command
-// like the registration jig. The operator button-jogs the head (Laser panel) to
-// each corner of a placed board; this panel records the machine coordinate, sets
-// the work origin at the bottom-left corner, and draws the board's outline (a
-// registration box) centred on the canvas so artwork can be positioned on it.
+// BoardCapturePanel — "Place Board" assistant (ADR-124, generalized to board
+// shapes in ADR-126). A NON-modal floating panel (top-left of the canvas),
+// toggled from the toolbar's Place Board command. The operator picks a shape
+// (Rectangle or Circle), button-jogs the head to the capture points, and this
+// records the machine coordinates, sets the work origin (a rectangle's
+// bottom-left corner or a circle's centre), and draws the locked outline so
+// artwork can be positioned on it.
 
-import { useRef, useState } from 'react';
-import {
-  bestFitRectangleFromCorners,
-  boardCornersFromOrigin,
-  BOARD_CORNER_COUNT,
-} from '../../../core/scene';
 import { Button } from '../../kit';
 import { useStore } from '../../state';
 import { inferCurrentMachinePosition } from '../../state/infer-machine-position';
 import { useLaserStore } from '../../state/laser-store';
 import { useUiStore } from '../../state/ui-store';
-import { BoardCaptureSteps } from './BoardCaptureSteps';
-import { BoardPlacementControls } from './BoardPlacementControls';
+import { BoardCapturePhase } from './BoardCapturePhase';
+import { BoardShapeToggle } from './BoardShapeToggle';
 import { useBoardCapture } from './use-board-capture';
+import { useBoardCaptureHandlers } from './use-board-capture-handlers';
 import { useCaptureGating } from './use-capture-gating';
 
 // Positioning feed cap, matching the JogPad's fast-jog rate.
@@ -32,54 +28,21 @@ export function BoardCapturePanel(): JSX.Element | null {
   const setOriginHere = useLaserStore((s) => s.setOriginHere);
   const device = useStore((s) => s.project.device);
   const addCapturedBoardBox = useStore((s) => s.addCapturedBoardBox);
+  const addCapturedBoard = useStore((s) => s.addCapturedBoard);
   const capture = useBoardCapture();
   const { connected, disabled } = useCaptureGating();
-  // Re-entrancy guard: a synchronous ref (not React state, which wouldn't flip
-  // before a rapid second click) so a double-click can't fire the origin write
-  // and record the first corner twice during the async setOriginHere gap.
-  const capturingRef = useRef(false);
-  const [captureError, setCaptureError] = useState<string | null>(null);
 
   const livePosition = inferCurrentMachinePosition(statusReport, wcoCache);
   const feed = Math.min(device.maxFeed, BOARD_JOG_FEED_MM_PER_MIN);
-  const rect =
-    capture.state.corners.length === BOARD_CORNER_COUNT
-      ? bestFitRectangleFromCorners(capture.state.corners)
-      : null;
-
-  const handleCapture = async (): Promise<void> => {
-    if (capturingRef.current || livePosition === null) return;
-    capturingRef.current = true;
-    setCaptureError(null);
-    try {
-      // Bottom-left is first: setting the origin there before recording keeps a
-      // failed G92 write from committing a corner with no origin behind it.
-      if (capture.state.corners.length === 0) await setOriginHere();
-      capture.capture(livePosition);
-    } catch {
-      // setOriginHere writes its reason to the store log; surface a prompt here
-      // so the operator isn't left on "Corner 1" with no feedback.
-      setCaptureError('Could not set the work origin. Check the machine is idle, then try again.');
-    } finally {
-      capturingRef.current = false;
-    }
-  };
-
-  const handleFinish = (): void => {
-    if (rect === null) return;
-    addCapturedBoardBox(rect.widthMm, rect.heightMm);
-    capture.commit();
-  };
-
-  // Manual-size path: the origin is already set at the captured bottom-left
-  // corner, so draw the outline at the typed size and synthesize the other three
-  // corners (so jog-to-corner works like a full capture).
-  const handleManualFinish = (widthMm: number, heightMm: number): void => {
-    const origin = capture.state.corners[0];
-    if (origin === undefined) return;
-    addCapturedBoardBox(widthMm, heightMm);
-    capture.commitManual(boardCornersFromOrigin(origin, widthMm, heightMm));
-  };
+  const { shapeKind, corners, committed, shape } = capture.state;
+  const circleDiameter = shape?.kind === 'circle' ? shape.diameterMm : null;
+  const handlers = useBoardCaptureHandlers({
+    capture,
+    livePosition,
+    setOriginHere,
+    addCapturedBoardBox,
+    addCapturedBoard,
+  });
 
   if (!open) return null;
   return (
@@ -91,31 +54,28 @@ export function BoardCapturePanel(): JSX.Element | null {
         </Button>
       </header>
       {!connected && <p style={hintStyle}>Connect the machine to capture a board.</p>}
-      {captureError !== null && (
+      {handlers.captureError !== null && (
         <p style={errorHintStyle} role="alert">
-          {captureError}
+          {handlers.captureError}
         </p>
       )}
-      {capture.state.committed ? (
-        <BoardPlacementControls
-          corners={capture.state.corners}
-          feed={feed}
-          disabled={disabled}
-          onReset={capture.reset}
-        />
-      ) : (
-        <BoardCaptureSteps
-          corners={capture.state.corners}
-          livePosition={livePosition}
-          rect={rect}
-          disabled={disabled}
-          onCapture={() => void handleCapture().catch(() => undefined)}
-          onUndo={capture.undo}
-          onFinish={handleFinish}
-          onManualSize={handleManualFinish}
-          onReset={capture.reset}
-        />
-      )}
+      {!committed && <BoardShapeToggle shapeKind={shapeKind} onChange={capture.setShape} />}
+      <BoardCapturePhase
+        committed={committed}
+        shapeKind={shapeKind}
+        corners={corners}
+        circleDiameter={circleDiameter}
+        rect={handlers.rect}
+        livePosition={livePosition}
+        disabled={disabled}
+        feed={feed}
+        onCapture={handlers.onCapture}
+        onUndo={capture.undo}
+        onFinishRect={handlers.onFinishRect}
+        onManualSize={handlers.onManualSize}
+        onFinishCircle={handlers.onFinishCircle}
+        onReset={capture.reset}
+      />
     </section>
   );
 }

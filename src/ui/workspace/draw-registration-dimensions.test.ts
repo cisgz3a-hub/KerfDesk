@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createProject, createRegistrationLayer, type Project } from '../../core/scene';
-import { createRectangle, createRegistrationBox } from '../../core/shapes';
+import {
+  createRectangle,
+  createRegistrationBox,
+  createRegistrationCircle,
+} from '../../core/shapes';
 import { drawScene } from './draw-scene';
 
 // Mock context that records every fillText call so we can assert the size label
@@ -92,5 +96,16 @@ describe('drawScene registration box dimensions', () => {
     drawScene(ctx, 800, 600, project, DRAW_OPTS);
 
     expect(texts.some((t) => t.endsWith('mm'))).toBe(false);
+  });
+
+  it('labels a circle (ellipse) box with its diameter, not its bounding square', () => {
+    const { ctx, texts } = recordingContext();
+    const circle = createRegistrationCircle({ diameterMm: 90, x: 10, y: 20 });
+    const project = sceneProject(createProject(), [createRegistrationLayer()], [circle]);
+
+    drawScene(ctx, 800, 600, project, DRAW_OPTS);
+
+    expect(texts).toContain('⌀ 90.0 mm');
+    expect(texts.some((t) => t.includes('×'))).toBe(false); // not "90.0 × 90.0 mm"
   });
 });

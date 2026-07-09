@@ -1,21 +1,19 @@
-// BoardPlacementControls — shown after a board is captured (ADR-124). Two ways
-// to use the outline: move the selected artwork onto a corner or the centre of
-// the board (on-canvas alignment), and jog the head to that point on the real
-// board (for eyeballing or a low-power test). The outline is the registration
-// box, so alignment reuses the same reference-box machinery.
+// BoardPlacementControls — post-capture controls for a RECTANGLE board
+// (ADR-124): move the selected artwork onto a corner/centre, fill the board
+// (fit/array), and jog the head to a board point. The circle equivalent is
+// CircleBoardPlacementControls; both share the placement gating
+// (useBoardPlacement) and the FillBoardControls / AnchorRow parts exported here.
 
 import {
   bestFitRectangleFromCorners,
   boardMachinePoints,
-  findRegistrationBoxes,
   type BoardAnchor,
   type TileLayout,
   type Vec2,
 } from '../../../core/scene';
 import { Button } from '../../kit';
-import { useStore } from '../../state';
-import { useLaserStore } from '../../state/laser-store';
 import { BoardArrayForm } from './BoardArrayForm';
+import { useBoardPlacement } from './use-board-placement';
 
 const ANCHORS: ReadonlyArray<{ readonly anchor: BoardAnchor; readonly label: string }> = [
   { anchor: 'center', label: 'Center' },
@@ -31,22 +29,8 @@ export function BoardPlacementControls(props: {
   readonly disabled: boolean;
   readonly onReset: () => void;
 }): JSX.Element {
-  const scene = useStore((s) => s.project.scene);
-  const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
-  const alignToBox = useStore((s) => s.alignSelectionToRegistrationBox);
-  const fitToBoard = useStore((s) => s.fitSelectionToBoard);
-  const arrayToBoard = useStore((s) => s.tileSelectionIntoBoard);
-  const jogToPoint = useLaserStore((s) => s.jogToMachinePosition);
-
-  const boxIds = new Set(findRegistrationBoxes(scene).map((b) => b.id));
-  const nonBoxSelectedCount = [selectedObjectId, ...additionalSelectedIds].filter(
-    (id): id is string => id !== null && !boxIds.has(id),
-  ).length;
-  const canAlign = boxIds.size > 0 && nonBoxSelectedCount > 0;
-  // Fit scales one design to fill the whole board; fitting several would pile
-  // them all on top of each other, so it needs exactly one selected design.
-  const canFit = boxIds.size > 0 && nonBoxSelectedCount === 1;
+  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, jogToPoint } =
+    useBoardPlacement();
   const points = boardMachinePoints(props.corners);
   const measured = bestFitRectangleFromCorners(props.corners);
 
@@ -101,8 +85,8 @@ export function BoardPlacementControls(props: {
 
 // The "fill the board" operations — scale one design to fill it (A1) or tile
 // copies across it (A2). Both need exactly one selected design, so they share
-// the `canFit` gate.
-function FillBoardControls(props: {
+// the `canFit` gate. Exported for the circle placement controls too.
+export function FillBoardControls(props: {
   readonly canFit: boolean;
   readonly onFit: () => void;
   readonly onArray: (layout: TileLayout) => void;
@@ -127,7 +111,7 @@ function FillBoardControls(props: {
   );
 }
 
-function AnchorRow(props: {
+export function AnchorRow(props: {
   readonly label: string;
   readonly children: React.ReactNode;
 }): JSX.Element {
