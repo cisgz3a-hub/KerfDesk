@@ -15,7 +15,7 @@ export function CircleBoardPlacementControls(props: {
   readonly disabled: boolean;
   readonly onReset: () => void;
 }): JSX.Element {
-  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, jogToPoint } =
+  const { canAlign, canFit, alignToBox, fitToBoard, arrayToBoard, removeBoard, jogToPoint } =
     useBoardPlacement();
   const centre = props.corners[0];
 
@@ -47,9 +47,21 @@ export function CircleBoardPlacementControls(props: {
           Center
         </Button>
       </AnchorRow>
-      <Button variant="ghost" onClick={props.onReset}>
-        Capture a new board
-      </Button>
+      <div style={footerStyle}>
+        <Button variant="ghost" onClick={props.onReset}>
+          Capture a new board
+        </Button>
+        <Button
+          variant="danger"
+          title="Delete this board outline"
+          onClick={() => {
+            removeBoard();
+            props.onReset();
+          }}
+        >
+          Remove board
+        </Button>
+      </div>
     </div>
   );
 }
@@ -61,4 +73,10 @@ const measuredStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
   lineHeight: 1.3,
+};
+const footerStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 4,
 };

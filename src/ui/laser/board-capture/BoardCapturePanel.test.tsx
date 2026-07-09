@@ -316,4 +316,48 @@ describe('BoardCapturePanel', () => {
     expect(box?.spec).toMatchObject({ kind: 'ellipse', widthMm: 120, heightMm: 120 });
     await unmount();
   });
+
+  it('removes a placed rectangle board and returns to the capture phase', async () => {
+    useLaserStore.setState({
+      setOriginHere: vi.fn(async () => undefined),
+      connection: { kind: 'connected' },
+      wcoCache: null,
+    });
+    const { host, unmount } = await render();
+
+    // Place a board via the manual path (capture bottom-left + type the size).
+    await setMachinePosition(50, 30);
+    await act(async () => buttonByText(host, 'Capture corner')?.click());
+    await act(async () => {
+      setNumberInput(host, 'Board width in mm', '120');
+      setNumberInput(host, 'Board height in mm', '80');
+    });
+    await act(async () => buttonByText(host, 'Draw board at this size')?.click());
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(1);
+
+    await act(async () => buttonByText(host, 'Remove board')?.click());
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(0);
+    expect(host.textContent).toContain('Corner 1 of 4'); // back to the capture phase
+    await unmount();
+  });
+
+  it('removes a placed circle board', async () => {
+    useLaserStore.setState({
+      setOriginHere: vi.fn(async () => undefined),
+      connection: { kind: 'connected' },
+      wcoCache: null,
+    });
+    const { host, unmount } = await render();
+
+    await act(async () => buttonByText(host, 'Circle')?.click());
+    await setMachinePosition(100, 100);
+    await act(async () => buttonByText(host, 'Capture centre')?.click());
+    await act(async () => setNumberInput(host, 'Circle diameter in mm', '90'));
+    await act(async () => buttonByText(host, 'Create board outline')?.click());
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(1);
+
+    await act(async () => buttonByText(host, 'Remove board')?.click());
+    expect(findRegistrationBoxes(useStore.getState().project.scene)).toHaveLength(0);
+    await unmount();
+  });
 });
