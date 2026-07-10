@@ -9,6 +9,7 @@ import type { Project } from '../../core/scene';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
 import { detectCncRasterWarnings } from './cnc-raster-warnings';
 import { detectCncStockWarnings } from './cnc-stock-warnings';
+import { detectCncThroughCutTabWarnings } from './cnc-through-cut-tab-warnings';
 import { detectJobIntentWarnings } from './job-intent-warnings';
 
 // controllerSettings is the connected machine's live `$$` snapshot (null when
@@ -21,6 +22,7 @@ export function detectMachineJobWarnings(
   return project.machine?.kind === 'cnc'
     ? [
         ...detectCncStockWarnings(project),
+        ...detectCncThroughCutTabWarnings(project),
         ...detectCncMachineLimitWarnings(project, controllerSettings),
         ...detectCncRasterWarnings(project),
       ]
