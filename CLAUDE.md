@@ -306,6 +306,7 @@ This is the most important rule in the file. Most "AI broke my codebase" stories
 - Run `pnpm test` before declaring work done.
 - Run `pnpm lint` before declaring work done.
 - Run `pnpm typecheck` before declaring work done.
+- Run `pnpm format:check` before declaring work done — CI runs `prettier --check .` repo-wide (in `release:check`), and it is NOT part of `pnpm lint`, so a Prettier-dirty file passes lint locally but fails the release gate.
 - Report what you changed, by file. Not "I updated the layer panel" — list `src/ui/layers/CutsLayersPanel.tsx` and `src/ui/layers/index.ts`.
 - Report what you didn't verify. If you didn't run the E2E suite, say so.
 - Don't write `// TODO` without opening a corresponding issue.
