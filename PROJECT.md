@@ -296,13 +296,13 @@ phase; tracked here so they don't get lost.
 - **State:** Zustand with strict slices. Discriminated-union actions.
 - **Canvas:** Canvas2D.
 - **Desktop shell:** Electron LTS. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
-- **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the desktop (Electron) side lives in the top-level `electron/` folder (there is no `src/platform/electron/`).
+- **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the main-process desktop (Electron) code lives in the top-level `electron/` folder, and `src/platform/electron/` holds the renderer-side Electron detection (`isElectronRenderer`, imported by `ui/app/main.tsx`) plus the release-workflow gate.
 - **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
 - **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
 - **Text (Phase D):** `opentype.js` (MIT). Bundled MIT-compatible fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script OFL-1.1).
 - **Vectorize (Phase E):** `imagetracerjs` (Unlicense — MIT-compatible).
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property). E2E smoke (Playwright) is anticipated but not yet adopted (absent from devDependencies and CI).
-- **Build:** Vite → web bundle; Vite + electron-builder → signed Windows `.exe`.
+- **Build:** Vite → web bundle; Vite + electron-builder → Windows `.exe` (unsigned in v1 — ADR-024 §5; code signing is secret-gated and a no-op until the certs exist).
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
