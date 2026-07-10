@@ -1,4 +1,5 @@
 import { type DeviceProfile } from '../devices';
+import { clamp } from '../math';
 import {
   applyImageMaskToLuma,
   applyLumaAdjustments,
@@ -136,8 +137,4 @@ function originFlipsRasterY(device: DeviceProfile): boolean {
   return (
     device.origin === 'front-left' || device.origin === 'front-right' || device.origin === 'center'
   );
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
 }

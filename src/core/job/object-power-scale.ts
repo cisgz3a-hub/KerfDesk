@@ -1,4 +1,5 @@
 import type { Layer, ObjectPowerScale } from '../scene';
+import { clamp } from '../math';
 
 const MIN_POWER_SCALE_PERCENT = 0;
 const MAX_POWER_SCALE_PERCENT = 100;
@@ -28,8 +29,4 @@ export function effectiveObjectMinPowerPercent(layer: Layer, object: ObjectPower
   const layerPower = clamp(layer.power, MIN_POWER_SCALE_PERCENT, MAX_POWER_SCALE_PERCENT);
   const minPower = clamp(layer.minPower, MIN_POWER_SCALE_PERCENT, layerPower);
   return (minPower * objectPowerScalePercent(object)) / MAX_POWER_SCALE_PERCENT;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }

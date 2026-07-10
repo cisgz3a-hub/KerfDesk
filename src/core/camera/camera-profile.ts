@@ -2,6 +2,7 @@
 // and image-to-world alignment points.
 
 import { buildCameraTransforms } from './camera-transform';
+import { clamp } from '../math';
 
 export type CameraPoint = {
   readonly x: number;
@@ -335,8 +336,4 @@ function isUnitNumber(value: unknown): value is number {
 
 function isRangeNumber(value: unknown, min: number, max: number): value is number {
   return isFiniteNumber(value) && value >= min && value <= max;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
