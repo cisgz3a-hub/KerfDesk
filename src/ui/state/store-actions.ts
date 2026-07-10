@@ -8,11 +8,9 @@ import {
 } from '../../core/scene';
 import type { JobPlacementSettings } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
-import { applyDuplicate, pushUndo } from './scene-mutations';
+import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState, OutputScopeSettings } from './store';
-
-const HISTORY_DEPTH = 50;
 
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),

@@ -25,7 +25,10 @@ import {
 } from '../../core/scene';
 import { applyCncTextDefaultsToNewLayer } from './cnc-text-defaults';
 
-const HISTORY_DEPTH = 50;
+// Shared undo/redo stack ceiling. store-actions caps the redo stack against the
+// same value, so it lives here (the module both stacks depend on) rather than
+// being redeclared — keeping the two ceilings from silently desyncing.
+export const HISTORY_DEPTH = 50;
 const MULTI_IMPORT_OFFSET_MM = 10;
 
 export type ImportOutcome =
