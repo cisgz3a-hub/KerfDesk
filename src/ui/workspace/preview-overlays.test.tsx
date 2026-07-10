@@ -11,6 +11,7 @@ import {
   PreviewStatsPanel,
   PreviewStatusOverlays,
 } from './preview-overlays';
+import type { PreviewIssue } from './preview-status';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -77,10 +78,25 @@ describe('PreviewStatusOverlays', () => {
     const host = await renderStatus({
       steps: [],
       totalLength: 0,
-      previewIssue: 'too-complex',
-    } as Toolpath & { readonly previewIssue: 'too-complex' });
+      previewIssue: { kind: 'too-complex' },
+    } as Toolpath & { readonly previewIssue: PreviewIssue });
 
     expect(host.textContent).toContain('Route preview is too large');
+    expect(host.textContent).not.toContain('Nothing to preview');
+  });
+
+  it('shows the placement-failure reason instead of the empty-project hint (PRV-01)', async () => {
+    const host = await renderStatus({
+      steps: [],
+      totalLength: 0,
+      previewIssue: {
+        kind: 'placement-unavailable',
+        messages: ['Move to the work origin first.'],
+      },
+    } as Toolpath & { readonly previewIssue: PreviewIssue });
+
+    expect(host.textContent).toContain('Preview unavailable');
+    expect(host.textContent).toContain('Move to the work origin first.');
     expect(host.textContent).not.toContain('Nothing to preview');
   });
 });

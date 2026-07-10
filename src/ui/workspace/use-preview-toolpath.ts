@@ -59,8 +59,11 @@ export function usePreviewToolpath(
         return;
       }
       const resolved = placementRef.current;
-      const next = !resolved.ok
-        ? buildToolpath(EMPTY_JOB)
+      const next: PreviewToolpath = !resolved.ok
+        ? {
+            ...buildToolpath(EMPTY_JOB),
+            previewIssue: { kind: 'placement-unavailable', messages: resolved.messages },
+          }
         : buildPreviewToolpath(project, {
             ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
             outputScope,

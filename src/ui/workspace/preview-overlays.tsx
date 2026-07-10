@@ -15,16 +15,24 @@ export function PreviewStatusOverlays(props: {
   readonly project: Project;
   readonly toolpath: Toolpath;
 }): JSX.Element | null {
-  const tooComplex = previewIssueFor(props.toolpath) === 'too-complex';
-  const empty = !tooComplex && !previewHasBurnableContent(props.project, props.toolpath);
+  const issue = previewIssueFor(props.toolpath);
+  const tooComplex = issue?.kind === 'too-complex';
+  // Any preview issue (too-complex, placement failure) already explains the
+  // blank route, so the scope-oriented "enable Output" hint must not fire.
+  const empty = issue === null && !previewHasBurnableContent(props.project, props.toolpath);
   const outOfBounds = hasOutOfBoundsObjects(props.project);
-  if (!empty && !outOfBounds && !tooComplex) return null;
+  if (issue === null && !empty && !outOfBounds) return null;
   return (
     <div style={stackStyle}>
       {tooComplex ? (
         <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
           Route preview is too large to draw safely. Simplify the trace or reduce detail, then
           preview again.
+        </div>
+      ) : null}
+      {issue?.kind === 'placement-unavailable' ? (
+        <div className="lf-banner lf-banner--warning" style={bannerStyle} role="status">
+          Preview unavailable: {issue.messages.join(' ')}
         </div>
       ) : null}
       {empty ? (
