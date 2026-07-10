@@ -108,6 +108,10 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeJoinGapPx: 5,
     // undefined = AUTO median: applied only when impulse noise is detected,
     // so clean art keeps its small features (see edge-trace.ts).
+    // Same 2x quality supersample as Line Art — the edge lane is
+    // contour-finished from a local-contrast mask, so it benefits from the
+    // identical measured-boundary stack (sub-pixel field + fit tail).
+    supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
     // Also supersample small sources regardless of stroke width — the reported

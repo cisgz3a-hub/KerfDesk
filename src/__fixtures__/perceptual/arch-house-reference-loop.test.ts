@@ -38,7 +38,7 @@ const ARTIFACT_DIR = 'perceptual-artifacts';
 
 const INK_LUMA_MAX = 128;
 const LOOP_ENABLED = process.env['ARCH_LOOP'] === '1';
-const PRESETS_UNDER_TEST = ['Line Art', 'Smooth', 'Sharp'] as const;
+const PRESETS_UNDER_TEST = ['Line Art', 'Smooth', 'Sharp', 'Edge Detection'] as const;
 
 describe.skipIf(!LOOP_ENABLED)('arch-house reference-pair loop', () => {
   it('scores each contour preset against the reference pair', { timeout: 600_000 }, async () => {

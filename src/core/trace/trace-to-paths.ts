@@ -185,15 +185,17 @@ function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
   const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
   const thinFactor = thinStroke ? THIN_STROKE_UPSCALE_FACTOR : 1;
   const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
-  // Quality supersample for binary contour presets (mkbitmap's recipe):
-  // mid-size art carries MIXED stroke widths — thick letters that defeat the
-  // thin-stroke detector alongside 1-2px features (hooked apex tips, pale
-  // subtitle strokes) that binarization physically misshapes at 1x. Neither
-  // legacy trigger fires there, so the presets opt in explicitly; the pixel
-  // budget cap keeps the 4x cost off photos and huge scans.
+  // Quality supersample for the contour-finished presets (mkbitmap's
+  // recipe): mid-size art carries MIXED stroke widths — thick letters that
+  // defeat the thin-stroke detector alongside 1-2px features (hooked apex
+  // tips, pale subtitle strokes) that binarization physically misshapes at
+  // 1x. Neither legacy trigger fires there, so the presets opt in
+  // explicitly; the pixel budget cap keeps the 4x cost off photos and huge
+  // scans. Edge Detection is contour-finished too (local-contrast mask →
+  // shared finisher), so its opt-in rides the same flag.
   const contourQuality =
     options.supersampleContour === true &&
-    isBinaryContourPreset(options) &&
+    (isBinaryContourPreset(options) || options.traceMode === 'edge') &&
     image.width * image.height <= MAX_UPSCALE_SOURCE_PIXELS;
   const contourFactor = contourQuality ? THIN_STROKE_UPSCALE_FACTOR : 1;
   return Math.max(thinFactor, smallFactor, contourFactor);

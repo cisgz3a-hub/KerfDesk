@@ -17,6 +17,7 @@
 // exact detail the edge preset exists to keep. The local-contrast test has
 // no morphology, so a 3px counter survives untouched.
 
+import type { CrackSubPixelField } from './contour-boundary';
 import type { RawImageData } from './trace-image';
 
 /** A bilevel raster: `data[i]` is 1 for foreground ink, 0 for background.
@@ -56,6 +57,35 @@ export function localContrastInkBitmap(
     if (l < (mean[i] as number) - options.delta || l < GLOBAL_INK_LUMA) ink[i] = 1;
   }
   return { width, height, data: ink };
+}
+
+/** Sub-pixel crack field for this mask: the union test `luma < mean − delta
+ *  OR luma < 128` is equivalent to one position-dependent iso-line at
+ *  max(mean − delta, 128), so the contour walker can interpolate true edge
+ *  crossings exactly like the filled-contour lane does (strict-< pixels on
+ *  the iso classify as background; the walker's straddle check falls back to
+ *  the plain midpoint there). */
+export function localContrastCrackField(
+  image: RawImageData,
+  options: LocalContrastMaskOptions,
+): CrackSubPixelField {
+  const { width, height } = image;
+  const luma = lumaPlane(image);
+  const mean = boxBlur(luma, width, height, Math.max(1, Math.round(options.radiusPx)));
+  return {
+    lumaAt: (x: number, y: number): number => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return OPAQUE_PAPER_LUMA;
+      return luma[y * width + x] ?? OPAQUE_PAPER_LUMA;
+    },
+    thresholdAt: (x: number, y: number): number => {
+      const cx = Math.min(width - 1, Math.max(0, x));
+      const cy = Math.min(height - 1, Math.max(0, y));
+      return Math.max(
+        (mean[cy * width + cx] ?? OPAQUE_PAPER_LUMA) - options.delta,
+        GLOBAL_INK_LUMA,
+      );
+    },
+  };
 }
 
 // Fully transparent pixels read as paper so alpha-backed art keeps its shape.
