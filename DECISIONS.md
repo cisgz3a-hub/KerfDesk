@@ -3721,6 +3721,19 @@ wiki); LaserForge reimplements clean-room (ADR-017 discipline, no code copied).
 warnings. Next steps (in order): validate a generated `.rd` against a real
 controller or reference files, then wire the UDP transport.
 
+**Limitation — layer Min/Max power collapsed to one value (recorded 2026-07-10, CTL-04 part 2).**
+LightBurn exposes two separate per-layer power values on a Ruida layer, Min Power
+and Max Power. Our `Job` cut-groups carry a single `power`, and the encoder writes
+that one value into BOTH the `layerMinPower` (0xC6 0x31) and `layerMaxPower`
+(0xC6 0x32) commands (`core/controllers/ruida/rd-encoder.ts:68-69`) — we always
+emit Min == Max. Decision (CTL-04): record this as a deliberate current limitation
+(option a) and DEFER plumbing a separate min power (option b), because a true split
+is a cross-cutting change to the core `Job` cut-group model (a second power field
+threaded through to the encoder) and — with no reference `.rd` from real hardware or
+LightBurn — there is no byte snapshot that would catch a regression in the emitted
+bytes. We record the divergence from LightBurn's separate Min/Max now; we do NOT
+assert what a Ruida controller does with Min == Max, as that is unverified.
+
 ---
 
 ## ADR-100 — Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params
@@ -5918,15 +5931,8 @@ match the real board. Inputs are finite-guarded (non-finite → null).
 so capturing a corner other than the bottom-left first silently sets the
 origin at the wrong corner with no geometric feedback (the burn would then be
 misplaced, but the frame/Start bounds preflight catches an off-bed job). The
-"bottom-left first" guidance is the primary mitigation.
-
-**Amended (CAM-05, 2026-07-10).** The capture panel now also warns when the
-first captured corner is far from the board’s bounding-box bottom-left, so a
-wrong-origin capture no longer passes with no feedback. Because the feature’s
-convention is machine +X = width / +Y = height, bottom-left is exactly
-(minX, minY) of the captured points — the check needs no device origin
-(`firstCornerOffsetMm`, `core/scene/board-capture.ts`), correcting the “would
-need the device origin” note above.
+"bottom-left first" guidance is the primary mitigation; an origin-aware
+first-corner check would need the device origin (deferred).
 
 ### Decision 2 — bottom-left sets the origin; box is drawn centered
 
@@ -6132,11 +6138,47 @@ Round boards work end-to-end (verified by panel integration tests: toggle -> cap
 
 Supersedes the "bounding square" note above. Fit/Array now fill a circle board's centered INSCRIBED SQUARE (side = diameter / sqrt(2)) instead of its bounding square, so a design stays inside the arc rather than overhanging the corners. A new pure helper `boardFitRegion(box)` (core/scene) returns the inscribed square for an ellipse box and the full bounds for a rectangle; `fitSelectionToBoard` and `tileSelectionIntoBoard` feed it to `fitObjectToRegion` / `tileIntoRegion`. Rectangle behavior is unchanged.
 
-## ADR-127 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
+
+## ADR-127 - Rotary axis engine: one machine-space job for chuck/roller Y-scaling (Phase N, 2026-07-09)
+
+Context. Cylindrical engraving (mugs, tumblers, pens) needs the design Y to drive
+a rotary axis instead of the flat-bed Y motor, mapping surface distance to
+rotation. The mapping must be applied consistently everywhere the job is measured
+- emit, framing, time estimate, placement preflight, and Ruida .rd - or they
+disagree with the streamed motion.
+
+Decision. A rotary attachment is an optional `RotarySetup` on the device profile
+(persisted in .lf2 and machine profiles). `core/job/rotary-job.ts` (machineSpaceJob)
+is the SINGLE source of truth: it scales + rebases Y for a rotary job and is the
+identity for non-rotary jobs; every downstream consumer routes through it.
+- Chuck: surface mm scaled by mmPerRotation / (pi * objectDiameterMm). Roller: 1:1.
+- Both rebase Y to 0 - rotation is relative; a flat-bed Y position is meaningless
+  on a cylinder. reverseAxis mirrors within the wrap window for inverted gearing.
+- Scale is applied AFTER prepareOutput so the on-canvas preview stays surface-true;
+  only emitted motion is scaled.
+- Bounds preflight swaps bed height for the one-revolution wrap limit
+  (boundsHeightOverrideMm); a job taller than one revolution is refused.
+- Image/raster engraving is refused while rotary is enabled
+  (rotary-raster-unsupported) - v1 is vectors-only.
+
+Scope of THIS change. Engine only: the rotary math and its wiring through
+emit/.rd/preflight/estimate/framing plus the .lf2 + machine-profile round-trip.
+The Rotary Setup dialog and command wiring are a deliberate follow-up so this
+lands as a small, reviewable, UI-free slice.
+
+Consequences.
+- Determinism (#5): disabled/absent rotary is byte-identical to current output
+  (asserted in the emit-gcode-rotary tests).
+- HARDWARE-GATED / CLAIMED: the Y-scale factor, reverse-mirror sign, and wrap
+  limit are structurally unit-tested but have never run on a physical rotary. A
+  wrong calibration silently distorts the burn and no automated test can catch
+  it. Ships CLAIMED until a maintainer rotary bench pass.
+
+## ADR-128 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
 
 **Status:** accepted (audit DEV-04: no-go zones gated Start/Frame/export/resume, but jog was zone-blind end to end).
 
-> **Numbering note.** ADR-126 (board-shape union) was the last used; **ADR-127** is the next free (verify at merge - parallel branches may also allocate).
+> **Numbering note.** ADR-127 (rotary axis engine, merged from main via #48) was the last used; **ADR-128** is the next free.
 
 ### Context
 
@@ -6154,11 +6196,11 @@ The check is skipped (motion allowed) when there is no known machine position fo
 
 A jog that would cross a keep-out is refused before any byte is sent, closing the gap between jogging and the job/frame/export paths. Pure core stays pure (returns the zone or null, no throw for control flow). No G-code or snapshot change. NOT hardware-verified - the geometry and the refusal are unit- and integration-tested (core segment cases + a connected-store jog that crosses a clamp sends nothing), but on-machine behavior is CLAIMED.
 
-## ADR-128 - Registration-box provenance: protect a captured board from the jig panel (2026-07-10)
+## ADR-129 - Registration-box provenance: protect a captured board from the jig panel (2026-07-10)
 
 **Status:** accepted (audit CAM-04: the Registration Jig panel could silently unlock/replace a captured board, breaking its physical registration).
 
-> **Numbering note.** ADR-127 (jog no-go zones) was the last used; **ADR-128** is the next free (verify at merge).
+> **Numbering note.** ADR-128 (jog no-go zones) was the last used; **ADR-129** is the next free.
 
 ### Context
 

@@ -9,7 +9,13 @@ import {
   type PreflightOptions,
   type PreflightResult,
 } from '../../core/preflight';
-import type { JobOriginPlacement } from '../../core/job';
+import {
+  machineSpaceJob,
+  rotaryAppliesTo,
+  rotaryWrapLimitMm,
+  type Job,
+  type JobOriginPlacement,
+} from '../../core/job';
 import { cncGrblStrategy, selectOutputStrategy } from '../../core/output';
 import type { OutputScope, Project } from '../../core/scene';
 import {
@@ -47,32 +53,87 @@ export function emitGcode(project: Project, options: EmitGcodeOptions = {}): Emi
   });
   if (!prepared.ok) return { gcode: '', preflight: prepared.preflight };
   const machine = prepared.project.machine;
+  // Rotary (ADR-127): scale Y at the last moment so previews stay
+  // surface-true; refuse raster jobs (v1 is vectors-only) before any emit.
+  const rotaryStage = applyRotaryStage(prepared.project, prepared.job);
+  if (rotaryStage.kind === 'refused') return { gcode: '', preflight: rotaryStage.preflight };
+  const job = rotaryStage.job;
   // CNC router projects always emit through the Z-aware GRBL strategy; laser
   // projects pick their controller dialect via the ADR-094 driver seam.
   const body =
     machine !== undefined && machine.kind === 'cnc'
-      ? cncGrblStrategy.emit(prepared.job, prepared.project.device)
-      : selectOutputStrategy(prepared.project.device).emit(prepared.job, prepared.project.device);
+      ? cncGrblStrategy.emit(job, prepared.project.device)
+      : selectOutputStrategy(prepared.project.device).emit(job, prepared.project.device);
   // Preflight the motion body, NOT the header — the provenance comments are
   // inert to every invariant (all strip comments) but keeping them out of the
   // preflight input makes that guarantee explicit.
-  const coordinateMode =
-    options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
-      ? 'relative-origin'
-      : 'machine';
-  const preflight =
-    machine !== undefined && machine.kind === 'cnc'
-      ? runCncPreflight(prepared.project, machine, body, {
-          motionOffset: options.preflightMotionOffset,
-        })
-      : runPreflight(prepared.project, body, {
-          motionOffset: options.preflightMotionOffset,
-          coordinateMode,
-        });
+  const preflight = runEmitPreflight(prepared.project, body, options, rotaryStage);
   const gcode = options.metadata
     ? gcodeMetadataHeader(options.metadata, headerAssumptionsFor(prepared.project)) + body
     : body;
   return { gcode, preflight };
+}
+
+function runEmitPreflight(
+  project: Project,
+  body: string,
+  options: EmitGcodeOptions,
+  rotaryStage: Extract<RotaryStage, { kind: 'ok' }>,
+): PreflightResult {
+  const machine = project.machine;
+  if (machine !== undefined && machine.kind === 'cnc') {
+    return runCncPreflight(project, machine, body, {
+      motionOffset: options.preflightMotionOffset,
+    });
+  }
+  const coordinateMode =
+    options.jobOrigin !== undefined && options.preflightMotionOffset === undefined
+      ? 'relative-origin'
+      : 'machine';
+  return runPreflight(project, body, {
+    motionOffset: options.preflightMotionOffset,
+    coordinateMode,
+    // One revolution is the wrap limit: a taller job burns onto its own
+    // start (ADR-127).
+    ...(rotaryStage.boundsHeightOverrideMm !== undefined
+      ? { boundsHeightOverrideMm: rotaryStage.boundsHeightOverrideMm }
+      : {}),
+  });
+}
+
+type RotaryStage =
+  | { readonly kind: 'refused'; readonly preflight: PreflightResult }
+  | { readonly kind: 'ok'; readonly job: Job; readonly boundsHeightOverrideMm?: number };
+
+// ADR-127: with the rotary active on a laser project, refuse raster jobs
+// (v1 is vectors-only), then delegate the Y scale/rebase + wrap limit to the
+// shared machineSpaceJob helper so framing, the estimate, placement, and
+// .rd export all agree with the emitted motion (review R3). CNC and disabled
+// rotary pass through untouched.
+function applyRotaryStage(project: Project, job: Job): RotaryStage {
+  if (!rotaryAppliesTo(project.device, project.machine)) return { kind: 'ok', job };
+  if (job.groups.some((group) => group.kind === 'raster')) {
+    return {
+      kind: 'refused',
+      preflight: {
+        ok: false,
+        issues: [
+          {
+            code: 'rotary-raster-unsupported',
+            message:
+              'Image engraves are not supported with the rotary enabled (v1 is vectors-only). ' +
+              'Disable the rotary in Tools → Rotary Setup, or remove the image layer.',
+          },
+        ],
+      },
+    };
+  }
+  const boundsHeightOverrideMm = rotaryWrapLimitMm(project.device, project.machine);
+  return {
+    kind: 'ok',
+    job: machineSpaceJob(job, project.device, project.machine),
+    ...(boundsHeightOverrideMm !== null ? { boundsHeightOverrideMm } : {}),
+  };
 }
 
 // The provenance header's assumption lines are machine-specific (ADR-103

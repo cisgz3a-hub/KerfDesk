@@ -8,6 +8,7 @@ import {
   computeJobBounds,
   describeFramePreflightFailure,
   framePreflight,
+  machineSpaceJob,
   type JobOriginPlacement,
 } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
@@ -30,7 +31,15 @@ export function emitRdFile(project: Project, options: EmitRdOptions = {}): EmitR
   if (!prepared.ok) {
     return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
   }
-  const bounds = computeJobBounds(prepared.job, prepared.project.device);
+  // Ruida export is the twin of emitGcode: apply the same rotary machine-space
+  // scaling so a saved .rd matches the streamed G-code (identity for
+  // non-rotary; rotary raster is refused by the encoder below) — review R3.
+  const machineJob = machineSpaceJob(
+    prepared.job,
+    prepared.project.device,
+    prepared.project.machine,
+  );
+  const bounds = computeJobBounds(machineJob, prepared.project.device);
   if (bounds !== null) {
     const pre = framePreflight(bounds, prepared.project.device);
     if (pre.kind === 'no-go-zone') {
@@ -40,7 +49,7 @@ export function emitRdFile(project: Project, options: EmitRdOptions = {}): EmitR
       return { ok: false, messages: [describeFramePreflightFailure(pre)] };
     }
   }
-  const encoded = encodeRdJob(prepared.job, prepared.project.device);
+  const encoded = encodeRdJob(machineJob, prepared.project.device);
   if (!encoded.ok) return { ok: false, messages: [describeRdEncodeError(encoded.error)] };
   return { ok: true, bytes: encoded.bytes };
 }

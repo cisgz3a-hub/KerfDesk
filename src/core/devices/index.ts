@@ -82,3 +82,11 @@ export {
   normalizeGrblRxBufferBytes,
   normalizeGrblStreamingMode,
 } from '../grbl-streaming';
+export {
+  DEFAULT_ROTARY_SETUP,
+  isRotaryActive,
+  rotaryCircumferenceMm,
+  rotaryYLimitMm,
+  rotaryYScale,
+} from './rotary';
+export type { RotarySetup, RotaryType } from './rotary';

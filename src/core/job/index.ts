@@ -52,6 +52,8 @@ export { computeRegistrationBoxBounds } from './registration-placement';
 export type { JobDurationEstimate } from './estimate-duration';
 export { estimateJobDuration, formatDuration } from './estimate-duration';
 export { optimizePaths } from './optimize-paths';
+export { applyRotaryYScale } from './rotary-transform';
+export { machineSpaceJob, rotaryAppliesTo, rotaryWrapLimitMm } from './rotary-job';
 export type {
   SlicedToolpath,
   Toolpath,
