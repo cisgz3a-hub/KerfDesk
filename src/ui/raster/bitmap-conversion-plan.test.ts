@@ -8,8 +8,7 @@
 // the Cuts panel considers out of range.
 
 import { describe, expect, it } from 'vitest';
-import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
-import { MIN_RASTER_LINES_PER_MM, MM_PER_INCH } from '../../core/raster/raster-units';
+import { MAX_RASTER_LINES_PER_MM, MIN_RASTER_LINES_PER_MM, MM_PER_INCH } from '../../core/raster';
 import {
   IDENTITY_TRANSFORM,
   transformedBounds,

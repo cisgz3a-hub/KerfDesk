@@ -3,13 +3,13 @@ import {
   applyImageMaskToLuma,
   applyLumaAdjustments,
   dither,
+  evaluateRasterBudget,
   maybeInvertLuma,
   pixelExtentForMm,
   rasterPreviewRgba,
   resampleLumaNearest,
   whiteLuma,
 } from '../../core/raster';
-import { evaluateRasterBudget } from '../../core/raster/raster-budget';
 import type { Layer, RasterImage, SceneObject } from '../../core/scene';
 
 const PERCENT_MAX = 100;

@@ -1,6 +1,6 @@
 import type { PlatformAdapter } from '../../platform/types';
 import type { Layer, Project, RasterImage, SceneObject } from '../../core/scene';
-import { evaluateRasterBudget } from '../../core/raster/raster-budget';
+import { evaluateRasterBudget } from '../../core/raster';
 import { buildProcessedRasterBitmap, processedRasterDimensions } from '../raster/processed-bitmap';
 import { rgbaToPngBlob } from '../raster/luma-bitmap';
 import type { ToastVariant } from '../state/toast-store';

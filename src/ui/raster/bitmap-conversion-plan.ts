@@ -1,9 +1,10 @@
 import {
-  MAX_RASTER_LINES_PER_MM,
   evaluateRasterBudget,
+  MAX_RASTER_LINES_PER_MM,
+  MIN_RASTER_LINES_PER_MM,
+  MM_PER_INCH,
   type RasterBudgetVerdict,
-} from '../../core/raster/raster-budget';
-import { MIN_RASTER_LINES_PER_MM, MM_PER_INCH } from '../../core/raster/raster-units';
+} from '../../core/raster';
 import { transformedBounds, type Bounds, type Transform } from '../../core/scene';
 
 const MIN_PIXEL_DIM = 1;
