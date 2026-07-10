@@ -83,14 +83,17 @@ export function jogActions(
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
       // CNC projects retract to the configured safe height before the XY
-      // perimeter trace (the bit would otherwise drag through stock). CNC is
-      // GRBL-only (ADR-098), so the GRBL jog literal is safe here; laser
-      // projects keep the driver's Z-silent perimeter.
+      // perimeter trace (the bit would otherwise drag through stock). The retract
+      // bytes come from the driver seam (ADR-094 — this file must not hardcode
+      // protocol bytes); a driver without a jog-based Z retract returns undefined
+      // and we skip the prefix. Laser projects keep the driver's Z-silent perimeter.
       const machine = useStore.getState().project.machine;
       const safeZMm = machine?.kind === 'cnc' ? machine.params.safeZMm : undefined;
       const frameLines = refs.driver.commands.buildFrameLines(bounds, feed);
+      const retractLine =
+        safeZMm === undefined ? undefined : refs.driver.commands.buildFrameRetract?.(safeZMm, feed);
       const [firstLine, ...pendingLines] =
-        safeZMm === undefined ? frameLines : [cncFrameRetractLine(safeZMm, feed), ...frameLines];
+        retractLine === undefined ? frameLines : [retractLine, ...frameLines];
       if (firstLine === undefined) return;
       set({ motionOperation: startMotionOperation('frame', pendingLines) });
       try {
@@ -104,11 +107,6 @@ export function jogActions(
       }
     },
   };
-}
-
-function cncFrameRetractLine(safeZMm: number, feed: number): string {
-  return `$J=G90 G21 Z${safeZMm.toFixed(3)} F${Math.max(1, Math.round(feed))}
-`;
 }
 
 function assertJogFrameReady(set: SetFn, get: GetFn): void {

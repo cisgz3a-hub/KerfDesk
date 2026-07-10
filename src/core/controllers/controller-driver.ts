@@ -56,6 +56,10 @@ export type ControllerCommands = {
   readonly buildJog: (params: JogParams) => string;
   /** Build the framing move sequence, each line newline-terminated. */
   readonly buildFrameLines: (bounds: FrameBounds, feed: number) => ReadonlyArray<string>;
+  /** Safe-Z retract jogged before a CNC frame trace. Optional: a driver whose
+   *  firmware has no jog-based Z retract omits it, and the caller skips the
+   *  retract prefix. Newline-terminated to match buildFrameLines. */
+  readonly buildFrameRetract?: (zMm: number, feed: number) => string;
 };
 
 export type ConsoleQuickCommand = {

@@ -15,3 +15,10 @@ export function buildGrblFrameJogLines(bounds: FrameBounds, feed: number): Reado
     { x: bounds.minX, y: bounds.minY },
   ].map((c) => `$J=G90 G21 X${fmt(c.x)} Y${fmt(c.y)} F${f}\n`);
 }
+
+// Safe-Z retract jogged before a CNC frame trace, so the bit clears the stock
+// before the XY perimeter. Absolute G90 jog, trailing newline — verbatim from
+// the pre-ADR-094 ui/state literal so the frame bytes stay byte-identical.
+export function buildGrblFrameRetract(zMm: number, feed: number): string {
+  return `$J=G90 G21 Z${zMm.toFixed(3)} F${Math.max(1, Math.round(feed))}\n`;
+}
