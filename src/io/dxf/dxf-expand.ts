@@ -11,6 +11,7 @@ import {
   ellipseToPolyline,
   firstNumber,
   firstString,
+  hasUnreadableGeometry,
   lineToPolyline,
   lwpolylineToPolyline,
   polylineEntityToPolyline,
@@ -98,6 +99,14 @@ export function expandEntities(
       notes.push(...child.notes);
       continue;
     }
+    // Reject value-level corruption (a non-numeric or astronomically-large
+    // geometry coordinate) instead of coercing it to 0 and importing wrong
+    // geometry — matches LightBurn, which drops unreadable entities.
+    if (hasUnreadableEntityGeometry(entity, ctx.scale)) {
+      bumpSkipped(skipped, entity.type);
+      notes.push(`${entity.type} skipped: unreadable or out-of-range coordinate value`);
+      continue;
+    }
     const conversion = convertEntity(entity, ctx.scale);
     if (conversion === null) {
       bumpSkipped(skipped, entity.type);
@@ -114,6 +123,13 @@ export function expandEntities(
     });
   }
   return { polylines, skipped, notes };
+}
+
+// Classic POLYLINE carries its geometry in VERTEX children, not its own tags,
+// so check both. Everything else keeps all geometry on entity.tags.
+function hasUnreadableEntityGeometry(entity: RawEntity, scale: number): boolean {
+  if (hasUnreadableGeometry(entity.tags, scale)) return true;
+  return entity.vertexRuns.some((run) => hasUnreadableGeometry(run, scale));
 }
 
 // null = unsupported entity type (counted); EntityConversion otherwise.

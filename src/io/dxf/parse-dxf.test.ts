@@ -336,3 +336,38 @@ describe('parseDxf rejection and empty cases', () => {
     expect(result.skippedSummary).toBe('1 HATCH, 2 TEXT');
   });
 });
+
+describe('parseDxf value-level corruption (IMP-08)', () => {
+  it('skips a LINE with a non-numeric coordinate instead of importing it at 0', () => {
+    const result = parse(
+      entitiesSection(
+        [
+          tags([0, 'LINE'], [10, '0'], [20, '0'], [11, '10'], [21, '0']), // valid
+          tags([0, 'LINE'], [10, 'not-a-number'], [20, '0'], [11, '5'], [21, '5']), // corrupt X
+        ].join('\n'),
+      ),
+    );
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    // Only the valid line imports; the corrupt one is reported, not zeroed.
+    expect(result.pathCount).toBe(1);
+    expect(result.skippedSummary).toBe('1 LINE');
+  });
+
+  it('skips an entity whose coordinate magnitude exceeds the import cap', () => {
+    const result = parse(
+      entitiesSection(tags([0, 'LINE'], [10, '0'], [20, '0'], [11, '2e9'], [21, '0'])),
+    );
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    expect(result.object).toBeNull();
+    expect(result.skippedSummary).toBe('1 LINE');
+  });
+
+  it('still imports a large but in-range coordinate (regression: normal files unaffected)', () => {
+    const result = parse(
+      entitiesSection(tags([0, 'LINE'], [10, '0'], [20, '0'], [11, '999999'], [21, '0'])),
+    );
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    expect(result.pathCount).toBe(1);
+    expect(result.skippedSummary).toBeNull();
+  });
+});

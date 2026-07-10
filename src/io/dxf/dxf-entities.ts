@@ -182,6 +182,35 @@ function parseNumber(value: string, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+// Group codes that carry geometry the converters actually read: point/vertex
+// coords (10/20, 11/21), radius/ratio/params/bulge (40/41/42), and angles
+// (50/51). Z (30/31/38) is deliberately absent — this is a 2.5D import that
+// ignores Z, so a corrupt Z is harmless. Non-geometry codes (layer 8, color 62,
+// flags 70, …) stay tolerant so ordinary files are unaffected.
+const DXF_GEOMETRY_CODES: ReadonlySet<number> = new Set([10, 20, 11, 21, 40, 41, 42, 50, 51]);
+// Codes that are scaled lengths in machine mm — the magnitude cap applies to
+// these (after scale). Angles/ratios/params/bulge (41/42/50/51) are not lengths.
+const DXF_SCALED_LENGTH_CODES: ReadonlySet<number> = new Set([10, 20, 11, 21, 40]);
+// Mirror SVG's coordinate cap (SVG_IMPORT_LIMITS.coordinateMagnitudeMm): a
+// finite-but-astronomical coordinate would only fault later at bed-bounds
+// preflight, so reject the entity at the import boundary like SVG does.
+export const DXF_COORDINATE_MAGNITUDE_MM = 1_000_000;
+
+// True if any geometry-bearing tag holds a value the converters would silently
+// coerce to 0 (non-numeric) or an out-of-range magnitude — i.e. the entity
+// should be skipped and reported rather than imported as corrupt geometry.
+export function hasUnreadableGeometry(tags: ReadonlyArray<DxfTag>, scale: number): boolean {
+  for (const tag of tags) {
+    if (!DXF_GEOMETRY_CODES.has(tag.code)) continue;
+    const value = Number.parseFloat(tag.value);
+    if (!Number.isFinite(value)) return true;
+    if (DXF_SCALED_LENGTH_CODES.has(tag.code) && Math.abs(value * scale) > DXF_COORDINATE_MAGNITUDE_MM) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function samePoint(a: Vec2, b: Vec2): boolean {
   const EPSILON = 1e-9;
   return Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON;
