@@ -143,7 +143,7 @@ When pattern-matching on `kind`, the default arm must be `assertNever(state)` so
 
 - No module-level mutable variables.
 - No `let` outside function bodies.
-- No mutation of objects after construction. Use spread or `produce` from Immer (already a Zustand dependency).
+- No mutation of objects after construction. Build a new value with spreads — the store uses spreads throughout. (Immer is **not** a dependency: it is only an optional peer of Zustand and is absent from the tree, so do not import `produce`.)
 - React state lives in either local `useState` or a Zustand slice — never a global object, never a singleton.
 
 ---
