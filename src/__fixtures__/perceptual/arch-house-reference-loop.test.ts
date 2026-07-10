@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest';
 import type { ColoredPath } from '../../core/scene';
 import { TRACE_PRESETS, traceImageToColoredPaths, type RawImageData } from '../../core/trace';
 import { preprocessForTrace } from '../../core/trace/trace-image';
+import { chamferDistance } from './chamfer';
 import { compareMasks } from './compare';
 import { decodePngFile } from './png-decode';
 import { encodeRgbPng, writePerceptualArtifact } from './png';
@@ -109,6 +110,25 @@ describe.skipIf(!LOOP_ENABLED)('arch-house reference-pair loop', () => {
         );
       }
 
+      // VECTOR-resolution crops: rasterize the traced paths at CROP_ZOOM×
+      // scale (what the canvas shows when zoomed) — sub-pixel spikes and
+      // scallops that vanish at 1024 rasterization are visible here.
+      const scaledPaths = scalePaths(paths, CROP_ZOOM);
+      const hiFill = rasterizeColoredPaths(
+        scaledPaths,
+        source.width * CROP_ZOOM,
+        source.height * CROP_ZOOM,
+      );
+      const hiStroke = strokeRasterize(
+        paths,
+        CROP_ZOOM,
+        source.width * CROP_ZOOM,
+        source.height * CROP_ZOOM,
+      );
+      for (const region of CROP_REGIONS) {
+        writeVectorCropArtifact(`arch-loop-${slug}-vec-${region.name}`, region, hiFill, hiStroke);
+      }
+
       expect(paths.length).toBeGreaterThan(0);
       expect(Number.isFinite(strokeToRef.mean)).toBe(true);
     }
@@ -135,6 +155,9 @@ const CROP_REGIONS: ReadonlyArray<CropRegion> = [
   // Birds + sun + upper water: hosts the small enclosed whites the pinhole
   // audit found at (426,341)/(600,336) — collateral watch for the fill.
   { name: 'sun-birds', x0: 400, y0: 280, x1: 640, y1: 470 },
+  // Long organic wave curves: where the maintainer reported Sharp's
+  // scalloped/uneven edges.
+  { name: 'waves', x0: 100, y0: 430, x1: 470, y1: 545 },
 ];
 
 const CROP_ZOOM = 3;
@@ -167,6 +190,57 @@ function writeRegionCropArtifact(
   paintMaskPanel(rgb, panelW, 3 * (panelH + gap), region, strokeMask);
   mkdirSync(ARTIFACT_DIR, { recursive: true });
   writeFileSync(join(ARTIFACT_DIR, `${name}.png`), encodeRgbPng(rgb, panelW, totalH));
+}
+
+// Vector-resolution crop: two panels [fill | strokes] sampled DIRECTLY from
+// CROP_ZOOM×-rasterized masks of the traced paths — the canvas-at-zoom view.
+function writeVectorCropArtifact(
+  name: string,
+  region: CropRegion,
+  hiFill: Mask,
+  hiStroke: Mask,
+): void {
+  if (process.env['PERCEPTUAL_ARTIFACTS'] !== '1') return;
+  const panelW = (region.x1 - region.x0) * CROP_ZOOM;
+  const panelH = (region.y1 - region.y0) * CROP_ZOOM;
+  const gap = 4;
+  const totalH = panelH * 2 + gap;
+  const rgb = new Uint8Array(panelW * totalH * 3).fill(255);
+  paintHiMaskPanel(rgb, panelW, 0, region, hiFill);
+  paintHiMaskPanel(rgb, panelW, panelH + gap, region, hiStroke);
+  mkdirSync(ARTIFACT_DIR, { recursive: true });
+  writeFileSync(join(ARTIFACT_DIR, `${name}.png`), encodeRgbPng(rgb, panelW, totalH));
+}
+
+// Unlike paintMaskPanel (nearest-upscale from source-res masks), this samples
+// a mask already rasterized at CROP_ZOOM× — one mask pixel per crop pixel.
+function paintHiMaskPanel(
+  rgb: Uint8Array,
+  panelW: number,
+  offsetY: number,
+  region: CropRegion,
+  hiMask: Mask,
+): void {
+  const panelH = (region.y1 - region.y0) * CROP_ZOOM;
+  for (let y = 0; y < panelH; y += 1) {
+    for (let x = 0; x < panelW; x += 1) {
+      const sx = region.x0 * CROP_ZOOM + x;
+      const sy = region.y0 * CROP_ZOOM + y;
+      if ((hiMask.data[sy * hiMask.width + sx] ?? 0) === 1) {
+        setRgb(rgb, panelW, x, offsetY + y, [0, 0, 0]);
+      }
+    }
+  }
+}
+
+function scalePaths(paths: ReadonlyArray<ColoredPath>, scale: number): ColoredPath[] {
+  return paths.map((path) => ({
+    color: path.color,
+    polylines: path.polylines.map((polyline) => ({
+      closed: polyline.closed,
+      points: polyline.points.map((point) => ({ x: point.x * scale, y: point.y * scale })),
+    })),
+  }));
 }
 
 function paintSourcePanel(
@@ -311,52 +385,6 @@ function drawLine(mask: Mask, ax: number, ay: number, bx: number, by: number): v
 function plotPixel(mask: Mask, x: number, y: number): void {
   if (x < 0 || y < 0 || x >= mask.width || y >= mask.height) return;
   mask.data[y * mask.width + x] = 1;
-}
-
-// Two-pass 1 / √2 chamfer distance transform: distance (px) from every pixel
-// to the nearest ink pixel of the mask. Accurate enough for line-deviation
-// statistics; exactness is not needed to rank engine iterations.
-const DIAGONAL_STEP = Math.SQRT2;
-
-function chamferDistance(mask: Mask): Float32Array {
-  const { width, height, data } = mask;
-  const dist = new Float32Array(width * height).fill(Number.POSITIVE_INFINITY);
-  for (let i = 0; i < data.length; i += 1) if ((data[i] ?? 0) === 1) dist[i] = 0;
-  chamferForwardPass(dist, width, height);
-  chamferBackwardPass(dist, width, height);
-  return dist;
-}
-
-function chamferForwardPass(dist: Float32Array, width: number, height: number): void {
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const i = y * width + x;
-      let d = dist[i] ?? Number.POSITIVE_INFINITY;
-      if (x > 0) d = relaxed(d, dist, i - 1, 1);
-      if (y > 0) d = relaxed(d, dist, i - width, 1);
-      if (x > 0 && y > 0) d = relaxed(d, dist, i - width - 1, DIAGONAL_STEP);
-      if (x < width - 1 && y > 0) d = relaxed(d, dist, i - width + 1, DIAGONAL_STEP);
-      dist[i] = d;
-    }
-  }
-}
-
-function chamferBackwardPass(dist: Float32Array, width: number, height: number): void {
-  for (let y = height - 1; y >= 0; y -= 1) {
-    for (let x = width - 1; x >= 0; x -= 1) {
-      const i = y * width + x;
-      let d = dist[i] ?? Number.POSITIVE_INFINITY;
-      if (x < width - 1) d = relaxed(d, dist, i + 1, 1);
-      if (y < height - 1) d = relaxed(d, dist, i + width, 1);
-      if (x < width - 1 && y < height - 1) d = relaxed(d, dist, i + width + 1, DIAGONAL_STEP);
-      if (x > 0 && y < height - 1) d = relaxed(d, dist, i + width - 1, DIAGONAL_STEP);
-      dist[i] = d;
-    }
-  }
-}
-
-function relaxed(d: number, dist: Float32Array, neighbour: number, step: number): number {
-  return Math.min(d, (dist[neighbour] ?? Number.POSITIVE_INFINITY) + step);
 }
 
 const P95 = 0.95;
