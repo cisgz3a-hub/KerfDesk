@@ -3548,6 +3548,10 @@ working.
 **Status:** Accepted. Slices 1–3 landed on `feat/offline-pwa` (app-shell precache,
 safe update prompt, connection badge + Install button). Hardware verification
 (Web Serial driving the laser with the network down) is the standing gap.
+Service-worker registration is **web-only**: on the desktop shell (the `app://`
+scheme, where Chromium refuses SW) the update prompt is gated off at its mount
+(`PwaUpdatePromptGate`, ELE-06), so the desktop auto-update path (ADR-024) is the
+single updater and no cached precache can mask its on-disk swap.
 
 **Context.** PROJECT.md already mandates this — the web app is "PWA-installable"
 (line 35) and "The app must work fully offline. No analytics, no error reporting
