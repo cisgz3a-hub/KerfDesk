@@ -153,7 +153,7 @@ Identical to F-A3 except:
 #### Multi — marquee
 1. Click+drag in empty workspace area.
 2. Dashed-blue marquee box follows cursor.
-3. On release, every object whose bounding box is fully or partially inside the marquee is selected.
+3. On release, selection is directional (LightBurn-style), keyed on the drag's horizontal direction: dragging left→right is an **enclosing** select (only objects whose bounding box is fully inside the marquee); dragging right→left is a **crossing** select (objects inside or merely touched).
 4. Locked objects inside the marquee are skipped.
 
 #### All — Cmd/Ctrl+A
@@ -197,8 +197,8 @@ Identical to F-A3 except:
 - Live angle shown next to handle.
 
 #### Mirror — menu / shortcut
-- `Edit → Flip Horizontal` (`H`)
-- `Edit → Flip Vertical` (`V`)
+- `Arrange → Flip Horizontal` (`H`)
+- `Arrange → Flip Vertical` (`V`)
 - Operates around selection's center.
 
 #### Edge — transform pushes object out of bed
