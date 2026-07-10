@@ -5299,8 +5299,9 @@ geometry.**
   (measured 0.135; the ridge-snap sub-pixel pass no longer exists; 0.015px
   is far below laser resolution).
 - Orphaned modules pending a separate cleanup commit: `canny-edges.ts`,
-  `edge-reconnect.ts`, `edge-subpixel.ts`, `edge-ink-support.ts` (no
-  remaining app importers; their tests still pass). The centerline pipeline
+  `edge-subpixel.ts`, `edge-ink-support.ts` (no remaining app importers;
+  their tests still pass; `edge-reconnect.ts` was deleted in ARC-07). The
+  centerline pipeline
   keeps its chain machinery (its own mode) including the spline deviation
   cap from the earlier fidelity fix.
 - Known residuals accepted from the render review: small junction notches
