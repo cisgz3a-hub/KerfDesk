@@ -19,6 +19,9 @@ import { JogPadAirAssist } from './JogPadAirAssist';
 const STEPS_MM = [0.1, 0.5, 1, 2, 5, 10, 25, 50, 100] as const;
 const FOCUS_STEPS_MM = [0.1, 0.5, 1, 2, 5] as const;
 const FOCUS_FEED_MM_PER_MIN = 600;
+// Default jog rate, clamped to the device's max feed. A dedicated speed selector
+// is the remaining MCH-06 parity item; this names the previously-magic value.
+const DEFAULT_JOG_FEED_MM_PER_MIN = 3000;
 
 export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Element {
   const [step, setStep] = useState<number>(10);
@@ -29,7 +32,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
   const maxFeed = project.device.maxFeed;
   const jog = useLaserStore((s) => s.jog);
   const zeroZHere = useLaserStore((s) => s.zeroZHere);
-  const feed = Math.min(maxFeed, 3000);
+  const feed = Math.min(maxFeed, DEFAULT_JOG_FEED_MM_PER_MIN);
   const focusFeed = Math.min(maxFeed, FOCUS_FEED_MM_PER_MIN);
 
   // The arrows are physical directions (↑ = away from the operator, → = the
