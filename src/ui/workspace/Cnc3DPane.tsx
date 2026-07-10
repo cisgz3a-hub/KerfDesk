@@ -14,8 +14,8 @@ import {
   kernelForTool,
   type RemovalGrid,
 } from '../../core/sim';
-import { activeCncTool, type Project } from '../../core/scene';
-import { currentOutputScope, useStore } from '../state';
+import { activeCncTool, type OutputScope, type Project } from '../../core/scene';
+import { useOutputScope, useStore } from '../state';
 import { createReliefThreeScene } from '../relief-viewer/relief-three-scene';
 import { buildPreviewToolpath } from './draw-preview';
 
@@ -29,7 +29,10 @@ type PaneSceneState = 'loading' | 'ready' | 'failed';
 
 export function Cnc3DPane(): JSX.Element | null {
   const project = useStore((s) => s.project);
-  const outputScope = useStore((s) => currentOutputScope(s));
+  // Value-stable across hover (setCursorMm) — subscribing to currentOutputScope
+  // directly returned a fresh object each store update, so the removal-grid
+  // useMemo below recompiled the ~500×500 grid on every pointer move (PRF-01).
+  const outputScope = useOutputScope();
   const [collapsed, setCollapsed] = useState(false);
   const deferredProject = useDeferredValue(project);
   const grid = useDesignRemovalGrid(deferredProject, outputScope, collapsed);
@@ -67,7 +70,7 @@ function stockThicknessMm(project: Project): number {
 // rect (same frame as the Preview grid, so orientation matches the dialog).
 function useDesignRemovalGrid(
   project: Project,
-  outputScope: ReturnType<typeof currentOutputScope>,
+  outputScope: OutputScope,
   collapsed: boolean,
 ): RemovalGrid | null {
   return useMemo(() => {
