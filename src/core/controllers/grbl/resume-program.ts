@@ -37,7 +37,13 @@ type ModalState = {
   x: number | null;
   y: number | null;
   z: number | null;
+  // Feed of the most recent pure-Z plunge (`G1 Z<d> F<f>`, no X/Y — the
+  // signature GrblStrategy emits). null until one is seen, then used for the
+  // re-entry descent instead of the caller's fallback plungeMmPerMin.
+  plungeMmPerMin: number | null;
 };
+
+type GcodeWord = { readonly letter: string; readonly value: number };
 
 const WORD_RE = /([A-Za-z])(-?\d+(?:\.\d+)?)/g;
 
@@ -58,6 +64,7 @@ export function buildResumeProgram(
     x: null,
     y: null,
     z: null,
+    plungeMmPerMin: null,
   };
   for (let i = 0; i < fromLine - 1; i += 1) {
     const issue = applyLine(state, lines[i] ?? '');
@@ -80,13 +87,28 @@ export function buildResumeProgram(
 function applyLine(state: ModalState, rawLine: string): string | null {
   const line = stripComments(rawLine);
   if (line.trim() === '' || line.trim() === '%') return null;
-  for (const match of line.matchAll(WORD_RE)) {
-    const letter = (match[1] ?? '').toUpperCase();
-    const value = Number(match[2]);
+  const words: GcodeWord[] = [...line.matchAll(WORD_RE)].map((match) => ({
+    letter: (match[1] ?? '').toUpperCase(),
+    value: Number(match[2]),
+  }));
+  for (const { letter, value } of words) {
     const issue = applyWord(state, letter, value);
     if (issue !== null) return issue;
   }
+  recordPlungeFeed(state, words);
   return null;
+}
+
+// A line carrying a Z word and an F word with no X/Y is a pure plunge — the
+// exact `G1 Z<depth> F<plunge>` GrblStrategy emits per pass. Its F is the job's
+// real plunge feed, distinct from the cutting feed (X/Y+F) and from a ramp
+// (X/Y/Z+F, which carries X/Y and is skipped so it can't hijack the value).
+function recordPlungeFeed(state: ModalState, words: ReadonlyArray<GcodeWord>): void {
+  const has = (letter: string): boolean => words.some((word) => word.letter === letter);
+  if (has('Z') && has('F') && !has('X') && !has('Y')) {
+    const f = words.find((word) => word.letter === 'F');
+    if (f !== undefined && Number.isFinite(f.value)) state.plungeMmPerMin = f.value;
+  }
 }
 
 function applyWord(state: ModalState, letter: string, value: number): string | null {
@@ -150,9 +172,11 @@ function cncResumeBody(state: ModalState, options: ResumeOptions): string[] {
   const move = positionMove(state);
   if (move !== null) lines.push(move);
   // Feed back down to the recorded depth so XY-only cut lines that follow
-  // resume in the material, not at safe height.
+  // resume in the material, not at safe height — at the job's own plunge feed
+  // (options.plungeMmPerMin is only a fallback when no plunge was seen).
   if (state.z !== null && state.z < options.safeZMm) {
-    lines.push(`G1 Z${formatNumber(state.z)} F${formatNumber(options.plungeMmPerMin)}`);
+    const plunge = state.plungeMmPerMin ?? options.plungeMmPerMin;
+    lines.push(`G1 Z${formatNumber(state.z)} F${formatNumber(plunge)}`);
   }
   if (state.feed !== null) lines.push(`F${formatNumber(state.feed)}`);
   return lines;
