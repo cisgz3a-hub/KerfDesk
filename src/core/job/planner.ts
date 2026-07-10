@@ -208,8 +208,9 @@ type PlanEntry = { entryV: number; exitV: number };
 
 // Two-pass lookahead. Sets entry/exit velocities per block such that
 // physics holds (accel/decel reachable) AND cornering doesn't exceed
-// junction-deviation limits.
-function planVelocities(blocks: ReadonlyArray<Block>, accel: number, jd: number): PlanEntry[] {
+// junction-deviation limits. Exported for white-box invariant tests
+// (alongside junctionVelocity/blockTime).
+export function planVelocities(blocks: ReadonlyArray<Block>, accel: number, jd: number): PlanEntry[] {
   const plan: PlanEntry[] = blocks.map(() => ({ entryV: 0, exitV: 0 }));
   capJunctionEntries(blocks, plan, accel, jd);
   backwardPass(blocks, plan, accel);
@@ -232,7 +233,11 @@ function capJunctionEntries(
     const p = plan[i];
     if (prev === undefined || next === undefined || p === undefined) continue;
     const vJunction = junctionVelocity(prev, next, accel, jd);
-    p.entryV = Math.min(next.targetVelocity, vJunction);
+    // Clamp to BOTH adjacent blocks' target speeds (GRBL mins the junction
+    // against both nominal speeds). Omitting prev.targetVelocity let the slower
+    // block inherit an exitV above its own target via backwardPass, which made
+    // blockTime's tDecel negative and shaved time off the estimate.
+    p.entryV = Math.min(prev.targetVelocity, next.targetVelocity, vJunction);
   }
 }
 
@@ -259,7 +264,9 @@ function forwardPass(blocks: ReadonlyArray<Block>, plan: PlanEntry[], accel: num
     const entry = i === 0 ? 0 : (plan[i - 1]?.exitV ?? 0);
     p.entryV = Math.min(p.entryV, entry, block.targetVelocity);
     const maxExit = Math.sqrt(p.entryV ** 2 + 2 * accel * block.distance);
-    p.exitV = Math.min(p.exitV, maxExit);
+    // Also bound exit by this block's own target so blockTime's decel leg can
+    // never go negative (belt-and-suspenders alongside the capJunctionEntries fix).
+    p.exitV = Math.min(p.exitV, maxExit, block.targetVelocity);
   }
 }
 

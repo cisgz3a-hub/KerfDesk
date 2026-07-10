@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
 import type { CutGroup, CutSegment, Job } from './job';
-import { estimateWithPlanner, junctionVelocity, blockTime } from './planner';
+import { estimateWithPlanner, junctionVelocity, blockTime, planVelocities } from './planner';
 
 const device = {
   ...DEFAULT_DEVICE_PROFILE,
@@ -220,5 +220,43 @@ describe('blockTime', () => {
 
   it('zero-distance returns zero', () => {
     expect(blockTime(block(0, 100), 0, 0, accel)).toBe(0);
+  });
+});
+
+describe('planVelocities — GCO-06 junction clamp to both target speeds', () => {
+  const accel = 1000;
+  const jd = 0.01;
+  const cut = (distance: number, targetVelocity: number) => ({
+    kind: 'cut' as const,
+    distance,
+    targetVelocity,
+    direction: { x: 1, y: 0 }, // collinear → straight junction (vJunction = ∞)
+  });
+
+  // Regression: a slow block abutting a collinear faster block used to inherit
+  // an exit velocity ABOVE its own target (the junction cap omitted
+  // prev.targetVelocity), which made blockTime's decel leg negative and shaved
+  // time off the estimate. Every block's entry/exit must stay within its target.
+  it('never plans an entry or exit above the block’s own target speed', () => {
+    const blocks = [cut(10, 5), cut(10, 100), cut(10, 20)]; // slow → fast → medium
+    const plan = planVelocities(blocks, accel, jd);
+
+    const EPS = 1e-9;
+    plan.forEach((p, i) => {
+      const target = blocks[i]?.targetVelocity ?? 0;
+      expect(p.entryV).toBeLessThanOrEqual(target + EPS);
+      expect(p.exitV).toBeLessThanOrEqual(target + EPS);
+    });
+  });
+
+  it('keeps every block time non-negative across mixed-speed junctions', () => {
+    const blocks = [cut(10, 5), cut(10, 100)];
+    const plan = planVelocities(blocks, accel, jd);
+
+    plan.forEach((p, i) => {
+      const b = blocks[i];
+      if (b === undefined) return;
+      expect(blockTime(b, p.entryV, p.exitV, accel)).toBeGreaterThanOrEqual(0);
+    });
   });
 });
