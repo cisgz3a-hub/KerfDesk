@@ -248,4 +248,26 @@ describe('RegistrationJigPanel', () => {
     });
     expect(findRegistrationBoxes(useStore.getState().project.scene)[0]?.locked).toBe(true);
   });
+
+  it('disables unlock and Replace and warns for a captured board (CAM-04)', () => {
+    useStore.getState().addCapturedBoardBox(120, 80);
+    render();
+
+    const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (checkbox === null) throw new Error('lock checkbox not found');
+    expect(checkbox.disabled).toBe(true);
+    expect(buttonByLabel('Replace box').disabled).toBe(true);
+    expect(container.textContent).toContain('captured board');
+  });
+
+  it('leaves unlock and Replace enabled for a jig outline (CAM-04)', () => {
+    useStore.getState().addRegistrationBox(80, 40);
+    render();
+
+    const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    if (checkbox === null) throw new Error('lock checkbox not found');
+    expect(checkbox.disabled).toBe(false);
+    expect(buttonByLabel('Replace box').disabled).toBe(false);
+    expect(container.textContent).not.toContain('captured board');
+  });
 });

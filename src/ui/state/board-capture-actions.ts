@@ -79,7 +79,9 @@ function placementFor(shape: BoardShape): JobPlacementSettings {
 }
 
 function locked(box: ShapeObject): ShapeObject {
-  return { ...box, locked: true };
+  // Tag the provenance so the Registration Jig panel refuses to unlock/replace a
+  // captured board (its canvas position encodes the physical work origin, CAM-04).
+  return { ...box, locked: true, provenance: 'captured-board' };
 }
 
 // Add the outline as the single registration box, force its output OFF (guide,

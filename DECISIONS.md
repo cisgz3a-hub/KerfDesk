@@ -6153,3 +6153,23 @@ The check is skipped (motion allowed) when there is no known machine position fo
 ### Consequences
 
 A jog that would cross a keep-out is refused before any byte is sent, closing the gap between jogging and the job/frame/export paths. Pure core stays pure (returns the zone or null, no throw for control flow). No G-code or snapshot change. NOT hardware-verified - the geometry and the refusal are unit- and integration-tested (core segment cases + a connected-store jog that crosses a clamp sends nothing), but on-machine behavior is CLAIMED.
+
+## ADR-128 - Registration-box provenance: protect a captured board from the jig panel (2026-07-10)
+
+**Status:** accepted (audit CAM-04: the Registration Jig panel could silently unlock/replace a captured board, breaking its physical registration).
+
+> **Numbering note.** ADR-127 (jog no-go zones) was the last used; **ADR-128** is the next free (verify at merge).
+
+### Context
+
+Place Board (ADR-124) and the Registration Jig panel share ONE reserved-color registration box (isRegistrationBox keys on the reserved color, not a provenance field). Place Board locks that box because its canvas position encodes the physical work origin (G92). But the always-available jig panel offered a one-click unlock checkbox and a Create/Replace button wired to the same box, so an operator could unlock+drag or replace a captured board and silently break centering, Fill/Array, and the burn placement, with no signal.
+
+### Decision
+
+Add an optional provenance?: 'captured-board' | 'jig' to ShapeObject. Place Board tags its outline 'captured-board' (in the locked() helper, the single construction choke point); jig creates leave it absent. Absent is treated as 'jig' (back-compatible: old .lf2 files load unchanged). The field round-trips as ordinary JSON (the deserializer passes non-text objects through as-is); the shape validator gains one optionalLiteral line so a malformed value is rejected at the .lf2 boundary.
+
+The jig panel reads the current box provenance: for a captured board it disables the unlock checkbox and the Create/Replace button and shows a warning that unlocking or replacing it here breaks its physical registration, and to use Place Board to re-capture or Remove it first. Remove stays available as the explicit, safe path to clear a captured board.
+
+### Consequences
+
+A captured board can no longer be silently unlocked or replaced from the jig panel. The two features keep sharing one box (no second reserved layer), and the tag is additive/optional so nothing else changes. NOT hardware-verified; the guard is unit-tested (io round-trip + a panel render test asserting the disabled controls + warning for a captured board and enabled for a jig box).
