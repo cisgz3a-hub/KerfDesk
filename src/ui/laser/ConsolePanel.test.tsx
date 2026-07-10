@@ -133,6 +133,7 @@ describe('ConsolePanel', () => {
         completed: 0,
         total: 1,
         rxBufferBytes: 120,
+        toolChangePause: false,
       },
     } as Partial<ReturnType<typeof useLaserStore.getState>>);
     const { host, unmount } = await renderPanel();

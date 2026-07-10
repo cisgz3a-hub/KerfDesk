@@ -36,6 +36,7 @@ describe('JobControls progress display', () => {
         completed: 5,
         total: 5,
         rxBufferBytes: 120,
+        toolChangePause: false,
       },
     });
     const host = document.createElement('div');
