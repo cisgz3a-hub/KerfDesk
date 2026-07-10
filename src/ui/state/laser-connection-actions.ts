@@ -23,6 +23,7 @@ import {
   isActiveJob,
   pushLog,
 } from './laser-store-helpers';
+import { appendSystemNotice } from './laser-system-notice';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -171,12 +172,12 @@ async function runHandshake(
 
   if (!gotLine) {
     const driver = refs.driver;
-    set({
-      log: pushLog(
+    set(
+      appendSystemNotice(
         get(),
         `[lf2] No controller response within 2 s. Check baud rate (${driver.defaultBaudRate}) and that the device is ${driver.label}.`,
       ),
-    });
+    );
     return;
   }
   const settingsQuery = refs.driver.commands.settingsQuery;

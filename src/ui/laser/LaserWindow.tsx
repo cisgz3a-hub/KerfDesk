@@ -238,7 +238,7 @@ function AlarmRecoveryActions(props: {
 
 const panelStyle: React.CSSProperties = {
   // Explicit width + flexShrink: 0 so this rail cannot push the workspace
-  // canvas off-screen when its sub-panels (DeviceSettings, LaserLog, etc.)
+  // canvas off-screen when its sub-panels (DeviceSettings, ConsolePanel, etc.)
   // collectively grow. overflowY scrolls the column internally instead of
   // forcing the parent flexbox to stretch — without this, on a narrower
   // window the canvas (flex:1, minWidth:0) collapses to zero.

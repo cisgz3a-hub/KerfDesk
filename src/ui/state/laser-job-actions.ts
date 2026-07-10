@@ -21,6 +21,7 @@ import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
+import { appendSystemNotice } from './laser-system-notice';
 import type { LaserState } from './laser-store';
 
 type SetFn = (
@@ -197,7 +198,7 @@ async function runPauseJob(
   const s = get().streamer;
   if (s !== null) set({ streamer: pauseStreamer(s) });
   if (hold === null) {
-    set({ log: pushLog(get(), `[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`) });
+    set(appendSystemNotice(get(), `[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`));
   }
 }
 

@@ -32,6 +32,7 @@ import { handleStatusLine, originUnknownAfterControllerReset } from './laser-sta
 import { advanceStream, settleUntrackedAck } from './laser-stream-ack';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
+import { appendSystemNotice } from './laser-system-notice';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
@@ -158,12 +159,10 @@ function handleWelcomeLine(
   const mismatchLog =
     detected === refs.driver.kind
       ? {}
-      : {
-          log: pushLog(
-            state,
-            `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
-          ),
-        };
+      : appendSystemNotice(
+          state,
+          `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
+        );
   // A banner means the controller (re)booted: replies owed by the previous
   // session will never arrive.
   set({
