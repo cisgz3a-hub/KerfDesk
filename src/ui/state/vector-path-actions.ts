@@ -128,17 +128,15 @@ function convertSelectionToPathMutation(
 function weldSelectionMutation(state: VectorPathState): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
-  let welded;
-  try {
-    welded = weldVectorObjects(selected, uniqueWeldId(state.project.scene));
-  } catch (error) {
-    // The core op throws a user-worded message for reachable failures the menu
+  const weldResult = weldVectorObjects(selected, uniqueWeldId(state.project.scene));
+  if (!weldResult.ok) {
+    // The core op returns a user-worded message for reachable failures the menu
     // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
-    // inward offset). Surface it instead of dead-ending silently (CNV-04).
-    const message = error instanceof Error ? error.message : 'Operation failed.';
-    useToastStore.getState().pushToast(message, 'warning');
+    // inward offset). Surface it instead of dead-ending silently (CNV-04/CNV-10).
+    useToastStore.getState().pushToast(weldResult.message, 'warning');
     return state;
   }
+  const welded = weldResult.value;
   const removeIds = new Set(selected.map((object) => object.id));
   let scene = state.project.scene;
   for (const id of removeIds) scene = removeObject(scene, id);
@@ -165,17 +163,12 @@ function booleanSelectionMutation(
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length < 2 || selected.some((object) => object.locked === true)) return state;
-  let combined;
-  try {
-    combined = combineVectorObjects(selected, op, uniqueObjectId(state.project.scene, op));
-  } catch (error) {
-    // The core op throws a user-worded message for reachable failures the menu
-    // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
-    // inward offset). Surface it instead of dead-ending silently (CNV-04).
-    const message = error instanceof Error ? error.message : 'Operation failed.';
-    useToastStore.getState().pushToast(message, 'warning');
+  const combineResult = combineVectorObjects(selected, op, uniqueObjectId(state.project.scene, op));
+  if (!combineResult.ok) {
+    useToastStore.getState().pushToast(combineResult.message, 'warning');
     return state;
   }
+  const combined = combineResult.value;
   const removeIds = new Set(selected.map((object) => object.id));
   let scene = state.project.scene;
   for (const id of removeIds) scene = removeObject(scene, id);
@@ -202,17 +195,16 @@ function offsetSelectionMutation(
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
-  let offset;
-  try {
-    offset = offsetVectorObjects(selected, deltaMm, uniqueObjectId(state.project.scene, 'offset'));
-  } catch (error) {
-    // The core op throws a user-worded message for reachable failures the menu
-    // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
-    // inward offset). Surface it instead of dead-ending silently (CNV-04).
-    const message = error instanceof Error ? error.message : 'Operation failed.';
-    useToastStore.getState().pushToast(message, 'warning');
+  const offsetResult = offsetVectorObjects(
+    selected,
+    deltaMm,
+    uniqueObjectId(state.project.scene, 'offset'),
+  );
+  if (!offsetResult.ok) {
+    useToastStore.getState().pushToast(offsetResult.message, 'warning');
     return state;
   }
+  const offset = offsetResult.value;
   let scene = state.project.scene;
   scene = ensureLayersForColors(scene, offset.paths);
   scene = addObject(scene, offset);

@@ -73,7 +73,9 @@ describe('vector path tools', () => {
       paths: [{ color: '#222222', polylines: [square(0, 0, 10)] }],
     };
 
-    const welded = weldVectorObjects([left, right], 'welded');
+    const result = weldVectorObjects([left, right], 'welded');
+    if (!result.ok) throw new Error(result.message);
+    const welded = result.value;
 
     expect(welded.kind).toBe('imported-svg');
     expect(welded.id).toBe('welded');
@@ -98,7 +100,9 @@ describe('vector path tools', () => {
       ...metadata,
     };
 
-    const welded = weldVectorObjects([left, right], 'welded');
+    const result = weldVectorObjects([left, right], 'welded');
+    if (!result.ok) throw new Error(result.message);
+    const welded = result.value;
 
     expect(welded.operationOverride).toEqual(metadata.operationOverride);
     expect(welded.powerScale).toBe(65);
@@ -114,7 +118,9 @@ describe('vector path tools', () => {
       powerScale: 80,
     };
 
-    expect(() => weldVectorObjects([left, right], 'welded')).toThrow(/matching output metadata/i);
+    const result = weldVectorObjects([left, right], 'welded');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toMatch(/matching output metadata/i);
   });
 
   it('rejects weld input containing open polylines', () => {
@@ -140,7 +146,9 @@ describe('vector path tools', () => {
       ],
     };
 
-    expect(() => weldVectorObjects([open], 'welded')).toThrow(/closed vector contours/i);
+    const result = weldVectorObjects([open], 'welded');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toMatch(/closed vector contours/i);
   });
 });
 

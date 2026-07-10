@@ -15,6 +15,13 @@ export type VectorSceneObject = Extract<
   { readonly paths: ReadonlyArray<ColoredPath> }
 >;
 
+// Weld / boolean / offset ops return this instead of throwing: pure core must
+// not throw for control flow (CLAUDE.md), and the failure carries a user-worded
+// message the store surfaces as a toast.
+export type VectorOpResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly message: string };
+
 const MIN_CLOSED_POINTS = 3;
 const EPS = 1e-9;
 
@@ -41,9 +48,15 @@ export function materializeVectorObject(object: VectorSceneObject, id = object.i
 export function weldVectorObjects(
   objects: ReadonlyArray<VectorSceneObject>,
   id: string,
-): ImportedSvg {
+): VectorOpResult<ImportedSvg> {
   if (objects.length === 0) {
-    throw new Error('Weld requires selected closed vector contours.');
+    return { ok: false, message: 'Weld requires selected closed vector contours.' };
+  }
+  if (!vectorObjectOutputMetadataCompatible(objects)) {
+    return {
+      ok: false,
+      message: 'Weld requires selected vector contours with matching output metadata.',
+    };
   }
   const materialized = objects.map((object) => materializeVectorObject(object));
   const byColor = new Map<string, PathD[]>();
@@ -52,7 +65,7 @@ export function weldVectorObjects(
       const paths = byColor.get(path.color) ?? [];
       for (const polyline of path.polylines) {
         if (!isClosedPolygon(polyline)) {
-          throw new Error('Weld requires selected closed vector contours.');
+          return { ok: false, message: 'Weld requires selected closed vector contours.' };
         }
         paths.push(polylineToPathD(polyline));
       }
@@ -69,16 +82,19 @@ export function weldVectorObjects(
   }
   const filtered = paths.filter((path) => path.polylines.length > 0);
   if (filtered.length === 0) {
-    throw new Error('Weld requires selected closed vector contours.');
+    return { ok: false, message: 'Weld requires selected closed vector contours.' };
   }
   return {
-    ...commonObjectMetadata(objects),
-    kind: 'imported-svg',
-    id,
-    source: 'Welded paths',
-    bounds: boundsForPaths(filtered) ?? firstBounds(objects),
-    transform: IDENTITY_TRANSFORM,
-    paths: filtered,
+    ok: true,
+    value: {
+      ...commonObjectMetadata(objects),
+      kind: 'imported-svg',
+      id,
+      source: 'Welded paths',
+      bounds: boundsForPaths(filtered) ?? firstBounds(objects),
+      transform: IDENTITY_TRANSFORM,
+      paths: filtered,
+    },
   };
 }
 
@@ -93,11 +109,8 @@ export function vectorObjectOutputMetadataCompatible(
 function commonObjectMetadata(
   objects: ReadonlyArray<VectorSceneObject>,
 ): Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'> {
-  const first = objectPowerScale(objects[0] as VectorSceneObject);
-  if (!vectorObjectOutputMetadataCompatible(objects)) {
-    throw new Error('Weld requires selected vector contours with matching output metadata.');
-  }
-  return first;
+  // Metadata compatibility is checked by weldVectorObjects before this runs.
+  return objectPowerScale(objects[0] as VectorSceneObject);
 }
 
 function materializePolyline(polyline: Polyline, transform: SceneObject['transform']): Polyline {

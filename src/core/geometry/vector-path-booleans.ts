@@ -18,6 +18,7 @@ import {
   materializeVectorObject,
   pathDToPolyline,
   polylineToPathD,
+  type VectorOpResult,
   type VectorSceneObject,
 } from './vector-path-tools';
 
@@ -33,22 +34,25 @@ const FALLBACK_COLOR = '#000000';
 const MIN_OFFSET_MM = 0.001;
 
 /**
- * Combine the bottom-most object (subject) with the rest (clips). Throws when
- * fewer than two objects are given, a contour is open, or the result is empty
- * (e.g. an intersection of disjoint shapes) — callers surface the message.
+ * Combine the bottom-most object (subject) with the rest (clips). Returns an
+ * error result when fewer than two objects are given, a contour is open, or the
+ * result is empty (e.g. an intersection of disjoint shapes) — callers surface
+ * the message as a toast.
  */
 export function combineVectorObjects(
   objects: ReadonlyArray<VectorSceneObject>,
   op: VectorBooleanOp,
   id: string,
-): ImportedSvg {
+): VectorOpResult<ImportedSvg> {
   const [subjectObject, ...clipObjects] = objects;
   if (subjectObject === undefined || clipObjects.length === 0) {
-    throw new Error('Boolean operations need two or more closed vector objects.');
+    return { ok: false, message: 'Boolean operations need two or more closed vector objects.' };
   }
   const subject = closedWorldPaths([subjectObject]);
+  if (!subject.ok) return subject;
   const clip = closedWorldPaths(clipObjects);
-  const combined = runBooleanOp(op, subject, clip);
+  if (!clip.ok) return clip;
+  const combined = runBooleanOp(op, subject.value, clip.value);
   const paths: ColoredPath[] = [
     {
       color: objectColor(subjectObject),
@@ -56,9 +60,12 @@ export function combineVectorObjects(
     },
   ];
   if ((paths[0]?.polylines.length ?? 0) === 0) {
-    throw new Error('The result is empty — the selected shapes do not overlap that way.');
+    return {
+      ok: false,
+      message: 'The result is empty — the selected shapes do not overlap that way.',
+    };
   }
-  return resultObject(id, OP_LABEL[op], paths, subjectObject);
+  return { ok: true, value: resultObject(id, OP_LABEL[op], paths, subjectObject) };
 }
 
 /**
@@ -70,27 +77,30 @@ export function offsetVectorObjects(
   objects: ReadonlyArray<VectorSceneObject>,
   deltaMm: number,
   id: string,
-): ImportedSvg {
+): VectorOpResult<ImportedSvg> {
   const first = objects[0];
   if (first === undefined) {
-    throw new Error('Offset needs at least one closed vector object.');
+    return { ok: false, message: 'Offset needs at least one closed vector object.' };
   }
   if (!Number.isFinite(deltaMm) || Math.abs(deltaMm) < MIN_OFFSET_MM) {
-    throw new Error('Offset distance must be a non-zero number of millimeters.');
+    return { ok: false, message: 'Offset distance must be a non-zero number of millimeters.' };
   }
-  const inflated = inflatePathsD(
-    closedWorldPaths(objects),
-    deltaMm,
-    JoinType.Round,
-    EndType.Polygon,
-  );
+  const world = closedWorldPaths(objects);
+  if (!world.ok) return world;
+  const inflated = inflatePathsD(world.value, deltaMm, JoinType.Round, EndType.Polygon);
   const paths: ColoredPath[] = [
     { color: objectColor(first), polylines: inflated.map(pathDToPolyline).filter(isClosedPolygon) },
   ];
   if ((paths[0]?.polylines.length ?? 0) === 0) {
-    throw new Error('The offset collapsed the shape — use a smaller inward distance.');
+    return {
+      ok: false,
+      message: 'The offset collapsed the shape — use a smaller inward distance.',
+    };
   }
-  return resultObject(id, `Offset paths (${deltaMm > 0 ? '+' : ''}${deltaMm} mm)`, paths, first);
+  return {
+    ok: true,
+    value: resultObject(id, `Offset paths (${deltaMm > 0 ? '+' : ''}${deltaMm} mm)`, paths, first),
+  };
 }
 
 function runBooleanOp(op: VectorBooleanOp, subject: PathsD, clip: PathsD): PathsD {
@@ -104,20 +114,20 @@ function runBooleanOp(op: VectorBooleanOp, subject: PathsD, clip: PathsD): Paths
   }
 }
 
-function closedWorldPaths(objects: ReadonlyArray<VectorSceneObject>): PathsD {
+function closedWorldPaths(objects: ReadonlyArray<VectorSceneObject>): VectorOpResult<PathsD> {
   const out: PathsD = [];
   for (const object of objects) {
     const materialized = materializeVectorObject(object);
     for (const path of materialized.paths) {
       for (const polyline of path.polylines) {
         if (!isClosedPolygon(polyline)) {
-          throw new Error('Boolean and offset operations need closed contours only.');
+          return { ok: false, message: 'Boolean and offset operations need closed contours only.' };
         }
         out.push(polylineToPathD(polyline));
       }
     }
   }
-  return out;
+  return { ok: true, value: out };
 }
 
 function objectColor(object: VectorSceneObject): string {
