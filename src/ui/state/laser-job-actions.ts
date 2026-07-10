@@ -6,6 +6,7 @@
 
 import {
   cancel as cancelStreamer,
+  continueToolChange as continueToolChangeStreamer,
   createStreamer,
   findOversizedLine,
   markErrored,
@@ -50,8 +51,12 @@ export function jobActions(
   refs: ResetCleanupRefs,
   safeWrite: SafeWriteFn,
   driver: DriverFn,
-): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
+): Pick<
+  LaserState,
+  'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'
+> {
   return {
+    continueToolChange: () => runContinueToolChange(set, safeWrite),
     startJob: async (gcode, options = {}) => {
       assertStartAllowed(set, get);
       if (get().pendingUntrackedAcks > 0) {
@@ -82,32 +87,7 @@ export function jobActions(
         throw err;
       }
     },
-    pauseJob: async () => {
-      const activeDriver = driver();
-      const hold = activeDriver.realtime.hold;
-      // Realtime feed hold pauses motion instantly but leaves the beam state
-      // to the firmware — only provable safe when $32 laser mode is
-      // confirmed. ADR-096's exemption is for firmwares that CANNOT report
-      // $-settings (settings 'none': Smoothieware ties beam power to motion
-      // in its laser module; Marlin has no hold byte and pauses stream-side).
-      // Firmwares that CAN report — writable ('grbl-dollar') or read-only
-      // ('readonly-dump', FluidNC's $$ compat dump) — keep the strict gate
-      // (audit F6). Router jobs are exempt: feed hold with a spindle is
-      // standard sender behavior (motion holds, spindle keeps spinning), and
-      // a router must have $32=0 — demanding the laser proof would block CNC
-      // pause outright.
-      const requiresLaserModeProof =
-        hold !== null &&
-        activeDriver.capabilities.settings !== 'none' &&
-        get().activeJobMachineKind !== 'cnc';
-      if (requiresLaserModeProof) assertPauseSafe(set, get);
-      if (hold !== null) await safeWrite(hold, 'pause');
-      const s = get().streamer;
-      if (s !== null) set({ streamer: pauseStreamer(s) });
-      if (hold === null) {
-        set({ log: pushLog(get(), `[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`) });
-      }
-    },
+    pauseJob: () => runPauseJob(set, get, safeWrite, driver),
     resumeJob: () => runResumeJob(set, safeWrite, driver),
     stopJob: async () => {
       const softReset = driver().realtime.softReset;
@@ -182,6 +162,38 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+async function runPauseJob(
+  set: SetFn,
+  get: GetFn,
+  safeWrite: SafeWriteFn,
+  driver: DriverFn,
+): Promise<void> {
+  const activeDriver = driver();
+  const hold = activeDriver.realtime.hold;
+  // Realtime feed hold pauses motion instantly but leaves the beam state
+  // to the firmware — only provable safe when $32 laser mode is
+  // confirmed. ADR-096's exemption is for firmwares that CANNOT report
+  // $-settings (settings 'none': Smoothieware ties beam power to motion
+  // in its laser module; Marlin has no hold byte and pauses stream-side).
+  // Firmwares that CAN report — writable ('grbl-dollar') or read-only
+  // ('readonly-dump', FluidNC's $$ compat dump) — keep the strict gate
+  // (audit F6). Router jobs are exempt: feed hold with a spindle is
+  // standard sender behavior (motion holds, spindle keeps spinning), and
+  // a router must have $32=0 — demanding the laser proof would block CNC
+  // pause outright.
+  const requiresLaserModeProof =
+    hold !== null &&
+    activeDriver.capabilities.settings !== 'none' &&
+    get().activeJobMachineKind !== 'cnc';
+  if (requiresLaserModeProof) assertPauseSafe(set, get);
+  if (hold !== null) await safeWrite(hold, 'pause');
+  const s = get().streamer;
+  if (s !== null) set({ streamer: pauseStreamer(s) });
+  if (hold === null) {
+    set({ log: pushLog(get(), `[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`) });
+  }
+}
+
 async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn): Promise<void> {
   const resumeByte = driver().realtime.resume;
   if (resumeByte !== null) await safeWrite(resumeByte, 'resume');
@@ -210,6 +222,32 @@ async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn
       // soft-reset stop command while GRBL may still be executing
       // buffered lines on a live port. 'errored' keeps the recovery
       // controls mounted; step() sends nothing further either way.
+      set((s) => ({
+        streamer: s.streamer === null ? s.streamer : markErrored(s.streamer),
+        safetyNotice: writeFailedNotice('resume'),
+      }));
+      throw err;
+    }
+  }
+}
+
+// Leave a tool-change hold: drop the swallowed M0 and pump the stream from the
+// emitter's M3/G4 spin-up. Unlike resume there is NO realtime resume byte — the
+// controller was never held (the M0 was never sent); it is idling at the park
+// position and simply needs the next lines fed. Functional set for the same
+// at-write-time snapshot reason as runResumeJob.
+async function runContinueToolChange(set: SetFn, safeWrite: SafeWriteFn): Promise<void> {
+  let toSend = '';
+  set((s) => {
+    if (s.streamer === null) return s;
+    const stepped = step(continueToolChangeStreamer(s.streamer));
+    toSend = stepped.toSend;
+    return { streamer: stepped.state };
+  });
+  if (toSend.length > 0) {
+    try {
+      await safeWrite(toSend, 'resume');
+    } catch (err) {
       set((s) => ({
         streamer: s.streamer === null ? s.streamer : markErrored(s.streamer),
         safetyNotice: writeFailedNotice('resume'),

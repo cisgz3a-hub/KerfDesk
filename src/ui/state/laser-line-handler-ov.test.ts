@@ -56,6 +56,7 @@ function makeLaserState(): LaserState {
     startJob: async () => undefined,
     pauseJob: async () => undefined,
     resumeJob: async () => undefined,
+    continueToolChange: async () => undefined,
     stopJob: async () => undefined,
     clearSafetyNotice: () => undefined,
     applyDetectedSettings: () => undefined,

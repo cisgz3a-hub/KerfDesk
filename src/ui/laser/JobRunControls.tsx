@@ -13,15 +13,21 @@ const PAUSE_HOLD_SAFETY_MESSAGE = 'Pause is feed hold only. Use Stop or physical
 const PAUSE_STREAM_SIDE_MESSAGE =
   'Pause stops sending; moves already buffered in the firmware finish first. Use Stop or physical E-stop if unsafe.';
 
+const TOOL_CHANGE_MESSAGE =
+  'Job paused for a tool change. Load the next bit and re-zero Z on the stock top (jog, then Zero Z), then Continue to resume.';
+
 export function RunningControls(props: {
   readonly isStreaming: boolean;
   readonly isPaused: boolean;
+  readonly isToolChange: boolean;
 }): JSX.Element {
   const pauseJob = useLaserStore((s) => s.pauseJob);
   const resumeJob = useLaserStore((s) => s.resumeJob);
+  const continueToolChange = useLaserStore((s) => s.continueToolChange);
   const stopJob = useLaserStore((s) => s.stopJob);
   const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
   const pauseMessage = hasRealtimePause ? PAUSE_HOLD_SAFETY_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE;
+  const safetyMessage = props.isToolChange ? TOOL_CHANGE_MESSAGE : pauseMessage;
   return (
     <>
       <div style={rowStyle}>
@@ -47,6 +53,15 @@ export function RunningControls(props: {
             Resume
           </button>
         )}
+        {props.isToolChange && (
+          <button
+            type="button"
+            onClick={() => void continueToolChange().catch(() => undefined)}
+            title="Resume the job after loading and re-zeroing the new bit"
+          >
+            Continue
+          </button>
+        )}
         <button
           type="button"
           onClick={() => void stopJob().catch(() => undefined)}
@@ -55,7 +70,7 @@ export function RunningControls(props: {
         >
           Stop
         </button>
-        <span style={runningSafetyStyle}>{pauseMessage}</span>
+        <span style={runningSafetyStyle}>{safetyMessage}</span>
       </div>
       {shouldShowOverrides(props.isStreaming, props.isPaused) && <OverrideControls />}
     </>

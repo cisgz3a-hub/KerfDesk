@@ -36,7 +36,10 @@ export function pushLog(state: LaserState, line: string): ReadonlyArray<string> 
 // physically finished motion. laser-line-handler clears the streamer after a
 // later Idle status report.
 export function isActiveJob(streamer: StreamerState | null): boolean {
-  return streamer !== null && ['streaming', 'paused', 'done', 'errored'].includes(streamer.status);
+  return (
+    streamer !== null &&
+    ['streaming', 'paused', 'tool-change', 'done', 'errored'].includes(streamer.status)
+  );
 }
 
 export function activeJobCommandBlockMessage(state: LaserState): string | null {

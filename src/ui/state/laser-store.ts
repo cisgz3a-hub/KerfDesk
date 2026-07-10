@@ -194,6 +194,8 @@ export type LaserState = {
   readonly startJob: (gcode: string, options?: StartJobOptions) => Promise<void>;
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
+  // Leave a multi-tool CNC job's M0 tool-change hold and resume the stream.
+  readonly continueToolChange: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
   readonly clearSafetyNotice: () => void;
   readonly applyDetectedSettings: () => void;
