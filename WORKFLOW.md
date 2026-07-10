@@ -579,7 +579,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 5. Connection dot turns green; the status display shows the GRBL state from the first `?` reply.
 
 #### Error — WebSerial not supported
-1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave, or Arc, or install the Windows desktop app."
+1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
 
 #### Error — user cancels picker
 1. App returns to disconnected state, no error surfaced.

@@ -117,8 +117,8 @@ function ConnectionHints(props: {
   if (!props.supportsSerial) {
     return (
       <p style={hintStyle}>
-        Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave, or Arc, or install the
-        Windows desktop app.
+        Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave (may require enabling
+        under Brave Shields/flags), or Arc, or install the Windows desktop app.
       </p>
     );
   }

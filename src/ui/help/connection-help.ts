@@ -12,6 +12,7 @@ export const CONNECTION_HELP_TEXT = [
   '1. USE A SUPPORTED BROWSER',
   '   Connecting needs Chrome, Edge, Brave, or Arc — or the desktop app.',
   '   Firefox and Safari cannot connect to a machine.',
+  '   On Brave, WebSerial may require enabling under Brave Shields/flags.',
   '',
   '2. INSTALL THE USB-TO-SERIAL DRIVER (most common fix on Windows)',
   '   Your controller shows up as a COM port only if its USB chip driver is',
