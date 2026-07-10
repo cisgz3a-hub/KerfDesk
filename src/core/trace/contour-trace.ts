@@ -193,16 +193,23 @@ function finishLoop(
   // verdicts, 2026-07-11) and evening it fights drawn texture. Binary
   // sources (saturated steps, fraction ~0) keep the full 1x behaviour.
   const subPixelInformed = crack.interpolatedFraction >= SUBPIXEL_INFORMED_FRACTION;
-  const wobbleStrength = subPixelInformed ? 0 : finish.flattenStrength;
   // The chain-length regime bounds were tuned at 1x; a supersampled chain is
   // pixelScale× denser, so the bounds scale with it — a LANGEBAAN-size glyph
   // must stay in the same (sparse-detection) regime it was tuned for.
   const sharpenMin = SHARPEN_MIN_CHAIN_POINTS * finish.pixelScale;
   const sharpenMax = SHARPEN_MAX_CHAIN_POINTS * finish.pixelScale;
-  const sharpened =
-    dense.length >= sharpenMin && dense.length <= sharpenMax
-      ? sharpenChainBends(dense, true, distSq, width)
-      : { points: dense, corners: NO_CORNERS };
+  const inSharpenRange = dense.length >= sharpenMin && dense.length <= sharpenMax;
+  // Measured loops skip the chord flattener everywhere (it fabricates joint
+  // steps on measured stems). The arc-noise evening stays ON for measured
+  // loops ABOVE the sharpener range: their thin-mask stretches (tapering
+  // stroke tails 1-2px wide) carry real interpolation noise that the
+  // evening pre-conditions for the curve fit below (maintainer's "crippled
+  // line" Edge crop, 2026-07-11).
+  const flattenStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
+  const arcStrengthEff = subPixelInformed && inSharpenRange ? 0 : finish.flattenStrength;
+  const sharpened = inSharpenRange
+    ? sharpenChainBends(dense, true, distSq, width)
+    : { points: dense, corners: NO_CORNERS };
   const evened = smoothChainCurvature(sharpened.points, true, sharpened.corners);
   // Mid-wavelength curvature noise (the "small wobble in the O") is evened
   // on the DENSE chain, where a local moving circle fit has rich statistics
@@ -213,7 +220,7 @@ function finishLoop(
   // large fraction of such a feature.
   const arcSmoothed =
     dense.length >= sharpenMin
-      ? smoothArcNoise(evened, true, sharpened.corners, wobbleStrength, finish.pixelScale)
+      ? smoothArcNoise(evened, true, sharpened.corners, arcStrengthEff, finish.pixelScale)
       : evened;
   // Measured loops with an evidence-based corner set (sharpener range) take
   // the fairing-by-fitting tail: least-squares cubics THROUGH the measured
@@ -221,8 +228,14 @@ function finishLoop(
   // into fair curves with no chord joints and no per-vertex facets
   // (research brief #2). Tiny glyphs and beyond-range art loops keep the
   // approved legacy tail until the fit path earns them.
-  if (subPixelInformed && dense.length >= sharpenMin && dense.length <= sharpenMax) {
-    return fitLoopTail(arcSmoothed, sharpened.corners, finish);
+  if (subPixelInformed && dense.length >= sharpenMin) {
+    // In-range loops carry the sharpener's evidence-backed corners; larger
+    // loops (arch bands, waves, house outline) detect theirs from windowed
+    // dense turns so needle tips and roof corners still pin exactly.
+    const corners = inSharpenRange
+      ? sharpened.corners
+      : denseHardTurnCorners(arcSmoothed, finish.pixelScale);
+    return fitLoopTail(arcSmoothed, corners, finish);
   }
   const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
@@ -233,7 +246,7 @@ function finishLoop(
     simplified,
     true,
     sharpened.corners,
-    wobbleStrength,
+    flattenStrengthEff,
     finish.pixelScale,
   );
   if (straightened.length < MIN_LOOP_POINTS) return null;
@@ -261,4 +274,68 @@ function fitLoopTail(
   if (sampled.length < MIN_LOOP_POINTS) return null;
   const closed = closeRingEndpoints([{ points: sampled, closed: true }]);
   return closed[0] ?? null;
+}
+
+// Windowed hard-turn corner detection for loops the sharpener never saw
+// (above its chain-length range): chord tangents ±span px around each
+// vertex, pin turns ≥ the shared 60° hard-turn convention, greedy non-max
+// suppression so one physical corner yields one pin.
+const DENSE_CORNER_SPAN_PX = 2;
+const DENSE_CORNER_TURN_RAD = (60 * Math.PI) / 180;
+
+function denseHardTurnCorners(
+  points: ReadonlyArray<Polyline['points'][number]>,
+  pixelScale: number,
+): ReadonlySet<Polyline['points'][number]> {
+  const n = points.length;
+  const corners = new Set<Polyline['points'][number]>();
+  if (n < 8) return corners;
+  const perimeter = ringPerimeter(points);
+  const avgSpacing = Math.max(1e-6, perimeter / n);
+  const k = Math.max(2, Math.round((DENSE_CORNER_SPAN_PX * pixelScale) / avgSpacing));
+  const turns: number[] = new Array<number>(n);
+  for (let i = 0; i < n; i += 1) {
+    turns[i] = windowedTurn(points, i, k);
+  }
+  const order = Array.from({ length: n }, (_, i) => i).sort(
+    (a, b) => (turns[b] ?? 0) - (turns[a] ?? 0),
+  );
+  const taken = new Uint8Array(n);
+  for (const i of order) {
+    if ((turns[i] ?? 0) < DENSE_CORNER_TURN_RAD) break;
+    if (taken[i] === 1) continue;
+    corners.add(points[i] as Polyline['points'][number]);
+    for (let d = -2 * k; d <= 2 * k; d += 1) {
+      taken[(i + d + n) % n] = 1;
+    }
+  }
+  return corners;
+}
+
+function ringPerimeter(points: ReadonlyArray<Polyline['points'][number]>): number {
+  let length = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i] as Polyline['points'][number];
+    const b = points[(i + 1) % points.length] as Polyline['points'][number];
+    length += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return length;
+}
+
+function windowedTurn(
+  points: ReadonlyArray<Polyline['points'][number]>,
+  i: number,
+  k: number,
+): number {
+  const n = points.length;
+  const prev = points[(i - k + n) % n] as Polyline['points'][number];
+  const at = points[i] as Polyline['points'][number];
+  const next = points[(i + k) % n] as Polyline['points'][number];
+  const inLen = Math.hypot(at.x - prev.x, at.y - prev.y);
+  const outLen = Math.hypot(next.x - at.x, next.y - at.y);
+  if (inLen < 1e-9 || outLen < 1e-9) return 0;
+  const dot =
+    ((at.x - prev.x) / inLen) * ((next.x - at.x) / outLen) +
+    ((at.y - prev.y) / inLen) * ((next.y - at.y) / outLen);
+  return Math.acos(Math.max(-1, Math.min(1, dot)));
 }
