@@ -372,14 +372,16 @@ describe('useStore — undo / redo (F-A14)', () => {
     expect(useStore.getState().project.scene.objects[0]?.id).toBe('O1');
   });
 
-  it('undo clears stale multi-selection ids along with the primary selection', () => {
+  it('undo drops stale multi-selection ids but keeps the still-present primary (CNV-13)', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
     useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
 
+    // Undo removes O2; O1 survives in the restored scene, so it stays selected
+    // while the now-stale O2 id is dropped.
     useStore.getState().undo();
 
-    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().selectedObjectId).toBe('O1');
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);
   });
 

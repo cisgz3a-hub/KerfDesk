@@ -107,8 +107,10 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           project: prev,
           undoStack: s.undoStack.slice(0, -1),
           redoStack: [...s.redoStack, s.project].slice(-HISTORY_DEPTH),
-          selectedObjectId: null,
-          additionalSelectedIds: new Set(),
+          // Keep the selection whose ids still resolve to a live object in the
+          // restored scene (CNV-13); node selection is cleared because its
+          // indices reference the pre-restore geometry.
+          ...visibleSelectionState(s, prev),
           selectedPathNode: null,
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
@@ -123,8 +125,9 @@ export function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
           project: next,
           redoStack: s.redoStack.slice(0, -1),
           undoStack: [...s.undoStack, s.project].slice(-HISTORY_DEPTH),
-          selectedObjectId: null,
-          additionalSelectedIds: new Set(),
+          // Symmetric with undo: keep the selection that still resolves in the
+          // restored scene (CNV-13); node selection is cleared (stale indices).
+          ...visibleSelectionState(s, next),
           selectedPathNode: null,
           selectedPathNodes: [],
           registrationArtworkOutputSnapshot: null,
