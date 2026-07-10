@@ -268,7 +268,7 @@ Phase A acceptance: stub `TextObject` variant compiles through `JobCompiler` wit
 LF1's `App.tsx` was 1,631 lines. AI-assisted coding tends to pile into existing files. Enforcement (not aspiration) prevents recurrence.
 
 ### Decision
-Hard limits enforced by ESLint:
+Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-131):
 - File: 400 lines hard, 250 soft
 - React component: 250 hard, 150 soft
 - Function: 80 hard, 40 soft
@@ -280,6 +280,8 @@ Plus: co-located tests required, single responsibility (no "and" in description)
 
 ### Verification
 ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
+
+The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-131). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
 
 ---
 
@@ -6243,3 +6245,21 @@ The `kind` tag matches the house discriminated-union style so `assertNever` clos
 ### Consequences
 
 Core control-flow errors now have one typed channel a caller must narrow on (`result.kind === 'error'`) rather than a throw a caller may forget to catch. The addition is behavior-neutral (ARC-01 ships no consumers); the behavior change — deleting the throws and the `catch` swallows — lands in ARC-02. The 46 ad-hoc sites converge opportunistically as they are touched; this ADR is the reference they converge to.
+
+## ADR-131 - The 250-line soft tier is a report-only script, not an ESLint warning (2026-07-11)
+
+**Status:** accepted (audit ARC-03: the 250 soft tier promised by ADR-015, CLAUDE.md's size table, and PROJECT.md non-negotiable 15 had no enforcement mechanism — it was fiction).
+
+> **Numbering note.** ADR-130 (canonical Result) was the last used; **ADR-131** is the next free.
+
+### Context
+
+ADR-015 lists a two-tier file-size discipline: 400 lines hard, 250 soft. The hard tier is a real ESLint gate (`max-lines: ['error', { max: 400, skipBlankLines, skipComments }]`, `eslint.config.mjs`). The soft tier was never implemented: `grep max-lines eslint.config.mjs` shows a single `error/400` entry, and the finding's recommendation to "add a second `max-lines` at warn/250" is **not achievable** — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the first (last-wins), it does not stack. You cannot have warn/250 AND error/400 on the built-in rule simultaneously. 78 non-test src files currently sit over 250 counted lines (two — `io/svg/parse-svg.ts`, `ui/library/DesignLibraryDialog.tsx` — pinned at 400 with zero headroom), all invisible.
+
+### Decision
+
+The soft tier is a separate, report-only mechanism, not an ESLint severity. Add `scripts/check-soft-line-limit.mjs` (mirroring `check-file-size-policy.mjs`'s walk) that counts ESLint-style lines — skipping blank and comment-only lines, and skipping string literals so a `//`/`/*` inside a string is not misread as a comment — and lists non-test files over 250, then **always exits 0**. Tests and `__fixtures__` are excluded because `eslint.config.mjs` relaxes file-size for them; the soft report mirrors the hard rule's scope. It is wired as `check:soft-size` and appended (non-failing) to `release:check`; in CI it also appends a table to the job summary. The counter is a line-scan approximation of ESLint's AST count — validated against the audit's independent tally (78 ≈ the finding's 76–81) and against ESLint's own count (the two 400-pinned files register at exactly 400). ADR-015's wording is updated to say the soft tier is report-only.
+
+### Consequences
+
+The soft tier is finally visible without blocking anyone: `release:check` prints the over-250 list every run, so the drift is measured, but only the ESLint error/400 rule fails CI. Splitting the 78 files (especially the two 400-pinned ones, whose next edit forces an unplanned mid-feature split) stays out of scope — each is its own concept-driven tidy PR. Because the counter is an approximation, a file within a line or two of 250 may be mis-listed; it is a report, not a gate, so that is acceptable.
