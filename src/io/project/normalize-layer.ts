@@ -197,11 +197,13 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function isNonNegativeNumber(value: unknown): value is number {
-  return typeof value === 'number' && value >= 0;
+  // Number.isFinite rejects Infinity/NaN (JSON `1e999` → Infinity) so a corrupt
+  // CNC-layer numeric cannot ride through normalization into emitted G-code.
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function isPositiveNumber(value: unknown): value is number {
-  return typeof value === 'number' && value > 0;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 function isPositiveInteger(value: unknown): value is number {
