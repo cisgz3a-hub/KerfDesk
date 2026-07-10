@@ -210,20 +210,17 @@ export function applyDuplicate(
     ...s.additionalSelectedIds,
   ];
   if (ids.length === 0) return null;
-  const offset = MULTI_IMPORT_OFFSET_MM;
   let scene = s.project.scene;
   const newIds: string[] = [];
   for (const oldId of ids) {
     const original = scene.objects.find((o) => o.id === oldId);
     if (original === undefined) continue;
+    // Duplicate places the clone exactly over the source (LightBurn parity); the
+    // operator then moves it. Fresh imports (applyFreshImport) and paste keep
+    // their own stagger — only Duplicate is in place.
     const clone = {
       ...original,
       id: newIdFor(oldId),
-      transform: {
-        ...original.transform,
-        x: original.transform.x + offset,
-        y: original.transform.y + offset,
-      },
     } as SceneObject;
     scene = addObject(scene, clone);
     newIds.push(clone.id);
