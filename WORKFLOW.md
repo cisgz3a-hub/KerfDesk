@@ -355,18 +355,49 @@ Identical to F-A3 except:
 
 ### F-A10. Pre-flight check (before G-code save)
 
-Runs whenever Save G-code is invoked. Cannot be skipped.
+Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. Any failing
+check surfaces the pre-flight modal listing every issue and cancels the
+save/start until they clear.
 
-Checks, in order:
+The authoritative list is the `PreflightCode` set in
+`src/core/preflight/preflight.ts` (laser + CNC shared codes) and
+`src/core/preflight/cnc-preflight.ts` (CNC-only). As of this writing it covers,
+grouped by what each validates:
 
-1. **At least one output layer exists.** If not: modal `No output layers. Enable Output on at least one layer.` Cancel save.
-2. **All output geometry fits inside the bed.** Iterate every path point. If any falls outside `[0, bedWidth] × [0, bedHeight]` (in machine coordinates, after origin transform), build a list of violations. If any exist: modal `Design extends beyond machine bed.` listing layers and amounts. Buttons: `Cancel`, `Show violations` (highlights them in viewport).
-3. **Power values within range.** 0 ≤ power ≤ 100 for every output layer. Should be enforced upstream by F-A7, but defense in depth.
-4. **Speed values within device max.** 0 < speed ≤ device.maxFeed for every output layer.
-5. **Passes ≥ 1** for every output layer.
-6. **Generated G-code is non-empty.** Sanity check — if the pipeline produced no G-code lines, something is wrong; modal `Internal error: G-code generation produced empty output. Please report this.` (This is also a property-test invariant.)
+**Structural**
+1. **At least one output layer exists.** Else modal `No output layers. Enable Output on at least one layer.`
+2. **Generated G-code is non-empty.** Pipeline sanity; also a property-test invariant.
+3. **A "Cut selected graphics" selection is not empty** when that scope is active.
+4. **The reserved registration box is not set to Output** (it is a camera/jig guide, never burned).
 
-If all checks pass, save proceeds.
+**Geometry and bounds**
+5. **All output geometry fits inside the bed** `[0, bedWidth] × [0, bedHeight]` (machine coordinates, after origin transform). Violations list the layers/amounts with a `Show violations` action.
+6. **No output motion crosses an enabled no-go / keep-out zone.**
+7. **No non-finite coordinate** (NaN / ±Infinity) reaches the emitted G-code.
+
+**Per-layer values** (defense in depth over F-A7)
+8. **Power within range** for every output layer.
+9. **Speed within `device.maxFeed`** for every output layer.
+10. **Passes ≥ 1** for every output layer.
+
+**Mode / geometry consistency**
+11. **Layer mode matches its geometry** — a fill/offset needs closed contours.
+12. **Raster transform is emittable** — a rotation/shear the raster path cannot engrave is refused.
+13. **Raster output stays within the pixel budget.**
+14. **Island-fill short-sweep risk** on the active machine profile is surfaced.
+15. **Relief objects appear only in CNC mode.**
+
+**Laser safety**
+16. **Laser off on every travel move** — the core invariant, re-scanned on the emitted text.
+17. **No excessively long blank (laser-off) feed move.**
+
+**CNC mode adds**
+18. **CNC layer settings are valid and the layer produces toolpaths.**
+19. **Cut depth stays within the stock** (plus the through-cut allowance).
+20. **No single pass cuts deeper than the configured maximum.**
+21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
+
+If all applicable checks pass, the save/start proceeds.
 
 ---
 
@@ -629,10 +660,20 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B7. Pause / resume
 
-#### Success — pause
+#### Success — pause (GRBL-family laser with proven laser mode)
 1. User clicks **Pause**. App writes real-time `!` (0x21).
 2. Streamer enters `paused`; no further bytes sent until resume.
 3. Status report transitions to `Hold:0` or `Hold:1`.
+
+#### Blocked — laser mode unproven
+1. On a laser job, Pause is refused unless GRBL laser mode is confirmed (`$32=1`): modal `Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.`
+2. Rationale: a feed hold with `$32=0` (or unknown) can leave the beam on. Use **Stop** for a guaranteed beam-off halt.
+
+#### Exempt — CNC / router jobs
+1. A CNC (router) job pauses with `!` without the `$32` proof: feed hold with a spinning spindle is standard sender behavior, and a router runs `$32=0`. Demanding the laser proof would block CNC pause outright.
+
+#### Degraded — controller with no realtime hold (e.g. Marlin)
+1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console notes `This controller has no realtime feed hold. Pause is stream-side only… Use Stop for an immediate halt.`
 
 #### Success — resume
 1. User clicks **Resume**. App writes real-time `~`.
