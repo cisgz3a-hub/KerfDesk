@@ -339,7 +339,7 @@ Identical to F-A3 except:
 7. Toast: `Saved to <path>`.
 
 #### Success — web
-1. Same flow, but step 3 uses File System Access API where available, else browser download.
+1. Same flow. The web app requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets") — there is **no browser-download fallback**. If the API is unavailable the save fails with the error toast `Could not save G-code: File System Access API is required to save files in the web app.`
 2. Toast same.
 
 #### Error — pre-flight failure
@@ -424,8 +424,8 @@ If all applicable checks pass, the save/start proceeds.
 - Modal: `Could not save project: <reason>`. Project remains dirty, user can retry.
 
 #### Edge — save in web context
-- Uses File System Access API where available; falls back to browser download.
-- If the user denies file-access permission, show modal: `Save needs file-system access. Re-prompt?` with `Retry` / `Cancel`. **No IndexedDB fallback in Phase A** — would introduce a second persistence path not covered by any ADR. Browser-storage save is a candidate for a Phase C ADR.
+- Requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets"). There is **no browser-download fallback and no IndexedDB fallback** — an unsupported browser fails clearly rather than creating a second persistence path outside the project/file contract (`web-adapter.ts`).
+- If the API is missing, the save fails with the error toast `Could not save project: File System Access API is required to save files in the web app.` There is **no** `Save needs file-system access. Re-prompt?` modal — that was never built.
 
 ---
 
