@@ -18,6 +18,14 @@ import { fitSmoothCurve } from './curve-fit';
 // sharpener and the dense-chain evening, so a junction weld or loop-closure
 // corner the sharpener never rebuilt is still treated as a corner here.
 const HARD_CORNER_RAD = (60 * Math.PI) / 180;
+// Potrace's published corner criterion pairs a sharp angle with STRAIGHT
+// legs. A moderate hard turn whose neighbour keeps turning the SAME
+// direction is a drawn fillet that Douglas-Peucker collapsed onto one
+// vertex; pinning it renders a rounded terminal as an angular beak (the
+// Arch House "still some sharp corners" verdict, 2026-07-10). Needle-sharp
+// turns always pin — a star tip's flank may legitimately curve.
+const ALWAYS_CORNER_RAD = (90 * Math.PI) / 180;
+const CURVE_CONTINUATION_RAD = (20 * Math.PI) / 180;
 // New samples placed inside each spline segment. Four keeps the drawn curve
 // smooth at engraving scale while holding the total point count near the
 // simplified-vertex budget (a smooth curve needs even curvature, not brute
@@ -59,27 +67,55 @@ function collectCorners(
   for (let i = 0; i < points.length; i += 1) {
     const p = points[i];
     if (p === undefined) continue;
-    if (drawnCorners.has(p) || turnAtIndex(points, i, closed) >= HARD_CORNER_RAD) corners.add(p);
+    if (drawnCorners.has(p)) {
+      corners.add(p);
+      continue;
+    }
+    const turn = Math.abs(signedTurnAtIndex(points, i, closed));
+    if (turn < HARD_CORNER_RAD) continue;
+    if (turn < ALWAYS_CORNER_RAD && isFilletContinuation(points, i, closed)) continue;
+    corners.add(p);
   }
   return corners;
 }
 
-function turnAtIndex(points: ReadonlyArray<Vec2>, i: number, closed: boolean): number {
+// True when either neighbour keeps turning the candidate's direction — the
+// signature of a collapsed rounded terminal, not a drawn corner.
+function isFilletContinuation(points: ReadonlyArray<Vec2>, i: number, closed: boolean): boolean {
+  const sign = Math.sign(signedTurnAtIndex(points, i, closed));
+  for (const j of [i - 1, i + 1]) {
+    const neighbourTurn = signedTurnAtIndex(points, wrapIndex(j, points.length, closed), closed);
+    if (Math.abs(neighbourTurn) >= CURVE_CONTINUATION_RAD && Math.sign(neighbourTurn) === sign) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Out-of-range neighbours on open chains resolve to the endpoint, whose turn
+// reads 0 — they can never mark a continuation.
+function wrapIndex(i: number, n: number, closed: boolean): number {
+  if (closed) return (i + n) % n;
+  return Math.min(n - 1, Math.max(0, i));
+}
+
+function signedTurnAtIndex(points: ReadonlyArray<Vec2>, i: number, closed: boolean): number {
   const n = points.length;
   if (!closed && (i === 0 || i === n - 1)) return 0;
   const prev = points[(i - 1 + n) % n];
   const at = points[i];
   const next = points[(i + 1) % n];
   if (prev === undefined || at === undefined || next === undefined) return 0;
-  return turnAt(prev, at, next);
+  return signedTurnAt(prev, at, next);
 }
 
-function turnAt(prev: Vec2, at: Vec2, next: Vec2): number {
+function signedTurnAt(prev: Vec2, at: Vec2, next: Vec2): number {
   const inLen = Math.hypot(at.x - prev.x, at.y - prev.y);
   const outLen = Math.hypot(next.x - at.x, next.y - at.y);
   if (inLen < NEAR_POINT_EPS || outLen < NEAR_POINT_EPS) return 0;
-  const dot =
-    ((at.x - prev.x) / inLen) * ((next.x - at.x) / outLen) +
-    ((at.y - prev.y) / inLen) * ((next.y - at.y) / outLen);
-  return Math.acos(Math.max(-1, Math.min(1, dot)));
+  const inX = (at.x - prev.x) / inLen;
+  const inY = (at.y - prev.y) / inLen;
+  const outX = (next.x - at.x) / outLen;
+  const outY = (next.y - at.y) / outLen;
+  return Math.atan2(inX * outY - inY * outX, inX * outX + inY * outY);
 }
