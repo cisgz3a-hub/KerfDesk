@@ -6215,3 +6215,31 @@ The jig panel reads the current box provenance: for a captured board it disables
 ### Consequences
 
 A captured board can no longer be silently unlocked or replaced from the jig panel. The two features keep sharing one box (no second reserved layer), and the tag is additive/optional so nothing else changes. NOT hardware-verified; the guard is unit-tested (io round-trip + a panel render test asserting the disabled controls + warning for a captured board and enabled for a jig box).
+
+## ADR-130 - Canonical Result<T, E> for core control-flow errors (2026-07-11)
+
+**Status:** accepted (audit ARC-01/ARC-02: core geometry ops throw user-facing strings for expected user input, which CLAUDE.md's "Pure core" section bans; there was no shared type to convert them to, so ~46 files hand-rolled ad-hoc `{ ok }` / `{ kind }` shapes).
+
+> **Numbering note.** ADR-129 (registration-box provenance) was the last used; **ADR-130** is the next free.
+
+### Context
+
+CLAUDE.md "Pure core" forbids throwing for control flow: "return a `Result<T, E>` discriminated union." But `grep 'Result<' src/core` returned zero files — the discipline was stated but had no vehicle. Ops such as `weldVectorObjects`, `combineVectorObjects`, and `offsetVectorObjects` threw `new Error(userMessage)` for expected conditions (too-few objects, open contours, empty intersection), and the four store actions swallowed them with the bare `try { … } catch { return state }` shape CLAUDE.md's anti-patterns list explicitly bans. Nothing in the type system marked these as throwing, so every future caller had to rediscover it. A first pass (CNV-10) converted three ops to an ad-hoc `{ ok, message }` shape — which is the very hand-rolling this ADR exists to eliminate.
+
+### Decision
+
+Add one pure-core module `src/core/result.ts` exporting the canonical type and its constructors:
+
+```ts
+export type Result<T, E> =
+  | { readonly kind: 'ok'; readonly value: T }
+  | { readonly kind: 'error'; readonly error: E };
+export function ok<T>(value: T): Result<T, never>;
+export function err<E>(error: E): Result<never, E>;
+```
+
+The `kind` tag matches the house discriminated-union style so `assertNever` closes a switch's default arm on the error variant, exactly like every other core union. There is no top-level `core/index.ts` barrel; consumers import `../result` (within core) or `../../core/result` (from ui), matching how the existing loose core files (`app-branding.ts`, `grbl-streaming.ts`) are imported. New ad-hoc `{ ok }` / `{ kind }` result shapes in core are disallowed going forward — converge on this type. Migration of the ~46 existing ad-hoc sites is incremental, not a single batch diff; ARC-02 converts the vector-geometry cluster first (weld/boolean/offset/dogbone) and supersedes CNV-10's interim `{ ok, message }` shape.
+
+### Consequences
+
+Core control-flow errors now have one typed channel a caller must narrow on (`result.kind === 'error'`) rather than a throw a caller may forget to catch. The addition is behavior-neutral (ARC-01 ships no consumers); the behavior change — deleting the throws and the `catch` swallows — lands in ARC-02. The 46 ad-hoc sites converge opportunistically as they are touched; this ADR is the reference they converge to.
