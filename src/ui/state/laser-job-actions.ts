@@ -76,7 +76,14 @@ export function jobActions(
             `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
         );
       }
-      const initial = createStreamer(gcode, streamOptions);
+      // A lone M0 in a CNC job is a tool-change boundary: swallow it and hold
+      // at Idle so the operator can jog/probe/Zero-Z the new bit (CNC-01..03).
+      // Laser jobs and imported-in-laser-mode programs keep sending M0 as an
+      // ordinary program stop.
+      const initial = createStreamer(gcode, {
+        ...streamOptions,
+        toolChangePause: options.machineKind === 'cnc',
+      });
       const stepped = step(initial);
       set({ streamer: stepped.state, activeJobMachineKind: options.machineKind ?? 'laser' });
       if (stepped.toSend.length === 0) return;
