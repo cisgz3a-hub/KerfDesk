@@ -133,6 +133,22 @@ describe('material library store actions', () => {
     expect(useStore.getState().materialLibrary?.entries[0]?.recipe.power).toBe(44);
   });
 
+  it('applies a device-mismatched preset (warn, not block) per ADR-045 [LAY-01]', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const mismatched = preset({
+      id: 'other-machine',
+      profileId: 'a-different-machine',
+      recipe: recipe({ power: 77 }),
+    });
+    useStore.getState().setMaterialLibrary(library([mismatched]));
+
+    // Before LAY-01 this returned false ("Preset was not applied") because the
+    // store re-blocked cross-machine reuse, contradicting ADR-045. (The
+    // matched-but-'unsupported' safety block is covered separately below.)
+    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'other-machine')).toBe(true);
+    expect(captureMaterialRecipe(targetLayer()).power).toBe(77);
+  });
+
   it('assignMaterialPresetToLayer is project-undoable and keeps the library clean', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const originalRecipe = captureMaterialRecipe(targetLayer());
@@ -166,27 +182,9 @@ describe('material library store actions', () => {
     });
   });
 
-  it('assignMaterialPresetToLayer blocks recipes for incompatible device profiles', () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const originalRecipe = captureMaterialRecipe(targetLayer());
-    useStore.getState().setMaterialLibrary(
-      library([
-        preset({
-          profileId: 'other-machine-profile',
-          confidence: 'calibrated',
-          recipe: recipe({ power: 99 }),
-        }),
-      ]),
-    );
-    useStore.setState({ dirty: false, undoStack: [], redoStack: [] });
-
-    expect(useStore.getState().assignMaterialPresetToLayer('#ff0000', 'birch-3mm-clean-cut')).toBe(
-      false,
-    );
-    expect(captureMaterialRecipe(targetLayer())).toEqual(originalRecipe);
-    expect(useStore.getState().dirty).toBe(false);
-    expect(useStore.getState().undoStack).toHaveLength(0);
-  });
+  // (The old "blocks recipes for incompatible device profiles" test was removed:
+  // ADR-045 says device mismatch is warn-not-block, now asserted by the
+  // device-mismatch apply test above. The 'unsupported' safety block below stays.)
 
   it('assignMaterialPresetToLayer blocks unsupported recipes', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
