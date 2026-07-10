@@ -47,7 +47,7 @@
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers."
-- **Toolbar**: left — Select, Pan, Zoom-fit, Preview-toggle (last is disabled when scene is empty).
+- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
 
 #### Disabled controls
 - `File → Save Project`
