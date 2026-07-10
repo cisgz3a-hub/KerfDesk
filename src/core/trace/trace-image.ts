@@ -23,6 +23,7 @@
 // load; the trace work itself is still synchronous CPU).
 
 import { finiteOr } from '../util';
+import { fillPinholes } from './fill-pinholes';
 import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
@@ -150,6 +151,12 @@ export type TraceOptions = {
   // than N pixels gets flipped to white. 0 or undefined disables.
   // Topology-preserving: holes inside letters (O, B, etc.) survive.
   readonly despeckleMinPixels?: number;
+  // fillPinholeCracks: fill hairline white slivers ENCLOSED inside solid ink
+  // after despeckle — thresholding artifacts that would otherwise trace as
+  // spurious inner contours (a crack down a letter stem). Enclosure +
+  // thinness + area guards keep letter counters, spacing gaps, and intended
+  // thin highlights untouched. See fill-pinholes.ts.
+  readonly fillPinholeCracks?: boolean;
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
@@ -245,25 +252,29 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
       options.cutoffLuma ?? 0,
       options.thresholdLuma ?? 128,
     );
-    return despeckleIfEnabled(prepared, options);
+    return cleanBinaryMask(prepared, options);
   }
   if (shouldUseSketchTrace(image, options)) {
     const prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
-    return despeckleIfEnabled(prepared, options);
+    return cleanBinaryMask(prepared, options);
   }
   let prepared = applyImageAdjustments(image, options);
   if (shouldApplyMedian(prepared, options.medianFilter)) {
     prepared = medianFilter(prepared);
   }
   prepared = applyThreshold(prepared, options);
-  return despeckleIfEnabled(prepared, options);
+  return cleanBinaryMask(prepared, options);
 }
 
-// Despeckle is the shared tail of every preprocessing branch; extracting it
-// keeps preprocessForTrace under the complexity cap and the behavior identical.
-function despeckleIfEnabled(image: RawImageData, options: TraceOptions): RawImageData {
-  if (!shouldDespeckle(options)) return image;
-  return despeckle(image, options.despeckleMinPixels ?? 0);
+// Mask cleanup is the shared tail of every preprocessing branch: despeckle
+// (ink specks → white), then pinhole-crack fill (enclosed hairline white
+// slivers → ink). Extracting it keeps preprocessForTrace under the
+// complexity cap.
+function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageData {
+  const despeckled = shouldDespeckle(options)
+    ? despeckle(image, options.despeckleMinPixels ?? 0)
+    : image;
+  return options.fillPinholeCracks === true ? fillPinholes(despeckled) : despeckled;
 }
 
 // Median gate. true forces it, false/undefined skips it, and 'auto' defers
