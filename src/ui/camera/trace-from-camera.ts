@@ -6,6 +6,7 @@
 import {
   frameMatchesCalibration,
   rectifyImage,
+  scaleAlignmentHomographyToFrame,
   scaleIntrinsicsToFrame,
   warpFrameToBed,
   type CameraAlignment,
@@ -62,7 +63,10 @@ export function buildCameraTraceImage(args: {
     bedWidthMm: args.bedWidthMm,
     bedHeightMm: args.bedHeightMm,
     pixelsPerMm: TRACE_PIXELS_PER_MM,
-    homography: alignment.homography,
+    // Rescale the solved homography if this frame's resolution differs from the
+    // one the alignment was clicked in — otherwise a later session's default
+    // capture size mis-registers the trace by the resolution ratio (CAM-02).
+    homography: scaleAlignmentHomographyToFrame(alignment, raw.width, raw.height),
   });
   if (warped.kind !== 'ok') return { kind: 'failed', reason: 'warp-failed' };
   const dataUrl = rgbaToPngDataUrl(warped.image);
