@@ -6124,3 +6124,25 @@ Round boards work end-to-end (verified by panel integration tests: toggle -> cap
 ### Amendment (2026-07-08) - inscribed-square fit for circles (PR 5)
 
 Supersedes the "bounding square" note above. Fit/Array now fill a circle board's centered INSCRIBED SQUARE (side = diameter / sqrt(2)) instead of its bounding square, so a design stays inside the arc rather than overhanging the corners. A new pure helper `boardFitRegion(box)` (core/scene) returns the inscribed square for an ellipse box and the full bounds for a rectangle; `fitSelectionToBoard` and `tileSelectionIntoBoard` feed it to `fitObjectToRegion` / `tileIntoRegion`. Rectangle behavior is unchanged.
+
+## ADR-127 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
+
+**Status:** accepted (audit DEV-04: no-go zones gated Start/Frame/export/resume, but jog was zone-blind end to end).
+
+> **Numbering note.** ADR-126 (board-shape union) was the last used; **ADR-127** is the next free (verify at merge - parallel branches may also allocate).
+
+### Context
+
+No-go/keep-out zones (clamps, cameras, fixtures) are honored by the Start, Frame, export, and resume preflights, but the jog path was blind to them end to end: `jogActions.jog` gated only on autofocus + jog/frame readiness, and `buildJog` checked only finiteness/axis. One jog-pad move or one click-to-position could drive the head straight through a clamp at up to 3000 mm/min. LightBurn has no equivalent (it does not model keep-out zones for jogging), so this is a deliberate KerfDesk safety divergence, recorded here.
+
+### Decision
+
+Add a pure core check `firstZoneCrossedBySegment(from, to, zones)` (`core/preflight/no-go-zones.ts`, reusing the existing segment/rect intersection helpers) and call it at the single jog choke point. All three UI motion paths - jog pad, jog-to-point, and click-to-position - funnel through `jog({dx,dy,feed})`, so the guard covers them all: it resolves the target from the live machine position plus the delta and refuses (same shape as the readiness refusal - set `lastWriteError`, log, throw) when the straight from->target segment crosses an enabled zone, naming the zone.
+
+### Scope / non-goals
+
+The check is skipped (motion allowed) when there is no known machine position for a relative jog - the operator has no live position to reason about either, and blocking would strand jogging. Homing and any future continuous (hold-to-jog) motion are out of scope here; the Safety Zones panel documents these uncovered paths.
+
+### Consequences
+
+A jog that would cross a keep-out is refused before any byte is sent, closing the gap between jogging and the job/frame/export paths. Pure core stays pure (returns the zone or null, no throw for control flow). No G-code or snapshot change. NOT hardware-verified - the geometry and the refusal are unit- and integration-tested (core segment cases + a connected-store jog that crosses a clamp sends nothing), but on-machine behavior is CLAIMED.

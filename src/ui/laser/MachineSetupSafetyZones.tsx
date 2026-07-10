@@ -24,6 +24,11 @@ export function SafetyZonesPanel(): JSX.Element {
         <Button onClick={() => updateZones([...zones, defaultZone(zones.length)])}>Add zone</Button>
       </div>
       {zones.length === 0 ? <p style={mutedStyle}>No safety zones configured.</p> : null}
+      <p style={mutedStyle}>
+        Enabled zones block a job, frame, export, and any jog whose path would cross them. A
+        continuous or keyboard jog with no known machine position, and homing, are not checked —
+        keep the head clear of these areas by hand.
+      </p>
       {zones.map((zone, index) => (
         <ZoneEditor
           key={zone.id}

@@ -5,6 +5,7 @@
 // active driver), and the connection-bound safe write. Type-only LaserState /
 // LiveRefs import — no runtime cycle.
 
+import { firstZoneCrossedBySegment } from '../../core/preflight';
 import { inferCurrentMachinePosition } from './infer-machine-position';
 import { runHomeAction } from './laser-home-action';
 import { markMotionOperationDispatched, startMotionOperation } from './laser-motion-operation';
@@ -56,6 +57,7 @@ export function jogActions(
     jog: async (params) => {
       assertAutofocusIdle(get());
       assertJogFrameReady(set, get);
+      assertJogClearsNoGoZones(set, get, params);
       set({ motionOperation: startMotionOperation('jog') });
       try {
         await safeWrite(`${refs.driver.commands.buildJog(params)}\n`, 'jog');
@@ -117,4 +119,26 @@ function assertJogFrameReady(set: SetFn, get: GetFn): void {
     log: pushLog(get(), `[lf2] Motion command blocked: ${blockedMessage}`),
   });
   throw new Error(blockedMessage);
+}
+
+// DEV-04: refuse a jog whose straight path would drive the head through an
+// enabled no-go/keep-out zone — the same zones Start/Frame/export already honor,
+// which jog was blind to. A relative jog with no known machine position can't be
+// resolved to a target, so it is allowed (the operator has no live position to
+// reason about either); homing and continuous jog are out of scope.
+function assertJogClearsNoGoZones(
+  set: SetFn,
+  get: GetFn,
+  params: { readonly dx?: number; readonly dy?: number },
+): void {
+  const zones = useStore.getState().project.device.noGoZones;
+  if (zones === undefined || zones.length === 0) return;
+  const current = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
+  if (current === null) return;
+  const target = { x: current.x + (params.dx ?? 0), y: current.y + (params.dy ?? 0) };
+  const zone = firstZoneCrossedBySegment(current, target, zones);
+  if (zone === null) return;
+  const message = `Jog blocked: this move would cross the no-go zone "${zone.name}". Jog around it, or disable the zone in Machine Setup → Safety Zones.`;
+  set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
+  throw new Error(message);
 }
