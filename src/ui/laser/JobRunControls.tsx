@@ -26,6 +26,7 @@ export function RunningControls(props: {
   const continueToolChange = useLaserStore((s) => s.continueToolChange);
   const stopJob = useLaserStore((s) => s.stopJob);
   const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
+  const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
   const pauseMessage = hasRealtimePause ? PAUSE_HOLD_SAFETY_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE;
   const safetyMessage = props.isToolChange ? TOOL_CHANGE_MESSAGE : pauseMessage;
   return (
@@ -72,15 +73,22 @@ export function RunningControls(props: {
         </button>
         <span style={runningSafetyStyle}>{safetyMessage}</span>
       </div>
-      {shouldShowOverrides(props.isStreaming, props.isPaused) && <OverrideControls />}
+      {shouldShowOverrides(props.isStreaming, props.isPaused, hasOverrides) && <OverrideControls />}
     </>
   );
 }
 
-// Overrides are only meaningful while GRBL is consuming motion — mounted
-// beside Pause/Resume/Stop for streaming and paused jobs (ADR-103 G3).
-function shouldShowOverrides(isStreaming: boolean, isPaused: boolean): boolean {
-  return isStreaming || isPaused;
+// Overrides are only meaningful while the controller is consuming motion AND its
+// firmware speaks GRBL 1.1 realtime override bytes — mounted beside
+// Pause/Resume/Stop for streaming and paused jobs (ADR-103 G3), never for a
+// controller without the capability (Marlin/Smoothieware/Ruida), whose line
+// buffer the bytes would corrupt (CTL-01). Exported for direct unit testing.
+export function shouldShowOverrides(
+  isStreaming: boolean,
+  isPaused: boolean,
+  hasOverrides: boolean,
+): boolean {
+  return (isStreaming || isPaused) && hasOverrides;
 }
 
 export function MotionControls(props: { readonly operationKind: 'frame' | 'jog' }): JSX.Element {
