@@ -25,6 +25,7 @@ import {
   type ResolvedJobPlacement,
 } from '../job-placement';
 import { detectMachineJobWarnings } from './machine-job-warnings';
+import { cncWorkZeroAdvisory } from './cnc-start-advisories';
 
 export const CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE =
   'Custom origin is active, but its physical machine location is not known yet. Wait for an Idle/WCO status report or reset origin before continuing.';
@@ -116,11 +117,31 @@ export function prepareStartJob(
   return {
     ok: true,
     gcode,
-    warnings: [
-      ...controller.warnings.map((i) => i.message),
-      ...detectMachineJobWarnings(project, controllerSettings),
-    ],
+    warnings: collectStartWarnings(
+      project,
+      controllerSettings,
+      controller.warnings.map((i) => i.message),
+      machine,
+    ),
   };
+}
+
+// The Start-path warning list: controller-readiness warnings, the machine-kind
+// advisory set, plus the CNC work-zero advisory (Start-only — it depends on
+// live machine state, so it cannot live in detectMachineJobWarnings, which the
+// Save path also uses).
+function collectStartWarnings(
+  project: Project,
+  controllerSettings: ControllerSettingsSnapshot | null,
+  controllerWarnings: ReadonlyArray<string>,
+  machine: MachineStartSnapshot,
+): string[] {
+  const workZeroAdvisory = cncWorkZeroAdvisory(project, machine.workOriginActive);
+  return [
+    ...controllerWarnings,
+    ...detectMachineJobWarnings(project, controllerSettings),
+    ...(workZeroAdvisory === null ? [] : [workZeroAdvisory]),
+  ];
 }
 
 function readinessMode(machine: MachineStartSnapshot): ReadinessSettingsCapability {
