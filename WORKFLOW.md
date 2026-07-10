@@ -452,8 +452,8 @@ If all applicable checks pass, the save/start proceeds.
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
-- Project loads with the embedded device profile.
-- Status bar warns: `Project's device profile (xTool S1) is not configured locally. Add it in Settings.`
+- Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
+- _Not yet implemented:_ a status-bar warning that the embedded profile is unknown to this machine (`Project's device profile … is not configured locally`). It needs an app-level device-profile registry to compare against, which does not exist yet (see the machine-profile lifecycle / app-level device-list work). Until then the embedded profile is simply used with no such warning.
 
 ---
 
