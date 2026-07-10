@@ -52,8 +52,41 @@ describe('refineChainForOutput corner pinning', () => {
     expect(turnDegAt(refined, fillet)).toBeLessThan(55);
   });
 
-  it('always pins needle-sharp turns even with a turning neighbour (star tips)', () => {
-    const points = chainFromHeadings([0, 0, 120, 30, 0, 0]);
+  it('lets a needle-sharp turn with a clearly curving flank smooth (rounded hook tips)', () => {
+    // The Arch House A-apex class: a drawn hook whose rounded tip collapses
+    // to one ~120-150° vertex. Unmarked + curving flank = rounding, not a
+    // corner; genuine needle tips carry sharpener ink evidence and arrive
+    // via drawnCorners instead.
+    const points = chainFromHeadings([0, 0, 120, 35, 0, 0]);
+    const tip = points[2]!;
+    const refined = refineChainForOutput(points, false);
+    expect(turnDegAt(refined, tip)).toBeLessThan(100);
+  });
+
+  it('pins an unmarked needle-sharp turn between straight flanks', () => {
+    const points = chainFromHeadings([0, 0, 120, 0, 0, 0]);
+    const tip = points[2]!;
+    const refined = refineChainForOutput(points, false);
+    expect(turnDegAt(refined, tip)).toBeGreaterThanOrEqual(100);
+  });
+
+  it('requires stronger flank curvature to unpin a needle-sharp turn than a moderate one', () => {
+    // 25° flank turn unpins a 65° candidate but NOT a 120° one — the
+    // sharper the turn, the more evidence needed to call it a rounding.
+    const points = chainFromHeadings([0, 0, 120, 25, 0, 0]);
+    const tip = points[2]!;
+    const refined = refineChainForOutput(points, false);
+    expect(turnDegAt(refined, tip)).toBeGreaterThanOrEqual(100);
+  });
+
+  it('keeps tiny-glyph apexes pinned (continuation legs below geometry scale)', () => {
+    // Same turning-neighbour shape but at ~1.5px segments: at small-glyph
+    // scale every neighbour "turns" from quantization, so continuation
+    // evidence must not fire (the small-glyph fidelity instrument's case).
+    const points = chainFromHeadings([0, 0, 120, 35, 0, 0]).map((p) => ({
+      x: p.x / 4,
+      y: p.y / 4,
+    }));
     const tip = points[2]!;
     const refined = refineChainForOutput(points, false);
     expect(turnDegAt(refined, tip)).toBeGreaterThanOrEqual(100);

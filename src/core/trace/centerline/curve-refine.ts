@@ -19,13 +19,22 @@ import { fitSmoothCurve } from './curve-fit';
 // corner the sharpener never rebuilt is still treated as a corner here.
 const HARD_CORNER_RAD = (60 * Math.PI) / 180;
 // Potrace's published corner criterion pairs a sharp angle with STRAIGHT
-// legs. A moderate hard turn whose neighbour keeps turning the SAME
-// direction is a drawn fillet that Douglas-Peucker collapsed onto one
-// vertex; pinning it renders a rounded terminal as an angular beak (the
-// Arch House "still some sharp corners" verdict, 2026-07-10). Needle-sharp
-// turns always pin — a star tip's flank may legitimately curve.
-const ALWAYS_CORNER_RAD = (90 * Math.PI) / 180;
+// legs. A hard turn whose neighbour keeps turning the SAME direction is a
+// drawn rounding that Douglas-Peucker collapsed onto one vertex; pinning it
+// renders a rounded terminal as an angular beak and a hooked apex as a
+// flick (the Arch House "sharp corners"/"sharp points" verdicts,
+// 2026-07-10). The sharper the candidate, the stronger the flank-curvature
+// evidence required to unpin it; genuine needle tips arrive sharpener-marked
+// (ink evidence) via drawnCorners and are never unpinned here.
+const NEEDLE_TURN_RAD = (90 * Math.PI) / 180;
 const CURVE_CONTINUATION_RAD = (20 * Math.PI) / 180;
+const NEEDLE_CONTINUATION_RAD = (30 * Math.PI) / 180;
+// Continuation evidence is only geometry when the vertices carrying it are
+// far enough apart — at small-glyph scale post-DP segments shrink to ~1px
+// and EVERY neighbour "turns", which would unpin genuine tiny-letter apexes
+// (the small-glyph fidelity instrument caught exactly that: A-glyph mean
+// boundary distance 0.30 → 0.31px).
+const MIN_CONTINUATION_LEG_PX = 2;
 // New samples placed inside each spline segment. Four keeps the drawn curve
 // smooth at engraving scale while holding the total point count near the
 // simplified-vertex budget (a smooth curve needs even curvature, not brute
@@ -73,7 +82,9 @@ function collectCorners(
     }
     const turn = Math.abs(signedTurnAtIndex(points, i, closed));
     if (turn < HARD_CORNER_RAD) continue;
-    if (turn < ALWAYS_CORNER_RAD && isFilletContinuation(points, i, closed)) continue;
+    const continuationRad =
+      turn >= NEEDLE_TURN_RAD ? NEEDLE_CONTINUATION_RAD : CURVE_CONTINUATION_RAD;
+    if (isFilletContinuation(points, i, closed, continuationRad)) continue;
     corners.add(p);
   }
   return corners;
@@ -81,11 +92,22 @@ function collectCorners(
 
 // True when either neighbour keeps turning the candidate's direction — the
 // signature of a collapsed rounded terminal, not a drawn corner.
-function isFilletContinuation(points: ReadonlyArray<Vec2>, i: number, closed: boolean): boolean {
+function isFilletContinuation(
+  points: ReadonlyArray<Vec2>,
+  i: number,
+  closed: boolean,
+  continuationRad: number,
+): boolean {
   const sign = Math.sign(signedTurnAtIndex(points, i, closed));
+  const at = points[i];
+  if (at === undefined) return false;
   for (const j of [i - 1, i + 1]) {
-    const neighbourTurn = signedTurnAtIndex(points, wrapIndex(j, points.length, closed), closed);
-    if (Math.abs(neighbourTurn) >= CURVE_CONTINUATION_RAD && Math.sign(neighbourTurn) === sign) {
+    const wrapped = wrapIndex(j, points.length, closed);
+    const neighbour = points[wrapped];
+    if (neighbour === undefined) continue;
+    if (Math.hypot(neighbour.x - at.x, neighbour.y - at.y) < MIN_CONTINUATION_LEG_PX) continue;
+    const neighbourTurn = signedTurnAtIndex(points, wrapped, closed);
+    if (Math.abs(neighbourTurn) >= continuationRad && Math.sign(neighbourTurn) === sign) {
       return true;
     }
   }

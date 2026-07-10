@@ -158,6 +158,10 @@ const CROP_REGIONS: ReadonlyArray<CropRegion> = [
   // Long organic wave curves: where the maintainer reported Sharp's
   // scalloped/uneven edges.
   { name: 'waves', x0: 100, y0: 430, x1: 470, y1: 545 },
+  // Tight close-ups for the iteration-5 verdict ("still some uneven spots
+  // and sharp points"): the A's hooked apex and the ARCH serif feet.
+  { name: 'a-apex', x0: 125, y0: 540, x1: 245, y1: 615 },
+  { name: 'serif-feet', x0: 120, y0: 620, x1: 330, y1: 668 },
 ];
 
 const CROP_ZOOM = 3;
