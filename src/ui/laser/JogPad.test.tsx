@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { JogPad } from './JogPad';
@@ -46,7 +47,11 @@ afterEach(() => {
     setAirAssistEnabled: originalSetAirAssistEnabled,
     airAssistOn: false,
   });
-  useStore.getState().newProject();
+  // Reset the whole project INCLUDING the device profile. newProject() now
+  // preserves the machine profile (DEV-01, LightBurn parity), so a
+  // per-test airAssistCommand / Z-axis config would otherwise leak into the
+  // next test and defeat the "no air command" / "no Z travel" isolation.
+  useStore.setState({ project: createProject() });
 });
 
 // Phase-0 discoverability: the arrow buttons were bare glyphs with no
