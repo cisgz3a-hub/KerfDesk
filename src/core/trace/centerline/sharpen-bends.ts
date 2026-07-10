@@ -16,6 +16,7 @@ import type { Vec2 } from '../../scene';
 import {
   MAX_VERTEX_OFFSET_FACTOR,
   apexReachScale,
+  apexSupportedByInk,
   arcLengthOf,
   bendVertex,
   bendWindow,
@@ -137,7 +138,7 @@ function trySharpenOpen(
 ): BendResult | null {
   const window = bendWindow(pts, i, distSq, width);
   const baseArm = Math.min(window.arm, maxArm);
-  const base = attemptBend(pts, i, baseArm, window.maxRadius);
+  const base = attemptBend(pts, i, baseArm, window.maxRadius, distSq, width);
   if (base !== null) return base;
   const nearTurn = netTurnAcross(pts, i, RETRY_NEAR_SPAN_PX);
   if (nearTurn === null || nearTurn < RETRY_MIN_NEAR_TURN_RAD) return null;
@@ -145,7 +146,7 @@ function trySharpenOpen(
     if (armPx <= baseArm || armPx > maxArm) continue;
     const turn = netTurnAcross(pts, i, armPx);
     if (turn === null || turn < RETRY_MIN_TURN_RAD) continue;
-    const bent = attemptBend(pts, i, armPx, window.maxRadius);
+    const bent = attemptBend(pts, i, armPx, window.maxRadius, distSq, width);
     if (bent !== null) return bent;
   }
   return null;
@@ -156,6 +157,8 @@ function attemptBend(
   i: number,
   arm: number,
   maxRadius: number,
+  distSq: Float64Array,
+  width: number,
 ): BendResult | null {
   const p = pts[i];
   if (p === undefined) return null;
@@ -169,13 +172,13 @@ function attemptBend(
   if (!turnIsConcentrated(pts, i, arm)) return null;
   const bend = bendVertex(head, tail);
   if (bend === null) return null;
+  const wedge = wedgeInkSupport(head, tail, bend.vertex, distSq, width);
+  if (wedge === null) return null;
+  const { legStart, legEnd } = wedge;
   const removedFrom = head.length;
   const removedTo = pts.length - tail.length;
   const maxOffset = maxRadius * MAX_VERTEX_OFFSET_FACTOR * apexReachScale(bend.turnRad);
   if (!vertexHugsChain(bend.vertex, pts, removedFrom, removedTo, maxOffset)) return null;
-  const legStart = head.at(-1);
-  const legEnd = tail[0];
-  if (legStart === undefined || legEnd === undefined) return null;
   if (
     !replacementCoversRemoved(pts, removedFrom, removedTo, legStart, bend.vertex, legEnd, maxOffset)
   ) {
@@ -186,6 +189,28 @@ function attemptBend(
     resumeAt: head.length + 1,
     corner: bend.vertex,
   };
+}
+
+// Physical gate: ink must accompany BOTH wedge legs to the apex. The
+// reach-scaled hugs/coverage tolerances legitimately widen for needle-sharp
+// turns (a real tip's apex stands ~radius past the rounded chain end), but
+// that same allowance let blunt serif terminals extend into blank
+// background — the intersection of two shallow leg fits is a fabrication
+// unless the drawn stroke actually runs there (the Arch House serif-spike
+// defect).
+function wedgeInkSupport(
+  head: ReadonlyArray<Vec2>,
+  tail: ReadonlyArray<Vec2>,
+  apex: Vec2,
+  distSq: Float64Array,
+  width: number,
+): { readonly legStart: Vec2; readonly legEnd: Vec2 } | null {
+  const legStart = head.at(-1);
+  const legEnd = tail[0];
+  if (legStart === undefined || legEnd === undefined) return null;
+  if (!apexSupportedByInk(legStart, apex, distSq, width)) return null;
+  if (!apexSupportedByInk(legEnd, apex, distSq, width)) return null;
+  return { legStart, legEnd };
 }
 
 // A rebuild may only remove NOISE, never geometry: every point the window
