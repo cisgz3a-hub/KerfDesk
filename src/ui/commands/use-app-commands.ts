@@ -10,6 +10,7 @@ import {
   handleSaveProject,
 } from '../app/file-actions';
 import { handleOpenGcodePreview } from '../app/gcode-open-action';
+import { connectOptionsForDevice } from './connect-options';
 import { currentOutputScope, useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
@@ -253,7 +254,8 @@ function laserCommandContext(
   laser: ReturnType<typeof useLaserStore.getState>,
 ): Pick<AppCommandContext, 'connectLaser' | 'disconnectLaser' | 'homeLaser'> {
   return {
-    connectLaser: () => void laser.connect(platform),
+    connectLaser: () =>
+      void laser.connect(platform, connectOptionsForDevice(useStore.getState().project.device)),
     disconnectLaser: () => void laser.disconnect().catch(() => undefined),
     homeLaser: () => void laser.home().catch(() => undefined),
   };
