@@ -47,7 +47,7 @@ export type AutosaveSnapshot = {
 };
 
 export type AutosaveWriteResult =
-  | { readonly kind: 'ok'; readonly savedAt: number }
+  | { readonly kind: 'ok'; readonly savedAt: number; readonly storageKey: string }
   | { readonly kind: 'unavailable'; readonly reason: 'storage-unavailable' }
   | {
       readonly kind: 'failed';
@@ -82,7 +82,7 @@ export function writeAutosave(
     };
     localStorage.setItem(storageKey, JSON.stringify(record));
     registerAutosaveKey(storageKey);
-    return { kind: 'ok', savedAt: now };
+    return { kind: 'ok', savedAt: now, storageKey };
   } catch (error) {
     return {
       kind: 'failed',
