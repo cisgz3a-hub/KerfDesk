@@ -13,6 +13,7 @@ import {
 import { addObject, removeObject, replaceObject, type Project, type Scene } from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
+import { useToastStore } from './toast-store';
 import {
   ensureLayersForColors,
   pruneOrphanLayers,
@@ -130,7 +131,12 @@ function weldSelectionMutation(state: VectorPathState): VectorPathMutation | Vec
   let welded;
   try {
     welded = weldVectorObjects(selected, uniqueWeldId(state.project.scene));
-  } catch {
+  } catch (error) {
+    // The core op throws a user-worded message for reachable failures the menu
+    // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
+    // inward offset). Surface it instead of dead-ending silently (CNV-04).
+    const message = error instanceof Error ? error.message : 'Operation failed.';
+    useToastStore.getState().pushToast(message, 'warning');
     return state;
   }
   const removeIds = new Set(selected.map((object) => object.id));
@@ -162,7 +168,12 @@ function booleanSelectionMutation(
   let combined;
   try {
     combined = combineVectorObjects(selected, op, uniqueObjectId(state.project.scene, op));
-  } catch {
+  } catch (error) {
+    // The core op throws a user-worded message for reachable failures the menu
+    // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
+    // inward offset). Surface it instead of dead-ending silently (CNV-04).
+    const message = error instanceof Error ? error.message : 'Operation failed.';
+    useToastStore.getState().pushToast(message, 'warning');
     return state;
   }
   const removeIds = new Set(selected.map((object) => object.id));
@@ -194,7 +205,12 @@ function offsetSelectionMutation(
   let offset;
   try {
     offset = offsetVectorObjects(selected, deltaMm, uniqueObjectId(state.project.scene, 'offset'));
-  } catch {
+  } catch (error) {
+    // The core op throws a user-worded message for reachable failures the menu
+    // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
+    // inward offset). Surface it instead of dead-ending silently (CNV-04).
+    const message = error instanceof Error ? error.message : 'Operation failed.';
+    useToastStore.getState().pushToast(message, 'warning');
     return state;
   }
   let scene = state.project.scene;
