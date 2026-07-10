@@ -5918,8 +5918,15 @@ match the real board. Inputs are finite-guarded (non-finite → null).
 so capturing a corner other than the bottom-left first silently sets the
 origin at the wrong corner with no geometric feedback (the burn would then be
 misplaced, but the frame/Start bounds preflight catches an off-bed job). The
-"bottom-left first" guidance is the primary mitigation; an origin-aware
-first-corner check would need the device origin (deferred).
+"bottom-left first" guidance is the primary mitigation.
+
+**Amended (CAM-05, 2026-07-10).** The capture panel now also warns when the
+first captured corner is far from the board’s bounding-box bottom-left, so a
+wrong-origin capture no longer passes with no feedback. Because the feature’s
+convention is machine +X = width / +Y = height, bottom-left is exactly
+(minX, minY) of the captured points — the check needs no device origin
+(`firstCornerOffsetMm`, `core/scene/board-capture.ts`), correcting the “would
+need the device origin” note above.
 
 ### Decision 2 — bottom-left sets the origin; box is drawn centered
 

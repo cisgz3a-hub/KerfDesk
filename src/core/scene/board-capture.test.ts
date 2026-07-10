@@ -5,6 +5,7 @@ import {
   boardCornersFromOrigin,
   boardMachinePoints,
   diameterFromCenterEdge,
+  firstCornerOffsetMm,
 } from './board-capture';
 import type { Vec2 } from './scene-object';
 
@@ -156,5 +157,21 @@ describe('diameterFromCenterEdge', () => {
   it('returns zero for non-finite input instead of NaN', () => {
     expect(diameterFromCenterEdge({ x: Number.NaN, y: 0 }, { x: 10, y: 0 })).toBe(0);
     expect(diameterFromCenterEdge({ x: 0, y: 0 }, { x: Number.POSITIVE_INFINITY, y: 0 })).toBe(0);
+  });
+});
+
+describe('firstCornerOffsetMm (wrong-first-corner plausibility — CAM-05)', () => {
+  it('is ~0 when the first captured corner IS the bottom-left', () => {
+    expect(firstCornerOffsetMm([BL, BR, TR, TL])).toBeCloseTo(0, 9);
+  });
+
+  it('is the board diagonal when the top-right was captured first', () => {
+    // TR = (300,200); distance to bounding-box (0,0) = hypot(300,200) ≈ 360.55.
+    expect(firstCornerOffsetMm([TR, BR, BL, TL])).toBeCloseTo(Math.hypot(300, 200), 6);
+  });
+
+  it('returns null for anything other than four finite corners', () => {
+    expect(firstCornerOffsetMm([BL, BR, TR])).toBeNull();
+    expect(firstCornerOffsetMm([BL, BR, TR, { x: Number.NaN, y: 0 }])).toBeNull();
   });
 });
