@@ -631,7 +631,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B5. Jog
 
 #### Success
-1. User selects a step size (0.1 / 1 / 10 / 100 mm) and clicks a direction arrow.
+1. User selects a step size (0.1 / 0.5 / 1 / 2 / 5 / 10 / 25 / 50 / 100 mm) and clicks a direction arrow.
 2. App sends a `$J=G91 G21 X<dx> Y<dy> F<feed>` command.
 3. Status polling shows the controller in `Jog` then back to `Idle`.
 
@@ -697,11 +697,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B10. Status polling
 
-App writes real-time `?` every 250 ms while connected. Replies are parsed by `parseStatusReport`. The latest report drives the Status panel and the bottom status bar.
+App writes real-time `?` every 250 ms while active — a streaming job, a motion or controller operation, probing, or auto-focus — and about once a second (every 4th tick) when the machine is idle. Replies are parsed by `parseStatusReport`. The latest report drives the Status panel and the bottom status bar.
 
 ### F-B11. Job progress UI
 
-Progress bar shows `completed / total` lines as a percentage with the count overlaid. Updates whenever the streamer advances. Phase C will add an estimated-time-remaining label.
+Progress bar shows `completed / total` lines as a percentage with the count overlaid. Updates whenever the streamer advances. A pre-job time estimate is shown before the run starts; a mid-job estimated-time-remaining label is not yet implemented.
 
 ### F-B12. Disconnect during job (cable yank)
 
