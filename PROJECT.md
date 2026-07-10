@@ -72,7 +72,7 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 ### Phase C — v0.3 "Polish" [MVP completes here]
 
-Job time estimates, settings panel, SVG re-import with diff, path optimization (2-opt), keyboard shortcuts pass, autosave + recovery, local-only crash reporter.
+Job time estimates, settings panel, SVG re-import with diff, path optimization (nearest-neighbor, inner-shapes-first), keyboard shortcuts pass, autosave + recovery, local-only crash reporter.
 
 Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `flatten-svg` (ISC) for path simplification.
 
