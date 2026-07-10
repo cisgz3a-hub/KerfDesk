@@ -4,6 +4,7 @@
 // keeps these handlers pure of React hooks, so they can be called from
 // anywhere.
 
+import { selectControllerDriver } from '../../core/controllers';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
 import { emitGcode } from '../../io/gcode';
@@ -125,7 +126,9 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
       project: ctx.project,
       savedName: ctx.savedName,
       ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
-      ...(ctx.controllerSettings === undefined ? {} : { controllerSettings: ctx.controllerSettings }),
+      ...(ctx.controllerSettings === undefined
+        ? {}
+        : { controllerSettings: ctx.controllerSettings }),
       pushToast: ctx.pushToast,
     })
   ) {
@@ -145,8 +148,13 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
-  // Ruida profiles export binary .rd jobs instead of G-code text (ADR-097).
-  if (ctx.project.device.controllerKind === 'ruida') {
+  // File-only transports export a binary job instead of G-code text (ADR-097:
+  // Ruida .rd today). Route on the driver capability, not `controllerKind ===
+  // 'ruida'` — ADR-094 bans kind checks in ui/, and LaserWindow's sibling gate
+  // already keys on transport. selectControllerDriver normalizes an unknown kind.
+  if (
+    selectControllerDriver(ctx.project.device.controllerKind).capabilities.transport === 'file-only'
+  ) {
     const { handleSaveRd } = await import('./save-rd-action');
     await handleSaveRd(ctx, placement);
     return;
