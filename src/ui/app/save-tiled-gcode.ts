@@ -6,13 +6,14 @@
 // tiling — and each tile's G-code preflights individually instead.
 
 import { tileFileName, tileJobs } from '../../core/cnc';
-import { runCncPreflight } from '../../core/preflight';
+import { runCncPreflight, type ControllerSettingsSnapshot } from '../../core/preflight';
 import { cncGrblStrategy } from '../../core/output';
 import { prepareOutput } from '../../io/gcode';
 import type { PlatformAdapter } from '../../platform/types';
 import type { OutputScope, Project } from '../../core/scene';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
+import { confirmControllerReadiness } from './confirm-controller-readiness';
 
 const GCODE_EXTENSIONS = ['.gcode', '.nc'];
 
@@ -23,6 +24,9 @@ export type SaveTiledGcodeCtx = {
   // "Cut selected graphics" applies to tiled exports too — ignoring it would
   // silently tile the whole scene.
   readonly outputScope?: OutputScope;
+  // The connected controller's live $$ snapshot, for the same $30/$32 readiness
+  // gate the single-file Save runs (GCO-02). null/undefined = nothing to prove.
+  readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
@@ -48,6 +52,10 @@ export async function handleSaveTiledGcode(ctx: SaveTiledGcodeCtx): Promise<bool
   }
   const emitted = emitTileFiles(ctx, machine, tiles);
   if (emitted === null) return true;
+  // Every tile has passed preflight and nothing is written yet — run the
+  // controller-readiness gate ONCE for the whole set (a bad $30/$32 is the
+  // same hazard whether the job is tiled or not). Declining writes no tiles.
+  if (!confirmControllerReadiness(ctx.project, ctx.controllerSettings)) return true;
   const saved = await saveTileFiles(ctx, emitted);
   ctx.pushToast(
     saved === emitted.length
