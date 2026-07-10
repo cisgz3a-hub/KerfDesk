@@ -2118,14 +2118,21 @@ F-CNC19 tiling.
 3. Both work in laser AND CNC modes (geometry is machine-agnostic).
 
 #### Error — invalid input
-1. Booleans refuse silently-noop when fewer than two closed vector
-   objects are selected (the menu items are disabled with the reason).
-2. Open contours are rejected — nothing changes (same rule as Weld).
-3. An inward offset large enough to collapse the shape changes nothing.
+1. Booleans are disabled with a reason when fewer than two closed
+   vector objects are selected — the menu never runs the op, so there
+   is nothing to surface.
+2. Open contours are rejected — the scene is unchanged and a warning
+   toast names the reason (same rule as Weld).
+3. An inward offset large enough to collapse the shape changes nothing
+   and warns why. Open contours and a collapsing offset are reachable
+   cases the menu gating cannot pre-detect, so the op runs, no-ops the
+   scene, and surfaces a warning toast rather than dead-ending silently
+   (the failure modes are typed per ADR-130; the toast is CNV-04).
 
 #### Empty
-1. An Intersect of non-overlapping shapes produces nothing and leaves
-   the scene untouched (empty results never replace the sources).
+1. An Intersect of non-overlapping shapes produces nothing, leaves the
+   scene untouched (empty results never replace the sources), and shows
+   a warning toast explaining the result was empty.
 
 #### Edge — transforms and z-order
 1. Object transforms are baked to world space before combining, so a
