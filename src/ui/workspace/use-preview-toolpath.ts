@@ -1,7 +1,7 @@
 // usePreviewToolpath schedules preview preparation outside render/draw so
 // entering Preview can paint first and cancel stale builds before they start.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { resolveJobPlacement } from '../job-placement';
@@ -42,12 +42,29 @@ export function usePreviewToolpath(
     [additionalSelectedIds, cutSelectedGraphics, selectedObjectId, useSelectionOrigin],
   );
 
+  // Resolve the placement during render (cheap) and key the rebuild on the
+  // RESOLVED placement, not the raw statusReport — a connected controller stores
+  // a fresh report object every 250 ms poll, but in absolute/user/verified modes
+  // the resolved placement is byte-identical across polls, so the preview should
+  // not rebuild. In current-position mode the origin tracks mPos, so the key
+  // changes as the head moves (a legitimate rebuild).
+  const placement = useMemo(
+    () => resolveJobPlacement(jobPlacement, { statusReport, workOriginActive, wcoCache }),
+    [jobPlacement, statusReport, workOriginActive, wcoCache],
+  );
+  const placementKey = useMemo(() => JSON.stringify(placement), [placement]);
+  // The scheduled build reads the latest resolved placement via a ref so the
+  // placement object itself need not be an effect dependency.
+  const placementRef = useRef(placement);
+  placementRef.current = placement;
+
   useEffect(() => {
     if (!previewMode) {
       setToolpath(null);
       return;
     }
-    setToolpath(null);
+    // NB: no setToolpath(null) here — keep the previous route painted until the
+    // new build resolves so a genuine rebuild doesn't blank the preview.
     let cancelled = false;
     const cancelScheduledBuild = scheduleBuild(() => {
       if (cancelled) return;
@@ -55,15 +72,11 @@ export function usePreviewToolpath(
         setToolpath(mapToolpathToScene(externalGcodePreview.toolpath, ZERO_OFFSET, project.device));
         return;
       }
-      const placement = resolveJobPlacement(jobPlacement, {
-        statusReport,
-        workOriginActive,
-        wcoCache,
-      });
-      const next = !placement.ok
+      const resolved = placementRef.current;
+      const next = !resolved.ok
         ? buildToolpath(EMPTY_JOB)
         : buildPreviewToolpath(project, {
-            ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
+            ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
             outputScope,
           });
       if (!cancelled) setToolpath(next);
@@ -72,17 +85,7 @@ export function usePreviewToolpath(
       cancelled = true;
       cancelScheduledBuild();
     };
-  }, [
-    previewMode,
-    project,
-    jobPlacement,
-    outputScope,
-    externalGcodePreview,
-    statusReport,
-    workOriginActive,
-    wcoCache,
-    scheduleBuild,
-  ]);
+  }, [previewMode, project, outputScope, externalGcodePreview, placementKey, scheduleBuild]);
 
   return toolpath;
 }
