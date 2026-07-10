@@ -23,6 +23,18 @@ describe('classifySmoothieResponse', () => {
       classifySmoothieResponse('<Idle|MPos:0.0000,0.0000,0.0000|WPos:0.0000,0.0000,0.0000>'),
     ).toMatchObject({ kind: 'status' });
   });
+
+  it('parses the classic comma-delimited status report, not only the pipe grammar', () => {
+    // Older Smoothie builds emit GRBL-0.9-style reports where the field
+    // separators are commas, same as the axis-triple separators. The pipe
+    // parser sees one field and the DRO never updates (controllerIdle stuck).
+    expect(
+      classifySmoothieResponse('<Idle,MPos:1.500,2.000,3.000,WPos:0.500,1.000,2.000>'),
+    ).toMatchObject({
+      kind: 'status',
+      report: { state: 'Idle', mPos: { x: 1.5, y: 2, z: 3 }, wPos: { x: 0.5, y: 1, z: 2 } },
+    });
+  });
 });
 
 describe('Smoothie command builders', () => {

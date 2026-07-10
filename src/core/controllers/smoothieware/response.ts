@@ -7,6 +7,7 @@
 
 import type { ControllerEvent } from '../controller-event';
 import { parseStatusReport } from '../grbl/status-parser';
+import { parseCommaStatusReport } from './comma-status-report';
 
 const OK_RE = /^ok\b/i;
 const ERROR_RE = /^error:/i;
@@ -22,7 +23,9 @@ export function classifySmoothieResponse(line: string): ControllerEvent {
     return { kind: 'error', code: null, raw: trimmed };
   }
   if (trimmed.startsWith('<')) {
-    const report = parseStatusReport(trimmed);
+    // GRBL-1.1 pipe grammar first; fall back to the classic comma grammar some
+    // Smoothie builds emit (CTL-05) so the DRO updates either way.
+    const report = parseStatusReport(trimmed) ?? parseCommaStatusReport(trimmed);
     if (report !== null) return { kind: 'status', report };
   }
   if (WELCOME_RE.test(trimmed) || FIRMWARE_RE.test(trimmed)) {
