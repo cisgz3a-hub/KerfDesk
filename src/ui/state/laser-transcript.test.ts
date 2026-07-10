@@ -25,6 +25,10 @@ describe('laser transcript', () => {
       kind: 'error',
       decoded: 'Unrecognized controller error: error:7002009',
     });
+    expect(inboundTranscriptEntry(23, 101, 'error:45')).toMatchObject({
+      kind: 'error',
+      decoded: 'Error 45',
+    });
     expect(inboundTranscriptEntry(3, 102, 'ALARM:1')).toMatchObject({
       kind: 'alarm',
       decoded: expect.stringContaining('Hard limit'),
