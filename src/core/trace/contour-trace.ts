@@ -20,10 +20,15 @@ import {
   squaredDistanceField,
   type InkMask,
 } from './centerline';
-import { midCrackChain, traceBoundaryLoops } from './contour-boundary';
+import { midCrackChain, traceBoundaryLoops, type CrackSubPixelField } from './contour-boundary';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
-import { preprocessForTrace, type RawImageData, type TraceOptions } from './trace-image';
+import {
+  crackFieldForTrace,
+  preprocessForTrace,
+  type RawImageData,
+  type TraceOptions,
+} from './trace-image';
 
 const CONTOUR_COLOR = '#000000';
 
@@ -85,10 +90,16 @@ export function traceImageToContourColoredPaths(
 ): ColoredPath[] {
   const prepared = preprocessForTrace(image, options);
   const mask = inkMaskFromPrepared(prepared);
+  // Sub-pixel crack interpolation: vertex POSITIONS come from the
+  // pre-threshold scalar field while loop TOPOLOGY stays on the cleaned
+  // binary mask (despeckle / pinhole fill decide what exists; the AA ramp
+  // decides exactly where its edge lies).
+  const crackField = crackFieldForTrace(image, options);
   const polylines = contourPolylinesFromMask(mask, {
     minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0),
     epsilonPx: SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1),
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
+    ...(crackField === null ? {} : { crackField }),
   });
   return polylines.length === 0 ? [] : [{ color: CONTOUR_COLOR, polylines }];
 }
@@ -100,6 +111,9 @@ export type ContourFinishOptions = {
   readonly epsilonPx: number;
   /** Wobble-flattening strength (see flatten-straight-runs.ts); 0 = off. */
   readonly flattenStrength: number;
+  /** Pre-threshold field for sub-pixel crack interpolation; omitted = plain
+   *  mid-crack vertices (binary-only callers like the edge lane). */
+  readonly crackField?: CrackSubPixelField;
 };
 
 /** Finish a binary ink mask into smooth closed outlines — the shared
@@ -111,6 +125,7 @@ export function contourPolylinesFromMask(mask: InkMask, options: ContourFinishOp
     width: mask.width,
     epsilonPx: options.epsilonPx,
     flattenStrength: options.flattenStrength,
+    crackField: options.crackField,
   };
   const polylines: Polyline[] = [];
   for (const loop of traceBoundaryLoops(mask)) {
@@ -128,6 +143,7 @@ type LoopFinish = {
   readonly width: number;
   readonly epsilonPx: number;
   readonly flattenStrength: number;
+  readonly crackField: CrackSubPixelField | undefined;
 };
 
 function finishLoop(
@@ -136,11 +152,12 @@ function finishLoop(
 ): Polyline | null {
   const { distSq, width, epsilonPx } = finish;
   if (staircase.length < MIN_LOOP_POINTS) return null;
-  // Mid-crack first (lattice steps become ≤45° bends), then the SAME raw
-  // Taubin pre-smoothing the skeleton tracer applies — without it the
-  // residual staircase jogs read as corners downstream and long straight
-  // edges come out wobbly (maintainer-observed on the arch-house H stems).
-  const dense = smoothRawChain(midCrackChain(staircase), true);
+  // Mid-crack first (lattice steps become ≤45° bends; sub-pixel interpolated
+  // when the pre-threshold field is available), then the SAME raw Taubin
+  // pre-smoothing the skeleton tracer applies — without it the residual
+  // staircase jogs read as corners downstream and long straight edges come
+  // out wobbly (maintainer-observed on the arch-house H stems).
+  const dense = smoothRawChain(midCrackChain(staircase, finish.crackField), true);
   const sharpened =
     dense.length >= SHARPEN_MIN_CHAIN_POINTS && dense.length <= SHARPEN_MAX_CHAIN_POINTS
       ? sharpenChainBends(dense, true, distSq, width)

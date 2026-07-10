@@ -23,6 +23,7 @@
 // load; the trace work itself is still synchronous CPU).
 
 import { finiteOr } from '../util';
+import type { CrackSubPixelField } from './contour-boundary';
 import { fillPinholes } from './fill-pinholes';
 import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
@@ -275,6 +276,74 @@ function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageDa
     ? despeckle(image, options.despeckleMinPixels ?? 0)
     : image;
   return options.fillPinholeCracks === true ? fillPinholes(despeckled) : despeckled;
+}
+
+// Sub-pixel crack field (research brief 2026-07-10): the pre-threshold
+// scalar field + its iso value, so the contour walker can interpolate TRUE
+// edge crossings instead of quantizing to crack midpoints — the
+// anti-aliasing ramp holds the sub-pixel edge position that binarization
+// discards. Mirrors preprocessForTrace's branch order; null where no single
+// iso-line exists (alpha masks, brightness bands with a cutoff above 0).
+export function crackFieldForTrace(
+  image: RawImageData,
+  options: TraceOptions,
+): CrackSubPixelField | null {
+  if (!isValidRawImageData(image)) return null;
+  if (shouldTraceAlphaMask(image, options)) return null;
+  const adjusted = applyImageAdjustments(image, options);
+  if (shouldUseSketchTrace(image, options)) return sketchCrackField(adjusted);
+  const prepared = shouldApplyMedian(adjusted, options.medianFilter)
+    ? medianFilter(adjusted)
+    : adjusted;
+  const threshold = singleIsoThreshold(prepared, options);
+  if (threshold === null) return null;
+  return lumaCrackField(prepared, threshold);
+}
+
+const BACKGROUND_LUMA = 255;
+
+function singleIsoThreshold(prepared: RawImageData, options: TraceOptions): number | null {
+  if (options.cutoffLuma !== undefined) {
+    // The band's lower cutoff is a second iso-line; only the degenerate
+    // cutoff-0 band (the LightBurn default) has a single crossing.
+    return options.cutoffLuma === 0 ? (options.thresholdLuma ?? 128) : null;
+  }
+  if (options.thresholdLuma !== undefined) return options.thresholdLuma;
+  if (options.useOtsuThreshold === true) return otsuThreshold(prepared);
+  return null;
+}
+
+function lumaCrackField(prepared: RawImageData, thresholdLuma: number): CrackSubPixelField {
+  const { width, height } = prepared;
+  const luma = lumaBuffer(prepared);
+  return {
+    thresholdAt: (): number => thresholdLuma,
+    lumaAt: (x: number, y: number): number => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return BACKGROUND_LUMA;
+      return luma[y * width + x] ?? BACKGROUND_LUMA;
+    },
+  };
+}
+
+// The sketch cut is luma < localMean − bias — a position-dependent
+// threshold, exposed as thresholdAt so the walker interpolates raw luma
+// against the local iso value. (Exact-equality pixels classify background in
+// the mask; the walker's straddle check falls back to the midpoint there.)
+function sketchCrackField(adjusted: RawImageData): CrackSubPixelField {
+  const { width, height } = adjusted;
+  const luma = lumaBuffer(adjusted);
+  const integral = integralLuma(luma, width, height);
+  return {
+    thresholdAt: (x: number, y: number): number => {
+      const cx = Math.min(width - 1, Math.max(0, x));
+      const cy = Math.min(height - 1, Math.max(0, y));
+      return localMean(integral, width, height, cx, cy, SKETCH_RADIUS_PX) - SKETCH_CONTRAST_BIAS;
+    },
+    lumaAt: (x: number, y: number): number => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return BACKGROUND_LUMA;
+      return luma[y * width + x] ?? BACKGROUND_LUMA;
+    },
+  };
 }
 
 // Median gate. true forces it, false/undefined skips it, and 'auto' defers
