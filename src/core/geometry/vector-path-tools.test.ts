@@ -74,7 +74,7 @@ describe('vector path tools', () => {
     };
 
     const result = weldVectorObjects([left, right], 'welded');
-    if (!result.ok) throw new Error(result.message);
+    if (result.kind === 'error') throw new Error(result.error.message);
     const welded = result.value;
 
     expect(welded.kind).toBe('imported-svg');
@@ -101,7 +101,7 @@ describe('vector path tools', () => {
     };
 
     const result = weldVectorObjects([left, right], 'welded');
-    if (!result.ok) throw new Error(result.message);
+    if (result.kind === 'error') throw new Error(result.error.message);
     const welded = result.value;
 
     expect(welded.operationOverride).toEqual(metadata.operationOverride);
@@ -119,8 +119,11 @@ describe('vector path tools', () => {
     };
 
     const result = weldVectorObjects([left, right], 'welded');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/matching output metadata/i);
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.error.kind).toBe('mixed-metadata');
+      expect(result.error.message).toMatch(/matching output metadata/i);
+    }
   });
 
   it('rejects weld input containing open polylines', () => {
@@ -147,8 +150,11 @@ describe('vector path tools', () => {
     };
 
     const result = weldVectorObjects([open], 'welded');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/closed vector contours/i);
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.error.kind).toBe('open-contours');
+      expect(result.error.message).toMatch(/closed vector contours/i);
+    }
   });
 });
 

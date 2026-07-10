@@ -1,4 +1,5 @@
 import { FillRule, unionD, type PathD } from 'clipper2-ts';
+import { err, ok, type Result } from '../result';
 import {
   IDENTITY_TRANSFORM,
   type Bounds,
@@ -15,12 +16,22 @@ export type VectorSceneObject = Extract<
   { readonly paths: ReadonlyArray<ColoredPath> }
 >;
 
-// Weld / boolean / offset ops return this instead of throwing: pure core must
-// not throw for control flow (CLAUDE.md), and the failure carries a user-worded
-// message the store surfaces as a toast.
-export type VectorOpResult<T> =
-  | { readonly ok: true; readonly value: T }
-  | { readonly ok: false; readonly message: string };
+// Weld / boolean / offset / dogbone ops return a canonical Result (ADR-130)
+// instead of throwing: pure core must not throw for control flow (CLAUDE.md).
+// The typed failure names the mode; its user-worded message is what the store
+// surfaces as a toast for the reachable cases menu-gating can't pre-detect
+// (WORKFLOW F-CNC22 error/empty states).
+export type VectorOpError = {
+  readonly kind:
+    | 'too-few-objects'
+    | 'open-contours'
+    | 'empty-result'
+    | 'collapsed'
+    | 'no-corners'
+    | 'bad-distance'
+    | 'mixed-metadata';
+  readonly message: string;
+};
 
 const MIN_CLOSED_POINTS = 3;
 const EPS = 1e-9;
@@ -48,15 +59,18 @@ export function materializeVectorObject(object: VectorSceneObject, id = object.i
 export function weldVectorObjects(
   objects: ReadonlyArray<VectorSceneObject>,
   id: string,
-): VectorOpResult<ImportedSvg> {
+): Result<ImportedSvg, VectorOpError> {
   if (objects.length === 0) {
-    return { ok: false, message: 'Weld requires selected closed vector contours.' };
+    return err({
+      kind: 'too-few-objects',
+      message: 'Weld requires selected closed vector contours.',
+    });
   }
   if (!vectorObjectOutputMetadataCompatible(objects)) {
-    return {
-      ok: false,
+    return err({
+      kind: 'mixed-metadata',
       message: 'Weld requires selected vector contours with matching output metadata.',
-    };
+    });
   }
   const materialized = objects.map((object) => materializeVectorObject(object));
   const byColor = new Map<string, PathD[]>();
@@ -65,7 +79,10 @@ export function weldVectorObjects(
       const paths = byColor.get(path.color) ?? [];
       for (const polyline of path.polylines) {
         if (!isClosedPolygon(polyline)) {
-          return { ok: false, message: 'Weld requires selected closed vector contours.' };
+          return err({
+            kind: 'open-contours',
+            message: 'Weld requires selected closed vector contours.',
+          });
         }
         paths.push(polylineToPathD(polyline));
       }
@@ -82,20 +99,17 @@ export function weldVectorObjects(
   }
   const filtered = paths.filter((path) => path.polylines.length > 0);
   if (filtered.length === 0) {
-    return { ok: false, message: 'Weld requires selected closed vector contours.' };
+    return err({ kind: 'empty-result', message: 'Weld requires selected closed vector contours.' });
   }
-  return {
-    ok: true,
-    value: {
-      ...commonObjectMetadata(objects),
-      kind: 'imported-svg',
-      id,
-      source: 'Welded paths',
-      bounds: boundsForPaths(filtered) ?? firstBounds(objects),
-      transform: IDENTITY_TRANSFORM,
-      paths: filtered,
-    },
-  };
+  return ok({
+    ...commonObjectMetadata(objects),
+    kind: 'imported-svg',
+    id,
+    source: 'Welded paths',
+    bounds: boundsForPaths(filtered) ?? firstBounds(objects),
+    transform: IDENTITY_TRANSFORM,
+    paths: filtered,
+  });
 }
 
 export function vectorObjectOutputMetadataCompatible(

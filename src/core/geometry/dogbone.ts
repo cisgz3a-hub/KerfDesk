@@ -11,6 +11,7 @@
 // are left alone in v1. The circles are unioned back into the region.
 
 import { unionD, FillRule, type PathD, type PathsD } from 'clipper2-ts';
+import { err, ok, type Result } from '../result';
 import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg, type Vec2 } from '../scene';
 import {
   boundsForPaths,
@@ -18,6 +19,7 @@ import {
   materializeVectorObject,
   pathDToPolyline,
   polylineToPathD,
+  type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
 
@@ -28,15 +30,21 @@ const FALLBACK_COLOR = '#000000';
 
 /**
  * Relieve the sharp convex corners of one object's cut region. Returns the
- * corner-relieved object (identity transform, world-space baked, same id) or
- * throws when the selection has no closed contours / no qualifying corners.
+ * corner-relieved object (identity transform, world-space baked, same id), or an
+ * error result (ADR-130) when the selection has no closed contours / no
+ * qualifying corners — the caller skips those objects silently (WORKFLOW F-CNC26).
  */
-export function dogboneVectorObject(object: VectorSceneObject, bitDiameterMm: number): ImportedSvg {
+export function dogboneVectorObject(
+  object: VectorSceneObject,
+  bitDiameterMm: number,
+): Result<ImportedSvg, VectorOpError> {
   if (!Number.isFinite(bitDiameterMm) || bitDiameterMm <= 0) {
-    throw new Error('Dogbone needs a positive bit diameter.');
+    return err({ kind: 'bad-distance', message: 'Dogbone needs a positive bit diameter.' });
   }
   const materialized = materializeVectorObject(object);
-  const region = unionD(collectClosedRings(materialized), FillRule.NonZero);
+  const rings = collectClosedRings(materialized);
+  if (rings.kind === 'error') return rings;
+  const region = unionD(rings.value, FillRule.NonZero);
   const radius = bitDiameterMm / 2;
   const circles: PathsD = [];
   for (const ring of region) {
@@ -48,9 +56,10 @@ export function dogboneVectorObject(object: VectorSceneObject, bitDiameterMm: nu
     }
   }
   if (circles.length === 0) {
-    throw new Error(
-      `No corners sharper than ${DOGBONE_MAX_CORNER_DEG}° to relieve in this selection.`,
-    );
+    return err({
+      kind: 'no-corners',
+      message: `No corners sharper than ${DOGBONE_MAX_CORNER_DEG}° to relieve in this selection.`,
+    });
   }
   const relieved = unionD([...region, ...circles], FillRule.NonZero);
   const paths: ColoredPath[] = [
@@ -59,27 +68,27 @@ export function dogboneVectorObject(object: VectorSceneObject, bitDiameterMm: nu
       polylines: relieved.map(pathDToPolyline).filter(isClosedPolygon),
     },
   ];
-  return {
+  return ok({
     kind: 'imported-svg',
     id: object.id,
     source: `${materialized.source.replace(/ \(paths\)$/, '')} (dogbone)`,
     bounds: boundsForPaths(paths) ?? object.bounds,
     transform: IDENTITY_TRANSFORM,
     paths,
-  };
+  });
 }
 
-function collectClosedRings(materialized: ImportedSvg): PathsD {
+function collectClosedRings(materialized: ImportedSvg): Result<PathsD, VectorOpError> {
   const rings: PathsD = [];
   for (const path of materialized.paths) {
     for (const polyline of path.polylines) {
       if (!isClosedPolygon(polyline)) {
-        throw new Error('Dogbone applies to closed contours only.');
+        return err({ kind: 'open-contours', message: 'Dogbone applies to closed contours only.' });
       }
       rings.push(polylineToPathD(polyline));
     }
   }
-  return rings;
+  return ok(rings);
 }
 
 function signedArea(ring: PathD): number {

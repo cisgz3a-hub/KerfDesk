@@ -3,8 +3,10 @@
 // and offset area growth/shrink with round joins.
 
 import { describe, expect, it } from 'vitest';
+import { type Result } from '../result';
 import { IDENTITY_TRANSFORM, type ImportedSvg } from '../scene';
 import { combineVectorObjects, offsetVectorObjects } from './vector-path-booleans';
+import { type VectorOpError } from './vector-path-tools';
 
 function rectObject(id: string, x0: number, y0: number, x1: number, y1: number): ImportedSvg {
   return {
@@ -53,21 +55,21 @@ function totalArea(object: ImportedSvg): number {
   return area;
 }
 
-function unwrap(
-  result:
-    | { readonly ok: true; readonly value: ImportedSvg }
-    | { readonly ok: false; readonly message: string },
-): ImportedSvg {
-  if (!result.ok) throw new Error(result.message);
+function unwrap(result: Result<ImportedSvg, VectorOpError>): ImportedSvg {
+  if (result.kind === 'error') throw new Error(result.error.message);
   return result.value;
 }
 
 function expectErr(
-  result: { readonly ok: true } | { readonly ok: false; readonly message: string },
+  result: Result<unknown, VectorOpError>,
+  kind: VectorOpError['kind'],
   pattern: RegExp,
 ): void {
-  expect(result.ok).toBe(false);
-  if (!result.ok) expect(result.message).toMatch(pattern);
+  expect(result.kind).toBe('error');
+  if (result.kind === 'error') {
+    expect(result.error.kind).toBe(kind);
+    expect(result.error.message).toMatch(pattern);
+  }
 }
 
 // 10×10 subject at origin; 10×10 clip shifted +5 in x → 5×10 overlap.
@@ -106,11 +108,15 @@ describe('combineVectorObjects', () => {
 
   it('rejects a non-overlapping intersect as an empty result', () => {
     const far = rectObject('c', 100, 100, 110, 110);
-    expectErr(combineVectorObjects([SUBJECT, far], 'intersect', 'out'), /empty/i);
+    expectErr(combineVectorObjects([SUBJECT, far], 'intersect', 'out'), 'empty-result', /empty/i);
   });
 
   it('rejects fewer than two objects and open contours', () => {
-    expectErr(combineVectorObjects([SUBJECT], 'subtract', 'out'), /two or more/i);
+    expectErr(
+      combineVectorObjects([SUBJECT], 'subtract', 'out'),
+      'too-few-objects',
+      /two or more/i,
+    );
     const open: ImportedSvg = {
       ...rectObject('d', 0, 0, 4, 4),
       paths: [
@@ -128,7 +134,7 @@ describe('combineVectorObjects', () => {
         },
       ],
     };
-    expectErr(combineVectorObjects([SUBJECT, open], 'subtract', 'out'), /closed/i);
+    expectErr(combineVectorObjects([SUBJECT, open], 'subtract', 'out'), 'open-contours', /closed/i);
   });
 });
 
@@ -149,7 +155,7 @@ describe('offsetVectorObjects', () => {
   });
 
   it('rejects a collapse-to-nothing inward offset and a zero distance', () => {
-    expectErr(offsetVectorObjects([SUBJECT], -6, 'out'), /collapsed/i);
-    expectErr(offsetVectorObjects([SUBJECT], 0, 'out'), /non-zero/i);
+    expectErr(offsetVectorObjects([SUBJECT], -6, 'out'), 'collapsed', /collapsed/i);
+    expectErr(offsetVectorObjects([SUBJECT], 0, 'out'), 'bad-distance', /non-zero/i);
   });
 });

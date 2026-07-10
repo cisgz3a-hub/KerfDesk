@@ -73,12 +73,12 @@ function dogboneSelectionMutation(
   let scene = state.project.scene;
   let changed = false;
   for (const object of selected) {
-    let relieved;
-    try {
-      relieved = dogboneVectorObject(object, bitDiameterMm);
-    } catch {
-      continue; // no qualifying corners on this object — leave it alone
-    }
+    // Per-object skip on error (no qualifying corners / open contour) is the
+    // intended silent behavior — dogbone a selection, relieve what qualifies,
+    // leave the rest (WORKFLOW F-CNC26; CNV-04 keeps this one silent).
+    const result = dogboneVectorObject(object, bitDiameterMm);
+    if (result.kind === 'error') continue;
+    const relieved = result.value;
     scene = replaceObject(scene, object.id, relieved);
     scene = ensureLayersForColors(scene, relieved.paths);
     changed = true;
@@ -129,11 +129,11 @@ function weldSelectionMutation(state: VectorPathState): VectorPathMutation | Vec
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
   const weldResult = weldVectorObjects(selected, uniqueWeldId(state.project.scene));
-  if (!weldResult.ok) {
+  if (weldResult.kind === 'error') {
     // The core op returns a user-worded message for reachable failures the menu
     // gating can't pre-detect (empty intersect of disjoint shapes, a collapsing
     // inward offset). Surface it instead of dead-ending silently (CNV-04/CNV-10).
-    useToastStore.getState().pushToast(weldResult.message, 'warning');
+    useToastStore.getState().pushToast(weldResult.error.message, 'warning');
     return state;
   }
   const welded = weldResult.value;
@@ -164,8 +164,8 @@ function booleanSelectionMutation(
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length < 2 || selected.some((object) => object.locked === true)) return state;
   const combineResult = combineVectorObjects(selected, op, uniqueObjectId(state.project.scene, op));
-  if (!combineResult.ok) {
-    useToastStore.getState().pushToast(combineResult.message, 'warning');
+  if (combineResult.kind === 'error') {
+    useToastStore.getState().pushToast(combineResult.error.message, 'warning');
     return state;
   }
   const combined = combineResult.value;
@@ -200,8 +200,8 @@ function offsetSelectionMutation(
     deltaMm,
     uniqueObjectId(state.project.scene, 'offset'),
   );
-  if (!offsetResult.ok) {
-    useToastStore.getState().pushToast(offsetResult.message, 'warning');
+  if (offsetResult.kind === 'error') {
+    useToastStore.getState().pushToast(offsetResult.error.message, 'warning');
     return state;
   }
   const offset = offsetResult.value;
