@@ -77,12 +77,13 @@ const SUBPIXEL_INFORMED_FRACTION = 0.3;
 // measurement noise: tight enough to keep drawn features, loose enough that
 // the fit averages noise instead of chasing it.
 const FIT_TOLERANCE_PX = 0.35;
-// Above-range (organic art) loops fit with a looser tolerance: their
-// hand-drawn brush texture is sub-pixel noise relative to the DRAWN shape,
-// and chasing it splits the fit into micro-segments that render as sawtooth
-// (maintainer roof-line verdicts, 2026-07-11). The reference style smooths
-// that texture; ~1px keeps every drawn feature while fairing the ink.
-const FIT_TOLERANCE_ORGANIC_PX = 0.9;
+// Above-range (organic art) loops fit with a much looser tolerance: their
+// hand-drawn brush texture reaches ~1.5-2px amplitude, and any tolerance
+// below that makes the error-split recursion CHASE it into micro-segments
+// that render as sawtooth (maintainer roof-line verdicts, 2026-07-11 x2).
+// The reference style fairs that ink texture away entirely; drawn structure
+// is protected by persistent-corner pins, not by the tolerance.
+const FIT_TOLERANCE_ORGANIC_PX = 1.8;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
 
@@ -289,11 +290,14 @@ function fitLoopTail(
 // vertex, pin turns ≥ the shared 60° hard-turn convention, greedy non-max
 // suppression so one physical corner yields one pin.
 const DENSE_CORNER_SPAN_PX = 2;
-// Needle-sharp only: hand-drawn brush texture turns 60-80° inside a ±2px
-// window all along rough strokes, and pinning those bumps breaks the fit at
-// every one (sawtooth). Genuine tips (wave points, tapered stroke ends) and
-// hard structural corners turn ≥90°.
-const DENSE_CORNER_TURN_RAD = (90 * Math.PI) / 180;
+// A drawn corner's direction change PERSISTS when the window widens; a
+// brush-texture bump's net turn reverts toward zero (the edge continues the
+// same way). Requiring the turn at ±2px AND at ±6px separates structural
+// corners (eaves, wave tips — pinned) from ink texture (faired) — an angle
+// bar alone cannot, because both classes turn 60-80° up close.
+const DENSE_CORNER_TURN_RAD = (60 * Math.PI) / 180;
+const DENSE_CORNER_PERSIST_SPAN_PX = 6;
+const DENSE_CORNER_PERSIST_TURN_RAD = (50 * Math.PI) / 180;
 
 function denseHardTurnCorners(
   points: ReadonlyArray<Polyline['points'][number]>,
@@ -305,9 +309,20 @@ function denseHardTurnCorners(
   const perimeter = ringPerimeter(points);
   const avgSpacing = Math.max(1e-6, perimeter / n);
   const k = Math.max(2, Math.round((DENSE_CORNER_SPAN_PX * pixelScale) / avgSpacing));
+  const kPersist = Math.max(
+    k + 1,
+    Math.round((DENSE_CORNER_PERSIST_SPAN_PX * pixelScale) / avgSpacing),
+  );
   const turns: number[] = new Array<number>(n);
   for (let i = 0; i < n; i += 1) {
-    turns[i] = windowedTurn(points, i, k);
+    const near = windowedTurn(points, i, k);
+    // Zero out candidates whose turn does not persist at the wider span —
+    // they are texture, not structure.
+    turns[i] =
+      near >= DENSE_CORNER_TURN_RAD &&
+      windowedTurn(points, i, kPersist) >= DENSE_CORNER_PERSIST_TURN_RAD
+        ? near
+        : 0;
   }
   const order = Array.from({ length: n }, (_, i) => i).sort(
     (a, b) => (turns[b] ?? 0) - (turns[a] ?? 0),
