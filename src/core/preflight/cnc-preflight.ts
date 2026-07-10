@@ -18,6 +18,7 @@ import { findDroppedCncLayers } from '../cnc';
 import { machineBoundsForDevice } from '../devices';
 import {
   DEFAULT_THROUGH_CUT_ALLOWANCE_MM,
+  findNonFiniteCoords,
   findOutOfBoundsCoords,
   findOverdeepCutIssues,
   findPlungedTravelIssues,
@@ -70,6 +71,7 @@ export function runCncPreflight(
     });
   }
   appendBoundsIssues(project, gcode, options, issues);
+  appendNonFiniteCoordIssues(gcode, issues);
   appendNoGoZoneIssues(project, gcode, options, issues);
   appendPlungedTravelIssues(gcode, config, issues);
   appendOverdeepCutIssues(gcode, config, issues);
@@ -157,6 +159,17 @@ function appendBoundsIssues(
   });
   for (const issue of oob.slice(0, MAX_REPORTED_ISSUES)) {
     issues.push({ code: 'out-of-bed', message: `Line ${issue.lineNumber}: ${issue.reason}` });
+  }
+}
+
+// See preflight.ts appendNonFiniteCoordIssues — a NaN/Infinity Z plunge or XY
+// coordinate is invisible to the bounds scanner and would fault the controller.
+function appendNonFiniteCoordIssues(gcode: string, issues: PreflightIssue[]): void {
+  for (const issue of findNonFiniteCoords(gcode).slice(0, MAX_REPORTED_ISSUES)) {
+    issues.push({
+      code: 'non-finite-coordinate',
+      message: `Line ${issue.lineNumber}: ${issue.reason}. Regenerate the output — this coordinate cannot be sent to the machine.`,
+    });
   }
 }
 
