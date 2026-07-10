@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB } from '../../core/job';
 import type { Project } from '../../core/scene';
 import { resolveJobPlacement } from '../job-placement';
-import { useStore } from '../state';
+import { useOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { buildPreviewToolpath } from './draw-preview';
 import { mapToolpathToScene } from './preview-scene-frame';
@@ -21,26 +21,12 @@ export function usePreviewToolpath(
   scheduleBuild: PreviewBuildScheduler = schedulePreviewBuild,
 ): PreviewToolpath | null {
   const jobPlacement = useStore((s) => s.jobPlacement);
-  const cutSelectedGraphics = useStore((s) => s.outputScopeSettings.cutSelectedGraphics);
-  const useSelectionOrigin = useStore((s) => s.outputScopeSettings.useSelectionOrigin);
-  const selectedObjectId = useStore((s) => s.selectedObjectId);
-  const additionalSelectedIds = useStore((s) => s.additionalSelectedIds);
   const externalGcodePreview = useStore((s) => s.externalGcodePreview);
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const [toolpath, setToolpath] = useState<PreviewToolpath | null>(null);
-  const outputScope = useMemo(
-    () => ({
-      cutSelectedGraphics,
-      useSelectionOrigin,
-      selectedObjectIds: [
-        ...(selectedObjectId === null ? [] : [selectedObjectId]),
-        ...additionalSelectedIds,
-      ],
-    }),
-    [additionalSelectedIds, cutSelectedGraphics, selectedObjectId, useSelectionOrigin],
-  );
+  const outputScope = useOutputScope();
 
   // Resolve the placement during render (cheap) and key the rebuild on the
   // RESOLVED placement, not the raw statusReport — a connected controller stores
