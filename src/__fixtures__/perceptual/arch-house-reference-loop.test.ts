@@ -147,6 +147,8 @@ type CropRegion = {
 };
 
 const CROP_REGIONS: ReadonlyArray<CropRegion> = [
+  // Tight H-stem close-up (iteration-8 verdict: chord-joint steps on stems).
+  { name: 'h-stem', x0: 515, y0: 540, x1: 585, y1: 670 },
   { name: 'arch-word', x0: 120, y0: 540, x1: 520, y1: 665 },
   { name: 'house-word', x0: 520, y0: 540, x1: 910, y1: 665 },
   { name: 'langebaan', x0: 290, y0: 660, x1: 740, y1: 730 },

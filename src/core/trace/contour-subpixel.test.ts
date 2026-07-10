@@ -6,7 +6,7 @@
 // position that binarization throws away.
 
 import { describe, expect, it } from 'vitest';
-import { midCrackChain, type CrackSubPixelField } from './contour-boundary';
+import { midCrackChain, midCrackChainWithStats, type CrackSubPixelField } from './contour-boundary';
 
 // A vertical boundary: background column luma 255, edge column luma 64,
 // threshold 128. The iso-crossing between centres sits at
@@ -65,6 +65,25 @@ describe('midCrackChain sub-pixel interpolation', () => {
     const rightCrack = chain[1]!;
     expect(rightCrack.y).toBeCloseTo(1.5, 6);
     expect(rightCrack.x).toBeCloseTo(2 - (0.665 - 0.5), 2);
+  });
+
+  it('reports ~zero interpolated fraction on binary sources and high on AA edges', () => {
+    // Binary (saturated steps): every crack stays at the midpoint — the
+    // wobble stages must keep their full 1x behaviour for these loops.
+    const binary = Array.from({ length: 9 }, () => 255);
+    binary[4] = 0;
+    const binaryStats = midCrackChainWithStats(loop, fieldFromLuma(3, 3, binary));
+    expect(binaryStats.interpolatedFraction).toBe(0);
+
+    // Anti-aliased (mid-gray ink): every crack carries a real offset — the
+    // boundary is a measurement and the wobble stages should stand down.
+    const aa = Array.from({ length: 9 }, () => 255);
+    aa[4] = 64;
+    const aaStats = midCrackChainWithStats(loop, fieldFromLuma(3, 3, aa));
+    expect(aaStats.interpolatedFraction).toBeGreaterThanOrEqual(0.75);
+
+    // No field at all: plain mid-crack, fraction 0.
+    expect(midCrackChainWithStats(loop).interpolatedFraction).toBe(0);
   });
 
   it('clamps extreme interpolation and falls back to the midpoint when the pair does not straddle the threshold', () => {

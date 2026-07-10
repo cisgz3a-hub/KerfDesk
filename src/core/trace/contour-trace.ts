@@ -20,7 +20,11 @@ import {
   squaredDistanceField,
   type InkMask,
 } from './centerline';
-import { midCrackChain, traceBoundaryLoops, type CrackSubPixelField } from './contour-boundary';
+import {
+  midCrackChainWithStats,
+  traceBoundaryLoops,
+  type CrackSubPixelField,
+} from './contour-boundary';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import {
@@ -64,6 +68,9 @@ const SHARPEN_MAX_CHAIN_POINTS = 4096;
 // genuine stem corners still break the spline, bowls stay round.
 const SHARPEN_MIN_CHAIN_POINTS = 260;
 const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
+// A loop whose cracks mostly interpolated is a sub-pixel MEASUREMENT (see
+// finishLoop): above this fraction the wobble stages disable for that loop.
+const SUBPIXEL_INFORMED_FRACTION = 0.3;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
 
@@ -171,7 +178,16 @@ function finishLoop(
   // pre-smoothing the skeleton tracer applies — without it the residual
   // staircase jogs read as corners downstream and long straight edges come
   // out wobbly (maintainer-observed on the arch-house H stems).
-  const dense = smoothRawChain(midCrackChain(staircase, finish.crackField), true);
+  const crack = midCrackChainWithStats(staircase, finish.crackField);
+  const dense = smoothRawChain(crack.points, true);
+  // The wobble stages (straight-run flattener, arc-noise evening) are
+  // quantization-noise medicine. When most cracks carried real sub-pixel
+  // information, the boundary is a MEASUREMENT — chord-replacing it
+  // fabricates joint steps on gently flaring stems (maintainer H-stem
+  // verdicts, 2026-07-11) and evening it fights drawn texture. Binary
+  // sources (saturated steps, fraction ~0) keep the full 1x behaviour.
+  const wobbleStrength =
+    crack.interpolatedFraction >= SUBPIXEL_INFORMED_FRACTION ? 0 : finish.flattenStrength;
   // The chain-length regime bounds were tuned at 1x; a supersampled chain is
   // pixelScale× denser, so the bounds scale with it — a LANGEBAAN-size glyph
   // must stay in the same (sparse-detection) regime it was tuned for.
@@ -191,7 +207,7 @@ function finishLoop(
   // large fraction of such a feature.
   const arcSmoothed =
     dense.length >= sharpenMin
-      ? smoothArcNoise(evened, true, sharpened.corners, finish.flattenStrength, finish.pixelScale)
+      ? smoothArcNoise(evened, true, sharpened.corners, wobbleStrength, finish.pixelScale)
       : evened;
   const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
@@ -202,7 +218,7 @@ function finishLoop(
     simplified,
     true,
     sharpened.corners,
-    finish.flattenStrength,
+    wobbleStrength,
     finish.pixelScale,
   );
   if (straightened.length < MIN_LOOP_POINTS) return null;

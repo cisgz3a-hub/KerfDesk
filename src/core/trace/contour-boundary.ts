@@ -76,8 +76,28 @@ const SATURATED_INK_LUMA = 5;
  *  it removes the ~1px boundary meander at the source instead of asking the
  *  smoothing stages to fight it (research brief 2026-07-10). */
 export function midCrackChain(loop: ReadonlyArray<Vec2>, field?: CrackSubPixelField): Vec2[] {
+  return midCrackChainWithStats(loop, field).points;
+}
+
+export type MidCrackChain = {
+  readonly points: Vec2[];
+  /** Fraction of cracks whose crossing carried real sub-pixel information
+   *  (|t − 0.5| beyond noise). ~0 on binary sources (saturated steps stay at
+   *  the midpoint), high on anti-aliased art — the signal callers use to
+   *  decide whether quantization-noise smoothing is still needed. */
+  readonly interpolatedFraction: number;
+};
+
+// |t − 0.5| below this is indistinguishable from the plain midpoint.
+const INTERPOLATED_T_EPS = 0.05;
+
+export function midCrackChainWithStats(
+  loop: ReadonlyArray<Vec2>,
+  field?: CrackSubPixelField,
+): MidCrackChain {
   const n = loop.length;
   const out: Vec2[] = [];
+  let interpolated = 0;
   for (let i = 0; i < n; i += 1) {
     const a = loop[i] as Vec2;
     const b = loop[(i + 1) % n] as Vec2;
@@ -93,9 +113,10 @@ export function midCrackChain(loop: ReadonlyArray<Vec2>, field?: CrackSubPixelFi
     const rightX = -(b.y - a.y);
     const rightY = b.x - a.x;
     const t = crackCrossing(field, midX, midY, rightX, rightY);
+    if (Math.abs(t - MID_CRACK_T) > INTERPOLATED_T_EPS) interpolated += 1;
     out.push({ x: midX + (t - MID_CRACK_T) * rightX, y: midY + (t - MID_CRACK_T) * rightY });
   }
-  return out;
+  return { points: out, interpolatedFraction: n === 0 ? 0 : interpolated / n };
 }
 
 function crackCrossing(
