@@ -88,8 +88,14 @@ export function flattenStraightRuns(
   closed: boolean,
   corners: ReadonlySet<Vec2>,
   strength = 1,
+  pixelScale = 1,
 ): Vec2[] {
-  const maxDeviationPx = BASE_MAX_DEVIATION_PX * Math.max(0, strength);
+  // The amplitude budget is denominated in chain pixels; on a supersampled
+  // trace it scales with pixelScale so the REAL-space flattening semantics
+  // match the 1x tuning (an unscaled 1px cap at 2x is 0.5px real — boundary
+  // nicks the flattener used to erase survive, the H-crossbar defect).
+  const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
+  const maxDeviationPx = BASE_MAX_DEVIATION_PX * Math.max(0, strength) * scale;
   if (points.length < 4 || maxDeviationPx < MIN_ACTIVE_DEVIATION_PX) return [...points];
   const ring = closed ? rotateToFarthest(points) : [...points];
   // OPEN chain endpoints are pinned like corners (they are real geometry).

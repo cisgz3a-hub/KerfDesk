@@ -191,7 +191,7 @@ function finishLoop(
   // large fraction of such a feature.
   const arcSmoothed =
     dense.length >= sharpenMin
-      ? smoothArcNoise(evened, true, sharpened.corners, finish.flattenStrength)
+      ? smoothArcNoise(evened, true, sharpened.corners, finish.flattenStrength, finish.pixelScale)
       : evened;
   const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
@@ -203,6 +203,7 @@ function finishLoop(
     true,
     sharpened.corners,
     finish.flattenStrength,
+    finish.pixelScale,
   );
   if (straightened.length < MIN_LOOP_POINTS) return null;
   // Closed rings must RETURN to their start point (ADR-100 third amendment):
