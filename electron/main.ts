@@ -279,12 +279,18 @@ function installPermissionHandlers(ses: Session): void {
 
 function installNavigationPolicy(window: BrowserWindow): void {
   const webContents = window.webContents;
-  webContents.on('will-navigate', (event, url) => {
-    const targetUrl = event.url.length > 0 ? event.url : url;
-    if (!shouldAllowNavigation(targetUrl, TRUSTED_RENDERER_ORIGINS)) {
+  // Use the always-provided `url` argument, not event.url — dereferencing
+  // event.url (which can be undefined) throws inside the handler before
+  // preventDefault runs, a fail-open on a security control. Guard will-redirect
+  // too so a redirect to an untrusted origin can't slip past will-navigate
+  // (ELE-07).
+  const blockUntrusted = (event: { preventDefault: () => void }, url: string): void => {
+    if (!shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS)) {
       event.preventDefault();
     }
-  });
+  };
+  webContents.on('will-navigate', blockUntrusted);
+  webContents.on('will-redirect', blockUntrusted);
   webContents.setWindowOpenHandler((details) => {
     return {
       action: shouldAllowWindowOpen(details.url, TRUSTED_RENDERER_ORIGINS) ? 'allow' : 'deny',
