@@ -25,6 +25,7 @@ import {
   traceBoundaryLoops,
   type CrackSubPixelField,
 } from './contour-boundary';
+import { fairChainSegments } from './fair-chain';
 import { fitCubicsThroughPoints, sampleCubics } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
@@ -77,13 +78,13 @@ const SUBPIXEL_INFORMED_FRACTION = 0.3;
 // measurement noise: tight enough to keep drawn features, loose enough that
 // the fit averages noise instead of chasing it.
 const FIT_TOLERANCE_PX = 0.35;
-// Above-range (organic art) loops fit with a much looser tolerance: their
-// hand-drawn brush texture reaches ~1.5-2px amplitude, and any tolerance
-// below that makes the error-split recursion CHASE it into micro-segments
-// that render as sawtooth (maintainer roof-line verdicts, 2026-07-11 x2).
-// The reference style fairs that ink texture away entirely; drawn structure
-// is protected by persistent-corner pins, not by the tolerance.
-const FIT_TOLERANCE_ORGANIC_PX = 1.8;
+// Above-range (organic art) loops are Whittaker-faired BEFORE fitting
+// (fair-chain.ts, research brief #3): the penalized smoother removes ~94%
+// of the ink texture in one banded solve, so the fit sees ~0.1-0.2px
+// residual noise and this tolerance (~3x that) physically cannot trigger
+// texture-chasing error splits. Tolerance-based fairing was tried twice and
+// still sawed — splitting on max error chases any bump above tolerance.
+const FIT_TOLERANCE_ORGANIC_PX = 0.55;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
 
@@ -206,14 +207,11 @@ function finishLoop(
   const sharpenMin = SHARPEN_MIN_CHAIN_POINTS * finish.pixelScale;
   const sharpenMax = SHARPEN_MAX_CHAIN_POINTS * finish.pixelScale;
   const inSharpenRange = dense.length >= sharpenMin && dense.length <= sharpenMax;
-  // Measured loops skip the chord flattener everywhere (it fabricates joint
-  // steps on measured stems). The arc-noise evening stays ON for measured
-  // loops ABOVE the sharpener range: their thin-mask stretches (tapering
-  // stroke tails 1-2px wide) carry real interpolation noise that the
-  // evening pre-conditions for the curve fit below (maintainer's "crippled
-  // line" Edge crop, 2026-07-11).
+  // Measured loops skip the wobble stages entirely: the chord flattener
+  // fabricates joint steps on measured stems, and above-range loops now get
+  // the principled Whittaker fairing instead of the arc-noise evening.
   const flattenStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
-  const arcStrengthEff = subPixelInformed && inSharpenRange ? 0 : finish.flattenStrength;
+  const arcStrengthEff = subPixelInformed ? 0 : finish.flattenStrength;
   const sharpened = inSharpenRange
     ? sharpenChainBends(dense, true, distSq, width)
     : { points: dense, corners: NO_CORNERS };
@@ -238,12 +236,14 @@ function finishLoop(
   if (subPixelInformed && dense.length >= sharpenMin) {
     // In-range loops carry the sharpener's evidence-backed corners; larger
     // loops (arch bands, waves, house outline) detect theirs from windowed
-    // dense turns so needle tips and roof corners still pin exactly.
-    const corners = inSharpenRange
-      ? sharpened.corners
-      : denseHardTurnCorners(arcSmoothed, finish.pixelScale);
-    const tolerancePx = inSharpenRange ? FIT_TOLERANCE_PX : FIT_TOLERANCE_ORGANIC_PX;
-    return fitLoopTail(arcSmoothed, corners, finish, tolerancePx);
+    // dense turns so needle tips and roof corners still pin exactly, then
+    // are Whittaker-faired between those pins before the fit.
+    if (inSharpenRange) {
+      return fitLoopTail(arcSmoothed, sharpened.corners, finish, FIT_TOLERANCE_PX);
+    }
+    const corners = denseHardTurnCorners(arcSmoothed, finish.pixelScale);
+    const faired = fairChainSegments(arcSmoothed, true, corners, finish.pixelScale);
+    return fitLoopTail(faired, corners, finish, FIT_TOLERANCE_ORGANIC_PX);
   }
   const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
