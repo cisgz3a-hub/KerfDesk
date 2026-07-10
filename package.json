@@ -24,6 +24,7 @@
     "license-check": "node scripts/check-licenses.mjs",
     "audit:deps": "pnpm audit --audit-level=low",
     "check:file-size": "node scripts/check-file-size-policy.mjs",
+    "check:index-exports": "node scripts/check-index-exports.mjs",
     "release:check": "pnpm guard:repo && pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm format:check && pnpm license-check && pnpm audit:deps && pnpm test && pnpm build:web && pnpm build:electron-main && pnpm check:file-size",
     "guard:repo": "node scripts/assert-correct-repo.mjs",
     "dev:web": "vite",
