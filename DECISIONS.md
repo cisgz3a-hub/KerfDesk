@@ -3721,6 +3721,19 @@ wiki); LaserForge reimplements clean-room (ADR-017 discipline, no code copied).
 warnings. Next steps (in order): validate a generated `.rd` against a real
 controller or reference files, then wire the UDP transport.
 
+**Limitation — layer Min/Max power collapsed to one value (recorded 2026-07-10, CTL-04 part 2).**
+LightBurn exposes two separate per-layer power values on a Ruida layer, Min Power
+and Max Power. Our `Job` cut-groups carry a single `power`, and the encoder writes
+that one value into BOTH the `layerMinPower` (0xC6 0x31) and `layerMaxPower`
+(0xC6 0x32) commands (`core/controllers/ruida/rd-encoder.ts:68-69`) — we always
+emit Min == Max. Decision (CTL-04): record this as a deliberate current limitation
+(option a) and DEFER plumbing a separate min power (option b), because a true split
+is a cross-cutting change to the core `Job` cut-group model (a second power field
+threaded through to the encoder) and — with no reference `.rd` from real hardware or
+LightBurn — there is no byte snapshot that would catch a regression in the emitted
+bytes. We record the divergence from LightBurn's separate Min/Max now; we do NOT
+assert what a Ruida controller does with Min == Max, as that is unverified.
+
 ---
 
 ## ADR-100 — Trace quality rebuild: medial-axis Centerline, chained Edge Detection, true Sharp params
