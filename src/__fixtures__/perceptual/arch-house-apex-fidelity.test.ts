@@ -13,6 +13,7 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TRACE_PRESETS, traceImageToColoredPaths } from '../../core/trace';
+import { upscaleBy } from '../../core/trace/auto-upscale';
 import { preprocessForTrace, type RawImageData } from '../../core/trace/trace-image';
 import { chamferDistance } from './chamfer';
 import { decodePngFile } from './png-decode';
@@ -28,15 +29,19 @@ const SOURCE_PATH = join(
 );
 const INK_LUMA_MAX = 128;
 // A boundary vertex sits within ~0.5px of ink; spline resampling and the
-// mid-crack lattice add fractions. Two legitimate mechanisms raise the
+// mid-crack lattice add fractions. Three legitimate mechanisms raise the
 // ceiling: (1) the sharpener's ink-support gate accepts an apex when ink
 // appears within a 1.6px leg-walk found via a 1.5px neighbourhood — a
 // SUPPORTED apex (genuine needle tip whose sub-pixel end binarization
 // dropped) can stand ~3.1px out; (2) Smooth's fit stages (DP ε=0.9,
-// straight-run TLS) drift ~0.3px further on noisy boundaries. Fabricated
-// spikes measured 5-10px before the gate existed; 3.5 rejects that class
-// while accepting honest geometry.
+// straight-run TLS) drift ~0.3px further on noisy boundaries. Supersampled
+// presets are additionally measured against the 2x truth they actually
+// traced (min of both distances): shallow-gradient edges legitimately move
+// a few px between the 1x and 2x binarizations, but a FABRICATION is far
+// from both masks. Fabricated spikes measured 5-10px before the gates
+// existed; 3.5 rejects that class while accepting honest geometry.
 const MAX_VERTEX_TO_INK_PX = 3.5;
+const SUPERSAMPLE_FACTOR = 2;
 const PRESETS_UNDER_TEST = ['Line Art', 'Smooth', 'Sharp'] as const;
 
 describe('arch-house apex fidelity (no fabricated spikes)', () => {
@@ -50,6 +55,16 @@ describe('arch-house apex fidelity (no fabricated spikes)', () => {
         if (preset === undefined) continue;
         const truth = monoToMask(preprocessForTrace(source, preset));
         const dt = chamferDistance(truth);
+        const supersampled = preset.supersampleContour === true;
+        const truth2x = supersampled
+          ? monoToMask(
+              preprocessForTrace(upscaleBy(source, SUPERSAMPLE_FACTOR), {
+                ...preset,
+                pixelScale: SUPERSAMPLE_FACTOR,
+              }),
+            )
+          : null;
+        const dt2x = truth2x === null ? null : chamferDistance(truth2x);
         const paths = await traceImageToColoredPaths(source, preset);
 
         let worst = 0;
@@ -59,7 +74,17 @@ describe('arch-house apex fidelity (no fabricated spikes)', () => {
           for (const polyline of path.polylines) {
             for (const point of polyline.points) {
               vertices += 1;
-              const d = distanceToInk(point.x, point.y, dt, truth);
+              let d = distanceToInk(point.x, point.y, dt, truth);
+              if (truth2x !== null && dt2x !== null) {
+                const d2 =
+                  distanceToInk(
+                    point.x * SUPERSAMPLE_FACTOR,
+                    point.y * SUPERSAMPLE_FACTOR,
+                    dt2x,
+                    truth2x,
+                  ) / SUPERSAMPLE_FACTOR;
+                d = Math.min(d, d2);
+              }
               if (d > worst) {
                 worst = d;
                 worstAt = { x: point.x, y: point.y };

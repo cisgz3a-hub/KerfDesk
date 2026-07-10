@@ -27,8 +27,15 @@ const RGBA_CHANNELS = 4;
 const PINHOLE_MAX_RADIUS_PX = 1;
 const PINHOLE_MAX_AREA_PX = 120;
 
-export function fillPinholes(image: RawImageData): RawImageData {
+/** pixelScale: supersampling factor of the mask relative to the source
+ *  image. The caps are calibrated in SOURCE pixels (from the arch-house
+ *  audit), so a 2x-supersampled trace scales the radius cap by 2 and the
+ *  area cap by 4 to keep the same real-space semantics. */
+export function fillPinholes(image: RawImageData, pixelScale = 1): RawImageData {
   if (!isValidMonochrome(image)) return image;
+  const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
+  const maxAreaPx = PINHOLE_MAX_AREA_PX * scale * scale;
+  const maxRadiusPx = PINHOLE_MAX_RADIUS_PX * scale;
   const { width, height } = image;
   const ink = inkMap(image);
   const outside = floodOutsideBackground(ink, width, height);
@@ -40,17 +47,21 @@ export function fillPinholes(image: RawImageData): RawImageData {
       continue;
     }
     const component = collectComponent(ink, outside, seen, width, height, start);
-    if (component.length > PINHOLE_MAX_AREA_PX) continue;
-    if (!isHairlineThin(component, ink, width, height)) continue;
-    for (const pixel of component) {
-      const base = pixel * RGBA_CHANNELS;
-      data[base] = 0;
-      data[base + 1] = 0;
-      data[base + 2] = 0;
-      data[base + 3] = 255;
-    }
+    if (component.length > maxAreaPx) continue;
+    if (!isHairlineThin(component, ink, width, height, maxRadiusPx)) continue;
+    paintComponentInk(data, component);
   }
   return { width, height, data };
+}
+
+function paintComponentInk(data: Uint8ClampedArray, component: ReadonlyArray<number>): void {
+  for (const pixel of component) {
+    const base = pixel * RGBA_CHANNELS;
+    data[base] = 0;
+    data[base + 1] = 0;
+    data[base + 2] = 0;
+    data[base + 3] = 255;
+  }
 }
 
 function isValidMonochrome(image: RawImageData): boolean {
@@ -127,12 +138,13 @@ function collectComponent(
 }
 
 // Max inscribed radius via multi-source BFS from the ink-adjacent rim
-// inward. A sliver ≤ ~2px wide never gets past depth 1.
+// inward. A sliver ≤ ~2px wide never gets past depth 1 (at pixelScale 1).
 function isHairlineThin(
   component: ReadonlyArray<number>,
   ink: Uint8Array,
   width: number,
   height: number,
+  maxRadiusPx: number,
 ): boolean {
   const inComponent = new Set(component);
   const depth = new Map<number, number>();
@@ -154,13 +166,13 @@ function isHairlineThin(
         if (!inComponent.has(neighbour) || depth.has(neighbour)) continue;
         depth.set(neighbour, d + 1);
         maxDepth = Math.max(maxDepth, d + 1);
-        if (maxDepth > PINHOLE_MAX_RADIUS_PX) return false;
+        if (maxDepth > maxRadiusPx) return false;
         next.push(neighbour);
       }
     }
     frontier = next;
   }
-  return depth.size === component.length && maxDepth <= PINHOLE_MAX_RADIUS_PX;
+  return depth.size === component.length && maxDepth <= maxRadiusPx;
 }
 
 function hasInkNeighbour(pixel: number, ink: Uint8Array, width: number, height: number): boolean {

@@ -44,6 +44,11 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // Fill hairline threshold cracks enclosed in solid ink (letter-stem
     // slivers) so they don't trace as spurious inner contours.
     fillPinholeCracks: true,
+    // Quality supersample (2x) for mid-size art: thin features (hooked apex
+    // tips, pale subtitle strokes) binarize with double the resolution —
+    // mask-level shape distortion no geometry stage can repair (mkbitmap's
+    // recipe; pixel-denominated caps scale via pixelScale).
+    supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
     // Also supersample small sources regardless of stroke width — small letters
@@ -134,6 +139,9 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     // Same hairline-crack cleanup as Line Art; Sharp deliberately omits it
     // (pixel-fidelity preset — every notch matters, even a crack).
     fillPinholeCracks: true,
+    // Same 2x quality supersample as Line Art (Sharp opts out: bilinear
+    // supersampling anti-aliases the pixel notches it exists to preserve).
+    supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
     // Also supersample small sources regardless of stroke width — small letters

@@ -323,7 +323,14 @@ describe('filled-contour backend routing', () => {
         data[o + 3] = 255;
       }
     const image: RawImageData = { width: size, height: size, data };
-    const lineArt = TRACE_PRESETS['Line Art'] as TraceOptions;
+    // supersampleContour off for the identity check: this pin proves ROUTING
+    // (dispatcher → contour backend, not imagetracerjs), so the wrapper must
+    // see the same pixels as the direct call. The quality supersample is
+    // covered by the arch-house perceptual suite instead.
+    const lineArt: TraceOptions = {
+      ...(TRACE_PRESETS['Line Art'] as TraceOptions),
+      supersampleContour: false,
+    };
     const routed = await traceImageToColoredPaths(image, lineArt);
     expect(routed).toEqual(traceImageToContourColoredPaths(image, lineArt));
     // ...and it is genuinely the contour output, not an accidental empty.

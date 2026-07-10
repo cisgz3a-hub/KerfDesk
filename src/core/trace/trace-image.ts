@@ -158,6 +158,18 @@ export type TraceOptions = {
   // thinness + area guards keep letter counters, spacing gaps, and intended
   // thin highlights untouched. See fill-pinholes.ts.
   readonly fillPinholeCracks?: boolean;
+  // supersampleContour: quality supersample for the binary contour presets —
+  // trace at 2x resolution and scale the vectors back down. Thin features
+  // (hooked apex tips, small pale letters) binarize with double the
+  // resolution, removing mask-level shape distortion no downstream geometry
+  // stage can repair (mkbitmap's published recipe). Sharp opts out: bilinear
+  // supersampling anti-aliases the pixel notches it exists to preserve.
+  readonly supersampleContour?: boolean;
+  // pixelScale: INTERNAL — set by the upscale wrapper so pixel-denominated
+  // cleanup caps (despeckle area, pinhole radius/area, contour min-area,
+  // simplify epsilon) keep their SOURCE-pixel semantics on a supersampled
+  // trace. Callers never set this directly.
+  readonly pixelScale?: number;
   readonly ignoreLessThanPixels?: number;
   readonly smoothness?: number;
   readonly optimize?: number;
@@ -256,7 +268,14 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
     return cleanBinaryMask(prepared, options);
   }
   if (shouldUseSketchTrace(image, options)) {
-    const prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
+    const prepared = sketchTraceToMonochrome(
+      applyImageAdjustments(image, options),
+      // The local-contrast window is denominated in SOURCE pixels; on a
+      // supersampled raster it must scale or it halves in real terms and
+      // hollows out strokes wider than the window (adaptive-threshold
+      // failure mode: recall 0.93 -> 0.66 measured at 2x).
+      SKETCH_RADIUS_PX * effectivePixelScale(options),
+    );
     return cleanBinaryMask(prepared, options);
   }
   let prepared = applyImageAdjustments(image, options);
@@ -272,10 +291,19 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
 // slivers → ink). Extracting it keeps preprocessForTrace under the
 // complexity cap.
 function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageData {
+  // Area-denominated caps scale by pixelScale² on supersampled traces so
+  // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
+  const scale = effectivePixelScale(options);
   const despeckled = shouldDespeckle(options)
-    ? despeckle(image, options.despeckleMinPixels ?? 0)
+    ? despeckle(image, (options.despeckleMinPixels ?? 0) * scale * scale)
     : image;
-  return options.fillPinholeCracks === true ? fillPinholes(despeckled) : despeckled;
+  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale) : despeckled;
+}
+
+/** Sanitized supersampling factor (see TraceOptions.pixelScale). */
+export function effectivePixelScale(options: TraceOptions): number {
+  const scale = options.pixelScale ?? 1;
+  return Number.isFinite(scale) && scale >= 1 ? scale : 1;
 }
 
 // Sub-pixel crack field (research brief 2026-07-10): the pre-threshold
@@ -291,7 +319,11 @@ export function crackFieldForTrace(
   if (!isValidRawImageData(image)) return null;
   if (shouldTraceAlphaMask(image, options)) return null;
   const adjusted = applyImageAdjustments(image, options);
-  if (shouldUseSketchTrace(image, options)) return sketchCrackField(adjusted);
+  if (shouldUseSketchTrace(image, options)) {
+    // Same scaled window as sketchTraceToMonochrome — the interpolation iso
+    // must be the exact iso the mask was cut at.
+    return sketchCrackField(adjusted, SKETCH_RADIUS_PX * effectivePixelScale(options));
+  }
   const prepared = shouldApplyMedian(adjusted, options.medianFilter)
     ? medianFilter(adjusted)
     : adjusted;
@@ -329,7 +361,7 @@ function lumaCrackField(prepared: RawImageData, thresholdLuma: number): CrackSub
 // threshold, exposed as thresholdAt so the walker interpolates raw luma
 // against the local iso value. (Exact-equality pixels classify background in
 // the mask; the walker's straddle check falls back to the midpoint there.)
-function sketchCrackField(adjusted: RawImageData): CrackSubPixelField {
+function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): CrackSubPixelField {
   const { width, height } = adjusted;
   const luma = lumaBuffer(adjusted);
   const integral = integralLuma(luma, width, height);
@@ -337,7 +369,7 @@ function sketchCrackField(adjusted: RawImageData): CrackSubPixelField {
     thresholdAt: (x: number, y: number): number => {
       const cx = Math.min(width - 1, Math.max(0, x));
       const cy = Math.min(height - 1, Math.max(0, y));
-      return localMean(integral, width, height, cx, cy, SKETCH_RADIUS_PX) - SKETCH_CONTRAST_BIAS;
+      return localMean(integral, width, height, cx, cy, radiusPx) - SKETCH_CONTRAST_BIAS;
     },
     lumaAt: (x: number, y: number): number => {
       if (x < 0 || y < 0 || x >= width || y >= height) return BACKGROUND_LUMA;
@@ -421,14 +453,14 @@ function shouldTraceAlphaMask(image: RawImageData, options: TraceOptions): boole
 const SKETCH_RADIUS_PX = 8;
 const SKETCH_CONTRAST_BIAS = 8;
 
-function sketchTraceToMonochrome(image: RawImageData): RawImageData {
+function sketchTraceToMonochrome(image: RawImageData, radiusPx = SKETCH_RADIUS_PX): RawImageData {
   const luma = lumaBuffer(image);
   const integral = integralLuma(luma, image.width, image.height);
   const data = new Uint8ClampedArray(image.data.length);
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
       const pixel = y * image.width + x;
-      const mean = localMean(integral, image.width, image.height, x, y, SKETCH_RADIUS_PX);
+      const mean = localMean(integral, image.width, image.height, x, y, radiusPx);
       const v = (luma[pixel] ?? 255) < mean - SKETCH_CONTRAST_BIAS ? 0 : 255;
       const out = pixel * 4;
       data[out] = v;

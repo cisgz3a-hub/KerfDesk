@@ -117,4 +117,23 @@ describe('fillPinholes', () => {
     };
     expect(fillPinholes(malformed)).toBe(malformed);
   });
+
+  it('scales its caps with pixelScale so supersampled cracks still fill', () => {
+    // The H-stem crack at 2x supersample: 4px wide, 60px long = 240px area —
+    // over BOTH 1x caps (radius 1, area 120) but exactly the same real-space
+    // sliver. With pixelScale 2 the caps normalize and it fills.
+    const rows = withVerticalSlit(solidBlock(40, 80), 18, 4, 10, 70);
+    expect(rowsFromImage(fillPinholes(imageFromRows(rows), 2))).toEqual(solidBlock(40, 80));
+    expect(rowsFromImage(fillPinholes(imageFromRows(rows)))).toEqual(rows);
+  });
+
+  it('keeps fat counters at pixelScale 2 (thinness still guards)', () => {
+    // A 16x16 counter at 2x (8x8 real): enclosed, area 256 <= scaled cap,
+    // but max inscribed radius 8 > scaled radius cap 2 — must survive.
+    const rows = solidBlock(40, 40).map((row, y) => {
+      if (y < 12 || y >= 28) return row;
+      return row.slice(0, 12) + '.'.repeat(16) + row.slice(28);
+    });
+    expect(rowsFromImage(fillPinholes(imageFromRows(rows), 2))).toEqual(rows);
+  });
 });

@@ -25,6 +25,7 @@ import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import {
   crackFieldForTrace,
+  effectivePixelScale,
   preprocessForTrace,
   type RawImageData,
   type TraceOptions,
@@ -95,10 +96,14 @@ export function traceImageToContourColoredPaths(
   // binary mask (despeckle / pinhole fill decide what exists; the AA ramp
   // decides exactly where its edge lies).
   const crackField = crackFieldForTrace(image, options);
+  // Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
+  // trace: areas scale by scale², lengths (simplify ε) by scale.
+  const scale = effectivePixelScale(options);
   const polylines = contourPolylinesFromMask(mask, {
-    minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0),
-    epsilonPx: SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1),
+    minAreaPx: Math.max(options.ignoreLessThanPixels ?? 0, 0) * scale * scale,
+    epsilonPx: SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale,
     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
+    pixelScale: scale,
     ...(crackField === null ? {} : { crackField }),
   });
   return polylines.length === 0 ? [] : [{ color: CONTOUR_COLOR, polylines }];
@@ -111,6 +116,9 @@ export type ContourFinishOptions = {
   readonly epsilonPx: number;
   /** Wobble-flattening strength (see flatten-straight-runs.ts); 0 = off. */
   readonly flattenStrength: number;
+  /** Supersampling factor of the mask; scales the sharpener's chain-length
+   *  regime bounds so glyphs stay in the same regime they were tuned in. */
+  readonly pixelScale?: number;
   /** Pre-threshold field for sub-pixel crack interpolation; omitted = plain
    *  mid-crack vertices (binary-only callers like the edge lane). */
   readonly crackField?: CrackSubPixelField;
@@ -120,11 +128,16 @@ export type ContourFinishOptions = {
  *  geometry stage behind the filled-contours lane and (via its own mask
  *  builder) the Edge Detection lane. */
 export function contourPolylinesFromMask(mask: InkMask, options: ContourFinishOptions): Polyline[] {
+  const pixelScale =
+    options.pixelScale !== undefined && Number.isFinite(options.pixelScale)
+      ? Math.max(1, options.pixelScale)
+      : 1;
   const finish: LoopFinish = {
     distSq: squaredDistanceField(mask),
     width: mask.width,
     epsilonPx: options.epsilonPx,
     flattenStrength: options.flattenStrength,
+    pixelScale,
     crackField: options.crackField,
   };
   const polylines: Polyline[] = [];
@@ -143,6 +156,7 @@ type LoopFinish = {
   readonly width: number;
   readonly epsilonPx: number;
   readonly flattenStrength: number;
+  readonly pixelScale: number;
   readonly crackField: CrackSubPixelField | undefined;
 };
 
@@ -158,8 +172,13 @@ function finishLoop(
   // staircase jogs read as corners downstream and long straight edges come
   // out wobbly (maintainer-observed on the arch-house H stems).
   const dense = smoothRawChain(midCrackChain(staircase, finish.crackField), true);
+  // The chain-length regime bounds were tuned at 1x; a supersampled chain is
+  // pixelScale× denser, so the bounds scale with it — a LANGEBAAN-size glyph
+  // must stay in the same (sparse-detection) regime it was tuned for.
+  const sharpenMin = SHARPEN_MIN_CHAIN_POINTS * finish.pixelScale;
+  const sharpenMax = SHARPEN_MAX_CHAIN_POINTS * finish.pixelScale;
   const sharpened =
-    dense.length >= SHARPEN_MIN_CHAIN_POINTS && dense.length <= SHARPEN_MAX_CHAIN_POINTS
+    dense.length >= sharpenMin && dense.length <= sharpenMax
       ? sharpenChainBends(dense, true, distSq, width)
       : { points: dense, corners: NO_CORNERS };
   const evened = smoothChainCurvature(sharpened.points, true, sharpened.corners);
@@ -171,7 +190,7 @@ function finishLoop(
   // bowls at counter scale already render correctly and a ±7px window is a
   // large fraction of such a feature.
   const arcSmoothed =
-    dense.length >= SHARPEN_MIN_CHAIN_POINTS
+    dense.length >= sharpenMin
       ? smoothArcNoise(evened, true, sharpened.corners, finish.flattenStrength)
       : evened;
   const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
