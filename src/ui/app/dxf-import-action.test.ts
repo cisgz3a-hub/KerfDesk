@@ -73,6 +73,24 @@ describe('importDxfFiles', () => {
     expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('1 path'), 'success');
   });
 
+  // IMP-07: when the handle reports its size, gate the oversize confirm BEFORE
+  // reading, so a declined huge file is never pulled into memory. (The existing
+  // no-size handles above exercise the post-read fallback.)
+  it('gates on size before reading; a declined oversize file is never read', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const text = vi.fn(async () => dxfLine());
+    const importObject = vi.fn();
+
+    await importDxfFiles([{ name: 'huge.dxf', size: 26 * 1024 * 1024, text }], {
+      importObject: importObject as never,
+      pushToast: vi.fn(),
+    });
+
+    expect(text).not.toHaveBeenCalled();
+    expect(importObject).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
   it('routes re-imports through the replace toast', async () => {
     const pushToast = vi.fn();
     await importDxfFiles([file('part.dxf', dxfLine())], {

@@ -5,6 +5,11 @@
 
 export type FileHandle = {
   readonly name: string;
+  // Byte size when the adapter can supply it cheaply (web File.size, Electron
+  // fs.stat). Lets callers gate an oversize-import confirm BEFORE reading the
+  // whole file into memory. Optional: adapters/mocks that don't set it fall
+  // back to gating on the loaded length.
+  readonly size?: number;
   // Lazily read the file's text content. Cheap to call once; some platforms
   // (web File objects) consume the stream so callers shouldn't call twice.
   readonly text: () => Promise<string>;

@@ -39,7 +39,11 @@ export async function handleImportDxf(
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<void> {
-  let files: ReadonlyArray<{ readonly name: string; readonly text: () => Promise<string> }>;
+  let files: ReadonlyArray<{
+    readonly name: string;
+    readonly size?: number;
+    readonly text: () => Promise<string>;
+  }>;
   try {
     files = await platform.pickFilesForOpen({ accept: ['.dxf'], multiple: true });
   } catch (err) {
@@ -54,7 +58,11 @@ export async function handleImportSvg(
   importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<void> {
-  let files: ReadonlyArray<{ readonly name: string; readonly text: () => Promise<string> }>;
+  let files: ReadonlyArray<{
+    readonly name: string;
+    readonly size?: number;
+    readonly text: () => Promise<string>;
+  }>;
   try {
     files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
   } catch (err) {
@@ -64,10 +72,12 @@ export async function handleImportSvg(
   let successIdx = 0;
   for (const file of files) {
     try {
+      // F-A4 oversize confirm. Gate on the file size BEFORE reading when the
+      // adapter supplies it, so a huge file can't OOM the tab before the user is
+      // asked; adapters without size fall back to the post-read length gate.
+      if (file.size !== undefined && !confirmOversizeImport(file.name, file.size)) continue;
       const text = await file.text();
-      // F-A4 mirrors F-A3's oversize confirm. The platform FileHandle has no
-      // size, so gate on the loaded text length (chars ≈ bytes for SVG).
-      if (!confirmOversizeImport(file.name, text.length)) continue;
+      if (file.size === undefined && !confirmOversizeImport(file.name, text.length)) continue;
       const id = crypto.randomUUID();
       const result = parseSvg({ svgText: text, id, source: file.name });
       if (result.object !== null) {
@@ -256,7 +266,11 @@ export type OpenProjectCtx = {
 };
 
 export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
-  let files: ReadonlyArray<{ readonly name: string; readonly text: () => Promise<string> }>;
+  let files: ReadonlyArray<{
+    readonly name: string;
+    readonly size?: number;
+    readonly text: () => Promise<string>;
+  }>;
   try {
     files = await ctx.platform.pickFilesForOpen({ accept: ['.lf2'], multiple: false });
   } catch (err) {
