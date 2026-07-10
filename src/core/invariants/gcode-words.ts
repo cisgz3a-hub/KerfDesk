@@ -19,6 +19,16 @@ export function isGcodeMotionCommand(line: string): boolean {
   return /^G[0123](?=$|\s|[A-Za-z])/i.test(line);
 }
 
+// G2 (clockwise) / G3 (counter-clockwise) circular interpolation. Matches the
+// single-digit form the emitter writes, consistent with isGcodeMotionCommand.
+export function isArcMotion(line: string): boolean {
+  return /^G[23](?=$|\s|[A-Za-z])/i.test(line);
+}
+
+export function isClockwiseArc(line: string): boolean {
+  return /^G2(?=$|\s|[A-Za-z])/i.test(line);
+}
+
 export function stripGcodeComment(line: string): string {
   const semi = line.indexOf(';');
   const head = semi >= 0 ? line.slice(0, semi) : line;
