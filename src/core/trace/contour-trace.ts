@@ -25,6 +25,7 @@ import {
   traceBoundaryLoops,
   type CrackSubPixelField,
 } from './contour-boundary';
+import { fitCubicsThroughPoints, sampleCubics } from './fit-cubics';
 import { flattenStraightRuns } from './flatten-straight-runs';
 import { smoothArcNoise } from './smooth-arc-noise';
 import {
@@ -71,6 +72,11 @@ const NO_CORNERS: ReadonlySet<Polyline['points'][number]> = new Set();
 // A loop whose cracks mostly interpolated is a sub-pixel MEASUREMENT (see
 // finishLoop): above this fraction the wobble stages disable for that loop.
 const SUBPIXEL_INFORMED_FRACTION = 0.3;
+// Least-squares cubic fit tolerance for the measured-loop output tail, in
+// SOURCE px (scaled by pixelScale like every px knob). ~2-3x the sub-pixel
+// measurement noise: tight enough to keep drawn features, loose enough that
+// the fit averages noise instead of chasing it.
+const FIT_TOLERANCE_PX = 0.35;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
 
@@ -186,8 +192,8 @@ function finishLoop(
   // fabricates joint steps on gently flaring stems (maintainer H-stem
   // verdicts, 2026-07-11) and evening it fights drawn texture. Binary
   // sources (saturated steps, fraction ~0) keep the full 1x behaviour.
-  const wobbleStrength =
-    crack.interpolatedFraction >= SUBPIXEL_INFORMED_FRACTION ? 0 : finish.flattenStrength;
+  const subPixelInformed = crack.interpolatedFraction >= SUBPIXEL_INFORMED_FRACTION;
+  const wobbleStrength = subPixelInformed ? 0 : finish.flattenStrength;
   // The chain-length regime bounds were tuned at 1x; a supersampled chain is
   // pixelScale× denser, so the bounds scale with it — a LANGEBAAN-size glyph
   // must stay in the same (sparse-detection) regime it was tuned for.
@@ -209,6 +215,15 @@ function finishLoop(
     dense.length >= sharpenMin
       ? smoothArcNoise(evened, true, sharpened.corners, wobbleStrength, finish.pixelScale)
       : evened;
+  // Measured loops with an evidence-based corner set (sharpener range) take
+  // the fairing-by-fitting tail: least-squares cubics THROUGH the measured
+  // points replace simplify+flatten+spline — the fit averages ~0.1px noise
+  // into fair curves with no chord joints and no per-vertex facets
+  // (research brief #2). Tiny glyphs and beyond-range art loops keep the
+  // approved legacy tail until the fit path earns them.
+  if (subPixelInformed && dense.length >= sharpenMin && dense.length <= sharpenMax) {
+    return fitLoopTail(arcSmoothed, sharpened.corners, finish);
+  }
   const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
   // Rough source edges leave long-wavelength waviness that survives both
@@ -231,5 +246,19 @@ function finishLoop(
       closed: true,
     },
   ]);
+  return closed[0] ?? null;
+}
+
+// The measured-loop output tail: G1 cubic fit segmented at the sharpener's
+// evidence-backed corners, resampled to the polyline contract.
+function fitLoopTail(
+  chain: ReadonlyArray<Polyline['points'][number]>,
+  corners: ReadonlySet<Polyline['points'][number]>,
+  finish: LoopFinish,
+): Polyline | null {
+  const cubics = fitCubicsThroughPoints(chain, true, corners, FIT_TOLERANCE_PX * finish.pixelScale);
+  const sampled = sampleCubics(cubics, true);
+  if (sampled.length < MIN_LOOP_POINTS) return null;
+  const closed = closeRingEndpoints([{ points: sampled, closed: true }]);
   return closed[0] ?? null;
 }
