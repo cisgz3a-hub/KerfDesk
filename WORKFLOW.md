@@ -513,10 +513,10 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 #### Edit
 - `Cmd/Ctrl+Z` — Undo
 - `Cmd/Ctrl+Shift+Z` — Redo
-- `Cmd/Ctrl+X` — Cut (not implemented)
-- `Cmd/Ctrl+C` — Copy (browser default in inputs; no scene-object clipboard yet)
-- `Cmd/Ctrl+V` — Paste (browser default in inputs)
-- `Cmd/Ctrl+D` — Duplicate selection with 10mm offset (shipped)
+- `Cmd/Ctrl+X` — Cut selected objects to the scene clipboard
+- `Cmd/Ctrl+C` — Copy selected objects to the scene clipboard
+- `Cmd/Ctrl+V` — Paste the scene clipboard (offset from the source)
+- `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
