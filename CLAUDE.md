@@ -171,9 +171,11 @@ Enforced by ESLint `no-restricted-globals` and `no-restricted-imports`.
 - Snapshot tests for G-code output on the fixture corpus.
 - **Bug fix workflow**: write a failing test that demonstrates the bug, then fix it, then verify the test passes. PR must include both the test (new) and the fix.
 
-CI rejects PRs that:
+PR review rejects PRs that:
 - Modify source without modifying or adding tests, except for pure refactors flagged as such.
 - Modify the G-code snapshot without an explicit acknowledgment line in the PR description: `Snapshot change acknowledged: <reason>`.
+
+(These are review conventions, not CI-mechanical gates — `release:check` runs lint, typecheck, format, license, audit, tests, builds, and file-size, none of which inspect test-file presence or the PR description. See line 169 and PROJECT.md #16.)
 
 ---
 
