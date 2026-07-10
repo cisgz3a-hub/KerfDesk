@@ -214,18 +214,10 @@ Identical to F-A3 except:
 ### F-A7. Cuts/Layers panel
 
 #### Layout
-- Vertical list. Each row is one Layer (one unique stroke color).
-- Row contents, left to right:
-  1. Color swatch (12×12 px square, the SVG stroke color).
-  2. Mode dropdown — value: `Line` (only enabled option in Phase A; `Fill` and `Image` disabled with tooltip).
-  3. Power input — number, 0–100, suffix `%`.
-  4. Speed input — number, suffix `mm/min`.
-  5. Passes input — integer, ≥ 1.
-  6. Visible toggle — eye icon.
-  7. Output toggle — checkbox labeled "Output".
-- Row hover: light highlight + delete button (for the *Layer*, not the objects — see edge below).
-
-- Each row includes order controls. The visible Cuts/Layers list order is the generated output order.
+- Vertical **card** stack — one card per Layer (one unique stroke color). Cards use the panel's full height rather than cramming the settings into a horizontal row.
+- Each card's **header strip** carries the colour swatch (the layer's stroke colour), a **Mode** selector (`Line` / `Fill` / `Image` — all three are live), and the **Show** / **Output** toggles; per-card order controls set the card's position in the stack.
+- Below the header, **field rows**: Power (0–100 `%`), Speed (`mm/min`), Passes (integer ≥ 1), and mode-specific fields (e.g. image adjustments in Image mode).
+- The visible card order is the generated output order. (Layer delete semantics — cards auto-appear/disappear with their colour — are covered under the edge cases below.)
 
 #### Default values for a new Layer
 - Power: 30 %
@@ -237,7 +229,7 @@ Identical to F-A3 except:
 #### Success — edit power value
 1. Click input, type new value (or use stepper).
 2. Input is debounced — change is committed after 300 ms of inactivity, **not** on every keystroke (the LF1 audit found this missing; do not repeat).
-3. On commit, status bar shows brief confirmation: `Layer · power set to 50%`.
+3. On commit, the change is applied to the layer and the field reflects the committed value. (There is no separate status-bar confirmation — the earlier spec's `Layer · power set to 50%` message was never implemented.)
 
 #### Success — toggle output off
 1. Click Output checkbox.
@@ -262,7 +254,7 @@ Identical to F-A3 except:
 - All controls disabled.
 
 #### Error — power input out of range
-- < 0 or > 100: input snaps to nearest valid value, briefly flashes red, status bar shows: `Power must be 0–100`.
+- Values outside 0–100 are constrained to the valid range. (The earlier spec's `Power must be 0–100` status-bar message was never implemented.)
 
 #### Error — speed input out of range
 - < 1: snaps to 1.
