@@ -4,7 +4,7 @@
 // keeps these handlers pure of React hooks, so they can be called from
 // anywhere.
 
-import { runControllerReadiness, type ControllerSettingsSnapshot } from '../../core/preflight';
+import type { ControllerSettingsSnapshot } from '../../core/preflight';
 import { machineKindOf, type OutputScope, type Project, type SceneObject } from '../../core/scene';
 import { emitGcode } from '../../io/gcode';
 import { buildGcodeMetadata } from './build-info';
@@ -12,7 +12,7 @@ import { deserializeProject, serializeProject } from '../../io/project';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
-import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
+import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
@@ -30,6 +30,7 @@ import {
 } from './import-toasts';
 import { importDxfFiles } from './dxf-import-action';
 import { handleSaveTiledGcode } from './save-tiled-gcode';
+import { confirmControllerReadiness } from './confirm-controller-readiness';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
 
@@ -145,7 +146,7 @@ export async function handleSaveGcode(ctx: SaveGcodeCtx): Promise<void> {
     jobAwareAlert(`Cannot save G-code:\n\n${lines}`);
     return;
   }
-  if (!confirmControllerMismatch(ctx)) return;
+  if (!confirmControllerReadiness(ctx.project, ctx.controllerSettings)) return;
   let target: SaveTarget | null;
   try {
     target = await ctx.platform.pickFileForSave({
@@ -194,21 +195,6 @@ function emitSaveGcode(
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),
     ...(motionOffset === undefined ? {} : { preflightMotionOffset: motionOffset }),
   });
-}
-
-// M11 (AUDIT-2026-06-10): the $30 power-scale check used to protect only the
-// streamed Start path. A project max S of 1000 saved for a $30=255 machine
-// clamps every S>255 to 100% beam power when the file is run from an SD card
-// or another sender — gate the export behind an explicit confirmation when
-// the connected controller's settings disagree.
-function confirmControllerMismatch(ctx: SaveGcodeCtx): boolean {
-  if (ctx.controllerSettings === undefined || ctx.controllerSettings === null) return true;
-  const readiness = runControllerReadiness(ctx.project, ctx.controllerSettings);
-  if (readiness.ok) return true;
-  const lines = readiness.errors.map((e) => `• ${e.message}`).join('\n');
-  return jobAwareConfirm(
-    `The exported file may not run safely on the connected controller:\n\n${lines}\n\nSave anyway?`,
-  );
 }
 
 export type SaveProjectCtx = {
