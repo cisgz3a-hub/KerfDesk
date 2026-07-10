@@ -147,6 +147,8 @@ type CropRegion = {
 };
 
 const CROP_REGIONS: ReadonlyArray<CropRegion> = [
+  // Upper roof beam (iteration-12 verdict: renders hollow on the canvas).
+  { name: 'top-beam', x0: 285, y0: 230, x1: 585, y1: 320 },
   // Tight H-stem close-up (iteration-8 verdict: chord-joint steps on stems).
   { name: 'h-stem', x0: 515, y0: 540, x1: 585, y1: 670 },
   { name: 'arch-word', x0: 120, y0: 540, x1: 520, y1: 665 },

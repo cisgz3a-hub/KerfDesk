@@ -77,6 +77,12 @@ const SUBPIXEL_INFORMED_FRACTION = 0.3;
 // measurement noise: tight enough to keep drawn features, loose enough that
 // the fit averages noise instead of chasing it.
 const FIT_TOLERANCE_PX = 0.35;
+// Above-range (organic art) loops fit with a looser tolerance: their
+// hand-drawn brush texture is sub-pixel noise relative to the DRAWN shape,
+// and chasing it splits the fit into micro-segments that render as sawtooth
+// (maintainer roof-line verdicts, 2026-07-11). The reference style smooths
+// that texture; ~1px keeps every drawn feature while fairing the ink.
+const FIT_TOLERANCE_ORGANIC_PX = 0.9;
 // Neutral Smoothness when the dialog value is absent or non-finite.
 const DEFAULT_SMOOTHNESS = 1;
 
@@ -235,7 +241,8 @@ function finishLoop(
     const corners = inSharpenRange
       ? sharpened.corners
       : denseHardTurnCorners(arcSmoothed, finish.pixelScale);
-    return fitLoopTail(arcSmoothed, corners, finish);
+    const tolerancePx = inSharpenRange ? FIT_TOLERANCE_PX : FIT_TOLERANCE_ORGANIC_PX;
+    return fitLoopTail(arcSmoothed, corners, finish, tolerancePx);
   }
   const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
@@ -268,8 +275,9 @@ function fitLoopTail(
   chain: ReadonlyArray<Polyline['points'][number]>,
   corners: ReadonlySet<Polyline['points'][number]>,
   finish: LoopFinish,
+  tolerancePx: number,
 ): Polyline | null {
-  const cubics = fitCubicsThroughPoints(chain, true, corners, FIT_TOLERANCE_PX * finish.pixelScale);
+  const cubics = fitCubicsThroughPoints(chain, true, corners, tolerancePx * finish.pixelScale);
   const sampled = sampleCubics(cubics, true);
   if (sampled.length < MIN_LOOP_POINTS) return null;
   const closed = closeRingEndpoints([{ points: sampled, closed: true }]);
@@ -281,7 +289,11 @@ function fitLoopTail(
 // vertex, pin turns ≥ the shared 60° hard-turn convention, greedy non-max
 // suppression so one physical corner yields one pin.
 const DENSE_CORNER_SPAN_PX = 2;
-const DENSE_CORNER_TURN_RAD = (60 * Math.PI) / 180;
+// Needle-sharp only: hand-drawn brush texture turns 60-80° inside a ±2px
+// window all along rough strokes, and pinning those bumps breaks the fit at
+// every one (sawtooth). Genuine tips (wave points, tapered stroke ends) and
+// hard structural corners turn ≥90°.
+const DENSE_CORNER_TURN_RAD = (90 * Math.PI) / 180;
 
 function denseHardTurnCorners(
   points: ReadonlyArray<Polyline['points'][number]>,
