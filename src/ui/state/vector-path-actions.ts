@@ -1,15 +1,13 @@
-import { dogboneVectorObject } from '../../core/geometry/dogbone';
 import {
   combineVectorObjects,
-  offsetVectorObjects,
-  type VectorBooleanOp,
-} from '../../core/geometry/vector-path-booleans';
-import {
+  dogboneVectorObject,
   isVectorPathObject,
   materializeVectorObject,
+  offsetVectorObjects,
   weldVectorObjects,
+  type VectorBooleanOp,
   type VectorSceneObject,
-} from '../../core/geometry/vector-path-tools';
+} from '../../core/geometry';
 import { addObject, removeObject, replaceObject, type Project, type Scene } from '../../core/scene';
 import type { PathNodeRef } from './path-node-edit-actions';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
