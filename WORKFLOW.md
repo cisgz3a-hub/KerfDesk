@@ -2739,10 +2739,12 @@ F-CNC19 tiling.
 ### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)
 
 - **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
-  feed. They engrave the four alignment targets (reusing the registration jig), then drag the
-  four on-screen markers onto the engraved crosshairs. On the fourth point the homography
-  solves and the feed warps to sit on the bed; the operator places artwork over the real
-  material and adjusts overlay opacity. The applied calibration is saved to the device profile.
+  feed. On a machine (network) camera the manual path is to click the four bed corners in the
+  live preview — the view prompts for each corner in turn ("Click the … bed corner (N / 4)").
+  On the fourth click the homography solves and the feed warps to sit on the bed; the operator
+  presses "Save & show on canvas" (F-CAM3) to persist the calibration to the device profile,
+  then places artwork over the real material and adjusts overlay opacity. USB/RTSP cameras have
+  no click-corners path — align them with the "Align to bed…" marker wizard (F-CAM4).
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
@@ -2797,14 +2799,14 @@ F-CNC19 tiling.
 
 ### F-CAM4. Automatic marker alignment (v3 — ADR-109)
 
-- **Success / one-click align.** The operator presses "Add markers to project"
-  (the scene is replaced by the five-patch pattern, like the other calibration
-  generators), burns it on scrap covering the bed corners, clears the bed of
-  everything else, and presses Auto-align with the camera live. The five
-  X-corners are detected, the origin pair resolves the camera's rotation, the
-  homography solves, and the alignment persists (undoable) — the workspace
-  overlay is immediately registered. With a lens calibration present the
-  capture is de-fisheyed first and the toast says "lens-corrected".
+- **Success / one-click align.** The operator opens the "Align to bed…" wizard from the
+  Camera panel. Its steps add the five-patch marker target to the project (the scene is
+  replaced by the pattern, like the other calibration generators) and burn it on scrap
+  covering the bed corners — or reuse an already-burned target — then, with the bed cleared of
+  everything else and the camera live, Detect. The five X-corners are detected, the origin
+  pair resolves the camera's rotation, the homography solves, and the alignment persists
+  (undoable) — the workspace overlay is immediately registered. With a lens calibration
+  present the capture is de-fisheyed first and the toast says "lens-corrected".
 - **Error / markers not found.** A cluttered bed, missing patches, or poor
   lighting produce a typed toast telling the operator what to fix; nothing
   persists. A degenerate solve (markers nearly collinear) is refused the same
