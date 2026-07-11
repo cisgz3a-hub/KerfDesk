@@ -34,6 +34,7 @@ function makeLaserState(): LaserState {
     wcoCache: null,
     ovCache: null,
     workOriginActive: false,
+    workZZeroKnown: false,
     workOriginSource: 'none',
     frameVerification: null,
     connect: async () => undefined,

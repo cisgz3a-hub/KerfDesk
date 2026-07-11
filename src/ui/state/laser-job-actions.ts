@@ -263,11 +263,12 @@ async function runContinueToolChange(set: SetFn, safeWrite: SafeWriteFn): Promis
 
 function originPatchAfterSoftReset(
   state: LaserState,
-): Pick<LaserState, 'workOriginActive' | 'workOriginSource'> {
+): Pick<LaserState, 'workOriginActive' | 'workOriginSource' | 'workZZeroKnown'> {
+  // A soft reset voids the bit-to-stock Z relationship (Codex audit P1).
   if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
-    return { workOriginActive: true, workOriginSource: 'unknown' };
+    return { workOriginActive: true, workOriginSource: 'unknown', workZZeroKnown: false };
   }
-  return { workOriginActive: false, workOriginSource: 'none' };
+  return { workOriginActive: false, workOriginSource: 'none', workZZeroKnown: false };
 }
 
 function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {

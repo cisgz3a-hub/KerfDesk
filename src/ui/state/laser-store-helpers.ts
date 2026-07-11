@@ -229,6 +229,7 @@ export function initialLaserState(): Pick<
   | 'ovCache'
   | 'workOriginActive'
   | 'workOriginSource'
+  | 'workZZeroKnown'
   | 'frameVerification'
 > {
   return {
@@ -260,6 +261,7 @@ export function initialLaserState(): Pick<
     ovCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
+    workZZeroKnown: false,
     frameVerification: null,
   };
 }

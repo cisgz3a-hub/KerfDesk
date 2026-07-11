@@ -139,6 +139,7 @@ async function runDisconnect(
     wcoCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
+    workZZeroKnown: false,
     frameVerification: null,
     motionOperation: null,
     controllerOperation: null,

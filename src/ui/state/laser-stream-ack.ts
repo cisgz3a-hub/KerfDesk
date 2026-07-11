@@ -39,6 +39,13 @@ export function advanceStream(
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
   set({ streamer: stepped.state });
+  // Entering a tool-change hold means a new bit is going in: the previous bit's
+  // work Z0 no longer holds, so the operator must re-Zero-Z for the new tool
+  // (the setup gate allows it during the hold). Invalidate so the no-work-zero
+  // advisory is honest again until they do (Codex audit P1).
+  if (s.status !== 'tool-change' && stepped.state.status === 'tool-change') {
+    set({ workZZeroKnown: false });
+  }
   if (s.status !== 'done' && stepped.state.status === 'done') {
     beginPostJobSettle(set, get, refs, safeWrite);
   }

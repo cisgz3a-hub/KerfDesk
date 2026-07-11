@@ -53,6 +53,7 @@ export type MachineStartSnapshot = {
   readonly controllerOperationActive?: boolean;
   readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
+  readonly workZZeroKnown?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;
   // ADR-053 P2 — the last clean Verified Frame, gating verified-origin starts.
   readonly frameVerification?: FrameVerification | null;
@@ -136,7 +137,7 @@ function collectStartWarnings(
   controllerWarnings: ReadonlyArray<string>,
   machine: MachineStartSnapshot,
 ): string[] {
-  const workZeroAdvisory = cncWorkZeroAdvisory(project, machine.workOriginActive);
+  const workZeroAdvisory = cncWorkZeroAdvisory(project, machine.workZZeroKnown);
   return [
     ...controllerWarnings,
     ...detectMachineJobWarnings(project, controllerSettings),

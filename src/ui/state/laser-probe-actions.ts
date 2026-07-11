@@ -29,11 +29,15 @@ export function probeActions(set: SetFn, get: GetFn, refs: ProbeRefs): Pick<Lase
       }
       set({ probeBusy: true });
       try {
-        return await runProbeSequence({
+        const result = await runProbeSequence({
           connection: refs.connection,
           statusReport: get().statusReport,
           lines,
         });
+        // A successful touch-plate probe runs the caller's probe lines, which set
+        // work Z0 — establish the CNC stock-top contract for the Start advisory.
+        if (result.kind === 'ok') set({ workZZeroKnown: true });
+        return result;
       } finally {
         set({ probeBusy: false });
       }

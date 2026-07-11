@@ -137,6 +137,13 @@ export type LaserState = {
   readonly ovCache: OverrideValues | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
+  // Whether work Z0 (the CNC stock-top contract) has been established THIS
+  // session and is still valid. Separate from workOriginActive (XY origin): Set
+  // Origin (G92 X0 Y0) sets XY but not Z; Zero Z / a successful probe set this.
+  // Invalidated by anything that voids the bit-to-stock relationship — reconnect,
+  // reset/alarm, homing, release-motors, clear-origin, and a tool change (Codex
+  // audit P1). Drives the CNC no-work-zero Start advisory.
+  readonly workZZeroKnown: boolean;
   /**
    * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
    * the current origin. Set when a frame is dispatched in 'verified-origin'
