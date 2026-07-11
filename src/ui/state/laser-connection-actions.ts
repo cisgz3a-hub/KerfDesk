@@ -175,6 +175,7 @@ async function runHandshake(
     set(
       appendSystemNotice(
         get(),
+        refs,
         `[lf2] No controller response within 2 s. Check baud rate (${driver.defaultBaudRate}) and that the device is ${driver.label}.`,
       ),
     );

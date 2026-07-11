@@ -30,6 +30,7 @@ import { grblSettingsActions } from './grbl-settings-actions';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
 import { jobActions } from './laser-job-actions';
+import { appendSystemNotice } from './laser-system-notice';
 import { jogActions } from './laser-jog-actions';
 import { type LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
@@ -198,6 +199,10 @@ export type LaserState = {
   readonly continueToolChange: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
   readonly clearSafetyNotice: () => void;
+  // Write an app diagnostic to the Console transcript + log. Used by UI callers
+  // (e.g. the wake-lock hook) that have no access to the store's refs; the action
+  // supplies them so transcript ids stay on the one shared counter.
+  readonly pushSystemNotice: (line: string) => void;
   readonly applyDetectedSettings: () => void;
   readonly dismissDetectedSettings: () => void;
   // G92 is the default session-scoped origin; advanced controls use G10/G54.
@@ -416,5 +421,6 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...originActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),
+  pushSystemNotice: (line) => set(appendSystemNotice(get(), refs, line)),
   markFrameVerified: (verification) => set({ frameVerification: verification }),
 }));

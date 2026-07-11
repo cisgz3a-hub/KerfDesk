@@ -9,7 +9,6 @@
 import { useEffect } from 'react';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
-import { appendSystemNotice } from '../state/laser-system-notice';
 
 const KEEP_AWAKE_UNAVAILABLE_MESSAGE =
   '[lf2] Keep-awake unavailable — the OS may sleep the screen mid-job. ' +
@@ -81,7 +80,7 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
   const warnUnavailableOnce = (): void => {
     if (warned) return;
     warned = true;
-    useLaserStore.setState((s) => appendSystemNotice(s, KEEP_AWAKE_UNAVAILABLE_MESSAGE));
+    useLaserStore.getState().pushSystemNotice(KEEP_AWAKE_UNAVAILABLE_MESSAGE);
   };
 
   const request = async (): Promise<void> => {

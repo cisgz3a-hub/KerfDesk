@@ -12,16 +12,20 @@ import type { LaserState } from './laser-store';
 
 export function appendSystemNotice(
   state: LaserState,
+  refs: { nextTranscriptId?: number },
   line: string,
 ): Pick<LaserState, 'log' | 'transcript'> {
-  // Derive the next id from the last entry's id (NOT the array length — the
-  // transcript is capped at TRANSCRIPT_MAX, so length plateaus while ids grow).
-  const lastId = state.transcript[state.transcript.length - 1]?.id ?? 0;
+  // Draw the id from the ONE shared owner — refs.nextTranscriptId, the same
+  // counter controller in/out lines use — and advance it. Deriving lastId+1
+  // independently would hand this notice the id the next controller line is
+  // about to take, colliding on the ConsolePanel React key (Codex audit).
+  const id = refs.nextTranscriptId ?? 1;
+  refs.nextTranscriptId = id + 1;
   return {
     log: pushLog(state, line),
     transcript: appendTranscript(
       state.transcript,
-      systemTranscriptEntry(lastId + 1, Date.now(), line, 'message'),
+      systemTranscriptEntry(id, Date.now(), line, 'message'),
     ),
   };
 }

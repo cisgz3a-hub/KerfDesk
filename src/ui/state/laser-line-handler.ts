@@ -161,6 +161,7 @@ function handleWelcomeLine(
       ? {}
       : appendSystemNotice(
           state,
+          refs,
           `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
         );
   // A banner means the controller (re)booted: replies owed by the previous
