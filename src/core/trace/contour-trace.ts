@@ -185,7 +185,7 @@ function finishLoop(
   staircase: ReadonlyArray<Polyline['points'][number]>,
   finish: LoopFinish,
 ): Polyline | null {
-  const { distSq, width, epsilonPx } = finish;
+  const { distSq, width } = finish;
   if (staircase.length < MIN_LOOP_POINTS) return null;
   // Mid-crack first (lattice steps become ≤45° bends; sub-pixel interpolated
   // when the pre-threshold field is available), then the SAME raw Taubin
@@ -234,18 +234,40 @@ function finishLoop(
   // (research brief #2). Tiny glyphs and beyond-range art loops keep the
   // approved legacy tail until the fit path earns them.
   if (subPixelInformed && dense.length >= sharpenMin) {
-    // In-range loops carry the sharpener's evidence-backed corners; larger
-    // loops (arch bands, waves, house outline) detect theirs from windowed
-    // dense turns so needle tips and roof corners still pin exactly, then
-    // are Whittaker-faired between those pins before the fit.
-    if (inSharpenRange) {
-      return fitLoopTail(arcSmoothed, sharpened.corners, finish, FIT_TOLERANCE_PX);
-    }
-    const corners = denseHardTurnCorners(arcSmoothed, finish.pixelScale);
-    const faired = fairChainSegments(arcSmoothed, true, corners, finish.pixelScale);
-    return fitLoopTail(faired, corners, finish, FIT_TOLERANCE_ORGANIC_PX);
+    return finishMeasuredLoop(arcSmoothed, sharpened, inSharpenRange, finish);
   }
-  const simplified = simplifyChain(arcSmoothed, true, epsilonPx);
+  return finishLegacyLoop(arcSmoothed, sharpened.corners, flattenStrengthEff, finish);
+}
+
+// Measured loops end in the fairing-by-fitting tail: least-squares cubics
+// THROUGH the measured points, with no chord joints or per-vertex facets.
+// In-range loops carry the sharpener's evidence-backed corners; larger loops
+// (arch bands, waves, house outline) detect theirs from windowed dense turns
+// so needle tips and roof corners still pin exactly, then are Whittaker-
+// faired between those pins before the tighter fit.
+function finishMeasuredLoop(
+  arcSmoothed: ReadonlyArray<Polyline['points'][number]>,
+  sharpened: { readonly corners: ReadonlySet<Polyline['points'][number]> },
+  inSharpenRange: boolean,
+  finish: LoopFinish,
+): Polyline | null {
+  if (inSharpenRange) {
+    return fitLoopTail(arcSmoothed, sharpened.corners, finish, FIT_TOLERANCE_PX);
+  }
+  const corners = denseHardTurnCorners(arcSmoothed, finish.pixelScale);
+  const faired = fairChainSegments(arcSmoothed, true, corners, finish.pixelScale);
+  return fitLoopTail(faired, corners, finish, FIT_TOLERANCE_ORGANIC_PX);
+}
+
+// The legacy tail (binary / pixel-fidelity sources): simplify → straight-run
+// flatten → corner-aware spline resample → close the ring.
+function finishLegacyLoop(
+  arcSmoothed: ReadonlyArray<Polyline['points'][number]>,
+  corners: ReadonlySet<Polyline['points'][number]>,
+  flattenStrength: number,
+  finish: LoopFinish,
+): Polyline | null {
+  const simplified = simplifyChain(arcSmoothed, true, finish.epsilonPx);
   if (simplified.length < MIN_LOOP_POINTS) return null;
   // Rough source edges leave long-wavelength waviness that survives both
   // evening and simplification (nominally straight stems trace wobbly);
@@ -253,8 +275,8 @@ function finishLoop(
   const straightened = flattenStraightRuns(
     simplified,
     true,
-    sharpened.corners,
-    flattenStrengthEff,
+    corners,
+    flattenStrength,
     finish.pixelScale,
   );
   if (straightened.length < MIN_LOOP_POINTS) return null;
@@ -263,7 +285,7 @@ function finishLoop(
   // closing edge, so a ring left "open" engraves with a seam gap.
   const closed = closeRingEndpoints([
     {
-      points: refineChainForOutput(straightened, true, sharpened.corners, epsilonPx),
+      points: refineChainForOutput(straightened, true, corners, finish.epsilonPx),
       closed: true,
     },
   ]);

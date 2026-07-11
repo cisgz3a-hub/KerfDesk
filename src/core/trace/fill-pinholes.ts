@@ -34,24 +34,45 @@ const PINHOLE_MAX_AREA_PX = 120;
 export function fillPinholes(image: RawImageData, pixelScale = 1): RawImageData {
   if (!isValidMonochrome(image)) return image;
   const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
-  const maxAreaPx = PINHOLE_MAX_AREA_PX * scale * scale;
-  const maxRadiusPx = PINHOLE_MAX_RADIUS_PX * scale;
   const { width, height } = image;
   const ink = inkMap(image);
   const outside = floodOutsideBackground(ink, width, height);
-
   const data = new Uint8ClampedArray(image.data);
+  fillEnclosedPinholes(data, ink, outside, width, height, {
+    maxAreaPx: PINHOLE_MAX_AREA_PX * scale * scale,
+    maxRadiusPx: PINHOLE_MAX_RADIUS_PX * scale,
+  });
+  return { width, height, data };
+}
+
+type PinholeCaps = { readonly maxAreaPx: number; readonly maxRadiusPx: number };
+
+// Scan every enclosed white component once; fill those under both caps.
+function fillEnclosedPinholes(
+  data: Uint8ClampedArray,
+  ink: Uint8Array,
+  outside: Uint8Array,
+  width: number,
+  height: number,
+  caps: PinholeCaps,
+): void {
   const seen = new Uint8Array(width * height);
   for (let start = 0; start < ink.length; start += 1) {
-    if ((ink[start] ?? 1) === 1 || (outside[start] ?? 1) === 1 || (seen[start] ?? 1) === 1) {
-      continue;
-    }
+    if (!isUnvisitedEnclosedWhite(ink, outside, seen, start)) continue;
     const component = collectComponent(ink, outside, seen, width, height, start);
-    if (component.length > maxAreaPx) continue;
-    if (!isHairlineThin(component, ink, width, height, maxRadiusPx)) continue;
+    if (component.length > caps.maxAreaPx) continue;
+    if (!isHairlineThin(component, ink, width, height, caps.maxRadiusPx)) continue;
     paintComponentInk(data, component);
   }
-  return { width, height, data };
+}
+
+function isUnvisitedEnclosedWhite(
+  ink: Uint8Array,
+  outside: Uint8Array,
+  seen: Uint8Array,
+  i: number,
+): boolean {
+  return (ink[i] ?? 1) === 0 && (outside[i] ?? 1) === 0 && (seen[i] ?? 1) === 0;
 }
 
 function paintComponentInk(data: Uint8ClampedArray, component: ReadonlyArray<number>): void {

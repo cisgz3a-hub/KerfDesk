@@ -139,7 +139,10 @@ function fitRecursive(
     out.push(cubic);
     return;
   }
-  if (error.maxSq <= tolerancePx * tolerancePx * REPARAM_TOLERANCE_FACTOR * REPARAM_TOLERANCE_FACTOR) {
+  if (
+    error.maxSq <=
+    tolerancePx * tolerancePx * REPARAM_TOLERANCE_FACTOR * REPARAM_TOLERANCE_FACTOR
+  ) {
     for (let pass = 0; pass < MAX_REPARAM_PASSES; pass += 1) {
       reparameterize(points, first, last, cubic, u);
       cubic = generateBezier(points, first, last, u, tangentStart, tangentEnd);
@@ -319,8 +322,10 @@ function evaluateCubic(c: CubicBezier, t: number): Vec2 {
 function cubicDerivative(c: CubicBezier, t: number): Vec2 {
   const m = 1 - t;
   return {
-    x: 3 * m * m * (c.p1.x - c.p0.x) + 6 * m * t * (c.p2.x - c.p1.x) + 3 * t * t * (c.p3.x - c.p2.x),
-    y: 3 * m * m * (c.p1.y - c.p0.y) + 6 * m * t * (c.p2.y - c.p1.y) + 3 * t * t * (c.p3.y - c.p2.y),
+    x:
+      3 * m * m * (c.p1.x - c.p0.x) + 6 * m * t * (c.p2.x - c.p1.x) + 3 * t * t * (c.p3.x - c.p2.x),
+    y:
+      3 * m * m * (c.p1.y - c.p0.y) + 6 * m * t * (c.p2.y - c.p1.y) + 3 * t * t * (c.p3.y - c.p2.y),
   };
 }
 

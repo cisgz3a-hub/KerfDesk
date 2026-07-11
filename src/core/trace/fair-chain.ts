@@ -177,32 +177,47 @@ function whittakerSmooth(y: Float64Array, lambda: number): Float64Array {
   return solvePentadiagonal(d0, d1, d2, rhs);
 }
 
-// In-place banded LDLᵀ factorization + solve for an SPD pentadiagonal
-// system. Bands are (d0 main, d1 first super, d2 second super); symmetric.
+type PentaFactor = {
+  readonly diag: Float64Array; // D
+  readonly e1: Float64Array; // L[i+1][i]
+  readonly e2: Float64Array; // L[i+2][i]
+};
+
+// Banded LDLᵀ factorization + solve for an SPD pentadiagonal system. Bands
+// are (d0 main, d1 first super, d2 second super); symmetric.
 function solvePentadiagonal(
   d0: Float64Array,
   d1: Float64Array,
   d2: Float64Array,
   rhs: Float64Array,
 ): Float64Array {
-  const n = rhs.length;
+  const factor = factorizePentadiagonal(d0, d1, d2);
+  return substitutePentadiagonal(factor, rhs);
+}
+
+function factorizePentadiagonal(d0: Float64Array, d1: Float64Array, d2: Float64Array): PentaFactor {
+  const n = d0.length;
   const diag = new Float64Array(n);
-  const e1 = new Float64Array(n); // L[i+1][i]
-  const e2 = new Float64Array(n); // L[i+2][i]
+  const e1 = new Float64Array(n);
+  const e2 = new Float64Array(n);
   for (let i = 0; i < n; i += 1) {
     let di = d0[i] as number;
     if (i >= 1) di -= (e1[i - 1] as number) ** 2 * (diag[i - 1] as number);
     if (i >= 2) di -= (e2[i - 2] as number) ** 2 * (diag[i - 2] as number);
     diag[i] = di;
     if (i + 1 < n) {
-      let s1 = d1[i] as number;
-      if (i >= 1) s1 -= (e1[i - 1] as number) * (e2[i - 1] as number) * (diag[i - 1] as number);
-      e1[i] = s1 / di;
+      const cross =
+        i >= 1 ? (e1[i - 1] as number) * (e2[i - 1] as number) * (diag[i - 1] as number) : 0;
+      e1[i] = ((d1[i] as number) - cross) / di;
     }
-    if (i + 2 < n) {
-      e2[i] = (d2[i] as number) / di;
-    }
+    if (i + 2 < n) e2[i] = (d2[i] as number) / di;
   }
+  return { diag, e1, e2 };
+}
+
+function substitutePentadiagonal(factor: PentaFactor, rhs: Float64Array): Float64Array {
+  const { diag, e1, e2 } = factor;
+  const n = rhs.length;
   // Forward substitution L z = rhs.
   const z = new Float64Array(n);
   for (let i = 0; i < n; i += 1) {
