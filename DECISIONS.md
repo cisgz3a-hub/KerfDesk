@@ -6173,3 +6173,80 @@ Consequences.
   limit are structurally unit-tested but have never run on a physical rotary. A
   wrong calibration silently distorts the burn and no automated test can catch
   it. Ships CLAIMED until a maintainer rotary bench pass.
+
+## ADR-128 — Measured-boundary trace pipeline: sub-pixel extraction, supersampling, and fair-then-fit finishing
+
+Context. ADR-123 replaced the potrace-derived backend with the in-house contour
+finisher (mid-crack boundary walk -> Taubin pre-smooth -> corner rebuild ->
+curvature evening -> straight-run flattening -> spline resample). Measured
+against a maintainer reference pair (an idealized outline drawing + a filled
+redraw of the Arch House logo), that finisher still produced wobbly stems, serif
+spikes/melt, ~1px scallops on organic curves, and sawtooth on the long
+hand-drawn strokes. Root analysis (three research briefs + a perceptual loop
+harness): those smoothing stages existed to repair QUANTIZATION noise from
+binarize-then-walk, and each stage fought the staircase the previous one left.
+The frontier is fidelity vs a professional-artist look: fair curves + regular
+typography.
+
+Decision. Move the contour lane (and the edge lane, which shares the finisher)
+to a MEASURED-boundary pipeline with a fair-then-fit finish:
+
+1. Sub-pixel boundary extraction. The mid-crack walker interpolates the
+   pre-threshold grayscale iso-line at each crack (marching-squares style)
+   instead of quantizing to lattice midpoints. Loop TOPOLOGY stays on the
+   cleaned binary mask; vertex POSITIONS come from the anti-aliasing ramp
+   (~0.1px vs ~0.7px). A CrackSubPixelField {lumaAt, thresholdAt} exposes the
+   iso per branch (global/Otsu = constant; local-contrast/sketch =
+   position-dependent). Saturated binary steps carry no sub-pixel information
+   and stay at the midpoint.
+
+2. 2x quality supersample. The binary-contour and edge presets trace at 2x
+   (mkbitmap's recipe) so 1-2px features (hooked apex tips, thin subtitle
+   strokes) binarize with double resolution. An INTERNAL pixelScale option
+   scales EVERY pixel-denominated constant (despeckle/pinhole/min-area areas by
+   s^2; simplify epsilon, window and run lengths, local-mean radius by s) so the
+   1x tuning holds. Sharp opts out: bilinear supersampling would anti-alias the
+   pixel notches it exists to preserve.
+
+3. Wobble stages stand down on measured loops. When most cracks interpolated
+   (the boundary is a MEASUREMENT), the quantization-noise stages (chord
+   flattener, arc-noise evening) are net harmful -- they fabricate joint steps
+   on measured stems. They disable per loop; binary/pixel sources keep the full
+   legacy behaviour, protected by the straightness/roundness instruments.
+
+4. Fair-then-fit finish. Measured loops end in least-squares cubic Bezier
+   fitting (Schneider's published Graphics Gems method: chord parameterization,
+   tangent-constrained LS, Newton reparameterization, corner split) -- on
+   low-noise measured data the fit IS the fairing. Large hand-drawn (organic)
+   loops are first Whittaker-Henderson penalized-smoothed (fair-chain.ts:
+   minimize ||y-x||^2 + lambda*||D2 x||^2, one banded LDL^T solve per
+   corner-delimited segment, lambda derived from a frequency cutoff at 2x the
+   ink-texture wavelength), THEN fit tight -- because max-error split-fitting
+   alone can never stop chasing texture (established over three iterations).
+   Corners are hard boundaries: persistence-gated for organic loops
+   (turn survives at two window widths), evidence-backed for glyphs.
+
+Scope. Line Art, Smooth, and Edge Detection get the full measured-boundary
+stack; Sharp stays 1x pixel-pure; Centerline (the skeleton lane) is untouched.
+Engine + perceptual harness only -- no changes to the trace dialog or public
+option surface beyond the internal preset flags.
+
+Consequences.
+- Provenance stays clean-room: standard published math (marching squares,
+  Schneider fitting, Whittaker-Henderson smoothing, scale-space corner
+  persistence). No GPL code was read or ported (potrace, libspiro, autotrace,
+  cornucopia-lib all avoided; only the imagetracerjs dependency remains, for the
+  legacy multi-colour path).
+- Fidelity vs fairness: input-mask IoU DROPS slightly on textured art BY DESIGN
+  -- the reference style prefers fair lines over faithfully-traced ink
+  roughness, and IoU/chamfer are blind to fairness. Verification is the
+  perceptual loop harness (arch-house-reference-loop, env-gated) plus a
+  resolution-aware apex-fidelity invariant and fair-chain / fit-cubics
+  frequency-response unit tests.
+- Cost: Line Art / Smooth / Edge trace rises from ~0.6s to ~2-3.5s on a 1024^2
+  logo (2x supersample + fitting). Acceptable at import time; a "High quality"
+  toggle to reclaim 1x speed is a possible follow-up.
+- Karpathy discipline: every iteration was gated on rendered vector-resolution
+  crops, not green tests. Perceptually verified against the reference on
+  letters, serifs, arch bands, waves and roof lines; NOT verified on physical
+  laser output (this changes trace geometry only, no G-code semantics).
