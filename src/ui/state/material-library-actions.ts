@@ -103,7 +103,10 @@ function deleteMaterialPreset(set: MaterialLibrarySet, presetId: string): boolea
 
 function canAssignPreset(project: Project, preset: MaterialPreset): boolean {
   const [match] = rankMaterialRecipeCandidates(project.device, [preset]);
-  return match !== undefined && match.confidence !== 'unsupported';
+  // ADR-045: a device MISMATCH (no match at all) is warn-not-block, so allow it —
+  // the recipe patch applies correctly regardless of device. Only a matched
+  // preset the machine flags 'unsupported' is a hard safety block.
+  return match === undefined || match.confidence !== 'unsupported';
 }
 
 function recipeMatchesLayer(layer: Layer, recipe: MaterialRecipe): boolean {

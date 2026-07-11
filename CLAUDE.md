@@ -143,7 +143,7 @@ When pattern-matching on `kind`, the default arm must be `assertNever(state)` so
 
 - No module-level mutable variables.
 - No `let` outside function bodies.
-- No mutation of objects after construction. Use spread or `produce` from Immer (already a Zustand dependency).
+- No mutation of objects after construction. Build a new value with spreads — the store uses spreads throughout. (Immer is **not** a dependency: it is only an optional peer of Zustand and is absent from the tree, so do not import `produce`.)
 - React state lives in either local `useState` or a Zustand slice — never a global object, never a singleton.
 
 ---
@@ -171,9 +171,11 @@ Enforced by ESLint `no-restricted-globals` and `no-restricted-imports`.
 - Snapshot tests for G-code output on the fixture corpus.
 - **Bug fix workflow**: write a failing test that demonstrates the bug, then fix it, then verify the test passes. PR must include both the test (new) and the fix.
 
-CI rejects PRs that:
+PR review rejects PRs that:
 - Modify source without modifying or adding tests, except for pure refactors flagged as such.
 - Modify the G-code snapshot without an explicit acknowledgment line in the PR description: `Snapshot change acknowledged: <reason>`.
+
+(These are review conventions, not CI-mechanical gates — `release:check` runs lint, typecheck, format, license, audit, tests, builds, and file-size, none of which inspect test-file presence or the PR description. See line 169 and PROJECT.md #16.)
 
 ---
 
@@ -306,6 +308,7 @@ This is the most important rule in the file. Most "AI broke my codebase" stories
 - Run `pnpm test` before declaring work done.
 - Run `pnpm lint` before declaring work done.
 - Run `pnpm typecheck` before declaring work done.
+- Run `pnpm format:check` before declaring work done — CI runs `prettier --check .` repo-wide (in `release:check`), and it is NOT part of `pnpm lint`, so a Prettier-dirty file passes lint locally but fails the release gate.
 - Report what you changed, by file. Not "I updated the layer panel" — list `src/ui/layers/CutsLayersPanel.tsx` and `src/ui/layers/index.ts`.
 - Report what you didn't verify. If you didn't run the E2E suite, say so.
 - Don't write `// TODO` without opening a corresponding issue.

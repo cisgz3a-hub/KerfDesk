@@ -110,9 +110,23 @@ export function runAutosaveRecovery(
     s.setProject(record.project);
     // M15 (AUDIT-2026-06-10): the restored project's ONLY durable copy is
     // the autosave slot. Mark it dirty so the 30 s loop, the beforeunload
-    // write, and the discard confirms all stay armed — and KEEP the slot;
+    // write, and the discard confirms all stay armed — and KEEP a slot;
     // handleSaveProject clears it after the first successful manual save.
     useStore.setState({ dirty: true });
+    // PST-01: the restore may have come from a *dead* window session's slot
+    // (or the legacy key). Re-home the copy into THIS session's slot so the
+    // first manual save's no-arg clearAutosave() actually clears it — the dead
+    // slot would otherwise linger and re-prompt on every later empty launch.
+    // Re-write BEFORE clearing so a durable copy always exists (M15); on a
+    // write failure keep the source slot rather than lose the only backup.
+    // When the source already IS this session's slot (same-tab reload), the
+    // re-home targets the same key, so skip the clear and leave it in place.
+    const rehome = writeAutosave(record.project);
+    if (rehome.kind === 'ok') {
+      if (rehome.storageKey !== record.storageKey) clearAutosave(record);
+    } else {
+      useToastStore.getState().pushToast(AUTOSAVE_FAILURE_MESSAGE, 'warning');
+    }
     return;
   }
   // Declining is an explicit discard — clearing stops the re-prompt loop.

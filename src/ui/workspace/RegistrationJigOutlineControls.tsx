@@ -24,7 +24,12 @@ export function RegistrationJigOutlineControls(): JSX.Element {
   const removeBox = useStore((s) => s.removeRegistrationBox);
   const setBoxLocked = useStore((s) => s.setRegistrationBoxLocked);
 
-  const initial = initialOutlineControls(findRegistrationBoxes(scene)[0]);
+  const box = findRegistrationBoxes(scene)[0];
+  const initial = initialOutlineControls(box);
+  // A captured board (Place Board) encodes the physical work origin in its canvas
+  // position; unlocking/replacing it from the jig panel silently breaks
+  // registration, so those controls are disabled for it (CAM-04).
+  const isCapturedBoard = box?.provenance === 'captured-board';
   const [shape, setShape] = useState<RegistrationJigShape>(initial.shape);
   const [widthMm, setWidthMm] = useState(initial.widthMm);
   const [heightMm, setHeightMm] = useState(initial.heightMm);
@@ -46,6 +51,12 @@ export function RegistrationJigOutlineControls(): JSX.Element {
         <span style={unitStyle}>mm</span>
         <Button
           variant="primary"
+          disabled={isCapturedBoard}
+          title={
+            isCapturedBoard
+              ? 'This outline is a captured board — Remove it or re-capture with Place Board.'
+              : undefined
+          }
           onClick={() =>
             createOutlineFromState({
               shape,
@@ -64,8 +75,15 @@ export function RegistrationJigOutlineControls(): JSX.Element {
       <LockOutlineControl
         show={initial.hasOutline}
         checked={initial.locked}
+        disabled={isCapturedBoard}
         onChange={setBoxLocked}
       />
+      {isCapturedBoard && (
+        <p style={capturedWarnStyle}>
+          This outline is a captured board — unlocking or replacing it here breaks its physical
+          registration. Use Place Board to re-capture, or Remove it first.
+        </p>
+      )}
     </>
   );
 }
@@ -175,6 +193,7 @@ function ShapeSizeFields(props: {
 function LockOutlineControl(props: {
   readonly show: boolean;
   readonly checked: boolean;
+  readonly disabled?: boolean;
   readonly onChange: (locked: boolean) => void;
 }): JSX.Element | null {
   if (!props.show) return null;
@@ -183,8 +202,13 @@ function LockOutlineControl(props: {
       <input
         type="checkbox"
         checked={props.checked}
+        disabled={props.disabled === true}
         aria-label="Lock registration outline"
-        title="Lock the outline so it can't move between the two burns"
+        title={
+          props.disabled === true
+            ? 'A captured board stays locked — its position is the work origin'
+            : "Lock the outline so it can't move between the two burns"
+        }
         onChange={(e) => props.onChange(e.target.checked)}
       />
       Lock outline (prevent moving between burns)
@@ -257,4 +281,9 @@ const lockRowStyle: React.CSSProperties = {
   alignItems: 'center',
   gap: 6,
   fontSize: 12,
+};
+const capturedWarnStyle: React.CSSProperties = {
+  margin: '4px 0 0',
+  fontSize: 12,
+  color: 'var(--lf-warning-fg)',
 };

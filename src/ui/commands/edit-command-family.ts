@@ -142,7 +142,7 @@ function ungroupCommand(ctx: AppCommandContext): AppCommand {
         'Ungroup',
         'Ungroup selected artwork',
         ctx.ungroupSelection,
-        'Ctrl+Shift+G',
+        'Ctrl+U',
       )
     : disabled(
         'edit.ungroup',
@@ -150,6 +150,6 @@ function ungroupCommand(ctx: AppCommandContext): AppCommand {
         'Ungroup',
         'Select grouped artwork to ungroup.',
         ctx.ungroupSelection,
-        'Ctrl+Shift+G',
+        'Ctrl+U',
       );
 }

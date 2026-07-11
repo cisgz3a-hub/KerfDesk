@@ -22,6 +22,7 @@ import {
 import {
   findLaserOnTravelIssues,
   findLongBlankFeedMoves,
+  findNonFiniteCoords,
   findOutOfBoundsCoords,
   type MotionBoundsOffset,
 } from '../invariants';
@@ -54,6 +55,7 @@ export type PreflightCode =
   | 'cnc-overdeep-cut'
   | 'plunged-travel'
   | 'relief-needs-cnc'
+  | 'non-finite-coordinate'
   // ADR-127: image engraves are refused while the rotary is enabled (v1).
   | 'rotary-raster-unsupported'
   | 'empty-output';
@@ -113,6 +115,8 @@ export function runPreflight(
   issues.push(...findMachineProfilePreflightIssues(project));
 
   appendBoundsIssues(project, gcode, issues, options);
+
+  appendNonFiniteCoordIssues(gcode, issues);
 
   appendNoGoZoneIssues(project, gcode, issues, options);
 
@@ -395,6 +399,21 @@ function maxOutputOverscanMm(scene: Scene): number {
     ...outputLayers.filter((l) => l.mode === 'fill').map((l) => Math.max(0, l.fillOverscanMm)),
   );
   return Math.max(imageOverscan, fillOverscan);
+}
+
+// Last line of defense against a non-finite coordinate (XNaN, X-Infinity)
+// reaching the machine. The bounds scanner cannot see these — parseGcodeWord
+// nulls a malformed word exactly as it nulls an absent one — so a NaN produced
+// by any non-import producer (numeric edits, geometry ops, kerf/tabs) would
+// otherwise pass every other check. See non-finite-coords.ts.
+function appendNonFiniteCoordIssues(gcode: string, issues: PreflightIssue[]): void {
+  const nonFinite = findNonFiniteCoords(gcode);
+  for (const issue of nonFinite.slice(0, MAX_BOUNDS_ISSUES)) {
+    issues.push({
+      code: 'non-finite-coordinate',
+      message: `Line ${issue.lineNumber}: ${issue.reason}. Regenerate the output — this coordinate cannot be sent to the machine.`,
+    });
+  }
 }
 
 function appendLaserOnTravelIssues(gcode: string, issues: PreflightIssue[]): void {

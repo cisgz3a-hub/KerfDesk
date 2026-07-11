@@ -77,8 +77,12 @@ export function originActions(
       assertOriginActionReady(set, get);
       await zeroZHereAction((out) => safeWrite(out, 'origin'));
       // Z-only offset: XY origin state is untouched, and the WCO cache
-      // refreshes from the next WCO-bearing status frame.
-      set({ log: pushLog(get(), '[lf2] Work Z zeroed at current bit height (G92 Z0).') });
+      // refreshes from the next WCO-bearing status frame. This is what
+      // establishes work Z0 (the CNC stock-top contract) for the Start advisory.
+      set({
+        workZZeroKnown: true,
+        log: pushLog(get(), '[lf2] Work Z zeroed at current bit height (G92 Z0).'),
+      });
     },
     resetOrigin: async () => {
       assertOriginActionReady(set, get);
@@ -132,6 +136,8 @@ function clearedOriginPatch(): Partial<LaserState> {
   return {
     workOriginActive: false,
     workOriginSource: 'none',
+    // clearOrigin (G92.1) drops ALL G92 offsets, Z included, so work Z0 is void.
+    workZZeroKnown: false,
     wcoCache: null,
     frameVerification: null,
   };
@@ -141,6 +147,8 @@ function unknownOriginPatch(): Partial<LaserState> {
   return {
     workOriginActive: true,
     workOriginSource: 'unknown',
+    // Motors released / hand-moved: the bit-to-stock Z relationship is void.
+    workZZeroKnown: false,
     wcoCache: null,
     frameVerification: null,
   };

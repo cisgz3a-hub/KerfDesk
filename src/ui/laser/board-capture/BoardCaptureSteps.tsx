@@ -4,7 +4,12 @@
 // all four corners are in — the measured rectangle with an off-square warning
 // before committing.
 
-import { BOARD_CORNER_COUNT, type BestFitRectangle, type Vec2 } from '../../../core/scene';
+import {
+  BOARD_CORNER_COUNT,
+  firstCornerOffsetMm,
+  type BestFitRectangle,
+  type Vec2,
+} from '../../../core/scene';
 import { Button } from '../../kit';
 import { MIN_BOARD_DIMENSION_MM } from './constants';
 import { ManualSizeForm } from './ManualSizeForm';
@@ -13,6 +18,10 @@ import { ManualSizeForm } from './ManualSizeForm';
 // (board rotated, or a corner mis-captured), so the drawn axis-aligned outline
 // won't match the real board.
 const OFF_SQUARE_WARN_MM = 5;
+// Above this the FIRST captured corner is too far from the board's bottom-left,
+// so the G92 work origin (set at the first corner) sits at the wrong corner —
+// the outline looks right but the burn is offset. See ADR-124.
+const FIRST_CORNER_WARN_MM = 5;
 
 export function BoardCaptureSteps(props: {
   readonly corners: ReadonlyArray<Vec2>;
@@ -54,7 +63,7 @@ export function BoardCaptureSteps(props: {
         )}
       </div>
       {allCaptured && props.rect !== null && (
-        <MeasuredBoard rect={props.rect} onFinish={props.onFinish} />
+        <MeasuredBoard rect={props.rect} corners={props.corners} onFinish={props.onFinish} />
       )}
       {count >= 1 && !allCaptured && <ManualSizeForm onDraw={props.onManualSize} />}
     </div>
@@ -74,10 +83,14 @@ function LivePositionRow({ position }: { readonly position: Vec2 | null }): JSX.
 
 function MeasuredBoard(props: {
   readonly rect: BestFitRectangle;
+  readonly corners: ReadonlyArray<Vec2>;
   readonly onFinish: () => void;
 }): JSX.Element {
   const { widthMm, heightMm, offSquareMm } = props.rect;
   const tooSmall = widthMm < MIN_BOARD_DIMENSION_MM || heightMm < MIN_BOARD_DIMENSION_MM;
+  const firstCornerOffset = firstCornerOffsetMm(props.corners);
+  const wrongFirstCorner =
+    !tooSmall && firstCornerOffset !== null && firstCornerOffset > FIRST_CORNER_WARN_MM;
   return (
     <div style={columnStyle}>
       <div style={measureStyle}>
@@ -97,6 +110,12 @@ function MeasuredBoard(props: {
             continue if it looks right.
           </p>
         )
+      )}
+      {wrongFirstCorner && (
+        <p style={warnStyle}>
+          The first corner you captured wasn&apos;t the bottom-left, so the work origin — and the
+          burn — is set at the wrong corner. Start over and capture the bottom-left corner first.
+        </p>
       )}
       <Button variant="primary" disabled={tooSmall} onClick={props.onFinish}>
         Create board outline

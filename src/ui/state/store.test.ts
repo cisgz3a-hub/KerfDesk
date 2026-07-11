@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IDENTITY_TRANSFORM, type ImportedSvg, type RasterImage } from '../../core/scene';
+import {
+  createProject,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+  type RasterImage,
+} from '../../core/scene';
 import { useStore } from './store';
 import { resetStore as reset, svgObj as svgObjFromHelpers } from './test-helpers';
 
@@ -180,6 +185,25 @@ describe('useStore', () => {
     expect(s.jobPlacement).toEqual({ startFrom: 'absolute', anchor: 'front-left' });
   });
 
+  it('newProject preserves the configured machine profile (DEV-01 / F-A13)', () => {
+    // A user who configured a rear-left 300x200 machine must not silently
+    // revert to the Default 400x400 profile on File -> New — that would emit
+    // Y-mirrored G-code against the wrong bed with no warning.
+    const base = useStore.getState().project.device;
+    const custom = { ...base, bedWidth: 300, bedHeight: 200, origin: 'rear-left' as const };
+    useStore.setState({ project: createProject(custom) });
+    // sanity: the custom bed drove the workspace
+    expect(useStore.getState().project.workspace).toEqual({ width: 300, height: 200, units: 'mm' });
+
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().newProject();
+
+    const s = useStore.getState();
+    expect(s.project.scene.objects).toHaveLength(0); // scene still clears
+    expect(s.project.device).toEqual(custom); // device PRESERVED, not reset to default
+    expect(s.project.workspace).toEqual({ width: 300, height: 200, units: 'mm' });
+  });
+
   it('setJobPlacement updates the start mode and anchor without marking the project dirty', () => {
     useStore.setState({ dirty: false });
 
@@ -348,14 +372,16 @@ describe('useStore — undo / redo (F-A14)', () => {
     expect(useStore.getState().project.scene.objects[0]?.id).toBe('O1');
   });
 
-  it('undo clears stale multi-selection ids along with the primary selection', () => {
+  it('undo drops stale multi-selection ids but keeps the still-present primary (CNV-13)', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
     useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set(['O2']) });
 
+    // Undo removes O2; O1 survives in the restored scene, so it stays selected
+    // while the now-stale O2 id is dropped.
     useStore.getState().undo();
 
-    expect(useStore.getState().selectedObjectId).toBeNull();
+    expect(useStore.getState().selectedObjectId).toBe('O1');
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);
   });
 

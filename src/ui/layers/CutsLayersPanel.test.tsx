@@ -153,7 +153,7 @@ describe('CutsLayersPanel layer order controls', () => {
     }
   });
 
-  it('collapses material and layer management while selected artwork is being edited', async () => {
+  it('collapses Material Library but keeps the Layers list open while editing selected artwork [LAY-02]', async () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#000000']));
     useStore.getState().selectObject('O1');
     const { host, unmount } = await renderPanel();
@@ -168,8 +168,10 @@ describe('CutsLayersPanel layer order controls', () => {
       if (!(layerSection instanceof HTMLDetailsElement))
         throw new Error('layer disclosure missing');
 
+      // Material Library stays collapsible/closed; the Layers list stays visible
+      // on selection (LightBurn parity) so cut settings aren't hidden.
       expect(materialSection.open).toBe(false);
-      expect(layerSection.open).toBe(false);
+      expect(layerSection.open).toBe(true);
     } finally {
       await unmount();
     }
@@ -389,6 +391,22 @@ describe('CutsLayersPanel layer order controls', () => {
       expect(row.style.flexWrap).toBe('wrap');
       expect(row.style.minWidth).toBe('0');
       expect(row.style.overflow).toBe('hidden');
+    } finally {
+      await unmount();
+    }
+  });
+
+  it('keeps the Layers list open when an object is selected [LAY-02]', async () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.setState({ selectedObjectId: 'O1', additionalSelectedIds: new Set() });
+    const { host, unmount } = await renderPanel();
+    try {
+      const details = host.querySelector('details[aria-label="Layer management section"]');
+      expect(details).not.toBeNull();
+      // LightBurn keeps the Cuts/Layers list visible; the disclosure defaults open
+      // so the layer rows aren't hidden the moment a selection appears.
+      expect((details as HTMLDetailsElement).open).toBe(true);
+      expect(host.querySelector('[aria-label="Layer management section"] button')).not.toBeNull();
     } finally {
       await unmount();
     }

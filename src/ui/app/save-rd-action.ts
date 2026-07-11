@@ -37,8 +37,11 @@ export async function handleSaveRd(
   if (target === null) return;
   try {
     // Uint8Array → Blob: SaveTarget.write accepts string | Blob; a Blob keeps
-    // the byte stream intact (no UTF-8 mangling).
-    await target.write(new Blob([result.bytes.buffer as ArrayBuffer]));
+    // the byte stream intact (no UTF-8 mangling). Copy into a fresh exact-size
+    // array rather than handing over `bytes.buffer` — the buffer would silently
+    // mis-copy the moment `bytes` is ever a subarray/offset view, and the copy
+    // types cleanly (its buffer is a plain ArrayBuffer) without an assertion.
+    await target.write(new Blob([new Uint8Array(result.bytes)]));
     ctx.pushToast(`Saved .rd job to ${target.displayName}`, 'success');
     ctx.pushToast(RD_EXPERIMENTAL_WARNING, 'warning');
   } catch (err) {

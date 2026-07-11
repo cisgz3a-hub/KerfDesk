@@ -18,7 +18,8 @@ import {
   rawResumeLine,
   type JobCheckpoint,
 } from '../../core/recovery';
-import { machineKindOf, type Project } from '../../core/scene';
+import type { JobOriginPlacement } from '../../core/job';
+import { machineKindOf, type OutputScope, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
@@ -42,6 +43,7 @@ export async function runStartJobFlow(): Promise<void> {
       controllerOperationActive: laser.controllerOperation !== null,
       autofocusBusy: laser.autofocusBusy,
       workOriginActive: laser.workOriginActive,
+      workZZeroKnown: laser.workZZeroKnown,
       wcoCache: laser.wcoCache,
       frameVerification: laser.frameVerification,
       settingsCapability: laser.capabilities.settings,
@@ -71,6 +73,11 @@ export async function runStartJobFlow(): Promise<void> {
       createJobCheckpoint({
         gcode: prepared.gcode,
         machineKind: machineKindOf(project.machine),
+        // Capture the scope + RESOLVED origin THIS run compiled with so resume
+        // reproduces identical bytes even after a crash resets the live values
+        // (PST-02) and re-resolves current-position to the post-crash head (R1).
+        outputScope: currentOutputScope(app),
+        ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
         nowIso: new Date().toISOString(),
       }),
     );
@@ -93,14 +100,22 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
 // edited project silently renumbers every line), then map the acked-sendable
 // count back to the raw line the stream died at.
 export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promise<void> {
-  const prepared = prepareResume();
+  // Recompile with the run's OWN scope + resolved origin (PST-02, R1): a crash
+  // resets the live output scope and re-resolves current-position against the
+  // post-crash head, both of which would renumber every line and trip the
+  // fingerprint refusal below. The frozen origin reproduces the exact bytes.
+  const prepared = prepareResume({
+    outputScope: checkpoint.outputScope,
+    ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
+  });
   if (prepared === null) return;
   if (!fingerprintsEqual(fingerprintGcode(prepared.gcode), checkpoint.fingerprint)) {
     jobAwareAlert(
       'Cannot resume the interrupted job:\n\n' +
         'The current project no longer produces the same G-code as the interrupted run — ' +
-        'it was edited since, so its line numbers no longer match. Re-open the original ' +
-        'project, or use Start from line… manually if you are sure of the line.',
+        'it was edited since (a changed object, output scope, or job placement all ' +
+        'renumber the lines), so they no longer match. Re-open the original project, or ' +
+        'use Start from line… manually if you are sure of the line.',
     );
     return;
   }
@@ -110,10 +125,17 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
 
 // Shared resume front half: readiness gate + re-compile. Same gate as a
 // fresh start (minus the settings-capability warning, matching the original
-// Start-from-line behavior).
-function prepareResume(): { readonly project: Project; readonly gcode: string } | null {
+// Start-from-line behavior). A checkpoint resume passes the scope + placement
+// the ORIGINAL run used so the recompiled bytes match its fingerprint even
+// after a crash reset the live values (PST-02); the manual Start-from-line path
+// passes nothing and uses current app state, as before.
+function prepareResume(overrides?: {
+  readonly outputScope: OutputScope;
+  readonly jobOrigin?: JobOriginPlacement;
+}): { readonly project: Project; readonly gcode: string } | null {
   const app = useStore.getState();
-  const { project, jobPlacement } = app;
+  const { project } = app;
+  const outputScope = overrides?.outputScope ?? currentOutputScope(app);
   const laser = useLaserStore.getState();
   const prepared = prepareStartJob(
     project,
@@ -127,11 +149,13 @@ function prepareResume(): { readonly project: Project; readonly gcode: string } 
       controllerOperationActive: laser.controllerOperation !== null,
       autofocusBusy: laser.autofocusBusy,
       workOriginActive: laser.workOriginActive,
+      workZZeroKnown: laser.workZZeroKnown,
       wcoCache: laser.wcoCache,
       frameVerification: laser.frameVerification,
     },
-    jobPlacement,
-    currentOutputScope(app),
+    app.jobPlacement,
+    outputScope,
+    overrides?.jobOrigin,
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');

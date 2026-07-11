@@ -9,7 +9,7 @@
 // words, `(...)` and `;` comments, `%` markers, M2/M30 program end.
 // Unsupported words are counted in notes, never fatal.
 
-import { sampleArcPoints } from '../../core/geometry/arc-sampling';
+import { sampleArcPoints } from '../../core/geometry';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
 

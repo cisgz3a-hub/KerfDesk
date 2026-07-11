@@ -73,7 +73,9 @@ describe('vector path tools', () => {
       paths: [{ color: '#222222', polylines: [square(0, 0, 10)] }],
     };
 
-    const welded = weldVectorObjects([left, right], 'welded');
+    const result = weldVectorObjects([left, right], 'welded');
+    if (result.kind === 'error') throw new Error(result.error.message);
+    const welded = result.value;
 
     expect(welded.kind).toBe('imported-svg');
     expect(welded.id).toBe('welded');
@@ -98,7 +100,9 @@ describe('vector path tools', () => {
       ...metadata,
     };
 
-    const welded = weldVectorObjects([left, right], 'welded');
+    const result = weldVectorObjects([left, right], 'welded');
+    if (result.kind === 'error') throw new Error(result.error.message);
+    const welded = result.value;
 
     expect(welded.operationOverride).toEqual(metadata.operationOverride);
     expect(welded.powerScale).toBe(65);
@@ -114,7 +118,47 @@ describe('vector path tools', () => {
       powerScale: 80,
     };
 
-    expect(() => weldVectorObjects([left, right], 'welded')).toThrow(/matching output metadata/i);
+    const result = weldVectorObjects([left, right], 'welded');
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.error.kind).toBe('mixed-metadata');
+      expect(result.error.message).toMatch(/matching output metadata/i);
+    }
+  });
+
+  it('checks output-metadata compatibility before contour closedness (fixed precedence)', () => {
+    // A selection that fails BOTH checks reports mixed-metadata: inputs are
+    // validated before any geometry is materialized. Pins the ARC-02 order so it
+    // is intentional, not an accident of the refactor (self-audit finding).
+    const openMismatched: ImportedSvg = {
+      kind: 'imported-svg',
+      id: 'open-a',
+      source: 'a',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 0 },
+      transform: IDENTITY_TRANSFORM,
+      powerScale: 50,
+      paths: [
+        {
+          color: '#222222',
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const closed: ShapeObject = {
+      ...shapeObject('b', '#222222', square(0, 0, 10)),
+      powerScale: 80,
+    };
+    const result = weldVectorObjects([openMismatched, closed], 'welded');
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') expect(result.error.kind).toBe('mixed-metadata');
   });
 
   it('rejects weld input containing open polylines', () => {
@@ -140,7 +184,12 @@ describe('vector path tools', () => {
       ],
     };
 
-    expect(() => weldVectorObjects([open], 'welded')).toThrow(/closed vector contours/i);
+    const result = weldVectorObjects([open], 'welded');
+    expect(result.kind).toBe('error');
+    if (result.kind === 'error') {
+      expect(result.error.kind).toBe('open-contours');
+      expect(result.error.message).toMatch(/closed vector contours/i);
+    }
   });
 });
 

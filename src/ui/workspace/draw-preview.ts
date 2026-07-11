@@ -127,7 +127,8 @@ export function buildPreviewToolpath(
       : validateOutputScope(project.scene, options.outputScope);
   if (scoped !== null && !scoped.ok) return buildToolpath(EMPTY_JOB);
   const complexityScene = scoped === null ? project.scene : scoped.scene;
-  if (scenePreparationTooComplex(complexityScene)) return emptyPreviewToolpath('too-complex');
+  if (scenePreparationTooComplex(complexityScene))
+    return emptyPreviewToolpath({ kind: 'too-complex' });
   const prepared = prepareOutput(project, {
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),

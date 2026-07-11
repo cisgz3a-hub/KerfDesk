@@ -37,7 +37,19 @@ describe('camera frame proxy URL policy', () => {
     expect(cameraFrameUrlPolicy(`http://localhost:${BRIDGE_PORT}/health`, BRIDGE_PORT).kind).toBe(
       'invalid',
     );
-    // Loopback on a different port stays allowed (e.g. a local test camera).
-    expect(cameraFrameUrlPolicy('http://127.0.0.1:8080/frame.jpg', BRIDGE_PORT).kind).toBe('ok');
+  });
+
+  it('rejects ALL loopback targets, not just the bridge port (ELE-02)', () => {
+    // The proxy must not be usable as a localhost port scanner: any loopback
+    // host on any port is refused, so it cannot read OTHER local services.
+    // Real machine cameras live on RFC1918, never loopback, so this is safe.
+    for (const url of [
+      'http://127.0.0.1:8080/frame.jpg',
+      'http://localhost:9000/media/getCapturePhoto',
+      'http://127.0.0.5:3000/frame.jpg',
+      'http://[::1]:8554/',
+    ]) {
+      expect(cameraFrameUrlPolicy(url, BRIDGE_PORT).kind).toBe('invalid');
+    }
   });
 });

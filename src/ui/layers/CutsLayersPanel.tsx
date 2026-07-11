@@ -52,7 +52,11 @@ export function CutsLayersPanel(): JSX.Element {
               <MaterialLibraryPanel />
             </CollapsedPanel>
           ) : null}
-          <CollapsedPanel label="Layers" ariaLabel="Layer management section">
+          <CollapsedPanel
+            label="Layers"
+            ariaLabel="Layer management section"
+            defaultOpen={LAYERS_SECTION_DEFAULT_OPEN}
+          >
             <LayerList layers={layers} />
           </CollapsedPanel>
         </>
@@ -89,10 +93,15 @@ function LayerList(props: {
 function CollapsedPanel(props: {
   readonly label: string;
   readonly ariaLabel: string;
+  readonly defaultOpen?: boolean;
   readonly children: React.ReactNode;
 }): JSX.Element {
   return (
-    <details aria-label={props.ariaLabel} style={collapsedPanelStyle}>
+    <details
+      aria-label={props.ariaLabel}
+      style={collapsedPanelStyle}
+      {...(props.defaultOpen === true ? { open: true } : {})}
+    >
       <summary style={summaryStyle} title={`Show ${props.label}`}>
         {props.label}
       </summary>
@@ -111,6 +120,12 @@ const panelStyle: React.CSSProperties = {
   width: 320,
   flexShrink: 0,
 };
+// LightBurn keeps the Cuts/Layers list always visible, so default the Layers
+// disclosure open — selecting an object never hides the layer rows. Material
+// Library stays collapsed by default. (Persisting a manual toggle across
+// selections would need useUiStore — an optional follow-up, LAY-02.)
+const LAYERS_SECTION_DEFAULT_OPEN = true;
+
 const headingStyle: React.CSSProperties = { margin: '0 0 10px 0' };
 const hintStyle: React.CSSProperties = { color: 'var(--lf-text-muted)', fontStyle: 'italic' };
 const listStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column' };

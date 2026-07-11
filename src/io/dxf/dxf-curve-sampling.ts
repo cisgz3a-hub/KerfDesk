@@ -4,7 +4,7 @@
 // independent of the file's $INSUNITS. The raw circular-arc sampler lives
 // in core/geometry/arc-sampling (shared with the G-code program parser).
 
-import { arcStepRad, sampleArcPoints } from '../../core/geometry/arc-sampling';
+import { arcStepRad, sampleArcPoints } from '../../core/geometry';
 import type { Vec2 } from '../../core/scene';
 
 const FULL_TURN = Math.PI * 2;

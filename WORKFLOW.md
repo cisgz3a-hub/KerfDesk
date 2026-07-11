@@ -47,7 +47,7 @@
 - **Drop hint**: centered ghost text "Drag an SVG here, or use File → Import" — visible only when scene is empty, fades out on hover.
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers."
-- **Toolbar**: left — Select, Pan, Zoom-fit, Preview-toggle (last is disabled when scene is empty).
+- **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
 
 #### Disabled controls
 - `File → Save Project`
@@ -153,7 +153,7 @@ Identical to F-A3 except:
 #### Multi — marquee
 1. Click+drag in empty workspace area.
 2. Dashed-blue marquee box follows cursor.
-3. On release, every object whose bounding box is fully or partially inside the marquee is selected.
+3. On release, selection is directional (LightBurn-style), keyed on the drag's horizontal direction: dragging left→right is an **enclosing** select (only objects whose bounding box is fully inside the marquee); dragging right→left is a **crossing** select (objects inside or merely touched).
 4. Locked objects inside the marquee are skipped.
 
 #### All — Cmd/Ctrl+A
@@ -197,8 +197,8 @@ Identical to F-A3 except:
 - Live angle shown next to handle.
 
 #### Mirror — menu / shortcut
-- `Edit → Flip Horizontal` (`H`)
-- `Edit → Flip Vertical` (`V`)
+- `Arrange → Flip Horizontal` (`H`)
+- `Arrange → Flip Vertical` (`V`)
 - Operates around selection's center.
 
 #### Edge — transform pushes object out of bed
@@ -214,18 +214,10 @@ Identical to F-A3 except:
 ### F-A7. Cuts/Layers panel
 
 #### Layout
-- Vertical list. Each row is one Layer (one unique stroke color).
-- Row contents, left to right:
-  1. Color swatch (12×12 px square, the SVG stroke color).
-  2. Mode dropdown — value: `Line` (only enabled option in Phase A; `Fill` and `Image` disabled with tooltip).
-  3. Power input — number, 0–100, suffix `%`.
-  4. Speed input — number, suffix `mm/min`.
-  5. Passes input — integer, ≥ 1.
-  6. Visible toggle — eye icon.
-  7. Output toggle — checkbox labeled "Output".
-- Row hover: light highlight + delete button (for the *Layer*, not the objects — see edge below).
-
-- Each row includes order controls. The visible Cuts/Layers list order is the generated output order.
+- Vertical **card** stack — one card per Layer (one unique stroke color). Cards use the panel's full height rather than cramming the settings into a horizontal row.
+- Each card's **header strip** carries the colour swatch (the layer's stroke colour), a **Mode** selector (`Line` / `Fill` / `Image` — all three are live), and the **Show** / **Output** toggles; per-card order controls set the card's position in the stack.
+- Below the header, **field rows**: Power (0–100 `%`), Speed (`mm/min`), Passes (integer ≥ 1), and mode-specific fields (e.g. image adjustments in Image mode).
+- The visible card order is the generated output order. (Layer delete semantics — cards auto-appear/disappear with their colour — are covered under the edge cases below.)
 
 #### Default values for a new Layer
 - Power: 30 %
@@ -237,7 +229,7 @@ Identical to F-A3 except:
 #### Success — edit power value
 1. Click input, type new value (or use stepper).
 2. Input is debounced — change is committed after 300 ms of inactivity, **not** on every keystroke (the LF1 audit found this missing; do not repeat).
-3. On commit, status bar shows brief confirmation: `Layer · power set to 50%`.
+3. On commit, the change is applied to the layer and the field reflects the committed value. (There is no separate status-bar confirmation — the earlier spec's `Layer · power set to 50%` message was never implemented.)
 
 #### Success — toggle output off
 1. Click Output checkbox.
@@ -262,7 +254,7 @@ Identical to F-A3 except:
 - All controls disabled.
 
 #### Error — power input out of range
-- < 0 or > 100: input snaps to nearest valid value, briefly flashes red, status bar shows: `Power must be 0–100`.
+- Values outside 0–100 are constrained to the valid range. (The earlier spec's `Power must be 0–100` status-bar message was never implemented.)
 
 #### Error — speed input out of range
 - < 1: snaps to 1.
@@ -339,7 +331,7 @@ Identical to F-A3 except:
 7. Toast: `Saved to <path>`.
 
 #### Success — web
-1. Same flow, but step 3 uses File System Access API where available, else browser download.
+1. Same flow. The web app requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets") — there is **no browser-download fallback**. If the API is unavailable the save fails with the error toast `Could not save G-code: File System Access API is required to save files in the web app.`
 2. Toast same.
 
 #### Error — pre-flight failure
@@ -355,18 +347,49 @@ Identical to F-A3 except:
 
 ### F-A10. Pre-flight check (before G-code save)
 
-Runs whenever Save G-code is invoked. Cannot be skipped.
+Runs whenever Save G-code (or Start) is invoked. Cannot be skipped. Any failing
+check surfaces the pre-flight modal listing every issue and cancels the
+save/start until they clear.
 
-Checks, in order:
+The authoritative list is the `PreflightCode` set in
+`src/core/preflight/preflight.ts` (laser + CNC shared codes) and
+`src/core/preflight/cnc-preflight.ts` (CNC-only). As of this writing it covers,
+grouped by what each validates:
 
-1. **At least one output layer exists.** If not: modal `No output layers. Enable Output on at least one layer.` Cancel save.
-2. **All output geometry fits inside the bed.** Iterate every path point. If any falls outside `[0, bedWidth] × [0, bedHeight]` (in machine coordinates, after origin transform), build a list of violations. If any exist: modal `Design extends beyond machine bed.` listing layers and amounts. Buttons: `Cancel`, `Show violations` (highlights them in viewport).
-3. **Power values within range.** 0 ≤ power ≤ 100 for every output layer. Should be enforced upstream by F-A7, but defense in depth.
-4. **Speed values within device max.** 0 < speed ≤ device.maxFeed for every output layer.
-5. **Passes ≥ 1** for every output layer.
-6. **Generated G-code is non-empty.** Sanity check — if the pipeline produced no G-code lines, something is wrong; modal `Internal error: G-code generation produced empty output. Please report this.` (This is also a property-test invariant.)
+**Structural**
+1. **At least one output layer exists.** Else modal `No output layers. Enable Output on at least one layer.`
+2. **Generated G-code is non-empty.** Pipeline sanity; also a property-test invariant.
+3. **A "Cut selected graphics" selection is not empty** when that scope is active.
+4. **The reserved registration box is not set to Output** (it is a camera/jig guide, never burned).
 
-If all checks pass, save proceeds.
+**Geometry and bounds**
+5. **All output geometry fits inside the bed** `[0, bedWidth] × [0, bedHeight]` (machine coordinates, after origin transform). Violations list the layers/amounts with a `Show violations` action.
+6. **No output motion crosses an enabled no-go / keep-out zone.**
+7. **No non-finite coordinate** (NaN / ±Infinity) reaches the emitted G-code.
+
+**Per-layer values** (defense in depth over F-A7)
+8. **Power within range** for every output layer.
+9. **Speed within `device.maxFeed`** for every output layer.
+10. **Passes ≥ 1** for every output layer.
+
+**Mode / geometry consistency**
+11. **Layer mode matches its geometry** — a fill/offset needs closed contours.
+12. **Raster transform is emittable** — a rotation/shear the raster path cannot engrave is refused.
+13. **Raster output stays within the pixel budget.**
+14. **Island-fill short-sweep risk** on the active machine profile is surfaced.
+15. **Relief objects appear only in CNC mode.**
+
+**Laser safety**
+16. **Laser off on every travel move** — the core invariant, re-scanned on the emitted text.
+17. **No excessively long blank (laser-off) feed move.**
+
+**CNC mode adds**
+18. **CNC layer settings are valid and the layer produces toolpaths.**
+19. **Cut depth stays within the stock** (plus the through-cut allowance).
+20. **No single pass cuts deeper than the configured maximum.**
+21. **No rapid (G0) travel before a safe-Z retract is established** (plunged-travel guard).
+
+If all applicable checks pass, the save/start proceeds.
 
 ---
 
@@ -393,8 +416,8 @@ If all checks pass, save proceeds.
 - Modal: `Could not save project: <reason>`. Project remains dirty, user can retry.
 
 #### Edge — save in web context
-- Uses File System Access API where available; falls back to browser download.
-- If the user denies file-access permission, show modal: `Save needs file-system access. Re-prompt?` with `Retry` / `Cancel`. **No IndexedDB fallback in Phase A** — would introduce a second persistence path not covered by any ADR. Browser-storage save is a candidate for a Phase C ADR.
+- Requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets"). There is **no browser-download fallback and no IndexedDB fallback** — an unsupported browser fails clearly rather than creating a second persistence path outside the project/file contract (`web-adapter.ts`).
+- If the API is missing, the save fails with the error toast `Could not save project: File System Access API is required to save files in the web app.` There is **no** `Save needs file-system access. Re-prompt?` modal — that was never built.
 
 ---
 
@@ -421,8 +444,8 @@ If all checks pass, save proceeds.
 - Modal: `Could not open <filename>: not a valid KerfDesk project.` No load.
 
 #### Edge — file is a valid .lf2 but references a device profile not on this machine
-- Project loads with the embedded device profile.
-- Status bar warns: `Project's device profile (xTool S1) is not configured locally. Add it in Settings.`
+- Project loads with the embedded device profile, adopted wholesale (`deserializeProject`).
+- _Not yet implemented:_ a status-bar warning that the embedded profile is unknown to this machine (`Project's device profile … is not configured locally`). It needs an app-level device-profile registry to compare against, which does not exist yet (see the machine-profile lifecycle / app-level device-list work). Until then the embedded profile is simply used with no such warning.
 
 ---
 
@@ -482,10 +505,10 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 #### Edit
 - `Cmd/Ctrl+Z` — Undo
 - `Cmd/Ctrl+Shift+Z` — Redo
-- `Cmd/Ctrl+X` — Cut (not implemented)
-- `Cmd/Ctrl+C` — Copy (browser default in inputs; no scene-object clipboard yet)
-- `Cmd/Ctrl+V` — Paste (browser default in inputs)
-- `Cmd/Ctrl+D` — Duplicate selection with 10mm offset (shipped)
+- `Cmd/Ctrl+X` — Cut selected objects to the scene clipboard
+- `Cmd/Ctrl+C` — Copy selected objects to the scene clipboard
+- `Cmd/Ctrl+V` — Paste the scene clipboard (offset from the source)
+- `Cmd/Ctrl+D` — Duplicate selection in place (LightBurn parity)
 - `Cmd/Ctrl+A` — Select all
 - `Delete` / `Backspace` — Delete selected
 - `Escape` — Deselect / cancel current operation
@@ -548,7 +571,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 5. Connection dot turns green; the status display shows the GRBL state from the first `?` reply.
 
 #### Error — WebSerial not supported
-1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave, or Arc, or install the Windows desktop app."
+1. Connection button is disabled, with a red hint above: "Your browser doesn't support WebSerial. Use Chrome, Edge, Brave (may require enabling under Brave Shields/flags), or Arc, or install the Windows desktop app."
 
 #### Error — user cancels picker
 1. App returns to disconnected state, no error surfaced.
@@ -600,7 +623,7 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 ### F-B5. Jog
 
 #### Success
-1. User selects a step size (0.1 / 1 / 10 / 100 mm) and clicks a direction arrow.
+1. User selects a step size (0.1 / 0.5 / 1 / 2 / 5 / 10 / 25 / 50 / 100 mm) and clicks a direction arrow.
 2. App sends a `$J=G91 G21 X<dx> Y<dy> F<feed>` command.
 3. Status polling shows the controller in `Jog` then back to `Idle`.
 
@@ -629,10 +652,20 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B7. Pause / resume
 
-#### Success — pause
+#### Success — pause (GRBL-family laser with proven laser mode)
 1. User clicks **Pause**. App writes real-time `!` (0x21).
 2. Streamer enters `paused`; no further bytes sent until resume.
 3. Status report transitions to `Hold:0` or `Hold:1`.
+
+#### Blocked — laser mode unproven
+1. On a laser job, Pause is refused unless GRBL laser mode is confirmed (`$32=1`): modal `Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead; feed hold can leave the laser on when $32=0 or unknown.`
+2. Rationale: a feed hold with `$32=0` (or unknown) can leave the beam on. Use **Stop** for a guaranteed beam-off halt.
+
+#### Exempt — CNC / router jobs
+1. A CNC (router) job pauses with `!` without the `$32` proof: feed hold with a spinning spindle is standard sender behavior, and a router runs `$32=0`. Demanding the laser proof would block CNC pause outright.
+
+#### Degraded — controller with no realtime hold (e.g. Marlin)
+1. When the driver has no feed-hold byte, Pause is stream-side only: outbound sending stops but buffered motion finishes. The Console notes `This controller has no realtime feed hold. Pause is stream-side only… Use Stop for an immediate halt.`
 
 #### Success — resume
 1. User clicks **Resume**. App writes real-time `~`.
@@ -656,11 +689,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 ### F-B10. Status polling
 
-App writes real-time `?` every 250 ms while connected. Replies are parsed by `parseStatusReport`. The latest report drives the Status panel and the bottom status bar.
+App writes real-time `?` every 250 ms while active — a streaming job, a motion or controller operation, probing, or auto-focus — and about once a second (every 4th tick) when the machine is idle. Replies are parsed by `parseStatusReport`. The latest report drives the Status panel and the bottom status bar.
 
 ### F-B11. Job progress UI
 
-Progress bar shows `completed / total` lines as a percentage with the count overlaid. Updates whenever the streamer advances. Phase C will add an estimated-time-remaining label.
+Progress bar shows `completed / total` lines as a percentage with the count overlaid. Updates whenever the streamer advances. A pre-job time estimate is shown before the run starts; a mid-job estimated-time-remaining label is not yet implemented.
 
 ### F-B12. Disconnect during job (cable yank)
 
@@ -790,6 +823,12 @@ run that finishes cleanly clears it.
 1. Fingerprint mismatch → alert explains the project no longer produces
    the interrupted program; nothing is streamed. The manual
    Start-from-line control remains the escape hatch.
+2. A checkpoint resume re-compiles with the output scope and the RESOLVED job
+   origin the ORIGINAL run used (both stored in the checkpoint, schema v3), so a
+   crash no longer trips this error on its own — including a Current Position
+   job, whose frozen head XY is reused instead of re-resolved against the
+   post-crash position. The alert names a changed object, output scope, or job
+   placement as the possible causes when the bytes genuinely differ (PST-02, R1).
 
 #### Edge — controller lost power too
 1. Acked lines may include a buffer's worth GRBL never executed; the
@@ -2107,14 +2146,21 @@ F-CNC19 tiling.
 3. Both work in laser AND CNC modes (geometry is machine-agnostic).
 
 #### Error — invalid input
-1. Booleans refuse silently-noop when fewer than two closed vector
-   objects are selected (the menu items are disabled with the reason).
-2. Open contours are rejected — nothing changes (same rule as Weld).
-3. An inward offset large enough to collapse the shape changes nothing.
+1. Booleans are disabled with a reason when fewer than two closed
+   vector objects are selected — the menu never runs the op, so there
+   is nothing to surface.
+2. Open contours are rejected — the scene is unchanged and a warning
+   toast names the reason (same rule as Weld).
+3. An inward offset large enough to collapse the shape changes nothing
+   and warns why. Open contours and a collapsing offset are reachable
+   cases the menu gating cannot pre-detect, so the op runs, no-ops the
+   scene, and surfaces a warning toast rather than dead-ending silently
+   (the failure modes are typed per ADR-131; the toast is CNV-04).
 
 #### Empty
-1. An Intersect of non-overlapping shapes produces nothing and leaves
-   the scene untouched (empty results never replace the sources).
+1. An Intersect of non-overlapping shapes produces nothing, leaves the
+   scene untouched (empty results never replace the sources), and shows
+   a warning toast explaining the result was empty.
 
 #### Edge — transforms and z-order
 1. Object transforms are baked to world space before combining, so a
@@ -2720,10 +2766,12 @@ F-CNC19 tiling.
 ### F-CAM1. Camera overlay + 4-point alignment (v1 — ADR-107)
 
 - **Success / aligned.** The operator opens Camera Mode, picks a camera, and sees the live
-  feed. They engrave the four alignment targets (reusing the registration jig), then drag the
-  four on-screen markers onto the engraved crosshairs. On the fourth point the homography
-  solves and the feed warps to sit on the bed; the operator places artwork over the real
-  material and adjusts overlay opacity. The applied calibration is saved to the device profile.
+  feed. On a machine (network) camera the manual path is to click the four bed corners in the
+  live preview — the view prompts for each corner in turn ("Click the … bed corner (N / 4)").
+  On the fourth click the homography solves and the feed warps to sit on the bed; the operator
+  presses "Save & show on canvas" (F-CAM3) to persist the calibration to the device profile,
+  then places artwork over the real material and adjusts overlay opacity. USB/RTSP cameras have
+  no click-corners path — align them with the "Align to bed…" marker wizard (F-CAM4).
 - **Error / permission denied.** If the browser or OS denies camera access (or the page is not
   served over https), a one-line message explains how to grant permission. No overlay is shown
   and the rest of the app is unaffected.
@@ -2778,14 +2826,14 @@ F-CNC19 tiling.
 
 ### F-CAM4. Automatic marker alignment (v3 — ADR-109)
 
-- **Success / one-click align.** The operator presses "Add markers to project"
-  (the scene is replaced by the five-patch pattern, like the other calibration
-  generators), burns it on scrap covering the bed corners, clears the bed of
-  everything else, and presses Auto-align with the camera live. The five
-  X-corners are detected, the origin pair resolves the camera's rotation, the
-  homography solves, and the alignment persists (undoable) — the workspace
-  overlay is immediately registered. With a lens calibration present the
-  capture is de-fisheyed first and the toast says "lens-corrected".
+- **Success / one-click align.** The operator opens the "Align to bed…" wizard from the
+  Camera panel. Its steps add the five-patch marker target to the project (the scene is
+  replaced by the pattern, like the other calibration generators) and burn it on scrap
+  covering the bed corners — or reuse an already-burned target — then, with the bed cleared of
+  everything else and the camera live, Detect. The five X-corners are detected, the origin
+  pair resolves the camera's rotation, the homography solves, and the alignment persists
+  (undoable) — the workspace overlay is immediately registered. With a lens calibration
+  present the capture is de-fisheyed first and the toast says "lens-corrected".
 - **Error / markers not found.** A cluttered bed, missing patches, or poor
   lighting produce a typed toast telling the operator what to fix; nothing
   persists. A degenerate solve (markers nearly collinear) is refused the same

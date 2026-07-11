@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { DEFAULT_DEVICE_PROFILE, type NoGoZone } from '../devices';
 import { createLayer, createProject, EMPTY_SCENE, type Project } from '../scene';
 import { runPreflight } from './preflight';
+import { firstZoneCrossedBySegment } from './no-go-zones';
 
 function projectWithNoGoZone(enabled = true): Project {
   return {
@@ -140,5 +141,35 @@ describe('preflight no-go zones', () => {
 
     expect(disabled.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
     expect(outsideBed.issues.every((issue) => issue.code !== 'no-go-zone-collision')).toBe(true);
+  });
+});
+
+describe('firstZoneCrossedBySegment (jog/click guard — DEV-04)', () => {
+  const zone: NoGoZone = {
+    id: 'clamp',
+    name: 'Left clamp',
+    enabled: true,
+    x: 20,
+    y: 20,
+    width: 20,
+    height: 20,
+  };
+
+  it('returns the zone a straight move passes through', () => {
+    expect(firstZoneCrossedBySegment({ x: 0, y: 0 }, { x: 50, y: 50 }, [zone])).toBe(zone);
+  });
+
+  it('returns the zone when the target lands inside it', () => {
+    expect(firstZoneCrossedBySegment({ x: 0, y: 30 }, { x: 30, y: 30 }, [zone])).toBe(zone);
+  });
+
+  it('returns null for a move that stays clear', () => {
+    expect(firstZoneCrossedBySegment({ x: 0, y: 0 }, { x: 10, y: 5 }, [zone])).toBeNull();
+  });
+
+  it('ignores disabled zones', () => {
+    expect(
+      firstZoneCrossedBySegment({ x: 0, y: 0 }, { x: 50, y: 50 }, [{ ...zone, enabled: false }]),
+    ).toBeNull();
   });
 });

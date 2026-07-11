@@ -96,6 +96,24 @@ describe('laser-store origin actions', () => {
     expect(useLaserStore.getState().wcoCache).toEqual({ x: 12, y: 34, z: 0 });
   });
 
+  it('Set Origin (XY) does not establish work Z0, but Zero Z does (Codex audit P1)', async () => {
+    const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
+    const connection = makeConnection(write);
+    await connectWith(connection);
+    connection.emitLine('<Idle|MPos:12.000,34.000,0.000|FS:0,0>');
+
+    // G92 X0 Y0 sets the XY origin but never touches Z — the CNC no-work-zero
+    // advisory (which keys on workZZeroKnown) must stay live.
+    await useLaserStore.getState().setOriginHere();
+    expect(useLaserStore.getState().workOriginActive).toBe(true);
+    expect(useLaserStore.getState().workZZeroKnown).toBe(false);
+
+    // Zero Z (G92 Z0) is what establishes the stock-top contract.
+    await useLaserStore.getState().zeroZHere();
+    expect(write).toHaveBeenCalledWith('G92 Z0\n');
+    expect(useLaserStore.getState().workZZeroKnown).toBe(true);
+  });
+
   it('marks the work origin persistent after advanced Set Persistent Origin succeeds', async () => {
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write);

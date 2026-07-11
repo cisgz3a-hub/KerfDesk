@@ -254,6 +254,7 @@ describe('JobControls running safety copy', () => {
         completed: 1,
         total: 5,
         rxBufferBytes: 120,
+        toolChangePause: false,
       },
     });
     const host = document.createElement('div');
@@ -288,6 +289,7 @@ describe('JobControls running safety copy', () => {
         completed: 2,
         total: 5,
         rxBufferBytes: 120,
+        toolChangePause: false,
       },
     });
     const host = document.createElement('div');
@@ -332,6 +334,7 @@ describe('JobControls running safety copy', () => {
         completed: 5,
         total: 5,
         rxBufferBytes: 120,
+        toolChangePause: false,
       },
     });
     const host = document.createElement('div');

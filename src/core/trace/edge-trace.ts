@@ -18,6 +18,7 @@
 // presets, and merge logic are untouched; the engine derives its two mask
 // parameters from them (see the derivation constants below).
 
+import { clamp } from '../math';
 import type { ColoredPath, Polyline } from '../scene';
 import {
   contourPolylinesFromMask,
@@ -144,8 +145,4 @@ function medianForEdges(image: RawImageData, edgeMedianFilter: boolean | undefin
   const filtered = medianFilter(image);
   if (edgeMedianFilter === true) return filtered;
   return impulseNoiseRatio(image, filtered) >= IMPULSE_NOISE_MIN_RATIO ? filtered : image;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }

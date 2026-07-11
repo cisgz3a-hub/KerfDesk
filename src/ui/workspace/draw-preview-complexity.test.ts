@@ -75,7 +75,7 @@ describe('buildPreviewToolpath complexity guard', () => {
 
     expect(gcodeMocks.prepareOutput).toHaveBeenCalledOnce();
     expect(toolpath.totalLength).toBeGreaterThan(0);
-    expect((toolpath as { readonly previewIssue?: string }).previewIssue).toBeUndefined();
+    expect((toolpath as { readonly previewIssue?: { kind: string } }).previewIssue).toBeUndefined();
   });
 
   it('skips extremely huge traces before full output preparation', () => {
@@ -86,6 +86,8 @@ describe('buildPreviewToolpath complexity guard', () => {
 
     expect(gcodeMocks.prepareOutput).not.toHaveBeenCalled();
     expect(toolpath.totalLength).toBe(0);
-    expect((toolpath as { readonly previewIssue?: string }).previewIssue).toBe('too-complex');
+    expect((toolpath as { readonly previewIssue?: { kind: string } }).previewIssue).toEqual({
+      kind: 'too-complex',
+    });
   });
 });

@@ -36,9 +36,24 @@ export function clickToIntrinsicPixel(
   natural: IntrinsicSize,
 ): { readonly x: number; readonly y: number } | null {
   if (rect.width === 0 || rect.height === 0) return null;
+  if (natural.width === 0 || natural.height === 0) return null;
+  // The frame renders object-fit:contain, so a natural aspect ≠ the element's
+  // is letterboxed/pillarboxed. Map through the fitted content rect (centred,
+  // aspect-preserved), not the full element, or a non-4:3 frame skews the
+  // correspondence and mis-registers the overlay/trace.
+  const contentW = Math.min(rect.width, (rect.height * natural.width) / natural.height);
+  const contentH = Math.min(rect.height, (rect.width * natural.height) / natural.width);
+  const localX = clientX - rect.left - (rect.width - contentW) / 2;
+  const localY = clientY - rect.top - (rect.height - contentH) / 2;
+  const EPS = 1e-6;
+  // A click in a letterbox/pillarbox bar (outside the image) is not a point on
+  // the frame — ignore it rather than snapping it to an edge.
+  if (localX < -EPS || localX > contentW + EPS || localY < -EPS || localY > contentH + EPS) {
+    return null;
+  }
   return {
-    x: ((clientX - rect.left) / rect.width) * natural.width,
-    y: ((clientY - rect.top) / rect.height) * natural.height,
+    x: (localX / contentW) * natural.width,
+    y: (localY / contentH) * natural.height,
   };
 }
 

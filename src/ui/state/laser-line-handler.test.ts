@@ -44,6 +44,10 @@ function makeLaserState(): LaserState {
     wcoCache: null,
     ovCache: null,
     workOriginActive: false,
+    workZZeroKnown: false,
+    toolChangeIdleSeen: false,
+    toolChangeLabels: [],
+    pendingToolLabel: null,
     workOriginSource: 'none',
     frameVerification: null,
     connect: async () => undefined,
@@ -62,8 +66,10 @@ function makeLaserState(): LaserState {
     startJob: async () => undefined,
     pauseJob: async () => undefined,
     resumeJob: async () => undefined,
+    continueToolChange: async () => undefined,
     stopJob: async () => undefined,
     clearSafetyNotice: () => undefined,
+    pushSystemNotice: () => undefined,
     applyDetectedSettings: () => undefined,
     dismissDetectedSettings: () => undefined,
     setOriginHere: async () => undefined,
@@ -243,6 +249,23 @@ describe('handleLine streamer writes', () => {
     // is usable again, while the operator still sees the error notice.
     handleLine(set, get, refs, async () => undefined, '<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
     expect(get().streamer).toBeNull();
+    expect(get().safetyNotice).not.toBeNull();
+  });
+
+  it('marks a tool-change hold errored on a controller reboot (Codex audit)', () => {
+    const { refs, set, get } = makeHarness();
+    // Fill to the tool-change hold: the M0 is swallowed and the streamer holds.
+    set({
+      streamer: step(createStreamer('G1 X1 Y1 F600\nM0\nG1 X2 Y2\n', { toolChangePause: true }))
+        .state,
+    });
+    expect(get().streamer?.status).toBe('tool-change');
+
+    // A boot banner = the controller rebooted mid-job; the queued job is dead and
+    // must be marked errored (Stop/recovery stay mounted), not left showing a
+    // live tool-change hold forever.
+    handleLine(set, get, refs, async () => undefined, 'Grbl 1.1f');
+    expect(get().streamer?.status).toBe('errored');
     expect(get().safetyNotice).not.toBeNull();
   });
 

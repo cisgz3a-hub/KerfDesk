@@ -90,28 +90,46 @@ export function handleStatusLine(
     ...statusPositionPatch(report, state.workOriginSource),
     ...operationPatch,
     ...completedStreamerPatch,
+    ...freshToolChangeIdlePatch(streamer, report),
   });
   observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
 }
 
+// A fresh Idle observed while holding at a tool change, with the pre-M0 tail
+// drained, means the retract/park motion has stopped — the setup gate and
+// Continue may unlock (Codex audit P1). Latches; only tool-change entry resets.
+function freshToolChangeIdlePatch(
+  streamer: StreamerState | null,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'toolChangeIdleSeen'>> {
+  const drainedIdleHold =
+    report.state === 'Idle' && streamer?.status === 'tool-change' && streamer.inFlight.length === 0;
+  return drainedIdleHold ? { toolChangeIdleSeen: true } : {};
+}
+
 // After an alarm or reset the controller has dropped G92; a persistent G54
 // origin may survive but is unverified until the next WCO frame.
 export function originUnknownAfterControllerReset(
   state: LaserState,
-): Pick<LaserState, 'workOriginActive' | 'workOriginSource'> {
+): Pick<LaserState, 'workOriginActive' | 'workOriginSource' | 'workZZeroKnown'> {
+  // A controller reset/alarm/reboot voids the bit-to-stock Z relationship
+  // regardless of what happens to the XY origin (Codex audit P1).
   if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
-    return { workOriginActive: true, workOriginSource: 'unknown' };
+    return { workOriginActive: true, workOriginSource: 'unknown', workZZeroKnown: false };
   }
-  return { workOriginActive: false, workOriginSource: 'none' };
+  return { workOriginActive: false, workOriginSource: 'none', workZZeroKnown: false };
 }
 
 function cancelActiveStreamerPatch(
   streamer: StreamerState | null,
 ): Partial<Pick<LaserState, 'streamer'>> {
   if (streamer === null) return {};
-  if (!['idle', 'streaming', 'paused'].includes(streamer.status)) return {};
+  // 'tool-change' is an active hold (M0 queued, pre-M0 motion may be draining):
+  // an Alarm there wiped the firmware buffer just as during streaming/paused, so
+  // cancel it too (Codex audit: status list not updated when tool-change landed).
+  if (!['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)) return {};
   // Alarm = the firmware wiped its buffer; in-flight lines will never be
   // acked, so drop them from the accounting too (audit F1).
   return { streamer: wipeInFlight(cancelStreamer(streamer)) };

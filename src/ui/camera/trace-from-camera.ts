@@ -4,9 +4,8 @@
 // vectors land at the object's true machine coordinates.
 
 import {
-  frameMatchesCalibration,
-  rectifyImage,
-  scaleIntrinsicsToFrame,
+  rectifyForAlignmentBasis,
+  scaleAlignmentHomographyToFrame,
   warpFrameToBed,
   type CameraAlignment,
   type CameraCalibration,
@@ -44,25 +43,16 @@ export function buildCameraTraceImage(args: {
 }): CameraTraceResult {
   const { raw, alignment, calibration } = args;
   if (alignment === undefined) return { kind: 'failed', reason: 'no-alignment' };
-  let frame = raw;
-  if (alignment.basis === 'rectified') {
-    if (calibration === undefined) return { kind: 'failed', reason: 'basis-mismatch' };
-    const sourceK = frameMatchesCalibration(calibration, raw.width, raw.height)
-      ? calibration.intrinsics
-      : scaleIntrinsicsToFrame(calibration, raw.width, raw.height);
-    frame = rectifyImage(raw, {
-      width: raw.width,
-      height: raw.height,
-      outputK: sourceK,
-      sourceK,
-      distortion: calibration.distortion,
-    });
-  }
-  const warped = warpFrameToBed(frame, {
+  const rectified = rectifyForAlignmentBasis(raw, alignment, calibration);
+  if (rectified.kind === 'basis-mismatch') return { kind: 'failed', reason: 'basis-mismatch' };
+  const warped = warpFrameToBed(rectified.frame, {
     bedWidthMm: args.bedWidthMm,
     bedHeightMm: args.bedHeightMm,
     pixelsPerMm: TRACE_PIXELS_PER_MM,
-    homography: alignment.homography,
+    // Rescale the solved homography if this frame's resolution differs from the
+    // one the alignment was clicked in — otherwise a later session's default
+    // capture size mis-registers the trace by the resolution ratio (CAM-02).
+    homography: scaleAlignmentHomographyToFrame(alignment, raw.width, raw.height),
   });
   if (warped.kind !== 'ok') return { kind: 'failed', reason: 'warp-failed' };
   const dataUrl = rgbaToPngDataUrl(warped.image);

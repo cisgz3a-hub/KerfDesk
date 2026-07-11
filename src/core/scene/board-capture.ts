@@ -71,6 +71,24 @@ export function bestFitRectangleFromCorners(corners: ReadonlyArray<Vec2>): BestF
 }
 
 /**
+ * Distance (mm) from the FIRST captured corner to the bounding-box bottom-left
+ * (minX, minY). Board geometry is order-independent, but the G92 work origin is
+ * set at the first corner captured — capturing e.g. the top-right first draws a
+ * correct-looking outline while the origin (and the burn) sits at the wrong
+ * corner. This flags that without needing the device origin: the feature's
+ * convention is machine +X = width, +Y = height, so bottom-left ≡ (minX, minY).
+ * Returns null unless exactly four finite corners (the manual-size path
+ * synthesizes the first corner AT the origin, so its offset is 0 — no warning).
+ */
+export function firstCornerOffsetMm(corners: ReadonlyArray<Vec2>): number | null {
+  if (corners.length !== BOARD_CORNER_COUNT || !allFinite(corners)) return null;
+  const first = corners[0];
+  if (first === undefined) return null;
+  const box = boundingBox(corners);
+  return Math.hypot(first.x - box.minX, first.y - box.minY);
+}
+
+/**
  * Map each {@link BoardAnchor} to a machine coordinate for the "jog head to"
  * targets: the four bounding-box corners and their centre. Order-independent,
  * so it stays correct however the corners were captured. Returns null unless

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createStreamer, step, type StreamerState } from '../../core/controllers/grbl';
 import { createJobCheckpoint, markResumeInFlight } from '../../core/recovery';
+import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
@@ -23,7 +24,12 @@ function patchStreamer(streamer: LaserState['streamer']): void {
 }
 
 function freshCheckpoint(): ReturnType<typeof createJobCheckpoint> {
-  return createJobCheckpoint({ gcode: GCODE, machineKind: 'laser', nowIso: NOW });
+  return createJobCheckpoint({
+    gcode: GCODE,
+    machineKind: 'laser',
+    outputScope: DEFAULT_OUTPUT_SCOPE,
+    nowIso: NOW,
+  });
 }
 
 let uninstall: (() => void) | null = null;

@@ -13,7 +13,7 @@ import { DesignLibraryDialog } from '../library/DesignLibraryDialog';
 import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { CameraPanel, WorkspaceCameraOverlay } from '../camera';
 import { Cnc3DPane, RegistrationJigPanel, ToolStrip, Workspace } from '../workspace';
-import { PwaUpdatePrompt } from './PwaUpdatePrompt';
+import { PwaUpdatePromptGate } from './PwaUpdatePromptGate';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
@@ -66,7 +66,7 @@ export function App(): JSX.Element {
       </main>
       <StatusBar />
       <Toasts />
-      <PwaUpdatePrompt />
+      <PwaUpdatePromptGate />
       <AddTextDialog />
       <DesignLibraryDialog />
       <ImportImageDialog />

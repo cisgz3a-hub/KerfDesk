@@ -45,7 +45,11 @@ function unmatchedOption(preset: MaterialPreset): MaterialLibraryPresetOption {
     label: `${presetLabel(preset)} - not compatible`,
     statusText: 'not compatible',
     warnings: [INCOMPATIBLE_WARNING],
-    isAssignable: false,
+    // ADR-045: device hints "do not block cross-machine reuse" — a device
+    // mismatch is warn-not-block, so it stays assignable (the warning above is
+    // surfaced and Apply prompts a confirm). Only a matched-but-'unsupported'
+    // preset (matchedOption) is a hard block, a distinct safety axis.
+    isAssignable: true,
   };
 }
 

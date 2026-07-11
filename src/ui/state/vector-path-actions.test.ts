@@ -8,6 +8,7 @@ import {
 } from '../../core/scene';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { useToastStore } from './toast-store';
 
 describe('vector path actions', () => {
   beforeEach(() => {
@@ -167,6 +168,25 @@ describe('boolean + offset actions (ADR-103 G1)', () => {
     expect(useStore.getState().project).toBe(before);
   });
 
+  it('warns and leaves state untouched when intersecting disjoint shapes (CNV-04)', () => {
+    loadObjects([
+      shapeObject('a', '#222222', squarePath('#222222', 0, 0, 10)),
+      shapeObject('b', '#222222', squarePath('#222222', 50, 50, 10)),
+    ]);
+    useStore.setState({
+      selectedObjectId: 'a',
+      additionalSelectedIds: new Set(['b']),
+      dirty: false,
+    });
+    const before = useStore.getState().project;
+    useToastStore.setState({ toasts: [] });
+
+    useStore.getState().booleanSelection('intersect');
+
+    expect(useStore.getState().project).toBe(before);
+    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
+  });
+
   it('offset adds a NEW grown object and keeps the source', () => {
     loadObjects([shapeObject('src', '#222222', squarePath('#222222', 0, 0, 10))]);
     useStore.setState({ selectedObjectId: 'src', dirty: false });
@@ -182,15 +202,17 @@ describe('boolean + offset actions (ADR-103 G1)', () => {
     expect(state.undoStack).toHaveLength(1);
   });
 
-  it('leaves state untouched when an inward offset collapses the shape', () => {
+  it('warns and leaves state untouched when an inward offset collapses the shape (CNV-04)', () => {
     loadObjects([shapeObject('src', '#222222', squarePath('#222222', 0, 0, 10))]);
     useStore.setState({ selectedObjectId: 'src', dirty: false });
     const before = useStore.getState().project;
+    useToastStore.setState({ toasts: [] });
 
     useStore.getState().offsetSelection(-6);
 
     expect(useStore.getState().project).toBe(before);
     expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useToastStore.getState().toasts.at(-1)?.variant).toBe('warning');
   });
 });
 

@@ -6,17 +6,24 @@
 // the warped frame tracks zoom and pan exactly. Sources, in priority order:
 // a captured still (LightBurn's Update Overlay model), else the live video.
 
-import { useEffect, useRef, useState } from 'react';
-import type { RgbaImage } from '../../core/camera';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  scaleAlignmentHomographyToFrame,
+  type CameraAlignment,
+  type RgbaImage,
+} from '../../core/camera';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
+import type { ViewTransform } from '../workspace/view-transform';
 import { computeView } from '../workspace/view-transform';
 import { CameraOverlay } from './CameraOverlay';
 import { overlayMatrix3d } from './camera-overlay-transform';
+import { resolveWorkspaceOverlay, type WorkspaceOverlayPlan } from './workspace-overlay-plan';
 
 export function WorkspaceCameraOverlay(): JSX.Element | null {
   const alignment = useStore((s) => s.project.device.cameraAlignment);
+  const calibration = useStore((s) => s.project.device.cameraCalibration);
   const bedWidth = useStore((s) => s.project.device.bedWidth);
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const visible = useCameraStore((s) => s.overlayVisible);
@@ -28,36 +35,92 @@ export function WorkspaceCameraOverlay(): JSX.Element | null {
   const panY = useUiStore((s) => s.panY);
   const [box, boxRef] = useElementSize();
 
-  if (alignment === undefined || !visible) return null;
   // Live overlay needs a MediaStream (USB); machine sources overlay via the
   // captured still (LightBurn's Update Overlay model).
   const liveStream =
     sourceState.kind === 'live' && sourceState.source.kind === 'usb'
       ? sourceState.source.stream.stream
       : null;
-  const hasSource = still !== null || liveStream !== null;
-  if (!hasSource) return null;
+  // Decide (and rectify the still, if the alignment is rectified) once per
+  // source/alignment change, not on every zoom/pan render (R2).
+  const plan = useMemo(
+    () =>
+      alignment === undefined
+        ? null
+        : resolveWorkspaceOverlay({
+            still,
+            hasLiveStream: liveStream !== null,
+            alignment,
+            calibration,
+          }),
+    [alignment, calibration, still, liveStream],
+  );
+
+  if (alignment === undefined || !visible || plan === null || plan.kind === 'none') return null;
 
   const view =
     box === null
       ? null
       : computeView(box.width, box.height, bedWidth, bedHeight, { zoomFactor, panX, panY });
   return (
-    <div ref={boxRef} style={boxStyle} aria-hidden="true">
-      {view === null ? null : still !== null ? (
-        <StillOverlay
-          still={still}
-          matrix={overlayMatrix3d(alignment.homography, view)}
-          opacityPercent={opacityPercent}
-        />
-      ) : liveStream !== null ? (
-        <CameraOverlay
-          stream={liveStream}
-          homography={alignment.homography}
-          view={view}
-          opacityPercent={opacityPercent}
-        />
-      ) : null}
+    <div ref={boxRef} style={boxStyle} aria-hidden={plan.kind !== 'basis-mismatch'}>
+      {renderOverlay(plan, {
+        view,
+        liveStream,
+        alignment,
+        opacityPercent,
+      })}
+    </div>
+  );
+}
+
+function renderOverlay(
+  plan: WorkspaceOverlayPlan,
+  ctx: {
+    readonly view: ViewTransform | null;
+    readonly liveStream: MediaStream | null;
+    readonly alignment: CameraAlignment;
+    readonly opacityPercent: number;
+  },
+): JSX.Element | null {
+  // A rectified alignment we cannot de-fisheye for display (no calibration, or a
+  // live video): show a hint instead of a mis-registered overlay (R2).
+  if (plan.kind === 'basis-mismatch') return <BasisMismatchNotice />;
+  if (ctx.view === null) return null;
+  if (plan.kind === 'still') {
+    return (
+      <StillOverlay
+        still={plan.frame}
+        // Rescale to the still's own resolution (it may differ from the
+        // calibration frame), matching the Trace path (Codex audit P2).
+        matrix={overlayMatrix3d(
+          scaleAlignmentHomographyToFrame(ctx.alignment, plan.frame.width, plan.frame.height),
+          ctx.view,
+        )}
+        opacityPercent={ctx.opacityPercent}
+      />
+    );
+  }
+  if (plan.kind === 'live' && ctx.liveStream !== null) {
+    return (
+      <CameraOverlay
+        stream={ctx.liveStream}
+        alignment={ctx.alignment}
+        view={ctx.view}
+        opacityPercent={ctx.opacityPercent}
+      />
+    );
+  }
+  return null;
+}
+
+// A calibrated (rectified) alignment can only be shown correctly on a captured,
+// lens-corrected still — not on a raw live frame. NOT perceptually verified; the
+// exact wording/placement is a maintainer UX call.
+function BasisMismatchNotice(): JSX.Element {
+  return (
+    <div role="status" style={noticeStyle}>
+      Aligned camera overlay needs a captured still. Use “Update overlay”.
     </div>
   );
 }
@@ -137,4 +200,17 @@ const boxStyle: React.CSSProperties = {
   overflow: 'hidden',
   pointerEvents: 'none',
   zIndex: 1,
+};
+
+const noticeStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 8,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  padding: '4px 10px',
+  borderRadius: 4,
+  fontSize: 'var(--lf-text-sm)',
+  background: 'var(--lf-bg-1)',
+  color: 'var(--lf-warning-fg)',
+  pointerEvents: 'none',
 };

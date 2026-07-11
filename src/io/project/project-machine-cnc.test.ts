@@ -65,6 +65,23 @@ describe('.lf2 machine / cnc round-trip', () => {
     expect(loaded.machine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
   });
 
+  it('rejects a non-finite (1e999 → Infinity) machine numeric at the .lf2 boundary', () => {
+    // JSON.stringify cannot emit Infinity, so splice the literal 1e999 into the
+    // serialized text — JSON.parse turns it into Infinity, which would otherwise
+    // ride through normalization into emitted G-code as "G0 ZInfinity".
+    const text = serializeProject(cncProject()).replace(
+      /"safeZMm":\s*[0-9.eE+-]+/,
+      '"safeZMm": 1e999',
+    );
+    expect(text).toContain('1e999'); // the splice actually landed
+    const machine = deserializeOk(text).machine;
+    expect(machine?.kind).toBe('cnc');
+    if (machine?.kind === 'cnc') {
+      expect(Number.isFinite(machine.params.safeZMm)).toBe(true);
+      expect(machine.params.safeZMm).toBe(DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm);
+    }
+  });
+
   it('round-trips a custom stock footprint (H.2)', () => {
     const project: Project = {
       ...cncProject(),

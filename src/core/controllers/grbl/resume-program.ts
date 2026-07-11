@@ -32,12 +32,22 @@ export type ResumeOptions = {
 type ModalState = {
   units: 'G20' | 'G21';
   spindle: 'M3' | 'M4' | 'M5';
+  // Modal motion mode. A G0 rapid ignores F; only a G1 feed move carries a real
+  // plunge feed. null until the first G0/G1 word is seen.
+  motionMode: 'G0' | 'G1' | null;
   sValue: number | null;
   feed: number | null;
   x: number | null;
   y: number | null;
   z: number | null;
+  // Feed of the most recent G1 move that LOWERED Z — a pure `G1 Z<d> F<f>`
+  // (GrblStrategy's per-pass signature) OR a ramp/relief move carrying X/Y/Z/F.
+  // null until one is seen, then used for the re-entry descent instead of the
+  // caller's fallback plungeMmPerMin.
+  plungeMmPerMin: number | null;
 };
+
+type GcodeWord = { readonly letter: string; readonly value: number };
 
 const WORD_RE = /([A-Za-z])(-?\d+(?:\.\d+)?)/g;
 
@@ -53,11 +63,13 @@ export function buildResumeProgram(
   const state: ModalState = {
     units: 'G21',
     spindle: 'M5',
+    motionMode: null,
     sValue: null,
     feed: null,
     x: null,
     y: null,
     z: null,
+    plungeMmPerMin: null,
   };
   for (let i = 0; i < fromLine - 1; i += 1) {
     const issue = applyLine(state, lines[i] ?? '');
@@ -80,13 +92,33 @@ export function buildResumeProgram(
 function applyLine(state: ModalState, rawLine: string): string | null {
   const line = stripComments(rawLine);
   if (line.trim() === '' || line.trim() === '%') return null;
-  for (const match of line.matchAll(WORD_RE)) {
-    const letter = (match[1] ?? '').toUpperCase();
-    const value = Number(match[2]);
+  const words: GcodeWord[] = [...line.matchAll(WORD_RE)].map((match) => ({
+    letter: (match[1] ?? '').toUpperCase(),
+    value: Number(match[2]),
+  }));
+  const prevZ = state.z;
+  for (const { letter, value } of words) {
     const issue = applyWord(state, letter, value);
     if (issue !== null) return issue;
   }
+  recordPlungeFeed(state, prevZ);
   return null;
+}
+
+// The plunge feed is the feed of a G1 move that LOWERS Z — whether a pure
+// `G1 Z<d> F<f>` (GrblStrategy's per-pass signature) or a ramp/relief move that
+// also carries X/Y. Recovering it from ramps means a relief/ramp-only program no
+// longer resumes at the caller's fallback feed (Codex audit). Guarded so it can
+// only DROP the recorded feed: a G0 rapid ignores F, and a lateral or UPWARD
+// (retract) G1 move's F is a cutting/retract feed, not a plunge — neither may
+// hijack the value. Z direction needs a known previous Z, so the first Z move
+// before any reference height is skipped rather than guessed.
+function recordPlungeFeed(state: ModalState, prevZ: number | null): void {
+  if (state.motionMode !== 'G1') return;
+  if (state.z === null || prevZ === null || state.z >= prevZ) return;
+  if (state.feed !== null && Number.isFinite(state.feed) && state.feed > 0) {
+    state.plungeMmPerMin = state.feed;
+  }
 }
 
 function applyWord(state: ModalState, letter: string, value: number): string | null {
@@ -104,6 +136,8 @@ function applyWord(state: ModalState, letter: string, value: number): string | n
 }
 
 function applyGWord(state: ModalState, value: number): string | null {
+  if (value === 0) state.motionMode = 'G0';
+  if (value === 1) state.motionMode = 'G1';
   if (value === 91) return 'relative positioning (G91) — resume needs absolute programs';
   // Machine-coordinate and predefined-position moves change the position
   // without updating the tracked X/Y/Z modal words, so the replayed re-entry
@@ -150,9 +184,11 @@ function cncResumeBody(state: ModalState, options: ResumeOptions): string[] {
   const move = positionMove(state);
   if (move !== null) lines.push(move);
   // Feed back down to the recorded depth so XY-only cut lines that follow
-  // resume in the material, not at safe height.
+  // resume in the material, not at safe height — at the job's own plunge feed
+  // (options.plungeMmPerMin is only a fallback when no plunge was seen).
   if (state.z !== null && state.z < options.safeZMm) {
-    lines.push(`G1 Z${formatNumber(state.z)} F${formatNumber(options.plungeMmPerMin)}`);
+    const plunge = state.plungeMmPerMin ?? options.plungeMmPerMin;
+    lines.push(`G1 Z${formatNumber(state.z)} F${formatNumber(plunge)}`);
   }
   if (state.feed !== null) lines.push(`F${formatNumber(state.feed)}`);
   return lines;

@@ -29,6 +29,7 @@ import {
 import type { CncArcPass, CncContourPass, CncGroup, CncPass, CncPath3dPass, Job } from '../job';
 import { assertNever } from '../scene';
 import type { OutputStrategy } from './output-strategy';
+import { TOOL_CHANGE_LOAD_PREFIX } from './tool-change-labels';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -148,7 +149,7 @@ function appendToolChange(lines: string[], head: Head, group: CncGroup, safeZMm:
   lines.push(parkLine(group));
   head.x = fmt(group.parkXMm ?? 0);
   head.y = fmt(group.parkYMm ?? 0);
-  lines.push(`; tool change: load ${group.toolName ?? 'next tool'}`);
+  lines.push(`${TOOL_CHANGE_LOAD_PREFIX}${group.toolName ?? 'next tool'}`);
   lines.push('; re-zero Z on the stock top, then cycle-start to resume');
   lines.push('M0');
   appendSpindleStart(lines, group.spindleRpm, group.spindleSpinupSec);

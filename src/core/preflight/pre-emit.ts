@@ -10,8 +10,7 @@
 // the live estimate) treat both uniformly. Pure-core: no clock, no random, no
 // I/O.
 
-import { pixelExtentForMm } from '../raster';
-import { evaluateRasterBudget } from '../raster/raster-budget';
+import { evaluateRasterBudget, pixelExtentForMm } from '../raster';
 import { rasterBoundsInMachineCoords } from '../job/raster-bounds';
 import type { Layer, Project, RasterImage } from '../scene';
 import { outputOperationLayers, registrationOutputConflict } from '../scene';

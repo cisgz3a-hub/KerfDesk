@@ -403,6 +403,11 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
     newProject: () =>
       set((s) => ({
         ...initialState(),
+        // Machine profiles are app-level (like the material and CNC libraries
+        // above): File -> New keeps the configured device — bed, origin, no-go
+        // zones, scan offsets, camera alignment — instead of silently reverting
+        // to the Default 400x400 (LightBurn parity; ADR device-lifecycle).
+        project: createProject(s.project.device),
         ...currentMaterialLibraryState(s),
         ...currentSavedLibrariesState(s),
         ...currentLayerDefaultsState(s),

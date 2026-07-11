@@ -60,4 +60,17 @@ describe('GRBL-family variant drivers', () => {
     expect(smoothiewareDriver.capabilities.cncJobs).toBe(false);
     expect(ruidaDriver.capabilities.cncJobs).toBe(false);
   });
+
+  it('exposes realtime overrides only on GRBL-family firmwares', () => {
+    // The feed/rapid/spindle override bytes are GRBL 1.1 extended realtime
+    // (0x90–0x9D). A firmware without them would take the byte into its line
+    // buffer and corrupt the running stream, so non-GRBL drivers declare
+    // overrides: false (CTL-01).
+    expect(grblDriver.capabilities.overrides).toBe(true);
+    expect(grblHalDriver.capabilities.overrides).toBe(true);
+    expect(fluidncDriver.capabilities.overrides).toBe(true);
+    expect(marlinDriver.capabilities.overrides).toBe(false);
+    expect(smoothiewareDriver.capabilities.overrides).toBe(false);
+    expect(ruidaDriver.capabilities.overrides).toBe(false);
+  });
 });

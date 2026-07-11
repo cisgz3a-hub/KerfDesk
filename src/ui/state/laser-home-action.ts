@@ -59,6 +59,9 @@ export async function runHomeAction(
       state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown'
         ? 'unknown'
         : 'none',
+    // Homing re-establishes machine zero, so any prior G92 Z0 now points at a
+    // different physical height — work Z0 must be re-set (Codex audit P1).
+    workZZeroKnown: false,
     frameVerification: null,
     log: pushLog(state, '[lf2] Homing started. Cleared origin and frame verification.'),
   }));
