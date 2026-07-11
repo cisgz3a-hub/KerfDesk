@@ -19,6 +19,7 @@ import {
   materializeVectorObject,
   pathDToPolyline,
   polylineToPathD,
+  tryVectorOp,
   type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
@@ -44,28 +45,23 @@ export function dogboneVectorObject(
   const materialized = materializeVectorObject(object);
   const rings = collectClosedRings(materialized);
   if (rings.kind === 'error') return rings;
-  const region = unionD(rings.value, FillRule.NonZero);
+  const regionResult = tryVectorOp(() => unionD(rings.value, FillRule.NonZero));
+  if (regionResult.kind === 'error') return regionResult;
+  const region = regionResult.value;
   const radius = bitDiameterMm / 2;
-  const circles: PathsD = [];
-  for (const ring of region) {
-    // Clipper orients outers CCW (positive area); holes CW. Holes = islands
-    // of remaining material — not relieved in v1.
-    if (signedArea(ring) <= 0) continue;
-    for (const corner of sharpConvexCorners(ring)) {
-      circles.push(circlePath(corner, radius));
-    }
-  }
+  const circles = reliefCircles(region, radius);
   if (circles.length === 0) {
     return err({
       kind: 'no-corners',
       message: `No corners sharper than ${DOGBONE_MAX_CORNER_DEG}° to relieve in this selection.`,
     });
   }
-  const relieved = unionD([...region, ...circles], FillRule.NonZero);
+  const relieved = tryVectorOp(() => unionD([...region, ...circles], FillRule.NonZero));
+  if (relieved.kind === 'error') return relieved;
   const paths: ColoredPath[] = [
     {
       color: materialized.paths[0]?.color ?? FALLBACK_COLOR,
-      polylines: relieved.map(pathDToPolyline).filter(isClosedPolygon),
+      polylines: relieved.value.map(pathDToPolyline).filter(isClosedPolygon),
     },
   ];
   return ok({
@@ -76,6 +72,19 @@ export function dogboneVectorObject(
     transform: IDENTITY_TRANSFORM,
     paths,
   });
+}
+
+function reliefCircles(region: PathsD, radius: number): PathsD {
+  const circles: PathsD = [];
+  for (const ring of region) {
+    // Clipper orients outers CCW (positive area); holes CW. Holes = islands
+    // of remaining material — not relieved in v1.
+    if (signedArea(ring) <= 0) continue;
+    for (const corner of sharpConvexCorners(ring)) {
+      circles.push(circlePath(corner, radius));
+    }
+  }
+  return circles;
 }
 
 function collectClosedRings(materialized: ImportedSvg): Result<PathsD, VectorOpError> {

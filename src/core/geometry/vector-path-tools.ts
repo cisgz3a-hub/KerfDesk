@@ -29,12 +29,31 @@ export type VectorOpError = {
     | 'collapsed'
     | 'no-corners'
     | 'bad-distance'
-    | 'mixed-metadata';
+    | 'mixed-metadata'
+    // The clipper2-ts engine threw on pathological/degenerate geometry. Before
+    // ADR-130 the store's try/catch swallowed this; now the op catches the
+    // third-party throw at the boundary and surfaces it as a Result so an
+    // unexpected clipper failure toasts instead of escaping uncaught (self-audit
+    // finding of the ARC-02 conversion).
+    | 'operation-failed';
   readonly message: string;
 };
 
 const MIN_CLOSED_POINTS = 3;
 const EPS = 1e-9;
+const OPERATION_FAILED_MESSAGE = 'The operation could not be completed on these shapes.';
+
+// Run a clipper2-ts call at the core/third-party boundary, converting any throw
+// into a typed error Result. This is NOT throw-for-control-flow (CLAUDE.md bans
+// that for OUR code): clipper is external and cannot be made to return a Result,
+// so catching its throw here is the correct boundary discipline.
+export function tryVectorOp<T>(run: () => T): Result<T, VectorOpError> {
+  try {
+    return ok(run());
+  } catch {
+    return err({ kind: 'operation-failed', message: OPERATION_FAILED_MESSAGE });
+  }
+}
 
 export function isVectorPathObject(object: SceneObject): object is VectorSceneObject {
   return 'paths' in object;
@@ -91,15 +110,16 @@ export function weldVectorObjects(
   }
   const paths: ColoredPath[] = [];
   for (const [color, subject] of byColor) {
-    const welded = unionD(subject, FillRule.NonZero);
+    const welded = tryVectorOp(() => unionD(subject, FillRule.NonZero));
+    if (welded.kind === 'error') return welded;
     paths.push({
       color,
-      polylines: welded.map(pathDToPolyline).filter(isClosedPolygon),
+      polylines: welded.value.map(pathDToPolyline).filter(isClosedPolygon),
     });
   }
   const filtered = paths.filter((path) => path.polylines.length > 0);
   if (filtered.length === 0) {
-    return err({ kind: 'empty-result', message: 'Weld requires selected closed vector contours.' });
+    return err({ kind: 'empty-result', message: 'Welding these shapes produced an empty result.' });
   }
   return ok({
     ...commonObjectMetadata(objects),

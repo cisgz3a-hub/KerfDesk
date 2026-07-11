@@ -19,6 +19,7 @@ import {
   materializeVectorObject,
   pathDToPolyline,
   polylineToPathD,
+  tryVectorOp,
   type VectorOpError,
   type VectorSceneObject,
 } from './vector-path-tools';
@@ -56,11 +57,12 @@ export function combineVectorObjects(
   if (subject.kind === 'error') return subject;
   const clip = closedWorldPaths(clipObjects);
   if (clip.kind === 'error') return clip;
-  const combined = runBooleanOp(op, subject.value, clip.value);
+  const combined = tryVectorOp(() => runBooleanOp(op, subject.value, clip.value));
+  if (combined.kind === 'error') return combined;
   const paths: ColoredPath[] = [
     {
       color: objectColor(subjectObject),
-      polylines: combined.map(pathDToPolyline).filter(isClosedPolygon),
+      polylines: combined.value.map(pathDToPolyline).filter(isClosedPolygon),
     },
   ];
   if ((paths[0]?.polylines.length ?? 0) === 0) {
@@ -97,9 +99,15 @@ export function offsetVectorObjects(
   }
   const world = closedWorldPaths(objects);
   if (world.kind === 'error') return world;
-  const inflated = inflatePathsD(world.value, deltaMm, JoinType.Round, EndType.Polygon);
+  const inflated = tryVectorOp(() =>
+    inflatePathsD(world.value, deltaMm, JoinType.Round, EndType.Polygon),
+  );
+  if (inflated.kind === 'error') return inflated;
   const paths: ColoredPath[] = [
-    { color: objectColor(first), polylines: inflated.map(pathDToPolyline).filter(isClosedPolygon) },
+    {
+      color: objectColor(first),
+      polylines: inflated.value.map(pathDToPolyline).filter(isClosedPolygon),
+    },
   ];
   if ((paths[0]?.polylines.length ?? 0) === 0) {
     return err({
