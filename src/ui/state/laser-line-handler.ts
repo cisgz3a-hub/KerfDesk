@@ -190,7 +190,14 @@ function rebootDuringJobPatch(
   state: LaserState,
 ): Partial<Pick<LaserState, 'streamer' | 'safetyNotice'>> {
   const streamer: StreamerState | null = state.streamer;
-  if (streamer === null || !['idle', 'streaming', 'paused'].includes(streamer.status)) return {};
+  // 'tool-change' is an active hold with the M0 still queued and pre-M0 motion
+  // possibly draining — a reboot there kills the job just like streaming/paused
+  // (Codex audit: this status list was not updated when tool-change landed).
+  if (
+    streamer === null ||
+    !['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)
+  )
+    return {};
   return {
     streamer: wipeInFlight(markErrored(streamer)),
     // First notice wins — an earlier root cause is what the operator needs.

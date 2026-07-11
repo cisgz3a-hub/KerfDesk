@@ -89,7 +89,11 @@ function appCommandContext(
     selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
   const activeStreamer =
     laser.streamer !== null &&
-    ['streaming', 'paused', 'done', 'errored'].includes(laser.streamer.status);
+    // 'tool-change' is an active hold: Frame/Home/Start and other job-active
+    // commands must stay blocked (the jog/probe/Zero-Z the operator needs at a
+    // tool change are gated separately by the setup gate). Codex audit: this
+    // status list was not updated when tool-change landed.
+    ['streaming', 'paused', 'done', 'errored', 'tool-change'].includes(laser.streamer.status);
   return {
     ...fileCommandContext(callbacks, platform, app, laser, pushToast),
     ...editCommandContext(app, dialogs),

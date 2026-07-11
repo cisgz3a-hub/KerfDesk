@@ -111,7 +111,10 @@ function cancelActiveStreamerPatch(
   streamer: StreamerState | null,
 ): Partial<Pick<LaserState, 'streamer'>> {
   if (streamer === null) return {};
-  if (!['idle', 'streaming', 'paused'].includes(streamer.status)) return {};
+  // 'tool-change' is an active hold (M0 queued, pre-M0 motion may be draining):
+  // an Alarm there wiped the firmware buffer just as during streaming/paused, so
+  // cancel it too (Codex audit: status list not updated when tool-change landed).
+  if (!['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)) return {};
   // Alarm = the firmware wiped its buffer; in-flight lines will never be
   // acked, so drop them from the accounting too (audit F1).
   return { streamer: wipeInFlight(cancelStreamer(streamer)) };

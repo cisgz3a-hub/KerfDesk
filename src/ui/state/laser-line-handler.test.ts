@@ -248,6 +248,23 @@ describe('handleLine streamer writes', () => {
     expect(get().safetyNotice).not.toBeNull();
   });
 
+  it('marks a tool-change hold errored on a controller reboot (Codex audit)', () => {
+    const { refs, set, get } = makeHarness();
+    // Fill to the tool-change hold: the M0 is swallowed and the streamer holds.
+    set({
+      streamer: step(createStreamer('G1 X1 Y1 F600\nM0\nG1 X2 Y2\n', { toolChangePause: true }))
+        .state,
+    });
+    expect(get().streamer?.status).toBe('tool-change');
+
+    // A boot banner = the controller rebooted mid-job; the queued job is dead and
+    // must be marked errored (Stop/recovery stay mounted), not left showing a
+    // live tool-change hold forever.
+    handleLine(set, get, refs, async () => undefined, 'Grbl 1.1f');
+    expect(get().streamer?.status).toBe('errored');
+    expect(get().safetyNotice).not.toBeNull();
+  });
+
   // markErrored, not disconnect: 'disconnected' falls outside isActiveJob,
   // which unmounts the Stop button and drops the soft-reset stop path while
   // GRBL may still be executing buffered lines on a live port (the same R-H2
