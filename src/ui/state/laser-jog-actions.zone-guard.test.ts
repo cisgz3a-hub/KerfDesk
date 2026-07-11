@@ -100,4 +100,19 @@ describe('jog no-go zone guard (DEV-04)', () => {
     await useLaserStore.getState().jogToMachinePosition(10, 5, 1000);
     expect(writes.filter((line) => line.startsWith('$J=')).length).toBe(1);
   });
+
+  it('allows a Z-only jog even when the head is parked inside a zone', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => void writes.push(data));
+    await useLaserStore.getState().connect(makeAdapter(connection));
+    connection.emitLine('Grbl 1.1f');
+    // Park the head at (30,30) — inside the clamp (20..40).
+    connection.emitLine('<Idle|MPos:30.000,30.000,0.000|FS:0,0>');
+    await Promise.resolve();
+    writes.length = 0;
+
+    // A Z-only retract has no XY motion, so an XY keep-out cannot block it.
+    await useLaserStore.getState().jog({ dz: 5, feed: 600 });
+    expect(writes.filter((line) => line.startsWith('$J=')).length).toBe(1);
+  });
 });

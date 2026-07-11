@@ -129,11 +129,17 @@ function assertJogClearsNoGoZones(
   get: GetFn,
   params: { readonly dx?: number; readonly dy?: number },
 ): void {
+  const dx = params.dx ?? 0;
+  const dy = params.dy ?? 0;
+  // A Z-only jog (or a no-op) has no XY motion, so no XY keep-out can be crossed.
+  // Testing the degenerate start==end segment would wrongly block a safe Z
+  // retract / touch-off whenever the head is parked inside a zone (DEV-04 audit).
+  if (dx === 0 && dy === 0) return;
   const zones = useStore.getState().project.device.noGoZones;
   if (zones === undefined || zones.length === 0) return;
   const current = inferCurrentMachinePosition(get().statusReport, get().wcoCache);
   if (current === null) return;
-  const target = { x: current.x + (params.dx ?? 0), y: current.y + (params.dy ?? 0) };
+  const target = { x: current.x + dx, y: current.y + dy };
   const zone = firstZoneCrossedBySegment(current, target, zones);
   if (zone === null) return;
   const message = `Jog blocked: this move would cross the no-go zone "${zone.name}". Jog around it, or disable the zone in Machine Setup → Safety Zones.`;
