@@ -1,8 +1,10 @@
 // .rd job encoder (ADR-097). Assembles the minimal Ruida command stream for a
 // vector cut job — bounds metadata, per-layer speed/power/color, travel + cut
 // moves per segment and pass, EOF — then swizzles every byte. Deterministic:
-// same Job + DeviceProfile → byte-identical output (non-negotiable #5, golden
-// hex fixtures pin it).
+// same Job + DeviceProfile → byte-identical output (non-negotiable #5, pinned
+// by the same-process double-encode test in ruida.test.ts). NO reference .rd
+// from real hardware or LightBurn exists to diff against yet — see the STATUS
+// HONESTY note below and ADR-097.
 //
 // STATUS HONESTY: byte meanings follow public reverse-engineering; the
 // encoder round-trips through this repo's own decoder (geometry/power/speed
