@@ -6,13 +6,13 @@
 // overlays. The wiring slice positions it over the canvas and feeds the view.
 
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import type { Mat3 } from '../../core/camera';
+import { scaleAlignmentHomographyToFrame, type CameraAlignment } from '../../core/camera';
 import type { ViewTransform } from '../workspace/view-transform';
 import { overlayMatrix3d } from './camera-overlay-transform';
 
 type CameraOverlayProps = {
   readonly stream: MediaStream;
-  readonly homography: Mat3;
+  readonly alignment: CameraAlignment;
   readonly view: ViewTransform;
   readonly opacityPercent: number;
   readonly cssScale?: number;
@@ -21,9 +21,17 @@ type CameraOverlayProps = {
 type FrameSize = { readonly width: number; readonly height: number };
 
 export function CameraOverlay(props: CameraOverlayProps): JSX.Element {
-  const { stream, homography, view, opacityPercent, cssScale = 1 } = props;
+  const { stream, alignment, view, opacityPercent, cssScale = 1 } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [frame, setFrame] = useState<FrameSize | null>(null);
+  // The homography was solved in the calibration frame's pixel basis; a live
+  // stream at a different resolution must be rescaled to it, exactly as the
+  // Trace path does (trace-from-camera.ts) — otherwise the warped frame is off
+  // by the resolution ratio (Codex audit P2).
+  const homography =
+    frame === null
+      ? alignment.homography
+      : scaleAlignmentHomographyToFrame(alignment, frame.width, frame.height);
 
   useEffect(() => {
     const video = videoRef.current;

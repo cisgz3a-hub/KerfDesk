@@ -7,7 +7,7 @@
 // a captured still (LightBurn's Update Overlay model), else the live video.
 
 import { useEffect, useRef, useState } from 'react';
-import type { RgbaImage } from '../../core/camera';
+import { scaleAlignmentHomographyToFrame, type RgbaImage } from '../../core/camera';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useUiStore } from '../state/ui-store';
@@ -47,13 +47,18 @@ export function WorkspaceCameraOverlay(): JSX.Element | null {
       {view === null ? null : still !== null ? (
         <StillOverlay
           still={still}
-          matrix={overlayMatrix3d(alignment.homography, view)}
+          // Rescale to the still's own resolution (it may differ from the
+          // calibration frame), matching the Trace path (Codex audit P2).
+          matrix={overlayMatrix3d(
+            scaleAlignmentHomographyToFrame(alignment, still.width, still.height),
+            view,
+          )}
           opacityPercent={opacityPercent}
         />
       ) : liveStream !== null ? (
         <CameraOverlay
           stream={liveStream}
-          homography={alignment.homography}
+          alignment={alignment}
           view={view}
           opacityPercent={opacityPercent}
         />

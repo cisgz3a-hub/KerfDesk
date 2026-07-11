@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Mat3 } from '../../core/camera';
+import type { CameraAlignment, Mat3 } from '../../core/camera';
 import type { ViewTransform } from '../workspace/view-transform';
 import { CameraOverlay } from './CameraOverlay';
 
@@ -11,6 +11,13 @@ import { CameraOverlay } from './CameraOverlay';
 
 const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const VIEW: ViewTransform = { scale: 2, offsetX: 10, offsetY: 20 };
+const ALIGNMENT: CameraAlignment = {
+  homography: IDENTITY,
+  frameWidth: 1280,
+  frameHeight: 720,
+  basis: 'raw',
+  alignedAt: 0,
+};
 
 let container: HTMLDivElement;
 let root: Root;
@@ -42,7 +49,7 @@ describe('CameraOverlay', () => {
     const stream = {} as MediaStream;
     act(() => {
       root.render(
-        <CameraOverlay stream={stream} homography={IDENTITY} view={VIEW} opacityPercent={60} />,
+        <CameraOverlay stream={stream} alignment={ALIGNMENT} view={VIEW} opacityPercent={60} />,
       );
     });
     const video = container.querySelector('video');
@@ -53,11 +60,32 @@ describe('CameraOverlay', () => {
     expect(srcObjectValue).toBe(stream);
   });
 
+  it('rescales the homography to the live frame resolution, not the calibration basis (Codex audit P2)', () => {
+    const stream = {} as MediaStream;
+    act(() => {
+      root.render(
+        <CameraOverlay stream={stream} alignment={ALIGNMENT} view={VIEW} opacityPercent={100} />,
+      );
+    });
+    const video = container.querySelector('video')!;
+    const beforeMetadata = video.style.transform;
+
+    // A 640×360 stream is half the 1280×720 calibration, so the homography's
+    // pixel input is scaled ×2 — the transform must differ from the raw one.
+    Object.defineProperty(video, 'videoWidth', { configurable: true, value: 640 });
+    Object.defineProperty(video, 'videoHeight', { configurable: true, value: 360 });
+    act(() => {
+      video.dispatchEvent(new Event('loadedmetadata'));
+    });
+    expect(video.style.transform).toContain('matrix3d(');
+    expect(video.style.transform).not.toBe(beforeMetadata);
+  });
+
   it('clears srcObject on unmount so the camera is released', () => {
     const stream = {} as MediaStream;
     act(() => {
       root.render(
-        <CameraOverlay stream={stream} homography={IDENTITY} view={VIEW} opacityPercent={100} />,
+        <CameraOverlay stream={stream} alignment={ALIGNMENT} view={VIEW} opacityPercent={100} />,
       );
     });
     expect(srcObjectValue).toBe(stream);
