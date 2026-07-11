@@ -92,4 +92,11 @@ describe('smoothiewareDriver', () => {
     expect(smoothiewareDriver.commands.settingsQuery).toBeNull();
     expect(smoothiewareDriver.commands.stopLaserLines).toEqual(['M5', 'M9']);
   });
+
+  it('settles with M400, not G4 P0.01 — G4 P is milliseconds on Smoothieware', () => {
+    // Same instant-ack hazard CTL-02 fixed for Marlin: G4 P0.01 would clear the
+    // streamer while motion still drains; M400 waits for the queue to empty.
+    expect(smoothiewareDriver.commands.settleDwell).toBe('M400');
+    expect(smoothiewareDriver.commands.settleDwell).not.toBe('G4 P0.01');
+  });
 });
