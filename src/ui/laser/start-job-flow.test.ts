@@ -15,7 +15,6 @@ import {
   fingerprintGcode,
   fingerprintsEqual,
 } from '../../core/recovery';
-import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import { useStore } from '../state';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
@@ -174,7 +173,6 @@ describe('job checkpoint integration (ADR-118)', () => {
       gcode: 'G1 X1 S1\nM5',
       machineKind: 'laser',
       outputScope: DEFAULT_OUTPUT_SCOPE,
-      jobPlacement: DEFAULT_JOB_PLACEMENT,
       nowIso: '2026-07-07T01:00:00.000Z',
     });
     writeJobCheckpoint(older);
@@ -194,7 +192,6 @@ describe('job checkpoint integration (ADR-118)', () => {
       gcode: 'G1 X999 S999\nM5',
       machineKind: 'laser',
       outputScope: DEFAULT_OUTPUT_SCOPE,
-      jobPlacement: DEFAULT_JOB_PLACEMENT,
       nowIso: '2026-07-07T01:00:00.000Z',
     });
     writeJobCheckpoint(foreign);
@@ -298,6 +295,46 @@ describe('job checkpoint integration (ADR-118)', () => {
       expect.stringContaining('no longer produces the same G-code'),
     );
     expect(startJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes a Current-Position job after the head moved (R1)', async () => {
+    const headAt = (x: number, y: number): StatusReport => ({
+      ...idleStatus,
+      mPos: { x, y, z: 0 },
+    });
+    // Start a Current-Position job with the head at (10,10): the compiled bytes
+    // anchor the job to that work position.
+    useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
+    useLaserStore.setState({ statusReport: headAt(10, 10) });
+
+    await runStartJobFlow();
+    const started = readJobCheckpoint();
+    if (started === null) throw new Error('unreachable');
+    // The checkpoint froze the RESOLVED origin, including the head XY (R1).
+    expect(started.jobOrigin).toEqual({
+      startFrom: 'current-position',
+      anchor: 'front-left',
+      currentPosition: { x: 10, y: 10 },
+    });
+
+    // Crash + reconnect with the head now parked somewhere else. Re-resolving
+    // Current-Position here would anchor the job to (60,60) and renumber every
+    // line — the exact false-refusal the fix prevents.
+    const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
+      async () => undefined,
+    );
+    useLaserStore.setState({ startJob, statusReport: headAt(60, 60) });
+    vi.mocked(jobAwareAlert).mockClear();
+
+    await runCheckpointResumeFlow(started);
+
+    expect(jobAwareAlert).not.toHaveBeenCalledWith(
+      expect.stringContaining('no longer produces the same G-code'),
+    );
+    expect(startJob).toHaveBeenCalledTimes(1);
+
+    // Reset placement so later tests keep the Absolute default.
+    useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
   });
 
   it('manual start-from-line also suspends checkpoint tracking', async () => {

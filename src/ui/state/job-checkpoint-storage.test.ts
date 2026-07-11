@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createJobCheckpoint } from '../../core/recovery';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
-import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import {
   JOB_CHECKPOINT_STORAGE_KEY,
   clearJobCheckpoint,
@@ -10,10 +9,9 @@ import {
 } from './job-checkpoint-storage';
 
 const NOW = '2026-07-07T03:00:00.000Z';
-const SCOPE_PLACEMENT = {
-  outputScope: DEFAULT_OUTPUT_SCOPE,
-  jobPlacement: DEFAULT_JOB_PLACEMENT,
-} as const;
+// jobOrigin omitted = Absolute (byte-deterministic); these tests exercise
+// storage round-tripping, not placement.
+const SCOPE_PLACEMENT = { outputScope: DEFAULT_OUTPUT_SCOPE } as const;
 
 afterEach(() => {
   localStorage.clear();

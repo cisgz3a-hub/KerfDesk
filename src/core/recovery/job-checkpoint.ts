@@ -15,13 +15,16 @@
 // Pure core: timestamps are passed in as ISO strings; no clock, no storage.
 
 import { isSendableGcodeLine } from '../controllers/grbl';
-import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobPlacementSettings } from '../job';
-import type { OutputScope } from '../scene';
+import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobOriginPlacement } from '../job';
+import type { OutputScope, Vec2 } from '../scene';
 
-// v2 (PST-02): the checkpoint now also stores the output scope + job placement
-// the run used, so resume recompiles the SAME bytes. v1 slots lack them and are
-// discarded on read (transient — a stale recovery prompt is the only cost).
-export const JOB_CHECKPOINT_SCHEMA_VERSION = 2;
+// v3 (R1): the checkpoint stores the RESOLVED job origin, not the placement
+// settings. A 'current-position' start freezes the live head XY into
+// jobOrigin.currentPosition at compile time; storing only {startFrom, anchor}
+// let resume re-resolve against the post-crash head, changing the bytes and
+// falsely refusing the resume. v2 (PST-02) stored the output scope + settings;
+// older slots are discarded on read (transient — a stale recovery prompt only).
+export const JOB_CHECKPOINT_SCHEMA_VERSION = 3;
 
 // FNV-1a 32-bit offset basis (public domain reference constant). The FNV
 // prime 0x01000193 appears only as its shift decomposition inside
@@ -54,11 +57,12 @@ export type JobCheckpoint = {
   // corrupt ackedLines with foreign counts.
   readonly resumeInFlight: boolean;
   readonly machineKind: JobMachineKind;
-  // The output scope + placement the run compiled with. Resume MUST recompile
-  // with these, not the (reset-after-crash) live values, or the bytes diverge
-  // and the fingerprint check falsely refuses the resume (PST-02).
+  // The output scope + RESOLVED job origin the run compiled with. Resume MUST
+  // recompile with these, not the (reset-after-crash) live values, or the bytes
+  // diverge and the fingerprint check falsely refuses the resume (PST-02, R1).
+  // Absent jobOrigin = Absolute Coordinates (no translation, byte-deterministic).
   readonly outputScope: OutputScope;
-  readonly jobPlacement: JobPlacementSettings;
+  readonly jobOrigin?: JobOriginPlacement;
   readonly startedAtIso: string;
   readonly updatedAtIso: string;
 };
@@ -88,7 +92,8 @@ export function createJobCheckpoint(args: {
   readonly gcode: string;
   readonly machineKind: JobMachineKind;
   readonly outputScope: OutputScope;
-  readonly jobPlacement: JobPlacementSettings;
+  // The resolved job origin the run compiled with; undefined = Absolute (R1).
+  readonly jobOrigin?: JobOriginPlacement;
   readonly nowIso: string;
 }): JobCheckpoint {
   return {
@@ -99,7 +104,7 @@ export function createJobCheckpoint(args: {
     resumeInFlight: false,
     machineKind: args.machineKind,
     outputScope: args.outputScope,
-    jobPlacement: args.jobPlacement,
+    ...(args.jobOrigin === undefined ? {} : { jobOrigin: args.jobOrigin }),
     startedAtIso: args.nowIso,
     updatedAtIso: args.nowIso,
   };
@@ -166,14 +171,14 @@ function validatedCheckpointBody(
   const resumeInFlight = value['resumeInFlight'];
   const machineKind = value['machineKind'];
   const outputScope = parseOutputScope(value['outputScope']);
-  const jobPlacement = parseJobPlacement(value['jobPlacement']);
+  const jobOriginPatch = parseOptionalJobOrigin(value['jobOrigin']);
   const startedAtIso = value['startedAtIso'];
   const updatedAtIso = value['updatedAtIso'];
   if (!isNonNegativeInteger(sendableLines) || sendableLines > fingerprint.lines) return null;
   if (!isNonNegativeInteger(ackedLines) || ackedLines > sendableLines) return null;
   if (typeof resumeInFlight !== 'boolean') return null;
   if (machineKind !== 'laser' && machineKind !== 'cnc') return null;
-  if (outputScope === null || jobPlacement === null) return null;
+  if (outputScope === null || jobOriginPatch === null) return null;
   if (typeof startedAtIso !== 'string' || typeof updatedAtIso !== 'string') return null;
   return {
     schemaVersion: JOB_CHECKPOINT_SCHEMA_VERSION,
@@ -183,10 +188,20 @@ function validatedCheckpointBody(
     resumeInFlight,
     machineKind,
     outputScope,
-    jobPlacement,
+    ...jobOriginPatch,
     startedAtIso,
     updatedAtIso,
   };
+}
+
+// jobOrigin is optional (absent = Absolute); present-but-malformed rejects the
+// whole checkpoint. Returns a spread-ready patch, or null on malformed.
+function parseOptionalJobOrigin(
+  value: unknown,
+): { readonly jobOrigin?: JobOriginPlacement } | null {
+  if (value === undefined) return {};
+  const parsed = parseJobOrigin(value);
+  return parsed === null ? null : { jobOrigin: parsed };
 }
 
 function parseOutputScope(value: unknown): OutputScope | null {
@@ -201,22 +216,39 @@ function parseOutputScope(value: unknown): OutputScope | null {
   return { cutSelectedGraphics, useSelectionOrigin, selectedObjectIds };
 }
 
-function parseJobPlacement(value: unknown): JobPlacementSettings | null {
+// Parse the RESOLVED origin: a 'current-position' origin carries the frozen
+// live head XY (currentPosition), which is exactly what resume must reuse to
+// reproduce the compiled bytes (R1). The other modes are position-independent.
+function parseJobOrigin(value: unknown): JobOriginPlacement | null {
   if (!isRecord(value)) return null;
   const startFrom = value['startFrom'];
   const anchor = value['anchor'];
   if (!isJobStartMode(startFrom) || !isJobOriginAnchor(anchor)) return null;
+  if (startFrom === 'current-position') {
+    const currentPosition = parseVec2(value['currentPosition']);
+    if (currentPosition === null) return null;
+    return { startFrom, anchor, currentPosition };
+  }
   return { startFrom, anchor };
 }
 
-const JOB_START_MODES: ReadonlyArray<JobPlacementSettings['startFrom']> = [
+function parseVec2(value: unknown): Vec2 | null {
+  if (!isRecord(value)) return null;
+  const x = value['x'];
+  const y = value['y'];
+  if (typeof x !== 'number' || !Number.isFinite(x)) return null;
+  if (typeof y !== 'number' || !Number.isFinite(y)) return null;
+  return { x, y };
+}
+
+const JOB_START_MODES: ReadonlyArray<JobOriginPlacement['startFrom']> = [
   'absolute',
   'current-position',
   'user-origin',
   'verified-origin',
 ];
 
-function isJobStartMode(value: unknown): value is JobPlacementSettings['startFrom'] {
+function isJobStartMode(value: unknown): value is JobOriginPlacement['startFrom'] {
   // Widen the literal tuple to string[] purely to test membership of an unknown;
   // the type guard restores the narrow type on success.
   return typeof value === 'string' && (JOB_START_MODES as ReadonlyArray<string>).includes(value);

@@ -4,7 +4,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createStreamer, step } from '../../core/controllers/grbl';
 import { advanceJobCheckpoint, createJobCheckpoint } from '../../core/recovery';
 import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
-import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import { useLaserStore } from '../state/laser-store';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { CheckpointResumeBanner } from './CheckpointResumeBanner';
@@ -38,7 +37,6 @@ function storedCheckpoint(acked: number): void {
     gcode: GCODE,
     machineKind: 'laser',
     outputScope: DEFAULT_OUTPUT_SCOPE,
-    jobPlacement: DEFAULT_JOB_PLACEMENT,
     nowIso: NOW,
   });
   writeJobCheckpoint(advanceJobCheckpoint(cp, acked, NOW));

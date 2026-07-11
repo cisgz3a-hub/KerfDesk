@@ -18,7 +18,7 @@ import {
   rawResumeLine,
   type JobCheckpoint,
 } from '../../core/recovery';
-import type { JobPlacementSettings } from '../../core/job';
+import type { JobOriginPlacement } from '../../core/job';
 import { machineKindOf, type OutputScope, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
@@ -73,11 +73,11 @@ export async function runStartJobFlow(): Promise<void> {
       createJobCheckpoint({
         gcode: prepared.gcode,
         machineKind: machineKindOf(project.machine),
-        // Capture the scope + placement THIS run compiled with so resume can
-        // reproduce identical bytes even after a crash resets the live values
-        // (PST-02).
+        // Capture the scope + RESOLVED origin THIS run compiled with so resume
+        // reproduces identical bytes even after a crash resets the live values
+        // (PST-02) and re-resolves current-position to the post-crash head (R1).
         outputScope: currentOutputScope(app),
-        jobPlacement,
+        ...(prepared.jobOrigin === undefined ? {} : { jobOrigin: prepared.jobOrigin }),
         nowIso: new Date().toISOString(),
       }),
     );
@@ -100,12 +100,13 @@ export async function runStartFromLineFlow(fromLine: number): Promise<void> {
 // edited project silently renumbers every line), then map the acked-sendable
 // count back to the raw line the stream died at.
 export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promise<void> {
-  // Recompile with the run's OWN scope + placement (PST-02): a crash resets the
-  // live output scope / job placement to defaults, and recompiling with those
-  // would renumber every line and trip the fingerprint refusal below.
+  // Recompile with the run's OWN scope + resolved origin (PST-02, R1): a crash
+  // resets the live output scope and re-resolves current-position against the
+  // post-crash head, both of which would renumber every line and trip the
+  // fingerprint refusal below. The frozen origin reproduces the exact bytes.
   const prepared = prepareResume({
     outputScope: checkpoint.outputScope,
-    jobPlacement: checkpoint.jobPlacement,
+    ...(checkpoint.jobOrigin === undefined ? {} : { jobOrigin: checkpoint.jobOrigin }),
   });
   if (prepared === null) return;
   if (!fingerprintsEqual(fingerprintGcode(prepared.gcode), checkpoint.fingerprint)) {
@@ -130,11 +131,10 @@ export async function runCheckpointResumeFlow(checkpoint: JobCheckpoint): Promis
 // passes nothing and uses current app state, as before.
 function prepareResume(overrides?: {
   readonly outputScope: OutputScope;
-  readonly jobPlacement: JobPlacementSettings;
+  readonly jobOrigin?: JobOriginPlacement;
 }): { readonly project: Project; readonly gcode: string } | null {
   const app = useStore.getState();
   const { project } = app;
-  const jobPlacement = overrides?.jobPlacement ?? app.jobPlacement;
   const outputScope = overrides?.outputScope ?? currentOutputScope(app);
   const laser = useLaserStore.getState();
   const prepared = prepareStartJob(
@@ -153,8 +153,9 @@ function prepareResume(overrides?: {
       wcoCache: laser.wcoCache,
       frameVerification: laser.frameVerification,
     },
-    jobPlacement,
+    app.jobPlacement,
     outputScope,
+    overrides?.jobOrigin,
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');

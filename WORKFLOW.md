@@ -823,11 +823,12 @@ run that finishes cleanly clears it.
 1. Fingerprint mismatch → alert explains the project no longer produces
    the interrupted program; nothing is streamed. The manual
    Start-from-line control remains the escape hatch.
-2. A checkpoint resume re-compiles with the output scope and job placement
-   the ORIGINAL run used (both are stored in the checkpoint, schema v2), so a
-   crash that reset the live scope/placement no longer trips this error on its
-   own. The alert names a changed object, output scope, or job placement as the
-   possible causes when the bytes genuinely differ (PST-02).
+2. A checkpoint resume re-compiles with the output scope and the RESOLVED job
+   origin the ORIGINAL run used (both stored in the checkpoint, schema v3), so a
+   crash no longer trips this error on its own — including a Current Position
+   job, whose frozen head XY is reused instead of re-resolved against the
+   post-crash position. The alert names a changed object, output scope, or job
+   placement as the possible causes when the bytes genuinely differ (PST-02, R1).
 
 #### Edge — controller lost power too
 1. Acked lines may include a buffer's worth GRBL never executed; the

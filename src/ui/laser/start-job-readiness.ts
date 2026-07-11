@@ -4,6 +4,7 @@ import {
   describeFramePreflightFailure,
   frameBoundsSignature,
   framePreflight,
+  type JobOriginPlacement,
 } from '../../core/job';
 import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
 import { runControllerReadiness, runPreEmitPreflight } from '../../core/preflight';
@@ -39,6 +40,9 @@ export type StartJobPreparation =
       readonly ok: true;
       readonly gcode: string;
       readonly warnings: ReadonlyArray<string>;
+      // The RESOLVED origin this compile used (undefined = Absolute). The
+      // checkpoint stores it so resume reproduces identical bytes (R1).
+      readonly jobOrigin?: JobOriginPlacement;
     }
   | {
       readonly ok: false;
@@ -82,11 +86,16 @@ export function prepareStartJob(
   machine: MachineStartSnapshot,
   jobPlacement: JobPlacementSettings = DEFAULT_JOB_PLACEMENT,
   outputScope: OutputScope = DEFAULT_OUTPUT_SCOPE,
+  // Resume only: the RESOLVED origin the original run compiled with. When set,
+  // the compile reuses it (so a 'current-position' job reproduces the frozen
+  // head XY and its checkpoint fingerprint) while the live machine is still
+  // re-validated through the origin's mode (R1).
+  resolvedJobOrigin?: JobOriginPlacement,
 ): StartJobPreparation {
   const machineIssues = findEarlyStartIssues(project, machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
 
-  const placement = resolveJobPlacement(jobPlacement, machine);
+  const placement = resolveStartPlacement(jobPlacement, machine, resolvedJobOrigin);
   if (!placement.ok) return { ok: false, messages: placement.messages };
   const motionOffset = trustedMotionOffsetForPreflight(project.device, placement);
   const preEmitIssues = findScopedPreEmitIssues(project, outputScope);
@@ -115,15 +124,46 @@ export function prepareStartJob(
     return { ok: false, messages: controller.errors.map((i) => i.message) };
   }
 
+  const warnings = collectStartWarnings(
+    project,
+    controllerSettings,
+    controller.warnings.map((i) => i.message),
+    machine,
+  );
+  return okPreparation(gcode, warnings, placement.jobOrigin);
+}
+
+function okPreparation(
+  gcode: string,
+  warnings: ReadonlyArray<string>,
+  jobOrigin: JobOriginPlacement | undefined,
+): StartJobPreparation {
+  return { ok: true, gcode, warnings, ...(jobOrigin === undefined ? {} : { jobOrigin }) };
+}
+
+// Resolve the origin for a Start or a resume. A fresh Start resolves the
+// operator's settings against the live machine. A resume passes the FROZEN
+// origin the original run compiled with: we still re-validate the live machine
+// through that origin's MODE (a vanished custom origin / unknown position still
+// refuses), but the frozen origin drives the compile so a 'current-position'
+// job reproduces its bytes instead of re-resolving to the post-crash head (R1).
+function resolveStartPlacement(
+  jobPlacement: JobPlacementSettings,
+  machine: MachineStartSnapshot,
+  resolvedJobOrigin: JobOriginPlacement | undefined,
+): ResolvedJobPlacement {
+  if (resolvedJobOrigin === undefined) return resolveJobPlacement(jobPlacement, machine);
+  const live = resolveJobPlacement(
+    { startFrom: resolvedJobOrigin.startFrom, anchor: resolvedJobOrigin.anchor },
+    machine,
+  );
+  if (!live.ok) return live;
   return {
     ok: true,
-    gcode,
-    warnings: collectStartWarnings(
-      project,
-      controllerSettings,
-      controller.warnings.map((i) => i.message),
-      machine,
-    ),
+    jobOrigin: resolvedJobOrigin,
+    ...(live.preflightMotionOffset === undefined
+      ? {}
+      : { preflightMotionOffset: live.preflightMotionOffset }),
   };
 }
 
