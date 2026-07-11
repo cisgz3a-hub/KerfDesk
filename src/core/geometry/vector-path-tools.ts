@@ -1,4 +1,5 @@
 import { FillRule, unionD, type PathD } from 'clipper2-ts';
+import { err, ok, type Result } from '../result';
 import {
   IDENTITY_TRANSFORM,
   type Bounds,
@@ -15,8 +16,44 @@ export type VectorSceneObject = Extract<
   { readonly paths: ReadonlyArray<ColoredPath> }
 >;
 
+// Weld / boolean / offset / dogbone ops return a canonical Result (ADR-131)
+// instead of throwing: pure core must not throw for control flow (CLAUDE.md).
+// The typed failure names the mode; its user-worded message is what the store
+// surfaces as a toast for the reachable cases menu-gating can't pre-detect
+// (WORKFLOW F-CNC22 error/empty states).
+export type VectorOpError = {
+  readonly kind:
+    | 'too-few-objects'
+    | 'open-contours'
+    | 'empty-result'
+    | 'collapsed'
+    | 'no-corners'
+    | 'bad-distance'
+    | 'mixed-metadata'
+    // The clipper2-ts engine threw on pathological/degenerate geometry. Before
+    // ADR-131 the store's try/catch swallowed this; now the op catches the
+    // third-party throw at the boundary and surfaces it as a Result so an
+    // unexpected clipper failure toasts instead of escaping uncaught (self-audit
+    // finding of the ARC-02 conversion).
+    | 'operation-failed';
+  readonly message: string;
+};
+
 const MIN_CLOSED_POINTS = 3;
 const EPS = 1e-9;
+const OPERATION_FAILED_MESSAGE = 'The operation could not be completed on these shapes.';
+
+// Run a clipper2-ts call at the core/third-party boundary, converting any throw
+// into a typed error Result. This is NOT throw-for-control-flow (CLAUDE.md bans
+// that for OUR code): clipper is external and cannot be made to return a Result,
+// so catching its throw here is the correct boundary discipline.
+export function tryVectorOp<T>(run: () => T): Result<T, VectorOpError> {
+  try {
+    return ok(run());
+  } catch {
+    return err({ kind: 'operation-failed', message: OPERATION_FAILED_MESSAGE });
+  }
+}
 
 export function isVectorPathObject(object: SceneObject): object is VectorSceneObject {
   return 'paths' in object;
@@ -41,9 +78,18 @@ export function materializeVectorObject(object: VectorSceneObject, id = object.i
 export function weldVectorObjects(
   objects: ReadonlyArray<VectorSceneObject>,
   id: string,
-): ImportedSvg {
+): Result<ImportedSvg, VectorOpError> {
   if (objects.length === 0) {
-    throw new Error('Weld requires selected closed vector contours.');
+    return err({
+      kind: 'too-few-objects',
+      message: 'Weld requires selected closed vector contours.',
+    });
+  }
+  if (!vectorObjectOutputMetadataCompatible(objects)) {
+    return err({
+      kind: 'mixed-metadata',
+      message: 'Weld requires selected vector contours with matching output metadata.',
+    });
   }
   const materialized = objects.map((object) => materializeVectorObject(object));
   const byColor = new Map<string, PathD[]>();
@@ -52,7 +98,10 @@ export function weldVectorObjects(
       const paths = byColor.get(path.color) ?? [];
       for (const polyline of path.polylines) {
         if (!isClosedPolygon(polyline)) {
-          throw new Error('Weld requires selected closed vector contours.');
+          return err({
+            kind: 'open-contours',
+            message: 'Weld requires selected closed vector contours.',
+          });
         }
         paths.push(polylineToPathD(polyline));
       }
@@ -61,17 +110,18 @@ export function weldVectorObjects(
   }
   const paths: ColoredPath[] = [];
   for (const [color, subject] of byColor) {
-    const welded = unionD(subject, FillRule.NonZero);
+    const welded = tryVectorOp(() => unionD(subject, FillRule.NonZero));
+    if (welded.kind === 'error') return welded;
     paths.push({
       color,
-      polylines: welded.map(pathDToPolyline).filter(isClosedPolygon),
+      polylines: welded.value.map(pathDToPolyline).filter(isClosedPolygon),
     });
   }
   const filtered = paths.filter((path) => path.polylines.length > 0);
   if (filtered.length === 0) {
-    throw new Error('Weld requires selected closed vector contours.');
+    return err({ kind: 'empty-result', message: 'Welding these shapes produced an empty result.' });
   }
-  return {
+  return ok({
     ...commonObjectMetadata(objects),
     kind: 'imported-svg',
     id,
@@ -79,7 +129,7 @@ export function weldVectorObjects(
     bounds: boundsForPaths(filtered) ?? firstBounds(objects),
     transform: IDENTITY_TRANSFORM,
     paths: filtered,
-  };
+  });
 }
 
 export function vectorObjectOutputMetadataCompatible(
@@ -93,11 +143,8 @@ export function vectorObjectOutputMetadataCompatible(
 function commonObjectMetadata(
   objects: ReadonlyArray<VectorSceneObject>,
 ): Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'> {
-  const first = objectPowerScale(objects[0] as VectorSceneObject);
-  if (!vectorObjectOutputMetadataCompatible(objects)) {
-    throw new Error('Weld requires selected vector contours with matching output metadata.');
-  }
-  return first;
+  // Metadata compatibility is checked by weldVectorObjects before this runs.
+  return objectPowerScale(objects[0] as VectorSceneObject);
 }
 
 function materializePolyline(polyline: Polyline, transform: SceneObject['transform']): Polyline {

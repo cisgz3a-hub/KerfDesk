@@ -6,7 +6,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CameraAlignment, RgbaImage } from '../../core/camera';
+import type { CameraAlignment, CameraCalibration, RgbaImage } from '../../core/camera';
 import { createProject } from '../../core/scene';
 import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
@@ -22,6 +22,17 @@ const ALIGNMENT: CameraAlignment = {
   frameHeight: 720,
   basis: 'raw',
   alignedAt: 0,
+};
+
+const RECTIFIED_ALIGNMENT: CameraAlignment = { ...ALIGNMENT, basis: 'rectified' };
+
+const CALIBRATION: CameraCalibration = {
+  intrinsics: { fx: 3, fy: 3, cx: 2, cy: 2 },
+  distortion: [0.3, -0.05, 0.01, -0.002],
+  imageWidth: 4,
+  imageHeight: 4,
+  rmsPx: 0.3,
+  calibratedAt: 0,
 };
 
 const STILL: RgbaImage = {
@@ -64,7 +75,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setAlignment(alignment: CameraAlignment | undefined): void {
+function setAlignment(
+  alignment: CameraAlignment | undefined,
+  calibration?: CameraCalibration,
+): void {
   const project = createProject();
   useStore.setState({
     project: {
@@ -72,7 +86,11 @@ function setAlignment(alignment: CameraAlignment | undefined): void {
       device:
         alignment === undefined
           ? project.device
-          : { ...project.device, cameraAlignment: alignment },
+          : {
+              ...project.device,
+              cameraAlignment: alignment,
+              ...(calibration === undefined ? {} : { cameraCalibration: calibration }),
+            },
     },
   });
 }
@@ -107,5 +125,25 @@ describe('WorkspaceCameraOverlay', () => {
     setAlignment(ALIGNMENT);
     act(() => root.render(<WorkspaceCameraOverlay />));
     expect(container.innerHTML).toBe('');
+  });
+
+  it('de-fisheyes the still for a rectified alignment with calibration (R2)', () => {
+    setAlignment(RECTIFIED_ALIGNMENT, CALIBRATION);
+    useCameraStore.setState({ overlayStill: STILL });
+    act(() => root.render(<WorkspaceCameraOverlay />));
+    // Still drawn (rectified), no basis-mismatch notice.
+    expect(container.querySelector('canvas')).not.toBeNull();
+    expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('shows a basis-mismatch notice instead of a mis-registered overlay (R2)', () => {
+    // A rectified alignment with no calibration cannot be de-fisheyed for display.
+    setAlignment(RECTIFIED_ALIGNMENT);
+    useCameraStore.setState({ overlayStill: STILL });
+    act(() => root.render(<WorkspaceCameraOverlay />));
+    expect(container.querySelector('canvas')).toBeNull();
+    const notice = container.querySelector('[role="status"]');
+    expect(notice).not.toBeNull();
+    expect(notice!.textContent).toContain('captured still');
   });
 });

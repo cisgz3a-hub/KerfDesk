@@ -46,6 +46,7 @@ export const marlinDriver: ControllerDriver = {
     firmwareSetupPanel: 'none',
     probing: false,
     cncJobs: false,
+    overrides: false,
   },
   realtime: {
     statusQuery: null,

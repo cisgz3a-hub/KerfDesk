@@ -65,6 +65,26 @@ describe('findOutOfBoundsCoords', () => {
   it('ignores non-motion lines', () => {
     expect(findOutOfBoundsCoords('M5\nG21\nG90', bed)).toEqual([]);
   });
+
+  // GCO-07: a G2/G3 arc can bow past a bed edge while both endpoints are inside.
+  it('flags a G2 arc whose bulge clears the bed even though both endpoints fit', () => {
+    // From (0,0) to (10,0) about centre (5,0): the clockwise path peaks at y=5.
+    const shallowBed = { width: 400, height: 4 };
+    const issues = findOutOfBoundsCoords('G2 X10 Y0 I5 J0', shallowBed);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.reason).toBe('Arc bulges out of bed: Y 5');
+  });
+
+  it('accepts the same arc when the bed is tall enough for its bulge', () => {
+    expect(findOutOfBoundsCoords('G2 X10 Y0 I5 J0', bed)).toEqual([]);
+  });
+
+  it('flags a full circle whose radius pokes below the bed', () => {
+    // Start == end (full circle) about centre (5,0), r=5: dips to y=-5.
+    const issues = findOutOfBoundsCoords('G3 X0 Y0 I5 J0', bed);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.reason).toBe('Arc bulges out of bed: Y -5');
+  });
 });
 
 describe('expectedS', () => {

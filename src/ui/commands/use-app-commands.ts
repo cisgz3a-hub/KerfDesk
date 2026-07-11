@@ -10,6 +10,7 @@ import {
   handleSaveProject,
 } from '../app/file-actions';
 import { handleOpenGcodePreview } from '../app/gcode-open-action';
+import { connectOptionsForDevice } from './connect-options';
 import { currentOutputScope, useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore } from '../state/laser-store';
@@ -88,7 +89,11 @@ function appCommandContext(
     selected?.kind === 'raster-image' && selected.imageMaskId !== undefined;
   const activeStreamer =
     laser.streamer !== null &&
-    ['streaming', 'paused', 'done', 'errored'].includes(laser.streamer.status);
+    // 'tool-change' is an active hold: Frame/Home/Start and other job-active
+    // commands must stay blocked (the jog/probe/Zero-Z the operator needs at a
+    // tool change are gated separately by the setup gate). Codex audit: this
+    // status list was not updated when tool-change landed.
+    ['streaming', 'paused', 'done', 'errored', 'tool-change'].includes(laser.streamer.status);
   return {
     ...fileCommandContext(callbacks, platform, app, laser, pushToast),
     ...editCommandContext(app, dialogs),
@@ -253,7 +258,8 @@ function laserCommandContext(
   laser: ReturnType<typeof useLaserStore.getState>,
 ): Pick<AppCommandContext, 'connectLaser' | 'disconnectLaser' | 'homeLaser'> {
   return {
-    connectLaser: () => void laser.connect(platform),
+    connectLaser: () =>
+      void laser.connect(platform, connectOptionsForDevice(useStore.getState().project.device)),
     disconnectLaser: () => void laser.disconnect().catch(() => undefined),
     homeLaser: () => void laser.home().catch(() => undefined),
   };

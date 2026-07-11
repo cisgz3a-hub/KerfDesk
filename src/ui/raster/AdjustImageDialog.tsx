@@ -1,5 +1,5 @@
 import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from 'react';
-import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
+import { MAX_RASTER_LINES_PER_MM } from '../../core/raster';
 import type { Layer, RasterImage } from '../../core/scene';
 import { jobAwareAlert, jobAwarePrompt } from '../state/job-aware-dialogs';
 import { Button, Dialog, DialogActions as KitDialogActions } from '../kit';

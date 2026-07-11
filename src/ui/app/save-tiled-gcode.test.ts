@@ -1,7 +1,7 @@
 // handleSaveTiledGcode honors the output scope: "Cut selected graphics" must
 // filter tiled exports exactly like the single-file path (audit finding #29).
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -113,5 +113,42 @@ describe('handleSaveTiledGcode', () => {
     });
 
     expect(maxX(written.join('\n'))).toBeGreaterThan(55);
+  });
+
+  // GCO-02 (Codex M-04): the tiled path must run the same controller-readiness
+  // gate as single-file Save. $32=1 (laser mode) on a CNC controller is a
+  // blocking plunge hazard; declining the confirm must write NO tiles.
+  it('writes no tiles when controller readiness fails and the user declines', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const written: string[] = [];
+    const handled = await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project: tiledCncProject(),
+      savedName: 'job',
+      // $30 matches spindle max (12000) but $32=1 → cncReadiness blocking error.
+      controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: true },
+      pushToast: () => undefined,
+    });
+
+    expect(handled).toBe(true);
+    expect(written).toHaveLength(0);
+    confirmSpy.mockRestore();
+  });
+
+  it('writes tiles when the connected controller passes readiness', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const written: string[] = [];
+    await handleSaveTiledGcode({
+      platform: capturingPlatform(written),
+      project: tiledCncProject(),
+      savedName: 'job',
+      // Router mode ($32=0) + matching $30 → readiness ok, confirm never asked.
+      controllerSettings: { maxPowerS: 12000, minPowerS: 0, laserModeEnabled: false },
+      pushToast: () => undefined,
+    });
+
+    expect(written.length).toBeGreaterThan(0);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

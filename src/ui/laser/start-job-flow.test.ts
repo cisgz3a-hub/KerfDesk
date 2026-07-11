@@ -3,12 +3,18 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   createLayer,
   createProject,
+  DEFAULT_OUTPUT_SCOPE,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type SceneObject,
 } from '../../core/scene';
 import type { StatusReport } from '../../core/controllers/grbl';
-import { advanceJobCheckpoint, createJobCheckpoint, fingerprintGcode } from '../../core/recovery';
+import {
+  advanceJobCheckpoint,
+  createJobCheckpoint,
+  fingerprintGcode,
+  fingerprintsEqual,
+} from '../../core/recovery';
 import { useStore } from '../state';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
@@ -166,6 +172,7 @@ describe('job checkpoint integration (ADR-118)', () => {
     const older = createJobCheckpoint({
       gcode: 'G1 X1 S1\nM5',
       machineKind: 'laser',
+      outputScope: DEFAULT_OUTPUT_SCOPE,
       nowIso: '2026-07-07T01:00:00.000Z',
     });
     writeJobCheckpoint(older);
@@ -184,6 +191,7 @@ describe('job checkpoint integration (ADR-118)', () => {
     const foreign = createJobCheckpoint({
       gcode: 'G1 X999 S999\nM5',
       machineKind: 'laser',
+      outputScope: DEFAULT_OUTPUT_SCOPE,
       nowIso: '2026-07-07T01:00:00.000Z',
     });
     writeJobCheckpoint(foreign);
@@ -219,6 +227,114 @@ describe('job checkpoint integration (ADR-118)', () => {
     expect(resumeProgram).toContain('resume preamble');
     expect(resumeProgram).not.toBe(gcode);
     expect(readJobCheckpoint()?.resumeInFlight).toBe(true);
+  });
+
+  it('resumes after a crash reset the output scope the run used (PST-02)', async () => {
+    // A selective burn: two objects on the output layer, only one selected, with
+    // "cut selected graphics" on — so the compiled program contains just it.
+    const objectB: SceneObject = {
+      ...lineObject,
+      id: 'line-object-b',
+      bounds: { minX: 20, minY: 20, maxX: 30, maxY: 30 },
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              points: [
+                { x: 21, y: 21 },
+                { x: 29, y: 29 },
+              ],
+              closed: false,
+            },
+          ],
+        },
+      ],
+    };
+    useStore.setState({
+      project: {
+        ...runnableProject(),
+        scene: {
+          ...EMPTY_SCENE,
+          objects: [lineObject, objectB],
+          layers: [createLayer({ id: 'red', color: '#ff0000' })],
+        },
+      },
+      selectedObjectId: 'line-object',
+      additionalSelectedIds: new Set(),
+      outputScopeSettings: { cutSelectedGraphics: true, useSelectionOrigin: false },
+    });
+
+    await runStartJobFlow();
+    const selectiveGcode = streamedGcode();
+    const stored = readJobCheckpoint();
+    if (stored === null) throw new Error('unreachable');
+    expect(stored.outputScope.cutSelectedGraphics).toBe(true);
+    expect(stored.outputScope.selectedObjectIds).toEqual(['line-object']);
+    expect(fingerprintsEqual(fingerprintGcode(selectiveGcode), stored.fingerprint)).toBe(true);
+
+    // Crash restore resets the live scope to "all objects" — recompiling with
+    // THAT would include objectB, renumber the lines, and (pre-PST-02) trip the
+    // false "it was edited" refusal below.
+    useStore.setState({
+      selectedObjectId: null,
+      additionalSelectedIds: new Set(),
+      outputScopeSettings: { cutSelectedGraphics: false, useSelectionOrigin: false },
+    });
+    const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
+      async () => undefined,
+    );
+    useLaserStore.setState({ startJob });
+    vi.mocked(jobAwareAlert).mockClear();
+
+    await runCheckpointResumeFlow(stored);
+
+    // Resume recompiled with the checkpoint's stored scope, so the fingerprint
+    // matched again and the run proceeded instead of dead-ending.
+    expect(jobAwareAlert).not.toHaveBeenCalledWith(
+      expect.stringContaining('no longer produces the same G-code'),
+    );
+    expect(startJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes a Current-Position job after the head moved (R1)', async () => {
+    const headAt = (x: number, y: number): StatusReport => ({
+      ...idleStatus,
+      mPos: { x, y, z: 0 },
+    });
+    // Start a Current-Position job with the head at (10,10): the compiled bytes
+    // anchor the job to that work position.
+    useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
+    useLaserStore.setState({ statusReport: headAt(10, 10) });
+
+    await runStartJobFlow();
+    const started = readJobCheckpoint();
+    if (started === null) throw new Error('unreachable');
+    // The checkpoint froze the RESOLVED origin, including the head XY (R1).
+    expect(started.jobOrigin).toEqual({
+      startFrom: 'current-position',
+      anchor: 'front-left',
+      currentPosition: { x: 10, y: 10 },
+    });
+
+    // Crash + reconnect with the head now parked somewhere else. Re-resolving
+    // Current-Position here would anchor the job to (60,60) and renumber every
+    // line — the exact false-refusal the fix prevents.
+    const startJob = vi.fn<(gcode: string, options?: object) => Promise<void>>(
+      async () => undefined,
+    );
+    useLaserStore.setState({ startJob, statusReport: headAt(60, 60) });
+    vi.mocked(jobAwareAlert).mockClear();
+
+    await runCheckpointResumeFlow(started);
+
+    expect(jobAwareAlert).not.toHaveBeenCalledWith(
+      expect.stringContaining('no longer produces the same G-code'),
+    );
+    expect(startJob).toHaveBeenCalledTimes(1);
+
+    // Reset placement so later tests keep the Absolute default.
+    useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
   });
 
   it('manual start-from-line also suspends checkpoint tracking', async () => {

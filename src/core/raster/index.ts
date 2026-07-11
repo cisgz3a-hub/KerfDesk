@@ -28,3 +28,15 @@ export {
   inkLumaForBrightnessPercent,
   rasterizeVectorToLuma,
 } from './rasterize-vector';
+
+export type { RasterBudgetVerdict } from './raster-budget';
+export { evaluateRasterBudget, MAX_RASTER_LINES_PER_MM, MAX_RASTER_PIXELS } from './raster-budget';
+
+export {
+  dpiToLinesPerMm,
+  lineIntervalMmToLinesPerMm,
+  linesPerMmToDpi,
+  linesPerMmToLineIntervalMm,
+  MIN_RASTER_LINES_PER_MM,
+  MM_PER_INCH,
+} from './raster-units';

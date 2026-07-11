@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linesPerMmToLineIntervalMm } from '../../core/raster/raster-units';
+import { linesPerMmToLineIntervalMm } from '../../core/raster';
 import { createLayer, type Layer } from '../../core/scene';
 import { dotWidthCorrectionMax, readCutSettingsPatch } from './cut-settings-draft';
 

@@ -7,7 +7,12 @@
 import type { Toolpath } from '../../core/job';
 import type { Project } from '../../core/scene';
 
-export type PreviewIssue = 'too-complex';
+export type PreviewIssue =
+  | { readonly kind: 'too-complex' }
+  // resolveJobPlacement refused (e.g. custom origin with no live position);
+  // carries the placement failure messages so the overlay can name the reason
+  // instead of the scope-oriented "enable Output" hint.
+  | { readonly kind: 'placement-unavailable'; readonly messages: ReadonlyArray<string> };
 
 export type PreviewToolpath = Toolpath & {
   readonly previewIssue?: PreviewIssue;

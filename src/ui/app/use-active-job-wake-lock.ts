@@ -1,14 +1,14 @@
 // useActiveJobWakeLock (ADR-117) — hold a screen wake lock while a job is
 // active so OS display-sleep can't suspend the tab / renderer mid-stream.
 // Best-effort: a denied or missing Wake Lock API never blocks the job, but
-// the operator is told once (LaserLog) so a marathon burn isn't trusted to a
+// the operator is told once (Console transcript) so a marathon burn isn't trusted to a
 // machine that will sleep. The Electron side needs 'screen-wake-lock' in the
 // trusted-renderer-policy permission allowlist; the web side works wherever
 // Chromium ships the API.
 
 import { useEffect } from 'react';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJob, pushLog } from '../state/laser-store-helpers';
+import { isActiveJob } from '../state/laser-store-helpers';
 
 const KEEP_AWAKE_UNAVAILABLE_MESSAGE =
   '[lf2] Keep-awake unavailable — the OS may sleep the screen mid-job. ' +
@@ -80,7 +80,7 @@ function createScreenWakeLockController(env: WakeLockEnvironment): {
   const warnUnavailableOnce = (): void => {
     if (warned) return;
     warned = true;
-    useLaserStore.setState((s) => ({ log: pushLog(s, KEEP_AWAKE_UNAVAILABLE_MESSAGE) }));
+    useLaserStore.getState().pushSystemNotice(KEEP_AWAKE_UNAVAILABLE_MESSAGE);
   };
 
   const request = async (): Promise<void> => {

@@ -268,7 +268,7 @@ Phase A acceptance: stub `TextObject` variant compiles through `JobCompiler` wit
 LF1's `App.tsx` was 1,631 lines. AI-assisted coding tends to pile into existing files. Enforcement (not aspiration) prevents recurrence.
 
 ### Decision
-Hard limits enforced by ESLint:
+Hard limits enforced by ESLint (the soft tier is surfaced report-only, not by ESLint — see ADR-131):
 - File: 400 lines hard, 250 soft
 - React component: 250 hard, 150 soft
 - Function: 80 hard, 40 soft
@@ -280,6 +280,8 @@ Plus: co-located tests required, single responsibility (no "and" in description)
 
 ### Verification
 ESLint's `max-lines` rule is the authoritative gate and fails CI on violation: 400 lines **excluding blank and comment lines** (`skipBlankLines: true, skipComments: true`). CI additionally runs a coarse raw-line backstop (`wc -l`, threshold 600) that counts *every* line — including the explanatory comments CLAUDE.md mandates — purely as a guard against catastrophic bloat; its threshold is deliberately looser than the 400 code-line rule and is not the real limit.
+
+The **soft** tier (250 counted lines/file) is **not** an ESLint warning — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the error/400 one (last-wins) rather than stacking, so warn/250 and error/400 cannot coexist on the built-in rule (ADR-131). The soft tier is instead surfaced by the report-only `check:soft-size` script (`scripts/check-soft-line-limit.mjs`), which lists non-test files over 250 counted lines and **always exits 0** — it never blocks CI; only the ESLint error/400 rule does.
 
 ---
 
@@ -3546,6 +3548,10 @@ working.
 **Status:** Accepted. Slices 1–3 landed on `feat/offline-pwa` (app-shell precache,
 safe update prompt, connection badge + Install button). Hardware verification
 (Web Serial driving the laser with the network down) is the standing gap.
+Service-worker registration is **web-only**: on the desktop shell (the `app://`
+scheme, where Chromium refuses SW) the update prompt is gated off at its mount
+(`PwaUpdatePromptGate`, ELE-06), so the desktop auto-update path (ADR-024) is the
+single updater and no cached precache can mask its on-disk swap.
 
 **Context.** PROJECT.md already mandates this — the web app is "PWA-installable"
 (line 35) and "The app must work fully offline. No analytics, no error reporting
@@ -5293,8 +5299,9 @@ geometry.**
   (measured 0.135; the ridge-snap sub-pixel pass no longer exists; 0.015px
   is far below laser resolution).
 - Orphaned modules pending a separate cleanup commit: `canny-edges.ts`,
-  `edge-reconnect.ts`, `edge-subpixel.ts`, `edge-ink-support.ts` (no
-  remaining app importers; their tests still pass). The centerline pipeline
+  `edge-subpixel.ts`, `edge-ink-support.ts` (no remaining app importers;
+  their tests still pass; `edge-reconnect.ts` was deleted in ARC-07). The
+  centerline pipeline
   keeps its chain machinery (its own mode) including the spline deviation
   cap from the earlier fidelity fix.
 - Known residuals accepted from the render review: small junction notches
@@ -5590,6 +5597,14 @@ start, fingerprint mismatch refuses with no stream. Banner: render /
 dismiss / hidden-while-active. NOT verified: a real crash + resume on
 hardware — CLAIMED in AUDIT.md until the maintainer kills the app
 mid-burn and resumes.
+
+### Amendment â€” schema v2: also store the output scope + job placement (2026-07-11, PST-02)
+
+The original checkpoint stored only the fingerprint + acked counts. But resume re-compiles the project through `prepareStartJob`, whose bytes depend on the output scope (cut-selected-graphics + selection ids) and the job placement â€” and a crash resets BOTH to their defaults. A run that used a non-default scope/placement therefore recompiled to different bytes on resume, failed `fingerprintsEqual`, and dead-ended with a false "it was edited since" refusal exactly when a long selective burn most needed to resume. `JobCheckpoint` now also carries `outputScope` + `jobPlacement`, and `JOB_CHECKPOINT_SCHEMA_VERSION` is bumped 1 â†’ 2 so pre-existing v1 slots (which lack the fields) read as `null` and are discarded (transient â€” the only cost is one stale recovery prompt). `runCheckpointResumeFlow` passes the stored scope/placement into `prepareResume`, reproducing identical bytes; the manual Start-from-line path still uses current app state.
+
+### Amendment â€” schema v3: store the RESOLVED job origin, not the placement settings (2026-07-11, R1)
+
+PST-02 (v2) stored the placement SETTINGS (`{startFrom, anchor}`). That is byte-deterministic for Absolute / User Origin / Verified Origin, but NOT for `current-position`: `resolveCurrentPosition` freezes the live head XY into `JobOriginPlacement.currentPosition` at compile time, and on resume it re-resolved against the (moved) post-crash head, translating the job to a different origin and renumbering every line â€” reopening the exact false "it was edited" refusal for a normal placement mode (Codex re-audit R1). The checkpoint now stores the RESOLVED `jobOrigin` (a `JobOriginPlacement`, so a current-position run carries its frozen XY); `JOB_CHECKPOINT_SCHEMA_VERSION` is bumped 2 â†’ 3 (older slots read null and are discarded). `prepareStartJob` gained an optional `resolvedJobOrigin` override: a resume re-validates the live machine through the frozen origin's MODE (a vanished custom origin / unknown position still refuses) but COMPILES with the frozen origin so the bytes match the fingerprint. `prepareStartJob` surfaces the resolved `jobOrigin` on its ok result so the write site can capture it. An absent `jobOrigin` = Absolute (no translation).
 
 ## ADR-119 — Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07)
 
@@ -6250,3 +6265,144 @@ Consequences.
   crops, not green tests. Perceptually verified against the reference on
   letters, serifs, arch bands, waves and roof lines; NOT verified on physical
   laser output (this changes trace geometry only, no G-code semantics).
+
+## ADR-129 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
+
+**Status:** accepted (audit DEV-04: no-go zones gated Start/Frame/export/resume, but jog was zone-blind end to end).
+
+> **Numbering note.** ADR-128 (measured-boundary trace pipeline, merged from main) was the last used; **ADR-129** is the next free.
+
+### Context
+
+No-go/keep-out zones (clamps, cameras, fixtures) are honored by the Start, Frame, export, and resume preflights, but the jog path was blind to them end to end: `jogActions.jog` gated only on autofocus + jog/frame readiness, and `buildJog` checked only finiteness/axis. One jog-pad move or one click-to-position could drive the head straight through a clamp at up to 3000 mm/min. LightBurn has no equivalent (it does not model keep-out zones for jogging), so this is a deliberate KerfDesk safety divergence, recorded here.
+
+### Decision
+
+Add a pure core check `firstZoneCrossedBySegment(from, to, zones)` (`core/preflight/no-go-zones.ts`, reusing the existing segment/rect intersection helpers) and call it at the single jog choke point. All three UI motion paths - jog pad, jog-to-point, and click-to-position - funnel through `jog({dx,dy,feed})`, so the guard covers them all: it resolves the target from the live machine position plus the delta and refuses (same shape as the readiness refusal - set `lastWriteError`, log, throw) when the straight from->target segment crosses an enabled zone, naming the zone.
+
+### Scope / non-goals
+
+The check is skipped (motion allowed) when there is no known machine position for a relative jog - the operator has no live position to reason about either, and blocking would strand jogging. Homing and any future continuous (hold-to-jog) motion are out of scope here; the Safety Zones panel documents these uncovered paths.
+
+### Consequences
+
+A jog that would cross a keep-out is refused before any byte is sent, closing the gap between jogging and the job/frame/export paths. Pure core stays pure (returns the zone or null, no throw for control flow). No G-code or snapshot change. NOT hardware-verified - the geometry and the refusal are unit- and integration-tested (core segment cases + a connected-store jog that crosses a clamp sends nothing), but on-machine behavior is CLAIMED.
+
+## ADR-130 - Registration-box provenance: protect a captured board from the jig panel (2026-07-10)
+
+**Status:** accepted (audit CAM-04: the Registration Jig panel could silently unlock/replace a captured board, breaking its physical registration).
+
+> **Numbering note.** ADR-129 (jog no-go zones) was the last used; **ADR-130** is the next free.
+
+### Context
+
+Place Board (ADR-124) and the Registration Jig panel share ONE reserved-color registration box (isRegistrationBox keys on the reserved color, not a provenance field). Place Board locks that box because its canvas position encodes the physical work origin (G92). But the always-available jig panel offered a one-click unlock checkbox and a Create/Replace button wired to the same box, so an operator could unlock+drag or replace a captured board and silently break centering, Fill/Array, and the burn placement, with no signal.
+
+### Decision
+
+Add an optional provenance?: 'captured-board' | 'jig' to ShapeObject. Place Board tags its outline 'captured-board' (in the locked() helper, the single construction choke point); jig creates leave it absent. Absent is treated as 'jig' (back-compatible: old .lf2 files load unchanged). The field round-trips as ordinary JSON (the deserializer passes non-text objects through as-is); the shape validator gains one optionalLiteral line so a malformed value is rejected at the .lf2 boundary.
+
+The jig panel reads the current box provenance: for a captured board it disables the unlock checkbox and the Create/Replace button and shows a warning that unlocking or replacing it here breaks its physical registration, and to use Place Board to re-capture or Remove it first. Remove stays available as the explicit, safe path to clear a captured board.
+
+### Consequences
+
+A captured board can no longer be silently unlocked or replaced from the jig panel. The two features keep sharing one box (no second reserved layer), and the tag is additive/optional so nothing else changes. NOT hardware-verified; the guard is unit-tested (io round-trip + a panel render test asserting the disabled controls + warning for a captured board and enabled for a jig box).
+
+## ADR-131 - Canonical Result<T, E> for core control-flow errors (2026-07-11)
+
+**Status:** accepted (audit ARC-01/ARC-02: core geometry ops throw user-facing strings for expected user input, which CLAUDE.md's "Pure core" section bans; there was no shared type to convert them to, so ~46 files hand-rolled ad-hoc `{ ok }` / `{ kind }` shapes).
+
+> **Numbering note.** ADR-130 (registration-box provenance) was the last used; **ADR-131** is the next free.
+
+### Context
+
+CLAUDE.md "Pure core" forbids throwing for control flow: "return a `Result<T, E>` discriminated union." But `grep 'Result<' src/core` returned zero files — the discipline was stated but had no vehicle. Ops such as `weldVectorObjects`, `combineVectorObjects`, and `offsetVectorObjects` threw `new Error(userMessage)` for expected conditions (too-few objects, open contours, empty intersection), and the four store actions swallowed them with the bare `try { … } catch { return state }` shape CLAUDE.md's anti-patterns list explicitly bans. Nothing in the type system marked these as throwing, so every future caller had to rediscover it. A first pass (CNV-10) converted three ops to an ad-hoc `{ ok, message }` shape — which is the very hand-rolling this ADR exists to eliminate.
+
+### Decision
+
+Add one pure-core module `src/core/result.ts` exporting the canonical type and its constructors:
+
+```ts
+export type Result<T, E> =
+  | { readonly kind: 'ok'; readonly value: T }
+  | { readonly kind: 'error'; readonly error: E };
+export function ok<T>(value: T): Result<T, never>;
+export function err<E>(error: E): Result<never, E>;
+```
+
+The `kind` tag matches the house discriminated-union style so `assertNever` closes a switch's default arm on the error variant, exactly like every other core union. There is no top-level `core/index.ts` barrel; consumers import `../result` (within core) or `../../core/result` (from ui), matching how the existing loose core files (`app-branding.ts`, `grbl-streaming.ts`) are imported. New ad-hoc `{ ok }` / `{ kind }` result shapes in core are disallowed going forward — converge on this type. Migration of the ~46 existing ad-hoc sites is incremental, not a single batch diff; ARC-02 converts the vector-geometry cluster first (weld/boolean/offset/dogbone) and supersedes CNV-10's interim `{ ok, message }` shape.
+
+### Consequences
+
+Core control-flow errors now have one typed channel a caller must narrow on (`result.kind === 'error'`) rather than a throw a caller may forget to catch. The addition is behavior-neutral (ARC-01 ships no consumers); the behavior change — deleting the throws and the `catch` swallows — lands in ARC-02. The 46 ad-hoc sites converge opportunistically as they are touched; this ADR is the reference they converge to.
+
+## ADR-132 - The 250-line soft tier is a report-only script, not an ESLint warning (2026-07-11)
+
+**Status:** accepted (audit ARC-03: the 250 soft tier promised by ADR-015, CLAUDE.md's size table, and PROJECT.md non-negotiable 15 had no enforcement mechanism — it was fiction).
+
+> **Numbering note.** ADR-131 (canonical Result) was the last used; **ADR-132** is the next free.
+
+### Context
+
+ADR-015 lists a two-tier file-size discipline: 400 lines hard, 250 soft. The hard tier is a real ESLint gate (`max-lines: ['error', { max: 400, skipBlankLines, skipComments }]`, `eslint.config.mjs`). The soft tier was never implemented: `grep max-lines eslint.config.mjs` shows a single `error/400` entry, and the finding's recommendation to "add a second `max-lines` at warn/250" is **not achievable** — ESLint keys rules by name, so a second `max-lines` config for the same files *replaces* the first (last-wins), it does not stack. You cannot have warn/250 AND error/400 on the built-in rule simultaneously. 78 non-test src files currently sit over 250 counted lines (two — `io/svg/parse-svg.ts`, `ui/library/DesignLibraryDialog.tsx` — pinned at 400 with zero headroom), all invisible.
+
+### Decision
+
+The soft tier is a separate, report-only mechanism, not an ESLint severity. Add `scripts/check-soft-line-limit.mjs` (mirroring `check-file-size-policy.mjs`'s walk) that counts ESLint-style lines — skipping blank and comment-only lines, and skipping string literals so a `//`/`/*` inside a string is not misread as a comment — and lists non-test files over 250, then **always exits 0**. Tests and `__fixtures__` are excluded because `eslint.config.mjs` relaxes file-size for them; the soft report mirrors the hard rule's scope. It is wired as `check:soft-size` and appended (non-failing) to `release:check`; in CI it also appends a table to the job summary. The counter is a line-scan approximation of ESLint's AST count — validated against the audit's independent tally (78 ≈ the finding's 76–81) and against ESLint's own count (the two 400-pinned files register at exactly 400). ADR-015's wording is updated to say the soft tier is report-only.
+
+### Consequences
+
+The soft tier is finally visible without blocking anyone: `release:check` prints the over-250 list every run, so the drift is measured, but only the ESLint error/400 rule fails CI. Splitting the 78 files (especially the two 400-pinned ones, whose next edit forces an unplanned mid-feature split) stays out of scope — each is its own concept-driven tidy PR. Because the counter is an approximation, a file within a line or two of 250 may be mis-listed; it is a report, not a gate, so that is acceptable.
+
+## ADR-133 - Camera bridge trusts only the exact production origins and refuses all loopback frame-proxy targets (2026-07-11)
+
+**Status:** accepted (audit ELE-02: residual-risk hardening of ADR-121's loopback camera bridge; the finding "drivable cross-origin by every *.pages.dev preview; usable as a localhost scanner" was CONFIRMED).
+
+> **Numbering note.** ADR-132 (soft-tier report-only script) was the last used; **ADR-133** is the next free.
+
+### Context
+
+ADR-121's loopback camera bridge opts into Private Network Access and trusted three origin classes in `isTrustedHostedAppOrigin` (`electron/rtsp-camera-bridge.ts`): `https://kerfdesk.com`, `https://laserforge-2fj.pages.dev`, AND any `*.laserforge-2fj.pages.dev` â€” every Cloudflare Pages preview of every branch/PR. Any such preview the operator opened in a normal browser could drive the bridge's `/discover`, `/frame.jpg?url=`, `/probe`, and `/stream.mjpg`. Separately, the frame-proxy URL policy (`electron/camera-frame-proxy-policy.ts`) refused only the bridge's OWN port as a proxy target (`targetsBridgeItself`), so `http://127.0.0.1:<other-port>` was permitted â€” the proxy could read other loopback services, acting as a localhost port/host oracle (timing/error) despite the private-network egress guard and the JPEG-magic content check.
+
+### Decision
+
+Two independent tightenings of ADR-121's origin/target policy:
+
+1. `isTrustedHostedAppOrigin` trusts only the EXACT production hostnames (`kerfdesk.com`, `laserforge-2fj.pages.dev`) â€” the `.pages.dev` subdomain wildcard is dropped. A preview build that must reach a local bridge is expected to gate that behind an explicit dev flag, not a standing wildcard. The loopback-dev-origin allowance (`http://localhost` / `127.0.0.1`, any port) is unchanged: code already running on the operator's loopback can reach the cameras without the bridge's help, so it is outside the S03-001 drive-by-remote threat model.
+2. `cameraFrameUrlPolicy` refuses ALL loopback targets (`localhost`, `::1`, `127.0.0.0/8`) on any port, not just the bridge port. The bridge-itself case keeps its clearer "cannot proxy itself" message; every other loopback host returns "private-network hosts only". Real machine cameras live on RFC1918, never loopback, so no legitimate reach is lost.
+
+### Consequences
+
+A preview-build deploy can no longer reach a locally-running bridge (intended â€” previews are for UI review, not hardware). A local test camera bound to loopback can no longer be proxied; real cameras (RFC1918) are unaffected. The residual timing/error oracle across the egress guard's allowed RFC1918 range remains â€” a per-session bridge token replacing Origin-header trust is the next step if the maintainer wants it, deferred to its own ticket. Behavior-only change; no G-code or core impact. The deliberate `camera-frame-proxy-policy.test.ts` expectation that loopback-on-another-port was `ok` is flipped to `invalid`.
+
+### Amendment â€” origin-exact allowlist + residual hosted-origin threat (2026-07-11, R3)
+
+Codex re-audit R3 split into a fixable bug and a documented residual:
+
+- **Fixed (R3):** `isTrustedHostedAppOrigin` compared `url.hostname`, which discards the port, so `https://kerfdesk.com:444` was accepted despite the "exact production origins" intent. It now compares `url.origin` against a set of full origins (`https://kerfdesk.com`, `https://laserforge-2fj.pages.dev`), so a non-default port or a wrong scheme no longer matches. Test-first in `rtsp-camera-bridge.test.ts`.
+- **Residual (accepted by design, NOT closed):** hosted-origin access to the loopback bridge is deliberate â€” ADR-121 makes the deployed site a supported bridge client so production CSP does not block camera probing. Therefore a compromise or XSS of an EXACT trusted hosted origin (`kerfdesk.com` / `laserforge-2fj.pages.dev`) can still drive `/discover`, `/probe`, and `/frame.jpg` against the operator's RFC1918/ULA cameras through the loopback bridge. Blocking loopback proxy targets (ADR-133) stops localhost scanning, not RFC1918/ULA discovery. The mitigation is per-session bridge-token auth replacing Origin-header trust; it is a larger change deferred to its own ticket (the maintainer decides whether the deployed-site camera workflow warrants it, or whether hosted access should be dropped). R3 is therefore "port-exactness fixed; hosted-origin access is an accepted, documented residual" â€” not "closed".
+
+## ADR-134 - The workspace camera overlay honors the alignment basis, matching Trace (2026-07-11)
+
+**Status:** accepted (Codex re-audit R2: the overlay applied a rectified-basis homography to raw pixels â€” a bug, not a design choice).
+
+> **Numbering note.** ADR-133 (camera bridge exact origins) was the last used; **ADR-134** is the next free.
+
+### Context
+
+A camera alignment records the `basis` it was solved in (`raw` or `rectified`). `runAutoAlign` persists `basis: 'rectified'` whenever a lens calibration exists â€” the homography was solved on de-fisheyed pixels. Trace (`buildCameraTraceImage`, ADR-110) honors this: it `rectifyImage()`s the raw frame before applying the homography, and refuses (`basis-mismatch`) when a rectified alignment has no calibration. The workspace overlay (CAM-02 / c70f4b87) only rescaled the homography for resolution and never read `alignment.basis`, so a calibrated (rectified) alignment was applied as a linear CSS `matrix3d` directly to raw, distorted pixels â€” the overlay bowed at the bed edges and mis-registered, while Trace of the same scene was correct. A CSS `matrix3d` is a linear projective map and cannot represent the nonlinear de-fisheye, so the live `<video>` overlay cannot be corrected by a transform at all.
+
+### Decision
+
+The overlay honors `basis`, sharing one pure helper with Trace (`rectifyForAlignmentBasis` in `core/camera`, so the two can never diverge again):
+
+- **Captured still, `basis: 'rectified'`, calibration present** â†’ de-fisheye the still in its canvas (same `rectifyImage` params as Trace) before applying the homography. This is the primary LightBurn "Update Overlay" path and is now correct.
+- **`basis: 'rectified'`, no calibration** (still or live) â†’ refuse: show a small "needs a captured still" notice instead of a mis-registered overlay.
+- **Live `<video>`, `basis: 'rectified'`** â†’ refuse (a CSS transform cannot de-fisheye); the operator captures a still to see the aligned overlay. This matches LightBurn, which lens-corrects a snapshot rather than streaming a de-fisheyed live overlay.
+- **`basis: 'raw'`** â†’ unchanged (warp raw pixels directly).
+
+The rectify runs once per source/alignment change (memoized), not per zoom/pan render.
+
+### Consequences
+
+Calibrated overlays now register correctly on the still. A visible UX change: for a rectified alignment on a live USB stream the overlay is replaced by a notice â€” the operator must capture a still (previously they saw a wrong overlay). Per-frame live de-fisheye (canvas-per-frame or a GPU shader, ADR-108) is deferred as a larger feature. NOT perceptually verified: the tests prove the basis routing and that a rectified still produces a new (de-fisheyed) buffer, not that the overlay visually lines up on real hardware â€” that needs a rendered comparison against the bed. The notice wording/placement is a maintainer UX call.

@@ -3,8 +3,10 @@
 // and offset area growth/shrink with round joins.
 
 import { describe, expect, it } from 'vitest';
+import { type Result } from '../result';
 import { IDENTITY_TRANSFORM, type ImportedSvg } from '../scene';
 import { combineVectorObjects, offsetVectorObjects } from './vector-path-booleans';
+import { type VectorOpError } from './vector-path-tools';
 
 function rectObject(id: string, x0: number, y0: number, x1: number, y1: number): ImportedSvg {
   return {
@@ -53,26 +55,43 @@ function totalArea(object: ImportedSvg): number {
   return area;
 }
 
+function unwrap(result: Result<ImportedSvg, VectorOpError>): ImportedSvg {
+  if (result.kind === 'error') throw new Error(result.error.message);
+  return result.value;
+}
+
+function expectErr(
+  result: Result<unknown, VectorOpError>,
+  kind: VectorOpError['kind'],
+  pattern: RegExp,
+): void {
+  expect(result.kind).toBe('error');
+  if (result.kind === 'error') {
+    expect(result.error.kind).toBe(kind);
+    expect(result.error.message).toMatch(pattern);
+  }
+}
+
 // 10×10 subject at origin; 10×10 clip shifted +5 in x → 5×10 overlap.
 const SUBJECT = rectObject('a', 0, 0, 10, 10);
 const CLIP = rectObject('b', 5, 0, 15, 10);
 
 describe('combineVectorObjects', () => {
   it('subtract removes the clip from the bottom-most subject', () => {
-    const result = combineVectorObjects([SUBJECT, CLIP], 'subtract', 'out');
+    const result = unwrap(combineVectorObjects([SUBJECT, CLIP], 'subtract', 'out'));
     expect(totalArea(result)).toBeCloseTo(50, 6);
     expect(result.bounds.maxX).toBeCloseTo(5, 6);
     expect(result.paths[0]?.color).toBe('#ff0000');
   });
 
   it('intersect keeps only the overlap', () => {
-    const result = combineVectorObjects([SUBJECT, CLIP], 'intersect', 'out');
+    const result = unwrap(combineVectorObjects([SUBJECT, CLIP], 'intersect', 'out'));
     expect(totalArea(result)).toBeCloseTo(50, 6);
     expect(result.bounds).toMatchObject({ minX: 5, maxX: 10 });
   });
 
   it('exclude keeps both non-overlapping parts', () => {
-    const result = combineVectorObjects([SUBJECT, CLIP], 'exclude', 'out');
+    const result = unwrap(combineVectorObjects([SUBJECT, CLIP], 'exclude', 'out'));
     expect(totalArea(result)).toBeCloseTo(100, 6);
     expect(result.bounds).toMatchObject({ minX: 0, maxX: 15 });
   });
@@ -83,17 +102,21 @@ describe('combineVectorObjects', () => {
       ...rectObject('b', 0, 0, 10, 10),
       transform: { ...IDENTITY_TRANSFORM, x: 5 },
     };
-    const result = combineVectorObjects([SUBJECT, movedClip], 'subtract', 'out');
+    const result = unwrap(combineVectorObjects([SUBJECT, movedClip], 'subtract', 'out'));
     expect(totalArea(result)).toBeCloseTo(50, 6);
   });
 
   it('rejects a non-overlapping intersect as an empty result', () => {
     const far = rectObject('c', 100, 100, 110, 110);
-    expect(() => combineVectorObjects([SUBJECT, far], 'intersect', 'out')).toThrow(/empty/i);
+    expectErr(combineVectorObjects([SUBJECT, far], 'intersect', 'out'), 'empty-result', /empty/i);
   });
 
   it('rejects fewer than two objects and open contours', () => {
-    expect(() => combineVectorObjects([SUBJECT], 'subtract', 'out')).toThrow(/two or more/i);
+    expectErr(
+      combineVectorObjects([SUBJECT], 'subtract', 'out'),
+      'too-few-objects',
+      /two or more/i,
+    );
     const open: ImportedSvg = {
       ...rectObject('d', 0, 0, 4, 4),
       paths: [
@@ -111,13 +134,13 @@ describe('combineVectorObjects', () => {
         },
       ],
     };
-    expect(() => combineVectorObjects([SUBJECT, open], 'subtract', 'out')).toThrow(/closed/i);
+    expectErr(combineVectorObjects([SUBJECT, open], 'subtract', 'out'), 'open-contours', /closed/i);
   });
 });
 
 describe('offsetVectorObjects', () => {
   it('outward offset grows the shape by the distance on every side', () => {
-    const result = offsetVectorObjects([SUBJECT], 2, 'out');
+    const result = unwrap(offsetVectorObjects([SUBJECT], 2, 'out'));
     expect(result.bounds.minX).toBeCloseTo(-2, 3);
     expect(result.bounds.maxX).toBeCloseTo(12, 3);
     // Rounded corners: area sits between the square-corner bound and the
@@ -127,12 +150,12 @@ describe('offsetVectorObjects', () => {
   });
 
   it('inward offset shrinks the shape', () => {
-    const result = offsetVectorObjects([SUBJECT], -2, 'out');
+    const result = unwrap(offsetVectorObjects([SUBJECT], -2, 'out'));
     expect(totalArea(result)).toBeCloseTo(36, 3);
   });
 
   it('rejects a collapse-to-nothing inward offset and a zero distance', () => {
-    expect(() => offsetVectorObjects([SUBJECT], -6, 'out')).toThrow(/collapsed/i);
-    expect(() => offsetVectorObjects([SUBJECT], 0, 'out')).toThrow(/non-zero/i);
+    expectErr(offsetVectorObjects([SUBJECT], -6, 'out'), 'collapsed', /collapsed/i);
+    expectErr(offsetVectorObjects([SUBJECT], 0, 'out'), 'bad-distance', /non-zero/i);
   });
 });

@@ -32,6 +32,14 @@ const MESSAGE_RE = /^\[([^:\]]+):([^\]]*)\]$/;
 // disambiguated downstream by detectControllerFromBanner.
 const WELCOME_RE = /^Grbl(?:HAL)? [\d.]+/i;
 
+// Real GRBL/grblHAL error codes are 1-2 digits (vanilla GRBL tops out at 38;
+// grblHAL's extended codes stay well under 100). We carry an undescribed
+// numeric code up to this generous ceiling so the UI/log can show "Error N"
+// and structured state keeps the number; multi-thousand values (e.g.
+// error:7002009) are mis-framing/garbage, not firmware codes, and fall back
+// to a raw-only, code:null event rather than a bogus "Error 7002009".
+const MAX_PLAUSIBLE_ERROR_CODE = 999;
+
 type Matcher = (line: string) => GrblResponse | null;
 
 const MATCHERS: ReadonlyArray<Matcher> = [
@@ -62,8 +70,11 @@ function matchError(line: string): GrblResponse | null {
   const codeText = line.slice('error:'.length);
   if (!/^\d+$/.test(codeText)) return { kind: 'error', code: null, raw: line };
   const code = Number.parseInt(codeText, 10);
+  if (code > MAX_PLAUSIBLE_ERROR_CODE) return { kind: 'error', code: null, raw: line };
+  // Undescribed grblHAL codes (39+) keep their number AND raw line so "Error N"
+  // surfaces downstream; described codes stay code-only (unchanged shape).
   return describeError(code) === null
-    ? { kind: 'error', code: null, raw: line }
+    ? { kind: 'error', code, raw: line }
     : { kind: 'error', code };
 }
 

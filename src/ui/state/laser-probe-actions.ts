@@ -5,8 +5,8 @@
 import type { SerialConnection } from '../../platform/types';
 import { runProbeSequence, type ProbeResult } from './probe-actions';
 import {
-  activeJobCommandBlockMessage,
   motionOperationCommandBlockMessage,
+  setupBlockingJobCommandBlockMessage,
 } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
@@ -17,7 +17,7 @@ type ProbeRefs = { readonly connection: SerialConnection | null };
 export function probeActions(set: SetFn, get: GetFn, refs: ProbeRefs): Pick<LaserState, 'probe'> {
   return {
     probe: async (lines): Promise<ProbeResult> => {
-      const activeJobBlock = activeJobCommandBlockMessage(get());
+      const activeJobBlock = setupBlockingJobCommandBlockMessage(get());
       if (activeJobBlock !== null) return { kind: 'preflight-failed', reason: activeJobBlock };
       const motionBlock = motionOperationCommandBlockMessage(get());
       if (motionBlock !== null) return { kind: 'preflight-failed', reason: motionBlock };
@@ -29,11 +29,15 @@ export function probeActions(set: SetFn, get: GetFn, refs: ProbeRefs): Pick<Lase
       }
       set({ probeBusy: true });
       try {
-        return await runProbeSequence({
+        const result = await runProbeSequence({
           connection: refs.connection,
           statusReport: get().statusReport,
           lines,
         });
+        // A successful touch-plate probe runs the caller's probe lines, which set
+        // work Z0 — establish the CNC stock-top contract for the Start advisory.
+        if (result.kind === 'ok') set({ workZZeroKnown: true });
+        return result;
       } finally {
         set({ probeBusy: false });
       }

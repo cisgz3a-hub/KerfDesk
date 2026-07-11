@@ -72,7 +72,7 @@ Open library evaluation at Phase B kickoff per ADR-017: study CNCjs source (MIT)
 
 ### Phase C — v0.3 "Polish" [MVP completes here]
 
-Job time estimates, settings panel, SVG re-import with diff, path optimization (2-opt), keyboard shortcuts pass, autosave + recovery, local-only crash reporter.
+Job time estimates, settings panel, SVG re-import with diff, path optimization (nearest-neighbor, inner-shapes-first), keyboard shortcuts pass, autosave + recovery, local-only crash reporter.
 
 Open library evaluation at Phase C kickoff: `simplify-js` (BSD-2-Clause) or `flatten-svg` (ISC) for path simplification.
 
@@ -88,7 +88,7 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 
 ### Phase E — v0.5 "Image vectorize" [Shipped]
 
-Import a raster (JPG/PNG), trace to vectors via `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds). Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013.
+Import a raster (JPG/PNG), trace to vectors with the in-house contour/centerline/edge engine (ADR-123 — binary presets route to `contour-trace.ts`; Centerline is a shipped preset). `imagetracerjs` (Unlicense — MIT-compatible; `potrace-wasm` rejected on GPL grounds) remains only as a UI-unreachable multi-colour fallback. Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013 and ADR-123.
 
 **Trace pipeline hardening (2026-05-29).** Fixed transparent-PNG decode (composite onto white — it was producing all-black traces); added a perceptual-fidelity test harness that renders trace output and diffs it against analytic ground-truth masks via IoU (ADR-025, `src/__fixtures__/perceptual/`); and made a committed trace keep its source bitmap as a coexisting `RasterImage` for LightBurn-style overlay (ADR-026, new `src/ui/state/import-actions.ts`). **Known open gap — the next frontier:** imagetracerjs is outline-only, so a single pen stroke becomes two parallel contours; closing this outline-vs-centerline gap (a centerline/skeleton trace mode + metric) is the core remaining "faulty vs LightBurn" issue and is *not* caught by the IoU harness. Also open: `DEFAULT_TRACE_OPTIONS` degenerates on already-binary input (the `Line Art` preset sidesteps it), and the ADR-026 follow-ups (re-trace-from-source, source dimming/opacity, grouping the trace+source pair). See ADR-025 'Scope'/'Consequences' and ADR-026 'Consequences'.
 
@@ -296,13 +296,13 @@ phase; tracked here so they don't get lost.
 - **State:** Zustand with strict slices. Discriminated-union actions.
 - **Canvas:** Canvas2D.
 - **Desktop shell:** Electron LTS. `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
-- **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the desktop (Electron) side lives in the top-level `electron/` folder (there is no `src/platform/electron/`).
+- **Platform adapter:** `platform/web/` implements the `PlatformAdapter` interface for the browser; the main-process desktop (Electron) code lives in the top-level `electron/` folder, and `src/platform/electron/` holds the renderer-side Electron detection (`isElectronRenderer`, imported by `ui/app/main.tsx`) plus the release-workflow gate.
 - **SVG parse:** native `DOMParser` (browser and jsdom in Node tests).
 - **SVG sanitize:** **DOMPurify ≥ 3.3.2** (MPL-2.0/Apache-2.0 dual; MIT-compatible). Pinned per ADR-017.
 - **Text (Phase D):** `opentype.js` (MIT). Bundled MIT-compatible fonts (Roboto Apache-2.0; Inconsolata / Pacifico / Dancing Script OFL-1.1).
-- **Vectorize (Phase E):** `imagetracerjs` (Unlicense — MIT-compatible).
+- **Vectorize (Phase E):** in-house contour/centerline/edge trace engine (ADR-123); `imagetracerjs` (Unlicense — MIT-compatible) kept only as a multi-colour fallback.
 - **Testing:** Vitest (unit + pipeline + snapshot), `fast-check` (property). E2E smoke (Playwright) is anticipated but not yet adopted (absent from devDependencies and CI).
-- **Build:** Vite → web bundle; Vite + electron-builder → signed Windows `.exe`.
+- **Build:** Vite → web bundle; Vite + electron-builder → Windows `.exe` (unsigned in v1 — ADR-024 §5; code signing is secret-gated and a no-op until the certs exist).
 - **Lint/format:**
   - ESLint with `eslint-plugin-boundaries` (module isolation).
   - `eslint max-lines`, `max-lines-per-function`, `complexity` (file-size enforcement).
@@ -424,7 +424,7 @@ an assumption that every folder must have an `index.ts`.
 - **Imported SVG is untrusted.** Parsed via native `DOMParser`, sanitized via **DOMPurify** with `USE_PROFILES: { svg: true, svgFilters: true }` and a custom hook removing external `xlink:href` and non-image data URIs.
 - **Imported raster images (Phase E)** decoded inside a sandbox. Memory-bounded.
 - **Bundled fonts (Phase D)** parsed with `opentype.js` only. Never passed to native font APIs.
-- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial` and any `fileSystem*` permission (needed for the File System Access API in Electron 33+ — see commit `2965bd0`). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
+- **Electron hardening:** `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`. No IPC handlers (no `ipcMain` surface). `setPermissionRequestHandler` returns `false` except for `serial`, any `fileSystem*` permission (File System Access API in Electron 33+ — see commit `2965bd0`), `media` (video-only, main-frame, trusted origin — audio is denied; the machine-camera capability, ADR-107/108), and `screen-wake-lock` (holds the display awake during a job, ADR-117). CSP via `session.webRequest.onHeadersReceived` (F-9 audit fix).
 - **Web hardening:** strict CSP, no inline scripts, no third-party CDNs.
 - **G-code preamble/postamble hard-coded.** `G21`, `G90`, `M3 S0` start (arm at zero power — laser-off in laser mode; primes $32=0 controllers, see grbl-strategy.ts); `M5`, park at end.
 - **No auto-update from arbitrary URLs.** The desktop `electron-updater` feed is pinned at build time to our own `https://dl.kerfdesk.com/desktop/` origin — never arbitrary (ADR-024). No `quitAndInstall`; updates apply on quit only, never mid-burn.

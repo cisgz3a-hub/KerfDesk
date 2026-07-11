@@ -6,6 +6,7 @@
 
 import {
   cancel as cancelStreamer,
+  continueToolChange as continueToolChangeStreamer,
   createStreamer,
   findOversizedLine,
   markErrored,
@@ -16,10 +17,17 @@ import {
   type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
+import { extractToolChangeLabels } from '../../core/output';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
-import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
+import {
+  assertAutofocusIdle,
+  pushLog,
+  setupCommandBlockMessage,
+  toolChangeReady,
+  TOOL_CHANGE_NOT_IDLE_MESSAGE,
+} from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
 type SetFn = (
@@ -50,8 +58,9 @@ export function jobActions(
   refs: ResetCleanupRefs,
   safeWrite: SafeWriteFn,
   driver: DriverFn,
-): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob'> {
+): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
   return {
+    continueToolChange: () => runContinueToolChange(set, get, safeWrite),
     startJob: async (gcode, options = {}) => {
       assertStartAllowed(set, get);
       if (get().pendingUntrackedAcks > 0) {
@@ -71,9 +80,27 @@ export function jobActions(
             `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
         );
       }
-      const initial = createStreamer(gcode, streamOptions);
+      // A lone M0 in a CNC job is a tool-change boundary: swallow it and hold
+      // at Idle so the operator can jog/probe/Zero-Z the new bit (CNC-01..03).
+      // Laser jobs and imported-in-laser-mode programs keep sending M0 as an
+      // ordinary program stop.
+      const initial = createStreamer(gcode, {
+        ...streamOptions,
+        toolChangePause: options.machineKind === 'cnc',
+      });
       const stepped = step(initial);
-      set({ streamer: stepped.state, activeJobMachineKind: options.machineKind ?? 'laser' });
+      // Name the bit at each M0 hold: the labels the CNC emitter wrote as
+      // comments (the streamer strips them), consumed head-first at entry (R5).
+      const labels = options.machineKind === 'cnc' ? extractToolChangeLabels(gcode) : [];
+      // A job whose pre-M0 lines all fit the RX buffer reaches the FIRST hold in
+      // this synchronous step (no ack); later holds enter via advanceStream.
+      const entersHoldNow = stepped.state.status === 'tool-change';
+      set({
+        streamer: stepped.state,
+        activeJobMachineKind: options.machineKind ?? 'laser',
+        toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
+        pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
+      });
       if (stepped.toSend.length === 0) return;
       try {
         await safeWrite(stepped.toSend, 'start');
@@ -82,32 +109,7 @@ export function jobActions(
         throw err;
       }
     },
-    pauseJob: async () => {
-      const activeDriver = driver();
-      const hold = activeDriver.realtime.hold;
-      // Realtime feed hold pauses motion instantly but leaves the beam state
-      // to the firmware — only provable safe when $32 laser mode is
-      // confirmed. ADR-096's exemption is for firmwares that CANNOT report
-      // $-settings (settings 'none': Smoothieware ties beam power to motion
-      // in its laser module; Marlin has no hold byte and pauses stream-side).
-      // Firmwares that CAN report — writable ('grbl-dollar') or read-only
-      // ('readonly-dump', FluidNC's $$ compat dump) — keep the strict gate
-      // (audit F6). Router jobs are exempt: feed hold with a spindle is
-      // standard sender behavior (motion holds, spindle keeps spinning), and
-      // a router must have $32=0 — demanding the laser proof would block CNC
-      // pause outright.
-      const requiresLaserModeProof =
-        hold !== null &&
-        activeDriver.capabilities.settings !== 'none' &&
-        get().activeJobMachineKind !== 'cnc';
-      if (requiresLaserModeProof) assertPauseSafe(set, get);
-      if (hold !== null) await safeWrite(hold, 'pause');
-      const s = get().streamer;
-      if (s !== null) set({ streamer: pauseStreamer(s) });
-      if (hold === null) {
-        set({ log: pushLog(get(), `[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`) });
-      }
-    },
+    pauseJob: () => runPauseJob(set, get, safeWrite, driver),
     resumeJob: () => runResumeJob(set, safeWrite, driver),
     stopJob: async () => {
       const softReset = driver().realtime.softReset;
@@ -182,6 +184,38 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+async function runPauseJob(
+  set: SetFn,
+  get: GetFn,
+  safeWrite: SafeWriteFn,
+  driver: DriverFn,
+): Promise<void> {
+  const activeDriver = driver();
+  const hold = activeDriver.realtime.hold;
+  // Realtime feed hold pauses motion instantly but leaves the beam state
+  // to the firmware — only provable safe when $32 laser mode is
+  // confirmed. ADR-096's exemption is for firmwares that CANNOT report
+  // $-settings (settings 'none': Smoothieware ties beam power to motion
+  // in its laser module; Marlin has no hold byte and pauses stream-side).
+  // Firmwares that CAN report — writable ('grbl-dollar') or read-only
+  // ('readonly-dump', FluidNC's $$ compat dump) — keep the strict gate
+  // (audit F6). Router jobs are exempt: feed hold with a spindle is
+  // standard sender behavior (motion holds, spindle keeps spinning), and
+  // a router must have $32=0 — demanding the laser proof would block CNC
+  // pause outright.
+  const requiresLaserModeProof =
+    hold !== null &&
+    activeDriver.capabilities.settings !== 'none' &&
+    get().activeJobMachineKind !== 'cnc';
+  if (requiresLaserModeProof) assertPauseSafe(set, get);
+  if (hold !== null) await safeWrite(hold, 'pause');
+  const s = get().streamer;
+  if (s !== null) set({ streamer: pauseStreamer(s) });
+  if (hold === null) {
+    get().pushSystemNotice(`[lf2] ${PAUSE_UNSUPPORTED_MESSAGE}`);
+  }
+}
+
 async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn): Promise<void> {
   const resumeByte = driver().realtime.resume;
   if (resumeByte !== null) await safeWrite(resumeByte, 'resume');
@@ -219,13 +253,53 @@ async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn
   }
 }
 
+// Leave a tool-change hold: drop the swallowed M0 and pump the stream from the
+// emitter's M3/G4 spin-up. Unlike resume there is NO realtime resume byte — the
+// controller was never held (the M0 was never sent); it is idling at the park
+// position and simply needs the next lines fed. Functional set for the same
+// at-write-time snapshot reason as runResumeJob.
+async function runContinueToolChange(
+  set: SetFn,
+  get: GetFn,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  // Refuse Continue until the hold is actually ready — the pre-M0 retract/park
+  // has drained to a fresh Idle. Otherwise the resumed spindle-restart and
+  // post-change cutting lines queue behind still-moving pre-change motion, or the
+  // operator resumes into a machine that never reached the tool-change position
+  // (Codex audit P1).
+  if (get().streamer?.status === 'tool-change' && !toolChangeReady(get())) {
+    set({ lastWriteError: TOOL_CHANGE_NOT_IDLE_MESSAGE });
+    return;
+  }
+  let toSend = '';
+  set((s) => {
+    if (s.streamer === null) return s;
+    const stepped = step(continueToolChangeStreamer(s.streamer));
+    toSend = stepped.toSend;
+    return { streamer: stepped.state };
+  });
+  if (toSend.length > 0) {
+    try {
+      await safeWrite(toSend, 'resume');
+    } catch (err) {
+      set((s) => ({
+        streamer: s.streamer === null ? s.streamer : markErrored(s.streamer),
+        safetyNotice: writeFailedNotice('resume'),
+      }));
+      throw err;
+    }
+  }
+}
+
 function originPatchAfterSoftReset(
   state: LaserState,
-): Pick<LaserState, 'workOriginActive' | 'workOriginSource'> {
+): Pick<LaserState, 'workOriginActive' | 'workOriginSource' | 'workZZeroKnown'> {
+  // A soft reset voids the bit-to-stock Z relationship (Codex audit P1).
   if (state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown') {
-    return { workOriginActive: true, workOriginSource: 'unknown' };
+    return { workOriginActive: true, workOriginSource: 'unknown', workZZeroKnown: false };
   }
-  return { workOriginActive: false, workOriginSource: 'none' };
+  return { workOriginActive: false, workOriginSource: 'none', workZZeroKnown: false };
 }
 
 function normalizeStartJobOptions(options: CreateStreamerOptions): CreateStreamerOptions {

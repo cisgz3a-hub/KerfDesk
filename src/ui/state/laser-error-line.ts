@@ -90,7 +90,7 @@ function requestRealtimeStopAfterStreamError(
   safeWrite: SafeWriteFn,
 ): void {
   const streamCanStillHaveBufferedMotion =
-    streamer !== null && ['streaming', 'paused', 'done'].includes(streamer.status);
+    streamer !== null && ['streaming', 'paused', 'done', 'tool-change'].includes(streamer.status);
   if (!streamCanStillHaveBufferedMotion) return;
   const driver = refs.driver;
   const softReset = driver.realtime.softReset;

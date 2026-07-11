@@ -276,6 +276,11 @@ export type ShapeObject = ObjectPowerScale & {
   readonly bounds: Bounds; // local-space bounds of the materialized outline
   readonly transform: Transform;
   readonly paths: ReadonlyArray<ColoredPath>;
+  // Registration-box provenance: 'captured-board' (Place Board, ADR-124/127)
+  // vs 'jig' (Registration Jig panel). The two share one reserved-color box; the
+  // tag lets the jig panel refuse to unlock/replace a captured board, whose
+  // canvas position encodes the physical work origin. Absent → jig (back-compat).
+  readonly provenance?: 'captured-board' | 'jig';
 };
 
 // 3D relief for CNC carving, Phase H.4 (ADR-098). Carries the parsed

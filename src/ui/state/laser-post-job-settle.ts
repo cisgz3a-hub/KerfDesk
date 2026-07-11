@@ -1,8 +1,5 @@
-import {
-  startControllerCommand,
-  waitForFreshIdle,
-  type ControllerLifecycleRefs,
-} from './laser-interactive-command';
+import { startControllerCommand, waitForFreshIdle } from './laser-interactive-command';
+import type { HandlerRefs } from './laser-line-shared';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
@@ -18,14 +15,13 @@ type SafeWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 
-const SETTLE_DWELL_COMMAND = 'G4 P0.01\n';
 const STABLE_IDLE_REPORTS = 2;
 const SETTLE_MARKER_ACTIVITY_TIMEOUT_MS = 30_000;
 
 export function beginPostJobSettle(
   set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
+  refs: HandlerRefs,
   safeWrite: SafeWriteFn,
 ): void {
   const state = get();
@@ -41,14 +37,19 @@ export function beginPostJobSettle(
 
 async function runPostJobSettle(
   set: SetFn,
-  refs: ControllerLifecycleRefs,
+  refs: HandlerRefs,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
   try {
+    // Use the active driver's settle marker (ADR-095), not a hardcoded GRBL
+    // dwell: on Marlin the marker is M400 (acks only when buffered motion has
+    // drained); G4 P is milliseconds there and acks immediately, so the settle
+    // would clear the streamer mid-motion (CTL-02). GRBL's is 'G4 P0.01', so
+    // its bytes are unchanged. The home action does the same at its call site.
     await startControllerCommand(refs, safeWrite, {
       kind: 'post-job-settle',
       label: 'post-job settle marker',
-      command: SETTLE_DWELL_COMMAND,
+      command: `${refs.driver.commands.settleDwell}\n`,
       action: 'console',
       source: 'system',
       timeoutMs: SETTLE_MARKER_ACTIVITY_TIMEOUT_MS,

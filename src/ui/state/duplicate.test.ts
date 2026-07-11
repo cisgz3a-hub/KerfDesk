@@ -7,7 +7,7 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     resetStore();
   });
 
-  it('clones the selected object with a 10 mm offset', () => {
+  it('clones the selected object in place (LightBurn parity — no stagger)', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().selectObject('O1');
     const before = useStore.getState().project.scene.objects[0];
@@ -18,8 +18,10 @@ describe('useStore — duplicateSelection (Cmd+D)', () => {
     expect(clone).toBeDefined();
     if (clone === undefined || before === undefined) return;
     expect(clone.id).not.toBe(before.id);
-    expect(clone.transform.x).toBeCloseTo(before.transform.x + 10, 5);
-    expect(clone.transform.y).toBeCloseTo(before.transform.y + 10, 5);
+    // LightBurn's Duplicate places the clone exactly over the source; the
+    // operator then moves it. (The old 10 mm stagger was an unrecorded divergence.)
+    expect(clone.transform.x).toBeCloseTo(before.transform.x, 5);
+    expect(clone.transform.y).toBeCloseTo(before.transform.y, 5);
     // New clone becomes the selection.
     expect(useStore.getState().selectedObjectId).toBe(clone.id);
   });

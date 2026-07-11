@@ -15,6 +15,7 @@ import { describeReimportOutcome } from './import-toasts';
 // pickFilesForOpen handles.
 type TextFileHandle = {
   readonly name: string;
+  readonly size?: number; // byte size when the adapter supplies it (IMP-07)
   readonly text: () => Promise<string>;
 };
 
@@ -32,8 +33,11 @@ export async function importDxfFiles(
   let successIdx = 0;
   for (const file of files) {
     try {
+      // Gate on the file size before reading when the adapter supplies it, so a
+      // huge file can't OOM the tab first; fall back to the post-read length gate.
+      if (file.size !== undefined && !confirmOversizeImport(file.name, file.size)) continue;
       const text = await file.text();
-      if (!confirmOversizeImport(file.name, text.length)) continue;
+      if (file.size === undefined && !confirmOversizeImport(file.name, text.length)) continue;
       const result = parseDxf({ dxfText: text, id: crypto.randomUUID(), source: file.name });
       if (result.kind === 'error') {
         ctx.pushToast(`${file.name}: ${result.reason}`, 'error');

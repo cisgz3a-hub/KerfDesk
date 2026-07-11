@@ -24,6 +24,22 @@ describe('classifyResponse', () => {
     });
   });
 
+  it('carries an undescribed but plausible grblHAL error code with its raw line', () => {
+    // grblHAL extends past vanilla GRBL's code 38; the shared table has no
+    // entry for 45, but the operator must still see the number ("Error 45"),
+    // so we keep the code AND the raw line instead of degrading to code:null.
+    expect(classifyResponse('error:45')).toEqual({ kind: 'error', code: 45, raw: 'error:45' });
+  });
+
+  it('carries codes up to the plausible ceiling but drops larger garbage', () => {
+    expect(classifyResponse('error:999')).toEqual({ kind: 'error', code: 999, raw: 'error:999' });
+    expect(classifyResponse('error:1000')).toEqual({
+      kind: 'error',
+      code: null,
+      raw: 'error:1000',
+    });
+  });
+
   it('parses ALARM:N', () => {
     expect(classifyResponse('ALARM:9')).toEqual({ kind: 'alarm', code: 9 });
   });

@@ -1,3 +1,4 @@
+import { clamp } from '../math';
 import type { Bounds, ColoredPath } from '../scene';
 import type { RawImageData } from './trace-image';
 
@@ -73,10 +74,6 @@ export function offsetBounds(bounds: Bounds, offsetX: number, offsetY: number): 
     maxX: bounds.maxX + offsetX,
     maxY: bounds.maxY + offsetY,
   };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 function isPositiveFinite(value: number): boolean {

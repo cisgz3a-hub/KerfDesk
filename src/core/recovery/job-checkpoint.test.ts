@@ -1,6 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { createStreamer } from '../controllers/grbl';
+import type { JobOriginPlacement } from '../job';
+import type { OutputScope } from '../scene';
 import {
   JOB_CHECKPOINT_SCHEMA_VERSION,
   advanceJobCheckpoint,
@@ -31,8 +33,29 @@ const GCODE = [
 const NOW = '2026-07-07T03:00:00.000Z';
 const LATER = '2026-07-07T04:00:00.000Z';
 
+// Deliberately NON-default so a round-trip that drops or resets them is visible
+// (PST-02/R1): the crash-resume bug recompiled with reset scope, and re-resolved
+// current-position against the post-crash head. A current-position origin with a
+// frozen currentPosition exercises the field resume must reproduce byte-for-byte.
+const OUTPUT_SCOPE: OutputScope = {
+  cutSelectedGraphics: true,
+  useSelectionOrigin: true,
+  selectedObjectIds: ['obj-a', 'obj-b'],
+};
+const JOB_ORIGIN: JobOriginPlacement = {
+  startFrom: 'current-position',
+  anchor: 'center',
+  currentPosition: { x: 123.5, y: -47.25 },
+};
+
 function checkpoint(): ReturnType<typeof createJobCheckpoint> {
-  return createJobCheckpoint({ gcode: GCODE, machineKind: 'laser', nowIso: NOW });
+  return createJobCheckpoint({
+    gcode: GCODE,
+    machineKind: 'laser',
+    outputScope: OUTPUT_SCOPE,
+    jobOrigin: JOB_ORIGIN,
+    nowIso: NOW,
+  });
 }
 
 describe('fingerprintGcode', () => {
@@ -137,6 +160,48 @@ describe('serialize / parse round-trip', () => {
     expect(parseJobCheckpoint(serializeJobCheckpoint(cp))).toEqual(cp);
   });
 
+  it('round-trips the output scope and RESOLVED job origin the run used (PST-02/R1)', () => {
+    const cp = checkpoint();
+    expect(cp.outputScope).toEqual(OUTPUT_SCOPE);
+    // The frozen current-position XY is what resume must reproduce byte-for-byte.
+    expect(cp.jobOrigin).toEqual(JOB_ORIGIN);
+    const parsed = parseJobCheckpoint(serializeJobCheckpoint(cp));
+    expect(parsed?.outputScope).toEqual(OUTPUT_SCOPE);
+    expect(parsed?.jobOrigin).toEqual(JOB_ORIGIN);
+  });
+
+  it('treats an absent jobOrigin as Absolute (byte-deterministic, no translation)', () => {
+    const absolute = createJobCheckpoint({
+      gcode: GCODE,
+      machineKind: 'laser',
+      outputScope: OUTPUT_SCOPE,
+      nowIso: NOW,
+    });
+    expect(absolute.jobOrigin).toBeUndefined();
+    const parsed = parseJobCheckpoint(serializeJobCheckpoint(absolute));
+    expect(parsed).not.toBeNull();
+    expect(parsed?.jobOrigin).toBeUndefined();
+  });
+
+  it('discards a pre-schema-3 checkpoint that stored placement settings, not the origin (R1)', () => {
+    // A v2 slot stored jobPlacement {startFrom,anchor} — it re-resolves
+    // current-position against the post-crash head, so the schema bump makes it
+    // read as null and be dropped rather than resume with the wrong translation.
+    const v2 = JSON.stringify({
+      schemaVersion: 2,
+      fingerprint: fingerprintGcode(GCODE),
+      sendableLines: 5,
+      ackedLines: 2,
+      resumeInFlight: false,
+      machineKind: 'laser',
+      outputScope: OUTPUT_SCOPE,
+      jobPlacement: { startFrom: 'current-position', anchor: 'center' },
+      startedAtIso: NOW,
+      updatedAtIso: NOW,
+    });
+    expect(parseJobCheckpoint(v2)).toBeNull();
+  });
+
   it('rejects malformed payloads', () => {
     const valid = JSON.parse(serializeJobCheckpoint(checkpoint())) as Record<string, unknown>;
     const cases: ReadonlyArray<string> = [
@@ -157,6 +222,44 @@ describe('serialize / parse round-trip', () => {
       JSON.stringify({ ...valid, machineKind: 'toaster' }),
       JSON.stringify({ ...valid, startedAtIso: 5 }),
       JSON.stringify({ ...valid, updatedAtIso: null }),
+      // PST-02 scope/placement strictness.
+      JSON.stringify({ ...valid, outputScope: undefined }),
+      JSON.stringify({ ...valid, outputScope: 'all' }),
+      JSON.stringify({
+        ...valid,
+        outputScope: {
+          cutSelectedGraphics: 'yes',
+          useSelectionOrigin: false,
+          selectedObjectIds: [],
+        },
+      }),
+      JSON.stringify({
+        ...valid,
+        outputScope: {
+          cutSelectedGraphics: false,
+          useSelectionOrigin: false,
+          selectedObjectIds: [1],
+        },
+      }),
+      // R1 jobOrigin strictness (an ABSENT jobOrigin is valid — that is Absolute
+      // — but a present one must be a well-formed resolved origin).
+      JSON.stringify({ ...valid, jobOrigin: 'nope' }),
+      JSON.stringify({ ...valid, jobOrigin: { startFrom: 'nowhere', anchor: 'center' } }),
+      JSON.stringify({ ...valid, jobOrigin: { startFrom: 'user-origin', anchor: 'middle' } }),
+      // current-position MUST carry a finite currentPosition Vec2.
+      JSON.stringify({ ...valid, jobOrigin: { startFrom: 'current-position', anchor: 'center' } }),
+      JSON.stringify({
+        ...valid,
+        jobOrigin: { startFrom: 'current-position', anchor: 'center', currentPosition: { x: 1 } },
+      }),
+      JSON.stringify({
+        ...valid,
+        jobOrigin: {
+          startFrom: 'current-position',
+          anchor: 'center',
+          currentPosition: { x: 'a', y: 2 },
+        },
+      }),
     ];
     for (const raw of cases) expect(parseJobCheckpoint(raw)).toBeNull();
   });

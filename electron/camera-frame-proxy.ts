@@ -91,7 +91,10 @@ export async function handleFrameRequest(
   await serveHttpFrame(policy.url, res);
 }
 
-async function serveHttpFrame(url: URL, res: ServerResponse): Promise<void> {
+// Exported for direct proxy-behavior tests: this is the fetch+serve half, BELOW
+// the loopback/origin policy in handleFrameRequest, so tests exercise it against
+// a loopback mock camera (the full /frame.jpg path now refuses loopback, ELE-02).
+export async function serveHttpFrame(url: URL, res: ServerResponse): Promise<void> {
   const frame = await fetchFrameBytesQueued(url.toString(), HTTP_FRAME_TIMEOUT_MS);
   if (frame.kind !== 'ok') {
     writeJson(res, { kind: 'unavailable', reason: frame.reason }, 502);

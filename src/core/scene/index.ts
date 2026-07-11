@@ -102,6 +102,7 @@ export {
   boardCornersFromOrigin,
   boardMachinePoints,
   diameterFromCenterEdge,
+  firstCornerOffsetMm,
 } from './board-capture';
 export type { BoxAnchorAlignError, BoxAnchorAlignResult } from './box-anchor-align';
 export { buildBoxAnchorAlign } from './box-anchor-align';

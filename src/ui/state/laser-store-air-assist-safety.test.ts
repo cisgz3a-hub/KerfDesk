@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RT_SOFT_RESET } from '../../core/controllers/grbl';
+import { createProject } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
@@ -70,7 +71,11 @@ afterEach(async () => {
     airAssistOn: false,
     log: [],
   });
-  useStore.getState().newProject();
+  // Reset the whole project — including the device profile — between tests.
+  // newProject() now PRESERVES the machine profile (DEV-01), so an
+  // airAssistCommand set by one test (e.g. 'M8') would otherwise leak into the
+  // next and defeat the "no air command" isolation.
+  useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
 

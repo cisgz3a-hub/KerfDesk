@@ -32,6 +32,7 @@ import { handleStatusLine, originUnknownAfterControllerReset } from './laser-sta
 import { advanceStream, settleUntrackedAck } from './laser-stream-ack';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
+import { appendSystemNotice } from './laser-system-notice';
 import { appendTranscript, inboundTranscriptEntry } from './laser-transcript';
 
 export type { GetFn, HandlerRefs, SetFn } from './laser-line-shared';
@@ -158,12 +159,11 @@ function handleWelcomeLine(
   const mismatchLog =
     detected === refs.driver.kind
       ? {}
-      : {
-          log: pushLog(
-            state,
-            `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
-          ),
-        };
+      : appendSystemNotice(
+          state,
+          refs,
+          `[lf2] Controller banner looks like ${detected}, but the profile selected ${refs.driver.kind}. Check the device profile's controller setting.`,
+        );
   // A banner means the controller (re)booted: replies owed by the previous
   // session will never arrive.
   set({
@@ -190,7 +190,14 @@ function rebootDuringJobPatch(
   state: LaserState,
 ): Partial<Pick<LaserState, 'streamer' | 'safetyNotice'>> {
   const streamer: StreamerState | null = state.streamer;
-  if (streamer === null || !['idle', 'streaming', 'paused'].includes(streamer.status)) return {};
+  // 'tool-change' is an active hold with the M0 still queued and pre-M0 motion
+  // possibly draining — a reboot there kills the job just like streaming/paused
+  // (Codex audit: this status list was not updated when tool-change landed).
+  if (
+    streamer === null ||
+    !['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)
+  )
+    return {};
   return {
     streamer: wipeInFlight(markErrored(streamer)),
     // First notice wins — an earlier root cause is what the operator needs.

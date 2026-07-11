@@ -295,11 +295,13 @@ function isLegacyNeotronicsFrameFeed(dev: Record<string, unknown>, feed: number)
 }
 
 function positiveNumberOrDefault(value: unknown, fallback: number): number {
-  return typeof value === 'number' && value > 0 ? value : fallback;
+  // Number.isFinite rejects Infinity/NaN — a JSON `1e999` parses to Infinity and
+  // would otherwise ride through into emitted G-code (e.g. "G0 ZInfinity").
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 function nonNegativeNumberOrDefault(value: unknown, fallback: number): number {
-  return typeof value === 'number' && value >= 0 ? value : fallback;
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 function booleanOrDefault(value: unknown, fallback: boolean): boolean {

@@ -10,11 +10,14 @@
 // tolerated. This means they can validate G-code from external tools too, not
 // just GrblStrategy's output.
 import {
+  isArcMotion,
+  isClockwiseArc,
   isGcodeCommand,
   isGcodeMotionCommand,
   parseGcodeWord,
   stripGcodeComment,
 } from './gcode-words';
+import { arcAabb } from './arc-bounds';
 
 export type Issue = {
   readonly lineNumber: number;
@@ -95,17 +98,69 @@ export function findOutOfBoundsCoords(
     maxX: bed.maxX ?? bed.width,
     maxY: bed.maxY ?? bed.height,
   };
+  // Modal position, so a G2/G3 arc knows its start point (the previous
+  // endpoint). GRBL programs start at the current machine position; for the
+  // emitted-text scan we track from 0,0 like the rest of the bounds contract.
+  let pos = { x: 0, y: 0 };
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i];
     if (raw === undefined) continue;
     const stripped = stripGcodeComment(raw);
     if (!isGcodeMotionCommand(stripped)) continue;
-    const x = parseGcodeWord(stripped, 'X');
-    const y = parseGcodeWord(stripped, 'Y');
-    appendAxisBoundsIssue(issues, 'X', x, offset.x, limits.minX, limits.maxX, i + 1, raw);
-    appendAxisBoundsIssue(issues, 'Y', y, offset.y, limits.minY, limits.maxY, i + 1, raw);
+    pos = scanMotionLineBounds(issues, stripped, pos, offset, limits, i + 1, raw);
   }
   return issues;
+}
+
+// Check one motion line's endpoint (and, for a G2/G3 arc, its bulge) against
+// the bed, and return the updated modal position.
+function scanMotionLineBounds(
+  issues: Issue[],
+  stripped: string,
+  pos: { x: number; y: number },
+  offset: { x: number; y: number },
+  limits: { minX: number; minY: number; maxX: number; maxY: number },
+  lineNumber: number,
+  line: string,
+): { x: number; y: number } {
+  const x = parseGcodeWord(stripped, 'X');
+  const y = parseGcodeWord(stripped, 'Y');
+  appendAxisBoundsIssue(issues, 'X', x, offset.x, limits.minX, limits.maxX, lineNumber, line);
+  appendAxisBoundsIssue(issues, 'Y', y, offset.y, limits.minY, limits.maxY, lineNumber, line);
+  if (isArcMotion(stripped)) {
+    appendArcBoundsIssue(issues, stripped, pos, x, y, offset, limits, lineNumber, line);
+  }
+  return { x: x ?? pos.x, y: y ?? pos.y };
+}
+
+// A G2/G3 arc can bow outside the bed while both endpoints sit inside it, so
+// the endpoint-word check above is blind to it. Compute the arc's true extent
+// from its centre offset (I/J) and direction, and flag any side that clears the
+// bed. Only reachable for CNC output (the laser strategy emits no arcs).
+function appendArcBoundsIssue(
+  issues: Issue[],
+  stripped: string,
+  start: { x: number; y: number },
+  endX: number | null,
+  endY: number | null,
+  offset: { x: number; y: number },
+  limits: { minX: number; minY: number; maxX: number; maxY: number },
+  lineNumber: number,
+  line: string,
+): void {
+  const iWord = parseGcodeWord(stripped, 'I');
+  const jWord = parseGcodeWord(stripped, 'J');
+  if (iWord === null || jWord === null) return;
+  const end = { x: endX ?? start.x, y: endY ?? start.y };
+  const box = arcAabb(start, end, iWord, jWord, isClockwiseArc(stripped));
+  const parts: string[] = [];
+  if (box.minX + offset.x < limits.minX) parts.push(`X ${box.minX + offset.x}`);
+  else if (box.maxX + offset.x > limits.maxX) parts.push(`X ${box.maxX + offset.x}`);
+  if (box.minY + offset.y < limits.minY) parts.push(`Y ${box.minY + offset.y}`);
+  else if (box.maxY + offset.y > limits.maxY) parts.push(`Y ${box.maxY + offset.y}`);
+  if (parts.length > 0) {
+    issues.push({ lineNumber, line, reason: `Arc bulges out of bed: ${parts.join(', ')}` });
+  }
 }
 
 function appendAxisBoundsIssue(

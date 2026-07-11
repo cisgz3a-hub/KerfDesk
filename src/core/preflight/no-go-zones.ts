@@ -26,6 +26,22 @@ type Rect = {
 type ActiveZone = { readonly zone: NoGoZone; readonly rect: Rect };
 type Axes = { readonly x: number | null; readonly y: number | null };
 
+// The first enabled zone a straight from→to move would cross (or null). Used by
+// the jog/click-to-position guard (DEV-04) — app-initiated motion isn't G-code,
+// so it checks the raw segment directly rather than scanning emitted lines.
+// Points are machine-coordinate mm.
+export function firstZoneCrossedBySegment(
+  from: { readonly x: number; readonly y: number },
+  to: { readonly x: number; readonly y: number },
+  zones: ReadonlyArray<NoGoZone>,
+): NoGoZone | null {
+  for (const zone of zones) {
+    if (!zone.enabled) continue;
+    if (segmentIntersectsRect(from, to, rectForZone(zone))) return zone;
+  }
+  return null;
+}
+
 export function findNoGoZoneCollisions(
   gcode: string,
   zones: ReadonlyArray<NoGoZone>,

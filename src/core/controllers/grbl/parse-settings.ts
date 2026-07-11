@@ -53,6 +53,11 @@ export type ControllerSettingsSnapshot = Partial<
   readonly homingDirectionMask?: number;
   readonly zMaxFeed?: number;
   readonly zAccelMmPerSec2?: number;
+  // Per-axis max rates ($110/$111). `maxFeed` (a DeviceProfile key) keeps the
+  // collapsed GREATER of the two for the planner/emit; these retain the raw
+  // pair so an advisory can warn against the SLOWER axis (Codex re-audit R4).
+  readonly maxFeedX?: number;
+  readonly maxFeedY?: number;
 };
 
 export type SettingsCollectorState =
@@ -147,6 +152,8 @@ export function settingsMapToControllerSettings(
   const homingDirectionMask = parseNonNegativeInteger(map.get(23));
   const zMaxFeed = parsePositiveNumber(map.get(112));
   const zAccelMmPerSec2 = parsePositiveNumber(map.get(122));
+  const maxFeedX = parsePositiveNumber(map.get(110));
+  const maxFeedY = parsePositiveNumber(map.get(111));
   return {
     ...settingsMapToProfilePatch(map),
     ...(softLimitsEnabled === undefined ? {} : { softLimitsEnabled }),
@@ -155,6 +162,8 @@ export function settingsMapToControllerSettings(
     ...(homingDirectionMask === undefined ? {} : { homingDirectionMask }),
     ...(zMaxFeed === undefined ? {} : { zMaxFeed }),
     ...(zAccelMmPerSec2 === undefined ? {} : { zAccelMmPerSec2 }),
+    ...(maxFeedX === undefined ? {} : { maxFeedX }),
+    ...(maxFeedY === undefined ? {} : { maxFeedY }),
   };
 }
 

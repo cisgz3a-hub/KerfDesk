@@ -3,7 +3,7 @@ import {
   isVectorPathObject,
   vectorObjectOutputMetadataCompatible,
   type VectorSceneObject,
-} from '../../core/geometry/vector-path-tools';
+} from '../../core/geometry';
 import { isConvertibleVector, type ConvertibleVector } from '../raster/vector-to-bitmap';
 
 export function selectedObject(project: Project, selectedObjectId: string | null) {

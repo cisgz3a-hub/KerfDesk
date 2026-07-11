@@ -17,7 +17,7 @@
 import { differenceD, FillRule, type PathD, type PathsD } from 'clipper2-ts';
 import type { Polyline, Vec2 } from '../scene';
 import { offsetClosedPolylinesForKerf } from '../geometry/kerf-offset';
-import { pathDToPolyline, polylineToPathD } from '../geometry/vector-path-tools';
+import { pathDToPolyline, polylineToPathD, tryVectorOp } from '../geometry/vector-path-tools';
 import type { BoxRelief } from './box-spec';
 
 // dogbone.ts precedent: 24-segment relief circles, F-CNC26 corner-overcut.
@@ -79,8 +79,18 @@ function subtractCornerReliefs(rings: PanelRings, radiusMm: number): PanelFitRes
     .flat()
     .map((corner) => circlePath(corner, radiusMm));
   if (circles.length === 0) return { kind: 'fitted', ...rings };
-  const relieved = differenceD([outline, ...holes], circles, FillRule.NonZero);
-  return classifyRings(relieved.map(pathDToPolyline), rings, `corner relief r=${radiusMm} mm`);
+  // clipper2-ts can throw internally on pathological geometry; catch it here so
+  // it never escapes the pure core and aborts the box generator (R6). A failed
+  // subtraction reports as degenerate, the same contract classifyRings uses.
+  const relieved = tryVectorOp(() => differenceD([outline, ...holes], circles, FillRule.NonZero));
+  if (relieved.kind === 'error') {
+    return { kind: 'degenerate', detail: `corner relief r=${radiusMm} mm failed` };
+  }
+  return classifyRings(
+    relieved.value.map(pathDToPolyline),
+    rings,
+    `corner relief r=${radiusMm} mm`,
+  );
 }
 
 // The outline is the ring that contains all the others — with our geometry

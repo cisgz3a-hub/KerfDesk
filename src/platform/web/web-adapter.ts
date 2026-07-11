@@ -42,7 +42,7 @@ async function pickFilesForOpen(req: FileOpenRequest): Promise<ReadonlyArray<Fil
   const out: FileHandle[] = [];
   for (const handle of handles) {
     const file = await handle.getFile();
-    out.push({ name: file.name, text: () => file.text(), blob: async () => file });
+    out.push({ name: file.name, size: file.size, text: () => file.text(), blob: async () => file });
   }
   return out;
 }

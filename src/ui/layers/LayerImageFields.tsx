@@ -1,11 +1,11 @@
-import { MAX_RASTER_LINES_PER_MM } from '../../core/raster/raster-budget';
 import {
   dpiToLinesPerMm,
   lineIntervalMmToLinesPerMm,
   linesPerMmToDpi,
   linesPerMmToLineIntervalMm,
+  MAX_RASTER_LINES_PER_MM,
   MIN_RASTER_LINES_PER_MM,
-} from '../../core/raster/raster-units';
+} from '../../core/raster';
 import { DITHER_ALGORITHMS, type Layer, type LayerOperationSettings } from '../../core/scene';
 import { useDebouncedCommit } from './use-debounced-commit';
 

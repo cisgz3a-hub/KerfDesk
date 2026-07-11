@@ -39,6 +39,22 @@ export function advanceStream(
   const acked = onAck(s, ack);
   const stepped = step(acked.state);
   set({ streamer: stepped.state });
+  // Entering a tool-change hold means a new bit is going in: the previous bit's
+  // work Z0 no longer holds, so the operator must re-Zero-Z for the new tool
+  // (the setup gate allows it during the hold). Invalidate so the no-work-zero
+  // advisory is honest again until they do (Codex audit P1).
+  if (s.status !== 'tool-change' && stepped.state.status === 'tool-change') {
+    // New bit going in: void the prior Z0, and require a FRESH Idle (observed
+    // after the pre-M0 retract drains) before the setup gate / Continue unlock —
+    // any Idle currently in statusReport predates reaching the boundary. Also
+    // consume the next tool label so the pause UI can name the bit (R5).
+    set((state) => ({
+      workZZeroKnown: false,
+      toolChangeIdleSeen: false,
+      pendingToolLabel: state.toolChangeLabels[0] ?? null,
+      toolChangeLabels: state.toolChangeLabels.slice(1),
+    }));
+  }
   if (s.status !== 'done' && stepped.state.status === 'done') {
     beginPostJobSettle(set, get, refs, safeWrite);
   }

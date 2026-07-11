@@ -23,6 +23,18 @@ describe('classifySmoothieResponse', () => {
       classifySmoothieResponse('<Idle|MPos:0.0000,0.0000,0.0000|WPos:0.0000,0.0000,0.0000>'),
     ).toMatchObject({ kind: 'status' });
   });
+
+  it('parses the classic comma-delimited status report, not only the pipe grammar', () => {
+    // Older Smoothie builds emit GRBL-0.9-style reports where the field
+    // separators are commas, same as the axis-triple separators. The pipe
+    // parser sees one field and the DRO never updates (controllerIdle stuck).
+    expect(
+      classifySmoothieResponse('<Idle,MPos:1.500,2.000,3.000,WPos:0.500,1.000,2.000>'),
+    ).toMatchObject({
+      kind: 'status',
+      report: { state: 'Idle', mPos: { x: 1.5, y: 2, z: 3 }, wPos: { x: 0.5, y: 1, z: 2 } },
+    });
+  });
 });
 
 describe('Smoothie command builders', () => {
@@ -79,5 +91,12 @@ describe('smoothiewareDriver', () => {
     expect(smoothiewareDriver.commands.unlock).toBe('M999');
     expect(smoothiewareDriver.commands.settingsQuery).toBeNull();
     expect(smoothiewareDriver.commands.stopLaserLines).toEqual(['M5', 'M9']);
+  });
+
+  it('settles with M400, not G4 P0.01 — G4 P is milliseconds on Smoothieware', () => {
+    // Same instant-ack hazard CTL-02 fixed for Marlin: G4 P0.01 would clear the
+    // streamer while motion still drains; M400 waits for the queue to empty.
+    expect(smoothiewareDriver.commands.settleDwell).toBe('M400');
+    expect(smoothiewareDriver.commands.settleDwell).not.toBe('G4 P0.01');
   });
 });

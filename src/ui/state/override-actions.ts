@@ -9,9 +9,17 @@ import type { LaserState } from './laser-store';
 
 type WriteFn = (line: string) => Promise<void>;
 
-export function overrideActions(write: WriteFn): Pick<LaserState, 'sendRealtimeOverride'> {
+export function overrideActions(
+  write: WriteFn,
+  hasOverrides: () => boolean,
+): Pick<LaserState, 'sendRealtimeOverride'> {
   return {
     sendRealtimeOverride: async (byte: RealtimeOverrideByte) => {
+      // Defense in depth: even if the override controls were somehow mounted,
+      // never write a GRBL 0x90–0x9D byte to a firmware without realtime
+      // overrides — it would land in the line buffer and corrupt the running
+      // stream (CTL-01). The UI mount is gated on the same capability.
+      if (!hasOverrides()) return;
       await write(byte);
     },
   };

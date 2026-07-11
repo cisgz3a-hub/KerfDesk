@@ -101,3 +101,43 @@ describe('runAutosaveRecovery (M15)', () => {
     expect(readAutosave()).not.toBeNull();
   });
 });
+
+// PST-01: on a fresh boot readAutosave surfaces a *dead* window-session's slot.
+// Accepting the restore must re-home the project into THIS session's slot and
+// drop the dead one — otherwise the dead slot lingers (no-arg clearAutosave on
+// the first manual save only clears the current-session + legacy keys) and
+// re-prompts "Restore?" on every later empty launch.
+const DEAD_SESSION = 'dead';
+const DEAD_KEY = 'lf2:autosave:v1:dead';
+// Year-2020 stamp: older than the re-home write (real Date.now()) so readAutosave
+// deterministically prefers the re-homed current-session slot.
+const OLD_TS = 1_600_000_000_000;
+
+describe('runAutosaveRecovery re-homes a dead-session slot (PST-01)', () => {
+  it('clears the source slot and moves the copy into the current session', () => {
+    writeAutosave(savedProject(), OLD_TS, { sessionId: DEAD_SESSION });
+
+    runAutosaveRecovery(() => true);
+
+    expect(localStorage.getItem(DEAD_KEY)).toBeNull();
+    const restored = readAutosave();
+    expect(restored).not.toBeNull();
+    expect(restored?.storageKey).not.toBe(DEAD_KEY);
+    expect(restored?.project.scene.objects).toHaveLength(1);
+  });
+
+  it('does not re-prompt on the next launch after the first manual save', () => {
+    writeAutosave(savedProject(), OLD_TS, { sessionId: DEAD_SESSION });
+
+    runAutosaveRecovery(() => true);
+    // First manual save clears the current-session slot (file-actions no-arg clear).
+    clearAutosave();
+    // New launch: empty project again.
+    useStore.getState().newProject();
+    useStore.setState({ dirty: false });
+
+    const confirm = vi.fn(() => true);
+    runAutosaveRecovery(confirm);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+});

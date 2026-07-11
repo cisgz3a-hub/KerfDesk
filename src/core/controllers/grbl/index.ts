@@ -53,6 +53,7 @@ export type {
 export {
   DEFAULT_RX_BUFFER_BYTES,
   cancel,
+  continueToolChange,
   createStreamer,
   disconnect,
   findOversizedLine,

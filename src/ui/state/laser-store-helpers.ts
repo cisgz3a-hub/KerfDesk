@@ -23,6 +23,8 @@ export const UNKNOWN_IDLE_STATUS_MESSAGE =
   'Controller status is not known yet. Wait for an Idle status report before jogging or framing.';
 export const MOTION_OPERATION_ACTIVE_MESSAGE =
   'A jog or frame operation is active. Wait for GRBL to report Idle, or cancel the operation, before sending another motion command.';
+export const TOOL_CHANGE_NOT_IDLE_MESSAGE =
+  'Waiting for the machine to reach the tool-change position. Jog, probe, and Zero Z unlock once it reports Idle.';
 
 export function serialWriteErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -36,11 +38,37 @@ export function pushLog(state: LaserState, line: string): ReadonlyArray<string> 
 // physically finished motion. laser-line-handler clears the streamer after a
 // later Idle status report.
 export function isActiveJob(streamer: StreamerState | null): boolean {
-  return streamer !== null && ['streaming', 'paused', 'done', 'errored'].includes(streamer.status);
+  return (
+    streamer !== null &&
+    ['streaming', 'paused', 'tool-change', 'done', 'errored'].includes(streamer.status)
+  );
 }
 
 export function activeJobCommandBlockMessage(state: LaserState): string | null {
   return isActiveJob(state.streamer) ? ACTIVE_JOB_COMMAND_MESSAGE : null;
+}
+
+// The setup-motion gate (jog, probe, Zero-Z, set origin). Identical to
+// activeJobCommandBlockMessage EXCEPT during a tool-change hold, where the
+// operator must touch off the new bit — but only once the machine has drained
+// the pre-M0 retract/park and reports Idle. Start / Home / Setup keep the
+// strict activeJobCommandBlockMessage, so Start never unblocks at a tool change.
+export function setupBlockingJobCommandBlockMessage(state: LaserState): string | null {
+  if (!isActiveJob(state.streamer)) return null;
+  if (state.streamer?.status !== 'tool-change') return ACTIVE_JOB_COMMAND_MESSAGE;
+  return toolChangeReady(state) ? null : TOOL_CHANGE_NOT_IDLE_MESSAGE;
+}
+
+// Ready to touch off the new bit only when the pre-M0 retract/park has fully
+// drained (no in-flight lines still owed acks) AND a FRESH Idle has been observed
+// since entering the hold. Checking statusReport.state === 'Idle' alone was
+// unsafe: that Idle can be stale (the report from before Start, before the
+// retract even began), so the setup gate unlocked while the machine was still
+// moving (Codex audit P1).
+export function toolChangeReady(state: LaserState): boolean {
+  const streamer = state.streamer;
+  if (streamer === null || streamer.status !== 'tool-change') return false;
+  return streamer.inFlight.length === 0 && state.toolChangeIdleSeen;
 }
 
 // True while stream acks are still outstanding — sending or paused, or any
@@ -66,7 +94,7 @@ export function setupCommandBlockMessage(state: LaserState): string | null {
 }
 
 export function jogFrameCommandBlockMessage(state: LaserState): string | null {
-  const activeJobMessage = activeJobCommandBlockMessage(state);
+  const activeJobMessage = setupBlockingJobCommandBlockMessage(state);
   if (activeJobMessage !== null) return activeJobMessage;
   const motionOperationMessage = motionOperationCommandBlockMessage(state);
   if (motionOperationMessage !== null) return motionOperationMessage;
@@ -102,8 +130,11 @@ export function assertAutofocusIdle(state: LaserState): void {
   if (state.autofocusBusy) throw new Error(AUTOFOCUS_BUSY_MESSAGE);
 }
 
+// Guards the origin actions (Zero-Z, Set Origin). Uses the setup-motion gate,
+// so re-zeroing the new bit is permitted during a settled (Idle) tool-change
+// hold but blocked during any other active job.
 export function assertNoActiveJob(state: LaserState): void {
-  const message = activeJobCommandBlockMessage(state);
+  const message = setupBlockingJobCommandBlockMessage(state);
   if (message !== null) throw new Error(message);
 }
 
@@ -210,6 +241,10 @@ export function initialLaserState(): Pick<
   | 'ovCache'
   | 'workOriginActive'
   | 'workOriginSource'
+  | 'workZZeroKnown'
+  | 'toolChangeIdleSeen'
+  | 'toolChangeLabels'
+  | 'pendingToolLabel'
   | 'frameVerification'
 > {
   return {
@@ -241,6 +276,10 @@ export function initialLaserState(): Pick<
     ovCache: null,
     workOriginActive: false,
     workOriginSource: 'none',
+    workZZeroKnown: false,
+    toolChangeIdleSeen: false,
+    toolChangeLabels: [],
+    pendingToolLabel: null,
     frameVerification: null,
   };
 }

@@ -407,4 +407,14 @@ describe('handleEditShortcut - grouping', () => {
     expect(ctx.ungroupSelection).toHaveBeenCalled();
     div.remove();
   });
+
+  it('Cmd+U ungroups the current selection (LightBurn primary binding)', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(fakeKeydown({ key: 'u', metaKey: true, target: div }), ctx);
+    expect(handled).toBe(true);
+    expect(ctx.ungroupSelection).toHaveBeenCalled();
+    div.remove();
+  });
 });

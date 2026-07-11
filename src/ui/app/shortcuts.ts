@@ -216,6 +216,13 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
     invoke: (c) => c.ungroupSelection(),
   },
   {
+    // Ctrl/Cmd+U — Ungroup, LightBurn's primary binding (Ctrl+Shift+G above
+    // stays as an alias). handleEditShortcut preventDefaults before invoke, so
+    // the browser's Ctrl+U "view source" default is suppressed.
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'u' && !e.shiftKey,
+    invoke: (c) => c.ungroupSelection(),
+  },
+  {
     // Cmd/Ctrl+D — Duplicate selection. Matches Figma / Inkscape /
     // LightBurn. Skipped inside editable targets (the input-focus
     // guard at the top of handleEditShortcut handles that) so the

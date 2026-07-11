@@ -30,6 +30,7 @@ import { grblSettingsActions } from './grbl-settings-actions';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { connectionActions } from './laser-connection-actions';
 import { jobActions } from './laser-job-actions';
+import { appendSystemNotice } from './laser-system-notice';
 import { jogActions } from './laser-jog-actions';
 import { type LaserMotionOperation } from './laser-motion-operation';
 import { type WorkCoordinateOffset } from './origin-actions';
@@ -136,6 +137,28 @@ export type LaserState = {
   readonly ovCache: OverrideValues | null;
   readonly workOriginActive: boolean;
   readonly workOriginSource: WorkOriginSource;
+  // Whether work Z0 (the CNC stock-top contract) has been established THIS
+  // session and is still valid. Separate from workOriginActive (XY origin): Set
+  // Origin (G92 X0 Y0) sets XY but not Z; Zero Z / a successful probe set this.
+  // Invalidated by anything that voids the bit-to-stock relationship — reconnect,
+  // reset/alarm, homing, release-motors, clear-origin, and a tool change (Codex
+  // audit P1). Drives the CNC no-work-zero Start advisory.
+  readonly workZZeroKnown: boolean;
+  // Tool-change readiness: true only once a FRESH Idle status report has been
+  // observed since the streamer entered the tool-change hold (cleared on entry,
+  // set when Idle arrives with the pre-M0 tail drained). Guards the setup gate
+  // and Continue against a STALE Idle from before Start, so jog/probe/Continue
+  // cannot unlock while the pre-change retract/park is still moving (Codex audit
+  // P1).
+  readonly toolChangeIdleSeen: boolean;
+  // The next-bit labels remaining in the current CNC job, in stream order (R5).
+  // Set at Start from the compiled program's tool-change comments; the head is
+  // consumed into pendingToolLabel each time a tool-change hold is entered.
+  readonly toolChangeLabels: ReadonlyArray<string>;
+  // The bit to load at the CURRENT tool-change hold, or null when it is unknown
+  // (single-tool job, imported .nc, resume tail) — the UI names the bit when set
+  // and falls back to a generic prompt when null (R5).
+  readonly pendingToolLabel: string | null;
   /**
    * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
    * the current origin. Set when a frame is dispatched in 'verified-origin'
@@ -194,8 +217,14 @@ export type LaserState = {
   readonly startJob: (gcode: string, options?: StartJobOptions) => Promise<void>;
   readonly pauseJob: () => Promise<void>;
   readonly resumeJob: () => Promise<void>;
+  // Leave a multi-tool CNC job's M0 tool-change hold and resume the stream.
+  readonly continueToolChange: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
   readonly clearSafetyNotice: () => void;
+  // Write an app diagnostic to the Console transcript + log. Used by UI callers
+  // (e.g. the wake-lock hook) that have no access to the store's refs; the action
+  // supplies them so transcript ids stay on the one shared counter.
+  readonly pushSystemNotice: (line: string) => void;
   readonly applyDetectedSettings: () => void;
   readonly dismissDetectedSettings: () => void;
   // G92 is the default session-scoped origin; advanced controls use G10/G54.
@@ -387,7 +416,10 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ),
   ...airAssistActions(set, get),
   ...probeActions(set, get, refs),
-  ...overrideActions((line) => safeWrite(set, get, line)),
+  ...overrideActions(
+    (line) => safeWrite(set, get, line),
+    () => get().capabilities.overrides,
+  ),
   ...jobActions(
     set,
     get,
@@ -411,5 +443,6 @@ export const useLaserStore = create<LaserState>((set, get) => ({
   ...originActions(set, get, (line, action) => safeWrite(set, get, line, action)),
   ...detectedSettingsActions(set, get),
   clearSafetyNotice: () => set({ safetyNotice: null }),
+  pushSystemNotice: (line) => set(appendSystemNotice(get(), refs, line)),
   markFrameVerified: (verification) => set({ frameVerification: verification }),
 }));

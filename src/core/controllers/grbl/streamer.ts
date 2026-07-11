@@ -36,10 +36,19 @@ export const DEFAULT_RX_BUFFER_BYTES = DEFAULT_GRBL_RX_BUFFER_BYTES;
 // mispositioned head after the rejected move, while keeping the in-app
 // Stop path mounted. CNCjs parity per MIT-T1 audit finding;
 // error-as-terminal matches LightBurn.
+// 'tool-change' is a non-terminal hold at an M0 boundary in a multi-bit CNC
+// job (CNC-01). The sender does NOT send the M0: it stops feeding and leaves
+// the M0 at the queue head, so GRBL drains the retract/M5/park that precede it
+// and settles to Idle — the only state in which it will accept the jog/probe/
+// G92 the operator needs to re-zero the new bit. A plain GRBL feed-hold (M0's
+// own effect) leaves the controller in Hold, where re-zeroing is impossible.
+// continueToolChange() drops the M0 and resumes; the emitter's own M3/G4
+// spin-up follows it, so the spindle restarts from the stream.
 export type StreamerStatus =
   | 'idle'
   | 'streaming'
   | 'paused'
+  | 'tool-change'
   | 'done'
   | 'cancelled'
   | 'disconnected'
@@ -59,12 +68,18 @@ export type StreamerState = {
   // Total line count at start of stream (for progress %).
   readonly total: number;
   readonly rxBufferBytes: number;
+  // When true, a lone M0/M1 is treated as a tool-change boundary (swallowed,
+  // stream held at Idle) instead of being sent. Set only for KerfDesk-emitted
+  // CNC jobs — an imported .nc program's M0/M1 is an ordinary program pause and
+  // must stream through unchanged.
+  readonly toolChangePause: boolean;
 };
 
 export type StreamingMode = GrblStreamingMode;
 export type CreateStreamerOptions = {
   readonly rxBufferBytes?: number;
   readonly streamingMode?: StreamingMode;
+  readonly toolChangePause?: boolean;
 };
 
 export type AckKind = 'ok' | 'error' | 'alarm';
@@ -94,7 +109,21 @@ export function createStreamer(gcode: string, opts: CreateStreamerOptions = {}):
     completed: 0,
     total: lines.length,
     rxBufferBytes: normalizeGrblRxBufferBytes(opts.rxBufferBytes),
+    toolChangePause: opts.toolChangePause ?? false,
   };
+}
+
+// A lone program-stop (M0) or optional-stop (M1). GrblStrategy emits a bare
+// `M0` between bit sections (the human-readable instructions before it are
+// comments, already filtered out of the queue). Comment-stripped and trimmed
+// so an imported `M0 ; change bit` still matches.
+function isToolChangeLine(line: string): boolean {
+  const code = line
+    .replace(/\(.*?\)/g, '')
+    .replace(/;.*$/, '')
+    .trim()
+    .toUpperCase();
+  return code === 'M0' || code === 'M00' || code === 'M1' || code === 'M01';
 }
 
 // The single definition of "sendable": blank lines and full-line comments are
@@ -150,40 +179,78 @@ function isTerminal(status: StreamerStatus): boolean {
   );
 }
 
+type FillResult = {
+  readonly queued: ReadonlyArray<string>;
+  readonly inFlight: ReadonlyArray<{ readonly line: string; readonly bytes: number }>;
+  readonly inFlightBytes: number;
+  readonly sent: ReadonlyArray<string>;
+  // True when the batch stopped at a lone M0 (toolChangePause) — the M0 is left
+  // at the head of `queued`, never sent.
+  readonly hitToolChange: boolean;
+};
+
+// Greedily batch queued lines that fit the remaining RX buffer. Stops early at
+// a tool-change M0 (leaving it queued) or when the next line won't fit.
+function fillBuffer(state: StreamerState): FillResult {
+  let queued = state.queued;
+  let inFlight = state.inFlight;
+  let inFlightBytes = state.inFlightBytes;
+  const sent: string[] = [];
+  while (queued.length > 0) {
+    if (state.streamingMode === 'ping-pong' && sent.length > 0) break;
+    const next = queued[0];
+    if (next === undefined) break;
+    // The M0 must NOT be sent: detected inside the loop, not at the top, because
+    // in char-counted mode the retract/M5/park/M0 are all tiny and would batch
+    // into one chunk with the M0.
+    if (state.toolChangePause && isToolChangeLine(next)) {
+      return { queued, inFlight, inFlightBytes, sent, hitToolChange: true };
+    }
+    const bytes = next.length;
+    if (inFlightBytes + bytes > state.rxBufferBytes) break;
+    sent.push(next);
+    inFlight = [...inFlight, { line: next, bytes }];
+    inFlightBytes += bytes;
+    queued = queued.slice(1);
+  }
+  return { queued, inFlight, inFlightBytes, sent, hitToolChange: false };
+}
+
 // Try to send as many queued lines as fit in the remaining buffer. Always
 // safe to call repeatedly; returns toSend = '' when nothing changed.
 export function step(state: StreamerState): StepResult {
-  if (state.status === 'paused' || isTerminal(state.status)) {
+  if (state.status === 'paused' || state.status === 'tool-change' || isTerminal(state.status)) {
     return { state, toSend: '' };
   }
   if (state.streamingMode === 'ping-pong' && state.inFlight.length > 0) {
     return { state, toSend: '' };
   }
-  let queued = state.queued;
-  let inFlight = state.inFlight;
-  let inFlightBytes = state.inFlightBytes;
-  const sentChunks: string[] = [];
-  while (queued.length > 0) {
-    if (state.streamingMode === 'ping-pong' && sentChunks.length > 0) break;
-    const next = queued[0];
-    if (next === undefined) break;
-    const bytes = next.length;
-    if (inFlightBytes + bytes > state.rxBufferBytes) break;
-    sentChunks.push(next);
-    inFlight = [...inFlight, { line: next, bytes }];
-    inFlightBytes += bytes;
-    queued = queued.slice(1);
+  const { queued, inFlight, inFlightBytes, sent, hitToolChange } = fillBuffer(state);
+  const toSend = sent.join('');
+  // Return the tool-change transition explicitly even when nothing was sent
+  // (the M0 was first this call) — otherwise the empty-send guard below would
+  // drop the transition and re-return the un-held original state.
+  if (hitToolChange) {
+    return { state: { ...state, status: 'tool-change', queued, inFlight, inFlightBytes }, toSend };
   }
-  if (sentChunks.length === 0) return { state, toSend: '' };
+  if (sent.length === 0) return { state, toSend: '' };
   return {
-    state: {
-      ...state,
-      status: 'streaming',
-      queued,
-      inFlight,
-      inFlightBytes,
-    },
-    toSend: sentChunks.join(''),
+    state: { ...state, status: 'streaming', queued, inFlight, inFlightBytes },
+    toSend,
+  };
+}
+
+// Leave a tool-change hold: drop the un-sent M0 from the queue head and count
+// it complete (it is a sendable line, so `total` counted it; never sending it
+// would otherwise strand `completed/total` one short forever), then hand back
+// to step() to resume from the M3/G4 spin-up the emitter placed after the M0.
+export function continueToolChange(state: StreamerState): StreamerState {
+  if (state.status !== 'tool-change') return state;
+  return {
+    ...state,
+    status: 'streaming',
+    queued: state.queued.slice(1),
+    completed: state.completed + 1,
   };
 }
 
@@ -222,7 +289,10 @@ export function onAck(state: StreamerState, kind: AckKind): AckResult {
       ? 'cancelled'
       : kind === 'error'
         ? 'errored'
-        : state.status !== 'paused' && nextInFlight.length === 0 && state.queued.length === 0
+        : state.status !== 'paused' &&
+            state.status !== 'tool-change' &&
+            nextInFlight.length === 0 &&
+            state.queued.length === 0
           ? 'done'
           : state.status;
   return {

@@ -1,9 +1,24 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { createProject } from '../../core/scene';
+import { useStore } from '../state';
+import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { usePreviewToolpath, type PreviewBuildScheduler } from './use-preview-toolpath';
+
+function idleReport(x: number, y: number): StatusReport {
+  return {
+    state: 'Idle',
+    subState: null,
+    mPos: { x, y, z: 0 },
+    wPos: { x, y, z: 0 },
+    feed: 0,
+    spindle: 0,
+    wco: null,
+  };
+}
 
 const previewMocks = vi.hoisted(() => ({
   buildPreviewToolpath: vi.fn(),
@@ -69,6 +84,35 @@ describe('usePreviewToolpath', () => {
 
     expect(previewMocks.buildPreviewToolpath).toHaveBeenCalledOnce();
     expect(probe.current).toBe(builtToolpath);
+  });
+
+  it('does not reschedule a build on a status poll that resolves to the same placement [PRF-02]', async () => {
+    const scheduleBuild = vi.fn((_work: () => void) => () => undefined);
+    act(() => useLaserStore.setState({ statusReport: idleReport(0, 0) }));
+
+    await renderHarness(true, scheduleBuild);
+    expect(scheduleBuild).toHaveBeenCalledTimes(1);
+
+    // A fresh poll stores a new report object with a different position; in the
+    // default 'absolute' mode the resolved placement is unchanged, so the
+    // preview must NOT rebuild (this fired 4x/s before PRF-02).
+    await act(async () => useLaserStore.setState({ statusReport: idleReport(40, 25) }));
+    expect(scheduleBuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('reschedules a build when the head moves in current-position mode [PRF-02]', async () => {
+    const scheduleBuild = vi.fn((_work: () => void) => () => undefined);
+    act(() => {
+      useStore.setState({ jobPlacement: { startFrom: 'current-position', anchor: 'front-left' } });
+      useLaserStore.setState({ statusReport: idleReport(0, 0) });
+    });
+
+    await renderHarness(true, scheduleBuild);
+    const afterMount = scheduleBuild.mock.calls.length;
+
+    // The origin tracks the head, so a moved position is a legitimate rebuild.
+    await act(async () => useLaserStore.setState({ statusReport: idleReport(40, 25) }));
+    expect(scheduleBuild.mock.calls.length).toBeGreaterThan(afterMount);
   });
 
   it('cancels stale scheduled preparation when preview exits', async () => {

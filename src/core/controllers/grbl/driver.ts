@@ -23,7 +23,7 @@ import {
   RT_STATUS,
 } from './commands';
 import { CMD_MODAL_STATE, CMD_OFFSETS, prepareConsoleCommand } from './console-command';
-import { buildGrblFrameJogLines } from './frame-lines';
+import { buildGrblFrameJogLines, buildGrblFrameRetract } from './frame-lines';
 import { classifyResponse } from './response';
 
 /** GRBL's ack-fenced settle marker: a 10 ms dwell whose `ok` proves the
@@ -52,6 +52,7 @@ export const grblDriver: ControllerDriver = {
     firmwareSetupPanel: 'grbl-laser',
     probing: true,
     cncJobs: true,
+    overrides: true,
   },
   realtime: {
     statusQuery: RT_STATUS,
@@ -74,6 +75,7 @@ export const grblDriver: ControllerDriver = {
     clearPersistentOrigin: CMD_CLEAR_PERSISTENT_ORIGIN,
     buildJog: buildJogCommand,
     buildFrameLines: buildGrblFrameJogLines,
+    buildFrameRetract: buildGrblFrameRetract,
   },
   classifyLine: classifyResponse,
   prepareConsoleCommand,

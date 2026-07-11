@@ -138,6 +138,20 @@ describe('Marlin lifecycle against the simulator', () => {
     }
   });
 
+  it('post-job settle uses the Marlin M400 marker, never the GRBL dwell (CTL-02)', async () => {
+    const sim = await connectMarlinIdle();
+    await useLaserStore.getState().startJob('G1 X10 Y0 F600 S100\nM5\n', {
+      streamingMode: 'ping-pong',
+    });
+    await pump(4000);
+    expect(useLaserStore.getState().streamer).toBeNull(); // the post-job settle completed
+    // G4 P0.01 acks instantly on Marlin (G4 P is milliseconds), so the settle
+    // would clear the streamer while buffered motion still runs — M400, which
+    // acks only once motion has drained, is the correct marker (CTL-02).
+    expect(sim.outbound()).toContain('M400\n');
+    expect(sim.outbound()).not.toContain('G4 P0.01\n');
+  });
+
   it('pauses stream-side (no ! byte) and resumes to completion', async () => {
     const sim = await connectMarlinIdle();
     await useLaserStore.getState().startJob(jobLines(40), { streamingMode: 'ping-pong' });
