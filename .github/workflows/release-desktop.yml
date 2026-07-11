@@ -31,7 +31,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Full history so the web bundle's git-derived build badge is real
           # (vite.config.ts appVersion). The installer version comes from the
@@ -41,10 +41,10 @@ jobs:
       - name: Set up pnpm
         # No `with.version` — package.json's packageManager field is the single
         # source of truth (see ci.yml).
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -90,7 +90,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
 
       - name: Upload installer + update feed as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kerfdesk-windows-${{ steps.version.outputs.version }}
           path: |
