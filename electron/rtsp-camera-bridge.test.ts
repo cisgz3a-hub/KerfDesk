@@ -20,6 +20,12 @@ describe('RTSP camera bridge request policy', () => {
     expect(cameraBridgeCorsOrigin('https://laserforge-2fj.pages.dev')).toBe(
       'https://laserforge-2fj.pages.dev',
     );
+    // ELE-02/R3: the allowlist is ORIGIN-exact, not host-based. An explicit
+    // non-default port or the wrong scheme is NOT the canonical production
+    // origin, so it is refused (url.hostname would have accepted the port).
+    expect(cameraBridgeCorsOrigin('https://kerfdesk.com:444')).toBeNull();
+    expect(cameraBridgeCorsOrigin('https://laserforge-2fj.pages.dev:8443')).toBeNull();
+    expect(cameraBridgeCorsOrigin('http://kerfdesk.com')).toBeNull();
     // ELE-02: a per-PR/branch Pages preview is NOT trusted — the old wildcard let
     // every *.pages.dev preview the operator visited drive the loopback bridge.
     // Only the exact production origins are trusted now.
@@ -35,6 +41,7 @@ describe('RTSP camera bridge request policy', () => {
     expect(isAllowedBridgeOrigin('app://app')).toBe(true);
     expect(isAllowedBridgeOrigin('https://kerfdesk.com')).toBe(true);
     expect(isAllowedBridgeOrigin('https://evil.example')).toBe(false); // drive-by page — refused
+    expect(isAllowedBridgeOrigin('https://kerfdesk.com:444')).toBe(false); // non-canonical port (R3)
   });
 
   it('treats only successful RTSP DESCRIBE replies as reachable', () => {

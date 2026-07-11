@@ -6298,6 +6298,13 @@ Two independent tightenings of ADR-121's origin/target policy:
 
 A preview-build deploy can no longer reach a locally-running bridge (intended â€” previews are for UI review, not hardware). A local test camera bound to loopback can no longer be proxied; real cameras (RFC1918) are unaffected. The residual timing/error oracle across the egress guard's allowed RFC1918 range remains â€” a per-session bridge token replacing Origin-header trust is the next step if the maintainer wants it, deferred to its own ticket. Behavior-only change; no G-code or core impact. The deliberate `camera-frame-proxy-policy.test.ts` expectation that loopback-on-another-port was `ok` is flipped to `invalid`.
 
+### Amendment â€” origin-exact allowlist + residual hosted-origin threat (2026-07-11, R3)
+
+Codex re-audit R3 split into a fixable bug and a documented residual:
+
+- **Fixed (R3):** `isTrustedHostedAppOrigin` compared `url.hostname`, which discards the port, so `https://kerfdesk.com:444` was accepted despite the "exact production origins" intent. It now compares `url.origin` against a set of full origins (`https://kerfdesk.com`, `https://laserforge-2fj.pages.dev`), so a non-default port or a wrong scheme no longer matches. Test-first in `rtsp-camera-bridge.test.ts`.
+- **Residual (accepted by design, NOT closed):** hosted-origin access to the loopback bridge is deliberate â€” ADR-121 makes the deployed site a supported bridge client so production CSP does not block camera probing. Therefore a compromise or XSS of an EXACT trusted hosted origin (`kerfdesk.com` / `laserforge-2fj.pages.dev`) can still drive `/discover`, `/probe`, and `/frame.jpg` against the operator's RFC1918/ULA cameras through the loopback bridge. Blocking loopback proxy targets (ADR-132) stops localhost scanning, not RFC1918/ULA discovery. The mitigation is per-session bridge-token auth replacing Origin-header trust; it is a larger change deferred to its own ticket (the maintainer decides whether the deployed-site camera workflow warrants it, or whether hosted access should be dropped). R3 is therefore "port-exactness fixed; hosted-origin access is an accepted, documented residual" â€” not "closed".
+
 ## ADR-133 - The workspace camera overlay honors the alignment basis, matching Trace (2026-07-11)
 
 **Status:** accepted (Codex re-audit R2: the overlay applied a rectified-basis homography to raw pixels â€” a bug, not a design choice).
