@@ -1,5 +1,6 @@
 import { EndType, inflatePathsD, isPositiveD, JoinType, type PathD } from 'clipper2-ts';
 import type { Polyline, Vec2 } from '../scene';
+import { tryVectorOp } from './vector-path-tools';
 
 const OFFSET_PRECISION_DECIMALS = 3;
 const MIN_CLOSED_POINTS = 3;
@@ -13,14 +14,21 @@ export function offsetClosedPolylinesForKerf(
   const paths = polylines.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
   if (paths.length === 0) return [];
   const oriented = orientByContainment(paths);
-  return inflatePathsD(
-    [...oriented],
-    kerfOffsetMm,
-    JoinType.Miter,
-    EndType.Polygon,
-    2,
-    OFFSET_PRECISION_DECIMALS,
-  ).map(pathDToPolyline);
+  // clipper2-ts can throw internally on pathological geometry; catch it at the
+  // boundary so it never escapes the pure core and aborts a compile/generator
+  // run (R6). A failed offset yields no paths — the same empty contract every
+  // caller already handles for "no usable contours".
+  const inflated = tryVectorOp(() =>
+    inflatePathsD(
+      [...oriented],
+      kerfOffsetMm,
+      JoinType.Miter,
+      EndType.Polygon,
+      2,
+      OFFSET_PRECISION_DECIMALS,
+    ),
+  );
+  return inflated.kind === 'error' ? [] : inflated.value.map(pathDToPolyline);
 }
 
 function polylineToPathD(polyline: Polyline): PathD {
