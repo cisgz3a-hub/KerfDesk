@@ -5598,6 +5598,10 @@ dismiss / hidden-while-active. NOT verified: a real crash + resume on
 hardware — CLAIMED in AUDIT.md until the maintainer kills the app
 mid-burn and resumes.
 
+### Amendment â€” schema v2: also store the output scope + job placement (2026-07-11, PST-02)
+
+The original checkpoint stored only the fingerprint + acked counts. But resume re-compiles the project through `prepareStartJob`, whose bytes depend on the output scope (cut-selected-graphics + selection ids) and the job placement â€” and a crash resets BOTH to their defaults. A run that used a non-default scope/placement therefore recompiled to different bytes on resume, failed `fingerprintsEqual`, and dead-ended with a false "it was edited since" refusal exactly when a long selective burn most needed to resume. `JobCheckpoint` now also carries `outputScope` + `jobPlacement`, and `JOB_CHECKPOINT_SCHEMA_VERSION` is bumped 1 â†’ 2 so pre-existing v1 slots (which lack the fields) read as `null` and are discarded (transient â€” the only cost is one stale recovery prompt). `runCheckpointResumeFlow` passes the stored scope/placement into `prepareResume`, reproducing identical bytes; the manual Start-from-line path still uses current app state.
+
 ## ADR-119 — Box designer usability pack: fit test coupon, assembled 3D preview (2026-07-07)
 
 **Status:** accepted.

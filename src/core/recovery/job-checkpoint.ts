@@ -15,8 +15,13 @@
 // Pure core: timestamps are passed in as ISO strings; no clock, no storage.
 
 import { isSendableGcodeLine } from '../controllers/grbl';
+import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobPlacementSettings } from '../job';
+import type { OutputScope } from '../scene';
 
-export const JOB_CHECKPOINT_SCHEMA_VERSION = 1;
+// v2 (PST-02): the checkpoint now also stores the output scope + job placement
+// the run used, so resume recompiles the SAME bytes. v1 slots lack them and are
+// discarded on read (transient — a stale recovery prompt is the only cost).
+export const JOB_CHECKPOINT_SCHEMA_VERSION = 2;
 
 // FNV-1a 32-bit offset basis (public domain reference constant). The FNV
 // prime 0x01000193 appears only as its shift decomposition inside
@@ -49,6 +54,11 @@ export type JobCheckpoint = {
   // corrupt ackedLines with foreign counts.
   readonly resumeInFlight: boolean;
   readonly machineKind: JobMachineKind;
+  // The output scope + placement the run compiled with. Resume MUST recompile
+  // with these, not the (reset-after-crash) live values, or the bytes diverge
+  // and the fingerprint check falsely refuses the resume (PST-02).
+  readonly outputScope: OutputScope;
+  readonly jobPlacement: JobPlacementSettings;
   readonly startedAtIso: string;
   readonly updatedAtIso: string;
 };
@@ -77,6 +87,8 @@ export function countSendableLines(gcode: string): number {
 export function createJobCheckpoint(args: {
   readonly gcode: string;
   readonly machineKind: JobMachineKind;
+  readonly outputScope: OutputScope;
+  readonly jobPlacement: JobPlacementSettings;
   readonly nowIso: string;
 }): JobCheckpoint {
   return {
@@ -86,6 +98,8 @@ export function createJobCheckpoint(args: {
     ackedLines: 0,
     resumeInFlight: false,
     machineKind: args.machineKind,
+    outputScope: args.outputScope,
+    jobPlacement: args.jobPlacement,
     startedAtIso: args.nowIso,
     updatedAtIso: args.nowIso,
   };
@@ -151,12 +165,15 @@ function validatedCheckpointBody(
   const ackedLines = value['ackedLines'];
   const resumeInFlight = value['resumeInFlight'];
   const machineKind = value['machineKind'];
+  const outputScope = parseOutputScope(value['outputScope']);
+  const jobPlacement = parseJobPlacement(value['jobPlacement']);
   const startedAtIso = value['startedAtIso'];
   const updatedAtIso = value['updatedAtIso'];
   if (!isNonNegativeInteger(sendableLines) || sendableLines > fingerprint.lines) return null;
   if (!isNonNegativeInteger(ackedLines) || ackedLines > sendableLines) return null;
   if (typeof resumeInFlight !== 'boolean') return null;
   if (machineKind !== 'laser' && machineKind !== 'cnc') return null;
+  if (outputScope === null || jobPlacement === null) return null;
   if (typeof startedAtIso !== 'string' || typeof updatedAtIso !== 'string') return null;
   return {
     schemaVersion: JOB_CHECKPOINT_SCHEMA_VERSION,
@@ -165,9 +182,53 @@ function validatedCheckpointBody(
     ackedLines,
     resumeInFlight,
     machineKind,
+    outputScope,
+    jobPlacement,
     startedAtIso,
     updatedAtIso,
   };
+}
+
+function parseOutputScope(value: unknown): OutputScope | null {
+  if (!isRecord(value)) return null;
+  const cutSelectedGraphics = value['cutSelectedGraphics'];
+  const useSelectionOrigin = value['useSelectionOrigin'];
+  const selectedObjectIds = value['selectedObjectIds'];
+  if (typeof cutSelectedGraphics !== 'boolean' || typeof useSelectionOrigin !== 'boolean') {
+    return null;
+  }
+  if (!isStringArray(selectedObjectIds)) return null;
+  return { cutSelectedGraphics, useSelectionOrigin, selectedObjectIds };
+}
+
+function parseJobPlacement(value: unknown): JobPlacementSettings | null {
+  if (!isRecord(value)) return null;
+  const startFrom = value['startFrom'];
+  const anchor = value['anchor'];
+  if (!isJobStartMode(startFrom) || !isJobOriginAnchor(anchor)) return null;
+  return { startFrom, anchor };
+}
+
+const JOB_START_MODES: ReadonlyArray<JobPlacementSettings['startFrom']> = [
+  'absolute',
+  'current-position',
+  'user-origin',
+  'verified-origin',
+];
+
+function isJobStartMode(value: unknown): value is JobPlacementSettings['startFrom'] {
+  // Widen the literal tuple to string[] purely to test membership of an unknown;
+  // the type guard restores the narrow type on success.
+  return typeof value === 'string' && (JOB_START_MODES as ReadonlyArray<string>).includes(value);
+}
+
+function isJobOriginAnchor(value: unknown): value is JobOriginAnchor {
+  // Same membership-of-unknown widening as isJobStartMode, over the shared list.
+  return typeof value === 'string' && (JOB_ORIGIN_ANCHORS as ReadonlyArray<string>).includes(value);
+}
+
+function isStringArray(value: unknown): value is ReadonlyArray<string> {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

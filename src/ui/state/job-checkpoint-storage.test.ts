@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { createJobCheckpoint } from '../../core/recovery';
+import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
+import { DEFAULT_JOB_PLACEMENT } from '../job-placement';
 import {
   JOB_CHECKPOINT_STORAGE_KEY,
   clearJobCheckpoint,
@@ -8,6 +10,10 @@ import {
 } from './job-checkpoint-storage';
 
 const NOW = '2026-07-07T03:00:00.000Z';
+const SCOPE_PLACEMENT = {
+  outputScope: DEFAULT_OUTPUT_SCOPE,
+  jobPlacement: DEFAULT_JOB_PLACEMENT,
+} as const;
 
 afterEach(() => {
   localStorage.clear();
@@ -15,7 +21,12 @@ afterEach(() => {
 
 describe('job-checkpoint-storage', () => {
   it('round-trips a checkpoint through localStorage', () => {
-    const cp = createJobCheckpoint({ gcode: 'G21\nG90\nM5\n', machineKind: 'laser', nowIso: NOW });
+    const cp = createJobCheckpoint({
+      gcode: 'G21\nG90\nM5\n',
+      machineKind: 'laser',
+      ...SCOPE_PLACEMENT,
+      nowIso: NOW,
+    });
     writeJobCheckpoint(cp);
     expect(readJobCheckpoint()).toEqual(cp);
   });
@@ -32,7 +43,12 @@ describe('job-checkpoint-storage', () => {
 
   it('clears the slot', () => {
     writeJobCheckpoint(
-      createJobCheckpoint({ gcode: 'G21\nM5\n', machineKind: 'cnc', nowIso: NOW }),
+      createJobCheckpoint({
+        gcode: 'G21\nM5\n',
+        machineKind: 'cnc',
+        ...SCOPE_PLACEMENT,
+        nowIso: NOW,
+      }),
     );
     clearJobCheckpoint();
     expect(readJobCheckpoint()).toBeNull();

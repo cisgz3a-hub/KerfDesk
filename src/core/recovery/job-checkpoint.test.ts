@@ -1,6 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { createStreamer } from '../controllers/grbl';
+import type { JobPlacementSettings } from '../job';
+import type { OutputScope } from '../scene';
 import {
   JOB_CHECKPOINT_SCHEMA_VERSION,
   advanceJobCheckpoint,
@@ -31,8 +33,23 @@ const GCODE = [
 const NOW = '2026-07-07T03:00:00.000Z';
 const LATER = '2026-07-07T04:00:00.000Z';
 
+// Deliberately NON-default so a round-trip that drops or resets them is visible
+// (PST-02): the crash-resume bug was recompiling with reset scope/placement.
+const OUTPUT_SCOPE: OutputScope = {
+  cutSelectedGraphics: true,
+  useSelectionOrigin: true,
+  selectedObjectIds: ['obj-a', 'obj-b'],
+};
+const JOB_PLACEMENT: JobPlacementSettings = { startFrom: 'user-origin', anchor: 'center' };
+
 function checkpoint(): ReturnType<typeof createJobCheckpoint> {
-  return createJobCheckpoint({ gcode: GCODE, machineKind: 'laser', nowIso: NOW });
+  return createJobCheckpoint({
+    gcode: GCODE,
+    machineKind: 'laser',
+    outputScope: OUTPUT_SCOPE,
+    jobPlacement: JOB_PLACEMENT,
+    nowIso: NOW,
+  });
 }
 
 describe('fingerprintGcode', () => {
@@ -137,6 +154,31 @@ describe('serialize / parse round-trip', () => {
     expect(parseJobCheckpoint(serializeJobCheckpoint(cp))).toEqual(cp);
   });
 
+  it('round-trips the output scope and job placement the run used (PST-02)', () => {
+    const cp = checkpoint();
+    expect(cp.outputScope).toEqual(OUTPUT_SCOPE);
+    expect(cp.jobPlacement).toEqual(JOB_PLACEMENT);
+    const parsed = parseJobCheckpoint(serializeJobCheckpoint(cp));
+    expect(parsed?.outputScope).toEqual(OUTPUT_SCOPE);
+    expect(parsed?.jobPlacement).toEqual(JOB_PLACEMENT);
+  });
+
+  it('discards a pre-schema-2 checkpoint that predates scope/placement (PST-02)', () => {
+    // A v1 slot lacks outputScope/jobPlacement; resuming from it would recompile
+    // with reset defaults, so the schema bump makes it read as null and be dropped.
+    const v1 = JSON.stringify({
+      schemaVersion: 1,
+      fingerprint: fingerprintGcode(GCODE),
+      sendableLines: 5,
+      ackedLines: 2,
+      resumeInFlight: false,
+      machineKind: 'laser',
+      startedAtIso: NOW,
+      updatedAtIso: NOW,
+    });
+    expect(parseJobCheckpoint(v1)).toBeNull();
+  });
+
   it('rejects malformed payloads', () => {
     const valid = JSON.parse(serializeJobCheckpoint(checkpoint())) as Record<string, unknown>;
     const cases: ReadonlyArray<string> = [
@@ -157,6 +199,28 @@ describe('serialize / parse round-trip', () => {
       JSON.stringify({ ...valid, machineKind: 'toaster' }),
       JSON.stringify({ ...valid, startedAtIso: 5 }),
       JSON.stringify({ ...valid, updatedAtIso: null }),
+      // PST-02 scope/placement strictness.
+      JSON.stringify({ ...valid, outputScope: undefined }),
+      JSON.stringify({ ...valid, outputScope: 'all' }),
+      JSON.stringify({
+        ...valid,
+        outputScope: {
+          cutSelectedGraphics: 'yes',
+          useSelectionOrigin: false,
+          selectedObjectIds: [],
+        },
+      }),
+      JSON.stringify({
+        ...valid,
+        outputScope: {
+          cutSelectedGraphics: false,
+          useSelectionOrigin: false,
+          selectedObjectIds: [1],
+        },
+      }),
+      JSON.stringify({ ...valid, jobPlacement: undefined }),
+      JSON.stringify({ ...valid, jobPlacement: { startFrom: 'nowhere', anchor: 'center' } }),
+      JSON.stringify({ ...valid, jobPlacement: { startFrom: 'user-origin', anchor: 'middle' } }),
     ];
     for (const raw of cases) expect(parseJobCheckpoint(raw)).toBeNull();
   });
