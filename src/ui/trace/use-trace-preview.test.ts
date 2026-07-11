@@ -58,6 +58,22 @@ describe('runTrace stale-result guard (P2-A)', () => {
     );
   });
 
+  it('retains the matching request and trace result for commit reuse', async () => {
+    vi.mocked(traceImageWithFallback).mockResolvedValue(traceResult);
+    const file = new File(['image'], 'logo.png', { type: 'image/png' });
+    const request = { file, options, boundary: null, boundaryMode: 'crop' as const };
+    const setState = vi.fn();
+
+    await runTrace({ img, options, request, isCurrent: () => true, setState });
+
+    expect(setState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'ready',
+        preparedTrace: { request, result: traceResult },
+      }),
+    );
+  });
+
   it('traces only the bounded pixels and offsets preview geometry back into the source image', async () => {
     const boundary: TraceBoundary = { x: 1, y: 0, width: 1, height: 2 };
     vi.mocked(traceImageWithFallback).mockResolvedValue({

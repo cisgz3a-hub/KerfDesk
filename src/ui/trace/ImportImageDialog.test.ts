@@ -21,10 +21,12 @@ vi.mock('./use-trace-worker-client', () => ({
 import { IDENTITY_TRANSFORM, type RasterImage, type SceneObject } from '../../core/scene';
 import { DEFAULT_TRACE_OPTIONS, type TraceBoundary } from '../../core/trace';
 import { commit, sameTraceSource } from './ImportImageDialog';
+import { loadImageAsRawData } from './image-loader';
 import { traceImageWithFallback } from './use-trace-worker-client';
 
 afterEach(() => {
   vi.mocked(traceImageWithFallback).mockClear();
+  vi.mocked(loadImageAsRawData).mockClear();
 });
 
 function seedRaster(over: Partial<RasterImage> = {}): RasterImage {
@@ -96,6 +98,64 @@ describe('sameTraceSource', () => {
 });
 
 describe('commit source revalidation (P2-A)', () => {
+  it('reuses a matching ready preview without decoding or tracing again', async () => {
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    const commitArgs = args(seed);
+    const result = {
+      paths: [{ color: '#000000', polylines: [] }],
+      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+    };
+
+    await commit(
+      {
+        ...commitArgs,
+        preparedTrace: {
+          request: {
+            file: commitArgs.file,
+            options: commitArgs.options,
+            boundary: null,
+            boundaryMode: 'crop',
+          },
+          result,
+        },
+      },
+      ctx,
+    );
+
+    expect(loadImageAsRawData).not.toHaveBeenCalled();
+    expect(traceImageWithFallback).not.toHaveBeenCalled();
+    expect(ctx.traceExistingImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('retraces instead of reusing a preview whose options no longer match', async () => {
+    const seed = seedRaster();
+    const ctx = ctxWith(() => seedRaster());
+    const commitArgs = args(seed);
+
+    await commit(
+      {
+        ...commitArgs,
+        preparedTrace: {
+          request: {
+            file: commitArgs.file,
+            options: { ...commitArgs.options },
+            boundary: null,
+            boundaryMode: 'crop',
+          },
+          result: {
+            paths: [{ color: '#ff0000', polylines: [] }],
+            bounds: { minX: 9, minY: 9, maxX: 9, maxY: 9 },
+          },
+        },
+      },
+      ctx,
+    );
+
+    expect(loadImageAsRawData).toHaveBeenCalledTimes(1);
+    expect(traceImageWithFallback).toHaveBeenCalledTimes(1);
+  });
+
   it('commits when the live source is unchanged', async () => {
     const seed = seedRaster();
     const ctx = ctxWith(() => seedRaster());
