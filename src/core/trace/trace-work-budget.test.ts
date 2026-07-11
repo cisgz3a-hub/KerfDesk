@@ -28,4 +28,19 @@ describe('trace working-pixel budgets', () => {
     expect(fitsTraceWorkingPixelBudget({ width: 1000, height: 1000 }, 2, edge)).toBe(true);
     expect(fitsTraceWorkingPixelBudget({ width: 1001, height: 1000 }, 2, edge)).toBe(false);
   });
+
+  it.each([
+    ['0.5 MP sparse line art', 1000, 500, 3, true],
+    ['0.5 MP over-scaled line art', 1000, 500, 4, false],
+    ['1.9 MP dense ink', 1600, 1200, 2, false],
+    ['5 MP noisy scan at native scale', 2500, 2000, 1, true],
+    ['6 MP cap boundary at native scale', 3000, 2000, 1, true],
+  ] as const)(
+    '%s has an explicit effective-work decision',
+    (_label, width, height, factor, fits) => {
+      expect(fitsTraceWorkingPixelBudget({ width, height }, factor, DEFAULT_TRACE_OPTIONS)).toBe(
+        fits,
+      );
+    },
+  );
 });
