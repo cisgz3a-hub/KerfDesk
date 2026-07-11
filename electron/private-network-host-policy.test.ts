@@ -46,4 +46,15 @@ describe('private network host policy', () => {
     expect(isAllowedPrivateNetworkHost('fc00:zzzz')).toBe(false); // malformed, no throw
     expect(isAllowedPrivateNetworkHost('::')).toBe(false); // unspecified
   });
+
+  it('rejects private-prefixed but structurally malformed IPv6 literals', () => {
+    // First-hextet classification alone would admit these; structural validation
+    // refuses them (self-audit: the exported gate must be robust to raw callers).
+    expect(isAllowedPrivateNetworkHost('fdff:')).toBe(false); // trailing single colon
+    expect(isAllowedPrivateNetworkHost('fe80:')).toBe(false); // trailing single colon
+    expect(isAllowedPrivateNetworkHost('fc00:::::')).toBe(false); // ':::' run
+    expect(isAllowedPrivateNetworkHost('fc00::1::2')).toBe(false); // two '::' elisions
+    expect(isAllowedPrivateNetworkHost('fc00:1:2:3:4:5:6:7:8')).toBe(false); // 9 groups
+    expect(isAllowedPrivateNetworkHost('fc000::1')).toBe(false); // 5-digit group
+  });
 });

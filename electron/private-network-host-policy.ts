@@ -18,19 +18,33 @@ export function isAllowedPrivateNetworkHost(hostname: string): boolean {
 
 // Classify an IPv6 literal by its first hextet: accept fc00::/7 (unique-local,
 // 0xfc00–0xfdff) and fe80::/10 (link-local, 0xfe80–0xfebf), reject everything
-// else. Only hex digits and colons are valid, so a v4-mapped (has '.') or
-// otherwise malformed literal is refused rather than throwing. `::` expansion is
-// irrelevant here — the first hextet is always the substring before the first
-// colon (and an address opening with `::` has an empty, non-matching one).
+// else. The literal is structurally validated first, so private-prefixed garbage
+// like `fdff:` or `fc00:::::` is rejected rather than admitted on its first
+// hextet alone. `::`-opening addresses have an empty first hextet → not private.
 function isAllowedIpv6Host(host: string): boolean {
   const address = host.split('%')[0] ?? ''; // drop any scoped-zone id (fe80::1%eth0)
-  if (!address.includes(':') || !/^[0-9a-f:]+$/.test(address)) return false;
+  if (!isWellFormedIpv6(address)) return false;
   const firstHextet = address.split(':')[0] ?? '';
   if (!/^[0-9a-f]{1,4}$/.test(firstHextet)) return false;
   const value = Number.parseInt(firstHextet, 16);
   const isUniqueLocal = value >= 0xfc00 && value <= 0xfdff;
   const isLinkLocal = value >= 0xfe80 && value <= 0xfebf;
   return isUniqueLocal || isLinkLocal;
+}
+
+// Structural IPv6 check (lowercased, zone-id already stripped): at most one `::`
+// elision, no `:::` run, every group 1–4 hex digits, and the right group count
+// (exactly 8, or ≤7 when `::` elides a zero run). A v4-mapped literal (a group
+// with `.`) fails the per-group hex test, so it is refused, not parsed.
+function isWellFormedIpv6(address: string): boolean {
+  if (!address.includes(':') || address.includes(':::')) return false;
+  if ((address.match(/::/g) ?? []).length > 1) return false;
+  const groups = address.split(':');
+  for (const group of groups) {
+    if (group !== '' && !/^[0-9a-f]{1,4}$/.test(group)) return false;
+  }
+  const realGroups = groups.filter((group) => group !== '').length;
+  return address.includes('::') ? realGroups <= 7 : realGroups === 8;
 }
 
 function isAllowedIpv4Host(host: string): boolean {
