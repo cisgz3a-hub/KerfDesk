@@ -17,6 +17,7 @@ import {
   type CreateStreamerOptions,
 } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
+import { extractToolChangeLabels } from '../../core/output';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
@@ -88,7 +89,18 @@ export function jobActions(
         toolChangePause: options.machineKind === 'cnc',
       });
       const stepped = step(initial);
-      set({ streamer: stepped.state, activeJobMachineKind: options.machineKind ?? 'laser' });
+      // Name the bit at each M0 hold: the labels the CNC emitter wrote as
+      // comments (the streamer strips them), consumed head-first at entry (R5).
+      const labels = options.machineKind === 'cnc' ? extractToolChangeLabels(gcode) : [];
+      // A job whose pre-M0 lines all fit the RX buffer reaches the FIRST hold in
+      // this synchronous step (no ack); later holds enter via advanceStream.
+      const entersHoldNow = stepped.state.status === 'tool-change';
+      set({
+        streamer: stepped.state,
+        activeJobMachineKind: options.machineKind ?? 'laser',
+        toolChangeLabels: entersHoldNow ? labels.slice(1) : labels,
+        pendingToolLabel: entersHoldNow ? (labels[0] ?? null) : null,
+      });
       if (stepped.toSend.length === 0) return;
       try {
         await safeWrite(stepped.toSend, 'start');

@@ -151,6 +151,14 @@ export type LaserState = {
   // cannot unlock while the pre-change retract/park is still moving (Codex audit
   // P1).
   readonly toolChangeIdleSeen: boolean;
+  // The next-bit labels remaining in the current CNC job, in stream order (R5).
+  // Set at Start from the compiled program's tool-change comments; the head is
+  // consumed into pendingToolLabel each time a tool-change hold is entered.
+  readonly toolChangeLabels: ReadonlyArray<string>;
+  // The bit to load at the CURRENT tool-change hold, or null when it is unknown
+  // (single-tool job, imported .nc, resume tail) — the UI names the bit when set
+  // and falls back to a generic prompt when null (R5).
+  readonly pendingToolLabel: string | null;
   /**
    * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
    * the current origin. Set when a frame is dispatched in 'verified-origin'

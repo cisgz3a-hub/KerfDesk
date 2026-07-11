@@ -36,6 +36,8 @@ function makeLaserState(): LaserState {
     workOriginActive: false,
     workZZeroKnown: false,
     toolChangeIdleSeen: false,
+    toolChangeLabels: [],
+    pendingToolLabel: null,
     workOriginSource: 'none',
     frameVerification: null,
     connect: async () => undefined,

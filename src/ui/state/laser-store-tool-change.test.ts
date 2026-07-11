@@ -4,6 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { createProject } from '../../core/scene';
+import { TOOL_CHANGE_LOAD_PREFIX } from '../../core/output';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
 
@@ -58,6 +59,9 @@ const CNC_MULTI_TOOL = [
   'G0 Z5',
   'M5',
   'G0 X0 Y0',
+  // The CNC emitter writes the next bit as a comment before each M0 (R5); the
+  // streamer strips it, so the sender extracts it at Start to name the hold.
+  `${TOOL_CHANGE_LOAD_PREFIX}6.35 mm end mill`,
   'M0',
   'M3 S12000',
   'G1 X2 Y2',
@@ -114,6 +118,25 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     // The M0 is dropped and the emitter's spin-up is fed next.
     expect(writes.join('')).toContain('M3 S12000');
     expect(useLaserStore.getState().streamer?.status).not.toBe('tool-change');
+  });
+
+  it('names the bit at the tool-change hold from the compiled label (R5)', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes));
+    await useLaserStore.getState().startJob(CNC_MULTI_TOOL, { machineKind: 'cnc' });
+
+    expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
+    // The generic "the next bit" prompt is replaced by the real bit identity.
+    expect(useLaserStore.getState().pendingToolLabel).toBe('6.35 mm end mill');
+  });
+
+  it('leaves the tool label null for a laser job M0 (no CNC tool change) (R5)', async () => {
+    const writes: string[] = [];
+    await connectWith(makeConnection(writes));
+    await useLaserStore
+      .getState()
+      .startJob(`${TOOL_CHANGE_LOAD_PREFIX}ignored\nG1 X1 S100\nM0`, { machineKind: 'laser' });
+    expect(useLaserStore.getState().pendingToolLabel).toBeNull();
   });
 
   it('streams a laser job M0 through as an ordinary program stop', async () => {

@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { useLaserStore } from '../state/laser-store';
 import { RunningControls } from './JobRunControls';
 
 async function renderRunningControls(props: {
@@ -23,6 +24,7 @@ let cleanup: (() => Promise<void>) | null = null;
 afterEach(async () => {
   if (cleanup !== null) await cleanup();
   cleanup = null;
+  useLaserStore.setState({ pendingToolLabel: null });
 });
 
 describe('RunningControls tool-change (CNC-04)', () => {
@@ -43,6 +45,22 @@ describe('RunningControls tool-change (CNC-04)', () => {
     // Pause/Resume belong to streaming/paused, not a tool-change hold.
     expect(host.textContent).not.toContain('Pause');
     expect(host.textContent).not.toContain('Resume');
+  });
+
+  it('names the bit in the prompt when the compiled label is known (R5)', async () => {
+    useLaserStore.setState({ pendingToolLabel: '6.35 mm end mill' });
+    const { host, root } = await renderRunningControls({
+      isStreaming: false,
+      isPaused: false,
+      isToolChange: true,
+    });
+    cleanup = async () => {
+      await act(async () => root.unmount());
+      host.remove();
+    };
+
+    expect(host.textContent).toContain('Load 6.35 mm end mill');
+    expect(host.textContent).not.toContain('Load the next bit');
   });
 
   it('does not show Continue for an ordinary streaming job', async () => {

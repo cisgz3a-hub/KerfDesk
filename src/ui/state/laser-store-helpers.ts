@@ -243,6 +243,8 @@ export function initialLaserState(): Pick<
   | 'workOriginSource'
   | 'workZZeroKnown'
   | 'toolChangeIdleSeen'
+  | 'toolChangeLabels'
+  | 'pendingToolLabel'
   | 'frameVerification'
 > {
   return {
@@ -276,6 +278,8 @@ export function initialLaserState(): Pick<
     workOriginSource: 'none',
     workZZeroKnown: false,
     toolChangeIdleSeen: false,
+    toolChangeLabels: [],
+    pendingToolLabel: null,
     frameVerification: null,
   };
 }

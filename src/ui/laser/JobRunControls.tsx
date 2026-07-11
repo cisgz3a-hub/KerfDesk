@@ -13,8 +13,12 @@ const PAUSE_HOLD_SAFETY_MESSAGE = 'Pause is feed hold only. Use Stop or physical
 const PAUSE_STREAM_SIDE_MESSAGE =
   'Pause stops sending; moves already buffered in the firmware finish first. Use Stop or physical E-stop if unsafe.';
 
-const TOOL_CHANGE_MESSAGE =
-  'Job paused for a tool change. Load the next bit and re-zero Z on the stock top (jog, then Zero Z), then Continue to resume.';
+// Name the bit at the hold when the compiled program identified it (R5); fall
+// back to the generic prompt for a single-tool / imported / resume-tail job.
+function toolChangeMessage(bitLabel: string | null): string {
+  const bit = bitLabel === null ? 'the next bit' : bitLabel;
+  return `Job paused for a tool change. Load ${bit} and re-zero Z on the stock top (jog, then Zero Z), then Continue to resume.`;
+}
 
 export function RunningControls(props: {
   readonly isStreaming: boolean;
@@ -27,8 +31,9 @@ export function RunningControls(props: {
   const stopJob = useLaserStore((s) => s.stopJob);
   const hasRealtimePause = useLaserStore((s) => s.capabilities.realtimePause);
   const hasOverrides = useLaserStore((s) => s.capabilities.overrides);
+  const pendingToolLabel = useLaserStore((s) => s.pendingToolLabel);
   const pauseMessage = hasRealtimePause ? PAUSE_HOLD_SAFETY_MESSAGE : PAUSE_STREAM_SIDE_MESSAGE;
-  const safetyMessage = props.isToolChange ? TOOL_CHANGE_MESSAGE : pauseMessage;
+  const safetyMessage = props.isToolChange ? toolChangeMessage(pendingToolLabel) : pauseMessage;
   return (
     <>
       <div style={rowStyle}>
