@@ -198,9 +198,17 @@ function traceInWorker(
         reject(err);
       },
     });
-    const request: TraceWorkerRequest = { id, image, options };
+    // Keep the decoded source alive for subsequent preview changes, but move a
+    // dedicated copy into the worker. Supplying its buffer as a transferable
+    // avoids the browser making a second structured-clone copy during send.
+    const transferredData = new Uint8ClampedArray(image.data);
+    const request: TraceWorkerRequest = {
+      id,
+      image: { width: image.width, height: image.height, data: transferredData },
+      options,
+    };
     try {
-      worker.postMessage(request);
+      worker.postMessage(request, [transferredData.buffer]);
     } catch (err) {
       rejectAllPendingAndRetireWorker(new Error(traceWorkerSendErrorMessage(err)));
     }
