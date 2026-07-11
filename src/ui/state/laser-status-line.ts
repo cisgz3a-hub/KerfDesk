@@ -85,23 +85,28 @@ export function handleStatusLine(
   // the release and the same Idle-means-motion-stopped reasoning applies.
   const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, state.controllerOperation, report);
   const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
-  // A fresh Idle observed while holding at a tool change, with the pre-M0 tail
-  // drained, means the retract/park motion has stopped — the setup gate and
-  // Continue may unlock (Codex audit P1). Latches; only tool-change entry resets.
-  const toolChangeReadyPatch =
-    report.state === 'Idle' && streamer?.status === 'tool-change' && streamer.inFlight.length === 0
-      ? { toolChangeIdleSeen: true }
-      : {};
 
   set({
     ...statusPositionPatch(report, state.workOriginSource),
     ...operationPatch,
     ...completedStreamerPatch,
-    ...toolChangeReadyPatch,
+    ...freshToolChangeIdlePatch(streamer, report),
   });
   observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)
     dispatchQueuedFrameLine(set, safeWrite, queuedFrameDispatch.line);
+}
+
+// A fresh Idle observed while holding at a tool change, with the pre-M0 tail
+// drained, means the retract/park motion has stopped — the setup gate and
+// Continue may unlock (Codex audit P1). Latches; only tool-change entry resets.
+function freshToolChangeIdlePatch(
+  streamer: StreamerState | null,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'toolChangeIdleSeen'>> {
+  const drainedIdleHold =
+    report.state === 'Idle' && streamer?.status === 'tool-change' && streamer.inFlight.length === 0;
+  return drainedIdleHold ? { toolChangeIdleSeen: true } : {};
 }
 
 // After an alarm or reset the controller has dropped G92; a persistent G54
