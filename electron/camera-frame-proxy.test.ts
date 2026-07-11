@@ -9,6 +9,7 @@ import {
   fetchFrameBytes,
   fetchFrameBytesQueued,
   handleDiscoverRequest,
+  serveHttpFrame,
 } from './camera-frame-proxy';
 import { startLocalRtspCameraBridge, type RtspCameraBridgeHandle } from './rtsp-camera-bridge';
 
@@ -69,18 +70,30 @@ describe('camera frame proxy over the real bridge server', () => {
       `/frame.jpg?url=${encodeURIComponent(`http://127.0.0.1:${upstreamPort}${upstreamPath}`)}`,
     );
 
-  it('proxies a machine-camera JPEG with CORS for a trusted app origin', async () => {
+  it('refuses a loopback camera end-to-end but still sets CORS for a trusted origin (ELE-02)', async () => {
+    // The mock camera is on loopback, which the proxy now refuses outright (a
+    // real machine camera lives on RFC1918); the request never reaches it. CORS
+    // is still set for the trusted app origin, since that runs before the policy.
+    const hitsBefore = upstreamHits;
     const response = await fetch(frameProxyUrl('/frame'), {
       headers: { Origin: TRUSTED_ORIGIN },
     });
+    expect(await response.json()).toMatchObject({ kind: 'invalid' });
+    expect(response.headers.get('access-control-allow-origin')).toBe(TRUSTED_ORIGIN);
+    expect(upstreamHits).toBe(hitsBefore);
+  });
+
+  // serveHttpFrame is the proxy's fetch+serve half, exercised directly against the
+  // loopback mock — it sits BELOW the loopback/origin policy the full path applies.
+  it('serves a proxied JPEG with its content type (serveHttpFrame)', async () => {
+    const response = await serveHttpFrameResponse('/frame');
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/jpeg');
-    expect(response.headers.get('access-control-allow-origin')).toBe(TRUSTED_ORIGIN);
     expect(Buffer.from(await response.arrayBuffer())).toEqual(JPEG_BYTES);
   });
 
   it('defaults the content type from JPEG magic when the camera omits it', async () => {
-    const response = await fetch(frameProxyUrl('/untyped-frame'));
+    const response = await serveHttpFrameResponse('/untyped-frame');
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/jpeg');
   });
@@ -104,18 +117,33 @@ describe('camera frame proxy over the real bridge server', () => {
     expect(upstreamHits).toBe(hitsBefore);
   });
 
-  it('maps camera HTTP errors and non-image bodies to unavailable', async () => {
-    const errorResponse = await fetch(frameProxyUrl('/error'));
+  it('maps camera HTTP errors and non-image bodies to unavailable (serveHttpFrame)', async () => {
+    const errorResponse = await serveHttpFrameResponse('/error');
     expect(errorResponse.status).toBe(502);
     expect(await errorResponse.json()).toMatchObject({ kind: 'unavailable' });
 
-    const htmlResponse = await fetch(frameProxyUrl('/not-a-camera'));
+    const htmlResponse = await serveHttpFrameResponse('/not-a-camera');
     expect(htmlResponse.status).toBe(502);
     expect(await htmlResponse.json()).toMatchObject({
       kind: 'unavailable',
       reason: 'Camera did not return an image.',
     });
   });
+
+  // Drive serveHttpFrame through a throwaway server (NOT the bridge), so the
+  // loopback mock camera is reached without the full path's loopback refusal.
+  async function serveHttpFrameResponse(upstreamPath: string): Promise<Response> {
+    const cameraUrl = `http://127.0.0.1:${upstreamPort}${upstreamPath}`;
+    const server = createServer((_req, res) => {
+      void serveHttpFrame(new URL(cameraUrl), res);
+    });
+    const port = await listenEphemeral(server);
+    try {
+      return await fetch(`http://127.0.0.1:${port}/`);
+    } finally {
+      await closeServer(server);
+    }
+  }
 
   it('reports the frame proxy in /health', async () => {
     const response = await fetch(bridgeUrl('/health'));
