@@ -52,9 +52,16 @@ function bedVsTravel(
 function speedVsMax(project: Project, limits: ControllerSettingsSnapshot): ReadonlyArray<string> {
   if (limits.maxFeed === undefined) return [];
   const topSpeed = maxOutputLayerSpeed(project);
-  if (topSpeed === null || topSpeed <= limits.maxFeed) return [];
+  if (topSpeed === null) return [];
+  // Compare what the emitter actually WRITES — min(layer speed, profile maxFeed)
+  // (compile-job.ts) — against the controller's reported rate. Attributing the
+  // clamp to the controller is only correct once the app's own profile clamp has
+  // been applied; otherwise a profile-capped speed would falsely blame the
+  // controller (self-audit of DEV-06).
+  const emittedFeed = Math.min(topSpeed, project.device.maxFeed);
+  if (emittedFeed <= limits.maxFeed) return [];
   return [
-    `A layer's speed ${topSpeed} mm/min is above the machine's reported max rate ` +
+    `A layer's feed ${emittedFeed} mm/min is above the machine's reported max rate ` +
       `${limits.maxFeed} mm/min — the controller clamps to its limit, so the job ` +
       'runs slower than planned.',
   ];

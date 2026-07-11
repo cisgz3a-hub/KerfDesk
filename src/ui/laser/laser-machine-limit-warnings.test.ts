@@ -9,10 +9,13 @@ import {
 } from '../../core/scene';
 import { detectLaserMachineLimitWarnings } from './laser-machine-limit-warnings';
 
-// Default laser device bed is 400 × 400 mm (device-profile.ts).
+// Default laser device bed is 400 × 400 mm (device-profile.ts). maxFeed defaults
+// high so the emitted feed isn't profile-clamped below the controller rate in
+// the speed tests (the stale-profile band DEV-06 targets).
 function laserProject(args: {
   readonly bedWidth?: number;
   readonly bedHeight?: number;
+  readonly maxFeed?: number;
   readonly speed?: number;
   readonly output?: boolean;
 }): Project {
@@ -28,6 +31,7 @@ function laserProject(args: {
       ...base.device,
       ...(args.bedWidth === undefined ? {} : { bedWidth: args.bedWidth }),
       ...(args.bedHeight === undefined ? {} : { bedHeight: args.bedHeight }),
+      ...(args.maxFeed === undefined ? {} : { maxFeed: args.maxFeed }),
     },
     scene: { objects: [], layers: [layer] },
   };
@@ -56,18 +60,31 @@ describe('detectLaserMachineLimitWarnings (DEV-06)', () => {
     expect(detectLaserMachineLimitWarnings(laserProject({ bedWidth: 400 }), REPORTED)).toEqual([]);
   });
 
-  it('warns when the fastest output-layer speed exceeds the reported max rate', () => {
+  it('warns when the emitted feed (profile not clamping) exceeds the reported max rate', () => {
+    // Stale profile: device maxFeed 10000 > reported 6000, so the emitted feed is
+    // the layer's 8000 and the controller really does clamp it.
     const warnings = detectLaserMachineLimitWarnings(
-      laserProject({ speed: 8000, output: true }),
+      laserProject({ maxFeed: 10000, speed: 8000, output: true }),
       REPORTED,
     );
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toMatch(/speed 8000 mm\/min is above the machine's reported max rate/);
+    expect(warnings[0]).toMatch(/feed 8000 mm\/min is above the machine's reported max rate/);
+  });
+
+  it('does not warn when the profile maxFeed already clamps below the reported rate', () => {
+    // device maxFeed 5000 ≤ reported 6000: the app clamps the emitted feed to
+    // 5000, the controller never clamps, so blaming the controller would be wrong.
+    expect(
+      detectLaserMachineLimitWarnings(laserProject({ maxFeed: 5000, speed: 8000 }), REPORTED),
+    ).toEqual([]);
   });
 
   it('ignores the speed of layers with output off', () => {
     expect(
-      detectLaserMachineLimitWarnings(laserProject({ speed: 8000, output: false }), REPORTED),
+      detectLaserMachineLimitWarnings(
+        laserProject({ maxFeed: 10000, speed: 8000, output: false }),
+        REPORTED,
+      ),
     ).toEqual([]);
   });
 });
