@@ -88,8 +88,14 @@ export function flattenStraightRuns(
   closed: boolean,
   corners: ReadonlySet<Vec2>,
   strength = 1,
+  pixelScale = 1,
 ): Vec2[] {
-  const maxDeviationPx = BASE_MAX_DEVIATION_PX * Math.max(0, strength);
+  // The amplitude budget is denominated in chain pixels; on a supersampled
+  // trace it scales with pixelScale so the REAL-space flattening semantics
+  // match the 1x tuning (an unscaled 1px cap at 2x is 0.5px real — boundary
+  // nicks the flattener used to erase survive, the H-crossbar defect).
+  const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
+  const maxDeviationPx = BASE_MAX_DEVIATION_PX * Math.max(0, strength) * scale;
   if (points.length < 4 || maxDeviationPx < MIN_ACTIVE_DEVIATION_PX) return [...points];
   const ring = closed ? rotateToFarthest(points) : [...points];
   // OPEN chain endpoints are pinned like corners (they are real geometry).
@@ -104,9 +110,9 @@ export function flattenStraightRuns(
     pinned.add(ring[0] as Vec2);
     pinned.add(ring[ring.length - 1] as Vec2);
   }
-  const runs = collectWobbleRuns(ring, corners, maxDeviationPx);
+  const runs = collectWobbleRuns(ring, corners, maxDeviationPx, scale);
   const out = emitWithFittedRuns(ring, runs, pinned);
-  return closed ? mergeRingSeam(out, corners) : out;
+  return closed ? mergeRingSeam(out, corners, scale) : out;
 }
 
 // Restore the no-repeated-first-point ring convention: the rotated ring
@@ -116,7 +122,7 @@ export function flattenStraightRuns(
 // midpoint (never moving a corner object).
 const SEAM_MERGE_PX = 1.0;
 
-function mergeRingSeam(out: Vec2[], corners: ReadonlySet<Vec2>): Vec2[] {
+function mergeRingSeam(out: Vec2[], corners: ReadonlySet<Vec2>, scale: number): Vec2[] {
   if (out.length < 2) return out;
   const first = out[0] as Vec2;
   const last = out[out.length - 1] as Vec2;
@@ -125,7 +131,7 @@ function mergeRingSeam(out: Vec2[], corners: ReadonlySet<Vec2>): Vec2[] {
     return out;
   }
   const gap = Math.hypot(last.x - first.x, last.y - first.y);
-  if (gap < SEAM_MERGE_PX && !corners.has(first) && !corners.has(last)) {
+  if (gap < SEAM_MERGE_PX * scale && !corners.has(first) && !corners.has(last)) {
     out[0] = { x: (first.x + last.x) / 2, y: (first.y + last.y) / 2 };
     out.pop();
   }
@@ -145,11 +151,12 @@ function collectWobbleRuns(
   ring: ReadonlyArray<Vec2>,
   corners: ReadonlySet<Vec2>,
   maxDeviationPx: number,
+  scale: number,
 ): WobbleRun[] {
   const runs: WobbleRun[] = [];
   let i = 0;
   while (i < ring.length - 1) {
-    const j = longestFlattenableRunEnd(ring, i, corners, maxDeviationPx);
+    const j = longestFlattenableRunEnd(ring, i, corners, maxDeviationPx, scale);
     if (j > i + 1) {
       runs.push({ start: i, end: j, line: fitLineThroughRun(ring, i, j) });
       i = j;
@@ -170,16 +177,19 @@ function longestFlattenableRunEnd(
   start: number,
   corners: ReadonlySet<Vec2>,
   maxDeviationPx: number,
+  scale: number,
 ): number {
   let best = start;
   for (let end = start + 2; end < ring.length; end += 1) {
     const interior = ring[end - 1] as Vec2;
     if (corners.has(interior)) break;
-    const shape = classifyRun(ring, start, end, maxDeviationPx);
+    const shape = classifyRun(ring, start, end, maxDeviationPx, scale);
     if (shape === 'too-bumpy') break;
     if (shape !== 'flatten') continue;
     if (end - start + 1 < MIN_RUN_POINTS) continue;
-    if (chordLength(ring[start] as Vec2, ring[end] as Vec2) >= MIN_RUN_LENGTH_PX) best = end;
+    if (chordLength(ring[start] as Vec2, ring[end] as Vec2) >= MIN_RUN_LENGTH_PX * scale) {
+      best = end;
+    }
   }
   return best;
 }
@@ -189,6 +199,7 @@ function classifyRun(
   start: number,
   end: number,
   maxDeviationPx: number,
+  scale: number,
 ): 'too-bumpy' | 'arc' | 'flatten' {
   const line = fitLineThroughRun(ring, start, end);
   const stats = runFrameStats(ring, start, end, line, maxDeviationPx);
@@ -200,26 +211,33 @@ function classifyRun(
   if (stats.maxAbsResidual > maxDeviationPx * HARD_BREAK_FACTOR) return 'too-bumpy';
   if (stats.overCapCount > Math.max(1, Math.ceil(n * OUTLIER_FRACTION))) return 'too-bumpy';
   const lineRms = Math.sqrt(stats.residualSumSq / n);
-  if (lineRms <= FLAT_LINE_SLACK_PX) return 'flatten';
-  if (chordMinoritySideShare(ring, start, end) < MIN_SIDE_BALANCE) return 'arc';
+  if (lineRms <= FLAT_LINE_SLACK_PX * scale) return 'flatten';
+  if (chordMinoritySideShare(ring, start, end, scale) < MIN_SIDE_BALANCE) return 'arc';
   // A degenerate quadratic system cannot masquerade as an arc: fall back to
   // the line RMS so the comparison is a wash and the amplitude gates decide.
   const quadRms = quadraticFitFromStats(stats, n)?.rms ?? lineRms;
-  return lineRms <= quadRms * LINE_VS_ARC_TOLERANCE + FLAT_LINE_SLACK_PX ? 'flatten' : 'arc';
+  return lineRms <= quadRms * LINE_VS_ARC_TOLERANCE + FLAT_LINE_SLACK_PX * scale
+    ? 'flatten'
+    : 'arc';
 }
 
 // Share of the significant chord deviations sitting on the minority side.
 // Noise splits roughly evenly; an arc's bow is nearly all one side. Runs
 // with no significant deviation at all read as balanced (clean straight).
-function chordMinoritySideShare(ring: ReadonlyArray<Vec2>, start: number, end: number): number {
+function chordMinoritySideShare(
+  ring: ReadonlyArray<Vec2>,
+  start: number,
+  end: number,
+  scale: number,
+): number {
   const a = ring[start] as Vec2;
   const b = ring[end] as Vec2;
   let positive = 0;
   let negative = 0;
   for (let k = start + 1; k < end; k += 1) {
     const d = signedPerpendicularDistance(ring[k] as Vec2, a, b);
-    if (d >= MIN_OSCILLATION_PX) positive += 1;
-    else if (d <= -MIN_OSCILLATION_PX) negative += 1;
+    if (d >= MIN_OSCILLATION_PX * scale) positive += 1;
+    else if (d <= -MIN_OSCILLATION_PX * scale) negative += 1;
   }
   const total = positive + negative;
   if (total === 0) return 0.5;

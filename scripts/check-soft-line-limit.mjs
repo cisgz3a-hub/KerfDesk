@@ -4,7 +4,7 @@ import { extname, join, relative } from 'node:path';
 // The 250 "soft" file-size tier from CLAUDE.md's size table and ADR-015 cannot be
 // an ESLint warning: ESLint keys rules by name, so a second `max-lines` entry
 // REPLACES the error/400 one (last-wins) instead of stacking — you cannot have
-// warn/250 AND error/400 on the built-in rule at once (ADR-131). This report-only
+// warn/250 AND error/400 on the built-in rule at once (ADR-132). This report-only
 // script surfaces the soft tier instead: it lists files over the soft limit and
 // ALWAYS exits 0, so it never blocks. Counting mirrors ESLint's `max-lines` with
 // skipBlankLines + skipComments — blank and comment-only lines do not count — via
@@ -157,7 +157,7 @@ oversized.sort((a, b) => b.lines - a.lines || a.path.localeCompare(b.path));
 
 const header =
   oversized.length > 0
-    ? `${oversized.length} file(s) over the ${SOFT_LIMIT} counted-line soft limit (report-only, ADR-015/ADR-131):`
+    ? `${oversized.length} file(s) over the ${SOFT_LIMIT} counted-line soft limit (report-only, ADR-015/ADR-132):`
     : `All files are within the ${SOFT_LIMIT} counted-line soft limit.`;
 console.log(header);
 for (const { path, lines } of oversized) {

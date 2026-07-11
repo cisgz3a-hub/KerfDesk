@@ -38,7 +38,7 @@ jobs:
     if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # M33 (AUDIT-2026-06-10): for workflow_run events GITHUB_SHA is the
           # default branch's CURRENT tip, not the commit whose CI succeeded —
@@ -56,10 +56,10 @@ jobs:
       - name: Set up pnpm
         # See ci.yml for why no `with.version` — package.json's
         # packageManager field is the single source of truth.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Node 22 LTS — see ci.yml comment. pnpm 11.3.0 needs ≥22.13.
           node-version: 22
@@ -73,10 +73,11 @@ jobs:
 
       - name: Publish to Cloudflare Pages
         # cloudflare/wrangler-action is the official Cloudflare action.
-        # We pin to v3 (current stable) — major bumps would change auth
-        # input names. The `command` is the standard `wrangler pages
+        # v4 installs Wrangler CLI v4 by default (matches this repo's
+        # wrangler ^4.100.0); the apiToken/accountId/command inputs are
+        # unchanged from v3. The `command` is the standard `wrangler pages
         # deploy` invocation; the action handles auth via the env vars.
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

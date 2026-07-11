@@ -21,9 +21,9 @@
 import { clamp } from '../math';
 import type { ColoredPath } from '../scene';
 import { contourPolylinesFromMask, flattenStrengthFromSmoothness } from './contour-trace';
-import { localContrastInkBitmap } from './local-contrast-mask';
+import { localContrastCrackField, localContrastInkBitmap } from './local-contrast-mask';
 import { impulseNoiseRatio, IMPULSE_NOISE_MIN_RATIO, medianFilter } from './preprocess';
-import type { RawImageData, TraceOptions } from './trace-image';
+import { effectivePixelScale, type RawImageData, type TraceOptions } from './trace-image';
 
 const EDGE_COLOR = '#000000';
 const DEFAULT_EDGE_MIN_LENGTH_PX = 3;
@@ -55,10 +55,20 @@ const RADIUS_MAX_PX = 32;
 
 export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions): ColoredPath[] {
   const source = medianForEdges(image, options.edgeMedianFilter);
-  const bitmap = localContrastInkBitmap(source, {
-    radiusPx: maskRadiusPx(options),
+  // Pixel-denominated knobs keep SOURCE-pixel semantics on a supersampled
+  // trace (same discipline as the filled-contour lane): the local-mean
+  // radius and simplify ε scale by pixelScale, areas by its square. delta is
+  // a luma contrast, scale-free.
+  const scale = effectivePixelScale(options);
+  const maskOptions = {
+    radiusPx: maskRadiusPx(options) * scale,
     delta: maskDelta(options),
-  });
+  };
+  const bitmap = localContrastInkBitmap(source, maskOptions);
+  // The same measured-boundary stack as the filled lane: the mask's iso-line
+  // field gives sub-pixel vertex positions, which in turn lets the wobble
+  // stages stand down and the fairing-by-fitting tail engage per loop.
+  const crackField = localContrastCrackField(source, maskOptions);
   const polylines = contourPolylinesFromMask(
     { width: bitmap.width, height: bitmap.height, ink: bitmap.data },
     {
@@ -66,10 +76,15 @@ export function traceImageToEdgePaths(image: RawImageData, options: TraceOptions
       // speckle gate: loops below this area (px²) are dropped — the same
       // numeric mapping the previous geometry stage used for its
       // area-based suppression.
-      minAreaPx: Math.max(2, Math.round(options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX)),
-      epsilonPx: EDGE_SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1),
+      minAreaPx:
+        Math.max(2, Math.round(options.edgeMinLengthPx ?? DEFAULT_EDGE_MIN_LENGTH_PX)) *
+        scale *
+        scale,
+      epsilonPx: EDGE_SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale,
       // Same Smoothness → flatten-strength ramp as the contour lane.
       flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
+      pixelScale: scale,
+      crackField,
     },
   );
   return polylines.length === 0 ? [] : [{ color: EDGE_COLOR, polylines }];

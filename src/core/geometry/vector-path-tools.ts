@@ -16,7 +16,7 @@ export type VectorSceneObject = Extract<
   { readonly paths: ReadonlyArray<ColoredPath> }
 >;
 
-// Weld / boolean / offset / dogbone ops return a canonical Result (ADR-130)
+// Weld / boolean / offset / dogbone ops return a canonical Result (ADR-131)
 // instead of throwing: pure core must not throw for control flow (CLAUDE.md).
 // The typed failure names the mode; its user-worded message is what the store
 // surfaces as a toast for the reachable cases menu-gating can't pre-detect
@@ -31,7 +31,7 @@ export type VectorOpError = {
     | 'bad-distance'
     | 'mixed-metadata'
     // The clipper2-ts engine threw on pathological/degenerate geometry. Before
-    // ADR-130 the store's try/catch swallowed this; now the op catches the
+    // ADR-131 the store's try/catch swallowed this; now the op catches the
     // third-party throw at the boundary and surfaces it as a Result so an
     // unexpected clipper failure toasts instead of escaping uncaught (self-audit
     // finding of the ARC-02 conversion).

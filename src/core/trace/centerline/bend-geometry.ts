@@ -249,6 +249,57 @@ export function vertexHugsChain(
   return nearest >= MIN_VERTEX_GAIN_PX && nearest <= maxOffsetPx;
 }
 
+// Ink-support gate for rebuilt apexes. The rebuilt corner claims "the drawn
+// shape runs straight to this apex" — so ink must ACCOMPANY the leg all the
+// way there. A genuine needle tip sub-pixel-thins only in its last ~1px
+// (binarization drops the very tip), so its inkless run from the apex is
+// tiny; a FABRICATED intersection extended past a blunt serif terminal has
+// several inkless px on BOTH legs (the Arch House serif-spike defect,
+// maintainer canvas screenshot 2026-07-10).
+const APEX_INK_NEAR_PX = 1.5;
+const APEX_MAX_INKLESS_RUN_PX = 1.6;
+const APEX_WALK_STEP_PX = 0.5;
+
+/** True when, walking from the apex back toward the leg, drawn ink appears
+ *  within APEX_MAX_INKLESS_RUN_PX. distSq is the squared distance-to-
+ *  background field: > 0 marks ink. */
+export function apexSupportedByInk(
+  legPoint: Vec2,
+  apex: Vec2,
+  distSq: Float64Array,
+  width: number,
+): boolean {
+  const length = Math.hypot(legPoint.x - apex.x, legPoint.y - apex.y);
+  if (length <= APEX_WALK_STEP_PX) return true; // apex effectively on the chain
+  for (let walked = 0; walked <= APEX_MAX_INKLESS_RUN_PX + APEX_WALK_STEP_PX; ) {
+    const t = Math.min(1, walked / length);
+    const sample = {
+      x: apex.x + (legPoint.x - apex.x) * t,
+      y: apex.y + (legPoint.y - apex.y) * t,
+    };
+    if (inkNear(sample, distSq, width)) return walked <= APEX_MAX_INKLESS_RUN_PX;
+    if (t >= 1) return false;
+    walked += APEX_WALK_STEP_PX;
+  }
+  return false;
+}
+
+function inkNear(point: Vec2, distSq: Float64Array, width: number): boolean {
+  const height = Math.floor(distSq.length / width);
+  const cx = Math.round(point.x);
+  const cy = Math.round(point.y);
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      const px = cx + dx;
+      const py = cy + dy;
+      if (px < 0 || py < 0 || px >= width || py >= height) continue;
+      if (Math.hypot(px - point.x, py - point.y) > APEX_INK_NEAR_PX) continue;
+      if ((distSq[py * width + px] ?? 0) > 0) return true;
+    }
+  }
+  return false;
+}
+
 // The far end of a tangent chord: walk from the head's last point (or the
 // tail's first) until TANGENT_CHORD_PX of arc length is behind the anchor.
 function chordAnchor(points: ReadonlyArray<Vec2>, from: 'head' | 'tail'): Vec2 | undefined {

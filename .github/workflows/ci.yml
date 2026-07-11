@@ -19,18 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up pnpm
-        # No `with.version` — pnpm/action-setup@v4 rejects when both
+        # No `with.version` — pnpm/action-setup@v6 rejects when both
         # the action input AND package.json's `packageManager` field
         # are set. We pin via packageManager: "pnpm@11.3.0" in
         # package.json (npm-standard, more specific). The action
         # reads it automatically.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           # Node 22 LTS — required by pnpm 11.3.0 (which uses node:sqlite,
           # added in Node 22.5). Bumped from 20 after pnpm/action-setup@v4

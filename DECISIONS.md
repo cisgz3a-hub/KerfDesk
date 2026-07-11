@@ -6189,11 +6189,88 @@ Consequences.
   wrong calibration silently distorts the burn and no automated test can catch
   it. Ships CLAIMED until a maintainer rotary bench pass.
 
-## ADR-128 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
+## ADR-128 — Measured-boundary trace pipeline: sub-pixel extraction, supersampling, and fair-then-fit finishing
+
+Context. ADR-123 replaced the potrace-derived backend with the in-house contour
+finisher (mid-crack boundary walk -> Taubin pre-smooth -> corner rebuild ->
+curvature evening -> straight-run flattening -> spline resample). Measured
+against a maintainer reference pair (an idealized outline drawing + a filled
+redraw of the Arch House logo), that finisher still produced wobbly stems, serif
+spikes/melt, ~1px scallops on organic curves, and sawtooth on the long
+hand-drawn strokes. Root analysis (three research briefs + a perceptual loop
+harness): those smoothing stages existed to repair QUANTIZATION noise from
+binarize-then-walk, and each stage fought the staircase the previous one left.
+The frontier is fidelity vs a professional-artist look: fair curves + regular
+typography.
+
+Decision. Move the contour lane (and the edge lane, which shares the finisher)
+to a MEASURED-boundary pipeline with a fair-then-fit finish:
+
+1. Sub-pixel boundary extraction. The mid-crack walker interpolates the
+   pre-threshold grayscale iso-line at each crack (marching-squares style)
+   instead of quantizing to lattice midpoints. Loop TOPOLOGY stays on the
+   cleaned binary mask; vertex POSITIONS come from the anti-aliasing ramp
+   (~0.1px vs ~0.7px). A CrackSubPixelField {lumaAt, thresholdAt} exposes the
+   iso per branch (global/Otsu = constant; local-contrast/sketch =
+   position-dependent). Saturated binary steps carry no sub-pixel information
+   and stay at the midpoint.
+
+2. 2x quality supersample. The binary-contour and edge presets trace at 2x
+   (mkbitmap's recipe) so 1-2px features (hooked apex tips, thin subtitle
+   strokes) binarize with double resolution. An INTERNAL pixelScale option
+   scales EVERY pixel-denominated constant (despeckle/pinhole/min-area areas by
+   s^2; simplify epsilon, window and run lengths, local-mean radius by s) so the
+   1x tuning holds. Sharp opts out: bilinear supersampling would anti-alias the
+   pixel notches it exists to preserve.
+
+3. Wobble stages stand down on measured loops. When most cracks interpolated
+   (the boundary is a MEASUREMENT), the quantization-noise stages (chord
+   flattener, arc-noise evening) are net harmful -- they fabricate joint steps
+   on measured stems. They disable per loop; binary/pixel sources keep the full
+   legacy behaviour, protected by the straightness/roundness instruments.
+
+4. Fair-then-fit finish. Measured loops end in least-squares cubic Bezier
+   fitting (Schneider's published Graphics Gems method: chord parameterization,
+   tangent-constrained LS, Newton reparameterization, corner split) -- on
+   low-noise measured data the fit IS the fairing. Large hand-drawn (organic)
+   loops are first Whittaker-Henderson penalized-smoothed (fair-chain.ts:
+   minimize ||y-x||^2 + lambda*||D2 x||^2, one banded LDL^T solve per
+   corner-delimited segment, lambda derived from a frequency cutoff at 2x the
+   ink-texture wavelength), THEN fit tight -- because max-error split-fitting
+   alone can never stop chasing texture (established over three iterations).
+   Corners are hard boundaries: persistence-gated for organic loops
+   (turn survives at two window widths), evidence-backed for glyphs.
+
+Scope. Line Art, Smooth, and Edge Detection get the full measured-boundary
+stack; Sharp stays 1x pixel-pure; Centerline (the skeleton lane) is untouched.
+Engine + perceptual harness only -- no changes to the trace dialog or public
+option surface beyond the internal preset flags.
+
+Consequences.
+- Provenance stays clean-room: standard published math (marching squares,
+  Schneider fitting, Whittaker-Henderson smoothing, scale-space corner
+  persistence). No GPL code was read or ported (potrace, libspiro, autotrace,
+  cornucopia-lib all avoided; only the imagetracerjs dependency remains, for the
+  legacy multi-colour path).
+- Fidelity vs fairness: input-mask IoU DROPS slightly on textured art BY DESIGN
+  -- the reference style prefers fair lines over faithfully-traced ink
+  roughness, and IoU/chamfer are blind to fairness. Verification is the
+  perceptual loop harness (arch-house-reference-loop, env-gated) plus a
+  resolution-aware apex-fidelity invariant and fair-chain / fit-cubics
+  frequency-response unit tests.
+- Cost: Line Art / Smooth / Edge trace rises from ~0.6s to ~2-3.5s on a 1024^2
+  logo (2x supersample + fitting). Acceptable at import time; a "High quality"
+  toggle to reclaim 1x speed is a possible follow-up.
+- Karpathy discipline: every iteration was gated on rendered vector-resolution
+  crops, not green tests. Perceptually verified against the reference on
+  letters, serifs, arch bands, waves and roof lines; NOT verified on physical
+  laser output (this changes trace geometry only, no G-code semantics).
+
+## ADR-129 - Enforce no-go/keep-out zones on app-initiated jog and click-to-position motion (2026-07-10)
 
 **Status:** accepted (audit DEV-04: no-go zones gated Start/Frame/export/resume, but jog was zone-blind end to end).
 
-> **Numbering note.** ADR-127 (rotary axis engine, merged from main via #48) was the last used; **ADR-128** is the next free.
+> **Numbering note.** ADR-128 (measured-boundary trace pipeline, merged from main) was the last used; **ADR-129** is the next free.
 
 ### Context
 
@@ -6211,11 +6288,11 @@ The check is skipped (motion allowed) when there is no known machine position fo
 
 A jog that would cross a keep-out is refused before any byte is sent, closing the gap between jogging and the job/frame/export paths. Pure core stays pure (returns the zone or null, no throw for control flow). No G-code or snapshot change. NOT hardware-verified - the geometry and the refusal are unit- and integration-tested (core segment cases + a connected-store jog that crosses a clamp sends nothing), but on-machine behavior is CLAIMED.
 
-## ADR-129 - Registration-box provenance: protect a captured board from the jig panel (2026-07-10)
+## ADR-130 - Registration-box provenance: protect a captured board from the jig panel (2026-07-10)
 
 **Status:** accepted (audit CAM-04: the Registration Jig panel could silently unlock/replace a captured board, breaking its physical registration).
 
-> **Numbering note.** ADR-128 (jog no-go zones) was the last used; **ADR-129** is the next free.
+> **Numbering note.** ADR-129 (jog no-go zones) was the last used; **ADR-130** is the next free.
 
 ### Context
 
@@ -6231,11 +6308,11 @@ The jig panel reads the current box provenance: for a captured board it disables
 
 A captured board can no longer be silently unlocked or replaced from the jig panel. The two features keep sharing one box (no second reserved layer), and the tag is additive/optional so nothing else changes. NOT hardware-verified; the guard is unit-tested (io round-trip + a panel render test asserting the disabled controls + warning for a captured board and enabled for a jig box).
 
-## ADR-130 - Canonical Result<T, E> for core control-flow errors (2026-07-11)
+## ADR-131 - Canonical Result<T, E> for core control-flow errors (2026-07-11)
 
 **Status:** accepted (audit ARC-01/ARC-02: core geometry ops throw user-facing strings for expected user input, which CLAUDE.md's "Pure core" section bans; there was no shared type to convert them to, so ~46 files hand-rolled ad-hoc `{ ok }` / `{ kind }` shapes).
 
-> **Numbering note.** ADR-129 (registration-box provenance) was the last used; **ADR-130** is the next free.
+> **Numbering note.** ADR-130 (registration-box provenance) was the last used; **ADR-131** is the next free.
 
 ### Context
 
@@ -6259,11 +6336,11 @@ The `kind` tag matches the house discriminated-union style so `assertNever` clos
 
 Core control-flow errors now have one typed channel a caller must narrow on (`result.kind === 'error'`) rather than a throw a caller may forget to catch. The addition is behavior-neutral (ARC-01 ships no consumers); the behavior change — deleting the throws and the `catch` swallows — lands in ARC-02. The 46 ad-hoc sites converge opportunistically as they are touched; this ADR is the reference they converge to.
 
-## ADR-131 - The 250-line soft tier is a report-only script, not an ESLint warning (2026-07-11)
+## ADR-132 - The 250-line soft tier is a report-only script, not an ESLint warning (2026-07-11)
 
 **Status:** accepted (audit ARC-03: the 250 soft tier promised by ADR-015, CLAUDE.md's size table, and PROJECT.md non-negotiable 15 had no enforcement mechanism — it was fiction).
 
-> **Numbering note.** ADR-130 (canonical Result) was the last used; **ADR-131** is the next free.
+> **Numbering note.** ADR-131 (canonical Result) was the last used; **ADR-132** is the next free.
 
 ### Context
 
@@ -6277,11 +6354,11 @@ The soft tier is a separate, report-only mechanism, not an ESLint severity. Add 
 
 The soft tier is finally visible without blocking anyone: `release:check` prints the over-250 list every run, so the drift is measured, but only the ESLint error/400 rule fails CI. Splitting the 78 files (especially the two 400-pinned ones, whose next edit forces an unplanned mid-feature split) stays out of scope — each is its own concept-driven tidy PR. Because the counter is an approximation, a file within a line or two of 250 may be mis-listed; it is a report, not a gate, so that is acceptable.
 
-## ADR-132 - Camera bridge trusts only the exact production origins and refuses all loopback frame-proxy targets (2026-07-11)
+## ADR-133 - Camera bridge trusts only the exact production origins and refuses all loopback frame-proxy targets (2026-07-11)
 
 **Status:** accepted (audit ELE-02: residual-risk hardening of ADR-121's loopback camera bridge; the finding "drivable cross-origin by every *.pages.dev preview; usable as a localhost scanner" was CONFIRMED).
 
-> **Numbering note.** ADR-131 (soft-tier report-only script) was the last used; **ADR-132** is the next free.
+> **Numbering note.** ADR-132 (soft-tier report-only script) was the last used; **ADR-133** is the next free.
 
 ### Context
 
@@ -6303,13 +6380,13 @@ A preview-build deploy can no longer reach a locally-running bridge (intended â
 Codex re-audit R3 split into a fixable bug and a documented residual:
 
 - **Fixed (R3):** `isTrustedHostedAppOrigin` compared `url.hostname`, which discards the port, so `https://kerfdesk.com:444` was accepted despite the "exact production origins" intent. It now compares `url.origin` against a set of full origins (`https://kerfdesk.com`, `https://laserforge-2fj.pages.dev`), so a non-default port or a wrong scheme no longer matches. Test-first in `rtsp-camera-bridge.test.ts`.
-- **Residual (accepted by design, NOT closed):** hosted-origin access to the loopback bridge is deliberate â€” ADR-121 makes the deployed site a supported bridge client so production CSP does not block camera probing. Therefore a compromise or XSS of an EXACT trusted hosted origin (`kerfdesk.com` / `laserforge-2fj.pages.dev`) can still drive `/discover`, `/probe`, and `/frame.jpg` against the operator's RFC1918/ULA cameras through the loopback bridge. Blocking loopback proxy targets (ADR-132) stops localhost scanning, not RFC1918/ULA discovery. The mitigation is per-session bridge-token auth replacing Origin-header trust; it is a larger change deferred to its own ticket (the maintainer decides whether the deployed-site camera workflow warrants it, or whether hosted access should be dropped). R3 is therefore "port-exactness fixed; hosted-origin access is an accepted, documented residual" â€” not "closed".
+- **Residual (accepted by design, NOT closed):** hosted-origin access to the loopback bridge is deliberate â€” ADR-121 makes the deployed site a supported bridge client so production CSP does not block camera probing. Therefore a compromise or XSS of an EXACT trusted hosted origin (`kerfdesk.com` / `laserforge-2fj.pages.dev`) can still drive `/discover`, `/probe`, and `/frame.jpg` against the operator's RFC1918/ULA cameras through the loopback bridge. Blocking loopback proxy targets (ADR-133) stops localhost scanning, not RFC1918/ULA discovery. The mitigation is per-session bridge-token auth replacing Origin-header trust; it is a larger change deferred to its own ticket (the maintainer decides whether the deployed-site camera workflow warrants it, or whether hosted access should be dropped). R3 is therefore "port-exactness fixed; hosted-origin access is an accepted, documented residual" â€” not "closed".
 
-## ADR-133 - The workspace camera overlay honors the alignment basis, matching Trace (2026-07-11)
+## ADR-134 - The workspace camera overlay honors the alignment basis, matching Trace (2026-07-11)
 
 **Status:** accepted (Codex re-audit R2: the overlay applied a rectified-basis homography to raw pixels â€” a bug, not a design choice).
 
-> **Numbering note.** ADR-132 (camera bridge exact origins) was the last used; **ADR-133** is the next free.
+> **Numbering note.** ADR-133 (camera bridge exact origins) was the last used; **ADR-134** is the next free.
 
 ### Context
 

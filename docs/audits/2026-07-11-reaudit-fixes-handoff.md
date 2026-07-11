@@ -20,14 +20,14 @@ All six are fixed, each its own test-first commit. Before implementing I re-veri
 
 ## R2 (P1) · Rectified-basis overlay — `292ad308`
 - **Was:** the overlay applied a rectified-basis homography to raw pixels (my earlier "matches Trace" claim was false — Trace rectifies first).
-- **Fix:** new shared pure helper `rectifyForAlignmentBasis` (core/camera) — Trace and the overlay both use it. Overlay: rectified still + calibration → de-fisheye before the homography; rectified + no calibration (still or live) → refuse with a visible notice; **live `<video>` + rectified → refuse** (a CSS `matrix3d` cannot represent the nonlinear de-fisheye), point to Update Overlay; raw → unchanged. ADR-133.
+- **Fix:** new shared pure helper `rectifyForAlignmentBasis` (core/camera) — Trace and the overlay both use it. Overlay: rectified still + calibration → de-fisheye before the homography; rectified + no calibration (still or live) → refuse with a visible notice; **live `<video>` + rectified → refuse** (a CSS `matrix3d` cannot represent the nonlinear de-fisheye), point to Update Overlay; raw → unchanged. ADR-134.
 - **Test:** core helper (raw passthrough / rectified new-buffer / basis-mismatch); pure `resolveWorkspaceOverlay` router; DOM tests (rectified still → canvas, rectified-no-calibration → notice).
-- **NOT verified:** the pixels. Proves basis routing + that a rectified still yields a new de-fisheyed buffer, **not** that it lines up on hardware. The live-refuse UX and notice wording are a maintainer call (ADR-133).
+- **NOT verified:** the pixels. Proves basis routing + that a rectified still yields a new de-fisheyed buffer, **not** that it lines up on hardware. The live-refuse UX and notice wording are a maintainer call (ADR-134).
 - **Audit hints:** confirm `rectifyForAlignmentBasis` is now the ONLY rectify path (Trace was refactored onto it) and that the resolution-scaling (`scaleAlignmentHomographyToFrame`) still applies after rectify (the still keeps its dimensions, so the homography scale is unchanged).
 
 ## R3 (P1, split) · Bridge origin allowlist — `c75c3014`
 - **Fixed (mechanical):** `isTrustedHostedAppOrigin` compared `url.hostname` (port-blind), so `https://kerfdesk.com:444` was accepted. Now compares `url.origin` against a set of full origins — a non-default port or wrong scheme refuses. Test-first.
-- **Documented, NOT closed (by design):** hosted-origin access to the loopback bridge is deliberate (ADR-121 — the deployed site is a bridge client), so a compromise/XSS of an exact trusted origin can still drive discover/probe/frame against RFC1918/ULA cameras. Recorded as an accepted residual in the ADR-132 amendment with per-session token as the deferred mitigation — **please treat R3 as "port fixed + residual documented," not "closed."**
+- **Documented, NOT closed (by design):** hosted-origin access to the loopback bridge is deliberate (ADR-121 — the deployed site is a bridge client), so a compromise/XSS of an exact trusted origin can still drive discover/probe/frame against RFC1918/ULA cameras. Recorded as an accepted residual in the ADR-133 amendment with per-session token as the deferred mitigation — **please treat R3 as "port fixed + residual documented," not "closed."**
 
 ## R4 (Major) · DEV-06 asymmetric + object overrides — `9195a90c`
 - **Was:** compared the fastest output-**layer** speed against a scalar `maxFeed` (the greater of $110/$111). Missed asymmetric axes and object `operationOverride.speed`.

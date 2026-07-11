@@ -2133,7 +2133,7 @@ F-CNC19 tiling.
    and warns why. Open contours and a collapsing offset are reachable
    cases the menu gating cannot pre-detect, so the op runs, no-ops the
    scene, and surfaces a warning toast rather than dead-ending silently
-   (the failure modes are typed per ADR-130; the toast is CNV-04).
+   (the failure modes are typed per ADR-131; the toast is CNV-04).
 
 #### Empty
 1. An Intersect of non-overlapping shapes produces nothing, leaves the

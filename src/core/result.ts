@@ -1,4 +1,4 @@
-// Canonical Result for core control-flow errors (ADR-130). CLAUDE.md's "Pure
+// Canonical Result for core control-flow errors (ADR-131). CLAUDE.md's "Pure
 // core" section bans throwing for expected conditions; ops return this instead.
 // The `kind` tag matches the house discriminated-union style, so a switch over
 // a Result's variants can close its default arm with `assertNever`.

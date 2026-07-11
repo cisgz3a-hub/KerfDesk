@@ -17,7 +17,7 @@ The fixes made in response to (a) Codex's first audit of this branch [4 P1 + 3 P
 ## Group A — promoted from report-only this session (audit these hardest)
 
 ### A1 · ELE-02 — camera bridge origin + loopback proxy hardening (S03-001)
-- **Commits:** `c1aec28a` (fix + ADR-132), `3bb6d3b0` (integration-test re-level).
+- **Commits:** `c1aec28a` (fix + ADR-133), `3bb6d3b0` (integration-test re-level).
 - **Defect (Codex-confirmed):** `isTrustedHostedAppOrigin` trusted `*.laserforge-2fj.pages.dev` — every Cloudflare Pages preview of any branch/PR could drive the loopback bridge's `/discover`, `/frame.jpg`, `/probe`, `/stream.mjpg`. Separately, `cameraFrameUrlPolicy` refused only the bridge's own port, so `http://127.0.0.1:<other>` was a permitted proxy target → localhost port/host oracle.
 - **Fix:**
   - `electron/rtsp-camera-bridge.ts` — `TRUSTED_HOSTED_APP_HOSTNAMES` is now an exact `Set(['kerfdesk.com','laserforge-2fj.pages.dev'])`; the wildcard is gone. The loopback-dev-origin allowance (`isLoopbackDevOrigin`, http localhost/127.0.0.1 any port) is untouched.

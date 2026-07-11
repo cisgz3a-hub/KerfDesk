@@ -32,7 +32,7 @@ const FALLBACK_COLOR = '#000000';
 /**
  * Relieve the sharp convex corners of one object's cut region. Returns the
  * corner-relieved object (identity transform, world-space baked, same id), or an
- * error result (ADR-130) when the selection has no closed contours / no
+ * error result (ADR-131) when the selection has no closed contours / no
  * qualifying corners — the caller skips those objects silently (WORKFLOW F-CNC26).
  */
 export function dogboneVectorObject(
