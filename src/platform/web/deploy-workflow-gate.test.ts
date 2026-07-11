@@ -69,7 +69,10 @@ describe('Cloudflare production deploy gate', () => {
       scripts: Record<string, string>;
     };
     const releaseCheck = packageJson.scripts['release:check'];
-    const publishIndex = workflow.indexOf('uses: cloudflare/wrangler-action@v3');
+    // Match the publish step by action name only, not a pinned major — this
+    // assertion guards ordering (gate before publish), so an action version
+    // bump must not break it. Only one wrangler-action step exists in deploy.yml.
+    const publishIndex = workflow.indexOf('uses: cloudflare/wrangler-action@');
     expect(publishIndex).toBeGreaterThanOrEqual(0);
 
     expect(commandIndex(workflow, 'pnpm release:check')).toBeLessThan(publishIndex);
