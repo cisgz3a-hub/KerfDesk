@@ -85,11 +85,19 @@ export function handleStatusLine(
   // the release and the same Idle-means-motion-stopped reasoning applies.
   const jobOverAtIdle = shouldReleaseStreamerAtIdle(streamer, state.controllerOperation, report);
   const completedStreamerPatch = jobOverAtIdle ? { streamer: null } : {};
+  // A fresh Idle observed while holding at a tool change, with the pre-M0 tail
+  // drained, means the retract/park motion has stopped — the setup gate and
+  // Continue may unlock (Codex audit P1). Latches; only tool-change entry resets.
+  const toolChangeReadyPatch =
+    report.state === 'Idle' && streamer?.status === 'tool-change' && streamer.inFlight.length === 0
+      ? { toolChangeIdleSeen: true }
+      : {};
 
   set({
     ...statusPositionPatch(report, state.workOriginSource),
     ...operationPatch,
     ...completedStreamerPatch,
+    ...toolChangeReadyPatch,
   });
   observeControllerIdleWait(set, refs, report);
   if (queuedFrameDispatch !== null)

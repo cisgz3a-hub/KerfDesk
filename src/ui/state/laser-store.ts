@@ -144,6 +144,13 @@ export type LaserState = {
   // reset/alarm, homing, release-motors, clear-origin, and a tool change (Codex
   // audit P1). Drives the CNC no-work-zero Start advisory.
   readonly workZZeroKnown: boolean;
+  // Tool-change readiness: true only once a FRESH Idle status report has been
+  // observed since the streamer entered the tool-change hold (cleared on entry,
+  // set when Idle arrives with the pre-M0 tail drained). Guards the setup gate
+  // and Continue against a STALE Idle from before Start, so jog/probe/Continue
+  // cannot unlock while the pre-change retract/park is still moving (Codex audit
+  // P1).
+  readonly toolChangeIdleSeen: boolean;
   /**
    * ADR-053 P2 — proof that a clean Verified Frame ran for the current job at
    * the current origin. Set when a frame is dispatched in 'verified-origin'

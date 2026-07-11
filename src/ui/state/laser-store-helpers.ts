@@ -56,7 +56,19 @@ export function activeJobCommandBlockMessage(state: LaserState): string | null {
 export function setupBlockingJobCommandBlockMessage(state: LaserState): string | null {
   if (!isActiveJob(state.streamer)) return null;
   if (state.streamer?.status !== 'tool-change') return ACTIVE_JOB_COMMAND_MESSAGE;
-  return state.statusReport?.state === 'Idle' ? null : TOOL_CHANGE_NOT_IDLE_MESSAGE;
+  return toolChangeReady(state) ? null : TOOL_CHANGE_NOT_IDLE_MESSAGE;
+}
+
+// Ready to touch off the new bit only when the pre-M0 retract/park has fully
+// drained (no in-flight lines still owed acks) AND a FRESH Idle has been observed
+// since entering the hold. Checking statusReport.state === 'Idle' alone was
+// unsafe: that Idle can be stale (the report from before Start, before the
+// retract even began), so the setup gate unlocked while the machine was still
+// moving (Codex audit P1).
+export function toolChangeReady(state: LaserState): boolean {
+  const streamer = state.streamer;
+  if (streamer === null || streamer.status !== 'tool-change') return false;
+  return streamer.inFlight.length === 0 && state.toolChangeIdleSeen;
 }
 
 // True while stream acks are still outstanding — sending or paused, or any
@@ -230,6 +242,7 @@ export function initialLaserState(): Pick<
   | 'workOriginActive'
   | 'workOriginSource'
   | 'workZZeroKnown'
+  | 'toolChangeIdleSeen'
   | 'frameVerification'
 > {
   return {
@@ -262,6 +275,7 @@ export function initialLaserState(): Pick<
     workOriginActive: false,
     workOriginSource: 'none',
     workZZeroKnown: false,
+    toolChangeIdleSeen: false,
     frameVerification: null,
   };
 }

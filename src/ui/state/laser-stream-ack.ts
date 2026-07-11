@@ -44,7 +44,10 @@ export function advanceStream(
   // (the setup gate allows it during the hold). Invalidate so the no-work-zero
   // advisory is honest again until they do (Codex audit P1).
   if (s.status !== 'tool-change' && stepped.state.status === 'tool-change') {
-    set({ workZZeroKnown: false });
+    // New bit going in: void the prior Z0, and require a FRESH Idle (observed
+    // after the pre-M0 retract drains) before the setup gate / Continue unlock —
+    // any Idle currently in statusReport predates reaching the boundary.
+    set({ workZZeroKnown: false, toolChangeIdleSeen: false });
   }
   if (s.status !== 'done' && stepped.state.status === 'done') {
     beginPostJobSettle(set, get, refs, safeWrite);

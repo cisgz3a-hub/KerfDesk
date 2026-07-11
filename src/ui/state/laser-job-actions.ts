@@ -20,7 +20,13 @@ import type { ControllerDriver } from '../../core/controllers';
 import { normalizeGrblRxBufferBytes } from '../../core/grbl-streaming';
 import { armResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
 import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
-import { assertAutofocusIdle, pushLog, setupCommandBlockMessage } from './laser-store-helpers';
+import {
+  assertAutofocusIdle,
+  pushLog,
+  setupCommandBlockMessage,
+  toolChangeReady,
+  TOOL_CHANGE_NOT_IDLE_MESSAGE,
+} from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 
 type SetFn = (
@@ -53,7 +59,7 @@ export function jobActions(
   driver: DriverFn,
 ): Pick<LaserState, 'startJob' | 'pauseJob' | 'resumeJob' | 'stopJob' | 'continueToolChange'> {
   return {
-    continueToolChange: () => runContinueToolChange(set, safeWrite),
+    continueToolChange: () => runContinueToolChange(set, get, safeWrite),
     startJob: async (gcode, options = {}) => {
       assertStartAllowed(set, get);
       if (get().pendingUntrackedAcks > 0) {
@@ -240,7 +246,20 @@ async function runResumeJob(set: SetFn, safeWrite: SafeWriteFn, driver: DriverFn
 // controller was never held (the M0 was never sent); it is idling at the park
 // position and simply needs the next lines fed. Functional set for the same
 // at-write-time snapshot reason as runResumeJob.
-async function runContinueToolChange(set: SetFn, safeWrite: SafeWriteFn): Promise<void> {
+async function runContinueToolChange(
+  set: SetFn,
+  get: GetFn,
+  safeWrite: SafeWriteFn,
+): Promise<void> {
+  // Refuse Continue until the hold is actually ready — the pre-M0 retract/park
+  // has drained to a fresh Idle. Otherwise the resumed spindle-restart and
+  // post-change cutting lines queue behind still-moving pre-change motion, or the
+  // operator resumes into a machine that never reached the tool-change position
+  // (Codex audit P1).
+  if (get().streamer?.status === 'tool-change' && !toolChangeReady(get())) {
+    set({ lastWriteError: TOOL_CHANGE_NOT_IDLE_MESSAGE });
+    return;
+  }
   let toSend = '';
   set((s) => {
     if (s.streamer === null) return s;

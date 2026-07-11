@@ -53,9 +53,15 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 }
 
 // pre-M0 section, M0 boundary, spin-up + second section.
-const CNC_MULTI_TOOL = ['G1 X1 Y1 F600', 'G0 Z5', 'M5', 'G0 X0 Y0', 'M0', 'M3 S12000', 'G1 X2 Y2'].join(
-  '\n',
-);
+const CNC_MULTI_TOOL = [
+  'G1 X1 Y1 F600',
+  'G0 Z5',
+  'M5',
+  'G0 X0 Y0',
+  'M0',
+  'M3 S12000',
+  'G1 X2 Y2',
+].join('\n');
 
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -63,7 +69,11 @@ beforeEach(() => {
 
 afterEach(async () => {
   await useLaserStore.getState().disconnect();
-  useLaserStore.setState({ connection: { kind: 'disconnected' }, statusReport: null, streamer: null });
+  useLaserStore.setState({
+    connection: { kind: 'disconnected' },
+    statusReport: null,
+    streamer: null,
+  });
   useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
@@ -81,6 +91,22 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
     expect(writes.join('')).toContain('G0 X0 Y0');
     expect(writes.join('')).not.toContain('M0');
+
+    // Continue is refused until the pre-M0 retract drains to a FRESH Idle — the
+    // resumed spindle/cutting must not queue behind still-moving motion, and the
+    // machine must have actually reached the tool-change position (Codex audit P1).
+    writes.length = 0;
+    await useLaserStore.getState().continueToolChange();
+    expect(writes.join('')).toBe('');
+    expect(useLaserStore.getState().streamer?.status).toBe('tool-change');
+
+    // Drain the tail with acks, then observe a fresh Idle → the hold is ready.
+    while ((useLaserStore.getState().streamer?.inFlight.length ?? 0) > 0) {
+      connection.emitLine('ok');
+      await flush();
+    }
+    connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await flush();
 
     writes.length = 0;
     await useLaserStore.getState().continueToolChange();

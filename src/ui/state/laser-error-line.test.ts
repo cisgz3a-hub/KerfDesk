@@ -45,6 +45,7 @@ function makeLaserState(): LaserState {
     ovCache: null,
     workOriginActive: false,
     workZZeroKnown: false,
+    toolChangeIdleSeen: false,
     workOriginSource: 'none',
     frameVerification: null,
     connect: async () => undefined,
