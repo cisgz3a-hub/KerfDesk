@@ -17,7 +17,8 @@ import type { Issue } from './predicates';
 // lists exactly the tokens `toFixed` emits for a non-finite number ("NaN",
 // "Infinity", "-Infinity"); the `i` flag also catches lowercase from external
 // G-code. Ordered longest-first so "Infinity" wins over a bare "Inf".
-const NON_FINITE_COORD = /(?:^|[^A-Za-z])([XYZIJ])\s*([+-]?(?:NaN|Infinity|Inf))(?=$|\s|[A-Za-z;])/gi;
+const NON_FINITE_COORD =
+  /(?:^|[^A-Za-z])([XYZIJ])\s*([+-]?(?:NaN|Infinity|Inf))(?=$|\s|[A-Za-z;])/gi;
 
 export function findNonFiniteCoords(gcode: string): readonly Issue[] {
   const lines = gcode.split('\n');

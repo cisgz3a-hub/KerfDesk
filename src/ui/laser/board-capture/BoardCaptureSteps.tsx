@@ -89,7 +89,8 @@ function MeasuredBoard(props: {
   const { widthMm, heightMm, offSquareMm } = props.rect;
   const tooSmall = widthMm < MIN_BOARD_DIMENSION_MM || heightMm < MIN_BOARD_DIMENSION_MM;
   const firstCornerOffset = firstCornerOffsetMm(props.corners);
-  const wrongFirstCorner = !tooSmall && firstCornerOffset !== null && firstCornerOffset > FIRST_CORNER_WARN_MM;
+  const wrongFirstCorner =
+    !tooSmall && firstCornerOffset !== null && firstCornerOffset > FIRST_CORNER_WARN_MM;
   return (
     <div style={columnStyle}>
       <div style={measureStyle}>

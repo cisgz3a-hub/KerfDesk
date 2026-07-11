@@ -32,10 +32,7 @@ export function buildRelativeJogCommand(params: JogParams): string {
 }
 
 /** Framing = absolute G0 perimeter (G21+G90 lead lines, then five legs). */
-export function buildAbsoluteFrameLines(
-  bounds: FrameBounds,
-  feed: number,
-): ReadonlyArray<string> {
+export function buildAbsoluteFrameLines(bounds: FrameBounds, feed: number): ReadonlyArray<string> {
   const f = fmtFeed(feed);
   const corners = [
     { x: bounds.minX, y: bounds.minY },

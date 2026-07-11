@@ -204,7 +204,10 @@ export function hasUnreadableGeometry(tags: ReadonlyArray<DxfTag>, scale: number
     if (!DXF_GEOMETRY_CODES.has(tag.code)) continue;
     const value = Number.parseFloat(tag.value);
     if (!Number.isFinite(value)) return true;
-    if (DXF_SCALED_LENGTH_CODES.has(tag.code) && Math.abs(value * scale) > DXF_COORDINATE_MAGNITUDE_MM) {
+    if (
+      DXF_SCALED_LENGTH_CODES.has(tag.code) &&
+      Math.abs(value * scale) > DXF_COORDINATE_MAGNITUDE_MM
+    ) {
       return true;
     }
   }

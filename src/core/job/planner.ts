@@ -210,7 +210,11 @@ type PlanEntry = { entryV: number; exitV: number };
 // physics holds (accel/decel reachable) AND cornering doesn't exceed
 // junction-deviation limits. Exported for white-box invariant tests
 // (alongside junctionVelocity/blockTime).
-export function planVelocities(blocks: ReadonlyArray<Block>, accel: number, jd: number): PlanEntry[] {
+export function planVelocities(
+  blocks: ReadonlyArray<Block>,
+  accel: number,
+  jd: number,
+): PlanEntry[] {
   const plan: PlanEntry[] = blocks.map(() => ({ entryV: 0, exitV: 0 }));
   capJunctionEntries(blocks, plan, accel, jd);
   backwardPass(blocks, plan, accel);

@@ -206,7 +206,7 @@ function LockOutlineControl(props: {
         aria-label="Lock registration outline"
         title={
           props.disabled === true
-            ? "A captured board stays locked — its position is the work origin"
+            ? 'A captured board stays locked — its position is the work origin'
             : "Lock the outline so it can't move between the two burns"
         }
         onChange={(e) => props.onChange(e.target.checked)}

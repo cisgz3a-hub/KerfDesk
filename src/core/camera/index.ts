@@ -42,10 +42,7 @@ export type { TrustInput, TrustReason, TrustVerdict } from './calibration-trust'
 export { checkPoseDiversity } from './pose-diversity';
 export type { PoseDiversityVerdict } from './pose-diversity';
 export { frameMatchesCalibration, scaleIntrinsicsToFrame } from './resolution-match';
-export {
-  alignmentMatchesFrame,
-  scaleAlignmentHomographyToFrame,
-} from './alignment-resolution';
+export { alignmentMatchesFrame, scaleAlignmentHomographyToFrame } from './alignment-resolution';
 export {
   addCapture,
   canSolve,

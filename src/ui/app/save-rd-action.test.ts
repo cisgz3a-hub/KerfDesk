@@ -28,7 +28,15 @@ function ruidaLineProject(): Project {
           paths: [
             {
               color: '#000000',
-              polylines: [{ closed: false, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] }],
+              polylines: [
+                {
+                  closed: false,
+                  points: [
+                    { x: 0, y: 0 },
+                    { x: 10, y: 0 },
+                  ],
+                },
+              ],
             },
           ],
         },

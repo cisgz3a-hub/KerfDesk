@@ -168,6 +168,8 @@ describe('firstZoneCrossedBySegment (jog/click guard — DEV-04)', () => {
   });
 
   it('ignores disabled zones', () => {
-    expect(firstZoneCrossedBySegment({ x: 0, y: 0 }, { x: 50, y: 50 }, [{ ...zone, enabled: false }])).toBeNull();
+    expect(
+      firstZoneCrossedBySegment({ x: 0, y: 0 }, { x: 50, y: 50 }, [{ ...zone, enabled: false }]),
+    ).toBeNull();
   });
 });
