@@ -38,8 +38,16 @@ export function cameraFrameUrlPolicy(
     };
   }
 
-  if (targetsBridgeItself(url, bridgePort)) {
-    return { kind: 'invalid', reason: 'Camera frame proxy cannot proxy itself.' };
+  if (isLoopbackHost(url)) {
+    // Refuse EVERY loopback target, not just the bridge's own port, so the proxy
+    // can't be used as a localhost port scanner reading OTHER local services
+    // (ELE-02). Real machine cameras live on RFC1918, never loopback, so this
+    // costs no legitimate reach. The bridge itself is loopback, so this also
+    // subsumes the recursion guard — keep its clearer message for that case.
+    const reason = targetsBridgeItself(url, bridgePort)
+      ? 'Camera frame proxy cannot proxy itself.'
+      : 'Camera frame proxy cannot reach loopback services (private-network hosts only).';
+    return { kind: 'invalid', reason };
   }
 
   return { kind: 'ok', url, transport };
@@ -51,10 +59,15 @@ function transportOf(url: URL): 'http' | 'rtsp' | null {
   return null;
 }
 
-// A proxied URL pointing back at the bridge would recurse until the socket
-// pool drains; refuse loopback targets on the bridge's own port outright.
-function targetsBridgeItself(url: URL, bridgePort: number): boolean {
+// Loopback: localhost, ::1, or 127.0.0.0/8. The URL parser keeps IPv6 literals
+// bracketed ([::1]), so strip the brackets before comparing.
+function isLoopbackHost(url: URL): boolean {
   const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  const isLoopback = host === 'localhost' || host === '::1' || host.startsWith('127.');
-  return isLoopback && url.port !== '' && Number(url.port) === bridgePort;
+  return host === 'localhost' || host === '::1' || host.startsWith('127.');
+}
+
+// A proxied URL pointing back at the bridge's own port would recurse until the
+// socket pool drains — the sharpest loopback case, so it gets its own message.
+function targetsBridgeItself(url: URL, bridgePort: number): boolean {
+  return isLoopbackHost(url) && url.port !== '' && Number(url.port) === bridgePort;
 }

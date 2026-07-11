@@ -20,9 +20,10 @@ describe('RTSP camera bridge request policy', () => {
     expect(cameraBridgeCorsOrigin('https://laserforge-2fj.pages.dev')).toBe(
       'https://laserforge-2fj.pages.dev',
     );
-    expect(cameraBridgeCorsOrigin('https://5e8ad38c.laserforge-2fj.pages.dev')).toBe(
-      'https://5e8ad38c.laserforge-2fj.pages.dev',
-    );
+    // ELE-02: a per-PR/branch Pages preview is NOT trusted — the old wildcard let
+    // every *.pages.dev preview the operator visited drive the loopback bridge.
+    // Only the exact production origins are trusted now.
+    expect(cameraBridgeCorsOrigin('https://5e8ad38c.laserforge-2fj.pages.dev')).toBeNull();
     expect(cameraBridgeCorsOrigin('https://example.com')).toBeNull();
   });
 

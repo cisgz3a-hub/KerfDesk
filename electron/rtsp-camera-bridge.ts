@@ -227,15 +227,21 @@ export function isAllowedBridgeOrigin(origin: string | undefined): boolean {
   return origin === undefined || cameraBridgeCorsOrigin(origin) !== null;
 }
 
+// Only the EXACT production origins are trusted. The former
+// `.laserforge-2fj.pages.dev` wildcard trusted every Cloudflare Pages preview
+// (any branch/PR the operator happened to open), each of which could then drive
+// the loopback bridge's discover/frame-proxy/probe endpoints (ELE-02, S03-001).
+// A preview build that must reach a local bridge should gate that behind an
+// explicit dev flag, not a permanent wildcard.
+const TRUSTED_HOSTED_APP_HOSTNAMES: ReadonlySet<string> = new Set([
+  'kerfdesk.com',
+  'laserforge-2fj.pages.dev',
+]);
+
 function isTrustedHostedAppOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
-    return (
-      url.protocol === 'https:' &&
-      (url.hostname === 'kerfdesk.com' ||
-        url.hostname === 'laserforge-2fj.pages.dev' ||
-        url.hostname.endsWith('.laserforge-2fj.pages.dev'))
-    );
+    return url.protocol === 'https:' && TRUSTED_HOSTED_APP_HOSTNAMES.has(url.hostname);
   } catch {
     return false;
   }

@@ -6268,3 +6268,24 @@ The soft tier is a separate, report-only mechanism, not an ESLint severity. Add 
 ### Consequences
 
 The soft tier is finally visible without blocking anyone: `release:check` prints the over-250 list every run, so the drift is measured, but only the ESLint error/400 rule fails CI. Splitting the 78 files (especially the two 400-pinned ones, whose next edit forces an unplanned mid-feature split) stays out of scope — each is its own concept-driven tidy PR. Because the counter is an approximation, a file within a line or two of 250 may be mis-listed; it is a report, not a gate, so that is acceptable.
+
+## ADR-132 - Camera bridge trusts only the exact production origins and refuses all loopback frame-proxy targets (2026-07-11)
+
+**Status:** accepted (audit ELE-02: residual-risk hardening of ADR-121's loopback camera bridge; the finding "drivable cross-origin by every *.pages.dev preview; usable as a localhost scanner" was CONFIRMED).
+
+> **Numbering note.** ADR-131 (soft-tier report-only script) was the last used; **ADR-132** is the next free.
+
+### Context
+
+ADR-121's loopback camera bridge opts into Private Network Access and trusted three origin classes in `isTrustedHostedAppOrigin` (`electron/rtsp-camera-bridge.ts`): `https://kerfdesk.com`, `https://laserforge-2fj.pages.dev`, AND any `*.laserforge-2fj.pages.dev` â€” every Cloudflare Pages preview of every branch/PR. Any such preview the operator opened in a normal browser could drive the bridge's `/discover`, `/frame.jpg?url=`, `/probe`, and `/stream.mjpg`. Separately, the frame-proxy URL policy (`electron/camera-frame-proxy-policy.ts`) refused only the bridge's OWN port as a proxy target (`targetsBridgeItself`), so `http://127.0.0.1:<other-port>` was permitted â€” the proxy could read other loopback services, acting as a localhost port/host oracle (timing/error) despite the private-network egress guard and the JPEG-magic content check.
+
+### Decision
+
+Two independent tightenings of ADR-121's origin/target policy:
+
+1. `isTrustedHostedAppOrigin` trusts only the EXACT production hostnames (`kerfdesk.com`, `laserforge-2fj.pages.dev`) â€” the `.pages.dev` subdomain wildcard is dropped. A preview build that must reach a local bridge is expected to gate that behind an explicit dev flag, not a standing wildcard. The loopback-dev-origin allowance (`http://localhost` / `127.0.0.1`, any port) is unchanged: code already running on the operator's loopback can reach the cameras without the bridge's help, so it is outside the S03-001 drive-by-remote threat model.
+2. `cameraFrameUrlPolicy` refuses ALL loopback targets (`localhost`, `::1`, `127.0.0.0/8`) on any port, not just the bridge port. The bridge-itself case keeps its clearer "cannot proxy itself" message; every other loopback host returns "private-network hosts only". Real machine cameras live on RFC1918, never loopback, so no legitimate reach is lost.
+
+### Consequences
+
+A preview-build deploy can no longer reach a locally-running bridge (intended â€” previews are for UI review, not hardware). A local test camera bound to loopback can no longer be proxied; real cameras (RFC1918) are unaffected. The residual timing/error oracle across the egress guard's allowed RFC1918 range remains â€” a per-session bridge token replacing Origin-header trust is the next step if the maintainer wants it, deferred to its own ticket. Behavior-only change; no G-code or core impact. The deliberate `camera-frame-proxy-policy.test.ts` expectation that loopback-on-another-port was `ok` is flipped to `invalid`.
