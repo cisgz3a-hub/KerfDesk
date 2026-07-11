@@ -4,8 +4,10 @@ import {
   createLayer,
   createProject,
   DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
   type Layer,
   type Project,
+  type SceneObject,
 } from '../../core/scene';
 import { detectLaserMachineLimitWarnings } from './laser-machine-limit-warnings';
 
@@ -18,6 +20,7 @@ function laserProject(args: {
   readonly maxFeed?: number;
   readonly speed?: number;
   readonly output?: boolean;
+  readonly objects?: ReadonlyArray<SceneObject>;
 }): Project {
   const base = createProject();
   const layer: Layer = {
@@ -33,7 +36,33 @@ function laserProject(args: {
       ...(args.bedHeight === undefined ? {} : { bedHeight: args.bedHeight }),
       ...(args.maxFeed === undefined ? {} : { maxFeed: args.maxFeed }),
     },
-    scene: { objects: [], layers: [layer] },
+    scene: { objects: args.objects ?? [], layers: [layer] },
+  };
+}
+
+// An object on the output layer's color ('#ff0000') with a speed override.
+function objectWithSpeedOverride(speed: number): SceneObject {
+  return {
+    kind: 'imported-svg',
+    id: 'obj-override',
+    source: 'x.svg',
+    bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            points: [
+              { x: 1, y: 1 },
+              { x: 9, y: 9 },
+            ],
+            closed: false,
+          },
+        ],
+      },
+    ],
+    operationOverride: { speed },
   };
 }
 
@@ -83,6 +112,59 @@ describe('detectLaserMachineLimitWarnings (DEV-06)', () => {
     expect(
       detectLaserMachineLimitWarnings(
         laserProject({ maxFeed: 10000, speed: 8000, output: false }),
+        REPORTED,
+      ),
+    ).toEqual([]);
+  });
+
+  it('warns against the SLOWER reported axis rate, not the collapsed max (R4)', () => {
+    // Asymmetric: X 10000, Y 1000. A 5000 mm/min job is under the collapsed
+    // maxFeed (10000) but firmware-clamps on Y — the old scalar check missed it.
+    const asymmetric: ControllerSettingsSnapshot = {
+      bedWidth: 400,
+      bedHeight: 400,
+      maxFeed: 10000,
+      maxFeedX: 10000,
+      maxFeedY: 1000,
+    };
+    const warnings = detectLaserMachineLimitWarnings(
+      laserProject({ maxFeed: 10000, speed: 5000 }),
+      asymmetric,
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/reported max rate 1000 mm\/min/);
+  });
+
+  it('does not over-warn when the axes are symmetric and the job is under the rate (R4)', () => {
+    const symmetric: ControllerSettingsSnapshot = {
+      bedWidth: 400,
+      bedHeight: 400,
+      maxFeed: 6000,
+      maxFeedX: 6000,
+      maxFeedY: 6000,
+    };
+    expect(
+      detectLaserMachineLimitWarnings(laserProject({ maxFeed: 10000, speed: 5000 }), symmetric),
+    ).toEqual([]);
+  });
+
+  it('warns when an object speed override exceeds the rate but the layer base does not (R4)', () => {
+    // Layer base 2000 (under 6000), but an object overrides to 8000; the emitter
+    // applies the override, so the controller really clamps it.
+    const warnings = detectLaserMachineLimitWarnings(
+      laserProject({ maxFeed: 10000, speed: 2000, objects: [objectWithSpeedOverride(8000)] }),
+      REPORTED,
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/feed 8000 mm\/min is above the machine's reported max rate/);
+  });
+
+  it('does not warn on an object override the profile maxFeed already clamps (R4)', () => {
+    // Override 8000 but device maxFeed 5000 ≤ reported 6000: the app clamps to
+    // 5000, so the controller never clamps.
+    expect(
+      detectLaserMachineLimitWarnings(
+        laserProject({ maxFeed: 5000, speed: 2000, objects: [objectWithSpeedOverride(8000)] }),
         REPORTED,
       ),
     ).toEqual([]);

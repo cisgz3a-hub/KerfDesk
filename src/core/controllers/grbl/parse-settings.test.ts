@@ -94,6 +94,21 @@ describe('settingsMapToProfilePatch', () => {
     expect(settingsMapToProfilePatch(map).maxFeed).toBe(5000);
   });
 
+  it('retains the raw per-axis rates on the snapshot for the slow-axis advisory (R4)', () => {
+    const map = new Map([
+      [110, '10000'],
+      [111, '1000'],
+    ]);
+    // maxFeed collapses to the greater (for the planner); the snapshot keeps both.
+    expect(settingsMapToControllerSettings(map)).toMatchObject({
+      maxFeed: 10000,
+      maxFeedX: 10000,
+      maxFeedY: 1000,
+    });
+    // Not DeviceProfile keys — they stay OUT of the profile patch.
+    expect(settingsMapToProfilePatch(map)).toEqual({ maxFeed: 10000 });
+  });
+
   it('takes the min of $120/$121 for accel (slowest axis bounds the planner)', () => {
     const map = new Map([
       [120, '1000'],
