@@ -32,14 +32,18 @@ export type ResumeOptions = {
 type ModalState = {
   units: 'G20' | 'G21';
   spindle: 'M3' | 'M4' | 'M5';
+  // Modal motion mode. A G0 rapid ignores F; only a G1 feed move carries a real
+  // plunge feed. null until the first G0/G1 word is seen.
+  motionMode: 'G0' | 'G1' | null;
   sValue: number | null;
   feed: number | null;
   x: number | null;
   y: number | null;
   z: number | null;
-  // Feed of the most recent pure-Z plunge (`G1 Z<d> F<f>`, no X/Y — the
-  // signature GrblStrategy emits). null until one is seen, then used for the
-  // re-entry descent instead of the caller's fallback plungeMmPerMin.
+  // Feed of the most recent G1 move that LOWERED Z — a pure `G1 Z<d> F<f>`
+  // (GrblStrategy's per-pass signature) OR a ramp/relief move carrying X/Y/Z/F.
+  // null until one is seen, then used for the re-entry descent instead of the
+  // caller's fallback plungeMmPerMin.
   plungeMmPerMin: number | null;
 };
 
@@ -59,6 +63,7 @@ export function buildResumeProgram(
   const state: ModalState = {
     units: 'G21',
     spindle: 'M5',
+    motionMode: null,
     sValue: null,
     feed: null,
     x: null,
@@ -91,23 +96,28 @@ function applyLine(state: ModalState, rawLine: string): string | null {
     letter: (match[1] ?? '').toUpperCase(),
     value: Number(match[2]),
   }));
+  const prevZ = state.z;
   for (const { letter, value } of words) {
     const issue = applyWord(state, letter, value);
     if (issue !== null) return issue;
   }
-  recordPlungeFeed(state, words);
+  recordPlungeFeed(state, prevZ);
   return null;
 }
 
-// A line carrying a Z word and an F word with no X/Y is a pure plunge — the
-// exact `G1 Z<depth> F<plunge>` GrblStrategy emits per pass. Its F is the job's
-// real plunge feed, distinct from the cutting feed (X/Y+F) and from a ramp
-// (X/Y/Z+F, which carries X/Y and is skipped so it can't hijack the value).
-function recordPlungeFeed(state: ModalState, words: ReadonlyArray<GcodeWord>): void {
-  const has = (letter: string): boolean => words.some((word) => word.letter === letter);
-  if (has('Z') && has('F') && !has('X') && !has('Y')) {
-    const f = words.find((word) => word.letter === 'F');
-    if (f !== undefined && Number.isFinite(f.value)) state.plungeMmPerMin = f.value;
+// The plunge feed is the feed of a G1 move that LOWERS Z — whether a pure
+// `G1 Z<d> F<f>` (GrblStrategy's per-pass signature) or a ramp/relief move that
+// also carries X/Y. Recovering it from ramps means a relief/ramp-only program no
+// longer resumes at the caller's fallback feed (Codex audit). Guarded so it can
+// only DROP the recorded feed: a G0 rapid ignores F, and a lateral or UPWARD
+// (retract) G1 move's F is a cutting/retract feed, not a plunge — neither may
+// hijack the value. Z direction needs a known previous Z, so the first Z move
+// before any reference height is skipped rather than guessed.
+function recordPlungeFeed(state: ModalState, prevZ: number | null): void {
+  if (state.motionMode !== 'G1') return;
+  if (state.z === null || prevZ === null || state.z >= prevZ) return;
+  if (state.feed !== null && Number.isFinite(state.feed) && state.feed > 0) {
+    state.plungeMmPerMin = state.feed;
   }
 }
 
@@ -126,6 +136,8 @@ function applyWord(state: ModalState, letter: string, value: number): string | n
 }
 
 function applyGWord(state: ModalState, value: number): string | null {
+  if (value === 0) state.motionMode = 'G0';
+  if (value === 1) state.motionMode = 'G1';
   if (value === 91) return 'relative positioning (G91) — resume needs absolute programs';
   // Machine-coordinate and predefined-position moves change the position
   // without updating the tracked X/Y/Z modal words, so the replayed re-entry

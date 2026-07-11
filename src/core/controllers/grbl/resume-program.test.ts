@@ -42,7 +42,7 @@ describe('buildResumeProgram', () => {
     expect(result.lines.at(-1)).toBe('G0 X0.000 Y0.000');
   });
 
-  it('re-enters at the job\'s real plunge feed, not the hard-coded fallback (CNC-07)', () => {
+  it("re-enters at the job's real plunge feed, not the hard-coded fallback (CNC-07)", () => {
     // The interrupted job plunged at F250; the fallback option is 300. Resume
     // must descend at the recorded 250, not the fallback, or it re-engages the
     // stock far faster than the job was cut.
@@ -64,23 +64,48 @@ describe('buildResumeProgram', () => {
     expect(preamble).not.toContain('G1 Z-1.500 F300');
   });
 
-  it('does not let a ramp move (X/Y/Z/F) hijack the plunge feed — falls back', () => {
-    // A path3d ramp is `G1 X Y Z F`; it carries X/Y so it is not a pure plunge.
-    // With no pure-Z plunge before the resume point, the re-entry uses the
-    // fallback option feed.
+  it('recovers the plunge feed from a ramp/relief move (X/Y/Z/F), not the fallback (Codex audit)', () => {
+    // A relief/ramp program plunges with `G1 X Y Z F` (no pure-Z line). Its F is
+    // the real plunge feed — re-entry must use it, not the faster fallback that
+    // would drive the tool back into the stock too hard.
     const program = [
       'G21', // 1
       'G90', // 2
       'M3 S12000', // 3
       'G0 Z5', // 4
       'G0 X10 Y20', // 5
-      'G1 X15 Y25 Z-1 F400', // 6  ramp (X,Y,Z,F) — not a pure plunge
+      'G1 X15 Y25 Z-1 F400', // 6  ramp lowers Z 5 -> -1 at F400
       'G1 X30 Y40', // 7  resume here
     ].join('\n');
     const result = buildResumeProgram(program, 7, { ...OPTIONS, plungeMmPerMin: 300 });
     if (result.kind !== 'ok') throw new Error(result.reason);
     const preamble = result.lines.slice(0, result.preambleCount);
-    expect(preamble).toContain('G1 Z-1 F300');
+    expect(preamble).toContain('G1 Z-1 F400');
+    expect(preamble).not.toContain('G1 Z-1 F300');
+  });
+
+  it('never lets an upward retract or a G0 rapid hijack the plunge feed', () => {
+    // After a real F250 plunge, a fast upward retract (F3000) and a rapid must
+    // not overwrite the remembered downward feed.
+    const program = [
+      'G21', // 1
+      'G90', // 2
+      'M3 S12000', // 3
+      'G0 Z5', // 4
+      'G1 Z-1.5 F250', // 5  plunge down at 250
+      'G1 Z8 F3000', // 6  retract UP at 3000 — must not become the plunge
+      'G0 Z-2 F9000', // 7  rapid down with F — G0 ignores F, must not record
+      'G0 X30 Y40', // 8  reposition
+      'G1 X40 Y40 F800', // 9  resume here (cut)
+    ].join('\n');
+    const result = buildResumeProgram(program, 9, { ...OPTIONS, plungeMmPerMin: 300 });
+    if (result.kind !== 'ok') throw new Error(result.reason);
+    const preamble = result.lines.slice(0, result.preambleCount);
+    // The Z-descent re-entry uses the real downward plunge feed (250) — never the
+    // upward retract (3000) or the rapid's F word (9000). (Restoring 9000 as the
+    // bare modal feed afterward is correct and separate.)
+    expect(preamble.some((line) => /^G1 Z.* F250$/.test(line))).toBe(true);
+    expect(preamble.some((line) => /^G1 Z.* F(3000|9000)$/.test(line))).toBe(false);
   });
 
   it('positions the head before arming the laser on a Z-free (laser) resume', () => {
