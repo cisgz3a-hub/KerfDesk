@@ -23,6 +23,9 @@
 // load; the trace work itself is still synchronous CPU).
 
 import { finiteOr } from '../util';
+import type { CrackSubPixelField } from './contour-boundary';
+import type { TraceOptions } from './trace-option-types';
+import { fillPinholes } from './fill-pinholes';
 import { despeckle, hasImpulseNoise, medianFilter, otsuThreshold } from './preprocess';
 import { adjustBrightness, adjustContrast, adjustGamma, invertImage } from './raster-prep';
 import { shouldUseSketchTrace } from './auto-sketch-trace';
@@ -73,132 +76,7 @@ export function isValidRawImageData(image: RawImageData): boolean {
   return data.length === width * height * RGBA_CHANNELS;
 }
 
-export type TraceOptions = {
-  // Filled contours preserve source silhouettes for fill engraving.
-  // Centerline traces skeletonize dark strokes into open line paths
-  // for single-pass vector engraving. Edge detection (Canny) traces the
-  // edges of full-colour art as single-stroke line drawings.
-  readonly traceMode?: 'filled-contours' | 'centerline' | 'edge';
-  // Number of color quantization buckets. 2 = black-and-white,
-  // suitable for most laser engraving. Higher values produce more
-  // layers and (usually) more visual fidelity. Range 2-16.
-  readonly numberOfColors: number;
-  // Path-omit: minimum number of points in a path for it to be
-  // kept. Higher values drop small noise blobs.
-  readonly pathOmit: number;
-  // Line/curve fit tolerances. Higher = smoother curves, fewer
-  // segments. ltres = straight-line tolerance, qtres = quadratic.
-  readonly lineTolerance: number;
-  readonly quadraticTolerance: number;
-  // Gaussian blur radius applied BEFORE tracing — pre-smoothing
-  // suppresses small pixel-level noise that would otherwise become
-  // jagged edges in the output. 0 = no blur (sharp / detailed),
-  // 1-5 = progressively smoother. The Phase E v1 ship omitted
-  // this, which is why traces looked jagged on photo-like input.
-  readonly blurRadius: number;
-  // After-blur threshold: pixels whose delta to neighbors is
-  // below this value are smoothed. Pairs with blurRadius.
-  readonly blurDelta: number;
-  // Smooths line angles in the final paths. Boolean. The default
-  // imagetracerjs setting is false; we ship it true for cleaner
-  // output on hand-drawn / photo-like inputs.
-  readonly lineFilter: boolean;
-  // When set, forces a fixed palette instead of color-quantizing the
-  // input. Use ['#ffffff', '#000000'] for line art — guarantees the
-  // output is two layers (background + ink) with no banding from
-  // imagetracer's clustering. Hex strings, parsed at the boundary.
-  readonly fixedPalette?: ReadonlyArray<string>;
-  // Pre-threshold the input to pure 1-bit before tracing. Pixels
-  // with luminance ≥ this value become white, the rest black. The
-  // most important quality lever for line-art input: it eliminates
-  // anti-aliased edges that otherwise become borderline-classified
-  // speckle in the trace output. 0..255 range; undefined = skip
-  // pre-threshold and feed raw pixels.
-  // If set, thresholdLuma becomes the upper bound of LightBurn's
-  // inclusive brightness band: cutoffLuma <= luma <= thresholdLuma.
-  readonly cutoffLuma?: number;
-  readonly thresholdLuma?: number;
-  readonly traceTransparency?: boolean;
-  readonly sketchTrace?: boolean;
-  readonly autoSketchTrace?: boolean;
-  // Phase E.2 quality polish — three pure-core preprocessing
-  // stages (see preprocess.ts). Compose in this order:
-  //   medianFilter → (otsuThreshold OR thresholdLuma) → despeckle → tracer
-  // Each is opt-in via its flag so callers see only the quality
-  // they ask for. Defaults in TRACE_PRESETS pick sensible bundles
-  // per input class (logo vs photo vs sketch).
-  //
-  // useOtsuThreshold: when true, the cutoff is picked from the
-  // image's luma histogram (Otsu 1979) instead of a fixed value.
-  // Used only when explicit cutoffLuma / thresholdLuma are absent.
-  readonly useOtsuThreshold?: boolean;
-  // medianFilter: 3×3 median filter (RGBA → greyscale) applied
-  // BEFORE thresholding. Kills salt-and-pepper noise and JPEG
-  // artefacts without rounding off real edges the way a Gaussian
-  // blur would.
-  //   - true  → force the median on every pixel.
-  //   - false / undefined → never apply it.
-  //   - 'auto' → apply ONLY when the image carries measurable impulse
-  //     noise (hasImpulseNoise, preprocess.ts). WHY: the median melts
-  //     clean small glyphs — 4-6 px letters trace as blobs — so on crisp
-  //     line art it does pure harm. 'auto' keeps the noise protection for
-  //     scanned/JPEG sources while leaving clean logos untouched, the same
-  //     policy Edge Detection already uses.
-  readonly medianFilter?: boolean | 'auto';
-  // despeckleMinPixels: connected-component despeckle applied AFTER
-  // thresholding. Any ink region (4-connected, luma<128) with fewer
-  // than N pixels gets flipped to white. 0 or undefined disables.
-  // Topology-preserving: holes inside letters (O, B, etc.) survive.
-  readonly despeckleMinPixels?: number;
-  readonly ignoreLessThanPixels?: number;
-  readonly smoothness?: number;
-  readonly optimize?: number;
-  // Edge Detection-only controls. UI exposes these as three simple
-  // operator knobs: Sensitivity, Detail, and Minimum line.
-  readonly edgeBlurSigma?: number;
-  readonly edgeLowThresholdRatio?: number;
-  readonly edgeHighThresholdRatio?: number;
-  readonly edgeMinLengthPx?: number;
-  readonly edgeJoinGapPx?: number;
-  readonly edgeMedianFilter?: boolean;
-  readonly centerlineJoinGapPx?: number;
-  // Phase E.3 — image-level adjustments matching LF1's
-  // ImageProcessing.ts math (see raster-prep.ts). All four run BEFORE the
-  // existing median → threshold → despeckle chain, so the cleanup
-  // stages operate on pixels the user has already brightened /
-  // contrast-pushed / gamma-corrected / inverted to taste.
-  //
-  // brightness: −100..+100, 0 = no-op. Linear add of brightness*2.55
-  // to each channel; +100 saturates black to white.
-  readonly brightness?: number;
-  // contrast: −100..+100, 0 = no-op. Pivot around 128 with factor
-  // 1 + contrast/100. +100 doubles contrast; −100 collapses to grey.
-  readonly contrast?: number;
-  // gamma: 0.1..5, 1 = no-op. Power curve in normalised space.
-  // gamma > 1 brightens midtones; gamma < 1 darkens them.
-  readonly gamma?: number;
-  // invert: swap each channel to 255 − v. Useful when the source is
-  // light-on-dark (white logo on black) and the user wants the laser
-  // to engrave the dark areas — flipping the image makes that the
-  // standard dark-on-light input every tracer assumes.
-  readonly invert?: boolean;
-  // autoUpscaleSmallSources: supersample small, THIN-featured sources before
-  // tracing, then scale the traced vectors back down. WHY: no tracing
-  // algorithm works well at very small scales (the official potrace project
-  // ships `mkbitmap` for exactly this) — strokes under ~3px fragment Edge
-  // Detection and lose detail on the potrace-backed presets. Off by default;
-  // the named presets opt in. See auto-upscale.ts.
-  readonly autoUpscaleSmallSources?: boolean;
-  // upscaleSmallSmoothSources: supersample any SMALL source (longest edge under
-  // ~260px) before tracing, regardless of stroke thickness, then scale back.
-  // WHY: small letters facet because their curve RADIUS spans only a few pixels
-  // — a 40px "E"/"B" traces as polygonal chords even with comfortable ~6px
-  // strokes, which the thin-stroke gate above misses. Set ONLY on the
-  // smooth-wanting presets (Line Art / Smooth / Edge Detection / Centerline);
-  // Sharp deliberately omits it so its pixel-art notches are never anti-aliased
-  // away. See auto-upscale.ts (shouldUpscaleSmallSource).
-  readonly upscaleSmallSmoothSources?: boolean;
-};
+export type { TraceOptions } from './trace-option-types';
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
 // kill noise, line filtering on. Was the gap between Phase E v1
@@ -245,25 +123,117 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
       options.cutoffLuma ?? 0,
       options.thresholdLuma ?? 128,
     );
-    return despeckleIfEnabled(prepared, options);
+    return cleanBinaryMask(prepared, options);
   }
   if (shouldUseSketchTrace(image, options)) {
-    const prepared = sketchTraceToMonochrome(applyImageAdjustments(image, options));
-    return despeckleIfEnabled(prepared, options);
+    const prepared = sketchTraceToMonochrome(
+      applyImageAdjustments(image, options),
+      // The local-contrast window is denominated in SOURCE pixels; on a
+      // supersampled raster it must scale or it halves in real terms and
+      // hollows out strokes wider than the window (adaptive-threshold
+      // failure mode: recall 0.93 -> 0.66 measured at 2x).
+      SKETCH_RADIUS_PX * effectivePixelScale(options),
+    );
+    return cleanBinaryMask(prepared, options);
   }
   let prepared = applyImageAdjustments(image, options);
   if (shouldApplyMedian(prepared, options.medianFilter)) {
     prepared = medianFilter(prepared);
   }
   prepared = applyThreshold(prepared, options);
-  return despeckleIfEnabled(prepared, options);
+  return cleanBinaryMask(prepared, options);
 }
 
-// Despeckle is the shared tail of every preprocessing branch; extracting it
-// keeps preprocessForTrace under the complexity cap and the behavior identical.
-function despeckleIfEnabled(image: RawImageData, options: TraceOptions): RawImageData {
-  if (!shouldDespeckle(options)) return image;
-  return despeckle(image, options.despeckleMinPixels ?? 0);
+// Mask cleanup is the shared tail of every preprocessing branch: despeckle
+// (ink specks → white), then pinhole-crack fill (enclosed hairline white
+// slivers → ink). Extracting it keeps preprocessForTrace under the
+// complexity cap.
+function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageData {
+  // Area-denominated caps scale by pixelScale² on supersampled traces so
+  // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
+  const scale = effectivePixelScale(options);
+  const despeckled = shouldDespeckle(options)
+    ? despeckle(image, (options.despeckleMinPixels ?? 0) * scale * scale)
+    : image;
+  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale) : despeckled;
+}
+
+/** Sanitized supersampling factor (see TraceOptions.pixelScale). */
+export function effectivePixelScale(options: TraceOptions): number {
+  const scale = options.pixelScale ?? 1;
+  return Number.isFinite(scale) && scale >= 1 ? scale : 1;
+}
+
+// Sub-pixel crack field (research brief 2026-07-10): the pre-threshold
+// scalar field + its iso value, so the contour walker can interpolate TRUE
+// edge crossings instead of quantizing to crack midpoints — the
+// anti-aliasing ramp holds the sub-pixel edge position that binarization
+// discards. Mirrors preprocessForTrace's branch order; null where no single
+// iso-line exists (alpha masks, brightness bands with a cutoff above 0).
+export function crackFieldForTrace(
+  image: RawImageData,
+  options: TraceOptions,
+): CrackSubPixelField | null {
+  if (!isValidRawImageData(image)) return null;
+  if (shouldTraceAlphaMask(image, options)) return null;
+  const adjusted = applyImageAdjustments(image, options);
+  if (shouldUseSketchTrace(image, options)) {
+    // Same scaled window as sketchTraceToMonochrome — the interpolation iso
+    // must be the exact iso the mask was cut at.
+    return sketchCrackField(adjusted, SKETCH_RADIUS_PX * effectivePixelScale(options));
+  }
+  const prepared = shouldApplyMedian(adjusted, options.medianFilter)
+    ? medianFilter(adjusted)
+    : adjusted;
+  const threshold = singleIsoThreshold(prepared, options);
+  if (threshold === null) return null;
+  return lumaCrackField(prepared, threshold);
+}
+
+const BACKGROUND_LUMA = 255;
+
+function singleIsoThreshold(prepared: RawImageData, options: TraceOptions): number | null {
+  if (options.cutoffLuma !== undefined) {
+    // The band's lower cutoff is a second iso-line; only the degenerate
+    // cutoff-0 band (the LightBurn default) has a single crossing.
+    return options.cutoffLuma === 0 ? (options.thresholdLuma ?? 128) : null;
+  }
+  if (options.thresholdLuma !== undefined) return options.thresholdLuma;
+  if (options.useOtsuThreshold === true) return otsuThreshold(prepared);
+  return null;
+}
+
+function lumaCrackField(prepared: RawImageData, thresholdLuma: number): CrackSubPixelField {
+  const { width, height } = prepared;
+  const luma = lumaBuffer(prepared);
+  return {
+    thresholdAt: (): number => thresholdLuma,
+    lumaAt: (x: number, y: number): number => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return BACKGROUND_LUMA;
+      return luma[y * width + x] ?? BACKGROUND_LUMA;
+    },
+  };
+}
+
+// The sketch cut is luma < localMean − bias — a position-dependent
+// threshold, exposed as thresholdAt so the walker interpolates raw luma
+// against the local iso value. (Exact-equality pixels classify background in
+// the mask; the walker's straddle check falls back to the midpoint there.)
+function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX): CrackSubPixelField {
+  const { width, height } = adjusted;
+  const luma = lumaBuffer(adjusted);
+  const integral = integralLuma(luma, width, height);
+  return {
+    thresholdAt: (x: number, y: number): number => {
+      const cx = Math.min(width - 1, Math.max(0, x));
+      const cy = Math.min(height - 1, Math.max(0, y));
+      return localMean(integral, width, height, cx, cy, radiusPx) - SKETCH_CONTRAST_BIAS;
+    },
+    lumaAt: (x: number, y: number): number => {
+      if (x < 0 || y < 0 || x >= width || y >= height) return BACKGROUND_LUMA;
+      return luma[y * width + x] ?? BACKGROUND_LUMA;
+    },
+  };
 }
 
 // Median gate. true forces it, false/undefined skips it, and 'auto' defers
@@ -341,14 +311,14 @@ function shouldTraceAlphaMask(image: RawImageData, options: TraceOptions): boole
 const SKETCH_RADIUS_PX = 8;
 const SKETCH_CONTRAST_BIAS = 8;
 
-function sketchTraceToMonochrome(image: RawImageData): RawImageData {
+function sketchTraceToMonochrome(image: RawImageData, radiusPx = SKETCH_RADIUS_PX): RawImageData {
   const luma = lumaBuffer(image);
   const integral = integralLuma(luma, image.width, image.height);
   const data = new Uint8ClampedArray(image.data.length);
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
       const pixel = y * image.width + x;
-      const mean = localMean(integral, image.width, image.height, x, y, SKETCH_RADIUS_PX);
+      const mean = localMean(integral, image.width, image.height, x, y, radiusPx);
       const v = (luma[pixel] ?? 255) < mean - SKETCH_CONTRAST_BIAS ? 0 : 255;
       const out = pixel * 4;
       data[out] = v;

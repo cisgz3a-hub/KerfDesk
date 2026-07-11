@@ -137,7 +137,12 @@ describe('contour backend small-glyph fidelity (Line Art defaults)', () => {
     const f = traceFidelity(A_GLYPH);
     expect(f.samples).toBeGreaterThanOrEqual(80);
     expect(f.maxPx).toBeLessThanOrEqual(0.8);
-    expect(f.rmsPx).toBeLessThanOrEqual(0.3);
+    // 0.32 (was 0.30): the rounded-terminal policy (curve-refine fillet
+    // continuation, maintainer verdicts 2026-07-10) lets the apex round
+    // slightly instead of pinning angular — +0.01px RMS in upscaled chain
+    // space (~0.005px at glyph scale), sub-perceptual. The 0.8 max cap
+    // above is the spike/melt guard and is unchanged.
+    expect(f.rmsPx).toBeLessThanOrEqual(0.32);
   });
 });
 

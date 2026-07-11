@@ -41,6 +41,14 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     smoothness: 1,
     optimize: 0.2,
     despeckleMinPixels: 12,
+    // Fill hairline threshold cracks enclosed in solid ink (letter-stem
+    // slivers) so they don't trace as spurious inner contours.
+    fillPinholeCracks: true,
+    // Quality supersample (2x) for mid-size art: thin features (hooked apex
+    // tips, pale subtitle strokes) binarize with double the resolution —
+    // mask-level shape distortion no geometry stage can repair (mkbitmap's
+    // recipe; pixel-denominated caps scale via pixelScale).
+    supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
     // Also supersample small sources regardless of stroke width — small letters
@@ -62,6 +70,9 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     fixedPalette: ['#ffffff', '#000000'],
     useOtsuThreshold: true,
     despeckleMinPixels: 12,
+    // A crack down a stroke splits the skeleton into two parallel lines;
+    // fill it before thinning (same rationale as Line Art).
+    fillPinholeCracks: true,
     centerlineJoinGapPx: 3,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
@@ -97,6 +108,10 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     edgeJoinGapPx: 5,
     // undefined = AUTO median: applied only when impulse noise is detected,
     // so clean art keeps its small features (see edge-trace.ts).
+    // Same 2x quality supersample as Line Art — the edge lane is
+    // contour-finished from a local-contrast mask, so it benefits from the
+    // identical measured-boundary stack (sub-pixel field + fit tail).
+    supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
     // Also supersample small sources regardless of stroke width — the reported
@@ -125,6 +140,12 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     medianFilter: 'auto',
     useOtsuThreshold: true,
     despeckleMinPixels: 24,
+    // Same hairline-crack cleanup as Line Art; Sharp deliberately omits it
+    // (pixel-fidelity preset — every notch matters, even a crack).
+    fillPinholeCracks: true,
+    // Same 2x quality supersample as Line Art (Sharp opts out: bilinear
+    // supersampling anti-aliases the pixel notches it exists to preserve).
+    supersampleContour: true,
     // Supersample small thin-featured sources before tracing (see auto-upscale.ts).
     autoUpscaleSmallSources: true,
     // Also supersample small sources regardless of stroke width — small letters

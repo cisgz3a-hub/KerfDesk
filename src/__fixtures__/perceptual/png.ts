@@ -93,6 +93,12 @@ function setPixel(rgb: Uint8Array, width: number, x: number, y: number, color: R
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 
+// Exported so other perceptual harness modules (e.g. region-crop dumps) can
+// write raw RGB buffers without duplicating a third PNG encoder copy.
+export function encodeRgbPng(rgb: Uint8Array, width: number, height: number): Uint8Array {
+  return encodePng(rgb, width, height);
+}
+
 function encodePng(rgb: Uint8Array, width: number, height: number): Uint8Array {
   const stride = width * CHANNELS;
   const raw = new Uint8Array((stride + 1) * height);

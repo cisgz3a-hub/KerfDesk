@@ -23,6 +23,7 @@ import {
   preprocessForTrace,
 } from './trace-image';
 import {
+  MAX_UPSCALE_SOURCE_PIXELS,
   THIN_STROKE_UPSCALE_FACTOR,
   computeUpscaleFactor,
   downscaleTracedPaths,
@@ -142,9 +143,13 @@ export async function traceImageToColoredPaths(
   // Small sources trace poorly at native resolution; supersample, trace, then
   // scale the vectors back down by the SAME factor. The inner dispatch is
   // called directly so this never re-enters itself and double-upscales.
+  // pixelScale rides along so pixel-denominated cleanup caps (despeckle,
+  // pinhole fill, min-area, simplify ε, sharpener regime bounds) keep their
+  // SOURCE-pixel semantics on the supersampled raster.
   const factor = upscaleFactorFor(image, options);
   if (factor > 1) {
-    const upscaled = await dispatchTrace(upscaleBy(image, factor), options);
+    const scaledOptions: TraceOptions = { ...options, pixelScale: factor };
+    const upscaled = await dispatchTrace(upscaleBy(image, factor), scaledOptions);
     return downscaleTracedPaths(upscaled, factor);
   }
   return dispatchTrace(image, options);
@@ -180,7 +185,20 @@ function upscaleFactorFor(image: RawImageData, options: TraceOptions): number {
   const smallSmooth = options.upscaleSmallSmoothSources === true && shouldUpscaleSmallSource(image);
   const thinFactor = thinStroke ? THIN_STROKE_UPSCALE_FACTOR : 1;
   const smallFactor = smallSmooth ? computeUpscaleFactor(image) : 1;
-  return Math.max(thinFactor, smallFactor);
+  // Quality supersample for the contour-finished presets (mkbitmap's
+  // recipe): mid-size art carries MIXED stroke widths — thick letters that
+  // defeat the thin-stroke detector alongside 1-2px features (hooked apex
+  // tips, pale subtitle strokes) that binarization physically misshapes at
+  // 1x. Neither legacy trigger fires there, so the presets opt in
+  // explicitly; the pixel budget cap keeps the 4x cost off photos and huge
+  // scans. Edge Detection is contour-finished too (local-contrast mask →
+  // shared finisher), so its opt-in rides the same flag.
+  const contourQuality =
+    options.supersampleContour === true &&
+    (isBinaryContourPreset(options) || options.traceMode === 'edge') &&
+    image.width * image.height <= MAX_UPSCALE_SOURCE_PIXELS;
+  const contourFactor = contourQuality ? THIN_STROKE_UPSCALE_FACTOR : 1;
+  return Math.max(thinFactor, smallFactor, contourFactor);
 }
 
 // The backend selection shared by both the direct and the upscaled paths.

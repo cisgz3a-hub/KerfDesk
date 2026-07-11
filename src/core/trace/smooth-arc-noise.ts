@@ -45,9 +45,15 @@ export function smoothArcNoise(
   closed: boolean,
   corners: ReadonlySet<Vec2>,
   strength = 1,
+  pixelScale = 1,
 ): Vec2[] {
-  const maxMovePx = BASE_MAX_MOVE_PX * Math.max(0, strength);
-  if (points.length < 2 * WINDOW_HALF_POINTS + 1 || maxMovePx < MIN_ACTIVE_MOVE_PX) {
+  // Window and movement budget are denominated in chain points/pixels; on a
+  // supersampled trace both scale with pixelScale so the REAL-space evening
+  // matches the 1x tuning (unscaled they halve — the lumpy-arch defect).
+  const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
+  const windowHalfPoints = Math.round(WINDOW_HALF_POINTS * scale);
+  const maxMovePx = BASE_MAX_MOVE_PX * Math.max(0, strength) * scale;
+  if (points.length < 2 * windowHalfPoints + 1 || maxMovePx < MIN_ACTIVE_MOVE_PX) {
     return [...points];
   }
   // One pass attenuates dent-scale noise ~65%; the second reaches the
@@ -56,7 +62,7 @@ export function smoothArcNoise(
   // lookups stay valid).
   let current = [...points];
   for (let pass = 0; pass < SMOOTHING_PASSES; pass += 1) {
-    current = smoothOnce(current, closed, corners, maxMovePx);
+    current = smoothOnce(current, closed, corners, maxMovePx, windowHalfPoints);
   }
   return current;
 }
@@ -68,6 +74,7 @@ function smoothOnce(
   closed: boolean,
   corners: ReadonlySet<Vec2>,
   maxMovePx: number,
+  windowHalfPoints: number,
 ): Vec2[] {
   const n = points.length;
   const blocked = blockedIndices(points, closed, corners);
@@ -79,7 +86,7 @@ function smoothOnce(
       out[i] = p;
       continue;
     }
-    if (!fillWindow(window, points, closed, blocked, i)) {
+    if (!fillWindow(window, points, closed, blocked, i, windowHalfPoints)) {
       out[i] = p;
       continue;
     }
@@ -113,19 +120,20 @@ function fillWindow(
   closed: boolean,
   blocked: ReadonlyArray<boolean>,
   i: number,
+  windowHalfPoints: number,
 ): boolean {
   const n = points.length;
   window.length = 0;
-  const minSide = Math.floor(WINDOW_HALF_POINTS / 2);
+  const minSide = Math.floor(windowHalfPoints / 2);
   let reachBack = 0;
-  for (let k = 1; k <= WINDOW_HALF_POINTS; k += 1) {
+  for (let k = 1; k <= windowHalfPoints; k += 1) {
     const idx = closed ? (i - k + n) % n : i - k;
     if (idx < 0 || blocked[idx] === true) break;
     window.push(points[idx] as Vec2);
     reachBack = k;
   }
   let reachForward = 0;
-  for (let k = 1; k <= WINDOW_HALF_POINTS; k += 1) {
+  for (let k = 1; k <= windowHalfPoints; k += 1) {
     const idx = closed ? (i + k) % n : i + k;
     if (idx >= n || blocked[idx] === true) break;
     window.push(points[idx] as Vec2);

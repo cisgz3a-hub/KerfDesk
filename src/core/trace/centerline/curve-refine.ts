@@ -18,6 +18,23 @@ import { fitSmoothCurve } from './curve-fit';
 // sharpener and the dense-chain evening, so a junction weld or loop-closure
 // corner the sharpener never rebuilt is still treated as a corner here.
 const HARD_CORNER_RAD = (60 * Math.PI) / 180;
+// Potrace's published corner criterion pairs a sharp angle with STRAIGHT
+// legs. A hard turn whose neighbour keeps turning the SAME direction is a
+// drawn rounding that Douglas-Peucker collapsed onto one vertex; pinning it
+// renders a rounded terminal as an angular beak and a hooked apex as a
+// flick (the Arch House "sharp corners"/"sharp points" verdicts,
+// 2026-07-10). The sharper the candidate, the stronger the flank-curvature
+// evidence required to unpin it; genuine needle tips arrive sharpener-marked
+// (ink evidence) via drawnCorners and are never unpinned here.
+const NEEDLE_TURN_RAD = (90 * Math.PI) / 180;
+const CURVE_CONTINUATION_RAD = (20 * Math.PI) / 180;
+const NEEDLE_CONTINUATION_RAD = (30 * Math.PI) / 180;
+// Continuation evidence is only geometry when the vertices carrying it are
+// far enough apart — at small-glyph scale post-DP segments shrink to ~1px
+// and EVERY neighbour "turns", which would unpin genuine tiny-letter apexes
+// (the small-glyph fidelity instrument caught exactly that: A-glyph mean
+// boundary distance 0.30 → 0.31px).
+const MIN_CONTINUATION_LEG_PX = 2;
 // New samples placed inside each spline segment. Four keeps the drawn curve
 // smooth at engraving scale while holding the total point count near the
 // simplified-vertex budget (a smooth curve needs even curvature, not brute
@@ -59,27 +76,68 @@ function collectCorners(
   for (let i = 0; i < points.length; i += 1) {
     const p = points[i];
     if (p === undefined) continue;
-    if (drawnCorners.has(p) || turnAtIndex(points, i, closed) >= HARD_CORNER_RAD) corners.add(p);
+    if (drawnCorners.has(p)) {
+      corners.add(p);
+      continue;
+    }
+    const turn = Math.abs(signedTurnAtIndex(points, i, closed));
+    if (turn < HARD_CORNER_RAD) continue;
+    const continuationRad =
+      turn >= NEEDLE_TURN_RAD ? NEEDLE_CONTINUATION_RAD : CURVE_CONTINUATION_RAD;
+    if (isFilletContinuation(points, i, closed, continuationRad)) continue;
+    corners.add(p);
   }
   return corners;
 }
 
-function turnAtIndex(points: ReadonlyArray<Vec2>, i: number, closed: boolean): number {
+// True when either neighbour keeps turning the candidate's direction — the
+// signature of a collapsed rounded terminal, not a drawn corner.
+function isFilletContinuation(
+  points: ReadonlyArray<Vec2>,
+  i: number,
+  closed: boolean,
+  continuationRad: number,
+): boolean {
+  const sign = Math.sign(signedTurnAtIndex(points, i, closed));
+  const at = points[i];
+  if (at === undefined) return false;
+  for (const j of [i - 1, i + 1]) {
+    const wrapped = wrapIndex(j, points.length, closed);
+    const neighbour = points[wrapped];
+    if (neighbour === undefined) continue;
+    if (Math.hypot(neighbour.x - at.x, neighbour.y - at.y) < MIN_CONTINUATION_LEG_PX) continue;
+    const neighbourTurn = signedTurnAtIndex(points, wrapped, closed);
+    if (Math.abs(neighbourTurn) >= continuationRad && Math.sign(neighbourTurn) === sign) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Out-of-range neighbours on open chains resolve to the endpoint, whose turn
+// reads 0 — they can never mark a continuation.
+function wrapIndex(i: number, n: number, closed: boolean): number {
+  if (closed) return (i + n) % n;
+  return Math.min(n - 1, Math.max(0, i));
+}
+
+function signedTurnAtIndex(points: ReadonlyArray<Vec2>, i: number, closed: boolean): number {
   const n = points.length;
   if (!closed && (i === 0 || i === n - 1)) return 0;
   const prev = points[(i - 1 + n) % n];
   const at = points[i];
   const next = points[(i + 1) % n];
   if (prev === undefined || at === undefined || next === undefined) return 0;
-  return turnAt(prev, at, next);
+  return signedTurnAt(prev, at, next);
 }
 
-function turnAt(prev: Vec2, at: Vec2, next: Vec2): number {
+function signedTurnAt(prev: Vec2, at: Vec2, next: Vec2): number {
   const inLen = Math.hypot(at.x - prev.x, at.y - prev.y);
   const outLen = Math.hypot(next.x - at.x, next.y - at.y);
   if (inLen < NEAR_POINT_EPS || outLen < NEAR_POINT_EPS) return 0;
-  const dot =
-    ((at.x - prev.x) / inLen) * ((next.x - at.x) / outLen) +
-    ((at.y - prev.y) / inLen) * ((next.y - at.y) / outLen);
-  return Math.acos(Math.max(-1, Math.min(1, dot)));
+  const inX = (at.x - prev.x) / inLen;
+  const inY = (at.y - prev.y) / inLen;
+  const outX = (next.x - at.x) / outLen;
+  const outY = (next.y - at.y) / outLen;
+  return Math.atan2(inX * outY - inY * outX, inX * outX + inY * outY);
 }
