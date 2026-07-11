@@ -28,6 +28,7 @@ import {
 } from '../../core/trace';
 import { PREVIEW_MAX_EDGE_PX, loadImageAsRawData } from './image-loader';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
+import { isTraceRequestSuperseded } from './use-trace-worker-client';
 
 export type TracePreviewState =
   | { readonly kind: 'idle' }
@@ -177,6 +178,7 @@ export function runTrace(args: {
         sourceHasTransparency: args.sourceHasTransparency,
       });
     } catch (err) {
+      if (isTraceRequestSuperseded(err)) return;
       if (!args.isCurrent()) return;
       args.setState({
         kind: 'error',

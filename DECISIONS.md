@@ -6250,3 +6250,37 @@ Consequences.
   crops, not green tests. Perceptually verified against the reference on
   letters, serifs, arch bands, waves and roof lines; NOT verified on physical
   laser output (this changes trace geometry only, no G-code semantics).
+
+## ADR-129 — Trace reliability: latest request wins and completed work is reusable
+
+Context. The trace dialog debounces preview state, but the shared worker client
+still queues every request. A CPU-bound worker cannot receive a cancellation
+message until its current synchronous trace returns, so rapid preset changes
+can put obsolete jobs ahead of the only result the user wants. Every queued
+request also starts its own fixed timeout. Clicking Trace then decodes and
+traces the same source again even when the current preview already contains the
+matching geometry. On large or supersampled images, this duplicate and queued
+work is a more credible failure source than the tracing quality itself.
+
+Decision. Make the tracing pipeline explicitly single-flight and latest-wins.
+Starting a new worker trace retires the worker that owns an unfinished request,
+rejects that request with a typed superseded error, and runs the new request on
+a fresh worker. Supersession is control flow, not a preview error and not a
+reason to retry inline. The timeout applies only to the active request. A ready
+preview carries the identity of the file, options, boundary, and boundary mode;
+commit may reuse its paths and bounds only while all of those inputs still
+match. Later reliability slices may move bounded decode/resize into the worker,
+transfer pixel buffers, and introduce backend-specific working-pixel budgets,
+but must preserve this one-live-job contract.
+
+Consequences.
+- Rapid option changes can pay worker startup again, but never wait behind stale
+  CPU work; old worker memory becomes reclaimable as soon as it is terminated.
+- The preview and commit paths share one completed result when their inputs
+  match, removing the most common duplicate full trace.
+- This is in-process cancellation, not cooperative cancellation inside the
+  tracing algorithms. A backend that monopolizes the main thread remains out of
+  scope, and worker termination latency remains browser-controlled.
+- Regression coverage must prove superseded jobs cannot fall back inline, stale
+  timers cannot retire the replacement worker, and mismatched preview inputs
+  cannot be reused at commit.

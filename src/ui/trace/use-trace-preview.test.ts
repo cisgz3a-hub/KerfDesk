@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./use-trace-worker-client', () => ({
   traceImageWithFallback: vi.fn(),
+  isTraceRequestSuperseded: (error: unknown) =>
+    error instanceof Error && error.name === 'TraceRequestSupersededError',
 }));
 
 import type { ColoredPath } from '../../core/scene';
@@ -111,6 +113,15 @@ describe('runTrace stale-result guard (P2-A)', () => {
     vi.mocked(traceImageWithFallback).mockRejectedValue(new Error('boom'));
     const setState = vi.fn();
     await runTrace({ img, options, isCurrent: () => false, setState });
+    expect(setState).not.toHaveBeenCalled();
+  });
+
+  it('does not show a superseded request as an error while still current', async () => {
+    const superseded = new Error('superseded');
+    superseded.name = 'TraceRequestSupersededError';
+    vi.mocked(traceImageWithFallback).mockRejectedValue(superseded);
+    const setState = vi.fn();
+    await runTrace({ img, options, isCurrent: () => true, setState });
     expect(setState).not.toHaveBeenCalled();
   });
 
