@@ -8,10 +8,11 @@ import { extname, join, relative } from 'node:path';
 // script surfaces the soft tier instead: it lists files over the soft limit and
 // ALWAYS exits 0, so it never blocks. Counting mirrors ESLint's `max-lines` with
 // skipBlankLines + skipComments — blank and comment-only lines do not count — via
-// a line scan that also skips string literals so a `//` or `/*` inside a string is
-// not misread as a comment. It is an approximation of ESLint's AST count (a `/*`
-// inside a multi-line template literal can still fool it), which is acceptable for
-// a non-blocking report.
+// a line scan that skips string literals (including multi-line templates, whose
+// open state is threaded across lines) so a `//` or `/*` inside a string is not
+// misread as a comment. It is an approximation of ESLint's AST count — an
+// unrecognized regex literal containing `/*` can still fool it — which is
+// acceptable for a non-blocking report.
 
 const SOFT_LIMIT = 250;
 const checkedRoots = ['src', 'electron', 'scripts', join('audit', 'scripts')];
@@ -44,10 +45,10 @@ function* walk(dir) {
   }
 }
 
-// Skip from an opening quote to its unescaped close; return the index just past it
-// (or end-of-line for a quote left open, e.g. a template literal spanning lines).
-function skipString(line, start, quote) {
-  let i = start + 1;
+// First index past the unescaped `quote` at or after `from`, or null if the
+// quote is left open on this line (a template literal running to the next line).
+function closeQuote(line, from, quote) {
+  let i = from;
   while (i < line.length) {
     if (line[i] === '\\') {
       i += 2;
@@ -56,15 +57,24 @@ function skipString(line, start, quote) {
     if (line[i] === quote) return i + 1;
     i += 1;
   }
-  return line.length;
+  return null;
 }
 
-// Does the line carry any code outside comments and strings? Carries the
-// block-comment state to the next line (matching ESLint skipComments semantics).
-function analyzeLine(line, startInBlockComment) {
+// Does the line carry any code outside comments and strings? Carries BOTH the
+// block-comment state and the unterminated-template-literal state to the next
+// line (matching ESLint skipComments semantics; only backtick strings span
+// lines, so threading their state stops a `/*` inside a multi-line template from
+// poisoning the comment scan of every line below it).
+function analyzeLine(line, startInBlockComment, startInTemplate) {
   let inBlock = startInBlockComment;
   let hasCode = false;
   let i = 0;
+  if (startInTemplate) {
+    const end = closeQuote(line, 0, '`'); // resume scanning for the closing backtick
+    if (end === null) return { hasCode: true, inBlock, inTemplate: true };
+    hasCode = true;
+    i = end;
+  }
   while (i < line.length) {
     if (inBlock) {
       if (line.slice(i, i + 2) === '*/') {
@@ -83,24 +93,34 @@ function analyzeLine(line, startInBlockComment) {
     }
     if (two === '//') break; // rest of the line is a line comment
     const ch = line[i];
-    if (ch === '"' || ch === "'" || ch === '`') {
+    if (ch === '"' || ch === "'") {
       hasCode = true;
-      i = skipString(line, i, ch);
+      const close = closeQuote(line, i + 1, ch);
+      i = close === null ? line.length : close; // '/" never span lines
+      continue;
+    }
+    if (ch === '`') {
+      hasCode = true;
+      const close = closeQuote(line, i + 1, '`');
+      if (close === null) return { hasCode, inBlock, inTemplate: true };
+      i = close;
       continue;
     }
     if (!/\s/.test(ch)) hasCode = true;
     i += 1;
   }
-  return { hasCode, inBlock };
+  return { hasCode, inBlock, inTemplate: false };
 }
 
 function countCodeLines(text) {
   const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   let count = 0;
   let inBlock = false;
+  let inTemplate = false;
   for (const line of normalized.split('\n')) {
-    const result = analyzeLine(line, inBlock);
+    const result = analyzeLine(line, inBlock, inTemplate);
     inBlock = result.inBlock;
+    inTemplate = result.inTemplate;
     if (result.hasCode) count += 1;
   }
   return count;
@@ -114,11 +134,24 @@ function* policyTargets() {
 }
 
 const oversized = [];
-for (const path of policyTargets()) {
-  const lines = countCodeLines(readFileSync(path, 'utf8'));
-  if (lines > SOFT_LIMIT) {
-    oversized.push({ path: relative(process.cwd(), path), lines });
+// Report-only: a filesystem error (a locked/unreadable file on Windows, a walk
+// permission fault, an fs race) must never fail release:check, where this is
+// &&-chained. Skip the unreadable file; swallow a walk-level fault entirely.
+try {
+  for (const path of policyTargets()) {
+    let text;
+    try {
+      text = readFileSync(path, 'utf8');
+    } catch {
+      continue;
+    }
+    const lines = countCodeLines(text);
+    if (lines > SOFT_LIMIT) {
+      oversized.push({ path: relative(process.cwd(), path), lines });
+    }
   }
+} catch {
+  console.log('(soft line-limit scan interrupted; continuing — report-only)');
 }
 oversized.sort((a, b) => b.lines - a.lines || a.path.localeCompare(b.path));
 
