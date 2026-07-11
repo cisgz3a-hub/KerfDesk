@@ -110,11 +110,18 @@ export async function traceImageToSvgString(
 // Extracted from traceImageToSvgString so complexity stays under
 // the project cap (12). Pure function — same inputs, same output.
 export function preprocessForTrace(image: RawImageData, options: TraceOptions): RawImageData {
+  return prepareTraceForContour(image, options).prepared;
+}
+
+export function prepareTraceForContour(
+  image: RawImageData,
+  options: TraceOptions,
+): { readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null } {
   // Fail closed on a malformed buffer: every downstream stage indexes
   // data[i..i+3] assuming length === width*height*4, so a short/oversized
   // buffer or non-integer dims would read past the array or size a wrong-shape
   // output. Return the input unchanged rather than corrupting it.
-  if (!isValidRawImageData(image)) return image;
+  if (!isValidRawImageData(image)) return { prepared: image, crackField: null };
   // Trace Transparency keys the mask off alpha. If an image is fully opaque,
   // tracing alpha would turn the whole page black, so fall back to luma trace.
   if (shouldTraceAlphaMask(image, options)) {
@@ -123,25 +130,36 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions): 
       options.cutoffLuma ?? 0,
       options.thresholdLuma ?? 128,
     );
-    return cleanBinaryMask(prepared, options);
+    return { prepared: cleanBinaryMask(prepared, options), crackField: null };
   }
+  const adjusted = applyImageAdjustments(image, options);
   if (shouldUseSketchTrace(image, options)) {
+    const radiusPx = SKETCH_RADIUS_PX * effectivePixelScale(options);
     const prepared = sketchTraceToMonochrome(
-      applyImageAdjustments(image, options),
+      adjusted,
       // The local-contrast window is denominated in SOURCE pixels; on a
       // supersampled raster it must scale or it halves in real terms and
       // hollows out strokes wider than the window (adaptive-threshold
       // failure mode: recall 0.93 -> 0.66 measured at 2x).
-      SKETCH_RADIUS_PX * effectivePixelScale(options),
+      radiusPx,
     );
-    return cleanBinaryMask(prepared, options);
+    return {
+      prepared: cleanBinaryMask(prepared, options),
+      crackField: sketchCrackField(adjusted, radiusPx),
+    };
   }
-  let prepared = applyImageAdjustments(image, options);
+  let prepared = adjusted;
   if (shouldApplyMedian(prepared, options.medianFilter)) {
     prepared = medianFilter(prepared);
   }
-  prepared = applyThreshold(prepared, options);
-  return cleanBinaryMask(prepared, options);
+  const thresholded = applyThresholdWithIso(prepared, options);
+  return {
+    prepared: cleanBinaryMask(thresholded.prepared, options),
+    crackField:
+      thresholded.thresholdLuma === null
+        ? null
+        : lumaCrackField(prepared, thresholded.thresholdLuma),
+  };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
@@ -174,33 +192,36 @@ export function crackFieldForTrace(
   image: RawImageData,
   options: TraceOptions,
 ): CrackSubPixelField | null {
-  if (!isValidRawImageData(image)) return null;
-  if (shouldTraceAlphaMask(image, options)) return null;
-  const adjusted = applyImageAdjustments(image, options);
-  if (shouldUseSketchTrace(image, options)) {
-    // Same scaled window as sketchTraceToMonochrome — the interpolation iso
-    // must be the exact iso the mask was cut at.
-    return sketchCrackField(adjusted, SKETCH_RADIUS_PX * effectivePixelScale(options));
-  }
-  const prepared = shouldApplyMedian(adjusted, options.medianFilter)
-    ? medianFilter(adjusted)
-    : adjusted;
-  const threshold = singleIsoThreshold(prepared, options);
-  if (threshold === null) return null;
-  return lumaCrackField(prepared, threshold);
+  return prepareTraceForContour(image, options).crackField;
 }
 
 const BACKGROUND_LUMA = 255;
 
-function singleIsoThreshold(prepared: RawImageData, options: TraceOptions): number | null {
+function applyThresholdWithIso(
+  prepared: RawImageData,
+  options: TraceOptions,
+): { readonly prepared: RawImageData; readonly thresholdLuma: number | null } {
   if (options.cutoffLuma !== undefined) {
-    // The band's lower cutoff is a second iso-line; only the degenerate
-    // cutoff-0 band (the LightBurn default) has a single crossing.
-    return options.cutoffLuma === 0 ? (options.thresholdLuma ?? 128) : null;
+    const upper = options.thresholdLuma ?? 128;
+    return {
+      prepared: thresholdBandToMonochrome(prepared, options.cutoffLuma, upper),
+      thresholdLuma: options.cutoffLuma === 0 ? upper : null,
+    };
   }
-  if (options.thresholdLuma !== undefined) return options.thresholdLuma;
-  if (options.useOtsuThreshold === true) return otsuThreshold(prepared);
-  return null;
+  if (options.thresholdLuma !== undefined) {
+    return {
+      prepared: thresholdToMonochrome(prepared, options.thresholdLuma),
+      thresholdLuma: options.thresholdLuma,
+    };
+  }
+  if (options.useOtsuThreshold === true) {
+    const thresholdLuma = otsuThreshold(prepared);
+    return {
+      prepared: thresholdToMonochrome(prepared, thresholdLuma),
+      thresholdLuma,
+    };
+  }
+  return { prepared, thresholdLuma: null };
 }
 
 function lumaCrackField(prepared: RawImageData, thresholdLuma: number): CrackSubPixelField {
@@ -272,21 +293,6 @@ function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawI
     out = invertImage(out);
   }
   return out;
-}
-
-// Manual Cutoff/Threshold wins over Otsu. LightBurn's trace controls
-// are explicit user input; Otsu is only an automatic preset default.
-function applyThreshold(image: RawImageData, options: TraceOptions): RawImageData {
-  if (options.cutoffLuma !== undefined) {
-    return thresholdBandToMonochrome(image, options.cutoffLuma, options.thresholdLuma ?? 128);
-  }
-  if (options.thresholdLuma !== undefined) {
-    return thresholdToMonochrome(image, options.thresholdLuma);
-  }
-  if (options.useOtsuThreshold === true) {
-    return thresholdToMonochrome(image, otsuThreshold(image));
-  }
-  return image;
 }
 
 // Despeckle only makes sense on binary data — otherwise the luma<128

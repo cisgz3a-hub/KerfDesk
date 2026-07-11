@@ -4,7 +4,10 @@ import { rasterizeColoredPaths } from '../../__fixtures__/perceptual/rasterize';
 import { PERCEPTUAL_FIXTURES } from '../../__fixtures__/perceptual/shapes';
 import { TRACE_PRESETS } from './trace-presets';
 import type { TraceOptions } from './trace-image';
-import { traceImageToContourColoredPaths } from './contour-trace';
+import {
+  optimizationToleranceScaleFromOptimize,
+  traceImageToContourColoredPaths,
+} from './contour-trace';
 
 const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
 
@@ -20,6 +23,13 @@ const EXPECTED_MIN_IOU: Readonly<Record<string, number>> = {
 };
 
 describe('traceImageToContourColoredPaths', () => {
+  it('maps Optimize onto a real geometry tolerance with 0.2 as the neutral default', () => {
+    expect(optimizationToleranceScaleFromOptimize(undefined)).toBe(1);
+    expect(optimizationToleranceScaleFromOptimize(0.2)).toBe(1);
+    expect(optimizationToleranceScaleFromOptimize(0)).toBeLessThan(1);
+    expect(optimizationToleranceScaleFromOptimize(2)).toBeGreaterThan(1);
+  });
+
   it.each(PERCEPTUAL_FIXTURES)('$name: covers the source ink', (fixture) => {
     const paths = traceImageToContourColoredPaths(fixture.image, LINE_ART);
     const mask = rasterizeColoredPaths(paths, fixture.width, fixture.height);
