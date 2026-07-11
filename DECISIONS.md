@@ -6297,3 +6297,28 @@ Two independent tightenings of ADR-121's origin/target policy:
 ### Consequences
 
 A preview-build deploy can no longer reach a locally-running bridge (intended â€” previews are for UI review, not hardware). A local test camera bound to loopback can no longer be proxied; real cameras (RFC1918) are unaffected. The residual timing/error oracle across the egress guard's allowed RFC1918 range remains â€” a per-session bridge token replacing Origin-header trust is the next step if the maintainer wants it, deferred to its own ticket. Behavior-only change; no G-code or core impact. The deliberate `camera-frame-proxy-policy.test.ts` expectation that loopback-on-another-port was `ok` is flipped to `invalid`.
+
+## ADR-133 - The workspace camera overlay honors the alignment basis, matching Trace (2026-07-11)
+
+**Status:** accepted (Codex re-audit R2: the overlay applied a rectified-basis homography to raw pixels â€” a bug, not a design choice).
+
+> **Numbering note.** ADR-132 (camera bridge exact origins) was the last used; **ADR-133** is the next free.
+
+### Context
+
+A camera alignment records the `basis` it was solved in (`raw` or `rectified`). `runAutoAlign` persists `basis: 'rectified'` whenever a lens calibration exists â€” the homography was solved on de-fisheyed pixels. Trace (`buildCameraTraceImage`, ADR-110) honors this: it `rectifyImage()`s the raw frame before applying the homography, and refuses (`basis-mismatch`) when a rectified alignment has no calibration. The workspace overlay (CAM-02 / c70f4b87) only rescaled the homography for resolution and never read `alignment.basis`, so a calibrated (rectified) alignment was applied as a linear CSS `matrix3d` directly to raw, distorted pixels â€” the overlay bowed at the bed edges and mis-registered, while Trace of the same scene was correct. A CSS `matrix3d` is a linear projective map and cannot represent the nonlinear de-fisheye, so the live `<video>` overlay cannot be corrected by a transform at all.
+
+### Decision
+
+The overlay honors `basis`, sharing one pure helper with Trace (`rectifyForAlignmentBasis` in `core/camera`, so the two can never diverge again):
+
+- **Captured still, `basis: 'rectified'`, calibration present** â†’ de-fisheye the still in its canvas (same `rectifyImage` params as Trace) before applying the homography. This is the primary LightBurn "Update Overlay" path and is now correct.
+- **`basis: 'rectified'`, no calibration** (still or live) â†’ refuse: show a small "needs a captured still" notice instead of a mis-registered overlay.
+- **Live `<video>`, `basis: 'rectified'`** â†’ refuse (a CSS transform cannot de-fisheye); the operator captures a still to see the aligned overlay. This matches LightBurn, which lens-corrects a snapshot rather than streaming a de-fisheyed live overlay.
+- **`basis: 'raw'`** â†’ unchanged (warp raw pixels directly).
+
+The rectify runs once per source/alignment change (memoized), not per zoom/pan render.
+
+### Consequences
+
+Calibrated overlays now register correctly on the still. A visible UX change: for a rectified alignment on a live USB stream the overlay is replaced by a notice â€” the operator must capture a still (previously they saw a wrong overlay). Per-frame live de-fisheye (canvas-per-frame or a GPU shader, ADR-108) is deferred as a larger feature. NOT perceptually verified: the tests prove the basis routing and that a rectified still produces a new (de-fisheyed) buffer, not that the overlay visually lines up on real hardware â€” that needs a rendered comparison against the bed. The notice wording/placement is a maintainer UX call.
