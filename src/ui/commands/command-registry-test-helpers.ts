@@ -98,6 +98,7 @@ function baseCtxActions(): Partial<AppCommandContext> {
     scanOffsetTest: vi.fn(),
     focusTest: vi.fn(),
     optimizationSettings: vi.fn(),
+    labsSettings: vi.fn(),
     adjustImage: vi.fn(),
     saveProcessedBitmap: vi.fn(),
     traceImage: vi.fn(),

@@ -144,7 +144,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<ReadonlyArray<Com
       'tools.box-generator',
     ],
     ['tools.material-test', 'tools.interval-test', 'tools.scan-offset-test', 'tools.focus-test'],
-    ['tools.optimization-settings'],
+    ['tools.optimization-settings', 'tools.labs'],
     [
       'tools.adjust-image',
       'tools.apply-image-mask',

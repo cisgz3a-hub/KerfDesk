@@ -53,6 +53,7 @@ export type CommandId =
   | 'tools.scan-offset-test'
   | 'tools.focus-test'
   | 'tools.optimization-settings'
+  | 'tools.labs'
   | 'tools.adjust-image'
   | 'tools.apply-image-mask'
   | 'tools.crop-image'
@@ -182,6 +183,7 @@ export type AppCommandContext = {
   readonly focusTestAvailable: boolean;
   readonly focusTest: () => void;
   readonly optimizationSettings: () => void;
+  readonly labsSettings: () => void;
   readonly adjustImage: () => void;
   readonly saveProcessedBitmap: () => void;
   readonly traceImage: () => void;

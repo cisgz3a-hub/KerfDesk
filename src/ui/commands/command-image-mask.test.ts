@@ -75,6 +75,7 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     focusTestAvailable: false,
     focusTest: vi.fn(),
     optimizationSettings: vi.fn(),
+    labsSettings: vi.fn(),
     adjustImage: vi.fn(),
     saveProcessedBitmap: vi.fn(),
     traceImage: vi.fn(),

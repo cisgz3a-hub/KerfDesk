@@ -21,6 +21,7 @@ import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { ScanOffsetCalibrationDialog } from '../calibration/ScanOffsetCalibrationDialog';
 import { OptimizationSettingsDialog } from '../laser/OptimizationSettingsDialog';
+import { LabsSettingsDialog } from '../laser/LabsSettingsDialog';
 import { AdjustImageDialog, type AdjustImageApply } from '../raster/AdjustImageDialog';
 import {
   ConvertToBitmapDialog,
@@ -59,6 +60,7 @@ export function CommandShell(): JSX.Element {
   const [intervalTestDialogOpen, setIntervalTestDialogOpen] = useState(false);
   const [scanOffsetTestDialogOpen, setScanOffsetTestDialogOpen] = useState(false);
   const [optimizationDialogOpen, setOptimizationDialogOpen] = useState(false);
+  const [labsDialogOpen, setLabsDialogOpen] = useState(false);
   const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [undoHistoryOpen, setUndoHistoryOpen] = useState(false);
   const [closeToleranceDialogOpen, setCloseToleranceDialogOpen] = useState(false);
@@ -82,6 +84,7 @@ export function CommandShell(): JSX.Element {
         'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.',
       ),
     requestOptimizationSettings: () => setOptimizationDialogOpen(true),
+    requestLabsSettings: () => setLabsDialogOpen(true),
     requestProjectNotes: () => setProjectNotesOpen(true),
     requestUndoHistory: () => setUndoHistoryOpen(true),
     requestCloseOpenFillContoursWithTolerance: () => setCloseToleranceDialogOpen(true),
@@ -116,6 +119,7 @@ export function CommandShell(): JSX.Element {
       {optimizationDialogOpen ? (
         <OptimizationDialog onClose={() => setOptimizationDialogOpen(false)} />
       ) : null}
+      {labsDialogOpen ? <LabsSettingsDialog onClose={() => setLabsDialogOpen(false)} /> : null}
       {projectNotesOpen ? <ProjectNotesPanel onClose={() => setProjectNotesOpen(false)} /> : null}
       {undoHistoryOpen ? <UndoHistoryPanel onClose={() => setUndoHistoryOpen(false)} /> : null}
       {closeToleranceDialogOpen ? (

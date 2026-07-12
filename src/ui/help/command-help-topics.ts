@@ -145,6 +145,10 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Adjust path ordering and travel optimization for output.',
   },
+  'tools.labs': {
+    family: 'tools',
+    tooltip: 'Enable experimental machine workflows that are still being hardware-validated.',
+  },
   'tools.adjust-image': {
     family: 'tools',
     tooltip: 'Tune brightness, contrast, gamma, and dithering for the selected image.',

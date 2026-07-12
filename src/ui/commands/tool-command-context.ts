@@ -36,6 +36,7 @@ export function toolCommandContext(
   | 'scanOffsetTest'
   | 'focusTest'
   | 'optimizationSettings'
+  | 'labsSettings'
   | 'adjustImage'
   | 'saveProcessedBitmap'
   | 'traceImage'
@@ -62,6 +63,7 @@ export function toolCommandContext(
     scanOffsetTest: callbacks.requestScanOffsetTest,
     focusTest: callbacks.requestFocusTest,
     optimizationSettings: callbacks.requestOptimizationSettings,
+    labsSettings: callbacks.requestLabsSettings,
     adjustImage: callbacks.requestAdjustImage,
     saveProcessedBitmap: saveProcessedBitmapAction(platform, app, pushToast),
     traceImage: traceImageAction(selection.selected, dialogs.openImageDialog),

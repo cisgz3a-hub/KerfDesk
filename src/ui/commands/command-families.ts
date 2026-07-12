@@ -84,6 +84,7 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
       'Adjust output path optimization',
       ctx.optimizationSettings,
     ),
+    labsCommand(ctx),
     adjustImageCommand(ctx),
     imageMaskApplyCommand(ctx),
     imageMaskCropCommand(ctx),
@@ -132,6 +133,16 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           ctx.convertToBitmap,
         ),
   ];
+}
+
+function labsCommand(ctx: AppCommandContext): AppCommand {
+  return enabled(
+    'tools.labs',
+    'tools',
+    'Labs...',
+    'Enable experimental machine workflows',
+    ctx.labsSettings,
+  );
 }
 
 function convertToPathCommand(ctx: AppCommandContext): AppCommand {
