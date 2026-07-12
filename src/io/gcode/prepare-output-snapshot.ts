@@ -5,6 +5,7 @@ import {
   type ColoredPath,
   type Project,
   type TextObject,
+  type Transform,
 } from '../../core/scene';
 import { evaluateVariableTemplate, type VariableEvaluationContext } from '../../core/variables';
 import { applySimilarityProject, type SimilarityTransform } from '../../core/registration';
@@ -18,6 +19,7 @@ export type VariableTextRenderInput = {
 export type VariableTextRenderResult = {
   readonly bounds: Bounds;
   readonly paths: readonly ColoredPath[];
+  readonly transform?: Transform;
 };
 export type VariableTextRenderer = (
   input: VariableTextRenderInput,

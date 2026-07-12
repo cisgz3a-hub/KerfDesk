@@ -335,6 +335,7 @@ function openTextEditForSelectedText(): void {
     lineHeight: obj.lineHeight,
     letterSpacing: obj.letterSpacing,
     bendDeg: obj.bendDeg ?? 0,
+    ...(obj.pathText === undefined ? {} : { pathText: obj.pathText }),
     color: obj.color,
   });
 }

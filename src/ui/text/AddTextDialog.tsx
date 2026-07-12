@@ -12,26 +12,9 @@
 // lookup; we just split on '\n' for line breaks.
 
 import { useRef, useState } from 'react';
-import {
-  DEFAULT_FONT_KEY,
-  bendTextRender,
-  encodeEmbeddedFont,
-  FONT_REGISTRY,
-  textToPolylines,
-} from '../../core/text';
-import {
-  DEFAULT_TEXT_ALIGNMENT,
-  DEFAULT_TEXT_COLOR,
-  DEFAULT_TEXT_LETTER_SPACING,
-  DEFAULT_TEXT_LINE_HEIGHT,
-  DEFAULT_TEXT_SIZE_MM,
-} from '../../core/text';
-import {
-  IDENTITY_TRANSFORM,
-  type EmbeddedFont,
-  type TextAlignment,
-  type TextObject,
-} from '../../core/scene';
+import { bendTextRender, placeTextOnPath, textToPolylines } from '../../core/text';
+import { DEFAULT_TEXT_COLOR } from '../../core/text';
+import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -39,15 +22,17 @@ import { useUiStore } from '../state/ui-store';
 import { loadFont } from './font-loader';
 import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
+import { PathTextFields } from './PathTextFields';
 import {
-  initialTextLetterSpacing,
-  initialTextBend,
-  initialTextLineHeight,
-  initialTextSizeMm,
   sanitizeTextDialogNumericValues,
   TextDialogNumericFields,
   type TextDialogNumericValues,
 } from './TextDialogNumericFields';
+import {
+  useTextDialogFields,
+  type DialogFields,
+  type DialogValues,
+} from './use-text-dialog-fields';
 
 export function AddTextDialog(): JSX.Element | null {
   const state = useUiStore((s) => s.textDialog);
@@ -66,9 +51,10 @@ function DialogForm(props: {
   const { state } = props;
   const close = useUiStore((s) => s.closeTextDialog);
   const upsert = useStore((s) => s.upsertTextObject);
-  const embeddedFonts = useStore((s) => s.project.embeddedFonts ?? []);
+  const project = useStore((s) => s.project);
+  const selectedObjectId = useStore((s) => s.selectedObjectId);
   const pushToast = useToastStore((s) => s.pushToast);
-  const fields = useTextDialogFields(state, embeddedFonts);
+  const fields = useTextDialogFields(state, project, selectedObjectId);
   const [submitting, setSubmitting] = useState(false);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -82,96 +68,17 @@ function DialogForm(props: {
       <FormFields fields={fields} />
       <FormActions
         mode={state.mode}
-        canSubmit={fields.values.content.trim() !== '' && fields.fontAvailable && !submitting}
+        canSubmit={
+          fields.values.content.trim() !== '' &&
+          fields.fontAvailable &&
+          fields.pathAvailable &&
+          !submitting
+        }
         submitting={submitting}
         onCancel={close}
       />
     </Dialog>
   );
-}
-
-type DialogValues = TextDialogNumericValues & {
-  content: string;
-  fontKey: string;
-  alignment: TextAlignment;
-  embeddedFonts: ReadonlyArray<EmbeddedFont>;
-  importedFont?: EmbeddedFont;
-};
-
-type DialogFields = {
-  readonly values: DialogValues;
-  readonly setContent: (v: string) => void;
-  readonly setFontKey: (v: string) => void;
-  readonly setSizeMm: (v: number) => void;
-  readonly setAlignment: (v: TextAlignment) => void;
-  readonly setLineHeight: (v: number) => void;
-  readonly setLetterSpacing: (v: number) => void;
-  readonly setBendDeg: (v: number) => void;
-  readonly importFont: (file: File) => Promise<void>;
-  readonly fontAvailable: boolean;
-};
-
-function useTextDialogFields(
-  state: NonNullable<ReturnType<typeof useUiStore.getState>['textDialog']>,
-  projectFonts: ReadonlyArray<EmbeddedFont>,
-): DialogFields {
-  const [content, setContent] = useState(state.mode === 'edit' ? state.content : '');
-  const [fontKey, setFontKey] = useState<string>(
-    state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY,
-  );
-  const [sizeMm, setSizeMm] = useState(
-    initialTextSizeMm(state.mode === 'edit' ? state.sizeMm : DEFAULT_TEXT_SIZE_MM),
-  );
-  const [alignment, setAlignment] = useState<TextAlignment>(
-    state.mode === 'edit' ? state.alignment : DEFAULT_TEXT_ALIGNMENT,
-  );
-  const [lineHeight, setLineHeight] = useState(
-    initialTextLineHeight(state.mode === 'edit' ? state.lineHeight : DEFAULT_TEXT_LINE_HEIGHT),
-  );
-  const [letterSpacing, setLetterSpacing] = useState(
-    initialTextLetterSpacing(
-      state.mode === 'edit' ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING,
-    ),
-  );
-  const [bendDeg, setBendDeg] = useState(
-    initialTextBend(state.mode === 'edit' ? (state.bendDeg ?? 0) : 0),
-  );
-  const [importedFont, setImportedFont] = useState<EmbeddedFont | undefined>();
-  const embeddedFonts = importedFont === undefined ? projectFonts : [...projectFonts, importedFont];
-  const importFont = async (file: File): Promise<void> => {
-    if (!/\.(ttf|otf)$/i.test(file.name)) throw new Error('Choose a .ttf or .otf font file.');
-    const font = encodeEmbeddedFont({
-      key: `embedded:${crypto.randomUUID()}`,
-      fileName: file.name,
-      buffer: await file.arrayBuffer(),
-    });
-    setImportedFont(font);
-    setFontKey(font.key);
-  };
-  return {
-    values: {
-      content,
-      fontKey,
-      sizeMm,
-      alignment,
-      lineHeight,
-      letterSpacing,
-      bendDeg,
-      embeddedFonts,
-      ...(importedFont === undefined ? {} : { importedFont }),
-    },
-    setContent,
-    setFontKey,
-    setSizeMm,
-    setAlignment,
-    setLineHeight,
-    setLetterSpacing,
-    setBendDeg,
-    importFont,
-    fontAvailable:
-      FONT_REGISTRY.some((font) => font.key === fontKey) ||
-      embeddedFonts.some((font) => font.key === fontKey),
-  };
 }
 
 async function commitText(
@@ -202,7 +109,7 @@ async function commitText(
       letterSpacing: safeValues.letterSpacing,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
     });
-    const rendered = bendTextRender(rawRendered, safeValues.bendDeg);
+    const placed = placeRenderedText(rawRendered, safeValues, v);
     const obj: TextObject = {
       kind: 'text',
       id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
@@ -212,11 +119,12 @@ async function commitText(
       alignment: v.alignment,
       lineHeight: safeValues.lineHeight,
       letterSpacing: safeValues.letterSpacing,
-      bendDeg: safeValues.bendDeg,
+      bendDeg: v.pathText === undefined ? safeValues.bendDeg : 0,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
-      bounds: rendered.bounds,
-      transform: IDENTITY_TRANSFORM,
-      paths: rendered.paths,
+      ...(v.pathText === undefined ? {} : { pathText: v.pathText }),
+      bounds: placed.rendered.bounds,
+      transform: placed.transform,
+      paths: placed.rendered.paths,
     };
     ctx.upsert(obj, v.importedFont);
     ctx.close();
@@ -262,8 +170,46 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
         setLetterSpacing={setLetterSpacing}
         setBendDeg={setBendDeg}
       />
+      <PathTextFields
+        enabled={props.fields.pathEnabled}
+        guides={props.fields.guides}
+        settings={
+          values.pathText ?? {
+            guideObjectId: props.fields.guides[0]?.id ?? '',
+            offsetMm: 0,
+            reverse: false,
+          }
+        }
+        setEnabled={props.fields.setPathEnabled}
+        setGuideId={props.fields.setPathGuideId}
+        setOffsetMm={props.fields.setPathOffsetMm}
+        setReverse={props.fields.setPathReverse}
+      />
     </>
   );
+}
+
+function placeRenderedText(
+  rendered: Awaited<ReturnType<typeof textToPolylines>>,
+  safeValues: TextDialogNumericValues,
+  values: DialogValues,
+): {
+  readonly rendered: Awaited<ReturnType<typeof textToPolylines>>;
+  readonly transform: typeof IDENTITY_TRANSFORM;
+} {
+  if (values.pathText === undefined) {
+    return {
+      rendered: bendTextRender(rendered, safeValues.bendDeg),
+      transform: IDENTITY_TRANSFORM,
+    };
+  }
+  if (values.pathGuide === undefined) throw new Error('Select a guide path for this text.');
+  const result = placeTextOnPath(rendered, values.pathGuide, values.pathText);
+  if (result.kind !== 'ok') throw new Error(result.message);
+  return {
+    rendered: result.rendered,
+    transform: { ...IDENTITY_TRANSFORM, x: result.origin.x, y: result.origin.y },
+  };
 }
 
 function ContentField(props: {

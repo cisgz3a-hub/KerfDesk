@@ -48,6 +48,7 @@ export type {
   LinePathSegment,
   ObjectOperationOverride,
   ObjectPowerScale,
+  PathTextSettings,
   EllipseShape,
   Polyline,
   PathSegment,

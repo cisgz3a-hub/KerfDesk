@@ -139,6 +139,12 @@ export type TextAlignment = 'left' | 'center' | 'right';
 // fonts are bundled (so adding a font doesn't ripple here).
 export type FontKey = string;
 
+export type PathTextSettings = {
+  readonly guideObjectId: string;
+  readonly offsetMm: number;
+  readonly reverse: boolean;
+};
+
 export type TextObject = ObjectPowerScale & {
   readonly kind: 'text';
   readonly id: string;
@@ -153,6 +159,7 @@ export type TextObject = ObjectPowerScale & {
   // applies this as an extra advance after each glyph. Phase D.1 add.
   readonly letterSpacing: number;
   readonly bendDeg?: number;
+  readonly pathText?: PathTextSettings;
   readonly color: string; // hex; default black
   readonly bounds: Bounds; // computed at edit time from `paths`
   readonly transform: Transform;

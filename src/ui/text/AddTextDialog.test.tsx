@@ -40,6 +40,7 @@ vi.mock('../../core/text', async (importOriginal) => {
 });
 
 import { useStore } from '../state';
+import { svgObj } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { AddTextDialog } from './AddTextDialog';
@@ -67,6 +68,60 @@ afterEach(() => {
 });
 
 describe('AddTextDialog unknown font safety', () => {
+  it('links new text to the selected vector guide', async () => {
+    const guide = svgObj('guide-path', ['#ff0000']);
+    useStore.getState().importSvgObject({
+      ...guide,
+      bounds: { minX: 0, minY: 0, maxX: 100, maxY: 0 },
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: false,
+              points: [
+                { x: 0, y: 0 },
+                { x: 100, y: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    useStore.getState().selectObject(guide.id);
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<AddTextDialog />));
+      await act(async () => {
+        const content = requireTextarea(host);
+        content.value = 'Path text';
+        Simulate.change(content);
+        const toggle = host.querySelector(
+          'input[title="Place text along a selected vector path."]',
+        );
+        if (!(toggle instanceof HTMLInputElement)) throw new Error('Path toggle missing');
+        toggle.checked = true;
+        Simulate.change(toggle);
+      });
+      await act(async () => {
+        Simulate.submit(requireForm(host));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(
+        useStore.getState().project.scene.objects.find((object) => object.kind === 'text'),
+      ).toMatchObject({
+        pathText: { guideObjectId: guide.id, offsetMm: 0, reverse: false },
+      });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('inserts a diacritic into the content box when the accent button is clicked', async () => {
     useUiStore.setState({ textDialog: { mode: 'add' } });
     const host = document.createElement('div');
