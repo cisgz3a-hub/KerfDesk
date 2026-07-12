@@ -14,8 +14,8 @@
 import { useRef, useState } from 'react';
 import {
   DEFAULT_FONT_KEY,
+  encodeEmbeddedFont,
   FONT_REGISTRY,
-  type KnownFontKey,
   textToPolylines,
 } from '../../core/text';
 import {
@@ -25,12 +25,18 @@ import {
   DEFAULT_TEXT_LINE_HEIGHT,
   DEFAULT_TEXT_SIZE_MM,
 } from '../../core/text';
-import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
+import {
+  IDENTITY_TRANSFORM,
+  type EmbeddedFont,
+  type TextAlignment,
+  type TextObject,
+} from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { loadFont } from './font-loader';
+import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
 import {
   initialTextLetterSpacing,
@@ -58,8 +64,9 @@ function DialogForm(props: {
   const { state } = props;
   const close = useUiStore((s) => s.closeTextDialog);
   const upsert = useStore((s) => s.upsertTextObject);
+  const embeddedFonts = useStore((s) => s.project.embeddedFonts ?? []);
   const pushToast = useToastStore((s) => s.pushToast);
-  const fields = useTextDialogFields(state);
+  const fields = useTextDialogFields(state, embeddedFonts);
   const [submitting, setSubmitting] = useState(false);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault();
@@ -73,7 +80,7 @@ function DialogForm(props: {
       <FormFields fields={fields} />
       <FormActions
         mode={state.mode}
-        canSubmit={fields.values.content.trim() !== '' && !submitting}
+        canSubmit={fields.values.content.trim() !== '' && fields.fontAvailable && !submitting}
         submitting={submitting}
         onCancel={close}
       />
@@ -85,6 +92,8 @@ type DialogValues = TextDialogNumericValues & {
   content: string;
   fontKey: string;
   alignment: TextAlignment;
+  embeddedFonts: ReadonlyArray<EmbeddedFont>;
+  importedFont?: EmbeddedFont;
 };
 
 type DialogFields = {
@@ -95,10 +104,13 @@ type DialogFields = {
   readonly setAlignment: (v: TextAlignment) => void;
   readonly setLineHeight: (v: number) => void;
   readonly setLetterSpacing: (v: number) => void;
+  readonly importFont: (file: File) => Promise<void>;
+  readonly fontAvailable: boolean;
 };
 
 function useTextDialogFields(
   state: NonNullable<ReturnType<typeof useUiStore.getState>['textDialog']>,
+  projectFonts: ReadonlyArray<EmbeddedFont>,
 ): DialogFields {
   const [content, setContent] = useState(state.mode === 'edit' ? state.content : '');
   const [fontKey, setFontKey] = useState<string>(
@@ -118,14 +130,39 @@ function useTextDialogFields(
       state.mode === 'edit' ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING,
     ),
   );
+  const [importedFont, setImportedFont] = useState<EmbeddedFont | undefined>();
+  const embeddedFonts = importedFont === undefined ? projectFonts : [...projectFonts, importedFont];
+  const importFont = async (file: File): Promise<void> => {
+    if (!/\.(ttf|otf)$/i.test(file.name)) throw new Error('Choose a .ttf or .otf font file.');
+    const font = encodeEmbeddedFont({
+      key: `embedded:${crypto.randomUUID()}`,
+      fileName: file.name,
+      buffer: await file.arrayBuffer(),
+    });
+    setImportedFont(font);
+    setFontKey(font.key);
+  };
   return {
-    values: { content, fontKey, sizeMm, alignment, lineHeight, letterSpacing },
+    values: {
+      content,
+      fontKey,
+      sizeMm,
+      alignment,
+      lineHeight,
+      letterSpacing,
+      embeddedFonts,
+      ...(importedFont === undefined ? {} : { importedFont }),
+    },
     setContent,
     setFontKey,
     setSizeMm,
     setAlignment,
     setLineHeight,
     setLetterSpacing,
+    importFont,
+    fontAvailable:
+      FONT_REGISTRY.some((font) => font.key === fontKey) ||
+      embeddedFonts.some((font) => font.key === fontKey),
   };
 }
 
@@ -147,9 +184,7 @@ async function commitText(
   const safeValues = sanitizeTextDialogNumericValues(v);
   ctx.setSubmitting(true);
   try {
-    const knownFontKey = asKnownFontKey(v.fontKey);
-    const substitutedFont = knownFontKey !== v.fontKey;
-    const buffer = await loadFont(knownFontKey);
+    const buffer = await loadFont(v.fontKey, v.embeddedFonts);
     const rendered = await textToPolylines({
       fontBuffer: buffer,
       content: normalizedContent,
@@ -163,7 +198,7 @@ async function commitText(
       kind: 'text',
       id: state.mode === 'edit' ? state.id : crypto.randomUUID(),
       content: normalizedContent,
-      fontKey: knownFontKey,
+      fontKey: v.fontKey,
       sizeMm: safeValues.sizeMm,
       alignment: v.alignment,
       lineHeight: safeValues.lineHeight,
@@ -173,13 +208,7 @@ async function commitText(
       transform: IDENTITY_TRANSFORM,
       paths: rendered.paths,
     };
-    ctx.upsert(obj);
-    if (substitutedFont) {
-      ctx.pushToast(
-        `Missing font "${v.fontKey}" was substituted with ${fontDisplayName(knownFontKey)}.`,
-        'warning',
-      );
-    }
+    ctx.upsert(obj, v.importedFont);
     ctx.close();
   } catch (err) {
     ctx.pushToast(
@@ -205,7 +234,12 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
     <>
       <ContentField value={values.content} onChange={setContent} />
       <Field label="Font">
-        <FontPicker value={values.fontKey} onChange={setFontKey} />
+        <FontPicker
+          value={values.fontKey}
+          embeddedFonts={values.embeddedFonts}
+          onChange={setFontKey}
+        />
+        <FontImportButton importFont={props.fields.importFont} />
       </Field>
       <Field label="Alignment">
         <AlignmentRadio value={values.alignment} onChange={setAlignment} />
@@ -289,19 +323,6 @@ function FormActions(props: {
       </Button>
     </DialogActions>
   );
-}
-
-// Narrow a stored fontKey string back to KnownFontKey for the
-// loader. Unknown keys fall back to the default (so .lf2 files from
-// a future build that referenced an unbundled font still render in
-// something rather than crash).
-function asKnownFontKey(key: string): KnownFontKey {
-  if (FONT_REGISTRY.some((f) => f.key === key)) return key as KnownFontKey;
-  return DEFAULT_FONT_KEY;
-}
-
-function fontDisplayName(key: KnownFontKey): string {
-  return FONT_REGISTRY.find((f) => f.key === key)?.displayName ?? key;
 }
 
 function normalizeTextContent(text: string): string {

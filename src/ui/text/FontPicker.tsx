@@ -16,11 +16,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { FONT_REGISTRY, type KnownFontKey } from '../../core/text';
+import type { EmbeddedFont } from '../../core/scene';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
 
 type Props = {
   readonly value: string;
   readonly onChange: (next: string) => void;
+  readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
 };
 
 export function FontPicker(props: Props): JSX.Element {
@@ -29,6 +31,7 @@ export function FontPicker(props: Props): JSX.Element {
   useFontCssRegistration();
   useOutsideClickToClose(rootRef, open, () => setOpen(false));
   const selected = FONT_REGISTRY.find((f) => f.key === props.value);
+  const selectedEmbedded = props.embeddedFonts?.find((font) => font.key === props.value);
   if (selected === undefined && props.value === '' && FONT_REGISTRY.length === 0) {
     // FONT_REGISTRY is a static non-empty array — this branch keeps
     // TS happy under noUncheckedIndexedAccess but is unreachable in
@@ -50,7 +53,12 @@ export function FontPicker(props: Props): JSX.Element {
         title="Open the font picker and choose the text typeface."
         style={selected === undefined ? triggerBaseStyle : triggerStyleFor(selected.key)}
       >
-        {selected === undefined ? (
+        {selectedEmbedded !== undefined ? (
+          <>
+            <span style={triggerNameStyle}>{selectedEmbedded.fileName}</span>
+            <span style={triggerClassStyle}>(project font)</span>
+          </>
+        ) : selected === undefined ? (
           <>
             <span style={triggerNameStyle}>Missing font: {props.value}</span>
             <span style={triggerClassStyle}>(choose replacement)</span>
@@ -81,9 +89,42 @@ export function FontPicker(props: Props): JSX.Element {
               </button>
             </li>
           ))}
+          <EmbeddedFontOptions
+            fonts={props.embeddedFonts}
+            selectedKey={props.value}
+            select={(key) => {
+              props.onChange(key);
+              setOpen(false);
+            }}
+          />
         </ul>
       )}
     </div>
+  );
+}
+
+function EmbeddedFontOptions(props: {
+  readonly fonts: ReadonlyArray<EmbeddedFont> | undefined;
+  readonly selectedKey: string;
+  readonly select: (key: string) => void;
+}): JSX.Element {
+  return (
+    <>
+      {props.fonts?.map((font) => (
+        <li key={font.key} role="option" aria-selected={font.key === props.selectedKey}>
+          <button
+            type="button"
+            className="lf-menu-item"
+            onClick={() => props.select(font.key)}
+            title={`Use embedded font ${font.fileName}.`}
+            style={optionBaseStyle}
+          >
+            <span style={optionNameStyle}>{font.fileName}</span>
+            <span style={optionMetaStyle(font.key === props.selectedKey)}>(project)</span>
+          </button>
+        </li>
+      ))}
+    </>
   );
 }
 

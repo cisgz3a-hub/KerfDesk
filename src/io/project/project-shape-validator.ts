@@ -12,6 +12,7 @@ import { validateOptimization } from './project-optimization-validator';
 import { validateProjectVariables, validateVariableTemplate } from './project-variable-validator';
 import { validateRasterLumaBase64 } from './project-raster-luma-validator';
 import { validatePrintAndCutTargets } from './project-print-and-cut-validator';
+import { validateEmbeddedFonts } from './project-embedded-font-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import {
   firstError,
@@ -63,6 +64,7 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateOptimization(raw['optimization']),
     validateProjectVariables(raw['variables']),
     validatePrintAndCutTargets(raw['printAndCutTargets']),
+    validateEmbeddedFonts(raw['embeddedFonts']),
     optionalString(raw, 'notes'),
     validateScene(scene),
   ]);

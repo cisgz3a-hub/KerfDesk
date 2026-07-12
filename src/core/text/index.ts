@@ -18,3 +18,4 @@ export {
 
 export type { TextRenderInput, TextRenderResult } from './text-to-polylines';
 export { textToPolylines } from './text-to-polylines';
+export { MAX_EMBEDDED_FONT_BYTES, embeddedFontBuffer, encodeEmbeddedFont } from './embedded-font';

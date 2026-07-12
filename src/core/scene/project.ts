@@ -9,6 +9,12 @@ import type { PrintAndCutDesignTargets } from './print-and-cut';
 
 export const PROJECT_SCHEMA_VERSION = 2 as const;
 
+export type EmbeddedFont = {
+  readonly key: string;
+  readonly fileName: string;
+  readonly dataBase64: string;
+};
+
 export type Workspace = {
   readonly width: number; // mm
   readonly height: number; // mm
@@ -41,6 +47,7 @@ export type Project = {
   readonly optimization: ProjectOptimizationSettings;
   readonly variables?: ProjectVariableData;
   readonly printAndCutTargets?: PrintAndCutDesignTargets;
+  readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
   readonly notes: string;
   // Absent on laser projects saved before CNC support — treated as laser.
   readonly machine?: MachineConfig;

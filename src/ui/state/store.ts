@@ -27,7 +27,7 @@ import type { SaveTarget } from '../../platform/types';
 import { DEFAULT_JOB_PLACEMENT, type JobPlacementSettings } from '../job-placement';
 import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
-import type { CncMachineConfig } from '../../core/scene';
+import type { CncMachineConfig, EmbeddedFont } from '../../core/scene';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
   rasterAdjustmentActions,
@@ -236,9 +236,8 @@ export type AppState = ObjectPropertiesActions &
     // raster engrave-source rasterized from them (LightBurn discards the
     // originals; a multi-selection merges into a single bitmap).
     readonly convertToBitmap: (sourceIds: ReadonlyArray<string>, raster: RasterImage) => void;
-    // Phase D insert / update text by id; on add it's a new id, on
-    // edit it replaces in place (preserves position/transform).
-    readonly upsertTextObject: (text: TextObject) => void;
+    // Insert/update text by id; edits preserve position and transform.
+    readonly upsertTextObject: (text: TextObject, embeddedFont?: EmbeddedFont) => void;
     // Phase G (ADR-051): commit a kind:'shape' object drawn on the canvas.
     readonly drawShape: (shape: ShapeObject) => void;
     // Phase K (ADR-106): insert a generated box panel sheet — one polyline

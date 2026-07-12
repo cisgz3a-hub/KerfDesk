@@ -39,7 +39,6 @@ vi.mock('../../core/text', async (importOriginal) => {
   };
 });
 
-import { DEFAULT_FONT_KEY } from '../../core/text';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
@@ -163,7 +162,7 @@ describe('AddTextDialog unknown font safety', () => {
     }
   });
 
-  it('normalizes an unknown edit font key when regenerating fallback geometry', async () => {
+  it('requires an unavailable edit font to be relinked before regenerating geometry', async () => {
     useUiStore.setState({
       textDialog: {
         mode: 'edit',
@@ -187,29 +186,65 @@ describe('AddTextDialog unknown font safety', () => {
       });
 
       expect(host.textContent).toContain('Missing font: future-font');
-      const form = host.querySelector('form');
-      if (!(form instanceof HTMLFormElement)) throw new Error('Text form not rendered');
+      const save = Array.from(host.querySelectorAll('button')).find(
+        (button) => button.textContent === 'Save',
+      );
+      expect(save).toBeInstanceOf(HTMLButtonElement);
+      expect((save as HTMLButtonElement | undefined)?.disabled).toBe(true);
+      expect(textMocks.loadFont).not.toHaveBeenCalled();
+      expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    } finally {
+      if (root !== null) {
+        await act(async () => root?.unmount());
+      }
+      host.remove();
+    }
+  });
+
+  it('embeds an imported font and uses its stable project key', async () => {
+    useUiStore.setState({ textDialog: { mode: 'add' } });
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    let root: Root | null = null;
+    try {
       await act(async () => {
-        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        root = createRoot(host);
+        root.render(<AddTextDialog />);
+      });
+
+      await act(async () => {
+        const textarea = requireTextarea(host);
+        textarea.value = 'Studio';
+        Simulate.change(textarea);
+      });
+      const fontInput = requireInput(host, 'input[aria-label="Import font file"]');
+      const bytes = new Uint8Array([79, 84, 84, 79, 0, 1, 0, 0]);
+      const file = {
+        name: 'Studio.otf',
+        arrayBuffer: async () => bytes.buffer,
+      } as File;
+      Object.defineProperty(fontInput, 'files', { configurable: true, value: [file] });
+      await act(async () => {
+        Simulate.change(fontInput);
         await Promise.resolve();
         await Promise.resolve();
       });
 
-      const saved = useStore
-        .getState()
-        .project.scene.objects.find((obj) => obj.kind === 'text' && obj.id === 'text-1');
-      expect(saved?.kind).toBe('text');
-      if (saved?.kind !== 'text') return;
-      expect(saved.fontKey).toBe(DEFAULT_FONT_KEY);
-      expect(textMocks.loadFont).toHaveBeenCalledWith(DEFAULT_FONT_KEY);
-      expect(useToastStore.getState().toasts).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            message: expect.stringContaining('future-font'),
-            variant: 'warning',
-          }),
-        ]),
-      );
+      expect(host.textContent).toContain('Studio.otf');
+      await act(async () => {
+        requireForm(host).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const embedded = useStore.getState().project.embeddedFonts?.[0];
+      expect(embedded).toMatchObject({ fileName: 'Studio.otf' });
+      expect(embedded?.key).toMatch(/^embedded:/);
+      expect(useStore.getState().project.scene.objects[0]).toMatchObject({
+        kind: 'text',
+        fontKey: embedded?.key,
+      });
+      expect(textMocks.loadFont).toHaveBeenCalledWith(embedded?.key, [embedded]);
     } finally {
       if (root !== null) {
         await act(async () => root?.unmount());
