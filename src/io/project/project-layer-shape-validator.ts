@@ -16,7 +16,7 @@ import {
   requirePositiveNumber,
   requireString,
 } from './project-shape-primitives';
-import { validateLayerSubLayers } from './project-layer-validator';
+import { validateLayerOperationSettings, validateLayerSubLayers } from './project-layer-validator';
 
 export function validateProjectLayer(layer: unknown, path: string): string | null {
   if (!isObject(layer)) return `missing or invalid \`${path}\``;
@@ -49,5 +49,16 @@ export function validateProjectLayer(layer: unknown, path: string): string | nul
     optionalBoolean(layer, `${path}.passThrough`),
     optionalNonNegativeNumber(layer, `${path}.dotWidthCorrectionMm`),
     validateLayerSubLayers(layer['subLayers'], `${path}.subLayers`),
+    validateMaterialBinding(layer['materialBinding'], `${path}.materialBinding`),
+  ]);
+}
+
+function validateMaterialBinding(value: unknown, path: string): string | null {
+  if (value === undefined) return null;
+  if (!isObject(value)) return `missing or invalid \`${path}\``;
+  return firstError([
+    requireString(value, `${path}.libraryId`),
+    requireString(value, `${path}.presetId`),
+    validateLayerOperationSettings(value['lastResolved'], `${path}.lastResolved`),
   ]);
 }

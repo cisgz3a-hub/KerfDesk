@@ -16,7 +16,7 @@ function validateLayerSubLayer(value: unknown, path: string): string | null {
   ]);
 }
 
-function validateLayerOperationSettings(value: unknown, path: string): string | null {
+export function validateLayerOperationSettings(value: unknown, path: string): string | null {
   if (!isObject(value)) return `missing or invalid \`${path}\``;
   return firstError([
     requireLiteral(value, `${path}.mode`, ['line', 'fill', 'image']),

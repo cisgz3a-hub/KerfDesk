@@ -4,6 +4,7 @@
 
 import type { MaterialLibraryDocument } from '../../io/material-library';
 import {
+  handleImportClbMaterialLibrary,
   handleOpenMaterialLibrary,
   handleSaveMaterialLibrary,
 } from '../app/material-library-file-actions';
@@ -69,6 +70,11 @@ export function SavedLibrariesDialog(props: { readonly onClose: () => void }): J
         >
           Import...
         </Button>
+        <ClbImportButton
+          platform={platform}
+          setMaterialLibrary={setMaterialLibrary}
+          pushToast={pushToast}
+        />
       </div>
       {summaries.length === 0 ? (
         <p style={emptyStyle}>No saved libraries yet. Create one or import a file.</p>
@@ -95,6 +101,22 @@ export function SavedLibrariesDialog(props: { readonly onClose: () => void }): J
         <Button onClick={props.onClose}>Close</Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function ClbImportButton(props: {
+  readonly platform: ReturnType<typeof usePlatform>;
+  readonly setMaterialLibrary: (library: MaterialLibraryDocument) => void;
+  readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
+}): JSX.Element {
+  return (
+    <Button
+      aria-label="Import LightBurn CLB"
+      title="Import presets from a LightBurn .clb file. This does not write CLB files."
+      onClick={() => void handleImportClbMaterialLibrary(props)}
+    >
+      Import CLB...
+    </Button>
   );
 }
 

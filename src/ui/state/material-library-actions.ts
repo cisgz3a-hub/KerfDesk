@@ -23,6 +23,8 @@ export type MaterialLibraryActions = {
   readonly markMaterialLibrarySaved: () => void;
   readonly assignMaterialPresetToLayer: (layerId: string, presetId: string) => boolean;
   readonly deleteMaterialPreset: (presetId: string) => boolean;
+  readonly linkMaterialPresetToLayer: (layerId: string, presetId: string) => boolean;
+  readonly refreshLinkedMaterialLayer: (layerId: string) => boolean;
 };
 
 export function currentMaterialLibraryState(state: MaterialLibraryState): MaterialLibraryState {
@@ -82,7 +84,48 @@ export function materialLibraryActions(set: MaterialLibrarySet): MaterialLibrary
       return assigned;
     },
     deleteMaterialPreset: (presetId) => deleteMaterialPreset(set, presetId),
+    linkMaterialPresetToLayer: (layerId, presetId) =>
+      applyLinkedPreset(set, layerId, presetId, false),
+    refreshLinkedMaterialLayer: (layerId) => applyLinkedPreset(set, layerId, null, true),
   };
+}
+
+function applyLinkedPreset(
+  set: MaterialLibrarySet,
+  layerId: string,
+  presetId: string | null,
+  refresh: boolean,
+): boolean {
+  let applied = false;
+  set((state) => {
+    const target = state.project.scene.layers.find((layer) => layer.id === layerId);
+    if (target === undefined || state.materialLibrary === null) return {};
+    const linkedPresetId = refresh ? target.materialBinding?.presetId : presetId;
+    if (linkedPresetId === undefined || linkedPresetId === null) return {};
+    const preset = state.materialLibrary.entries.find((entry) => entry.id === linkedPresetId);
+    if (preset === undefined || !canAssignPreset(state.project, preset)) return {};
+    const recipe = materialRecipePatch(preset.recipe);
+    const next = {
+      ...target,
+      ...recipe,
+      materialBinding: {
+        libraryId: state.materialLibrary.libraryId,
+        presetId: preset.id,
+        lastResolved: { ...target, ...recipe },
+      },
+    };
+    applied = true;
+    return {
+      project: {
+        ...state.project,
+        scene: updateLayer(state.project.scene, layerId, next),
+      },
+      undoStack: pushUndo(state.project, state.undoStack),
+      redoStack: [],
+      dirty: true,
+    };
+  });
+  return applied;
 }
 
 function deleteMaterialPreset(set: MaterialLibrarySet, presetId: string): boolean {

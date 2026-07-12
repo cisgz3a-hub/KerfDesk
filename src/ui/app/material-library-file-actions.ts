@@ -7,6 +7,7 @@ import {
 import type { PlatformAdapter } from '../../platform/types';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ToastVariant } from '../state/toast-store';
+import { importLightBurnClb } from '../../io/lightburn';
 
 type PushToast = (message: string, variant?: ToastVariant) => void;
 
@@ -58,6 +59,39 @@ export async function handleOpenMaterialLibrary(ctx: OpenMaterialLibraryCtx): Pr
   }
 
   ctx.pushToast(`Could not open ${file.name}: ${describeOpenResult(result)}`, 'error');
+}
+
+export async function handleImportClbMaterialLibrary(ctx: OpenMaterialLibraryCtx): Promise<void> {
+  let files;
+  try {
+    files = await ctx.platform.pickFilesForOpen({ accept: ['.clb'], multiple: false });
+  } catch (err) {
+    ctx.pushToast(`Could not import CLB: ${errMsg(err)}`, 'error');
+    return;
+  }
+  const file = files[0];
+  if (file === undefined) return;
+  let text: string;
+  try {
+    text = await file.text();
+  } catch (err) {
+    ctx.pushToast(`Could not read ${file.name}: ${errMsg(err)}`, 'error');
+    return;
+  }
+  const result = importLightBurnClb(text, file.name);
+  if (!result.ok) {
+    ctx.pushToast(`Could not import ${file.name}: ${result.reason}`, 'error');
+    return;
+  }
+  ctx.setMaterialLibrary(result.library);
+  ctx.pushToast(`Imported ${result.report.importedEntries} CLB preset(s).`, 'success');
+  const unsupported = result.report.unknownFields.length + result.report.warnings.length;
+  if (unsupported > 0) {
+    ctx.pushToast(
+      `${unsupported} unsupported CLB field or entry warning(s) were reported.`,
+      'warning',
+    );
+  }
 }
 
 export async function handleSaveMaterialLibrary(ctx: SaveMaterialLibraryCtx): Promise<void> {
