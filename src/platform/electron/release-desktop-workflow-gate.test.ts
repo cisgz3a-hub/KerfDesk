@@ -18,6 +18,10 @@ describe('Desktop release workflow gate (ADR-024/135)', () => {
     expect(workflow).toContain('runs-on: windows-latest');
   });
 
+  it('checks text out as LF on Windows so the Prettier release gate is stable', () => {
+    expect(repoFile('.gitattributes')).toContain('* text=auto eol=lf');
+  });
+
   it('runs the full release:check gate before packaging the installer', () => {
     const gateIndex = workflow.indexOf('run: pnpm release:check');
     const buildIndex = workflow.indexOf('electron-builder --win --x64');

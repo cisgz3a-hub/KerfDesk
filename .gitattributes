@@ -1,3 +1,8 @@
+# Keep text byte-identical across Linux and Windows release runners. Prettier
+# enforces LF, so relying on a runner's core.autocrlf setting makes the Windows
+# packaging gate report the entire checkout as unformatted.
+* text=auto eol=lf
+
 # Treat binary assets as binary explicitly, so git's autocrlf logic
 # never tries to "fix" line endings inside them. The previous Dancing
 # Script font failed to parse because the download was an HTML error
