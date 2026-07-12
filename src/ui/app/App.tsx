@@ -17,6 +17,7 @@ import { PwaUpdatePromptGate } from './PwaUpdatePromptGate';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useCncLibraryPersistence } from './use-cnc-library-persistence';
+import { useCompactRailDefaults } from './use-compact-rail-defaults';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
 import { useJobCheckpoint } from './use-job-checkpoint';
@@ -37,6 +38,7 @@ export function App(): JSX.Element {
   useAutosave();
   useMaterialLibraryPersistence();
   useCncLibraryPersistence();
+  useCompactRailDefaults();
   useLayerDefaultsPersistence();
   useGlobalErrorHandlers();
   useImportDragDrop();

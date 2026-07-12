@@ -6517,6 +6517,9 @@ target for an emergency stop, even though the global keyboard shortcut remains.
   a narrow named strip with an expand button, preserving location and
   discoverability.
 - Checked commands in the Window menu mirror both visibility states.
+- Entering a viewport 700 px wide or narrower collapses both rails once. Users
+  may expand either rail while remaining compact; the default reapplies only on
+  the next transition into compact mode.
 - An active job makes the machine panel fail-visible regardless of its stored
   preference. Its collapse button and Window command are disabled until the job
   is no longer active, so the visible Stop control remains reachable.
@@ -6528,6 +6531,7 @@ restore the panels. Ending a job restores the operator's prior machine-panel
 preference, so a panel that was collapsed before Start collapses again after the
 stream fully settles. Panel visibility remains session-only; persistence across
 launches can be added later if user testing shows that preference is valuable.
+At 700 px and below, the initial canvas no longer collapses to zero width.
 
 ---
 
