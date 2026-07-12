@@ -54,16 +54,11 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
   const controlsBusy = jobNeedsRecovery || motionBusy || controllerOperation !== null;
   return (
     <div style={containerStyle}>
-      <JobPlacementControls disabled={disabled} streaming={controlsBusy} />
-      <OriginRow disabled={disabled} streaming={controlsBusy} />
       <SetupRow disabled={disabled} streaming={controlsBusy} onStartJob={onStartJob} />
       {motionOperation !== null && <MotionControls operationKind={motionOperation.kind} />}
       {controllerOperation !== null && (
         <ControllerOperationControls label={describeControllerOperation(controllerOperation)} />
       )}
-      <IslandFillRecoveryAction streaming={controlsBusy} />
-      <CheckpointResumeBanner disabled={disabled} busy={controlsBusy} />
-      <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
       {jobNeedsRecovery && (
         <RunningControls
           isStreaming={isStreaming}
@@ -71,6 +66,11 @@ export function JobControls({ disabled, onStartJob }: Props): JSX.Element {
           isToolChange={isToolChange}
         />
       )}
+      <JobPlacementControls disabled={disabled} streaming={controlsBusy} />
+      <OriginRow disabled={disabled} streaming={controlsBusy} />
+      <IslandFillRecoveryAction streaming={controlsBusy} />
+      <CheckpointResumeBanner disabled={disabled} busy={controlsBusy} />
+      <StartFromLineControl disabled={disabled} busy={controlsBusy} machineKind={machineKind} />
       {streamer !== null && streamer.total > 0 && <ProgressBar streamer={streamer} />}
     </div>
   );
