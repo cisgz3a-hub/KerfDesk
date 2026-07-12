@@ -9,20 +9,24 @@ export function editPathsNodesByDelta(
 ): { readonly paths: ReadonlyArray<ColoredPath> } | null {
   let changed = false;
   const refKeys = new Set(refs.map(pathNodeRefKey));
-  const nextPaths = paths.map((path, pathIndex) => ({
-    ...path,
-    polylines: path.polylines.map((polyline, polylineIndex) => ({
+  const nextPaths = paths.map((path, pathIndex) => {
+    let pathChanged = false;
+    const polylines = path.polylines.map((polyline, polylineIndex) => ({
       ...polyline,
       points: polyline.points.map((point, pointIndex) => {
         if (!refKeys.has(pathNodeRefKey({ objectId: '', pathIndex, polylineIndex, pointIndex }))) {
           return point;
         }
         changed = true;
-        const nextPoint = { x: point.x + dx, y: point.y + dy };
-        return nextPoint;
+        pathChanged = true;
+        return { x: point.x + dx, y: point.y + dy };
       }),
-    })),
-  }));
+    }));
+    // The legacy node editor addresses compatibility-polyline indices. Until
+    // handle-aware curve editing lands, discard stale canonical geometry so
+    // preview and machine output use the points the user actually changed.
+    return pathChanged ? { color: path.color, polylines } : path;
+  });
   return changed ? { paths: nextPaths } : null;
 }
 
@@ -33,9 +37,9 @@ export function deletePathsNodes(
   let changed = false;
   let invalid = false;
   const refsByPolyline = groupPathNodeRefsByPolyline(refs);
-  const nextPaths = paths.map((path, pathIndex) => ({
-    ...path,
-    polylines: path.polylines.map((polyline, polylineIndex) => {
+  const nextPaths = paths.map((path, pathIndex) => {
+    let pathChanged = false;
+    const polylines = path.polylines.map((polyline, polylineIndex) => {
       const polylineRefs = refsByPolyline.get(pathNodePolylineKey({ pathIndex, polylineIndex }));
       if (polylineRefs === undefined) return polyline;
       const edited = deletePolylineNodes(
@@ -48,9 +52,11 @@ export function deletePathsNodes(
       }
       if (edited === polyline) return polyline;
       changed = true;
+      pathChanged = true;
       return edited;
-    }),
-  }));
+    });
+    return pathChanged ? { color: path.color, polylines } : path;
+  });
   if (invalid || !changed) return null;
   return { paths: nextPaths };
 }
