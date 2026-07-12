@@ -27,8 +27,8 @@
 | ADR-024 | 2026-07-04 | Accepted | Windows desktop distribution + auto-update (revises non-negotiable #8 "no network calls") |
 | ADR-135 | 2026-07-12 | Accepted | Gate desktop auto-update on a trusted, code-signed channel |
 | ADR-136 | 2026-07-12 | Accepted | CNC interruption recovery rewinds to a retract-first safe boundary |
-| ADR-137 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
-| ADR-138 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
+| ADR-138 | 2026-07-12 | Accepted | Network-camera bridge is desktop and local-development only |
+| ADR-139 | 2026-07-12 | Accepted | Production desktop tags require a valid Windows signature |
 
 ---
 
@@ -6496,9 +6496,11 @@ remain unverified and must use the standing air-cut/scrap protocol first.
 
 ---
 
-## ADR-137 - The network-camera bridge is desktop and local-development only
+## ADR-138 - The network-camera bridge is desktop and local-development only
 
 **Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-137 is reserved by open PR #53; **ADR-138** is the next unallocated decision number.
 
 ### Context
 
@@ -6520,9 +6522,11 @@ network camera oracle. Desktop is the supported network-camera workflow.
 
 ---
 
-## ADR-138 - Production desktop tags require a valid Windows signature
+## ADR-139 - Production desktop tags require a valid Windows signature
 
 **Status:** Accepted | **Date:** 2026-07-12
+
+> **Numbering note.** ADR-138 records the network-camera bridge restriction; **ADR-139** is the next decision number.
 
 ### Context
 
