@@ -1,0 +1,395 @@
+{
+  "sector": 6,
+  "categories": [
+    {
+      "id": "6.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Reference-grade seam control: Set Start Point tool moves seam to any node, Shift-click or Edit > Reverse Shape Direction flips direction; Edit Nodes adds seam nodes; optimizer can auto-choose start/direction. Community guides show routine use.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/SetStartPoint/" },
+            { "tag": "COMM", "cite": "https://support.salasers.com/using-the-start-point-editor-in-lightburn-for-co2-lasers" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/starting-point-when-cutting/54451" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only product; no laser toolpath generation (phase0 coverage notes: product page lists only CNC control targets).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Vector line cutting exists via Inkscape-tuned SVG import and vectorization; vectorizer emits internal paths before external for cutting. No seam/start-point or direction controls documented anywhere in official usage docs [INF from absence].",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/perfect-cut-with-lasergrbl/" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no start-point/direction pages in nav)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio Cut processing type on vectors; closed shapes detected via <=0.05 mm endpoint-gap rule (kerf doc). No start-point, seam, or cut-direction control documented [INF from absence across support articles].",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1885" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1425" },
+            { "tag": "INF", "cite": "https://support.xtool.com/learning-center (no seam/direction article found)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: Easel generates CNC spindle toolpaths only; no native laser mode. Laser vendor J Tech recommends LightBurn instead of Easel; forum laser use is a workaround.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" },
+            { "tag": "COMM", "cite": "https://jtechphotonics.com/?page_id=1980" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/how-to-burn-first-laser-project/32522" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Broadest in roster: scan angle, line interval/LPI, cross-hatch, bi-directional, flood fill, fill grouping (all-at-once/groups/individually), separate Offset Fill contour mode, and sub-layers to stack fill+line settings on one layer.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only; no laser fill/hatch.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Minimal: only a silhouette 'filling pass' option inside the raster vectorization tool. No fill angle, spacing, cross-hatch, offset-fill, or fill-of-imported-SVG controls documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no vector-fill settings pages)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Vector fill engraving with engraving angle, cross-hatch, lines-per-cm density, bi-/uni-directional, and scanning-way/path options (incl. bottom-to-top). No offset-fill (contour-follow) mode or fill+line stacking documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1905" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2428" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1904" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: no laser fill/hatch generation; CNC pocketing is spindle-based.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" },
+            { "tag": "COMM", "cite": "https://jtechphotonics.com/?page_id=1980" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Fill of closed shapes with documented grouping semantics (all-at-once vs individually) governing hole/nesting behavior. Widely used in production as the de-facto reference; fill correctness NOT perceptually verified in this audit [INF for reference status].",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/" },
+            { "tag": "INF", "cite": "https://forum.lightburnsoftware.com/ (ubiquity of fill workflows; no systematic correctness complaints located)" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only; no laser fill.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Unknown correctness: the vectorization filling pass exists, but no evidence found on hole/even-odd handling, shared edges, or small-feature behavior.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            { "tag": "INF", "cite": "No official or community source found on fill correctness details" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Unknown correctness: vector fill engraving exists with display of fills ('Display vector fill' toggle), but no evidence found on hole/even-odd, shared-edge, or small-feature handling.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/3450" },
+            { "tag": "INF", "cite": "No official or community source found on fill correctness details" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: no laser fill capability to assess.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Kerf Offset in Line mode: positive values offset the beam path outside closed shapes, negative inside; documented as compensation for material removed.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only (CNC has cutter compensation, but no laser kerf sector presence).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No kerf compensation documented anywhere in official usage docs (vectorization, import parameters, load-and-send all checked).",
+          "evidence": [
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no kerf setting in any documented page)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Kerf offset -1 to +1 mm (two decimals), closed shapes only (<=0.05 mm gap rule); positive moves beam outward, negative inward. Dedicated xTool Studio how-to exists; community reports some vectors not recognized as closed.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1425" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2426" },
+            { "tag": "COMM", "cite": "https://support.xtool.com/community-support/detail/6253" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: no laser kerf feature.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Both Tabs/Bridges (skip sections so parts don't fall) and Perforation Mode (alternate cut/skip distances) documented in Line mode common settings - available across laser types.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only (CNC holding tabs exist but no laser tab/perforation sector presence).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No tabs, bridges, or perforation mode documented in official usage docs.",
+          "evidence": [
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no tab/perforation page in nav)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Tab Generation with tab size and optional non-zero tab cut power (snap-off aid); dashed-line/outline technique documented separately for perforation-style cuts in xTool Studio.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1894" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/3278" },
+            { "tag": "COMM", "cite": "https://support.xtool.com/community-support/detail/3856" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: Easel tabs are CNC holding tabs, not laser tabs.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Start points fully controllable via Set Start Point tool (any node, either direction). Lead-In/Lead-Out (angle, length, style) documented but DSP-lasers-only - not offered for GCode/Core devices. Start/End Pause Time also DSP-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/SetStartPoint/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No lead-in/lead-out or start-point control documented in official usage docs.",
+          "evidence": [
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no such pages in nav)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No lead-in/lead-out or user start-point control found in xTool support articles for XCS or xTool Studio (searched; absence inferred).",
+          "evidence": [
+            { "tag": "INF", "cite": "https://support.xtool.com/learning-center (no lead-in/start-point article found)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: no laser lead-in/start-point features.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6.7",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Number of Passes plus Z Offset and Z Step per Pass documented in both Line and Fill mode common settings (raise/lower laser each pass).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only (CNC depth passes exist but no laser multi-pass sector presence).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Whole-program loop counter repeats the job N times, decrementing per pass. No per-pass Z step or any Z control between passes documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/load-and-send/ (Z step absent from multi-pass doc)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Pass parameter up to 10 repeats (XCS and xTool Studio). No per-pass Z step-down documented; depth effects route through machine auto-focus or the separate layered Embossing feature.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2425" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1891" },
+            { "tag": "INF", "cite": "https://support.xtool.com/article/1325 (embossing = layered depth; no Z-step-per-pass article found)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: Easel depth-per-pass is CNC cutting, not laser.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "6.8",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Full Cut Planner: order by layer/priority/group, cut inner shapes first, reduce travel moves, reduce direction changes, choose best start point/direction; effects visible in Preview. Forum threads show it is tunable and effective in practice.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/OptimizationSettings/" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/how-to-optimize-moves/13470" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/optimization-settings-and-actual-cut-path/16172" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "N/R - CNC-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "'Optimize Travel' (shortest-order routing) exists only inside the vectorization tool, plus fixed inner-before-outer cutting order. No optimization documented for imported G-code or SVG jobs.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/perfect-cut-with-lasergrbl/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Auto-plan mode (algorithm picks efficient path mixing one-by-one/all-together), User-define mode for manual path/sequence, processing order by layer drag; F1-only Smart Engraving skips blank space.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1301" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1902" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/880" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Outside sector: no laser job travel optimization.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
+          ]
+        }
+      ]
+    }
+  ]
+}
