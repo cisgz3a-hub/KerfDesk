@@ -25,6 +25,7 @@ export function QuickNestDialog(props: {
         <label style={fieldStyle}>
           <span>Nest into</span>
           <select
+            title="Choose the boundary that contains the nested selection"
             value={bin}
             onChange={(event) => setBin(event.currentTarget.value as QuickNestOptions['bin'])}
           >
@@ -46,6 +47,7 @@ export function QuickNestDialog(props: {
         <label style={checkStyle}>
           <input
             type="checkbox"
+            title="Allow parts to rotate by 90 degrees while nesting"
             checked={allowRotation}
             onChange={(event) => setAllowRotation(event.currentTarget.checked)}
           />

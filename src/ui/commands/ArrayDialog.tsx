@@ -87,6 +87,7 @@ function ModeButton(props: {
     <button
       type="button"
       role="tab"
+      title={`Use ${props.label.toLowerCase()} array placement`}
       aria-selected={props.active}
       className="lf-button"
       style={{ ...tabStyle, fontWeight: props.active ? 600 : 400 }}
@@ -177,6 +178,7 @@ function CircularFields(props: {
       <label style={checkboxStyle}>
         <input
           type="checkbox"
+          title="Rotate each copy to follow its position around the circle"
           checked={props.values.rotateCopies}
           onChange={(event) => props.setters.setRotateCopies(event.currentTarget.checked)}
         />
