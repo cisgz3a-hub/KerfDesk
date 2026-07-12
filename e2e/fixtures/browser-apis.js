@@ -1,4 +1,4 @@
-/* global Blob, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
+/* global Blob, document, EventTarget, File, MediaStream, navigator, queueMicrotask, ReadableStream, setTimeout, TextDecoder, TextEncoder, window, WritableStream */
 
 const BASIC_PROJECT = '__KERFDESK_E2E_PROJECT_FIXTURE__';
 
@@ -102,8 +102,38 @@ function fileHandle(file) {
   return {
     kind: 'file',
     name: file.name,
-    getFile: async () => new File([file.text], file.name, { type: 'application/json' }),
+    getFile: async () =>
+      file.kind === 'png-fixture'
+        ? generatedPngFile(file)
+        : new File([file.text ?? ''], file.name, { type: textFileType(file.name) }),
   };
+}
+
+async function generatedPngFile(file) {
+  const width = file.width ?? 64;
+  const height = file.height ?? 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = '#000000';
+  context.fillRect(width / 4, height / 4, width / 2, height / 2);
+  const blob = await new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (value) => (value === null ? reject(new Error('PNG encode failed')) : resolve(value)),
+      'image/png',
+    ),
+  );
+  return new File([blob], file.name, { type: 'image/png' });
+}
+
+function textFileType(name) {
+  if (/\.svg$/i.test(name)) return 'image/svg+xml';
+  if (/\.csv$/i.test(name)) return 'text/csv';
+  if (/\.(clb|lbrn2?)$/i.test(name)) return 'application/xml';
+  return 'application/json';
 }
 
 function saveHandle(name) {

@@ -3,14 +3,19 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export type FixtureEvent = Readonly<Record<string, unknown>> & { readonly kind: string };
+export interface OpenFileFixture {
+  readonly name: string;
+  readonly text?: string;
+  readonly kind?: 'text' | 'png-fixture';
+  readonly width?: number;
+  readonly height?: number;
+}
 
 export interface KerfDeskFixture {
   readonly events: () => Promise<readonly FixtureEvent[]>;
   readonly savedFiles: () => Promise<Readonly<Record<string, string>>>;
   readonly emitSerialLine: (line: string) => Promise<void>;
-  readonly setOpenFiles: (
-    files: readonly { readonly name: string; readonly text: string }[],
-  ) => Promise<void>;
+  readonly setOpenFiles: (files: readonly OpenFileFixture[]) => Promise<void>;
 }
 
 const browserFixturePath = fileURLToPath(new URL('./browser-apis.js', import.meta.url));
@@ -69,7 +74,7 @@ function createFixtureControl(page: Page, pageErrors: readonly Error[]): KerfDes
         (
           window as typeof window & {
             __KERFDESK_E2E__: {
-              setOpenFiles: (files: readonly { name: string; text: string }[]) => void;
+              setOpenFiles: (files: readonly OpenFileFixture[]) => void;
             };
           }
         ).__KERFDESK_E2E__.setOpenFiles(value);

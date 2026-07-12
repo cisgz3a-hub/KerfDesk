@@ -173,6 +173,61 @@ test('builds variable text with embedded CSV and serial state', async ({ page, k
   });
 });
 
+test('configures the Creality Falcon profile through the complete setup wizard', async ({
+  page,
+  kerfdesk,
+}) => {
+  await page.getByRole('button', { name: 'Set up device' }).click();
+  await expect(page.getByRole('dialog', { name: 'Device Setup' })).toContainText('Step 1 of 7');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Use Creality Falcon A1 Pro' }).click();
+  for (let step = 0; step < 5; step += 1) {
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
+  }
+  await expect(page.getByRole('button', { name: 'Finish setup' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Finish setup' }).click();
+  await page.getByRole('button', { name: 'Save As...' }).click();
+
+  const saved = await savedProject(kerfdesk);
+  expect(saved.device).toMatchObject({
+    profileId: 'creality-falcon-a1-pro-grblhal',
+    controllerKind: 'grblhal',
+    bedWidth: 400,
+    bedHeight: 400,
+    framingFeedMmPerMin: 10000,
+  });
+});
+
+test('imports a generated bitmap and traces it through the production worker workflow', async ({
+  page,
+  kerfdesk,
+}) => {
+  await kerfdesk.setOpenFiles([
+    { name: 'trace-square.png', kind: 'png-fixture', width: 64, height: 64 },
+  ]);
+  await page.getByRole('button', { name: 'Import Image...' }).click();
+  await expect(page.getByText('Objects: 2', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Trace Image...' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Trace Image...' }).click();
+  await expect(page.getByRole('dialog', { name: 'Trace image' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Trace', exact: true })).toBeEnabled({
+    timeout: 15_000,
+  });
+  await page.getByRole('button', { name: 'Trace', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Trace image' })).not.toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Save As...' }).click();
+
+  const saved = await savedProject(kerfdesk);
+  expect(saved.scene.objects.some((object) => object['kind'] === 'traced-image')).toBe(true);
+  expect(
+    saved.scene.objects.some(
+      (object) => object['kind'] === 'raster-image' && object['source'] === 'trace-square.png',
+    ),
+  ).toBe(true);
+});
+
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
 }
@@ -199,6 +254,11 @@ async function savedProject(kerfdesk: {
 
 interface SavedProject {
   readonly device: {
+    readonly profileId?: string;
+    readonly controllerKind?: string;
+    readonly bedWidth?: number;
+    readonly bedHeight?: number;
+    readonly framingFeedMmPerMin?: number;
     readonly rotary?: {
       readonly enabled: boolean;
       readonly type: string;
