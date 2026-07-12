@@ -813,11 +813,17 @@ run that finishes cleanly clears it.
    <time>: N of M motion lines confirmed."
 3. Operator connects, homes, and confirms the work zero is unchanged
    (same contract as manual Start-from-line).
-4. **Resume interrupted job** re-compiles the project, verifies the
-   fingerprint matches the interrupted program byte-for-byte, maps the
-   acked count to the raw G-code line, and runs the standard
-   start-from-line replay (safe re-entry preamble, then the tail).
-5. The checkpoint clears when the resume run completes.
+4. **Review safe recovery** re-compiles the project and verifies the
+   fingerprint. Laser resumes map the acked count to the first unconfirmed
+   raw line. Router resumes rewind from that point to the previous pure
+   safe-Z retract boundary, extract Z at the recovered plunge feed before
+   issuing a spindle-start command, spin up at clearance, then replay the
+   complete cutting segment.
+5. The checkpoint records the terminal safety reason when one is available
+   (disconnect, controller error/rejected line, reboot, write failure, or
+   cancellation) and shows it after reload/reconnect.
+6. The checkpoint clears only after the controller reports connected,
+   physical Idle; the final GRBL `ok` alone is not physical completion.
 
 #### Error — project changed since the run
 1. Fingerprint mismatch → alert explains the project no longer produces
@@ -2265,17 +2271,18 @@ F-CNC19 tiling.
 
 #### Success
 1. Job controls → "Start from line…": enter the 1-based line of the
-   exported job and Resume. The app replays the program's modal state
-   up to that line and streams a safe re-entry: units + absolute mode,
-   spindle restart with spin-up dwell, safe-Z travel to the recorded
-   XY, feed back down to the recorded depth, feed restore, then the
-   rest of the job verbatim.
+   exported job and Resume. Laser jobs replay modal state and position
+   with the beam off before arming. CNC jobs treat the requested line as
+   the interruption vicinity, rewind to the previous pure safe-Z retract,
+   extract Z at the recovered plunge feed before any spindle-start command,
+   spin up at safe height, then replay that entire cutting segment.
 2. A confirm spells out the contract: the work zero must be UNCHANGED
    since the original run.
 
 #### Error — impossible resumes
-1. Out-of-range lines, programs using G91 before the resume point, and
-   empty tails are refused with the reason (nothing streams).
+1. Out-of-range lines, programs using G91 before the resume point, empty
+   tails, and CNC programs with no previous safe retract boundary are
+   refused with the reason (nothing streams).
 
 #### Empty
 1. The control is disabled while disconnected or any job/motion is

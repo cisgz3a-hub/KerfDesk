@@ -17,6 +17,7 @@
 import { isSendableGcodeLine } from '../controllers/grbl';
 import { JOB_ORIGIN_ANCHORS, type JobOriginAnchor, type JobOriginPlacement } from '../job';
 import type { OutputScope, Vec2 } from '../scene';
+import { parseOptionalJobInterruption, type JobInterruption } from './job-interruption';
 
 // v3 (R1): the checkpoint stores the RESOLVED job origin, not the placement
 // settings. A 'current-position' start freezes the live head XY into
@@ -56,6 +57,7 @@ export type JobCheckpoint = {
   // progress updates are suspended so a coincidental total match can never
   // corrupt ackedLines with foreign counts.
   readonly resumeInFlight: boolean;
+  readonly interruption?: JobInterruption;
   readonly machineKind: JobMachineKind;
   // The output scope + RESOLVED job origin the run compiled with. Resume MUST
   // recompile with these, not the (reset-after-crash) live values, or the bytes
@@ -171,14 +173,14 @@ function validatedCheckpointBody(
   const resumeInFlight = value['resumeInFlight'];
   const machineKind = value['machineKind'];
   const outputScope = parseOutputScope(value['outputScope']);
-  const jobOriginPatch = parseOptionalJobOrigin(value['jobOrigin']);
+  const optionalFields = parseOptionalCheckpointFields(value);
   const startedAtIso = value['startedAtIso'];
   const updatedAtIso = value['updatedAtIso'];
   if (!isNonNegativeInteger(sendableLines) || sendableLines > fingerprint.lines) return null;
   if (!isNonNegativeInteger(ackedLines) || ackedLines > sendableLines) return null;
   if (typeof resumeInFlight !== 'boolean') return null;
   if (machineKind !== 'laser' && machineKind !== 'cnc') return null;
-  if (outputScope === null || jobOriginPatch === null) return null;
+  if (outputScope === null || optionalFields === null) return null;
   if (typeof startedAtIso !== 'string' || typeof updatedAtIso !== 'string') return null;
   return {
     schemaVersion: JOB_CHECKPOINT_SCHEMA_VERSION,
@@ -188,10 +190,19 @@ function validatedCheckpointBody(
     resumeInFlight,
     machineKind,
     outputScope,
-    ...jobOriginPatch,
+    ...optionalFields,
     startedAtIso,
     updatedAtIso,
   };
+}
+
+function parseOptionalCheckpointFields(
+  value: Record<string, unknown>,
+): { readonly interruption?: JobInterruption; readonly jobOrigin?: JobOriginPlacement } | null {
+  const interruptionPatch = parseOptionalJobInterruption(value['interruption']);
+  const jobOriginPatch = parseOptionalJobOrigin(value['jobOrigin']);
+  if (interruptionPatch === null || jobOriginPatch === null) return null;
+  return { ...interruptionPatch, ...jobOriginPatch };
 }
 
 // jobOrigin is optional (absent = Absolute); present-but-malformed rejects the
