@@ -23,6 +23,7 @@ export function FontImportButton(props: {
         accept=".ttf,.otf,font/ttf,font/otf"
         hidden
         aria-label="Import font file"
+        title="Choose a TTF or OTF font file to embed in this project."
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = '';

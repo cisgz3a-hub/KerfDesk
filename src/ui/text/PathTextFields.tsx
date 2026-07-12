@@ -31,6 +31,7 @@ export function PathTextFields(props: {
               value={props.settings.guideObjectId}
               onChange={(event) => props.setGuideId(event.target.value)}
               aria-label="Text path guide"
+              title="Choose the vector path that the text follows."
             >
               {props.guides.map((guide) => (
                 <option key={guide.id} value={guide.id}>
