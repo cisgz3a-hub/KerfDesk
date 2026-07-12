@@ -8,6 +8,8 @@ const MEASURE_DRAFT = { start: { x: 0, y: 0 }, end: { x: 12, y: 8 } };
 
 describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
   beforeEach(() => {
+    useUiStore.getState().setRailPanelVisible('layers', true);
+    useUiStore.getState().setRailPanelVisible('machine', true);
     useUiStore.getState().setToolMode({ kind: 'select' });
     useUiStore.getState().setPenDraft(null);
     useUiStore.getState().setSelectionMarquee(null);
@@ -19,6 +21,20 @@ describe('ui-store pen draft lifecycle (ADR-051 B6)', () => {
     useUiStore.getState().closeWorkspaceContextBar();
     useUiStore.getState().setSnapSettings(DEFAULT_SNAP_SETTINGS);
     useUiStore.getState().setSnapGuides([]);
+  });
+
+  it('tracks the two right-rail visibility choices independently', () => {
+    useUiStore.getState().toggleRailPanel('layers');
+    expect(useUiStore.getState().railPanelVisibility).toEqual({
+      layers: false,
+      machine: true,
+    });
+
+    useUiStore.getState().setRailPanelVisible('machine', false);
+    expect(useUiStore.getState().railPanelVisibility).toEqual({
+      layers: false,
+      machine: false,
+    });
   });
 
   it('setToolMode clears the pen draft when switching to a non-pen draw tool', () => {

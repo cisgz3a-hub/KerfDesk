@@ -408,3 +408,26 @@ describe('window.toggle-preview command (M27)', () => {
     expect(togglePreview).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('right-rail visibility commands', () => {
+  it('exposes independent checked commands for both right rails', () => {
+    const commands = buildAppCommands(baseCtx({ layersPanelOpen: false, machinePanelOpen: true }));
+
+    expect(commandById(commands, 'window.toggle-layers-panel').active).toBe(false);
+    expect(commandById(commands, 'window.toggle-machine-panel').active).toBe(true);
+  });
+
+  it('keeps machine controls visible and non-collapsible during an active job', () => {
+    const toggleMachinePanel = vi.fn();
+    const command = commandById(
+      buildAppCommands(baseCtx({ jobActive: true, machinePanelOpen: false, toggleMachinePanel })),
+      'window.toggle-machine-panel',
+    );
+
+    expect(command.active).toBe(true);
+    expect(command.enabled).toBe(false);
+    expect(command.disabledReason).toContain('Stop remains reachable');
+    expect(runCommand(command)).toBe(false);
+    expect(toggleMachinePanel).not.toHaveBeenCalled();
+  });
+});
