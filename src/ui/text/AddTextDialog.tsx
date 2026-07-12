@@ -15,6 +15,7 @@ import { useRef, useState } from 'react';
 import { bendTextRender, placeTextOnPath, textToPolylines } from '../../core/text';
 import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import { IDENTITY_TRANSFORM, type TextAlignment, type TextObject } from '../../core/scene';
+import { parseVariableTemplateSource } from '../../core/variables';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
@@ -23,6 +24,7 @@ import { loadFont } from './font-loader';
 import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
 import { PathTextFields } from './PathTextFields';
+import { VariableTextFields } from './VariableTextFields';
 import {
   sanitizeTextDialogNumericValues,
   TextDialogNumericFields,
@@ -97,6 +99,11 @@ async function commitText(
     return;
   }
   const safeValues = sanitizeTextDialogNumericValues(v);
+  const variable = fieldsVariableTemplate(v);
+  if (!variable.ok) {
+    ctx.pushToast(variable.message, 'error');
+    return;
+  }
   ctx.setSubmitting(true);
   try {
     const buffer = await loadFont(v.fontKey, v.embeddedFonts);
@@ -122,6 +129,7 @@ async function commitText(
       bendDeg: v.pathText === undefined ? safeValues.bendDeg : 0,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
       ...(v.pathText === undefined ? {} : { pathText: v.pathText }),
+      ...(variable.template === undefined ? {} : { variableTemplate: variable.template }),
       bounds: placed.rendered.bounds,
       transform: placed.transform,
       paths: placed.rendered.paths,
@@ -152,6 +160,11 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
   return (
     <>
       <ContentField value={values.content} onChange={setContent} />
+      <VariableTextFields
+        enabled={props.fields.variableEnabled}
+        onEnabledChange={props.fields.setVariableEnabled}
+        onInsert={(source) => setContent(`${values.content}${source}`)}
+      />
       <Field label="Font">
         <FontPicker
           value={values.fontKey}
@@ -187,6 +200,15 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
       />
     </>
   );
+}
+
+function fieldsVariableTemplate(
+  values: DialogValues,
+):
+  | { readonly ok: true; readonly template?: NonNullable<TextObject['variableTemplate']> }
+  | { readonly ok: false; readonly message: string } {
+  if (values.variableTemplate === undefined) return { ok: true };
+  return parseVariableTemplateSource(values.content);
 }
 
 function placeRenderedText(

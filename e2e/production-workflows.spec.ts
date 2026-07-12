@@ -139,6 +139,40 @@ test('imports a CLB library and links its preset to a cut layer', async ({ page,
   await expect(page.getByText('Layer is linked to the selected material library.')).toBeVisible();
 });
 
+test('builds variable text with embedded CSV and serial state', async ({ page, kerfdesk }) => {
+  await page.getByRole('button', { name: 'Text...' }).click();
+  await page.getByRole('textbox', { name: 'Text content' }).fill('Part-');
+  await page.getByRole('checkbox', { name: 'Variable text' }).check();
+  await page.getByLabel('Import variable CSV').setInputFiles({
+    name: 'parts.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('name,material\nBracket,Birch\nPanel,Acrylic\n'),
+  });
+  await page.getByRole('button', { name: 'CSV: name' }).click();
+  await page.getByRole('button', { name: 'Serial' }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Add or edit text' })).not.toBeVisible();
+  await page.getByRole('button', { name: 'Save As...' }).click();
+
+  const saved = await savedProject(kerfdesk);
+  expect(saved.variables?.csv).toMatchObject({
+    sourceName: 'parts.csv',
+    headers: ['name', 'material'],
+    records: [
+      ['Bracket', 'Birch'],
+      ['Panel', 'Acrylic'],
+    ],
+  });
+  const text = saved.scene.objects.find((object) => object['kind'] === 'text');
+  expect(text?.['variableTemplate']).toMatchObject({
+    tokens: [
+      { kind: 'literal', value: 'Part-' },
+      { kind: 'csv', column: 'name' },
+      { kind: 'serial', width: 4 },
+    ],
+  });
+});
+
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
 }
@@ -175,6 +209,13 @@ interface SavedProject {
   readonly printAndCutTargets?: {
     readonly first: { readonly x: number; readonly y: number };
     readonly second: { readonly x: number; readonly y: number };
+  };
+  readonly variables?: {
+    readonly csv?: {
+      readonly sourceName: string;
+      readonly headers: readonly string[];
+      readonly records: readonly (readonly string[])[];
+    };
   };
   readonly scene: { readonly objects: readonly Record<string, unknown>[] };
 }

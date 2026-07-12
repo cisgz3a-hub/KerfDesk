@@ -11,6 +11,7 @@ import type {
   RasterImage,
   SelectionAnchor,
   ShapeObject,
+  VariableTemplate,
   Vec2,
 } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
@@ -57,6 +58,7 @@ export type TextDialogState =
       readonly letterSpacing: number;
       readonly bendDeg?: number;
       readonly pathText?: PathTextSettings;
+      readonly variableTemplate?: VariableTemplate;
       readonly color: string;
     };
 

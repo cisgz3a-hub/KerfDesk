@@ -14,7 +14,9 @@ import type {
   Project,
   SceneObject,
   TextAlignment,
+  VariableTemplate,
 } from '../../core/scene';
+import { variableTemplateToSource } from '../../core/variables';
 import type { TextDialogState } from '../state/ui-store';
 import {
   initialTextBend,
@@ -32,6 +34,7 @@ export type DialogValues = TextDialogNumericValues & {
   readonly importedFont?: EmbeddedFont;
   readonly pathText?: PathTextSettings;
   readonly pathGuide?: SceneObject;
+  readonly variableTemplate?: VariableTemplate;
 };
 
 export type DialogFields = {
@@ -52,6 +55,8 @@ export type DialogFields = {
   readonly setPathGuideId: (id: string) => void;
   readonly setPathOffsetMm: (offset: number) => void;
   readonly setPathReverse: (reverse: boolean) => void;
+  readonly variableEnabled: boolean;
+  readonly setVariableEnabled: (enabled: boolean) => void;
 };
 
 export function useTextDialogFields(
@@ -62,10 +67,14 @@ export function useTextDialogFields(
   const basic = useBasicFields(state);
   const font = useImportedFont(state.mode === 'edit' ? state.fontKey : DEFAULT_FONT_KEY);
   const path = usePathFields(state, textGuides(project, state), selectedObjectId);
+  const [variableEnabled, setVariableEnabled] = useState(
+    state.mode === 'edit' && state.variableTemplate !== undefined,
+  );
   const embeddedFonts =
     font.importedFont === undefined
       ? (project.embeddedFonts ?? [])
       : [...(project.embeddedFonts ?? []), font.importedFont];
+  const variableTemplate = variableTemplateValue(state, variableEnabled);
   return {
     values: {
       ...basic.values,
@@ -74,6 +83,7 @@ export function useTextDialogFields(
       ...(font.importedFont === undefined ? {} : { importedFont: font.importedFont }),
       ...(path.settings === undefined ? {} : { pathText: path.settings }),
       ...(path.guide === undefined ? {} : { pathGuide: path.guide }),
+      ...(variableTemplate === undefined ? {} : { variableTemplate }),
     },
     ...basic.setters,
     setFontKey: font.setFontKey,
@@ -85,12 +95,30 @@ export function useTextDialogFields(
     pathEnabled: path.enabled,
     guides: path.guides,
     ...path.setters,
+    variableEnabled,
+    setVariableEnabled,
   };
+}
+
+function variableTemplateValue(
+  state: TextDialogState,
+  enabled: boolean,
+): VariableTemplate | undefined {
+  if (!enabled) return undefined;
+  return state.mode === 'edit' && state.variableTemplate !== undefined
+    ? state.variableTemplate
+    : { tokens: [] };
 }
 
 function useBasicFields(state: TextDialogState) {
   const editing = state.mode === 'edit';
-  const [content, setContent] = useState(editing ? state.content : '');
+  const [content, setContent] = useState(
+    editing && state.variableTemplate !== undefined
+      ? variableTemplateToSource(state.variableTemplate)
+      : editing
+        ? state.content
+        : '',
+  );
   const [sizeMm, setSizeMm] = useState(
     initialTextSizeMm(editing ? state.sizeMm : DEFAULT_TEXT_SIZE_MM),
   );

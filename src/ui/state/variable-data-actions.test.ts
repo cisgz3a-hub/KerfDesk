@@ -47,4 +47,24 @@ describe('variable data advancement', () => {
     useStore.getState().advanceVariablesAfter(project, 'successful-stream');
     expect(useStore.getState().project).toBe(edited);
   });
+
+  it('embeds and clears CSV while manual advancement remains undoable', () => {
+    const original = useStore.getState().project;
+    useStore.getState().setVariableCsv({
+      sourceName: 'parts.csv',
+      headers: ['name'],
+      records: [['A'], ['B']],
+    });
+    useStore.getState().setVariableSettings({ serialValue: 8, advancement: 'manual' });
+    useStore.getState().advanceVariablesManually();
+    expect(useStore.getState().project.variables).toMatchObject({
+      recordIndex: 1,
+      serialValue: 9,
+      csv: { sourceName: 'parts.csv' },
+    });
+    expect(useStore.getState().undoStack[0]).toBe(original);
+
+    useStore.getState().setVariableCsv(undefined);
+    expect(useStore.getState().project.variables?.csv).toBeUndefined();
+  });
 });
