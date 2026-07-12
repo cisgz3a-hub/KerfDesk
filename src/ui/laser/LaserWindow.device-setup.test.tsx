@@ -56,20 +56,23 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       expect(host.textContent).not.toContain('set up yet');
-      expect(button(host, 'Set up device').className).not.toContain('lf-btn--primary');
+      expect(button(host, 'Machine Setup').className).not.toContain('lf-btn--primary');
+      expect(buttons(host, 'Machine Setup')).toHaveLength(1);
+      expect(host.textContent).not.toContain('Set up device');
     } finally {
       await unmount();
     }
   });
 
-  it('emphasizes Set up device only while the connected machine needs setup', async () => {
+  it('emphasizes the single Machine Setup action while the connected machine needs setup', async () => {
     useLaserStore.setState({ connection: { kind: 'connected' } } as Partial<
       ReturnType<typeof useLaserStore.getState>
     >);
     const { host, unmount } = await renderLaserWindow();
     try {
-      expect(button(host, 'Set up device').className).toContain('lf-btn--primary');
-      expect(button(host, 'Machine Setup').className).not.toContain('lf-btn--primary');
+      expect(button(host, 'Machine Setup').className).toContain('lf-btn--primary');
+      expect(buttons(host, 'Machine Setup')).toHaveLength(1);
+      expect(host.textContent).not.toContain('Set up device');
       expect(button(host, 'Machine Setup').dataset.helpId).toBe(
         'control:laser.machine-setup.launch',
       );
@@ -99,7 +102,8 @@ describe('LaserWindow device-setup nudge', () => {
     const { host, unmount } = await renderLaserWindow();
     try {
       expect(host.textContent).toContain('set up yet');
-      await act(async () => button(host, 'Set up device').click());
+      await act(async () => button(host, 'Machine Setup').click());
+      await act(async () => button(host, 'Run guided setup').click());
       await act(async () => button(host, 'Next').click()); // connect -> identify
       await act(async () => button(host, 'Use Creality Falcon A1 Pro').click());
       for (let guard = 0; guard < 8; guard += 1) {
@@ -111,8 +115,8 @@ describe('LaserWindow device-setup nudge', () => {
       }
       await act(async () => button(host, 'Finish setup').click());
       expect(host.textContent).not.toContain('set up yet');
-      // Setup recorded — the wizard entry drops its primary emphasis too.
-      expect(button(host, 'Set up device').className).not.toContain('lf-btn--primary');
+      // Setup recorded - the shared setup entry drops its primary emphasis too.
+      expect(button(host, 'Machine Setup').className).not.toContain('lf-btn--primary');
       // The configured signature is persisted, so a reload re-hydrates it.
       expect(localStorage.getItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY)).toContain(
         'creality-falcon-a1-pro-grblhal',
@@ -124,11 +128,15 @@ describe('LaserWindow device-setup nudge', () => {
 });
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {
-  const match = [...host.querySelectorAll('button')].find((candidate) =>
-    candidate.textContent?.includes(label),
-  );
+  const match = buttons(host, label)[0];
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
   return match;
+}
+
+function buttons(host: HTMLElement, label: string): HTMLButtonElement[] {
+  return [...host.querySelectorAll('button')].filter((candidate) =>
+    candidate.textContent?.includes(label),
+  );
 }
 
 async function renderLaserWindow(): Promise<{

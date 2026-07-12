@@ -6490,3 +6490,34 @@ but avoids both gaps and a spindle restart while embedded. The operator still
 must preserve work zero and pass all normal readiness checks. The behavior is
 unit/integration verified; real interruption and embedded-tool hardware tests
 remain unverified and must use the standing air-cut/scrap protocol first.
+
+---
+
+## ADR-140 - Use one context-aware Machine Setup entry in the control rail
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The machine rail presented "Set up device" and "Machine Setup" as adjacent buttons with separate
+captions. Their labels described the same user goal without making the distinction between the
+guided wizard and the full configuration surface clear. This consumed scarce vertical space and
+made first-time users choose between two near-synonym doors. Machine Setup already has an Overview
+action that launches the guided wizard.
+
+### Decision
+
+Expose one rail action labelled "Machine Setup." It always opens the full Machine Setup dialog. If
+the connected profile has not completed guided setup, give this action primary emphasis and show a
+short setup-required status note. Keep "Run guided setup" on the dialog Overview as the explicit
+wizard action. Completing the wizard continues to persist the profile signature and removes the
+rail emphasis. Do not auto-open either dialog.
+
+### Consequences
+
+- The rail loses one button and two routine explanatory captions.
+- Beginners follow one setup entry and then an explicit guided action.
+- Experienced users retain direct access to every Machine Setup tab, including while a profile is
+  unconfigured.
+- Disconnected profiles do not receive a setup-required warning; the existing passive nudge remains
+  connection-aware.
