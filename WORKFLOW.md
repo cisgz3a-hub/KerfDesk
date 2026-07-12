@@ -48,6 +48,7 @@
 - **Status bar**: bottom — current cursor mm coords, zoom level, device name, scene object count.
 - **Cuts/Layers panel**: docked right, empty with hint text "Import a design to populate layers." A header chevron collapses it to a narrow named strip; the same strip expands it.
 - **Machine controls panel**: docked at the far right. It uses the same collapse/expand pattern, except it cannot be collapsed while a job is active because the visible Stop control must remain reachable.
+- **Compact workspace**: at 700 px wide or below, both right rails start collapsed so the canvas remains usable. Either named strip can be expanded, and entering compact mode again reapplies the collapsed default.
 - **Left tool strip (ADR-051)**: Select, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), and Position-laser, plus a Library ("Lib") button. Preview lives in the top toolbar and the Window menu, not here.
 - **Window menu**: checked `Cuts / Layers Panel` and `Machine Controls Panel` commands mirror the two panel states. The machine-panel command is disabled and checked while a job is active.
 
