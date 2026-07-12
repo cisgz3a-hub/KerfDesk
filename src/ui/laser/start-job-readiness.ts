@@ -1,4 +1,5 @@
 import type { StatusReport } from '../../core/controllers/grbl';
+import type { SimilarityTransform } from '../../core/registration';
 import {
   computeJobBounds,
   describeFramePreflightFailure,
@@ -149,7 +150,11 @@ export async function prepareStartJobSnapshot(
   jobPlacement: JobPlacementSettings,
   outputScope: OutputScope,
   allowRotaryRaster: boolean,
-  options: { readonly clock: () => Date; readonly renderVariableText: VariableTextRenderer },
+  options: {
+    readonly clock: () => Date;
+    readonly renderVariableText: VariableTextRenderer;
+    readonly registration?: SimilarityTransform | null;
+  },
 ): Promise<StartJobPreparation> {
   const machineIssues = findEarlyStartIssues(project, machine);
   if (machineIssues.length > 0) return { ok: false, messages: machineIssues };
@@ -163,6 +168,7 @@ export async function prepareStartJobSnapshot(
   const prepared = await prepareOutputSnapshot(project, {
     clock: options.clock,
     renderVariableText: options.renderVariableText,
+    ...registrationOption(options.registration),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
   });
@@ -195,6 +201,12 @@ export async function prepareStartJobSnapshot(
     machine,
   );
   return okPreparation(gcode, warnings, placement.jobOrigin);
+}
+
+function registrationOption(registration: SimilarityTransform | null | undefined): {
+  readonly registration?: SimilarityTransform | null;
+} {
+  return registration === undefined ? {} : { registration };
 }
 
 function okPreparation(

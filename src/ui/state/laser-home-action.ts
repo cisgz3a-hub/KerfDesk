@@ -52,6 +52,7 @@ export async function runHomeAction(
   set((state) => ({
     controllerOperation: { kind: 'home', phase: 'command', idleReports: 0 },
     homingState: 'homing',
+    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     wcoCache: null,
     workOriginActive:
       state.workOriginSource === 'g54-persistent' || state.workOriginSource === 'unknown',

@@ -50,6 +50,8 @@ export type PreflightCode =
   | 'registration-both-output'
   | 'selected-output-empty'
   | 'variable-evaluation-failed'
+  | 'print-and-cut-registration-invalid'
+  | 'print-and-cut-job-origin-disabled'
   | 'cnc-settings-invalid'
   | 'cnc-layer-empty'
   | 'cnc-depth-exceeds-stock'

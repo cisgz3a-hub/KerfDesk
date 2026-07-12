@@ -35,6 +35,7 @@ import { confirmControllerReadiness } from './confirm-controller-readiness';
 import { detectMachineJobWarnings } from '../laser/machine-job-warnings';
 import { confirmOversizeImport } from './import-size-guard';
 import { renderVariableText } from '../text/render-variable-text';
+import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
 
 export async function handleImportDxf(
   platform: PlatformAdapter,
@@ -217,9 +218,11 @@ async function emitSaveGcode(
   placement: Extract<ResolvedJobPlacement, { ok: true }>,
 ): ReturnType<typeof emitGcodeSnapshot> {
   const motionOffset = trustedMotionOffsetForPreflight(ctx.project.device, placement);
+  const registration = currentPrintCutOutputRegistration(ctx.project);
   return emitGcodeSnapshot(ctx.project, {
     clock: () => new Date(),
     renderVariableText,
+    ...(registration === undefined ? {} : { registration }),
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     ...(ctx.outputScope === undefined ? {} : { outputScope: ctx.outputScope }),

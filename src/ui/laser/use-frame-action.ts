@@ -17,6 +17,7 @@ import { currentOutputScope, useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { renderVariableText } from '../text/render-variable-text';
+import { currentPrintCutOutputRegistration } from './print-cut-output';
 
 export function useFrameAction(): () => void {
   const frame = useLaserStore((s) => s.frame);
@@ -61,9 +62,11 @@ async function runFrameAction({
     project.device,
     placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin },
   );
+  const registration = currentPrintCutOutputRegistration(project);
   const prepared = await prepareOutputSnapshot(project, {
     clock: () => new Date(),
     renderVariableText,
+    ...(registration === undefined ? {} : { registration }),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
     outputScope,
   });

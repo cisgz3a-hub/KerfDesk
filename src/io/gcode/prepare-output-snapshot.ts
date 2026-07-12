@@ -7,6 +7,7 @@ import {
   type TextObject,
 } from '../../core/scene';
 import { evaluateVariableTemplate, type VariableEvaluationContext } from '../../core/variables';
+import { applySimilarityProject, type SimilarityTransform } from '../../core/registration';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from './prepare-output';
 
 export type VariableTextRenderInput = {
@@ -26,6 +27,7 @@ export type PrepareOutputSnapshotOptions = PrepareOutputOptions & {
   readonly recordIndex?: number;
   readonly serialValue?: number;
   readonly renderVariableText: VariableTextRenderer;
+  readonly registration?: SimilarityTransform | null;
 };
 
 export type PreparedOutputSnapshot = PreparedOutput & {
@@ -42,6 +44,10 @@ export function prepareOutputSnapshot(
   options: PrepareOutputSnapshotOptions,
 ): Promise<PreparedOutputSnapshot> {
   const evaluationContext = resolveEvaluationContext(project, options);
+  const registrationFailure = validateRegistrationOptions(options);
+  if (registrationFailure !== null) {
+    return Promise.resolve({ ...registrationFailure, evaluationContext });
+  }
   const cache = projectCache(options.renderVariableText, project);
   const key = snapshotCacheKey(options, evaluationContext);
   const cached = cache.get(key);
@@ -49,6 +55,24 @@ export function prepareOutputSnapshot(
   const prepared = prepareSnapshot(project, options, evaluationContext);
   cache.set(key, prepared);
   return prepared;
+}
+
+function validateRegistrationOptions(
+  options: PrepareOutputSnapshotOptions,
+): Extract<PreparedOutput, { readonly ok: false }> | null {
+  if (options.registration === null) {
+    return snapshotFailure(
+      'print-and-cut-registration-invalid',
+      'Print-and-Cut registration is not valid. Capture both machine points again.',
+    );
+  }
+  if (options.registration !== undefined && options.jobOrigin !== undefined) {
+    return snapshotFailure(
+      'print-and-cut-job-origin-disabled',
+      'Job-origin placement is disabled while Print-and-Cut registration is active.',
+    );
+  }
+  return null;
 }
 
 async function prepareSnapshot(
@@ -62,7 +86,11 @@ async function prepareSnapshot(
     options.renderVariableText,
   );
   if (!evaluated.ok) return { ...evaluated, evaluationContext };
-  const prepared = prepareOutput(evaluated.project, outputOptions(options));
+  const registeredProject =
+    options.registration === undefined || options.registration === null
+      ? evaluated.project
+      : applySimilarityProject(evaluated.project, options.registration);
+  const prepared = prepareOutput(registeredProject, outputOptions(options));
   return { ...prepared, evaluationContext };
 }
 
@@ -174,6 +202,7 @@ function snapshotCacheKey(
     serialValue: context.serialValue,
     jobOrigin: options.jobOrigin ?? null,
     outputScope: options.outputScope ?? null,
+    registration: options.registration ?? null,
   });
 }
 
@@ -182,4 +211,11 @@ function variableFailure(message: string): Extract<MaterializedProject, { readon
     ok: false,
     preflight: { ok: false, issues: [{ code: 'variable-evaluation-failed', message }] },
   };
+}
+
+function snapshotFailure(
+  code: 'print-and-cut-registration-invalid' | 'print-and-cut-job-origin-disabled',
+  message: string,
+): Extract<PreparedOutput, { readonly ok: false }> {
+  return { ok: false, preflight: { ok: false, issues: [{ code, message }] } };
 }

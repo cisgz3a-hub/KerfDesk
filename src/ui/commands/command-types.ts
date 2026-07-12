@@ -54,6 +54,7 @@ export type CommandId =
   | 'tools.focus-test'
   | 'tools.optimization-settings'
   | 'tools.rotary-setup'
+  | 'tools.print-and-cut'
   | 'tools.labs'
   | 'tools.adjust-image'
   | 'tools.apply-image-mask'
@@ -189,6 +190,9 @@ export type AppCommandContext = {
   readonly rotaryFeatureEnabled: boolean;
   readonly rotaryProfileSupported: boolean;
   readonly rotarySetup: () => void;
+  readonly printAndCutFeatureEnabled: boolean;
+  readonly printAndCutProfileSupported: boolean;
+  readonly printAndCut: () => void;
   readonly labsSettings: () => void;
   readonly adjustImage: () => void;
   readonly saveProcessedBitmap: () => void;

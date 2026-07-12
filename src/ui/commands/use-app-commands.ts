@@ -59,6 +59,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
   const cameraPanelOpen = useCameraStore((s) => s.panelOpen);
   const toggleCameraPanel = useCameraStore((s) => s.togglePanel);
   const rotaryFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.rotary);
+  const printAndCutFeatureEnabled = useExperimentalLaserFeatures((s) => s.features.printAndCut);
   return buildAppCommands(
     appCommandContext(callbacks, platform, app, laser, pushToast, {
       openImageDialog,
@@ -73,6 +74,9 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       toggleCameraPanel,
       rotaryFeatureEnabled,
       rotaryProfileSupported: profileSupportsCapability(app.project.device, 'rotary'),
+      printAndCutFeatureEnabled,
+      printAndCutProfileSupported: app.project.device.homing.enabled,
+      printAndCut: callbacks.requestPrintAndCut,
     }),
   );
 }
@@ -155,6 +159,8 @@ function appCommandContext(
       app.project.device.zTravelConfirmed === true,
     rotaryFeatureEnabled: dialogs.rotaryFeatureEnabled,
     rotaryProfileSupported: dialogs.rotaryProfileSupported,
+    printAndCutFeatureEnabled: dialogs.printAndCutFeatureEnabled,
+    printAndCutProfileSupported: dialogs.printAndCutProfileSupported,
     previewActive: app.previewMode,
     hasPreviewableContent: hasPreviewableContent(app.project),
   };
@@ -217,6 +223,7 @@ function editCommandContext(
   | 'measureTool'
   | 'measureActive'
   | 'addText'
+  | 'printAndCut'
 > {
   return {
     canUndo: app.undoStack.length > 0,
@@ -237,6 +244,7 @@ function editCommandContext(
     measureTool: dialogs.measureTool,
     measureActive: dialogs.measureActive,
     addText: () => dialogs.openTextDialog({ mode: 'add' }),
+    printAndCut: dialogs.printAndCut,
   };
 }
 

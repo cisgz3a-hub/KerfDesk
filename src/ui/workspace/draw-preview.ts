@@ -145,7 +145,7 @@ export async function buildPreviewToolpathSnapshot(
   project: Project,
   options: Pick<
     PrepareOutputSnapshotOptions,
-    'clock' | 'renderVariableText' | 'jobOrigin' | 'outputScope'
+    'clock' | 'renderVariableText' | 'jobOrigin' | 'outputScope' | 'registration'
   >,
 ): Promise<PreviewToolpath> {
   const scoped =

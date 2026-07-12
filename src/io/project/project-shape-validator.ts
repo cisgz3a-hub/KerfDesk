@@ -10,6 +10,7 @@ import { validateObjectOperationOverride } from './project-operation-override-va
 import { validateOptimization } from './project-optimization-validator';
 import { validateProjectVariables, validateVariableTemplate } from './project-variable-validator';
 import { validateRasterLumaBase64 } from './project-raster-luma-validator';
+import { validatePrintAndCutTargets } from './project-print-and-cut-validator';
 import { validateSceneBudgets, validateSceneIntegrity } from './project-scene-integrity-validator';
 import {
   firstError,
@@ -60,6 +61,7 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateWorkspace(workspace),
     validateOptimization(raw['optimization']),
     validateProjectVariables(raw['variables']),
+    validatePrintAndCutTargets(raw['printAndCutTargets']),
     optionalString(raw, 'notes'),
     validateScene(scene),
   ]);

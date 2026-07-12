@@ -15,6 +15,7 @@ export type CommandShellCallbacks = {
   readonly requestOptimizationSettings: () => void;
   readonly requestArray: () => void;
   readonly requestQuickNest: () => void;
+  readonly requestPrintAndCut: () => void;
   readonly requestRotarySetup: () => void;
   readonly requestLabsSettings: () => void;
   readonly requestProjectNotes: () => void;
@@ -41,6 +42,9 @@ export type CommandDialogs = {
   readonly toggleCameraPanel: () => void;
   readonly rotaryFeatureEnabled: boolean;
   readonly rotaryProfileSupported: boolean;
+  readonly printAndCutFeatureEnabled: boolean;
+  readonly printAndCutProfileSupported: boolean;
+  readonly printAndCut: () => void;
 };
 
 export type CommandSelection = {

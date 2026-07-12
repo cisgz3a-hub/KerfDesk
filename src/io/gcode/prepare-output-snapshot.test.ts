@@ -112,4 +112,46 @@ describe('prepareOutputSnapshot', () => {
 
     expect(snapshot).toMatchObject(prepareOutput(project));
   });
+
+  it('applies registration before the shared output preparation pipeline', async () => {
+    const snapshot = await prepareOutputSnapshot(variableProject(), {
+      clock: () => NOW,
+      renderVariableText: renderer,
+      registration: {
+        scale: 2,
+        rotationRad: Math.PI / 2,
+        translation: { x: 100, y: 50 },
+      },
+    });
+    expect(snapshot.ok).toBe(true);
+    if (!snapshot.ok) return;
+    const text = snapshot.project.scene.objects[0];
+    expect(text?.transform.x).toBeCloseTo(100);
+    expect(text?.transform.y).toBeCloseTo(50);
+    expect(text?.transform.scaleX).toBeCloseTo(2);
+    expect(text?.transform.rotationDeg).toBeCloseTo(90);
+  });
+
+  it('fails closed for stale registration and job-origin composition', async () => {
+    const stale = await prepareOutputSnapshot(createProject(), {
+      clock: () => NOW,
+      renderVariableText: renderer,
+      registration: null,
+    });
+    expect(stale).toMatchObject({
+      ok: false,
+      preflight: { issues: [{ code: 'print-and-cut-registration-invalid' }] },
+    });
+
+    const doublePlaced = await prepareOutputSnapshot(createProject(), {
+      clock: () => NOW,
+      renderVariableText: renderer,
+      registration: { scale: 1, rotationRad: 0, translation: { x: 1, y: 2 } },
+      jobOrigin: { startFrom: 'user-origin', anchor: 'front-left' },
+    });
+    expect(doublePlaced).toMatchObject({
+      ok: false,
+      preflight: { issues: [{ code: 'print-and-cut-job-origin-disabled' }] },
+    });
+  });
 });

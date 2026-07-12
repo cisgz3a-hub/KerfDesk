@@ -30,11 +30,13 @@ import { isActiveJob } from '../state/laser-store-helpers';
 import { prepareStartJob, prepareStartJobSnapshot } from './start-job-readiness';
 import { renderVariableText } from '../text/render-variable-text';
 import { armVariableStreamAdvancement } from './variable-stream-advancement';
+import { currentPrintCutOutputRegistration } from './print-cut-output';
 
 export async function runStartJobFlow(): Promise<void> {
   const app = useStore.getState();
   const { project, jobPlacement } = app;
   const laser = useLaserStore.getState();
+  const registration = currentPrintCutOutputRegistration(project);
   const prepared = await prepareStartJobSnapshot(
     project,
     laser.controllerSettings,
@@ -55,7 +57,11 @@ export async function runStartJobFlow(): Promise<void> {
     jobPlacement,
     currentOutputScope(app),
     rotaryRasterAllowed(project),
-    { clock: () => new Date(), renderVariableText },
+    {
+      clock: () => new Date(),
+      renderVariableText,
+      ...(registration === undefined ? {} : { registration }),
+    },
   );
   if (!prepared.ok) {
     const lines = prepared.messages.map((message) => `• ${message}`).join('\n');

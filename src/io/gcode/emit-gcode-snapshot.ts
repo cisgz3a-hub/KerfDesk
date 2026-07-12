@@ -8,7 +8,7 @@ import {
 export type EmitGcodeSnapshotOptions = EmitGcodeOptions &
   Pick<
     PrepareOutputSnapshotOptions,
-    'clock' | 'recordIndex' | 'serialValue' | 'renderVariableText'
+    'clock' | 'recordIndex' | 'serialValue' | 'renderVariableText' | 'registration'
   >;
 
 export async function emitGcodeSnapshot(
@@ -20,6 +20,7 @@ export async function emitGcodeSnapshot(
     renderVariableText: options.renderVariableText,
     ...(options.recordIndex === undefined ? {} : { recordIndex: options.recordIndex }),
     ...(options.serialValue === undefined ? {} : { serialValue: options.serialValue }),
+    ...(options.registration === undefined ? {} : { registration: options.registration }),
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
   });

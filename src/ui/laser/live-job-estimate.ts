@@ -19,6 +19,7 @@ import {
   type PreparedOutput,
   type VariableTextRenderer,
 } from '../../io/gcode';
+import type { SimilarityTransform } from '../../core/registration';
 
 export { countOutputVectorSegments };
 export const LIVE_ESTIMATE_RAW_VECTOR_SEGMENT_BUDGET = PREPARATION_RAW_VECTOR_SEGMENT_BUDGET;
@@ -57,6 +58,7 @@ export async function estimateLiveJobSnapshot(
   outputScope: OutputScope,
   clock: () => Date,
   renderVariableText: VariableTextRenderer,
+  registration?: SimilarityTransform | null,
 ): Promise<LiveJobEstimate> {
   const scoped = validateOutputScope(project.scene, outputScope);
   if (!scoped.ok) return { kind: 'empty' };
@@ -72,6 +74,7 @@ export async function estimateLiveJobSnapshot(
     outputScope,
     clock,
     renderVariableText,
+    ...(registration === undefined ? {} : { registration }),
   });
   return estimatePrepared(prepared);
 }

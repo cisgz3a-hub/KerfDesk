@@ -11,6 +11,8 @@ import { buildPreviewToolpath, buildPreviewToolpathSnapshot } from './draw-previ
 import { mapToolpathToScene } from './preview-scene-frame';
 import type { PreviewToolpath } from './preview-status';
 import { renderVariableText } from '../text/render-variable-text';
+import { currentPrintCutOutputRegistration } from '../laser/print-cut-output';
+import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 
 export type PreviewBuildScheduler = (work: () => void) => () => void;
 
@@ -26,6 +28,9 @@ export function usePreviewToolpath(
   const statusReport = useLaserStore((s) => s.statusReport);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
   const wcoCache = useLaserStore((s) => s.wcoCache);
+  const positionEpoch = useLaserStore((s) => s.trustedPositionEpoch ?? 0);
+  const firstRegistrationPoint = usePrintCutSessionStore((s) => s.first);
+  const secondRegistrationPoint = usePrintCutSessionStore((s) => s.second);
   const [toolpath, setToolpath] = useState<PreviewToolpath | null>(null);
   const outputScope = useOutputScope();
 
@@ -71,13 +76,16 @@ export function usePreviewToolpath(
         ...(resolved.jobOrigin === undefined ? {} : { jobOrigin: resolved.jobOrigin }),
         outputScope,
       };
-      const next = hasVariableText(project)
-        ? buildPreviewToolpathSnapshot(project, {
-            ...options,
-            clock: () => new Date(),
-            renderVariableText,
-          })
-        : Promise.resolve(buildPreviewToolpath(project, options));
+      const registration = currentPrintCutOutputRegistration(project);
+      const next =
+        hasVariableText(project) || registration !== undefined
+          ? buildPreviewToolpathSnapshot(project, {
+              ...options,
+              clock: () => new Date(),
+              renderVariableText,
+              ...(registration === undefined ? {} : { registration }),
+            })
+          : Promise.resolve(buildPreviewToolpath(project, options));
       void next.then((built) => {
         if (!cancelled) setToolpath(built);
       });
@@ -86,7 +94,17 @@ export function usePreviewToolpath(
       cancelled = true;
       cancelScheduledBuild();
     };
-  }, [previewMode, project, outputScope, externalGcodePreview, placementKey, scheduleBuild]);
+  }, [
+    previewMode,
+    project,
+    outputScope,
+    externalGcodePreview,
+    placementKey,
+    scheduleBuild,
+    positionEpoch,
+    firstRegistrationPoint,
+    secondRegistrationPoint,
+  ]);
 
   return toolpath;
 }
