@@ -6490,3 +6490,39 @@ but avoids both gaps and a spindle restart while embedded. The operator still
 must preserve work zero and pass all normal readiness checks. The behavior is
 unit/integration verified; real interruption and embedded-tool hardware tests
 remain unverified and must use the standing air-cut/scrap protocol first.
+
+---
+
+## ADR-138 - The primary toolbar is icon-first and never wraps
+
+**Status:** Accepted | **Date:** 2026-07-13
+
+### Context
+
+The primary toolbar had fourteen text buttons and wrapped into a second row at
+compact desktop widths. That reduced canvas height, shifted the numeric toolbar
+and workspace during resize, and made the command surface visually dominant.
+Removing commands would improve density at the cost of discoverability.
+
+### Decision
+
+- Every toolbar command uses a pinned `lucide-static` icon. Familiar file,
+  import, export, Preview, and Shortcuts actions are icon-only at all widths.
+- Specialist commands retain icon-plus-label presentation above 1280 px and
+  switch to icon-only at 1280 px and below.
+- Icon-only buttons keep the complete command label as their accessible name
+  and retain the command registry's tooltip, shortcut, disabled reason, and
+  pressed state.
+- The toolbar is one non-wrapping row. Its command-group region may scroll
+  horizontally on unusually narrow windows; the brand and Shortcuts control
+  remain fixed outside that region, except the redundant brand wordmark hides
+  below 700 px to preserve every command before scrolling is needed.
+- Icons come from the already-approved `lucide-static` dependency. Imported SVG
+  strings are build assets, never project or user content.
+
+### Consequences
+
+The workspace no longer jumps between one-row and two-row chrome. Common
+desktop widths gain vertical space while specialist labels remain available
+where room permits. Operators on narrow windows may need to horizontally scroll
+the command group, but every command also remains available from the menus.

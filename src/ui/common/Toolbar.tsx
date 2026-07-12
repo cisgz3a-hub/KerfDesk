@@ -10,6 +10,7 @@ import { ConnectionBadge } from './ConnectionBadge';
 import { InstallButton } from './InstallButton';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { shortcutHint } from './shortcut-list';
+import { ToolbarIcon } from './ToolbarIcon';
 
 export function Toolbar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -18,21 +19,24 @@ export function Toolbar(props: {
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   return (
     <header aria-label="Toolbar" style={barStyle}>
-      <span style={titleStyle}>{APP_DISPLAY_NAME}</span>
+      <span className="lf-toolbar-brand" style={titleStyle}>
+        {APP_DISPLAY_NAME}
+      </span>
       <BuildBadge />
       <ConnectionBadge />
-      <ToolbarSeparator />
+      <ToolbarSeparator className="lf-toolbar-identity-separator" />
       <ToolbarButtons commands={props.commands} />
       {/* No separator before the hint: margin-left auto already isolates it,
           and a lone rule floating in the stretch of empty bar looked stray. */}
       <button
         type="button"
-        className="lf-btn lf-btn--ghost"
+        className="lf-btn lf-btn--ghost lf-toolbar-command lf-toolbar-command--icon-only"
         style={hintStyle}
+        aria-label="Keyboard Shortcuts"
         title={shortcutHint(props.machineKind)}
         onClick={() => setShortcutsOpen(true)}
       >
-        Shortcuts
+        <ToolbarIcon icon="shortcuts" />
       </button>
       {/* InstallButton renders only when the browser offers a PWA install
           prompt (beforeinstallprompt), so it stays hidden until installable
@@ -55,7 +59,12 @@ function BuildBadge(): JSX.Element {
   // the build timestamp lives in the hover title so the toolbar's full button
   // set still fits a single row on a 1512px-wide window.
   return (
-    <span style={buildBadgeStyle} title={title} aria-label="Build version">
+    <span
+      className="lf-toolbar-build"
+      style={buildBadgeStyle}
+      title={title}
+      aria-label="Build version"
+    >
       v{version} - {sha}
     </span>
   );
@@ -71,7 +80,7 @@ function ToolbarButtons(props: { readonly commands: ReadonlyArray<AppCommand> })
       .filter((command): command is AppCommand => command !== undefined),
   ).filter((group) => group.length > 0);
   return (
-    <>
+    <div className="lf-toolbar-command-groups">
       {visibleGroups.map((group, index) => (
         <Fragment key={index}>
           {index > 0 ? <ToolbarSeparator /> : null}
@@ -80,12 +89,23 @@ function ToolbarButtons(props: { readonly commands: ReadonlyArray<AppCommand> })
           ))}
         </Fragment>
       ))}
-    </>
+    </div>
   );
 }
 
-function ToolbarSeparator(): JSX.Element {
-  return <span role="separator" aria-orientation="vertical" style={separatorStyle} />;
+function ToolbarSeparator(props: { readonly className?: string } = {}): JSX.Element {
+  const className =
+    props.className === undefined
+      ? 'lf-toolbar-separator'
+      : `lf-toolbar-separator ${props.className}`;
+  return (
+    <span
+      role="separator"
+      aria-orientation="vertical"
+      style={separatorStyle}
+      className={className}
+    />
+  );
 }
 
 function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
@@ -97,8 +117,8 @@ function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
   return (
     <button
       type="button"
-      className="lf-btn"
-      style={noWrapStyle}
+      className={toolbarButtonClass(props.command.id)}
+      aria-label={props.command.label}
       title={title}
       data-help-id={helpId}
       disabled={!props.command.enabled}
@@ -107,9 +127,18 @@ function ToolbarButton(props: { readonly command: AppCommand }): JSX.Element {
         runCommand(props.command);
       }}
     >
-      {props.command.label}
+      <ToolbarIcon icon={props.command.id} />
+      {!ICON_ONLY_TOOLBAR_COMMANDS.has(props.command.id) ? (
+        <span className="lf-toolbar-command-label">{props.command.label}</span>
+      ) : null}
     </button>
   );
+}
+
+function toolbarButtonClass(id: CommandId): string {
+  return ICON_ONLY_TOOLBAR_COMMANDS.has(id)
+    ? 'lf-btn lf-toolbar-command lf-toolbar-command--icon-only'
+    : 'lf-btn lf-toolbar-command';
 }
 
 function toolbarTitle(command: AppCommand): string {
@@ -136,21 +165,29 @@ const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['window.toggle-preview'],
 ];
 
+const ICON_ONLY_TOOLBAR_COMMANDS = new Set<CommandId>([
+  'file.new',
+  'file.open',
+  'file.save',
+  'file.save-as',
+  'file.import-svg',
+  'file.import-image',
+  'file.save-gcode',
+  'window.toggle-preview',
+]);
+
 const barStyle: React.CSSProperties = {
   display: 'flex',
-  // Narrow windows: whole buttons wrap to the next row. Without this the
-  // labels wrapped *inside* the buttons instead, giving a ragged two-line bar.
-  flexWrap: 'wrap',
+  flexWrap: 'nowrap',
   alignItems: 'center',
-  // 6px (not 8) so the full button set + group separators fits one row at
-  // the common 1512px-wide window.
-  gap: 6,
-  padding: '6px 12px',
+  gap: 4,
+  padding: '4px 8px',
   background: 'var(--lf-bg-0)',
   color: 'var(--lf-text)',
   fontFamily: 'system-ui, sans-serif',
   fontSize: 13,
   borderBottom: '1px solid var(--lf-border)',
+  overflow: 'hidden',
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
 const buildBadgeStyle: React.CSSProperties = {
@@ -160,15 +197,12 @@ const buildBadgeStyle: React.CSSProperties = {
   cursor: 'help',
   userSelect: 'none',
 };
-const noWrapStyle: React.CSSProperties = { whiteSpace: 'nowrap' };
 const separatorStyle: React.CSSProperties = {
-  display: 'inline-block',
   width: 1,
   height: 16,
   background: 'var(--lf-border-strong)',
 };
 const hintStyle: React.CSSProperties = {
   marginLeft: 'auto',
-  fontSize: 11,
-  whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
