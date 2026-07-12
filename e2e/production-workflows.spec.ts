@@ -18,6 +18,10 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
   await selectAll(page);
   await runMenuCommand(page, 'Arrange', 'Quick Nest...');
   await expect(page.getByRole('dialog', { name: 'Quick Nest' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Outline', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await page.getByRole('button', { name: 'Nest selection' }).click();
 
   await page.getByRole('button', { name: 'Preview' }).click();
@@ -28,6 +32,27 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.length).toBe(4);
+});
+
+test('outline-nests complementary vector parts that rectangular bounds cannot fit', async ({
+  page,
+  kerfdesk,
+}) => {
+  await kerfdesk.setOpenFiles([{ name: 'outline-nest.lf2', text: outlineNestProjectFixture() }]);
+  await page.getByRole('button', { name: 'Open...' }).click();
+  await expect(page).toHaveTitle(/outline-nest\.lf2/);
+  await selectAll(page);
+  await runMenuCommand(page, 'Arrange', 'Quick Nest...');
+  await page.getByRole('spinbutton', { name: 'Part spacing (mm)' }).fill('0');
+  await page.getByRole('button', { name: 'Nest selection' }).click();
+  await page.getByRole('button', { name: 'Save As...' }).click();
+
+  const saved = await savedProject(kerfdesk);
+  expect(saved.scene.objects).toHaveLength(2);
+  expect(saved.scene.objects.map((object) => object['transform'])).toEqual([
+    expect.objectContaining({ x: 0, y: 0 }),
+    expect.objectContaining({ x: 0, y: 0 }),
+  ]);
 });
 
 test('imports SVG through the real picker and creates a circular array', async ({
@@ -413,4 +438,92 @@ interface SavedProject {
     };
   };
   readonly scene: { readonly objects: readonly Record<string, unknown>[] };
+}
+
+function outlineNestProjectFixture(): string {
+  const object = (id: string, x: number, points: readonly (readonly [number, number])[]) => ({
+    kind: 'imported-svg',
+    id,
+    source: `${id}.svg`,
+    bounds: { minX: 0, minY: 0, maxX: 40, maxY: 40 },
+    transform: {
+      x,
+      y: 0,
+      scaleX: 1,
+      scaleY: 1,
+      rotationDeg: 0,
+      mirrorX: false,
+      mirrorY: false,
+    },
+    paths: [
+      {
+        color: '#000000',
+        polylines: [
+          { closed: true, points: points.map(([pointX, pointY]) => ({ x: pointX, y: pointY })) },
+        ],
+      },
+    ],
+  });
+  return JSON.stringify({
+    schemaVersion: 1,
+    device: {
+      name: 'Outline Nest Fixture',
+      bedWidth: 40,
+      bedHeight: 40,
+      maxFeed: 6_000,
+      maxPowerS: 1_000,
+      capabilities: ['grbl'],
+      origin: 'front-left',
+      homing: { enabled: true, direction: 'front-left' },
+      autofocusCommand: '',
+    },
+    workspace: { width: 40, height: 40, units: 'mm' },
+    scene: {
+      objects: [
+        object('upper', 0, [
+          [0, 0],
+          [40, 0],
+          [0, 40],
+        ]),
+        object('lower', 40, [
+          [40, 40],
+          [40, 0],
+          [0, 40],
+        ]),
+      ],
+      layers: [
+        {
+          id: '#000000',
+          color: '#000000',
+          mode: 'line',
+          minPower: 0,
+          power: 30,
+          speed: 1_500,
+          passes: 1,
+          visible: true,
+          output: true,
+          airAssist: false,
+          kerfOffsetMm: 0,
+          tabsEnabled: false,
+          tabSizeMm: 0.5,
+          tabsPerShape: 4,
+          tabSkipInnerShapes: true,
+          hatchAngleDeg: 0,
+          hatchSpacingMm: 0.1,
+          fillOverscanMm: 5,
+          fillStyle: 'scanline',
+          fillBidirectional: true,
+          fillCrossHatch: false,
+          ditherAlgorithm: 'floyd-steinberg',
+          linesPerMm: 10,
+          imageBidirectional: true,
+          negativeImage: false,
+          passThrough: false,
+          dotWidthCorrectionMm: 0,
+          subLayers: [],
+        },
+      ],
+      groups: [],
+    },
+  });
 }

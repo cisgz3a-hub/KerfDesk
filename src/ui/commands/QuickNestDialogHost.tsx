@@ -18,7 +18,13 @@ export function QuickNestDialogHost(props: { readonly onClose: () => void }): JS
           return;
         }
         props.onClose();
-        pushToast(`Nested ${result.packedUnits} unit(s).`, 'success');
+        const fallback = result.boundsFallbackUnits ?? 0;
+        pushToast(
+          fallback === 0
+            ? `Nested ${result.packedUnits} unit(s).`
+            : `Nested ${result.packedUnits} unit(s); ${fallback} used rectangular bounds.`,
+          'success',
+        );
       }}
     />
   );
