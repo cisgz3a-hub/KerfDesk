@@ -22,6 +22,19 @@ afterEach(() => {
 });
 
 describe('StatusBar', () => {
+  it('contains status segments with local horizontal scrolling', async () => {
+    const { host, root } = await renderStatusBar();
+    try {
+      const status = host.querySelector('footer[aria-label="Status bar"]');
+      expect(status).toBeInstanceOf(HTMLElement);
+      expect((status as HTMLElement).style.overflowX).toBe('auto');
+      expect((status as HTMLElement).style.minWidth).toBe('0');
+      expect((status as HTMLElement).style.maxWidth).toBe('100%');
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('renders clean status text for empty workspace and bed size', async () => {
     const { host, root } = await renderStatusBar();
     try {

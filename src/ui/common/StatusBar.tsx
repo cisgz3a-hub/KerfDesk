@@ -76,6 +76,11 @@ function Segment({ children }: { readonly children: React.ReactNode }): JSX.Elem
 
 const barStyle: React.CSSProperties = {
   display: 'flex',
+  minWidth: 0,
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+  overflowX: 'auto',
+  overflowY: 'hidden',
   gap: 16,
   alignItems: 'center',
   padding: '4px 12px',
