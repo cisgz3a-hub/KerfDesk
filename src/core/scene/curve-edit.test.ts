@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CurveSubpath } from './scene-object';
 import {
   breakCurveAtNode,
+  cornerCurveNode,
   convertCurveSegment,
   curveNodeCount,
   joinCurveSubpaths,
@@ -54,6 +55,18 @@ describe('curve editing', () => {
         (incoming.control2.x - anchor.x) * (outgoing.control1.y - anchor.y) -
         (incoming.control2.y - anchor.y) * (outgoing.control1.x - anchor.x);
       expect(cross).toBeCloseTo(0, 10);
+    }
+  });
+
+  it('converts a smooth node to chord-aligned corner handles', () => {
+    const corner = cornerCurveNode(CLOSED, 1);
+    const incoming = corner?.segments[0];
+    const outgoing = corner?.segments[1];
+    expect(incoming?.kind).toBe('cubic');
+    expect(outgoing?.kind).toBe('cubic');
+    if (incoming?.kind === 'cubic' && outgoing?.kind === 'cubic') {
+      expect(incoming.control2.y).toBeCloseTo(0, 10);
+      expect(outgoing.control1).toEqual({ x: 8, y: 0 });
     }
   });
 

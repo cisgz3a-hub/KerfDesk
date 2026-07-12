@@ -80,6 +80,7 @@ export {
 } from './curve-path';
 export {
   breakCurveAtNode,
+  cornerCurveNode,
   convertCurveSegment,
   curveControlPoint,
   curveNodeCount,

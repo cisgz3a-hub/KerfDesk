@@ -104,6 +104,10 @@ import {
   type PathNodeEditActions,
   type PathNodeRef,
 } from './path-node-edit-actions';
+import {
+  pathNodeCurveCommandActions,
+  type PathNodeCurveCommandActions,
+} from './path-node-curve-command-actions';
 import { type ImportOutcome, type TraceExistingImageOptions } from './scene-mutations';
 import { objectInsertActions } from './object-insert-actions';
 import { objectDeleteActions, type ObjectDeleteActions } from './object-delete-actions';
@@ -144,6 +148,7 @@ export type AppState = ObjectPropertiesActions &
   SelectionTransformActions &
   RegistrationOutputActions &
   PathNodeEditActions &
+  PathNodeCurveCommandActions &
   BreakApartActions &
   FillSelectionActions &
   VectorPathActions &
@@ -468,6 +473,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...boardCaptureActions(set),
   ...boardTileActions(set),
   ...pathNodeEditActions(set),
+  ...pathNodeCurveCommandActions(set),
   ...objectDeleteActions(set),
   ...arrayActions(set),
   ...nestActions(set, get),

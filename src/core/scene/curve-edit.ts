@@ -118,6 +118,49 @@ export function smoothCurveNode(path: CurveSubpath, nodeIndex: number): CurveSub
   return { ...path, segments };
 }
 
+// A corner needs both adjacent cubic segments and both neighboring anchors;
+// keeping those guards together makes the geometric preconditions explicit.
+// eslint-disable-next-line complexity
+export function cornerCurveNode(path: CurveSubpath, nodeIndex: number): CurveSubpath | null {
+  const anchor = curveNodePoint(path, nodeIndex);
+  const incomingIndex = incomingSegmentIndex(path, nodeIndex);
+  const outgoingIndex = outgoingSegmentIndex(path, nodeIndex);
+  if (anchor === null || incomingIndex === null || outgoingIndex === null) return null;
+  const incoming = path.segments[incomingIndex];
+  const outgoing = path.segments[outgoingIndex];
+  const previous = incomingIndex === 0 ? path.start : path.segments[incomingIndex - 1]?.to;
+  const next = outgoing?.to;
+  if (
+    incoming?.kind !== 'cubic' ||
+    outgoing?.kind !== 'cubic' ||
+    previous === undefined ||
+    next === undefined
+  ) {
+    return null;
+  }
+  const incomingDirection = normalized({ x: previous.x - anchor.x, y: previous.y - anchor.y });
+  const outgoingDirection = normalized({ x: next.x - anchor.x, y: next.y - anchor.y });
+  if (incomingDirection === null || outgoingDirection === null) return null;
+  const inLength = distance(anchor, incoming.control2);
+  const outLength = distance(anchor, outgoing.control1);
+  const segments = [...path.segments];
+  segments[incomingIndex] = {
+    ...incoming,
+    control2: {
+      x: anchor.x + incomingDirection.x * inLength,
+      y: anchor.y + incomingDirection.y * inLength,
+    },
+  };
+  segments[outgoingIndex] = {
+    ...outgoing,
+    control1: {
+      x: anchor.x + outgoingDirection.x * outLength,
+      y: anchor.y + outgoingDirection.y * outLength,
+    },
+  };
+  return { ...path, segments };
+}
+
 export function setCurveStartNode(path: CurveSubpath, nodeIndex: number): CurveSubpath | null {
   if (!path.closed || nodeIndex <= 0 || nodeIndex >= curveNodeCount(path)) return null;
   const start = curveNodePoint(path, nodeIndex);

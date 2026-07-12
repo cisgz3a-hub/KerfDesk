@@ -7,6 +7,7 @@
 import { IconButton, type IconName } from '../kit';
 import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
+import { useStore } from '../state/store';
 
 type Tool = {
   readonly mode: ToolMode;
@@ -47,6 +48,7 @@ export function ToolStrip(): JSX.Element {
           pressed={isActive(toolMode, tool.mode)}
         />
       ))}
+      {toolMode.kind === 'node' ? <NodeCommandBar /> : null}
       <button
         type="button"
         aria-label="Open design library"
@@ -57,6 +59,88 @@ export function ToolStrip(): JSX.Element {
         Lib
       </button>
     </aside>
+  );
+}
+
+function NodeCommandBar(): JSX.Element | null {
+  const project = useStore((state) => state.project);
+  const selected = useStore((state) => state.selectedPathNode);
+  const selectedNodes = useStore((state) => state.selectedPathNodes);
+  const smooth = useStore((state) => state.smoothSelectedCurveNode);
+  const corner = useStore((state) => state.cornerSelectedCurveNode);
+  const convert = useStore((state) => state.convertSelectedCurveSegment);
+  const setStart = useStore((state) => state.setSelectedCurveStart);
+  const breakCurve = useStore((state) => state.breakSelectedCurve);
+  const join = useStore((state) => state.joinSelectedCurveNodes);
+  if (selected?.geometry !== 'curve' || selected.handle !== undefined) return null;
+  const object = project.scene.objects.find((candidate) => candidate.id === selected.objectId);
+  const path =
+    object !== undefined && 'paths' in object ? object.paths[selected.pathIndex] : undefined;
+  const curve = path?.curves?.[selected.polylineIndex];
+  if (curve === undefined) return null;
+  const outgoing = curve.segments[selected.pointIndex];
+  const canJoin =
+    selectedNodes.filter((ref) => ref.geometry === 'curve' && ref.handle === undefined).length ===
+    2;
+  return (
+    <div role="toolbar" aria-label="Curve node actions" style={nodeActionsStyle}>
+      <NodeAction
+        label="Smooth"
+        title="Align the incoming and outgoing curve handles"
+        onClick={smooth}
+      />
+      <NodeAction label="Corner" title="Align handles to the adjoining chords" onClick={corner} />
+      <NodeAction
+        label="Curve"
+        title="Convert the outgoing segment to a cubic curve"
+        disabled={outgoing === undefined || outgoing.kind === 'cubic'}
+        onClick={() => convert('cubic')}
+      />
+      <NodeAction
+        label="Line"
+        title="Convert the outgoing segment to a straight line"
+        disabled={outgoing === undefined || outgoing.kind === 'line'}
+        onClick={() => convert('line')}
+      />
+      <NodeAction
+        label="Start"
+        title="Use this node as the closed path start point"
+        disabled={!curve.closed || selected.pointIndex === 0}
+        onClick={setStart}
+      />
+      <NodeAction
+        label="Break"
+        title="Break the closed path open at this node"
+        disabled={!curve.closed}
+        onClick={breakCurve}
+      />
+      <NodeAction
+        label="Join"
+        title="Join two selected open curve endpoints"
+        disabled={!canJoin}
+        onClick={join}
+      />
+    </div>
+  );
+}
+
+function NodeAction(props: {
+  readonly label: string;
+  readonly title: string;
+  readonly disabled?: boolean;
+  readonly onClick: () => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      aria-label={props.label}
+      title={props.title}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      style={nodeActionStyle}
+    >
+      {props.label}
+    </button>
   );
 }
 
@@ -80,4 +164,18 @@ const stripStyle: React.CSSProperties = {
   gap: 'var(--lf-space-4)',
   padding: 'var(--lf-space-4)',
   flexShrink: 0,
+};
+
+const nodeActionsStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+  paddingTop: 4,
+  borderTop: '1px solid var(--lf-border)',
+};
+
+const nodeActionStyle: React.CSSProperties = {
+  minWidth: 48,
+  padding: '3px 4px',
+  fontSize: 10,
 };
