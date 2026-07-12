@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CurveSubpath } from './scene-object';
 import {
   curveSubpathBounds,
+  flattenColoredPathCurves,
   flattenCurveSubpath,
   polylineToCurveSubpath,
   transformCurveSubpathUniform,
@@ -124,4 +125,127 @@ describe('curve path geometry', () => {
       segmentBudget: 1,
     });
   });
+
+  it('keeps cubic flattening within the requested geometric deviation', () => {
+    const curve: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 0, y: 20 },
+          control2: { x: 20, y: 20 },
+          to: { x: 20, y: 0 },
+        },
+      ],
+      closed: false,
+    };
+    const toleranceMm = 0.05;
+    const result = flattenCurveSubpath(curve, { toleranceMm });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+
+    let maximumDeviation = 0;
+    for (let sample = 0; sample <= 1_000; sample += 1) {
+      const t = sample / 1_000;
+      const point = cubicPoint(t, curve);
+      maximumDeviation = Math.max(
+        maximumDeviation,
+        distanceToPolyline(point, result.polyline.points),
+      );
+    }
+    expect(maximumDeviation).toBeLessThanOrEqual(toleranceMm);
+  });
+
+  it('preserves subpath count and closed topology while flattening', () => {
+    const result = flattenColoredPathCurves(
+      {
+        color: '#000000',
+        polylines: [],
+        curves: [
+          {
+            start: { x: 0, y: 0 },
+            segments: [
+              { kind: 'line', to: { x: 10, y: 0 } },
+              { kind: 'line', to: { x: 10, y: 10 } },
+              { kind: 'line', to: { x: 0, y: 10 } },
+            ],
+            closed: true,
+          },
+          {
+            start: { x: 20, y: 0 },
+            segments: [{ kind: 'line', to: { x: 30, y: 0 } }],
+            closed: false,
+          },
+        ],
+      },
+      { toleranceMm: 0.025 },
+    );
+    expect(result).toMatchObject({
+      kind: 'ok',
+      polylines: [{ closed: true }, { closed: false }],
+    });
+  });
+
+  it('enforces the aggregate segment budget exactly on large line fixtures', () => {
+    const segmentCount = 10_000;
+    const curve: CurveSubpath = {
+      start: { x: 0, y: 0 },
+      segments: Array.from({ length: segmentCount }, (_, index) => ({
+        kind: 'line' as const,
+        to: { x: index + 1, y: index % 2 },
+      })),
+      closed: false,
+    };
+    expect(
+      flattenCurveSubpath(curve, { toleranceMm: 0.025, segmentBudget: segmentCount }),
+    ).toMatchObject({ kind: 'ok', segmentCount });
+    expect(
+      flattenCurveSubpath(curve, { toleranceMm: 0.025, segmentBudget: segmentCount - 1 }),
+    ).toEqual({ kind: 'segment-budget-exceeded', segmentBudget: segmentCount - 1 });
+  });
 });
+
+function cubicPoint(t: number, curve: CurveSubpath): { x: number; y: number } {
+  const segment = curve.segments[0];
+  if (segment?.kind !== 'cubic') throw new Error('Expected cubic test fixture');
+  const u = 1 - t;
+  return {
+    x:
+      u ** 3 * curve.start.x +
+      3 * u * u * t * segment.control1.x +
+      3 * u * t * t * segment.control2.x +
+      t ** 3 * segment.to.x,
+    y:
+      u ** 3 * curve.start.y +
+      3 * u * u * t * segment.control1.y +
+      3 * u * t * t * segment.control2.y +
+      t ** 3 * segment.to.y,
+  };
+}
+
+function distanceToPolyline(
+  point: { x: number; y: number },
+  polyline: ReadonlyArray<{ x: number; y: number }>,
+): number {
+  let nearest = Infinity;
+  for (let index = 1; index < polyline.length; index += 1) {
+    const from = polyline[index - 1];
+    const to = polyline[index];
+    if (from === undefined || to === undefined) continue;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const lengthSquared = dx * dx + dy * dy;
+    const projection =
+      lengthSquared === 0
+        ? 0
+        : Math.max(
+            0,
+            Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared),
+          );
+    nearest = Math.min(
+      nearest,
+      Math.hypot(point.x - (from.x + projection * dx), point.y - (from.y + projection * dy)),
+    );
+  }
+  return nearest;
+}
