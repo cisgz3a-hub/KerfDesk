@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
+import { createRectangle } from '../../core/shapes';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
@@ -78,6 +79,63 @@ describe('SelectedObjectProperties', () => {
     const { host, root } = await render();
     try {
       expect(host.querySelector('[aria-label="Selected object properties"]')).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('rematerializes a rectangle when its corner radius is edited', async () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'rect-1',
+        color: '#ff0000',
+        spec: { widthMm: 40, heightMm: 20, cornerRadiusMm: 0 },
+      }),
+    );
+    const before = useStore.getState().project.scene.objects[0];
+    const { host, root } = await render();
+    try {
+      const input = host.querySelector('input[aria-label="Rectangle corner radius"]');
+      if (!(input instanceof HTMLInputElement)) throw new Error('corner radius input missing');
+      await act(async () => {
+        input.value = '5';
+        Simulate.change(input);
+      });
+      await act(async () => {
+        Simulate.blur(input);
+      });
+
+      const after = useStore.getState().project.scene.objects[0];
+      expect(after).toMatchObject({
+        id: 'rect-1',
+        spec: { kind: 'rect', widthMm: 40, heightMm: 20, cornerRadiusMm: 5 },
+      });
+      expect(after).not.toEqual(before);
+      expect(
+        after !== undefined && 'paths' in after
+          ? after.paths[0]?.curves?.[0]?.segments.some((segment) => segment.kind === 'cubic')
+          : false,
+      ).toBe(true);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps parametric geometry controls available in CNC mode', async () => {
+    useStore.getState().drawShape(
+      createRectangle({
+        id: 'rect-1',
+        color: '#ff0000',
+        spec: { widthMm: 40, heightMm: 20, cornerRadiusMm: 0 },
+      }),
+    );
+    useStore.getState().setMachineKind('cnc');
+    const { host, root } = await render();
+    try {
+      expect(host.querySelector('input[aria-label="Rectangle width"]')).not.toBeNull();
+      expect(host.querySelector('input[aria-label="Power scale for selected objects"]')).toBeNull();
     } finally {
       await act(async () => root.unmount());
       host.remove();
