@@ -3,32 +3,84 @@ import { PROJECT_SCHEMA_VERSION } from '../../core/scene';
 import { migrateToCurrent, type Migrator } from './migrations';
 
 describe('migrateToCurrent', () => {
-  it('returns ok with no steps when sawVersion === current', () => {
-    const r = migrateToCurrent({ schemaVersion: PROJECT_SCHEMA_VERSION }, PROJECT_SCHEMA_VERSION);
-    expect(r.kind).toBe('ok');
-    if (r.kind === 'ok') expect(r.steps).toEqual([]);
+  it('returns ok with no steps when sawVersion equals current', () => {
+    const result = migrateToCurrent(
+      { schemaVersion: PROJECT_SCHEMA_VERSION },
+      PROJECT_SCHEMA_VERSION,
+    );
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') expect(result.steps).toEqual([]);
   });
 
-  it('reports no-path when sawVersion < current and no migrator covers the gap', () => {
-    // Phase A ships PROJECT_SCHEMA_VERSION=1 with an empty registry, so a
-    // v0 file should report no-path; deserialize-project surfaces this as
-    // schema-too-old (the spec-compliant "Could not open" flow).
-    const r = migrateToCurrent({}, 0);
-    expect(r.kind).toBe('no-path');
+  it('reports no-path when no migrator covers the first gap', () => {
+    expect(migrateToCurrent({}, 0).kind).toBe('no-path');
   });
 
   it('walks the registry from sawVersion upward', () => {
-    const fakeRegistry: Readonly<Record<number, Migrator>> = {
+    const registry: Readonly<Record<number, Migrator>> = {
       0: (raw) => ({ ...raw, addedAtV0: true }),
+      1: (raw) => ({ ...raw, addedAtV1: true }),
     };
-    // Synthetic: pretend current is 1 (which it is in Phase A) and a
-    // 0→1 migrator is registered.
-    const r = migrateToCurrent({ schemaVersion: 0 }, 0, fakeRegistry);
-    expect(r.kind).toBe('ok');
-    if (r.kind === 'ok') {
-      expect(r.steps).toEqual([0]);
-      expect(r.raw['addedAtV0']).toBe(true);
-      expect(r.raw['schemaVersion']).toBe(PROJECT_SCHEMA_VERSION);
+    const result = migrateToCurrent({ schemaVersion: 0 }, 0, registry);
+    expect(result.kind).toBe('ok');
+    if (result.kind === 'ok') {
+      expect(result.steps).toEqual([0, 1]);
+      expect(result.raw['addedAtV0']).toBe(true);
+      expect(result.raw['addedAtV1']).toBe(true);
+      expect(result.raw['schemaVersion']).toBe(PROJECT_SCHEMA_VERSION);
     }
+  });
+
+  it('migrates every v1 polyline into deterministic line segments', () => {
+    const result = migrateToCurrent(
+      {
+        schemaVersion: 1,
+        scene: {
+          objects: [
+            {
+              paths: [
+                {
+                  color: '#000000',
+                  polylines: [
+                    {
+                      closed: false,
+                      points: [
+                        { x: 1, y: 2 },
+                        { x: 3, y: 4 },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+      1,
+    );
+    expect(result).toMatchObject({
+      kind: 'ok',
+      steps: [1],
+      raw: {
+        schemaVersion: 2,
+        scene: {
+          objects: [
+            {
+              paths: [
+                {
+                  curves: [
+                    {
+                      start: { x: 1, y: 2 },
+                      segments: [{ kind: 'line', to: { x: 3, y: 4 } }],
+                      closed: false,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
   });
 });

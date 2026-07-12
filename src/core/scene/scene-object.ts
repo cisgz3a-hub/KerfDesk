@@ -13,10 +13,44 @@ export type Polyline = {
   readonly closed: boolean;
 };
 
+export type LinePathSegment = {
+  readonly kind: 'line';
+  readonly to: Vec2;
+};
+
+export type CubicPathSegment = {
+  readonly kind: 'cubic';
+  readonly control1: Vec2;
+  readonly control2: Vec2;
+  readonly to: Vec2;
+};
+
+export type EllipticalArcPathSegment = {
+  readonly kind: 'elliptical-arc';
+  readonly radiusX: number;
+  readonly radiusY: number;
+  readonly rotationDeg: number;
+  readonly largeArc: boolean;
+  readonly sweep: boolean;
+  readonly to: Vec2;
+};
+
+export type PathSegment = LinePathSegment | CubicPathSegment | EllipticalArcPathSegment;
+
+export type CurveSubpath = {
+  readonly start: Vec2;
+  readonly segments: ReadonlyArray<PathSegment>;
+  readonly closed: boolean;
+};
+
 export type ColoredPath = {
   // Lowercase 6-digit hex color, e.g. '#ff0000'. Layers are keyed by this value.
   readonly color: string;
   readonly polylines: ReadonlyArray<Polyline>;
+  // Schema-v2 canonical geometry. `polylines` remains a deterministic
+  // compatibility view while preview and compilation migrate subsystem by
+  // subsystem; serializers always materialize this field for saved projects.
+  readonly curves?: ReadonlyArray<CurveSubpath>;
 };
 
 export type Transform = {

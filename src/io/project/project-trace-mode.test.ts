@@ -44,7 +44,7 @@ describe('project traced-image traceMode serialization', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
       expect(result.project.scene.objects[0]?.kind).toBe('traced-image');
       if (result.project.scene.objects[0]?.kind === 'traced-image') {
         expect(result.project.scene.objects[0].traceMode).toBe('edge');

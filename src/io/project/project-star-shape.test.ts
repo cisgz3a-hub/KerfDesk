@@ -24,7 +24,7 @@ describe('star shape project IO', () => {
 
     expect(result.kind).toBe('ok');
     if (result.kind === 'ok') {
-      expect(result.project).toEqual(original);
+      expect(serializeProject(result.project)).toBe(serializeProject(original));
     }
   });
 

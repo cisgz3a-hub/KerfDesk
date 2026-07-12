@@ -39,13 +39,18 @@ export type { RegistrationRunState } from './registration-layer';
 export type {
   Bounds,
   ColoredPath,
+  CubicPathSegment,
+  CurveSubpath,
   DitherAlgorithm,
   FontKey,
   ImportedSvg,
+  EllipticalArcPathSegment,
+  LinePathSegment,
   ObjectOperationOverride,
   ObjectPowerScale,
   EllipseShape,
   Polyline,
+  PathSegment,
   PolygonShape,
   RasterImage,
   RectangleShape,
@@ -60,6 +65,15 @@ export type {
   Transform,
   Vec2,
 } from './scene-object';
+export {
+  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+  MAX_FLATTENED_CURVE_SEGMENTS,
+  curveSubpathBounds,
+  flattenCurveSubpath,
+  polylineToCurveSubpath,
+  type FlattenCurveOptions,
+  type FlattenCurveResult,
+} from './curve-path';
 export {
   DITHER_ALGORITHMS,
   DEFAULT_RASTER_LAYER_COLOR,

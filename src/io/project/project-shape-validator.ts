@@ -6,6 +6,7 @@ import {
 } from '../../core/devices';
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
+import { validateCurveSubpaths } from './project-curve-shape-validator';
 import { validateObjectOperationOverride } from './project-operation-override-validator';
 import { validateOptimization } from './project-optimization-validator';
 import { validateProjectVariables, validateVariableTemplate } from './project-variable-validator';
@@ -393,6 +394,7 @@ function validateColoredPath(value: unknown, path: string): string | null {
   return firstError([
     requireString(value, `${path}.color`),
     validatePolylines(value['polylines'], `${path}.polylines`),
+    validateCurveSubpaths(value['curves'], `${path}.curves`),
   ]);
 }
 

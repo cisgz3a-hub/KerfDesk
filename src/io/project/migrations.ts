@@ -22,7 +22,48 @@ export type MigrationResult =
 
 // Registry. Keyed by FROM version: e.g. `1` means "migrate v1 → v2".
 // Phase A ships empty. Phase D/E will add the first entries here.
-const MIGRATORS: Readonly<Record<number, Migrator>> = {};
+const MIGRATORS: Readonly<Record<number, Migrator>> = {
+  1: migrateV1ToV2,
+};
+
+function migrateV1ToV2(raw: RawProject): RawProject {
+  const scene = record(raw['scene']);
+  if (scene === null || !Array.isArray(scene['objects'])) return raw;
+  return {
+    ...raw,
+    schemaVersion: 2,
+    scene: { ...scene, objects: scene['objects'].map(addCurveGeometryToObject) },
+  };
+}
+
+function addCurveGeometryToObject(value: unknown): unknown {
+  const object = record(value);
+  if (object === null || !Array.isArray(object['paths'])) return value;
+  return { ...object, paths: object['paths'].map(addCurveGeometryToColoredPath) };
+}
+
+function addCurveGeometryToColoredPath(value: unknown): unknown {
+  const path = record(value);
+  if (path === null || !Array.isArray(path['polylines'])) return value;
+  return { ...path, curves: path['polylines'].map(rawPolylineToCurve) };
+}
+
+function rawPolylineToCurve(value: unknown): unknown {
+  const polyline = record(value);
+  if (polyline === null || !Array.isArray(polyline['points'])) return value;
+  const points = polyline['points'];
+  return {
+    start: points[0] ?? { x: 0, y: 0 },
+    segments: points.slice(1).map((to) => ({ kind: 'line', to })),
+    closed: polyline['closed'] === true,
+  };
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
 
 export function migrateToCurrent(
   raw: RawProject,
